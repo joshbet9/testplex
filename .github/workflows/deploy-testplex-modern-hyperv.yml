@@ -1,0 +1,1132 @@
+name: Deploy Testplex Modern Paper 26.3 to isolated Hyper-V
+
+on:
+  # Reusable by the independent latest-successful-build handler. Manual dispatch remains available.
+  workflow_call:
+    inputs:
+      deploy_to_modern_test_server:
+        description: Deploy the selected successful build to the isolated modern test server
+        required: true
+        type: boolean
+      source_run_id:
+        description: Successful Testplex Modern Paper 26.3 build run ID (uploads all Testplex-owned modern plugin JARs)
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      deploy_to_modern_test_server:
+        description: Deploy the selected successful build to the isolated modern test server
+        required: true
+        type: boolean
+        default: false
+      source_run_id:
+        description: Successful Testplex Modern Paper 26.3 build run ID (uploads all Testplex-owned modern plugin JARs)
+        required: true
+        type: string
+        default: "40819650403"
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: testplex-isolated-hyperv-server-v2-20261031
+  cancel-in-progress: false
+
+jobs:
+  validate_request:
+    name: Validate explicit deployment approval
+    if: ${{ inputs.deploy_to_modern_test_server }}
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Require all deployment acknowledgements
+        env:
+          DEPLOY: ${{ inputs.deploy_to_modern_test_server }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$DEPLOY" == "true" ]] || { echo "Deployment was not explicitly enabled." >&2; exit 1; }
+          [[ "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]] || { echo "source_run_id must be numeric." >&2; exit 1; }
+
+  deploy_modern_test_server:
+    name: Deploy isolated Paper 26.3 server
+    needs: validate_request
+    if: ${{ inputs.deploy_to_modern_test_server }}
+    runs-on: ubuntu-22.04
+    environment: hyperv
+    timeout-minutes: 60
+    steps:
+      - name: Connect runner to Hyper-V over Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:github-actions
+          # Reachability is verified by the subsequent strict SSH preflight.
+          # Tailscale ICMP ping can be blocked even when SSH is allowed, so do not gate deployment on ping.
+
+      - name: Prepare SSH credentials
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.HYPERV_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.HYPERV_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_PRIVATE_KEY" || { echo 'HYPERV_SSH_PRIVATE_KEY is not configured.' >&2; exit 1; }
+          test -n "$SSH_KNOWN_HOSTS" || { echo 'HYPERV_SSH_KNOWN_HOSTS is not configured.' >&2; exit 1; }
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/testplex_hyperv"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/testplex_hyperv" "$HOME/.ssh/known_hosts"
+
+      - name: Select an existing successful modern build artifact
+        id: source-artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]] || { echo "source_run_id must be numeric." >&2; exit 1; }
+          run_json="$RUNNER_TEMP/testplex-modern-source-run.json"
+          artifacts_json="$RUNNER_TEMP/testplex-modern-source-artifacts.json"
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID" -o "$run_json"
+          # In auto-deploy mode, this is the caller workflow's own run. It is
+          # still in_progress while this deployment job executes, but the
+          # caller's needs: build-modern-arcade gate guarantees the build job
+          # succeeded. Manual dispatch must continue to use a completed,
+          # successful build from an earlier run.
+          if [[ "$SOURCE_RUN_ID" == "$GITHUB_RUN_ID" ]]; then
+            SOURCE_RUN_MODE="same-run"
+          else
+            SOURCE_RUN_MODE="completed-run"
+          fi
+          jq -e --arg repo "$GITHUB_REPOSITORY" --arg branch "feat/testplex-modern-26.3-platform" --arg mode "$SOURCE_RUN_MODE" '
+            (if $mode == "same-run" then .status == "in_progress"
+             else .status == "completed" and .conclusion == "success" end) and
+            .head_branch == $branch and
+            ((.head_repository.full_name // "") | ascii_downcase) == ($repo | ascii_downcase) and
+            .path == ".github/workflows/testplex-modern-build.yml" and
+            (.head_sha | test("^[0-9a-f]{40}$"))
+          ' "$run_json" >/dev/null || {
+            echo "Source must be this in-progress modern build (automatic mode, after its build job passed) or a completed successful Testplex Modern build from feat/testplex-modern-26.3-platform in this repository." >&2
+            exit 1
+          }
+          source_sha="$(jq -er '.head_sha' "$run_json")"
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts" -o "$artifacts_json"
+          artifact_record="$(jq -ce '[.artifacts[] | select(.expired == false and .name == "testplex-modern-paper-26.3")] | if length == 1 then .[0] else error("Expected exactly one unexpired testplex-modern-paper-26.3 artifact") end' "$artifacts_json")"
+          echo "artifact_name=$(jq -er '.name' <<< "$artifact_record")" >> "$GITHUB_OUTPUT"
+          echo "artifact_id=$(jq -er '.id | tostring' <<< "$artifact_record")" >> "$GITHUB_OUTPUT"
+          echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
+          echo "Selected modern build $source_sha from run $SOURCE_RUN_ID"
+
+      - name: Download modern plugin artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.source-artifact.outputs.artifact_name }}
+          path: ${{ runner.temp }}/testplex-modern-artifact
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout deployment recovery helper source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.source-artifact.outputs.source_sha }}
+          path: deployment-source
+
+      - name: Checkout pinned Monster Maze source world assets
+        uses: actions/checkout@v4
+        with:
+          repository: joshbet9/MonsterMaze
+          # Match the exact 1.21 source revision used for the gameplay port.
+          ref: 231fb1830ca53a3cdd7451391ac3d384a03ec5bb
+          path: monstermaze-source
+
+      - name: Verify and stage the four Testplex JARs and Monster Maze worlds
+        id: stage-jars
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ steps.source-artifact.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          source_dir="$RUNNER_TEMP/testplex-modern-artifact"
+          stage_dir="$RUNNER_TEMP/testplex-modern-verified"
+          mkdir -p "$stage_dir"
+          for jar in TestplexModernArcade.jar SnakeModern.jar ArcadeMechanicsModern.jar WizardsModern.jar; do
+            matches="$(find "$source_dir" -type f -name "$jar" | wc -l | tr -d ' ')"
+            [[ "$matches" == "1" ]] || { echo "Expected exactly one $jar in the selected artifact; got $matches." >&2; exit 1; }
+            source_jar="$(find "$source_dir" -type f -name "$jar" -print -quit)"
+            test -s "$source_jar"
+            unzip -tq "$source_jar" >/dev/null
+            cp "$source_jar" "$stage_dir/$jar"
+          done
+          recovery_helper="$GITHUB_WORKSPACE/deployment-source/.github/testplex-modern-recovery.sh"
+          test -s "$recovery_helper" || { echo "Independent modern recovery helper is missing." >&2; exit 1; }
+          cp "$recovery_helper" "$stage_dir/testplex-modern-recovery.sh"
+          chmod 0755 "$stage_dir/testplex-modern-recovery.sh"
+
+          # These physical worlds are required by the Monster Maze game module bundled inside ArcadeMechanicsModern.
+          map_root="$GITHUB_WORKSPACE/monstermaze-source/solo/1.21/maps"
+          map_source_sha="$(git -C "$GITHUB_WORKSPACE/monstermaze-source" rev-parse HEAD)"
+          for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+            test -s "$map_root/$world/level.dat" || { echo "Missing source level.dat for $world" >&2; exit 1; }
+            test -d "$map_root/$world/region" || { echo "Missing source region folder for $world" >&2; exit 1; }
+          done
+          tar --exclude='*/session.lock' --exclude='*/uid.dat' -czf "$stage_dir/MonsterMazeMaps.tar.gz" \
+            -C "$map_root" mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido
+          printf '%s\n' "$map_source_sha" > "$stage_dir/MonsterMazeMapsSource.txt"
+          tar -tzf "$stage_dir/MonsterMazeMaps.tar.gz" >/dev/null
+          (cd "$stage_dir" && sha256sum *.jar MonsterMazeMaps.tar.gz MonsterMazeMapsSource.txt testplex-modern-recovery.sh > SHA256SUMS)
+          echo "stage_dir=$stage_dir" >> "$GITHUB_OUTPUT"
+          echo "Verified four Testplex Modern JARs ($SOURCE_SHA), with Monster Maze bundled in ArcadeMechanicsModern, and seven source worlds ($map_source_sha)"
+
+      - name: Validate isolated target without changing service state
+        id: remote-preflight
+        shell: bash
+        env:
+          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
+          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
+          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
+        run: |
+          set -euo pipefail
+          test -n "$HYPERV_SSH_HOST" || { echo 'HYPERV_SSH_HOST is not configured.' >&2; exit 1; }
+          test -n "$HYPERV_SSH_USER" || { echo 'HYPERV_SSH_USER is not configured.' >&2; exit 1; }
+          SSH_PORT="$HYPERV_SSH_PORT"
+          [[ -n "$SSH_PORT" ]] || SSH_PORT=22
+          remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
+          ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
+            -o BatchMode=yes -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
+
+          timeout --foreground --signal=TERM --kill-after=15s 5m ssh "${ssh_opts[@]}" "$remote" bash -s <<'REMOTE_PREFLIGHT'
+          set -euo pipefail
+          sudo -n true
+          server_dir="/home/monstermaze/servers/testplex-modern"
+          if [[ -L "$server_dir" ]]; then
+            echo "Modern server directory must not be a symlink." >&2
+            exit 1
+          fi
+          if [[ -e "$server_dir" ]] && ! sudo -n test -f "$server_dir/.testplex-modern-sandbox"; then
+            echo "Target exists without .testplex-modern-sandbox; refusing to risk overwriting an unrelated directory." >&2
+            exit 1
+          fi
+          for unit in testplex-modern.service testplex-reborn.service; do
+            active="$(sudo -n systemctl is-active "$unit" 2>/dev/null || true)"
+            enabled="$(sudo -n systemctl is-enabled "$unit" 2>/dev/null || true)"
+            if [[ "$active" == unknown && "$enabled" == not-found ]]; then active=inactive; fi
+            [[ "$active" == active || "$active" == inactive ]] || {
+              echo "Cannot safely establish $unit active state ($active); refusing deployment." >&2
+              exit 1
+            }
+            [[ "$enabled" =~ ^(enabled|disabled|masked|static|indirect|not-found)$ ]] || {
+              echo "Cannot safely establish $unit enablement state ($enabled); refusing deployment." >&2
+              exit 1
+            }
+          done
+          if ! sudo -n systemctl is-active --quiet testplex-modern.service; then
+            if ss -ltn | awk '$4 ~ /:25568$/ {found=1} END {exit !found}'; then
+              echo "Port 25568 is already in use by a non-modern service." >&2
+              exit 1
+            fi
+          fi
+          echo "Read-only preflight passed: Testplex target is isolated; service states, enablement, and port are readable. State-changing preflight runs under the deployment lock after journaling."
+          REMOTE_PREFLIGHT
+
+      - name: Upload verified JARs to the isolated directory
+        id: upload
+        shell: bash
+        env:
+          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
+          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
+          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
+          BUILD_SHA: ${{ steps.source-artifact.outputs.source_sha }}
+          STAGE_DIR: ${{ steps.stage-jars.outputs.stage_dir }}
+        run: |
+          set -euo pipefail
+          SSH_PORT="$HYPERV_SSH_PORT"
+          [[ -n "$SSH_PORT" ]] || SSH_PORT=22
+          remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
+          upload_dir="/var/tmp/testplex-modern-artifacts-$BUILD_SHA"
+          ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
+            -o BatchMode=yes -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
+          scp_opts=(-P "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
+            -o BatchMode=yes -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=40)
+          # The legacy and modern deploy jobs share one Hyper-V disk and are serialized.
+          # Only generated, abandoned staging directories are eligible for pruning; never
+          # clean server worlds, installed plugins, databases or recovery backups.
+          stage_kb="$(du -sk "$STAGE_DIR" | awk '{print $1}')"
+          [[ "$stage_kb" =~ ^[0-9]+$ ]] && (( stage_kb > 0 )) || { echo "Could not determine the verified deployment payload size." >&2; exit 1; }
+          # Uploaded chunk parts are replaced by sequential assembly, deleting each part only
+          # after it has been appended. Peak staging use stays within one payload copy.
+          # Keep a full 1 GiB free after reserving the single staged payload.
+          required_free_kb=$((stage_kb + 1048576))
+          timeout --foreground --signal=TERM --kill-after=15s 5m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$BUILD_SHA" "$required_free_kb" "$stage_kb" <<'REMOTE_STAGE_PREP'
+          set -euo pipefail
+          build_sha="$1"
+          required_free_kb="$2"
+          stage_kb="$3"
+          [[ "$build_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid build SHA for artifact staging." >&2; exit 1; }
+          [[ "$required_free_kb" =~ ^[0-9]+$ && "$stage_kb" =~ ^[0-9]+$ ]] || { echo "Invalid deployment storage budget." >&2; exit 1; }
+          upload_dir="/var/tmp/testplex-modern-artifacts-$build_sha"
+          echo "Disk usage before staging-cache cleanup:"
+          df -h /var/tmp
+          df -i /var/tmp
+          shopt -s nullglob
+          now_epoch="$(date +%s)"
+          for existing in /var/tmp/testplex-modern-artifacts-*; do
+            [[ -d "$existing" && ! -L "$existing" ]] || continue
+            name="${existing##*/}"
+            [[ "$name" =~ ^testplex-modern-artifacts-[0-9a-f]{40}$ ]] || continue
+            [[ "$existing" == "$upload_dir" ]] && continue
+            # Another workflow may be actively uploading to a different SHA-named
+            # directory. Only prune caches that have been untouched for >24h.
+            mtime="$(stat -c %Y -- "$existing" 2>/dev/null || printf '0')"
+            if [[ "$mtime" =~ ^[0-9]+$ ]] && (( now_epoch - mtime > 86400 )); then
+              size="$(du -sh -- "$existing" 2>/dev/null | cut -f1 || true)"
+              echo "Removing abandoned modern deployment cache (>24h old): $existing (${size:-size unavailable})"
+              sudo -n rm -rf -- "$existing"
+            else
+              echo "Leaving recent/possibly active modern staging directory untouched: $existing"
+            fi
+          done
+          sudo -n rm -rf -- "$upload_dir"
+          # Downloaded package archives are reproducible cache, not installed software.
+          # This safely recovers small amounts of space without touching worlds or backups.
+          apt_cache_before="$(sudo -n du -sh /var/cache/apt/archives 2>/dev/null | cut -f1 || true)"
+          sudo -n apt-get clean
+          echo "Cleared downloaded APT package cache (${apt_cache_before:-size unavailable}); installed packages were not removed."
+          echo "Disk usage after staging-cache and package-cache cleanup:"
+          df -h /var/tmp
+          df -i /var/tmp
+          avail_kb="$(df -Pk /var/tmp | awk 'END {print $4}')"
+          if [[ ! "$avail_kb" =~ ^[0-9]+$ ]] || (( avail_kb < required_free_kb )); then
+            echo "Only ${avail_kb:-unknown} KiB free in /var/tmp after staging cleanup; deployment needs at least $required_free_kb KiB (one $stage_kb KiB payload copy plus a 1 GiB safety reserve)." >&2
+            exit 1
+          fi
+          echo "Available space: $((avail_kb / 1024)) MiB; payload: $((stage_kb / 1024)) MiB; required free-space reserve: $((required_free_kb / 1024)) MiB."
+          install -d -m 0700 -- "$upload_dir"
+          REMOTE_STAGE_PREP
+          # Use the SFTP subsystem rather than legacy SCP's single remote sink process.
+          # Split the large JAR into smaller files and keep only four SFTP writes outstanding;
+          # this avoids leaving the VM unresponsive while its /var/tmp storage flushes a large write.
+          sftp_opts=(-P "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
+            -o BatchMode=yes -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+            -o ConnectTimeout=20 -o ServerAliveInterval=15
+            -o ServerAliveCountMax=40 -o TCPKeepAlive=yes
+            -B 65536 -R 4)
+          chunk_dir="$RUNNER_TEMP/testplex-modern-arcade-chunks"
+          mkdir -p "$chunk_dir"
+          split -b 4M -d -a 3 "$STAGE_DIR/ArcadeMechanicsModern.jar" "$chunk_dir/ArcadeMechanicsModern.jar.part."
+          split -b 512K -d -a 3 "$STAGE_DIR/MonsterMazeMaps.tar.gz" "$chunk_dir/MonsterMazeMaps.tar.gz.part."
+          mapfile -t arcade_chunks < <(printf '%s\n' "$chunk_dir"/ArcadeMechanicsModern.jar.part.* | sort)
+          mapfile -t world_chunks < <(printf '%s\n' "$chunk_dir"/MonsterMazeMaps.tar.gz.part.* | sort)
+          test "${#arcade_chunks[@]}" -gt 0
+          test "${#world_chunks[@]}" -gt 0
+          batch_file="$RUNNER_TEMP/testplex-modern-upload.sftp"
+          {
+            printf 'cd "%s"\n' "$upload_dir"
+            printf 'put "%s" "%s"\n' "$STAGE_DIR/TestplexModernArcade.jar" "TestplexModernArcade.jar"
+            printf 'put "%s" "%s"\n' "$STAGE_DIR/SnakeModern.jar" "SnakeModern.jar"
+            printf 'put "%s" "%s"\n' "$STAGE_DIR/WizardsModern.jar" "WizardsModern.jar"
+            printf 'put "%s" "%s"\n' "$STAGE_DIR/MonsterMazeMapsSource.txt" "MonsterMazeMapsSource.txt"
+            printf 'put "%s" "%s"\n' "$STAGE_DIR/testplex-modern-recovery.sh" "testplex-modern-recovery.sh"
+            for file in "${world_chunks[@]}" "${arcade_chunks[@]}"; do
+              printf 'put "%s" "%s"\n' "$file" "${file##*/}"
+            done
+          } > "$batch_file"
+          echo "Uploading verified modern artifacts with SFTP, ${#arcade_chunks[@]} 4 MiB Arcade JAR parts and ${#world_chunks[@]} 512 KiB map parts."
+          timeout --foreground --signal=TERM --kill-after=30s 15m sftp "${sftp_opts[@]}" -b "$batch_file" "$remote"
+          timeout --foreground --signal=TERM --kill-after=30s 6m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" <<'REMOTE_ASSEMBLE_ARCADE'
+          set -euo pipefail
+          upload_dir="$1"
+          cd "$upload_dir"
+          shopt -s nullglob
+          map_parts=(MonsterMazeMaps.tar.gz.part.*)
+          arcade_parts=(ArcadeMechanicsModern.jar.part.*)
+          [[ ${#map_parts[@]} -gt 0 ]] || { echo "No map archive parts arrived." >&2; exit 1; }
+          [[ ${#arcade_parts[@]} -gt 0 ]] || { echo "No Arcade JAR parts arrived." >&2; exit 1; }
+          # Assemble each payload in place: remove a chunk only after it has been
+          # appended successfully. This bounds the peak of (remaining parts + output)
+          # to one copy of each source file instead of retaining two full copies.
+          : > MonsterMazeMaps.tar.gz.tmp
+          for part in "${map_parts[@]}"; do
+            cat "$part" >> MonsterMazeMaps.tar.gz.tmp
+            rm -- "$part"
+          done
+          mv MonsterMazeMaps.tar.gz.tmp MonsterMazeMaps.tar.gz
+          : > ArcadeMechanicsModern.jar.tmp
+          for part in "${arcade_parts[@]}"; do
+            cat "$part" >> ArcadeMechanicsModern.jar.tmp
+            rm -- "$part"
+          done
+          mv ArcadeMechanicsModern.jar.tmp ArcadeMechanicsModern.jar
+          echo "Assembled MonsterMazeMaps.tar.gz ($(stat -c %s MonsterMazeMaps.tar.gz) bytes)."
+          echo "Assembled ArcadeMechanicsModern.jar ($(stat -c %s ArcadeMechanicsModern.jar) bytes)."
+          REMOTE_ASSEMBLE_ARCADE
+          timeout --foreground --signal=TERM --kill-after=15s 3m scp "${scp_opts[@]}" \
+            "$STAGE_DIR/SHA256SUMS" "$remote:$upload_dir/SHA256SUMS"
+          timeout --foreground --signal=TERM --kill-after=15s 3m ssh "${ssh_opts[@]}" "$remote" "echo 'Disk after transfer:'; df -h /var/tmp; du -sh '$upload_dir'; cd '$upload_dir' && sha256sum -c SHA256SUMS"
+          echo "upload_dir=$upload_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Provision and start only testplex-modern.service
+        id: install-and-start
+        shell: bash
+        timeout-minutes: 35
+        env:
+          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
+          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
+          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
+          BUILD_SHA: ${{ steps.source-artifact.outputs.source_sha }}
+          UPLOAD_DIR: ${{ steps.upload.outputs.upload_dir }}
+          # EULA accepted per the user's explicit instruction for this isolated test server.
+          ACCEPT_EULA: "true"
+        run: |
+          set -euo pipefail
+          SSH_PORT="$HYPERV_SSH_PORT"
+          [[ -n "$SSH_PORT" ]] || SSH_PORT=22
+          remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
+          ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
+            -o BatchMode=yes -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=20)
+          echo "[deploy] opening an exclusive remote deployment lock."
+          deploy_exit=0
+          timeout --foreground --signal=TERM --kill-after=30s 28m ssh "${ssh_opts[@]}" "$remote" sudo -n flock -n /var/lock/testplex-modern-deploy.lock bash -s -- "$BUILD_SHA" "$UPLOAD_DIR" "$ACCEPT_EULA" <<'REMOTE_DEPLOY' || deploy_exit=$?
+          set -euo pipefail
+          BUILD_SHA="$1"
+          UPLOAD_DIR="$2"
+          ACCEPT_EULA="$3"
+          SERVER_DIR="/home/monstermaze/servers/testplex-modern"
+          JAVA_HOME="/opt/testplex/java25"
+          JAVA_BIN="$JAVA_HOME/bin/java"
+          USER_AGENT="TestplexModernDeploy/1.0 (https://github.com/joshbet9/testplex)"
+
+          [[ "$BUILD_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid source build SHA." >&2; exit 1; }
+          [[ "$ACCEPT_EULA" == "true" ]] || { echo "Minecraft EULA acknowledgement missing." >&2; exit 1; }
+          for jar in TestplexModernArcade.jar SnakeModern.jar ArcadeMechanicsModern.jar WizardsModern.jar; do
+            sudo -n test -s "$UPLOAD_DIR/$jar"
+          done
+          sudo -n test -s "$UPLOAD_DIR/testplex-modern-recovery.sh"
+          sudo -n test -s "$UPLOAD_DIR/MonsterMazeMaps.tar.gz"
+          sudo -n test -s "$UPLOAD_DIR/MonsterMazeMapsSource.txt"
+          sudo -n test -s "$UPLOAD_DIR/SHA256SUMS"
+
+          STATE_DIR=/var/lib/testplex-modern-deploy
+          RECOVERY_HELPER=/usr/local/sbin/testplex-modern-recovery
+          # Gate before host prerequisites or service changes. This SSH session
+          # already owns the shared flock and keeps it through deploy completion.
+          # Install the exact helper bundled with this build before evaluating the
+          # journal. If a previous deploy lost its SSH response, recover that active
+          # transaction under this same lock before starting a new replacement.
+          sudo -n install -m 0750 "$UPLOAD_DIR/testplex-modern-recovery.sh" "$RECOVERY_HELPER"
+          sudo -n install -d -m 0700 "$STATE_DIR/backups"
+          if ! sudo -n "$RECOVERY_HELPER" --locked assert-deployable; then
+            echo "[deploy] unresolved prior transaction detected; attempting verified recovery before this deployment."
+            sudo -n "$RECOVERY_HELPER" --locked recover
+            sudo -n "$RECOVERY_HELPER" --locked assert-deployable
+          fi
+          # Separate Monster Maze services are deliberately outside this deployment's scope.
+
+          if ! command -v curl >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1; then
+            echo '[deploy] installing host prerequisites (8 minute limit).'
+            timeout --foreground --signal=TERM 8m sudo -n apt-get update
+            timeout --foreground --signal=TERM 8m sudo -n apt-get install -y curl jq unzip
+          fi
+
+          if [[ ! -x "$JAVA_BIN" ]]; then
+            echo "Installing an isolated Temurin Java 25 JRE under /opt/testplex; system Java alternatives and legacy units are not changed."
+            echo "[deploy] downloading Java 25 JRE (6 minute limit)."
+            timeout --foreground --signal=TERM 6m curl --fail --location --retry 3 --user-agent "$USER_AGENT" \
+              "https://api.adoptium.net/v3/binary/latest/25/ga/linux/x64/jre/hotspot/normal/eclipse" \
+              -o "$UPLOAD_DIR/temurin25-jre.tar.gz"
+            sudo -n install -d -m 0755 /opt/testplex
+            sudo -n rm -rf /opt/testplex/java25.installing
+            sudo -n install -d -m 0755 /opt/testplex/java25.installing
+            sudo -n tar -xzf "$UPLOAD_DIR/temurin25-jre.tar.gz" --strip-components=1 -C /opt/testplex/java25.installing
+            sudo -n rm -rf "$JAVA_HOME"
+            sudo -n mv /opt/testplex/java25.installing "$JAVA_HOME"
+            sudo -n chown -R root:root "$JAVA_HOME"
+          fi
+          "$JAVA_BIN" -version
+
+          echo "Fetching a stable Paper build for Minecraft 26.3 from PaperMC's official downloads service."
+          echo "[deploy] querying Paper 26.3 metadata (4 minute limit)."
+          builds_json="$(timeout --foreground --signal=TERM 4m curl --fail --silent --show-error --retry 3 --user-agent "$USER_AGENT" \
+            "https://fill.papermc.io/v3/projects/paper/versions/26.3/builds")"
+          if printf '%s' "$builds_json" | jq -e '.ok == false' >/dev/null 2>&1; then
+            printf '%s\n' "$builds_json" | jq -r '.message // "PaperMC downloads API returned an error."' >&2
+            exit 1
+          fi
+          paper_build="$(printf '%s' "$builds_json" | jq -er 'first(.[] | select(.channel == "STABLE") | .id)')"
+          paper_url="$(printf '%s' "$builds_json" | jq -er 'first(.[] | select(.channel == "STABLE") | .downloads."server:default".url)')"
+          paper_sha="$(printf '%s' "$builds_json" | jq -er 'first(.[] | select(.channel == "STABLE") | .downloads."server:default".checksums.sha256)')"
+          paper_tmp="$UPLOAD_DIR/paper-26.3-$paper_build.jar"
+          echo "[deploy] downloading Paper build $paper_build (8 minute limit)."
+          timeout --foreground --signal=TERM 8m curl --fail --location --retry 3 --user-agent "$USER_AGENT" "$paper_url" -o "$paper_tmp"
+          printf '%s  %s\n' "$paper_sha" "$paper_tmp" | sha256sum -c -
+
+          # FakePlayerPlugin is a separate Paper plugin with its own distribution terms.
+          # Fetch the unmodified, pinned release directly onto the user's administered VM:
+          # it is intentionally not bundled into or redistributed with Testplex artifacts.
+          FPP_VERSION="2.1.7"
+          FPP_TMP="$UPLOAD_DIR/fake-player-plugin-$FPP_VERSION.jar"
+          FPP_URL="https://hangarcdn.papermc.io/plugins/Janky-Development/FakePlayerPlugin/versions/$FPP_VERSION/PAPER/fake-player-plugin-$FPP_VERSION.jar"
+          echo "[deploy] downloading FakePlayerPlugin $FPP_VERSION from the official Hangar release (6 minute limit)."
+          timeout --foreground --signal=TERM 6m curl --fail --location --retry 3 --user-agent "$USER_AGENT" \
+            "$FPP_URL" -o "$FPP_TMP"
+          unzip -tq "$FPP_TMP" >/dev/null
+          fpp_descriptor="$(unzip -p "$FPP_TMP" plugin.yml)"
+          yaml_descriptor_value() {
+            local key="$1" descriptor="$2"
+            printf '%s\n' "$descriptor" | awk -F': *' -v key="$key" \
+              '$1 == key { gsub(/["\047\r]/, "", $2); sub(/[[:space:]]+$/, "", $2); print $2; exit }'
+          }
+          fpp_name="$(yaml_descriptor_value name "$fpp_descriptor")"
+          fpp_version="$(yaml_descriptor_value version "$fpp_descriptor")"
+          fpp_main="$(yaml_descriptor_value main "$fpp_descriptor")"
+          [[ "$fpp_name" == "FakePlayerPlugin" && "$fpp_version" == "$FPP_VERSION" \
+             && "$fpp_main" == "me.bill.fakePlayerPlugin.FakePlayerPlugin" ]] || {
+            echo "Downloaded FakePlayerPlugin descriptor did not match pinned release $FPP_VERSION." >&2
+            exit 1
+          }
+
+          # Stage and validate source worlds outside the live Bukkit world folders.
+          MAP_STAGE_DIR="$UPLOAD_DIR/mm-map-stage"
+          mkdir -p "$MAP_STAGE_DIR"
+          tar -xzf "$UPLOAD_DIR/MonsterMazeMaps.tar.gz" -C "$MAP_STAGE_DIR"
+          for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+            test -s "$MAP_STAGE_DIR/$world/level.dat"
+            test -d "$MAP_STAGE_DIR/$world/region"
+          done
+
+          STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+          DEPLOYMENT_ID="$(cat /proc/sys/kernel/random/uuid)"
+          BACKUP_DIR="$STATE_DIR/backups/$STAMP-$BUILD_SHA-$DEPLOYMENT_ID"
+          previous_enabled="$(sudo -n systemctl is-enabled testplex-modern.service 2>/dev/null || true)"
+          active_state="$(sudo -n systemctl is-active testplex-modern.service 2>/dev/null || true)"
+          if [[ "$active_state" == unknown && "$previous_enabled" == not-found ]]; then active_state=inactive; fi
+          reborn_active_state="$(sudo -n systemctl is-active testplex-reborn.service 2>/dev/null || true)"
+          reborn_enabled_state="$(sudo -n systemctl is-enabled testplex-reborn.service 2>/dev/null || true)"
+          if [[ "$reborn_active_state" == unknown && "$reborn_enabled_state" == not-found ]]; then reborn_active_state=inactive; fi
+          case "$active_state" in active) MODERN_WAS_ACTIVE=true ;; inactive) MODERN_WAS_ACTIVE=false ;; *) echo "Cannot establish prior Modern active state." >&2; exit 1 ;; esac
+          case "$reborn_active_state" in active) REBORN_WAS_ACTIVE=true ;; inactive) REBORN_WAS_ACTIVE=false ;; *) echo "Cannot establish prior Reborn active state." >&2; exit 1 ;; esac
+          case "$previous_enabled" in enabled|disabled|masked|static|indirect|not-found) ;; *) echo "Cannot establish Modern unit enablement state ($previous_enabled)." >&2; exit 1 ;; esac
+          SERVER_DIR_EXISTS=false
+          if sudo -n test -e "$SERVER_DIR"; then SERVER_DIR_EXISTS=true; fi
+          if [[ "$SERVER_DIR_EXISTS" == true ]] && sudo -n test -L "$SERVER_DIR"; then echo "Modern server directory must not be a symlink." >&2; exit 1; fi
+          marker_exists=false
+          previous_sha=none
+          if [[ "$SERVER_DIR_EXISTS" == true ]] && sudo -n test -e "$SERVER_DIR/.testplex-modern-deployed-build"; then
+            marker_exists=true
+            previous_sha="$(sudo -n cat "$SERVER_DIR/.testplex-modern-deployed-build")" || { echo "Previous build marker is unreadable." >&2; exit 1; }
+            [[ "$previous_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Previous build marker is unknown or invalid; refusing mutation." >&2; exit 1; }
+            sudo -n grep -Fxq "TESTPLEX MODERN ISOLATED TEST SERVER - NOT LEGACY" "$SERVER_DIR/.testplex-modern-sandbox" || { echo "Modern sandbox marker missing or invalid." >&2; exit 1; }
+            PREVIOUS_STATE=deployed
+          else
+            PREVIOUS_STATE=none
+            [[ "$SERVER_DIR_EXISTS" == false && "$previous_enabled" == not-found && "$MODERN_WAS_ACTIVE" == false ]] || {
+              echo "Previous deployment is unmarked or its exact prior state cannot be established; refusing mutation." >&2; exit 1;
+            }
+            ! ss -ltn | awk '$4 ~ /:25568$/ {found=1} END {exit !found}' || { echo "Port 25568 is occupied; absence cannot be verified." >&2; exit 1; }
+          fi
+          HAD_OLD_UNIT=false; HAD_OLD_PAPER=false; HAD_OLD_PLUGINS=false
+          if sudo -n test -e /etc/systemd/system/testplex-modern.service || sudo -n test -L /etc/systemd/system/testplex-modern.service; then HAD_OLD_UNIT=true; fi
+          if [[ "$SERVER_DIR_EXISTS" == true ]]; then
+            sudo -n test -f "$SERVER_DIR/paper.jar" && HAD_OLD_PAPER=true || true
+            sudo -n test -d "$SERVER_DIR/plugins" && HAD_OLD_PLUGINS=true || true
+          fi
+          prior_files=""; worlds_before=""; snapshot_items=()
+          for item in paper.jar server.properties eula.txt .testplex-modern-deployed-build .testplex-paper-build .testplex-mm-source-maps .testplex-plugin-sha256sums .testplex-modern-sandbox; do
+            if [[ "$SERVER_DIR_EXISTS" == true ]] && sudo -n test -e "$SERVER_DIR/$item"; then
+              snapshot_items+=("$item"); prior_files="${prior_files:+$prior_files,}$item"
+            fi
+          done
+          if [[ "$HAD_OLD_PLUGINS" == true ]]; then snapshot_items+=(plugins); fi
+          for item in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+            if [[ "$SERVER_DIR_EXISTS" == true ]] && sudo -n test -e "$SERVER_DIR/$item"; then
+              snapshot_items+=("$item"); worlds_before="${worlds_before:+$worlds_before,}$item"
+            fi
+          done
+          if [[ "$PREVIOUS_STATE" == none ]]; then
+            [[ "$HAD_OLD_UNIT" == false && "$HAD_OLD_PAPER" == false && "$HAD_OLD_PLUGINS" == false && -z "$prior_files" && -z "$worlds_before" ]] || {
+              echo "Unmarked deployment artifacts exist; refusing to treat this as a first installation." >&2; exit 1;
+            }
+            previous_sha=none
+            previous_enabled=not-found
+            snapshot_items=()
+          fi
+          sudo -n "$RECOVERY_HELPER" --locked begin \
+            "$DEPLOYMENT_ID" "$BUILD_SHA" "$BACKUP_DIR" "$previous_sha" "$PREVIOUS_STATE" "$MODERN_WAS_ACTIVE" \
+            "$previous_enabled" "$REBORN_WAS_ACTIVE" "$SERVER_DIR_EXISTS" "$HAD_OLD_UNIT" "$HAD_OLD_PAPER" "$HAD_OLD_PLUGINS" "$prior_files" "$worlds_before"
+          if [[ "$MODERN_WAS_ACTIVE" == true ]]; then
+            timeout --foreground --signal=TERM 90s sudo -n systemctl stop testplex-modern.service
+          fi
+          if [[ "$REBORN_WAS_ACTIVE" == true ]]; then
+            timeout --foreground --signal=TERM 90s sudo -n systemctl stop testplex-reborn.service
+          fi
+          for unit in testplex-modern.service testplex-reborn.service; do
+            for attempt in $(seq 1 30); do
+              if ! sudo -n systemctl is-active --quiet "$unit"; then break; fi
+              [[ "$attempt" != 30 ]] || { echo "$unit did not stop cleanly." >&2; exit 1; }
+              sleep 2
+            done
+          done
+          available_mb="$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)"
+          [[ "$available_mb" -ge 2000 ]] || { echo "Insufficient memory after service stop: $available_mb MiB." >&2; exit 1; }
+          ! ss -ltn | awk '$4 ~ /:25568$/ {found=1} END {exit !found}' || { echo "Port 25568 remains occupied after preflight stop." >&2; exit 1; }
+          sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$BACKUP_DIR"
+          # Capture a coherent, quiescent snapshot before replacing any plugin or map.
+          if [[ "$PREVIOUS_STATE" == deployed ]]; then
+            sudo -n tar --numeric-owner -cpf "$BACKUP_DIR/server-artifacts.tar" -C "$SERVER_DIR" "${snapshot_items[@]}"
+          else
+            sudo -n tar -cpf "$BACKUP_DIR/server-artifacts.tar" --files-from /dev/null
+          fi
+          sudo -n tar -tf "$BACKUP_DIR/server-artifacts.tar" >/dev/null
+          sudo -n sha256sum "$BACKUP_DIR/server-artifacts.tar" | sudo -n tee "$BACKUP_DIR/server-artifacts.sha256" >/dev/null
+          if [[ "$HAD_OLD_UNIT" == true ]]; then
+            sudo -n tar -cpf "$BACKUP_DIR/unit.tar" -C /etc/systemd/system testplex-modern.service
+            sudo -n sha256sum "$BACKUP_DIR/unit.tar" | sudo -n tee "$BACKUP_DIR/unit.sha256" >/dev/null
+          fi
+          sudo -n sync
+          snapshot_sha="$(sudo -n sha256sum "$BACKUP_DIR/server-artifacts.tar" | awk '{print $1}')"
+          sudo -n /usr/local/sbin/testplex-modern-recovery --locked set-field backup_sha "$snapshot_sha"
+          sudo -n /usr/local/sbin/testplex-modern-recovery --locked set-field backup_complete true
+          sudo -n /usr/local/sbin/testplex-modern-recovery --locked set-phase PREPARED
+
+          sudo -n /usr/local/sbin/testplex-modern-recovery --locked set-phase REPLACING
+          sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$SERVER_DIR" "$SERVER_DIR/plugins"
+          if ! sudo -n test -f "$SERVER_DIR/.testplex-modern-sandbox"; then
+            printf '%s\n' "TESTPLEX MODERN ISOLATED TEST SERVER - NOT LEGACY" | sudo -n tee "$SERVER_DIR/.testplex-modern-sandbox" >/dev/null
+            sudo -n chown monstermaze:monstermaze "$SERVER_DIR/.testplex-modern-sandbox"
+          fi
+          sudo -n install -o monstermaze -g monstermaze -m 0644 "$paper_tmp" "$SERVER_DIR/paper.jar"
+          # Install all four Bukkit plugins owned by the Testplex Modern server.
+          # Monster Maze gameplay is compiled into ArcadeMechanicsModern and is not a plugin of its own.
+          for jar in TestplexModernArcade.jar SnakeModern.jar ArcadeMechanicsModern.jar WizardsModern.jar; do
+            sudo -n install -o monstermaze -g monstermaze -m 0644 "$UPLOAD_DIR/$jar" "$SERVER_DIR/plugins/$jar"
+          done
+
+          # Retire any previously installed FakePlayerPlugin version by descriptor,
+          # not filename. The existing pre-deployment plugins snapshot preserves the
+          # exact prior plugin set for rollback; then install the pinned unmodified jar.
+          for plugin_jar in "$SERVER_DIR"/plugins/*.jar; do
+            [[ -f "$plugin_jar" ]] || continue
+            descriptor="$(sudo -n unzip -p "$plugin_jar" plugin.yml 2>/dev/null || true)"
+            [[ -n "$descriptor" ]] || continue
+            plugin_name="$(yaml_descriptor_value name "$descriptor")"
+            plugin_main="$(yaml_descriptor_value main "$descriptor")"
+            if [[ "$plugin_name" == "FakePlayerPlugin" || "$plugin_main" == "me.bill.fakePlayerPlugin.FakePlayerPlugin" ]]; then
+              sudo -n rm -f -- "$plugin_jar"
+              echo "Replaced previous FakePlayerPlugin jar $plugin_jar with the pinned Paper 26.3 release."
+            fi
+          done
+          sudo -n install -o monstermaze -g monstermaze -m 0644 \
+            "$FPP_TMP" "$SERVER_DIR/plugins/FakePlayerPlugin.jar"
+
+          # Disable FPP restart persistence before Paper starts. Its own onEnable
+          # restores saved bots before Testplex can sweep them, so this prevents a
+          # previous match roster from briefly becoming a global lobby population
+          # after a crash/restart. Existing FPP settings are preserved otherwise.
+          FPP_DATA_DIR="$SERVER_DIR/plugins/FakePlayerPlugin"
+          FPP_CONFIG="$FPP_DATA_DIR/config.yml"
+          sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$FPP_DATA_DIR"
+          if ! sudo -n test -f "$FPP_CONFIG"; then
+            sudo -n unzip -p "$FPP_TMP" config.yml | sudo -n tee "$FPP_CONFIG" >/dev/null
+          fi
+          FPP_CONFIG_TMP="$FPP_CONFIG.testplex-tmp"
+          sudo -n awk '
+            /^persistence:[[:space:]]*$/ { in_persistence=1; print; next }
+            in_persistence && /^[^[:space:]#]/ { in_persistence=0 }
+            in_persistence && /^  enabled:[[:space:]]*/ { print "  enabled: false"; updated=1; next }
+            { print }
+            END { if (!updated) exit 41 }
+          ' "$FPP_CONFIG" > "$FPP_CONFIG_TMP" || {
+            sudo -n rm -f -- "$FPP_CONFIG_TMP"
+            echo "Could not safely disable FakePlayerPlugin restart persistence in $FPP_CONFIG." >&2
+            exit 1
+          }
+          sudo -n install -o monstermaze -g monstermaze -m 0640 "$FPP_CONFIG_TMP" "$FPP_CONFIG"
+          sudo -n rm -f -- "$FPP_CONFIG_TMP"
+          sudo -n grep -A 2 '^persistence:' "$FPP_CONFIG" | grep -Fxq '  enabled: false' || {
+            echo "FakePlayerPlugin restart persistence is not disabled before server startup." >&2
+            exit 1
+          }
+
+          # Migrate persistent state from both historical standalone data-folder names.
+          # The 1.21 source plugin.yml names the plugin MonsterMazeStandalone, so
+          # Paper stores its data in plugins/MonsterMazeStandalone (not only the
+          # older Testplex alias plugins/MonsterMazeModern). Keep both source folders
+          # intact; cp -an preserves existing Testplex module settings.
+          MM_DATA_DIR="$SERVER_DIR/plugins/ArcadeMechanicsModern/monster-maze"
+          sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$MM_DATA_DIR"
+          for OLD_MM_DATA_DIR in \
+            "$SERVER_DIR/plugins/MonsterMazeStandalone" \
+            "$SERVER_DIR/plugins/MonsterMazeModern"; do
+            if sudo -n test -d "$OLD_MM_DATA_DIR"; then
+              sudo -n cp -an "$OLD_MM_DATA_DIR/." "$MM_DATA_DIR/"
+              echo "Migrated non-overwriting Monster Maze data from $OLD_MM_DATA_DIR."
+            fi
+          done
+          MM_CONFIG="$MM_DATA_DIR/config.yml"
+          if ! sudo -n test -f "$MM_CONFIG"; then
+            sudo -n unzip -p "$UPLOAD_DIR/ArcadeMechanicsModern.jar" monster-maze/config.yml | sudo -n tee "$MM_CONFIG" >/dev/null
+          fi
+
+          # Retire old standalone Monster Maze Bukkit plugins by inspecting their
+          # plugin.yml descriptor, not their filename. This catches the actual
+          # MonsterMazeStandalone.jar plus older aliases/renames without touching
+          # ArcadeMechanicsModern.jar or any unrelated plugin. The complete plugins/
+          # directory has already been snapshotted to BACKUP_DIR for rollback.
+          is_standalone_monster_maze_plugin() {
+            local descriptor="$1"
+            local plugin_name plugin_main
+            plugin_name="$(printf '%s\n' "$descriptor" | sed -n 's/^name:[[:space:]]*//p' | head -n 1 | tr -d "'\"" | tr -d '\r')"
+            plugin_main="$(printf '%s\n' "$descriptor" | sed -n 's/^main:[[:space:]]*//p' | head -n 1 | tr -d "'\"" | tr -d '\r')"
+            [[ "$plugin_name" == "MonsterMazeStandalone" \
+              || "$plugin_name" == "MonsterMazeModern" \
+              || "$plugin_main" == "me.monstermaze.MonsterMazePlugin" \
+              || "$plugin_main" == "me.monstermaze.MonsterMazeStandalonePlugin" ]]
+          }
+
+          RETIRED_MM_PLUGIN_DIR="$BACKUP_DIR/retired-monster-maze-plugins"
+          sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$RETIRED_MM_PLUGIN_DIR"
+          shopt -s nullglob
+          for plugin_jar in "$SERVER_DIR"/plugins/*.jar; do
+            [[ -f "$plugin_jar" ]] || continue
+            descriptor="$(sudo -n unzip -p "$plugin_jar" plugin.yml 2>/dev/null || true)"
+            [[ -n "$descriptor" ]] || continue
+            if is_standalone_monster_maze_plugin "$descriptor"; then
+              retired_name="$(basename "$plugin_jar")"
+              sudo -n mv -- "$plugin_jar" "$RETIRED_MM_PLUGIN_DIR/$retired_name"
+              echo "Retired obsolete standalone Monster Maze plugin $retired_name; its descriptor identified a separate Bukkit lifecycle."
+            fi
+          done
+
+          # Fail closed: never restart Paper while another standalone Monster Maze
+          # plugin descriptor remains beside the Testplex-owned Arcade module.
+          for plugin_jar in "$SERVER_DIR"/plugins/*.jar; do
+            [[ -f "$plugin_jar" ]] || continue
+            descriptor="$(sudo -n unzip -p "$plugin_jar" plugin.yml 2>/dev/null || true)"
+            [[ -n "$descriptor" ]] || continue
+            if is_standalone_monster_maze_plugin "$descriptor"; then
+              echo "Refusing to start Testplex Modern while standalone Monster Maze plugin $plugin_jar remains installed." >&2
+              exit 1
+            fi
+          done
+          set_mm_config() {
+            key="$1"
+            value="$2"
+            if sudo -n grep -q "^$key:" "$MM_CONFIG"; then
+              sudo -n sed -i "s|^$key:.*|$key: $value|" "$MM_CONFIG"
+            else
+              printf '%s: %s\n' "$key" "$value" | sudo -n tee -a "$MM_CONFIG" >/dev/null
+            fi
+          }
+          set_mm_config mode Modern
+          set_mm_config test-mode true
+          set_mm_config solo-mode false
+          set_mm_config record-runs false
+          set_mm_config debug true
+          sudo -n grep -Fxq "mode: Modern" "$MM_CONFIG" || {
+            echo "Monster Maze modern mode was not persisted; refusing to start an Original-mode test server." >&2
+            exit 1
+          }
+          sudo -n install -o monstermaze -g monstermaze -m 0644 "$UPLOAD_DIR/SHA256SUMS" "$SERVER_DIR/.testplex-plugin-sha256sums"
+          printf '%s\n' "$BUILD_SHA" | sudo -n tee "$SERVER_DIR/.testplex-modern-deployed-build" >/dev/null
+          printf '%s\n' "$paper_build" | sudo -n tee "$SERVER_DIR/.testplex-paper-build" >/dev/null
+          # A fresh nonce prevents prior startups, stale log lines, or unrelated plugins from satisfying readiness.
+          DEPLOYMENT_NONCE="$(cat /proc/sys/kernel/random/uuid)"
+          ARCADE_PLUGIN_DATA="$SERVER_DIR/plugins/ArcadeMechanicsModern"
+          sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$ARCADE_PLUGIN_DATA"
+          sudo -n rm -f "$ARCADE_PLUGIN_DATA/.monster-maze-readiness.properties" \
+            "$ARCADE_PLUGIN_DATA/.testplex-arcade-readiness.properties"
+          printf 'source_sha=%s\nnonce=%s\n' "$BUILD_SHA" "$DEPLOYMENT_NONCE" \
+            | sudo -n tee "$ARCADE_PLUGIN_DATA/.testplex-modern-deploy-identity.properties" >/dev/null
+          sudo -n chown monstermaze:monstermaze "$ARCADE_PLUGIN_DATA/.testplex-modern-deploy-identity.properties"
+          # Persist the user's explicit Minecraft EULA acceptance for this test server.
+          printf 'eula=true\n' | sudo -n tee "$SERVER_DIR/eula.txt" >/dev/null
+          sudo -n chown monstermaze:monstermaze "$SERVER_DIR/.testplex-modern-deployed-build" "$SERVER_DIR/.testplex-paper-build" "$SERVER_DIR/eula.txt"
+
+          if ! sudo -n test -f "$SERVER_DIR/server.properties"; then
+            printf 'motd=TESTPLEX MODERN 26.3 ISOLATED TEST SERVER\nserver-port=25568\nserver-ip=\nonline-mode=true\nmax-players=16\nview-distance=5\nsimulation-distance=4\n' \
+              | sudo -n tee "$SERVER_DIR/server.properties" >/dev/null
+            sudo -n chown monstermaze:monstermaze "$SERVER_DIR/server.properties"
+          fi
+          set_property() {
+            key="$1"
+            value="$2"
+            if sudo -n grep -q "^$key=" "$SERVER_DIR/server.properties"; then
+              sudo -n sed -i "s|^$key=.*|$key=$value|" "$SERVER_DIR/server.properties"
+            else
+              printf '%s=%s\n' "$key" "$value" | sudo -n tee -a "$SERVER_DIR/server.properties" >/dev/null
+            fi
+          }
+          set_property motd "TESTPLEX MODERN 26.3 ISOLATED TEST SERVER"
+          set_property server-port "25568"
+          set_property server-ip ""
+          set_property online-mode "true"
+          # This isolated acceptance-test server must not inherit an old whitelist.
+          set_property white-list "false"
+          sudo -n grep -Fxq "white-list=false" "$SERVER_DIR/server.properties" || {
+            echo "Failed to disable whitelist on the isolated modern server." >&2
+            exit 1
+          }
+          set_property max-players "16"
+          set_property view-distance "5"
+          set_property simulation-distance "4"
+          sudo -n chown monstermaze:monstermaze "$SERVER_DIR/server.properties"
+
+          cat > "$UPLOAD_DIR/testplex-modern.service" <<'UNIT'
+          [Unit]
+          Description=Testplex Modern Paper 26.3 isolated Arcade test server
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User=monstermaze
+          Group=monstermaze
+          Environment=TESTPLEX_DEPLOYED_BUILD_SHA=$BUILD_SHA
+          Environment=TESTPLEX_DEPLOYMENT_ID=$DEPLOYMENT_ID
+          WorkingDirectory=/home/monstermaze/servers/testplex-modern
+          Environment=JAVA_HOME=/opt/testplex/java25
+          ExecStart=/opt/testplex/java25/bin/java -Xms384M -Xmx1536M -jar paper.jar --nogui
+          Restart=on-failure
+          RestartSec=8
+          TimeoutStopSec=45
+          KillSignal=SIGINT
+          LimitNOFILE=65535
+          NoNewPrivileges=true
+          ProtectSystem=full
+          ReadWritePaths=/home/monstermaze/servers/testplex-modern
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+          sudo -n install -m 0644 "$UPLOAD_DIR/testplex-modern.service" /etc/systemd/system/testplex-modern.service
+          sudo -n systemctl daemon-reload
+          # Keep this service disabled at boot by default: the host has limited RAM and must not start both versions automatically.
+          sudo -n systemctl disable testplex-modern.service >/dev/null 2>&1 || true
+
+          rollback() {
+            echo "Requesting independent recovery for transaction $DEPLOYMENT_ID under the deployment lock." >&2
+            if ! sudo -n /usr/local/sbin/testplex-modern-recovery --locked recover; then
+              echo "Independent rollback is unresolved; transaction remains locked against later deployment attempts." >&2
+            fi
+            timeout --foreground --signal=TERM 10s sudo -n tail -n 100 "$SERVER_DIR/logs/latest.log" 2>/dev/null || true
+          }
+
+          # Install fresh source maps only after a recoverable snapshot is ready.
+          # Previous worlds are in the verified snapshot; move them aside rather than deleting them.
+          install_source_worlds() (
+            set -euo pipefail
+            sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$BACKUP_DIR/replaced-source-worlds"
+            for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+              if sudo -n test -e "$SERVER_DIR/$world"; then
+                sudo -n mv -- "$SERVER_DIR/$world" "$BACKUP_DIR/replaced-source-worlds/$world"
+              fi
+            done
+            for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+              sudo -n cp -a "$MAP_STAGE_DIR/$world" "$SERVER_DIR/$world"
+              sudo -n chown -R monstermaze:monstermaze "$SERVER_DIR/$world"
+            done
+            sudo -n install -o monstermaze -g monstermaze -m 0644 \
+              "$UPLOAD_DIR/MonsterMazeMapsSource.txt" "$SERVER_DIR/.testplex-mm-source-maps"
+          )
+          if ! install_source_worlds; then
+            echo "Failed to install Monster Maze source worlds; rolling back the modern-only deployment." >&2
+            rollback
+            exit 1
+          fi
+          echo "Installed Monster Maze map source commit $(cat "$UPLOAD_DIR/MonsterMazeMapsSource.txt")."
+
+          echo "[deploy] restarting testplex-modern.service (90 second limit)."
+          if ! timeout --foreground --signal=TERM 90s sudo -n systemctl restart testplex-modern.service; then
+            rollback
+            exit 1
+          fi
+          # The old latest.log may still contain a previous startup's "Done (" line
+          # while systemd has already marked the new JVM active. Wait for the server
+          # to actually bind its dedicated port as well as showing Paper ready.
+          ready=false
+          for attempt in $(seq 1 45); do
+            if sudo -n systemctl is-active --quiet testplex-modern.service &&
+               sudo -n grep -Fq 'Done (' "$SERVER_DIR/logs/latest.log" 2>/dev/null &&
+               sudo -n ss -ltn | awk '$4 ~ /:25568$/ {found=1} END {exit !found}'; then
+              ready=true
+              break
+            fi
+            sleep 2
+          done
+          if [[ "$ready" != "true" ]]; then
+            echo "Modern Paper did not reach a ready state with port 25568 listening. Check the modern-only logs and rollback directory." >&2
+            rollback
+            exit 1
+          fi
+          for plugin in TestplexModernArcade SnakeModern ArcadeMechanicsModern WizardsModern FakePlayerPlugin; do
+            if ! sudo -n grep -Fq "$plugin" "$SERVER_DIR/logs/latest.log"; then
+              echo "Expected plugin name $plugin not found in the modern server log." >&2
+              rollback
+              exit 1
+            fi
+          done
+          # The shared Arcade lobby is the host runtime required by the currently
+          # cleared games. Its readiness record is independent of optional game-module
+          # initialisation and is correlated to this exact deployment/process.
+          arcade_runtime_ready=false
+          readiness_file="$SERVER_DIR/plugins/ArcadeMechanicsModern/.testplex-arcade-readiness.properties"
+          for attempt in $(seq 1 30); do
+            current_invocation="$(timeout --foreground --signal=TERM 10s sudo -n systemctl show --property=InvocationID --value testplex-modern.service 2>/dev/null || true)"
+            current_main_pid="$(timeout --foreground --signal=TERM 10s sudo -n systemctl show --property=MainPID --value testplex-modern.service 2>/dev/null || true)"
+            if [[ -n "$current_invocation" && -n "$current_main_pid" ]] && sudo -n test -f "$readiness_file" &&
+               sudo -n grep -Fxq 'status=READY' "$readiness_file" &&
+               sudo -n grep -Fxq 'module=arcade-lobby' "$readiness_file" &&
+               sudo -n grep -Fxq 'manager=testplex-arcade' "$readiness_file" &&
+               sudo -n grep -Fxq 'world=testplex_arcade_lobby_v1' "$readiness_file" &&
+               sudo -n grep -Fxq 'plane=100x100' "$readiness_file" &&
+               sudo -n grep -Fxq 'floor_y=100' "$readiness_file" &&
+               sudo -n grep -Fxq "source_sha=$BUILD_SHA" "$readiness_file" &&
+               sudo -n grep -Fxq "nonce=$DEPLOYMENT_NONCE" "$readiness_file" &&
+               sudo -n grep -Fxq "invocation_id=$current_invocation" "$readiness_file" &&
+               sudo -n grep -Fxq "process_id=$current_main_pid" "$readiness_file"; then
+              arcade_runtime_ready=true
+              break
+            fi
+            sleep 2
+          done
+          if [[ "$arcade_runtime_ready" != "true" ]]; then
+            echo "Testplex Arcade lobby readiness did not match build $BUILD_SHA, nonce $DEPLOYMENT_NONCE, world testplex_arcade_lobby_v1, and current systemd invocation; rolling back." >&2
+            timeout --foreground --signal=TERM 10s sudo -n grep -i -E -C 3 'Arcade|ERROR|SEVERE|Exception|Caused by:|Failed|Could not|Unable to' "$SERVER_DIR/logs/latest.log" | tail -n 240 >&2 || true
+            rollback
+            exit 1
+          fi
+
+          monster_maze_readiness="$SERVER_DIR/plugins/ArcadeMechanicsModern/.monster-maze-readiness.properties"
+          if sudo -n test -f "$monster_maze_readiness" &&
+             sudo -n grep -Fxq 'status=READY' "$monster_maze_readiness" &&
+             sudo -n grep -Fxq 'module=monster-maze' "$monster_maze_readiness" &&
+             sudo -n grep -Fxq 'manager=testplex-arcade' "$monster_maze_readiness" &&
+             sudo -n grep -Fxq "source_sha=$BUILD_SHA" "$monster_maze_readiness" &&
+             sudo -n grep -Fxq "nonce=$DEPLOYMENT_NONCE" "$monster_maze_readiness" &&
+             sudo -n grep -Fxq "invocation_id=$current_invocation" "$monster_maze_readiness" &&
+             sudo -n grep -Fxq "process_id=$current_main_pid" "$monster_maze_readiness"; then
+            echo "Monster Maze module registered with Testplex Arcade and passed the deployment-correlated readiness gate."
+          else
+            echo "ERROR: Monster Maze is in the 20-game acceptance queue but did not register with this Testplex Arcade deployment; rolling back." >&2
+            timeout --foreground --signal=TERM 10s sudo -n grep -i -E -C 3 'MonsterMaze|ERROR|SEVERE|Exception|Caused by:|Failed|Could not|Unable to' "$SERVER_DIR/logs/latest.log" | tail -n 160 >&2 || true
+            rollback
+            exit 1
+          fi
+          if ! sudo -n grep -Fq 'SnakeModern loaded in isolated test mode; /snake help for commands.' "$SERVER_DIR/logs/latest.log"; then
+            echo "SnakeModern is in the 20-game acceptance queue but did not load successfully; rolling back." >&2
+            timeout --foreground --signal=TERM 10s sudo -n grep -i -E -C 3 'Snake|ERROR|SEVERE|Exception|Caused by:|Failed|Could not|Unable to' "$SERVER_DIR/logs/latest.log" | tail -n 160 >&2 || true
+            rollback
+            exit 1
+          fi
+          if ! sudo -n grep -Fq 'Installed original Snake map Snake Pit for Paper 26.3.' "$SERVER_DIR/logs/latest.log"; then
+            echo "SnakeModern started without confirming its selected original source map; rolling back." >&2
+            rollback
+            exit 1
+          fi
+          if ! sudo -n grep -Fq 'WizardsModern is installed but disabled; it is not cleared for in-game testing yet.' "$SERVER_DIR/logs/latest.log"; then
+            echo "WizardsModern did not remain gated while being installed; rolling back the modern-only deployment." >&2
+            rollback
+            exit 1
+          fi
+          # All new artifacts are assigned monstermaze ownership at installation time;
+          # source-map trees are chowned individually when copied. Do not recursively
+          # traverse the entire server directory here: it includes large survival/map
+          # worlds and plugin data and can stall SSH after the server is already ready.
+          sudo -n chown monstermaze:monstermaze "$SERVER_DIR" "$SERVER_DIR/plugins"
+
+          echo "[deploy] Verified Testplex Arcade runtime readiness identity:"
+          sudo -n awk -F= '$1 ~ /^(status|module|manager|world|plane|floor_y|source_sha|invocation_id|process_id)$/ { print }' "$readiness_file"
+          sudo -n grep -F 'TESTPLEX_ARCADE_LOBBY_READY' "$SERVER_DIR/logs/latest.log" | tail -n 1 || true
+
+          sudo -n /usr/local/sbin/testplex-modern-recovery --locked set-phase DEPLOYMENT_VERIFIED
+          echo "Modern Paper 26.3 is ready with the Testplex Arcade 100x100 lobby and the 20-game controlled acceptance queue, including Monster Maze, Snake, Draw My Thing and Master Builders; Monster Maze registration and Snake source-map startup are required deployment gates; Wizards and the remaining unfinished game ports remain disabled; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
+          echo "On successful deployment, testplex-reborn.service remains stopped if it was active during preflight; a failed deployment restores services that were active before preflight. Separate Monster Maze project services/data were not modified."
+          REMOTE_DEPLOY
+
+          # If the remote transaction finishes but its SSH response is lost, verify
+          # the durable transaction and live Paper process through a fresh connection.
+          # Acquire the same deployment lock first, so this cannot race the original
+          # deployment process or accidentally accept an older build's journal.
+          if [[ "$deploy_exit" -ne 0 ]]; then
+            echo "[deploy] Primary SSH session exited $deploy_exit; checking completed deployment through a fresh connection."
+            verify_ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
+              -o BatchMode=yes -o StrictHostKeyChecking=yes
+              -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+              -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=3
+              -o TCPKeepAlive=yes)
+            deployment_verified=false
+            for attempt in 1 2 3 4 5 6 7 8; do
+              echo "[deploy] independent live verification attempt $attempt/8."
+              verification_output=""
+              if verification_output="$(timeout --foreground --signal=TERM --kill-after=15s 90s \
+                  ssh "${verify_ssh_opts[@]}" "$remote" \
+                  sudo -n flock -n /var/lock/testplex-modern-deploy.lock \
+                  /usr/local/sbin/testplex-modern-recovery --locked verify-deployment "$BUILD_SHA" 2>&1)"; then
+                printf '%s\n' "$verification_output"
+                if grep -Fq "Deployment already verified: target artifact SHA=$BUILD_SHA; runtime SHA=$BUILD_SHA; process identity=VERIFIED" \
+                    <<< "$verification_output"; then
+                  deployment_verified=true
+                  break
+                fi
+                echo "[deploy] Remote journal/runtime check did not attest this build; it will not be reported as a successful deployment." >&2
+                break
+              else
+                verify_exit=$?
+                printf '%s\n' "$verification_output" >&2
+                echo "[deploy] Fresh verification connection failed with exit $verify_exit." >&2
+              fi
+              sleep 5
+            done
+            if [[ "$deployment_verified" != true ]]; then
+              echo "[deploy] Original SSH exit=$deploy_exit; independent live deployment verification did not succeed. Failure recovery will handle any unresolved transaction." >&2
+              exit "$deploy_exit"
+            fi
+            echo "[deploy] Original SSH response was lost, but a fresh locked connection verified the target artifact and live Paper runtime."
+          fi
+
+          echo "Modern deployment completed. Server directory: /home/monstermaze/servers/testplex-modern"
+          echo "Service: testplex-modern.service (disabled at boot by default)"
+          echo "Endpoint, when the host's Tailscale/firewall routing allows it: 100.98.188.97:25568"
+          echo "Separate Monster Maze project units/data were not modified. The Testplex Reborn 1.8 service remains stopped after a successful modern deployment to preserve VM memory."
+
+      - name: Restore previously running game servers if modern deployment fails
+        if: ${{ failure() }}
+        shell: bash
+        env:
+          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
+          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
+          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
+          BUILD_SHA: ${{ steps.source-artifact.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          SSH_PORT="$HYPERV_SSH_PORT"
+          [[ -n "$SSH_PORT" ]] || SSH_PORT=22
+          remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
+          ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
+            -o BatchMode=yes -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+            -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=3)
+          recovered=false
+          for attempt in 1 2 3 4 5; do
+            echo "Independent artifact recovery SSH attempt $attempt/5."
+            if timeout --foreground --signal=TERM --kill-after=20s 240s ssh "${ssh_opts[@]}" "$remote" bash -s <<'REMOTE_RESTORE'
+          set -euo pipefail
+          helper=/usr/local/sbin/testplex-modern-recovery
+          if ! sudo -n test -x "$helper"; then
+            echo "Independent recovery helper is missing or not executable by root; no rollback success is claimed." >&2
+            exit 1
+          fi
+          recovery_output=""
+          if ! recovery_output="$(sudo -n env TESTPLEX_LOCK_WAIT_SECONDS=30 "$helper" recover)"; then
+            printf '%s\n' "$recovery_output" >&2
+            echo "Independent rollback remains unresolved; artifact and runtime restoration are not verified." >&2
+            echo "===== Recovery service status =====" >&2
+            timeout --foreground --signal=TERM 10s sudo -n systemctl status --no-pager --full testplex-modern.service >&2 || true
+            echo "===== Recovery Paper log tail =====" >&2
+            timeout --foreground --signal=TERM 10s sudo -n tail -n 160 /home/monstermaze/servers/testplex-modern/logs/latest.log >&2 || true
+            echo "===== Recovery service journal =====" >&2
+            timeout --foreground --signal=TERM 10s sudo -n journalctl -u testplex-modern.service -n 100 --no-pager -o short-iso >&2 || true
+            echo "===== Recovery host memory =====" >&2
+            timeout --foreground --signal=TERM 10s free -h >&2 || true
+            exit 1
+          fi
+          printf '%s\n' "$recovery_output"
+          if ! grep -Eq '^Rollback (verified|already verified):' <<< "$recovery_output" &&
+             ! grep -Eq '^Deployment already verified:' <<< "$recovery_output" &&
+             ! grep -Eq '^no-prior-deployment-restored:' <<< "$recovery_output" &&
+             ! grep -Fxq 'No durable transaction is present; no rollback was claimed.' <<< "$recovery_output"; then
+            echo "Recovery helper returned no recognized transaction outcome; no rollback success is claimed." >&2
+            exit 1
+          fi
+          if grep -Eq '^Rollback (verified|already verified):' <<< "$recovery_output"; then
+            echo "Independent recovery finished with separately verified restored artifact SHA and running runtime SHA."
+          elif grep -Eq '^Deployment already verified:' <<< "$recovery_output"; then
+            echo "The remote transaction had already recorded successful deployment verification; rollback and legacy restart were skipped."
+          elif grep -Eq '^no-prior-deployment-restored:' <<< "$recovery_output"; then
+            echo "The verified pre-installation absence of the deployment was restored."
+          else
+            echo "No deployment transaction existed; no rollback was needed or claimed."
+          fi
+          echo "Separate Monster Maze services were never changed."
+          REMOTE_RESTORE
+            then
+              recovered=true
+              break
+            fi
+            sleep 5
+          done
+          if [[ "$recovered" != "true" ]]; then
+            echo "Recovery host remained unreachable or independent recovery failed after five bounded sessions; remote state is unknown and no rollback success is claimed." >&2
+            exit 1
+          fi
+
+      - name: Remove temporary modern deployment artifacts
+        if: always()
+        continue-on-error: true
+        shell: bash
+        env:
+          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
+          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
+          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
+          BUILD_SHA: ${{ steps.source-artifact.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          [[ -f "$HOME/.ssh/testplex_hyperv" && -f "$HOME/.ssh/known_hosts" ]] || {
+            echo "SSH credentials were not prepared; pre-upload cleanup was not needed or could not run."
+            exit 0
+          }
+          SSH_PORT="${HYPERV_SSH_PORT:-22}"
+          remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
+          ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
+            -o BatchMode=yes -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
+          timeout --foreground --signal=TERM --kill-after=15s 3m ssh "${ssh_opts[@]}" "$remote" sudo -n flock -n /var/lock/testplex-modern-deploy.lock bash -s -- "$BUILD_SHA" <<'REMOTE_STAGE_CLEANUP'
+          set -euo pipefail
+          build_sha="$1"
+          if [[ "$build_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            upload_dir="/var/tmp/testplex-modern-artifacts-$build_sha"
+            if [[ -d "$upload_dir" && ! -L "$upload_dir" ]]; then
+              echo "Removing only this deployment's staging directory: $upload_dir"
+              sudo -n rm -rf -- "$upload_dir"
+            fi
+          else
+            echo "No valid source SHA was available; leaving all modern staging directories untouched."
+          fi
+          echo "Remaining temporary filesystem usage:"
+          df -h /var/tmp
+          df -i /var/tmp
+          REMOTE_STAGE_CLEANUP
+
+      - name: Write deployment summary
+        if: always()
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ steps.source-artifact.outputs.source_sha }}
+        run: |
+          {
+            echo "## Testplex Modern Paper 26.3 deployment"
+            echo
+            echo "- Source build SHA: $SOURCE_SHA"
+            echo "- Destination: /home/monstermaze/servers/testplex-modern"
+            echo "- Dedicated unit: testplex-modern.service"
+            echo "- Dedicated Minecraft port: 25568"
+            echo "- Memory safety: only Testplex's own legacy service is stopped; separate Monster Maze services are left untouched, and deployment aborts rather than stopping them when memory is insufficient; successful deployments leave only modern Paper running"
+            echo "- Rollback: modern-only backup created before replacement; startup is checked before success"
+          } >> "$GITHUB_STEP_SUMMARY"

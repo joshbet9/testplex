@@ -30,8 +30,8 @@ jobs:
     environment: hyperv
     timeout-minutes: 45
     concurrency:
-      group: testplex-isolated-hyperv-server
-      cancel-in-progress: true
+      group: testplex-isolated-hyperv-server-v2-20261031
+      cancel-in-progress: false
     steps:
       - name: Check out deployment script
         uses: actions/checkout@v4

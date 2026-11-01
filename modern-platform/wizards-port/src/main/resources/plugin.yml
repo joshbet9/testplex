@@ -1,0 +1,14 @@
+name: WizardsModern
+version: 0.1.0-SNAPSHOT
+main: au.com.testplex.wizards.WizardsModernPlugin
+api-version: '26.3'
+author: Testplex
+description: Resource-pack-independent Mineplex Wizards survival port for Paper 26.3
+commands:
+  wizards:
+    description: Join and test the modern Wizards survival game
+    usage: /wizards <join|start|leave|kit|status|stop>
+permissions:
+  testplex.wizards.admin:
+    description: Allows an operator to stop or reset a Wizards test round
+    default: op
