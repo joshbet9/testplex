@@ -2118,12 +2118,16 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (stopped || game != ArcadePortGame.HEROES_OF_GWEN) return;
         Player killer = event.getEntity().getKiller();
         if (killer == null || !killer.isOnline() || !activePlayers.contains(killer.getUniqueId())) return;
-        double heal = killer.getMaxHealth()
+        // HPManager's source baseline kill heal is a direct setHealth operation;
+        // only MobaKillHealEffect bonuses go through the item heal event callbacks.
+        double baseHeal = killer.getMaxHealth()
                 * ArcadePortRules.HEROES_OF_GWEN_BASE_KILL_HEAL_FACTOR;
+        killer.setHealth(Math.min(killer.getMaxHealth(), killer.getHealth() + baseHeal));
+        double itemHeal = 0.0D;
         for (String itemName : heroesOfGwenOwnedStoreItemNames(killer)) {
-            heal += ArcadePortRules.heroesOfGwenStoreKillHeal(itemName);
+            itemHeal += ArcadePortRules.heroesOfGwenStoreKillHeal(itemName);
         }
-        healHeroesOfGwenAbility(killer, killer, heal);
+        if (itemHeal > 0.0D) healHeroesOfGwenAbility(killer, killer, itemHeal);
     }
 
     @EventHandler
