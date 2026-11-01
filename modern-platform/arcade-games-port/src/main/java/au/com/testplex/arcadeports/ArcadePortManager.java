@@ -929,9 +929,8 @@ public final class ArcadePortManager implements Listener {
         }
         boolean explicitMonsterMazeKit = value.startsWith("monster-maze-");
         if (explicitMonsterMazeKit) value = value.substring("monster-maze-".length());
-        ArcadePortGame selectedLobbyGame = ArcadePortGame.fromId(
-                plugin.getConfig().getString("lobby-selected-game", "bacon-brawl"));
-        boolean monsterMazeLobby = selectedLobbyGame != null && selectedLobbyGame.isMonsterMaze();
+        ArcadePortGame selectedLobbyGameType = ArcadePortGame.fromId(selectedLobbyGame);
+        boolean monsterMazeLobby = selectedLobbyGameType != null && selectedLobbyGameType.isMonsterMaze();
         if (explicitMonsterMazeKit || monsterMazeLobby || monsterMazeRunning()) {
             me.monstermaze.kit.KitType mazeKit = me.monstermaze.kit.KitType.byName(value);
             if (mazeKit != null) {
