@@ -19676,6 +19676,7 @@ public final class ArcadePortManager implements Listener {
     private boolean isSessionTimestampField(String name) {
         if (name.equals("startedat") || name.equals("endsat") || name.equals("prepareendsat")) return false;
         return name.endsWith("at") || name.endsWith("until")
+                || name.contains("atby") || name.contains("untilby")
                 || name.contains("cooldown") || name.contains("deadline");
     }
 
