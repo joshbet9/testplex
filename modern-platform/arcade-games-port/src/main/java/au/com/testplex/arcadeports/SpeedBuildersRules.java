@@ -76,7 +76,7 @@ public final class SpeedBuildersRules {
                                  double multiplier, Integer exactSeconds) {
         public TemplateTiming {
             displayName = displayName == null ? "" : displayName.trim();
-            if (!Double.isFinite(multiplier) || multiplier <= 0.0D
+            if (!Double.isFinite(multiplier) || multiplier < 0.0D
                     || addSeconds < 0 || subtractSeconds < 0
                     || (exactSeconds != null && exactSeconds < 0)) {
                 throw new IllegalArgumentException("Invalid Speed Builders template timing.");
@@ -120,7 +120,7 @@ public final class SpeedBuildersRules {
     public static int buildSeconds(int baseSeconds, int addSeconds, int subtractSeconds,
                                    double multiplier, Integer exactSeconds) {
         if (baseSeconds < 0 || addSeconds < 0 || subtractSeconds < 0
-                || !Double.isFinite(multiplier) || multiplier <= 0.0D
+                || !Double.isFinite(multiplier) || multiplier < 0.0D
                 || (exactSeconds != null && exactSeconds < 0)) {
             throw new IllegalArgumentException("Invalid template timing modifier.");
         }
