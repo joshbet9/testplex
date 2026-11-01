@@ -22,7 +22,7 @@ class SpeedBuildersSourceMapTest {
                 String worldConfig = null;
                 ZipEntry entry;
                 while ((entry = zip.getNextEntry()) != null) {
-                    String name = entry.getName().replace('\\\\', '/');
+                    String name = entry.getName().replace('\\', '/');
                     if (name.equals("WorldConfig.dat") || name.endsWith("/WorldConfig.dat")) {
                         worldConfig = new String(zip.readAllBytes(), StandardCharsets.UTF_8);
                         break;
