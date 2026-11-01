@@ -18,7 +18,7 @@ This is an implementation milestone, not a readiness or live-acceptance claim. T
 
 ## Implemented mechanics
 
-- Queues 2–8 online builders. Quick start and standard queue have separate join windows; an undersized queue is retained rather than starting a one-player match.
+- Queues 2–8 online builders. Quick start and standard queue have separate join windows; an undersized queue is retained rather than starting a one-player match. Once started, players are never removed for a low or empty score.
 - Ten-second model viewing, then the source-derived build timer starting at 40 seconds. The base timer decreases by one second after each subsequent round's duration is calculated, with source template modifiers clamped to 5–60 seconds.
 - The model's block palette and spawn eggs are issued at build start. Multiblock palette entries are deduplicated; water/lava templates receive buckets.
 - Players can build anywhere inside their own 7×7×7 volume. They are not restricted to only the materials present in the model. Door/bed companion blocks must also remain inside the plot.
@@ -26,8 +26,8 @@ This is an implementation milestone, not a readiness or live-acceptance claim. T
 - Template mobs are frozen and silent while displayed. Spawn-egg mobs are frozen in place, can be hit for removal, and score only when the entity type and relative block position match.
 - Scores count each expected non-air block and each expected mob once; extra blocks do not deduct points. Block-data comparison preserves orientation/state and includes the original end-portal-frame, sapling, leaves, anvil, redstone-ore and stair-corner exceptions.
 - A perfect build locks further placement/interactions and announces its completion. If every remaining player completes a perfect build early, the build phase ends.
-- Ten-second judging phase; all empty builds are selected first. Otherwise, one lowest scorer is selected only when the round is neither an all-perfect round nor a full tie. Eliminations are announced one at a time with two seconds between them.
-- The original template is shown in the central judging plot during review. An isolated sidebar/action bar shows round, phase, model, time, score and remaining builders.
+- Ten-second judging phase calculates a normalized accuracy score out of 100 for every connected builder. Every builder continues into the next round regardless of score, including an empty plot. The five-round match length is configurable through `speed-builders.match-rounds` (default 5); highest cumulative points wins, with tied top scores sharing the win.
+- The original template is shown in the central judging plot during review. Gwen is a non-attacking Elder Guardian who slowly looks between active build plots. An isolated sidebar/action bar shows round, phase, model, time, per-round accuracy and cumulative points.
 - Source-style local progress counters cover wins, perfect builds, first perfect build, builds completed under ten seconds, perfectionist wins, blocks placed/broken and mobs built.
 - A durable pre-match player snapshot is recorded before the participant is modified. It is restored on normal finish, operator stop, disconnect/rejoin and plugin shutdown. A pending snapshot remains saved when a player is offline.
 
@@ -45,17 +45,17 @@ This is an implementation milestone, not a readiness or live-acceptance claim. T
 ## Remaining gaps before readiness
 
 1. The Paper 26.3 module has not yet been compiled and exercised on the live Testplex Reborn VM after this source-map conversion.
-2. The central judge currently uses a static template presentation and spectator viewpoints; Gwen's original elder-guardian disguise, moving gaze/laser target and elimination presentation/explosion still need a close visual port.
+2. Gwen currently uses a native Elder Guardian with simple plot-to-plot gaze tracking. It is not a packet-level Mineplex disguise, and the gaze/rotation should be validated in-game on multiple clients. There is deliberately no Guardian attack, elimination beam, player elimination or plot explosion in the Arcade variant.
 3. The original demolition presentation/tick animation is not reproduced; the configured Reborn mode is instant-break, but the precise legacy click/refund timing still needs live confirmation.
 4. The full set of modern block-state mappings needs archive-driven audit. The listed legacy exceptions have unit tests, but unusual tile entities, fluids and non-cube blocks need in-game verification.
-5. Source score/empty-build edge cases, multiblock refund behaviour, mob spawn-egg placement, water/lava templates, jump flight and two-second sequential eliminations need live two-client acceptance.
+5. Source score edge cases, empty-plot scoring, cumulative totals, tied final scores, multiblock refund behaviour, mob spawn-egg placement, water/lava templates and jump flight need live two-client acceptance across the complete configured match.
 6. The snapshot restores inventory, armour, offhand, effects, movement/flight flags, health, food, experience and location. Scoreboard restoration across a server restart and unusual custom item metadata still need explicit acceptance.
 7. The implementation currently uses the bundled Shroomland Lake archive. Map selection across any additional Speed Builders source archives is not exposed.
 8. Lifetime statistics are local Testplex config values and do not write to production Arcade databases.
 
 ## Automated coverage
 
-- `SpeedBuildersRulesTest`: source timing modifiers, block-state scoring exceptions, extra-block scoring, perfect builds and elimination selection.
+- `SpeedBuildersRulesTest`: source timing modifiers, block-state scoring exceptions, extra-block scoring, perfect builds and normalized 0–100 non-elimination scoring.
 - `SpeedBuildersSourceMapTest`: the Maven-packaged original ZIP contains WorldConfig data, a RED judging marker, at least eight YELLOW plots and an authored custom-template library.
 - `SpeedBuildersProgressStoreTest`: allowed local counter names, positive increments and persistence paths.
 - The full Modern Paper 26.3 workflow must compile the plugin, run the complete Arcade test suite, and verify the packaged source ZIP before this branch is considered build-ready.
