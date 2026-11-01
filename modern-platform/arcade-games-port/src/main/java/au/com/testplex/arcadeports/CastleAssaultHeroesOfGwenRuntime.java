@@ -2730,25 +2730,6 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 player.getInventory().getItem(7).setAmount(3);
                 heroAmmoNextAt.put(id, System.currentTimeMillis() + 3_000L);
             }
-            case "rowena" -> {
-                ItemStack bow = new ItemStack(Material.BOW);
-                ItemMeta bowMeta = bow.getItemMeta();
-                bowMeta.setUnbreakable(true);
-                bowMeta.setDisplayName(ChatColor.GREEN + "Bow");
-                bow.setItemMeta(bowMeta);
-                player.getInventory().setItem(0, bow);
-                player.getInventory().setItem(1, namedItem(Material.GOLD_NUGGET,
-                        ChatColor.GREEN + "Light Arrows", "Rowena's light-arrow ability; effect values still need source validation."));
-                player.getInventory().setItem(2, namedItem(Material.FEATHER,
-                        ChatColor.GREEN + "Combat Slide", "Movement ability; its archived movement values still need source validation."));
-                player.getInventory().setItem(3, namedItem(Material.NETHER_STAR,
-                        ChatColor.GREEN + "Bombardment", "Ultimate ability; its archived targeting values still need source validation."));
-                player.getInventory().setItem(7, namedItem(Material.ARROW,
-                        ChatColor.YELLOW + "Fletched Arrow", "Fletcher supplies one arrow every two seconds, up to two."));
-                player.getInventory().getItem(7).setAmount(ArcadePortRules.HEROES_OF_GWEN_ROWENA_FLETCHER_MAX_ARROWS);
-                heroAmmoNextAt.put(id, System.currentTimeMillis()
-                        + ArcadePortRules.HEROES_OF_GWEN_ROWENA_FLETCHER_RELOAD_MILLIS);
-            }
             default -> {
                 String role = ArcadePortRules.heroesOfGwenHeroRole(hero);
                 Material primary = "Hunter".equals(role) ? Material.BOW
