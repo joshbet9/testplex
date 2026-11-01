@@ -746,6 +746,7 @@ jobs:
           printf '%s\n' "$BUILD_SHA" | sudo -n tee "$SERVER_DIR/.testplex-modern-deployed-build" >/dev/null
           printf '%s\n' "$paper_build" | sudo -n tee "$SERVER_DIR/.testplex-paper-build" >/dev/null
           # A fresh nonce prevents prior startups, stale log lines, or unrelated plugins from satisfying readiness.
+          # Also remove the obsolete per-Monster-Maze marker left by older integrated builds.
           DEPLOYMENT_NONCE="$(cat /proc/sys/kernel/random/uuid)"
           ARCADE_PLUGIN_DATA="$SERVER_DIR/plugins/ArcadeMechanicsModern"
           sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$ARCADE_PLUGIN_DATA"
@@ -881,9 +882,8 @@ jobs:
               exit 1
             fi
           done
-          # The shared Arcade lobby is the host runtime required by the currently
-          # cleared games. Its readiness record is independent of optional game-module
-          # initialisation and is correlated to this exact deployment/process.
+          # One Arcade-owned readiness record attests the shared lobby and the
+          # integrated Monster Maze game after the complete host lifecycle succeeds.
           arcade_runtime_ready=false
           readiness_file="$SERVER_DIR/plugins/ArcadeMechanicsModern/.testplex-arcade-readiness.properties"
           for attempt in $(seq 1 30); do
@@ -891,7 +891,8 @@ jobs:
             current_main_pid="$(timeout --foreground --signal=TERM 10s sudo -n systemctl show --property=MainPID --value testplex-modern.service 2>/dev/null || true)"
             if [[ -n "$current_invocation" && -n "$current_main_pid" ]] && sudo -n test -f "$readiness_file" &&
                sudo -n grep -Fxq 'status=READY' "$readiness_file" &&
-               sudo -n grep -Fxq 'module=arcade-lobby' "$readiness_file" &&
+               sudo -n grep -Fxq 'module=arcade-runtime' "$readiness_file" &&
+               sudo -n grep -Fxq 'monster_maze=READY' "$readiness_file" &&
                sudo -n grep -Fxq 'manager=testplex-arcade' "$readiness_file" &&
                sudo -n grep -Fxq 'world=testplex_arcade_lobby_v1' "$readiness_file" &&
                sudo -n grep -Fxq 'plane=100x100' "$readiness_file" &&
@@ -906,7 +907,7 @@ jobs:
             sleep 2
           done
           if [[ "$arcade_runtime_ready" != "true" ]]; then
-            echo "Testplex Arcade lobby readiness did not match build $BUILD_SHA, nonce $DEPLOYMENT_NONCE, world testplex_arcade_lobby_v1, and current systemd invocation; rolling back." >&2
+            echo "Complete Testplex Arcade runtime readiness (including integrated Monster Maze) did not match build $BUILD_SHA, nonce $DEPLOYMENT_NONCE, world testplex_arcade_lobby_v1, and current systemd invocation; rolling back." >&2
             echo "===== Arcade deployment identity file =====" >&2
             identity_file="$SERVER_DIR/plugins/ArcadeMechanicsModern/.testplex-modern-deploy-identity.properties"
             if sudo -n test -f "$identity_file"; then
@@ -942,51 +943,6 @@ jobs:
             exit 1
           fi
 
-          monster_maze_readiness="$SERVER_DIR/plugins/ArcadeMechanicsModern/.monster-maze-readiness.properties"
-          monster_maze_ready=false
-          echo "[deploy] waiting up to 120 seconds for post-attachment Monster Maze registration."
-          # Arcade lobby readiness is published before optional game modules are
-          # attached. Do not race that earlier signal: wait for Monster Maze's own
-          # exact-process registration record before declaring the 25-game runtime ready.
-          for attempt in $(seq 1 60); do
-            current_invocation="$(timeout --foreground --signal=TERM 8s sudo -n systemctl show --property=InvocationID --value testplex-modern.service 2>/dev/null || true)"
-            current_main_pid="$(timeout --foreground --signal=TERM 8s sudo -n systemctl show --property=MainPID --value testplex-modern.service 2>/dev/null || true)"
-            if [[ -n "$current_invocation" && "$current_main_pid" =~ ^[1-9][0-9]*$ ]] &&
-               sudo -n systemctl is-active --quiet testplex-modern.service &&
-               sudo -n test -f "$monster_maze_readiness" &&
-               sudo -n grep -Fxq 'status=READY' "$monster_maze_readiness" &&
-               sudo -n grep -Fxq 'module=monster-maze' "$monster_maze_readiness" &&
-               sudo -n grep -Fxq 'manager=testplex-arcade' "$monster_maze_readiness" &&
-               sudo -n grep -Fxq "source_sha=$BUILD_SHA" "$monster_maze_readiness" &&
-               sudo -n grep -Fxq "nonce=$DEPLOYMENT_NONCE" "$monster_maze_readiness" &&
-               sudo -n grep -Fxq "invocation_id=$current_invocation" "$monster_maze_readiness" &&
-               sudo -n grep -Fxq "process_id=$current_main_pid" "$monster_maze_readiness"; then
-              monster_maze_ready=true
-              break
-            fi
-            if (( attempt % 10 == 0 )); then
-              echo "[deploy] Monster Maze registration is still pending (attempt $attempt/60)."
-              if sudo -n test -f "$monster_maze_readiness"; then
-                timeout --foreground --signal=TERM 5s sudo -n sed -n '1,40p' "$monster_maze_readiness" >&2 || true
-              fi
-            fi
-            sleep 2
-          done
-          if [[ "$monster_maze_ready" != "true" ]]; then
-            echo "ERROR: Monster Maze did not publish deployment-correlated registration within 120 seconds; rolling back." >&2
-            echo "===== Monster Maze / Arcade bootstrap log markers =====" >&2
-            timeout --foreground --signal=TERM 10s sudo -n grep -i -E 'TESTPLEX_ARCADE_BOOTSTRAP|TESTPLEX_MONSTER_MAZE_BOOTSTRAP|TESTPLEX_ARCADE_MODULE_READY|Monster Maze|MonsterMaze|ERROR|SEVERE|Exception|Caused by:|Failed|Could not|Unable to' "$SERVER_DIR/logs/latest.log" | tail -n 200 >&2 || true
-            echo "===== Paper log tail =====" >&2
-            timeout --foreground --signal=TERM 10s sudo -n tail -n 180 "$SERVER_DIR/logs/latest.log" >&2 || true
-            echo "===== Modern service journal =====" >&2
-            timeout --foreground --signal=TERM 10s sudo -n journalctl -u testplex-modern.service -n 100 --no-pager -o short-iso >&2 || true
-            echo "===== VM memory and storage =====" >&2
-            timeout --foreground --signal=TERM 8s free -h >&2 || true
-            timeout --foreground --signal=TERM 8s df -h "$SERVER_DIR" /var/tmp >&2 || true
-            rollback
-            exit 1
-          fi
-          echo "Monster Maze module registered with Testplex Arcade and passed the deployment-correlated readiness gate."
           if ! sudo -n grep -Fq 'SnakeModern loaded in isolated test mode; /snake help for commands.' "$SERVER_DIR/logs/latest.log"; then
             echo "SnakeModern is in the 25-game acceptance queue but did not load successfully; rolling back." >&2
             timeout --foreground --signal=TERM 10s sudo -n grep -i -E -C 3 'Snake|ERROR|SEVERE|Exception|Caused by:|Failed|Could not|Unable to' "$SERVER_DIR/logs/latest.log" | tail -n 160 >&2 || true
@@ -1010,11 +966,11 @@ jobs:
           sudo -n chown monstermaze:monstermaze "$SERVER_DIR" "$SERVER_DIR/plugins"
 
           echo "[deploy] Verified Testplex Arcade runtime readiness identity:"
-          sudo -n awk -F= '$1 ~ /^(status|module|manager|world|plane|floor_y|source_sha|invocation_id|process_id)$/ { print }' "$readiness_file"
-          sudo -n grep -F 'TESTPLEX_ARCADE_LOBBY_READY' "$SERVER_DIR/logs/latest.log" | tail -n 1 || true
+          sudo -n awk -F= '$1 ~ /^(status|module|manager|world|plane|floor_y|monster_maze|source_sha|invocation_id|process_id)$/ { print }' "$readiness_file"
+          sudo -n grep -F 'TESTPLEX_ARCADE_RUNTIME_READY' "$SERVER_DIR/logs/latest.log" | tail -n 1 || true
 
           sudo -n /usr/local/sbin/testplex-modern-recovery --locked set-phase DEPLOYMENT_VERIFIED
-          echo "Modern Paper 26.3 is ready with the Testplex Arcade 100x100 lobby and the 25-game controlled acceptance queue, including SkyWars Mixed, Wither Assault and Sneaky Assassins; CI verifies all 50 original SkyWars maps, while Wither Assault and Sneaky Assassins are explicitly generated-arena mechanics-test ports without authentic source maps; Castle Assault and BobsFarm archive checks remain enforced; Monster Maze registration and Snake source-map startup are required deployment gates; Wizards, Speed Builders Arcade and Hoops Remastered remain disabled/outside the queue; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
+          echo "Modern Paper 26.3 is ready with the Testplex Arcade 100x100 lobby and the 25-game controlled acceptance queue, including integrated Monster Maze, SkyWars Mixed, Wither Assault and Sneaky Assassins; CI verifies all 50 original SkyWars maps, while Wither Assault and Sneaky Assassins are explicitly generated-arena mechanics-test ports without authentic source maps; Castle Assault and BobsFarm archive checks remain enforced; the single Arcade runtime readiness check and Snake source-map startup are required deployment gates; Wizards, Speed Builders Arcade and Hoops Remastered remain disabled/outside the queue; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
           echo "On successful deployment, testplex-reborn.service remains stopped if it was active during preflight; a failed deployment restores services that were active before preflight. Separate Monster Maze project services/data were not modified."
           REMOTE_DEPLOY
 

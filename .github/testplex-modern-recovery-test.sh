@@ -25,7 +25,7 @@ case "$cmd" in
     printf active > "$statefile"
     [[ "$statefile" != "$TESTPLEX_STUB_REBORN_ACTIVE" ]] || exit 0
     printf 'Paper server Done (3.0s)!\n' >> "$TESTPLEX_SERVER_DIR/logs/latest.log"
-    printf 'status=READY\nmodule=arcade-lobby\nmanager=testplex-arcade\nworld=testplex_arcade_lobby_v1\nplane=100x100\nfloor_y=100\nsource_sha=%s\nnonce=123e4567-e89b-12d3-a456-426614174000\ninvocation_id=0123456789abcdef0123456789abcdef\nprocess_id=4242\n' \
+    printf 'status=READY\nmodule=arcade-runtime\nmonster_maze=READY\nmanager=testplex-arcade\nworld=testplex_arcade_lobby_v1\nplane=100x100\nfloor_y=100\nsource_sha=%s\nnonce=123e4567-e89b-12d3-a456-426614174000\ninvocation_id=0123456789abcdef0123456789abcdef\nprocess_id=4242\n' \
       "$(cat "$TESTPLEX_SERVER_DIR/.testplex-modern-deployed-build")" > "$TESTPLEX_SERVER_DIR/plugins/ArcadeMechanicsModern/.testplex-arcade-readiness.properties"
     ;;
   enable) printf enabled > "$TESTPLEX_STUB_ENABLED" ;;
@@ -247,7 +247,7 @@ printf '%s\n' "$target_sha" > "$SERVER/.testplex-modern-deployed-build"
 printf 'deployed Paper artifact\n' > "$SERVER/paper.jar"
 nonce=123e4567-e89b-12d3-a456-426614174000
 printf 'source_sha=%s\nnonce=%s\n' "$target_sha" "$nonce" > "$SERVER/plugins/ArcadeMechanicsModern/.testplex-modern-deploy-identity.properties"
-printf 'status=READY\nmodule=arcade-lobby\nmanager=testplex-arcade\nworld=testplex_arcade_lobby_v1\nplane=100x100\nfloor_y=100\nsource_sha=%s\nnonce=%s\ninvocation_id=0123456789abcdef0123456789abcdef\nprocess_id=4242\n' "$target_sha" "$nonce" > "$SERVER/plugins/ArcadeMechanicsModern/.testplex-arcade-readiness.properties"
+printf 'status=READY\nmodule=arcade-runtime\nmonster_maze=READY\nmanager=testplex-arcade\nworld=testplex_arcade_lobby_v1\nplane=100x100\nfloor_y=100\nsource_sha=%s\nnonce=%s\ninvocation_id=0123456789abcdef0123456789abcdef\nprocess_id=4242\n' "$target_sha" "$nonce" > "$SERVER/plugins/ArcadeMechanicsModern/.testplex-arcade-readiness.properties"
 printf active > "$TESTPLEX_STUB_ACTIVE"
 printf 'Paper server Done (3.0s)!\n' >> "$SERVER/logs/latest.log"
 output="$(run_helper verify-deployment "$target_sha")"
@@ -277,7 +277,7 @@ printf '%s\n' "$old_sha" > "$SERVER/.testplex-modern-deployed-build"
 printf 'old paper\n' > "$SERVER/paper.jar"
 printf 'old plugin payload\n' > "$SERVER/plugins/ArcadeMechanicsModern/plugin.dat"
 printf 'source_sha=%s\nnonce=%s\n' "$old_sha" "$nonce" > "$SERVER/plugins/ArcadeMechanicsModern/.testplex-modern-deploy-identity.properties"
-printf 'status=READY\nmodule=arcade-lobby\nmanager=testplex-arcade\nworld=testplex_arcade_lobby_v1\nplane=100x100\nfloor_y=100\nsource_sha=%s\nnonce=%s\ninvocation_id=0123456789abcdef0123456789abcdef\nprocess_id=4242\n' "$old_sha" "$nonce" > "$SERVER/plugins/ArcadeMechanicsModern/.testplex-arcade-readiness.properties"
+printf 'status=READY\nmodule=arcade-runtime\nmonster_maze=READY\nmanager=testplex-arcade\nworld=testplex_arcade_lobby_v1\nplane=100x100\nfloor_y=100\nsource_sha=%s\nnonce=%s\ninvocation_id=0123456789abcdef0123456789abcdef\nprocess_id=4242\n' "$old_sha" "$nonce" > "$SERVER/plugins/ArcadeMechanicsModern/.testplex-arcade-readiness.properties"
 
 # A PREPARING transaction can recover a Modern service stopped by locked preflight.
 write_txn PREPARING true false

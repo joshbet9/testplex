@@ -21,7 +21,6 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     private CameraShyGame cameraShy;
     private SpeedBuildersGame speedBuilders;
     private MineplexCoreRankBridge mineplexCoreRankBridge;
-    private final MonsterMazeRegistrationReadiness monsterMazeReadiness = new MonsterMazeRegistrationReadiness();
 
     // Keep aligned with ArcadeCatalog's READY_FOR_TEST statuses.
     private static final java.util.List<String> READY_FOR_TEST_GAME_IDS = java.util.List.of(
@@ -95,38 +94,41 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         getCommand("arcadeport").setExecutor(this);
         getCommand("gamepreferences").setExecutor(this);
         getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=commands-and-menus-registered");
-        publishArcadeRuntimeReadiness();
-        getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=arcade-readiness-published");
 
-        // Monster Maze is embedded in this Arcade host and is part of the controlled
-        // acceptance queue. Startup remains isolated from the shared lobby; the
-        // deployment gate separately requires its registration readiness signal.
+        // Monster Maze is a built-in game in this Arcade runtime, not a separate
+        // Bukkit plugin or deployment integration. Its managers, commands, map
+        // selection and queue/session callbacks are owned by this same lifecycle.
         try {
-            monsterMazeReadiness.initializeAndAttach(
-                    () -> {
-                        monsterMaze = new MonsterMazePlugin(this);
-                        monsterMaze.enable();
-                    },
-                    () -> monsterMaze != null && monsterMaze.getGameManager() != null,
-                    () -> manager.setMonsterMazeModule(monsterMaze),
-                    () -> manager.isMonsterMazeModuleRegistered(monsterMaze));
-            publishMonsterMazeReadiness();
+            monsterMaze = new MonsterMazePlugin(this);
+            monsterMaze.enable();
+            if (monsterMaze.getGameManager() == null) {
+                throw new IllegalStateException("Monster Maze GameManager was not initialised.");
+            }
+            manager.setMonsterMazeModule(monsterMaze);
+            if (!manager.isMonsterMazeModuleRegistered(monsterMaze)) {
+                throw new IllegalStateException("The Arcade manager did not retain the integrated Monster Maze runtime.");
+            }
+            getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=monster-maze-registered map="
+                    + monsterMaze.getMapManager().getActiveMap());
         } catch (RuntimeException | Error startupFailure) {
-            monsterMazeReadiness.markFailed();
-            getLogger().log(java.util.logging.Level.SEVERE,
-                    "Monster Maze did not initialise inside Testplex Arcade. The shared lobby and cleared Arcade games "
-                            + "remain available; Monster Maze stays unavailable until this module fault is fixed.",
-                    startupFailure);
             if (monsterMaze != null) {
                 try {
                     monsterMaze.shutdown();
                 } catch (Throwable shutdownFailure) {
                     getLogger().log(java.util.logging.Level.WARNING,
-                            "Monster Maze cleanup after failed startup was incomplete.", shutdownFailure);
+                            "Monster Maze cleanup after failed Arcade startup was incomplete.", shutdownFailure);
                 }
-                monsterMaze = null;
             }
+            monsterMaze = null;
+            throw new IllegalStateException(
+                    "The integrated Monster Maze game failed to initialise; the Arcade runtime cannot be marked ready.",
+                    startupFailure);
         }
+
+        // Publish one process-correlated readiness record only after the shared
+        // lobby and every game required by the controlled acceptance queue exist.
+        publishArcadeRuntimeReadiness();
+        getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=full-runtime-readiness-published");
 
         for (Player online : Bukkit.getOnlinePlayers()) {
             Bukkit.getScheduler().runTask(this, () -> {
@@ -234,9 +236,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     public void onDisable() {
         try {
             ArcadeRuntimeReadinessSignal.remove(getDataFolder().toPath());
-            MonsterMazeRegistrationSignal.remove(getDataFolder().toPath());
         } catch (java.io.IOException exception) {
-            getLogger().warning("Could not remove an Arcade runtime readiness record: " + exception.getMessage());
+            getLogger().warning("Could not remove the Arcade runtime readiness record: " + exception.getMessage());
         }
         if (speedBuilders != null) speedBuilders.shutdown();
         if (manager != null) manager.shutdown();
@@ -245,6 +246,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     }
 
     private void publishArcadeRuntimeReadiness() {
+        if (manager == null || monsterMaze == null || !manager.isMonsterMazeModuleRegistered(monsterMaze)) {
+            throw new IllegalStateException(
+                    "The shared Arcade runtime cannot be marked ready without its integrated Monster Maze game.");
+        }
         try {
             java.nio.file.Path identityPath = getDataFolder().toPath()
                     .resolve(ArcadeRuntimeReadinessSignal.IDENTITY_FILE);
@@ -253,37 +258,17 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     + " deployed-sha-present=" + (System.getenv("TESTPLEX_DEPLOYED_BUILD_SHA") != null)
                     + " invocation-id-present=" + (System.getenv("INVOCATION_ID") != null));
             boolean deploymentSignal = ArcadeRuntimeReadinessSignal.publish(
-                    getDataFolder().toPath(), System.getenv("INVOCATION_ID"), ProcessHandle.current().pid());
-            getLogger().info("TESTPLEX_ARCADE_LOBBY_READY world=" + ModernArcadeLobby.WORLD_NAME
+                    getDataFolder().toPath(), System.getenv("INVOCATION_ID"), ProcessHandle.current().pid(),
+                    manager.isMonsterMazeModuleRegistered(monsterMaze));
+            getLogger().info("TESTPLEX_ARCADE_RUNTIME_READY world=" + ModernArcadeLobby.WORLD_NAME
                     + " plane=100x100 floor-y=" + ModernArcadeLobby.FLOOR_Y
-                    + " deployment-signal=" + deploymentSignal);
+                    + " monster-maze=READY deployment-signal=" + deploymentSignal);
             if (!deploymentSignal && System.getenv("TESTPLEX_DEPLOYED_BUILD_SHA") != null) {
                 throw new IllegalStateException("Systemd deployment identity is missing from "
-                        + getDataFolder() + "; refusing to report Arcade lobby as deployment-ready.");
+                        + getDataFolder() + "; refusing to report the complete Arcade runtime as deployment-ready.");
             }
         } catch (java.io.IOException exception) {
-            throw new IllegalStateException("Could not publish Testplex Arcade lobby readiness.", exception);
-        }
-    }
-
-    private void publishMonsterMazeReadiness() {
-        monsterMazeReadiness.requireReady();
-        if (manager == null || !manager.isMonsterMazeModuleRegistered(monsterMaze)) {
-            monsterMazeReadiness.markFailed();
-            throw new IllegalStateException("Monster Maze readiness cannot be published before Arcade manager attachment.");
-        }
-        try {
-            boolean deploymentSignal = MonsterMazeRegistrationSignal.publish(getDataFolder().toPath(),
-                    monsterMazeReadiness, System.getenv("INVOCATION_ID"), ProcessHandle.current().pid());
-            if (!deploymentSignal && System.getenv("TESTPLEX_DEPLOYED_BUILD_SHA") != null) {
-                throw new IllegalStateException("Monster Maze attached successfully but its deployment identity file "
-                        + "was unavailable; refusing to report the module as deployment-ready.");
-            }
-            getLogger().info("TESTPLEX_ARCADE_MODULE_READY module=monster-maze manager=testplex-arcade "
-                    + "game-manager=initialized deployment-signal=" + deploymentSignal);
-        } catch (java.io.IOException exception) {
-            monsterMazeReadiness.markFailed();
-            throw new IllegalStateException("Could not publish Monster Maze post-attachment readiness.", exception);
+            throw new IllegalStateException("Could not publish complete Testplex Arcade runtime readiness.", exception);
         }
     }
 

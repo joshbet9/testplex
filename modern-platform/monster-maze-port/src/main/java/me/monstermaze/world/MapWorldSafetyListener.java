@@ -32,8 +32,9 @@ public final class MapWorldSafetyListener implements Listener {
         this.plugin = plugin;
         Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
 
-        // MapManager loads the active map before this listener is constructed, so WorldLoadEvent
-        // is not sufficient for converted 1.8 worlds. Clean already-loaded worlds immediately.
+        // Map worlds are loaded lazily when a round starts. Handle WorldLoadEvent so
+        // newly loaded source maps receive their safety rules immediately, and sweep
+        // already-loaded map worlds here when the shared server restarts.
         for (World world : Bukkit.getWorlds()) {
             if (!isManagedWorld(world)) continue;
             configureWorld(world);
