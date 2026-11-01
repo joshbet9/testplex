@@ -1888,6 +1888,22 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onHeroesOfGwenBowOfRenewalAmmo(EntityDamageByEntityEvent event) {
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN || !(event.getDamager() instanceof Arrow)) return;
+        if (!(event.getEntity() instanceof Player victim) || !activePlayers.contains(victim.getUniqueId())) return;
+        Player shooter = resolveAttacker(event);
+        if (shooter == null || !activePlayers.contains(shooter.getUniqueId())
+                || !heroesOfGwenOwnedStoreItemNames(shooter).contains("Bow of Renewal")) return;
+        String hero = selectedHeroesOfGwen.get(shooter.getUniqueId());
+        int capacity = ArcadePortRules.heroesOfGwenFletcherMaxArrows(hero)
+                + heroesOfGwenStoreBonusAmmo(shooter);
+        ItemStack ammo = shooter.getInventory().getItem(7);
+        if (ammo == null || ammo.getType() != Material.ARROW || ammo.getAmount() >= capacity) return;
+        ammo.setAmount(Math.min(capacity, ammo.getAmount() + 1));
+        shooter.playSound(shooter.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.45F, 1.4F);
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onHeroesOfGwenPurchasedGearDeath(PlayerDeathEvent event) {
         if (stopped || game != ArcadePortGame.HEROES_OF_GWEN) return;
@@ -1908,6 +1924,18 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             String displayName = ChatColor.stripColor(drop.getItemMeta().getDisplayName());
             return displayName != null && protectedNames.contains(displayName);
         });
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onHeroesOfGwenStoreKillHeal(PlayerDeathEvent event) {
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN) return;
+        Player killer = event.getEntity().getKiller();
+        if (killer == null || !killer.isOnline() || !activePlayers.contains(killer.getUniqueId())) return;
+        double heal = 0.0D;
+        for (String itemName : heroesOfGwenOwnedStoreItemNames(killer)) {
+            heal += ArcadePortRules.heroesOfGwenStoreKillHeal(itemName);
+        }
+        if (heal > 0.0D) killer.setHealth(Math.min(killer.getMaxHealth(), killer.getHealth() + heal));
     }
 
     @EventHandler
@@ -2783,6 +2811,14 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 .put(slot, item.clone());
     }
 
+    private int heroesOfGwenStoreBonusAmmo(Player player) {
+        int bonus = 0;
+        for (String itemName : heroesOfGwenOwnedStoreItemNames(player)) {
+            bonus += ArcadePortRules.heroesOfGwenStoreAmmoIncrease(itemName);
+        }
+        return bonus;
+    }
+
     private void restoreHeroesOfGwenPurchasedEquipment(Player player) {
         if (player == null || !player.isOnline()) return;
         String hero = selectedHeroesOfGwen.get(player.getUniqueId());
@@ -3396,7 +3432,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         "Bombardment", "Ascend 15 blocks, then fire three explosive shots within 10 seconds. 60-second cooldown after the flight.");
                 player.getInventory().setItem(7, namedItem(Material.ARROW,
                         ChatColor.YELLOW + "Fletched Arrow", "Replenished every two seconds; maximum two."));
-                player.getInventory().getItem(7).setAmount(ArcadePortRules.HEROES_OF_GWEN_ROWENA_FLETCHER_MAX_ARROWS);
+                player.getInventory().getItem(7).setAmount(
+                        ArcadePortRules.HEROES_OF_GWEN_ROWENA_FLETCHER_MAX_ARROWS + heroesOfGwenStoreBonusAmmo(player));
                 heroAmmoNextAt.put(id, System.currentTimeMillis()
                         + ArcadePortRules.HEROES_OF_GWEN_ROWENA_FLETCHER_RELOAD_MILLIS);
             }
@@ -3443,7 +3480,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         "Infinity", "Seven seconds of homing arrows and Wither.");
                 player.getInventory().setItem(7, namedItem(Material.ARROW,
                         ChatColor.YELLOW + "Hunting Arrow", "Replenished every three seconds."));
-                player.getInventory().getItem(7).setAmount(3);
+                player.getInventory().getItem(7).setAmount(3 + heroesOfGwenStoreBonusAmmo(player));
                 heroAmmoNextAt.put(id, System.currentTimeMillis() + 3_000L);
             }
             default -> {
@@ -5661,7 +5698,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                             player, ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_AMMO_RELOAD_MILLIS, true));
                 }
             }
-            int fletcherCapacity = ArcadePortRules.heroesOfGwenFletcherMaxArrows(hunterHero);
+            int fletcherCapacity = ArcadePortRules.heroesOfGwenFletcherMaxArrows(hunterHero)
+                    + heroesOfGwenStoreBonusAmmo(player);
             long fletcherReload = ArcadePortRules.heroesOfGwenFletcherReloadMillis(hunterHero);
             if (fletcherCapacity > 0 && fletcherReload > 0L) {
                 long nextAmmo = heroAmmoNextAt.getOrDefault(id, now + fletcherReload);
