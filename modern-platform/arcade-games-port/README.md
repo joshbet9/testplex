@@ -1,6 +1,6 @@
 # Modern Arcade mechanics prototypes (Paper 26.3)
 
-This plugin adds first-pass playable mechanics harnesses for the 17 Arcade games outside the dedicated Monster Maze and Snake modules. It is a compatibility/work-in-progress layer intended to expose API and game-loop problems early; it is **not** a claim that all original Mineplex mechanics or maps have been faithfully ported yet.
+This plugin adds first-pass playable mechanics harnesses for the 18 Arcade games outside the dedicated Monster Maze and Snake modules. It is a compatibility/work-in-progress layer intended to expose API and game-loop problems early; it is **not** a claim that all original Mineplex mechanics or maps have been faithfully ported yet.
 
 ## Current controlled acceptance queue
 
@@ -178,3 +178,12 @@ Wither flight speed follows a continuous altitude curve. Near the spawn height, 
 ## Speed Builders — isolated source-map WIP
 
 Speed Builders Arcade loads the original Reborn Shroomland Lake archive, the authored 7×7×7 template library and per-template ground states, the eight source player plots and central judging plot. Gameplay uses source-style view/build timers, template time modifiers, block-state scoring, mob markers/spawn-egg reconstruction, plot-bounded building and instant demolition refunds. The Arcade variant is **non-elimination**: every connected builder receives a normalized accuracy score out of 100 each round, remains in play regardless of score, and contributes to a configurable five-round cumulative total (default `speed-builders.match-rounds: 5`). Highest cumulative accuracy wins. Cumulative build time is a tie-break only for players who perfected every build; only their times appear on the final scoreboard. If no tied top scorer perfected every build, the accuracy tie remains shared. Gwen is a non-attacking Elder Guardian judge who looks between build plots; there is no attack beam, plot explosion, Guardian conversion or player elimination. All builders briefly enter spectator mode together to review the central model, then return to their own plots for the next round. Local stats and durable player-state snapshots are retained. The module remains outside the normal `READY_FOR_TEST` rotation pending Paper build and live multiplayer/map acceptance; see [SPEED-BUILDERS-TEST-PLAN.md](SPEED-BUILDERS-TEST-PLAN.md). Test commands: `/arcadeport play speed-builders`, `/arcadeport join speed-builders`, `/arcadeport start speed-builders`, and `/stats speed-builders`.
+
+
+## Hoops Remastered — modern basketball port
+
+Hoops Remastered is a two-team basketball port inside the shared Arcade lifecycle. It supports 2–16 players (up to 8v8), a five-minute regulation clock or first-to-21 score, no win-by-two, tied-score sudden-death overtime, a 24-second shot clock, two- and three-point shots, passing, steals, timed blocks, recoverable rebounds and Hops movement. The disposable Paper 26.3 acceptance harness launches four real clients and checks consecutive matches, career statistics and complete return to the standard lobby state.
+
+Hoops remains outside the normal READY_FOR_TEST allow-list until live acceptance is complete; CI enables it only in its disposable test server.
+
+See `HOOPS-REMASTERED-ACCEPTANCE-PLAN.md` for the remaining manual ball-feel, trajectory and rim-geometry checks.
