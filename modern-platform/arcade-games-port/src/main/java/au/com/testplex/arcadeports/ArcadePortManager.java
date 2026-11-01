@@ -18340,7 +18340,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         session.witherMinionReadyAt.put(owner, now + 10_000L);
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < WitherAssaultRules.minionCount(); i++) {
             Skeleton minion = session.world.spawn(player.getEyeLocation(), Skeleton.class);
             minion.setRemoveWhenFarAway(false);
             minion.setCustomName(ChatColor.DARK_GRAY + "Skeletal Minion");
