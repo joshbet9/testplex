@@ -457,6 +457,19 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     }
 
     @Test
+    void heroesOfGwenStorePlayerCombatAppliesBasicAbilityAndUniversalFlatEffects() {
+        List<String> items = List.of("Adept's Chestplate", "Battle Mage Chestplate", "Urchin's Chestcloth");
+        assertEquals(13.5D, ArcadePortRules.heroesOfGwenStorePlayerCombatDamage(
+                10.0D, items, true, false), 0.00001D);
+        assertEquals(12.0D, ArcadePortRules.heroesOfGwenStorePlayerCombatDamage(
+                10.0D, items, false, true), 0.00001D);
+        assertEquals(11.0D, ArcadePortRules.heroesOfGwenStorePlayerCombatDamage(
+                10.0D, List.of("Urchin's Chestcloth"), false, false), 0.00001D);
+        assertEquals(10.0D, ArcadePortRules.heroesOfGwenStorePlayerCombatDamage(
+                10.0D, List.of(), false, false), 0.00001D);
+    }
+
+    @Test
     void heroesOfGwenStoreHitConditionsMatchSourceBowAndSwordEffects() {
         assertEquals("SPEED", ArcadePortRules.heroesOfGwenStoreHitCondition("Bow of Pursuit"));
         assertEquals(3_000L, ArcadePortRules.heroesOfGwenStoreHitConditionDurationMillis("Bow of Pursuit"));
