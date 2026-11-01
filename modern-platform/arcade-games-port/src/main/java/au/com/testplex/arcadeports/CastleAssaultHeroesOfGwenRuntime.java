@@ -2037,7 +2037,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         for (String itemName : heroesOfGwenOwnedStoreItemNames(killer)) {
             heal += ArcadePortRules.heroesOfGwenStoreKillHeal(itemName);
         }
-        killer.setHealth(Math.min(killer.getMaxHealth(), killer.getHealth() + heal));
+        healHeroesOfGwenAbility(killer, killer, heal);
     }
 
     @EventHandler
@@ -2953,9 +2953,17 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void healHeroesOfGwenAbility(Player source, LivingEntity recipient, double baseAmount) {
-        if (source == null || !source.isOnline() || recipient == null
-                || !recipient.isValid() || recipient.isDead()) return;
-        double amount = heroesOfGwenStoreAbilityDamage(source, baseAmount);
+        if (recipient == null || !recipient.isValid() || recipient.isDead()) return;
+        double amount = baseAmount;
+        // MobaAbilityDamageEffect is owned by the healing source; MobaHPRegenEffect
+        // is owned by the player receiving this non-natural HP regen event.
+        if (source != null && source.isOnline()) {
+            amount = heroesOfGwenStoreAbilityDamage(source, amount);
+        }
+        if (recipient instanceof Player target) {
+            amount = ArcadePortRules.heroesOfGwenStoreHpRegenAmount(
+                    amount, heroesOfGwenOwnedStoreItemNames(target));
+        }
         recipient.setHealth(Math.min(recipient.getMaxHealth(), recipient.getHealth() + amount));
     }
 
