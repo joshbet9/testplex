@@ -30,10 +30,23 @@ function connect(username) {
       hideErrors: false,
     });
     clients.push(client);
+    const rawWrite = client.write.bind(client);
+    client.write = (name, data) => {
+      const result = rawWrite(name, data);
+      // Pair each position-bearing packet at the socket-write boundary. A free-
+      // running timer can race a buffered movement packet and leave it unpaired.
+      if (name === 'position' || name === 'position_look' || name === 'look' || name === 'flying') {
+        try {
+          rawWrite('tick_end', {});
+          log('BOT_MOVEMENT_TICK|PASS|' + username + '|after=' + name);
+        } catch (error) {
+          log('BOT_MOVEMENT_TICK|FAIL|' + username + '|after=' + name + '|' + String(error));
+        }
+      }
+      return result;
+    };
     let loggedIn = false;
     let settled = false;
-    let clientTickTimer = null;
-    let tickEndErrorLogged = false;
     let lastPlayerLoadedAt = 0;
 
     const timeout = setTimeout(() => {
@@ -98,7 +111,6 @@ function connect(username) {
             onGround: false,
             hasHorizontalCollision: false,
           });
-          client.write('tick_end', {});
           acknowledgedTeleports.add(latestTeleportId);
           log('BOT_TELEPORT_ACK|PASS|' + username + '|id=' + latestTeleportId
             + '|reason=' + pending.reason + '|pos=' + latest.x + ',' + latest.y + ',' + latest.z
@@ -117,23 +129,6 @@ function connect(username) {
       clearTimeout(timeout);
       log('BOT_LOGIN|PASS|' + username + '|protocol=' + client.protocolVersion);
 
-      // Paper 26.3 tracks whether a position-bearing movement packet has been
-      // received in the current client tick. A second move before tick_end is
-      // rejected as "Invalid move player packet received". Vanilla emits
-      // client_tick_end once per tick; this raw protocol client has no game loop,
-      // so mirror it explicitly while the Play connection is alive.
-      clientTickTimer = setInterval(() => {
-        try {
-          client.write('tick_end', {});
-        } catch (error) {
-          if (!tickEndErrorLogged) {
-            tickEndErrorLogged = true;
-            log('BOT_TICK_END|FAIL|' + username + '|' + String(error));
-          }
-        }
-      }, 50);
-      clientTickTimer.unref?.();
-      log('BOT_TICK_END|PASS|' + username + '|intervalMs=50|protocol=777');
       resolve(client);
     });
 
@@ -187,10 +182,6 @@ function connect(username) {
 
     client.once('end', (reason) => {
       clearTimeout(timeout);
-      if (clientTickTimer) {
-        clearInterval(clientTickTimer);
-        clientTickTimer = null;
-      }
       if (loggedIn) {
         finished.add(username);
         log('BOT_END|' + username + '|' + String(reason || 'server closed connection'));
