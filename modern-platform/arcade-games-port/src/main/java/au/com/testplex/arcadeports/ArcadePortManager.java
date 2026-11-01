@@ -24114,6 +24114,8 @@ public final class ArcadePortManager implements Listener {
         final int food;
         final float saturation;
         final float walkSpeed;
+        final float flySpeed;
+        final Location compassTarget;
         final boolean collidable;
         final boolean invulnerable;
         final Scoreboard scoreboard;
@@ -24136,6 +24138,9 @@ public final class ArcadePortManager implements Listener {
             food = p.getFoodLevel();
             saturation = p.getSaturation();
             walkSpeed = p.getWalkSpeed();
+            flySpeed = p.getFlySpeed();
+            Location currentCompassTarget = p.getCompassTarget();
+            compassTarget = currentCompassTarget == null ? null : currentCompassTarget.clone();
             collidable = p.isCollidable();
             invulnerable = p.isInvulnerable();
             scoreboard = p.getScoreboard();
@@ -24157,6 +24162,8 @@ public final class ArcadePortManager implements Listener {
             p.setFoodLevel(food);
             p.setSaturation(saturation);
             p.setWalkSpeed(walkSpeed);
+            p.setFlySpeed(flySpeed);
+            p.setCompassTarget(compassTarget == null ? null : compassTarget.clone());
             p.setCollidable(collidable);
             p.setInvulnerable(invulnerable);
             p.setScoreboard(scoreboard);
