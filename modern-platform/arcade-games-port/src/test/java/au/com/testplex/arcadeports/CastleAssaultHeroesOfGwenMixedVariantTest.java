@@ -442,7 +442,7 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
         assertEquals(0.792D, ArcadePortRules.heroesOfGwenStoreHpRegenAmount(
                 0.66D, List.of("Urchin's Cap")), 0.00001D);
         assertEquals(0.759D, ArcadePortRules.heroesOfGwenStoreHpRegenAmount(
-                0.66D, List.of("Archer's Bane Helmet")), 0.00001D);
+                0.66D, List.of("Prince's Plate Helmet")), 0.00001D);
         assertEquals(0.792D, ArcadePortRules.heroesOfGwenStoreHpRegenAmount(
                 0.66D, List.of("Urchin's Cap", "Vampiric Helmet")), 0.00001D);
     }
