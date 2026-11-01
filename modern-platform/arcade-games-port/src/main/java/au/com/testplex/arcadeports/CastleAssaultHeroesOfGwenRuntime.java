@@ -1283,7 +1283,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         ItemStack dropped = event.getItemDrop().getItemStack();
         String id = heroSkillId(dropped);
         if (id == null || !Set.of("hattori.ender_blade", "devon.infinity",
-                "anath.burn_beam", "anath.meteor_shower", "larissa.storm_blessing").contains(id)) return;
+                "anath.burn_beam", "anath.meteor_shower", "larissa.storm_blessing",
+                "bardolf.full_moon").contains(id)) return;
         event.setCancelled(true);
         activateHeroesOfGwenSkill(player, id);
     }
@@ -1302,6 +1303,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             ItemStack skill = player.getInventory().getItem(2);
             if ("larissa.water_dash".equals(heroSkillId(skill))) {
                 activateHeroesOfGwenSkill(player, "larissa.water_dash");
+            }
+        } else if ("bardolf".equals(hero)) {
+            ItemStack skill = player.getInventory().getItem(2);
+            if ("bardolf.wolf_pounce".equals(heroSkillId(skill))) {
+                activateHeroesOfGwenSkill(player, "bardolf.wolf_pounce");
             }
         }
     }
@@ -2528,6 +2534,16 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 player.getInventory().setItem(7, namedItem(Material.BLAZE_POWDER,
                         ChatColor.GOLD + "Embers", "Anath mage resource."));
             }
+            case "bardolf" -> {
+                player.getInventory().setItem(0, namedItem(Material.WOODEN_SWORD,
+                        ChatColor.GREEN + "Sword", "Bardolf's basic weapon; attacks direct the wolf pack."));
+                giveHeroesOfGwenSkillItem(player, 1, "bardolf.summon_wolf", Material.BONE,
+                        "Summon Wolf", "Summon up to five 8-health wolves. Wolves attack enemies you hit. 5-second cooldown.");
+                giveHeroesOfGwenSkillItem(player, 2, "bardolf.wolf_pounce", Material.FEATHER,
+                        "Wolf Pounce", "Leap into the air; your wolves follow and leap after you. Click or sneak. 7-second cooldown.");
+                giveHeroesOfGwenSkillItem(player, 3, "bardolf.full_moon", Material.NETHER_STAR,
+                        "Full Moon", "For 10 seconds gain +1 attack damage and +5% movement speed per living wolf; wolves are healed and strengthened, then perish. 60-second cooldown.");
+            }
             case "larissa" -> {
                 ItemStack cannon = namedItem(Material.DIAMOND_HOE, ChatColor.GREEN + "Aqua Cannon",
                         "Fires a 10-block water beam for 3 damage. Consumes one Water Stone.");
@@ -2683,6 +2699,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             case "larissa.dancing_fountain" -> launchLarissaFountain(player);
             case "larissa.water_dash" -> activateLarissaWaterDash(player);
             case "larissa.storm_blessing" -> activateLarissaStormBlessing(player);
+            case "bardolf.summon_wolf" -> summonBardolfWolf(player);
+            case "bardolf.wolf_pounce" -> activateBardolfPounce(player);
+            case "bardolf.full_moon" -> activateBardolfFullMoon(player);
             default -> player.sendMessage(ChatColor.YELLOW + "That hero ability is not yet available.");
         }
     }
