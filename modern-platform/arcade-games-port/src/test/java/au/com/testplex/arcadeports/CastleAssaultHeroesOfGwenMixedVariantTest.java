@@ -414,7 +414,7 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     void heroesValleyAndMonochromeSidequestsMatchSourceTimingAndCombatValues() {
         assertEquals(300_000L, ArcadePortRules.HEROES_OF_GWEN_SIDEQUEST_INITIAL_DELAY_MILLIS);
         assertEquals(300_000L, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_RESPAWN_DELAY_MILLIS);
-        assertEquals(250L, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_ATTACK_INTERVAL_MILLIS);
+        assertEquals(500L, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_ATTACK_INTERVAL_MILLIS);
         assertEquals(100, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_HEALTH);
         assertEquals(5.0D, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_TARGET_SPEED, 0.00001D);
         assertEquals(3.0D, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_HOME_SPEED, 0.00001D);
