@@ -95,6 +95,61 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     }
 
     @Test
+    void anathBurnBeamMatchesArchivedRangeDamageAndTargetRecharge() {
+        assertEquals(9_000L, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_COOLDOWN_MILLIS);
+        assertEquals(9.0D, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_RANGE, 0.00001D);
+        assertEquals(0.2D, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_STEP, 0.00001D);
+        assertEquals(2.0D, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_HIT_RADIUS, 0.00001D);
+        assertEquals(11, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE);
+        assertEquals(2_000L, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_TARGET_RECHARGE_MILLIS);
+        assertEquals(3, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_STEPS_PER_TICK);
+    }
+
+    @Test
+    void anathFlameWandMatchesArchivedEmberDamageSpeedAndAmmoCadence() {
+        assertEquals(500L, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_INTERVAL_MILLIS);
+        assertEquals(1_000L, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_RELOAD_MILLIS);
+        assertEquals(4, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_CAPACITY);
+        assertEquals(5, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE);
+        assertEquals(1.25D, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_PROJECTILE_SPEED, 0.00001D);
+        assertEquals(60, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_TICKS);
+    }
+
+    @Test
+    void anathFlameDashMatchesArchivedVelocityDurationAndFireTrail() {
+        assertEquals(12_000L, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_COOLDOWN_MILLIS);
+        assertEquals(600L, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_DURATION_MILLIS);
+        assertEquals(1.0D, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_SPEED, 0.00001D);
+        assertEquals(500L, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_FIRE_DELAY_MILLIS);
+        assertEquals(5_000L, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_FIRE_DURATION_MILLIS);
+    }
+
+    @Test
+    void anathMeteorShowerMatchesItsDocumentedAreaDurationAndDamageCadence() {
+        assertEquals(60_000L, ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_COOLDOWN_MILLIS);
+        assertEquals(7_000L, ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_DURATION_MILLIS);
+        assertEquals(10.0D, ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_RADIUS, 0.00001D);
+        assertEquals(500L, ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_BURN_INTERVAL_MILLIS);
+        assertEquals(1.0D, ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_BURN_DAMAGE, 0.00001D);
+        assertEquals(2.0D, ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_PULSE_DAMAGE, 0.00001D);
+        assertEquals(20.0D, ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_FIREBALL_DAMAGE, 0.00001D);
+        assertTrue(ArcadePortRules.heroesOfGwenAnathMeteorContainsDistance(0.0D));
+        assertTrue(ArcadePortRules.heroesOfGwenAnathMeteorContainsDistance(10.0D));
+        assertFalse(ArcadePortRules.heroesOfGwenAnathMeteorContainsDistance(10.01D));
+        assertFalse(ArcadePortRules.heroesOfGwenAnathMeteorContainsDistance(Double.NaN));
+    }
+
+    @Test
+    void heroesOfGwenFletcherUsesTheSourceHunterCapacitiesAndReloadTimes() {
+        assertEquals(3, ArcadePortRules.heroesOfGwenFletcherMaxArrows("devon"));
+        assertEquals(3_000L, ArcadePortRules.heroesOfGwenFletcherReloadMillis("devon"));
+        assertEquals(2, ArcadePortRules.heroesOfGwenFletcherMaxArrows("rowena"));
+        assertEquals(2_000L, ArcadePortRules.heroesOfGwenFletcherReloadMillis("rowena"));
+        assertEquals(0, ArcadePortRules.heroesOfGwenFletcherMaxArrows("hattori"));
+        assertEquals(0L, ArcadePortRules.heroesOfGwenFletcherReloadMillis("hattori"));
+    }
+
+    @Test
     void bothGamesResolveTheirOriginalSourceMapFoldersAndIds() {
         assertEquals(ArcadePortGame.CASTLE_ASSAULT, ArcadePortGame.fromId("castle-assault"));
         assertEquals(ArcadePortGame.HEROES_OF_GWEN, ArcadePortGame.fromId("Heroes of Gwen"));
@@ -106,5 +161,496 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
                 "source-maps/Castle Assault/CastleAssault_Castle Siege.zip"));
         assertTrue(SourceMapCatalog.resourcePathBelongsToGame(ArcadePortGame.HEROES_OF_GWEN,
                 "source-maps/Heroes of GWEN/HOG_Heros_Valley.zip"));
+    }
+
+    @Test
+    void larissaAquaCannonUsesSourceDamageRangeAndWaterStoneReload() {
+        assertEquals(3, ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE);
+        assertEquals(10.0D, ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_RANGE, 0.00001D);
+        assertEquals(500L, ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_INTERVAL_MILLIS);
+        assertEquals(3_000L, ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_AMMO_RELOAD_MILLIS);
+        assertEquals(64, ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_AMMO_CAPACITY);
+    }
+
+    @Test
+    void larissaDancingFountainMatchesSourceAreaDurationHealingAndDamage() {
+        assertEquals(14_000L, ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_COOLDOWN_MILLIS);
+        assertEquals(6_000L, ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DURATION_MILLIS);
+        assertEquals(3.0D, ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS, 0.00001D);
+        assertEquals(1_000L, ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_PULSE_INTERVAL_MILLIS);
+        assertEquals(4, ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_HEAL_PER_SECOND);
+        assertEquals(2, ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DAMAGE_PER_SECOND);
+    }
+
+    @Test
+    void larissaWaterDashAndStormBlessingMatchSourceDurationsAndCooldowns() {
+        assertEquals(600L, ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_DASH_DURATION_MILLIS);
+        assertEquals(10_000L, ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_DASH_COOLDOWN_MILLIS);
+        assertEquals(7_000L, ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_DURATION_MILLIS);
+        assertEquals(60_000L, ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_COOLDOWN_MILLIS);
+        assertEquals(66_500L, ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_REUSE_DELAY_MILLIS);
+        assertEquals(1_000L, ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_INTERVAL_MILLIS);
+        assertEquals(2, ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_PER_SECOND);
+    }
+
+    @Test
+    void bardolfSummonWolfMatchesTheArchivedPackLimitHealthAndCooldown() {
+        assertEquals(5, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_MAX_WOLVES);
+        assertEquals(8.0D, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_HEALTH, 0.00001D);
+        assertEquals(5_000L, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_SUMMON_COOLDOWN_MILLIS);
+        assertEquals(500L, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_ATTACK_INTERVAL_MILLIS);
+        assertEquals(1.0D, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_ATTACK_DAMAGE, 0.00001D);
+        assertEquals(9.0D, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_ATTACK_DISTANCE_SQUARED, 0.00001D);
+        assertEquals(100.0D, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_OWNER_TELEPORT_DISTANCE_SQUARED, 0.00001D);
+    }
+
+    @Test
+    void bardolfWolfPounceMatchesTheCoordinatedLeapTimingAndVector() {
+        assertEquals(7_000L, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_POUNCE_COOLDOWN_MILLIS);
+        assertEquals(6_500L, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_POUNCE_OVERRIDE_MILLIS);
+        assertEquals(4.0D, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_POUNCE_TRIGGER_DISTANCE_SQUARED, 0.00001D);
+        assertEquals(1.5D, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_POUNCE_VELOCITY_MULTIPLIER, 0.00001D);
+        assertEquals(0.8D, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_POUNCE_MINIMUM_VERTICAL_VELOCITY, 0.00001D);
+    }
+
+    @Test
+    void bardolfFullMoonMatchesItsActiveDurationBuffsAndCooldownRestart() {
+        assertEquals(10_000L, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_DURATION_MILLIS);
+        assertEquals(60_000L, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_COOLDOWN_MILLIS);
+        assertEquals(70_000L, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_REUSE_DELAY_MILLIS);
+        assertEquals(20.0D, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_WOLF_HEALTH, 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_DAMAGE_PER_WOLF, 0.00001D);
+        assertEquals(0.05D, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_SPEED_PER_WOLF, 0.00001D);
+    }
+
+    @Test
+    void rowenaLightArrowsMatchesFivePiercingShotsAndDamageScaling() {
+        assertEquals(5, ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_COUNT);
+        assertEquals(12_000L, ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROWS_COOLDOWN_MILLIS);
+        assertEquals(500L, ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_TARGET_RECHARGE_MILLIS);
+        assertEquals(40.0D, ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_RANGE, 0.00001D);
+        assertEquals(0.4D, ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_STEP, 0.00001D);
+        assertEquals(1.5D, ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_HIT_RADIUS, 0.00001D);
+        assertEquals(4.0D, ArcadePortRules.heroesOfGwenRowenaLightArrowDamage(0), 0.00001D);
+        assertEquals(5.25D, ArcadePortRules.heroesOfGwenRowenaLightArrowDamage(1), 0.00001D);
+        assertEquals(6.5D, ArcadePortRules.heroesOfGwenRowenaLightArrowDamage(2), 0.00001D);
+    }
+
+    @Test
+    void rowenaCombatSlideMatchesSourceVelocityDurationAndCooldown() {
+        assertEquals(8_000L, ArcadePortRules.HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_COOLDOWN_MILLIS);
+        assertEquals(250L, ArcadePortRules.HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_DURATION_MILLIS);
+        assertEquals(1.5D, ArcadePortRules.HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_SPEED, 0.00001D);
+    }
+
+    @Test
+    void rowenaBombardmentMatchesSourceFlightShotsAndExplosiveDamage() {
+        assertEquals(10_000L, ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_DURATION_MILLIS);
+        assertEquals(60_000L, ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_COOLDOWN_MILLIS);
+        assertEquals(70_000L, ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_REUSE_DELAY_MILLIS);
+        assertEquals(3, ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_SHOTS);
+        assertEquals(15.0D, ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_ASCENT_BLOCKS, 0.00001D);
+        assertEquals(40.0D, ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_RANGE, 0.00001D);
+        assertEquals(5.0D, ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_BLAST_RADIUS, 0.00001D);
+        assertEquals(10.0D, ArcadePortRules.heroesOfGwenRowenaBombardmentDamage(0), 0.00001D);
+        assertEquals(12.5D, ArcadePortRules.heroesOfGwenRowenaBombardmentDamage(1), 0.00001D);
+    }
+
+    @Test
+    void danaPulseHealMatchesSourceRadiusCooldownAndHealingValues() {
+        assertEquals(8_000L, ArcadePortRules.HEROES_OF_GWEN_DANA_PULSE_HEAL_COOLDOWN_MILLIS);
+        assertEquals(7.0D, ArcadePortRules.HEROES_OF_GWEN_DANA_PULSE_HEAL_RADIUS, 0.00001D);
+        assertEquals(2.0D, ArcadePortRules.HEROES_OF_GWEN_DANA_PULSE_HEAL_SELF, 0.00001D);
+        assertEquals(4.0D, ArcadePortRules.HEROES_OF_GWEN_DANA_PULSE_HEAL_ALLY, 0.00001D);
+    }
+
+    @Test
+    void danaKnockUpMatchesSourceDashAndCollisionValues() {
+        assertEquals(10_000L, ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_COOLDOWN_MILLIS);
+        assertEquals(600L, ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_DURATION_MILLIS);
+        assertEquals(1.0D, ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_SPEED, 0.00001D);
+        assertEquals(2.0D, ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_COLLISION_RADIUS, 0.00001D);
+        assertEquals(500L, ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_TARGET_RECHARGE_MILLIS);
+        assertEquals(12.0D, ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_PLAYER_DAMAGE, 0.00001D);
+        assertEquals(8.0D, ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_MINION_DAMAGE, 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_PLAYER_LIFT, 0.00001D);
+        assertEquals(0.5D, ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_MINION_LIFT, 0.00001D);
+    }
+
+    @Test
+    void danaRallyMatchesSourceLeapLandingAndBannerTimings() {
+        assertEquals(40_000L, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_COOLDOWN_MILLIS);
+        assertEquals(47_000L, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_REUSE_DELAY_MILLIS);
+        assertEquals(1.5D, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_JUMP_VERTICAL_VELOCITY, 0.00001D);
+        assertEquals(1_000L, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_MINIMUM_FLIGHT_MILLIS);
+        assertEquals(7_000L, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_BANNER_DURATION_MILLIS);
+        assertEquals(5.0D, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_HEAL_RADIUS, 0.00001D);
+        assertEquals(3.0D, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_HEAL_PER_SECOND, 0.00001D);
+        assertEquals(3.0D, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_LANDING_DAMAGE_RADIUS, 0.00001D);
+        assertEquals(7.0D, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_LANDING_DAMAGE, 0.00001D);
+    }
+
+    @Test
+    void biffTetherMatchesSourceRangeSlowAndActiveCooldownWindow() {
+        assertEquals(12_000L, ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_COOLDOWN_MILLIS);
+        assertEquals(5_000L, ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_ACTIVE_MILLIS);
+        assertEquals(17_000L, ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_REUSE_DELAY_MILLIS);
+        assertEquals(8.0D, ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_RANGE, 0.00001D);
+        assertEquals(100.0D, ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_BREAK_DISTANCE_SQUARED, 0.00001D);
+        assertEquals(4.0D, ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_PULL_STOP_DISTANCE_SQUARED, 0.00001D);
+        assertEquals(5_000L, ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_SLOW_DURATION_MILLIS);
+        assertEquals(1, ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_SLOW_AMPLIFIER);
+    }
+
+    @Test
+    void biffBattleLeapMatchesSourceLeapLandingDamageAndKnockUp() {
+        assertEquals(11_000L, ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_COOLDOWN_MILLIS);
+        assertEquals(1.0D, ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_VERTICAL_VELOCITY, 0.00001D);
+        assertEquals(1_000L, ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_MINIMUM_FLIGHT_MILLIS);
+        assertEquals(5.0D, ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_LANDING_RADIUS, 0.00001D);
+        assertEquals(4.0D, ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_DAMAGE, 0.00001D);
+        assertEquals(0.6D, ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_MINIMUM_KNOCK_UP, 0.00001D);
+        assertEquals(0.5D, ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_RANDOM_KNOCK_UP, 0.00001D);
+    }
+
+    @Test
+    void biffCavalryChargeMatchesSourceMountDurationRootAndCooldown() {
+        assertEquals(45_000L, ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_COOLDOWN_MILLIS);
+        assertEquals(50_500L, ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_REUSE_DELAY_MILLIS);
+        assertEquals(6_000L, ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_DURATION_MILLIS);
+        assertEquals(2_000L, ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_ROOT_RECHARGE_MILLIS);
+        assertEquals(1_000L, ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_ROOT_DURATION_MILLIS);
+        assertEquals(5.0D, ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_RADIUS, 0.00001D);
+        assertEquals(4.0D, ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_DAMAGE, 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_JUMP_STRENGTH, 0.00001D);
+    }
+
+    @Test
+    void ivyVinePullMatchesSourceBeamRangeDamageAndSlowValues() {
+        assertEquals(10_000L, ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_COOLDOWN_MILLIS);
+        assertEquals(9.0D, ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_RANGE, 0.00001D);
+        assertEquals(0.25D, ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_BEAM_STEP, 0.00001D);
+        assertEquals(2.0D, ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_HIT_RADIUS, 0.00001D);
+        assertEquals(4.0D, ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_STOP_DISTANCE_SQUARED, 0.00001D);
+        assertEquals(4, ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_PLAYER_DAMAGE);
+        assertEquals(6, ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_MINION_DAMAGE);
+        assertEquals(60, ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_SLOW_TICKS);
+        assertEquals(2, ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_SLOW_AMPLIFIER);
+        assertEquals(8_000L, ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_MAX_PULL_MILLIS);
+    }
+
+    @Test
+    void ivyFloralLeapMatchesSourceLandingDamageFlowerBedAndCooldown() {
+        assertEquals(11_000L, ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_COOLDOWN_MILLIS);
+        assertEquals(1.2D, ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_VERTICAL_VELOCITY, 0.00001D);
+        assertEquals(500L, ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_MINIMUM_FLIGHT_MILLIS);
+        assertEquals(5_000L, ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_BED_DURATION_MILLIS);
+        assertEquals(1_000L, ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE_INTERVAL_MILLIS);
+        assertEquals(5.0D, ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE_RADIUS, 0.00001D);
+        assertEquals(3, ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_FLOWER_RADIUS);
+        assertEquals(2, ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE);
+        assertEquals(50, ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_SLOW_TICKS);
+        assertEquals(2, ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_SLOW_AMPLIFIER);
+    }
+
+    @Test
+    void ivyThornWallMatchesSourceDurationAreaSupportAndEnemyEffects() {
+        assertEquals(45_000L, ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_COOLDOWN_MILLIS);
+        assertEquals(5_000L, ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_DURATION_MILLIS);
+        assertEquals(3, ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_BLOCK_RADIUS);
+        assertEquals(60L, ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ALLY_REGEN_TICKS);
+        assertEquals(1, ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ALLY_REGEN_AMPLIFIER);
+        assertEquals(2_000L, ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_ROOT_MILLIS);
+        assertEquals(2_000L, ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_ROOT_RECHARGE_MILLIS);
+        assertEquals(900L, ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_DAMAGE_RECHARGE_MILLIS);
+        assertEquals(2, ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_DAMAGE);
+    }
+
+    @Test
+    void hattoriDoubleJumpMatchesSourcePowerHeightAndRecharge() {
+        assertEquals(1.0D, ArcadePortRules.HEROES_OF_GWEN_HATTORI_DOUBLE_JUMP_POWER, 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.HEROES_OF_GWEN_HATTORI_DOUBLE_JUMP_HEIGHT_LIMIT, 0.00001D);
+        assertEquals(3_000L, ArcadePortRules.HEROES_OF_GWEN_HATTORI_DOUBLE_JUMP_COOLDOWN_MILLIS);
+    }
+
+    @Test
+    void hattoriShurikenNinjaDashAndEnderBladeMatchSourceValues() {
+        assertEquals(3, ArcadePortRules.HEROES_OF_GWEN_HATTORI_SHURIKEN_COUNT);
+        assertEquals(3, ArcadePortRules.HEROES_OF_GWEN_HATTORI_SHURIKEN_DAMAGE);
+        assertEquals(1_500L, ArcadePortRules.HEROES_OF_GWEN_HATTORI_SHURIKEN_COOLDOWN_MILLIS);
+        assertEquals(4L, ArcadePortRules.HEROES_OF_GWEN_HATTORI_SHURIKEN_SPACING_TICKS);
+        assertEquals(7_000L, ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_COOLDOWN_MILLIS);
+        assertEquals(10.0D, ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_RANGE, 0.00001D);
+        assertEquals(2.0D, ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_COLLISION_RADIUS, 0.00001D);
+        assertEquals(8, ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_DAMAGE);
+        assertEquals(7_000L, ArcadePortRules.HEROES_OF_GWEN_HATTORI_ENDER_BLADE_ACTIVE_MILLIS);
+        assertEquals(60_000L, ArcadePortRules.HEROES_OF_GWEN_HATTORI_ENDER_BLADE_COOLDOWN_MILLIS);
+        assertEquals(67_000L, ArcadePortRules.HEROES_OF_GWEN_HATTORI_ENDER_BLADE_REUSE_DELAY_MILLIS);
+        assertEquals(9.0D, ArcadePortRules.HEROES_OF_GWEN_HATTORI_ENDER_BLADE_DAMAGE_BONUS, 0.00001D);
+    }
+
+    @Test
+    void devonTntArrowsMatchSourceShotCountCooldownAndBowDamageScaling() {
+        assertEquals(3, ArcadePortRules.HEROES_OF_GWEN_DEVON_TNT_ARROW_COUNT);
+        assertEquals(17_000L, ArcadePortRules.HEROES_OF_GWEN_DEVON_TNT_ARROW_COOLDOWN_MILLIS);
+        assertEquals(5.0D, ArcadePortRules.HEROES_OF_GWEN_DEVON_TNT_EXPLOSION_RADIUS, 0.00001D);
+        assertEquals(10.0D, ArcadePortRules.heroesOfGwenDevonTntArrowDamage(0), 0.00001D);
+        assertEquals(12.5D, ArcadePortRules.heroesOfGwenDevonTntArrowDamage(1), 0.00001D);
+        assertEquals(15.0D, ArcadePortRules.heroesOfGwenDevonTntArrowDamage(2), 0.00001D);
+    }
+
+    @Test
+    void devonHuntersBoostAndInfinityMatchSourceActiveAndCooldownWindows() {
+        assertEquals(10_000L, ArcadePortRules.HEROES_OF_GWEN_DEVON_HUNTERS_BOOST_COOLDOWN_MILLIS);
+        assertEquals(3_000L, ArcadePortRules.HEROES_OF_GWEN_DEVON_HUNTERS_BOOST_DURATION_MILLIS);
+        assertEquals(7_000L, ArcadePortRules.HEROES_OF_GWEN_DEVON_INFINITY_ACTIVE_MILLIS);
+        assertEquals(60_000L, ArcadePortRules.HEROES_OF_GWEN_DEVON_INFINITY_COOLDOWN_MILLIS);
+        assertEquals(67_000L, ArcadePortRules.HEROES_OF_GWEN_DEVON_INFINITY_REUSE_DELAY_MILLIS);
+        assertEquals(6.0D, ArcadePortRules.HEROES_OF_GWEN_DEVON_INFINITY_HOMING_RANGE, 0.00001D);
+        assertEquals(3_000L, ArcadePortRules.HEROES_OF_GWEN_DEVON_INFINITY_WITHER_DURATION_MILLIS);
+    }
+
+    @Test
+    void heroesValleyAndMonochromeSidequestsMatchSourceTimingAndCombatValues() {
+        assertEquals(300_000L, ArcadePortRules.HEROES_OF_GWEN_SIDEQUEST_INITIAL_DELAY_MILLIS);
+        assertEquals(300_000L, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_RESPAWN_DELAY_MILLIS);
+        assertEquals(500L, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_ATTACK_INTERVAL_MILLIS);
+        assertEquals(100, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_HEALTH);
+        assertEquals(5.0D, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_TARGET_SPEED, 0.00001D);
+        assertEquals(3.0D, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_HOME_SPEED, 0.00001D);
+        assertEquals(9.0D, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_DIRECT_RANGE_SQUARED, 0.00001D);
+        assertEquals(6, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_DIRECT_DAMAGE);
+        assertEquals(2.0D, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_AREA_RADIUS, 0.00001D);
+        assertEquals(2, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_AREA_DAMAGE);
+        assertEquals(2, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_OUT_OF_COMBAT_HEAL);
+        assertEquals(60_000L, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_BUFF_DURATION_MILLIS);
+        assertEquals(1, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_REGENERATION_AMPLIFIER);
+        assertEquals(1.5D, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_DAMAGE_MULTIPLIER, 0.00001D);
+        assertEquals(30_000L, ArcadePortRules.HEROES_OF_GWEN_MONOCHROME_SKELETONS_DURATION_MILLIS);
+        assertEquals(4, ArcadePortRules.HEROES_OF_GWEN_SMALL_HEALTH_POTION_HEAL_HP);
+        assertEquals(8, ArcadePortRules.HEROES_OF_GWEN_LARGE_HEALTH_POTION_HEAL_HP);
+        assertEquals(90_000L, ArcadePortRules.HEROES_OF_GWEN_POWER_POTION_DURATION_MILLIS);
+        assertEquals(180_000L, ArcadePortRules.HEROES_OF_GWEN_SPEED_POTION_DURATION_MILLIS);
+    }
+
+    @Test
+    void heroesOfGwenAbilityHealingUsesSourceAbilityDamageAndRecipientHp5() {
+        assertEquals(126.0D, ArcadePortRules.heroesOfGwenStoreAbilityHeal(
+                100.0D, List.of("Adept's Cap"), List.of("Urchin's Cap")), 0.00001D);
+        assertEquals(105.0D, ArcadePortRules.heroesOfGwenStoreAbilityHeal(
+                100.0D, List.of("Adept's Cap"), List.of()), 0.00001D);
+        assertEquals(120.0D, ArcadePortRules.heroesOfGwenStoreAbilityHeal(
+                100.0D, List.of(), List.of("Urchin's Cap")), 0.00001D);
+    }
+
+    @Test
+    void heroesOfGwenStoreDamageModifiersStackInTheirOwnDamageFamilies() {
+        assertEquals(12.0D, ArcadePortRules.heroesOfGwenStoreAbilityDamage(
+                10.0D, List.of("Adept's Cap", "Adept's Chestplate", "Ninja's Mask")), 0.00001D);
+        assertEquals(10.0D, ArcadePortRules.heroesOfGwenStoreAbilityDamage(
+                10.0D, List.of("Adept's Cap", "Adept's Chestplate"), false), 0.00001D);
+        assertEquals(11.6D, ArcadePortRules.heroesOfGwenStoreBasicAttackDamage(
+                10.0D, List.of("Battle Mage Cap", "Battle Mage Chestplate", "Battle Mage Boots")), 0.00001D);
+        assertEquals(11.0D, ArcadePortRules.heroesOfGwenStoreMeleeDamage(
+                10.0D, List.of("Urchin's Chestcloth")), 0.00001D);
+        assertEquals(10.0D, ArcadePortRules.heroesOfGwenStoreMeleeDamage(10.0D, List.of("Ninja's Mask")), 0.00001D);
+    }
+
+    @Test
+    void heroesOfGwenStorePlayerCombatAppliesBasicAbilityAndUniversalFlatEffects() {
+        List<String> items = List.of("Adept's Chestplate", "Battle Mage Chestplate", "Urchin's Chestcloth");
+        assertEquals(12.5D, ArcadePortRules.heroesOfGwenStorePlayerCombatDamage(
+                10.0D, items, true, false), 0.00001D);
+        assertEquals(12.0D, ArcadePortRules.heroesOfGwenStorePlayerCombatDamage(
+                10.0D, items, false, true), 0.00001D);
+        assertEquals(11.0D, ArcadePortRules.heroesOfGwenStorePlayerCombatDamage(
+                10.0D, List.of("Urchin's Chestcloth"), false, false), 0.00001D);
+        assertEquals(10.0D, ArcadePortRules.heroesOfGwenStorePlayerCombatDamage(
+                10.0D, List.of(), false, false), 0.00001D);
+    }
+
+    @Test
+    void heroesOfGwenStoreHitConditionsMatchSourceBowAndSwordEffects() {
+        assertEquals("SPEED", ArcadePortRules.heroesOfGwenStoreHitCondition("Bow of Pursuit"));
+        assertEquals(3_000L, ArcadePortRules.heroesOfGwenStoreHitConditionDurationMillis("Bow of Pursuit"));
+        assertEquals(1, ArcadePortRules.heroesOfGwenStoreHitConditionAmplifier("Bow of Pursuit"));
+        assertEquals("SLOWNESS", ArcadePortRules.heroesOfGwenStoreHitCondition("Frostbound Sword"));
+        assertEquals(3_000L, ArcadePortRules.heroesOfGwenStoreHitConditionDurationMillis("Frostbound Sword"));
+        assertEquals(0, ArcadePortRules.heroesOfGwenStoreHitConditionAmplifier("Frostbound Sword"));
+        assertEquals("", ArcadePortRules.heroesOfGwenStoreHitCondition("Swift Blade"));
+        assertEquals(0L, ArcadePortRules.heroesOfGwenStoreHitConditionDurationMillis("Swift Blade"));
+        assertTrue(ArcadePortRules.heroesOfGwenStoreImmuneToSlowness("Stone Sword"));
+        assertTrue(ArcadePortRules.heroesOfGwenStoreImmuneToSlowness("Frostbound Sword"));
+        assertTrue(ArcadePortRules.heroesOfGwenStoreImmuneToSlowness("Swift Blade"));
+        assertFalse(ArcadePortRules.heroesOfGwenStoreImmuneToSlowness("Knight's Blade"));
+    }
+
+    @Test
+    void heroesOfGwenHealthManagerMatchesSourceFiveSecondRegenAndKillHeal() {
+        assertEquals(5_000L, ArcadePortRules.HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS);
+        assertEquals(0.66D, ArcadePortRules.HEROES_OF_GWEN_BASE_HP_REGEN_PER_INTERVAL, 0.00001D);
+        assertEquals(0.25D, ArcadePortRules.HEROES_OF_GWEN_BASE_KILL_HEAL_FACTOR, 0.00001D);
+        assertEquals(0.66D, ArcadePortRules.heroesOfGwenStoreHpRegenAmount(0.66D, List.of()), 0.00001D);
+        assertEquals(0.792D, ArcadePortRules.heroesOfGwenStoreHpRegenAmount(
+                0.66D, List.of("Urchin's Cap")), 0.00001D);
+        assertEquals(0.759D, ArcadePortRules.heroesOfGwenStoreHpRegenAmount(
+                0.66D, List.of("Prince's Plate Helmet")), 0.00001D);
+        assertEquals(0.792D, ArcadePortRules.heroesOfGwenStoreHpRegenAmount(
+                0.66D, List.of("Urchin's Cap", "Vampiric Helmet")), 0.00001D);
+    }
+
+    @Test
+    void heroesOfGwenStorePassiveValuesMatchSourceEquipmentEffects() {
+        assertEquals(0.10D, ArcadePortRules.heroesOfGwenStoreAbilityDamageFactor("Urchin's Leggings"), 0.00001D);
+        assertEquals(0.20D, ArcadePortRules.heroesOfGwenStoreAbilityDamageFactor("Specialist's Bow"), 0.00001D);
+        assertEquals(0.15D, ArcadePortRules.heroesOfGwenStoreAbilityDamageFactor("Adept's Chestplate"), 0.00001D);
+        assertEquals(0.10D, ArcadePortRules.heroesOfGwenStoreBasicAttackDamageFactor("Battle Mage Chestplate"), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.heroesOfGwenStoreMeleeDamageBonus("Urchin's Chestcloth"), 0.00001D);
+        assertEquals(0.20D, ArcadePortRules.heroesOfGwenStoreHealthRegenBonus("Vampiric Helmet"), 0.00001D);
+        assertEquals(0.15D, ArcadePortRules.heroesOfGwenStoreHealthRegenBonus("Prince's Plate Helmet"), 0.00001D);
+        assertEquals(0.17D, ArcadePortRules.heroesOfGwenStoreSpeedFactor("Urchin's Boots"), 0.00001D);
+        assertEquals(0.15D, ArcadePortRules.heroesOfGwenStoreSpeedFactor("Leather Crosstrainers"), 0.00001D);
+        assertEquals(0.10D, ArcadePortRules.heroesOfGwenStoreSpeedFactor("Prince's Plate Boots"), 0.00001D);
+        assertEquals(2, ArcadePortRules.heroesOfGwenStoreMaxHealthBonus("Brawler's Plate Chestplate"));
+        assertEquals(4, ArcadePortRules.heroesOfGwenStoreMaxHealthBonus("Prince's Plate Chestplate"));
+        assertEquals(3.0D, ArcadePortRules.heroesOfGwenStoreKillHeal("Sword of Time"), 0.00001D);
+        assertEquals(0.15D, ArcadePortRules.heroesOfGwenStoreKillHeal("Vampiric Bow"), 0.00001D);
+        assertEquals(1, ArcadePortRules.heroesOfGwenStoreAmmoIncrease("Leather Cap of Holding"));
+        assertEquals(0, ArcadePortRules.heroesOfGwenStoreAmmoIncrease("Leather Cap of Nimble Fingers"));
+    }
+
+    @Test
+    void heroesOfGwenStoreTracksOnlyReplaceableEquipmentCategories() {
+        assertEquals("helmet", ArcadePortRules.heroesOfGwenStoreEquipmentSlot("IRON_HELMET"));
+        assertEquals("chestplate", ArcadePortRules.heroesOfGwenStoreEquipmentSlot("LEATHER_CHESTPLATE"));
+        assertEquals("leggings", ArcadePortRules.heroesOfGwenStoreEquipmentSlot("DIAMOND_LEGGINGS"));
+        assertEquals("boots", ArcadePortRules.heroesOfGwenStoreEquipmentSlot("CHAINMAIL_BOOTS"));
+        assertEquals("weapon", ArcadePortRules.heroesOfGwenStoreEquipmentSlot("GOLDEN_SWORD"));
+        assertEquals("weapon", ArcadePortRules.heroesOfGwenStoreEquipmentSlot("BOW"));
+        assertNull(ArcadePortRules.heroesOfGwenStoreEquipmentSlot("POTION"));
+        assertNull(ArcadePortRules.heroesOfGwenStoreEquipmentSlot("ENDER_PEARL"));
+    }
+
+    @Test
+    void heroesOfGwenRoleStoreUsesOriginalEnchantmentFamiliesAndLevels() {
+        assertEquals("POWER", ArcadePortRules.heroesOfGwenStoreEnchantment("Hunter's Bow"));
+        assertEquals(1, ArcadePortRules.heroesOfGwenStoreEnchantmentLevel("Hunter's Bow"));
+        assertEquals("POWER", ArcadePortRules.heroesOfGwenStoreEnchantment("Elven Bow"));
+        assertEquals(2, ArcadePortRules.heroesOfGwenStoreEnchantmentLevel("Elven Bow"));
+        assertEquals(3, ArcadePortRules.heroesOfGwenStoreEnchantmentLevel("Eagle's Bow"));
+        assertEquals("SHARPNESS", ArcadePortRules.heroesOfGwenStoreEnchantment("Pumpkin King's Blade"));
+        assertEquals(2, ArcadePortRules.heroesOfGwenStoreEnchantmentLevel("Pumpkin King's Blade"));
+        assertEquals("PROJECTILE_PROTECTION", ArcadePortRules.heroesOfGwenStoreEnchantment("Superior Archer's Bane"));
+        assertEquals(2, ArcadePortRules.heroesOfGwenStoreEnchantmentLevel("Superior Archer's Bane"));
+        assertEquals("PROTECTION", ArcadePortRules.heroesOfGwenStoreEnchantment("Brawler's Plate"));
+        assertEquals(1, ArcadePortRules.heroesOfGwenStoreEnchantmentLevel("Brawler's Plate"));
+        assertEquals("", ArcadePortRules.heroesOfGwenStoreEnchantment("Adept's Cap"));
+        assertEquals(0, ArcadePortRules.heroesOfGwenStoreEnchantmentLevel("Adept's Cap"));
+    }
+
+    @Test
+    void heroesOfGwenStoreCooldownReductionMatchesOriginalEquipmentEffects() {
+        assertEquals(0.15D, ArcadePortRules.heroesOfGwenStoreCooldownReduction("Ninja's Chestcloth"), 0.00001D);
+        assertEquals(0.10D, ArcadePortRules.heroesOfGwenStoreCooldownReduction("Ninja's Leggings"), 0.00001D);
+        assertEquals(0.03D, ArcadePortRules.heroesOfGwenStoreCooldownReduction("Helm of Focus"), 0.00001D);
+        assertEquals(0.10D, ArcadePortRules.heroesOfGwenStoreCooldownReduction("Chestplate of Focus"), 0.00001D);
+        assertEquals(0.05D, ArcadePortRules.heroesOfGwenStoreCooldownReduction("Leggings of Focus"), 0.00001D);
+        assertEquals(0.05D, ArcadePortRules.heroesOfGwenStoreCooldownReduction("Focused Cap"), 0.00001D);
+        assertEquals(0.10D, ArcadePortRules.heroesOfGwenStoreCooldownReduction("Specialist's Bow"), 0.00001D);
+        assertEquals(0.07D, ArcadePortRules.heroesOfGwenStoreCooldownReduction("Superior Archer's Bane Leggings"), 0.00001D);
+        assertEquals(0.10D, ArcadePortRules.heroesOfGwenStoreCooldownReduction("Prince's Plate Leggings"), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.heroesOfGwenStoreCooldownReduction("Leather Cap of Holding"), 0.00001D);
+    }
+
+    @Test
+    void heroesOfGwenHunterNimbleFingersReducesOnlyAmmoReloads() {
+        assertEquals(0.05D, ArcadePortRules.heroesOfGwenStoreAmmoCooldownReduction(
+                "Leather Cap of Nimble Fingers"), 0.00001D);
+        assertEquals(0.15D, ArcadePortRules.heroesOfGwenStoreAmmoCooldownReduction(
+                "Leather Chestplate of Nimble Fingers"), 0.00001D);
+        assertEquals(0.10D, ArcadePortRules.heroesOfGwenStoreAmmoCooldownReduction(
+                "Leather Leggings of Nimble Fingers"), 0.00001D);
+        assertEquals(0.05D, ArcadePortRules.heroesOfGwenStoreAmmoCooldownReduction(
+                "Leather Boots of Nimble Fingers"), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.heroesOfGwenStoreAmmoCooldownReduction(
+                "Focused Cap"), 0.00001D);
+    }
+
+    @Test
+    void heroesOfGwenStoreCooldownModifiersStackAndStaySeparateFromAmmoModifiers() {
+        assertEquals(750L, ArcadePortRules.heroesOfGwenStoreAdjustedCooldown(1_000L,
+                List.of("Ninja's Chestcloth", "Ninja's Leggings"), false));
+        assertEquals(850L, ArcadePortRules.heroesOfGwenStoreAdjustedCooldown(1_000L,
+                List.of("Focused Cap", "Focused Chestplate"), false));
+        assertEquals(800L, ArcadePortRules.heroesOfGwenStoreAdjustedCooldown(1_000L,
+                List.of("Leather Cap of Nimble Fingers", "Leather Chestplate of Nimble Fingers"), true));
+        assertEquals(1_000L, ArcadePortRules.heroesOfGwenStoreAdjustedCooldown(1_000L,
+                List.of("Leather Cap of Nimble Fingers"), false));
+        assertEquals(950L, ArcadePortRules.heroesOfGwenStoreAdjustedCooldown(1_000L,
+                List.of("Ninja's Chestcloth", "Leather Cap of Nimble Fingers"), true));
+        assertEquals(0L, ArcadePortRules.heroesOfGwenStoreAdjustedCooldown(0L,
+                List.of("Ninja's Chestcloth"), false));
+    }
+
+    @Test
+    void monochromeSidequestAwardsOnlyTheHigherScoringTeam() {
+        assertEquals(0, ArcadePortRules.heroesOfGwenMonochromeWinner(3, 2));
+        assertEquals(1, ArcadePortRules.heroesOfGwenMonochromeWinner(1, 4));
+        assertEquals(-1, ArcadePortRules.heroesOfGwenMonochromeWinner(2, 2));
+        assertEquals(-1, ArcadePortRules.heroesOfGwenMonochromeWinner(0, 0));
+    }
+
+    @Test
+    void witherDamageRequiresActiveEnemyInsideBoundaryAndDestroyedTowers() {
+        assertTrue(ArcadePortRules.heroesOfGwenWitherCanTakeDamage(0, 1, true, true, true, 1.0D));
+        assertFalse(ArcadePortRules.heroesOfGwenWitherCanTakeDamage(0, 0, true, true, true, 1.0D));
+        assertFalse(ArcadePortRules.heroesOfGwenWitherCanTakeDamage(0, 1, false, true, true, 1.0D));
+        assertFalse(ArcadePortRules.heroesOfGwenWitherCanTakeDamage(0, 1, true, false, true, 1.0D));
+        assertFalse(ArcadePortRules.heroesOfGwenWitherCanTakeDamage(0, 1, true, true, false, 1.0D));
+        assertFalse(ArcadePortRules.heroesOfGwenWitherCanTakeDamage(0, 1, true, true, true, 0.0D));
+        assertFalse(ArcadePortRules.heroesOfGwenWitherCanTakeDamage(0, -1, true, true, true, 1.0D));
+    }
+
+    @Test
+    void witherDefenderWarningMatchesThirtySecondSourceThrottle() {
+        assertTrue(ArcadePortRules.heroesOfGwenWitherShouldInform(100_000L, 0L));
+        assertTrue(ArcadePortRules.heroesOfGwenWitherShouldInform(130_000L, 100_000L));
+        assertFalse(ArcadePortRules.heroesOfGwenWitherShouldInform(129_999L, 100_000L));
+        assertFalse(ArcadePortRules.heroesOfGwenWitherShouldInform(100_000L, 101_000L));
+        assertFalse(ArcadePortRules.heroesOfGwenWitherShouldInform(1_000L, 0L));
+        assertTrue(ArcadePortRules.heroesOfGwenWitherShouldInform(30_000L, 0L));
+    }
+
+    @Test
+    void heroesOfGwenOvertimeStartsAtFifteenMinutesAndMovesWitherAlongFirstHalfOfLane() {
+        assertEquals(900_000L, ArcadePortRules.HEROES_OF_GWEN_OVERTIME_DELAY_MILLIS);
+        assertFalse(ArcadePortRules.heroesOfGwenOvertimeHasStarted(100_000L, 999_999L));
+        assertTrue(ArcadePortRules.heroesOfGwenOvertimeHasStarted(100_000L, 1_000_000L));
+        assertFalse(ArcadePortRules.heroesOfGwenOvertimeHasStarted(100_000L, 99_999L));
+        assertEquals(2.0D, ArcadePortRules.HEROES_OF_GWEN_OVERTIME_WITHER_SPEED, 0.00001D);
+        assertEquals(5, ArcadePortRules.heroesOfGwenOvertimePathLength(10));
+        assertEquals(4, ArcadePortRules.heroesOfGwenOvertimePathLength(9));
+        assertEquals(0, ArcadePortRules.heroesOfGwenOvertimePathLength(1));
+        assertEquals(1, ArcadePortRules.heroesOfGwenOvertimeNextTargetIndex(0, 5, 15.9D));
+        assertEquals(0, ArcadePortRules.heroesOfGwenOvertimeNextTargetIndex(0, 5, 16.0D));
+        assertEquals(4, ArcadePortRules.heroesOfGwenOvertimeNextTargetIndex(4, 5, 1.0D));
+        assertEquals(-1, ArcadePortRules.heroesOfGwenOvertimeNextTargetIndex(0, 0, 0.0D));
+    }
+
+    @Test
+    void witherTargetsHostileLivingEntitiesIncludingNeutralMobsButNotAlliesOrInactivePlayers() {
+        assertTrue(ArcadePortRules.heroesOfGwenWitherCanTarget(0, 1, true));
+        assertTrue(ArcadePortRules.heroesOfGwenWitherCanTarget(0, -1, true));
+        assertFalse(ArcadePortRules.heroesOfGwenWitherCanTarget(0, 0, true));
+        assertFalse(ArcadePortRules.heroesOfGwenWitherCanTarget(0, 1, false));
+        assertFalse(ArcadePortRules.heroesOfGwenWitherCanTarget(0, -1, false));
+    }
+
+    @Test
+    void witherDirectMovementUsesSourceTickPerBlockSpeed() {
+        assertEquals(0.2D, ArcadePortRules.heroesOfGwenWitherStepPerTick(
+                ArcadePortRules.HEROES_OF_GWEN_WITHER_TARGET_SPEED), 0.00001D);
+        assertEquals(0.3D, ArcadePortRules.heroesOfGwenWitherStepPerTick(
+                ArcadePortRules.HEROES_OF_GWEN_WITHER_HOME_SPEED), 0.00001D);
     }
 }

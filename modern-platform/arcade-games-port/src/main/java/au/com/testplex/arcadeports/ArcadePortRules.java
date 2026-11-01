@@ -2650,6 +2650,324 @@ public final class ArcadePortRules {
     public static final double HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS = 8.0D;
     public static final double HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE = 4.0D;
 
+    // Source Moba Heroes Valley / Monochrome mid-match sidequests.
+    public static final long HEROES_OF_GWEN_SIDEQUEST_INITIAL_DELAY_MILLIS = 300_000L;
+    public static final long HEROES_OF_GWEN_PUMPKIN_KING_RESPAWN_DELAY_MILLIS = 300_000L;
+    public static final long HEROES_OF_GWEN_PUMPKIN_KING_ATTACK_INTERVAL_MILLIS = 500L;
+    public static final int HEROES_OF_GWEN_PUMPKIN_KING_HEALTH = 100;
+    public static final double HEROES_OF_GWEN_PUMPKIN_KING_TARGET_SPEED = 5.0D;
+    public static final double HEROES_OF_GWEN_PUMPKIN_KING_HOME_SPEED = 3.0D;
+    public static final double HEROES_OF_GWEN_PUMPKIN_KING_DIRECT_RANGE_SQUARED = 9.0D;
+    public static final int HEROES_OF_GWEN_PUMPKIN_KING_DIRECT_DAMAGE = 6;
+    public static final double HEROES_OF_GWEN_PUMPKIN_KING_AREA_RADIUS = 2.0D;
+    public static final int HEROES_OF_GWEN_PUMPKIN_KING_AREA_DAMAGE = 2;
+    public static final int HEROES_OF_GWEN_PUMPKIN_KING_OUT_OF_COMBAT_HEAL = 2;
+    public static final long HEROES_OF_GWEN_PUMPKIN_KING_BUFF_DURATION_MILLIS = 60_000L;
+    public static final int HEROES_OF_GWEN_PUMPKIN_KING_REGENERATION_AMPLIFIER = 1;
+    public static final double HEROES_OF_GWEN_PUMPKIN_KING_DAMAGE_MULTIPLIER = 1.5D;
+    public static final long HEROES_OF_GWEN_MONOCHROME_SKELETONS_DURATION_MILLIS = 30_000L;
+    public static final long HEROES_OF_GWEN_OVERTIME_DELAY_MILLIS = 900_000L;
+    public static final double HEROES_OF_GWEN_OVERTIME_WITHER_SPEED = 2.0D;
+    public static final double HEROES_OF_GWEN_OVERTIME_PATH_ADVANCE_DISTANCE_SQUARED = 16.0D;
+    public static final int HEROES_OF_GWEN_SMALL_HEALTH_POTION_HEAL_HP = 4;
+    public static final int HEROES_OF_GWEN_LARGE_HEALTH_POTION_HEAL_HP = 8;
+    public static final long HEROES_OF_GWEN_POWER_POTION_DURATION_MILLIS = 90_000L;
+    public static final long HEROES_OF_GWEN_SPEED_POTION_DURATION_MILLIS = 180_000L;
+
+    /** Resolve a source role-store item into its single replaceable equipment category. */
+    public static String heroesOfGwenStoreEquipmentSlot(String materialName) {
+        if (materialName == null) return null;
+        if (materialName.endsWith("_HELMET")) return "helmet";
+        if (materialName.endsWith("_CHESTPLATE")) return "chestplate";
+        if (materialName.endsWith("_LEGGINGS")) return "leggings";
+        if (materialName.endsWith("_BOOTS")) return "boots";
+        if (materialName.endsWith("_SWORD") || "BOW".equals(materialName)) return "weapon";
+        return null;
+    }
+
+    public static final long HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS = 5_000L;
+    public static final double HEROES_OF_GWEN_BASE_HP_REGEN_PER_INTERVAL = 0.66D;
+    public static final double HEROES_OF_GWEN_BASE_KILL_HEAL_FACTOR = 0.25D;
+
+    /** Source HP5 effects add a percentage of the base 0.66 HP regeneration pulse. */
+    public static double heroesOfGwenStoreHpRegenAmount(
+            double baseAmount, Collection<String> equippedItemNames) {
+        double factor = 0.0D;
+        if (equippedItemNames != null) {
+            for (String itemName : equippedItemNames) {
+                factor = Math.max(factor, heroesOfGwenStoreHealthRegenBonus(itemName));
+            }
+        }
+        return baseAmount + baseAmount * factor;
+    }
+
+    /** Source MobaItemEffect value maps for the role shops. */
+    public static double heroesOfGwenStoreAbilityDamageFactor(String itemName) {
+        if (itemName == null) return 0.0D;
+        return switch (itemName) {
+            case "Urchin's Leggings" -> 0.10D;
+            case "Specialist's Bow" -> 0.20D;
+            case "Adept's Cap", "Adept's Boots" -> 0.05D;
+            case "Adept's Chestplate" -> 0.15D;
+            case "Adept's Leggings" -> 0.10D;
+            default -> 0.0D;
+        };
+    }
+
+    public static double heroesOfGwenStoreBasicAttackDamageFactor(String itemName) {
+        if (itemName == null) return 0.0D;
+        return switch (itemName) {
+            case "Battle Mage Cap", "Battle Mage Boots" -> 0.03D;
+            case "Battle Mage Chestplate" -> 0.10D;
+            case "Battle Mage Leggings" -> 0.05D;
+            default -> 0.0D;
+        };
+    }
+
+    public static double heroesOfGwenStoreMeleeDamageBonus(String itemName) {
+        return "Urchin's Chestcloth".equals(itemName) ? 1.0D : 0.0D;
+    }
+
+    public static double heroesOfGwenStoreAbilityDamage(double baseDamage,
+            Collection<String> items, boolean playerTarget) {
+        if (!playerTarget) return baseDamage;
+        double factor = 0.0D;
+        if (items != null) {
+            for (String item : items) factor += heroesOfGwenStoreAbilityDamageFactor(item);
+        }
+        return baseDamage * (1.0D + factor);
+    }
+
+    public static double heroesOfGwenStoreAbilityDamage(double baseDamage, Collection<String> items) {
+        return heroesOfGwenStoreAbilityDamage(baseDamage, items, true);
+    }
+
+    /** Source and recipient equipment both affect non-natural ability healing. */
+    public static double heroesOfGwenStoreAbilityHeal(double baseHeal,
+            Collection<String> sourceItems, Collection<String> recipientItems) {
+        double sourceAdjusted = heroesOfGwenStoreAbilityDamage(baseHeal, sourceItems);
+        return heroesOfGwenStoreHpRegenAmount(sourceAdjusted, recipientItems);
+    }
+
+    public static double heroesOfGwenStoreBasicAttackDamage(double baseDamage, Collection<String> items) {
+        double factor = 0.0D;
+        if (items != null) {
+            for (String item : items) factor += heroesOfGwenStoreBasicAttackDamageFactor(item);
+        }
+        return baseDamage * (1.0D + factor);
+    }
+
+    public static double heroesOfGwenStoreMeleeDamage(double baseDamage, Collection<String> items) {
+        double bonus = 0.0D;
+        if (items != null) {
+            for (String item : items) bonus += heroesOfGwenStoreMeleeDamageBonus(item);
+        }
+        return baseDamage + bonus;
+    }
+
+    /** Source MobaShop applies effects to all active player-vs-player damage events. */
+    public static double heroesOfGwenStorePlayerCombatDamage(double baseDamage,
+            Collection<String> items, boolean abilityDamage, boolean basicAttack) {
+        double damage = baseDamage;
+        if (abilityDamage) {
+            damage = heroesOfGwenStoreAbilityDamage(damage, items, true);
+        } else if (basicAttack) {
+            damage = heroesOfGwenStoreBasicAttackDamage(damage, items);
+        }
+        // MobaMeleeDamageEffect has no damage-cause filter: its flat increase
+        // is appended to every player-vs-player CustomDamageEvent.
+        return heroesOfGwenStoreMeleeDamage(damage, items);
+    }
+
+    public static double heroesOfGwenStoreHealthRegenBonus(String itemName) {
+        if (itemName == null) return 0.0D;
+        return switch (itemName) {
+            case "Urchin's Cap", "Vampiric Helmet" -> 0.20D;
+            case "Archer's Bane Helmet", "Brawler's Plate Helmet" -> 0.03D;
+            case "Superior Archer's Bane Helmet" -> 0.05D;
+            case "Prince's Plate Helmet" -> 0.15D;
+            default -> 0.0D;
+        };
+    }
+
+    public static double heroesOfGwenStoreSpeedFactor(String itemName) {
+        if (itemName == null) return 0.0D;
+        return switch (itemName) {
+            case "Ninja's Boots" -> 0.15D;
+            case "Urchin's Boots" -> 0.17D;
+            case "Leather Hiking Boots" -> 0.05D;
+            case "Leather Moccasins" -> 0.10D;
+            case "Leather Crosstrainers" -> 0.15D;
+            case "Archer's Bane Boots", "Brawler's Plate Boots" -> 0.04D;
+            case "Superior Archer's Bane Boots" -> 0.06D;
+            case "Prince's Plate Boots" -> 0.10D;
+            default -> 0.0D;
+        };
+    }
+
+    public static int heroesOfGwenStoreMaxHealthBonus(String itemName) {
+        if (itemName == null) return 0;
+        return switch (itemName) {
+            case "Archer's Bane Chestplate", "Brawler's Plate Chestplate" -> 2;
+            case "Superior Archer's Bane Chestplate", "Prince's Plate Chestplate" -> 4;
+            default -> 0;
+        };
+    }
+
+    public static double heroesOfGwenStoreKillHeal(String itemName) {
+        if (itemName == null) return 0.0D;
+        return switch (itemName) {
+            case "Sword of Time" -> 3.0D;
+            case "Ninja's Mask" -> 2.0D;
+            case "Vampiric Bow" -> 0.15D;
+            case "Vampiric Chestplate", "Vampiric Leggings" -> 3.0D;
+            case "Vampiric Boots" -> 1.0D;
+            default -> 0.0D;
+        };
+    }
+
+    public static int heroesOfGwenStoreAmmoIncrease(String itemName) {
+        return "Leather Cap of Holding".equals(itemName) ? 1 : 0;
+    }
+
+    public static boolean heroesOfGwenStoreImmuneToSlowness(String itemName) {
+        return "Stone Sword".equals(itemName)
+                || "Frostbound Sword".equals(itemName)
+                || "Swift Blade".equals(itemName);
+    }
+
+    public static String heroesOfGwenStoreHitCondition(String itemName) {
+        if ("Bow of Pursuit".equals(itemName)) return "SPEED";
+        if ("Frostbound Sword".equals(itemName)) return "SLOWNESS";
+        return "";
+    }
+
+    public static long heroesOfGwenStoreHitConditionDurationMillis(String itemName) {
+        return heroesOfGwenStoreHitCondition(itemName).isEmpty() ? 0L : 3_000L;
+    }
+
+    public static int heroesOfGwenStoreHitConditionAmplifier(String itemName) {
+        return "Bow of Pursuit".equals(itemName) ? 1 : 0;
+    }
+
+    /** Original role-store equipment enchantment family by display name. */
+    public static String heroesOfGwenStoreEnchantment(String itemName) {
+        if (itemName == null) return "";
+        return switch (itemName) {
+            case "Hunter's Bow", "Elven Bow", "Eagle's Bow", "Bow of Pursuit",
+                    "Vampiric Bow", "Bow of Renewal" -> "POWER";
+            case "Pumpkin King's Blade" -> "SHARPNESS";
+            case "Archer's Bane", "Superior Archer's Bane" -> "PROJECTILE_PROTECTION";
+            case "Brawler's Plate", "Superior Brawler's Plate" -> "PROTECTION";
+            default -> "";
+        };
+    }
+
+    /** Original role-store enchantment level; zero means no base enchantment. */
+    public static int heroesOfGwenStoreEnchantmentLevel(String itemName) {
+        if (itemName == null) return 0;
+        return switch (itemName) {
+            case "Hunter's Bow", "Vampiric Bow", "Bow of Renewal", "Archer's Bane",
+                    "Brawler's Plate" -> 1;
+            case "Elven Bow", "Bow of Pursuit", "Pumpkin King's Blade",
+                    "Superior Archer's Bane", "Superior Brawler's Plate" -> 2;
+            case "Eagle's Bow" -> 3;
+            default -> 0;
+        };
+    }
+
+    /** Source MobaCDREffect values; factors are added against the original cooldown. */
+    public static double heroesOfGwenStoreCooldownReduction(String itemName) {
+        if (itemName == null) return 0.0D;
+        return switch (itemName) {
+            case "Ninja's Chestcloth" -> 0.15D;
+            case "Ninja's Leggings" -> 0.10D;
+            case "Helm of Focus", "Boots of Focus" -> 0.03D;
+            case "Chestplate of Focus" -> 0.10D;
+            case "Leggings of Focus" -> 0.05D;
+            case "Focused Cap" -> 0.05D;
+            case "Focused Chestplate", "Focused Leggings" -> 0.10D;
+            case "Focused Boots" -> 0.05D;
+            case "Specialist's Bow" -> 0.10D;
+            case "Archer's Bane Leggings", "Brawler's Plate Leggings" -> 0.05D;
+            case "Superior Archer's Bane Leggings" -> 0.07D;
+            case "Prince's Plate Leggings" -> 0.10D;
+            default -> 0.0D;
+        };
+    }
+
+    /** Source MobaCDRAmmoEffect values; only Hunter Nimble Fingers gear affects ammo reloads. */
+    public static double heroesOfGwenStoreAmmoCooldownReduction(String itemName) {
+        if (itemName == null) return 0.0D;
+        return switch (itemName) {
+            case "Leather Cap of Nimble Fingers", "Leather Boots of Nimble Fingers" -> 0.05D;
+            case "Leather Chestplate of Nimble Fingers" -> 0.15D;
+            case "Leather Leggings of Nimble Fingers" -> 0.10D;
+            default -> 0.0D;
+        };
+    }
+
+    /**
+     * Source MobaItemEffect modifiers stack additively against the original cooldown.
+     * Ammo effects are deliberately separate from ability cooldown modifiers.
+     */
+    public static long heroesOfGwenStoreAdjustedCooldown(long baseCooldown,
+            Collection<String> equippedItemNames, boolean ammo) {
+        if (baseCooldown <= 0L) return baseCooldown;
+        long reductionMillis = 0L;
+        if (equippedItemNames != null) {
+            for (String itemName : equippedItemNames) {
+                double factor = ammo
+                        ? heroesOfGwenStoreAmmoCooldownReduction(itemName)
+                        : heroesOfGwenStoreCooldownReduction(itemName);
+                if (factor > 0.0D) reductionMillis += (long) (baseCooldown * factor);
+            }
+        }
+        return Math.max(1L, baseCooldown - reductionMillis);
+    }
+
+    /** Return red/blue challenge winner, or -1 for a tie. */
+    public static int heroesOfGwenMonochromeWinner(int redKills, int blueKills) {
+        return redKills == blueKills ? -1 : redKills > blueKills ? 0 : 1;
+    }
+
+    /** Source MobaAI targets hostile living entities inside its team boundary, not only players. */
+    public static boolean heroesOfGwenWitherCanTarget(int ownerTeam, int targetTeam, boolean activeTarget) {
+        return ownerTeam >= 0 && activeTarget && targetTeam != ownerTeam;
+    }
+
+    /** Source Wither accepts damage only from active enemy players inside its polygon after both towers fall. */
+    public static boolean heroesOfGwenWitherCanTakeDamage(int ownerTeam, int attackerTeam,
+            boolean activeAttacker, boolean insideBoundary, boolean damageable, double damage) {
+        return ownerTeam >= 0 && attackerTeam >= 0 && attackerTeam != ownerTeam
+                && activeAttacker && insideBoundary && damageable && damage > 0.0D;
+    }
+
+    /** Source Wither warns its owning team at most once every 30 seconds; zero means never warned. */
+    public static boolean heroesOfGwenWitherShouldInform(long now, long lastInformAt) {
+        return now >= lastInformAt && now - lastInformAt >= 30_000L;
+    }
+
+    /** Source OvertimeManager starts after 15 minutes of Live play. */
+    public static boolean heroesOfGwenOvertimeHasStarted(long liveStartedAt, long now) {
+        return liveStartedAt > 0L && now >= liveStartedAt
+                && now - liveStartedAt >= HEROES_OF_GWEN_OVERTIME_DELAY_MILLIS;
+    }
+
+    /** Source OvertimeAI follows only the first half of the ordered blue-to-red minion path. */
+    public static int heroesOfGwenOvertimePathLength(int fullPathSize) {
+        return Math.max(0, fullPathSize / 2);
+    }
+
+    /** Source OvertimeAI advances one lane point when it comes within four blocks. */
+    public static int heroesOfGwenOvertimeNextTargetIndex(int currentIndex, int pathSize,
+            double distanceSquaredToTarget) {
+        if (pathSize <= 0) return -1;
+        int bounded = Math.max(0, Math.min(currentIndex, pathSize - 1));
+        return distanceSquaredToTarget < HEROES_OF_GWEN_OVERTIME_PATH_ADVANCE_DISTANCE_SQUARED
+                && bounded < pathSize - 1 ? bounded + 1 : bounded;
+    }
+
     /** Source MobaDirectAIMethod interprets speed as ticks per block, then divides by 20. */
     public static double heroesOfGwenWitherStepPerTick(double sourceSpeed) {
         return Math.max(0.0D, sourceSpeed) / 20.0D;
@@ -2843,6 +3161,259 @@ public final class ArcadePortRules {
     }
 
 
+
+    // Fletcher passive — source values for the two Heroes of Gwen Hunters.
+    // Hattori — source values from HeroHattori, PerkDoubleJump, SkillSnowball,
+    // SkillNinjaDash and SkillNinjaBlade.
+    public static final double HEROES_OF_GWEN_HATTORI_DOUBLE_JUMP_POWER = 1.0D;
+    public static final double HEROES_OF_GWEN_HATTORI_DOUBLE_JUMP_HEIGHT_LIMIT = 1.0D;
+    public static final long HEROES_OF_GWEN_HATTORI_DOUBLE_JUMP_COOLDOWN_MILLIS = 3_000L;
+    public static final int HEROES_OF_GWEN_HATTORI_SHURIKEN_COUNT = 3;
+    public static final int HEROES_OF_GWEN_HATTORI_SHURIKEN_DAMAGE = 3;
+    public static final long HEROES_OF_GWEN_HATTORI_SHURIKEN_COOLDOWN_MILLIS = 1_500L;
+    public static final long HEROES_OF_GWEN_HATTORI_SHURIKEN_SPACING_TICKS = 4L;
+    public static final long HEROES_OF_GWEN_HATTORI_NINJA_DASH_COOLDOWN_MILLIS = 7_000L;
+    public static final double HEROES_OF_GWEN_HATTORI_NINJA_DASH_RANGE = 10.0D;
+    public static final double HEROES_OF_GWEN_HATTORI_NINJA_DASH_COLLISION_RADIUS = 2.0D;
+    public static final int HEROES_OF_GWEN_HATTORI_NINJA_DASH_DAMAGE = 8;
+    public static final long HEROES_OF_GWEN_HATTORI_ENDER_BLADE_ACTIVE_MILLIS = 7_000L;
+    public static final long HEROES_OF_GWEN_HATTORI_ENDER_BLADE_COOLDOWN_MILLIS = 60_000L;
+    public static final long HEROES_OF_GWEN_HATTORI_ENDER_BLADE_REUSE_DELAY_MILLIS = 67_000L;
+    public static final double HEROES_OF_GWEN_HATTORI_ENDER_BLADE_DAMAGE_BONUS = 9.0D;
+
+    // Devon — values from HeroDevon, SkillTNTArrows, SkillBoost and SkillInfinity.
+    public static final int HEROES_OF_GWEN_DEVON_TNT_ARROW_COUNT = 3;
+    public static final long HEROES_OF_GWEN_DEVON_TNT_ARROW_COOLDOWN_MILLIS = 17_000L;
+    public static final double HEROES_OF_GWEN_DEVON_TNT_EXPLOSION_RADIUS = 5.0D;
+    public static final double HEROES_OF_GWEN_DEVON_TNT_BOW_BASE_DAMAGE = 5.0D;
+    public static final long HEROES_OF_GWEN_DEVON_HUNTERS_BOOST_COOLDOWN_MILLIS = 10_000L;
+    public static final long HEROES_OF_GWEN_DEVON_HUNTERS_BOOST_DURATION_MILLIS = 3_000L;
+    public static final long HEROES_OF_GWEN_DEVON_INFINITY_ACTIVE_MILLIS = 7_000L;
+    public static final long HEROES_OF_GWEN_DEVON_INFINITY_COOLDOWN_MILLIS = 60_000L;
+    public static final long HEROES_OF_GWEN_DEVON_INFINITY_REUSE_DELAY_MILLIS = 67_000L;
+    public static final double HEROES_OF_GWEN_DEVON_INFINITY_HOMING_RANGE = 6.0D;
+    public static final long HEROES_OF_GWEN_DEVON_INFINITY_WITHER_DURATION_MILLIS = 3_000L;
+
+    public static final int HEROES_OF_GWEN_DEVON_FLETCHER_MAX_ARROWS = 3;
+    public static final long HEROES_OF_GWEN_DEVON_FLETCHER_RELOAD_MILLIS = 3_000L;
+    public static final int HEROES_OF_GWEN_ROWENA_FLETCHER_MAX_ARROWS = 2;
+    public static final long HEROES_OF_GWEN_ROWENA_FLETCHER_RELOAD_MILLIS = 2_000L;
+
+    public static int heroesOfGwenFletcherMaxArrows(String hero) {
+        if ("devon".equalsIgnoreCase(hero)) return HEROES_OF_GWEN_DEVON_FLETCHER_MAX_ARROWS;
+        if ("rowena".equalsIgnoreCase(hero)) return HEROES_OF_GWEN_ROWENA_FLETCHER_MAX_ARROWS;
+        return 0;
+    }
+
+    public static long heroesOfGwenFletcherReloadMillis(String hero) {
+        if ("devon".equalsIgnoreCase(hero)) return HEROES_OF_GWEN_DEVON_FLETCHER_RELOAD_MILLIS;
+        if ("rowena".equalsIgnoreCase(hero)) return HEROES_OF_GWEN_ROWENA_FLETCHER_RELOAD_MILLIS;
+        return 0L;
+    }
+
+    // Ivy — source values from SkillHook, SkillFloralLeap and SkillBoxingRing.
+    public static final long HEROES_OF_GWEN_IVY_VINE_PULL_COOLDOWN_MILLIS = 10_000L;
+    public static final double HEROES_OF_GWEN_IVY_VINE_PULL_RANGE = 9.0D;
+    public static final double HEROES_OF_GWEN_IVY_VINE_PULL_BEAM_STEP = 0.25D;
+    public static final double HEROES_OF_GWEN_IVY_VINE_PULL_HIT_RADIUS = 2.0D;
+    public static final double HEROES_OF_GWEN_IVY_VINE_PULL_STOP_DISTANCE_SQUARED = 4.0D;
+    public static final int HEROES_OF_GWEN_IVY_VINE_PULL_PLAYER_DAMAGE = 4;
+    public static final int HEROES_OF_GWEN_IVY_VINE_PULL_MINION_DAMAGE = 6;
+    public static final int HEROES_OF_GWEN_IVY_VINE_PULL_SLOW_TICKS = 60;
+    public static final int HEROES_OF_GWEN_IVY_VINE_PULL_SLOW_AMPLIFIER = 2;
+    public static final long HEROES_OF_GWEN_IVY_VINE_PULL_MAX_PULL_MILLIS = 8_000L;
+    public static final long HEROES_OF_GWEN_IVY_FLORAL_LEAP_COOLDOWN_MILLIS = 11_000L;
+    public static final double HEROES_OF_GWEN_IVY_FLORAL_LEAP_VERTICAL_VELOCITY = 1.2D;
+    public static final long HEROES_OF_GWEN_IVY_FLORAL_LEAP_MINIMUM_FLIGHT_MILLIS = 500L;
+    public static final long HEROES_OF_GWEN_IVY_FLORAL_LEAP_BED_DURATION_MILLIS = 5_000L;
+    public static final long HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE_INTERVAL_MILLIS = 1_000L;
+    public static final double HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE_RADIUS = 5.0D;
+    public static final int HEROES_OF_GWEN_IVY_FLORAL_LEAP_FLOWER_RADIUS = 3;
+    public static final int HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE = 2;
+    public static final int HEROES_OF_GWEN_IVY_FLORAL_LEAP_SLOW_TICKS = 50;
+    public static final int HEROES_OF_GWEN_IVY_FLORAL_LEAP_SLOW_AMPLIFIER = 2;
+    public static final long HEROES_OF_GWEN_IVY_THORN_WALL_COOLDOWN_MILLIS = 45_000L;
+    public static final long HEROES_OF_GWEN_IVY_THORN_WALL_DURATION_MILLIS = 5_000L;
+    public static final int HEROES_OF_GWEN_IVY_THORN_WALL_BLOCK_RADIUS = 3;
+    public static final long HEROES_OF_GWEN_IVY_THORN_WALL_ALLY_REGEN_TICKS = 60L;
+    public static final int HEROES_OF_GWEN_IVY_THORN_WALL_ALLY_REGEN_AMPLIFIER = 1;
+    public static final long HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_ROOT_MILLIS = 2_000L;
+    public static final long HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_ROOT_RECHARGE_MILLIS = 2_000L;
+    public static final long HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_DAMAGE_RECHARGE_MILLIS = 900L;
+    public static final int HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_DAMAGE = 2;
+
+    // Biff — source values from SkillLeash, SkillBiffDash and SkillWarHorse.
+    public static final long HEROES_OF_GWEN_BIFF_TETHER_COOLDOWN_MILLIS = 12_000L;
+    public static final long HEROES_OF_GWEN_BIFF_TETHER_ACTIVE_MILLIS = 5_000L;
+    public static final long HEROES_OF_GWEN_BIFF_TETHER_REUSE_DELAY_MILLIS = 17_000L;
+    public static final double HEROES_OF_GWEN_BIFF_TETHER_RANGE = 8.0D;
+    public static final double HEROES_OF_GWEN_BIFF_TETHER_BREAK_DISTANCE_SQUARED = 100.0D;
+    public static final double HEROES_OF_GWEN_BIFF_TETHER_PULL_STOP_DISTANCE_SQUARED = 4.0D;
+    public static final long HEROES_OF_GWEN_BIFF_TETHER_SLOW_DURATION_MILLIS = 5_000L;
+    public static final int HEROES_OF_GWEN_BIFF_TETHER_SLOW_AMPLIFIER = 1;
+    public static final long HEROES_OF_GWEN_BIFF_BATTLE_LEAP_COOLDOWN_MILLIS = 11_000L;
+    public static final double HEROES_OF_GWEN_BIFF_BATTLE_LEAP_VERTICAL_VELOCITY = 1.0D;
+    public static final long HEROES_OF_GWEN_BIFF_BATTLE_LEAP_MINIMUM_FLIGHT_MILLIS = 1_000L;
+    public static final double HEROES_OF_GWEN_BIFF_BATTLE_LEAP_LANDING_RADIUS = 5.0D;
+    public static final double HEROES_OF_GWEN_BIFF_BATTLE_LEAP_DAMAGE = 4.0D;
+    public static final double HEROES_OF_GWEN_BIFF_BATTLE_LEAP_MINIMUM_KNOCK_UP = 0.6D;
+    public static final double HEROES_OF_GWEN_BIFF_BATTLE_LEAP_RANDOM_KNOCK_UP = 0.5D;
+    public static final long HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_COOLDOWN_MILLIS = 45_000L;
+    public static final long HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_REUSE_DELAY_MILLIS = 50_500L;
+    public static final long HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_DURATION_MILLIS = 6_000L;
+    public static final long HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_ROOT_RECHARGE_MILLIS = 2_000L;
+    public static final long HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_ROOT_DURATION_MILLIS = 1_000L;
+    public static final double HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_RADIUS = 5.0D;
+    public static final double HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_DAMAGE = 4.0D;
+    public static final double HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_JUMP_STRENGTH = 1.0D;
+
+    // Dana — source values from SkillPulseHeal, SkillDanaDash and SkillRally.
+    public static final long HEROES_OF_GWEN_DANA_PULSE_HEAL_COOLDOWN_MILLIS = 8_000L;
+    public static final double HEROES_OF_GWEN_DANA_PULSE_HEAL_RADIUS = 7.0D;
+    public static final double HEROES_OF_GWEN_DANA_PULSE_HEAL_SELF = 2.0D;
+    public static final double HEROES_OF_GWEN_DANA_PULSE_HEAL_ALLY = 4.0D;
+    public static final long HEROES_OF_GWEN_DANA_KNOCK_UP_COOLDOWN_MILLIS = 10_000L;
+    public static final long HEROES_OF_GWEN_DANA_KNOCK_UP_DURATION_MILLIS = 600L;
+    public static final double HEROES_OF_GWEN_DANA_KNOCK_UP_SPEED = 1.0D;
+    public static final double HEROES_OF_GWEN_DANA_KNOCK_UP_COLLISION_RADIUS = 2.0D;
+    public static final long HEROES_OF_GWEN_DANA_KNOCK_UP_TARGET_RECHARGE_MILLIS = 500L;
+    public static final double HEROES_OF_GWEN_DANA_KNOCK_UP_PLAYER_DAMAGE = 12.0D;
+    public static final double HEROES_OF_GWEN_DANA_KNOCK_UP_MINION_DAMAGE = 8.0D;
+    public static final double HEROES_OF_GWEN_DANA_KNOCK_UP_PLAYER_LIFT = 1.0D;
+    public static final double HEROES_OF_GWEN_DANA_KNOCK_UP_MINION_LIFT = 0.5D;
+    public static final long HEROES_OF_GWEN_DANA_RALLY_COOLDOWN_MILLIS = 40_000L;
+    public static final long HEROES_OF_GWEN_DANA_RALLY_REUSE_DELAY_MILLIS = 47_000L;
+    public static final double HEROES_OF_GWEN_DANA_RALLY_JUMP_VERTICAL_VELOCITY = 1.5D;
+    public static final long HEROES_OF_GWEN_DANA_RALLY_MINIMUM_FLIGHT_MILLIS = 1_000L;
+    public static final long HEROES_OF_GWEN_DANA_RALLY_BANNER_DURATION_MILLIS = 7_000L;
+    public static final double HEROES_OF_GWEN_DANA_RALLY_HEAL_RADIUS = 5.0D;
+    public static final double HEROES_OF_GWEN_DANA_RALLY_HEAL_PER_SECOND = 3.0D;
+    public static final double HEROES_OF_GWEN_DANA_RALLY_LANDING_DAMAGE_RADIUS = 3.0D;
+    public static final double HEROES_OF_GWEN_DANA_RALLY_LANDING_DAMAGE = 7.0D;
+
+    // Rowena — source values from SkillLightArrows, SkillCombatDash and SkillBombardment.
+    public static final int HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_COUNT = 5;
+    public static final long HEROES_OF_GWEN_ROWENA_LIGHT_ARROWS_COOLDOWN_MILLIS = 12_000L;
+    public static final long HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_TARGET_RECHARGE_MILLIS = 500L;
+    public static final double HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_RANGE = 40.0D;
+    public static final double HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_STEP = 0.4D;
+    public static final double HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_HIT_RADIUS = 1.5D;
+    public static final long HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_COOLDOWN_MILLIS = 8_000L;
+    public static final long HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_DURATION_MILLIS = 250L;
+    public static final double HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_SPEED = 1.5D;
+    public static final long HEROES_OF_GWEN_ROWENA_BOMBARDMENT_DURATION_MILLIS = 10_000L;
+    public static final long HEROES_OF_GWEN_ROWENA_BOMBARDMENT_COOLDOWN_MILLIS = 60_000L;
+    public static final long HEROES_OF_GWEN_ROWENA_BOMBARDMENT_REUSE_DELAY_MILLIS = 70_000L;
+    public static final int HEROES_OF_GWEN_ROWENA_BOMBARDMENT_SHOTS = 3;
+    public static final double HEROES_OF_GWEN_ROWENA_BOMBARDMENT_ASCENT_BLOCKS = 15.0D;
+    public static final double HEROES_OF_GWEN_ROWENA_BOMBARDMENT_RANGE = 40.0D;
+    public static final double HEROES_OF_GWEN_ROWENA_BOMBARDMENT_BLAST_RADIUS = 5.0D;
+    public static final double HEROES_OF_GWEN_ROWENA_BOMBARDMENT_DAMAGE_FACTOR = 2.0D;
+
+    // Bardolf — source values from HeroBardolf, SkillSummonWolf, SkillWolfPounce and SkillFullMoon.
+    public static final int HEROES_OF_GWEN_BARDOLF_MAX_WOLVES = 5;
+    public static final double HEROES_OF_GWEN_BARDOLF_WOLF_HEALTH = 8.0D;
+    public static final long HEROES_OF_GWEN_BARDOLF_SUMMON_COOLDOWN_MILLIS = 5_000L;
+    public static final double HEROES_OF_GWEN_BARDOLF_OWNER_FOLLOW_MIN_DISTANCE_SQUARED = 2.0D;
+    public static final double HEROES_OF_GWEN_BARDOLF_OWNER_TELEPORT_DISTANCE_SQUARED = 100.0D;
+    public static final double HEROES_OF_GWEN_BARDOLF_ATTACK_DISTANCE_SQUARED = 9.0D;
+    public static final long HEROES_OF_GWEN_BARDOLF_ATTACK_INTERVAL_MILLIS = 500L;
+    public static final double HEROES_OF_GWEN_BARDOLF_WOLF_ATTACK_DAMAGE = 1.0D;
+    public static final double HEROES_OF_GWEN_BARDOLF_WOLF_FOLLOW_SPEED = 1.5D;
+    public static final double HEROES_OF_GWEN_BARDOLF_WOLF_ULTIMATE_SPEED = 2.0D;
+    public static final long HEROES_OF_GWEN_BARDOLF_POUNCE_COOLDOWN_MILLIS = 7_000L;
+    public static final long HEROES_OF_GWEN_BARDOLF_POUNCE_OVERRIDE_MILLIS = 6_500L;
+    public static final double HEROES_OF_GWEN_BARDOLF_POUNCE_TRIGGER_DISTANCE_SQUARED = 4.0D;
+    public static final double HEROES_OF_GWEN_BARDOLF_POUNCE_VELOCITY_MULTIPLIER = 1.5D;
+    public static final double HEROES_OF_GWEN_BARDOLF_POUNCE_MINIMUM_VERTICAL_VELOCITY = 0.8D;
+    public static final long HEROES_OF_GWEN_BARDOLF_FULL_MOON_DURATION_MILLIS = 10_000L;
+    public static final long HEROES_OF_GWEN_BARDOLF_FULL_MOON_COOLDOWN_MILLIS = 60_000L;
+    public static final long HEROES_OF_GWEN_BARDOLF_FULL_MOON_REUSE_DELAY_MILLIS = 70_000L;
+    public static final double HEROES_OF_GWEN_BARDOLF_FULL_MOON_WOLF_HEALTH = 20.0D;
+    public static final double HEROES_OF_GWEN_BARDOLF_FULL_MOON_DAMAGE_PER_WOLF = 1.0D;
+    public static final double HEROES_OF_GWEN_BARDOLF_FULL_MOON_SPEED_PER_WOLF = 0.05D;
+
+    // Larissa — source values from the archived Heroes of Gwen kit implementations.
+    public static final long HEROES_OF_GWEN_LARISSA_AQUA_CANNON_INTERVAL_MILLIS = 500L;
+    public static final int HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE = 3;
+    public static final double HEROES_OF_GWEN_LARISSA_AQUA_CANNON_RANGE = 10.0D;
+    public static final long HEROES_OF_GWEN_LARISSA_WATER_AMMO_RELOAD_MILLIS = 3_000L;
+    public static final int HEROES_OF_GWEN_LARISSA_WATER_AMMO_CAPACITY = 64;
+    public static final long HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_COOLDOWN_MILLIS = 14_000L;
+    public static final long HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DURATION_MILLIS = 6_000L;
+    public static final double HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS = 3.0D;
+    public static final long HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_PULSE_INTERVAL_MILLIS = 1_000L;
+    public static final int HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_HEAL_PER_SECOND = 4;
+    public static final int HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DAMAGE_PER_SECOND = 2;
+    public static final long HEROES_OF_GWEN_LARISSA_WATER_DASH_DURATION_MILLIS = 600L;
+    public static final long HEROES_OF_GWEN_LARISSA_WATER_DASH_COOLDOWN_MILLIS = 10_000L;
+    public static final long HEROES_OF_GWEN_LARISSA_STORM_BLESSING_DURATION_MILLIS = 7_000L;
+    public static final long HEROES_OF_GWEN_LARISSA_STORM_BLESSING_COOLDOWN_MILLIS = 60_000L;
+    // Active skills call useSkill again after their progress-bar duration expires.
+    public static final long HEROES_OF_GWEN_LARISSA_STORM_BLESSING_REUSE_DELAY_MILLIS = 66_500L;
+    public static final long HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_INTERVAL_MILLIS = 1_000L;
+    public static final int HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_PER_SECOND = 2;
+
+    // Anath the Burnt — values from the archived Heroes of Gwen ability references.
+    // Anath — source values from SkillFireProjectile, SkillBurnBeam and SkillFlameDash.
+    public static final long HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_INTERVAL_MILLIS = 500L;
+    public static final long HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_RELOAD_MILLIS = 1_000L;
+    public static final int HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_CAPACITY = 4;
+    public static final int HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE = 5;
+    public static final double HEROES_OF_GWEN_ANATH_FLAME_WAND_PROJECTILE_SPEED = 1.25D;
+    public static final int HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_TICKS = 60;
+    public static final double HEROES_OF_GWEN_ANATH_FLAME_WAND_MAX_RANGE = 40.0D;
+    public static final double HEROES_OF_GWEN_ANATH_FLAME_WAND_HIT_RADIUS = 0.65D;
+    public static final long HEROES_OF_GWEN_ANATH_BURN_BEAM_COOLDOWN_MILLIS = 9_000L;
+    public static final double HEROES_OF_GWEN_ANATH_BURN_BEAM_RANGE = 9.0D;
+    public static final double HEROES_OF_GWEN_ANATH_BURN_BEAM_STEP = 0.2D;
+    public static final double HEROES_OF_GWEN_ANATH_BURN_BEAM_HIT_RADIUS = 2.0D;
+    public static final int HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE = 11;
+    public static final long HEROES_OF_GWEN_ANATH_BURN_BEAM_TARGET_RECHARGE_MILLIS = 2_000L;
+    public static final int HEROES_OF_GWEN_ANATH_BURN_BEAM_STEPS_PER_TICK = 3;
+    public static final long HEROES_OF_GWEN_ANATH_FLAME_DASH_COOLDOWN_MILLIS = 12_000L;
+    public static final long HEROES_OF_GWEN_ANATH_FLAME_DASH_DURATION_MILLIS = 600L;
+    public static final double HEROES_OF_GWEN_ANATH_FLAME_DASH_SPEED = 1.0D;
+    public static final long HEROES_OF_GWEN_ANATH_FLAME_DASH_FIRE_DELAY_MILLIS = 500L;
+    public static final long HEROES_OF_GWEN_ANATH_FLAME_DASH_FIRE_DURATION_MILLIS = 5_000L;
+    public static final long HEROES_OF_GWEN_ANATH_METEOR_COOLDOWN_MILLIS = 60_000L;
+    public static final long HEROES_OF_GWEN_ANATH_METEOR_DURATION_MILLIS = 7_000L;
+    public static final double HEROES_OF_GWEN_ANATH_METEOR_RADIUS = 10.0D;
+    public static final long HEROES_OF_GWEN_ANATH_METEOR_BURN_INTERVAL_MILLIS = 500L;
+    public static final double HEROES_OF_GWEN_ANATH_METEOR_BURN_DAMAGE = 1.0D;
+    public static final double HEROES_OF_GWEN_ANATH_METEOR_PULSE_DAMAGE = 2.0D;
+    public static final double HEROES_OF_GWEN_ANATH_METEOR_FIREBALL_DAMAGE = 20.0D;
+
+    /** Matches MobaUtil.scaleDamageWithBow(bow, 5) used by Devon's TNT Arrows. */
+    public static double heroesOfGwenDevonTntArrowDamage(int powerLevel) {
+        double scaled = HEROES_OF_GWEN_DEVON_TNT_BOW_BASE_DAMAGE + 5.0D;
+        return scaled * (1.0D + Math.max(0, powerLevel) * 0.25D);
+    }
+
+    public static final double HEROES_OF_GWEN_ROWENA_BOW_BASE_DAMAGE = 5.0D;
+    public static final double HEROES_OF_GWEN_ROWENA_BOW_POWER_DAMAGE_PER_LEVEL = 0.25D;
+
+    /** Mirrors MobaUtil.scaleDamageWithBow(item, 0) in the archived Java source. */
+    public static double heroesOfGwenRowenaBowDamage(int powerLevel) {
+        return HEROES_OF_GWEN_ROWENA_BOW_BASE_DAMAGE
+                * (1.0D + Math.max(0, powerLevel) * HEROES_OF_GWEN_ROWENA_BOW_POWER_DAMAGE_PER_LEVEL);
+    }
+
+    /** Light Arrows use scaled bow damage minus one point. */
+    public static double heroesOfGwenRowenaLightArrowDamage(int powerLevel) {
+        return heroesOfGwenRowenaBowDamage(powerLevel) - 1.0D;
+    }
+
+    /** Bombardment multiplies the same scaled bow damage by two. */
+    public static double heroesOfGwenRowenaBombardmentDamage(int powerLevel) {
+        return heroesOfGwenRowenaBowDamage(powerLevel)
+                * HEROES_OF_GWEN_ROWENA_BOMBARDMENT_DAMAGE_FACTOR;
+    }
+
+    public static boolean heroesOfGwenAnathMeteorContainsDistance(double distance) {
+        return Double.isFinite(distance) && distance >= 0.0D
+                && distance <= HEROES_OF_GWEN_ANATH_METEOR_RADIUS;
+    }
 
     // Heroes of Gwen: source-derived lane minion and economy timings.
     public static final long HEROES_OF_GWEN_MINION_WAVE_INTERVAL_MILLIS = 10_000L;
