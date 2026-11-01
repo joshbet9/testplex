@@ -147,6 +147,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final Map<Integer, List<TowerState>> towers = new HashMap<>();
     private final Map<UUID, Integer> heroesOfGwenMinionTeams = new HashMap<>();
     private final Set<Integer> heroesOfGwenIronMinionTeams = new HashSet<>();
+    private final Set<UUID> heroesOfGwenAbilityDamageTargets = new HashSet<>();
     private final List<CapturePointState> capturePoints = new ArrayList<>();
     private final Map<Integer, Wither> withers = new HashMap<>();
     private final Map<Integer, Boolean> witherDamageable = new HashMap<>();
@@ -1914,6 +1915,35 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onHeroesOfGwenStoreDamageModifiers(EntityDamageByEntityEvent event) {
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN
+                || !(event.getEntity() instanceof LivingEntity target)) return;
+        Player attacker = resolveAttacker(event);
+        if (attacker == null || !activePlayers.contains(attacker.getUniqueId())
+                || heroesOfGwenAbilityDamageTargets.contains(target.getUniqueId())) return;
+        int attackingTeam = teams.getOrDefault(attacker.getUniqueId(), -1);
+        if (attackingTeam < 0 || heroesOfGwenEntityTeam(target) == attackingTeam) return;
+
+        if (event.getDamager() instanceof Projectile projectile) {
+            String projectileType = projectile.getPersistentDataContainer()
+                    .get(heroProjectileTypeKey, PersistentDataType.STRING);
+            // Source-ability projectiles are adjusted in the dedicated projectile
+            // handler, after its source damage value has been assigned.
+            if (projectileType != null) return;
+            if (event.getDamager() instanceof Arrow) {
+                event.setDamage(ArcadePortRules.heroesOfGwenStoreBasicAttackDamage(
+                        event.getDamage(), heroesOfGwenOwnedStoreItemNames(attacker)));
+            }
+            return;
+        }
+        if (event.getDamager() instanceof Player) {
+            Set<String> items = heroesOfGwenOwnedStoreItemNames(attacker);
+            double damage = ArcadePortRules.heroesOfGwenStoreBasicAttackDamage(event.getDamage(), items);
+            event.setDamage(ArcadePortRules.heroesOfGwenStoreMeleeDamage(damage, items));
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onHeroesOfGwenStoreHitConditions(EntityDamageByEntityEvent event) {
         if (stopped || game != ArcadePortGame.HEROES_OF_GWEN
@@ -2093,7 +2123,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                     && !target.equals(owner)
                     && teams.getOrDefault(owner.getUniqueId(), -1) != teams.getOrDefault(target.getUniqueId(), -2)
                     && activePlayers.contains(target.getUniqueId())) {
-                event.setDamage(ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_FIREBALL_DAMAGE);
+                event.setDamage(heroesOfGwenStoreAbilityDamage(owner,
+                        ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_FIREBALL_DAMAGE));
                 target.setFireTicks(Math.max(target.getFireTicks(), 40));
             } else event.setCancelled(true);
             return;
@@ -2104,16 +2135,20 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             Player owner = heroProjectileOwner(snowball);
             if (owner == null || !(event.getEntity() instanceof Player target)
                     || teams.getOrDefault(owner.getUniqueId(), -1) == teams.getOrDefault(target.getUniqueId(), -2)) return;
-            event.setDamage(3.0D);
+            event.setDamage(heroesOfGwenStoreAbilityDamage(owner, 3.0D));
             return;
         }
         if (damager instanceof Arrow arrow) {
             String type = arrow.getPersistentDataContainer().get(heroProjectileTypeKey, PersistentDataType.STRING);
             if (!"devon.infinity_arrow".equals(type)) return;
             Player owner = heroProjectileOwner(arrow);
-            if (owner != null && event.getEntity() instanceof Player target
-                    && teams.getOrDefault(owner.getUniqueId(), -1) != teams.getOrDefault(target.getUniqueId(), -2)) {
-                target.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 3 * 20, 0, true, true, true));
+            if (owner != null && event.getEntity() instanceof LivingEntity target
+                    && activePlayers.contains(owner.getUniqueId())
+                    && heroesOfGwenEntityTeam(target) != teams.getOrDefault(owner.getUniqueId(), -1)) {
+                event.setDamage(heroesOfGwenStoreAbilityDamage(owner, event.getDamage()));
+                if (target instanceof Player playerTarget) {
+                    playerTarget.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 3 * 20, 0, true, true, true));
+                }
             }
             return;
         }
@@ -2910,6 +2945,23 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             }
         }
         player.updateInventory();
+    }
+
+    private double heroesOfGwenStoreAbilityDamage(Player owner, double damage) {
+        return ArcadePortRules.heroesOfGwenStoreAbilityDamage(
+                damage, heroesOfGwenOwnedStoreItemNames(owner));
+    }
+
+    private void damageHeroesOfGwenAbility(Entity target, Player owner, double damage) {
+        if (!(target instanceof LivingEntity living) || !living.isValid() || living.isDead()
+                || owner == null || !owner.isOnline()) return;
+        UUID targetId = living.getUniqueId();
+        heroesOfGwenAbilityDamageTargets.add(targetId);
+        try {
+            living.damage(heroesOfGwenStoreAbilityDamage(owner, damage), owner);
+        } finally {
+            heroesOfGwenAbilityDamageTargets.remove(targetId);
+        }
     }
 
     private Set<String> heroesOfGwenOwnedStoreItemNames(Player player) {
