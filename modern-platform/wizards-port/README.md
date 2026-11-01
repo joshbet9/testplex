@@ -1,6 +1,6 @@
 # WizardsModern — Paper 26.3
 
-A separate, resource-pack-independent port of the original Mineplex Wizards Arcade survival game. It is built as its own plugin and does not use the legacy 1.8 NMS implementation.
+A resource-pack-independent port of the original Mineplex Wizards Arcade survival game for Paper 26.3. The active test controller is embedded inside `ArcadeMechanicsModern`, so Wizards shares the Testplex Arcade server session rather than starting a second standalone game lifecycle. The `WizardsModern.jar` artifact is retained as a disabled reference build; it is not the active test entry point.
 
 ## Resource-pack-free presentation
 
@@ -8,8 +8,8 @@ All spell books, wands, inventory menus and feedback use ordinary Paper/Minecraf
 
 ## First implementation milestone
 
-- Standalone /wizards queue/start/leave/kit/status/stop test controls.
-- Four source kits: Mage, Sorcerer, Mystic and Witch Doctor. All kits begin with only Mana Bolt and Wizard's Compass; Mage does not receive additional random starter spells.
+- Shared Arcade `/arcadeport` queue/start/leave/kit/status/stop controls (see below).
+- Four source kits: Mage, Sorcerer, Mystic and Witch Doctor. All kits begin with Mana Bolt and Wizard's Compass; Mage additionally receives two random starter spells selected using the original SpellType loot-weight roll.
 - Free-for-all, last-wizard-standing round flow in a generated isolated test arena.
 - Loot chests with food, armour, wands and spellbooks; spellbooks level known spells and convert duplicates at max level into mana.
 - Mana regeneration, Soul Star boosts, wand slots, per-spell cooldowns and an inventory spell selector.
@@ -17,16 +17,19 @@ All spell books, wands, inventory menus and feedback use ordinary Paper/Minecraf
 - All 21 historical spells now have playable implementations: Anvil Drop, Fireball, Flash, Frost Barrier, Gust, Heal, Ice Prison, Ice Shards, Implode, Lightning Strike, Mana Bolt, Napalm, Rainbow Beam, Rainbow Road, Rumble, Spectral Arrow, Speed Boost, Summon Wolves, Trap Rune, Web Shot and Wizard's Compass.
 - Spell maximum levels, mana deltas, cooldown deltas and loot weights are aligned to the original SpellType definitions. Implode's block removal is opt-in (`destructive-spells: true`) so a generated test arena remains reusable; Napalm fire and Rainbow Road blocks expire and restore automatically.
 
-The repository currently has no Wizards map archive. This module therefore creates a clearly-labelled generated arena for mechanics testing; it does not claim the original map layout or source map chest placements.
+The current repository snapshot has no Wizards map ZIPs, but the shared Arcade source-map importer can also use archives already present on the server. It scans the original `update/maps/Wizards` and `update/maps/Nano Wizards` folders under `source-maps.directory` (default `update/maps`, relative to the server process working directory); set that option to an absolute map-root path when the existing Reborn map store is elsewhere. Only ZIPs within those two approved folders are considered, and path traversal or symbolic-link escapes are rejected. When no matching archive is available in either the plugin bundle or the configured server directory, the game creates a clearly-labelled generated arena for mechanics testing; it does not claim the original map layout or source map chest placements.
 
-## Test commands
+## Shared Arcade test commands
 
-- /wizards join — queue for the next round.
-- /wizards kit <mage|sorcerer|mystic|witchdoctor> — choose a kit before starting.
-- /wizards start — start the queued players (solo start is enabled in the default test config).
-- /wizards status — inspect queue and round state.
-- /wizards leave — leave the queue or active round and restore the saved player state.
-- /wizards stop — operator reset.
+- `/arcadeport play wizards` — quick-start queue (solo is allowed by the test config).
+- `/arcadeport join wizards` — join the normal queue.
+- `/arcadeport kit wizards <mage|sorcerer|mystic|witchdoctor>` — choose a kit before starting.
+- `/arcadeport start wizards` — operator-only force start.
+- `/arcadeport status` — inspect the shared Arcade and Wizards session state.
+- `/arcadeport leave wizards` — leave the queue or active round and restore your saved player state.
+- `/arcadeport stop` — operator reset.
+
+Do not use `/wizards` as the active runtime entry point. The standalone reference build remains disabled while the hosted controller is owned by `ArcadeMechanicsModern`.
 
 Right-click a wand to open the spell selector. Left-click a spell in the selector to bind it to that wand; right-click a spell to quickcast it. Left-click with a bound wand to cast. Spellbooks found in chests are consumed to learn or level the spell.
 

@@ -62,6 +62,23 @@ Two additional Reborn games and their original archived map collections are regi
 
 Mixed Arcade commands accept both `<game-id>-mixed` and `mixed-<game-id>` for Turf Wars, Castle Assault and Heroes of Gwen. Unit tests cover Castle Assault kit and perk rules, blast protection, Heroes of Gwen's ten-hero role mapping and Wither movement/Earthquake falloff, the 60s/30s objective TNT delay, half-cost calculation, archive registration and the central tower filter. These do not certify live in-game parity. Keep Castle Assault and Heroes of Gwen disabled until the remaining mechanics are accepted on the 26.3 test server.
 
+## Wizards — shared Arcade lifecycle prototype
+
+Wizards is now hosted by `ArcadeMechanicsModern` rather than requiring its own runtime plugin to own the match. Its existing 21 spell effects, four source kits, loot/chest progression, mana/wand loop, endgame and temporary spell cleanup remain in the Wizards controller. Mage receives the source two-random-spell live-start bonus using each spell's original loot weight; Sorcerer, Mystic and Witch Doctor retain only Mana Bolt and Wizard's Compass as starter spells.
+
+Use the shared Arcade entry points:
+
+- `/arcadeport play wizards` — join and trigger a short quick-start window.
+- `/arcadeport join wizards` — join the normal shared queue.
+- `/arcadeport start wizards` — operator-only force start.
+- `/arcadeport leave wizards` — leave the queue or active match.
+- `/arcadeport kit wizards <mage|sorcerer|mystic|witchdoctor>` — select a kit while queued.
+- `/arcadeport status` and `/arcadeport stop` — inspect or stop the shared test session.
+
+Wizards takes exclusive ownership of the Arcade test session: it stops an existing Arcade match before taking player snapshots, prevents another game from starting while its queue/match is active, and restores players to their pre-match shared-lobby state on elimination, leave, completion, disconnect/reconnect or server shutdown. It writes lifetime wins, kills and spell-binding counts to the common local stats configuration.
+
+This remains a mechanics-in-progress test port, not a READY_FOR_TEST game. Wizards discovers both the original Arcade `Wizards` map directory and the `Nano Wizards` compatibility folder through the shared Paper 26.3 source-map importer. The legacy Nano `GameType.WIZARDS` explicitly selects `mapsFromArcade(GameDisplay.Wizards)`, so source map WorldConfig spawn/chest markers drive the match arena. Map ZIPs can be bundled in the plugin or discovered from the server-local directory configured by `source-maps.directory` (default `update/maps`, relative to the server process working directory). An absolute path can be configured when the existing Reborn map store is elsewhere. External archives are constrained to the approved Wizards folders and rejected when paths traverse outside the map root or include symbolic links. The generated arena remains a fallback only when neither source folder contains an archive. The Git tree contains the `Nano Wizards/uses_arcade.txt` compatibility marker but does not mirror the original map ZIPs. The ten-map catalogue, builder credits and exact standard/Nano download URLs are recorded in `docs/wizards-source-map-catalogue.md`. A dedicated `Validate Wizards Source Maps` GitHub Actions workflow downloads all 20 variants into temporary runner storage, checks ZIP integrity and the exact world-root/WorldConfig/terrain structure required by this importer, records spawn and map-marker metadata plus SHA-256 hashes, then deletes the binary downloads; it uploads only the JSON/Markdown report. Live Paper 26.3 world loading and multi-client/reconnect acceptance remain outstanding. Mage's two source-weighted random starter spells, original 0.5 melee-damage cap, source armour-per-piece reductions and Wizards sidebar are preserved. Wizards is deliberately not added to the normal playable-game allow-list.
+
 ## Commands
 
 - `/gamepanel` → choose a supported game → **Start / Test**. The coordinator calls `/arcadeport play <game-id>`.
