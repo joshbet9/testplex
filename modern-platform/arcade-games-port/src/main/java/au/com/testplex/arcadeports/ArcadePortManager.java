@@ -19531,9 +19531,13 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        // Bukkit removes the quitter after this event. Refresh on the next tick so
-        // every remaining lobby viewer receives the corrected count and tab roster.
-        Bukkit.getScheduler().runTask(plugin, lobby::refreshLobbyScoreboards);
+        // Bukkit removes the quitter after this event. Rebuild active-match tab
+        // groups and lobby scoreboards on the next tick using the final player roster.
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            Session currentSession = active;
+            if (currentSession != null) applySessionTeamTabTeams(currentSession);
+            lobby.refreshLobbyScoreboards();
+        });
         UUID id = event.getPlayer().getUniqueId();
         PlayerSnapshot endingSnapshot = endingSnapshots.remove(id);
         if (endingSnapshot != null) pendingRestore.put(id, endingSnapshot);
