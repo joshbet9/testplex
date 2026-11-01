@@ -2733,6 +2733,13 @@ public final class ArcadePortRules {
         return baseDamage * (1.0D + factor);
     }
 
+    /** Source and recipient equipment both affect non-natural ability healing. */
+    public static double heroesOfGwenStoreAbilityHeal(double baseHeal,
+            Collection<String> sourceItems, Collection<String> recipientItems) {
+        double sourceAdjusted = heroesOfGwenStoreAbilityDamage(baseHeal, sourceItems);
+        return heroesOfGwenStoreHpRegenAmount(sourceAdjusted, recipientItems);
+    }
+
     public static double heroesOfGwenStoreBasicAttackDamage(double baseDamage, Collection<String> items) {
         double factor = 0.0D;
         if (items != null) {
