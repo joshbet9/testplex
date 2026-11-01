@@ -168,7 +168,7 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.SPLEEF.id(), enabled),
                 "Spleef is promoted into the controlled READY_FOR_TEST queue.");
         assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.DRAGONS.id(), enabled),
-                "Dragons Solo is promoted into the controlled READY_FOR_TEST queue.");
+                "Dragons is promoted into the controlled READY_FOR_TEST queue.");
         assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.RUNNER.id(), enabled),
                 "Runner is promoted into the controlled READY_FOR_TEST queue.");
         assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.SUPER_SPLOOR.id(), enabled),
@@ -2144,16 +2144,16 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.allGladiatorPairsResolved(0, 0));
     }
 
-    @Test void dragonsSoloScoreboardMatchesSourceThresholds() {
-        assertEquals(0, ArcadePortRules.dragonsSoloScoreboardMode(14, 14));
-        assertEquals(0, ArcadePortRules.dragonsSoloScoreboardMode(14, 3));
-        assertEquals(1, ArcadePortRules.dragonsSoloScoreboardMode(15, 15));
-        assertEquals(1, ArcadePortRules.dragonsSoloScoreboardMode(25, 15));
-        assertEquals(2, ArcadePortRules.dragonsSoloScoreboardMode(16, 16));
-        assertEquals(2, ArcadePortRules.dragonsSoloScoreboardMode(40, 20));
+    @Test void dragonsScoreboardMatchesSourceThresholds() {
+        assertEquals(0, ArcadePortRules.dragonsScoreboardMode(14, 14));
+        assertEquals(0, ArcadePortRules.dragonsScoreboardMode(14, 3));
+        assertEquals(1, ArcadePortRules.dragonsScoreboardMode(15, 15));
+        assertEquals(1, ArcadePortRules.dragonsScoreboardMode(25, 15));
+        assertEquals(2, ArcadePortRules.dragonsScoreboardMode(16, 16));
+        assertEquals(2, ArcadePortRules.dragonsScoreboardMode(40, 20));
     }
 
-    @Test void dragonsSoloSurvivalAndPlacementGemRulesMatchSource() {
+    @Test void dragonsSurvivalAndPlacementGemRulesMatchSource() {
         assertEquals(0.0D, ArcadePortRules.dragonSurvivalGems(-1L), 0.00001D);
         assertEquals(0.9999D, ArcadePortRules.dragonSurvivalGems(9_999L), 0.00001D);
         assertEquals(1.0D, ArcadePortRules.dragonSurvivalGems(10_000L), 0.00001D);
