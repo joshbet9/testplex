@@ -168,6 +168,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final Map<UUID, Long> heroInfinityEndsAt = new HashMap<>();
     private final Map<UUID, Integer> heroInfinityOriginalEnchant = new HashMap<>();
     private final List<AnathMeteorZone> anathMeteorZones = new ArrayList<>();
+    private final List<LarissaFountainZone> larissaFountainZones = new ArrayList<>();
+    private final Map<UUID, Long> larissaWaterDashEndsAt = new HashMap<>();
+    private final Map<UUID, Long> larissaStormBlessingEndsAt = new HashMap<>();
+    private final Map<UUID, Long> larissaStormBlessingNextHealAt = new HashMap<>();
     private final List<StoreEntry> storeEntries = new ArrayList<>();
     private final Map<UUID, StoreHolder> openStores = new HashMap<>();
 
@@ -1242,6 +1246,14 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 throwPlayerTnt(player);
             }
         } else if (game == ArcadePortGame.HEROES_OF_GWEN) {
+            if ("larissa".equals(selectedHeroesOfGwen.get(player.getUniqueId()))
+                    && player.getInventory().getHeldItemSlot() == 0
+                    && (event.getAction().isLeftClick() || event.getAction().isRightClick())
+                    && event.getItem() != null && event.getItem().getType() == Material.DIAMOND_HOE) {
+                event.setCancelled(true);
+                fireLarissaAquaCannon(player);
+                return;
+            }
             if (event.getItem() != null && heroSkillId(event.getItem()) != null) {
                 event.setCancelled(true);
                 activateHeroesOfGwenSkill(player, heroSkillId(event.getItem()));
@@ -1262,7 +1274,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         ItemStack dropped = event.getItemDrop().getItemStack();
         String id = heroSkillId(dropped);
         if (!Set.of("hattori.ender_blade", "devon.infinity",
-                "anath.burn_beam", "anath.meteor_shower").contains(id)) return;
+                "anath.burn_beam", "anath.meteor_shower", "larissa.storm_blessing").contains(id)) return;
         event.setCancelled(true);
         activateHeroesOfGwenSkill(player, id);
     }
@@ -1271,10 +1283,18 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     public void onHeroesOfGwenSneak(PlayerToggleSneakEvent event) {
         if (stopped || game != ArcadePortGame.HEROES_OF_GWEN || !event.isSneaking()) return;
         Player player = event.getPlayer();
-        if (!"devon".equals(selectedHeroesOfGwen.get(player.getUniqueId()))) return;
-        ItemStack skill = player.getInventory().getItem(2);
-        if (!"devon.hunters_boost".equals(heroSkillId(skill))) return;
-        activateHeroesOfGwenSkill(player, "devon.hunters_boost");
+        String hero = selectedHeroesOfGwen.get(player.getUniqueId());
+        if ("devon".equals(hero)) {
+            ItemStack skill = player.getInventory().getItem(2);
+            if ("devon.hunters_boost".equals(heroSkillId(skill))) {
+                activateHeroesOfGwenSkill(player, "devon.hunters_boost");
+            }
+        } else if ("larissa".equals(hero)) {
+            ItemStack skill = player.getInventory().getItem(2);
+            if ("larissa.water_dash".equals(heroSkillId(skill))) {
+                activateHeroesOfGwenSkill(player, "larissa.water_dash");
+            }
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -1324,6 +1344,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     public void onHeroesOfGwenProjectileDamage(EntityDamageByEntityEvent event) {
         if (stopped || game != ArcadePortGame.HEROES_OF_GWEN) return;
         Entity damager = event.getDamager();
+        if (damager instanceof Snowball fountain && "larissa.dancing_fountain".equals(
+                fountain.getPersistentDataContainer().get(heroProjectileTypeKey, PersistentDataType.STRING))) {
+            event.setCancelled(true);
+            return;
+        }
         if (damager instanceof SmallFireball meteorFireball) {
             String type = meteorFireball.getPersistentDataContainer()
                     .get(heroProjectileTypeKey, PersistentDataType.STRING);
@@ -1373,6 +1398,15 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (stopped || game != ArcadePortGame.HEROES_OF_GWEN) return;
         Projectile projectile = event.getEntity();
         String type = projectile.getPersistentDataContainer().get(heroProjectileTypeKey, PersistentDataType.STRING);
+        if ("larissa.dancing_fountain".equals(type)) {
+            Player owner = heroProjectileOwner(projectile);
+            if (owner != null && activePlayers.contains(owner.getUniqueId())) {
+                startLarissaFountain(owner, projectile.getLocation().clone(), System.currentTimeMillis());
+            }
+            entities.remove(projectile);
+            projectile.remove();
+            return;
+        }
         if ("anath.meteor".equals(type)) {
             Player owner = heroProjectileOwner(projectile);
             if (owner != null && activePlayers.contains(owner.getUniqueId())) {
@@ -2455,6 +2489,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         heroEnderBladeOriginalSword.remove(id);
         heroInfinityEndsAt.remove(id);
         heroInfinityOriginalEnchant.remove(id);
+        larissaWaterDashEndsAt.remove(id);
+        larissaStormBlessingEndsAt.remove(id);
+        larissaStormBlessingNextHealAt.remove(id);
         player.getInventory().clear();
         player.getInventory().setArmorContents(new ItemStack[4]);
         player.getInventory().setItem(8, namedItem(Material.GOLD_INGOT,
@@ -2481,6 +2518,24 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         "Meteor Shower", "Throw to mark a 10-block radius for 7 seconds. 60-second cooldown.");
                 player.getInventory().setItem(7, namedItem(Material.BLAZE_POWDER,
                         ChatColor.GOLD + "Embers", "Anath mage resource."));
+            }
+            case "larissa" -> {
+                ItemStack cannon = namedItem(Material.DIAMOND_HOE, ChatColor.GREEN + "Aqua Cannon",
+                        "Fires a 10-block water beam for 3 damage. Consumes one Water Stone.");
+                ItemMeta cannonMeta = cannon.getItemMeta();
+                cannonMeta.setUnbreakable(true);
+                cannon.setItemMeta(cannonMeta);
+                player.getInventory().setItem(0, cannon);
+                giveHeroesOfGwenSkillItem(player, 1, "larissa.dancing_fountain", Material.WATER_BUCKET,
+                        "Dancing Fountain", "Throw a fountain that heals allies 4 HP/s and damages enemies 2 HP/s for 6 seconds in a 3-block radius. 14-second cooldown.");
+                giveHeroesOfGwenSkillItem(player, 2, "larissa.water_dash", Material.FEATHER,
+                        "Water Dash", "Dash horizontally for 600 ms. Click or sneak to activate. 10-second cooldown.");
+                giveHeroesOfGwenSkillItem(player, 3, "larissa.storm_blessing", Material.NETHER_STAR,
+                        "Storm's Blessing", "Heal all teammates by 2 HP/s and grant Speed I for 7 seconds. Drop to activate; 60-second cooldown.");
+                player.getInventory().setItem(7, namedItem(Material.BLUE_DYE,
+                        ChatColor.AQUA + "Water Stone", "Aqua Cannon ammunition; one charge replenishes every 3 seconds."));
+                heroAmmoNextAt.put(id, System.currentTimeMillis()
+                        + ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_AMMO_RELOAD_MILLIS);
             }
             case "devon" -> {
                 ItemStack bow = new ItemStack(Material.BOW);
@@ -2616,6 +2671,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             case "devon.infinity" -> activateDevonInfinity(player);
             case "anath.burn_beam" -> activateAnathBurnBeam(player);
             case "anath.meteor_shower" -> launchAnathMeteor(player);
+            case "larissa.dancing_fountain" -> launchLarissaFountain(player);
+            case "larissa.water_dash" -> activateLarissaWaterDash(player);
+            case "larissa.storm_blessing" -> activateLarissaStormBlessing(player);
             default -> player.sendMessage(ChatColor.YELLOW + "That hero ability is not yet available.");
         }
     }
@@ -3015,6 +3073,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         heroInfinityEndsAt.clear();
         heroInfinityOriginalEnchant.clear();
         anathMeteorZones.clear();
+        larissaFountainZones.clear();
+        larissaWaterDashEndsAt.clear();
+        larissaStormBlessingEndsAt.clear();
+        larissaStormBlessingNextHealAt.clear();
         castleAssaultPlayerKits.clear();
         castleArcherNextArrowAt.clear();
         castleDemolitionistNextTntAt.clear();
