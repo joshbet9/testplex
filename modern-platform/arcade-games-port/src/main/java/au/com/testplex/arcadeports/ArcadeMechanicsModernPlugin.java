@@ -335,6 +335,15 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 else sender.sendMessage(ChatColor.RED + "Plexball progression is unavailable.");
                 return true;
             }
+            if (SpeedBuildersGame.isStatsRequest(args)) {
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage("Players only.");
+                    return true;
+                }
+                if (speedBuilders != null) speedBuilders.showStats(player, args);
+                else sender.sendMessage(ChatColor.RED + "Speed Builders statistics are unavailable.");
+                return true;
+            }
             return handleStatsCommand(sender, args);
         }
         String sub = args.length == 0 ? "help" : args[0].toLowerCase(java.util.Locale.ROOT);
