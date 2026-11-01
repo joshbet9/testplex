@@ -52,7 +52,7 @@ jobs:
           node-version: "24"
 
       - name: Install pinned offline Minecraft 26.3 protocol client
-        run: npm install --prefix "$RUNNER_TEMP/hoops-protocol-client" --no-save --no-package-lock --ignore-scripts --no-audit --no-fund "@wp2508/minecraft-protocol@1.69.5"
+        run: npm install --prefix "$RUNNER_TEMP/hoops-protocol-client" --no-save --no-package-lock --ignore-scripts --no-audit --no-fund "@wp2508/minecraft-protocol@1.69.6"
 
       - name: Build and run catalogue tests
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/pom.xml clean verify
