@@ -1273,7 +1273,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         Player player = event.getPlayer();
         ItemStack dropped = event.getItemDrop().getItemStack();
         String id = heroSkillId(dropped);
-        if (!Set.of("hattori.ender_blade", "devon.infinity",
+        if (id == null || !Set.of("hattori.ender_blade", "devon.infinity",
                 "anath.burn_beam", "anath.meteor_shower", "larissa.storm_blessing").contains(id)) return;
         event.setCancelled(true);
         activateHeroesOfGwenSkill(player, id);
@@ -3113,7 +3113,6 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                             double damage = ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DAMAGE_PER_SECOND;
                             if (wither.getHealth() <= damage) {
                                 finishHeroesOfGwen(zone.team, "enemy Wither defeated by Larissa's Dancing Fountain");
-                                iterator.remove();
                                 return;
                             }
                             wither.setHealth(wither.getHealth() - damage);
