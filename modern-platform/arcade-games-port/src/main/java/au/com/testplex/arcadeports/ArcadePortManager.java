@@ -12757,6 +12757,29 @@ public final class ArcadePortManager implements Listener {
                 awardCatalogAchievement(winner, "draw-my-thing", "doubted-but-not-in-doubt");
             }
         }
+        if (announceWinner && session.type == ArcadePortGame.MILK_THE_COW && winner != null) {
+            UUID winnerId = winner.getUniqueId();
+            if (ArcadeProgressRules.shouldAwardMilkCowPerfectGame(session.milkDeathCounts.getOrDefault(winnerId, 0))) {
+                awardCatalogAchievement(winner, "milk-the-cow", "perfect-game");
+            }
+            if (session.milkComebackCandidates.contains(winnerId)) {
+                awardCatalogAchievement(winner, "milk-the-cow", "pure-skill");
+            }
+            if (session.milkPingerCandidates.contains(winnerId)) {
+                awardCatalogAchievement(winner, "milk-the-cow", "pinger");
+            }
+            if (ArcadeProgressRules.shouldAwardMilkCowHighClub(
+                    session.milkDrankAirborne.contains(winnerId),
+                    session.milkDrankGrounded.contains(winnerId))) {
+                awardCatalogAchievement(winner, "milk-the-cow", "milk-high-club");
+            }
+            boolean opponentLedThreeTimes = session.milkTimesLed.entrySet().stream()
+                    .anyMatch(entry -> !entry.getKey().equals(winnerId)
+                            && ArcadeProgressRules.shouldAwardMilkCowStopStopHeIsAlreadyDead(entry.getValue()));
+            if (opponentLedThreeTimes) {
+                awardCatalogAchievement(winner, "milk-the-cow", "stop-stop-hes-already-dead");
+            }
+        }
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
             removeAllMicroBorderWarnings(session);
             for (Player player : session.players.values()) restoreMicroMiddleGlassCosmetic(session, player);
@@ -13170,6 +13193,8 @@ public final class ArcadePortManager implements Listener {
             case "draw-my-thing" -> Set.of("pixel-linguist", "why-cant-we-have-nice-things",
                     "doubted-but-not-in-doubt", "triple-threat", "for-the-people");
             case "master-builders" -> Set.of("purist", "sharing-is-caring", "for-the-greater-good", "architect");
+            case "milk-the-cow" -> Set.of("pure-skill", "pinger", "milk-high-club", "perfect-game",
+                    "slaughterhouse", "stop-stop-hes-already-dead", "got-the-chops");
             default -> Set.of();
         };
         if (!valid.contains(achievementId)) return;
@@ -13186,6 +13211,13 @@ public final class ArcadePortManager implements Listener {
             case "sharing-is-caring" -> "Sharing is Caring";
             case "for-the-greater-good" -> "For the greater good";
             case "architect" -> "Architect";
+            case "pure-skill" -> "Pure Skill";
+            case "pinger" -> "Pinger";
+            case "milk-high-club" -> "Milk High Club";
+            case "perfect-game" -> "Perfect Game";
+            case "slaughterhouse" -> "Slaughterhouse";
+            case "stop-stop-hes-already-dead" -> "Stop Stop he's already dead";
+            case "got-the-chops" -> "Got the Chops";
             default -> achievementId.replace('-', ' ');
         };
         plugin.saveConfig();
@@ -13497,8 +13529,10 @@ public final class ArcadePortManager implements Listener {
                     && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
             boolean superSploorWinner = session.type == ArcadePortGame.SUPER_SPLOOR
                     && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
+            boolean milkCowWinner = session.type == ArcadePortGame.MILK_THE_COW
+                    && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
             boolean won = winnerId != null && (winnerId.equals(id) || turfWarsWinner || paintballWinner
-                    || superSploorWinner
+                    || superSploorWinner || milkCowWinner
                     || ((session.type == ArcadePortGame.BOMB_LOBBERS
                             || session.type == ArcadePortGame.MICRO_BATTLES)
                         && session.alive.contains(id)
@@ -13506,11 +13540,25 @@ public final class ArcadePortManager implements Listener {
             if (won) {
                 plugin.getConfig().set(path + "wins",
                         plugin.getConfig().getInt(path + "wins", 0) + 1);
+                if (session.type == ArcadePortGame.MILK_THE_COW) {
+                    String roleWins = session.teams.getOrDefault(id, 0) == 1 ? "cow-wins" : "human-wins";
+                    plugin.getConfig().set(path + roleWins,
+                            plugin.getConfig().getInt(path + roleWins, 0) + 1);
+                }
                 if (session.type == ArcadePortGame.TURF_WARS
                         && session.turfTeamsBelowSixLines.contains(winningTeam)) {
                     plugin.getConfig().set(path + "the-comeback",
                             plugin.getConfig().getInt(path + "the-comeback", 0) + 1);
                 }
+            }
+            if (session.type == ArcadePortGame.MILK_THE_COW) {
+                plugin.getConfig().set(path + "kills", plugin.getConfig().getInt(path + "kills", 0)
+                        + session.milkKillsByPlayer.getOrDefault(id, 0));
+                plugin.getConfig().set(path + "assists", plugin.getConfig().getInt(path + "assists", 0)
+                        + session.milkAssistsByPlayer.getOrDefault(id, 0));
+                plugin.getConfig().set(path + "buckets-digested",
+                        plugin.getConfig().getInt(path + "buckets-digested", 0)
+                                + session.milkBucketsDigested.getOrDefault(id, 0));
             }
             if (session.type == ArcadePortGame.RUNNER) {
                 int marathonDistance = (int) Math.round(session.runnerMarathonDistance.getOrDefault(id, 0.0D));
@@ -17212,6 +17260,17 @@ public final class ArcadePortManager implements Listener {
                 || event.getItem().getType() != Material.MILK_BUCKET
                 || !session.alive.contains(player.getUniqueId())
                 || session.teams.getOrDefault(player.getUniqueId(), 0) != 0) return;
+        UUID drinkerId = player.getUniqueId();
+        session.milkBucketsDigested.merge(drinkerId, 1, Integer::sum);
+        if (player.isOnGround()) session.milkDrankGrounded.add(drinkerId);
+        else session.milkDrankAirborne.add(drinkerId);
+        int drinkerScore = session.scores.getOrDefault(drinkerId, 0);
+        for (UUID otherId : session.alive) {
+            if (otherId.equals(drinkerId) || session.teams.getOrDefault(otherId, 0) != 0) continue;
+            if (session.scores.getOrDefault(otherId, 0) == drinkerScore) {
+                session.milkPingerCandidates.add(otherId);
+            }
+        }
         incrementMilkCowScore(session, player, MilkCowRules.SCORE_PER_MILK, "Milk drunk");
         if (active != session) return;
         player.setHealth(Math.min(player.getMaxHealth(), player.getHealth() + 2.0D));
@@ -17624,6 +17683,19 @@ public final class ArcadePortManager implements Listener {
         UUID id = player.getUniqueId();
         int score = MilkCowRules.scoreAfterChange(session.scores.getOrDefault(id, 0), change);
         session.scores.put(id, score);
+        int bestOpponentScore = session.scores.entrySet().stream()
+                .filter(entry -> !entry.getKey().equals(id))
+                .mapToInt(Map.Entry::getValue).max().orElse(0);
+        if (bestOpponentScore - score >= 5) session.milkComebackCandidates.add(id);
+        int currentLeaderScore = session.scores.values().stream().mapToInt(Integer::intValue).max().orElse(0);
+        List<UUID> currentLeaders = session.scores.entrySet().stream()
+                .filter(entry -> entry.getValue() == currentLeaderScore)
+                .map(Map.Entry::getKey).toList();
+        UUID nextLeader = currentLeaders.size() == 1 ? currentLeaders.get(0) : null;
+        if (nextLeader != null && !nextLeader.equals(session.milkCurrentLeader)) {
+            session.milkTimesLed.merge(nextLeader, 1, Integer::sum);
+        }
+        session.milkCurrentLeader = nextLeader;
         player.sendMessage((change >= 0 ? ChatColor.GREEN : ChatColor.RED)
                 + reason + ": " + score + "/" + MilkCowRules.SCORE_TO_WIN);
         if (MilkCowRules.hasWon(score)) {
@@ -17766,7 +17838,35 @@ public final class ArcadePortManager implements Listener {
     private void damageMilkCowFarmer(Session session, Player target, Player attacker, double damage) {
         if (active != session || target == null || !session.alive.contains(target.getUniqueId())
                 || session.teams.getOrDefault(target.getUniqueId(), 0) != 0 || damage <= 0.0D) return;
+        UUID targetId = target.getUniqueId();
+        UUID attackerId = attacker == null ? null : attacker.getUniqueId();
+        long now = System.currentTimeMillis();
+        Map<UUID, Long> contributors = session.milkDamageAtByTarget.computeIfAbsent(
+                targetId, ignored -> new HashMap<>());
+        if (attackerId != null && session.teams.getOrDefault(attackerId, -1) == 1) {
+            contributors.put(attackerId, now);
+        }
         if (target.getHealth() <= damage) {
+            session.milkDeathCounts.merge(targetId, 1, Integer::sum);
+            if (attacker != null && session.teams.getOrDefault(attackerId, -1) == 1) {
+                session.milkKillsByPlayer.merge(attackerId, 1, Integer::sum);
+                if (!target.isOnGround()) {
+                    int airborneKills = session.milkAirborneKillsByPlayer.merge(attackerId, 1, Integer::sum);
+                    if (ArcadeProgressRules.shouldAwardMilkCowGotTheChops(airborneKills)) {
+                        awardCatalogAchievement(attacker, "milk-the-cow", "got-the-chops");
+                    }
+                }
+                for (Map.Entry<UUID, Long> contribution : contributors.entrySet()) {
+                    UUID assisterId = contribution.getKey();
+                    if (assisterId.equals(attackerId) || now - contribution.getValue() > 10_000L) continue;
+                    int assists = session.milkAssistsByPlayer.merge(assisterId, 1, Integer::sum);
+                    Player assister = session.players.get(assisterId);
+                    if (ArcadeProgressRules.shouldAwardMilkCowSlaughterhouse(assists) && assister != null) {
+                        awardCatalogAchievement(assister, "milk-the-cow", "slaughterhouse");
+                    }
+                }
+            }
+            session.milkDamageAtByTarget.remove(targetId);
             incrementMilkCowScore(session, target, -MilkCowRules.SCORE_LOST_ON_DEATH, "Farmer defeated");
             if (active != session) return;
             if (attacker != null && session.teams.getOrDefault(attacker.getUniqueId(), -1) == 1) {
@@ -20156,6 +20256,18 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> milkBodySlamReadyAt = new HashMap<>();
         final Map<UUID, Cow> milkCowDisguises = new HashMap<>();
         final Map<UUID, Long> milkChargeHungerAt = new HashMap<>();
+        final Map<UUID, Integer> milkDeathCounts = new HashMap<>();
+        final Set<UUID> milkComebackCandidates = new HashSet<>();
+        final Set<UUID> milkPingerCandidates = new HashSet<>();
+        final Set<UUID> milkDrankAirborne = new HashSet<>();
+        final Set<UUID> milkDrankGrounded = new HashSet<>();
+        final Map<UUID, Integer> milkTimesLed = new HashMap<>();
+        final Map<UUID, Integer> milkKillsByPlayer = new HashMap<>();
+        final Map<UUID, Integer> milkAssistsByPlayer = new HashMap<>();
+        final Map<UUID, Integer> milkAirborneKillsByPlayer = new HashMap<>();
+        final Map<UUID, Integer> milkBucketsDigested = new HashMap<>();
+        final Map<UUID, Map<UUID, Long>> milkDamageAtByTarget = new HashMap<>();
+        UUID milkCurrentLeader;
         final Map<UUID, String> witherAssaultKits = new HashMap<>();
         final Map<UUID, Wither> witherDisguises = new HashMap<>();
         final Map<UUID, Skeleton> witherOutCopies = new HashMap<>();
