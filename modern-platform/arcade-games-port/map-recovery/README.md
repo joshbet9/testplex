@@ -73,6 +73,10 @@ ZIP's checksum. The read-only checker follows the source 1.8
 for each room. All 15 candidate centres have a solid, two-block-clear foot
 level at **Y=6**. The checker is calibrated against Caged In's authentic
 15-room tier topology and **all 30** real BLACK duel spawn coordinates.
+Each provisional centre also connects to at least **66** two-block-clear
+standing cells within a seven-block horizontal radius at Y=6; the checker
+requires at least 60. These are local, measured floor areas, not verified
+combat boundaries, routes or spawn positions.
 
 ![Bliss provisional, unverified arena-centre overlay](../../../update/map-recovery/nixuge/review/gladiators-bliss-stage-centres.png)
 

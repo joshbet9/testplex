@@ -12,6 +12,7 @@ progression markers, emerald-ore gates, or create a WorldConfig.dat.
 from __future__ import annotations
 
 import argparse
+from collections import deque
 import hashlib
 import json
 from pathlib import Path
@@ -79,6 +80,27 @@ class WorldBlocks:
         return [[y, block] for y in range(high + 1)
                 if (block := self.block(x, y, z)) not in (None, 0)]
 
+    def reachable_floor_cells(self, x: int, z: int, y: int, radius: int = 7) -> int:
+        """How many local foot positions are connected to the candidate centre?
+
+        Uses 4-neighbour horizontal steps at the same elevation. This measures
+        immediately usable floor area, not an arena boundary or a gate route.
+        """
+        if y not in self.safe_feet_levels(x, z, y, y):
+            return 0
+        seen = {(x, z)}
+        pending = deque([(x, z)])
+        while pending:
+            px, pz = pending.popleft()
+            for nx, nz in ((px - 1, pz), (px + 1, pz), (px, pz - 1), (px, pz + 1)):
+                if (nx, nz) in seen or (nx - x) ** 2 + (nz - z) ** 2 > radius ** 2:
+                    continue
+                if y not in self.safe_feet_levels(nx, nz, y, y):
+                    continue
+                seen.add((nx, nz))
+                pending.append((nx, nz))
+        return len(seen)
+
 
 def closest_two(parent: dict, choices: list[dict]) -> list[dict]:
     def distance(candidate):
@@ -135,6 +157,8 @@ def review_candidate(candidate: dict) -> dict:
     result["stage_probes"] = [{
         "name": s["name"], "tier": s["tier"], "x": s["x"], "z": s["z"],
         "safe_feet_y_candidates": world.safe_feet_levels(s["x"], s["z"]),
+        "connected_safe_floor_cells_at_y6_within_radius7":
+            world.reachable_floor_cells(s["x"], s["z"], 6),
         "blocks_in_column": world.column(s["x"], s["z"]),
     } for s in stages]
     # No condition here claims an arena centre is a suitable duel spawn.

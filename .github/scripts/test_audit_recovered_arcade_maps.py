@@ -84,6 +84,8 @@ CUSTOM_LOCS:16,17,18:
         self.assertEqual(len(result["stage_probes"]), 15)
         self.assertTrue(all(6 in p["safe_feet_y_candidates"]
                             for p in result["stage_probes"]))
+        self.assertTrue(all(p["connected_safe_floor_cells_at_y6_within_radius7"] >= 60
+                            for p in result["stage_probes"]))
 
     def test_quiver_twin_peaks_is_not_evolution_configured(self):
         ref = audit.ROOT / "update/maps/One in the Quiver/Quiver_Twin Peaks 2.0.zip"

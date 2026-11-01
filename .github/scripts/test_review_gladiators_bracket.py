@@ -29,6 +29,8 @@ class GladiatorsBracketReviewTest(unittest.TestCase):
         self.assertEqual(len(result["stage_probes"]), 15)
         self.assertTrue(all(6 in stage["safe_feet_y_candidates"]
                             for stage in result["stage_probes"]))
+        self.assertTrue(all(stage["connected_safe_floor_cells_at_y6_within_radius7"] >= 60
+                            for stage in result["stage_probes"]))
 
     def test_missing_or_duplicated_bracket_child_is_rejected(self):
         stages = [dict(s) for s in self.candidate["stages"]]
