@@ -558,6 +558,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 if (args.length < 2) {
                     if (cameraShy != null) cameraShy.leaveQueue(leavingPlayer);
                     if (speedBuilders != null) speedBuilders.leaveQueue(leavingPlayer);
+                    if (wizards != null) wizards.leave(leavingPlayer);
                     return true;
                 }
                 if (isSnapStatsArgument(args[1])) {
@@ -572,7 +573,6 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     if (wizards != null) wizards.leave(leavingPlayer);
                     return true;
                 }
-                if (args.length < 2 && wizards != null) wizards.leave(leavingPlayer);
                 ArcadePortGame leavingGame = ArcadePortGame.fromId(args[1]);
                 if (leavingGame == null || !manager.leaveQueue(leavingGame, leavingPlayer)) {
                     sender.sendMessage(ChatColor.YELLOW + "You are not queued or spectating that Arcade game.");
