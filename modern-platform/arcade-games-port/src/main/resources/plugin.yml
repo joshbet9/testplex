@@ -12,7 +12,7 @@ softdepend:
 commands:
   stats:
     description: Open the shared local Testplex Arcade statistics menu and game-specific progression.
-        usage: /stats [player] | /stats [player] snap [page] | /stats plexball | /stats [player] speed-builders
+    usage: /stats [player] | /stats [player] snap [page] | /stats plexball | /stats [player] speed-builders
     aliases: [arcadestats]
   gamepreferences:
     description: Rate Arcade games and view their weighted rotation likelihood.
