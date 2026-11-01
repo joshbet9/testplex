@@ -88,7 +88,13 @@ final class ArcadeLobbyKitCatalogue {
                             null, Material.CHAINMAIL_BOOTS, Material.CHAINMAIL_LEGGINGS,
                             Material.CHAINMAIL_CHESTPLATE, Material.CHAINMAIL_HELMET),
                     choice("pyrotechnic", "Pyrotechnic", Material.FIREWORK_ROCKET,
-                            Unlock.GEM, Zombie.class, Material.FIREWORK_ROCKET));
+                            Unlock.GEM, Zombie.class, Material.FIREWORK_ROCKET),
+                    choice("frost", "Frost", Material.SNOWBALL,
+                            Unlock.GEM, Zombie.class, Material.SNOWBALL),
+                    choice("glider", "Glider", Material.ELYTRA,
+                            Unlock.GEM, Zombie.class, Material.ELYTRA),
+                    choice("tamer", "Tamer", Material.END_CRYSTAL,
+                            Unlock.GEM, Zombie.class, Material.END_CRYSTAL));
             case MICRO_BATTLES -> List.of(
                     choice("micro-archer", "Archer", Material.BOW,
                             Unlock.FREE, Zombie.class, Material.BOW),
