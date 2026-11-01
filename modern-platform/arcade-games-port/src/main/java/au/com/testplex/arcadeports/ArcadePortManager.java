@@ -13,32 +13,42 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.destroystokyo.paper.event.player.PlayerJumpEvent;
-import org.bukkit.Bukkit;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 import org.bukkit.attribute.Attribute;
-import org.bukkit.ChatColor;
-import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.Color;
-import org.bukkit.DyeColor;
-import org.bukkit.EntityEffect;
-import org.bukkit.Effect;
-import org.bukkit.FireworkEffect;
-import org.bukkit.GameMode;
-import org.bukkit.GameRule;
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
-import org.bukkit.Particle;
-import org.bukkit.Sound;
-import org.bukkit.World;
-import org.bukkit.WorldBorder;
-import org.bukkit.WorldCreator;
-import org.bukkit.WorldType;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.data.BlockData;
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
+import org.bukkit.Color;
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.DyeColor;
+import org.bukkit.Effect;
 import org.bukkit.enchantments.Enchantment;
-import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Ageable;
 import org.bukkit.entity.Cow;
 import org.bukkit.entity.Creature;
@@ -46,28 +56,31 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.entity.WitherSkull;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.BlockDisplay;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.EnderPearl;
-import org.bukkit.entity.EnderDragon;
+import org.bukkit.entity.Arrow;
+import org.bukkit.entity.Display;
 import org.bukkit.entity.Egg;
-import org.bukkit.entity.Fireball;
+import org.bukkit.entity.EnderDragon;
+import org.bukkit.entity.EnderPearl;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.FallingBlock;
+import org.bukkit.entity.Fireball;
 import org.bukkit.entity.Firework;
 import org.bukkit.entity.Horse;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.ItemFrame;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
-import org.bukkit.entity.Player;
 import org.bukkit.entity.Pig;
+import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
 import org.bukkit.entity.Skeleton;
 import org.bukkit.entity.Wither;
 import org.bukkit.entity.Sheep;
 import org.bukkit.entity.Snowball;
-import org.bukkit.entity.WitherSkeleton;
-import org.bukkit.entity.TNTPrimed;
+import org.bukkit.entity.TextDisplay;
 import org.bukkit.entity.ThrownPotion;
+import org.bukkit.entity.TNTPrimed;
+import org.bukkit.entity.WitherSkeleton;
 import org.bukkit.entity.Zombie;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Cancellable;
@@ -76,14 +89,14 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockDamageEvent;
-import org.bukkit.event.block.Action;
+import org.bukkit.event.block.BlockFromToEvent;
+import org.bukkit.event.block.BlockGrowEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
-import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.PlayerLeashEntityEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityCombustEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
-import org.bukkit.event.entity.EntityShootBowEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import io.papermc.paper.event.entity.EntityKnockbackEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
@@ -94,11 +107,16 @@ import org.bukkit.event.entity.ItemSpawnEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
+import org.bukkit.event.entity.EntityShootBowEvent;
+import org.bukkit.event.entity.EntityTargetEvent;
+import org.bukkit.event.entity.FoodLevelChangeEvent;
+import org.bukkit.event.entity.ItemSpawnEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.entity.PotionSplashEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
+import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerFishEvent;
@@ -109,11 +127,11 @@ import org.bukkit.event.player.PlayerShearEntityEvent;
 import org.bukkit.event.player.PlayerUnleashEntityEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.player.PlayerArmorStandManipulateEvent;
 import org.bukkit.event.player.PlayerToggleFlightEvent;
@@ -126,16 +144,16 @@ import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.FireworkMeta;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.inventory.meta.SkullMeta;
-import org.bukkit.projectiles.ProjectileSource;
-import org.bukkit.scoreboard.DisplaySlot;
-import org.bukkit.scoreboard.Objective;
-import org.bukkit.scoreboard.Scoreboard;
-import org.bukkit.scoreboard.Team;
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Particle;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.projectiles.ProjectileSource;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.BoundingBox;
@@ -2781,6 +2799,8 @@ public final class ArcadePortManager implements Listener {
         session.microBarrierActive = type == ArcadePortGame.MICRO_BATTLES;
         YamlConfiguration microCosmeticPreferences = type == ArcadePortGame.MICRO_BATTLES
                 ? loadMicroBattlesCosmeticPreferences() : null;
+        YamlConfiguration microCosmeticPreferences = type == ArcadePortGame.MICRO_BATTLES
+                ? loadMicroBattlesCosmeticPreferences() : null;
         SourceMapCatalog.MapData microSourceMap = sourceMapData.get(type.id());
         if (type == ArcadePortGame.MICRO_BATTLES) {
             session.microCrumbleMinX = microSourceMap == null ? -HALF_SIZE : microSourceMap.minX();
@@ -2798,6 +2818,26 @@ public final class ArcadePortManager implements Listener {
                 Block barrier = marker.getBlock();
                 session.microBarrierBlocks.add(barrier);
                 barrier.setType(Material.GLASS, false);
+            }
+        }
+        if (type == ArcadePortGame.MICRO_BATTLES && session.microBarrierBlocks.isEmpty()) {
+            // Source-map fallback: retain the same two-block team-island glass rings as the generated arena.
+            for (int team = 0; team < 4; team++) {
+                Location island = microSourceMap == null ? islandSpawn(team * 2) : microTeamCenter(session, team);
+                int cx = island.getBlockX(), cy = island.getBlockY(), cz = island.getBlockZ();
+                for (int offset = -4; offset <= 4; offset++) {
+                    for (int y = cy; y <= ArcadePortRules.microBattlesBarrierTopY(cy); y++) {
+                        Block[] ring = {
+                                session.world.getBlockAt(cx + offset, y, cz - 4),
+                                session.world.getBlockAt(cx + offset, y, cz + 4),
+                                session.world.getBlockAt(cx - 4, y, cz + offset),
+                                session.world.getBlockAt(cx + 4, y, cz + offset)
+                        };
+                        for (Block barrier : ring) {
+                            if (barrier.getType() == Material.GLASS) session.microBarrierBlocks.add(barrier);
+                        }
+                    }
+                }
             }
         }
         if (type == ArcadePortGame.MICRO_BATTLES && session.microBarrierBlocks.isEmpty()) {
@@ -3002,7 +3042,12 @@ public final class ArcadePortManager implements Listener {
                 UUID microId = player.getUniqueId();
                 session.microKits.put(microId, microKitPreferences.getOrDefault(microId, "archer"));
                 session.microNextArrowAt.put(microId,
+                session.microNextArrowAt.put(microId,
                         now + ArcadePortRules.MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS);
+                session.microGlassColours.put(microId, microBattlesColourSelection(
+                        microCosmeticPreferences, microId, "middle-glass-colour"));
+                session.microBorderColours.put(microId, microBattlesColourSelection(
+                        microCosmeticPreferences, microId, "border-particle-colour"));
                 session.microGlassColours.put(microId, microBattlesColourSelection(
                         microCosmeticPreferences, microId, "middle-glass-colour"));
                 session.microBorderColours.put(microId, microBattlesColourSelection(
@@ -6272,9 +6317,9 @@ public final class ArcadePortManager implements Listener {
                 best.getRelative(BlockFace.UP).setType(Material.AIR, false);
             } else if (ThreadLocalRandom.current().nextDouble() > 0.95D) {
                 // The source spawnFallingBlock overload keeps the server's default item-drop behaviour.
+                // The source spawnFallingBlock overload keeps the server's default item-drop behaviour.
                 FallingBlock falling = session.world.spawnFallingBlock(
                         best.getLocation().add(0.5D, 0.5D, 0.5D), best.getBlockData());
-                session.entities.add(falling);
             }
             best.setType(Material.AIR, false);
         }
@@ -6678,6 +6723,9 @@ public final class ArcadePortManager implements Listener {
             case 1 -> ChatColor.AQUA;
             case 2 -> ChatColor.GREEN;
             default -> ChatColor.YELLOW;
+            case 1 -> ChatColor.AQUA;
+            case 2 -> ChatColor.GREEN;
+            default -> ChatColor.YELLOW;
         };
     }
 
@@ -6753,6 +6801,18 @@ public final class ArcadePortManager implements Listener {
         if (attacker == null) return;
         double rawDamage = "melee".equals(source)
                 ? ArcadePortRules.microBattlesMeleeDamage(attacker.getInventory().getItemInMainHand().getType().name())
+                : 0.0D;
+        applyMicroBattlesHit(session, attacker, target, source, rawDamage, null,
+                EntityDamageEvent.DamageCause.ENTITY_ATTACK);
+    }
+
+    /** Resolve the Reborn DamageManager path after native Bukkit damage has been cancelled. */
+    private void applyMicroBattlesHit(Session session, Player attacker, Player target, String source,
+            double rawDamage, Projectile projectile, EntityDamageEvent.DamageCause cause) {
+        if (active != session || target == null || !session.alive.contains(target.getUniqueId())) return;
+        if (attacker != null && (!session.alive.contains(attacker.getUniqueId())
+                || attacker.getUniqueId().equals(target.getUniqueId()))) return;
+
                 : 0.0D;
         applyMicroBattlesHit(session, attacker, target, source, rawDamage, null,
                 EntityDamageEvent.DamageCause.ENTITY_ATTACK);
@@ -8045,6 +8105,10 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.MILK_THE_COW) updateMilkCow(session, now);
         if (session.type == ArcadePortGame.WITHER_ASSAULT) updateWitherAssault(session, now);
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
+            updateMicroBorderWarnings(session);
+            updateMicroBattlesBorderParticles(session);
+            updateMicroSpectatorCompass(session);
+            if (session.ticks % 20 == 0) updateMicroLastTwoMission(session);
             updateMicroBorderWarnings(session);
             updateMicroBattlesBorderParticles(session);
             updateMicroSpectatorCompass(session);
@@ -12549,6 +12613,9 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
             recordMicroBattlesAssists(session, eliminatedId, killer == null ? null : killer.getUniqueId());
         }
+        if (session.type == ArcadePortGame.MICRO_BATTLES) {
+            recordMicroBattlesAssists(session, eliminatedId, killer == null ? null : killer.getUniqueId());
+        }
         player.leaveVehicle();
         if (session.type == ArcadePortGame.PAINTBALL) {
             if (killer != null && session.players.containsKey(killer.getUniqueId())) {
@@ -12646,6 +12713,12 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (player.isOnline()) {
+            if (session.type == ArcadePortGame.MICRO_BATTLES) {
+                removeMicroBorderWarning(session, player.getUniqueId());
+                restoreMicroMiddleGlassCosmetic(session, player);
+                player.getInventory().clear();
+                giveMicroTrackingCompass(player);
+            }
             if (session.type == ArcadePortGame.MICRO_BATTLES) {
                 removeMicroBorderWarning(session, player.getUniqueId());
                 restoreMicroMiddleGlassCosmetic(session, player);
@@ -14373,6 +14446,10 @@ public final class ArcadePortManager implements Listener {
             sneakyAssassins.finish(winner);
             sneakyAssassins.stop();
         }
+        if (session.type == ArcadePortGame.MICRO_BATTLES) {
+            removeAllMicroBorderWarnings(session);
+            for (Player player : session.players.values()) restoreMicroMiddleGlassCosmetic(session, player);
+        }
         if (announceWinner && session.type == ArcadePortGame.BOMB_LOBBERS) {
             recordBombLobbersAchievements(session, winner);
         }
@@ -15064,6 +15141,15 @@ public final class ArcadePortManager implements Listener {
 
 
 
+    private void awardMicroBattlesAchievement(Player player, String key, String description) {
+        if (key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
+        plugin.getConfig().set(key, true);
+        if (player != null && player.isOnline()) {
+            player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + description);
+        }
+        plugin.saveConfig();
+    }
+
     private void awardBaconAchievement(Player player, String key, String description) {
         if (player == null || testPlayers.isTestPlayer(player) || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
@@ -15504,6 +15590,19 @@ public final class ArcadePortManager implements Listener {
             }
             if (session.type == ArcadePortGame.SUPER_SPLOOR) {
                 recordSuperSploorPlayerStats(session, id, entry.getValue(), won, path);
+            }
+            if (session.type == ArcadePortGame.MICRO_BATTLES) {
+                plugin.getConfig().set(path + "kills",
+                        plugin.getConfig().getInt(path + "kills", 0) + score);
+                plugin.getConfig().set(path + "assists",
+                        plugin.getConfig().getInt(path + "assists", 0)
+                                + session.microAssists.getOrDefault(id, 0));
+                plugin.getConfig().set(path + "damage-dealt",
+                        plugin.getConfig().getDouble(path + "damage-dealt", 0.0D)
+                                + session.microDamageDealtByPlayer.getOrDefault(id, 0.0D));
+                plugin.getConfig().set(path + "damage-taken",
+                        plugin.getConfig().getDouble(path + "damage-taken", 0.0D)
+                                + session.microDamageTakenByPlayer.getOrDefault(id, 0.0D));
             }
             if (session.type == ArcadePortGame.DEATH_TAG) {
                 int roundKills = Math.max(0, session.scores.getOrDefault(id, 0));
@@ -19113,6 +19212,9 @@ public final class ArcadePortManager implements Listener {
                 && !event.getAction().isRightClick();
         boolean dragonEscapeDisruptorLeftClick = session.type == ArcadePortGame.DRAGON_ESCAPE
                 && event.getAction() == Action.LEFT_CLICK_AIR;
+        boolean microCompassLeftClick = session.type == ArcadePortGame.MICRO_BATTLES
+                && !session.alive.contains(event.getPlayer().getUniqueId())
+                && isMicroTrackingCompass(event.getItem()) && event.getAction().isLeftClick();
         boolean dragonsSparklerLeftClick = session.type == ArcadePortGame.DRAGONS
                 && event.getAction() == Action.LEFT_CLICK_AIR;
         boolean spleefCompassLeftClick = session.type == ArcadePortGame.SPLEEF
@@ -20896,7 +20998,6 @@ public final class ArcadePortManager implements Listener {
 
     private boolean isDragonProtectedKitItem(ItemStack item) {
         if (item == null || item.getType().isAir()) return false;
-        if (item.getType() == Material.EMERALD) return true;
         if (!item.hasItemMeta()) return false;
         ItemMeta meta = item.getItemMeta();
         if (!meta.hasDisplayName()) return false;
@@ -21149,13 +21250,16 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
             spectator.closeInventory();
+            if (target == null || !target.isOnline() || !activeSession.alive.contains(targetId)) {
+                spectator.sendMessage(ChatColor.YELLOW + "That opponent is no longer available.");
+                return;
+            }
             if (event.isRightClick()) {
                 spectator.setSpectatorTarget(target);
             } else {
-                spectator.setSpectatorTarget(null);
                 spectator.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
-                spectator.setCompassTarget(target.getLocation());
             }
+            spectator.setCompassTarget(target.getLocation());
             return;
         }
         if (event.getView().getTopInventory().getHolder() instanceof StatsMenuHolder holder) {
@@ -22832,6 +22936,7 @@ public final class ArcadePortManager implements Listener {
             session.dragonMarksmanFiring.remove(id);
             session.dragonWaterDamageNextAt.remove(id);
         }
+        if (session.type == ArcadePortGame.MICRO_BATTLES) removeMicroBorderWarning(session, id);
         if (session.type == ArcadePortGame.MICRO_BATTLES) removeMicroBorderWarning(session, id);
         if (session.type == ArcadePortGame.BOMB_LOBBERS) updateBombLobbersMvpEligibility(session);
         if (session.type == ArcadePortGame.BACON_BRAWL) {
