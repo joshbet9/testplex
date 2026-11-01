@@ -639,6 +639,8 @@ public final class SpeedBuildersGame implements Listener {
         for (PlayerState state : players.values()) {
             UUID playerId = state.player.getUniqueId();
             SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "blocks-placed", state.blocksPlaced);
+            SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "blocks-broken", state.blocksBroken);
+            SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "mobs-built", state.mobsBuilt);
             SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "perfect-builds", state.perfectBuilds);
             if (playerId.equals(winnerId)) {
                 SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "wins", 1L);
@@ -936,8 +938,6 @@ public final class SpeedBuildersGame implements Listener {
             } else held.setAmount(held.getAmount() - 1);
         }
         state.mobsBuilt++;
-        SpeedBuildersProgressStore.increment(plugin.getConfig(), event.getPlayer().getUniqueId(), "mobs-built", 1L);
-        plugin.saveConfig();
         Bukkit.getScheduler().runTask(plugin, () -> checkPerfectBuild(state));
     }
 
@@ -1007,8 +1007,6 @@ public final class SpeedBuildersGame implements Listener {
         block.setType(Material.AIR, false);
         if (otherHalf != null && otherHalf.getType() == material) otherHalf.setType(Material.AIR, false);
         state.blocksBroken++;
-        SpeedBuildersProgressStore.increment(plugin.getConfig(), event.getPlayer().getUniqueId(), "blocks-broken", 1L);
-        plugin.saveConfig();
         Bukkit.getScheduler().runTask(plugin, () -> checkPerfectBuild(state));
     }
 
@@ -1019,7 +1017,6 @@ public final class SpeedBuildersGame implements Listener {
             state.perfect = true;
             state.perfectBuilds++;
             long elapsedMillis = Math.max(0L, tick - buildPhaseStartedTick) * 50L;
-            SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(), "perfect-builds", 1L);
             if (!firstPerfectBuildAwarded) {
                 firstPerfectBuildAwarded = true;
                 SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(), "perfect-first", 1L);
