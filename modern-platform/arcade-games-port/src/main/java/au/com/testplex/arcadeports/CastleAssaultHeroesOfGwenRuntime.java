@@ -2293,6 +2293,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     void stop() {
         if (stopped) return;
         stopped = true;
+        if (listenersRegistered) {
+            org.bukkit.event.HandlerList.unregisterAll(this);
+            listenersRegistered = false;
+        }
         if (objectiveItem != null && objectiveItem.isValid()) objectiveItem.remove();
         objectiveItem = null;
         for (UUID id : new ArrayList<>(carriedTntOldHelmet.keySet())) {
