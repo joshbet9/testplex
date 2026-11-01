@@ -36,4 +36,22 @@ public final class WitherAssaultRules {
     public static boolean shouldTrackSmokeArrow(int team, String kit, boolean alive, boolean arrowProjectile) {
         return team == 0 && alive && arrowProjectile && hasFletcher(kit);
     }
+    public static boolean shouldLaunchSkull(String itemType, boolean leftClick) {
+        return leftClick && "golden_sword".equals(normalizeItem(itemType));
+    }
+
+    public static boolean shouldLaunchMinions(String itemType, boolean leftClick) {
+        return leftClick && "diamond_sword".equals(normalizeItem(itemType));
+    }
+
+    public static boolean shouldStartFireStorm(String itemType, boolean rightClick) {
+        String item = normalizeItem(itemType);
+        return rightClick && ("golden_sword".equals(item) || "diamond_sword".equals(item));
+    }
+
+    public static int minionCount() { return 3; }
+
+    private static String normalizeItem(String itemType) {
+        return itemType == null ? "" : itemType.trim().toLowerCase(Locale.ROOT);
+    }
 }
