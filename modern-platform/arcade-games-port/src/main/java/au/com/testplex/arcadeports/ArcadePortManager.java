@@ -8455,6 +8455,8 @@ public final class ArcadePortManager implements Listener {
         teamMeta.setLore(List.of(" ", ChatColor.YELLOW + "Players Alive: " + ChatColor.WHITE + targets.size()));
         teamHeader.setItemMeta(teamMeta);
         holder.inventory.setItem(13, teamHeader);
+        holder.inventory.setItem(4, namedItem(Material.BARRIER, ChatColor.RED + "Close",
+                "Close the Dragons spectator menu."));
 
         int slot = 19;
         for (Player target : targets) {
