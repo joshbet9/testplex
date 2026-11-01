@@ -310,19 +310,20 @@ public final class SpeedBuildersGame implements Listener {
 
     /** Load the real Mineplex Reborn build definitions from the original Shroomland Lake map. */
     private void loadSourceTemplates() {
-        if (sourceWorld == null) sourceWorld = Bukkit.getWorld(SOURCE_WORLD_NAME);
-        if (sourceWorld == null) {
-            if (!SourceMapCatalog.resetTestWorld(plugin, SOURCE_WORLD_NAME)) {
-                throw new IllegalStateException("Could not safely reset the isolated Speed Builders source-map world.");
-            }
-            if (!SourceMapCatalog.installResource(plugin, "Speed Builders", SOURCE_MAP_RESOURCE, SOURCE_WORLD_NAME)) {
-                throw new IllegalStateException("The original Speed Builders map archive could not be installed.");
-            }
-            sourceWorld = new WorldCreator(SOURCE_WORLD_NAME)
-                    .environment(World.Environment.NORMAL)
-                    .generateStructures(false)
-                    .createWorld();
+        // Reinstall the archive before each match. This also repairs an interrupted prior
+        // run and prevents old player builds from contaminating the next game's source world.
+        sourceWorld = Bukkit.getWorld(SOURCE_WORLD_NAME);
+        if (!SourceMapCatalog.resetTestWorld(plugin, SOURCE_WORLD_NAME)) {
+            throw new IllegalStateException("Could not safely reset the isolated Speed Builders source-map world.");
         }
+        sourceWorld = null;
+        if (!SourceMapCatalog.installResource(plugin, "Speed Builders", SOURCE_MAP_RESOURCE, SOURCE_WORLD_NAME)) {
+            throw new IllegalStateException("The original Speed Builders map archive could not be installed.");
+        }
+        sourceWorld = new WorldCreator(SOURCE_WORLD_NAME)
+                .environment(World.Environment.NORMAL)
+                .generateStructures(false)
+                .createWorld();
         if (sourceWorld == null) {
             throw new IllegalStateException("Paper could not load the isolated Speed Builders source map.");
         }
@@ -768,8 +769,10 @@ public final class SpeedBuildersGame implements Listener {
 
     private void spawnReviewMobs(Template template) {
         for (MobCell mob : template.mobs()) {
-            Location location = new Location(arena, mob.x() - 2.5D,
-                    reviewPlot.baseY() + mob.y(), reviewPlot.centerZ() - 3 + mob.z() + 0.5D);
+            Location location = new Location(arena,
+                    reviewPlot.centerX() - 3 + mob.x() + 0.5D,
+                    reviewPlot.baseY() + mob.y(),
+                    reviewPlot.centerZ() - 3 + mob.z() + 0.5D);
             Entity entity = spawnDisplayMob(location, mob.type());
             if (entity != null) reviewMobs.add(entity);
         }
@@ -801,7 +804,12 @@ public final class SpeedBuildersGame implements Listener {
 
     private void giveTemplateBlocks(Player player, Template template) {
         Map<Material, Integer> counts = new EnumMap<>(Material.class);
-        for (SpeedBuildersRules.Cell cell : template.cells()) counts.merge(cell.material(), 1, Integer::sum);
+        for (SpeedBuildersRules.Cell cell : template.cells()) {
+            BlockData data = Bukkit.createBlockData(cell.blockData());
+            if (data instanceof Bisected bisected && bisected.getHalf() == Bisected.Half.TOP) continue;
+            if (data instanceof Bed bed && bed.getPart() == Bed.Part.HEAD) continue;
+            counts.merge(cell.material(), 1, Integer::sum);
+        }
         for (Map.Entry<Material, Integer> entry : counts.entrySet()) {
             int remaining = entry.getValue();
             while (remaining > 0) {
@@ -991,6 +999,35 @@ public final class SpeedBuildersGame implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onBuildInteraction(PlayerInteractEvent event) {
+        if (phase != Phase.BUILDING || event.getAction() != Action.RIGHT_CLICK_BLOCK
+                && event.getAction() != Action.LEFT_CLICK_BLOCK) return;
+        PlayerState state = players.get(event.getPlayer().getUniqueId());
+        if (state == null || state.eliminated) return;
+        if (state.perfect) {
+            event.setCancelled(true);
+            return;
+        }
+        if (event.getClickedBlock() != null) {
+            Block target = event.getClickedBlock().getRelative(event.getBlockFace());
+            if (!isInBuildVolume(state, target)) event.setCancelled(true);
+        }
+        Bukkit.getScheduler().runTask(plugin, () -> checkPerfectBuild(state));
+    }
+
+    @EventHandler
+    public void onJumpFlight(PlayerToggleFlightEvent event) {
+        PlayerState state = players.get(event.getPlayer().getUniqueId());
+        if (state == null || phase != Phase.BUILDING || state.eliminated || state.perfect) return;
+        event.setCancelled(true);
+        Player player = event.getPlayer();
+        player.setAllowFlight(false);
+        player.setFlying(false);
+        player.playSound(player.getEyeLocation(), org.bukkit.Sound.ENTITY_GHAST_SHOOT, 1.0F, 1.0F);
+        player.setVelocity(new org.bukkit.util.Vector(0.0D, 1.0D, 0.0D));
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockPlace(BlockPlaceEvent event) {
         PlayerState state = players.get(event.getPlayer().getUniqueId());
         if (state == null || event.getBlockPlaced().getWorld() != arena) return;
@@ -999,6 +1036,22 @@ public final class SpeedBuildersGame implements Listener {
                 || currentTemplate.cells().stream().noneMatch(cell -> cell.material() == event.getBlockPlaced().getType())) {
             event.setCancelled(true);
             return;
+        }
+        if (event.getBlockPlaced().getBlockData() instanceof Bisected bisected) {
+            Block companion = event.getBlockPlaced().getRelative(
+                    bisected.getHalf() == Bisected.Half.TOP
+                            ? org.bukkit.block.BlockFace.DOWN : org.bukkit.block.BlockFace.UP);
+            if (!isInBuildVolume(state, companion)) {
+                event.setCancelled(true);
+                return;
+            }
+        } else if (event.getBlockPlaced().getBlockData() instanceof Bed bed) {
+            Block companion = event.getBlockPlaced().getRelative(bed.getPart() == Bed.Part.HEAD
+                    ? bed.getFacing().getOppositeFace() : bed.getFacing());
+            if (!isInBuildVolume(state, companion)) {
+                event.setCancelled(true);
+                return;
+            }
         }
         state.blocksPlaced++;
         Bukkit.getScheduler().runTask(plugin, () -> checkPerfectBuild(state));
@@ -1029,6 +1082,7 @@ public final class SpeedBuildersGame implements Listener {
             upperHalf = bisected.getHalf() == Bisected.Half.TOP;
             otherHalf = block.getRelative(upperHalf ? org.bukkit.block.BlockFace.DOWN : org.bukkit.block.BlockFace.UP);
         } else if (block.getBlockData() instanceof Bed bed) {
+            upperHalf = bed.getPart() == Bed.Part.HEAD;
             otherHalf = block.getRelative(bed.getPart() == Bed.Part.HEAD
                     ? bed.getFacing().getOppositeFace() : bed.getFacing());
         }
@@ -1091,8 +1145,10 @@ public final class SpeedBuildersGame implements Listener {
             event.setTo(event.getFrom());
             return;
         }
-        if (to.getWorld() != arena) return;
-        if (!isInsidePlot(state, to)) event.setTo(event.getFrom());
+        if (phase == Phase.BUILDING && event.getPlayer().isOnGround()
+                && !event.getPlayer().isFlying() && !event.getPlayer().getAllowFlight()) {
+            event.getPlayer().setAllowFlight(true);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -1339,23 +1395,5 @@ public final class SpeedBuildersGame implements Listener {
 
     private record MobCell(EntityType type, int x, int y, int z) { }
 
-    private static final class TemplateBuilder {
-        private final String id;
-        private final String name;
-        private final Map<SpeedBuildersRules.Coordinate, SpeedBuildersRules.Cell> cells = new LinkedHashMap<>();
 
-        private TemplateBuilder(String id, String name) {
-            this.id = id;
-            this.name = name;
-        }
-
-        private void add(int x, int y, int z, Material material) {
-            SpeedBuildersRules.Coordinate coordinate = new SpeedBuildersRules.Coordinate(x, y, z);
-            cells.put(coordinate, new SpeedBuildersRules.Cell(x, y, z, material));
-        }
-
-        private Template build() {
-            return new Template(id, name, List.copyOf(cells.values()));
-        }
-    }
 }
