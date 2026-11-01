@@ -101,6 +101,25 @@ public final class MenuService implements Listener {
         return candidate instanceof JavaPlugin engine && candidate.isEnabled() ? engine : null;
     }
 
+    /**
+     * The Arcade mechanics engine is a separate plugin JAR. Keep this menu module
+     * decoupled from its compile-time classes while using the engine's authoritative
+     * map/acceptance eligibility check when the API is present.
+     */
+    private boolean rotationCandidateAvailable(JavaPlugin engine, String gameId) {
+        if (engine == null || gameId == null) return false;
+        try {
+            Object result = engine.getClass()
+                    .getMethod("isRotationCandidateAvailable", String.class)
+                    .invoke(engine, gameId);
+            return Boolean.TRUE.equals(result);
+        } catch (ReflectiveOperationException | RuntimeException exception) {
+            plugin.getLogger().warning("Could not query Arcade rotation eligibility for "
+                    + gameId + ": " + exception.getMessage());
+            return false;
+        }
+    }
+
     private boolean gameOptionEnabled(String id) {
         return switch (id) {
             case "public-server" -> !Bukkit.hasWhitelist();
@@ -280,7 +299,7 @@ public final class MenuService implements Listener {
             for (int index = start; index < end; index++) {
                 GameDefinition game = clearedGames.get(index);
                 boolean included = rotation.contains(game.getId());
-                boolean available = engine.isRotationCandidateAvailable(game.getId());
+                boolean available = rotationCandidateAvailable(engine, game.getId());
                 ItemStack item = makeItem(icon(game.getIcon()),
                         (included ? available ? ChatColor.GREEN : ChatColor.RED : ChatColor.YELLOW)
                                 + game.getName(),
@@ -356,7 +375,7 @@ public final class MenuService implements Listener {
             GameDefinition game = catalog.getGames().get(index);
             boolean ready = cleared.contains(game.getId());
             boolean included = rotationPool.contains(game.getId());
-            boolean rotationAvailable = engine != null && engine.isRotationCandidateAvailable(game.getId());
+            boolean rotationAvailable = engine != null && rotationCandidateAvailable(engine, game.getId());
             ChatColor colour = rotation
                     ? !ready ? ChatColor.RED
                     : included ? rotationAvailable ? ChatColor.GREEN : ChatColor.RED : ChatColor.YELLOW
@@ -841,7 +860,7 @@ public final class MenuService implements Listener {
                 List<String> rotation = new ArrayList<>(engine.getConfig().contains(rotationPath)
                         ? engine.getConfig().getStringList(rotationPath) : cleared);
                 boolean included = rotation.contains(game.getId());
-                if (!included && !engine.isRotationCandidateAvailable(game.getId())) {
+                if (!included && !rotationCandidateAvailable(engine, game.getId())) {
                     player.sendMessage(ChatColor.RED + game.getName()
                             + " cannot be added yet: its selected map is missing or invalid.");
                     int page = 0;
