@@ -2770,14 +2770,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private String heroesOfGwenEquipmentSlot(ItemStack item) {
-        if (item == null) return null;
-        String name = item.getType().name();
-        if (name.endsWith("_HELMET")) return "helmet";
-        if (name.endsWith("_CHESTPLATE")) return "chestplate";
-        if (name.endsWith("_LEGGINGS")) return "leggings";
-        if (name.endsWith("_BOOTS")) return "boots";
-        if (name.endsWith("_SWORD") || item.getType() == Material.BOW) return "weapon";
-        return null;
+        return item == null ? null : ArcadePortRules.heroesOfGwenStoreEquipmentSlot(item.getType().name());
     }
 
     private void rememberHeroesOfGwenPurchasedEquipment(
