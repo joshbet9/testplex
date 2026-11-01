@@ -6725,9 +6725,16 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
             session.liveStarted = true;
-            long prepareElapsed = Math.max(0L, session.prepareEndsAt - session.startedAt);
+            // All session timers were seeded during arena preparation. Pause their
+            // clocks until Live so cooldowns, round timers and first spawns begin
+            // from the same game-start instant instead of consuming Prepare time.
+            long prepareElapsed = Math.max(0L, now - session.startedAt);
+            shiftSessionTimestamps(session, prepareElapsed);
             session.startedAt = now;
-            if (session.endsAt > 0L) session.endsAt += prepareElapsed;
+            session.ticks = 0L;
+            if (session.endsAt > 0L) {
+                session.endsAt = ArcadeLobbyLifecycleRules.shiftPausedTimestamp(session.endsAt, prepareElapsed);
+            }
             for (Player player : session.players.values()) {
                 if (player == null || !player.isOnline() || !session.alive.contains(player.getUniqueId())) continue;
                 player.setInvulnerable(false);
@@ -6778,10 +6785,6 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.MILK_THE_COW) updateMilkCow(session, now);
         if (session.type == ArcadePortGame.WITHER_ASSAULT) updateWitherAssault(session, now);
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
-            updateMicroBorderWarnings(session);
-            updateMicroBattlesBorderParticles(session);
-            updateMicroSpectatorCompass(session);
-            if (session.ticks % 20 == 0) updateMicroLastTwoMission(session);
             updateMicroBorderWarnings(session);
             updateMicroBattlesBorderParticles(session);
             updateMicroSpectatorCompass(session);
@@ -19638,6 +19641,57 @@ public final class ArcadePortManager implements Listener {
      * Shared Prepare-phase gate. Game-specific handlers remain focused on mechanics;
      * this gate rejects all player-originated gameplay input until Live begins.
      */
+    /**
+     * Timed state is constructed before Prepare completes, while event handlers and
+     * the game tick are intentionally paused. Shift every timestamp-bearing session
+     * field once at the Live boundary so initial delays/cooldowns retain their full
+     * configured duration. Maps whose values are timestamps (including nested
+     * contributor maps) are adjusted as well.
+     */
+    private void shiftSessionTimestamps(Session session, long pausedMillis) {
+        if (session == null || pausedMillis <= 0L) return;
+        for (java.lang.reflect.Field field : Session.class.getDeclaredFields()) {
+            if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) continue;
+            String name = field.getName().toLowerCase(java.util.Locale.ROOT);
+            if (!isSessionTimestampField(name)) continue;
+            try {
+                field.setAccessible(true);
+                if (field.getType() == long.class) {
+                    long value = field.getLong(session);
+                    field.setLong(session,
+                            ArcadeLobbyLifecycleRules.shiftPausedTimestamp(value, pausedMillis));
+                } else if (Map.class.isAssignableFrom(field.getType())) {
+                    Object value = field.get(session);
+                    if (value instanceof Map<?, ?> timestamps) {
+                        shiftTimestampMap(timestamps, pausedMillis);
+                    }
+                }
+            } catch (ReflectiveOperationException | RuntimeException exception) {
+                plugin.getLogger().warning("Could not pause session timer field "
+                        + field.getName() + ": " + exception.getMessage());
+            }
+        }
+    }
+
+    private boolean isSessionTimestampField(String name) {
+        if (name.equals("startedat") || name.equals("endsat") || name.equals("prepareendsat")) return false;
+        return name.endsWith("at") || name.endsWith("until")
+                || name.contains("cooldown") || name.contains("deadline");
+    }
+
+    @SuppressWarnings("unchecked")
+    private void shiftTimestampMap(Map<?, ?> source, long pausedMillis) {
+        Map<Object, Object> timestamps = (Map<Object, Object>) source;
+        for (Map.Entry<Object, Object> entry : timestamps.entrySet()) {
+            Object value = entry.getValue();
+            if (value instanceof Long timestamp) {
+                entry.setValue(ArcadeLobbyLifecycleRules.shiftPausedTimestamp(timestamp, pausedMillis));
+            } else if (value instanceof Map<?, ?> nested) {
+                shiftTimestampMap(nested, pausedMillis);
+            }
+        }
+    }
+
     private boolean isPreparingParticipant(Player player) {
         Session session = active;
         return player != null && session != null
