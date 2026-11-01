@@ -37,7 +37,7 @@ class ArcadeRuntimeReadinessSignalTest {
     }
 
     @Test void doesNotPublishOutsideADeployment() throws Exception {
-        assertFalse(ArcadeRuntimeReadinessSignal.publish(pluginDataFolder, INVOCATION_ID, 4312, true));
+        assertFalse(ArcadeRuntimeReadinessSignal.publish(pluginDataFolder, INVOCATION_ID, 4312, true, true));
         assertFalse(Files.exists(pluginDataFolder.resolve(ArcadeRuntimeReadinessSignal.READINESS_FILE)));
     }
 
