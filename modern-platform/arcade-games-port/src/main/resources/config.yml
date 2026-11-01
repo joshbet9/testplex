@@ -44,6 +44,13 @@ wizards:
   allow-solo-start: false
   allow-generated-test-arena: false
   source-map-world: arcadeport_source_wizards
+  arena-radius: 48
+  chest-count: 32
+  destructive-spells: false
+  destructive-endgame-blocks: false
+  temporary-spell-fire: true
+  kits:
+    default: WIZARD
 
 # Base selection weights used by the Like/Dislike preference calculation.
 # Games default to 1.0 (equal base chance); set a game ID here to override it.
@@ -90,22 +97,3 @@ owner-usernames:
 admin-usernames:
   - jn_playzmc
 
-# Existing source maps can be discovered from the server checkout without committing binaries.
-source-maps:
-  directory: update/maps
-
-# Wizards remains manually gated outside the READY_FOR_TEST/rotation catalogue.
-wizards:
-  include-nano-maps: true
-  allow-generated-test-arena: false
-  source-map-world: arcadeport_source_wizards
-  minimum-players: 8
-  maximum-players: 12
-  allow-solo-start: false
-  arena-radius: 48
-  chest-count: 32
-  destructive-spells: false
-  destructive-endgame-blocks: false
-  temporary-spell-fire: true
-  kits:
-    default: WIZARD
