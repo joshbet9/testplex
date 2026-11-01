@@ -28,12 +28,12 @@ The build uses Paper's official Maven repository and a version range for the cur
 - All 27 shared Arcade games are catalogued with optional future concepts for cosmetic lines and win scenes; these are not current parity acceptance criteria.
 - `monster-maze-port/` contains the 1.21 Monster Maze gameplay source. It is compiled directly into `ArcadeMechanicsModern.jar` as an in-process game module; it has no Bukkit plugin descriptor, join listener, private lobby, NPC selector or separate server lifecycle.
 - `snake-port/` builds `SnakeModern.jar`, a Paper-native mechanics-first port with an isolated arena.
-- `arcade-games-port/` builds `ArcadeMechanicsModern.jar`, dedicated test arenas and game loops for the modern shared Arcade catalogue, including Draw My Thing, Master Builders, Plexball, Super Sploor and Camera Shy.
+- `arcade-games-port/` builds `ArcadeMechanicsModern.jar`, dedicated test arenas and game loops for the modern shared Arcade catalogue, including Draw My Thing, Master Builders, Plexball, Super Sploor and Snap.
 - Plexball is enabled for controlled Paper 26.3 acceptance testing through the shared 2–8-player Arcade queue. It uses the normal lobby kit pedestals, player snapshots, Session/stop lifecycle and return-to-lobby flow; gameplay commands are `/arcadeport play plexball`, `/arcadeport join plexball`, `/arcadeport spectate plexball`, `/arcadeport leave plexball`, `/arcadeport kit plexball` and `/stats plexball`. It is not a public production rotation claim: measured-latency and live multiplayer acceptance remain required.
 - Game Details routes Monster Maze through `/arcadeport play monster-maze`; its participants, queue, stop handling and return-to-lobby flow are owned by Testplex Arcade.
 - Deployment migrates saved module data from both old standalone data folders (`plugins/MonsterMazeStandalone/` and `plugins/MonsterMazeModern/`), then inspects plugin descriptors and quarantines any standalone Monster Maze Bukkit JAR (including the source project's actual `MonsterMazeStandalone.jar` name) in the deployment backup before Paper restarts. The independent `joshbet9/MonsterMaze` project and its separate services are not modified.
 
-**Important:** the prototype loops are intentionally rough starting points, not a claim of original Mineplex parity. Mechanics-in-progress games remain gated until their mechanics have passed in-game acceptance; Camera Shy is now available in the shared controlled acceptance queue, with full live mechanics acceptance still pending. CI confirms compile/unit-level checks only. Cosmetic renderers, progression milestones, and win scenes are out of scope during this parity pass for every game except Monster Maze, where customisation is a core pillar and remains part of acceptance.
+**Important:** the prototype loops are intentionally rough starting points, not a claim of original Mineplex parity. Mechanics-in-progress games remain gated until their mechanics have passed in-game acceptance; Snap is now available in the shared controlled acceptance queue, with full live mechanics acceptance still pending. CI confirms compile/unit-level checks only. Cosmetic renderers, progression milestones, and win scenes are out of scope during this parity pass for every game except Monster Maze, where customisation is a core pillar and remains part of acceptance.
 
 ## Isolation from 1.8
 
@@ -57,7 +57,7 @@ The overall programme tracks 29 titles/variants: **27 shared Arcade catalogue ga
 | 2 | Bomb Lobbers | Controlled acceptance testing; original map and core mechanics implemented | Enabled |
 | 3 | Death Tag | Acceptance-ready | Enabled |
 | 4 | Dragon Escape | Controlled acceptance candidate; original 30-map race, four source kits and PB ghost implemented | Enabled |
-| 5 | Dragons (Solo) | Source implementation prepared; controlled gameplay acceptance required | Enabled |
+| 5 | Dragons | Source implementation prepared; controlled gameplay acceptance required | Enabled |
 | 6 | Evolution | Mechanics in progress | Disabled |
 | 7 | Gladiators | Controlled acceptance; Normal default plus four voteable rulesets and tournament lifecycle implemented | Enabled |
 | 8 | Micro Battles | Controlled acceptance; original map, four-team combat, kits and achievements implemented | Enabled |
@@ -78,9 +78,9 @@ The overall programme tracks 29 titles/variants: **27 shared Arcade catalogue ga
 | 23 | Milk the Cow | Mechanics-first port integrated | Disabled |
 | 24 | Wither Assault | Mechanics-first port integrated; generated test arena | Disabled |
 | 25 | Plexball | Controlled acceptance; server-authoritative batting/fielding, kits, HUD, progression and shared Arcade lifecycle; modern arena (no 1.8 map archive) | Enabled |
-| 26 | Camera Shy | Spyglass-based photographic elimination game; five exposures eliminate; full live acceptance pending | Enabled for controlled testing |
+| 26 | Snap | Spyglass-based photographic elimination game; five exposures eliminate; full live acceptance pending | Enabled for controlled testing |
 | 27 | Super Sploor | NANO-inspired five-kit team territory shooter with original Sploor map | Enabled for controlled testing |
 | 28 | Wizards | Separate resource-packless module; 10 of 21 spell effects implemented | Disabled |
 | 29 | Speed Builders Arcade | Planned; implementation not started | Not available |
 
-**Readiness rule:** Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons (Solo), Runner, Sheep Quest, Turf Wars and Camera Shy form the shared controlled test queue. Being enabled means a game is available for controlled testing, not that every mechanic has already passed live acceptance. Fix issues found during combined testing, keep playable games available, and expand the queue as other games become testable. The 357 archived map ZIPs for enabled games are tracked in [the legacy map parity register](arcade-games-port/LEGACY-MAP-PARITY.md); Plexball is explicitly documented as using a modern arena.
+**Readiness rule:** Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons, Runner, Sheep Quest, Turf Wars and Snap form the shared controlled test queue. Being enabled means a game is available for controlled testing, not that every mechanic has already passed live acceptance. Fix issues found during combined testing, keep playable games available, and expand the queue as other games become testable. The 357 archived map ZIPs for enabled games are tracked in [the legacy map parity register](arcade-games-port/LEGACY-MAP-PARITY.md); Plexball is explicitly documented as using a modern arena.
