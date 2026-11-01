@@ -17842,19 +17842,6 @@ public final class ArcadePortManager implements Listener {
     public void onRunnerFallingBlockLand(EntityChangeBlockEvent event) {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
-        if (session.type == ArcadePortGame.EVOLUTION
-                && event.getEntity() instanceof Player evolutionPlayer
-                && session.alive.contains(evolutionPlayer.getUniqueId())
-                && event.getCause() == EntityDamageEvent.DamageCause.FALL) {
-            int form = session.evolutionLevels.getOrDefault(evolutionPlayer.getUniqueId(), 0);
-            double multiplier = ArcadePortRules.evolutionFallDamageMultiplier(form);
-            if (multiplier <= 0.0D) {
-                event.setCancelled(true);
-                evolutionPlayer.setFallDistance(0.0F);
-                return;
-            }
-            if (multiplier < 1.0D) event.setDamage(event.getDamage() * multiplier);
-        }
         if (session.type == ArcadePortGame.DRAGONS
                 && event.getEntity() instanceof EnderDragon dragon && session.entities.contains(dragon)) {
             event.setCancelled(true);
@@ -17967,6 +17954,19 @@ public final class ArcadePortManager implements Listener {
         if (event instanceof EntityDamageByEntityEvent byEntity && cancelPrepareAction(playerShooter(byEntity.getDamager()), event)) return;
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.EVOLUTION
+                && event.getEntity() instanceof Player evolutionPlayer
+                && session.alive.contains(evolutionPlayer.getUniqueId())
+                && event.getCause() == EntityDamageEvent.DamageCause.FALL) {
+            int form = session.evolutionLevels.getOrDefault(evolutionPlayer.getUniqueId(), 0);
+            double multiplier = ArcadePortRules.evolutionFallDamageMultiplier(form);
+            if (multiplier <= 0.0D) {
+                event.setCancelled(true);
+                evolutionPlayer.setFallDistance(0.0F);
+                return;
+            }
+            if (multiplier < 1.0D) event.setDamage(event.getDamage() * multiplier);
+        }
         if (session.type == ArcadePortGame.DRAGONS
                 && event.getEntity() instanceof Player controlledPlayer
                 && session.dragonTamerControls.containsKey(controlledPlayer.getUniqueId())) {
