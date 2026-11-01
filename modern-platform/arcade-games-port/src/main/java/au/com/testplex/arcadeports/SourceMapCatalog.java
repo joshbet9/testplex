@@ -575,8 +575,19 @@ public final class SourceMapCatalog {
                 try (ZipInputStream zip = new ZipInputStream(input)) {
                     ZipEntry entry;
                     while ((entry = zip.getNextEntry()) != null) {
-                        Path output = staging.resolve(entry.getName()).normalize();
-                        if (!output.startsWith(staging)) {
+                        // Mineplex legacy archives are a mixture of Unix-style '/' and
+                        // Windows-style '\\' ZIP entry paths. Linux treats backslashes as
+                        // literal filename characters: Gladiators_Caged_In.zip then
+                        // extracts region\\r.*.mca into the world root instead of region/,
+                        // leaving Paper with no terrain to migrate.
+                        String entryName = entry.getName().replace('\\', '/');
+                        if (entryName.isBlank() || entryName.startsWith("/")
+                                || entryName.matches("(?i)^[a-z]:.*")
+                                || entryName.indexOf('\\0') >= 0) {
+                            throw new IOException("Unsafe archive entry: " + entry.getName());
+                        }
+                        Path output = staging.resolve(entryName).normalize();
+                        if (!output.startsWith(staging) || output.equals(staging)) {
                             throw new IOException("Unsafe archive entry: " + entry.getName());
                         }
                         if (entry.isDirectory()) {
