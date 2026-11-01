@@ -8317,10 +8317,6 @@ public final class ArcadePortManager implements Listener {
             updateMicroBattlesBorderParticles(session);
             updateMicroSpectatorCompass(session);
             if (session.ticks % 20 == 0) updateMicroLastTwoMission(session);
-            updateMicroBorderWarnings(session);
-            updateMicroBattlesBorderParticles(session);
-            updateMicroSpectatorCompass(session);
-            if (session.ticks % 20 == 0) updateMicroLastTwoMission(session);
             enforceMicroBattlesHunger(session);
             updateMicroBattlesArrows(session, now);
             updateMicroCrumble(session, now);
@@ -14602,16 +14598,9 @@ public final class ArcadePortManager implements Listener {
             session.variantRuntime.stop();
             session.variantRuntime = null;
         }
-        if (announceWinner && session.type == ArcadePortGame.SNEAKY_ASSASSINS) {
-            sneakyAssassins.finish(winner);
-        }
         if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) {
-            sneakyAssassins.finish(winner);
+            if (announceWinner) sneakyAssassins.finish(winner);
             sneakyAssassins.stop();
-        }
-        if (session.type == ArcadePortGame.MICRO_BATTLES) {
-            removeAllMicroBorderWarnings(session);
-            for (Player player : session.players.values()) restoreMicroMiddleGlassCosmetic(session, player);
         }
         if (announceWinner && session.type == ArcadePortGame.BOMB_LOBBERS) {
             recordBombLobbersAchievements(session, winner);
