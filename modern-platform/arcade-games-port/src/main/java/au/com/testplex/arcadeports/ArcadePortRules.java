@@ -199,7 +199,7 @@ public final class ArcadePortRules {
     }
     public static final long BACON_FLASH_FRIED_MAX_WIN_MILLIS = 60_000L;
     public static final long BOMB_LOBBERS_ASSIST_WINDOW_MILLIS = 10_000L;
-    public static final long BOMB_LOBBERS_POWERUP_FIRST_SPAWN_DELAY_MILLIS = 10_000L;
+    public static final long BOMB_LOBBERS_POWERUP_FIRST_SPAWN_DELAY_MILLIS = 60_000L;
     public static final double BOMB_LOBBERS_SUPER_TNT_EXPLOSION_RADIUS = 10.0D;
     public static final double BOMB_LOBBERS_SUPER_TNT_MAX_DAMAGE = 65.0D;
     public static final int BOMB_LOBBERS_POWERUP_SPEED_DURATION_TICKS = 240;
@@ -576,7 +576,7 @@ public final class ArcadePortRules {
 
     public static String normalizeDragonEscapeKit(String requested) {
         if (requested == null) return null;
-        String value = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        String value = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-').replace(".", "");
         if (value.startsWith("dragon-escape-")) value = value.substring("dragon-escape-".length());
         return switch (value) {
             case "jumper" -> "jumper";
@@ -982,23 +982,14 @@ public final class ArcadePortRules {
         return ownerTeam >= 0 && targetTeam >= 0 && ownerTeam != targetTeam;
     }
 
-    /** More players in the match lobby produce more frequent power-up spawns. */
+    /** Rare paired team drops: one per side, averaging one minute between waves. */
     public static long bombLobbersPowerupSpawnIntervalMillis(int lobbyPlayers) {
-        int players = Math.max(1, lobbyPlayers);
-        if (players <= 2) return 30_000L;
-        if (players <= 4) return 25_000L;
-        if (players <= 8) return 20_000L;
-        if (players <= 12) return 15_000L;
-        return 12_000L;
+        return 60_000L;
     }
 
-    /** Keep small matches readable while allowing more simultaneous drops in larger lobbies. */
+    /** Each wave places at most one power-up on each team's side of the arena. */
     public static int bombLobbersPowerupMaxActive(int lobbyPlayers) {
-        int players = Math.max(1, lobbyPlayers);
-        if (players <= 4) return 1;
-        if (players <= 8) return 2;
-        if (players <= 12) return 3;
-        return 4;
+        return 2;
     }
 
     public static double bombLobbersExplosionRadius(String powerupType) {
@@ -1335,8 +1326,14 @@ public final class ArcadePortRules {
             case "mama", "mama-pig", "mama-piggles" -> "mama-piggles";
             case "pig", "sneaky-pig", "sheep", "sheep-pig", "pig-cloak", "cloak-pig" -> "pig";
             case "brutus", "brutus-bacon", "bacon-brutus", "brutus-pig" -> "brutus-bacon";
+            case "chris", "chris-p", "chris-p-bacon", "crispy-bacon" -> "chris-p-bacon";
             default -> null;
         };
+    }
+
+    /** Only ordinary weapon hits charge Bacon Brawl's meter; abilities and recoil do not. */
+    public static boolean shouldChargeBaconMeter(String source) {
+        return "melee".equals(source) || "projectile hit".equals(source);
     }
 
     /**

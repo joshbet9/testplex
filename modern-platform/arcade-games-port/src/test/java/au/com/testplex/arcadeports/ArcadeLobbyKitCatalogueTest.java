@@ -27,6 +27,16 @@ class ArcadeLobbyKitCatalogueTest {
     }
 
     @Test
+    void baconBrawlIncludesChrisPBaconWithItsSourceKitIdentity() {
+        List<ArcadeLobbyKitCatalogue.KitChoice> choices =
+                ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.BACON_BRAWL, List.of());
+        ArcadeLobbyKitCatalogue.KitChoice chris = choices.stream()
+                .filter(choice -> choice.id.equals("chris-p-bacon")).findFirst().orElseThrow();
+        assertEquals("Chris P. Bacon", chris.name);
+        assertEquals(org.bukkit.Material.IRON_AXE, chris.heldItem);
+    }
+
+    @Test
     void snapUsesItsNewNameAndKitIdsWhileRetainingItsLegacyGameId() {
         List<ArcadeLobbyKitCatalogue.KitChoice> choices =
                 ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.CAMERA_SHY, List.of());

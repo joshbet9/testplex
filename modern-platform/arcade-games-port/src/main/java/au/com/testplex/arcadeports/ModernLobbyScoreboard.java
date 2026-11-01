@@ -52,7 +52,7 @@ public final class ModernLobbyScoreboard {
         String gameName = formatGameName(selectedGameId);
         String selectedKitId = plugin.getConfig().getString(
                 "lobby-kit-preferences." + player.getUniqueId() + "." + selectedGameId, "None");
-        String kitName = formatKitName(selectedKitId);
+        String kitName = formatSelectedKitName(selectedKitId, selectedGameId);
         String serverName = plugin.getConfig().getString(
                 "lobby-scoreboard.server-name", "Testplex Modern");
         String gems = String.valueOf(plugin.getConfig().getInt(
@@ -139,6 +139,20 @@ public final class ModernLobbyScoreboard {
     static String formatKitName(String kitId) {
         if (kitId == null || kitId.isBlank()) return "None";
         return titleCase(kitId);
+    }
+
+    private String formatSelectedKitName(String kitId, String gameId) {
+        if (kitId == null || kitId.isBlank() || "none".equalsIgnoreCase(kitId)) return "None";
+        ArcadePortGame game = ArcadePortGame.fromId(gameId);
+        if (game != null) {
+            List<ArcadeLobbyKitCatalogue.KitChoice> choices = ArcadeLobbyKitCatalogue.forGame(
+                    game, plugin.getConfig().getStringList("lobby-kits.hidden"),
+                    plugin.getConfig().getStringList("lobby-kits.order." + game.id()));
+            for (ArcadeLobbyKitCatalogue.KitChoice choice : choices) {
+                if (choice.id.equalsIgnoreCase(kitId)) return choice.unlock.nameColor + choice.name;
+            }
+        }
+        return ChatColor.WHITE + formatKitName(kitId);
     }
 
     /**

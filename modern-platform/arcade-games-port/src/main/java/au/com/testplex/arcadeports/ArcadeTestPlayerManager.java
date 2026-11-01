@@ -384,9 +384,9 @@ final class ArcadeTestPlayerManager {
     }
 
     private void configureAsAfkPlayer(Object handle, Player player, boolean initialSpawn) throws Exception {
-        // FPP's AFK bot type does not run player input/AI. Freeze it as well so the
-        // target remains stationary until the game itself moves, teleports or kills it.
-        invoke(handle, "setFrozen", new Class<?>[] {boolean.class}, true);
+        // FPP's AFK bot type has no player-input AI. Keep it unfrozen so normal entity
+        // physics, explosions and the minigame's knockback can still move the participant.
+        invoke(handle, "setFrozen", new Class<?>[] {boolean.class}, false);
         invoke(handle, "setHeadAiEnabled", new Class<?>[] {boolean.class}, false);
         invoke(handle, "setSwimAiEnabled", new Class<?>[] {boolean.class}, false);
         invoke(handle, "setPveEnabled", new Class<?>[] {boolean.class}, false);

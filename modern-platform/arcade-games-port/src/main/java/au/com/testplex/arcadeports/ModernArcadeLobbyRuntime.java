@@ -16,6 +16,7 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.Pig;
+import org.bukkit.entity.Husk;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Sheep;
 import org.bukkit.entity.Skeleton;
@@ -277,7 +278,10 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     }
 
     private LivingEntity spawnKitNpc(World world, Location at, ArcadeLobbyKitCatalogue.KitChoice choice) {
-        LivingEntity npc = world.spawn(at, choice.npcType);
+        // Husk is a Zombie subtype but is immune to sunlight ignition; this avoids the
+        // repeating fire overlay that persisted despite clearing fire ticks every tick.
+        LivingEntity npc = choice.npcType == Zombie.class
+                ? world.spawn(at, Husk.class) : world.spawn(at, choice.npcType);
         npc.setCustomName(choice.unlock.nameColor + ChatColor.BOLD.toString() + choice.name);
         npc.setCustomNameVisible(true);
         npc.setInvulnerable(true);
@@ -333,7 +337,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
 
     /**
      * Source-mapped Mineplex kit stations: individual coloured wool pads, a
-     * black outline, raised 2x2 wool blocks and stone-slab caps.
+     * black outline, raised 3x3 wool blocks and stone-slab caps.
      */
     private void buildLegacyPedestals(World world, List<Pedestal> pedestals) {
         for (Pedestal pedestal : pedestals) {
@@ -353,8 +357,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             }
         }
         for (Pedestal pedestal : pedestals) {
-            for (int dx = -1; dx <= 0; dx++) {
-                for (int dz = -1; dz <= 0; dz++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
                     world.getBlockAt(pedestal.centerX + dx, ModernArcadeLobby.FLOOR_Y + 1, pedestal.centerZ + dz)
                             .setType(pedestal.color, false);
                     world.getBlockAt(pedestal.centerX + dx, ModernArcadeLobby.FLOOR_Y + 2, pedestal.centerZ + dz)
@@ -1104,18 +1108,12 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         lastBotHitAtByAttacker.put(attackerId, now);
 
         boolean critical = hit.timingMultiplier() >= 1.5D;
-        String flashy = ChatColor.GOLD + "✦ " + ChatColor.YELLOW + ChatColor.BOLD
-                + "FLASHY CRITICAL!" + ChatColor.GOLD + " ✦";
-        if (critical) {
-            attacker.sendActionBar(flashy + ChatColor.WHITE + "  Knockback x"
-                    + String.format(Locale.ROOT, "%.2f", hit.timingMultiplier()));
-            attacker.sendTitle("", flashy, 0, 18, 5);
-            actor.getWorld().spawnParticle(Particle.FIREWORK, actor.getLocation().add(0, 1, 0),
-                    18, 0.45, 0.5, 0.45, 0.06);
-        }
-        // Every hit has hurt animation, sound and impact particles; only critical hits get
-        // the explicit flashy label, so normal/early/late hits aren't mislabeled as misses.
-        showBotImpact(bot, actor, attacker, critical ? flashy : null, null);
+        // Keep the hit marker compact and anchored beside the target rather than filling
+        // the attacker's title/action bar with the old oversized "Flashy Critical" banner.
+        String criticalLabel = critical ? ChatColor.GOLD + "Critical!" : null;
+        if (critical) actor.getWorld().spawnParticle(Particle.CRIT,
+                actor.getLocation().clone().add(0, 1, 0), 10, 0.3, 0.35, 0.3, 0.05);
+        showBotImpact(bot, actor, attacker, criticalLabel, null);
     }
 
     private void showBotImpact(Bot bot, LivingEntity actor, Player attacker, String visibleLabel, String actionbar) {
@@ -1132,7 +1130,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             attacker.sendActionBar(actionbar);
         }
         if (visibleLabel != null && !visibleLabel.isBlank()) {
-            final ArmorStand label = actor.getWorld().spawn(actor.getLocation().clone().add(0, 1.8D, 0), ArmorStand.class);
+            final ArmorStand label = actor.getWorld().spawn(actor.getLocation().clone().add(0.55D, 1.45D, 0.0D), ArmorStand.class);
             label.setVisible(false); label.setSmall(true); label.setGravity(false); label.setBasePlate(false);
             label.setArms(false); label.setMarker(true); label.setInvulnerable(true); label.setCanPickupItems(false);
             label.setCustomName(visibleLabel); label.setCustomNameVisible(true);
