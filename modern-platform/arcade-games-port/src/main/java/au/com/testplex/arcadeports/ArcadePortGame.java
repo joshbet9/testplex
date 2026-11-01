@@ -25,24 +25,32 @@ public enum ArcadePortGame {
     MONSTER_MAZE("monster-maze", "Monster Maze", Material.ROTTEN_FLESH, 0),
     SNEAKY_ASSASSINS("sneaky-assassins", "Sneaky Assassins", Material.EMERALD_BLOCK, 0),
     SKY_WARS("skywars", "SkyWars", Material.END_STONE_BRICKS, 0),
-    MILK_THE_COW("milk-the-cow", "Milk the Cow", Material.GRASS_BLOCK, 0),
-    WITHER_ASSAULT("wither-assault", "Wither Assault", Material.STONE_BRICKS, 0);
+    MILK_THE_COW("milk-the-cow", "Milk the Cow", Material.GRASS_BLOCK, 0, true),
+    WITHER_ASSAULT("wither-assault", "Wither Assault", Material.STONE_BRICKS, 0, true);
 
     private final String id;
     private final String displayName;
     private final Material floor;
     private final int lobbyTeamCount;
+    private final boolean lobbyRolesAssignedAutomatically;
     ArcadePortGame(String id, String displayName, Material floor, int lobbyTeamCount) {
+        this(id, displayName, floor, lobbyTeamCount, false);
+    }
+    ArcadePortGame(String id, String displayName, Material floor,
+                   int lobbyTeamCount, boolean lobbyRolesAssignedAutomatically) {
         this.id = id;
         this.displayName = displayName;
         this.floor = floor;
         this.lobbyTeamCount = lobbyTeamCount;
+        this.lobbyRolesAssignedAutomatically = lobbyRolesAssignedAutomatically;
     }
     public String id() { return id; }
     public String displayName() { return displayName; }
     public Material floor() { return floor; }
     /** Number of player-selectable teams exposed at the shared lobby queue station. */
     public int lobbyTeamCount() { return lobbyTeamCount; }
+    /** True when the game has teams/roles but players do not choose a team in the lobby. */
+    public boolean lobbyRolesAssignedAutomatically() { return lobbyRolesAssignedAutomatically; }
     public static ArcadePortGame fromId(String id) {
         if (id == null) return null;
         String value = id.toLowerCase(Locale.ROOT).replace('_', '-').replace(' ', '-');
