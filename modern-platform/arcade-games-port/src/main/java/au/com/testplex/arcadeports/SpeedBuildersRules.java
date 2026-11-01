@@ -3,11 +3,9 @@ package au.com.testplex.arcadeports;
 import org.bukkit.Material;
 
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 /** Deterministic source-parity rules for the Paper 26.3 Speed Builders port. */
 public final class SpeedBuildersRules {
@@ -20,10 +18,8 @@ public final class SpeedBuildersRules {
     public static final int MIN_BUILD_SECONDS = 5;
     public static final int MAX_BUILD_SECONDS = 60;
     public static final int REVIEW_SECONDS = 10;
-    public static final int ELIMINATION_INTERVAL_SECONDS = 2;
     public static final int INTERMISSION_SECONDS = 3;
-    public static final long JUDGE_BEAM_HOLD_TICKS = 100L;
-    public static final long ELIMINATION_INTERVAL_TICKS = ELIMINATION_INTERVAL_SECONDS * 20L;
+    public static final int DEFAULT_MATCH_ROUNDS = 5;
 
     private SpeedBuildersRules() { }
 
@@ -54,23 +50,6 @@ public final class SpeedBuildersRules {
         public BlockState {
             Objects.requireNonNull(material, "material");
             blockData = blockData == null ? "" : blockData;
-        }
-    }
-
-    public record PlayerScore(String playerId, int matchedBlocks, int expectedBlocks, boolean empty) {
-        public PlayerScore {
-            if (playerId == null || playerId.isBlank()) throw new IllegalArgumentException("playerId is required.");
-            if (matchedBlocks < 0 || expectedBlocks < 0 || matchedBlocks > expectedBlocks) {
-                throw new IllegalArgumentException("Invalid Speed Builders score.");
-            }
-        }
-
-        public boolean perfect() {
-            return expectedBlocks > 0 && matchedBlocks == expectedBlocks;
-        }
-
-        public int percent() {
-            return expectedBlocks == 0 ? 0 : (int) Math.round(matchedBlocks * 100.0D / expectedBlocks);
         }
     }
 
@@ -258,26 +237,14 @@ public final class SpeedBuildersRules {
     }
 
     /**
-     * Reborn eliminates empty plots first. Otherwise it removes one lowest scorer
-     * only when the round was neither a complete-perfect round nor a full tie.
+     * Converts a round's matched model pieces into a normalized 0–100 accuracy score.
+     * All builders receive points; missing pieces reduce accuracy but never remove a player.
      */
-    public static Set<String> eliminationCandidates(List<PlayerScore> scores) {
-        Objects.requireNonNull(scores, "scores");
-        if (scores.isEmpty()) return Set.of();
-
-        Set<String> eliminated = new LinkedHashSet<>();
-        for (PlayerScore score : scores) {
-            if (score.empty()) eliminated.add(score.playerId());
+    public static int roundPoints(int matchedPieces, int expectedPieces) {
+        if (matchedPieces < 0 || expectedPieces < 0 || matchedPieces > expectedPieces) {
+            throw new IllegalArgumentException("Invalid Speed Builders round score.");
         }
-
-        boolean allPerfect = scores.stream().allMatch(PlayerScore::perfect);
-        boolean allEqual = scores.stream().map(PlayerScore::matchedBlocks).distinct().count() <= 1L;
-        if (!allPerfect && !allEqual) {
-            PlayerScore lowest = scores.stream()
-                    .min((left, right) -> Integer.compare(left.matchedBlocks(), right.matchedBlocks()))
-                    .orElse(null);
-            if (lowest != null) eliminated.add(lowest.playerId());
-        }
-        return Set.copyOf(eliminated);
+        return expectedPieces == 0 ? 0
+                : (int) Math.round(matchedPieces * 100.0D / expectedPieces);
     }
 }
