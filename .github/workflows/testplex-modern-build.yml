@@ -92,6 +92,35 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+      - name: Build ephemeral Wizards Paper 26.3 gameplay smoke harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          smoke_dir="modern-platform/arcade-games-port/src/test-runtime/wizards-paper-smoke"
+          mvn --batch-mode --no-transfer-progress -f "$smoke_dir/pom.xml" clean package
+
+      - name: Run three-client Wizards Paper 26.3 gameplay acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash modern-platform/arcade-games-port/scripts/run-wizards-paper-smoke.sh \
+            modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar \
+            modern-platform/arcade-games-port/src/test-runtime/wizards-paper-smoke/target/WizardsPaperSmoke.jar \
+            "$RUNNER_TEMP/wizards-paper-smoke" \
+            "$RUNNER_TEMP/hoops-protocol-client/node_modules"
+
+      - name: Upload Wizards Paper smoke results and server log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wizards-paper-26.3-smoke-results
+          path: |
+            ${{ runner.temp }}/wizards-paper-smoke/plugins/WizardsPaperSmoke/results.tsv
+            ${{ runner.temp }}/wizards-paper-smoke/server.log
+            ${{ runner.temp }}/wizards-paper-smoke/client-bots.log
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Build the disabled Wizards 26.3 port and run spell-rule tests
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/wizards-port/pom.xml clean verify
 
@@ -126,6 +155,10 @@ jobs:
           jar tf "$arcade_jar" | grep -Fxq "plugin.yml"
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/ArcadeMechanicsModernPlugin.class"
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/ArcadePortManager.class"
+          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/wizards/WizardsGameManager.class"
+          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/wizards/WizardsRules.class"
+          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/wizards/WizardsSpell.class"
+          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/wizards/WizardsKit.class"
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/PlexballGame.class"
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/PlexballRules.class"
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/CameraShyGame.class"

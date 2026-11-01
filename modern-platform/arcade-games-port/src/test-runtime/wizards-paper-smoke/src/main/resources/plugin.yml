@@ -1,0 +1,7 @@
+name: WizardsPaperSmoke
+version: 0.1.0
+main: au.com.testplex.wizardssmoke.WizardsPaperSmoke
+api-version: '26.3'
+depend:
+  - ArcadeMechanicsModern
+description: Ephemeral CI-only Paper world-import smoke test for Wizards source snapshots
