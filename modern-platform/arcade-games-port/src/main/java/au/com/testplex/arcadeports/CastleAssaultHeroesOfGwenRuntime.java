@@ -32,6 +32,7 @@ import org.bukkit.entity.Snowball;
 import org.bukkit.entity.SmallFireball;
 import org.bukkit.entity.TNTPrimed;
 import org.bukkit.entity.Wither;
+import org.bukkit.entity.WitherSkeleton;
 import org.bukkit.entity.Wolf;
 import org.bukkit.entity.Zombie;
 import org.bukkit.event.EventHandler;
@@ -41,6 +42,7 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.EntityCombustEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
@@ -148,6 +150,17 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final Map<Integer, UUID> witherTargets = new HashMap<>();
     private final Map<Integer, Long> witherNextEarthquakeAt = new HashMap<>();
     private final Set<FallingBlock> witherDebris = new HashSet<>();
+    private HeroesOfGwenSidequestType heroesOfGwenSidequestType = HeroesOfGwenSidequestType.NONE;
+    private List<Location> heroesOfGwenPumpkinBoundary = List.of();
+    private WitherSkeleton heroesOfGwenPumpkinKing;
+    private UUID heroesOfGwenPumpkinKingTarget;
+    private long heroesOfGwenPumpkinKingRespawnAt;
+    private long heroesOfGwenPumpkinKingNextAttackAt;
+    private long heroesOfGwenSidequestNextStartAt;
+    private long heroesOfGwenMonochromeEndsAt;
+    private final Set<UUID> heroesOfGwenMonochromeSkeletons = new HashSet<>();
+    private final int[] heroesOfGwenMonochromeKills = new int[2];
+    private final Map<UUID, Long> heroesOfGwenPumpkinBuffEndsAt = new HashMap<>();
     private final List<Location> objectiveTntSpawns = new ArrayList<>();
     private final List<Block> castleChests = new ArrayList<>();
     private final Map<UUID, Integer> castleKillStreaks = new HashMap<>();
@@ -301,6 +314,16 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (!isReady() || listenersRegistered) return;
         Bukkit.getPluginManager().registerEvents(this, plugin);
         listenersRegistered = true;
+        if (game == ArcadePortGame.HEROES_OF_GWEN
+                && heroesOfGwenSidequestType != HeroesOfGwenSidequestType.NONE) {
+            long firstSidequestAt = System.currentTimeMillis()
+                    + ArcadePortRules.HEROES_OF_GWEN_SIDEQUEST_INITIAL_DELAY_MILLIS;
+            if (heroesOfGwenSidequestType == HeroesOfGwenSidequestType.PUMPKIN_KING) {
+                heroesOfGwenPumpkinKingRespawnAt = firstSidequestAt;
+            } else {
+                heroesOfGwenSidequestNextStartAt = firstSidequestAt;
+            }
+        }
     }
 
     private boolean prepareCastleAssault() {
@@ -370,6 +393,30 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             plugin.getLogger().warning("Heroes of Gwen map " + map.mapName()
                     + " has no RED/BLUE Wither base markers in WorldConfig.dat.");
             return false;
+        }
+
+        Map<String, List<Location>> sourceMapGroups = map.customLocationGroups();
+        if (sourceMapGroups.containsKey("HEROES_VALLEY")) {
+            heroesOfGwenSidequestType = HeroesOfGwenSidequestType.PUMPKIN_KING;
+            List<Location> pumpkinBoundary = map.dataLocations("GRAY").stream()
+                    .map(Location::clone).toList();
+            if (map.dataLocations("BLACK").isEmpty() || pumpkinBoundary.size() < 3) {
+                plugin.getLogger().warning("Heroes Valley map " + map.mapName()
+                        + " is missing BLACK Pumpkin King spawn or GRAY boss-boundary markers; sidequest is unavailable.");
+                heroesOfGwenSidequestType = HeroesOfGwenSidequestType.NONE;
+            } else {
+                heroesOfGwenPumpkinBoundary = orderBoundaryPoints(pumpkinBoundary);
+            }
+        } else if (sourceMapGroups.containsKey("MONOCHROME")) {
+            heroesOfGwenSidequestType = HeroesOfGwenSidequestType.MONOCHROME_SKELETONS;
+            if (map.dataLocations("BLACK").isEmpty()) {
+                plugin.getLogger().warning("Monochrome map " + map.mapName()
+                        + " has no BLACK Wither Skeleton challenge spawn markers; sidequest is unavailable.");
+                heroesOfGwenSidequestType = HeroesOfGwenSidequestType.NONE;
+            }
+        } else {
+            plugin.getLogger().warning("Heroes of Gwen map " + map.mapName()
+                    + " has no recognised HEROES_VALLEY or MONOCHROME source map type; mid-match sidequest is disabled.");
         }
 
         int found = 0;
@@ -1016,6 +1063,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private void tickHeroesOfGwen(long now) {
         updateMobaWithers(now);
+        updateHeroesOfGwenSidequest(now);
         updateHeroesOfGwenAbilities(now);
         updateAnathMeteorZones(now);
         updateHeroesOfGwenMinions(now);
@@ -1534,6 +1582,83 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (targetTeam >= 0 && targetTeam == ownerTeam) return;
         for (Wolf wolf : liveBardolfWolves(attacker.getUniqueId())) {
             bardolfWolfTargets.put(wolf.getUniqueId(), target.getUniqueId());
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onHeroesOfGwenPumpkinKingDamage(EntityDamageEvent event) {
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN || heroesOfGwenPumpkinKing == null
+                || !event.getEntity().getUniqueId().equals(heroesOfGwenPumpkinKing.getUniqueId())) return;
+        if (!(event instanceof EntityDamageByEntityEvent byEntity)) {
+            event.setCancelled(true);
+            return;
+        }
+        Player attacker = resolveAttacker(byEntity);
+        if (attacker == null || !activePlayers.contains(attacker.getUniqueId())
+                || !isInsideHeroesOfGwenPumpkinBoundary(attacker.getLocation())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onHeroesOfGwenPumpkinKingBuffDamage(EntityDamageByEntityEvent event) {
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN) return;
+        Player attacker = resolveAttacker(event);
+        if (attacker == null || !activePlayers.contains(attacker.getUniqueId())) return;
+        long expiresAt = heroesOfGwenPumpkinBuffEndsAt.getOrDefault(attacker.getUniqueId(), 0L);
+        if (expiresAt > System.currentTimeMillis()) {
+            event.setDamage(event.getDamage() * ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_DAMAGE_MULTIPLIER);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onHeroesOfGwenSidequestCombust(EntityCombustEvent event) {
+        if (game != ArcadePortGame.HEROES_OF_GWEN) return;
+        if (heroesOfGwenPumpkinKing != null
+                && event.getEntity().getUniqueId().equals(heroesOfGwenPumpkinKing.getUniqueId())) {
+            event.setCancelled(true);
+        } else if (heroesOfGwenMonochromeSkeletons.contains(event.getEntity().getUniqueId())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onHeroesOfGwenSidequestDeath(EntityDeathEvent event) {
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN) return;
+        UUID id = event.getEntity().getUniqueId();
+        if (heroesOfGwenPumpkinKing != null && heroesOfGwenPumpkinKing.getUniqueId().equals(id)) {
+            event.getDrops().clear();
+            event.setDroppedExp(0);
+            heroesOfGwenPumpkinKing = null;
+            heroesOfGwenPumpkinKingTarget = null;
+            heroesOfGwenPumpkinKingNextAttackAt = 0L;
+            heroesOfGwenPumpkinKingRespawnAt = System.currentTimeMillis()
+                    + ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_RESPAWN_DELAY_MILLIS;
+            entities.remove(event.getEntity());
+            Player killer = event.getEntity().getKiller();
+            int team = killer != null && activePlayers.contains(killer.getUniqueId())
+                    ? teams.getOrDefault(killer.getUniqueId(), -1) : -1;
+            if (team >= 0) {
+                announce(teamName(team) + " defeated the Pumpkin King and earned his blessing!");
+                grantHeroesOfGwenPumpkinKingBuff(team);
+            } else {
+                announce(ChatColor.DARK_RED + "The Pumpkin King was defeated, but no team earned the blessing.");
+            }
+            return;
+        }
+        if (heroesOfGwenMonochromeSkeletons.remove(id)) {
+            event.getDrops().clear();
+            event.setDroppedExp(0);
+            entities.remove(event.getEntity());
+            Player killer = event.getEntity().getKiller();
+            if (killer != null && activePlayers.contains(killer.getUniqueId())) {
+                int team = teams.getOrDefault(killer.getUniqueId(), -1);
+                if (team >= 0 && team < heroesOfGwenMonochromeKills.length) {
+                    heroesOfGwenMonochromeKills[team]++;
+                    killer.sendMessage(ChatColor.GOLD + "Wither Skeleton defeated! "
+                            + ChatColor.GRAY + "Your team: " + heroesOfGwenMonochromeKills[team]);
+                }
+            }
         }
     }
 
@@ -2097,6 +2222,19 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
         if (game != ArcadePortGame.HEROES_OF_GWEN) return;
         Entity damaged = event.getEntity();
+        if (heroesOfGwenPumpkinKing != null
+                && damaged.getUniqueId().equals(heroesOfGwenPumpkinKing.getUniqueId())) {
+            if (!(event instanceof EntityDamageByEntityEvent byEntity)) {
+                event.setCancelled(true);
+                return;
+            }
+            Player attacker = resolveAttacker(byEntity);
+            if (attacker == null || !activePlayers.contains(attacker.getUniqueId())
+                    || !isInsideHeroesOfGwenPumpkinBoundary(attacker.getLocation())) {
+                event.setCancelled(true);
+            }
+            return;
+        }
         TowerState tower = towerFor(damaged);
         if (tower != null) {
             event.setCancelled(true);
@@ -5196,6 +5334,14 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
         witherDebris.clear();
         witherTargets.clear();
+        heroesOfGwenPumpkinKing = null;
+        heroesOfGwenPumpkinKingTarget = null;
+        heroesOfGwenPumpkinBoundary = List.of();
+        heroesOfGwenMonochromeSkeletons.clear();
+        heroesOfGwenPumpkinBuffEndsAt.clear();
+        heroesOfGwenMonochromeEndsAt = 0L;
+        heroesOfGwenSidequestNextStartAt = 0L;
+        heroesOfGwenPumpkinKingRespawnAt = 0L;
         heroesOfGwenMinionTeams.clear();
         heroesOfGwenIronMinionTeams.clear();
         witherHomes.clear();
