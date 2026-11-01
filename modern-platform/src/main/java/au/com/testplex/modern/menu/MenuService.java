@@ -494,6 +494,7 @@ public final class MenuService implements Listener {
         Inventory inventory = Bukkit.createInventory(null, 54, WIN_HOME_TITLE);
         int index = 0;
         for (GameDefinition game : catalog.getGames()) {
+            if (isMonsterMazeModeAlias(game)) continue;
             if (index >= LEGACY_GAME_SLOTS.length) break;
             ItemStack item = makeItem(icon(game.getIcon()), ChatColor.YELLOW + game.getName(),
                     List.of(ChatColor.GRAY.toString() + game.getWinEffects().size() + " win-effect choices",
@@ -510,6 +511,7 @@ public final class MenuService implements Listener {
         int index = 0;
         int[] legacySlots = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34, 37, 39, 41, 43};
         for (GameDefinition game : catalog.getGames()) {
+            if (isMonsterMazeModeAlias(game)) continue;
             if (index >= legacySlots.length) break;
             ItemStack item = makeItem(icon(game.getIcon()), ChatColor.YELLOW + game.getName(), List.of(
                     ChatColor.GRAY.toString() + game.getCosmeticLines().size()
@@ -522,6 +524,11 @@ public final class MenuService implements Listener {
         inventory.setItem(49, makeItem(Material.BARRIER, ChatColor.RED + "Close",
                 List.of(ChatColor.GRAY + "Close the Arcade Cosmetics menu.")));
         player.openInventory(inventory);
+    }
+
+    private boolean isMonsterMazeModeAlias(GameDefinition game) {
+        return game != null && ("monster-maze-speed".equals(game.getId())
+                || "monster-maze-modern".equals(game.getId()));
     }
 
     /** Original ArcadeCosmeticsMenu game page: inset feature grid and back/close controls. */
