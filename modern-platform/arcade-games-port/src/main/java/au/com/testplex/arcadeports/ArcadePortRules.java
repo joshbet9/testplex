@@ -2862,6 +2862,25 @@ public final class ArcadePortRules {
         return 0L;
     }
 
+    // Larissa — source values from the archived Heroes of Gwen kit implementations.
+    public static final long HEROES_OF_GWEN_LARISSA_AQUA_CANNON_INTERVAL_MILLIS = 500L;
+    public static final int HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE = 3;
+    public static final double HEROES_OF_GWEN_LARISSA_AQUA_CANNON_RANGE = 10.0D;
+    public static final long HEROES_OF_GWEN_LARISSA_WATER_AMMO_RELOAD_MILLIS = 3_000L;
+    public static final int HEROES_OF_GWEN_LARISSA_WATER_AMMO_CAPACITY = 64;
+    public static final long HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_COOLDOWN_MILLIS = 14_000L;
+    public static final long HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DURATION_MILLIS = 6_000L;
+    public static final double HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS = 3.0D;
+    public static final long HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_PULSE_INTERVAL_MILLIS = 1_000L;
+    public static final int HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_HEAL_PER_SECOND = 4;
+    public static final int HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DAMAGE_PER_SECOND = 2;
+    public static final long HEROES_OF_GWEN_LARISSA_WATER_DASH_DURATION_MILLIS = 600L;
+    public static final long HEROES_OF_GWEN_LARISSA_WATER_DASH_COOLDOWN_MILLIS = 10_000L;
+    public static final long HEROES_OF_GWEN_LARISSA_STORM_BLESSING_DURATION_MILLIS = 7_000L;
+    public static final long HEROES_OF_GWEN_LARISSA_STORM_BLESSING_COOLDOWN_MILLIS = 60_000L;
+    public static final long HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_INTERVAL_MILLIS = 1_000L;
+    public static final int HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_PER_SECOND = 2;
+
     // Anath the Burnt — values from the archived Heroes of Gwen ability references.
     public static final long HEROES_OF_GWEN_ANATH_BURN_BEAM_COOLDOWN_MILLIS = 10_000L;
     public static final double HEROES_OF_GWEN_ANATH_BURN_BEAM_RANGE = 20.0D;
