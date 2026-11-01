@@ -1356,6 +1356,72 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
     }
 
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onHeroesOfGwenBardolfDamage(EntityDamageByEntityEvent event) {
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN) return;
+        if (event.getEntity() instanceof Wolf wolf) {
+            UUID ownerId = bardolfOwnerId(wolf);
+            Player attacker = resolveAttacker(event);
+            if (ownerId != null && attacker != null
+                    && teams.getOrDefault(ownerId, -1) == teams.getOrDefault(attacker.getUniqueId(), -2)) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+
+        Player attacker = resolveAttacker(event);
+        if (attacker == null || !"bardolf".equals(selectedHeroesOfGwen.get(attacker.getUniqueId()))
+                || bardolfFullMoonEndsAt.getOrDefault(attacker.getUniqueId(), 0L) <= System.currentTimeMillis()
+                || !(event.getEntity() instanceof LivingEntity)) return;
+        int attackerTeam = teams.getOrDefault(attacker.getUniqueId(), -1);
+        int victimTeam = heroesOfGwenEntityTeam(event.getEntity());
+        if (victimTeam >= 0 && victimTeam == attackerTeam) return;
+        int livingWolves = liveBardolfWolves(attacker.getUniqueId()).size();
+        if (livingWolves > 0) {
+            event.setDamage(event.getDamage()
+                    + livingWolves * ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_DAMAGE_PER_WOLF);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onHeroesOfGwenBardolfOwnerAttack(EntityDamageByEntityEvent event) {
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN
+                || !(event.getEntity() instanceof LivingEntity target)) return;
+        Player attacker = resolveAttacker(event);
+        if (attacker == null || !activePlayers.contains(attacker.getUniqueId())
+                || !"bardolf".equals(selectedHeroesOfGwen.get(attacker.getUniqueId()))) return;
+        int ownerTeam = teams.getOrDefault(attacker.getUniqueId(), -1);
+        int targetTeam = heroesOfGwenEntityTeam(target);
+        if (targetTeam >= 0 && targetTeam == ownerTeam) return;
+        for (Wolf wolf : liveBardolfWolves(attacker.getUniqueId())) {
+            bardolfWolfTargets.put(wolf.getUniqueId(), target.getUniqueId());
+        }
+    }
+
+    @EventHandler
+    public void onHeroesOfGwenBardolfPlayerDeath(PlayerDeathEvent event) {
+        if (game == ArcadePortGame.HEROES_OF_GWEN) removeBardolfPack(event.getEntity().getUniqueId());
+    }
+
+    @EventHandler
+    public void onHeroesOfGwenBardolfPlayerQuit(PlayerQuitEvent event) {
+        if (game == ArcadePortGame.HEROES_OF_GWEN) removeBardolfPack(event.getPlayer().getUniqueId());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onHeroesOfGwenBardolfWolfDeath(EntityDeathEvent event) {
+        if (game != ArcadePortGame.HEROES_OF_GWEN || !(event.getEntity() instanceof Wolf wolf)) return;
+        UUID ownerId = bardolfOwnerId(wolf);
+        if (ownerId == null) return;
+        event.getDrops().clear();
+        event.setDroppedExp(0);
+        List<Wolf> pack = bardolfWolves.get(ownerId);
+        if (pack != null) pack.removeIf(existing -> existing == null || existing.getUniqueId().equals(wolf.getUniqueId()));
+        bardolfWolfTargets.remove(wolf.getUniqueId());
+        entities.remove(wolf);
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onHeroesOfGwenProjectileDamage(EntityDamageByEntityEvent event) {
         if (stopped || game != ArcadePortGame.HEROES_OF_GWEN) return;
@@ -2486,6 +2552,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         String hero = ArcadePortRules.normalizeHeroesOfGwenHero(requestedHero);
         if (hero == null) hero = "hattori";
         String previous = selectedHeroesOfGwen.put(player.getUniqueId(), hero);
+        if (!hero.equals(previous) && "bardolf".equals(previous)) removeBardolfPack(player.getUniqueId());
         if (!hero.equals(previous) && previous != null) {
             int team = teams.getOrDefault(player.getUniqueId(), -1);
             boolean ownTowerLost = towers.getOrDefault(team, List.of()).stream().anyMatch(tower -> tower.dead);
