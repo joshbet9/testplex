@@ -205,6 +205,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 completedGame != null && completedGame.isMonsterMaze() ? completedGame : ArcadePortGame.MONSTER_MAZE);
     }
 
+    public void onWizardsRoundCompleted() {
+        if (manager != null) manager.onExternalGameCompleted(ArcadePortGame.WIZARDS);
+    }
+
     public WizardsGameManager getWizardsGameManager() { return wizards; }
 
     public void stopMonsterMazeRound(String reason) {
@@ -242,7 +246,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     + " invocation-id-present=" + (System.getenv("INVOCATION_ID") != null));
             boolean deploymentSignal = ArcadeRuntimeReadinessSignal.publish(
                     getDataFolder().toPath(), System.getenv("INVOCATION_ID"), ProcessHandle.current().pid(),
-                    manager.isMonsterMazeModuleRegistered());
+                    manager.isMonsterMazeModuleRegistered() && manager.isWizardsModuleRegistered());
             getLogger().info("TESTPLEX_ARCADE_RUNTIME_READY world=" + ModernArcadeLobby.WORLD_NAME
                     + " plane=100x100 floor-y=" + ModernArcadeLobby.FLOOR_Y
                     + " monster-maze=READY deployment-signal=" + deploymentSignal);
