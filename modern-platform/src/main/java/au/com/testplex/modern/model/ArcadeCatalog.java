@@ -272,6 +272,14 @@ public final class ArcadeCatalog {
                 win("beacon-crown", "Beacon Crown", "Captured beacons form a crown around the victor."),
                 win("wither-fall", "Wither Fall", "The defeated Wither fades behind the winning team.")));
 
+        register(game("hoops-remastered", "Hoops Remastered", "BIRCH_PLANKS",
+                "Play a fast 2–16 player RED versus BLUE basketball match with passing, shooting, layups, dunks, steals and blocks.",
+                GameDefinition.PortStatus.READY_FOR_TEST,
+                List.of(),
+                win("hoops-trophy", "Hoops Trophy", "The winning team raises the championship cup above the court."),
+                win("buzzer-beater", "Buzzer Beater", "The decisive final basket lights up the arena clock."),
+                win("court-dominance", "Court Dominance", "The winning lineup takes centre court.")));
+
         register(game("milk-the-cow", "Milk the Cow", "MILK_BUCKET",
                 "Collect milk for your team, protect the herd and use Cow charge and body-slam abilities.",
                 GameDefinition.PortStatus.READY_FOR_TEST, List.of(),
