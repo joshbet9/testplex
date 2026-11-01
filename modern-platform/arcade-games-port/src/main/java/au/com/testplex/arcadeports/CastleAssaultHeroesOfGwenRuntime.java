@@ -877,25 +877,25 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         addStoreEntry("Hunter", Material.CHAINMAIL_BOOTS, "Leather Moccasins", 500, "Legacy Hunter store item.");
         addStoreEntry("Hunter", Material.CHAINMAIL_BOOTS, "Leather Crosstrainers", 800, "Legacy Hunter store item.");
         addStoreEntry("Hunter", Material.CHAINMAIL_BOOTS, "Chainmail Boots", 500, "Legacy Hunter store item.");
-        addStoreEntry("Assassin", Material.POTION, "Small Health Potion", 100, "Legacy Assassin store item.");
-        addStoreEntry("Assassin", Material.POTION, "Large Health Potion", 200, "Legacy Assassin store item.");
-        addStoreEntry("Assassin", Material.POTION, "Power Potion", 1000, "Legacy Assassin store item.");
-        addStoreEntry("Assassin", Material.POTION, "Speed Potion", 500, "Legacy Assassin store item.");
+        addStoreEntry("Assassin", Material.POTION, "Small Health Potion", 100, "Instantly restores 4 HP.");
+        addStoreEntry("Assassin", Material.POTION, "Large Health Potion", 200, "Instantly restores 8 HP.");
+        addStoreEntry("Assassin", Material.POTION, "Power Potion", 1000, "Strength I for 90 seconds.");
+        addStoreEntry("Assassin", Material.POTION, "Speed Potion", 500, "Speed I for 180 seconds.");
         addStoreEntry("Assassin", Material.ENDER_PEARL, "Ender Pearl", 750, "Legacy Assassin store item.");
-        addStoreEntry("Warrior", Material.POTION, "Small Health Potion", 100, "Legacy Warrior store item.");
-        addStoreEntry("Warrior", Material.POTION, "Large Health Potion", 200, "Legacy Warrior store item.");
-        addStoreEntry("Warrior", Material.POTION, "Power Potion", 1000, "Legacy Warrior store item.");
-        addStoreEntry("Warrior", Material.POTION, "Speed Potion", 500, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.POTION, "Small Health Potion", 100, "Instantly restores 4 HP.");
+        addStoreEntry("Warrior", Material.POTION, "Large Health Potion", 200, "Instantly restores 8 HP.");
+        addStoreEntry("Warrior", Material.POTION, "Power Potion", 1000, "Strength I for 90 seconds.");
+        addStoreEntry("Warrior", Material.POTION, "Speed Potion", 500, "Speed I for 180 seconds.");
         addStoreEntry("Warrior", Material.ENDER_PEARL, "Ender Pearl", 750, "Legacy Warrior store item.");
-        addStoreEntry("Mage", Material.POTION, "Small Health Potion", 100, "Legacy Mage store item.");
-        addStoreEntry("Mage", Material.POTION, "Large Health Potion", 200, "Legacy Mage store item.");
-        addStoreEntry("Mage", Material.POTION, "Power Potion", 1000, "Legacy Mage store item.");
-        addStoreEntry("Mage", Material.POTION, "Speed Potion", 500, "Legacy Mage store item.");
+        addStoreEntry("Mage", Material.POTION, "Small Health Potion", 100, "Instantly restores 4 HP.");
+        addStoreEntry("Mage", Material.POTION, "Large Health Potion", 200, "Instantly restores 8 HP.");
+        addStoreEntry("Mage", Material.POTION, "Power Potion", 1000, "Strength I for 90 seconds.");
+        addStoreEntry("Mage", Material.POTION, "Speed Potion", 500, "Speed I for 180 seconds.");
         addStoreEntry("Mage", Material.ENDER_PEARL, "Ender Pearl", 750, "Legacy Mage store item.");
-        addStoreEntry("Hunter", Material.POTION, "Small Health Potion", 100, "Legacy Hunter store item.");
-        addStoreEntry("Hunter", Material.POTION, "Large Health Potion", 200, "Legacy Hunter store item.");
-        addStoreEntry("Hunter", Material.POTION, "Power Potion", 1000, "Legacy Hunter store item.");
-        addStoreEntry("Hunter", Material.POTION, "Speed Potion", 500, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.POTION, "Small Health Potion", 100, "Instantly restores 4 HP.");
+        addStoreEntry("Hunter", Material.POTION, "Large Health Potion", 200, "Instantly restores 8 HP.");
+        addStoreEntry("Hunter", Material.POTION, "Power Potion", 1000, "Strength I for 90 seconds.");
+        addStoreEntry("Hunter", Material.POTION, "Speed Potion", 500, "Speed I for 180 seconds.");
         addStoreEntry("Hunter", Material.ENDER_PEARL, "Ender Pearl", 750, "Legacy Hunter store item.");
     }
 
@@ -2675,6 +2675,21 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         ItemStack reward = new ItemStack(entry.material);
         ItemMeta rewardMeta = reward.getItemMeta();
         rewardMeta.setDisplayName(ChatColor.GREEN + entry.name);
+        if (entry.material == Material.POTION && rewardMeta instanceof PotionMeta potionMeta) {
+            switch (entry.name) {
+                case "Small Health Potion" -> potionMeta.addCustomEffect(new PotionEffect(
+                        PotionEffectType.INSTANT_HEALTH, 1, 0), true);
+                case "Large Health Potion" -> potionMeta.addCustomEffect(new PotionEffect(
+                        PotionEffectType.INSTANT_HEALTH, 1, 1), true);
+                case "Power Potion" -> potionMeta.addCustomEffect(new PotionEffect(
+                        PotionEffectType.STRENGTH,
+                        (int) (ArcadePortRules.HEROES_OF_GWEN_POWER_POTION_DURATION_MILLIS / 50L), 0), true);
+                case "Speed Potion" -> potionMeta.addCustomEffect(new PotionEffect(
+                        PotionEffectType.SPEED,
+                        (int) (ArcadePortRules.HEROES_OF_GWEN_SPEED_POTION_DURATION_MILLIS / 50L), 0), true);
+                default -> { }
+            }
+        }
         reward.setItemMeta(rewardMeta);
         String materialName = entry.material.name();
         if (materialName.endsWith("_HELMET") || materialName.endsWith("_CHESTPLATE")
