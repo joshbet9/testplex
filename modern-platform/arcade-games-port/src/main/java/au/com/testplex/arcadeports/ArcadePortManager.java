@@ -12478,6 +12478,7 @@ public final class ArcadePortManager implements Listener {
         return switch (session.type) {
             case CASTLE_ASSAULT -> "objective TNT | kills " + scoreFor(session, id);
             case HEROES_OF_GWEN -> "gold store | team " + (session.teams.getOrDefault(id, 0) + 1);
+            case WIZARDS -> "spellcasting | " + session.alive.size() + " wizards alive";
             case BACON_BRAWL -> "meter " + session.baconMeters.getOrDefault(id, 0) + "% | knockback x"
                     + String.format(java.util.Locale.ROOT, "%.1f", session.baconKnockback)
                     + " | " + baconTimingStatusText(session, id, System.currentTimeMillis());
