@@ -203,6 +203,16 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
     }
 
+    /**
+     * The mixed-mode runtime owns separate respawn/refill/update clocks from the
+     * parent Arcade session. Pause those clocks as well when Prepare completes.
+     */
+    void shiftPrepareTimers(long pausedMillis) {
+        for (String failure : SessionTimestampShifter.shift(this, pausedMillis)) {
+            plugin.getLogger().warning("Could not pause a mixed-mode runtime timer: " + failure);
+        }
+    }
+
     boolean isReady() {
         return ready && !stopped;
     }
