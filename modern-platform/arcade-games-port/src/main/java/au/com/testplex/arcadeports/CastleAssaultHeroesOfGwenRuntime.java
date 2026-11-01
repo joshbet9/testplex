@@ -2954,16 +2954,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private void healHeroesOfGwenAbility(Player source, LivingEntity recipient, double baseAmount) {
         if (recipient == null || !recipient.isValid() || recipient.isDead()) return;
-        double amount = baseAmount;
-        // MobaAbilityDamageEffect is owned by the healing source; MobaHPRegenEffect
-        // is owned by the player receiving this non-natural HP regen event.
-        if (source != null && source.isOnline()) {
-            amount = heroesOfGwenStoreAbilityDamage(source, amount);
-        }
-        if (recipient instanceof Player target) {
-            amount = ArcadePortRules.heroesOfGwenStoreHpRegenAmount(
-                    amount, heroesOfGwenOwnedStoreItemNames(target));
-        }
+        // MobaAbilityDamageEffect belongs to the healing source and MobaHPRegenEffect
+        // belongs to the recipient, mirroring the original MobaHPRegenEvent callbacks.
+        amount = ArcadePortRules.heroesOfGwenStoreAbilityHeal(
+                baseAmount,
+                source != null && source.isOnline() ? heroesOfGwenOwnedStoreItemNames(source) : Set.of(),
+                recipient instanceof Player target ? heroesOfGwenOwnedStoreItemNames(target) : Set.of());
         recipient.setHealth(Math.min(recipient.getMaxHealth(), recipient.getHealth() + amount));
     }
 
