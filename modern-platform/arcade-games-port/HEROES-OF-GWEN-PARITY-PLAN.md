@@ -169,12 +169,29 @@ Bardolf's source kit is now implemented in the match-scoped runtime:
 - **Thorn Wall:** 5-second square wall; allies regenerate while enemies are rooted or damaged. Block data is saved and restored without leaving temporary blocks behind.
 - Regression tests cover the archived beam, leap, field and wall timings/effects. Ivy's mechanics and tests compile in the successful pre-Anath Paper 26.3 snapshot; the latest combined Anath build remains the current validation run.
 
+### Assassin and Hunter parity — Hattori and Devon
+
+**Hattori**
+- **Double Jump:** the source `PerkDoubleJump` is included as a grounded-only flight toggle with controlled 1-block vertical launch and a 3-second recharge. Flight is re-enabled only after landing and when the cooldown is ready.
+- **Shuriken:** three snowballs, 3 damage each, 4 ticks apart, 1.5-second cooldown.
+- **Ninja Dash:** 10-block teleport dash, 2-block collision radius and 8 damage to enemy living targets, with the source 7-second cooldown.
+- **Ender Blade:** 7-second Diamond Sword form, +9 damage, and 60-second source cooldown restarted after the active window.
+- Regression tests cover the passive, all three abilities and source timings.
+
+**Devon**
+- **TNT Infusion:** three arrows and the source 17-second cooldown after the third shot. Impact splash now applies the archived bow-scaling formula to eligible enemy players/minions and uses the 5-block radius/knockback.
+- **Hunters Boost:** Speed II and Jump Boost I for 3 seconds; 10-second cooldown.
+- **Infinity:** 7-second arrow-infinity/homing/Wither effect; 60-second source cooldown restarted after the active window. Homing uses the source 6-block target radius.
+- Regression tests cover TNT arrow count, radius, bow scaling, boost and ultimate timings.
+
+**Validation boundary:** these final Hattori/Devon mechanics and tests are in the current branch; the new combined Paper 26.3 build is pending.
+
 ### Remaining blockers before enabling Heroes of Gwen
 
-The hero ability slices above do not by themselves make the game ready. The following acceptance work remains:
+The hero kit source ports do not by themselves make the game ready. The following acceptance work remains:
 
-- Confirm source parity for Hattori and Devon and verify all nine hero selections/loadouts in-game.
-- Wither patrol, target acquisition, attacks and return-home behaviour need source comparison and acceptance.
+- Verify all nine hero selections, loadouts, cooldown indicators, purchases and respawns in-game.
+- Wither patrol, target acquisition, attacks and return-home behaviour still need source comparison and acceptance.
 - Verify capture points, shops, role passives/upgrades, purchase charging and Mixed Arcade price scaling.
 - Complete both source maps (Heroes Valley and Heroes Ruins) with real players, then run multi-player ability/team/friendly-fire tests.
 - Confirm objective lifecycle, team spawns, minion waves and second-tower minion upgrade together with the final hero kit.
