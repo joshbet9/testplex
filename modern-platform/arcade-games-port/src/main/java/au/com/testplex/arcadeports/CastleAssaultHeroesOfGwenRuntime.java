@@ -2,6 +2,7 @@ package au.com.testplex.arcadeports;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -26,6 +27,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Snowball;
+import org.bukkit.entity.SmallFireball;
 import org.bukkit.entity.TNTPrimed;
 import org.bukkit.entity.Wither;
 import org.bukkit.entity.Zombie;
@@ -165,6 +167,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final Map<UUID, ItemStack> heroEnderBladeOriginalSword = new HashMap<>();
     private final Map<UUID, Long> heroInfinityEndsAt = new HashMap<>();
     private final Map<UUID, Integer> heroInfinityOriginalEnchant = new HashMap<>();
+    private final List<AnathMeteorZone> anathMeteorZones = new ArrayList<>();
     private final List<StoreEntry> storeEntries = new ArrayList<>();
     private final Map<UUID, StoreHolder> openStores = new HashMap<>();
 
@@ -960,6 +963,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private void tickHeroesOfGwen(long now) {
         updateMobaWithers(now);
         updateHeroesOfGwenAbilities(now);
+        updateAnathMeteorZones(now);
         updateHeroesOfGwenMinions(now);
         recordMobaTowerEntries(now);
         if (now >= nextGoldAt) {
@@ -1255,9 +1259,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     public void onHeroesOfGwenSkillDrop(PlayerDropItemEvent event) {
         if (stopped || game != ArcadePortGame.HEROES_OF_GWEN) return;
         Player player = event.getPlayer();
-        ItemStack skill = player.getInventory().getItem(3);
-        String id = heroSkillId(skill);
-        if (!"hattori.ender_blade".equals(id) && !"devon.infinity".equals(id)) return;
+        ItemStack dropped = event.getItemDrop().getItemStack();
+        String id = heroSkillId(dropped);
+        if (!Set.of("hattori.ender_blade", "devon.infinity",
+                "anath.burn_beam", "anath.meteor_shower").contains(id)) return;
         event.setCancelled(true);
         activateHeroesOfGwenSkill(player, id);
     }
@@ -1319,6 +1324,20 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     public void onHeroesOfGwenProjectileDamage(EntityDamageByEntityEvent event) {
         if (stopped || game != ArcadePortGame.HEROES_OF_GWEN) return;
         Entity damager = event.getDamager();
+        if (damager instanceof SmallFireball meteorFireball) {
+            String type = meteorFireball.getPersistentDataContainer()
+                    .get(heroProjectileTypeKey, PersistentDataType.STRING);
+            if (!"anath.meteor_fireball".equals(type)) return;
+            Player owner = heroProjectileOwner(meteorFireball);
+            if (owner != null && event.getEntity() instanceof Player target
+                    && !target.equals(owner)
+                    && teams.getOrDefault(owner.getUniqueId(), -1) != teams.getOrDefault(target.getUniqueId(), -2)
+                    && activePlayers.contains(target.getUniqueId())) {
+                event.setDamage(ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_FIREBALL_DAMAGE);
+                target.setFireTicks(Math.max(target.getFireTicks(), 40));
+            } else event.setCancelled(true);
+            return;
+        }
         if (damager instanceof Snowball snowball) {
             String type = snowball.getPersistentDataContainer().get(heroProjectileTypeKey, PersistentDataType.STRING);
             if (!"hattori.shuriken".equals(type)) return;
@@ -1354,6 +1373,19 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (stopped || game != ArcadePortGame.HEROES_OF_GWEN) return;
         Projectile projectile = event.getEntity();
         String type = projectile.getPersistentDataContainer().get(heroProjectileTypeKey, PersistentDataType.STRING);
+        if ("anath.meteor".equals(type)) {
+            Player owner = heroProjectileOwner(projectile);
+            if (owner != null && activePlayers.contains(owner.getUniqueId())) {
+                Location center = projectile.getLocation().clone();
+                startAnathMeteorZone(owner, center, System.currentTimeMillis());
+            }
+            projectile.remove();
+            return;
+        }
+        if ("anath.meteor_fireball".equals(type)) {
+            projectile.remove();
+            return;
+        }
         if (!"devon.tnt_arrow".equals(type)) return;
         Player owner = heroProjectileOwner(projectile);
         if (owner == null) return;
@@ -2437,6 +2469,18 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 giveHeroesOfGwenSkillItem(player, 3, "hattori.ender_blade", Material.NETHER_STAR,
                         "Ender Blade", "Use the Ender Blade for seven seconds.");
             }
+            case "anath" -> {
+                player.getInventory().setItem(0, namedItem(Material.BLAZE_ROD,
+                        ChatColor.GREEN + "Flame Wand", "Anath's primary weapon; basic wand attack parity still needs source validation."));
+                giveHeroesOfGwenSkillItem(player, 1, "anath.burn_beam", Material.FIRE_CHARGE,
+                        "Burn Beam", "10-block-high flame wall; 20 blocks forward; 14 damage. 10-second cooldown.");
+                player.getInventory().setItem(2, namedItem(Material.FEATHER,
+                        ChatColor.GREEN + "Flame Dash", "Movement ability; its archived movement values still need source validation."));
+                giveHeroesOfGwenSkillItem(player, 3, "anath.meteor_shower", Material.NETHER_STAR,
+                        "Meteor Shower", "Throw to mark a 10-block radius for 7 seconds. 60-second cooldown.");
+                player.getInventory().setItem(7, namedItem(Material.BLAZE_POWDER,
+                        ChatColor.GOLD + "Embers", "Anath mage resource."));
+            }
             case "devon" -> {
                 ItemStack bow = new ItemStack(Material.BOW);
                 ItemMeta bowMeta = bow.getItemMeta();
@@ -2550,8 +2594,220 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.8F, 1.5F);
             }
             case "devon.infinity" -> activateDevonInfinity(player);
+            case "anath.burn_beam" -> activateAnathBurnBeam(player);
+            case "anath.meteor_shower" -> launchAnathMeteor(player);
             default -> player.sendMessage(ChatColor.YELLOW + "That hero ability is not yet available.");
         }
+    }
+
+    private void activateAnathBurnBeam(Player player) {
+        UUID id = player.getUniqueId();
+        long now = System.currentTimeMillis();
+        String skill = "anath.burn_beam";
+        if (!isHeroSkillReady(player, skill)) {
+            player.sendActionBar(ChatColor.RED + "Burn Beam is recharging.");
+            return;
+        }
+        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_COOLDOWN_MILLIS);
+
+        Vector direction = player.getEyeLocation().getDirection().normalize();
+        Location start = player.getEyeLocation().clone();
+        Set<UUID> hitPlayers = new HashSet<>();
+        Set<UUID> hitMinions = new HashSet<>();
+        Set<Integer> hitWithers = new HashSet<>();
+        int team = teams.getOrDefault(id, -1);
+
+        for (double distance = 0.5D; distance <= ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_RANGE;
+                distance += 0.5D) {
+            Location center = start.clone().add(direction.clone().multiply(distance));
+            // The reference describes a ten-block-high wall that advances as far as twenty blocks.
+            world.spawnParticle(Particle.FLAME, center.clone().add(0.0D, 5.0D, 0.0D),
+                    18, 0.45D, 5.0D, 0.45D, 0.02D);
+            world.spawnParticle(Particle.LAVA, center.clone().add(0.0D, 5.0D, 0.0D),
+                    4, 0.35D, 4.5D, 0.35D, 0.0D);
+
+            for (Entity entity : world.getNearbyEntities(center,
+                    1.25D, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_HEIGHT / 2.0D,
+                    1.25D)) {
+                if (entity instanceof Player target && !target.equals(player)
+                        && activePlayers.contains(target.getUniqueId())
+                        && teams.getOrDefault(target.getUniqueId(), -1) != team) {
+                    hitPlayers.add(target.getUniqueId());
+                } else if (entity instanceof Mob minion) {
+                    Integer minionTeam = heroesOfGwenMinionTeams.get(minion.getUniqueId());
+                    if (minionTeam != null && minionTeam != team) hitMinions.add(minion.getUniqueId());
+                } else if (entity instanceof Wither wither) {
+                    for (Map.Entry<Integer, Wither> entry : withers.entrySet()) {
+                        if (entry.getValue().equals(wither) && entry.getKey() != team) hitWithers.add(entry.getKey());
+                    }
+                }
+            }
+        }
+
+        for (UUID targetId : hitPlayers) {
+            Player target = players.get(targetId);
+            if (target != null && target.isOnline() && activePlayers.contains(targetId)) {
+                target.damage(ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE, player);
+                target.setFireTicks(Math.max(target.getFireTicks(), 40));
+            }
+        }
+        for (UUID minionId : hitMinions) {
+            Entity entity = Bukkit.getEntity(minionId);
+            if (entity instanceof Mob minion && minion.isValid()) {
+                minion.damage(Math.max(100.0D, minion.getHealth() + 1.0D), player);
+            }
+        }
+        for (Integer enemyTeam : hitWithers) {
+            Wither wither = withers.get(enemyTeam);
+            if (wither == null || !wither.isValid()) continue;
+            // The source ability can damage a Wither, but never damages towers.
+            if (wither.getHealth() <= ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE) {
+                finishHeroesOfGwen(team, "enemy Wither defeated by Anath's Burn Beam");
+                return;
+            }
+            wither.setHealth(wither.getHealth() - ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE);
+        }
+        player.playSound(player.getLocation(), Sound.ITEM_FIRECHARGE_USE, 1.0F, 0.8F);
+        player.sendActionBar(ChatColor.GOLD + "Burn Beam!");
+    }
+
+    private void launchAnathMeteor(Player player) {
+        UUID id = player.getUniqueId();
+        String skill = "anath.meteor_shower";
+        if (!isHeroSkillReady(player, skill)) {
+            player.sendActionBar(ChatColor.RED + "Meteor Shower is recharging.");
+            return;
+        }
+        Snowball projectile = player.launchProjectile(Snowball.class);
+        projectile.setItem(new ItemStack(Material.NETHERRACK));
+        projectile.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(1.2D));
+        markHeroProjectile(projectile, player, "anath.meteor");
+        entities.add(projectile);
+        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_COOLDOWN_MILLIS);
+        player.playSound(player.getLocation(), Sound.ENTITY_GHAST_SHOOT, 0.9F, 0.9F);
+        player.sendActionBar(ChatColor.GOLD + "Meteor Shower launched!");
+    }
+
+    private void startAnathMeteorZone(Player owner, Location center, long now) {
+        if (owner == null || center == null || center.getWorld() != world) return;
+        AnathMeteorZone zone = new AnathMeteorZone(owner.getUniqueId(),
+                teams.getOrDefault(owner.getUniqueId(), -1), center,
+                now + ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_DURATION_MILLIS, now);
+        anathMeteorZones.add(zone);
+        world.playSound(center, Sound.ENTITY_GENERIC_EXPLODE, 0.9F, 0.65F);
+        playerMeteorMarker(zone, owner);
+    }
+
+    private void playerMeteorMarker(AnathMeteorZone zone, Player owner) {
+        Color colour = zone.team == 0 ? Color.fromRGB(255, 65, 65) : Color.fromRGB(75, 175, 255);
+        Particle.DustOptions dust = new Particle.DustOptions(colour, 1.3F);
+        for (int angle = 0; angle < 360; angle += 6) {
+            double radians = Math.toRadians(angle);
+            Location point = zone.center.clone().add(
+                    Math.cos(radians) * ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_RADIUS,
+                    0.15D,
+                    Math.sin(radians) * ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_RADIUS);
+            world.spawnParticle(Particle.DUST, point, 1, 0.0D, 0.0D, 0.0D, 0.0D, dust);
+        }
+        world.spawnParticle(Particle.FLAME, zone.center, 24, 0.8D, 0.15D, 0.8D, 0.02D);
+        world.playSound(zone.center, Sound.BLOCK_BEACON_ACTIVATE, 0.7F, 1.1F);
+    }
+
+    private void updateAnathMeteorZones(long now) {
+        for (AnathMeteorZone zone : new ArrayList<>(anathMeteorZones)) {
+            if (now >= zone.expiresAt) {
+                anathMeteorZones.remove(zone);
+                world.spawnParticle(Particle.SMOKE, zone.center, 28, 2.0D, 0.2D, 2.0D, 0.02D);
+                continue;
+            }
+            Player owner = players.get(zone.ownerId);
+            if (owner == null || !owner.isOnline()) {
+                anathMeteorZones.remove(zone);
+                continue;
+            }
+            if (now >= zone.nextVisualAt) {
+                zone.nextVisualAt = now + 500L;
+                playerMeteorMarker(zone, owner);
+                for (int i = 0; i < 5; i++) {
+                    double angle = ThreadLocalRandom.current().nextDouble(0.0D, Math.PI * 2.0D);
+                    double radius = ThreadLocalRandom.current().nextDouble(0.0D,
+                            ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_RADIUS);
+                    Location sky = zone.center.clone().add(Math.cos(angle) * radius, 12.0D,
+                            Math.sin(angle) * radius);
+                    world.spawnParticle(Particle.FLAME, sky, 2, 0.2D, 0.1D, 0.2D, 0.02D);
+                }
+            }
+            if (now >= zone.nextBurnAt) {
+                zone.nextBurnAt = now + ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_BURN_INTERVAL_MILLIS;
+                for (Player target : activeMatchPlayers()) {
+                    if (teams.getOrDefault(target.getUniqueId(), -1) == zone.team
+                            || !ArcadePortRules.heroesOfGwenAnathMeteorContainsDistance(
+                                    target.getLocation().distance(zone.center))) continue;
+                    target.setFireTicks(Math.max(target.getFireTicks(), 30));
+                    applyAnathMeteorPlayerDamage(owner, target,
+                            ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_BURN_DAMAGE);
+                    if (!activePlayers.contains(target.getUniqueId())) continue;
+                    Vector knockback = target.getLocation().toVector().subtract(zone.center.toVector());
+                    if (knockback.lengthSquared() > 0.001D) {
+                        target.setVelocity(knockback.normalize().multiply(0.12D).setY(0.05D));
+                    }
+                }
+                for (Mob minion : liveHeroesOfGwenMinions()) {
+                    if (heroesOfGwenMinionTeams.getOrDefault(minion.getUniqueId(), -1) == zone.team
+                            || !ArcadePortRules.heroesOfGwenAnathMeteorContainsDistance(
+                                    minion.getLocation().distance(zone.center))) continue;
+                    minion.setFireTicks(Math.max(minion.getFireTicks(), 60));
+                }
+            }
+            if (now >= zone.nextPulseAt) {
+                zone.nextPulseAt = now + 1_000L;
+                for (Player target : activeMatchPlayers()) {
+                    if (teams.getOrDefault(target.getUniqueId(), -1) == zone.team
+                            || !ArcadePortRules.heroesOfGwenAnathMeteorContainsDistance(
+                                    target.getLocation().distance(zone.center))) continue;
+                    applyAnathMeteorPlayerDamage(owner, target,
+                            ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_PULSE_DAMAGE);
+                    if (!activePlayers.contains(target.getUniqueId())) continue;
+                }
+                for (Map.Entry<Integer, Wither> entry : withers.entrySet()) {
+                    if (entry.getKey() == zone.team || entry.getValue() == null || !entry.getValue().isValid()
+                            || !ArcadePortRules.heroesOfGwenAnathMeteorContainsDistance(
+                                    entry.getValue().getLocation().distance(zone.center))) continue;
+                    Wither wither = entry.getValue();
+                    if (wither.getHealth() <= ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_PULSE_DAMAGE) {
+                        finishHeroesOfGwen(zone.team, "enemy Wither defeated by Meteor Shower");
+                        anathMeteorZones.remove(zone);
+                        return;
+                    }
+                    wither.setHealth(wither.getHealth() - ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_PULSE_DAMAGE);
+                }
+                List<Player> candidates = activeMatchPlayers().stream()
+                        .filter(target -> teams.getOrDefault(target.getUniqueId(), -1) != zone.team)
+                        .filter(target -> ArcadePortRules.heroesOfGwenAnathMeteorContainsDistance(
+                                target.getLocation().distance(zone.center)))
+                        .toList();
+                for (Player target : candidates) {
+                    Location spawn = target.getLocation().clone().add(
+                            ThreadLocalRandom.current().nextDouble(-2.0D, 2.0D), 12.0D,
+                            ThreadLocalRandom.current().nextDouble(-2.0D, 2.0D));
+                    SmallFireball fireball = world.spawn(spawn, SmallFireball.class);
+                    fireball.setShooter(owner);
+                    fireball.setIsIncendiary(false);
+                    fireball.setYield(0.0F);
+                    Vector direction = target.getLocation().toVector().subtract(spawn.toVector());
+                    fireball.setVelocity(direction.normalize().multiply(1.3D));
+                    markHeroProjectile(fireball, owner, "anath.meteor_fireball");
+                    entities.add(fireball);
+                }
+            }
+        }
+    }
+
+    private void applyAnathMeteorPlayerDamage(Player owner, Player target, double damage) {
+        if (owner == null || !owner.isOnline() || target == null || !target.isOnline()
+                || !activePlayers.contains(target.getUniqueId())
+                || teams.getOrDefault(owner.getUniqueId(), -1) == teams.getOrDefault(target.getUniqueId(), -2)) return;
+        target.damage(damage, owner);
     }
 
     private void performHattoriDash(Player player) {
@@ -2733,6 +2989,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         heroEnderBladeOriginalSword.clear();
         heroInfinityEndsAt.clear();
         heroInfinityOriginalEnchant.clear();
+        anathMeteorZones.clear();
         castleAssaultPlayerKits.clear();
         castleArcherNextArrowAt.clear();
         castleDemolitionistNextTntAt.clear();
@@ -2776,6 +3033,25 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             this.colour = colour;
             this.center = center;
             this.wool = wool;
+        }
+    }
+
+    private static final class AnathMeteorZone {
+        final UUID ownerId;
+        final int team;
+        final Location center;
+        final long expiresAt;
+        long nextBurnAt;
+        long nextPulseAt;
+        long nextVisualAt;
+        AnathMeteorZone(UUID ownerId, int team, Location center, long expiresAt, long now) {
+            this.ownerId = ownerId;
+            this.team = team;
+            this.center = center.clone();
+            this.expiresAt = expiresAt;
+            this.nextBurnAt = now;
+            this.nextPulseAt = now;
+            this.nextVisualAt = now;
         }
     }
 
