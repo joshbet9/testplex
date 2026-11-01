@@ -35,6 +35,15 @@ enabled-games:
   - hoops-remastered
   - wizards
 lobby-selected-game: death-tag
+source-maps:
+  directory: update/maps
+wizards:
+  include-nano-maps: true
+  minimum-players: 2
+  maximum-players: 16
+  allow-solo-start: false
+  allow-generated-test-arena: false
+  source-map-world: arcadeport_source_wizards
 
 # Base selection weights used by the Like/Dislike preference calculation.
 # Games default to 1.0 (equal base chance); set a game ID here to override it.
