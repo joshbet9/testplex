@@ -4782,7 +4782,7 @@ public final class ArcadePortManager implements Listener {
         List<Player> roster = new ArrayList<>(session.players.values());
         int total = roster.size();
         int alive = session.alive.size();
-        int mode = ArcadePortRules.dragonsSoloScoreboardMode(total, alive);
+        int mode = ArcadePortRules.dragonsScoreboardMode(total, alive);
         if (mode == 0) {
             int score = total;
             for (Player player : roster) {
