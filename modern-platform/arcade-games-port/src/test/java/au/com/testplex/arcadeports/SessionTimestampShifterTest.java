@@ -32,6 +32,21 @@ class SessionTimestampShifterTest {
     }
 
     @Test
+    void shiftsTimersOnTopLevelRuntimeObjectsAndTheirNestedState() {
+        TopLevelTimerFixture fixture = new TopLevelTimerFixture();
+        UUID player = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        fixture.nextAbilityAt.put(player, 500L);
+        fixture.playerStates.put(player, new TopLevelTimerFixture.PlayerTimer(700L));
+
+        List<String> failures = SessionTimestampShifter.shift(fixture, 2_000L);
+
+        assertTrue(failures.isEmpty(), failures.toString());
+        assertEquals(2_050L, fixture.nextSpawnAt);
+        assertEquals(2_500L, fixture.nextAbilityAt.get(player));
+        assertEquals(2_700L, fixture.playerStates.get(player).nextUpdateAt);
+    }
+
+    @Test
     void preservesLifecycleAnchorsAndNonPositiveSentinels() {
         Fixture fixture = new Fixture();
 
@@ -78,5 +93,20 @@ class SessionTimestampShifterTest {
     }
 
     private record Expiry(String id, long expiresAtMillis) {
+    }
+}
+
+
+final class TopLevelTimerFixture {
+    long nextSpawnAt = 50L;
+    final Map<UUID, Long> nextAbilityAt = new HashMap<>();
+    final Map<UUID, PlayerTimer> playerStates = new HashMap<>();
+
+    private static final class PlayerTimer {
+        long nextUpdateAt;
+
+        private PlayerTimer(long nextUpdateAt) {
+            this.nextUpdateAt = nextUpdateAt;
+        }
     }
 }
