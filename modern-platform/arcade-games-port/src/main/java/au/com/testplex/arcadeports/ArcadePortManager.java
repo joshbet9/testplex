@@ -8268,7 +8268,8 @@ public final class ArcadePortManager implements Listener {
                 Location target = session.dragonTargetLocations.get(dragonId);
                 if (targetPlayerId != null) {
                     Player targetPlayer = session.players.get(targetPlayerId);
-                    if (targetPlayer != null && targetPlayer.isOnline() && session.alive.contains(targetPlayerId)) {
+                    if (targetPlayer != null && targetPlayer.isOnline() && session.alive.contains(targetPlayerId)
+                            && !session.dragonTamerControls.containsKey(targetPlayerId)) {
                         target = targetPlayer.getLocation().clone();
                         session.dragonTargetLocations.put(dragonId, target.clone());
                     } else {
