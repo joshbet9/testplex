@@ -111,6 +111,33 @@ public final class SnakeRules {
         return slimesEatenThisRound == SLIMY_SHEEP_REQUIRED;
     }
 
+
+    public static int nextSameRouletteEffectCount(boolean sameAsPrevious, int previousCount) {
+        return sameAsPrevious ? Math.max(0, previousCount) + 1 : 1;
+    }
+
+    public static boolean shouldAwardBusted(int consecutiveSameEffects) {
+        return consecutiveSameEffects >= 3;
+    }
+
+    public static boolean isTenSecondRouletteHit(int durationSeconds) {
+        return durationSeconds == 10;
+    }
+
+    public static boolean isWithinTenBlocksOfMapEdge(double x, double z, double clampedX, double clampedZ) {
+        if (!Double.isFinite(x) || !Double.isFinite(z)
+                || !Double.isFinite(clampedX) || !Double.isFinite(clampedZ)) return false;
+        return Math.abs(x - clampedX) > 0.001D || Math.abs(z - clampedZ) > 0.001D;
+    }
+
+    public static boolean isAbilityActive(long now, long speedUntil, long reverseUntil, long invulnerableUntil) {
+        return speedUntil > now || reverseUntil > now || invulnerableUntil > now;
+    }
+
+    public static boolean shouldAwardFlawless(int kills, boolean allKillsDuringAbility) {
+        return kills > 0 && allKillsDuringAbility;
+    }
+
     private SnakeRules() {}
 
     public static int rouletteDurationSecondsForHit(int hitCount) {
