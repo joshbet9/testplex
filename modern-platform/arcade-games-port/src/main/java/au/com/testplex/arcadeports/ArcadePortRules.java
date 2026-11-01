@@ -2878,6 +2878,8 @@ public final class ArcadePortRules {
     public static final long HEROES_OF_GWEN_LARISSA_WATER_DASH_COOLDOWN_MILLIS = 10_000L;
     public static final long HEROES_OF_GWEN_LARISSA_STORM_BLESSING_DURATION_MILLIS = 7_000L;
     public static final long HEROES_OF_GWEN_LARISSA_STORM_BLESSING_COOLDOWN_MILLIS = 60_000L;
+    // Active skills call useSkill again after their progress-bar duration expires.
+    public static final long HEROES_OF_GWEN_LARISSA_STORM_BLESSING_REUSE_DELAY_MILLIS = 66_500L;
     public static final long HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_INTERVAL_MILLIS = 1_000L;
     public static final int HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_PER_SECOND = 2;
 
