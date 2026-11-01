@@ -2765,6 +2765,20 @@ public final class ArcadePortRules {
         return baseDamage + bonus;
     }
 
+    /** Source MobaShop applies effects to all active player-vs-player damage events. */
+    public static double heroesOfGwenStorePlayerCombatDamage(double baseDamage,
+            Collection<String> items, boolean abilityDamage, boolean basicAttack) {
+        double damage = baseDamage;
+        if (abilityDamage) {
+            damage = heroesOfGwenStoreAbilityDamage(damage, items, true);
+        } else if (basicAttack) {
+            damage = heroesOfGwenStoreBasicAttackDamage(damage, items);
+        }
+        // MobaMeleeDamageEffect has no damage-cause filter: its flat increase
+        // is appended to every player-vs-player CustomDamageEvent.
+        return heroesOfGwenStoreMeleeDamage(damage, items);
+    }
+
     public static double heroesOfGwenStoreHealthRegenBonus(String itemName) {
         if (itemName == null) return 0.0D;
         return switch (itemName) {
