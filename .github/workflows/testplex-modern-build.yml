@@ -203,7 +203,7 @@ jobs:
 
           arcade_config="$(unzip -p "$arcade_jar" config.yml)"
           enabled_ids="$(awk '/^enabled-games:/{in_list=1;next} in_list && /^[^ ]/{exit} in_list && /^  - /{print $2}' <<< "$arcade_config" | paste -sd, -)"
-death-tag,one-in-the-quiver,bomb-lobbers,bacon-brawl,castle-assault,gladiators,micro-battles,milk-the-cow,paintball,plexball,spleef,super-sploor,dragon-escape,dragons,runner,sheep-quest,turf-wars,camera-shy,monster-maze,monster-maze-speed,monster-maze-modern,snake,draw-my-thing,master-builders,skywars,wither-assault,sneaky-assassins,speed-builders,evolution,heroes-of-gwen,hoops-remastered,wizards
+          [[ "$enabled_ids" == "death-tag,one-in-the-quiver,bomb-lobbers,bacon-brawl,castle-assault,gladiators,micro-battles,milk-the-cow,paintball,plexball,spleef,super-sploor,dragon-escape,dragons,runner,sheep-quest,turf-wars,camera-shy,monster-maze,monster-maze-speed,monster-maze-modern,snake,draw-my-thing,master-builders,skywars,wither-assault,sneaky-assassins,speed-builders,evolution,heroes-of-gwen,hoops-remastered,wizards" ]] || {
             echo "Only the explicitly reviewed acceptance queue may be enabled. Found: [$enabled_ids]" >&2
             exit 1
           }
