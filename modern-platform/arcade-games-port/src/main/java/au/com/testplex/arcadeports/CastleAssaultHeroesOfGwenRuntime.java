@@ -2755,6 +2755,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         } else {
             player.getInventory().addItem(reward);
         }
+        if (equipmentSlot != null) applyHeroesOfGwenStoreRespawnPassives(player, true);
         player.sendMessage(ChatColor.GREEN + "Purchased " + entry.name + " for " + cost + " gold.");
         player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8F, 1.2F);
         updateGoldActionBar(player);
@@ -2802,6 +2803,53 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             }
         }
         player.updateInventory();
+    }
+
+    private Set<String> heroesOfGwenOwnedStoreItemNames(Player player) {
+        if (player == null) return Set.of();
+        String role = ArcadePortRules.heroesOfGwenHeroRole(
+                selectedHeroesOfGwen.get(player.getUniqueId()));
+        if (role == null) return Set.of();
+        Map<String, Map<String, ItemStack>> byRole =
+                heroesOfGwenPurchasedEquipment.get(player.getUniqueId());
+        Map<String, ItemStack> equipment = byRole == null ? null : byRole.get(role);
+        if (equipment == null) return Set.of();
+        Set<String> names = new HashSet<>();
+        for (Map.Entry<String, ItemStack> entry : equipment.entrySet()) {
+            ItemStack item = entry.getValue();
+            if (item == null || !item.hasItemMeta() || !item.getItemMeta().hasDisplayName()) continue;
+            String name = ChatColor.stripColor(item.getItemMeta().getDisplayName());
+            if (name == null || name.isBlank()) continue;
+            names.add(name);
+            String suffix = switch (entry.getKey()) {
+                case "helmet" -> "Helmet";
+                case "chestplate" -> "Chestplate";
+                case "leggings" -> "Leggings";
+                case "boots" -> "Boots";
+                default -> null;
+            };
+            if (suffix != null) names.add(name + " " + suffix);
+        }
+        return names;
+    }
+
+    /**
+     * Re-run the source MobaShop onRespawn effects from the player's tracked,
+     * role-scoped store equipment. A fake invocation preserves current health;
+     * a real respawn restores the new maximum.
+     */
+    private void applyHeroesOfGwenStoreRespawnPassives(Player player, boolean fake) {
+        if (player == null || !player.isOnline()) return;
+        double currentHealth = player.getHealth();
+        double maxHealth = 20.0D;
+        float walkSpeed = 0.2F;
+        for (String itemName : heroesOfGwenOwnedStoreItemNames(player)) {
+            maxHealth += ArcadePortRules.heroesOfGwenStoreMaxHealthBonus(itemName);
+            walkSpeed += walkSpeed * (float) ArcadePortRules.heroesOfGwenStoreSpeedFactor(itemName);
+        }
+        player.setWalkSpeed(Math.min(1.0F, walkSpeed));
+        player.setMaxHealth(maxHealth);
+        player.setHealth(fake ? Math.min(currentHealth, maxHealth) : maxHealth);
     }
 
     private void addGold(Player player, int amount, String reason) {
@@ -2950,6 +2998,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         activePlayers.add(player.getUniqueId());
         if (game == ArcadePortGame.HEROES_OF_GWEN) {
             restoreHeroesOfGwenPurchasedEquipment(player);
+            applyHeroesOfGwenStoreRespawnPassives(player, false);
         }
     }
 
@@ -3407,6 +3456,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             }
         }
         restoreHeroesOfGwenPurchasedEquipment(player);
+        applyHeroesOfGwenStoreRespawnPassives(player, true);
         player.updateInventory();
     }
 
