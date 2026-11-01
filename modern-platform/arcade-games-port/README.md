@@ -76,7 +76,7 @@ Mixed Arcade commands accept both `<game-id>-mixed` and `mixed-<game-id>` for Tu
 - `/gamepanel` → choose a supported game → **Start / Test**. The coordinator calls `/arcadeport play <game-id>`.
 - /arcadeport play snap — quick-start Snap; hold right-click to scope with the spyglass and press F to take a photo.
 - `/arcadeport lobby snap` — select Snap in the shared lobby and expose its five kit choices.
-- `/arcadeport play camera-shy` or `/arcadeport join camera-shy` then `/arcadeport start snap` — start a quick or queued test; direct kit IDs are `camera-shy-smoke-artist`, `camera-shy-decoy`, `camera-shy-runner`, `camera-shy-spotter` and `camera-shy-understudy`.
+- `/arcadeport play snap` or `/arcadeport join snap` then `/arcadeport start snap` — start a quick or queued test; direct kit IDs are `snap-smoke-artist`, `snap-decoy`, `snap-runner`, `snap-spotter` and `snap-understudy`; the legacy `camera-shy` game and kit IDs remain accepted as aliases.
 - `/arcadeport play <id>` — joins a quick-start window, giving others a few seconds to join.
 - `/arcadeport join <id>` then `/arcadeport start <id>` — queue a multi-player test.
 - `/arcadeport play turf-wars-mixed` or `/arcadeport join turf-wars-mixed` then `/arcadeport start turf-wars-mixed` — use the dedicated Mixed Arcade Turf Wars timings and double-column capture. This variant has its own queue and does not change standard `turf-wars`.
@@ -84,7 +84,7 @@ Mixed Arcade commands accept both `<game-id>-mixed` and `mixed-<game-id>` for Tu
 - `/arcadeport ghost <on|off|toggle>` — enable or hide your Dragon Escape translucent PB player ghost.
 - `/arcadeport status`, `/arcadeport stop` (operator only).
 
-Game IDs include `camera-shy` and `super-sploor` alongside `bacon-brawl`, `bomb-lobbers`, `castle-assault`, `death-tag`, `dragon-escape`, `dragons`, `draw-my-thing`, `evolution`, `gladiators`, `heroes-of-gwen`, `master-builders`, `micro-battles`, `one-in-the-quiver`, `paintball`, `plexball`, `runner`, `sheep-quest`, `spleef`, `turf-wars`. Mixed Arcade aliases use `<game-id>-mixed` or `mixed-<game-id>` for Turf Wars, Castle Assault and Heroes of Gwen. Castle Assault and Heroes of Gwen remain disabled pending acceptance.
+Game IDs include `snap` (legacy ID `camera-shy`) and `super-sploor` alongside `bacon-brawl`, `bomb-lobbers`, `castle-assault`, `death-tag`, `dragon-escape`, `dragons`, `draw-my-thing`, `evolution`, `gladiators`, `heroes-of-gwen`, `master-builders`, `micro-battles`, `one-in-the-quiver`, `paintball`, `plexball`, `runner`, `sheep-quest`, `spleef`, `turf-wars`. Mixed Arcade aliases use `<game-id>-mixed` or `mixed-<game-id>` for Turf Wars, Castle Assault and Heroes of Gwen. Castle Assault and Heroes of Gwen remain disabled pending acceptance.
 
 See `GLADIATORS-ACCEPTANCE-PLAN.md` and `MICRO-BATTLES-ACCEPTANCE-PLAN.md` for combined-session live checks and known caveats.
 
