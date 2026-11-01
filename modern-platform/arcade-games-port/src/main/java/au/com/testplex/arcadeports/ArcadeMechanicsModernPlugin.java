@@ -26,8 +26,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             "death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl",
             "castle-assault", "gladiators", "micro-battles", "milk-the-cow", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "runner", "sheep-quest", "turf-wars", "camera-shy",
             "monster-maze", "monster-maze-speed", "monster-maze-modern", "snake", "draw-my-thing", "master-builders",
-            "skywars", "wither-assault", "sneaky-assassins", "speed-builders", "evolution", "heroes-of-gwen");
-    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-30-selectable-ids-20261101-v11";
+            "skywars", "wither-assault", "sneaky-assassins", "speed-builders", "evolution", "heroes-of-gwen", "hoops-remastered");
+    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-31-selectable-ids-20261101-v12";
 
     @Override
     public void onEnable() {
