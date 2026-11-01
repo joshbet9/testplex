@@ -727,7 +727,7 @@ public final class SpeedBuildersGame implements Listener {
                         "perfectionist-wins", 1L);
             }
         }
-        if (!players.isEmpty()) plugin.saveConfig();
+        plugin.saveConfig();
         for (PlayerState state : new ArrayList<>(players.values())) {
             Player player = state.player;
             restorePlot(state.plot);
@@ -1101,7 +1101,9 @@ public final class SpeedBuildersGame implements Listener {
             return;
         }
         if (event.getClickedBlock() != null) {
-            Block target = event.getClickedBlock().getRelative(event.getBlockFace());
+            Block target = event.getAction() == Action.LEFT_CLICK_BLOCK
+                    ? event.getClickedBlock()
+                    : event.getClickedBlock().getRelative(event.getBlockFace());
             if (!isInBuildVolume(state, target)) event.setCancelled(true);
         }
         Bukkit.getScheduler().runTask(plugin, () -> checkPerfectBuild(state));
@@ -1110,7 +1112,8 @@ public final class SpeedBuildersGame implements Listener {
     @EventHandler
     public void onJumpFlight(PlayerToggleFlightEvent event) {
         PlayerState state = players.get(event.getPlayer().getUniqueId());
-        if (state == null || phase != Phase.BUILDING || state.eliminated || state.perfect) return;
+        if (state == null || (phase != Phase.BUILDING && phase != Phase.VIEWING)
+                || state.eliminated || state.perfect) return;
         event.setCancelled(true);
         Player player = event.getPlayer();
         player.setAllowFlight(false);
@@ -1350,7 +1353,7 @@ public final class SpeedBuildersGame implements Listener {
             event.setTo(event.getFrom());
             return;
         }
-        if (phase == Phase.BUILDING && event.getPlayer().isOnGround()
+        if ((phase == Phase.BUILDING || phase == Phase.VIEWING) && event.getPlayer().isOnGround()
                 && !event.getPlayer().isFlying() && !event.getPlayer().getAllowFlight()) {
             event.getPlayer().setAllowFlight(true);
         }
