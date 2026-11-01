@@ -1,9 +1,9 @@
-# Dragons (Solo) — Paper 26.3 source-parity acceptance plan
+# Dragons — Paper 26.3 source-parity acceptance plan
 
 **Readiness:** `READY_FOR_TEST` — enabled in the shared controlled queue. Live multiplayer acceptance is still outstanding.  
 **Legacy reference:** Mineplex Reborn `Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/game/games/dragons/Dragons.java`, `MineplexDragon.java` and the three `kits/Kit*.java` files.  
 **Map source:** `update/maps/Dragons/` — 40 original ZIP archives.  
-**Scope:** Solo Dragons only. The separate legacy **Dragons Teams** variant is not included or implied to be implemented.
+**Scope:** One Dragons experience is exposed through the shared `dragons` game ID.
 
 CI and deterministic rule tests are necessary but do not replace an in-game two-client / multi-client run on the isolated Paper 26.3 server.
 
@@ -58,7 +58,7 @@ The similarly named Balloon Town, Sky Ship and Voyage files are distinct origina
 
 ### Match, map and world rules
 
-- [ ] Start `dragons` using the shared Arcade Game Panel and `/arcadeport play dragons`; confirm it is the SoloGame ruleset and uses the ordinary shared Session, spectator, stop and lobby-restore lifecycle.
+- [ ] Start `dragons` using the shared Arcade Game Panel and `/arcadeport play dragons`; confirm it uses the ordinary shared Session, spectator, stop and lobby-restore lifecycle.
 - [ ] Select and load all 40 maps once. Read the original RED marker locations as dragon spawn points; verify no map falls back to the convenience archive or another map when the chosen archive is valid.
 - [ ] Confirm Adventure mode, PvP disabled (including player-fired projectiles), hunger fixed at 20, the source four-damage water hazard on its 500 ms cadence, and one point of fall-damage reduction.
 - [ ] Only source-permitted emerald world items may remain; ordinary dropped items are suppressed. Verify this does not remove kit items, test harness equipment or legitimate emeralds.
@@ -109,6 +109,6 @@ The similarly named Balloon Town, Sky Ship and Voyage files are distinct origina
 
 ## Controlled-queue acceptance gate
 
-Dragons (Solo) is enabled for combined controlled testing because its source implementation, regression coverage and exact 40-map packaging comparison are present in the Paper 26.3 build. This is **not** a claim that live gameplay has already been accepted.
+Dragons is enabled for combined controlled testing because its source implementation, regression coverage and exact 40-map packaging comparison are present in the Paper 26.3 build. This is **not** a claim that live gameplay has already been accepted.
 
-Before calling Dragons gameplay-accepted, load all 40 maps, verify RED-marker dragon spawns and run all six kits, the three community achievements, target/contact, spectator and cleanup scenarios above on the isolated live server. Fix each observed defect and rerun affected tests. The separate legacy Dragons Teams variant remains excluded from the catalogue and test commands unless it receives its own port and acceptance work.
+Before calling Dragons gameplay-accepted, load all 40 maps, verify RED-marker dragon spawns and run all six kits, the three community achievements, target/contact, spectator and cleanup scenarios above on the isolated live server. Fix each observed defect and rerun affected tests.
