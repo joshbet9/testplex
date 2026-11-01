@@ -647,6 +647,7 @@ public class KitManager implements Listener {
 
         // Manager.GetCondition().Factory().Slow(..., 2, 1, ...) → 2 seconds, amplifier 1
         target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 1), true);
+        game.noteOutOfCupSlowball(shooter, target);
         target.getWorld().playSound(target.getLocation(), Sound.ENTITY_SLIME_SQUISH, 1f, 1.2f);
     }
 
