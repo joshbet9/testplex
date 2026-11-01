@@ -2848,7 +2848,10 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
             WizardsProgressStore.increment(config, entry.getKey(), "kills", state.kills);
             WizardsProgressStore.increment(config, entry.getKey(), "spells-bound", state.spellsBound);
         }
-        if (winner != null && states.containsKey(winner.getUniqueId())) {
+        // A shared Arcade session records the win (and games-played) in its common
+        // finish path. Only the legacy unmanaged controller records wins itself.
+        // Otherwise a single shared Wizards victory is counted twice.
+        if (!arcadeManaged && winner != null && states.containsKey(winner.getUniqueId())) {
             WizardsProgressStore.increment(config, winner.getUniqueId(), "wins", 1L);
         }
         plugin.saveConfig();
