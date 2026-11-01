@@ -38,6 +38,7 @@ cat > "$SERVER_ROOT/plugins/ArcadeMechanicsModern/config.yml" <<'CONFIG'
 enabled-games:
   - death-tag
   - one-in-the-quiver
+  - wizards
 lobby-selected-game: death-tag
 source-maps:
   directory: update/maps
