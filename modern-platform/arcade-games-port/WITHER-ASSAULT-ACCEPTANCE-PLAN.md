@@ -1,6 +1,6 @@
 # Wither Assault readiness and acceptance plan
 
-Wither Assault remains MECHANICS_IN_PROGRESS. The Mineplex Reborn repository does not contain the original Industrial West, Labyrinth or Sky Ruins world archives, so Testplex uses an isolated generated arena. A generated layout is not authentic source-map parity. The source kit names are Human Archer, Human Medic and Human Editor.
+Wither Assault remains outside the 22-game enabled queue, but is **READY_FOR_TEST** for isolated controlled mechanics sessions using a generated arena. The original Industrial West, Labyrinth and Sky Ruins archives are not present in the repository, so the generated layout is not authentic source-map parity. The source kit names are Human Archer, Human Medic and Human Editor.
 
 ## Implemented in this readiness pass
 
@@ -13,7 +13,7 @@ Wither Assault remains MECHANICS_IN_PROGRESS. The Mineplex Reborn repository doe
 - The custom Revival Potion splash event revives a nearby downed Human at their Wither-out marker.
 - Editor blocks are tracked, temporarily removed for two seconds by any Human right-click, constrained by the four-block floor rule and protected from breaking directly under another player. Editor-placed blocks are restored at round end.
 
-## Still required before enabling
+## Remaining parity and live-acceptance work
 
 1. Implement and validate the Human Medic's Repair Master and Healing Hands behaviours; the refill and revival potion paths alone do not complete the Medic kit.
 2. Compare Wither Skull proximity/damage scaling, Wither movement/slowdown near the ground, terrain destruction, Wither immunity and minion damage/targeting against the source.
