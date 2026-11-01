@@ -2785,23 +2785,28 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             event.setCancelled(true);
             if (!(event instanceof EntityDamageByEntityEvent byEntity)) return;
             Player attacker = resolveAttacker(byEntity);
-            if (attacker == null || !activePlayers.contains(attacker.getUniqueId())
-                    || teams.getOrDefault(attacker.getUniqueId(), -1) == ownerTeam) return;
             if (event.getCause() == EntityDamageEvent.DamageCause.FIRE
-                    || event.getCause() == EntityDamageEvent.DamageCause.FIRE_TICK) return;
-            if (!isInsideWitherBoundary(ownerTeam, attacker.getLocation())) {
+                    || event.getCause() == EntityDamageEvent.DamageCause.FIRE_TICK
+                    || attacker == null) return;
+            boolean activeAttacker = activePlayers.contains(attacker.getUniqueId());
+            boolean enemyAttacker = teams.getOrDefault(attacker.getUniqueId(), -1);
+            boolean insideBoundary = isInsideWitherBoundary(ownerTeam, attacker.getLocation());
+            boolean damageable = Boolean.TRUE.equals(witherDamageable.get(ownerTeam));
+            if (!activeAttacker || enemyAttacker == ownerTeam) return;
+            if (!insideBoundary) {
                 attacker.sendMessage(ChatColor.RED + "You must enter your enemy Wither's territory to attack it.");
                 return;
             }
-            if (!Boolean.TRUE.equals(witherDamageable.get(ownerTeam))) {
+            if (!damageable) {
                 attacker.sendMessage(ChatColor.RED + "Destroy both enemy towers before attacking the Wither.");
                 return;
             }
-            if (damage <= 0.0D) return;
+            if (!ArcadePortRules.heroesOfGwenWitherCanTakeDamage(
+                    ownerTeam, enemyAttacker, activeAttacker, insideBoundary, damageable, damage)) return;
 
             long now = System.currentTimeMillis();
             long lastInform = witherLastInformAt.getOrDefault(ownerTeam, 0L);
-            if (now - lastInform >= 30_000L) {
+            if (ArcadePortRules.heroesOfGwenWitherShouldInform(now, lastInform)) {
                 witherLastInformAt.put(ownerTeam, now);
                 for (Player defender : activeMatchPlayers()) {
                     if (teams.getOrDefault(defender.getUniqueId(), -1) != ownerTeam) continue;
