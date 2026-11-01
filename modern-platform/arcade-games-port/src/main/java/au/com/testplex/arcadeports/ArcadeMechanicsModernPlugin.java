@@ -26,8 +26,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             "death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl",
             "castle-assault", "gladiators", "micro-battles", "milk-the-cow", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "runner", "sheep-quest", "turf-wars", "camera-shy",
             "monster-maze", "monster-maze-speed", "monster-maze-modern", "snake", "draw-my-thing", "master-builders",
-            "skywars", "wither-assault", "sneaky-assassins", "speed-builders", "evolution");
-    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-29-games-plus-three-monster-maze-modes-20261101-v10";
+            "skywars", "wither-assault", "sneaky-assassins", "speed-builders", "evolution", "heroes-of-gwen");
+    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-30-selectable-ids-20261101-v11";
 
     @Override
     public void onEnable() {
@@ -360,8 +360,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         else if (normalized.startsWith("mixed-")) baseId = normalized.substring("mixed-".length());
         if (baseId == null) return null;
         ArcadePortGame game = ArcadePortGame.fromId(baseId);
-        return game == ArcadePortGame.TURF_WARS || game == ArcadePortGame.CASTLE_ASSAULT
-                || game == ArcadePortGame.HEROES_OF_GWEN ? game : null;
+        return game == ArcadePortGame.TURF_WARS || game == ArcadePortGame.CASTLE_ASSAULT ? game : null;
     }
 
     private boolean isMixedSkyWarsId(String requestedId) {
