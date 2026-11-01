@@ -3780,8 +3780,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                     }
                     player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.45F, 1.4F);
                 }
-                heroAmmoNextAt.put(id,
-                        now + ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_RELOAD_MILLIS);
+                heroAmmoNextAt.put(id, now + heroesOfGwenStoreAdjustedCooldown(
+                        player, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_RELOAD_MILLIS, true));
             }
         }
     }
@@ -5547,7 +5547,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         } else waterStone.setAmount(amount + 1);
                         player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.45F, 1.5F);
                     }
-                    heroAmmoNextAt.put(id, now + ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_AMMO_RELOAD_MILLIS);
+                    heroAmmoNextAt.put(id, now + heroesOfGwenStoreAdjustedCooldown(
+                            player, ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_AMMO_RELOAD_MILLIS, true));
                 }
             }
             int fletcherCapacity = ArcadePortRules.heroesOfGwenFletcherMaxArrows(hunterHero);
