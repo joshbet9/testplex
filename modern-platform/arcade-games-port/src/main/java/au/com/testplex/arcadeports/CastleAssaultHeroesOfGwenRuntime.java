@@ -2943,6 +2943,246 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 0.8F);
     }
 
+
+    private void fireLarissaAquaCannon(Player player) {
+        String skill = "larissa.aqua_cannon";
+        if (!isHeroSkillReady(player, skill)) return;
+        ItemStack ammo = player.getInventory().getItem(7);
+        if (ammo == null || ammo.getType() != Material.BLUE_DYE || ammo.getAmount() < 1) {
+            player.sendActionBar(ChatColor.RED + "Aqua Cannon needs a Water Stone charge.");
+            return;
+        }
+        if (ammo.getAmount() == 1) player.getInventory().setItem(7, null);
+        else ammo.setAmount(ammo.getAmount() - 1);
+        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_INTERVAL_MILLIS);
+
+        Vector direction = player.getLocation().getDirection().normalize();
+        Location start = player.getLocation().clone().add(0.0D, 1.7D, 0.0D);
+        Location impact = start.clone();
+        int team = teams.getOrDefault(player.getUniqueId(), -1);
+        boolean hit = false;
+        for (double distance = 0.2D; distance <= ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_RANGE;
+                distance += 0.2D) {
+            Location point = start.clone().add(direction.clone().multiply(distance));
+            impact = point;
+            world.spawnParticle(Particle.SPLASH, point, 3, 0.08D, 0.08D, 0.08D, 0.02D);
+
+            for (Entity entity : world.getNearbyEntities(point, 2.0D, 2.0D, 2.0D)) {
+                TowerState tower = towerFor(entity);
+                if (tower != null) {
+                    if (tower.owner != team && canDamageMobaTower(tower, team)
+                            && player.getLocation().distanceSquared(tower.location)
+                                    <= MOBA_TOWER_RANGE_SQUARED) {
+                        damageMobaTower(tower, ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE, player);
+                        hit = true;
+                        break;
+                    }
+                    continue;
+                }
+                Integer minionTeam = heroesOfGwenMinionTeams.get(entity.getUniqueId());
+                if (minionTeam != null) {
+                    if (minionTeam != team && entity instanceof Mob minion) {
+                        minion.damage(ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE, player);
+                        hit = true;
+                        break;
+                    }
+                    continue;
+                }
+                if (entity instanceof Player target && !target.equals(player)
+                        && activePlayers.contains(target.getUniqueId())) {
+                    if (teams.getOrDefault(target.getUniqueId(), -1) == team) continue;
+                    target.damage(ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE, player);
+                    hit = true;
+                    break;
+                }
+                if (entity instanceof Wither wither) {
+                    Integer enemyTeam = withers.entrySet().stream()
+                            .filter(entry -> entry.getValue().equals(wither))
+                            .map(Map.Entry::getKey).findFirst().orElse(null);
+                    if (enemyTeam != null && enemyTeam != team && witherDamageable.getOrDefault(enemyTeam, false)) {
+                        if (wither.getHealth() <= ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE) {
+                            finishHeroesOfGwen(team, "enemy Wither defeated by Larissa's Aqua Cannon");
+                            return;
+                        }
+                        wither.setHealth(wither.getHealth()
+                                - ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE);
+                        hit = true;
+                        break;
+                    }
+                }
+            }
+            if (hit) break;
+        }
+        world.playSound(impact, Sound.BLOCK_BUBBLE_COLUMN_BUBBLE_POP, 0.8F, 1.4F);
+        world.spawnParticle(Particle.SPLASH, impact, 10, 0.18D, 0.18D, 0.18D, 0.08D);
+    }
+
+    private void launchLarissaFountain(Player player) {
+        String skill = "larissa.dancing_fountain";
+        if (!isHeroSkillReady(player, skill)) return;
+        Snowball projectile = player.launchProjectile(Snowball.class);
+        projectile.setItem(new ItemStack(Material.WATER_BUCKET));
+        projectile.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(1.15D));
+        markHeroProjectile(projectile, player, skill);
+        entities.add(projectile);
+        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_COOLDOWN_MILLIS);
+        player.playSound(player.getLocation(), Sound.ENTITY_SPLASH_POTION_THROW, 0.8F, 1.0F);
+        player.sendActionBar(ChatColor.AQUA + "Dancing Fountain!");
+    }
+
+    private void startLarissaFountain(Player owner, Location center, long now) {
+        if (owner == null || center == null || center.getWorld() != world) return;
+        int team = teams.getOrDefault(owner.getUniqueId(), -1);
+        if (team < 0) return;
+        larissaFountainZones.add(new LarissaFountainZone(owner.getUniqueId(), team, center,
+                now + ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DURATION_MILLIS, now));
+        world.playSound(center, Sound.BLOCK_WATER_AMBIENT, 0.9F, 1.1F);
+        world.spawnParticle(Particle.SPLASH, center.clone().add(0.0D, 0.5D, 0.0D),
+                24, 0.6D, 0.25D, 0.6D, 0.12D);
+    }
+
+    private void activateLarissaWaterDash(Player player) {
+        String skill = "larissa.water_dash";
+        if (!isHeroSkillReady(player, skill)) return;
+        long now = System.currentTimeMillis();
+        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_DASH_COOLDOWN_MILLIS);
+        larissaWaterDashEndsAt.put(player.getUniqueId(),
+                now + ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_DASH_DURATION_MILLIS);
+        player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_SPLASH, 0.8F, 1.25F);
+    }
+
+    private void activateLarissaStormBlessing(Player player) {
+        String skill = "larissa.storm_blessing";
+        if (!isHeroSkillReady(player, skill)) return;
+        long now = System.currentTimeMillis();
+        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_COOLDOWN_MILLIS);
+        long endsAt = now + ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_DURATION_MILLIS;
+        larissaStormBlessingEndsAt.put(player.getUniqueId(), endsAt);
+        larissaStormBlessingNextHealAt.put(player.getUniqueId(),
+                now + ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_INTERVAL_MILLIS);
+        for (Player teammate : activeMatchPlayers()) {
+            if (teams.getOrDefault(teammate.getUniqueId(), -1) == teams.getOrDefault(player.getUniqueId(), -2)) {
+                teammate.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,
+                        (int) (ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_DURATION_MILLIS / 50L),
+                        0, true, true, true));
+            }
+        }
+        player.sendMessage(ChatColor.AQUA + "Larissa has called Storm's Blessing!");
+        player.playSound(player.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 0.9F, 1.2F);
+    }
+
+    private void updateLarissaFountains(long now) {
+        java.util.Iterator<LarissaFountainZone> iterator = larissaFountainZones.iterator();
+        while (iterator.hasNext()) {
+            LarissaFountainZone zone = iterator.next();
+            Player owner = players.get(zone.ownerId);
+            if (owner == null || !owner.isOnline() || !activePlayers.contains(zone.ownerId)) {
+                iterator.remove();
+                continue;
+            }
+            if (now >= zone.expiresAt) {
+                world.spawnParticle(Particle.CLOUD, zone.center, 16, 0.8D, 0.25D, 0.8D, 0.02D);
+                iterator.remove();
+                continue;
+            }
+            if (now >= zone.nextPulseAt) {
+                for (Entity entity : world.getNearbyEntities(zone.center,
+                        ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS,
+                        ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS,
+                        ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS)) {
+                    if (entity instanceof Player target && activePlayers.contains(target.getUniqueId())) {
+                        if (teams.getOrDefault(target.getUniqueId(), -1) == zone.team) {
+                            target.setHealth(Math.min(target.getMaxHealth(), target.getHealth()
+                                    + ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_HEAL_PER_SECOND));
+                        } else {
+                            target.damage(ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DAMAGE_PER_SECOND,
+                                    owner);
+                        }
+                        continue;
+                    }
+                    Integer minionTeam = heroesOfGwenMinionTeams.get(entity.getUniqueId());
+                    if (minionTeam != null && entity instanceof Mob minion) {
+                        if (minionTeam == zone.team) {
+                            var maxHealth = minion.getAttribute(Attribute.MAX_HEALTH);
+                            double maximum = maxHealth == null ? 20.0D : maxHealth.getValue();
+                            minion.setHealth(Math.min(maximum, minion.getHealth()
+                                    + ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_HEAL_PER_SECOND));
+                        } else {
+                            minion.damage(ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DAMAGE_PER_SECOND,
+                                    owner);
+                        }
+                    }
+                }
+                zone.nextPulseAt = now + ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_PULSE_INTERVAL_MILLIS;
+            }
+            if (now >= zone.nextVisualAt) {
+                Color colour = zone.team == 0 ? Color.fromRGB(255, 70, 70) : Color.fromRGB(70, 165, 255);
+                Particle.DustOptions dust = new Particle.DustOptions(colour, 1.15F);
+                for (int angle = 0; angle < 360; angle += 15) {
+                    double radians = Math.toRadians(angle);
+                    Location edge = zone.center.clone().add(
+                            Math.cos(radians) * ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS,
+                            0.12D, Math.sin(radians) * ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS);
+                    world.spawnParticle(Particle.DUST, edge, 1, 0.0D, 0.0D, 0.0D, 0.0D, dust);
+                }
+                world.spawnParticle(Particle.SPLASH, zone.center.clone().add(0.0D, 0.45D, 0.0D),
+                        5, 0.65D, 0.3D, 0.65D, 0.04D);
+                zone.nextVisualAt = now + 250L;
+            }
+        }
+    }
+
+    private void updateLarissaAbilities(long now) {
+        for (Map.Entry<UUID, Long> entry : new HashMap<>(larissaWaterDashEndsAt).entrySet()) {
+            UUID id = entry.getKey();
+            Player player = players.get(id);
+            if (now >= entry.getValue()) {
+                if (player != null && player.isOnline()) player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+                larissaWaterDashEndsAt.remove(id);
+                continue;
+            }
+            if (player == null || !player.isOnline() || !activePlayers.contains(id)) {
+                larissaWaterDashEndsAt.remove(id);
+                continue;
+            }
+            Vector direction = player.getLocation().getDirection();
+            direction.setY(0.0D);
+            if (direction.lengthSquared() < 0.001D) direction = new Vector(0.0D, 0.0D, 1.0D);
+            player.setVelocity(direction.normalize());
+            world.spawnParticle(Particle.DRIPPING_WATER, player.getLocation().add(0.0D, 1.0D, 0.0D),
+                    4, 0.35D, 0.25D, 0.35D, 0.02D);
+        }
+
+        for (Map.Entry<UUID, Long> entry : new HashMap<>(larissaStormBlessingEndsAt).entrySet()) {
+            UUID id = entry.getKey();
+            if (now >= entry.getValue()) {
+                larissaStormBlessingEndsAt.remove(id);
+                larissaStormBlessingNextHealAt.remove(id);
+                continue;
+            }
+            Player owner = players.get(id);
+            if (owner == null || !owner.isOnline() || !activePlayers.contains(id)) {
+                larissaStormBlessingEndsAt.remove(id);
+                larissaStormBlessingNextHealAt.remove(id);
+                continue;
+            }
+            long nextHeal = larissaStormBlessingNextHealAt.getOrDefault(id, now + 1_000L);
+            if (now >= nextHeal) {
+                int team = teams.getOrDefault(id, -1);
+                for (Player teammate : activeMatchPlayers()) {
+                    if (teams.getOrDefault(teammate.getUniqueId(), -1) != team) continue;
+                    teammate.setHealth(Math.min(teammate.getMaxHealth(), teammate.getHealth()
+                            + ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_PER_SECOND));
+                    Location visual = teammate.getLocation().clone().add(0.0D, 2.4D, 0.0D);
+                    world.spawnParticle(Particle.CLOUD, visual, 6, 0.35D, 0.2D, 0.35D, 0.01D);
+                    world.spawnParticle(Particle.DRIPPING_WATER, visual, 3, 0.3D, 0.15D, 0.3D, 0.03D);
+                }
+                larissaStormBlessingNextHealAt.put(id,
+                        now + ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_INTERVAL_MILLIS);
+            }
+        }
+    }
+
     private void markHeroProjectile(Projectile projectile, Player owner, String type) {
         projectile.getPersistentDataContainer().set(heroProjectileTypeKey, PersistentDataType.STRING, type);
         projectile.getPersistentDataContainer().set(heroProjectileOwnerKey, PersistentDataType.STRING,
