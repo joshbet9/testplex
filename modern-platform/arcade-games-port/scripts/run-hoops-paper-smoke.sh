@@ -7,7 +7,7 @@ SERVER_ROOT="${3:?Disposable Paper server root required}"
 BOT_NODE_MODULES="${4:?Minecraft 26.3 protocol client node_modules path required}"
 USER_AGENT="Testplex-Hoops-Paper-Smoke/1.0 (https://github.com/joshbet9/testplex)"
 SERVER_ROOT="$(mkdir -p "$SERVER_ROOT" && cd "$SERVER_ROOT" && pwd)"
-mkdir -p "$SERVER_ROOT/plugins"
+mkdir -p "$SERVER_ROOT/plugins" "$SERVER_ROOT/update/maps"
 [[ -s "$ARCADE_JAR" ]] || { echo "Missing Arcade jar: $ARCADE_JAR" >&2; exit 1; }
 [[ -s "$SMOKE_PLUGIN_JAR" ]] || { echo "Missing smoke-test plugin jar: $SMOKE_PLUGIN_JAR" >&2; exit 1; }
 [[ -d "$BOT_NODE_MODULES/@wp2508/minecraft-protocol" ]] || {
@@ -16,6 +16,9 @@ mkdir -p "$SERVER_ROOT/plugins"
 }
 BOT_SCRIPT="$(dirname "$0")/hoops-paper-clients.js"
 [[ -s "$BOT_SCRIPT" ]] || { echo "Missing protocol client script: $BOT_SCRIPT" >&2; exit 1; }
+
+echo "[hoops-smoke] Installing the original Wizards source maps required by shared Arcade startup readiness."
+python3 "$(dirname "$0")/download-wizards-source-maps.py" --map-root "$SERVER_ROOT/update/maps"
 
 echo "[hoops-smoke] Resolving stable Paper 26.3."
 builds_json="$(curl --fail --silent --show-error --retry 3 --user-agent "$USER_AGENT" \
@@ -41,6 +44,10 @@ owner-usernames:
   - jn_playzmc
 admin-usernames:
   - jn_playzmc
+source-maps:
+  directory: update/maps
+wizards:
+  include-nano-maps: true
 CONFIG
 cat > "$SERVER_ROOT/eula.txt" <<'EULA'
 eula=true

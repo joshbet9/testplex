@@ -29,6 +29,8 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import me.monstermaze.MonsterMazePlugin;
+import au.com.testplex.wizards.WizardsGameManager;
+import au.com.testplex.wizards.WizardsRules;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
@@ -303,6 +305,7 @@ public final class ArcadePortManager implements Listener {
     public void initializeGameModules() {
         if (gameModulesInitialized) return;
         initializeMonsterMazeGameModule();
+        initializeWizardsGameModule();
         gameModulesInitialized = true;
     }
 
@@ -327,6 +330,25 @@ public final class ArcadePortManager implements Listener {
             throw new IllegalStateException(
                     "Monster Maze could not be registered as part of the shared Arcade lifecycle.", startupFailure);
         }
+    }
+
+    private void initializeWizardsGameModule() {
+        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=wizards-module-registration-start");
+        WizardsGameManager module = plugin.getWizardsGameManager();
+        if (module == null) throw new IllegalStateException("Wizards controller is missing.");
+        try {
+            gameModules.register(module);
+            if (!isWizardsModuleRegistered()) throw new IllegalStateException("Arcade registry did not retain Wizards.");
+            plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=wizards-module-registered");
+        } catch (RuntimeException | Error failure) {
+            throw new IllegalStateException("Wizards could not be registered in the shared Arcade lifecycle.", failure);
+        }
+    }
+
+    public boolean isWizardsModuleRegistered() {
+        WizardsGameManager module = plugin.getWizardsGameManager();
+        return module != null && gameModules.isRegistered(ArcadePortGame.WIZARDS, module)
+                && module.game() == ArcadePortGame.WIZARDS;
     }
 
     public MonsterMazePlugin getMonsterMazeModule() { return monsterMazeModule; }
@@ -360,7 +382,7 @@ public final class ArcadePortManager implements Listener {
 
     /** Called after Monster Maze returns its roster; only despawn when the embedded module is truly idle. */
     public void cleanupTestPlayersIfNoGameIsRunning() {
-        if (active == null && !monsterMazeRunning() && !standaloneGameActive) testPlayers.despawnSessionPlayers();
+        if (active == null && !monsterMazeRunning() && !wizardsRunning() && !standaloneGameActive) testPlayers.despawnSessionPlayers();
     }
 
     public void returnPlayerToLobby(Player player) {
@@ -373,11 +395,11 @@ public final class ArcadePortManager implements Listener {
 
     CameraShyGame cameraShyModule() { return cameraShyModule; }
 
-    boolean canStartCameraShy() { return active == null && !monsterMazeRunning() && !standaloneGameActive; }
+    boolean canStartCameraShy() { return active == null && !monsterMazeRunning() && !wizardsRunning() && !standaloneGameActive; }
 
     /** Availability guard for standalone Arcade-hosted test modules. */
     public boolean canStartExternalGame() {
-        return !standaloneGameActive && active == null && !monsterMazeRunning()
+        return !standaloneGameActive && active == null && !monsterMazeRunning() && !wizardsRunning()
                 && (cameraShyModule == null || !cameraShyModule.isActive());
     }
 
@@ -445,6 +467,11 @@ public final class ArcadePortManager implements Listener {
         return module != null && module.isGameRunning();
     }
 
+    private boolean wizardsRunning() {
+        ArcadeGameModule module = gameModules.get(ArcadePortGame.WIZARDS);
+        return module != null && module.isGameRunning();
+    }
+
     public void selectLobbyGame(ArcadePortGame type) {
         if (type == null) return;
         plugin.getConfig().set("lobby-selected-game", type.id());
@@ -502,8 +529,7 @@ public final class ArcadePortManager implements Listener {
 
     private static boolean supportsMixedArcadeVariant(ArcadePortGame type) {
         return type == ArcadePortGame.TURF_WARS
-                || type == ArcadePortGame.CASTLE_ASSAULT
-                || type == ArcadePortGame.HEROES_OF_GWEN;
+                || type == ArcadePortGame.CASTLE_ASSAULT;
     }
 
     private static String queueKey(ArcadePortGame type, boolean mixedArcadeVariant) {
@@ -621,7 +647,49 @@ public final class ArcadePortManager implements Listener {
             lobbyRuntime.refreshDisplays();
             return true;
         }
+        if (type == ArcadePortGame.WIZARDS && wizardsRunning()) {
+            WizardsGameManager module = plugin.getWizardsGameManager();
+            if (module != null) {
+                module.leave(player);
+                lobbyRuntime.refreshDisplays();
+                return true;
+            }
+        }
         return false;
+    }
+
+    /** Complete Wizards through the shared Arcade Game Over, snapshot and lobby-return lifecycle. */
+    public void finishWizardsSession(Player winner) {
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.WIZARDS) {
+            finish(session, winner, true);
+        } else {
+            onExternalGameCompleted(ArcadePortGame.WIZARDS);
+        }
+    }
+
+    /** Keep the common Arcade session's alive roster aligned with Wizards eliminations. */
+    public void markWizardsParticipantEliminated(Player player) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.WIZARDS || player == null) return;
+        session.alive.remove(player.getUniqueId());
+        lobbyRuntime.refreshDisplays();
+    }
+
+    /** Leave Wizards by restoring and removing the participant from the common Arcade session. */
+    public void returnWizardsParticipantToLobby(Player player) {
+        if (player == null || !player.isOnline()) return;
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.WIZARDS) {
+            UUID id = player.getUniqueId();
+            PlayerSnapshot snapshot = session.snapshots.remove(id);
+            session.players.remove(id);
+            session.alive.remove(id);
+            session.scores.remove(id);
+            if (snapshot != null) snapshot.restore(player);
+        }
+        lobby.sendToLobby(player);
+        lobbyRuntime.refreshDisplays();
     }
 
     /** Finish a game-specific engine while preserving global Session cleanup and snapshots. */
@@ -1773,6 +1841,10 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.RED + "Monster Maze is already running. Wait for the current Testplex game to finish.");
             return;
         }
+        if (wizardsRunning()) {
+            player.sendMessage(ChatColor.RED + "Wizards is already running. Wait for the current Testplex game to finish.");
+            return;
+        }
         if (type == null) {
             player.sendMessage(ChatColor.RED + "Unknown game id. Use /arcadeport help for the available IDs.");
             return;
@@ -1790,8 +1862,8 @@ public final class ArcadePortManager implements Listener {
                     + " is not cleared for in-game parity testing yet. Cleared game IDs: " + enabledGamesLabel() + ".");
             return;
         }
-        if (type.isMonsterMaze() && !isRotationCandidateAvailable(type)) {
-            player.sendMessage(ChatColor.RED + "Monster Maze is unavailable because its embedded module or selected map world is not ready.");
+        if ((type.isMonsterMaze() || type == ArcadePortGame.WIZARDS) && !isRotationCandidateAvailable(type)) {
+            player.sendMessage(ChatColor.RED + type.displayName() + " is unavailable because its Arcade module or selected source map is not ready.");
             return;
         }
         if (automaticRotationTask != null || automaticRotationOnReturn) {
@@ -1825,6 +1897,14 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.PLEXBALL && queuedPlayers >= PlexballRules.MAX_PLAYERS) {
             player.sendMessage(ChatColor.RED + "Plexball's Arcade queue is full (8/8 players).");
             return;
+        }
+        if (type == ArcadePortGame.WIZARDS) {
+            int maximum = Math.max(WizardsRules.MIN_PLAYERS, Math.min(WizardsRules.MAX_PLAYERS,
+                    plugin.getConfig().getInt("wizards.maximum-players", WizardsRules.MAX_PLAYERS)));
+            if (queuedPlayers >= maximum) {
+                player.sendMessage(ChatColor.RED + "Wizards' Arcade queue is full (" + maximum + "/" + maximum + " players).");
+                return;
+            }
         }
 
         lobby.ensurePlayerInLobby(player);
@@ -1975,7 +2055,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (mixedArcadeVariant && !supportsMixedArcadeVariant(type)) {
-            sender.sendMessage(ChatColor.RED + "Mixed Arcade variants are only available for Turf Wars, Castle Assault, and Heroes of Gwen.");
+            sender.sendMessage(ChatColor.RED + "Mixed Arcade variants are only available for Turf Wars and Castle Assault.");
             return;
         }
         if (type == null) {
@@ -1987,14 +2067,15 @@ public final class ArcadePortManager implements Listener {
                     + " is not cleared for in-game parity testing yet. Cleared game IDs: " + enabledGamesLabel() + ".");
             return;
         }
-        if (type.isMonsterMaze() && !isRotationCandidateAvailable(type)) {
-            sender.sendMessage(ChatColor.RED + "Monster Maze cannot start because its embedded module or selected map world is unavailable.");
+        if ((type.isMonsterMaze() || type == ArcadePortGame.WIZARDS) && !isRotationCandidateAvailable(type)) {
+            sender.sendMessage(ChatColor.RED + type.displayName() + " cannot start because its Arcade module or selected map is unavailable.");
             return;
         }
         cancelAutomaticRotationVote();
-        if (active != null || monsterMazeRunning()) {
+        if (active != null || monsterMazeRunning() || wizardsRunning()) {
             sender.sendMessage(ChatColor.RED + "A modern Arcade test is already running"
-                    + (active == null ? " (Monster Maze)." : ": " + active.type.displayName() + "."));
+                    + (active != null ? ": " + active.type.displayName() + "."
+                            : wizardsRunning() ? " (Wizards)." : " (Monster Maze)."));
             return;
         }
         if (manualStartCountdown != null) {
@@ -2002,6 +2083,10 @@ public final class ArcadePortManager implements Listener {
             manualStartCountdown = null;
             manualStartType = null;
             clearLobbyCountdownStatus();
+        }
+        if (type == ArcadePortGame.WIZARDS && !isRotationCandidateAvailable(type)) {
+            sender.sendMessage(ChatColor.RED + "Select an installed Wizards source map in the Game Panel before starting.");
+            return;
         }
         if (SourceMapCatalog.hasMap(type)) {
             String selectedResource = plugin.getConfig().getString("selected-maps." + type.id(),
@@ -2115,7 +2200,7 @@ public final class ArcadePortManager implements Listener {
         manualStartMixedVariant = mixedVariant;
         final int[] remaining = {initial};
         manualStartCountdown = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-            if (active != null || monsterMazeRunning()) {
+            if (active != null || monsterMazeRunning() || wizardsRunning()) {
                 cancelManualStartCountdown(type, "The start countdown was cancelled because another game became active.");
                 return;
             }
@@ -2241,7 +2326,7 @@ public final class ArcadePortManager implements Listener {
     void onExternalGameCompleted(ArcadePortGame game) {
         if (game == null) return;
         lastAutomaticRotationGameId = game.id();
-        if (active != null || monsterMazeRunning()) return;
+        if (active != null || monsterMazeRunning() || wizardsRunning()) return;
         beginAutomaticRotationVote();
     }
 
@@ -2271,6 +2356,10 @@ public final class ArcadePortManager implements Listener {
             if (maps == null) return false;
             String activeMap = maps.getActiveMap();
             return maps.isKnown(activeMap) && maps.isAvailable(activeMap);
+        }
+        if (game == ArcadePortGame.WIZARDS) {
+            WizardsGameManager module = plugin.getWizardsGameManager();
+            return isWizardsModuleRegistered() && module.hasAvailableSelectedMap();
         }
         if (!SourceMapCatalog.hasMap(game)) return true;
         String selectedResource = plugin.getConfig().getString("selected-maps." + game.id(),
@@ -2601,7 +2690,7 @@ public final class ArcadePortManager implements Listener {
         }
         cancelAutomaticRotationVote();
         if (mixedArcadeVariant && !supportsMixedArcadeVariant(type)) {
-            sender.sendMessage(ChatColor.RED + "Mixed Arcade variants are only available for Turf Wars, Castle Assault, and Heroes of Gwen.");
+            sender.sendMessage(ChatColor.RED + "Mixed Arcade variants are only available for Turf Wars and Castle Assault.");
             return;
         }
         if (type == null) {
@@ -2613,8 +2702,12 @@ public final class ArcadePortManager implements Listener {
                     + " is not cleared for in-game parity testing yet. Cleared game IDs: " + enabledGamesLabel() + ".");
             return;
         }
-        if (type.isMonsterMaze() && !isRotationCandidateAvailable(type)) {
-            sender.sendMessage(ChatColor.RED + "Monster Maze cannot start because its embedded module or selected map world is unavailable.");
+        if ((type.isMonsterMaze() || type == ArcadePortGame.WIZARDS) && !isRotationCandidateAvailable(type)) {
+            sender.sendMessage(ChatColor.RED + type.displayName() + " cannot start because its Arcade module or selected map is unavailable.");
+            return;
+        }
+        if (type == ArcadePortGame.WIZARDS && !isRotationCandidateAvailable(type)) {
+            sender.sendMessage(ChatColor.RED + "Select an installed Wizards source map in the Game Panel before starting.");
             return;
         }
         if (SourceMapCatalog.hasMap(type)) {
@@ -2626,9 +2719,10 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
         }
-        if (active != null || monsterMazeRunning()) {
+        if (active != null || monsterMazeRunning() || wizardsRunning()) {
             sender.sendMessage(ChatColor.RED + "A modern Arcade test is already running"
-                    + (active == null ? " (Monster Maze)." : ": " + active.type.displayName() + "."));
+                    + (active != null ? ": " + active.type.displayName() + "."
+                            : wizardsRunning() ? " (Wizards)." : " (Monster Maze)."));
             return;
         }
         String selectedQueueKey = queueKey(type, mixedArcadeVariant);
@@ -2748,6 +2842,75 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
+        if (type == ArcadePortGame.WIZARDS) {
+            WizardsGameManager module = plugin.getWizardsGameManager();
+            if (module == null || !isWizardsModuleRegistered()) {
+                sender.sendMessage(ChatColor.RED + "Wizards is not registered by the shared Arcade manager.");
+                return;
+            }
+            World wizardsWorld = module.prepareArenaForArcade();
+            if (wizardsWorld == null) {
+                sender.sendMessage(ChatColor.RED + "The selected Wizards source map could not be prepared. No match was started.");
+                return;
+            }
+
+            // Capture the common Arcade snapshots before the Wizards controller equips
+            // spell wands and teleports the roster into the selected source map.
+            Session session = new Session(type, wizardsWorld, participants, false);
+            for (Player participant : participants) {
+                if (participant == null || !participant.isOnline()) continue;
+                UUID id = participant.getUniqueId();
+                PlayerSnapshot pending = pendingRestore.remove(id);
+                if (pending != null) pending.restore(participant);
+                lobby.ensurePlayerInLobby(participant);
+                PlayerSnapshot snapshot = new PlayerSnapshot(participant);
+                session.snapshots.put(id, snapshot);
+                session.players.put(id, participant);
+                session.alive.add(id);
+                session.scores.put(id, 0);
+                session.lastLocations.put(id, participant.getLocation().clone());
+            }
+            long now = System.currentTimeMillis();
+            session.startedAt = now;
+            session.prepareDurationMillis = 0L;
+            session.prepareEndsAt = now;
+            session.lastPrepareSecond = 0;
+            session.liveStarted = true;
+            session.endsAt = 0L;
+            session.startupComplete = true;
+
+            if (!module.startFromArcadeLifecycle(participants)) {
+                for (Map.Entry<UUID, PlayerSnapshot> snapshot : session.snapshots.entrySet()) {
+                    Player participant = session.players.get(snapshot.getKey());
+                    if (participant != null && participant.isOnline()) {
+                        snapshot.getValue().restore(participant);
+                        lobby.sendToLobby(participant);
+                    } else {
+                        pendingRestore.put(snapshot.getKey(), snapshot.getValue());
+                    }
+                }
+                sender.sendMessage(ChatColor.RED + "Wizards could not start with the current Arcade queue. The queue has been preserved.");
+                return;
+            }
+
+            active = session;
+            if (queue != null) queues.remove(selectedQueueKey);
+            if (pendingStart != null && pendingType == type
+                    && pendingMixedArcadeVariant == mixedArcadeVariant) {
+                pendingStart.cancel();
+                pendingStart = null;
+                pendingType = null;
+                pendingMixedArcadeVariant = false;
+            }
+            setLobbyLifecycleStatus("In Progress...");
+            lobbyRuntime.refreshDisplays();
+            for (Player player : participants) {
+                if (player != null && player.isOnline()) player.sendMessage(
+                        ChatColor.AQUA + "Testplex has started Wizards through the shared Arcade lifecycle.");
+            }
+            return;
+        }
+
         if (type == ArcadePortGame.SUPER_SPLOOR && participants.size() > 16) {
             sender.sendMessage(ChatColor.RED + "Super Sploor supports up to 16 players (8 per team).");
             return;
@@ -12590,6 +12753,7 @@ public final class ArcadePortManager implements Listener {
         return switch (session.type) {
             case CASTLE_ASSAULT -> "objective TNT | kills " + scoreFor(session, id);
             case HEROES_OF_GWEN -> "gold store | team " + (session.teams.getOrDefault(id, 0) + 1);
+            case WIZARDS -> "spellcasting | " + session.alive.size() + " wizards alive";
             case BACON_BRAWL -> "meter " + session.baconMeters.getOrDefault(id, 0) + "% | knockback x"
                     + String.format(java.util.Locale.ROOT, "%.1f", session.baconKnockback)
                     + " | " + baconTimingStatusText(session, id, System.currentTimeMillis());
@@ -17198,6 +17362,10 @@ public final class ArcadePortManager implements Listener {
         Session stopping = active;
         List<Player> participantsToReturn = stopping == null
                 ? List.of() : new ArrayList<>(stopping.players.values());
+        if (wizardsRunning()) {
+            WizardsGameManager module = plugin.getWizardsGameManager();
+            if (module != null) module.stop(reason);
+        }
         if (stopping != null && stopping.type == ArcadePortGame.PLEXBALL
                 && plugin.getPlexballGame() != null) {
             plugin.getPlexballGame().stopForArcadeLifecycle(reason);
@@ -17229,7 +17397,8 @@ public final class ArcadePortManager implements Listener {
         }
         String variant = active != null && active.mixedArcadeVariant ? " (Mixed Arcade)" : "";
         String game = active == null
-                ? (monsterMazeRunning() ? monsterMazeModule.getActiveArcadeGame().displayName()
+                ? (wizardsRunning() ? "Wizards (" + plugin.getWizardsGameManager().status() + ")"
+                        : monsterMazeRunning() ? monsterMazeModule.getActiveArcadeGame().displayName()
                         + " (" + monsterMazeModule.getGameManager().getStage() + " stages reached)" : "idle")
                 : active.type.displayName() + variant
                 + " (" + active.alive.size() + "/" + active.participantsAtStart + " alive)";
@@ -18257,6 +18426,9 @@ public final class ArcadePortManager implements Listener {
         if (event instanceof EntityDamageByEntityEvent byEntity && cancelPrepareAction(playerShooter(byEntity.getDamager()), event)) return;
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+        // Wizards runs its own source-faithful damage, armor and spell pipeline.
+        // The shared Arcade default cancellation below must not swallow its PvP.
+        if (session.type == ArcadePortGame.WIZARDS) return;
         if (session.type == ArcadePortGame.EVOLUTION
                 && event.getEntity() instanceof Player evolutionPlayer
                 && session.alive.contains(evolutionPlayer.getUniqueId())

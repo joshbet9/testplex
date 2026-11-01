@@ -1,6 +1,8 @@
 package au.com.testplex.arcadeports;
 
 import me.monstermaze.MonsterMazePlugin;
+import au.com.testplex.wizards.WizardsGameManager;
+import au.com.testplex.wizards.WizardsKit;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
@@ -14,6 +16,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements CommandExecutor, Listener {
     private ArcadePortManager manager;
+    private WizardsGameManager wizards;
     private PlexballGame plexball;
     private ArcadeMapSelectionMenu mapMenu;
     private GamePreferenceMenu preferenceMenu;
@@ -26,8 +29,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             "death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl",
             "castle-assault", "gladiators", "micro-battles", "milk-the-cow", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "runner", "sheep-quest", "turf-wars", "camera-shy",
             "monster-maze", "monster-maze-speed", "monster-maze-modern", "snake", "draw-my-thing", "master-builders",
-            "skywars", "wither-assault", "sneaky-assassins", "speed-builders", "heroes-of-gwen", "hoops-remastered");
-    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-30-selectable-ids-20261101-v13";
+            "skywars", "wither-assault", "sneaky-assassins", "speed-builders", "heroes-of-gwen", "hoops-remastered", "wizards");
+    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-31-selectable-ids-20261102-v14";
 
     @Override
     public void onEnable() {
@@ -77,6 +80,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         // in Monster Maze must not leave players in the unrelated survival world.
         getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=arcade-manager-construction-start");
         manager = new ArcadePortManager(this);
+        wizards = new WizardsGameManager(this);
         getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=arcade-manager-construction-complete");
         cameraShy = new CameraShyGame(this, manager);
         manager.setCameraShyModule(cameraShy);
@@ -201,6 +205,21 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 completedGame != null && completedGame.isMonsterMaze() ? completedGame : ArcadePortGame.MONSTER_MAZE);
     }
 
+    /** Natural Wizards completion enters the same Game Over and lobby-return path as every Arcade game. */
+    public void onWizardsRoundCompleted(Player winner) {
+        if (manager != null) manager.finishWizardsSession(winner);
+    }
+
+    public void markWizardsParticipantEliminated(Player player) {
+        if (manager != null) manager.markWizardsParticipantEliminated(player);
+    }
+
+    public void returnWizardsParticipantToLobby(Player player) {
+        if (manager != null) manager.returnWizardsParticipantToLobby(player);
+    }
+
+    public WizardsGameManager getWizardsGameManager() { return wizards; }
+
     public void stopMonsterMazeRound(String reason) {
         if (manager != null) manager.stop(reason == null ? "Monster Maze stopped" : reason);
     }
@@ -216,15 +235,17 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         } catch (java.io.IOException exception) {
             getLogger().warning("Could not remove the Arcade runtime readiness record: " + exception.getMessage());
         }
-        if (speedBuilders != null) speedBuilders.shutdown();
         if (manager != null) manager.shutdown();
+        else if (wizards != null) wizards.shutdown();
+        if (speedBuilders != null) speedBuilders.shutdown();
         if (plexball != null) plexball.shutdown();
     }
 
     private void publishArcadeRuntimeReadiness() {
-        if (manager == null || !manager.isMonsterMazeModuleRegistered()) {
+        if (manager == null || !manager.isMonsterMazeModuleRegistered() || !manager.isWizardsModuleRegistered()
+                || !manager.isRotationCandidateAvailable(ArcadePortGame.WIZARDS)) {
             throw new IllegalStateException(
-                    "The shared Arcade runtime cannot be marked ready without its integrated Monster Maze game.");
+                    "The shared Arcade runtime cannot be marked ready without its integrated Monster Maze and Wizards Arcade modules and installed Wizards source maps.");
         }
         try {
             java.nio.file.Path identityPath = getDataFolder().toPath()
@@ -235,10 +256,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     + " invocation-id-present=" + (System.getenv("INVOCATION_ID") != null));
             boolean deploymentSignal = ArcadeRuntimeReadinessSignal.publish(
                     getDataFolder().toPath(), System.getenv("INVOCATION_ID"), ProcessHandle.current().pid(),
-                    manager.isMonsterMazeModuleRegistered());
+                    manager.isMonsterMazeModuleRegistered(), manager.isWizardsModuleRegistered());
             getLogger().info("TESTPLEX_ARCADE_RUNTIME_READY world=" + ModernArcadeLobby.WORLD_NAME
                     + " plane=100x100 floor-y=" + ModernArcadeLobby.FLOOR_Y
-                    + " monster-maze=READY deployment-signal=" + deploymentSignal);
+                    + " monster-maze=READY wizards=READY deployment-signal=" + deploymentSignal);
             if (!deploymentSignal && System.getenv("TESTPLEX_DEPLOYED_BUILD_SHA") != null) {
                 throw new IllegalStateException("Systemd deployment identity is missing from "
                         + getDataFolder() + "; refusing to report the complete Arcade runtime as deployment-ready.");
@@ -377,6 +398,13 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         String normalized = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
         return normalized.equals("speed-builders") || normalized.equals("speedbuilder")
                 || normalized.equals("speedbuilders") || normalized.equals("speed-builder");
+    }
+
+    private static boolean isWizardsId(String requested) {
+        if (requested == null) return false;
+        String normalized = requested.toLowerCase(java.util.Locale.ROOT)
+                .replace('_', '-').replace(' ', '-');
+        return normalized.equals("wizards") || normalized.equals("wizard");
     }
 
     private static boolean isSnapStatsArgument(String argument) {
@@ -605,6 +633,17 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport kit <kit-id|plexball>");
                     return true;
                 }
+                if ("wizards".equalsIgnoreCase(args[1]) || "wizard".equalsIgnoreCase(args[1])) {
+                    if (args.length < 3) {
+                        sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport kit wizards <wizard|mage|sorcerer|mystic|witchdoctor>");
+                        return true;
+                    }
+                    WizardsKit kit = WizardsKit.parse(args[2]);
+                    if (kit == null) sender.sendMessage(ChatColor.YELLOW
+                            + "Usage: /arcadeport kit wizards <wizard|mage|sorcerer|mystic|witchdoctor>");
+                    else if (wizards != null) wizards.setKit(player, kit);
+                    return true;
+                }
                 if ("plexball".equalsIgnoreCase(args[1])) {
                     if (plexball != null) plexball.openKitMenu(player);
                     else sender.sendMessage(ChatColor.RED + "Plexball is unavailable.");
@@ -661,6 +700,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 sender.sendMessage(ChatColor.YELLOW + "/stats [player]" + ChatColor.GRAY + " — open the shared local Arcade achievements, milestones and game stats menu");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play speed-builders" + ChatColor.GRAY + " — queue for an isolated Speed Builders match");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport start speed-builders" + ChatColor.GRAY + " — operator start of the Speed Builders queue");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport kit wizards <kit>" + ChatColor.GRAY + " — choose the Wizard, Mage, Sorcerer, Mystic or Witch Doctor kit");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play <game-id>" + ChatColor.GRAY + " — quick solo test; starts after a short join window");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play plexball" + ChatColor.GRAY + " — queue for Plexball");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport join plexball" + ChatColor.GRAY + " — join the Plexball queue");

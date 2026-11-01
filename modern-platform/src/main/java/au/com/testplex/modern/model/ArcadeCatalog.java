@@ -280,6 +280,14 @@ public final class ArcadeCatalog {
                 win("buzzer-beater", "Buzzer Beater", "The decisive final basket lights up the arena clock."),
                 win("court-dominance", "Court Dominance", "The winning lineup takes centre court.")));
 
+        register(game("wizards", "Wizards", "ENCHANTING_TABLE",
+                "Choose a wizard kit, explore the original Wizards and Nano Wizards maps, collect spellbooks and be the last wizard standing.",
+                GameDefinition.PortStatus.READY_FOR_TEST,
+                List.of(),
+                win("last-wizard-standing", "Last Wizard Standing", "The last wizard alive claims the arena."),
+                win("arcane-survivor", "Arcane Survivor", "Survive the final endgame strikes."),
+                win("spellmaster", "Spellmaster", "A chain of spells marks the winning mage.")));
+
         register(game("milk-the-cow", "Milk the Cow", "MILK_BUCKET",
                 "Collect milk for your team, protect the herd and use Cow charge and body-slam abilities.",
                 GameDefinition.PortStatus.READY_FOR_TEST, List.of(),

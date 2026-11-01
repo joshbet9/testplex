@@ -52,7 +52,7 @@ jobs:
           node-version: "24"
 
       - name: Install pinned offline Minecraft 26.3 protocol client
-        run: npm install --prefix "$RUNNER_TEMP/hoops-protocol-client" --no-save --no-package-lock --ignore-scripts --no-audit --no-fund "@wp2508/minecraft-protocol@1.69.5"
+        run: npm install --prefix "$RUNNER_TEMP/hoops-protocol-client" --no-save --no-package-lock --ignore-scripts --no-audit --no-fund "@wp2508/minecraft-protocol@1.69.6"
 
       - name: Build and run catalogue tests
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/pom.xml clean verify
@@ -92,6 +92,55 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+      - name: Build ephemeral Wizards Paper 26.3 gameplay smoke harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          smoke_dir="modern-platform/arcade-games-port/src/test-runtime/wizards-paper-smoke"
+          mvn --batch-mode --no-transfer-progress -f "$smoke_dir/pom.xml" clean package
+
+      - name: Run three-client Wizards Paper 26.3 gameplay acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash modern-platform/arcade-games-port/scripts/run-wizards-paper-smoke.sh \
+            modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar \
+            modern-platform/arcade-games-port/src/test-runtime/wizards-paper-smoke/target/WizardsPaperSmoke.jar \
+            "$RUNNER_TEMP/wizards-paper-smoke" \
+            "$RUNNER_TEMP/hoops-protocol-client/node_modules"
+
+      - name: Upload Wizards Paper smoke results and server log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wizards-paper-26.3-smoke-results
+          path: |
+            ${{ runner.temp }}/wizards-paper-smoke/plugins/WizardsPaperSmoke/results.tsv
+            ${{ runner.temp }}/wizards-paper-smoke/server.log
+            ${{ runner.temp }}/wizards-paper-smoke/client-bots.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Package the 20 original Wizards maps for isolated deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          map_root="$RUNNER_TEMP/wizards-paper-smoke/update/maps"
+          verify_root="$RUNNER_TEMP/wizards-source-map-verify"
+          for folder in "Wizards" "Nano Wizards"; do
+            count="$(find "$map_root/$folder" -maxdepth 1 -type f -name "*.zip" | wc -l | tr -d " ")"
+            [[ "$count" == "10" ]] || { echo "Expected 10 source archives in $folder; found $count." >&2; exit 1; }
+          done
+          mkdir -p modern-platform/target "$verify_root"
+          tar -czf modern-platform/target/WizardsSourceMaps.tar.gz -C "$map_root" "Wizards" "Nano Wizards"
+          tar -xzf modern-platform/target/WizardsSourceMaps.tar.gz -C "$verify_root"
+          for folder in "Wizards" "Nano Wizards"; do
+            count="$(find "$verify_root/$folder" -maxdepth 1 -type f -name "*.zip" | wc -l | tr -d " ")"
+            [[ "$count" == "10" ]] || { echo "Packaged source archive count is wrong for $folder: $count." >&2; exit 1; }
+          done
+          tar -tzf modern-platform/target/WizardsSourceMaps.tar.gz >/dev/null
+          sha256sum modern-platform/target/WizardsSourceMaps.tar.gz
+
       - name: Build the disabled Wizards 26.3 port and run spell-rule tests
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/wizards-port/pom.xml clean verify
 
@@ -126,6 +175,10 @@ jobs:
           jar tf "$arcade_jar" | grep -Fxq "plugin.yml"
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/ArcadeMechanicsModernPlugin.class"
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/ArcadePortManager.class"
+          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/wizards/WizardsGameManager.class"
+          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/wizards/WizardsRules.class"
+          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/wizards/WizardsSpell.class"
+          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/wizards/WizardsKit.class"
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/PlexballGame.class"
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/PlexballRules.class"
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/CameraShyGame.class"
@@ -150,7 +203,7 @@ jobs:
 
           arcade_config="$(unzip -p "$arcade_jar" config.yml)"
           enabled_ids="$(awk '/^enabled-games:/{in_list=1;next} in_list && /^[^ ]/{exit} in_list && /^  - /{print $2}' <<< "$arcade_config" | paste -sd, -)"
-          [[ "$enabled_ids" == "death-tag,one-in-the-quiver,bomb-lobbers,bacon-brawl,castle-assault,gladiators,micro-battles,milk-the-cow,paintball,plexball,spleef,super-sploor,dragon-escape,dragons,runner,sheep-quest,turf-wars,camera-shy,monster-maze,monster-maze-speed,monster-maze-modern,snake,draw-my-thing,master-builders,skywars,wither-assault,sneaky-assassins,speed-builders,evolution,heroes-of-gwen,hoops-remastered" ]] || {
+          [[ "$enabled_ids" == "death-tag,one-in-the-quiver,bomb-lobbers,bacon-brawl,castle-assault,gladiators,micro-battles,milk-the-cow,paintball,plexball,spleef,super-sploor,dragon-escape,dragons,runner,sheep-quest,turf-wars,camera-shy,monster-maze,monster-maze-speed,monster-maze-modern,snake,draw-my-thing,master-builders,skywars,wither-assault,sneaky-assassins,speed-builders,heroes-of-gwen,hoops-remastered,wizards" ]] || {
             echo "Only the explicitly reviewed acceptance queue may be enabled. Found: [$enabled_ids]" >&2
             exit 1
           }
@@ -190,6 +243,7 @@ jobs:
               castle-assault) map_folders=("Castle Assault") ;;
               heroes-of-gwen) map_folders=("Heroes of GWEN") ;;
               hoops-remastered) map_folders=(); echo "Hoops Remastered uses its generated isolated court; no legacy source map archives are required." ;;
+              wizards) map_folders=(); echo "Wizards and Nano Wizards source archives are imported and packaged by the dedicated 20-map Paper 26.3 harness." ;;
               gladiators) map_folders=("Gladiators") ;;
               micro-battles) map_folders=("Micro Battle") ;;
               milk-the-cow) map_folders=("Milk the Cow") ;;
@@ -234,7 +288,7 @@ jobs:
           grep -Fxq "enabled: true" <<< "$snake_config"
           grep -Fxq "readiness-revision: snake-controlled-acceptance-20261101-v1" <<< "$snake_config"
           grep -Fq 'private static final boolean READY_FOR_TEST = true;' modern-platform/snake-port/src/main/java/au/com/testplex/snake/SnakeModernPlugin.java
-          echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, and all 31 controlled Arcade IDs are packaged and READY_FOR_TEST. The queue represents 29 distinct titles because Monster Maze (Original), Monster Maze (Speed) and Monster Maze (Modern) are selectable modes of one title; Heroes of Gwen and Hoops Remastered each appear once. CI compares all 422 enabled source-map archives with the packaged JAR, including both Heroes of GWEN maps; Evolution, Wither Assault, Sneaky Assassins and Hoops Remastered use dedicated generated arenas. Wizards is the final distinct title to integrate and enable. Speed Builders is manually queued through /arcadeport play speed-builders."
+          echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, and 31 Arcade selections are enabled for controlled testing (29 distinct titles); Evolution is catalogued but disabled pending separate clearance. Heroes of Gwen, Hoops Remastered and Wizards each appear once as Arcade games. CI verifies all 422 bundled original map archives, including both Heroes of GWEN maps; the 20 Wizards/Nano Wizards archives are separately imported in Paper 26.3 and packaged for isolated deployment. Evolution, Wither Assault, Sneaky Assassins and Hoops Remastered use dedicated generated arenas. Speed Builders is manually queued through /arcadeport play speed-builders."
 
       - name: Validate independent deployment recovery and shell syntax
         shell: bash
@@ -264,6 +318,7 @@ jobs:
             modern-platform/snake-port/target/SnakeModern.jar
             modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar
             modern-platform/wizards-port/target/WizardsModern.jar
+            modern-platform/target/WizardsSourceMaps.tar.gz
           if-no-files-found: error
           retention-days: 14
 
@@ -276,12 +331,12 @@ jobs:
             echo
             echo "- Runtime/API baseline: Java 25 / Paper 26.3"
             echo "- Separate from legacy Java 8 build and deployment"
-            echo "- Catalogue: 31 Arcade selectable IDs (31 READY_FOR_TEST, 0 MECHANICS_IN_PROGRESS); 29 distinct titles because Monster Maze has three selectable modes"
+            echo "- Catalogue: 32 Arcade selectable IDs (32 READY_FOR_TEST, 0 MECHANICS_IN_PROGRESS), with Evolution excluded from the 31 enabled selections (29 distinct enabled titles)"
             echo "- Built artifacts: TestplexModernArcade.jar, SnakeModern.jar, ArcadeMechanicsModern.jar and WizardsModern.jar (Monster Maze is compiled into the Testplex-owned Arcade module)"
             echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
             echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
-            echo "- Gameplay ports: all 31 catalogue IDs are READY_FOR_TEST, including one Heroes of Gwen Arcade entry and one Hoops Remastered entry; 29 distinct titles are currently represented because Monster Maze (Original), Monster Maze (Speed) and Monster Maze (Modern) are separate modes of one title. Wizards is the final title to add to reach 30 distinct Arcade games"
-            echo "- Playable allow-list: Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Castle Assault, Gladiators, Micro Battles, Milk the Cow, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons, Evolution, Runner, Sheep Quest, Turf Wars, Snap, Monster Maze (Original), Monster Maze (Speed), Monster Maze (Modern), Snake, Draw My Thing, Master Builders, SkyWars Mixed, Wither Assault, Sneaky Assassins, Speed Builders, Heroes of Gwen and Hoops Remastered; Wizards is the one final title to add"
+            echo "- Gameplay ports: 31 selections enabled across 29 distinct games, including one Heroes of Gwen Arcade entry, one Hoops Remastered entry and one Wizards Arcade entry; Evolution is withheld pending separate source-map clearance"
+            echo "- Playable allow-list: Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Castle Assault, Gladiators, Micro Battles, Milk the Cow, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons, Runner, Sheep Quest, Turf Wars, Snap, Monster Maze (Original), Monster Maze (Speed), Monster Maze (Modern), Snake, Draw My Thing, Master Builders, SkyWars Mixed, Wither Assault, Sneaky Assassins, Speed Builders, Heroes of Gwen, Hoops Remastered and Wizards"
             echo "- Deployment: successful pushes to feat/testplex-modern-26.3-platform automatically deploy through the isolated modern Hyper-V workflow"
           } >> "$GITHUB_STEP_SUMMARY"
 

@@ -85,7 +85,15 @@ final class ArcadeTestPlayerManager {
     }
 
     static int additionalPlayersNeeded(int humanPlayers) {
-        return Math.max(0, TARGET_ROSTER_SIZE - Math.max(0, humanPlayers));
+        // Only disposable Paper gameplay harnesses set this JVM property. Real
+        // deployments retain the full 16-player test roster by default.
+        return additionalPlayersNeeded(humanPlayers,
+                Integer.getInteger("testplex.arcade.acceptance-target-roster-size", TARGET_ROSTER_SIZE));
+    }
+
+    static int additionalPlayersNeeded(int humanPlayers, int targetRosterSize) {
+        int clampedTarget = Math.max(1, Math.min(TARGET_ROSTER_SIZE, targetRosterSize));
+        return Math.max(0, clampedTarget - Math.max(0, humanPlayers));
     }
 
     static boolean canFitHumanPlayers(int humanPlayers) {
@@ -181,9 +189,19 @@ final class ArcadeTestPlayerManager {
                 }
                 startupCleanupSucceeded = true;
             } catch (Exception exception) {
-                host.getLogger().warning("Could not inspect FakePlayerPlugin for stale Testplex bots: "
-                        + rootMessage(exception));
-                startupCleanupSucceeded = false;
+                // A disposable real-client smoke server has no FakePlayerPlugin at
+                // all. Absence is safe only when no TPXTEST player survived a
+                // previous session; it must not block a fully human match.
+                // Any match needing bots still checks the FPP damageable API.
+                boolean pluginMissing = Bukkit.getPluginManager().getPlugin(FPP_PLUGIN_NAME) == null;
+                startupCleanupSucceeded = pluginMissing && noOnlineTestPlayersRemain();
+                if (startupCleanupSucceeded) {
+                    host.getLogger().info("No FakePlayerPlugin installed and no stale TPXTEST players present; "
+                            + "allowing a human-only Arcade match.");
+                } else {
+                    host.getLogger().warning("Could not verify cleanup of stale FakePlayerPlugin test players: "
+                            + rootMessage(exception));
+                }
             } finally {
                 if (!cleanupScheduled) startupCleanupComplete = true;
             }
