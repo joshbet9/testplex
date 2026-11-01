@@ -118,6 +118,16 @@ public final class ArcadeProgressCatalog {
                     a("solo-carry", "Solo carry", "Kill 3 opponents and then capture 2 of their sheep without teammate assists."),
                     a("the-biggest-loser", "The Biggest Loser", "Lose after capturing 8 sheep."),
                     a("baaaad-to-the-bone", "Baaaaad to the bone", "As Archer, kill the same eligible player 5 times with bowshots."))),
+            Map.entry("snake", List.of(
+                    a("Cannibal", "Cannibal", "Get six kills in one Snake game."),
+                    a("ChooChoo", "Choo Choo", "Grow your tail to at least 60 sheep segments."),
+                    a("SlimySheep", "Slimy Sheep", "Eat 20 green slime pickups in one Snake game."),
+                    a("dont-want-none", "Don't want none", "Win a game without getting a kill."),
+                    a("resilience-snakeified", "Resilience Snakeified", "Win after being hit by a 10-second Magma Cube nerf."),
+                    a("busted", "Busted", "Roll the same Magma Cube nerf 3 times in a row."),
+                    a("one-of-the-ogs", "One of the OGs", "Win a game without using an ability."),
+                    a("flawless", "Flawless", "Win with every kill earned while an ability is active."),
+                    a("bots-everywhere", "Bots Everywhere!", "Win while staying within 10 blocks of the map edge throughout the game."))),
 
             Map.entry("spleef", List.of(
                     a("praying-to-the-gods", "Praying to the Gods", "Win while falling into the void."),
@@ -233,16 +243,7 @@ public final class ArcadeProgressCatalog {
             Map.entry("paintball", List.of(m("wins", "Wins", "wins", 5000, "wins"), m("kills", "Kills", "kills", 5000, "kills"), m("revives", "Revives", "medic", 2500, "revives"))),
             Map.entry("runner", List.of(m("wins", "Wins", "wins", 250, "wins"), m("blocks-run", "Blocks Run", "marathon-runner", 100000, "blocks"))),
             Map.entry("sheep-quest", List.of(m("wins", "Wins", "wins", 250, "wins"), m("kills", "Kills", "kills", 2000, "kills"), m("sheep-captures", "Sheep Captures", "sheep-captures", 1000, "captures"))),
-            Map.entry("snake", List.of(
-                    a("Cannibal", "Cannibal", "Get six kills in one Snake game."),
-                    a("ChooChoo", "Choo Choo", "Grow your tail to at least 60 sheep segments."),
-                    a("SlimySheep", "Slimy Sheep", "Eat 20 green slime pickups in one Snake game."),
-                    a("dont-want-none", "Don't want none", "Win a game without getting a kill."),
-                    a("resilience-snakeified", "Resilience Snakeified", "Win after being hit by a 10-second Magma Cube nerf."),
-                    a("busted", "Busted", "Roll the same Magma Cube nerf 3 times in a row."),
-                    a("one-of-the-ogs", "One of the OGs", "Win a game without using an ability."),
-                    a("flawless", "Flawless", "Win with every kill earned while an ability is active."),
-                    a("bots-everywhere", "Bots Everywhere!", "Win while staying within 10 blocks of the map edge throughout the game."))),
+            Map.entry("snake", List.of(m("wins", "Wins", "wins", 250, "wins"), m("kills", "Kills", "lifetime-kills", 750, "kills"))),
             Map.entry("spleef", List.of(m("wins", "Wins", "wins", 250, "wins"), m("blocks-broken", "Blocks Broken", "blocks-broken", 250000, "blocks"))),
             Map.entry("turf-wars", List.of(m("wins", "Wins", "wins", 1000, "wins"), m("kills", "Kills", "kills", 10000, "kills"), m("blocks-broken", "Blocks Broken", "blocks-broken", 10000, "blocks"))),
             Map.entry("sneaky-assassins", List.of(
