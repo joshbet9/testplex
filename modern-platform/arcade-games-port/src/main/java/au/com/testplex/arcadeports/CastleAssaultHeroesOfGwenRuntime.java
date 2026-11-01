@@ -2952,9 +2952,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 damage, heroesOfGwenOwnedStoreItemNames(owner));
     }
 
-    private void healHeroesOfGwenAbility(Player recipient, double baseAmount) {
-        if (recipient == null || !recipient.isOnline()) return;
-        double amount = heroesOfGwenStoreAbilityDamage(recipient, baseAmount);
+    private void healHeroesOfGwenAbility(Player source, LivingEntity recipient, double baseAmount) {
+        if (source == null || !source.isOnline() || recipient == null
+                || !recipient.isValid() || recipient.isDead()) return;
+        double amount = heroesOfGwenStoreAbilityDamage(source, baseAmount);
         recipient.setHealth(Math.min(recipient.getMaxHealth(), recipient.getHealth() + amount));
     }
 
@@ -4455,7 +4456,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                                     * ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS) continue;
                     if (entity instanceof Player target && activePlayers.contains(target.getUniqueId())) {
                         if (teams.getOrDefault(target.getUniqueId(), -1) == zone.team) {
-                            healHeroesOfGwenAbility(target, ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_HEAL_PER_SECOND);
+                            healHeroesOfGwenAbility(owner, target, ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_HEAL_PER_SECOND);
                         } else {
                             damageHeroesOfGwenAbility(target, owner,
                                     ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DAMAGE_PER_SECOND);
@@ -4548,7 +4549,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 int team = teams.getOrDefault(id, -1);
                 for (Player teammate : activeMatchPlayers()) {
                     if (teams.getOrDefault(teammate.getUniqueId(), -1) != team) continue;
-                    healHeroesOfGwenAbility(teammate, ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_PER_SECOND);
+                    healHeroesOfGwenAbility(owner, teammate, ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_PER_SECOND);
                     Location visual = teammate.getLocation().clone().add(0.0D, 2.4D, 0.0D);
                     world.spawnParticle(Particle.CLOUD, visual, 6, 0.35D, 0.2D, 0.35D, 0.01D);
                     world.spawnParticle(Particle.DRIPPING_WATER, visual, 3, 0.3D, 0.15D, 0.3D, 0.03D);
@@ -5362,7 +5363,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             double amount = target.equals(player)
                     ? ArcadePortRules.HEROES_OF_GWEN_DANA_PULSE_HEAL_SELF
                     : ArcadePortRules.HEROES_OF_GWEN_DANA_PULSE_HEAL_ALLY;
-            healHeroesOfGwenAbility(target, amount);
+            healHeroesOfGwenAbility(player, target, amount);
             world.spawnParticle(Particle.HAPPY_VILLAGER,
                     target.getLocation().clone().add(0.0D, 1.0D, 0.0D),
                     8, 0.45D, 0.5D, 0.45D, 0.06D);
@@ -5514,7 +5515,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 for (Player teammate : activeMatchPlayers()) {
                     if (teams.getOrDefault(teammate.getUniqueId(), -2) != team
                             || teammate.getLocation().distanceSquared(state.center) > radius * radius) continue;
-                    healHeroesOfGwenAbility(teammate, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_HEAL_PER_SECOND);
+                    healHeroesOfGwenAbility(player, teammate, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_HEAL_PER_SECOND);
                     world.spawnParticle(Particle.HAPPY_VILLAGER,
                             teammate.getLocation().clone().add(0.0D, 1.0D, 0.0D),
                             4, 0.3D, 0.35D, 0.3D, 0.04D);
