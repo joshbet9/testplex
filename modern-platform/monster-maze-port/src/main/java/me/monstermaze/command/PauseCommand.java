@@ -77,7 +77,13 @@ public class PauseCommand implements CommandExecutor, Listener {
     }
 
     private boolean hasPermission(CommandSender sender) {
-        return plugin.isSoloMode() || sender.hasPermission(ADMIN_PERMISSION);
+        if (sender.hasPermission(ADMIN_PERMISSION)) return true;
+        // In a standalone one-player run, the sole participant may pause their own game.
+        // The embedded Testplex Arcade module never lets a player pause a shared round.
+        if (!plugin.isSoloMode() || game.isTestplexManagedRound()
+                || !(sender instanceof Player player)) return false;
+        List<Player> alive = game.getAlivePlayers();
+        return alive.size() == 1 && alive.getFirst().getUniqueId().equals(player.getUniqueId());
     }
 
     private void pause(CommandSender sender) {
