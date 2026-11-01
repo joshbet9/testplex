@@ -2450,6 +2450,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private void giveHeroesOfGwenLoadout(Player player, String hero) {
         UUID id = player.getUniqueId();
         heroTntArrowCharges.remove(id);
+        heroAmmoNextAt.remove(id);
         heroEnderBladeEndsAt.remove(id);
         heroEnderBladeOriginalSword.remove(id);
         heroInfinityEndsAt.remove(id);
