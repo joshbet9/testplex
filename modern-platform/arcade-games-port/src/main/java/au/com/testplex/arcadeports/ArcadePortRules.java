@@ -2682,6 +2682,84 @@ public final class ArcadePortRules {
         return null;
     }
 
+    /** Source MobaItemEffect value maps for the role shops. */
+    public static double heroesOfGwenStoreAbilityDamageFactor(String itemName) {
+        if (itemName == null) return 0.0D;
+        return switch (itemName) {
+            case "Urchin's Leggings" -> 0.10D;
+            case "Specialist's Bow" -> 0.20D;
+            case "Adept's Cap", "Adept's Boots" -> 0.05D;
+            case "Adept's Chestplate" -> 0.15D;
+            case "Adept's Leggings" -> 0.10D;
+            default -> 0.0D;
+        };
+    }
+
+    public static double heroesOfGwenStoreBasicAttackDamageFactor(String itemName) {
+        if (itemName == null) return 0.0D;
+        return switch (itemName) {
+            case "Battle Mage Cap", "Battle Mage Boots" -> 0.03D;
+            case "Battle Mage Chestplate" -> 0.10D;
+            case "Battle Mage Leggings" -> 0.05D;
+            default -> 0.0D;
+        };
+    }
+
+    public static double heroesOfGwenStoreMeleeDamageBonus(String itemName) {
+        return "Urchin's Chestcloth".equals(itemName) ? 1.0D : 0.0D;
+    }
+
+    public static double heroesOfGwenStoreHealthRegenBonus(String itemName) {
+        if (itemName == null) return 0.0D;
+        return switch (itemName) {
+            case "Urchin's Cap", "Vampiric Helmet" -> 0.20D;
+            case "Archer's Bane Helmet", "Brawler's Plate Helmet" -> 0.03D;
+            case "Superior Archer's Bane Helmet" -> 0.05D;
+            case "Prince's Plate Helmet" -> 0.15D;
+            default -> 0.0D;
+        };
+    }
+
+    public static double heroesOfGwenStoreSpeedFactor(String itemName) {
+        if (itemName == null) return 0.0D;
+        return switch (itemName) {
+            case "Ninja's Boots" -> 0.15D;
+            case "Urchin's Boots" -> 0.17D;
+            case "Leather Hiking Boots" -> 0.05D;
+            case "Leather Moccasins" -> 0.10D;
+            case "Leather Crosstrainers" -> 0.15D;
+            case "Archer's Bane Boots", "Brawler's Plate Boots" -> 0.04D;
+            case "Superior Archer's Bane Boots" -> 0.06D;
+            case "Prince's Plate Boots" -> 0.10D;
+            default -> 0.0D;
+        };
+    }
+
+    public static int heroesOfGwenStoreMaxHealthBonus(String itemName) {
+        if (itemName == null) return 0;
+        return switch (itemName) {
+            case "Archer's Bane Chestplate", "Brawler's Plate Chestplate" -> 2;
+            case "Superior Archer's Bane Chestplate", "Prince's Plate Chestplate" -> 4;
+            default -> 0;
+        };
+    }
+
+    public static double heroesOfGwenStoreKillHeal(String itemName) {
+        if (itemName == null) return 0.0D;
+        return switch (itemName) {
+            case "Sword of Time" -> 3.0D;
+            case "Ninja's Mask" -> 2.0D;
+            case "Vampiric Bow" -> 0.15D;
+            case "Vampiric Chestplate", "Vampiric Leggings" -> 3.0D;
+            case "Vampiric Boots" -> 1.0D;
+            default -> 0.0D;
+        };
+    }
+
+    public static int heroesOfGwenStoreAmmoIncrease(String itemName) {
+        return "Leather Cap of Holding".equals(itemName) ? 1 : 0;
+    }
+
     /** Original role-store equipment enchantment family by display name. */
     public static String heroesOfGwenStoreEnchantment(String itemName) {
         if (itemName == null) return "";
