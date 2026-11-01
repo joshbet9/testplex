@@ -113,7 +113,7 @@ public final class ModernArcadeLobby implements Listener {
         world.setGameRule(GameRule.KEEP_INVENTORY, true);
         world.setSpawnLocation((int) SPAWN_X, (int) SPAWN_Y, (int) SPAWN_Z);
         world.getWorldBorder().setCenter(0.0D, 0.0D);
-        world.getWorldBorder().setSize(100.0D);
+        world.getWorldBorder().setSize(59_999_968.0D);
         world.getWorldBorder().setDamageAmount(0.0D);
 
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=lobby-plane-build-start");

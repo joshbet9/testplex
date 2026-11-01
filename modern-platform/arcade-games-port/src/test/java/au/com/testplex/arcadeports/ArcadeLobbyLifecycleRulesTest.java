@@ -6,8 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class ArcadeLobbyLifecycleRulesTest {
     @Test void recruitCountdownUsesLegacyFullnessThresholds() {
         assertEquals(-1, ArcadeLobbyLifecycleRules.recruitCountdownSeconds(0, 1, 16));
-        assertEquals(60, ArcadeLobbyLifecycleRules.recruitCountdownSeconds(1, 1, 16));
-        assertEquals(60, ArcadeLobbyLifecycleRules.recruitCountdownSeconds(11, 1, 16));
+        assertEquals(20, ArcadeLobbyLifecycleRules.recruitCountdownSeconds(1, 1, 16));
+        assertEquals(20, ArcadeLobbyLifecycleRules.recruitCountdownSeconds(11, 1, 16));
         assertEquals(30, ArcadeLobbyLifecycleRules.recruitCountdownSeconds(12, 1, 16));
         assertEquals(30, ArcadeLobbyLifecycleRules.recruitCountdownSeconds(15, 1, 16));
         assertEquals(10, ArcadeLobbyLifecycleRules.recruitCountdownSeconds(16, 1, 16));

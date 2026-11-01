@@ -118,13 +118,7 @@ public final class ArcadeProgressCatalog {
                     a("solo-carry", "Solo carry", "Kill 3 opponents and then capture 2 of their sheep without teammate assists."),
                     a("the-biggest-loser", "The Biggest Loser", "Lose after capturing 8 sheep."),
                     a("baaaad-to-the-bone", "Baaaaad to the bone", "As Archer, kill the same eligible player 5 times with bowshots."))),
-            Map.entry("snake", List.of(
-                    a("dont-want-none", "Don't want none", "Win a game without getting a kill."),
-                    a("resilience-snakeified", "Resilience Snakeified", "Win after being hit by a 10-second Magma Cube nerf."),
-                    a("busted", "Busted", "Roll the same Magma Cube nerf 3 times in a row."),
-                    a("one-of-the-ogs", "One of the OGs", "Win a game without using an ability."),
-                    a("flawless", "Flawless", "Win with every kill earned while an ability is active."),
-                    a("bots-everywhere", "Bots Everywhere!", "Win while staying within 10 blocks of the map edge throughout the game."))),
+
             Map.entry("spleef", List.of(
                     a("praying-to-the-gods", "Praying to the Gods", "Win while falling into the void."),
                     a("clutchest-of-them-all", "Clutchest of them all", "As Brawler, spleef yourself and your final opponent, then leap back to the ground and win."),

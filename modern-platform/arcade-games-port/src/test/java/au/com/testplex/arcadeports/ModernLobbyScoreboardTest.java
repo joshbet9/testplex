@@ -11,31 +11,41 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ModernLobbyScoreboardTest {
     @Test
-    void rendersOnlyTheOriginalFourArcadeScoreboardSections() {
+    void rendersPlayersGameKitGemsAndServerSections() {
         List<String> lines = ModernLobbyScoreboard.sidebarLines(
-                "2/16", "Runner Basher", "0", "Testplex Modern");
+                "2/16", "Monster Maze", "Runner Basher", "0", "Testplex Modern");
 
-        assertEquals(12, lines.size());
-        assertEquals(12, new HashSet<>(lines).size());
+        assertEquals(15, lines.size());
+        assertEquals(15, new HashSet<>(lines).size());
 
         assertEquals(ChatColor.YELLOW.toString() + ChatColor.BOLD + "Players", lines.get(1));
         assertEquals(ChatColor.WHITE + "2/16", lines.get(2));
-        assertEquals(ChatColor.GOLD.toString() + ChatColor.BOLD + "Kit", lines.get(4));
-        assertEquals(ChatColor.WHITE + "Runner Basher", lines.get(5));
-        assertEquals(ChatColor.GREEN.toString() + ChatColor.BOLD + "Gems", lines.get(7));
-        assertEquals(ChatColor.WHITE + "0", lines.get(8));
-        assertEquals(ChatColor.AQUA.toString() + ChatColor.BOLD + "Server", lines.get(10));
-        assertEquals(ChatColor.WHITE + "Testplex Modern", lines.get(11));
+        assertEquals(ChatColor.AQUA.toString() + ChatColor.BOLD + "Game", lines.get(4));
+        assertEquals(ChatColor.WHITE + "Monster Maze", lines.get(5));
+        assertEquals(ChatColor.GOLD.toString() + ChatColor.BOLD + "Kit", lines.get(7));
+        assertEquals(ChatColor.WHITE + "Runner Basher", lines.get(8));
+        assertEquals(ChatColor.GREEN.toString() + ChatColor.BOLD + "Gems", lines.get(10));
+        assertEquals(ChatColor.WHITE + "0", lines.get(11));
+        assertEquals(ChatColor.AQUA.toString() + ChatColor.BOLD + "Server", lines.get(13));
+        assertEquals(ChatColor.WHITE + "Testplex Modern", lines.get(14));
 
         String visible = String.join("|", lines.stream().map(ChatColor::stripColor).toList());
         assertTrue(visible.contains("Players"));
+        assertTrue(visible.contains("Game"));
+        assertTrue(visible.contains("Monster Maze"));
         assertTrue(visible.contains("Kit"));
         assertTrue(visible.contains("Gems"));
         assertTrue(visible.contains("Server"));
         assertTrue(!visible.contains("Shards"));
         assertTrue(!visible.contains("Rank"));
         assertTrue(!visible.contains("Website"));
-        assertTrue(!visible.contains("Game"));
+    }
+
+    @Test
+    void formatsTheSelectedGameAndCollapsesMonsterMazeModes() {
+        assertEquals("Death Tag", ModernLobbyScoreboard.formatGameName("death-tag"));
+        assertEquals("Monster Maze", ModernLobbyScoreboard.formatGameName("monster-maze-speed"));
+        assertEquals("Speed Builders", ModernLobbyScoreboard.formatGameName("speed-builders"));
     }
 
     @Test

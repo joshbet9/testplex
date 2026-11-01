@@ -10,7 +10,7 @@ final class ArcadeLobbyLifecycleRules {
         int safeCapacity = Math.max(1, capacity);
         if (players >= safeCapacity) return 10;
         if (players >= Math.ceil(safeCapacity * 0.75D)) return 30;
-        return 60;
+        return 20;
     }
     /** Gameplay input is not accepted until the session's Prepare phase has ended. */
     static boolean gameplayInputAllowed(boolean liveStarted) { return liveStarted; }

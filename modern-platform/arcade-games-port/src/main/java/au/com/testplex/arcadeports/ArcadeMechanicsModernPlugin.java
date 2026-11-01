@@ -593,7 +593,9 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 ArcadePortGame mixedStartGame = mixedArcadeGameFromId(args[1]);
                 boolean mixedArcadeStart = mixedStartGame != null;
                 ArcadePortGame requestedStartGame = mixedArcadeStart ? mixedStartGame : ArcadePortGame.fromId(args[1]);
-                manager.startFromLobby(requestedStartGame, sender, mixedArcadeStart);
+                boolean startImmediately = args.length > 2
+                        && ("immediate".equalsIgnoreCase(args[2]) || "now".equalsIgnoreCase(args[2]));
+                manager.startFromLobby(requestedStartGame, sender, mixedArcadeStart, startImmediately);
                 return true;
             case "kit":
                 if (!(sender instanceof Player player)) {
