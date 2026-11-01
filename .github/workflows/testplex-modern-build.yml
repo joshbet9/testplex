@@ -16,6 +16,8 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "modern-platform/**"
+      - ".github/scripts/audit_recovered_arcade_maps.py"
+      - ".github/scripts/test_audit_recovered_arcade_maps.py"
       - ".github/workflows/testplex-modern-build.yml"
       - ".github/workflows/deploy-testplex-modern-hyperv.yml"
       - ".github/testplex-modern-recovery.sh"
@@ -34,6 +36,9 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+
+      - name: Verify recovered Evolution and Gladiators archives remain unconfigured
+        run: python3 -m unittest discover -s .github/scripts -p 'test_audit_recovered_arcade_maps.py' -v
 
       - name: Set up Java 25
         uses: actions/setup-java@v4
