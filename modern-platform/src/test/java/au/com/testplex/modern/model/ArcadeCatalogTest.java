@@ -179,6 +179,21 @@ class ArcadeCatalogTest {
     }
 
     @Test
+    void microBattlesUsesOneCombinedMultiSelectGlassAndBorderLine() {
+        GameDefinition game = new ArcadeCatalog().getGame("micro-battles");
+        assertNotNull(game);
+        assertEquals(1, game.getCosmeticLines().size());
+        CosmeticLineDefinition line = game.getCosmeticLines().get(0);
+        assertEquals("island-visuals", line.getId());
+        assertEquals(CosmeticLineDefinition.SelectionMode.MULTI, line.getSelectionMode());
+        assertEquals(32, line.getOptions().size());
+        assertEquals(16, line.getOptions().stream().filter(option -> option.getId().startsWith("glass-")).count());
+        assertEquals(16, line.getOptions().stream().filter(option -> option.getId().startsWith("border-")).count());
+        assertTrue(line.getDescription().contains("private starting-glass"));
+        assertTrue(line.getDescription().contains("shared border-particle"));
+    }
+
+    @Test
     void monsterMazeMobFormsCanBeEquippedIndependently() {
         GameDefinition game = new ArcadeCatalog().getGame("monster-maze");
         CosmeticLineDefinition mobForms = game.getCosmeticLines().stream()
