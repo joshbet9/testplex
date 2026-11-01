@@ -3466,26 +3466,51 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         target.damage(damage, owner);
     }
 
+
     private void performHattoriDash(Player player) {
-        Location origin = player.getEyeLocation();
+        Location origin = player.getEyeLocation().clone();
         Vector direction = player.getLocation().getDirection().normalize();
         Location destination = player.getLocation().clone();
         Set<UUID> hit = new HashSet<>();
-        double range = 10.0D;
-        for (double distance = 0.5D; distance <= range; distance += 0.5D) {
+        double range = ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_RANGE;
+        int team = teams.getOrDefault(player.getUniqueId(), -1);
+        for (double distance = 0.4D; distance <= range; distance += 0.4D) {
             Location point = origin.clone().add(direction.clone().multiply(distance));
             world.spawnParticle(Particle.CRIT, point, 3, 0.12D, 0.12D, 0.12D, 0.01D);
-            for (Entity entity : world.getNearbyEntities(point, 1.5D, 1.5D, 1.5D)) {
-                if (!(entity instanceof Player target) || target.equals(player)
-                        || !activePlayers.contains(target.getUniqueId())
-                        || teams.getOrDefault(target.getUniqueId(), -1) == teams.getOrDefault(player.getUniqueId(), -2)
+            double radius = ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_COLLISION_RADIUS;
+            for (Entity entity : world.getNearbyEntities(point, radius, radius, radius)) {
+                if (!(entity instanceof LivingEntity target) || target.equals(player)
+                        || !target.isValid() || target.isDead()
+                        || point.distanceSquared(target.getLocation()) > radius * radius
                         || !hit.add(target.getUniqueId())) continue;
-                target.damage(8.0D, player);
-                Vector push = target.getLocation().toVector().subtract(player.getLocation().toVector());
-                if (push.lengthSquared() > 0.001D) target.setVelocity(push.normalize().multiply(0.7D).setY(0.25D));
+                if (target instanceof Player victim && !activePlayers.contains(victim.getUniqueId())) continue;
+                int targetTeam = heroesOfGwenEntityTeam(target);
+                if (targetTeam >= 0 && targetTeam == team) continue;
+                TowerState tower = towerFor(target);
+                if (tower != null) {
+                    if (tower.owner != team && canDamageMobaTower(tower, team)
+                            && player.getLocation().distanceSquared(tower.location) <= MOBA_TOWER_RANGE_SQUARED) {
+                        damageMobaTower(tower,
+                                ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_DAMAGE, player);
+                    }
+                } else if (target instanceof Wither wither) {
+                    Integer enemyTeam = withers.entrySet().stream()
+                            .filter(witherEntry -> witherEntry.getValue().equals(wither))
+                            .map(Map.Entry::getKey).findFirst().orElse(null);
+                    if (enemyTeam != null && enemyTeam != team
+                            && witherDamageable.getOrDefault(enemyTeam, false)) {
+                        double damage = ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_DAMAGE;
+                        if (wither.getHealth() <= damage) {
+                            finishHeroesOfGwen(team, "enemy Wither defeated by Hattori's Ninja Dash");
+                            return;
+                        }
+                        wither.setHealth(wither.getHealth() - damage);
+                    }
+                } else {
+                    target.damage(ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_DAMAGE, player);
+                }
             }
-            Block feet = point.getBlock();
-            if (!feet.isPassable() && distance > 1.0D) break;
+            if (!point.getBlock().isPassable() && distance > 1.0D) break;
             destination = point.clone().subtract(0.0D, 1.6D, 0.0D);
         }
         destination.setYaw(player.getLocation().getYaw());
