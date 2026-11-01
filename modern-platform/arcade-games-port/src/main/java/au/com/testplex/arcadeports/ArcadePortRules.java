@@ -2666,6 +2666,10 @@ public final class ArcadePortRules {
     public static final int HEROES_OF_GWEN_PUMPKIN_KING_REGENERATION_AMPLIFIER = 1;
     public static final double HEROES_OF_GWEN_PUMPKIN_KING_DAMAGE_MULTIPLIER = 1.5D;
     public static final long HEROES_OF_GWEN_MONOCHROME_SKELETONS_DURATION_MILLIS = 30_000L;
+    public static final int HEROES_OF_GWEN_SMALL_HEALTH_POTION_HEAL_HP = 4;
+    public static final int HEROES_OF_GWEN_LARGE_HEALTH_POTION_HEAL_HP = 8;
+    public static final long HEROES_OF_GWEN_POWER_POTION_DURATION_MILLIS = 90_000L;
+    public static final long HEROES_OF_GWEN_SPEED_POTION_DURATION_MILLIS = 180_000L;
 
     /** Return red/blue challenge winner, or -1 for a tie. */
     public static int heroesOfGwenMonochromeWinner(int redKills, int blueKills) {
