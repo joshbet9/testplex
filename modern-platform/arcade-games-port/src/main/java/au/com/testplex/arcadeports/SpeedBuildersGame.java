@@ -399,6 +399,7 @@ public final class SpeedBuildersGame implements Listener {
             state.empty = false;
             state.player.setGameMode(GameMode.SURVIVAL);
             state.player.getInventory().clear();
+            removeMobs(state.mobs);
             clearPlotBuildVolume(state.plot);
             pasteTemplate(state.plot, currentTemplate);
             spawnTemplateMobs(state, state.plot, currentTemplate);
@@ -477,38 +478,59 @@ public final class SpeedBuildersGame implements Listener {
         for (PlayerState state : alive) {
             scores.add(new SpeedBuildersRules.PlayerScore(
                     state.player.getUniqueId().toString(), state.score,
-                    currentTemplate.cells().size(), state.empty));
+                    currentTemplate.expectedScore(), state.empty));
+            state.player.sendMessage(ChatColor.GREEN + "You scored " + percent(state.score)
+                    + "% — " + state.score + "/" + currentTemplate.expectedScore() + " points.");
         }
         Set<String> candidates = SpeedBuildersRules.eliminationCandidates(scores);
-        if (candidates.size() >= alive.size()) {
-            // A round of completely empty builds should still leave a playable winner.
-            PlayerState best = alive.stream().max((left, right) -> Integer.compare(left.score, right.score)).orElseThrow();
-            candidates = new LinkedHashSet<>(candidates);
-            candidates.remove(best.player.getUniqueId().toString());
-        }
+        pendingEliminations.clear();
+        alive.stream()
+                .filter(state -> candidates.contains(state.player.getUniqueId().toString()))
+                .sorted(java.util.Comparator.comparing((PlayerState state) -> !state.empty)
+                        .thenComparingInt(state -> state.score)
+                        .thenComparing(state -> state.player.getUniqueId().toString()))
+                .forEach(pendingEliminations::add);
 
-        for (PlayerState state : alive) {
-            if (candidates.contains(state.player.getUniqueId().toString())) {
-                state.eliminated = true;
-                state.player.sendTitle(ChatColor.RED + "ELIMINATED",
-                        ChatColor.YELLOW + "You scored " + percent(state.score) + "%",
-                        0, 50, 10);
-                state.player.sendMessage(ChatColor.RED + "You have been eliminated from Speed Builders.");
-            } else {
-                state.player.sendMessage(ChatColor.GREEN + "You scored " + percent(state.score)
-                        + "% — keep building!");
-            }
+        Bukkit.broadcastMessage(ChatColor.YELLOW + "Round " + round + " judged. "
+                + pendingEliminations.size() + " builder(s) will be eliminated.");
+        if (pendingEliminations.isEmpty()) {
+            phase = Phase.INTERMISSION;
+            phaseDeadlineTick = tick + SpeedBuildersRules.INTERMISSION_SECONDS * 20L;
+        } else {
+            phase = Phase.ELIMINATING;
+            eliminateNextPlayer();
         }
-        List<PlayerState> remaining = alivePlayers();
-        Bukkit.broadcastMessage(ChatColor.YELLOW + "Round " + round + " complete. "
-                + remaining.size() + " builder(s) remain.");
-        if (remaining.size() <= 1) {
-            finishMatch(remaining.isEmpty() ? null : remaining.getFirst().player, "The last builder standing wins.");
+        refreshHud();
+    }
+
+    /** Reborn eliminates one lowest/empty build at a time, with a two-second gap. */
+    private void eliminateNextPlayer() {
+        if (phase != Phase.ELIMINATING) return;
+        if (pendingEliminations.isEmpty()) {
+            List<PlayerState> remaining = alivePlayers();
+            if (remaining.size() <= 1) {
+                finishMatch(remaining.isEmpty() ? null : remaining.getFirst().player,
+                        "The last builder standing wins.");
+            } else {
+                phase = Phase.INTERMISSION;
+                phaseDeadlineTick = tick + SpeedBuildersRules.INTERMISSION_SECONDS * 20L;
+            }
             return;
         }
-
-        phase = Phase.INTERMISSION;
-        phaseDeadlineTick = tick + SpeedBuildersRules.INTERMISSION_SECONDS * 20L;
+        PlayerState eliminated = pendingEliminations.removeFirst();
+        eliminated.eliminated = true;
+        removeMobs(eliminated.mobs);
+        clearPlotBuildVolume(eliminated.plot);
+        eliminated.player.sendTitle(ChatColor.RED + "ELIMINATED",
+                ChatColor.YELLOW + "You scored " + percent(eliminated.score) + "%", 0, 50, 10);
+        eliminated.player.sendMessage(ChatColor.RED + "You have been eliminated from Speed Builders.");
+        eliminated.player.setGameMode(GameMode.SPECTATOR);
+        eliminated.player.teleport(new Location(arena, 0.5D, REVIEW_Y, 0.5D, 0.0F, 30.0F));
+        Bukkit.broadcastMessage(ChatColor.RED + eliminated.player.getName()
+                + ChatColor.YELLOW + " was eliminated. " + alivePlayers().size() + " builder(s) remain.");
+        phaseDeadlineTick = tick + (pendingEliminations.isEmpty()
+                ? SpeedBuildersRules.INTERMISSION_SECONDS * 20L
+                : SpeedBuildersRules.ELIMINATION_INTERVAL_SECONDS * 20L);
         refreshHud();
     }
 
@@ -541,6 +563,8 @@ public final class SpeedBuildersGame implements Listener {
             }
         }
         players.clear();
+        pendingEliminations.clear();
+        clearPlotBuildVolume(new Plot(0, 0));
         refreshHud();
     }
 
@@ -881,8 +905,8 @@ public final class SpeedBuildersGame implements Listener {
 
     private void checkPerfectBuild(PlayerState state) {
         if (phase != Phase.BUILDING || state.eliminated || state.perfect || !state.player.isOnline()) return;
-        int score = score(state.plot);
-        if (score == currentTemplate.cells().size()) {
+        int score = score(state);
+        if (score == currentTemplate.expectedScore()) {
             state.perfect = true;
             state.perfectBuilds++;
             state.player.getInventory().clear();
