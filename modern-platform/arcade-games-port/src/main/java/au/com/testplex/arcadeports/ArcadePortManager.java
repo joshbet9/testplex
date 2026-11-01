@@ -6729,7 +6729,9 @@ public final class ArcadePortManager implements Listener {
             // clocks until Live so cooldowns, round timers and first spawns begin
             // from the same game-start instant instead of consuming Prepare time.
             long prepareElapsed = Math.max(0L, now - session.startedAt);
-            shiftSessionTimestamps(session, prepareElapsed);
+            for (String timerFailure : SessionTimestampShifter.shift(session, prepareElapsed)) {
+                plugin.getLogger().warning("Could not pause a session timer: " + timerFailure);
+            }
             session.startedAt = now;
             session.ticks = 0;
             if (session.endsAt > 0L) {
@@ -19648,51 +19650,6 @@ public final class ArcadePortManager implements Listener {
      * configured duration. Maps whose values are timestamps (including nested
      * contributor maps) are adjusted as well.
      */
-    private void shiftSessionTimestamps(Session session, long pausedMillis) {
-        if (session == null || pausedMillis <= 0L) return;
-        for (java.lang.reflect.Field field : Session.class.getDeclaredFields()) {
-            if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) continue;
-            String name = field.getName().toLowerCase(java.util.Locale.ROOT);
-            if (!isSessionTimestampField(name)) continue;
-            try {
-                field.setAccessible(true);
-                if (field.getType() == long.class) {
-                    long value = field.getLong(session);
-                    field.setLong(session,
-                            ArcadeLobbyLifecycleRules.shiftPausedTimestamp(value, pausedMillis));
-                } else if (Map.class.isAssignableFrom(field.getType())) {
-                    Object value = field.get(session);
-                    if (value instanceof Map<?, ?> timestamps) {
-                        shiftTimestampMap(timestamps, pausedMillis);
-                    }
-                }
-            } catch (ReflectiveOperationException | RuntimeException exception) {
-                plugin.getLogger().warning("Could not pause session timer field "
-                        + field.getName() + ": " + exception.getMessage());
-            }
-        }
-    }
-
-    private boolean isSessionTimestampField(String name) {
-        if (name.equals("startedat") || name.equals("endsat") || name.equals("prepareendsat")) return false;
-        return name.endsWith("at") || name.endsWith("until")
-                || name.contains("atby") || name.contains("untilby")
-                || name.contains("cooldown") || name.contains("deadline");
-    }
-
-    @SuppressWarnings("unchecked")
-    private void shiftTimestampMap(Map<?, ?> source, long pausedMillis) {
-        Map<Object, Object> timestamps = (Map<Object, Object>) source;
-        for (Map.Entry<Object, Object> entry : timestamps.entrySet()) {
-            Object value = entry.getValue();
-            if (value instanceof Long timestamp) {
-                entry.setValue(ArcadeLobbyLifecycleRules.shiftPausedTimestamp(timestamp, pausedMillis));
-            } else if (value instanceof Map<?, ?> nested) {
-                shiftTimestampMap(nested, pausedMillis);
-            }
-        }
-    }
-
     private boolean isPreparingParticipant(Player player) {
         Session session = active;
         return player != null && session != null
