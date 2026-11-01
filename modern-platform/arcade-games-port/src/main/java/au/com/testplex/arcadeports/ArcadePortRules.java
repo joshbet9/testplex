@@ -2844,6 +2844,24 @@ public final class ArcadePortRules {
 
 
 
+    // Anath the Burnt — values from the archived Heroes of Gwen ability references.
+    public static final long HEROES_OF_GWEN_ANATH_BURN_BEAM_COOLDOWN_MILLIS = 10_000L;
+    public static final double HEROES_OF_GWEN_ANATH_BURN_BEAM_RANGE = 20.0D;
+    public static final double HEROES_OF_GWEN_ANATH_BURN_BEAM_HEIGHT = 10.0D;
+    public static final double HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE = 14.0D;
+    public static final long HEROES_OF_GWEN_ANATH_METEOR_COOLDOWN_MILLIS = 60_000L;
+    public static final long HEROES_OF_GWEN_ANATH_METEOR_DURATION_MILLIS = 7_000L;
+    public static final double HEROES_OF_GWEN_ANATH_METEOR_RADIUS = 10.0D;
+    public static final long HEROES_OF_GWEN_ANATH_METEOR_BURN_INTERVAL_MILLIS = 500L;
+    public static final double HEROES_OF_GWEN_ANATH_METEOR_BURN_DAMAGE = 1.0D;
+    public static final double HEROES_OF_GWEN_ANATH_METEOR_PULSE_DAMAGE = 2.0D;
+    public static final double HEROES_OF_GWEN_ANATH_METEOR_FIREBALL_DAMAGE = 20.0D;
+
+    public static boolean heroesOfGwenAnathMeteorContainsDistance(double distance) {
+        return Double.isFinite(distance) && distance >= 0.0D
+                && distance <= HEROES_OF_GWEN_ANATH_METEOR_RADIUS;
+    }
+
     // Heroes of Gwen: source-derived lane minion and economy timings.
     public static final long HEROES_OF_GWEN_MINION_WAVE_INTERVAL_MILLIS = 10_000L;
     public static final int HEROES_OF_GWEN_MINIONS_PER_WAVE = 6;
