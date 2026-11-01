@@ -238,21 +238,35 @@ public final class SpeedBuildersRules {
     }
 
     /**
-     * Returns all UUID/player keys with the highest cumulative score. Ties are shared wins.
-     * A missing roster produces no winner; malformed totals are rejected.
+     * Highest cumulative accuracy wins. A tie on accuracy is broken by the lowest
+     * cumulative build time across all rounds. Exact ties on both remain shared wins.
      */
-    public static List<String> highestScorers(Map<String, Integer> totalScores) {
+    public static List<String> winnersByScoreThenBuildTime(
+            Map<String, Integer> totalScores, Map<String, Long> cumulativeBuildTicks) {
         Objects.requireNonNull(totalScores, "totalScores");
+        Objects.requireNonNull(cumulativeBuildTicks, "cumulativeBuildTicks");
+        if (!totalScores.keySet().equals(cumulativeBuildTicks.keySet())) {
+            throw new IllegalArgumentException("Score and build-time rosters must match.");
+        }
         if (totalScores.isEmpty()) return List.of();
+
         for (Map.Entry<String, Integer> entry : totalScores.entrySet()) {
+            Long buildTicks = cumulativeBuildTicks.get(entry.getKey());
             if (entry.getKey() == null || entry.getKey().isBlank()
-                    || entry.getValue() == null || entry.getValue() < 0) {
-                throw new IllegalArgumentException("Invalid Speed Builders cumulative score.");
+                    || entry.getValue() == null || entry.getValue() < 0
+                    || buildTicks == null || buildTicks < 0L) {
+                throw new IllegalArgumentException("Invalid Speed Builders score or cumulative build time.");
             }
         }
-        int highest = totalScores.values().stream().mapToInt(Integer::intValue).max().orElse(0);
+
+        int highestScore = totalScores.values().stream().mapToInt(Integer::intValue).max().orElse(0);
+        long fastestBuildTime = totalScores.entrySet().stream()
+                .filter(entry -> entry.getValue() == highestScore)
+                .mapToLong(entry -> cumulativeBuildTicks.get(entry.getKey()))
+                .min().orElseThrow();
         return totalScores.entrySet().stream()
-                .filter(entry -> entry.getValue() == highest)
+                .filter(entry -> entry.getValue() == highestScore
+                        && cumulativeBuildTicks.get(entry.getKey()) == fastestBuildTime)
                 .map(Map.Entry::getKey)
                 .sorted(String.CASE_INSENSITIVE_ORDER)
                 .toList();
