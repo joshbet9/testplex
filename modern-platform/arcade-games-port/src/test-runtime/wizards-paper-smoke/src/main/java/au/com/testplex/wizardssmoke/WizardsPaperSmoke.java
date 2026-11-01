@@ -546,6 +546,27 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
             return;
         }
 
+        // The shared Arcade finish path shows Game Over before restoring the
+        // participants. Wait for its scheduled presentation/return, rather than
+        // treating the deliberate presentation period as a failed restoration.
+        Object sharedManager = field(arcade, "manager");
+        @SuppressWarnings("unchecked")
+        Map<Object, Object> endingSnapshots = (Map<Object, Object>) field(sharedManager, "endingSnapshots");
+        long presentationEndsAt = ((Number) field(sharedManager, "postGameEndsAtMillis")).longValue();
+        boolean stillInMatchWorld = owner.getWorld().equals(gameplayArena)
+                || rival.getWorld().equals(gameplayArena) || third.getWorld().equals(gameplayArena);
+        if (!endingSnapshots.isEmpty() || presentationEndsAt > 0L || stillInMatchWorld) {
+            if (gameplayTicks >= 240) {
+                throw new IllegalStateException("shared Arcade did not complete Game Over restoration"
+                        + " (endingSnapshots=" + endingSnapshots.size()
+                        + ", presentationEndsAt=" + presentationEndsAt
+                        + ", winnerWorld=" + owner.getWorld().getName()
+                        + ", rivalWorld=" + rival.getWorld().getName()
+                        + ", thirdWorld=" + third.getWorld().getName() + ")");
+            }
+            return;
+        }
+
         require(owner.isOnline() && rival.isOnline() && third.isOnline(),
                 "a client disconnected during death/respawn restoration acceptance");
         require(!owner.getWorld().equals(gameplayArena), "winner was not restored out of the match world");
@@ -558,6 +579,8 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
         String statsRoot = "local-stats." + owner.getUniqueId() + ".wizards.";
         require(arcade.getConfig().getLong(statsRoot + "wins") == 1L,
                 "match winner did not receive exactly one Wizards win");
+        require(arcade.getConfig().getLong(statsRoot + "games-played") == 1L,
+                "shared Arcade did not record exactly one Wizards game played");
         require(arcade.getConfig().getLong(statsRoot + "kills") == 2L,
                 "winner did not receive both player elimination credits");
 
