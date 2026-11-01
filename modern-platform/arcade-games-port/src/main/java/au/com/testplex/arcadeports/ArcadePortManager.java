@@ -2492,13 +2492,6 @@ public final class ArcadePortManager implements Listener {
                             && session.microBarrierActive) applyMicroMiddleGlassCosmetic(session, player);
                 }, 2L);
             }
-            if (type == ArcadePortGame.MICRO_BATTLES) {
-                UUID microId = player.getUniqueId();
-                Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                    if (active == session && player.isOnline() && session.alive.contains(microId)
-                            && session.microBarrierActive) applyMicroMiddleGlassCosmetic(session, player);
-                }, 2L);
-            }
             if (type == ArcadePortGame.RUNNER) session.runnerMarathonLastSample.put(player.getUniqueId(), spawn.clone());
             if (type == ArcadePortGame.DRAW_MY_THING) {
                 session.drawStartLocations.put(player.getUniqueId(), spawn.clone());
