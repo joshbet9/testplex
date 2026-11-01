@@ -200,15 +200,15 @@ final class ArcadeLobbyKitCatalogue {
                     choice("skyguard", "Skyguard", Material.FEATHER,
                             Unlock.ACHIEVEMENT, Skeleton.class, Material.FEATHER));
             case CAMERA_SHY -> List.of(
-                    choice("camera-shy-smoke-artist", "Smoke Artist", Material.POTION,
+                    choice("snap-smoke-artist", "Smoke Artist", Material.POTION,
                             Unlock.FREE, Villager.class, Material.POTION),
-                    choice("camera-shy-decoy", "Decoy", Material.FIREWORK_ROCKET,
+                    choice("snap-decoy", "Decoy", Material.FIREWORK_ROCKET,
                             Unlock.GEM, Villager.class, Material.FIREWORK_ROCKET),
-                    choice("camera-shy-runner", "Runner", Material.SUGAR,
+                    choice("snap-runner", "Runner", Material.SUGAR,
                             Unlock.GEM, Villager.class, Material.SUGAR),
-                    choice("camera-shy-spotter", "Spotter", Material.COMPASS,
+                    choice("snap-spotter", "Spotter", Material.COMPASS,
                             Unlock.GEM, Villager.class, Material.COMPASS),
-                    choice("camera-shy-understudy", "Understudy", Material.ARMOR_STAND,
+                    choice("snap-understudy", "Understudy", Material.ARMOR_STAND,
                             Unlock.ACHIEVEMENT, Villager.class, Material.ARMOR_STAND));
             default -> List.of();
         };
