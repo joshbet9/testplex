@@ -250,9 +250,10 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
         require(Bukkit.dispatchCommand(third, "arcadeport kit wizards mystic"),
                 "Mystic kit selection command was rejected");
 
-        int queued = (Integer) method(arcadeManager.getClass(), "queuedCount",
-                au.com.testplex.arcadeports.ArcadePortGame.class)
-                .invoke(arcadeManager, au.com.testplex.arcadeports.ArcadePortGame.WIZARDS);
+        Class<?> arcadeGameType = Class.forName("au.com.testplex.arcadeports.ArcadePortGame");
+        Object wizardsGameId = arcadeGameType.getField("WIZARDS").get(null);
+        int queued = (Integer) method(arcadeManager.getClass(), "queuedCount", arcadeGameType)
+                .invoke(arcadeManager, wizardsGameId);
         require(queued == 3, "expected three players in the shared Arcade queue, found " + queued);
         require(Bukkit.dispatchCommand(owner, "arcadeport start wizards"),
                 "owner could not start Wizards through the shared Arcade queue");
