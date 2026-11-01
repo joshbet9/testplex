@@ -109,3 +109,16 @@ The next source-documented Mage slice is implemented on branch feat/heroes-of-gw
 - Add deterministic tests for both Hunter reload intervals and ammo caps.
 
 **Remaining:** Rowena's Light Arrows, Combat Slide and Bombardment effects still require their own mechanics references; those slots are shown but are not advertised as implemented.
+
+
+### Mage parity — Larissa
+
+Larissa's four-slot kit is now ported from the archived Java implementation into the same match-scoped Heroes of Gwen runtime:
+
+- **Aqua Cannon:** Diamond Hoe primary weapon, 10-block water beam, first opposing target hit, 3 damage, 500 ms fire interval; consumes one Water Stone and replenishes one every 3 seconds (source cap 64). Eligible opposing towers can be hit by the beam while the player is inside the tower's 10-block damage radius.
+- **Dancing Fountain:** Water Bucket projectile; on collision it creates a 3-block radius field for 6 seconds. Every second it heals allied players/minions by 4 HP and damages opposing players/minions by 2 HP. Cooldown 14 seconds.
+- **Water Dash:** horizontal look-direction movement for 600 ms, with velocity stopped at the end. Supports click and sneak activation. Cooldown 10 seconds.
+- **Storm's Blessing:** Drop-item ultimate; grants Speed I to the team for 7 seconds and heals active teammates by 2 HP each second. The reuse delay accounts for the 7-second active period before the source's 60-second cooldown restarts.
+- Added deterministic tests for source attack damage/range, Water Stone cadence/cap, fountain radius/duration/healing/damage and the dash/ultimate timings.
+
+**Validation boundary:** the source-value tests are added, but the Paper 26.3 workflow still needs to compile and pass this update. This is a mechanics slice, not whole-game acceptance: Bardolf, Rowena's three active abilities, Warrior kits, Anath's Flame Wand/Flame Dash, Wither source parity, Pumpkin King, shops/passives, and both-map/multi-player acceptance remain open. Heroes of Gwen must stay `MECHANICS_IN_PROGRESS` and disabled until those gates pass.
