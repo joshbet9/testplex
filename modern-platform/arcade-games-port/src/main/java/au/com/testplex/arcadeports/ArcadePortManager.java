@@ -658,6 +658,40 @@ public final class ArcadePortManager implements Listener {
         return false;
     }
 
+    /** Complete Wizards through the shared Arcade Game Over, snapshot and lobby-return lifecycle. */
+    public void finishWizardsSession(Player winner) {
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.WIZARDS) {
+            finish(session, winner, true);
+        } else {
+            onExternalGameCompleted(ArcadePortGame.WIZARDS);
+        }
+    }
+
+    /** Keep the common Arcade session's alive roster aligned with Wizards eliminations. */
+    public void markWizardsParticipantEliminated(Player player) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.WIZARDS || player == null) return;
+        session.alive.remove(player.getUniqueId());
+        lobbyRuntime.refreshDisplays();
+    }
+
+    /** Leave Wizards by restoring and removing the participant from the common Arcade session. */
+    public void returnWizardsParticipantToLobby(Player player) {
+        if (player == null || !player.isOnline()) return;
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.WIZARDS) {
+            UUID id = player.getUniqueId();
+            PlayerSnapshot snapshot = session.snapshots.remove(id);
+            session.players.remove(id);
+            session.alive.remove(id);
+            session.scores.remove(id);
+            if (snapshot != null) snapshot.restore(player);
+        }
+        lobby.sendToLobby(player);
+        lobbyRuntime.refreshDisplays();
+    }
+
     /** Finish a game-specific engine while preserving global Session cleanup and snapshots. */
     public void finishExternalSession(ArcadePortGame type) {
         Session session = active;
@@ -2286,7 +2320,7 @@ public final class ArcadePortManager implements Listener {
     void onExternalGameCompleted(ArcadePortGame game) {
         if (game == null) return;
         lastAutomaticRotationGameId = game.id();
-        if (active != null || monsterMazeRunning()) return;
+        if (active != null || monsterMazeRunning() || wizardsRunning()) return;
         beginAutomaticRotationVote();
     }
 
@@ -2808,20 +2842,52 @@ public final class ArcadePortManager implements Listener {
                 sender.sendMessage(ChatColor.RED + "Wizards is not registered by the shared Arcade manager.");
                 return;
             }
-            if (!module.hasAvailableSelectedMap()) {
-                sender.sendMessage(ChatColor.RED + "Select an installed Wizards source map in Set Game before starting.");
+            World wizardsWorld = module.prepareArenaForArcade();
+            if (wizardsWorld == null) {
+                sender.sendMessage(ChatColor.RED + "The selected Wizards source map could not be prepared. No match was started.");
                 return;
             }
+
+            // Capture the common Arcade snapshots before the Wizards controller equips
+            // spell wands and teleports the roster into the selected source map.
+            Session session = new Session(type, wizardsWorld, participants, false);
             for (Player participant : participants) {
                 if (participant == null || !participant.isOnline()) continue;
-                PlayerSnapshot pending = pendingRestore.remove(participant.getUniqueId());
+                UUID id = participant.getUniqueId();
+                PlayerSnapshot pending = pendingRestore.remove(id);
                 if (pending != null) pending.restore(participant);
                 lobby.ensurePlayerInLobby(participant);
+                PlayerSnapshot snapshot = new PlayerSnapshot(participant);
+                session.snapshots.put(id, snapshot);
+                session.players.put(id, participant);
+                session.alive.add(id);
+                session.scores.put(id, 0);
+                session.lastLocations.put(id, participant.getLocation().clone());
             }
+            long now = System.currentTimeMillis();
+            session.startedAt = now;
+            session.prepareDurationMillis = 0L;
+            session.prepareEndsAt = now;
+            session.lastPrepareSecond = 0;
+            session.liveStarted = true;
+            session.endsAt = 0L;
+            session.startupComplete = true;
+
             if (!module.startFromArcadeLifecycle(participants)) {
+                for (Map.Entry<UUID, PlayerSnapshot> snapshot : session.snapshots.entrySet()) {
+                    Player participant = session.players.get(snapshot.getKey());
+                    if (participant != null && participant.isOnline()) {
+                        snapshot.getValue().restore(participant);
+                        lobby.sendToLobby(participant);
+                    } else {
+                        pendingRestore.put(snapshot.getKey(), snapshot.getValue());
+                    }
+                }
                 sender.sendMessage(ChatColor.RED + "Wizards could not start with the current Arcade queue. The queue has been preserved.");
                 return;
             }
+
+            active = session;
             if (queue != null) queues.remove(selectedQueueKey);
             if (pendingStart != null && pendingType == type
                     && pendingMixedArcadeVariant == mixedArcadeVariant) {
@@ -2830,6 +2896,8 @@ public final class ArcadePortManager implements Listener {
                 pendingType = null;
                 pendingMixedArcadeVariant = false;
             }
+            setLobbyLifecycleStatus("In Progress...");
+            lobbyRuntime.refreshDisplays();
             for (Player player : participants) {
                 if (player != null && player.isOnline()) player.sendMessage(
                         ChatColor.AQUA + "Testplex has started Wizards through the shared Arcade lifecycle.");
