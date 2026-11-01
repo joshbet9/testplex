@@ -434,6 +434,18 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     }
 
     @Test
+    void heroesOfGwenStoreHitConditionsMatchSourceBowAndSwordEffects() {
+        assertEquals("SPEED", ArcadePortRules.heroesOfGwenStoreHitCondition("Bow of Pursuit"));
+        assertEquals(3_000L, ArcadePortRules.heroesOfGwenStoreHitConditionDurationMillis("Bow of Pursuit"));
+        assertEquals(1, ArcadePortRules.heroesOfGwenStoreHitConditionAmplifier("Bow of Pursuit"));
+        assertEquals("SLOWNESS", ArcadePortRules.heroesOfGwenStoreHitCondition("Frostbound Sword"));
+        assertEquals(3_000L, ArcadePortRules.heroesOfGwenStoreHitConditionDurationMillis("Frostbound Sword"));
+        assertEquals(0, ArcadePortRules.heroesOfGwenStoreHitConditionAmplifier("Frostbound Sword"));
+        assertEquals("", ArcadePortRules.heroesOfGwenStoreHitCondition("Swift Blade"));
+        assertEquals(0L, ArcadePortRules.heroesOfGwenStoreHitConditionDurationMillis("Swift Blade"));
+    }
+
+    @Test
     void heroesOfGwenHealthManagerMatchesSourceFiveSecondRegenAndKillHeal() {
         assertEquals(5_000L, ArcadePortRules.HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS);
         assertEquals(0.66D, ArcadePortRules.HEROES_OF_GWEN_BASE_HP_REGEN_PER_INTERVAL, 0.00001D);
