@@ -1,6 +1,7 @@
 package au.com.testplex.arcadeports;
 
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.EventPriority;
@@ -30,6 +31,8 @@ final class MineplexCoreRankBridge {
     private final Method getClient;
     private final Method getAccountId;
     private final Method getPrimaryGroup;
+    private final Method getCanBePrimary;
+    private final Method getDisplay;
     private final Method inheritsFrom;
     private final Object adminGroup;
     private final AtomicBoolean warned = new AtomicBoolean();
@@ -40,6 +43,8 @@ final class MineplexCoreRankBridge {
             Method getClient,
             Method getAccountId,
             Method getPrimaryGroup,
+            Method getCanBePrimary,
+            Method getDisplay,
             Method inheritsFrom,
             Object adminGroup) {
         this.plugin = plugin;
@@ -47,6 +52,8 @@ final class MineplexCoreRankBridge {
         this.getClient = getClient;
         this.getAccountId = getAccountId;
         this.getPrimaryGroup = getPrimaryGroup;
+        this.getCanBePrimary = getCanBePrimary;
+        this.getDisplay = getDisplay;
         this.inheritsFrom = inheritsFrom;
         this.adminGroup = adminGroup;
     }
@@ -72,6 +79,9 @@ final class MineplexCoreRankBridge {
             Method getClient = managerType.getMethod("Get", Player.class);
             Method getAccountId = clientType.getMethod("getAccountId");
             Method getPrimaryGroup = clientType.getMethod("getPrimaryGroup");
+            Method getCanBePrimary = groupType.getMethod("canBePrimary");
+            Method getDisplay = groupType.getMethod(
+                    "getDisplay", boolean.class, boolean.class, boolean.class, boolean.class);
             Method inheritsFrom = clientType.getMethod("inheritsFrom", groupType);
             Object adminGroup = null;
             for (Object candidate : groupType.getEnumConstants()) {
@@ -86,7 +96,7 @@ final class MineplexCoreRankBridge {
 
             MineplexCoreRankBridge bridge = new MineplexCoreRankBridge(
                     plugin, manager, getClient, getAccountId,
-                    getPrimaryGroup, inheritsFrom, adminGroup);
+                    getPrimaryGroup, getCanBePrimary, getDisplay, inheritsFrom, adminGroup);
             bridge.registerPrimaryRankUpdateListener(loader, rankUpdateListener);
             return Optional.of(bridge);
         } catch (ReflectiveOperationException | LinkageError failure) {
@@ -98,13 +108,27 @@ final class MineplexCoreRankBridge {
     }
 
     Optional<String> rankId(Player player) {
+        return rankPresentation(player).map(RankPresentation::rankId);
+    }
+
+    /**
+     * Mirrors the legacy Arcade scoreboard's PermissionGroup teams and display prefix.
+     * The old scoreboard calls getDisplay(true, true, true, false) for every
+     * primary group rather than collapsing staff/content ranks into broad categories.
+     */
+    Optional<RankPresentation> rankPresentation(Player player) {
         Object client = loadedClient(player);
         if (client == null) return Optional.empty();
 
         try {
             Object group = getPrimaryGroup.invoke(client);
-            if (!(group instanceof Enum<?> rank)) return Optional.empty();
-            return Optional.of(rankIdForGroup(rank.name()));
+            if (!(group instanceof Enum<?> rank)
+                    || !Boolean.TRUE.equals(getCanBePrimary.invoke(group))) {
+                return Optional.empty();
+            }
+            String plainDisplay = (String) getDisplay.invoke(group, false, false, false, false);
+            String formattedDisplay = (String) getDisplay.invoke(group, true, true, true, false);
+            return Optional.of(presentationForGroup(rank.name(), plainDisplay, formattedDisplay));
         } catch (ReflectiveOperationException | RuntimeException failure) {
             warnOnce("Could not read a loaded CoreClient primary rank.", failure);
             return Optional.empty();
@@ -116,6 +140,9 @@ final class MineplexCoreRankBridge {
         if (client == null) return Optional.empty();
 
         try {
+            // Ensure a loaded client's primary group has been materialised before the
+            // legacy inheritsFrom method dereferences it.
+            if (getPrimaryGroup.invoke(client) == null) return Optional.empty();
             return Optional.of(Boolean.TRUE.equals(inheritsFrom.invoke(client, adminGroup)));
         } catch (ReflectiveOperationException | RuntimeException failure) {
             warnOnce("Could not evaluate CoreClient ADMIN inheritance.", failure);
@@ -166,6 +193,15 @@ final class MineplexCoreRankBridge {
             plugin.getLogger().warning(message + " Falling back to isolated rank configuration. "
                     + failure.getClass().getSimpleName() + ": " + failure.getMessage());
         }
+    }
+
+    record RankPresentation(String groupName, String prefix, String rankId) { }
+
+    static RankPresentation presentationForGroup(
+            String groupName, String plainDisplay, String formattedDisplay) {
+        String prefix = plainDisplay == null || plainDisplay.isEmpty()
+                ? "" : formattedDisplay + ChatColor.RESET + " ";
+        return new RankPresentation(groupName, prefix, rankIdForGroup(groupName));
     }
 
     static String rankIdForGroup(String groupName) {

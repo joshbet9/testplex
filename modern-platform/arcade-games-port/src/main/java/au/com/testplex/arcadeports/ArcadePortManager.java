@@ -1910,8 +1910,7 @@ public final class ArcadePortManager implements Listener {
                         ? session.teams.getOrDefault(tabPlayer.getUniqueId(), -1) : -1;
                 if (teamId < 0 || teamId >= teamCount) teamId = -1;
 
-                String rank = ModernLobbyScoreboard.rankId(plugin, tabPlayer);
-                String groupName = ModernLobbyScoreboard.tabTeamSortKey(rank, teamId);
+                String groupName = ModernLobbyScoreboard.tabTeamSortKey(plugin, tabPlayer, teamId);
                 Team group = board.getTeam(groupName);
                 if (group == null) group = board.registerNewTeam(groupName);
                 group.setPrefix(ModernLobbyScoreboard.rankPrefix(plugin, tabPlayer));

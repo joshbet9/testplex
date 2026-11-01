@@ -137,6 +137,17 @@ public final class ModernLobbyScoreboard {
         return teamId >= 0 && teamId < 4 ? rankKey + "_t" + teamId : rankKey;
     }
 
+    /** Uses the real CoreClient PermissionGroup team name when Hub is available. */
+    static String tabTeamSortKey(JavaPlugin plugin, Player player, int teamId) {
+        String groupName = null;
+        if (plugin instanceof ArcadeMechanicsModernPlugin arcade) {
+            MineplexCoreRankBridge.RankPresentation presentation = arcade.mineplexRankPresentation(player);
+            if (presentation != null) groupName = presentation.groupName();
+        }
+        if (groupName == null) groupName = tabSortKey(rankId(plugin, player));
+        return teamId >= 0 && teamId < 4 ? groupName + "_t" + teamId : groupName;
+    }
+
     static String tabSortKey(String rank) {
         return switch (rank == null ? "player" : rank.toLowerCase(Locale.ROOT)) {
             case "owner" -> "r0_owner";
@@ -149,6 +160,10 @@ public final class ModernLobbyScoreboard {
     }
 
     static String rankPrefix(JavaPlugin plugin, Player player) {
+        if (plugin instanceof ArcadeMechanicsModernPlugin arcade) {
+            MineplexCoreRankBridge.RankPresentation presentation = arcade.mineplexRankPresentation(player);
+            if (presentation != null) return presentation.prefix();
+        }
         String rank = rankId(plugin, player);
         ChatColor colour = switch (rank) {
             case "owner" -> ChatColor.DARK_RED;
@@ -194,9 +209,9 @@ public final class ModernLobbyScoreboard {
     private void applyLobbyTabTeams(Scoreboard scoreboard) {
         for (Player online : Bukkit.getOnlinePlayers()) {
             if (!ModernArcadeLobby.WORLD_NAME.equals(online.getWorld().getName())) continue;
-            String rank = rankId(plugin, online);
-            Team team = scoreboard.getTeam(tabSortKey(rank));
-            if (team == null) team = scoreboard.registerNewTeam(tabSortKey(rank));
+            String teamName = tabTeamSortKey(plugin, online, -1);
+            Team team = scoreboard.getTeam(teamName);
+            if (team == null) team = scoreboard.registerNewTeam(teamName);
             team.setPrefix(rankPrefix(plugin, online));
             team.addEntry(online.getName());
         }

@@ -134,9 +134,14 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     public PlexballGame getPlexballGame() { return plexball; }
 
     /** Returns null when the optional Mineplex CoreClient service is not available or not loaded for this player. */
-    String mineplexRankId(Player player) {
+    MineplexCoreRankBridge.RankPresentation mineplexRankPresentation(Player player) {
         return mineplexCoreRankBridge == null || player == null
-                ? null : mineplexCoreRankBridge.rankId(player).orElse(null);
+                ? null : mineplexCoreRankBridge.rankPresentation(player).orElse(null);
+    }
+
+    String mineplexRankId(Player player) {
+        MineplexCoreRankBridge.RankPresentation presentation = mineplexRankPresentation(player);
+        return presentation == null ? null : presentation.rankId();
     }
 
     private void refreshRankScoreboard(Player changedPlayer) {
