@@ -57,8 +57,8 @@ class SpeedBuildersSourceMapTest {
                                 || line.toUpperCase(java.util.Locale.ROOT).contains("DATA_LOCS"))
                         .limit(30)
                         .collect(java.util.stream.Collectors.joining(" | "));
-                assertTrue(yellowMarkers >= SpeedBuildersRules.MAX_PLAYERS,
-                        "The source map needs eight YELLOW player build plots; parsed=" + yellowMarkers
+                assertTrue(yellowMarkers >= SpeedBuildersRules.PLOTS_PER_ARENA,
+                        "Each original map copy needs eight YELLOW player build plots; parsed=" + yellowMarkers
                                 + ", DATA markers: " + markerDiagnostics);
                 assertTrue(customTemplates >= 10,
                         "Speed Builders must use the original custom-location build library, not demo templates.");

@@ -10,6 +10,25 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class SpeedBuildersRulesTest {
     @Test
+    void sixteenPlayersAreAllocatedAcrossTwoEightPlotArenaCopies() {
+        assertEquals(1, SpeedBuildersRules.arenaCountForPlayers(1));
+        assertEquals(1, SpeedBuildersRules.arenaCountForPlayers(8));
+        assertEquals(2, SpeedBuildersRules.arenaCountForPlayers(9));
+        assertEquals(2, SpeedBuildersRules.arenaCountForPlayers(16));
+        assertEquals(0, SpeedBuildersRules.arenaIndexForPlayer(0));
+        assertEquals(0, SpeedBuildersRules.arenaIndexForPlayer(7));
+        assertEquals(1, SpeedBuildersRules.arenaIndexForPlayer(8));
+        assertEquals(1, SpeedBuildersRules.arenaIndexForPlayer(15));
+        assertEquals(0, SpeedBuildersRules.plotIndexForPlayer(0));
+        assertEquals(7, SpeedBuildersRules.plotIndexForPlayer(7));
+        assertEquals(0, SpeedBuildersRules.plotIndexForPlayer(8));
+        assertEquals(7, SpeedBuildersRules.plotIndexForPlayer(15));
+        assertThrows(IllegalArgumentException.class, () -> SpeedBuildersRules.arenaIndexForPlayer(16));
+        assertThrows(IllegalArgumentException.class, () -> SpeedBuildersRules.plotIndexForPlayer(-1));
+        assertThrows(IllegalArgumentException.class, () -> SpeedBuildersRules.arenaCountForPlayers(17));
+    }
+
+    @Test
     void onlyMatchingTemplateCellsScore() {
         List<SpeedBuildersRules.Cell> expected = List.of(
                 new SpeedBuildersRules.Cell(3, 0, 3, Material.STONE),

@@ -1,35 +1,28 @@
-# Speed Builders — Paper 26.3 source-parity test plan
+# Speed Builders — Paper 26.3 source-map acceptance plan
 
 ## Status
 
-Speed Builders now loads the original Mineplex Reborn Shroomland Lake map archive and its authored build definitions. It is an isolated in-process module hosted by `ArcadeMechanicsModern`; it is **not** in `READY_FOR_TEST_GAME_IDS`, not part of the normal lobby rotation, and not enabled for public play.
+Speed Builders uses the original Mineplex Reborn Shroomland Lake map and its authored build definitions. The Arcade implementation supports **2–16 players** by loading two isolated copies of the original eight-plot arena. It remains a controlled test module and is not automatically enabled in public rotation.
 
-This is an implementation milestone, not a readiness or live-acceptance claim. The branch has not been merged or deployed.
+## Arena layout and allocation
 
-## Source assets and layout
+- Each arena instance is an authentic copy of `SpeedBuilders_Shroomland_Lake.zip` with its eight authored YELLOW player plots.
+- Players 1–8 are assigned to the first map instance; players 9–16 are assigned to the second. The second world is only created when the queue contains more than eight players.
+- Each mirrored arena has its own world, spawn markers, plot bounds, fluid/build isolation and original map geometry. Players can see and play alongside the other builders in their own eight-player arena. The first world remains the only active map for matches of eight or fewer.
+- Both copies use the same selected template, round number, viewing period and build timer. The manager advances both instances together as one match.
+- Player allocation is deterministic by queue order and never indexes beyond the eight plots in either map.
 
-- Uses `update/maps/Speed Builders/SpeedBuilders_Shroomland_Lake.zip`, packaged from the shared source-map resource tree by Maven.
-- Imports the map into a reserved, isolated Paper world and reads its embedded `WorldConfig.dat`.
-- Uses the source `YELLOW` data markers for up to eight player plots and the `RED` marker for the central judging display.
-- Uses the archived `TEAM_SPAWNS` as the source spawn locations, choosing the closest source spawn to each assigned plot.
-- Enumerates the original custom-location groups as the template library; there is no generated demo-template fallback. A missing archive, invalid marker layout or empty template set fails the match setup safely.
-- Retains each template's original 7×7 ground layer and 7×7×7 block volume, modern block-state strings, mob markers, display name and `time+N`, `time-N`, `time=N`, `time*X` modifiers.
-- Resets only the reserved Speed Builders source world before the next match, so player construction is not allowed to contaminate the next import.
+## Gameplay and scoring
 
-## Implemented mechanics
-
-- Queues 2–8 online builders. Quick start and standard queue have separate join windows; an undersized queue is retained rather than starting a one-player match. Once started, players are never removed for a low or empty score.
-- Ten-second model viewing, then the source-derived build timer starting at 40 seconds. The base timer decreases by one second after each subsequent round's duration is calculated, with source template modifiers clamped to 5–60 seconds.
-- The model's block palette and spawn eggs are issued at build start. Multiblock palette entries are deduplicated; water/lava templates receive buckets.
-- Players can build anywhere inside their own 7×7×7 volume. They are not restricted to only the materials present in the model. Door/bed companion blocks must also remain inside the plot.
-- Source-style instant demolition returns the dismantled block to the player's inventory, including multiblock handling for doors, beds and double-height blocks. Mob demolition returns a matching spawn egg.
-- Template mobs are frozen and silent while displayed. Spawn-egg mobs are frozen in place, can be hit for removal, and score only when the entity type and relative block position match.
-- Scores count each expected non-air block and each expected mob once; extra blocks do not deduct points. Block-data comparison preserves orientation/state and includes the original end-portal-frame, sapling, leaves, anvil, redstone-ore and stair-corner exceptions.
-- A perfect build locks further placement/interactions and announces its completion. If every remaining player completes a perfect build early, the build phase ends.
-- Ten-second judging phase moves all builders to temporary spectator viewpoints around the central model and calculates a normalized accuracy score out of 100 for every connected builder. All builders return to their own plots in the next round regardless of score, including an empty plot. The five-round match length is configurable through `speed-builders.match-rounds` (default 5); highest cumulative accuracy wins. A player's build time is eligible only if they perfected every build in the match. Eligible players' cumulative completion times break a tied top accuracy score and are shown only on the final scoreboard; players who miss any build have no time tie-break. If no tied top scorer perfected every build, the accuracy tie remains shared. A successful build's completion time is captured when it becomes perfect; incomplete builds do not add time and disqualify the player from the time tie-break.
-- The original template is shown in the central judging plot during review. Gwen is a non-attacking Elder Guardian who slowly looks between active build plots. An isolated sidebar/action bar shows round, phase, model, time, per-round accuracy and cumulative points; build times appear only on the final results scoreboard for all-round perfect builders.
-- Source-style local progress counters cover wins, perfect builds, first perfect build, builds completed under ten seconds, perfectionist wins, blocks placed/broken and mobs built.
-- A durable pre-match player snapshot is recorded before the participant is modified. It is restored on normal finish, operator stop, disconnect/rejoin and plugin shutdown. A pending snapshot remains saved when a player is offline.
+- There is **no judging phase, no judge NPC, no central judging gallery, and no spectator transfer**. Players remain in their own plots throughout the match.
+- Every player's model is shown directly in their own plot during the viewing phase. At the end of viewing, the model is cleared and the player receives its palette/spawn eggs.
+- Each player's build is scored automatically at the end of the build timer, or immediately when all connected players have completed a perfect build.
+- Per-build accuracy is calculated as a percentage from correctly matched expected blocks and mobs. Every player remains in the match regardless of their score.
+- The match winner is determined by highest cumulative accuracy over the configured rounds.
+- Build time is recorded when a player completes a perfect build. Cumulative build time is used only to break a tie between top-scoring players who perfected every build. Players who missed any build are ineligible for the time tie-break; their time is not shown on the final scoreboard.
+- The same random template sequence, per-template time modifier and round timer are shared across both arenas.
+- Template blocks preserve modern block-state strings and the existing Mineplex compatibility exceptions. Mobs are built with spawn eggs and scored by entity type and relative position.
+- The five-round match length is configurable through `speed-builders.match-rounds` (default 5). The existing source-derived viewing/build timers and per-template `time+N`, `time-N`, `time=N`, and `time*X` modifiers remain in force.
 
 ## Commands
 
@@ -42,24 +35,17 @@ This is an implementation milestone, not a readiness or live-acceptance claim. T
 - `/stats speed-builders` — own local Speed Builders lifetime statistics.
 - `/stats <player> speed-builders` — view an online player's local statistics.
 
-## Remaining gaps before readiness
+## Remaining acceptance requirements
 
-1. The Paper 26.3 module has not yet been compiled and exercised on the live Testplex Reborn VM after this source-map conversion.
-2. Gwen currently uses a native Elder Guardian with simple plot-to-plot gaze tracking. It is not a packet-level Mineplex disguise, and the gaze/rotation should be validated in-game on multiple clients. There is deliberately no Guardian attack, elimination beam, player elimination or plot explosion in the Arcade variant.
-3. The original demolition presentation/tick animation is not reproduced; the configured Reborn mode is instant-break, but the precise legacy click/refund timing still needs live confirmation.
-4. The full set of modern block-state mappings needs archive-driven audit. The listed legacy exceptions have unit tests, but unusual tile entities, fluids and non-cube blocks need in-game verification.
-5. Source score edge cases, empty-plot scoring, cumulative totals, all-round perfect eligibility for build-time tie-breaks, exact eligible-time ties, multiblock refund behaviour, mob spawn-egg placement, water/lava templates and jump flight need live two-client acceptance across the complete configured match.
-6. The snapshot restores inventory, armour, offhand, effects, movement/flight flags, health, food, experience and location. Scoreboard restoration across a server restart and unusual custom item metadata still need explicit acceptance.
-7. The implementation currently uses the bundled Shroomland Lake archive. Map selection across any additional Speed Builders source archives is not exposed.
-8. Lifetime statistics are local Testplex config values and do not write to production Arcade databases.
-
-## Automated coverage
-
-- `SpeedBuildersRulesTest`: source timing modifiers, block-state scoring exceptions, extra-block scoring, perfect builds, normalized 0–100 accuracy scoring, higher-score precedence, eligible all-round-perfect build-time tie-breaks, shared ties without an eligible perfect builder, exact eligible-time ties and malformed-score validation.
-- `SpeedBuildersSourceMapTest`: the Maven-packaged original ZIP contains WorldConfig data, a RED judging marker, at least eight YELLOW plots and an authored custom-template library.
-- `SpeedBuildersProgressStoreTest`: allowed local counter names, positive increments and persistence paths.
-- The full Modern Paper 26.3 workflow must compile the plugin, run the complete Arcade test suite, and verify the packaged source ZIP before this branch is considered build-ready.
+1. Run a fresh Paper 26.3 / Java 25 build and the full Arcade test suite.
+2. Perform live two-client acceptance in one arena and a second test with at least nine clients to prove that the ninth player is placed into the mirrored arena.
+3. Confirm the two map copies present the same model and synchronized viewing/build countdowns.
+4. Confirm every player remains in their own arena and plot through viewing, building, intermission and results; verify block placement, demolition, buckets, spawn eggs and fluid isolation in both worlds.
+5. Verify per-build percentage scoring is identical across both arena copies for equivalent builds.
+6. Verify perfect-build completion timing and the all-round-perfect tie-break across players in both arenas.
+7. Verify leave, disconnect/reconnect, operator stop, normal completion and plugin shutdown restore every participant's pre-match snapshot.
+8. Verify both source worlds reset cleanly between matches and no build/entity state leaks from one match to the next.
 
 ## Enablement boundary
 
-Do not add `speed-builders` to `READY_FOR_TEST_GAME_IDS`, do not set it in `enabled-games`, and do not deploy it to the live VM as part of this implementation pass. Enablement requires a passing build plus the multiplayer/map/lifecycle acceptance above.
+Do not add `speed-builders` to `READY_FOR_TEST_GAME_IDS`, do not set it in `enabled-games`, and do not deploy it to the live VM as part of this implementation pass. Enablement requires a passing build plus the 2–16-player multiplayer/map/lifecycle acceptance above.

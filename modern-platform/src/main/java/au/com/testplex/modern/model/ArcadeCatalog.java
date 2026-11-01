@@ -7,7 +7,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Modern catalogue for all 27 Arcade games. Each game owns its own cosmetic
+ * Modern catalogue for all 28 Arcade games. Each game owns its own cosmetic
  * lines and win-scene choices; actual render/gameplay handlers are added with
  * each port rather than pretending global cosmetics are game-specific.
  */
@@ -340,6 +340,13 @@ public final class ArcadeCatalog {
                 GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(),
                 win("colour-surge", "Colour Surge", "A vivid wash of team-coloured ink rolls across the winning team's podium.")));
+
+        register(game("speed-builders", "Speed Builders", "CRAFTING_TABLE",
+                "Recreate Mineplex build models in your own plot. Up to sixteen builders compete across synchronized mirrored arenas, scored automatically by build accuracy.",
+                GameDefinition.PortStatus.READY_FOR_TEST,
+                List.of(),
+                win("highest-accuracy", "Highest Accuracy",
+                        "The builder with the highest cumulative model accuracy is announced as the winner.")));
     }
 
     private void register(GameDefinition definition) {

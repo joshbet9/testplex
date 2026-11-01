@@ -13,7 +13,9 @@ public final class SpeedBuildersRules {
     public static final int BUILD_WIDTH = 7;
     public static final int BUILD_HEIGHT = 7;
     public static final int MIN_PLAYERS = 2;
-    public static final int MAX_PLAYERS = 8;
+    public static final int PLOTS_PER_ARENA = 8;
+    public static final int MAX_ARENAS = 2;
+    public static final int MAX_PLAYERS = PLOTS_PER_ARENA * MAX_ARENAS;
     public static final int DEFAULT_VIEW_SECONDS = 10;
     public static final int DEFAULT_BUILD_SECONDS = 40;
     public static final int MIN_BUILD_SECONDS = 5;
@@ -23,6 +25,30 @@ public final class SpeedBuildersRules {
     public static final int DEFAULT_MATCH_ROUNDS = 5;
 
     private SpeedBuildersRules() { }
+
+    /** Maps queue order to one of two authentic eight-plot arena copies. */
+    public static int arenaIndexForPlayer(int playerIndex) {
+        if (playerIndex < 0 || playerIndex >= MAX_PLAYERS) {
+            throw new IllegalArgumentException("Speed Builders supports player indices 0–15.");
+        }
+        return playerIndex / PLOTS_PER_ARENA;
+    }
+
+    /** Maps queue order to the authored plot within its arena copy. */
+    public static int plotIndexForPlayer(int playerIndex) {
+        if (playerIndex < 0 || playerIndex >= MAX_PLAYERS) {
+            throw new IllegalArgumentException("Speed Builders supports player indices 0–15.");
+        }
+        return playerIndex % PLOTS_PER_ARENA;
+    }
+
+    /** Returns one or two map instances for a valid participant count. */
+    public static int arenaCountForPlayers(int players) {
+        if (players < 0 || players > MAX_PLAYERS) {
+            throw new IllegalArgumentException("Speed Builders supports at most 16 players.");
+        }
+        return Math.max(1, (players + PLOTS_PER_ARENA - 1) / PLOTS_PER_ARENA);
+    }
 
     public record Coordinate(int x, int y, int z) { }
 
