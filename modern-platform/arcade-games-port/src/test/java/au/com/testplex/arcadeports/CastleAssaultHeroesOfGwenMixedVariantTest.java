@@ -479,6 +479,22 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     }
 
     @Test
+    void heroesOfGwenStoreCooldownModifiersStackAndStaySeparateFromAmmoModifiers() {
+        assertEquals(765L, ArcadePortRules.heroesOfGwenStoreAdjustedCooldown(1_000L,
+                List.of("Ninja's Chestcloth", "Ninja's Leggings"), false));
+        assertEquals(700L, ArcadePortRules.heroesOfGwenStoreAdjustedCooldown(1_000L,
+                List.of("Focused Cap", "Focused Chestplate"), false));
+        assertEquals(700L, ArcadePortRules.heroesOfGwenStoreAdjustedCooldown(1_000L,
+                List.of("Leather Cap of Nimble Fingers", "Leather Chestplate of Nimble Fingers"), true));
+        assertEquals(1_000L, ArcadePortRules.heroesOfGwenStoreAdjustedCooldown(1_000L,
+                List.of("Leather Cap of Nimble Fingers"), false));
+        assertEquals(950L, ArcadePortRules.heroesOfGwenStoreAdjustedCooldown(1_000L,
+                List.of("Ninja's Chestcloth", "Leather Cap of Nimble Fingers"), true));
+        assertEquals(0L, ArcadePortRules.heroesOfGwenStoreAdjustedCooldown(0L,
+                List.of("Ninja's Chestcloth"), false));
+    }
+
+    @Test
     void monochromeSidequestAwardsOnlyTheHigherScoringTeam() {
         assertEquals(0, ArcadePortRules.heroesOfGwenMonochromeWinner(3, 2));
         assertEquals(1, ArcadePortRules.heroesOfGwenMonochromeWinner(1, 4));
