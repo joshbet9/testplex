@@ -2845,6 +2845,37 @@ public final class ArcadePortRules {
 
 
     // Fletcher passive — source values for the two Heroes of Gwen Hunters.
+    // Hattori — source values from HeroHattori, PerkDoubleJump, SkillSnowball,
+    // SkillNinjaDash and SkillNinjaBlade.
+    public static final double HEROES_OF_GWEN_HATTORI_DOUBLE_JUMP_POWER = 1.0D;
+    public static final double HEROES_OF_GWEN_HATTORI_DOUBLE_JUMP_HEIGHT_LIMIT = 1.0D;
+    public static final long HEROES_OF_GWEN_HATTORI_DOUBLE_JUMP_COOLDOWN_MILLIS = 3_000L;
+    public static final int HEROES_OF_GWEN_HATTORI_SHURIKEN_COUNT = 3;
+    public static final int HEROES_OF_GWEN_HATTORI_SHURIKEN_DAMAGE = 3;
+    public static final long HEROES_OF_GWEN_HATTORI_SHURIKEN_COOLDOWN_MILLIS = 1_500L;
+    public static final long HEROES_OF_GWEN_HATTORI_SHURIKEN_SPACING_TICKS = 4L;
+    public static final long HEROES_OF_GWEN_HATTORI_NINJA_DASH_COOLDOWN_MILLIS = 7_000L;
+    public static final double HEROES_OF_GWEN_HATTORI_NINJA_DASH_RANGE = 10.0D;
+    public static final double HEROES_OF_GWEN_HATTORI_NINJA_DASH_COLLISION_RADIUS = 2.0D;
+    public static final int HEROES_OF_GWEN_HATTORI_NINJA_DASH_DAMAGE = 8;
+    public static final long HEROES_OF_GWEN_HATTORI_ENDER_BLADE_ACTIVE_MILLIS = 7_000L;
+    public static final long HEROES_OF_GWEN_HATTORI_ENDER_BLADE_COOLDOWN_MILLIS = 60_000L;
+    public static final long HEROES_OF_GWEN_HATTORI_ENDER_BLADE_REUSE_DELAY_MILLIS = 67_000L;
+    public static final double HEROES_OF_GWEN_HATTORI_ENDER_BLADE_DAMAGE_BONUS = 9.0D;
+
+    // Devon — values from HeroDevon, SkillTNTArrows, SkillBoost and SkillInfinity.
+    public static final int HEROES_OF_GWEN_DEVON_TNT_ARROW_COUNT = 3;
+    public static final long HEROES_OF_GWEN_DEVON_TNT_ARROW_COOLDOWN_MILLIS = 17_000L;
+    public static final double HEROES_OF_GWEN_DEVON_TNT_EXPLOSION_RADIUS = 5.0D;
+    public static final double HEROES_OF_GWEN_DEVON_TNT_BOW_BASE_DAMAGE = 5.0D;
+    public static final long HEROES_OF_GWEN_DEVON_HUNTERS_BOOST_COOLDOWN_MILLIS = 10_000L;
+    public static final long HEROES_OF_GWEN_DEVON_HUNTERS_BOOST_DURATION_MILLIS = 3_000L;
+    public static final long HEROES_OF_GWEN_DEVON_INFINITY_ACTIVE_MILLIS = 7_000L;
+    public static final long HEROES_OF_GWEN_DEVON_INFINITY_COOLDOWN_MILLIS = 60_000L;
+    public static final long HEROES_OF_GWEN_DEVON_INFINITY_REUSE_DELAY_MILLIS = 67_000L;
+    public static final double HEROES_OF_GWEN_DEVON_INFINITY_HOMING_RANGE = 6.0D;
+    public static final long HEROES_OF_GWEN_DEVON_INFINITY_WITHER_DURATION_MILLIS = 3_000L;
+
     public static final int HEROES_OF_GWEN_DEVON_FLETCHER_MAX_ARROWS = 3;
     public static final long HEROES_OF_GWEN_DEVON_FLETCHER_RELOAD_MILLIS = 3_000L;
     public static final int HEROES_OF_GWEN_ROWENA_FLETCHER_MAX_ARROWS = 2;
