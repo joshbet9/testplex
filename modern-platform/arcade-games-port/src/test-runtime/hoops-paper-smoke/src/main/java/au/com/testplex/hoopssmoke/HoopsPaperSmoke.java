@@ -379,7 +379,7 @@ public final class HoopsPaperSmoke extends JavaPlugin {
             require(display == null || !display.isValid(), "centre scoreboard display survived match cleanup");
             if (field(runtime, "match") != null || !allRestored()) {
                 // The shared Arcade end presentation defaults to 10 seconds before snapshots are restored.
-                if (ticks >= 300L) throw new IllegalStateException("winner transition did not restore all players after the full end presentation");
+                if (ticks >= 300L) throw new IllegalStateException("winner transition did not restore all players after the full end presentation: " + restorationDiagnostics());
                 return;
             }
             verifyCareerStats(firstMatch, firstPasserId, firstShooterId, firstScoringTeam);
@@ -545,17 +545,50 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         require(scores[winningTeam] >= 21, "final score did not reach 21");
     }
 
-    private boolean allRestored() {
-        Location commonLobbyLocation = null;
+    private boolean allRestored() throws Exception {
+        Object lobby = field(manager, "lobby");
+        Location lobbySpawn = (Location) invoke(lobby, "spawnLocation", new Class<?>[0]);
+        if (lobbySpawn == null) return false;
         for (Player player : players) {
             if (!player.isOnline()) return false;
             Baseline baseline = baselines.get(player.getUniqueId());
             if (baseline == null || !baseline.matches(player)) return false;
             Location location = player.getLocation();
-            if (commonLobbyLocation == null) commonLobbyLocation = location.clone();
-            else if (commonLobbyLocation.distanceSquared(location) > 0.01D) return false;
+            // All players are sent to the same lobby spawn. Collision physics immediately
+            // separates overlapping real clients, so require the canonical lobby area rather
+            // than impossible sub-0.1-block overlap after four simultaneous teleports.
+            if (!location.getWorld().equals(lobbySpawn.getWorld())
+                    || location.distanceSquared(lobbySpawn) > 64.0D) return false;
         }
-        return commonLobbyLocation != null;
+        return true;
+    }
+
+    private String restorationDiagnostics() {
+        StringBuilder details = new StringBuilder();
+        try {
+            Object snapshots = field(manager, "endingSnapshots");
+            Object endAt = field(manager, "postGameEndsAtMillis");
+            Object task = field(manager, "postGameReturnTask");
+            details.append("endingSnapshots=").append(snapshots instanceof Map<?, ?> map ? map.size() : "unknown")
+                    .append(",postGameEndsAtMillis=").append(endAt)
+                    .append(",postGameReturnTask=").append(task != null);
+        } catch (Exception failure) {
+            details.append("managerStateError=").append(failure.getClass().getSimpleName())
+                    .append(':').append(failure.getMessage());
+        }
+        for (Player player : players) {
+            Baseline baseline = baselines.get(player.getUniqueId());
+            details.append("|").append(player.getName())
+                    .append(":online=").append(player.isOnline())
+                    .append(",baseline=").append(baseline != null && baseline.matches(player))
+                    .append(",world=").append(player.getWorld().getName())
+                    .append(",location=").append(player.getLocation())
+                    .append(",mode=").append(player.getGameMode())
+                    .append(",allowFlight=").append(player.getAllowFlight())
+                    .append(",walk=").append(player.getWalkSpeed())
+                    .append(",fly=").append(player.getFlySpeed());
+        }
+        return details.toString();
     }
 
     private void seedBaselineProfile(Player player, int variant) {
