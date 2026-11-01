@@ -227,12 +227,6 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
         Object arcadeManager = field(arcade, "manager");
         method(arcadeManager.getClass(), "stop", String.class).invoke(
                 arcadeManager, "Wizards Paper smoke setup");
-        seedBaselineProfile(owner, 0);
-        seedBaselineProfile(rival, 1);
-        seedBaselineProfile(third, 2);
-        ownerBaseline = captureBaseline(owner);
-        rivalBaseline = captureBaseline(rival);
-        thirdBaseline = captureBaseline(third);
         require(GAMEPLAY_MAP.equals(arcade.getConfig().getString("selected-maps.wizards")),
                 "gameplay map selection was not persisted");
         require(!arcade.getConfig().getBoolean("wizards.allow-solo-start", true),
@@ -243,6 +237,12 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
                 "second client could not join the Wizards queue");
         require(Bukkit.dispatchCommand(third, "arcadeport join wizards"),
                 "third client could not join the Wizards queue");
+        // Capture the authoritative shared Arcade *lobby* state, not an
+        // unrelated survival-world profile that queueing deliberately resets.
+        // Return-to-lobby must reinstate the normal cosmetics/panel hotbar.
+        ownerBaseline = captureBaseline(owner);
+        rivalBaseline = captureBaseline(rival);
+        thirdBaseline = captureBaseline(third);
         require(Bukkit.dispatchCommand(owner, "arcadeport kit wizards mage"),
                 "Mage kit selection command was rejected");
         require(Bukkit.dispatchCommand(rival, "arcadeport kit wizards sorcerer"),
