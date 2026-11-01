@@ -81,7 +81,7 @@ public final class ArcadeCatalog {
 
         register(game("evolution", "Evolution", "DRAGON_EGG",
                 "Earn evolutions through kills or the 90-second pity clock; progress through five forms.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("metamorphosis", "Dragon Egg Variants",
                         "Choose the dragon egg and its evolving particle sequence; effects are visible to everyone in the game.",
                         "DRAGON_EGG",
