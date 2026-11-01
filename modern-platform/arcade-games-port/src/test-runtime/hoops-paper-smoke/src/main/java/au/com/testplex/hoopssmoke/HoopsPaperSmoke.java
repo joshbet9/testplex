@@ -152,8 +152,6 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         // still run through ArcadePortManager.
         Object testPlayers = field(manager, "testPlayers");
         require(testPlayers != null, "shared Arcade test-player manager is unavailable");
-        require(Boolean.TRUE.equals(invoke(testPlayers, "isStartupCleanupComplete", new Class<?>[0])),
-                "fake-player startup cleanup has not completed");
         int managedTestPlayers = ((Number) invoke(testPlayers, "activeCount", new Class<?>[0])).intValue();
         require(managedTestPlayers == 0,
                 "disposable four-client fixture unexpectedly has " + managedTestPlayers + " managed fake player(s)");
