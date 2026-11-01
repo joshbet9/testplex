@@ -14,7 +14,7 @@ public final class SpeedBuildersRules {
     public static final int BUILD_WIDTH = 7;
     public static final int BUILD_HEIGHT = 7;
     public static final int MIN_PLAYERS = 2;
-    public static final int MAX_PLAYERS = 16;
+    public static final int MAX_PLAYERS = 8;
     public static final int DEFAULT_VIEW_SECONDS = 10;
     public static final int DEFAULT_BUILD_SECONDS = 40;
     public static final int MIN_BUILD_SECONDS = 5;
