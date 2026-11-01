@@ -2725,6 +2725,30 @@ public final class ArcadePortRules {
         return "Urchin's Chestcloth".equals(itemName) ? 1.0D : 0.0D;
     }
 
+    public static double heroesOfGwenStoreAbilityDamage(double baseDamage, Collection<String> items) {
+        double factor = 0.0D;
+        if (items != null) {
+            for (String item : items) factor += heroesOfGwenStoreAbilityDamageFactor(item);
+        }
+        return baseDamage * (1.0D + factor);
+    }
+
+    public static double heroesOfGwenStoreBasicAttackDamage(double baseDamage, Collection<String> items) {
+        double factor = 0.0D;
+        if (items != null) {
+            for (String item : items) factor += heroesOfGwenStoreBasicAttackDamageFactor(item);
+        }
+        return baseDamage * (1.0D + factor);
+    }
+
+    public static double heroesOfGwenStoreMeleeDamage(double baseDamage, Collection<String> items) {
+        double bonus = 0.0D;
+        if (items != null) {
+            for (String item : items) bonus += heroesOfGwenStoreMeleeDamageBonus(item);
+        }
+        return baseDamage + bonus;
+    }
+
     public static double heroesOfGwenStoreHealthRegenBonus(String itemName) {
         if (itemName == null) return 0.0D;
         return switch (itemName) {
