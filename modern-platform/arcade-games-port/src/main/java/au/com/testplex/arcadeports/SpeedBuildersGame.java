@@ -37,7 +37,6 @@ import org.bukkit.event.block.BlockFadeEvent;
 import org.bukkit.event.block.BlockBurnEvent;
 import org.bukkit.event.block.BlockGrowEvent;
 import org.bukkit.event.block.LeavesDecayEvent;
-import org.bukkit.event.block.BlockCanBuildEvent;
 import org.bukkit.event.world.StructureGrowEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityCombustEvent;
@@ -71,13 +70,11 @@ import java.util.UUID;
 /**
  * Source-mapped Speed Builders mechanics hosted by ArcadeMechanicsModern.
  *
- * This first port milestone uses an authored, deterministic starter template
- * pack and a generated isolated arena. It deliberately stays outside the
- * READY_FOR_TEST rotation until the wider source-map template pack and live
- * multiplayer acceptance are complete.
+ * Templates, the 16 player plots, central judging plot, spawn points and
+ * per-template ground layers are read from the archived Reborn Shroomland Lake
+ * map. The module remains an isolated WIP test entry, not a rotation-enabled game.
  */
 public final class SpeedBuildersGame implements Listener {
-    private static final String ARENA_WORLD_NAME = "testplex_speedbuilders_arena_v1";
     private static final String SOURCE_WORLD_NAME = "arcadeport_source_speedbuilders_v1";
     private static final String SOURCE_MAP_RESOURCE = "source-maps/Speed Builders/SpeedBuilders_Shroomland_Lake.zip";
     private static final int REVIEW_HEIGHT = 12;
@@ -882,10 +879,20 @@ public final class SpeedBuildersGame implements Listener {
 
     private void giveTemplateBlocks(Player player, Template template) {
         Map<Material, Integer> counts = new EnumMap<>(Material.class);
+        boolean needsWaterBucket = false;
+        boolean needsLavaBucket = false;
         for (SpeedBuildersRules.Cell cell : template.cells()) {
             BlockData data = Bukkit.createBlockData(cell.blockData());
             if (data instanceof Bisected bisected && bisected.getHalf() == Bisected.Half.TOP) continue;
             if (data instanceof Bed bed && bed.getPart() == Bed.Part.HEAD) continue;
+            if (cell.material() == Material.WATER) {
+                needsWaterBucket = true;
+                continue;
+            }
+            if (cell.material() == Material.LAVA) {
+                needsLavaBucket = true;
+                continue;
+            }
             counts.merge(cell.material(), 1, Integer::sum);
         }
         for (Map.Entry<Material, Integer> entry : counts.entrySet()) {
@@ -896,6 +903,8 @@ public final class SpeedBuildersGame implements Listener {
                 remaining -= stack;
             }
         }
+        if (needsWaterBucket) player.getInventory().addItem(new ItemStack(Material.WATER_BUCKET));
+        if (needsLavaBucket) player.getInventory().addItem(new ItemStack(Material.LAVA_BUCKET));
         for (MobCell mob : template.mobs()) {
             Material spawnEgg = spawnEggMaterial(mob.type());
             if (spawnEgg != null) player.getInventory().addItem(new ItemStack(spawnEgg));
@@ -1101,12 +1110,6 @@ public final class SpeedBuildersGame implements Listener {
         player.setVelocity(new org.bukkit.util.Vector(0.0D, 1.0D, 0.0D));
     }
 
-    private boolean isWithinAnyPlot(Block block) {
-        if (block == null || block.getWorld() != arena) return false;
-        if (isWithinPlot(reviewPlot, block)) return true;
-        return playerPlots.stream().anyMatch(plot -> isWithinPlot(plot, block));
-    }
-
     private boolean isWithinPlot(Plot plot, Block block) {
         return plot != null && block.getWorld() == arena
                 && block.getX() >= plot.centerX() - 3 && block.getX() <= plot.centerX() + 3
@@ -1117,9 +1120,18 @@ public final class SpeedBuildersGame implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onLiquidLeak(BlockFromToEvent event) {
         if (event.getBlock().getWorld() != arena) return;
-        boolean from = isWithinAnyPlot(event.getBlock());
-        boolean to = isWithinAnyPlot(event.getToBlock());
-        if (from != to) event.setCancelled(true);
+        Block from = event.getBlock();
+        Block to = event.getToBlock();
+        if (isWithinPlot(reviewPlot, from) != isWithinPlot(reviewPlot, to)) {
+            event.setCancelled(true);
+            return;
+        }
+        for (Plot plot : playerPlots) {
+            if (isWithinPlot(plot, from) != isWithinPlot(plot, to)) {
+                event.setCancelled(true);
+                return;
+            }
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
