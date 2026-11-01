@@ -604,7 +604,8 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
         assertTrue(ArcadePortRules.heroesOfGwenWitherShouldInform(130_000L, 100_000L));
         assertFalse(ArcadePortRules.heroesOfGwenWitherShouldInform(129_999L, 100_000L));
         assertFalse(ArcadePortRules.heroesOfGwenWitherShouldInform(100_000L, 101_000L));
-        assertTrue(ArcadePortRules.heroesOfGwenWitherShouldInform(1_000L, 0L));
+        assertFalse(ArcadePortRules.heroesOfGwenWitherShouldInform(1_000L, 0L));
+        assertTrue(ArcadePortRules.heroesOfGwenWitherShouldInform(30_000L, 0L));
     }
 
     @Test
