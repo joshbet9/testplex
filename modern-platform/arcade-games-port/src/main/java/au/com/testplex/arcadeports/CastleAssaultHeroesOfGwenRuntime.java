@@ -906,8 +906,81 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         addStoreEntry("Hunter", Material.ENDER_PEARL, "Ender Pearl", 750, "Legacy Hunter store item.");
     }
 
+    private String heroesOfGwenStoreItemDescription(String role, String name) {
+        return switch (role) {
+            case "Assassin" -> switch (name) {
+                case "Sword of Time" -> "Killing a player heals you for 3 HP.";
+                case "Ninja's Mask" -> "Killing a player heals you for 2 HP.";
+                case "Urchin's Cap" -> "Increases HP regeneration by 20%.";
+                case "Ninja's Chestcloth" -> "Decreases ability cooldowns by 15%.";
+                case "Urchin's Chestcloth" -> "Melee attacks deal +1 damage.";
+                case "Ninja's Leggings" -> "Decreases ability cooldowns by 10%.";
+                case "Urchin's Leggings" -> "Increases ability damage and healing by 10%.";
+                case "Ninja's Boots" -> "Increases movement speed by 15%.";
+                case "Urchin's Boots" -> "Increases movement speed by 17%.";
+                default -> "";
+            };
+            case "Hunter" -> switch (name) {
+                case "Bow of Pursuit" -> "Arrow hits grant you Speed II for 3 seconds.";
+                case "Vampiric Bow" -> "Killing a player heals you for 0.15 HP.";
+                case "Bow of Renewal" -> "Hitting a player with an arrow gives you a new arrow.";
+                case "Specialist's Bow" -> "Ability cooldowns -10%; ability damage and healing +20%.";
+                case "Leather Cap of Holding" -> "Increases maximum ammo by 1.";
+                case "Leather Cap of Nimble Fingers" -> "Ammo reload time -5%.";
+                case "Leather Chestplate of Nimble Fingers" -> "Ammo reload time -15%.";
+                case "Leather Leggings of Nimble Fingers" -> "Ammo reload time -10%.";
+                case "Leather Boots of Nimble Fingers" -> "Ammo reload time -5%.";
+                case "Focused Cap" -> "Ability cooldowns -5%.";
+                case "Focused Chestplate", "Focused Leggings" -> "Ability cooldowns -10%.";
+                case "Focused Boots" -> "Ability cooldowns -5%.";
+                case "Vampiric Helmet" -> "Increases HP regeneration by 20%.";
+                case "Vampiric Chestplate", "Vampiric Leggings" -> "Killing a player heals you for 3 HP.";
+                case "Vampiric Boots" -> "Killing a player heals you for 1 HP.";
+                case "Leather Hiking Boots" -> "Increases movement speed by 5%.";
+                case "Leather Moccasins" -> "Increases movement speed by 10%.";
+                case "Leather Crosstrainers" -> "Increases movement speed by 15%.";
+                default -> "";
+            };
+            case "Mage" -> switch (name) {
+                case "Adept's Cap", "Adept's Boots" -> "Increases ability damage and healing by 5%.";
+                case "Adept's Chestplate" -> "Increases ability damage and healing by 15%.";
+                case "Adept's Leggings" -> "Increases ability damage and healing by 10%.";
+                case "Helm of Focus", "Boots of Focus" -> "Ability cooldowns -3%.";
+                case "Chestplate of Focus" -> "Ability cooldowns -10%.";
+                case "Leggings of Focus" -> "Ability cooldowns -5%.";
+                case "Battle Mage Cap", "Battle Mage Boots" -> "Basic attack damage +3%.";
+                case "Battle Mage Chestplate" -> "Basic attack damage +10%.";
+                case "Battle Mage Leggings" -> "Basic attack damage +5%.";
+                default -> "";
+            };
+            case "Warrior" -> switch (name) {
+                case "Stone Sword", "Swift Blade" -> "Grants immunity to Slowness effects.";
+                case "Frostbound Sword" -> "Melee hits apply Slowness I for 3 seconds; grants Slowness immunity.";
+                case "Archer's Bane Helmet" -> "Projectile Protection I; HP regeneration +3%.";
+                case "Superior Archer's Bane Helmet" -> "Projectile Protection II; HP regeneration +5%.";
+                case "Brawler's Plate Helmet" -> "Protection I; HP regeneration +3%.";
+                case "Prince's Plate Helmet" -> "Increases HP regeneration by 15%.";
+                case "Archer's Bane Chestplate" -> "Projectile Protection I; maximum health +2 HP.";
+                case "Superior Archer's Bane Chestplate" -> "Projectile Protection II; maximum health +4 HP.";
+                case "Brawler's Plate Chestplate" -> "Protection I; maximum health +2 HP.";
+                case "Prince's Plate Chestplate" -> "Increases maximum health by 4 HP.";
+                case "Archer's Bane Leggings", "Brawler's Plate Leggings" -> "Ability cooldowns -5%.";
+                case "Superior Archer's Bane Leggings" -> "Ability cooldowns -7%.";
+                case "Prince's Plate Leggings" -> "Ability cooldowns -10%.";
+                case "Archer's Bane Boots", "Brawler's Plate Boots" -> "Increases movement speed by 4%.";
+                case "Superior Archer's Bane Boots" -> "Increases movement speed by 6%.";
+                case "Prince's Plate Boots" -> "Increases movement speed by 10%.";
+                default -> "";
+            };
+            default -> "";
+        };
+    }
+
     private void addStoreEntry(String role, Material material, String name, int cost, String description) {
-        storeEntries.add(new StoreEntry(role, material, name, cost, description));
+        String resolvedDescription = description != null && description.startsWith("Legacy ")
+                ? heroesOfGwenStoreItemDescription(role, name) : description;
+        storeEntries.add(new StoreEntry(role, material, name, cost,
+                resolvedDescription == null ? "" : resolvedDescription));
     }
 
     private static Location first(List<Location> locations) {
@@ -2769,10 +2842,14 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             ItemStack item = new ItemStack(entry.material);
             ItemMeta meta = item.getItemMeta();
             meta.setDisplayName(ChatColor.GREEN + entry.name);
-            meta.setLore(List.of(ChatColor.GRAY + entry.description,
-                    ChatColor.WHITE + "Standard cost: " + ChatColor.GRAY + entry.cost,
-                    ChatColor.WHITE + "Your cost: " + ChatColor.GOLD + price + " gold",
-                    ChatColor.YELLOW + "Click to purchase"));
+            List<String> lore = new ArrayList<>();
+            if (entry.description != null && !entry.description.isBlank()) {
+                lore.add(ChatColor.GRAY + entry.description);
+            }
+            lore.add(ChatColor.WHITE + "Standard cost: " + ChatColor.GRAY + entry.cost);
+            lore.add(ChatColor.WHITE + "Your cost: " + ChatColor.GOLD + price + " gold");
+            lore.add(ChatColor.YELLOW + "Click to purchase");
+            meta.setLore(lore);
             meta.getPersistentDataContainer().set(shopItemKey, PersistentDataType.INTEGER, index);
             item.setItemMeta(meta);
             inventory.setItem(slot++, item);
@@ -2832,7 +2909,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         ItemStack reward = new ItemStack(entry.material);
         ItemMeta rewardMeta = reward.getItemMeta();
         rewardMeta.setDisplayName(ChatColor.GREEN + entry.name);
-        if (entry.material != Material.POTION) rewardMeta.setUnbreakable(true);
+        rewardMeta.setUnbreakable(true);
         int enchantmentLevel = ArcadePortRules.heroesOfGwenStoreEnchantmentLevel(entry.name);
         if (enchantmentLevel > 0) {
             String enchantment = ArcadePortRules.heroesOfGwenStoreEnchantment(entry.name);
