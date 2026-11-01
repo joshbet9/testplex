@@ -36,6 +36,7 @@ final class WitherAssaultRulesTest {
 
     @Test
     void witherSwordClicksMatchTheSourceAbilityLayout() {
+        assertEquals(3, WitherAssaultRules.minionCount());
         assertTrue(WitherAssaultRules.shouldLaunchSkull("golden_sword", true));
         assertFalse(WitherAssaultRules.shouldLaunchSkull("golden_sword", false));
         assertTrue(WitherAssaultRules.shouldLaunchMinions("diamond_sword", true));
