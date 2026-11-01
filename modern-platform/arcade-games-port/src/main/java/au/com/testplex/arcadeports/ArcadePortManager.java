@@ -10327,6 +10327,7 @@ public final class ArcadePortManager implements Listener {
         target.setFallDistance(0.0F);
         target.setVelocity(ArcadePortRules.dragonsContactKnockback(trajectory, target.isOnGround()));
         target.playEffect(EntityEffect.HURT);
+        target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.9F, 0.85F);
     }
 
     private void handleDragonProjectileHit(Session session, EnderDragon dragon, Player shooter) {
@@ -18579,6 +18580,9 @@ public final class ArcadePortManager implements Listener {
             event.setCancelled(true);
             double damage = ArcadePortRules.dragonFallDamageAfterReduction(rawDamage);
             if (damage > 0.0D) {
+                // Cancelled native fall events never reach the normal uncancelled
+                // damage monitor. This must also disqualify "Untouched" wins.
+                session.dragonDamagedPlayers.add(dragonPlayer.getUniqueId());
                 if (dragonPlayer.getHealth() > damage) {
                     session.dragonFallDamageTaken.add(dragonPlayer.getUniqueId());
                     if (damage >= 15.0D) {
