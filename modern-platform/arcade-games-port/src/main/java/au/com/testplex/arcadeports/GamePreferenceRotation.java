@@ -85,14 +85,20 @@ public final class GamePreferenceRotation {
                     .toList();
             if (!alternatives.isEmpty()) available = alternatives;
         }
-        double totalWeight = available.stream().mapToDouble(Map.Entry::getValue).sum();
-        if (!Double.isFinite(totalWeight) || totalWeight <= 0.0D) {
+        double maximumWeight = available.stream().mapToDouble(Map.Entry::getValue).max().orElse(0.0D);
+        if (!Double.isFinite(maximumWeight) || maximumWeight <= 0.0D) {
+            for (String id : probabilities.keySet()) result.put(id, 0.0D);
+            return result;
+        }
+        double scaledTotal = available.stream()
+                .mapToDouble(entry -> entry.getValue() / maximumWeight).sum();
+        if (!Double.isFinite(scaledTotal) || scaledTotal <= 0.0D) {
             for (String id : probabilities.keySet()) result.put(id, 0.0D);
             return result;
         }
         Map<String, Double> normalized = new LinkedHashMap<>();
         for (Map.Entry<String, Double> entry : available) {
-            normalized.put(entry.getKey(), entry.getValue() / totalWeight);
+            normalized.put(entry.getKey(), (entry.getValue() / maximumWeight) / scaledTotal);
         }
         for (String id : probabilities.keySet()) {
             result.put(id, normalized.getOrDefault(id, 0.0D));
