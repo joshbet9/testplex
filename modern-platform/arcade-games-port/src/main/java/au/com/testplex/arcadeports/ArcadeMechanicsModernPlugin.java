@@ -18,6 +18,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     private MonsterMazePlugin monsterMaze;
     private ArcadeMapSelectionMenu mapMenu;
     private CameraShyGame cameraShy;
+    private SpeedBuildersGame speedBuilders;
     private final MonsterMazeRegistrationReadiness monsterMazeReadiness = new MonsterMazeRegistrationReadiness();
 
     // Keep aligned with ArcadeCatalog's READY_FOR_TEST statuses.
@@ -56,6 +57,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         plexball = new PlexballGame(this);
         getServer().getPluginManager().registerEvents(plexball, this);
         mapMenu = new ArcadeMapSelectionMenu(this);
+        speedBuilders = new SpeedBuildersGame(this);
+        getServer().getPluginManager().registerEvents(speedBuilders, this);
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(mapMenu, this);
         getCommand("stats").setExecutor(this);
@@ -107,6 +110,15 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     public MonsterMazePlugin getMonsterMazeModule() { return monsterMaze; }
     public ArcadePortManager getArcadePortManager() { return manager; }
     public PlexballGame getPlexballGame() { return plexball; }
+    public SpeedBuildersGame getSpeedBuildersGame() { return speedBuilders; }
+
+    /** Keep the standalone WIP game mutually exclusive with shared Arcade/Plexball sessions. */
+    public void prepareForSpeedBuilders() {
+        if (plexball != null && plexball.isActive()) {
+            throw new IllegalStateException("Plexball is using the shared Arcade test lane.");
+        }
+        if (manager != null) manager.stop("Speed Builders is taking over the isolated Arcade test lane.");
+    }
     public void returnPlayerToArcadeLobby(Player player) {
         if (manager != null && player != null && player.isOnline()) {
             manager.returnPlayerToLobby(player);
@@ -133,6 +145,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         } catch (java.io.IOException exception) {
             getLogger().warning("Could not remove an Arcade runtime readiness record: " + exception.getMessage());
         }
+        if (speedBuilders != null) speedBuilders.shutdown();
         if (manager != null) manager.shutdown();
         if (plexball != null) plexball.shutdown();
         if (monsterMaze != null) monsterMaze.shutdown();
@@ -298,6 +311,13 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         return true;
     }
 
+    private static boolean isSpeedBuildersId(String requested) {
+        if (requested == null) return false;
+        String normalized = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        return normalized.equals("speed-builders") || normalized.equals("speedbuilder") 
+                || normalized.equals("speedbuilders") || normalized.equals("speed-builder");
+    }
+
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if ("stats".equalsIgnoreCase(command.getName())
@@ -327,6 +347,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 }
                 ArcadePortGame mixedJoinGame = mixedArcadeGameFromId(args[1]);
                 boolean mixedArcadeVariant = mixedJoinGame != null;
+                if (isSpeedBuildersId(args[1])) {
+                    if (speedBuilders != null) speedBuilders.queue(player, sub.equals("play"));
+                    return true;
+                }
                 ArcadePortGame requestedGame = mixedArcadeVariant ? mixedJoinGame : ArcadePortGame.fromId(args[1]);
                 manager.queue(requestedGame, player, sub.equals("play"), mixedArcadeVariant);
                 return true;
@@ -337,10 +361,15 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 }
                 if (args.length < 2) {
                     if (cameraShy != null) cameraShy.leaveQueue(leavingPlayer);
+                    if (speedBuilders != null) speedBuilders.leaveQueue(leavingPlayer);
                     return true;
                 }
                 if ("camera-shy".equalsIgnoreCase(args[1])) {
                     if (cameraShy != null) cameraShy.leaveQueue(leavingPlayer);
+                    return true;
+                }
+                if (isSpeedBuildersId(args[1])) {
+                    if (speedBuilders != null) speedBuilders.leaveQueue(leavingPlayer);
                     return true;
                 }
                 ArcadePortGame leavingGame = ArcadePortGame.fromId(args[1]);
@@ -394,6 +423,14 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             case "start":
                 if (args.length < 2) {
                     sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport start <game-id>");
+                    return true;
+                }
+                if (isSpeedBuildersId(args[1])) {
+                    if (!hasAdminAccess(sender)) {
+                        sender.sendMessage(ChatColor.RED + "Operator permission required to force-start Speed Builders.");
+                        return true;
+                    }
+                    if (speedBuilders != null) speedBuilders.startQueued();
                     return true;
                 }
                 if ("plexball".equalsIgnoreCase(args[1])) {
@@ -463,17 +500,21 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             case "status":
                 sender.sendMessage(ChatColor.GOLD + "Modern Arcade ports: " + ChatColor.WHITE + manager.status());
                 if (plexball != null) sender.sendMessage(ChatColor.GOLD + "Plexball: " + ChatColor.WHITE + plexball.status());
+                if (speedBuilders != null) sender.sendMessage(ChatColor.GOLD + "Speed Builders: " + ChatColor.WHITE + speedBuilders.status());
                 return true;
             case "stop":
                 if (!hasAdminAccess(sender)) {
                     sender.sendMessage(ChatColor.RED + "Operator permission required.");
                     return true;
                 }
+                if (speedBuilders != null) speedBuilders.stop("Stopped by an operator.");
                 manager.stop("Stopped by an operator.");
                 return true;
             default:
                 sender.sendMessage(ChatColor.GOLD + "=== Modern Arcade Mechanics Prototypes ===");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play <game-id>" + ChatColor.GRAY + " — quick solo test; starts after a short join window");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport play speed-builders" + ChatColor.GRAY + " — queue for an isolated Speed Builders match");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport start speed-builders" + ChatColor.GRAY + " — operator start of the Speed Builders queue");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play plexball" + ChatColor.GRAY + " — queue for Plexball");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport join plexball" + ChatColor.GRAY + " — join the Plexball queue");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport spectate plexball" + ChatColor.GRAY + " — watch an active Plexball match");
