@@ -27,6 +27,16 @@ paper_jar="$SERVER_ROOT/paper-26.3-$paper_build.jar"
 curl --fail --location --retry 3 --user-agent "$USER_AGENT" "$paper_url" -o "$paper_jar"
 printf '%s  %s\n' "$paper_sha" "$paper_jar" | sha256sum -c -
 
+FPP_VERSION="2.1.7"
+FPP_TMP="$SERVER_ROOT/fake-player-plugin-$FPP_VERSION.jar"
+FPP_URL="https://hangarcdn.papermc.io/plugins/Janky-Development/FakePlayerPlugin/versions/$FPP_VERSION/PAPER/fake-player-plugin-$FPP_VERSION.jar"
+echo "[hoops-smoke] Fetching required FakePlayerPlugin $FPP_VERSION dependency."
+curl --fail --location --retry 3 --user-agent "$USER_AGENT" "$FPP_URL" -o "$FPP_TMP"
+unzip -tq "$FPP_TMP" >/dev/null
+fpp_descriptor="$(unzip -p "$FPP_TMP" plugin.yml)"
+grep -Fxq "name: FakePlayerPlugin" <<< "$fpp_descriptor"
+grep -Fxq "version: $FPP_VERSION" <<< "$fpp_descriptor"
+cp "$FPP_TMP" "$SERVER_ROOT/plugins/FakePlayerPlugin.jar"
 cp "$ARCADE_JAR" "$SERVER_ROOT/plugins/ArcadeMechanicsModern.jar"
 cp "$SMOKE_PLUGIN_JAR" "$SERVER_ROOT/plugins/HoopsPaperSmoke.jar"
 mkdir -p "$SERVER_ROOT/plugins/ArcadeMechanicsModern"

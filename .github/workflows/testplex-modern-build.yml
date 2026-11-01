@@ -30,7 +30,7 @@ jobs:
   build-modern-arcade:
     name: Build and test Paper 26.3 plugin
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -46,6 +46,14 @@ jobs:
             modern-platform/snake-port/pom.xml
             modern-platform/arcade-games-port/pom.xml
 
+      - name: Set up Node.js 24 for Minecraft 26.3 protocol clients
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install pinned offline Minecraft 26.3 protocol client
+        run: npm install --prefix "$RUNNER_TEMP/modern-protocol-client" --no-save --no-package-lock --ignore-scripts --no-audit --no-fund "@wp2508/minecraft-protocol@1.69.5"
+
       - name: Build and run catalogue tests
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/pom.xml clean verify
 
@@ -54,6 +62,30 @@ jobs:
 
       - name: Build Arcade mechanics and the integrated Monster Maze module
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/arcade-games-port/pom.xml clean verify
+
+      - name: Build and run four-client Hoops Paper 26.3 acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          smoke_dir="modern-platform/arcade-games-port/src/test-runtime/hoops-paper-smoke"
+          mvn --batch-mode --no-transfer-progress -f "$smoke_dir/pom.xml" clean package
+          bash modern-platform/arcade-games-port/scripts/run-hoops-paper-smoke.sh \
+            modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar \
+            "$smoke_dir/target/HoopsPaperSmoke.jar" \
+            "$RUNNER_TEMP/hoops-paper-smoke" \
+            "$RUNNER_TEMP/modern-protocol-client/node_modules"
+
+      - name: Upload Hoops Paper acceptance results and server log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hoops-paper-26.3-smoke-results
+          path: |
+            ${{ runner.temp }}/hoops-paper-smoke/plugins/HoopsPaperSmoke/results.tsv
+            ${{ runner.temp }}/hoops-paper-smoke/server.log
+            ${{ runner.temp }}/hoops-paper-smoke/client-bots.log
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Build the disabled Wizards 26.3 port and run spell-rule tests
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/wizards-port/pom.xml clean verify
@@ -94,6 +126,8 @@ jobs:
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/CameraShyGame.class"
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/CameraShyRules.class"
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/CameraShyProgressCatalog.class"
+          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/HoopsRemasteredRuntime.class"
+          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/HoopsRemasteredRules.class"
           jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/MonsterMazePlugin.class"
           jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/game/GameManager.class"
           jar tf "$arcade_jar" | grep -Fxq "monster-maze/maps.yml"
@@ -193,7 +227,7 @@ jobs:
           grep -Fxq "enabled: true" <<< "$snake_config"
           grep -Fxq "readiness-revision: snake-controlled-acceptance-20261101-v1" <<< "$snake_config"
           grep -Fq 'private static final boolean READY_FOR_TEST = true;' modern-platform/snake-port/src/main/java/au/com/testplex/snake/SnakeModernPlugin.java
-          echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, 27 shared Arcade catalogue games are packaged, and the 25-game controlled acceptance queue includes SkyWars Mixed, Wither Assault and Sneaky Assassins. CI compares all 419 original enabled map archives with the packaged JAR; Wither Assault and Sneaky Assassins are explicitly generated-arena test exceptions. Wizards remains a separate disabled module; Speed Builders Arcade and Hoops Remastered are tracked outside the enabled queue."
+          echo "All four modern Paper 26.3 Bukkit plugins verified; Hoops Remastered's generated court passed the four-client 2v2 Paper gameplay smoke. Hoops remains outside the READY_FOR_TEST allow-list and enabled queue pending 8v8/source acceptance. Monster Maze registration and the existing 25-game controlled queue remain unchanged."
 
       - name: Validate independent deployment recovery and shell syntax
         shell: bash
@@ -239,7 +273,7 @@ jobs:
             echo "- Built artifacts: TestplexModernArcade.jar, SnakeModern.jar, ArcadeMechanicsModern.jar and WizardsModern.jar (Monster Maze is compiled into the Testplex-owned Arcade module)"
             echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
             echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
-            echo "- Gameplay ports: 27 shared Arcade catalogue entries are packaged; the controlled READY_FOR_TEST queue now contains 25 games, including SkyWars Mixed, Wither Assault and Sneaky Assassins; Wizards remains separate and disabled, while Speed Builders Arcade and Hoops Remastered remain outside the enabled queue"
+            echo "- Gameplay ports: 27 shared Arcade catalogue entries are packaged; the controlled READY_FOR_TEST queue remains at 25. Hoops Remastered has a four-client Paper smoke harness but remains gated pending full 8v8/source acceptance; Wizards remains separate and disabled; Speed Builders Arcade remains gated"
             echo "- Playable allow-list: Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Castle Assault, Gladiators, Micro Battles, Milk the Cow, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons, Runner, Sheep Quest, Turf Wars, Snap, Monster Maze, Snake, Draw My Thing, Master Builders, SkyWars Mixed, Wither Assault and Sneaky Assassins; Evolution and Heroes of Gwen remain gated; Wizards, Speed Builders Arcade and Hoops Remastered remain outside the enabled catalogue queue"
             echo "- Deployment: successful pushes to feat/testplex-modern-26.3-platform automatically deploy through the isolated modern Hyper-V workflow"
           } >> "$GITHUB_STEP_SUMMARY"
