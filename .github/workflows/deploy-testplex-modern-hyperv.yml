@@ -907,7 +907,37 @@ jobs:
           done
           if [[ "$arcade_runtime_ready" != "true" ]]; then
             echo "Testplex Arcade lobby readiness did not match build $BUILD_SHA, nonce $DEPLOYMENT_NONCE, world testplex_arcade_lobby_v1, and current systemd invocation; rolling back." >&2
-            timeout --foreground --signal=TERM 10s sudo -n grep -i -E -C 3 'Arcade|ERROR|SEVERE|Exception|Caused by:|Failed|Could not|Unable to' "$SERVER_DIR/logs/latest.log" | tail -n 240 >&2 || true
+            echo "===== Arcade deployment identity file =====" >&2
+            identity_file="$SERVER_DIR/plugins/ArcadeMechanicsModern/.testplex-modern-deploy-identity.properties"
+            if sudo -n test -f "$identity_file"; then
+              timeout --foreground --signal=TERM 8s sudo -n sed -n '1,40p' "$identity_file" >&2 || true
+            else
+              echo "Missing: $identity_file" >&2
+            fi
+            echo "===== Arcade deployment readiness file =====" >&2
+            if sudo -n test -f "$readiness_file"; then
+              timeout --foreground --signal=TERM 8s sudo -n sed -n '1,60p' "$readiness_file" >&2 || true
+            else
+              echo "Missing: $readiness_file" >&2
+            fi
+            echo "===== Modern service state and process identity =====" >&2
+            timeout --foreground --signal=TERM 8s sudo -n systemctl show testplex-modern.service \
+              --property=ActiveState --property=SubState --property=MainPID --property=InvocationID \
+              --property=ExecMainStatus --property=Result >&2 || true
+            diagnostic_pid="$(timeout --foreground --signal=TERM 8s sudo -n systemctl show --property=MainPID --value testplex-modern.service 2>/dev/null || true)"
+            if [[ "$diagnostic_pid" =~ ^[1-9][0-9]*$ ]]; then
+              echo "===== Selected Java process environment =====" >&2
+              timeout --foreground --signal=TERM 8s sudo -n sh -c \
+                "tr '\\000' '\\n' < '/proc/$diagnostic_pid/environ' | grep -E '^(INVOCATION_ID|TESTPLEX_DEPLOYED_BUILD_SHA|TESTPLEX_DEPLOYMENT_ID)=' || true" >&2 || true
+            fi
+            echo "===== Modern service journal (last 100 lines) =====" >&2
+            timeout --foreground --signal=TERM 8s sudo -n journalctl -u testplex-modern.service \
+              -n 100 --no-pager -o short-iso >&2 || true
+            echo "===== Paper log tail (last 140 lines) =====" >&2
+            timeout --foreground --signal=TERM 8s sudo -n tail -n 140 "$SERVER_DIR/logs/latest.log" >&2 || true
+            echo "===== VM memory and storage =====" >&2
+            timeout --foreground --signal=TERM 8s free -h >&2 || true
+            timeout --foreground --signal=TERM 8s df -h "$SERVER_DIR" /var/tmp >&2 || true
             rollback
             exit 1
           fi
