@@ -541,10 +541,15 @@ public final class ArcadePortRules {
     /** PerkBarrage fires queued arrows once per TICK (approximately 20 per second). */
     public static final long DRAGONS_BARRAGE_FIRE_INTERVAL_MILLIS = 50L;
     public static final double DRAGONS_PARTICIPATION_GEMS = 10.0D;
-    public static final double DRAGONS_FLARE_RADIUS = 24.0D;
-    public static final double DRAGONS_FLARE_RADIUS_SQUARED = DRAGONS_FLARE_RADIUS * DRAGONS_FLARE_RADIUS;
-    public static final double DRAGONS_FLARE_VERTICAL_RANGE = 24.0D;
-    public static final long DRAGONS_FLARE_DURATION_MILLIS = 6_000L;
+    public static final long DRAGONS_FROST_COOLDOWN_MILLIS = 25_000L;
+    public static final long DRAGONS_GLIDER_COOLDOWN_MILLIS = 15_000L;
+    public static final long DRAGONS_GLIDER_DURATION_MILLIS = 3_500L;
+    public static final long DRAGONS_TAMER_COOLDOWN_MILLIS = 90_000L;
+    public static final long DRAGONS_TAMER_DURATION_MILLIS = 15_000L;
+    public static final long DRAGONS_SURVIVE_FIVE_MINUTES_MILLIS = 5 * 60_000L;
+    public static final int DRAGONS_WIN_STREAK_ACHIEVEMENT = 3;
+    public static final int DRAGONS_FROST_BRIDGE_LENGTH = 7;
+    public static final long DRAGONS_FROST_BRIDGE_LIFETIME_MILLIS = 8_000L;
     public static final long DRAGONS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS = 3_000L;
     public static final int DRAGONS_MARKSMAN_START_ARROWS = 1;
     public static final long DRAGONS_CONTACT_COOLDOWN_MILLIS = 2_000L;
@@ -696,21 +701,27 @@ public final class ArcadePortRules {
             case "coward" -> "coward";
             case "marksman", "markman" -> "marksman";
             case "pyrotechnic", "pyro" -> "pyrotechnic";
+            case "frost", "ice", "ice-bridge" -> "frost";
+            case "glider", "glide" -> "glider";
+            case "tamer", "dragon-tamer" -> "tamer";
             default -> null;
         };
     }
 
-    public static int dragonsFlareCharges(String requestedKit) {
-        return switch (normalizeDragonsKit(requestedKit) == null ? "" : normalizeDragonsKit(requestedKit)) {
-            case "marksman" -> 3;
-            case "pyrotechnic" -> 2;
-            case "coward" -> 1;
-            default -> 0;
-        };
+    public static boolean shouldAwardDragonsSurviveFiveMinutes(long liveElapsedMillis) {
+        return liveElapsedMillis >= DRAGONS_SURVIVE_FIVE_MINUTES_MILLIS;
     }
 
-    public static boolean isDragonFlareActive(long nowMillis, long expiresAtMillis) {
-        return expiresAtMillis > nowMillis;
+    public static int nextDragonsWinStreak(int previousStreak, boolean won) {
+        return won ? Math.max(0, previousStreak) + 1 : 0;
+    }
+
+    public static boolean shouldAwardDragonsWinStreak(int streak) {
+        return streak >= DRAGONS_WIN_STREAK_ACHIEVEMENT;
+    }
+
+    public static boolean shouldAwardDragonsNoDamageWin(boolean won, boolean tookDamage) {
+        return won && !tookDamage;
     }
 
     public static boolean shouldCancelDragonsPvp(boolean directPlayerDamager, boolean playerProjectileShooter) {
@@ -776,16 +787,6 @@ public final class ArcadePortRules {
     public static boolean canUseDragonSpectatorTeleport(long nowMillis, long nextAllowedMillis) {
         return nowMillis >= nextAllowedMillis;
     }
-
-    /** Horizontal radius is circular; the vertical limit prevents one flare protecting an entire tower. */
-    public static boolean isDragonFlareLocationProtected(
-            double horizontalDistanceSquared, double verticalDistance) {
-        return Double.isFinite(horizontalDistanceSquared) && horizontalDistanceSquared >= 0.0D
-                && horizontalDistanceSquared <= DRAGONS_FLARE_RADIUS_SQUARED
-                && Double.isFinite(verticalDistance)
-                && Math.abs(verticalDistance) <= DRAGONS_FLARE_VERTICAL_RANGE;
-    }
-
 
 
     /** SoloGame awards one survival gem per ten seconds alive. */

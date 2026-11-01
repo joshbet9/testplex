@@ -291,7 +291,10 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             case DRAGONS -> List.of(
                     new KitChoice("coward", "Coward", Material.FEATHER),
                     new KitChoice("marksman", "Marksman", Material.BOW),
-                    new KitChoice("pyrotechnic", "Pyrotechnic", Material.FIREWORK_ROCKET));
+                    new KitChoice("pyrotechnic", "Pyrotechnic", Material.FIREWORK_ROCKET),
+                    new KitChoice("frost", "Frost", Material.SNOWBALL),
+                    new KitChoice("glider", "Glider", Material.ELYTRA),
+                    new KitChoice("tamer", "Tamer", Material.END_CRYSTAL));
             case MICRO_BATTLES -> List.of(
                     new KitChoice("micro-archer", "Archer", Material.BOW),
                     new KitChoice("micro-worker", "Worker", Material.IRON_PICKAXE),
