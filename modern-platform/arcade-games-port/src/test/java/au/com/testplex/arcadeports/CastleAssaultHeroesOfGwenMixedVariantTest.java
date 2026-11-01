@@ -118,6 +118,16 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     }
 
     @Test
+    void heroesOfGwenFletcherUsesTheSourceHunterCapacitiesAndReloadTimes() {
+        assertEquals(3, ArcadePortRules.heroesOfGwenFletcherMaxArrows("devon"));
+        assertEquals(3_000L, ArcadePortRules.heroesOfGwenFletcherReloadMillis("devon"));
+        assertEquals(2, ArcadePortRules.heroesOfGwenFletcherMaxArrows("rowena"));
+        assertEquals(2_000L, ArcadePortRules.heroesOfGwenFletcherReloadMillis("rowena"));
+        assertEquals(0, ArcadePortRules.heroesOfGwenFletcherMaxArrows("hattori"));
+        assertEquals(0L, ArcadePortRules.heroesOfGwenFletcherReloadMillis("hattori"));
+    }
+
+    @Test
     void bothGamesResolveTheirOriginalSourceMapFoldersAndIds() {
         assertEquals(ArcadePortGame.CASTLE_ASSAULT, ArcadePortGame.fromId("castle-assault"));
         assertEquals(ArcadePortGame.HEROES_OF_GWEN, ArcadePortGame.fromId("Heroes of Gwen"));
