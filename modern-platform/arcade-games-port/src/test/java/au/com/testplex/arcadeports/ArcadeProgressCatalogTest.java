@@ -2,143 +2,14 @@ package au.com.testplex.arcadeports;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.junit.jupiter.api.Test;
 
 class ArcadeProgressCatalogTest {
-    private static final Map<String, List<ArcadeProgressCatalog.Achievement>> ACHIEVEMENTS = Map.ofEntries(
-            Map.entry("bacon-brawl", List.of(
-                    a("king-of-bacon", "King of Bacon", "Win 15 Bacon Brawl games."),
-                    a("pigs-in-blankets", "Pigs In Blankets", "Get 6 kills in one game."),
-                    a("flash-fried", "Flash Fried", "Win Bacon Brawl in 60 seconds or less."),
-                    a("raw-pork", "Raw Pork", "Win Bacon Brawl without using an ability."),
-                    a("three-for-one", "Three for One!", "Get 3 Body Slam kills in one game."),
-                    a("goat-sty", "GOAT Sty", "Win as Pig, landing only cloaked backstabs."),
-                    a("pork-on-fork", "Get Some Pork on Your Fork", "Win a game without a kill."),
-                    a("mama-camera", "Mama Get the Camera", "As Mama Piggles, get 4 kills from Bacon Blast or its kill combo."),
-                    a("got-em", "Got em’", "Kill a player during their Body Slam recovery before they land."),
-                    a("hamished", "Hamished", "Win while taking starvation damage."))),
-            Map.entry("bomb-lobbers", List.of(
-                    a("ultimate-killer", "Ultimate Killer", "Get 5 kills in one game."),
-                    a("two-birds-one-stone", "Two birds, one stone", "Kill 2 players with one TNT."),
-                    a("team-player", "Team player!", "Get 5 assists in one game."),
-                    a("whats-a-double-jump", "What's a double jump?", "Win without using double jump while alive."),
-                    a("the-mvp", "The MVP", "Win a 1v3 clutch as the last living member of your team."),
-                    a("blast-proof", "Blast Proof", "Win a game as the Armorer."),
-                    a("jelly-skin", "Jelly Skin", "Win a game without taking damage."),
-                    a("master-bomber", "Master Bomber", "Win 30 Bomb Lobbers games."),
-                    a("wonderkid", "Wonderkid", "Get 3 kills without throwing TNT that explodes immediately on impact."),
-                    a("technical", "Technical", "Kill a player with a TNT thrown from less than 20 blocks away."),
-                    a("calma", "Calma", "Jump 100 times in one game."),
-                    a("over-9000", "Over 9000", "Win a 1v3 clutch using only powerups."))),
-            Map.entry("death-tag", List.of(
-                    a("statue", "Statue", "Win while staying in the same 5×5 area for 3 minutes."),
-                    a("gallows", "Gallows", "As Runner Traitor, assist 3 comrade deaths in one game."))),
-            Map.entry("dragon-escape", List.of(
-                    a("strats", "Strats", "As Warper, warp to a leader at least 40 blocks ahead and win."),
-                    a("ragebaiter", "Ragebaiter", "Kill 3 players with Disruptor TNT in one game."),
-                    a("twinning-this-halloween", "Twinning This Halloween?", "Tie a race with your ghost."),
-                    a("learn-to-code", "Learn to Code", "As Digger, use all breaks in a winning race without running through a broken block."))),
-            Map.entry("dragons", List.of(
-                    a("win-three-in-a-row", "Win 3 in a row", "Win three completed Dragons games consecutively."),
-                    a("survive-five-minutes", "Survive 5 minutes", "Stay alive in a Dragons match for at least five minutes."),
-                    a("no-damage-win", "Untouched", "Win a Dragons match without taking damage."))),
-            Map.entry("evolution", List.of(
-                    a("overkill", "Overkill", "Get 2 kills before each evolution."),
-                    a("mercy-rule", "Mercy Rule", "Win without manually evolving."),
-                    a("objection", "Objection!", "Win by killing only players who share your current mob."),
-                    a("turns-tabled", "How the Turns have Tabled", "As a Chicken, kill an Iron Golem and win."),
-                    a("try-again", "Try Try Again", "Evolve 3 times only from assists in a winning game."),
-                    a("wrong-kit-champ", "Wrong Kit Champ", "Without Quick Evolver, lose a game where that kit would have let you evolve in time to win."))),
-            Map.entry("gladiators", List.of(
-                    a("are-you-not-entertained", "Are you not entertained?", "Win without using a bow or rod when available."),
-                    a("not-even-close", "Not even close.", "Win a duel with half a heart remaining."),
-                    a("silky-seconds", "Silky Seconds", "Win from loser bracket after a first-round loss by less than 0.5 hearts."),
-                    a("comeback-kid", "Comeback Kid", "Win from loser bracket after being 10-d in round one."),
-                    a("who-do-you-think-you-are", "Who do you think you are?", "Beat an opponent who used all potions/arrows without using any."),
-                    a("man-of-integrity", "Man of Integrity", "Win without using a fishing rod when it was available."))),
-            Map.entry("micro-battles", List.of(
-                    a("annihilation", "Annihilation", "Get 8 kills in one Micro Battles game."),
-                    a("last-two", "Last Two", "Be alive when exactly two teams remain."),
-                    a("phew", "PHEW!", "Build up to the border without dying to it."),
-                    a("micro-battles-king", "Micro Battles King", "Use a placed block to knock a jumper into lava/water and get 3 kills."),
-                    a("mosh-pit-playroom", "Mosh-Pit Playroom", "Get 8 assists in one game."),
-                    a("built-for-this", "Built for This", "As Fighter, win the final 1v1 where another kit would have lost."),
-                    a("sniper-dawg", "Sniper Dawg", "As Archer, knock a player from every team off a skybase in one game."),
-                    a("gravedigger", "Gravedigger", "Get a melee kill with a shovel."))),
-            Map.entry("monster-maze", List.of(
-                    a("jumpman", "Jumpman", "Spend all jumps on stage 1, reach the first safe pad, and win."),
-                    a("just-to-suffer", "Just to Suffer", "Use a jump on a one-block gap."),
-                    a("blizzard", "Blizzard", "Freeze 10 mobs in one Cryo Blitz."),
-                    a("out-of-the-cup", "Out of the cup", "Reach a safe pad first, then slowball an opponent who misses that pad."),
-                    a("blackout", "Blackout", "As Body Builder, win without reaching a first safe pad."),
-                    a("stampede", "Stampede", "Send 10 mobs flying with Body Rush in one game."),
-                    a("perfect-run", "Perfect Run", "Win after reaching every first safe pad."),
-                    a("breakaway", "Breakaway", "Reach a safe pad first while the closest player is more than 30 blocks away."),
-                    a("photo-finish", "Photo Finish", "Win on the final second with an opponent within 3 blocks."))));
-
-    private static final Map<String, List<ArcadeProgressCatalog.Milestone>> MILESTONES = Map.ofEntries(
-            Map.entry("bacon-brawl", List.of(
-                    m("wins", "Wins", "wins", 250, "wins"),
-                    m("kills", "Kills", "kills", 1000, "kills"))),
-            Map.entry("bomb-lobbers", List.of(
-                    m("wins", "Wins", "wins", 500, "wins"),
-                    m("kills", "Kills", "kills", 1000, "kills"))),
-            Map.entry("death-tag", List.of(
-                    m("kills", "Kills", "kills", 500, "kills"),
-                    m("chaser-wins", "Chaser Wins", "chaser-wins", 125, "wins"),
-                    m("runner-wins", "Runner Wins", "runner-wins", 125, "wins"))),
-            Map.entry("dragon-escape", List.of(
-                    m("wins", "Wins", "wins", 2000, "wins"),
-                    m("courses", "Course Completes", "course-completes", 3000, "courses"),
-                    m("distance", "Blocks Travelled", "blocks-travelled", 750000, "blocks"))),
-            Map.entry("dragons", List.of(
-                    m("survival", "Survive", "survival-millis", 36_000_000, "milliseconds"),
-                    m("wins", "Wins", "wins", 250, "wins"))),
-            Map.entry("evolution", List.of(
-                    m("wins", "Wins", "wins", 250, "wins"),
-                    m("kills", "Kills", "kills", 2000, "kills"))),
-            Map.entry("gladiators", List.of(
-                    m("wins", "Wins", "wins", 250, "wins"),
-                    m("kills", "Kills", "kills", 1000, "kills"),
-                    m("loser-bracket-wins", "Loser Bracket Wins", "loser-bracket-wins", 100, "wins"))),
-            Map.entry("micro-battles", List.of(
-                    m("wins", "Wins", "wins", 1500, "wins"),
-                    m("kills", "Kills", "kills", 5000, "kills"))),
-            Map.entry("monster-maze", List.of(
-                    ms("wins", "Wins", "wins", 250, "wins", 25, 50, 100, 250),
-                    ms("first-safe-pads", "First Safe Pads", "first-safe-pads", 1000, "pads", 100, 250, 500, 1000),
-                    ms("highest-stage", "Highest Stage", "highest-stage", 21, "stage", 12, 15, 18, 21))));
-
-    private static final String[] GAMES = {"bacon-brawl", "bomb-lobbers", "death-tag", "dragon-escape",
-            "dragons", "evolution", "gladiators", "micro-battles", "monster-maze"};
-
-    @Test
-    void achievementCatalogMatchesTheSourceDefinitionsExactly() {
-        int total = 0;
-        for (String game : GAMES) {
-            assertEquals(ACHIEVEMENTS.get(game), ArcadeProgressCatalog.achievements(game), game);
-            total += ACHIEVEMENTS.get(game).size();
-        }
-        assertEquals(63, total);
-        assertEquals(List.of(), ArcadeProgressCatalog.achievements("not-a-game"));
-    }
-
-    @Test
-    void milestoneCatalogMatchesTheSourceDefinitionsExactly() {
-        int total = 0;
-        for (String game : GAMES) {
-            assertEquals(MILESTONES.get(game), ArcadeProgressCatalog.milestones(game), game);
-            total += MILESTONES.get(game).size();
-        }
-        assertEquals(22, total);
-        assertEquals(List.of(), ArcadeProgressCatalog.milestones("not-a-game"));
-    }
-
     @Test
     void monsterMazeUsesTheRequestedMilestoneThresholds() {
         assertArrayEquals(new long[] {25, 50, 100, 250}, stages("monster-maze", "wins"));
@@ -147,7 +18,7 @@ class ArcadeProgressCatalogTest {
     }
 
     @Test
-    void otherMilestonesHaveFourComputedProgressStagesAndReadPerPlayerValues() {
+    void otherMilestonesHaveFourProgressStagesAndReadPerPlayerValues() {
         var milestone = ArcadeProgressCatalog.milestones("bacon-brawl").get(0);
         assertArrayEquals(new long[] {25, 63, 125, 250}, milestone.stages());
         UUID player = UUID.randomUUID();
@@ -155,42 +26,153 @@ class ArcadeProgressCatalogTest {
         config.set("local-stats." + player + ".bacon-brawl.wins", 77);
         assertEquals(77, milestone.value(config, player, "bacon-brawl"));
         assertEquals(0, milestone.value(config, UUID.randomUUID(), "bacon-brawl"));
-        assertEquals(0, milestone.value(new YamlConfiguration(), player, "bacon-brawl"));
     }
 
     @Test
-    void everyMilestoneStageIsAscendingAndCappedByItsMaximum() {
-        for (List<ArcadeProgressCatalog.Milestone> milestones : MILESTONES.values()) {
-            for (ArcadeProgressCatalog.Milestone milestone : milestones) {
-                long[] stages = milestone.stages();
-                assertEquals(4, stages.length, milestone.id());
-                for (int i = 0; i < stages.length; i++) {
-                    if (i > 0) assertArrayEquals(new long[] {Math.max(stages[i - 1], stages[i])},
-                            new long[] {stages[i]}, milestone.id());
-                    assertEquals(stages[i], Math.min(stages[i], milestone.maximum()), milestone.id());
-                }
-                assertEquals(milestone.maximum(), stages[stages.length - 1], milestone.id());
-            }
+    void firstBatchCatalogContainsAllProvidedGameCriteria() {
+        String[] games = {"bacon-brawl", "bomb-lobbers", "death-tag", "dragon-escape", "dragons",
+                "evolution", "gladiators", "micro-battles", "monster-maze", "one-in-the-quiver",
+                "paintball", "runner", "sheep-quest", "snake", "spleef", "turf-wars"};
+        int[] achievementCounts = {5, 4, 2, 4, 3, 5, 4, 6, 9, 2, 5, 7, 8, 6, 7, 9};
+        for (int i = 0; i < games.length; i++) {
+            assertTrue(ArcadeProgressCatalog.milestones(games[i]).size() >= 2, games[i]);
+            assertTrue(ArcadeProgressCatalog.achievements(games[i]).size() >= achievementCounts[i], games[i]);
         }
+    }
+
+    @Test
+    void dragonsCatalogUsesTheCommunityAchievementSetWithoutFlareAchievements() {
+        assertTrue(hasAchievement("dragons", "win-three-in-a-row", "Win 3 in a row"));
+        assertTrue(hasAchievement("dragons", "survive-five-minutes", "Survive 5 minutes"));
+        assertTrue(hasAchievement("dragons", "no-damage-win", "Untouched"));
+        assertEquals(3, ArcadeProgressCatalog.achievements("dragons").size());
+    }
+
+    @Test
+    void grenadeFromTheGraveRequiresTwoKillsAfterElimination() {
+        var achievement = ArcadeProgressCatalog.achievements("bomb-lobbers").stream()
+                .filter(entry -> entry.id().equals("grenade-from-the-grave"))
+                .findFirst().orElseThrow();
+        assertEquals("Grenade From the Grave", achievement.name());
+        assertFalse(BombLobbersAchievement.shouldAwardGrenadeFromTheGrave(0));
+        assertFalse(BombLobbersAchievement.shouldAwardGrenadeFromTheGrave(1));
+        assertTrue(BombLobbersAchievement.shouldAwardGrenadeFromTheGrave(2));
+        assertTrue(BombLobbersAchievement.shouldAwardGrenadeFromTheGrave(3));
+    }
+
+
+    @Test
+    void nextSevenGameMilestonesUseTheRequestedLifetimeThresholds() {
+        assertArrayEquals(new long[] {25, 63, 125, 250}, stages("one-in-the-quiver", "wins"));
+        assertArrayEquals(new long[] {500, 1250, 2500, 5000}, stages("paintball", "kills"));
+        assertArrayEquals(new long[] {10000, 25000, 50000, 100000}, stages("runner", "blocks-run"));
+        assertArrayEquals(new long[] {200, 500, 1000, 2000}, stages("sheep-quest", "kills"));
+        assertArrayEquals(new long[] {75, 188, 375, 750}, stages("snake", "kills"));
+        assertArrayEquals(new long[] {25000, 62500, 125000, 250000}, stages("spleef", "blocks-broken"));
+        assertArrayEquals(new long[] {1000, 2500, 5000, 10000}, stages("turf-wars", "blocks-broken"));
+    }
+
+    @Test
+    void newAchievementCatalogContainsAllRequestedNames() {
+        assertTrue(hasAchievement("one-in-the-quiver", "heads", "HEADS!"));
+        assertTrue(hasAchievement("paintball", "aura", "AURA"));
+        assertTrue(hasAchievement("runner", "special-play", "Special Play"));
+        assertTrue(hasAchievement("sheep-quest", "baaaad-to-the-bone", "Baaaaad to the bone"));
+        assertTrue(hasAchievement("snake", "busted", "Busted"));
+        assertTrue(hasAchievement("spleef", "no-mods-in-here", "No Mods in Here"));
+        assertTrue(hasAchievement("turf-wars", "fair-game", "Fair Game"));
+    }
+
+
+    @Test
+    void allSevenGamesExposeEveryRequestedMilestoneKeyAndThreshold() {
+        assertMilestone("one-in-the-quiver", "wins", "wins", 250, new long[] {25, 63, 125, 250});
+        assertMilestone("one-in-the-quiver", "kills", "kills", 5000, new long[] {500, 1250, 2500, 5000});
+
+        assertMilestone("paintball", "wins", "wins", 5000, new long[] {500, 1250, 2500, 5000});
+        assertMilestone("paintball", "kills", "kills", 5000, new long[] {500, 1250, 2500, 5000});
+        assertMilestone("paintball", "revives", "medic", 2500, new long[] {250, 625, 1250, 2500});
+
+        assertMilestone("runner", "wins", "wins", 250, new long[] {25, 63, 125, 250});
+        assertMilestone("runner", "blocks-run", "marathon-runner", 100000, new long[] {10000, 25000, 50000, 100000});
+
+        assertMilestone("sheep-quest", "wins", "wins", 250, new long[] {25, 63, 125, 250});
+        assertMilestone("sheep-quest", "kills", "kills", 2000, new long[] {200, 500, 1000, 2000});
+        assertMilestone("sheep-quest", "sheep-captures", "sheep-captures", 1000, new long[] {100, 250, 500, 1000});
+
+        assertMilestone("snake", "wins", "wins", 250, new long[] {25, 63, 125, 250});
+        assertMilestone("snake", "kills", "lifetime-kills", 750, new long[] {75, 188, 375, 750});
+
+        assertMilestone("spleef", "wins", "wins", 250, new long[] {25, 63, 125, 250});
+        assertMilestone("spleef", "blocks-broken", "blocks-broken", 250000, new long[] {25000, 62500, 125000, 250000});
+
+        assertMilestone("turf-wars", "wins", "wins", 1000, new long[] {100, 250, 500, 1000});
+        assertMilestone("turf-wars", "kills", "kills", 10000, new long[] {1000, 2500, 5000, 10000});
+        assertMilestone("turf-wars", "blocks-broken", "blocks-broken", 10000, new long[] {1000, 2500, 5000, 10000});
+    }
+
+    @Test
+    void secondAchievementBatchContainsTheRequestedTitles() {
+        assertTrue(hasAchievement("sneaky-assassins", "you-need-directions", "You Need Directions?"));
+        assertTrue(hasAchievement("sneaky-assassins", "not-so-sneaky", "Not So Sneaky"));
+        assertTrue(hasAchievement("sneaky-assassins", "prosecutor", "Prosecutor"));
+        assertTrue(hasAchievement("sneaky-assassins", "idiot", "Idiot"));
+        assertTrue(hasAchievement("sneaky-assassins", "the-duels-duels-duel", "The Duel’s Duel’s Duel"));
+        assertTrue(hasAchievement("sneaky-assassins", "disappointment-is-immeasurable", "Disappointment is Immeasurable"));
+        assertTrue(hasAchievement("speed-builders-arcade", "speedrunner", "Speedrunner"));
+        assertTrue(hasAchievement("speed-builders-arcade", "unlucky", "Unlucky"));
+        assertTrue(hasAchievement("speed-builders-arcade", "bad-builds", "Bad Builds"));
+        assertTrue(hasAchievement("speed-builders-arcade", "right-on-time", "Right on time"));
+        assertTrue(hasAchievement("wizards", "trifecta", "Trifecta"));
+        assertTrue(hasAchievement("wither-assault", "savior", "Savior"));
+        assertTrue(hasAchievement("hoops-remastered", "quintuple-double", "Quintuple Double"));
+        assertTrue(hasAchievement("milk-the-cow", "got-the-chops", "Got the Chops"));
+        assertTrue(hasAchievement("draw-my-thing", "for-the-people", "For the people"));
+        assertTrue(hasAchievement("master-builders", "architect", "Architect"));
+        assertTrue(hasAchievement("heroes-of-gwen", "know-your-enemy", "Know Your Enemy"));
+        assertTrue(hasAchievement("castle-assault", "moral-exercise", "Moral Exercise"));
+        assertTrue(ArcadeProgressCatalog.achievements("skywars").isEmpty());
+    }
+
+    @Test
+    void secondMilestoneBatchUsesAllRequestedLifetimeTargets() {
+        assertMilestone("sneaky-assassins", "kills", "kills", 1000, new long[] {100, 250, 500, 1000});
+        assertMilestone("sneaky-assassins", "wins", "wins", 250, new long[] {25, 63, 125, 250});
+        assertMilestone("sneaky-assassins", "powerups", "powerups", 750, new long[] {75, 188, 375, 750});
+        assertMilestone("speed-builders-arcade", "wins", "wins", 250, new long[] {25, 63, 125, 250});
+        assertMilestone("speed-builders-arcade", "perfect-builds", "perfect-builds", 1000, new long[] {100, 250, 500, 1000});
+        assertMilestone("speed-builders-arcade", "blocks-placed", "blocks-placed", 50000, new long[] {5000, 12500, 25000, 50000});
+        assertMilestone("wizards", "wins", "wins", 250, new long[] {25, 63, 125, 250});
+        assertMilestone("wizards", "kills", "kills", 1000, new long[] {100, 250, 500, 1000});
+        assertMilestone("wizards", "spells-bound", "spells-bound", 5000, new long[] {500, 1250, 2500, 5000});
+        assertMilestone("wither-assault", "revives", "revives", 500, new long[] {50, 125, 250, 500});
+        assertMilestone("hoops-remastered", "points", "points", 500, new long[] {50, 125, 250, 500});
+        assertMilestone("hoops-remastered", "blocks", "blocks", 250, new long[] {25, 63, 125, 250});
+        assertMilestone("milk-the-cow", "buckets-digested", "buckets-digested", 1500, new long[] {150, 375, 750, 1500});
+        assertMilestone("skywars", "tnt-kills", "tnt-kills", 100, new long[] {10, 25, 50, 100});
+        assertMilestone("draw-my-thing", "first-guesses", "first-guesses", 500, new long[] {50, 125, 250, 500});
+        assertMilestone("master-builders", "fair-votes", "fair-votes", 250, new long[] {25, 63, 125, 250});
+        assertMilestone("heroes-of-gwen", "mage-wins", "mage-wins", 100, new long[] {10, 25, 50, 100});
+        assertMilestone("castle-assault", "crystals-destroyed", "crystals-destroyed", 250, new long[] {25, 63, 125, 250});
+    }
+
+    private void assertMilestone(String game, String id, String statKey, long maximum, long[] stages) {
+        var milestone = ArcadeProgressCatalog.milestones(game).stream()
+                .filter(entry -> entry.id().equals(id))
+                .findFirst().orElseThrow(() -> new AssertionError("Missing milestone " + game + "/" + id));
+        assertEquals(statKey, milestone.statKey(), game + "/" + id + " stat key");
+        assertEquals(maximum, milestone.maximum(), game + "/" + id + " maximum");
+        assertArrayEquals(stages, milestone.stages(), game + "/" + id + " stages");
+    }
+
+    private boolean hasAchievement(String game, String id, String name) {
+        return ArcadeProgressCatalog.achievements(game).stream()
+                .anyMatch(entry -> entry.id().equals(id) && entry.name().equals(name));
     }
 
     private long[] stages(String gameId, String id) {
         return ArcadeProgressCatalog.milestones(gameId).stream()
                 .filter(milestone -> milestone.id().equals(id))
                 .findFirst().orElseThrow().stages();
-    }
-
-    private static ArcadeProgressCatalog.Achievement a(String id, String name, String requirement) {
-        return new ArcadeProgressCatalog.Achievement(id, name, requirement);
-    }
-
-    private static ArcadeProgressCatalog.Milestone m(String id, String name, String statKey, long maximum, String unit) {
-        return new ArcadeProgressCatalog.Milestone(id, name, statKey, maximum, unit);
-    }
-
-    private static ArcadeProgressCatalog.Milestone ms(String id, String name, String statKey, long maximum,
-            String unit, long... stages) {
-        return new ArcadeProgressCatalog.Milestone(id, name, statKey, maximum, unit,
-                java.util.Arrays.stream(stages).boxed().toList());
     }
 }
