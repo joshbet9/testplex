@@ -55,6 +55,65 @@ class SpeedBuildersRulesTest {
         assertEquals(60, SpeedBuildersRules.buildSeconds(40, 40, 0, 2.0D, null));
     }
 
+ 
+    @Test
+    void sourceBlockStateScoringChecksOrientationAndState() {
+        assertTrue(SpeedBuildersRules.blockMatches(Material.OAK_STAIRS,
+                "minecraft:oak_stairs[facing=north,half=bottom,shape=inner_left,waterlogged=false]",
+                Material.OAK_STAIRS,
+                "minecraft:oak_stairs[facing=north,half=bottom,shape=inner_right,waterlogged=false]"));
+        assertFalse(SpeedBuildersRules.blockMatches(Material.OAK_STAIRS,
+                "minecraft:oak_stairs[facing=north,half=bottom,shape=inner_left,waterlogged=false]",
+                Material.OAK_STAIRS,
+                "minecraft:oak_stairs[facing=south,half=bottom,shape=inner_right,waterlogged=false]"));
+        assertTrue(SpeedBuildersRules.blockMatches(Material.END_PORTAL_FRAME,
+                "minecraft:end_portal_frame[facing=east,eye=true]",
+                Material.END_PORTAL_FRAME,
+                "minecraft:end_portal_frame[facing=east,eye=false]"));
+        assertFalse(SpeedBuildersRules.blockMatches(Material.END_PORTAL_FRAME,
+                "minecraft:end_portal_frame[facing=east,eye=true]",
+                Material.END_PORTAL_FRAME,
+                "minecraft:end_portal_frame[facing=west,eye=true]"));
+        assertTrue(SpeedBuildersRules.blockMatches(Material.OAK_LEAVES,
+                "minecraft:oak_leaves[distance=7,persistent=false]",
+                Material.OAK_LEAVES,
+                "minecraft:oak_leaves[distance=2,persistent=true]"));
+        assertTrue(SpeedBuildersRules.blockMatches(Material.REDSTONE_ORE,
+                "minecraft:redstone_ore[lit=false]",
+                Material.REDSTONE_ORE,
+                "minecraft:redstone_ore[lit=true]"));
+        assertTrue(SpeedBuildersRules.blockMatches(Material.ANVIL,
+                "minecraft:anvil[facing=east]",
+                Material.CHIPPED_ANVIL,
+                "minecraft:chipped_anvil[facing=east]"));
+    }
+
+    @Test
+    void sourceScorerCountsBlockDataMatchesButDoesNotPenaliseExtraBlocks() {
+        var expected = List.of(
+                new SpeedBuildersRules.Cell(0, 0, 0, Material.OAK_STAIRS,
+                        "minecraft:oak_stairs[facing=north,half=bottom,shape=straight,waterlogged=false]"),
+                new SpeedBuildersRules.Cell(1, 0, 0, Material.STONE, "minecraft:stone"));
+        Map<SpeedBuildersRules.Coordinate, SpeedBuildersRules.BlockState> actual = Map.of(
+                new SpeedBuildersRules.Coordinate(0, 0, 0),
+                new SpeedBuildersRules.BlockState(Material.OAK_STAIRS,
+                        "minecraft:oak_stairs[facing=north,half=bottom,shape=straight,waterlogged=false]"),
+                new SpeedBuildersRules.Coordinate(1, 0, 0),
+                new SpeedBuildersRules.BlockState(Material.DIRT, "minecraft:dirt"),
+                new SpeedBuildersRules.Coordinate(2, 0, 0),
+                new SpeedBuildersRules.BlockState(Material.DIAMOND_BLOCK, "minecraft:diamond_block"));
+        assertEquals(1, SpeedBuildersRules.scoreBlockStates(expected, actual));
+    }
+
+    @Test
+    void sourceTemplateNameModifiersAreRemovedFromTheDisplayedName() {
+        var timing = SpeedBuildersRules.parseTemplateName("Oak Tree time+5 time*0.5");
+        assertEquals("Oak Tree", timing.displayName());
+        assertEquals(22, timing.buildSeconds(40));
+        assertEquals(12, SpeedBuildersRules.parseTemplateName("Flower time=12").buildSeconds(40));
+        assertEquals(35, SpeedBuildersRules.parseTemplateName("Bridge time-5").buildSeconds(40));
+    }
+
     @Test
     void emptyPlotsAreEliminatedAndAUniqueLowestBuildIsRemoved() {
         var scores = List.of(
