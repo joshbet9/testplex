@@ -27,6 +27,16 @@ class ArcadeLobbyKitCatalogueTest {
     }
 
     @Test
+    void snapUsesItsNewNameAndKitIdsWhileRetainingItsLegacyGameId() {
+        List<ArcadeLobbyKitCatalogue.KitChoice> choices =
+                ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.CAMERA_SHY, List.of());
+        assertEquals(List.of("snap-smoke-artist", "snap-decoy", "snap-runner", "snap-spotter", "snap-understudy"),
+                choices.stream().map(choice -> choice.id).toList());
+        assertEquals("Snap", ArcadePortGame.fromId("snap").displayName());
+        assertEquals(ArcadePortGame.CAMERA_SHY, ArcadePortGame.fromId("camera-shy"));
+    }
+
+    @Test
     void dragonsCommunityKitsAreAvailableFromTheSharedKitCatalogue() {
         List<ArcadeLobbyKitCatalogue.KitChoice> choices =
                 ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.DRAGONS, List.of());
