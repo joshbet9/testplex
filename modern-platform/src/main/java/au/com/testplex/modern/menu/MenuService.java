@@ -332,6 +332,11 @@ public final class MenuService implements Listener {
                 List.of(ChatColor.GRAY + "Like / Dislike / Neutral ratings are collected",
                         ChatColor.GRAY + "through /gamepreferences and weighted together.",
                         ChatColor.YELLOW + "Edit Game Rotation controls the eligible pool.")));
+        ItemStack preferences = makeItem(Material.WRITABLE_BOOK, ChatColor.GREEN + "Rate Games",
+                List.of(ChatColor.GRAY + "Open your Like / Dislike / Neutral preferences.",
+                        ChatColor.YELLOW + "Click to open Game Preferences."));
+        mark(preferences, "panel-open-preferences", null, null, null);
+        inventory.setItem(50, preferences);
         inventory.setItem(53, makeItem(Material.BARRIER, ChatColor.RED + "Close", List.of()));
         viewer.openInventory(inventory);
     }
@@ -612,6 +617,12 @@ public final class MenuService implements Listener {
         String lineId = meta.getPersistentDataContainer().get(lineKey, PersistentDataType.STRING);
         String optionId = meta.getPersistentDataContainer().get(optionKey, PersistentDataType.STRING);
         GameDefinition game = catalog.getGame(gameId);
+
+        if (VOTING_TITLE.equals(title) && "panel-open-preferences".equals(action)) {
+            player.closeInventory();
+            player.performCommand("gamepreferences");
+            return;
+        }
 
         if (VOTING_TITLE.equals(title) && "panel-rotation-status-page".equals(action)
                 && optionId != null) {
