@@ -595,12 +595,16 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             Location home = witherHomes.get(team);
             if (wither == null || !wither.isValid() || home == null) continue;
 
-            Player target = witherTargets.containsKey(team) ? players.get(witherTargets.get(team)) : null;
+            Entity currentTargetEntity = witherTargets.containsKey(team)
+                    ? Bukkit.getEntity(witherTargets.get(team)) : null;
+            LivingEntity target = currentTargetEntity instanceof LivingEntity living ? living : null;
             if (!isValidWitherTarget(team, target)) {
-                target = activeMatchPlayers().stream()
-                        .filter(player -> isValidWitherTarget(ownerTeam, player))
-                        .min(java.util.Comparator.comparingDouble(player ->
-                                player.getLocation().distanceSquared(home)))
+                target = world.getEntities().stream()
+                        .filter(entity -> entity instanceof LivingEntity)
+                        .map(entity -> (LivingEntity) entity)
+                        .filter(candidate -> isValidWitherTarget(ownerTeam, candidate))
+                        .min(java.util.Comparator.comparingDouble(candidate ->
+                                candidate.getLocation().distanceSquared(home)))
                         .orElse(null);
                 if (target == null) witherTargets.remove(team);
                 else witherTargets.put(team, target.getUniqueId());
@@ -619,10 +623,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
     }
 
-    private boolean isValidWitherTarget(int team, Player target) {
-        return target != null && target.isOnline() && activePlayers.contains(target.getUniqueId())
-                && teams.getOrDefault(target.getUniqueId(), -1) == 1 - team
-                && isInsideWitherBoundary(team, target.getLocation());
+    private boolean isValidWitherTarget(int team, LivingEntity target) {
+        if (target == null || target.equals(withers.get(team)) || !target.isValid() || target.isDead()
+                || !isInsideWitherBoundary(team, target.getLocation())) return false;
+        boolean activeTarget = !(target instanceof Player player)
+                || (player.isOnline() && activePlayers.contains(player.getUniqueId()));
+        return ArcadePortRules.heroesOfGwenWitherCanTarget(
+                team, heroesOfGwenEntityTeam(target), activeTarget);
     }
 
     private boolean isInsideWitherBoundary(int team, Location location) {
@@ -657,20 +664,28 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         Location center = wither.getLocation();
         for (Entity entity : world.getNearbyEntities(center, ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS,
                 ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS, ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS)) {
-            if (!(entity instanceof Player player) || !activePlayers.contains(player.getUniqueId())
-                    || teams.getOrDefault(player.getUniqueId(), -1) == team) continue;
-            double distance = Math.min(center.distance(player.getLocation()),
-                    center.distance(player.getEyeLocation()));
+            if (!(entity instanceof LivingEntity target) || target.equals(wither)
+                    || !target.isValid() || target.isDead()) continue;
+            boolean activeTarget = !(target instanceof Player player)
+                    || (player.isOnline() && activePlayers.contains(player.getUniqueId()));
+            if (!ArcadePortRules.heroesOfGwenWitherCanTarget(
+                    team, heroesOfGwenEntityTeam(target), activeTarget)) continue;
+            double distance = Math.min(center.distance(target.getLocation()),
+                    center.distance(target.getEyeLocation()));
             if (distance >= ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS) continue;
             double damage = ArcadePortRules.heroesOfGwenWitherEarthquakeDamage(distance);
-            if (player.getHealth() <= damage) {
-                hooks.eliminate(player, null, "was struck by the enemy Wither's Earthquake");
+            if (target instanceof Player player) {
+                if (player.getHealth() <= damage) {
+                    hooks.eliminate(player, null, "was struck by the enemy Wither's Earthquake");
+                } else {
+                    player.setHealth(player.getHealth() - damage);
+                }
             } else {
-                player.setHealth(player.getHealth() - damage);
+                target.damage(damage, wither);
             }
-            Vector knockback = player.getLocation().toVector().subtract(center.toVector());
+            Vector knockback = target.getLocation().toVector().subtract(center.toVector());
             if (knockback.lengthSquared() > 0.001D) {
-                player.setVelocity(knockback.normalize().setY(1.0D));
+                target.setVelocity(knockback.normalize().setY(1.0D));
             }
         }
 
