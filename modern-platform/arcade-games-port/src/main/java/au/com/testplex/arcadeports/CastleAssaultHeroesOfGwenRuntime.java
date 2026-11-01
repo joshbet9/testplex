@@ -3361,17 +3361,22 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         return item.getItemMeta().getPersistentDataContainer().get(heroSkillKey, PersistentDataType.STRING);
     }
 
+    private void addHeroesOfGwenEquippedStoreName(Set<String> names, ItemStack item, boolean leggingsSlot) {
+        if (item == null || !item.hasItemMeta() || !item.getItemMeta().hasDisplayName()) return;
+        String name = ChatColor.stripColor(item.getItemMeta().getDisplayName());
+        if (name == null || name.isBlank()) return;
+        names.add(name);
+        if (leggingsSlot) names.add(name + " Leggings");
+    }
+
     private Set<String> heroesOfGwenEquippedStoreItemNames(Player player) {
         Set<String> names = new HashSet<>();
         if (player == null) return names;
-        List<ItemStack> equipped = new ArrayList<>();
-        equipped.add(player.getInventory().getItem(0));
-        equipped.addAll(List.of(player.getInventory().getArmorContents()));
-        for (ItemStack item : equipped) {
-            if (item == null || !item.hasItemMeta() || !item.getItemMeta().hasDisplayName()) continue;
-            String name = ChatColor.stripColor(item.getItemMeta().getDisplayName());
-            if (name != null && !name.isBlank()) names.add(name);
-        }
+        addHeroesOfGwenEquippedStoreName(names, player.getInventory().getItem(0), false);
+        addHeroesOfGwenEquippedStoreName(names, player.getInventory().getHelmet(), false);
+        addHeroesOfGwenEquippedStoreName(names, player.getInventory().getChestplate(), false);
+        addHeroesOfGwenEquippedStoreName(names, player.getInventory().getLeggings(), true);
+        addHeroesOfGwenEquippedStoreName(names, player.getInventory().getBoots(), false);
         return names;
     }
 
