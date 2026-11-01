@@ -1382,6 +1382,10 @@ public final class ArcadePortManager implements Listener {
                     + " is not cleared for in-game parity testing yet. Cleared game IDs: " + enabledGamesLabel() + ".");
             return;
         }
+        if (type == ArcadePortGame.MONSTER_MAZE && !isRotationCandidateAvailable(type)) {
+            player.sendMessage(ChatColor.RED + "Monster Maze is unavailable because its embedded module or selected map world is not ready.");
+            return;
+        }
         if (automaticRotationTask != null || automaticRotationOnReturn) {
             cancelAutomaticRotationVote();
             player.sendMessage(ChatColor.YELLOW + "The automatic preference vote was cancelled by a manual queue selection.");
@@ -1475,6 +1479,10 @@ public final class ArcadePortManager implements Listener {
         if (!isGameEnabled(type)) {
             sender.sendMessage(ChatColor.RED + type.displayName()
                     + " is not cleared for in-game parity testing yet. Cleared game IDs: " + enabledGamesLabel() + ".");
+            return;
+        }
+        if (type == ArcadePortGame.MONSTER_MAZE && !isRotationCandidateAvailable(type)) {
+            sender.sendMessage(ChatColor.RED + "Monster Maze cannot start because its embedded module or selected map world is unavailable.");
             return;
         }
         cancelAutomaticRotationVote();
