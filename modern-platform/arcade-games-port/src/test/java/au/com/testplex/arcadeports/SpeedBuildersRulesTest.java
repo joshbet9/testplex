@@ -120,6 +120,13 @@ class SpeedBuildersRulesTest {
     }
 
     @Test
+    void gwenJudgementAndSequentialEliminationUseSourceTimings() {
+        assertEquals(100L, SpeedBuildersRules.JUDGE_BEAM_HOLD_TICKS);
+        assertEquals(40L, SpeedBuildersRules.ELIMINATION_INTERVAL_TICKS);
+        assertEquals(10, SpeedBuildersRules.REVIEW_SECONDS);
+    }
+
+    @Test
     void emptyPlotsAreEliminatedAndAUniqueLowestBuildIsRemoved() {
         var scores = List.of(
                 new SpeedBuildersRules.PlayerScore("empty", 0, 10, true),
