@@ -139,10 +139,16 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 ? null : mineplexCoreRankBridge.rankId(player).orElse(null);
     }
 
-    private void refreshRankScoreboard(Player player) {
-        if (player != null && player.isOnline()
-                && ModernArcadeLobby.WORLD_NAME.equals(player.getWorld().getName())) {
-            new ModernLobbyScoreboard(this).apply(player);
+    private void refreshRankScoreboard(Player changedPlayer) {
+        if (changedPlayer == null || !changedPlayer.isOnline()
+                || !ModernArcadeLobby.WORLD_NAME.equals(changedPlayer.getWorld().getName())) return;
+        // Every lobby player owns a separate scoreboard instance. Refresh all viewers
+        // so the changed player's prefix and rank sort are consistent for everyone.
+        ModernLobbyScoreboard scoreboard = new ModernLobbyScoreboard(this);
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            if (viewer.isOnline() && ModernArcadeLobby.WORLD_NAME.equals(viewer.getWorld().getName())) {
+                scoreboard.apply(viewer);
+            }
         }
     }
 
