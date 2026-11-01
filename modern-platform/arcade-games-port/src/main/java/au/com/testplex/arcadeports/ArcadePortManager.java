@@ -2819,6 +2819,14 @@ public final class ArcadePortManager implements Listener {
                     + " map or its WorldConfig metadata could not be loaded. No fallback arena was generated; see server logs.");
             return;
         }
+        if (type == ArcadePortGame.DRAGONS) {
+            SourceMapCatalog.MapData dragonsMap = sourceMapData.get(type.id());
+            if (dragonsMap == null || dragonsMap.dataLocations("RED").isEmpty()) {
+                sender.sendMessage(ChatColor.RED + "The selected Dragons map has no RED dragon-spawn markers. "
+                        + "Choose another original Dragons map; the round was not started.");
+                return;
+            }
+        }
         if (type == ArcadePortGame.SKY_WARS) {
             SourceMapCatalog.MapData skyWarsMap = sourceMapData.get(type.id());
             boolean validBounds = skyWarsMap != null && skyWarsMap.hasBounds()
@@ -3250,6 +3258,7 @@ public final class ArcadePortManager implements Listener {
             player.getInventory().clear();
             giveKit(session, player);
             player.setInvulnerable(true);
+            player.setCollidable(false);
             player.setWalkSpeed(0.0F);
             if (type == ArcadePortGame.SKY_WARS) {
                 player.setInvulnerable(true);
@@ -5754,8 +5763,7 @@ public final class ArcadePortManager implements Listener {
                 String kit = session.dragonEscapeKits.getOrDefault(id, "jumper");
                 int leaps = session.dragonEscapeLeapUsesRemaining.getOrDefault(id, ArcadePortRules.dragonEscapeLeapUses(kit));
                 if (!"digger".equals(kit)) {
-                    player.getInventory().addItem(namedItem(Material.IRON_AXE, "Leap",
-                            "Right-click to leap forward (" + leaps + " uses remaining).", Math.max(1, leaps)));
+                    setDragonEscapeLeapItem(player, leaps);
                 }
                 if ("disruptor".equals(kit)) {
                     player.getInventory().addItem(namedItem(Material.TNT, "Mini Explosive",
@@ -9969,6 +9977,17 @@ public final class ArcadePortManager implements Listener {
         double x = center.getX() + ThreadLocalRandom.current().nextInt(-50, 51);
         double y = center.getY() + ThreadLocalRandom.current().nextInt(20, 41);
         double z = center.getZ() + ThreadLocalRandom.current().nextInt(-50, 51);
+        SourceMapCatalog.MapData mapData = sourceMapData.get(ArcadePortGame.DRAGONS.id());
+        if (mapData != null && mapData.hasBounds()) {
+            double insetX = Math.min(4.0D, Math.max(0.0D, mapData.width() * 0.1D));
+            double insetZ = Math.min(4.0D, Math.max(0.0D, mapData.depth() * 0.1D));
+            double minX = mapData.minX() + insetX;
+            double maxX = mapData.maxX() + 1.0D - insetX;
+            double minZ = mapData.minZ() + insetZ;
+            double maxZ = mapData.maxZ() + 1.0D - insetZ;
+            x = maxX > minX ? Math.max(minX, Math.min(maxX, x)) : mapData.centerX();
+            z = maxZ > minZ ? Math.max(minZ, Math.min(maxZ, z)) : mapData.centerZ();
+        }
         return new Location(session.world, x, y, z);
     }
 
@@ -10306,12 +10325,7 @@ public final class ArcadePortManager implements Listener {
         player.setExp(Math.max(0.0F, Math.min(0.99F,
                 remaining / (float) Math.max(1, ArcadePortRules.dragonEscapeLeapUses(
                         session.dragonEscapeKits.getOrDefault(id, "jumper"))))));
-        if (remaining == 0) {
-            player.getInventory().setItemInMainHand(null);
-        } else {
-            player.getInventory().setItemInMainHand(namedItem(Material.IRON_AXE, "Leap",
-                    "Right-click to leap forward (" + remaining + " uses remaining).", remaining));
-        }
+        setDragonEscapeLeapItem(player, remaining);
         Vector direction = player.getLocation().getDirection().normalize().multiply(1.0D);
         direction.setY(ArcadePortRules.dragonEscapeLeapVerticalVelocity(
                 direction.getY(), player.isOnGround()));
@@ -10734,11 +10748,14 @@ public final class ArcadePortManager implements Listener {
         location.add(velocity.clone().multiply(speed));
         location.add(0.0D, -pitch, 0.0D);
         location.setPitch(-pitch);
-        location.setYaw(180.0F + dragonEscapeYaw(velocity));
+        location.setYaw(dragonEscapeYaw(velocity));
         session.dragonEscapeDragonVelocity = velocity;
         session.dragonEscapeDragonPitch = pitch;
         session.dragonEscapeDragonLocation = location.clone();
-        dragon.teleport(location);
+        dragon.setRotation(location.getYaw(), location.getPitch());
+        Vector movement = velocity.clone().multiply(speed);
+        movement.setY(-pitch);
+        dragon.setVelocity(movement);
         return location;
     }
 
@@ -12429,6 +12446,12 @@ public final class ArcadePortManager implements Listener {
             if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
                 String pbDelta = dragonEscapePbDeltaText(session, p, now);
                 if (!pbDelta.isEmpty()) specific += (specific.isEmpty() ? "" : ChatColor.DARK_GRAY + " | ") + pbDelta;
+            }
+            if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
+                String pbDelta = dragonEscapePbDeltaText(session, p, now);
+                p.sendActionBar(ChatColor.WHITE + "TIME " + timeText
+                        + (pbDelta.isEmpty() ? "" : ChatColor.DARK_GRAY + " | " + pbDelta));
+                continue;
             }
             p.sendActionBar(ChatColor.GOLD + session.type.displayName() + ChatColor.GRAY + " | " + timeText
                     + ChatColor.DARK_GRAY + " | " + ChatColor.GREEN + "alive " + alive
@@ -17172,7 +17195,8 @@ public final class ArcadePortManager implements Listener {
         SourceMapCatalog.MapData sourceMap = sourceMapData.get(session.type.id());
         double voidThresholdY;
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
-            voidThresholdY = ArcadePortRules.dragonEscapeVoidThresholdY(session.dragonEscapeMapName);
+            voidThresholdY = ArcadePortRules.dragonEscapeVoidThresholdY(session.dragonEscapeMapName,
+                    sourceMap != null && sourceMap.hasVerticalBounds(), sourceMap == null ? 0 : sourceMap.minY());
         } else if (sourceMap != null && sourceMap.hasVerticalBounds()) {
             voidThresholdY = ArcadePortRules.sourceMapVoidThresholdY(true, sourceMap.minY());
         } else {
@@ -17183,7 +17207,7 @@ public final class ArcadePortManager implements Listener {
                 && ArcadePortRules.isOutsideDragonEscapeMapBounds(
                         location.getX(), location.getY(), location.getZ(),
                         sourceMap.minX(), sourceMap.maxX(), sourceMap.minZ(), sourceMap.maxZ(),
-                        sourceMap.hasVerticalBounds(), sourceMap.minY(), sourceMap.maxY())) {
+                        false, 0, 0)) {
             eliminate(session, player, null, "left the playable map area");
             return;
         }
@@ -19431,7 +19455,9 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE
                 && event.getAction() != Action.PHYSICAL
-                && isDragonEscapeUsableBlock(event.getClickedBlock())) {
+                && isDragonEscapeUsableBlock(event.getClickedBlock())
+                && !(event.getAction().isRightClick()
+                        && shouldRouteRightClickAbility(session, event.getPlayer(), event.getItem()))) {
             event.setCancelled(true);
             return;
         }
@@ -19773,7 +19799,7 @@ public final class ArcadePortManager implements Listener {
                 event.setCancelled(true); activateDragonTamer(session, player, System.currentTimeMillis()); return;
             }
             if ("coward".equals(kit) && item == Material.IRON_AXE && event.getAction().isRightClick()
-                    && !isDragonUsableBlock(event.getClickedBlock())) {
+) {
                 event.setCancelled(true);
                 useDragonsLeap(session, player, System.currentTimeMillis());
                 return;
@@ -19804,7 +19830,7 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
             if ("marksman".equals(kit) && item == Material.BOW && event.getAction().isRightClick()
-                    && !isDragonUsableBlock(event.getClickedBlock())
+
                     && player.getInventory().contains(Material.ARROW)
                     && !session.dragonMarksmanFiring.contains(id)) {
                 session.dragonMarksmanCharge.put(id, 0);
@@ -19820,13 +19846,10 @@ public final class ArcadePortManager implements Listener {
             useQuiverGroundPound(session, player, System.currentTimeMillis());
             return;
         }
-        boolean spleefLeapClickedUsableBlock = event.getClickedBlock() != null
-                && event.getClickedBlock().getType().isInteractable();
         if (session.type == ArcadePortGame.SPLEEF
                 && session.alive.contains(player.getUniqueId())
                 && "brawler".equals(session.spleefKits.getOrDefault(player.getUniqueId(), "snowballer"))
-                && item == Material.IRON_AXE && event.getAction().isRightClick()
-                && !spleefLeapClickedUsableBlock) {
+                && item == Material.IRON_AXE && event.getAction().isRightClick()) {
             event.setCancelled(true);
             useSpleefLeap(session, player, System.currentTimeMillis());
             return;
@@ -19976,6 +19999,13 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
         }
+        if (shouldRouteRightClickAbility(session, player, held)) {
+            PlayerInteractEvent routedClick = new PlayerInteractEvent(
+                    player, Action.RIGHT_CLICK_AIR, held, null, BlockFace.SELF, EquipmentSlot.HAND);
+            onPlayerInteract(routedClick);
+            if (routedClick.isCancelled()) event.setCancelled(true);
+            return;
+        }
         if (session.type == ArcadePortGame.BACON_BRAWL && item == Material.IRON_AXE) {
             String kit = session.baconKits.getOrDefault(player.getUniqueId(), "el-muchacho-pigo");
             if (ArcadePortRules.shouldActivateBaconBrawlAbility(true, item, false, kit)) {
@@ -20014,6 +20044,82 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.PAINTBALL
                 && event.getCause() == PlayerTeleportEvent.TeleportCause.ENDER_PEARL) event.setCancelled(true);
+    }
+
+    /**
+     * Player/entity right-clicks do not emit PlayerInteractEvent on modern Paper.
+     * Only route held items that are active game abilities, then reuse the ordinary
+     * air-click dispatcher so cooldowns, kit checks and cancellation stay consistent.
+     */
+    private boolean shouldRouteRightClickAbility(Session session, Player player, ItemStack heldItem) {
+        if (session == null || player == null || heldItem == null || heldItem.getType().isAir()) return false;
+        UUID id = player.getUniqueId();
+        Material item = heldItem.getType();
+        return switch (session.type) {
+            case BACON_BRAWL -> item == Material.IRON_AXE;
+            case BOMB_LOBBERS -> item == Material.TNT
+                    || "wind-charge".equals(bombLobbersPowerupType(heldItem))
+                    || ("pitcher".equals(session.bombLobbersKits.getOrDefault(id, "jumper"))
+                            && item == Material.LEVER)
+                    || ("waller".equals(session.bombLobbersKits.getOrDefault(id, "jumper"))
+                            && item == Material.STONE_SHOVEL);
+            case DRAGON_ESCAPE -> {
+                String kit = session.dragonEscapeKits.getOrDefault(id, "jumper");
+                yield (item == Material.IRON_AXE && !"digger".equals(kit))
+                        || (item == Material.ENDER_PEARL && "warper".equals(kit))
+                        || (item == Material.TNT && "disruptor".equals(kit))
+                        || (!session.alive.contains(id) && isDragonEscapeTrackingCompass(heldItem));
+            }
+            case DRAGONS -> {
+                String kit = session.dragonKits.getOrDefault(id, "coward");
+                yield ("coward".equals(kit) && item == Material.IRON_AXE)
+                        || ("frost".equals(kit) && item == Material.SNOWBALL)
+                        || ("glider".equals(kit) && item == Material.FEATHER)
+                        || ("tamer".equals(kit) && item == Material.END_CRYSTAL)
+                        || ("pyrotechnic".equals(kit) && item == Material.EMERALD)
+                        || ("marksman".equals(kit) && item == Material.BOW)
+                        || (!session.alive.contains(id) && isDragonsTrackingCompass(heldItem));
+            }
+            case EVOLUTION -> {
+                int level = session.evolutionLevels.getOrDefault(id, 0);
+                yield (level == 0 && item == Material.IRON_INGOT)
+                        || (level == 1 && item == Material.BLAZE_ROD)
+                        || (level == 2 && item == Material.COAL)
+                        || (level == 3 && item == Material.SLIME_BALL)
+                        || (level == 4 && item == Material.FEATHER);
+            }
+            case RUNNER -> item == Material.IRON_AXE || item == Material.FEATHER;
+            case SPLEEF -> ("brawler".equals(session.spleefKits.getOrDefault(id, "snowballer"))
+                    && item == Material.IRON_AXE)
+                    || (!session.alive.contains(id) && isSpleefTrackingCompass(heldItem));
+            case ONE_IN_THE_QUIVER -> "slam-shot".equals(session.quiverKits.getOrDefault(id, "leaper"))
+                    && item == Material.DIAMOND_SHOVEL;
+            case TURF_WARS -> "shredder".equals(session.turfWarsKits.getOrDefault(id, "marksman"))
+                    && item == Material.BOW;
+            case WITHER_ASSAULT -> session.teams.getOrDefault(id, 0) == 1
+                    && (item == Material.GOLDEN_SWORD || item == Material.DIAMOND_SWORD || item == Material.COMPASS);
+            case PAINTBALL -> isPaintballWaterBomb(heldItem) || paintballKitForItem(heldItem) != null;
+            case MICRO_BATTLES -> !session.alive.contains(id) && isMicroTrackingCompass(heldItem);
+            default -> false;
+        };
+    }
+
+    /** Keep Dragon Escape's Leap tool in slot 1 and remove stale duplicates. */
+    private void setDragonEscapeLeapItem(Player player, int remaining) {
+        if (player == null) return;
+        for (int slot = 0; slot < 9; slot++) {
+            ItemStack current = player.getInventory().getItem(slot);
+            if (current == null || current.getType() != Material.IRON_AXE || !current.hasItemMeta()) continue;
+            ItemMeta meta = current.getItemMeta();
+            if (meta != null && meta.hasDisplayName()
+                    && "Leap".equalsIgnoreCase(ChatColor.stripColor(meta.getDisplayName()))) {
+                player.getInventory().setItem(slot, null);
+            }
+        }
+        if (remaining > 0) {
+            player.getInventory().setItem(0, namedItem(Material.IRON_AXE, "Leap",
+                    "Right-click to leap forward (" + remaining + " uses remaining).", remaining));
+        }
     }
 
     /** Match Reborn's UtilBlock.usable guard so map containers, switches and doors stay inert. */

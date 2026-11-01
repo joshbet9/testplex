@@ -1912,11 +1912,17 @@ public final class ArcadePortRules {
         return hasVerticalBounds && (y <= minY || y >= maxY + 1.0D);
     }
 
-    /** Fall limits below the minimum authored play surface for known low-altitude Dragon Escape maps. */
+    /** Backwards-compatible fallback when a map has no authored vertical bounds. */
     public static double dragonEscapeVoidThresholdY(String mapName) {
+        return dragonEscapeVoidThresholdY(mapName, false, 0);
+    }
+
+    /** Use the selected source map's actual vertical bounds for its fall-out threshold. */
+    public static double dragonEscapeVoidThresholdY(String mapName, boolean hasVerticalBounds, int minY) {
         String name = mapName == null ? "" : mapName.toLowerCase(java.util.Locale.ROOT);
         if (name.contains("hell")) return 24.0D;
         if (name.contains("pirate")) return 0.0D;
+        if (hasVerticalBounds) return sourceMapVoidThresholdY(true, minY);
         return 58.0D;
     }
 
