@@ -20,7 +20,7 @@ Snap is an in-process free-for-all: hold right-click with the vanilla spyglass t
 
 The lobby offers Smoke Artist (smoke screen), Decoy (fake snapshot), Runner (short Speed II escape burst), Spotter (nearby-player scan) and Understudy (player-skin stand-in). A rare Group Photo pickup can photograph two opponents in one frame; Director's Spotlight periodically highlights a player; Final Snapshot speeds up the shutter in the last 30 seconds. The dedicated maze is isolated from the lobby and other game worlds. Original human-player state is checkpointed to the plugin config before match setup, restored on a normal finish or reconnect, and retained across an unclean server restart.
 
-`/stats snap` exposes Snap's lifetime record, milestone progress and all 20 achievements across four pages. The three lifetime milestones are 250 wins, 500 eliminations and 1,000 photographs. Snap is now in the shared controlled READY_FOR_TEST queue; live multiplayer acceptance remains outstanding.
+`/stats snap` exposes Snap's lifetime record, milestone progress and all 20 achievements across four pages. The three lifetime milestones are 250 wins, 500 eliminations and 1,000 photographs. Snap is now in the shared controlled READY_FOR_TEST queue; live multiplayer acceptance remains outstanding. See [SNAP-TEST-PLAN.md](SNAP-TEST-PLAN.md) for the acceptance checklist.
 
 ## Super Sploor — five-kit territory shooter
 
