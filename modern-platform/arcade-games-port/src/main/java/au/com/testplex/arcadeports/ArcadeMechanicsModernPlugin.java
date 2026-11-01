@@ -270,6 +270,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         try {
             boolean deploymentSignal = MonsterMazeRegistrationSignal.publish(getDataFolder().toPath(),
                     monsterMazeReadiness, System.getenv("INVOCATION_ID"), ProcessHandle.current().pid());
+            if (!deploymentSignal && System.getenv("TESTPLEX_DEPLOYED_BUILD_SHA") != null) {
+                throw new IllegalStateException("Monster Maze attached successfully but its deployment identity file "
+                        + "was unavailable; refusing to report the module as deployment-ready.");
+            }
             getLogger().info("TESTPLEX_ARCADE_MODULE_READY module=monster-maze manager=testplex-arcade "
                     + "game-manager=initialized deployment-signal=" + deploymentSignal);
         } catch (java.io.IOException exception) {

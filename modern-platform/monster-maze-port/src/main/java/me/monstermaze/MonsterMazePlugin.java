@@ -89,14 +89,19 @@ public final class MonsterMazePlugin {
     /** Initialise Monster Maze managers without taking ownership of player joins or the server lobby. */
     public void enable() {
         instance = this;
+        getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=enable-start data-folder=" + dataFolder);
         saveDefaultConfig();
+        getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=config-loaded");
         this.backendClient = new BackendClient(this);
+        getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=backend-client-created");
         this.mapManager = new MapManager(this);
+        getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=map-catalogue-loaded active-map=" + mapManager.getActiveMap());
         this.mapThemeApplier = new MapThemeApplier(this);
         this.mapWorldSafetyListener = new MapWorldSafetyListener(this);
         this.leaderboards = new me.monstermaze.stats.LeaderboardManager(this);
         this.runRecorder = new RunRecorder(this);
         this.challengeManager = new ChallengeManager(this);
+        getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=stats-and-world-services-created");
 
         FileConfiguration cfg = getConfig();
         MazeMode stored = MazeMode.byName(cfg.getString("mode", "Original"));
@@ -109,6 +114,8 @@ public final class MonsterMazePlugin {
             cfg.set("forced-pattern", -1);
             saveConfig();
         }
+        getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=game-configured mode=" + mode.id
+                + " record-runs=" + recordRuns);
 
         for (MazeMode m : MazeMode.values()) {
             try {
@@ -125,16 +132,22 @@ public final class MonsterMazePlugin {
                 getLogger().log(Level.WARNING, "Could not prepare Monster Maze mode data.", exception);
             }
         }
+        getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=mode-resources-ready");
 
         this.mobThemeManager = new MobThemeManager(this);
+        getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=map-world-load-start map=" + mapManager.getActiveMap());
         Location mapCenter = mapManager.defaultCenter();
+        getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=map-world-load-finished map="
+                + mapManager.getActiveMap() + " world=" + (mapCenter == null ? "unavailable" : mapCenter.getWorld().getName()));
         if (mapCenter == null) {
             getLogger().warning("No active Monster Maze source map is available yet; the module will remain idle until a map can be loaded.");
         }
         this.gameManager = new GameManager(this);
+        getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=game-manager-created");
         if (mapCenter != null) this.gameManager.setCenter(mapCenter);
         this.gameManager.getMonsterManager().setMobType(mapManager.activeMob());
         this.monsterEntityListener = new MonsterEntityListener(this, gameManager);
+        getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=gameplay-listeners-created");
         if (Bukkit.getPluginManager().isPluginEnabled("ProtocolLib")) {
             try {
                 Class<?> adapterType = Class.forName("me.monstermaze.entity.MonsterDisguiseListener");
@@ -156,6 +169,7 @@ public final class MonsterMazePlugin {
         this.soloRunCompletionListener = new SoloRunCompletionListener(this);
         this.competitiveMatchTracker = new CompetitiveMatchTracker(this);
         this.statusHeartbeatReporter = new StatusHeartbeatReporter(this);
+        getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=progression-and-heartbeat-services-created");
 
         // Intentionally do not bootstrap a Monster Maze lobby or register the old
         // LobbyListener. Testplex's shared Arcade lobby is the only player lobby.
@@ -164,6 +178,7 @@ public final class MonsterMazePlugin {
         new BuildBypassListener(this);
         new MMUtilityCommandListener(this);
         Bukkit.getPluginManager().registerEvents(new DebugSoloModeListener(this), host);
+        getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=event-listeners-registered");
 
         PluginCommand mm = getCommand("mm");
         if (mm == null) throw new IllegalStateException("Testplex Arcade plugin.yml is missing the /mm command.");
@@ -173,10 +188,12 @@ public final class MonsterMazePlugin {
         pause.setExecutor(new PauseCommand(this));
 
         statusHeartbeatReporter.start();
+        getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=commands-and-heartbeat-started");
         getLogger().info("Monster Maze gameplay initialization completed; awaiting Testplex Arcade manager attachment.");
         getLogger().info("Active map: " + mapManager.getActiveMap());
         getLogger().info("Mode: " + mode.id);
         getLogger().info("Run recording: " + recordRuns);
+        getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=enable-complete");
     }
 
     public void shutdown() {
