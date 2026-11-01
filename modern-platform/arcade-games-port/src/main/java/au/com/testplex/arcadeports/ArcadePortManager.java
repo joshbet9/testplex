@@ -5269,7 +5269,10 @@ public final class ArcadePortManager implements Listener {
             player.setFoodLevel(20);
             player.setSaturation(20.0F);
             player.setFireTicks(0);
+            player.setFallDistance(0.0F);
             player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+            session.deathTagRespawnGraceUntil.put(convertedPlayerId, System.currentTimeMillis() + 2_500L);
+            player.setNoDamageTicks(50);
             giveDeathTagKit(session, player, true, session.alphaChasers.contains(player.getUniqueId()));
             player.playSound(player.getLocation(), Sound.ENTITY_ZOMBIE_AMBIENT, 1.0F, 1.0F);
             player.sendMessage(ChatColor.RED + (forcedAlpha ? "You are now an Alpha Chaser!" : "You are now a Chaser!"));
@@ -5368,14 +5371,16 @@ public final class ArcadePortManager implements Listener {
         if (active != session || player == null || !player.isOnline()) return;
         session.deathTagDeathsByPlayer.merge(player.getUniqueId(), 1, Integer::sum);
         player.teleport(deathTagChaserRespawnSpawn(session, player));
-        session.deathTagRespawnGraceUntil.put(player.getUniqueId(), System.currentTimeMillis() + 2_000L);
+        session.deathTagRespawnGraceUntil.put(player.getUniqueId(), System.currentTimeMillis() + 2_500L);
         player.leaveVehicle();
         player.setGameMode(GameMode.ADVENTURE);
         player.setHealth(player.getMaxHealth());
         player.setFoodLevel(20);
         player.setSaturation(20.0F);
         player.setFireTicks(0);
+        player.setFallDistance(0.0F);
         player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+        player.setNoDamageTicks(50);
         giveDeathTagKit(session, player, true, session.alphaChasers.contains(player.getUniqueId()));
         player.sendMessage(ChatColor.RED + "You respawned as a Chaser.");
     }
@@ -5387,6 +5392,9 @@ public final class ArcadePortManager implements Listener {
                 || session.tagged.contains(shooterId)
                 || !"archer".equals(session.deathTagRunnerKits.getOrDefault(shooterId, "basher"))
                 || !session.tagged.contains(targetId)) return;
+
+        if (session.deathTagRespawnGraceUntil.getOrDefault(targetId, 0L)
+                > System.currentTimeMillis()) return;
 
         double baseDamage = session.deathTagProjectileDamage.getOrDefault(arrow.getUniqueId(),
                 ArcadePortRules.deathTagRunnerDamage("archer", true));
@@ -9300,9 +9308,11 @@ public final class ArcadePortManager implements Listener {
             Location current = bacon.getLocation().clone();
             Location previous = session.baconBlastLastLocations.getOrDefault(blastId, current).clone();
             double blastPower = session.baconBlastPowerById.getOrDefault(blastId, 0.5D);
+            boolean crispy = session.baconCrispyProjectiles.contains(blastId);
             if (session.ticks % 2 == 0) {
-                session.world.spawnParticle(Particle.SOUL_FIRE_FLAME, current, Math.max(1, (int) Math.round(blastPower * 3.0D)),
-                        0.05D, 0.05D, 0.05D, 0.005D);
+                session.world.spawnParticle(crispy ? Particle.FLAME : Particle.SOUL_FIRE_FLAME,
+                        current, crispy ? 2 : Math.max(1, (int) Math.round(blastPower * 3.0D)),
+                        0.05D, 0.05D, 0.05D, crispy ? 0.015D : 0.005D);
             }
             UUID ownerId = session.baconBlastOwners.get(blastId);
             double segmentLength = Math.sqrt(previous.distanceSquared(current));
@@ -9608,11 +9618,11 @@ public final class ArcadePortManager implements Listener {
             session.baconMeters.put(attackerId, meter);
             updateBaconMeterItem(session, attacker);
         }
-        attacker.setFoodLevel(Math.min(20, attacker.getFoodLevel() + 2));
-        attacker.setSaturation(0.0F);
+        // Combat must never refill hunger: the slow round drain can reach starvation.
         target.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
                 target.getLocation().add(0.0D, 1.0D, 0.0D), 6, 0.28D, 0.35D, 0.28D, 0.01D);
         attacker.playSound(attacker.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 0.8F, 1.1F);
+        target.playEffect(EntityEffect.HURT);
         target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.9F, 0.85F);
         showBaconHitFeedback(session, attacker, target, timingMultiplier);
 
@@ -9622,8 +9632,7 @@ public final class ArcadePortManager implements Listener {
             session.baconLastDamager.put(attackerId, targetId);
             session.baconLastDamagedAt.put(attackerId, now);
             session.baconLastHitSource.put(attackerId, "body-slam-recoil");
-            target.setFoodLevel(Math.min(20, target.getFoodLevel() + 2));
-            target.setSaturation(0.0F);
+            // Body Slam recoil leaves the victim's hunger unchanged.
             attacker.setVelocity(baconBrawlKnockbackVelocity(target, attacker, 2.0D,
                     session.baconKnockback * ArcadePortRules.BACON_BODY_SLAM_KNOCKBACK_MULTIPLIER, null));
         }
@@ -14038,6 +14047,9 @@ public final class ArcadePortManager implements Listener {
     private void handlePlayerHit(Session session, Player attacker, Player target, String source, int paintballAmount) {
         if (active != session || attacker.equals(target) || !session.alive.contains(attacker.getUniqueId())
                 || !session.alive.contains(target.getUniqueId())) return;
+        if (session.type == ArcadePortGame.DEATH_TAG
+                && session.deathTagRespawnGraceUntil.getOrDefault(target.getUniqueId(), 0L)
+                    > System.currentTimeMillis()) return;
         if (session.type == ArcadePortGame.EVOLUTION) {
             if (session.evolving.contains(attacker.getUniqueId())) return;
             if (session.evolving.contains(target.getUniqueId())) {
@@ -18671,6 +18683,8 @@ public final class ArcadePortManager implements Listener {
             EntityDamageEvent event, double incomingDamage) {
         if (active != session || target == null || !session.alive.contains(target.getUniqueId())
                 || incomingDamage <= 0.0D) return;
+        if (session.deathTagRespawnGraceUntil.getOrDefault(target.getUniqueId(), 0L)
+                > System.currentTimeMillis()) return;
 
         if (event instanceof EntityDamageByEntityEvent byEntity) {
             Entity damager = byEntity.getDamager();
@@ -23176,10 +23190,11 @@ public final class ArcadePortManager implements Listener {
         return p.distanceSquared(nearest);
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onExplode(EntityExplodeEvent event) {
         Session session = active;
         if (session == null || event.getEntity() == null || event.getEntity().getWorld() != session.world) return;
+        if (event.isCancelled() && session.type != ArcadePortGame.BOMB_LOBBERS) return;
         if (session.type == ArcadePortGame.WITHER_ASSAULT
                 && event.getEntity() instanceof WitherSkull skull && session.entities.contains(skull)) {
             event.blockList().clear();
@@ -23277,6 +23292,8 @@ public final class ArcadePortManager implements Listener {
             // explosion is still on its own side. Never allow an orphaned TNT to blast.
             event.blockList().clear();
             event.setCancelled(true);
+            // A prohibited blast still plays the shared TNT explosion; it only skips damage and blocks.
+            renderBombLobbersExplosion(session, bomb.getLocation().clone(), owner, bombPowerupType);
             removeBombTracking(session, bombId);
             session.entities.remove(bomb);
             bomb.remove();
