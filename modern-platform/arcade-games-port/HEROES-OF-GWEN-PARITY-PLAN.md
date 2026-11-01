@@ -122,3 +122,16 @@ Larissa's four-slot kit is now ported from the archived Java implementation into
 - Added deterministic tests for source attack damage/range, Water Stone cadence/cap, fountain radius/duration/healing/damage and the dash/ultimate timings.
 
 **Validation boundary:** the source-value tests are added, but the Paper 26.3 workflow still needs to compile and pass this update. This is a mechanics slice, not whole-game acceptance: Bardolf, Rowena's three active abilities, Warrior kits, Anath's Flame Wand/Flame Dash, Wither source parity, Pumpkin King, shops/passives, and both-map/multi-player acceptance remain open. Heroes of Gwen must stay `MECHANICS_IN_PROGRESS` and disabled until those gates pass.
+
+
+### Assassin parity — Bardolf
+
+Bardolf's source kit is now implemented in the match-scoped runtime:
+
+- **Summon Wolf:** Bone skill with the source five-wolf cap, 8 health per wolf, and 5-second summon cooldown. Wolves are owned by the Bardolf player, show the correct team collar, follow their owner, teleport back when they fall more than 10 blocks away, and attack the target the owner most recently damaged.
+- **Wolf attacks:** one damage per bite with the source 500 ms per-owner/per-target recharge; allied players cannot damage their team's wolves, and wolf deaths give no drops or experience.
+- **Wolf Pounce:** Feather skill, 7-second cooldown. Bardolf leaps in his look direction with the source minimum upward component; wolves are redirected to his take-off point and leap with the same 1.5 velocity when they get within two blocks.
+- **Full Moon:** Nether Star drop-activated ultimate, 10-second active period and 60-second source cooldown restarted after the active period (70 seconds until reuse). Each living wolf adds one damage and 5% walk speed at activation; wolves are restored to 20 health, untamed and made angry, move faster, and are removed when the ultimate ends.
+- Pack entities and temporary effects are explicitly removed on player death, disconnect, hero change and runtime stop. Added deterministic tests for summon limits/health/cadence, pounce timing/vector and Full Moon values.
+
+**Validation boundary:** the first post-Bardolf build is running now. This is not whole-game acceptance: Rowena's three active abilities, all three Warrior kits, Anath's Flame Wand/Flame Dash, source Wither patrol/target parity, Pumpkin King sidequest, role shops/passives, both-map checks and live multiplayer acceptance remain outstanding. Keep Heroes of Gwen MECHANICS_IN_PROGRESS and disabled until those checks pass.
