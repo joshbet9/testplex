@@ -552,10 +552,16 @@ public final class HoopsRemasteredRuntime implements Listener {
         }
         ball.display.teleport(ball.location);
         for (Player player : alivePlayers(current)) {
-            // A pass begins at the thrower's eye position. Do not let the
-            // thrower immediately reclaim that same active pass on the first
-            // physics tick; possession must transfer to another player.
-            if (ball.mode == BallMode.PASS && player.getUniqueId().equals(ball.shooterId)) continue;
+            if (player.getUniqueId().equals(ball.shooterId)) {
+                // Passes begin at the thrower's eye position and must not be
+                // caught again by the thrower before a teammate/interceptor.
+                if (ball.mode == BallMode.PASS) continue;
+                // Shots also begin at the shooter's eye. Suppress only the
+                // immediate launch overlap; a player may still recover their
+                // own miss once the ball has travelled away and rebounds.
+                if (ball.mode == BallMode.SHOT
+                        && ball.location.distanceSquared(ball.origin) < 2.25D) continue;
+            }
             Location catchPoint = player.getLocation().clone().add(0.0D, 1.0D, 0.0D);
             if (catchPoint.distanceSquared(ball.location) > 2.25D) continue;
             boolean rebound = ball.reboundEligible;
@@ -1291,6 +1297,7 @@ public final class HoopsRemasteredRuntime implements Listener {
     private static final class Ball {
         final ItemDisplay display;
         final Location location;
+        final Location origin;
         final Vector velocity;
         BallMode mode;
         final UUID shooterId;
@@ -1309,6 +1316,7 @@ public final class HoopsRemasteredRuntime implements Listener {
                 UUID shooterId, UUID passerId, int defendingTeam, long createdAt) {
             this.display = display;
             this.location = location;
+            this.origin = location.clone();
             this.velocity = velocity;
             this.mode = mode;
             this.shooterId = shooterId;
