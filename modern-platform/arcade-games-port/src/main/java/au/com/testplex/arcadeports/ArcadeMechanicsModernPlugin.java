@@ -137,6 +137,11 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             });
         }
     }
+    /** Called only after a natural Testplex-managed Monster Maze round completion. */
+    public void onMonsterMazeRoundCompleted() {
+        if (manager != null) manager.onExternalGameCompleted(ArcadePortGame.MONSTER_MAZE);
+    }
+
     public void stopMonsterMazeRound(String reason) {
         if (manager != null) manager.stop(reason == null ? "Monster Maze stopped" : reason);
     }
