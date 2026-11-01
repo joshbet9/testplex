@@ -137,15 +137,31 @@ public final class ModernLobbyScoreboard {
         return teamId >= 0 && teamId < 4 ? rankKey + "_t" + teamId : rankKey;
     }
 
-    /** Uses the real CoreClient PermissionGroup team name when Hub is available. */
+    /**
+     * Keeps the legacy rank priority first while retaining Mineplex's exact
+     * primary PermissionGroup name in the team key. Raw enum names alone sort
+     * alphabetically (for example ADMIN before OWNER), which is not the Arcade
+     * rank order. The suffix also keeps distinct staff/content primary groups
+     * separate without collapsing them into their broad display category.
+     */
+    static String tabTeamSortKeyForGroup(String rank, String permissionGroupName, int teamId) {
+        String rankKey = tabSortKey(rank);
+        String groupSuffix = permissionGroupName == null || permissionGroupName.isBlank()
+                ? "" : "_" + permissionGroupName.trim();
+        String teamSuffix = teamId >= 0 && teamId < 4 ? "_t" + teamId : "";
+        return rankKey + groupSuffix + teamSuffix;
+    }
+
+    /** Uses the real CoreClient PermissionGroup and its legacy rank order when Hub is available. */
     static String tabTeamSortKey(JavaPlugin plugin, Player player, int teamId) {
-        String groupName = null;
         if (plugin instanceof ArcadeMechanicsModernPlugin arcade) {
             MineplexCoreRankBridge.RankPresentation presentation = arcade.mineplexRankPresentation(player);
-            if (presentation != null) groupName = presentation.groupName();
+            if (presentation != null) {
+                return tabTeamSortKeyForGroup(
+                        presentation.rankId(), presentation.groupName(), teamId);
+            }
         }
-        if (groupName == null) groupName = tabSortKey(rankId(plugin, player));
-        return teamId >= 0 && teamId < 4 ? groupName + "_t" + teamId : groupName;
+        return tabTeamSortKey(rankId(plugin, player), teamId);
     }
 
     static String tabSortKey(String rank) {
