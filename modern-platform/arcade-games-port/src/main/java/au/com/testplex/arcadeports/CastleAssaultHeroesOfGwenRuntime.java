@@ -665,17 +665,20 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
      * the source WitherBoss territory and both-towers-destroyed checks.
      */
     private boolean damageHeroesOfGwenWither(Player attacker, int ownerTeam, double damage, String reason) {
-        if (attacker == null || !attacker.isOnline() || !activePlayers.contains(attacker.getUniqueId())
-                || teams.getOrDefault(attacker.getUniqueId(), -1) != 1 - ownerTeam) return false;
-        if (!isInsideWitherBoundary(ownerTeam, attacker.getLocation())) {
-            attacker.sendMessage(ChatColor.RED + "You must enter your enemy Wither's territory to attack it.");
+        if (attacker == null || !attacker.isOnline() || !activePlayers.contains(attacker.getUniqueId())) return false;
+        int attackerTeam = teams.getOrDefault(attacker.getUniqueId(), -1);
+        boolean insideBoundary = isInsideWitherBoundary(ownerTeam, attacker.getLocation());
+        boolean damageable = Boolean.TRUE.equals(witherDamageable.get(ownerTeam));
+        if (!ArcadePortRules.heroesOfGwenWitherCanTakeDamage(
+                ownerTeam, attackerTeam, activePlayers.contains(attacker.getUniqueId()),
+                insideBoundary, damageable, damage)) {
+            if (attackerTeam == 1 - ownerTeam && !insideBoundary) {
+                attacker.sendMessage(ChatColor.RED + "You must enter your enemy Wither's territory to attack it.");
+            } else if (attackerTeam == 1 - ownerTeam && !damageable) {
+                attacker.sendMessage(ChatColor.RED + "Destroy both enemy towers before attacking the Wither.");
+            }
             return false;
         }
-        if (!Boolean.TRUE.equals(witherDamageable.get(ownerTeam))) {
-            attacker.sendMessage(ChatColor.RED + "Destroy both enemy towers before attacking the Wither.");
-            return false;
-        }
-        if (damage <= 0.0D) return false;
         Wither wither = withers.get(ownerTeam);
         if (wither == null || !wither.isValid() || wither.isDead()) return false;
 
@@ -2794,7 +2797,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
         TowerState tower = towerFor(damaged);
         if (tower != null) {
-            double towerDamage = towerDamage;
+            double towerDamage = event.getFinalDamage();
             event.setCancelled(true);
             if (!(event instanceof EntityDamageByEntityEvent byEntity)) return;
             Integer minionTeam = heroesOfGwenMinionTeams.get(byEntity.getDamager().getUniqueId());
