@@ -222,7 +222,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         return owners.stream().anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
     }
 
-    private boolean hasAdminAccess(CommandSender sender) {
+    /** Shared admin check for both Game Panel actions and their command/API equivalents. */
+    public boolean hasAdminAccess(CommandSender sender) {
         if (sender.isOp() || sender.hasPermission("testplex.arcadeports.admin")) return true;
         if (!(sender instanceof Player player)) return false;
 
@@ -303,6 +304,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 return true;
             case "lobby":
             case "selectgame":
+                if (!hasAdminAccess(sender)) {
+                    sender.sendMessage(ChatColor.RED + "Operator permission required to change the lobby game.");
+                    return true;
+                }
                 if (args.length < 2) {
                     sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport lobby <game-id>");
                     return true;
@@ -322,6 +327,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 return true;
             case "maps":
             case "map":
+                if (!hasAdminAccess(sender)) {
+                    sender.sendMessage(ChatColor.RED + "Operator permission required to change the selected map.");
+                    return true;
+                }
                 if (!(sender instanceof Player player)) {
                     sender.sendMessage("Players only.");
                     return true;
