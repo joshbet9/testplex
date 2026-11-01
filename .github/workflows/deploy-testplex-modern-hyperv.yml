@@ -923,7 +923,7 @@ jobs:
              sudo -n grep -Fxq "process_id=$current_main_pid" "$monster_maze_readiness"; then
             echo "Monster Maze module registered with Testplex Arcade and passed the deployment-correlated readiness gate."
           else
-            echo "ERROR: Monster Maze is in the 20-game acceptance queue but did not register with this Testplex Arcade deployment; rolling back." >&2
+            echo "ERROR: Monster Maze is in the 22-game acceptance queue but did not register with this Testplex Arcade deployment; rolling back." >&2
             timeout --foreground --signal=TERM 10s sudo -n grep -i -E -C 3 'MonsterMaze|ERROR|SEVERE|Exception|Caused by:|Failed|Could not|Unable to' "$SERVER_DIR/logs/latest.log" | tail -n 160 >&2 || true
             rollback
             exit 1
@@ -955,7 +955,7 @@ jobs:
           sudo -n grep -F 'TESTPLEX_ARCADE_LOBBY_READY' "$SERVER_DIR/logs/latest.log" | tail -n 1 || true
 
           sudo -n /usr/local/sbin/testplex-modern-recovery --locked set-phase DEPLOYMENT_VERIFIED
-          echo "Modern Paper 26.3 is ready with the Testplex Arcade 100x100 lobby and the 20-game controlled acceptance queue, including Monster Maze, Snake, Draw My Thing and Master Builders; Monster Maze registration and Snake source-map startup are required deployment gates; Wizards and the remaining unfinished game ports remain disabled; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
+          echo "Modern Paper 26.3 is ready with the Testplex Arcade 100x100 lobby and the 22-game controlled acceptance queue, including Monster Maze, Snake, Draw My Thing, Master Builders, Castle Assault and Milk the Cow; the original Castle Assault and BobsFarm archives are packaged and checked by CI; Monster Maze registration and Snake source-map startup are required deployment gates; Wizards and the remaining unfinished game ports remain disabled; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
           echo "On successful deployment, testplex-reborn.service remains stopped if it was active during preflight; a failed deployment restores services that were active before preflight. Separate Monster Maze project services/data were not modified."
           REMOTE_DEPLOY
 
