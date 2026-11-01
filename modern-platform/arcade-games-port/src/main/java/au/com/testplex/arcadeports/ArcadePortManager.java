@@ -161,6 +161,7 @@ import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 import org.bukkit.util.BoundingBox;
+import org.bukkit.util.EulerAngle;
 import org.bukkit.util.Vector;
 
 public final class ArcadePortManager implements Listener {
@@ -7601,36 +7602,48 @@ public final class ArcadePortManager implements Listener {
 
 
 
-    private ArmorStand spawnPaintballSaveMeMarker(Session session, Player player) {
+    private ArmorStand spawnPaintballSaveMeMarker(Session session, Player player, Player killer) {
         Location location = player.getLocation().clone();
         ArmorStand marker = session.world.spawn(location, ArmorStand.class);
         marker.setArms(true);
         marker.setBasePlate(false);
         marker.setGravity(false);
+        marker.setVisible(false);
         marker.setInvulnerable(true);
         marker.setSilent(true);
         marker.setCanPickupItems(false);
-        marker.setCustomName(ChatColor.RED + "SAVE ME! " + player.getName());
+        String killerName = killer == null ? "the opposing team" : killer.getName();
+        marker.setCustomName(ChatColor.RED + "SAVE ME! " + ChatColor.WHITE + player.getName()
+                + ChatColor.GRAY + " — Painted by " + ChatColor.GOLD + killerName);
         marker.setCustomNameVisible(true);
-        Color teamColor = ArcadePortRules.paintballTeamColor(session.teams.getOrDefault(player.getUniqueId(), 0));
-        ItemStack[] armor = new ItemStack[] {
-                new ItemStack(Material.LEATHER_BOOTS), new ItemStack(Material.LEATHER_LEGGINGS),
-                new ItemStack(Material.LEATHER_CHESTPLATE), new ItemStack(Material.LEATHER_HELMET)
-        };
-        for (ItemStack piece : armor) {
-            if (piece.getItemMeta() instanceof LeatherArmorMeta meta) {
-                meta.setColor(teamColor);
-                piece.setItemMeta(meta);
-            }
+        // Reborn's fallen copy uses a slightly randomized ragdoll pose.
+        marker.setRightArmPose(randomPaintballPose());
+        marker.setLeftArmPose(randomPaintballPose());
+        marker.setRightLegPose(randomPaintballPose());
+        marker.setLeftLegPose(randomPaintballPose());
+        ItemStack[] armor = player.getInventory().getArmorContents();
+        ItemStack[] copiedArmour = new ItemStack[armor.length];
+        for (int i = 0; i < armor.length; i++) copiedArmour[i] = armor[i] == null ? null : armor[i].clone();
+        marker.getEquipment().setArmorContents(copiedArmour);
+        ItemStack head = new ItemStack(Material.PLAYER_HEAD);
+        if (head.getItemMeta() instanceof org.bukkit.inventory.meta.SkullMeta skullMeta) {
+            skullMeta.setOwningPlayer(player);
+            head.setItemMeta(skullMeta);
         }
-        marker.getEquipment().setBoots(armor[0]);
-        marker.getEquipment().setLeggings(armor[1]);
-        marker.getEquipment().setChestplate(armor[2]);
-        marker.getEquipment().setHelmet(armor[3]);
+        marker.getEquipment().setHelmet(head);
+        ItemStack held = player.getInventory().getItemInMainHand();
+        if (held != null && !held.getType().isAir()) marker.getEquipment().setItemInMainHand(held.clone());
         session.entities.add(marker);
         session.paintballSaveMeMarkers.put(player.getUniqueId(), marker);
         session.paintballSaveMeLocations.put(player.getUniqueId(), location.clone());
         return marker;
+    }
+
+    private EulerAngle randomPaintballPose() {
+        double x = Math.toRadians(ThreadLocalRandom.current().nextInt(-3, 17));
+        double y = Math.toRadians(ThreadLocalRandom.current().nextInt(-12, 13));
+        double z = Math.toRadians(ThreadLocalRandom.current().nextInt(-15, 16));
+        return new EulerAngle(x, y, z);
     }
 
     private void removePaintballSaveMeMarker(Session session, UUID outPlayer) {
@@ -12790,9 +12803,6 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
             recordMicroBattlesAssists(session, eliminatedId, killer == null ? null : killer.getUniqueId());
         }
-        if (session.type == ArcadePortGame.MICRO_BATTLES) {
-            recordMicroBattlesAssists(session, eliminatedId, killer == null ? null : killer.getUniqueId());
-        }
         player.leaveVehicle();
         if (session.type == ArcadePortGame.PAINTBALL) {
             if (killer != null && session.players.containsKey(killer.getUniqueId())) {
@@ -12802,7 +12812,7 @@ public final class ArcadePortManager implements Listener {
             }
         }
         if (session.type == ArcadePortGame.PAINTBALL && player.isOnline()) {
-            spawnPaintballSaveMeMarker(session, player);
+            spawnPaintballSaveMeMarker(session, player, killer);
             player.setHealth(20.0D);
             player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 30, 0, false, false, true), true);
             player.setGameMode(GameMode.SPECTATOR);
