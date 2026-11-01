@@ -2682,6 +2682,22 @@ public final class ArcadePortRules {
         return null;
     }
 
+    public static final long HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS = 5_000L;
+    public static final double HEROES_OF_GWEN_BASE_HP_REGEN_PER_INTERVAL = 0.66D;
+    public static final double HEROES_OF_GWEN_BASE_KILL_HEAL_FACTOR = 0.25D;
+
+    /** Source HP5 effects add a percentage of the base 0.66 HP regeneration pulse. */
+    public static double heroesOfGwenStoreHpRegenAmount(
+            double baseAmount, Collection<String> equippedItemNames) {
+        double factor = 0.0D;
+        if (equippedItemNames != null) {
+            for (String itemName : equippedItemNames) {
+                factor = Math.max(factor, heroesOfGwenStoreHealthRegenBonus(itemName));
+            }
+        }
+        return baseAmount + baseAmount * factor;
+    }
+
     /** Source MobaItemEffect value maps for the role shops. */
     public static double heroesOfGwenStoreAbilityDamageFactor(String itemName) {
         if (itemName == null) return 0.0D;
