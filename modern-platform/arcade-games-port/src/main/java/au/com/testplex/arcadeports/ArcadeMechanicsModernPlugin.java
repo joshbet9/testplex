@@ -181,6 +181,36 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         }
     }
 
+    private String monsterMazeStatsPath(java.util.UUID playerId) { return "local-stats." + playerId + ".monster-maze."; }
+    public void recordMonsterMazeFirstSafePad(java.util.UUID playerId) {
+        if (playerId == null) return;
+        String path = monsterMazeStatsPath(playerId);
+        getConfig().set(path + "first-safe-pads", getConfig().getInt(path + "first-safe-pads", 0) + 1);
+        saveConfig();
+    }
+    public void recordMonsterMazeHighestStage(java.util.UUID playerId, int stage) {
+        if (playerId == null || stage < 0) return;
+        String path = monsterMazeStatsPath(playerId);
+        getConfig().set(path + "highest-stage", Math.max(getConfig().getInt(path + "highest-stage", 0), stage));
+        saveConfig();
+    }
+    public void recordMonsterMazeWin(java.util.UUID playerId, int stage) {
+        if (playerId == null || stage < 0) return;
+        String path = monsterMazeStatsPath(playerId);
+        getConfig().set(path + "wins", getConfig().getInt(path + "wins", 0) + 1);
+        getConfig().set(path + "highest-stage", Math.max(getConfig().getInt(path + "highest-stage", 0), stage));
+        saveConfig();
+    }
+    public void recordMonsterMazeAchievement(java.util.UUID playerId, String achievementId) {
+        if (playerId == null || achievementId == null || !java.util.Set.of("jumpman", "just-to-suffer", "blizzard", "out-of-the-cup", "blackout", "stampede", "perfect-run", "breakaway", "photo-finish").contains(achievementId)) return;
+        String key = "local-achievements." + playerId + ".monster-maze." + achievementId;
+        if (getConfig().getBoolean(key, false)) return;
+        getConfig().set(key, true);
+        saveConfig();
+        Player player = Bukkit.getPlayer(playerId);
+        if (player != null && player.isOnline()) player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + ChatColor.YELLOW + achievementId.replace('-', ' '));
+    }
+
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();

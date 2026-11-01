@@ -104,6 +104,9 @@ public class GameManager implements Listener {
     private float lastExpPct = -1;
     private int lastLevel = -1;
     private final Map<UUID, Location> lastCompassTargets = new HashMap<UUID, Location>();
+    private final Set<UUID> firstPadPlayers = new HashSet<UUID>();
+    private final Map<UUID, Set<UUID>> outOfCupTargets = new HashMap<UUID, Set<UUID>>();
+    private final Set<UUID> photoFinishCandidates = new HashSet<UUID>();
 
     public GameManager(MonsterMazePlugin plugin) {
         this.plugin = plugin;
@@ -120,6 +123,30 @@ public class GameManager implements Listener {
     public boolean isRunning() { return state != GameState.IDLE && state != GameState.ENDING; }
     public boolean isLive() { return state == GameState.LIVE; }
     public int getStage() { return curSafe; }
+    public void recordFirstSafePad(UUID playerId) { plugin.recordFirstSafePad(playerId); }
+    public void recordAchievement(UUID playerId, String achievementId) { plugin.recordAchievement(playerId, achievementId); }
+    public void noteFirstPad(Player player) { if (player != null) firstPadPlayers.add(player.getUniqueId()); }
+    public void noteOutOfCupSlowball(Player shooter, Player target) {
+        if (shooter == null || target == null || !firstPadPlayers.contains(shooter.getUniqueId())) return;
+        outOfCupTargets.computeIfAbsent(shooter.getUniqueId(), ignored -> new HashSet<UUID>()).add(target.getUniqueId());
+    }
+    public void notePhotoFinish(Player player) { if (player != null) photoFinishCandidates.add(player.getUniqueId()); }
+    /** One missing maze-path cell directly below an airborne player, with path on opposing sides. */
+    public boolean isOverOneBlockGap(Player player) {
+        if (player == null || center == null || player.getWorld() != center.getWorld()) return false;
+        Location current = player.getLocation();
+        if (current.getY() <= center.getY() || current.getY() > center.getY() + 5.0D) return false;
+        Location cell = new Location(current.getWorld(), current.getX(), center.getY(), current.getZ());
+        if (mazeGenerator.isPathRaw(cell)) return false;
+        boolean north = mazeGenerator.isPathRaw(cell.clone().add(0.0D, 0.0D, -1.0D));
+        boolean south = mazeGenerator.isPathRaw(cell.clone().add(0.0D, 0.0D, 1.0D));
+        boolean east = mazeGenerator.isPathRaw(cell.clone().add(1.0D, 0.0D, 0.0D));
+        boolean west = mazeGenerator.isPathRaw(cell.clone().add(-1.0D, 0.0D, 0.0D));
+        return isSingleBlockMazeGap(north, south, east, west);
+    }
+    static boolean isSingleBlockMazeGap(boolean north, boolean south, boolean east, boolean west) {
+        return (north && south) || (east && west);
+    }
     public void setCenter(Location loc) {
         // A live round's arena world is part of its player/entity isolation boundary.
         if (loc == null || loc.getWorld() == null || isRunning()) return;
@@ -236,6 +263,9 @@ public void startGame(Location preferCenter, int requestedPattern) {
         firstClaimedThisPhase = false;
         soloMode = false;
         stats.reset();
+        firstPadPlayers.clear();
+        outOfCupTargets.clear();
+        photoFinishCandidates.clear();
 
         // Freeze the participant list before generation so late entrants are not reset or counted.
         final List<Player> startingPlayers = testplexManagedRound && pendingTestplexParticipants != null
@@ -588,6 +618,13 @@ public void startGame(Location preferCenter, int requestedPattern) {
             boolean onPad = safePad.isOn(p);
             boolean grounded = p.isOnGround();
 
+            if (onPad && grounded && phaseTimer <= 1) {
+                boolean rivalNearby = false;
+                for (Player rival : getAlivePlayers()) {
+                    if (!rival.equals(p) && rival.getLocation().distance(p.getLocation()) <= 3.0D) { rivalNearby = true; break; }
+                }
+                if (rivalNearby) notePhotoFinish(p);
+            }
             if (onPad && grounded) padLockIns.add(id);
             if (!onPad || !grounded) {
                 allOn = false;
@@ -739,6 +776,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         me.monstermaze.kit.KitType k = kitManager.getKit(player);
         if (k != null) kit = k.id;
         plugin.getLeaderboards().recordRun(plugin.getMode(), pattern, player.getUniqueId(), curSafe, kit);
+        plugin.recordHighestStage(player.getUniqueId(), curSafe);
     }
 
     private void eliminate(Player player, String message) {
@@ -799,7 +837,12 @@ public void startGame(Location preferCenter, int requestedPattern) {
                 
                 // Record winner's PB BEFORE setting state to ENDING
                 recordPB(winner);
-                
+                plugin.recordWin(winner.getUniqueId(), curSafe);
+                if (photoFinishCandidates.contains(winner.getUniqueId())) recordAchievement(winner.getUniqueId(), "photo-finish");
+                Set<UUID> targets = outOfCupTargets.getOrDefault(winner.getUniqueId(), Collections.emptySet());
+                if (targets.stream().anyMatch(targetId -> roundParticipants.contains(targetId) && !alive.contains(targetId))) {
+                    recordAchievement(winner.getUniqueId(), "out-of-the-cup");
+                }
                 broadcast(ChatColor.GOLD + "" + ChatColor.BOLD + winner.getName()
                         + " wins Monster Maze! (Stage " + curSafe + ")");
                 TextUtil.title(winner, ChatColor.GOLD + "Victory!", ChatColor.YELLOW + "Stage " + curSafe, 10, 60, 10);
