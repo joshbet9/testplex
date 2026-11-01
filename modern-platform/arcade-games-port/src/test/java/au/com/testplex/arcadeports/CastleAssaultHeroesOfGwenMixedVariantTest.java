@@ -434,6 +434,23 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     }
 
     @Test
+    void heroesOfGwenRoleStoreUsesOriginalEnchantmentFamiliesAndLevels() {
+        assertEquals("POWER", ArcadePortRules.heroesOfGwenStoreEnchantment("Hunter's Bow"));
+        assertEquals(1, ArcadePortRules.heroesOfGwenStoreEnchantmentLevel("Hunter's Bow"));
+        assertEquals("POWER", ArcadePortRules.heroesOfGwenStoreEnchantment("Elven Bow"));
+        assertEquals(2, ArcadePortRules.heroesOfGwenStoreEnchantmentLevel("Elven Bow"));
+        assertEquals(3, ArcadePortRules.heroesOfGwenStoreEnchantmentLevel("Eagle's Bow"));
+        assertEquals("SHARPNESS", ArcadePortRules.heroesOfGwenStoreEnchantment("Pumpkin King's Blade"));
+        assertEquals(2, ArcadePortRules.heroesOfGwenStoreEnchantmentLevel("Pumpkin King's Blade"));
+        assertEquals("PROJECTILE_PROTECTION", ArcadePortRules.heroesOfGwenStoreEnchantment("Superior Archer's Bane"));
+        assertEquals(2, ArcadePortRules.heroesOfGwenStoreEnchantmentLevel("Superior Archer's Bane"));
+        assertEquals("PROTECTION", ArcadePortRules.heroesOfGwenStoreEnchantment("Brawler's Plate"));
+        assertEquals(1, ArcadePortRules.heroesOfGwenStoreEnchantmentLevel("Brawler's Plate"));
+        assertEquals("", ArcadePortRules.heroesOfGwenStoreEnchantment("Adept's Cap"));
+        assertEquals(0, ArcadePortRules.heroesOfGwenStoreEnchantmentLevel("Adept's Cap"));
+    }
+
+    @Test
     void monochromeSidequestAwardsOnlyTheHigherScoringTeam() {
         assertEquals(0, ArcadePortRules.heroesOfGwenMonochromeWinner(3, 2));
         assertEquals(1, ArcadePortRules.heroesOfGwenMonochromeWinner(1, 4));
