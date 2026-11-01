@@ -378,7 +378,8 @@ public final class HoopsPaperSmoke extends JavaPlugin {
             TextDisplay display = (TextDisplay) Bukkit.getEntity(firstDisplayId);
             require(display == null || !display.isValid(), "centre scoreboard display survived match cleanup");
             if (field(runtime, "match") != null || !allRestored()) {
-                if (ticks >= 100L) throw new IllegalStateException("winner transition did not restore all players");
+                // The shared Arcade end presentation defaults to 10 seconds before snapshots are restored.
+                if (ticks >= 300L) throw new IllegalStateException("winner transition did not restore all players after the full end presentation");
                 return;
             }
             verifyCareerStats(firstMatch, firstPasserId, firstShooterId, firstScoringTeam);
