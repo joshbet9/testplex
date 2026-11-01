@@ -658,8 +658,10 @@ public final class MenuService implements Listener {
                 return;
             }
             switch (optionId) {
-                case "public-server" -> Bukkit.setWhitelist(!Bukkit.hasWhitelist());
-                case "enforce-whitelist" -> Bukkit.setWhitelist(!Bukkit.hasWhitelist());
+                // These are two views of one server access mode, not independent toggles.
+                // Public Server always means whitelist OFF; Enforce Whitelist means ON.
+                case "public-server" -> Bukkit.setWhitelist(false);
+                case "enforce-whitelist" -> Bukkit.setWhitelist(true);
                 case "game-auto-start" -> {
                     JavaPlugin engine = arcadeMechanicsPlugin();
                     if (engine == null) {
