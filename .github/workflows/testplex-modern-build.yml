@@ -80,6 +80,9 @@ jobs:
           jar tf "$snake_jar" | grep -Fxq "plugin.yml"
           jar tf "$snake_jar" | grep -Fxq "au/com/testplex/snake/SnakeModernPlugin.class"
           jar tf "$snake_jar" | grep -Fxq "au/com/testplex/snake/SnakeRules.class"
+          for snake_map in Snake_Pit.zip Snake_Volcanic.zip Snake_WinterBabylon.zip; do
+            jar tf "$snake_jar" | grep -Fxq "source-maps/Snake/$snake_map"
+          done
           unzip -p "$snake_jar" plugin.yml | grep -Fxq "name: SnakeModern"
           unzip -p "$snake_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
           jar tf "$arcade_jar" | grep -Fxq "plugin.yml"
@@ -109,7 +112,7 @@ jobs:
 
           arcade_config="$(unzip -p "$arcade_jar" config.yml)"
           enabled_ids="$(awk '/^enabled-games:/{in_list=1;next} in_list && /^[^ ]/{exit} in_list && /^  - /{print $2}' <<< "$arcade_config" | paste -sd, -)"
-          [[ "$enabled_ids" == "death-tag,one-in-the-quiver,bomb-lobbers,bacon-brawl,gladiators,micro-battles,paintball,plexball,spleef,super-sploor,dragon-escape,dragons,runner,sheep-quest,turf-wars,camera-shy" ]] || {
+          [[ "$enabled_ids" == "death-tag,one-in-the-quiver,bomb-lobbers,bacon-brawl,gladiators,micro-battles,paintball,plexball,spleef,super-sploor,dragon-escape,dragons,runner,sheep-quest,turf-wars,camera-shy,monster-maze,snake,draw-my-thing,master-builders" ]] || {
             echo "Only the explicitly reviewed acceptance queue may be enabled. Found: [$enabled_ids]" >&2
             exit 1
           }
@@ -155,8 +158,12 @@ jobs:
               runner) map_folders=("Runner") ;;
               sheep-quest) map_folders=("Sheep Quest") ;;
               turf-wars) map_folders=("Turf Wars") ;;
-              camera-shy) map_folders=(); echo "Camera Shy uses its procedural modern maze; no legacy 1.8 map archive folder exists." ;;
+              camera-shy) map_folders=(); echo "Snap uses its procedural modern maze; no legacy 1.8 map archive folder exists." ;;
               spleef) map_folders=("Speef" "Super Spleef") ;;
+              monster-maze) map_folders=(); echo "Monster Maze uses its dedicated bundled source worlds; deployment readiness verifies its embedded Arcade registration." ;;
+              snake) map_folders=(); echo "Snake's three original map archives are packaged and checked in SnakeModern.jar." ;;
+              draw-my-thing) map_folders=("Draw My Thing") ;;
+              master-builders) map_folders=(); echo "Master Builders uses generated isolated build plots; no legacy map archive folder exists." ;;
               *) echo "No legacy map parity policy is defined for enabled game [$game_id]." >&2; exit 1 ;;
             esac
             for map_folder in "${map_folders[@]}"; do
@@ -176,7 +183,9 @@ jobs:
           grep -Fq 'me.monstermaze.MonsterMazePlugin' "$deploy_workflow"
           grep -Fq 'retired-monster-maze-plugins' "$deploy_workflow"
           snake_config="$(unzip -p "$snake_jar" config.yml)"
-          grep -Fxq "enabled: false" <<< "$snake_config"
+          grep -Fxq "enabled: true" <<< "$snake_config"
+          grep -Fxq "readiness-revision: snake-controlled-acceptance-20261101-v1" <<< "$snake_config"
+          grep -Fq 'private static final boolean READY_FOR_TEST = true;' modern-platform/snake-port/src/main/java/au/com/testplex/snake/SnakeModernPlugin.java
           echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, 27 shared Arcade catalogue games are packaged, and Super Sploor, Dragon Escape, Dragons (Solo), Runner, Sheep Quest, Turf Wars and Camera Shy join the sixteen-game controlled acceptance queue; Camera Shy uses its procedural modern maze, and all 357 original enabled map archives are compared with the packaged JAR; Wizards is built as a separate module and Speed Builders Arcade remains planned."
 
       - name: Validate independent deployment recovery and shell syntax
@@ -219,12 +228,12 @@ jobs:
             echo
             echo "- Runtime/API baseline: Java 25 / Paper 26.3"
             echo "- Separate from legacy Java 8 build and deployment"
-            echo "- Catalogue: 27 shared Arcade games (16 READY_FOR_TEST, 11 MECHANICS_IN_PROGRESS)"
+            echo "- Catalogue: 27 shared Arcade games (20 READY_FOR_TEST, 7 MECHANICS_IN_PROGRESS)"
             echo "- Built artifacts: TestplexModernArcade.jar, SnakeModern.jar, ArcadeMechanicsModern.jar and WizardsModern.jar (Monster Maze is compiled into the Testplex-owned Arcade module)"
             echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
             echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
-            echo "- Gameplay ports: 27 shared Arcade catalogue entries are packaged; Plexball, Super Sploor, Dragon Escape, Dragons (Solo), Runner, Sheep Quest, Turf Wars and Camera Shy are in the controlled READY_FOR_TEST queue, Wizards remains a separate disabled module, and Speed Builders Arcade is planned but not implemented"
-            echo "- Playable allow-list: Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons (Solo), Runner, Sheep Quest, Turf Wars and Camera Shy; remaining catalogue entries, Snake and Wizards remain gated pending readiness promotion"
+            echo "- Gameplay ports: 27 shared Arcade catalogue entries are packaged; the controlled READY_FOR_TEST queue now contains 20 games, including Monster Maze, Snake, Draw My Thing and Master Builders; Wizards remains a separate disabled module and Speed Builders remains under development"
+            echo "- Playable allow-list: Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons, Runner, Sheep Quest, Turf Wars, Snap, Monster Maze, Snake, Draw My Thing and Master Builders; Wizards and the remaining catalogue entries remain gated"
             echo "- Deployment: successful pushes to feat/testplex-modern-26.3-platform automatically deploy through the isolated modern Hyper-V workflow"
           } >> "$GITHUB_STEP_SUMMARY"
 
