@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ArcadeLobbyKitCatalogueTest {
@@ -13,6 +14,16 @@ class ArcadeLobbyKitCatalogueTest {
         assertEquals(List.of("jumper", "armorer", "pitcher", "waller"),
                 ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.BOMB_LOBBERS, List.of()).stream()
                         .map(choice -> choice.id).toList());
+    }
+
+    @Test
+    void baconBrawlRestoresChrisPBaconAsAnAchievementKit() {
+        ArcadeLobbyKitCatalogue.KitChoice chris =
+                ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.BACON_BRAWL, List.of()).stream()
+                        .filter(choice -> choice.id.equals("chris-p-bacon")).findFirst().orElseThrow();
+        assertEquals("Chris P. Bacon", chris.name);
+        assertEquals(ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT, chris.unlock);
+        assertEquals(org.bukkit.Material.IRON_AXE, chris.heldItem);
     }
 
     @Test

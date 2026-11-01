@@ -982,23 +982,14 @@ public final class ArcadePortRules {
         return ownerTeam >= 0 && targetTeam >= 0 && ownerTeam != targetTeam;
     }
 
-    /** More players in the match lobby produce more frequent power-up spawns. */
+    /** Paired side-specific power-up waves use a random interval averaging one minute. */
     public static long bombLobbersPowerupSpawnIntervalMillis(int lobbyPlayers) {
-        int players = Math.max(1, lobbyPlayers);
-        if (players <= 2) return 30_000L;
-        if (players <= 4) return 25_000L;
-        if (players <= 8) return 20_000L;
-        if (players <= 12) return 15_000L;
-        return 12_000L;
+        return 60_000L;
     }
 
-    /** Keep small matches readable while allowing more simultaneous drops in larger lobbies. */
+    /** Each wave retains at most one uncollected power-up per team, regardless of lobby size. */
     public static int bombLobbersPowerupMaxActive(int lobbyPlayers) {
-        int players = Math.max(1, lobbyPlayers);
-        if (players <= 4) return 1;
-        if (players <= 8) return 2;
-        if (players <= 12) return 3;
-        return 4;
+        return 2;
     }
 
     public static double bombLobbersExplosionRadius(String powerupType) {
@@ -1329,12 +1320,14 @@ public final class ArcadePortRules {
     /** Canonical kit IDs mirror the official names; old test aliases remain accepted. */
     public static String normalizeBaconBrawlKit(String requested) {
         if (requested == null) return null;
-        String value = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        String value = requested.toLowerCase(java.util.Locale.ROOT)
+                .replace(".", "").replace('_', '-').replace(' ', '-');
         return switch (value) {
             case "el-muchacho-pigo", "muchacho", "body-slam", "pigo" -> "el-muchacho-pigo";
             case "mama", "mama-pig", "mama-piggles" -> "mama-piggles";
             case "pig", "sneaky-pig", "sheep", "sheep-pig", "pig-cloak", "cloak-pig" -> "pig";
             case "brutus", "brutus-bacon", "bacon-brutus", "brutus-pig" -> "brutus-bacon";
+            case "chris", "chris-p", "chris-p-bacon", "crispy-bacon" -> "chris-p-bacon";
             default -> null;
         };
     }
@@ -1915,11 +1908,17 @@ public final class ArcadePortRules {
         return hasVerticalBounds && (y <= minY || y >= maxY + 1.0D);
     }
 
-    /** Fall limits below the minimum authored play surface for known low-altitude Dragon Escape maps. */
+    /** Backwards-compatible fallback when a map has no authored vertical bounds. */
     public static double dragonEscapeVoidThresholdY(String mapName) {
+        return dragonEscapeVoidThresholdY(mapName, false, 0);
+    }
+
+    /** Use the selected source map's actual vertical bounds for its fall-out threshold. */
+    public static double dragonEscapeVoidThresholdY(String mapName, boolean hasVerticalBounds, int minY) {
         String name = mapName == null ? "" : mapName.toLowerCase(java.util.Locale.ROOT);
         if (name.contains("hell")) return 24.0D;
         if (name.contains("pirate")) return 0.0D;
+        if (hasVerticalBounds) return sourceMapVoidThresholdY(true, minY);
         return 58.0D;
     }
 

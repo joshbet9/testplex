@@ -48,7 +48,9 @@ final class ArcadeLobbyKitCatalogue {
                     choice("pig", "Pig Cloak", Material.PHANTOM_MEMBRANE,
                             Unlock.GEM, Sheep.class, null, DyeColor.PINK),
                     choice("brutus-bacon", "Brutus Bacon", Material.SHIELD,
-                            Unlock.ACHIEVEMENT, Pig.class, null));
+                            Unlock.ACHIEVEMENT, Pig.class, null),
+                    choice("chris-p-bacon", "Chris P. Bacon", Material.COOKED_PORKCHOP,
+                            Unlock.ACHIEVEMENT, Pig.class, Material.IRON_AXE));
             case BOMB_LOBBERS -> List.of(
                     choice("jumper", "Jumper", Material.RABBIT_FOOT,
                             Unlock.FREE, Zombie.class, Material.IRON_AXE),
@@ -95,6 +97,11 @@ final class ArcadeLobbyKitCatalogue {
                             Unlock.GEM, Zombie.class, Material.ELYTRA),
                     choice("tamer", "Tamer", Material.END_CRYSTAL,
                             Unlock.GEM, Zombie.class, Material.END_CRYSTAL));
+            case EVOLUTION -> List.of(
+                    choice("standard-evolution", "Standard Evolution", Material.DRAGON_EGG,
+                            Unlock.FREE, Zombie.class, Material.IRON_INGOT),
+                    choice("quick-evolver", "Quick Evolver", Material.CLOCK,
+                            Unlock.FREE, Zombie.class, Material.GOLDEN_APPLE));
             case MICRO_BATTLES -> List.of(
                     choice("micro-archer", "Archer", Material.BOW,
                             Unlock.FREE, Zombie.class, Material.BOW),
