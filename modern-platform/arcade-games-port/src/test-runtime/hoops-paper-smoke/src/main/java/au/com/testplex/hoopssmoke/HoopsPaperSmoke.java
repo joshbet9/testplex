@@ -274,9 +274,13 @@ public final class HoopsPaperSmoke extends JavaPlugin {
             Player intendedReceiver = player(passReceiverId);
             require(liveBall != null && intendedReceiver != null,
                     "launched pass or intended receiver disappeared before catch");
-            Location livePosition = ((Location) field(liveBall, "location")).clone();
+            // Keep the receiver on a valid court surface. Place the live,
+            // server-authoritative ball inside the receiver's normal catch
+            // radius instead of teleporting the player downward into the floor.
+            Location catchPoint = intendedReceiver.getLocation().clone().add(0.0D, 1.0D, 0.0D);
+            Location livePosition = (Location) field(liveBall, "location");
+            livePosition.set(catchPoint.getX(), catchPoint.getY(), catchPoint.getZ());
             setField(liveBall, "velocity", new Vector(0.0D, 0.0D, 0.0D));
-            intendedReceiver.teleport(livePosition.subtract(0.0D, 1.0D, 0.0D));
             intendedReceiver.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
             return;
         }
