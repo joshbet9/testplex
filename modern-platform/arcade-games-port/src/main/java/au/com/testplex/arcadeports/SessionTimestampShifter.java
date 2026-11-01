@@ -92,6 +92,7 @@ final class SessionTimestampShifter {
             List<String> failures,
             IdentityHashMap<Object, Boolean> visited,
             String path) {
+        if (visited.put(source, Boolean.TRUE) != null) return;
         for (Map.Entry<?, ?> entry : source.entrySet()) {
             Object value = entry.getValue();
             String entryPath = path + "[" + entry.getKey() + "]";
@@ -129,6 +130,7 @@ final class SessionTimestampShifter {
             List<String> failures,
             IdentityHashMap<Object, Boolean> visited,
             String path) {
+        if (visited.put(source, Boolean.TRUE) != null) return;
         if (source instanceof List<?> list) {
             @SuppressWarnings("unchecked")
             List<Object> writable = (List<Object>) list;
@@ -172,6 +174,7 @@ final class SessionTimestampShifter {
             List<String> failures,
             IdentityHashMap<Object, Boolean> visited,
             String path) {
+        if (visited.put(record, Boolean.TRUE) != null) return record;
         Class<?> type = record.getClass();
         RecordComponent[] components = type.getRecordComponents();
         Class<?>[] parameterTypes = new Class<?>[components.length];
