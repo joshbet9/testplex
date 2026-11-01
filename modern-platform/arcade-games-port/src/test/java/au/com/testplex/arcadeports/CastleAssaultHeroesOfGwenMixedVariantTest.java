@@ -95,11 +95,33 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     }
 
     @Test
-    void anathBurnBeamMatchesTheArchivedRangeHeightDamageAndCooldown() {
-        assertEquals(10_000L, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_COOLDOWN_MILLIS);
-        assertEquals(20.0D, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_RANGE, 0.00001D);
-        assertEquals(10.0D, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_HEIGHT, 0.00001D);
-        assertEquals(14.0D, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE, 0.00001D);
+    void anathBurnBeamMatchesArchivedRangeDamageAndTargetRecharge() {
+        assertEquals(9_000L, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_COOLDOWN_MILLIS);
+        assertEquals(9.0D, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_RANGE, 0.00001D);
+        assertEquals(0.2D, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_STEP, 0.00001D);
+        assertEquals(2.0D, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_HIT_RADIUS, 0.00001D);
+        assertEquals(11, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE);
+        assertEquals(2_000L, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_TARGET_RECHARGE_MILLIS);
+        assertEquals(3, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_STEPS_PER_TICK);
+    }
+
+    @Test
+    void anathFlameWandMatchesArchivedEmberDamageSpeedAndAmmoCadence() {
+        assertEquals(500L, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_INTERVAL_MILLIS);
+        assertEquals(1_000L, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_RELOAD_MILLIS);
+        assertEquals(4, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_CAPACITY);
+        assertEquals(5, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE);
+        assertEquals(1.25D, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_PROJECTILE_SPEED, 0.00001D);
+        assertEquals(60, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_TICKS);
+    }
+
+    @Test
+    void anathFlameDashMatchesArchivedVelocityDurationAndFireTrail() {
+        assertEquals(12_000L, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_COOLDOWN_MILLIS);
+        assertEquals(600L, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_DURATION_MILLIS);
+        assertEquals(1.0D, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_SPEED, 0.00001D);
+        assertEquals(500L, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_FIRE_DELAY_MILLIS);
+        assertEquals(5_000L, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_FIRE_DURATION_MILLIS);
     }
 
     @Test
