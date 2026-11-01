@@ -35,6 +35,17 @@ class ArcadeLobbyKitCatalogueTest {
     }
 
     @Test
+    void sheepQuestLobbyCatalogueMatchesItsThreeLegacyKitsAndUnlockTiers() {
+        List<ArcadeLobbyKitCatalogue.KitChoice> choices =
+                ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.SHEEP_QUEST, List.of());
+        assertEquals(List.of("beserker", "archer", "brute"),
+                choices.stream().map(choice -> choice.id).toList());
+        assertEquals(ArcadeLobbyKitCatalogue.Unlock.FREE, choices.get(0).unlock);
+        assertEquals(ArcadeLobbyKitCatalogue.Unlock.GEM, choices.get(1).unlock);
+        assertEquals(ArcadeLobbyKitCatalogue.Unlock.GEM, choices.get(2).unlock);
+    }
+
+    @Test
     void gamesWithoutLobbyKitStationsExposeNoChoices() {
         assertTrue(ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.SHEEP_QUEST, List.of()).isEmpty());
         assertTrue(ArcadeLobbyKitCatalogue.forGame(null, List.of()).isEmpty());
