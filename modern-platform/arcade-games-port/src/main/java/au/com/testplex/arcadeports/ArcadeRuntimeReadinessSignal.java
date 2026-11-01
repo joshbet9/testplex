@@ -17,7 +17,11 @@ final class ArcadeRuntimeReadinessSignal {
 
     private ArcadeRuntimeReadinessSignal() { }
 
-    static boolean publish(Path pluginDataFolder, String invocationId, long processId) throws IOException {
+    static boolean publish(Path pluginDataFolder, String invocationId, long processId,
+                           boolean monsterMazeRegistered) throws IOException {
+        if (!monsterMazeRegistered) {
+            throw new IOException("The integrated Monster Maze game is not registered with Testplex Arcade.");
+        }
         Path identity = pluginDataFolder.resolve(IDENTITY_FILE);
         if (!Files.isRegularFile(identity)) return false;
 
@@ -42,7 +46,8 @@ final class ArcadeRuntimeReadinessSignal {
 
         Properties signal = new Properties();
         signal.setProperty("status", "READY");
-        signal.setProperty("module", "arcade-lobby");
+        signal.setProperty("module", "arcade-runtime");
+        signal.setProperty("monster_maze", "READY");
         signal.setProperty("manager", "testplex-arcade");
         signal.setProperty("world", ModernArcadeLobby.WORLD_NAME);
         signal.setProperty("plane", "100x100");
@@ -64,7 +69,7 @@ final class ArcadeRuntimeReadinessSignal {
         Path temporary = Files.createTempFile(parent, ".testplex-arcade-readiness-", ".tmp");
         try {
             try (OutputStream output = Files.newOutputStream(temporary)) {
-                values.store(output, "Testplex Arcade runtime readiness; generated after lobby and plane initialisation");
+                values.store(output, "Testplex Arcade runtime readiness; generated after the shared lobby and integrated games are initialised");
             }
             try {
                 Files.move(temporary, destination, StandardCopyOption.ATOMIC_MOVE,
