@@ -57,4 +57,26 @@ public final class ArcadeProgressRules {
         return assists >= 15;
     }
 
+
+    public static boolean isRecentWitherHumanActivity(long nowMillis, long lastActivityAtMillis, long windowMillis) {
+        return windowMillis >= 0L && lastActivityAtMillis > 0L
+                && nowMillis >= lastActivityAtMillis && nowMillis - lastActivityAtMillis <= windowMillis;
+    }
+
+    public static boolean shouldAwardWitherSavior(int distinctHumansRevived) {
+        return distinctHumansRevived >= 5;
+    }
+
+    public static boolean shouldAwardWitherTormentor(int humanKillsFromOneSkull) {
+        return humanKillsFromOneSkull >= 3;
+    }
+
+    public static boolean shouldAwardWitherWorstWitherEver(int killsOfSameHuman, boolean humanRecentlyActive) {
+        return humanRecentlyActive && killsOfSameHuman >= 5;
+    }
+
+    public static boolean shouldAwardWitherLucidDreams(boolean humanTeamWon, boolean tookDamageThisRound) {
+        return humanTeamWon && !tookDamageThisRound;
+    }
+
 }

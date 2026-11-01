@@ -53,4 +53,21 @@ class ArcadeProgressRulesTest {
         assertTrue(ArcadeProgressRules.shouldAwardMilkCowSlaughterhouse(15));
     }
 
+
+    @Test void witherAssaultAchievementConditionsRequireRealInRoundEvents() {
+        assertTrue(ArcadeProgressRules.isRecentWitherHumanActivity(61_000, 1_000, 60_000));
+        assertFalse(ArcadeProgressRules.isRecentWitherHumanActivity(61_001, 1_000, 60_000));
+        assertFalse(ArcadeProgressRules.isRecentWitherHumanActivity(999, 1_000, 60_000));
+        assertTrue(ArcadeProgressRules.shouldAwardWitherSavior(5));
+        assertFalse(ArcadeProgressRules.shouldAwardWitherSavior(4));
+        assertTrue(ArcadeProgressRules.shouldAwardWitherTormentor(3));
+        assertFalse(ArcadeProgressRules.shouldAwardWitherTormentor(2));
+        assertTrue(ArcadeProgressRules.shouldAwardWitherWorstWitherEver(5, true));
+        assertFalse(ArcadeProgressRules.shouldAwardWitherWorstWitherEver(5, false));
+        assertFalse(ArcadeProgressRules.shouldAwardWitherWorstWitherEver(4, true));
+        assertTrue(ArcadeProgressRules.shouldAwardWitherLucidDreams(true, false));
+        assertFalse(ArcadeProgressRules.shouldAwardWitherLucidDreams(true, true));
+        assertFalse(ArcadeProgressRules.shouldAwardWitherLucidDreams(false, false));
+    }
+
 }
