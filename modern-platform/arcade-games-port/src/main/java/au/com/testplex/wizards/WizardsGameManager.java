@@ -2836,7 +2836,6 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
                     : Math.max(48.0D, Math.max(sourceMapData.width(), sourceMapData.depth()) + 8.0D);
             border.setSize(size);
         }
-        boolean returnThroughArcade = arcadeManaged && !stopRequested;
         arcadeManaged = false;
         if (!stopRequested) plugin.onWizardsRoundCompleted(winner);
     }
