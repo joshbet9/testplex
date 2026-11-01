@@ -55,7 +55,7 @@ This is an implementation milestone, not a readiness or live-acceptance claim. T
 
 ## Automated coverage
 
-- `SpeedBuildersRulesTest`: source timing modifiers, block-state scoring exceptions, extra-block scoring, perfect builds and normalized 0–100 non-elimination scoring.
+- `SpeedBuildersRulesTest`: source timing modifiers, block-state scoring exceptions, extra-block scoring, perfect builds, normalized 0–100 accuracy scoring, malformed-score validation and shared highest-score ties.
 - `SpeedBuildersSourceMapTest`: the Maven-packaged original ZIP contains WorldConfig data, a RED judging marker, at least eight YELLOW plots and an authored custom-template library.
 - `SpeedBuildersProgressStoreTest`: allowed local counter names, positive increments and persistence paths.
 - The full Modern Paper 26.3 workflow must compile the plugin, run the complete Arcade test suite, and verify the packaged source ZIP before this branch is considered build-ready.
