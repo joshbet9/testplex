@@ -207,8 +207,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             if (player.isOnline() && manager != null) {
                 // Session fake players must remain in the game lifecycle that just admitted them.
                 if (manager.isTestPlayer(player)) return;
-                // The server's only human-facing spawn is the shared Testplex Arcade lobby.
-                manager.returnPlayerToLobby(player);
+                // ArcadePortManager.onJoin owns the lobby redirect, snapshot restoration
+                // and scoreboard refresh. Keep this listener for host-level access and kit setup.
                 grantConfiguredAdmin(player);
                 manager.restoreMonsterMazeKitPreference(player);
             }
