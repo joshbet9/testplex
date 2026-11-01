@@ -317,7 +317,7 @@ public final class ArcadePortManager implements Listener {
     public boolean startMonsterMazeTournamentRound(List<Player> requestedParticipants) {
         if (requestedParticipants == null || requestedParticipants.isEmpty()
                 || monsterMazeModule == null || active != null || monsterMazeRunning()
-                || !isGameEnabled(ArcadePortGame.MONSTER_MAZE)) return false;
+                || !isRotationCandidateAvailable(ArcadePortGame.MONSTER_MAZE)) return false;
         LinkedHashMap<UUID, Player> selected = new LinkedHashMap<>();
         for (Player player : requestedParticipants) {
             if (player == null || !player.isOnline() || testPlayers.isTestPlayer(player)) continue;
@@ -2014,6 +2014,10 @@ public final class ArcadePortManager implements Listener {
         if (!isGameEnabled(type)) {
             sender.sendMessage(ChatColor.RED + type.displayName()
                     + " is not cleared for in-game parity testing yet. Cleared game IDs: " + enabledGamesLabel() + ".");
+            return;
+        }
+        if (type == ArcadePortGame.MONSTER_MAZE && !isRotationCandidateAvailable(type)) {
+            sender.sendMessage(ChatColor.RED + "Monster Maze cannot start because its embedded module or selected map world is unavailable.");
             return;
         }
         if (SourceMapCatalog.hasMap(type)) {
