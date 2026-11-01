@@ -67,18 +67,6 @@ public final class SnakeStatsStore {
         return true;
     }
 
-    public boolean awardAchievement(UUID playerId, String achievement) {
-        if (playerId == null || achievement == null || !Set.of(
-                "Cannibal", "ChooChoo", "SlimySheep",
-                "dont-want-none", "resilience-snakeified", "busted",
-                "one-of-the-ogs", "flawless", "bots-everywhere").contains(achievement)) return false;
-        String path = base(playerId) + ".achievements." + achievement;
-        if (data.getBoolean(path)) return false;
-        data.set(path, true);
-        plugin.getLogger().info("Snake achievement " + achievement + " awarded to " + playerId + ".");
-        save();
-        return true;
-    }
 
     public void recordGameEnd(UUID player, boolean won, int killsThisRound) {
         String path = base(player);
