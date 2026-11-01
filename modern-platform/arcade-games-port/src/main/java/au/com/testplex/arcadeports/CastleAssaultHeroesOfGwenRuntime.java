@@ -3616,6 +3616,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
         updateLarissaAbilities(now);
         updateLarissaFountains(now);
+        updateBardolfWolves(now);
+        for (Map.Entry<UUID, BardolfPounceState> entry : new HashMap<>(bardolfPounces).entrySet()) {
+            if (now >= entry.getValue().expiresAt) bardolfPounces.remove(entry.getKey());
+        }
         for (UUID id : new ArrayList<>(activePlayers)) {
             Player player = players.get(id);
             if (player == null || !player.isOnline()) continue;
@@ -3725,6 +3729,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         larissaWaterDashEndsAt.clear();
         larissaStormBlessingEndsAt.clear();
         larissaStormBlessingNextHealAt.clear();
+        bardolfWolves.clear();
+        bardolfWolfTargets.clear();
+        bardolfLastWolfAttackAt.clear();
+        bardolfPounces.clear();
+        bardolfFullMoonEndsAt.clear();
+        bardolfOriginalWalkSpeeds.clear();
         castleAssaultPlayerKits.clear();
         castleArcherNextArrowAt.clear();
         castleDemolitionistNextTntAt.clear();
@@ -3768,6 +3778,18 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             this.colour = colour;
             this.center = center;
             this.wool = wool;
+        }
+    }
+
+    private static final class BardolfPounceState {
+        final Location target;
+        final Vector direction;
+        final long expiresAt;
+        final Set<UUID> leapedWolfIds = new HashSet<>();
+        BardolfPounceState(Location target, Vector direction, long expiresAt) {
+            this.target = target.clone();
+            this.direction = direction.clone();
+            this.expiresAt = expiresAt;
         }
     }
 
