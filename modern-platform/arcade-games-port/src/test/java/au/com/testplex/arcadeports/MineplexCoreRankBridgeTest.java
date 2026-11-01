@@ -34,7 +34,6 @@ class MineplexCoreRankBridgeTest {
         assertEquals("player", MineplexCoreRankBridge.rankIdForGroup("BUILDER"));
         assertEquals("player", MineplexCoreRankBridge.rankIdForGroup("MAPPER"));
         assertEquals("player", MineplexCoreRankBridge.rankIdForGroup("MAPLEAD"));
-        assertEquals("player", MineplexCoreRankBridge.rankIdForGroup("BUILDER"));
         assertEquals("player", MineplexCoreRankBridge.rankIdForGroup("UNKNOWN"));
         assertEquals("player", MineplexCoreRankBridge.rankIdForGroup(null));
     }
