@@ -36,4 +36,25 @@ public final class ArcadeProgressRules {
             int highestOtherScore) {
         return ownScore > hypotheticalWinnerScore && ownScore > highestOtherScore;
     }
+
+    public static boolean shouldAwardMilkCowPerfectGame(int farmerDeaths) {
+        return farmerDeaths == 0;
+    }
+
+    public static boolean shouldAwardMilkCowHighClub(boolean drankWhileAirborne, boolean drankWhileGrounded) {
+        return drankWhileAirborne && !drankWhileGrounded;
+    }
+
+    public static boolean shouldAwardMilkCowStopStopHeIsAlreadyDead(int opponentLeadCount) {
+        return opponentLeadCount >= 3;
+    }
+
+    public static boolean shouldAwardMilkCowGotTheChops(int airborneKills) {
+        return airborneKills >= 10;
+    }
+
+    public static boolean shouldAwardMilkCowSlaughterhouse(int assists) {
+        return assists >= 15;
+    }
+
 }
