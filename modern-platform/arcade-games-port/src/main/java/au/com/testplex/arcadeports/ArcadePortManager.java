@@ -6721,6 +6721,9 @@ public final class ArcadePortManager implements Listener {
             for (String timerFailure : SessionTimestampShifter.shift(session, prepareElapsed)) {
                 plugin.getLogger().warning("Could not pause a session timer: " + timerFailure);
             }
+            if (session.variantRuntime != null) {
+                session.variantRuntime.shiftPrepareTimers(prepareElapsed);
+            }
             session.startedAt = now;
             session.ticks = 0;
             if (session.endsAt > 0L) {
