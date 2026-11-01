@@ -7,8 +7,8 @@ Speed Builders uses the original Mineplex Reborn Shroomland Lake map and its aut
 ## Arena layout and allocation
 
 - Each arena instance is an authentic copy of `SpeedBuilders_Shroomland_Lake.zip` with its eight authored YELLOW player plots.
-- Players 1–8 are assigned to the first map instance; players 9–16 are assigned to the second.
-- Each mirrored arena has its own world, spawn markers, plot bounds, fluid/build isolation and original map geometry. Players can see and play alongside the other builders in their own eight-player arena.
+- Players 1–8 are assigned to the first map instance; players 9–16 are assigned to the second. The second world is only created when the queue contains more than eight players.
+- Each mirrored arena has its own world, spawn markers, plot bounds, fluid/build isolation and original map geometry. Players can see and play alongside the other builders in their own eight-player arena. The first world remains the only active map for matches of eight or fewer.
 - Both copies use the same selected template, round number, viewing period and build timer. The manager advances both instances together as one match.
 - Player allocation is deterministic by queue order and never indexes beyond the eight plots in either map.
 
