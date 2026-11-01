@@ -1465,6 +1465,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (game == ArcadePortGame.HEROES_OF_GWEN) {
             removeBardolfPack(event.getEntity().getUniqueId());
             removeRowenaState(event.getEntity().getUniqueId());
+            removeDanaState(event.getEntity().getUniqueId());
         }
     }
 
@@ -1473,6 +1474,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (game == ArcadePortGame.HEROES_OF_GWEN) {
             removeBardolfPack(event.getPlayer().getUniqueId());
             removeRowenaState(event.getPlayer().getUniqueId());
+            removeDanaState(event.getPlayer().getUniqueId());
         }
     }
 
@@ -2621,6 +2623,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         String previous = selectedHeroesOfGwen.put(player.getUniqueId(), hero);
         if (!hero.equals(previous) && "bardolf".equals(previous)) removeBardolfPack(player.getUniqueId());
         if (!hero.equals(previous) && "rowena".equals(previous)) removeRowenaState(player.getUniqueId());
+        if (!hero.equals(previous) && "dana".equals(previous)) removeDanaState(player.getUniqueId());
         if (!hero.equals(previous) && previous != null) {
             int team = teams.getOrDefault(player.getUniqueId(), -1);
             boolean ownTowerLost = towers.getOrDefault(team, List.of()).stream().anyMatch(tower -> tower.dead);
@@ -2643,6 +2646,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         larissaWaterDashEndsAt.remove(id);
         larissaStormBlessingEndsAt.remove(id);
         larissaStormBlessingNextHealAt.remove(id);
+        danaKnockUpEndsAt.remove(id);
+        danaKnockUpNextHitAt.remove(id);
+        danaRallies.remove(id);
         rowenaLightArrowsRemaining.remove(id);
         rowenaLightArrowNextHitAt.remove(id);
         rowenaCombatSlideEndsAt.remove(id);
@@ -4150,6 +4156,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         updateLarissaAbilities(now);
         updateLarissaFountains(now);
         updateBardolfWolves(now);
+        updateDanaAbilities(now);
         updateRowenaAbilities(now);
         for (Map.Entry<UUID, BardolfPounceState> entry : new HashMap<>(bardolfPounces).entrySet()) {
             if (now >= entry.getValue().expiresAt) bardolfPounces.remove(entry.getKey());
@@ -4232,6 +4239,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             if (player != null && player.isOnline()) restoreCarrierHelmet(player);
         }
         for (UUID id : new ArrayList<>(rowenaBombardments.keySet())) endRowenaBombardment(id, false);
+        for (UUID id : new ArrayList<>(danaRallies.keySet())) endDanaRally(id);
         for (Entity entity : new ArrayList<>(entities)) if (entity != null && entity.isValid()) entity.remove();
         for (Map.Entry<Block, BlockData> block : changedBlocks.entrySet()) {
             if (block.getKey() != null && block.getKey().getWorld() == world) block.getKey().setBlockData(block.getValue(), false);
@@ -4274,6 +4282,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         rowenaLightArrowNextHitAt.clear();
         rowenaCombatSlideEndsAt.clear();
         rowenaBombardments.clear();
+        danaKnockUpEndsAt.clear();
+        danaKnockUpNextHitAt.clear();
+        danaRallies.clear();
         castleAssaultPlayerKits.clear();
         castleArcherNextArrowAt.clear();
         castleDemolitionistNextTntAt.clear();
@@ -4318,6 +4329,18 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             this.center = center;
             this.wool = wool;
         }
+    }
+
+    private static final class DanaRallyState {
+        final long launchedAt;
+        boolean landed;
+        Location center;
+        long endsAt;
+        long nextHealAt;
+        Block bannerBlock;
+        BlockData originalBannerBlockData;
+        boolean bannerPlaced;
+        DanaRallyState(long launchedAt) { this.launchedAt = launchedAt; }
     }
 
     private static final class RowenaBombardmentState {
