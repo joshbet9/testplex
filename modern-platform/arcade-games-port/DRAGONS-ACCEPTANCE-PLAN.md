@@ -82,14 +82,49 @@ The similarly named Balloon Town, Sky Ship and Voyage files are distinct origina
 - [ ] **Pyrotechnic:** gold armour; first Sparkler charge after 25 seconds, capped at two, with the source five-second lifetime. Sparks attract only dragons within 48 blocks; low or submerged sparkler items are ignored for targeting.
 - [ ] All three kits are selectable from the common lobby pedestal and `/arcadeport kit dragons-<kit>`; kit changes lock at match start and do not duplicate kit gear after respawn/reconnect.
 
-### Dragon Flare (modern test-queue extension)
+### Community-requested kit and ability changes
 
-- [ ] Coward receives one flare charge, Marksman three and Pyrotechnic two. Charges cannot be dropped, moved to containers or transferred to another player.
-- [ ] A flare protects a 24-block horizontal radius and a 24-block vertical envelope for six seconds. Check the exact boundary and just-outside values.
-- [ ] Existing dragons retarget immediately when entering the protected area; future target selection and contact checks also respect the flare.
-- [ ] Sparkler attraction does not pull a dragon into a protected location.
-- [ ] Test all six server-visible effects (Classic, Ember, Frost, Ender, Solar and Aurora) from another player and spectator. Effects must not change protection, charge consumption or target physics.
-- [ ] Verify a second charge cannot extend or duplicate the active state unless that is the explicitly implemented rule; expiry and re-use feedback must be consistent.
+Defensive Dragon Flares are removed from Dragons. There is no flare item, charge, protection zone, flare target exclusion, flare-specific inventory protection or flare cosmetic catalogue.
+
+- [ ] Remove Dragon Flare from every kit loadout and remove all flare activation, protection-zone creation/expiry, retargeting exclusions and flare inventory/drop/container handling.
+- [ ] Remove flare-only balance constants, session state, event paths and stale configuration/catalogue references. Do not leave an inert flare item or hidden protection behaviour.
+- [ ] Preserve the Pyrotechnic Sparkler attraction ability; it is a separate kit mechanic and is not a flare.
+
+**Frost**
+- [ ] Add Frost as a selectable Dragons kit with the Ice Bridge ability based on the legacy SkyWars Ice / SSM Snowman bridge behaviour.
+- [ ] Ability activation creates a temporary bridge in the player's forward travel path, with safe placement and cleanup so it cannot overwrite or permanently alter the source map.
+- [ ] Ability cooldown is 25 seconds from a successful activation. Rejected/unsafe activations do not consume the cooldown.
+- [ ] Verify bridge placement while moving, airborne and near map edges; prevent placement inside players, liquids, protected map structures or outside the arena.
+
+**Glider**
+- [ ] Add Glider as a selectable Dragons kit.
+- [ ] Successful activation grants a controlled elytra glide for 3.5 seconds, then reliably ends gliding and removes any temporary flight/glide state.
+- [ ] Ability cooldown is 15 seconds from a successful activation.
+- [ ] Prevent permanent elytra equipment or flight from surviving the ability, elimination, spectator transition, match end, forced stop or reconnect. Confirm normal fall handling resumes after the glide.
+
+**Tamer**
+- [ ] Add Tamer as a selectable Dragons kit.
+- [ ] On activation, select the closest valid living dragon in the player's arena and transfer control to it for 15 seconds. The player steers it by changing their facing direction; dragon movement must follow that direction rather than continuing its normal target AI.
+- [ ] While controlling a dragon, the player's body is safely hidden/immobilised and cannot be damaged, targeted, moved by contact knockback or used to trigger player abilities. The controlled dragon remains a dragon hazard, not a player combat entity.
+- [ ] At the end of 15 seconds, return the player to their saved activation position. If the original supporting block has been removed or is no longer safe/solid, find the nearest safe supporting block and return them there.
+- [ ] If the controlled dragon is removed, invalidated or the round ends early, immediately restore the player through the same safe-return path.
+- [ ] Tamer has a 90-second cooldown, measured from successful activation. Reject activation if there is no valid dragon or the player is already controlling one.
+- [ ] Clean up control state, scheduled tasks, dragon ownership/target state and player visibility/invulnerability on death, disconnect, forced stop, round completion and server shutdown.
+
+### Achievements
+
+- [ ] **Win 3 in a row** — award after the same player wins three consecutive completed Dragons rounds. A loss, elimination/quit that counts as a loss, or a completed round without a win resets the streak; disconnects and forced operator stops must follow the shared Arcade result semantics and must not award a win.
+- [ ] **Survive 5 minutes** — award for remaining alive for at least five minutes in one round. Use elapsed live-round time, excluding Recruit/Prepare and pauses; award once per player per round.
+- [ ] **Win a game without taking damage** — award only to the round winner if they received no player damage during Live. Dragon contact knockback without health damage does not count as damage; water damage, fall damage and any other actual damage do. Reset tracking on every new round.
+- [ ] Persist unlocks through the existing local Dragons achievement/stat path and expose all three in the Dragons stats/achievement UI.
+- [ ] Add deterministic tests for exact threshold boundaries, streak reset/continuation, no-damage damage categories, Prepare exclusion, duplicate award prevention and disconnect/forced-stop handling.
+
+### Sparkler cosmetic
+
+- [ ] Replace the removed Flare Effects cosmetic line with a **Sparkler** cosmetic line.
+- [ ] Sparkler cosmetics are visual-only and apply to the existing Pyrotechnic Sparkler effect/throw; they must not create a defensive zone, alter dragon targeting/attraction, change cooldowns or grant extra charges.
+- [ ] Keep the Sparkler cosmetic selection visible to other players and spectators in the match world, and persist the player's selection through the existing cosmetics configuration.
+- [ ] Remove the six old flare effect choices (Classic, Ember, Frost, Ender, Solar and Aurora) from the player-facing cosmetic catalogue and any stale menu/stat text.
 
 ### Spectators, stats and cleanup
 
