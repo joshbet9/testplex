@@ -265,11 +265,11 @@ class ArcadeCatalogTest {
         assertNull(catalog.getGame("not-a-game"));
     }
     @Test
-    void sneakyAssassinsIsCataloguedWithoutInventingCosmeticLines() {
+    void sneakyAssassinsIsReadyForTestWithoutInventingCosmeticLines() {
         GameDefinition game = new ArcadeCatalog().getGame("sneaky-assassins");
         assertNotNull(game);
         assertEquals("Sneaky Assassins", game.getName());
-        assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, game.getPortStatus());
+        assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, game.getPortStatus());
         assertTrue(game.getCosmeticLines().isEmpty());
         assertEquals(List.of("last-assassin-standing"),
                 game.getWinEffects().stream().map(CosmeticOption::getId).toList());
