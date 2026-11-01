@@ -126,7 +126,7 @@ final class TopLevelTimerFixture {
     static final class PlayerTimer {
         long nextUpdateAt;
 
-        private PlayerTimer(long nextUpdateAt) {
+        PlayerTimer(long nextUpdateAt) {
             this.nextUpdateAt = nextUpdateAt;
         }
     }
