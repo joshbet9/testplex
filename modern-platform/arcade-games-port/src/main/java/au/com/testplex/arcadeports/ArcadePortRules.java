@@ -2697,6 +2697,37 @@ public final class ArcadePortRules {
         };
     }
 
+    /** Source MobaCDREffect values; factors are added against the original cooldown. */
+    public static double heroesOfGwenStoreCooldownReduction(String itemName) {
+        if (itemName == null) return 0.0D;
+        return switch (itemName) {
+            case "Ninja's Chestcloth" -> 0.15D;
+            case "Ninja's Leggings" -> 0.10D;
+            case "Helm of Focus", "Boots of Focus" -> 0.03D;
+            case "Chestplate of Focus" -> 0.10D;
+            case "Leggings of Focus" -> 0.05D;
+            case "Focused Cap" -> 0.05D;
+            case "Focused Chestplate", "Focused Leggings" -> 0.10D;
+            case "Focused Boots" -> 0.05D;
+            case "Specialist's Bow" -> 0.10D;
+            case "Archer's Bane Leggings", "Brawler's Plate Leggings" -> 0.05D;
+            case "Superior Archer's Bane Leggings" -> 0.07D;
+            case "Prince's Plate Leggings" -> 0.10D;
+            default -> 0.0D;
+        };
+    }
+
+    /** Source MobaCDRAmmoEffect values; only Hunter Nimble Fingers gear affects ammo reloads. */
+    public static double heroesOfGwenStoreAmmoCooldownReduction(String itemName) {
+        if (itemName == null) return 0.0D;
+        return switch (itemName) {
+            case "Leather Cap of Nimble Fingers", "Leather Boots of Nimble Fingers" -> 0.05D;
+            case "Leather Chestplate of Nimble Fingers" -> 0.15D;
+            case "Leather Leggings of Nimble Fingers" -> 0.10D;
+            default -> 0.0D;
+        };
+    }
+
     /** Return red/blue challenge winner, or -1 for a tie. */
     public static int heroesOfGwenMonochromeWinner(int redKills, int blueKills) {
         return redKills == blueKills ? -1 : redKills > blueKills ? 0 : 1;
