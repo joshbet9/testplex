@@ -1162,7 +1162,7 @@ class ArcadePortGameTest {
         }
     }
 
-    @Test void baconBrawlExposesTheThreeSourceKitsAndDoubleHungerRules() {
+    @Test void baconBrawlExposesAllRestoredKitsAndDoubleHungerRules() {
         assertEquals("pig", ArcadePortRules.normalizeBaconBrawlKit("Pig"));
         assertEquals("pig", ArcadePortRules.normalizeBaconBrawlKit("sheep-pig"));
         assertEquals("mama-piggles", ArcadePortRules.normalizeBaconBrawlKit("mama"));
@@ -1175,7 +1175,8 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.baconBrawlUsesSheepAvatar("Sheep Pig"));
         assertFalse(ArcadePortRules.baconBrawlUsesSheepAvatar("mama-piggles"));
         assertFalse(ArcadePortRules.baconBrawlUsesSheepAvatar("el-muchacho-pigo"));
-        assertNull(ArcadePortRules.normalizeBaconBrawlKit("chris-p-bacon"));
+        assertEquals("chris-p-bacon", ArcadePortRules.normalizeBaconBrawlKit("chris-p-bacon"));
+        assertEquals("chris-p-bacon", ArcadePortRules.normalizeBaconBrawlKit("Chris P. Bacon"));
         assertNull(ArcadePortRules.normalizeBaconBrawlKit("unknown"));
         assertEquals(4_000L, ArcadePortRules.BACON_SLOW_UPDATE_INTERVAL_MILLIS);
         assertFalse(ArcadePortRules.BACON_BRAWL_HAS_ROUND_TIMER,
@@ -1221,8 +1222,10 @@ class ArcadePortGameTest {
                 org.bukkit.Material.IRON_AXE, false, "pig"));
         assertFalse(ArcadePortRules.shouldActivateBaconBrawlAbility(true,
                 org.bukkit.Material.STICK, false, "pig"));
-        assertFalse(ArcadePortRules.shouldActivateBaconBrawlAbility(true,
+        assertTrue(ArcadePortRules.shouldActivateBaconBrawlAbility(true,
                 org.bukkit.Material.IRON_AXE, false, "chris-p-bacon"));
+        assertTrue(ArcadePortRules.shouldActivateBaconBrawlAbility(true,
+                org.bukkit.Material.IRON_AXE, true, "Chris P. Bacon"));
     }
 
     @Test void baconBrutusGuardBlocksFrontHitsButBackstabsBreakItAndPigCloakUsesTimedDuration() {
