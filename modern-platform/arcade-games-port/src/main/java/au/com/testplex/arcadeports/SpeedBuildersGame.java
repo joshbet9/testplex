@@ -197,6 +197,7 @@ public final class SpeedBuildersGame implements Listener {
             player.sendMessage(ChatColor.RED + "The Speed Builders queue is full (" + SpeedBuildersRules.MAX_PLAYERS + " builders).");
             return;
         }
+        if (plugin.getArcadePortManager() != null) plugin.getArcadePortManager().removeFromQueues(player);
         queue.add(player.getUniqueId());
         long requestedDeadline = tick + (quickStart ? QUICK_QUEUE_TICKS : NORMAL_QUEUE_TICKS);
         if (queueDeadlineTick < 0L || requestedDeadline < queueDeadlineTick) {
@@ -287,6 +288,15 @@ public final class SpeedBuildersGame implements Listener {
                     "Could not restore Speed Builders player snapshot for " + player.getUniqueId(), failure);
             return false;
         }
+    }
+
+    /** Release the shared Arcade lock only after queued lobby and snapshot restoration has run. */
+    private void releaseSessionLockAfterRestoration() {
+        if (shuttingDown || !plugin.isEnabled()) {
+            plugin.releaseSpeedBuildersLock();
+            return;
+        }
+        Bukkit.getScheduler().runTask(plugin, plugin::releaseSpeedBuildersLock);
     }
 
     private void restoreAfterReturningToLobby(Player player, PlayerSnapshot snapshot) {
@@ -398,6 +408,7 @@ public final class SpeedBuildersGame implements Listener {
             removeGwen();
             phase = Phase.IDLE;
             currentTemplate = null;
+            releaseSessionLockAfterRestoration();
         }
     }
 
@@ -871,6 +882,7 @@ public final class SpeedBuildersGame implements Listener {
         matchHistory.clear();
         restorePlot(reviewPlot);
         refreshHud();
+        releaseSessionLockAfterRestoration();
     }
 
     private void persistMatchProgress(Set<UUID> winnerIds) {

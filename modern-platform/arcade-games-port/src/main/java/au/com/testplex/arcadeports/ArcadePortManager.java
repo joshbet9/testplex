@@ -216,6 +216,8 @@ public final class ArcadePortManager implements Listener {
     private DragonEscapeGhostBridge dragonEscapeGhostBridge;
     private final Map<String, List<DragonEscapeGhostFrame>> dragonEscapeGhostFrameCache = new HashMap<>();
     private Session active;
+    /** True while an isolated standalone Arcade test owns the shared Testplex session. */
+    private boolean standaloneGameActive;
     private BukkitTask pendingStart;
     private ArcadePortGame pendingType;
     private boolean pendingMixedArcadeVariant;
@@ -313,7 +315,7 @@ public final class ArcadePortManager implements Listener {
 
     /** Called after Monster Maze returns its roster; only despawn when the embedded module is truly idle. */
     public void cleanupTestPlayersIfNoGameIsRunning() {
-        if (active == null && !monsterMazeRunning()) testPlayers.despawnSessionPlayers();
+        if (active == null && !monsterMazeRunning() && !standaloneGameActive) testPlayers.despawnSessionPlayers();
     }
 
     public void returnPlayerToLobby(Player player) {
@@ -326,11 +328,29 @@ public final class ArcadePortManager implements Listener {
 
     CameraShyGame cameraShyModule() { return cameraShyModule; }
 
-    boolean canStartCameraShy() { return active == null && !monsterMazeRunning(); }
+    boolean canStartCameraShy() { return active == null && !monsterMazeRunning() && !standaloneGameActive; }
+
+    /** Availability check for a standalone game sharing this server's lobby and test-player manager. */
+    public boolean canStartStandaloneGame() {
+        return !standaloneGameActive && active == null && !monsterMazeRunning()
+                && (cameraShyModule == null || !cameraShyModule.isActive())
+                && pendingStart == null && manualStartCountdown == null
+                && postGameEndsAtMillis <= System.currentTimeMillis();
+    }
+
+    /** Atomically reserve the shared session before a standalone module changes player/world state. */
+    public boolean tryAcquireStandaloneGameLock() {
+        if (!canStartStandaloneGame()) return false;
+        standaloneGameActive = true;
+        return true;
+    }
+
+    /** Release the shared session after standalone player snapshots have been restored. */
+    public void releaseStandaloneGameLock() { standaloneGameActive = false; }
 
     /** Start an explicit participant set through the same Testplex Arcade queue/manager path. */
     public boolean startMonsterMazeTournamentRound(List<Player> requestedParticipants) {
-        if (requestedParticipants == null || requestedParticipants.isEmpty()
+        if (standaloneGameActive || requestedParticipants == null || requestedParticipants.isEmpty()
                 || monsterMazeModule == null || active != null || monsterMazeRunning()
                 || !isRotationCandidateAvailable(ArcadePortGame.MONSTER_MAZE)) return false;
         LinkedHashMap<UUID, Player> selected = new LinkedHashMap<>();
@@ -1644,6 +1664,10 @@ public final class ArcadePortManager implements Listener {
 
     public void queue(ArcadePortGame type, Player player, boolean quickStart, boolean mixedArcadeVariant) {
         if (player == null || !player.isOnline()) return;
+        if (standaloneGameActive) {
+            player.sendMessage(ChatColor.RED + "A standalone Arcade test is already running. Wait for it to finish before joining another queue.");
+            return;
+        }
         if (type == ArcadePortGame.CAMERA_SHY) {
             // Camera Shy uses a dedicated queue implementation, but it is still subject
             // to the central acceptance allow-list and manual-rotation cancellation.
@@ -1862,6 +1886,10 @@ public final class ArcadePortManager implements Listener {
 
     public void startFromLobby(ArcadePortGame type, org.bukkit.command.CommandSender sender,
             boolean mixedArcadeVariant) {
+        if (standaloneGameActive) {
+            sender.sendMessage(ChatColor.YELLOW + "A standalone Arcade test is running. Retry Start Game after it finishes.");
+            return;
+        }
         if (!plugin.hasAdminAccess(sender)) {
             sender.sendMessage(ChatColor.RED + "Operator permission required to start a queued Arcade game.");
             return;
@@ -2318,6 +2346,20 @@ public final class ArcadePortManager implements Listener {
 
     public void startQueued(ArcadePortGame type, Player requester, org.bukkit.command.CommandSender sender,
             boolean mixedArcadeVariant) {
+        if (standaloneGameActive) {
+            sender.sendMessage(ChatColor.YELLOW + "A standalone Arcade test is active; the existing game queue has been retained.");
+            if (type != null && !onlineQueuedPlayers(type, mixedArcadeVariant).isEmpty() && pendingStart == null) {
+                pendingType = type;
+                pendingMixedArcadeVariant = mixedArcadeVariant;
+                pendingStart = Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    pendingStart = null;
+                    pendingType = null;
+                    pendingMixedArcadeVariant = false;
+                    startQueued(type, null, Bukkit.getConsoleSender(), mixedArcadeVariant);
+                }, JOIN_WINDOW_TICKS);
+            }
+            return;
+        }
         if (manualStartCountdown != null) {
             manualStartCountdown.cancel();
             manualStartCountdown = null;
@@ -2465,6 +2507,10 @@ public final class ArcadePortManager implements Listener {
 
     private void startQueuedInternal(ArcadePortGame type, Player requester,
             org.bukkit.command.CommandSender sender, boolean mixedArcadeVariant) {
+        if (standaloneGameActive) {
+            sender.sendMessage(ChatColor.RED + "A standalone Arcade test is currently running. Start this game after it finishes.");
+            return;
+        }
         cancelAutomaticRotationVote();
         if (mixedArcadeVariant && !supportsMixedArcadeVariant(type)) {
             sender.sendMessage(ChatColor.RED + "Mixed Arcade variants are only available for Turf Wars, Castle Assault, and Heroes of Gwen.");
