@@ -1263,6 +1263,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 throwPlayerTnt(player);
             }
         } else if (game == ArcadePortGame.HEROES_OF_GWEN) {
+            if (isRowenaBombardmentItem(event.getItem())
+                    && rowenaBombardments.containsKey(player.getUniqueId())) {
+                event.setCancelled(true);
+                fireRowenaBombardmentShot(player);
+                return;
+            }
             if ("larissa".equals(selectedHeroesOfGwen.get(player.getUniqueId()))
                     && player.getInventory().getHeldItemSlot() == 0
                     && (event.getAction().isLeftClick() || event.getAction().isRightClick())
@@ -1292,7 +1298,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         String id = heroSkillId(dropped);
         if (id == null || !Set.of("hattori.ender_blade", "devon.infinity",
                 "anath.burn_beam", "anath.meteor_shower", "larissa.storm_blessing",
-                "bardolf.full_moon").contains(id)) return;
+                "bardolf.full_moon", "rowena.bombardment").contains(id)) return;
         event.setCancelled(true);
         activateHeroesOfGwenSkill(player, id);
     }
@@ -1317,6 +1323,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             if ("bardolf.wolf_pounce".equals(heroSkillId(skill))) {
                 activateHeroesOfGwenSkill(player, "bardolf.wolf_pounce");
             }
+        } else if ("rowena".equals(hero)) {
+            ItemStack skill = player.getInventory().getItem(2);
+            if ("rowena.combat_slide".equals(heroSkillId(skill))) {
+                activateHeroesOfGwenSkill(player, "rowena.combat_slide");
+            }
         }
     }
 
@@ -1325,6 +1336,28 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (stopped || game != ArcadePortGame.HEROES_OF_GWEN
                 || !(event.getEntity() instanceof Player player)) return;
         String hero = selectedHeroesOfGwen.get(player.getUniqueId());
+        if ("rowena".equals(hero)) {
+            int remaining = rowenaLightArrowsRemaining.getOrDefault(player.getUniqueId(), 0);
+            if (remaining <= 0 || !(event.getProjectile() instanceof Arrow)) return;
+            event.setCancelled(true);
+            event.getProjectile().remove();
+            int next = remaining - 1;
+            if (next <= 0) {
+                rowenaLightArrowsRemaining.remove(player.getUniqueId());
+                setHeroSkillCooldown(player, "rowena.light_arrows",
+                        ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROWS_COOLDOWN_MILLIS);
+                giveHeroesOfGwenSkillItem(player, 1, "rowena.light_arrows", Material.GOLD_NUGGET,
+                        "Light Arrows", "Infuse your next five arrows. They pass through blocks and deal high damage.");
+            } else {
+                rowenaLightArrowsRemaining.put(player.getUniqueId(), next);
+                ItemStack skillItem = player.getInventory().getItem(1);
+                if (skillItem != null && "rowena.light_arrows".equals(heroSkillId(skillItem))) {
+                    skillItem.setAmount(next);
+                }
+            }
+            fireRowenaLightArrow(player);
+            return;
+        }
         if (!"devon".equals(hero)) return;
         if (heroTntArrowCharges.getOrDefault(player.getUniqueId(), 0) > 0
                 && event.getProjectile() instanceof Arrow arrow) {
@@ -2609,6 +2642,25 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 player.getInventory().setItem(7, namedItem(Material.BLAZE_POWDER,
                         ChatColor.GOLD + "Embers", "Anath mage resource."));
             }
+            case "rowena" -> {
+                ItemStack bow = new ItemStack(Material.BOW);
+                ItemMeta bowMeta = bow.getItemMeta();
+                bowMeta.setUnbreakable(true);
+                bowMeta.setDisplayName(ChatColor.GREEN + "Bow");
+                bow.setItemMeta(bowMeta);
+                player.getInventory().setItem(0, bow);
+                giveHeroesOfGwenSkillItem(player, 1, "rowena.light_arrows", Material.GOLD_NUGGET,
+                        "Light Arrows", "Infuse your next five arrows. They pass through blocks and deal high damage.");
+                giveHeroesOfGwenSkillItem(player, 2, "rowena.combat_slide", Material.FEATHER,
+                        "Combat Slide", "Dash horizontally along the ground for 250 ms. 8-second cooldown.");
+                giveHeroesOfGwenSkillItem(player, 3, "rowena.bombardment", Material.NETHER_STAR,
+                        "Bombardment", "Ascend 15 blocks, then fire three explosive shots within 10 seconds. 60-second cooldown after the flight.");
+                player.getInventory().setItem(7, namedItem(Material.ARROW,
+                        ChatColor.YELLOW + "Fletched Arrow", "Replenished every two seconds; maximum two."));
+                player.getInventory().getItem(7).setAmount(ArcadePortRules.HEROES_OF_GWEN_ROWENA_FLETCHER_MAX_ARROWS);
+                heroAmmoNextAt.put(id, System.currentTimeMillis()
+                        + ArcadePortRules.HEROES_OF_GWEN_ROWENA_FLETCHER_RELOAD_MILLIS);
+            }
             case "bardolf" -> {
                 player.getInventory().setItem(0, namedItem(Material.WOODEN_SWORD,
                         ChatColor.GREEN + "Sword", "Bardolf's basic weapon; attacks direct the wolf pack."));
@@ -2777,6 +2829,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             case "bardolf.summon_wolf" -> summonBardolfWolf(player);
             case "bardolf.wolf_pounce" -> activateBardolfPounce(player);
             case "bardolf.full_moon" -> activateBardolfFullMoon(player);
+            case "rowena.light_arrows" -> activateRowenaLightArrows(player);
+            case "rowena.combat_slide" -> activateRowenaCombatSlide(player);
+            case "rowena.bombardment" -> beginRowenaBombardment(player);
             default -> player.sendMessage(ChatColor.YELLOW + "That hero ability is not yet available.");
         }
     }
