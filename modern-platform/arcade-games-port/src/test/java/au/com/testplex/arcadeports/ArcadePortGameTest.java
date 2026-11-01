@@ -150,7 +150,7 @@ class ArcadePortGameTest {
 
 
     @Test void exposesTheMechanicsGamesAndIntegratedModules() {
-        assertEquals(29, ArcadePortGame.values().length);
+        assertEquals(30, ArcadePortGame.values().length);
         Set<String> ids = new HashSet<>();
         for (ArcadePortGame game : ArcadePortGame.values()) {
             assertTrue(ids.add(game.id()), "duplicate game id: " + game.id());
@@ -166,6 +166,7 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortGame.MONSTER_MAZE.isMonsterMaze());
         assertTrue(ArcadePortGame.MONSTER_MAZE_SPEED.isMonsterMaze());
         assertTrue(ArcadePortGame.MONSTER_MAZE_MODERN.isMonsterMaze());
+        assertEquals(ArcadePortGame.WIZARDS, ArcadePortGame.fromId("wizards"));
         assertEquals(ArcadePortGame.PLEXBALL, ArcadePortGame.fromId("plexball"));
         assertEquals(ArcadePortGame.CAMERA_SHY, ArcadePortGame.fromId("camera-shy"));
         assertEquals(ArcadePortGame.SUPER_SPLOOR, ArcadePortGame.fromId("super-sploor"));

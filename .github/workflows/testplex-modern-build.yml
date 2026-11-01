@@ -183,7 +183,7 @@ jobs:
 
           arcade_config="$(unzip -p "$arcade_jar" config.yml)"
           enabled_ids="$(awk '/^enabled-games:/{in_list=1;next} in_list && /^[^ ]/{exit} in_list && /^  - /{print $2}' <<< "$arcade_config" | paste -sd, -)"
-          [[ "$enabled_ids" == "death-tag,one-in-the-quiver,bomb-lobbers,bacon-brawl,castle-assault,gladiators,micro-battles,milk-the-cow,paintball,plexball,spleef,super-sploor,dragon-escape,dragons,runner,sheep-quest,turf-wars,camera-shy,monster-maze,monster-maze-speed,monster-maze-modern,snake,draw-my-thing,master-builders,skywars,wither-assault,sneaky-assassins,speed-builders,evolution,heroes-of-gwen,hoops-remastered" ]] || {
+          [[ "$enabled_ids" == "death-tag,one-in-the-quiver,bomb-lobbers,bacon-brawl,castle-assault,gladiators,micro-battles,milk-the-cow,paintball,plexball,spleef,super-sploor,dragon-escape,dragons,runner,sheep-quest,turf-wars,camera-shy,monster-maze,monster-maze-speed,monster-maze-modern,snake,draw-my-thing,master-builders,skywars,wither-assault,sneaky-assassins,speed-builders,evolution,heroes-of-gwen,hoops-remastered,wizards" ]] || {
             echo "Only the explicitly reviewed acceptance queue may be enabled. Found: [$enabled_ids]" >&2
             exit 1
           }
@@ -267,7 +267,7 @@ jobs:
           grep -Fxq "enabled: true" <<< "$snake_config"
           grep -Fxq "readiness-revision: snake-controlled-acceptance-20261101-v1" <<< "$snake_config"
           grep -Fq 'private static final boolean READY_FOR_TEST = true;' modern-platform/snake-port/src/main/java/au/com/testplex/snake/SnakeModernPlugin.java
-          echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, and all 31 controlled Arcade IDs are packaged and READY_FOR_TEST. The queue represents 29 distinct titles because Monster Maze (Original), Monster Maze (Speed) and Monster Maze (Modern) are selectable modes of one title; Heroes of Gwen and Hoops Remastered each appear once. CI compares all 422 enabled source-map archives with the packaged JAR, including both Heroes of GWEN maps; Evolution, Wither Assault, Sneaky Assassins and Hoops Remastered use dedicated generated arenas. Wizards is the final distinct title to integrate and enable. Speed Builders is manually queued through /arcadeport play speed-builders."
+          echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, and all 32 controlled Arcade IDs are packaged and READY_FOR_TEST. The queue represents 30 distinct titles because Monster Maze (Original), Monster Maze (Speed) and Monster Maze (Modern) are selectable modes of one title; Heroes of Gwen, Hoops Remastered and Wizards each appear once. CI compares all 422 enabled source-map archives with the packaged JAR, including both Heroes of GWEN maps; Evolution, Wither Assault, Sneaky Assassins and Hoops Remastered use dedicated generated arenas. Wizards source maps are separately validated in the 20-map Paper import harness. Speed Builders is manually queued through /arcadeport play speed-builders."
 
       - name: Validate independent deployment recovery and shell syntax
         shell: bash
@@ -309,12 +309,12 @@ jobs:
             echo
             echo "- Runtime/API baseline: Java 25 / Paper 26.3"
             echo "- Separate from legacy Java 8 build and deployment"
-            echo "- Catalogue: 31 Arcade selectable IDs (31 READY_FOR_TEST, 0 MECHANICS_IN_PROGRESS); 29 distinct titles because Monster Maze has three selectable modes"
+            echo "- Catalogue: 32 Arcade selectable IDs (32 READY_FOR_TEST, 0 MECHANICS_IN_PROGRESS); 30 distinct titles because Monster Maze has three selectable modes"
             echo "- Built artifacts: TestplexModernArcade.jar, SnakeModern.jar, ArcadeMechanicsModern.jar and WizardsModern.jar (Monster Maze is compiled into the Testplex-owned Arcade module)"
             echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
             echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
-            echo "- Gameplay ports: all 31 catalogue IDs are READY_FOR_TEST, including one Heroes of Gwen Arcade entry and one Hoops Remastered entry; 29 distinct titles are currently represented because Monster Maze (Original), Monster Maze (Speed) and Monster Maze (Modern) are separate modes of one title. Wizards is the final title to add to reach 30 distinct Arcade games"
-            echo "- Playable allow-list: Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Castle Assault, Gladiators, Micro Battles, Milk the Cow, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons, Evolution, Runner, Sheep Quest, Turf Wars, Snap, Monster Maze (Original), Monster Maze (Speed), Monster Maze (Modern), Snake, Draw My Thing, Master Builders, SkyWars Mixed, Wither Assault, Sneaky Assassins, Speed Builders, Heroes of Gwen and Hoops Remastered; Wizards is the one final title to add"
+            echo "- Gameplay ports: all 32 catalogue IDs are READY_FOR_TEST, including one Heroes of Gwen Arcade entry, one Hoops Remastered entry and one Wizards Arcade entry; 30 distinct titles are represented because Monster Maze (Original), Monster Maze (Speed) and Monster Maze (Modern) are separate selectable modes of one title"
+            echo "- Playable allow-list: Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Castle Assault, Gladiators, Micro Battles, Milk the Cow, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons, Evolution, Runner, Sheep Quest, Turf Wars, Snap, Monster Maze (Original), Monster Maze (Speed), Monster Maze (Modern), Snake, Draw My Thing, Master Builders, SkyWars Mixed, Wither Assault, Sneaky Assassins, Speed Builders, Heroes of Gwen, Hoops Remastered and Wizards"
             echo "- Deployment: successful pushes to feat/testplex-modern-26.3-platform automatically deploy through the isolated modern Hyper-V workflow"
           } >> "$GITHUB_STEP_SUMMARY"
 
