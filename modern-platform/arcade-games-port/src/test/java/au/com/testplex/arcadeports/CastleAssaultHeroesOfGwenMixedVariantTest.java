@@ -447,6 +447,8 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     void heroesOfGwenStoreDamageModifiersStackInTheirOwnDamageFamilies() {
         assertEquals(12.0D, ArcadePortRules.heroesOfGwenStoreAbilityDamage(
                 10.0D, List.of("Adept's Cap", "Adept's Chestplate", "Ninja's Mask")), 0.00001D);
+        assertEquals(10.0D, ArcadePortRules.heroesOfGwenStoreAbilityDamage(
+                10.0D, List.of("Adept's Cap", "Adept's Chestplate"), false), 0.00001D);
         assertEquals(11.6D, ArcadePortRules.heroesOfGwenStoreBasicAttackDamage(
                 10.0D, List.of("Battle Mage Cap", "Battle Mage Chestplate", "Battle Mage Boots")), 0.00001D);
         assertEquals(11.0D, ArcadePortRules.heroesOfGwenStoreMeleeDamage(
