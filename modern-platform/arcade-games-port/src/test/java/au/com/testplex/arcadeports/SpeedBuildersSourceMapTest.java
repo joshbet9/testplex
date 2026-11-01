@@ -52,8 +52,14 @@ class SpeedBuildersSourceMapTest {
                     }
                 }
                 assertTrue(redMarkers >= 1, "The source map needs its central RED display marker.");
+                String markerDiagnostics = lines.stream()
+                        .filter(line -> line.toUpperCase(java.util.Locale.ROOT).contains("DATA_NAME")
+                                || line.toUpperCase(java.util.Locale.ROOT).contains("DATA_LOCS"))
+                        .limit(30)
+                        .collect(java.util.stream.Collectors.joining(" | "));
                 assertTrue(yellowMarkers >= SpeedBuildersRules.MAX_PLAYERS,
-                        "The source map needs 16 YELLOW player build plots.");
+                        "The source map needs 16 YELLOW player build plots; parsed=" + yellowMarkers
+                                + ", DATA markers: " + markerDiagnostics);
                 assertTrue(customTemplates >= 10,
                         "Speed Builders must use the original custom-location build library, not demo templates.");
             }
