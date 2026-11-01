@@ -10,7 +10,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.Properties;
 import java.util.UUID;
 
-/** Publishes a process-correlated signal that the shared Testplex Arcade lobby is ready. */
+/** Publishes one process-correlated signal for the complete Arcade runtime, including integrated Monster Maze. */
 final class ArcadeRuntimeReadinessSignal {
     static final String IDENTITY_FILE = ".testplex-modern-deploy-identity.properties";
     static final String READINESS_FILE = ".testplex-arcade-readiness.properties";
