@@ -717,7 +717,8 @@ public final class ArcadePortRules {
 
     /** The source Ice Path replaces only AIR and SNOW; all other map blocks are protected. */
     public static boolean isDragonFrostBridgeSurface(Material material) {
-        return material != null && (material.isAir() || material == Material.SNOW);
+        return material == Material.AIR || material == Material.CAVE_AIR
+                || material == Material.VOID_AIR || material == Material.SNOW;
     }
 
     public static boolean shouldAwardDragonsSurviveFiveMinutes(long liveElapsedMillis) {
