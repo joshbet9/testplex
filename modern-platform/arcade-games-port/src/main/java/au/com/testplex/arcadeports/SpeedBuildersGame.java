@@ -474,7 +474,7 @@ public final class SpeedBuildersGame implements Listener {
         }
         currentTemplate = unusedTemplates.removeFirst();
         removeMobs(reviewMobs);
-        clearPlotBuildVolume(new Plot(0, 0));
+        restorePlot(reviewPlot)
         round++;
         if (round > 1) buildTimeTracker = Math.max(1, buildTimeTracker - 1);
         buildSeconds = currentTemplate.timing().buildSeconds(buildTimeTracker);
@@ -527,9 +527,9 @@ public final class SpeedBuildersGame implements Listener {
         if (phase != Phase.BUILDING) return;
         phase = Phase.REVIEWING;
         phaseDeadlineTick = tick + SpeedBuildersRules.REVIEW_SECONDS * 20L;
-        clearPlotBuildVolume(new Plot(0, 0));
+        restorePlot(reviewPlot)
         removeMobs(reviewMobs);
-        pasteTemplate(new Plot(0, 0), currentTemplate);
+        pasteTemplate(reviewPlot, currentTemplate);
         spawnReviewMobs(currentTemplate);
         List<PlayerState> alive = alivePlayers();
         for (int i = 0; i < alive.size(); i++) {
@@ -661,7 +661,7 @@ public final class SpeedBuildersGame implements Listener {
         }
         players.clear();
         pendingEliminations.clear();
-        clearPlotBuildVolume(new Plot(0, 0));
+        restorePlot(reviewPlot)
         refreshHud();
     }
 
@@ -693,7 +693,7 @@ public final class SpeedBuildersGame implements Listener {
         Map<SpeedBuildersRules.Coordinate, SpeedBuildersRules.BlockState> actual = new LinkedHashMap<>();
         for (SpeedBuildersRules.Cell cell : currentTemplate.cells()) {
             int x = plot.centerX() - 3 + cell.x();
-            int y = FLOOR_Y + 1 + cell.y();
+            int y = plot.baseY() + cell.y();
             int z = plot.centerZ() - 3 + cell.z();
             Block block = arena.getBlockAt(x, y, z);
             if (!block.getType().isAir()) {
@@ -708,7 +708,7 @@ public final class SpeedBuildersGame implements Listener {
             for (Entity entity : new ArrayList<>(unmatched)) {
                 Location location = entity.getLocation();
                 int x = location.getBlockX() - (plot.centerX() - 3);
-                int y = location.getBlockY() - (FLOOR_Y + 1);
+                int y = location.getBlockY() - plot.baseY();
                 int z = location.getBlockZ() - (plot.centerZ() - 3);
                 if (entity.getType() == expected.type() && x == expected.x() && y == expected.y() && z == expected.z()) {
                     mobScore++;
@@ -726,7 +726,7 @@ public final class SpeedBuildersGame implements Listener {
         for (int x = -3; x <= 3; x++) {
             for (int y = 0; y < SpeedBuildersRules.BUILD_HEIGHT; y++) {
                 for (int z = -3; z <= 3; z++) {
-                    if (!arena.getBlockAt(plot.centerX() + x, FLOOR_Y + 1 + y, plot.centerZ() + z).getType().isAir()) {
+                    if (!arena.getBlockAt(plot.centerX() + x, plot.baseY() + y, plot.centerZ() + z).getType().isAir()) {
                         return false;
                     }
                 }
@@ -741,8 +741,13 @@ public final class SpeedBuildersGame implements Listener {
     }
 
     private void pasteTemplate(Plot plot, Template template) {
+        for (GroundCell cell : template.ground()) {
+            Block floor = arena.getBlockAt(plot.centerX() - 3 + cell.x(), plot.baseY() - 1,
+                    plot.centerZ() - 3 + cell.z());
+            floor.setBlockData(Bukkit.createBlockData(cell.blockData()), false);
+        }
         for (SpeedBuildersRules.Cell cell : template.cells()) {
-            Block block = arena.getBlockAt(plot.centerX() - 3 + cell.x(), FLOOR_Y + 1 + cell.y(),
+            Block block = arena.getBlockAt(plot.centerX() - 3 + cell.x(), plot.baseY() + cell.y(),
                     plot.centerZ() - 3 + cell.z());
             if (cell.blockData().isBlank()) block.setType(cell.material(), false);
             else block.setBlockData(Bukkit.createBlockData(cell.blockData()), false);
@@ -757,7 +762,7 @@ public final class SpeedBuildersGame implements Listener {
         for (MobCell mob : template.mobs()) {
             Location location = new Location(arena,
                     plot.centerX() - 3 + mob.x() + 0.5D,
-                    FLOOR_Y + 1 + mob.y(),
+                    plot.baseY() + mob.y(),
                     plot.centerZ() - 3 + mob.z() + 0.5D);
             Entity entity = spawnDisplayMob(location, mob.type());
             if (entity != null) state.mobs.add(entity);
@@ -767,7 +772,7 @@ public final class SpeedBuildersGame implements Listener {
     private void spawnReviewMobs(Template template) {
         for (MobCell mob : template.mobs()) {
             Location location = new Location(arena, mob.x() - 2.5D,
-                    FLOOR_Y + 1 + mob.y(), mob.z() - 2.5D);
+                    plot.baseY() + mob.y(), mob.z() - 2.5D);
             Entity entity = spawnDisplayMob(location, mob.type());
             if (entity != null) reviewMobs.add(entity);
         }
@@ -824,20 +829,32 @@ public final class SpeedBuildersGame implements Listener {
     }
 
     private void clearPlotBuildVolume(Plot plot) {
+        if (plot == null) return;
         for (int x = -3; x <= 3; x++) {
             for (int y = 0; y < SpeedBuildersRules.BUILD_HEIGHT; y++) {
                 for (int z = -3; z <= 3; z++) {
-                    arena.getBlockAt(plot.centerX() + x, FLOOR_Y + 1 + y,
+                    arena.getBlockAt(plot.centerX() + x, plot.baseY() + y,
                             plot.centerZ() + z).setType(Material.AIR, false);
                 }
             }
         }
     }
 
+    private void restorePlot(Plot plot) {
+        if (plot == null || arena == null) return;
+        clearPlotBuildVolume(plot);
+        for (GroundCell cell : plot.originalGround()) {
+            Block floor = arena.getBlockAt(plot.centerX() - 3 + cell.x(), plot.baseY() - 1,
+                    plot.centerZ() - 3 + cell.z());
+            floor.setBlockData(Bukkit.createBlockData(cell.blockData()), false);
+        }
+    }
+
     private Plot plotFor(int index) {
-        int row = index / 4;
-        int column = index % 4;
-        return new Plot(-27 + column * PLOT_SPACING, -27 + row * PLOT_SPACING);
+        if (index < 0 || index >= playerPlots.size()) {
+            throw new IllegalArgumentException("No authored Speed Builders plot for player index " + index);
+        }
+        return playerPlots.get(index);
     }
 
     private void preparePlayerForRound(PlayerState state) {
@@ -853,8 +870,10 @@ public final class SpeedBuildersGame implements Listener {
     }
 
     private void teleportToPlot(PlayerState state) {
-        Location spawn = new Location(arena, state.plot.centerX() + 0.5D,
-                FLOOR_Y + 1.0D, state.plot.centerZ() + 4.0D, 180.0F, 10.0F);
+        Location spawn = nearestSourceSpawn(state.plot);
+        Location target = new Location(arena, state.plot.centerX() + 0.5D,
+                state.plot.baseY(), state.plot.centerZ() + 0.5D);
+        spawn.setDirection(target.toVector().subtract(spawn.toVector()));
         state.player.teleport(spawn);
     }
 
