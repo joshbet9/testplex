@@ -2862,6 +2862,25 @@ public final class ArcadePortRules {
         return 0L;
     }
 
+    // Rowena — source values from SkillLightArrows, SkillCombatDash and SkillBombardment.
+    public static final int HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_COUNT = 5;
+    public static final long HEROES_OF_GWEN_ROWENA_LIGHT_ARROWS_COOLDOWN_MILLIS = 12_000L;
+    public static final long HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_TARGET_RECHARGE_MILLIS = 500L;
+    public static final double HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_RANGE = 40.0D;
+    public static final double HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_STEP = 0.4D;
+    public static final double HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_HIT_RADIUS = 1.5D;
+    public static final double HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_COOLDOWN_MILLIS = 8_000L;
+    public static final long HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_DURATION_MILLIS = 250L;
+    public static final double HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_SPEED = 1.5D;
+    public static final long HEROES_OF_GWEN_ROWENA_BOMBARDMENT_DURATION_MILLIS = 10_000L;
+    public static final long HEROES_OF_GWEN_ROWENA_BOMBARDMENT_COOLDOWN_MILLIS = 60_000L;
+    public static final long HEROES_OF_GWEN_ROWENA_BOMBARDMENT_REUSE_DELAY_MILLIS = 70_000L;
+    public static final int HEROES_OF_GWEN_ROWENA_BOMBARDMENT_SHOTS = 3;
+    public static final double HEROES_OF_GWEN_ROWENA_BOMBARDMENT_ASCENT_BLOCKS = 15.0D;
+    public static final double HEROES_OF_GWEN_ROWENA_BOMBARDMENT_RANGE = 40.0D;
+    public static final double HEROES_OF_GWEN_ROWENA_BOMBARDMENT_BLAST_RADIUS = 5.0D;
+    public static final double HEROES_OF_GWEN_ROWENA_BOMBARDMENT_DAMAGE_FACTOR = 2.0D;
+
     // Bardolf — source values from HeroBardolf, SkillSummonWolf, SkillWolfPounce and SkillFullMoon.
     public static final int HEROES_OF_GWEN_BARDOLF_MAX_WOLVES = 5;
     public static final double HEROES_OF_GWEN_BARDOLF_WOLF_HEALTH = 8.0D;
