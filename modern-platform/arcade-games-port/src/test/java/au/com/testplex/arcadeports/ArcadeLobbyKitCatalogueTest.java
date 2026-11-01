@@ -16,11 +16,9 @@ class ArcadeLobbyKitCatalogueTest {
     }
 
     @Test
-    void baconBrawlIncludesChrisPBaconAsAnAchievementKit() {
-        var chris = ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.BACON_BRAWL, List.of()).stream()
-                .filter(choice -> choice.id.equals("chris-p-bacon")).findFirst().orElseThrow();
-        assertEquals("Chris P Bacon", chris.name);
-        assertEquals(ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT, chris.unlock);
+    void baconBrawlKeepsChrisPBaconRemovedFromTheSelectableCatalogue() {
+        assertFalse(ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.BACON_BRAWL, List.of()).stream()
+                .anyMatch(choice -> choice.id.equals("chris-p-bacon")));
     }
 
     @Test
