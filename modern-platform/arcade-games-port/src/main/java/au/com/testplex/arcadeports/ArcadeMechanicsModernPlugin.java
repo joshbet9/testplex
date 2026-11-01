@@ -120,11 +120,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
      */
     public boolean isRotationCandidateAvailable(String gameId) {
         ArcadePortGame game = ArcadePortGame.fromId(gameId);
-        if (game == null || !getConfig().getStringList("enabled-games").contains(game.id())) return false;
-        if (!SourceMapCatalog.hasMap(game)) return true;
-        String selectedResource = getConfig().getString("selected-maps." + game.id(),
-                SourceMapCatalog.selectedResource(this, game));
-        return selectedResource != null && SourceMapCatalog.isInstalledResource(this, game, selectedResource);
+        return manager != null && manager.isRotationCandidateAvailable(game);
     }
 
     public void returnPlayerToArcadeLobby(Player player) {
