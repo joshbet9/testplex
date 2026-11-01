@@ -2968,6 +2968,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             world.spawnParticle(Particle.SPLASH, point, 3, 0.08D, 0.08D, 0.08D, 0.02D);
 
             for (Entity entity : world.getNearbyEntities(point, 2.0D, 2.0D, 2.0D)) {
+                if (point.distanceSquared(entity.getLocation()) > 4.0D) continue;
                 TowerState tower = towerFor(entity);
                 if (tower != null) {
                     if (tower.owner != team && canDamageMobaTower(tower, team)
@@ -3090,6 +3091,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS,
                         ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS,
                         ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS)) {
+                    if (zone.center.distanceSquared(entity.getLocation())
+                            > ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS
+                                    * ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS) continue;
                     if (entity instanceof Player target && activePlayers.contains(target.getUniqueId())) {
                         if (teams.getOrDefault(target.getUniqueId(), -1) == zone.team) {
                             target.setHealth(Math.min(target.getMaxHealth(), target.getHealth()
@@ -3097,6 +3101,22 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         } else {
                             target.damage(ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DAMAGE_PER_SECOND,
                                     owner);
+                        }
+                        continue;
+                    }
+                    if (entity instanceof Wither wither) {
+                        Integer enemyTeam = withers.entrySet().stream()
+                                .filter(entry -> entry.getValue().equals(wither))
+                                .map(Map.Entry::getKey).findFirst().orElse(null);
+                        if (enemyTeam != null && enemyTeam != zone.team
+                                && witherDamageable.getOrDefault(enemyTeam, false)) {
+                            double damage = ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DAMAGE_PER_SECOND;
+                            if (wither.getHealth() <= damage) {
+                                finishHeroesOfGwen(zone.team, "enemy Wither defeated by Larissa's Dancing Fountain");
+                                iterator.remove();
+                                return;
+                            }
+                            wither.setHealth(wither.getHealth() - damage);
                         }
                         continue;
                     }
