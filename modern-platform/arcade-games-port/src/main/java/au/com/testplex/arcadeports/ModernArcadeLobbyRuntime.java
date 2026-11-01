@@ -146,8 +146,9 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         display(world, "game-mode", ChatColor.WHITE + "Mode: " + (mode == null || mode.isBlank() ? "Standard" : mode));
         display(world, "game-status", ChatColor.GREEN + status);
         display(world, "kit-text", ChatColor.GREEN + "" + ChatColor.BOLD + "KIT SELECT | " + name);
-        display(world, "team-text", ChatColor.BLUE + "" + ChatColor.BOLD
-                + (ArcadePortManager.teamCountForGame(selectedGame) > 0 ? "TEAM SELECT | " : "QUEUE | ") + name);
+        String queueLabel = selectedGame.lobbyRolesAssignedAutomatically() ? "ROLE QUEUE | "
+                : ArcadePortManager.teamCountForGame(selectedGame) > 0 ? "TEAM SELECT | " : "QUEUE | ";
+        display(world, "team-text", ChatColor.BLUE + "" + ChatColor.BOLD + queueLabel + name);
         display(world, "kit-display", ChatColor.GREEN + "Choose a " + name + " kit");
         int teamCount = ArcadePortManager.teamCountForGame(selectedGame);
         if (teamCount > 0) {
@@ -160,6 +161,9 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                         .append(manager.queuedCountForTeam(selectedGame, team));
             }
             display(world, "team-display", counts.toString());
+        } else if (selectedGame.lobbyRolesAssignedAutomatically()) {
+            display(world, "team-display", ChatColor.GOLD + "ROLES ASSIGNED AUTOMATICALLY"
+                    + ChatColor.WHITE + " | Queued: " + manager.queuedCount(selectedGame));
         } else {
             display(world, "team-display", ChatColor.BLUE + "FREE FOR ALL"
                     + ChatColor.WHITE + " | Queued: " + manager.queuedCount(selectedGame));
@@ -233,7 +237,9 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     ModernArcadeLobby.FLOOR_Y + 2.5D, 0.5D);
             at.setYaw(90.0F);
             Sheep queue = world.spawn(at, Sheep.class);
-            configureLobbySheep(queue, ChatColor.AQUA + ChatColor.BOLD.toString() + "Free For All");
+            String queueName = selectedGame.lobbyRolesAssignedAutomatically()
+                    ? "Auto Roles" : "Free For All";
+            configureLobbySheep(queue, ChatColor.AQUA + ChatColor.BOLD.toString() + queueName);
             queue.getPersistentDataContainer().set(teamNpcKey, PersistentDataType.STRING, "queue");
             teamNpcs.add(queue);
         }
