@@ -433,6 +433,10 @@ public final class SpeedBuildersGame implements Listener {
                 throw new IllegalStateException("The mirrored Speed Builders map could not be read.");
             }
             appendArenaPlots(mirrorData, mirrorWorld, allocatedPlots);
+        } else if (!SourceMapCatalog.resetTestWorld(plugin, MIRROR_WORLD_NAME)) {
+            // A prior 9–16 player match may have left the mirror world loaded.
+            // Remove it for smaller matches so the idle copy consumes no memory or disk space.
+            throw new IllegalStateException("Could not clean up the unused mirrored Speed Builders arena.");
         }
         if (allocatedPlots.size() != requiredArenas * SpeedBuildersRules.PLOTS_PER_ARENA) {
             throw new IllegalStateException("Expected " + (requiredArenas * SpeedBuildersRules.PLOTS_PER_ARENA)
