@@ -3741,6 +3741,268 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
 
+
+    private void activateIvyVinePull(Player player) {
+        UUID ownerId = player.getUniqueId();
+        if (!isHeroSkillReady(player, "ivy.vine_pull") || ivyHooks.containsKey(ownerId)) return;
+        Location origin = player.getEyeLocation().clone();
+        Vector direction = player.getLocation().getDirection().normalize();
+        ivyHooks.put(ownerId, new IvyHookState(origin, direction, System.currentTimeMillis()));
+        setHeroSkillCooldown(player, "ivy.vine_pull",
+                ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_COOLDOWN_MILLIS);
+        player.playSound(player.getLocation(), Sound.BLOCK_GRASS_BREAK, 1.0F, 1.2F);
+    }
+
+    private void activateIvyFloralLeap(Player player) {
+        String skill = "ivy.floral_leap";
+        if (!isHeroSkillReady(player, skill) || ivyFloralLeaps.containsKey(player.getUniqueId())) return;
+        Vector direction = player.getLocation().getDirection();
+        direction.setY(ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_VERTICAL_VELOCITY);
+        player.setVelocity(direction);
+        ivyFloralLeaps.put(player.getUniqueId(), new IvyFloralLeapState(System.currentTimeMillis()));
+        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_COOLDOWN_MILLIS);
+        player.playSound(player.getLocation(), Sound.BLOCK_GRASS_BREAK, 1.0F, 1.0F);
+        world.spawnParticle(Particle.CLOUD, player.getLocation().clone().add(0.0D, 1.0D, 0.0D),
+                20, 0.5D, 0.5D, 0.5D, 0.08D);
+    }
+
+    private void activateIvyThornWall(Player player) {
+        UUID ownerId = player.getUniqueId();
+        if (!isHeroSkillReady(player, "ivy.thorn_wall") || ivyThornWalls.containsKey(ownerId)) return;
+        Location floorCenter = player.getLocation().clone().subtract(0.0D, 1.0D, 0.0D);
+        int team = teams.getOrDefault(ownerId, 0);
+        IvyThornWallState state = new IvyThornWallState(player.getLocation().clone(),
+                System.currentTimeMillis() + ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_DURATION_MILLIS);
+        Material floorMaterial = team == 0 ? Material.RED_TERRACOTTA : Material.BLUE_TERRACOTTA;
+        int radius = ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_BLOCK_RADIUS;
+
+        for (int x = -radius; x <= radius; x++) {
+            for (int z = -radius; z <= radius; z++) {
+                Block block = floorCenter.clone().add(x, 0.0D, z).getBlock();
+                if (block.getType().isAir() || block.isPassable()) continue;
+                state.originalBlocks.put(block, block.getBlockData().clone());
+                state.placedMaterials.put(block, floorMaterial);
+                block.setType(floorMaterial, false);
+            }
+        }
+        for (int x = -radius; x <= radius; x++) {
+            for (int z = -radius; z <= radius; z++) {
+                if (Math.abs(x) != radius && Math.abs(z) != radius) continue;
+                Block flower = floorCenter.clone().add(x, 1.0D, z).getBlock();
+                if (!flower.isPassable()) continue;
+                state.originalBlocks.put(flower, flower.getBlockData().clone());
+                state.placedMaterials.put(flower, Material.POPPY);
+                flower.setType(Material.POPPY, false);
+            }
+        }
+        ivyThornWalls.put(ownerId, state);
+        setHeroSkillCooldown(player, "ivy.thorn_wall",
+                ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_COOLDOWN_MILLIS);
+        world.playSound(player.getLocation(), Sound.BLOCK_GRASS_PLACE, 1.0F, 0.8F);
+        player.sendMessage(ChatColor.GREEN + "Thorn Wall surrounds you!");
+    }
+
+    private void updateIvyAbilities(long now) {
+        for (Map.Entry<UUID, IvyHookState> entry : new HashMap<>(ivyHooks).entrySet()) {
+            UUID ownerId = entry.getKey();
+            Player owner = players.get(ownerId);
+            IvyHookState state = entry.getValue();
+            if (owner == null || !owner.isOnline() || !activePlayers.contains(ownerId)
+                    || !"ivy".equals(selectedHeroesOfGwen.get(ownerId))
+                    || now - state.startedAt >= ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_MAX_PULL_MILLIS) {
+                ivyHooks.remove(ownerId);
+                continue;
+            }
+            if (state.targetId != null) {
+                Player target = players.get(state.targetId);
+                if (target == null || !target.isOnline() || !activePlayers.contains(state.targetId)
+                        || target.isDead()
+                        || owner.getLocation().distanceSquared(target.getLocation())
+                                < ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_STOP_DISTANCE_SQUARED) {
+                    if (target != null && target.isOnline()) target.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+                    ivyHooks.remove(ownerId);
+                    continue;
+                }
+                Vector pull = owner.getLocation().toVector().subtract(target.getLocation().toVector());
+                pull.setY(state.firstPull ? 0.3D : 0.0D);
+                state.firstPull = true;
+                if (pull.lengthSquared() > 0.001D) target.setVelocity(pull.normalize());
+                Location link = target.getEyeLocation().clone().add(
+                        owner.getEyeLocation().toVector().subtract(target.getEyeLocation().toVector()).multiply(0.5D));
+                world.spawnParticle(Particle.HAPPY_VILLAGER, link, 2, 0.05D, 0.05D, 0.05D, 0.01D);
+                continue;
+            }
+
+            for (int step = 0; step < 10; step++) {
+                state.distance += ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_BEAM_STEP;
+                if (state.distance >= ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_RANGE) {
+                    ivyHooks.remove(ownerId);
+                    break;
+                }
+                Location point = state.origin.clone().add(
+                        state.direction.clone().multiply(state.distance)).subtract(0.0D, 1.2D, 0.0D);
+                world.spawnParticle(Particle.HAPPY_VILLAGER, point, 1, 0.0D, 0.0D, 0.0D, 0.0D);
+                double radius = ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_HIT_RADIUS;
+                for (Entity entity : world.getNearbyEntities(point, radius, radius, radius)) {
+                    if (!(entity instanceof LivingEntity target) || target.equals(owner)
+                            || !target.isValid() || target.isDead()
+                            || point.distanceSquared(target.getLocation()) > radius * radius
+                            || heroesOfGwenEntityTeam(target) == teams.getOrDefault(ownerId, -1)
+                            || (target instanceof Player victim && !activePlayers.contains(victim.getUniqueId()))
+                            || !state.hitEntities.add(target.getUniqueId())) continue;
+                    if (target instanceof Player victim) {
+                        state.targetId = victim.getUniqueId();
+                        victim.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,
+                                ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_SLOW_TICKS,
+                                ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_SLOW_AMPLIFIER,
+                                false, false, true));
+                        victim.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+                        victim.damage(ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_PLAYER_DAMAGE, owner);
+                        victim.sendMessage(ChatColor.GREEN + owner.getName() + " has hooked you!");
+                        break;
+                    }
+                    target.damage(ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_MINION_DAMAGE, owner);
+                }
+                if (state.targetId != null) break;
+            }
+        }
+
+        for (Map.Entry<UUID, IvyFloralLeapState> entry : new HashMap<>(ivyFloralLeaps).entrySet()) {
+            UUID ownerId = entry.getKey();
+            Player owner = players.get(ownerId);
+            IvyFloralLeapState state = entry.getValue();
+            if (owner == null || !owner.isOnline() || !activePlayers.contains(ownerId)
+                    || !"ivy".equals(selectedHeroesOfGwen.get(ownerId))) {
+                restoreIvyBlocks(state.flowerBlocks, state.flowerMaterials);
+                ivyFloralLeaps.remove(ownerId);
+                continue;
+            }
+            if (!state.landed) {
+                if (now - state.launchedAt < ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_MINIMUM_FLIGHT_MILLIS
+                        || !owner.isOnGround()) continue;
+                state.landed = true;
+                state.center = owner.getLocation().clone();
+                state.endsAt = now + ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_BED_DURATION_MILLIS;
+                state.nextDamageAt = now + ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE_INTERVAL_MILLIS;
+                Material[] flowers = {Material.POPPY, Material.BLUE_ORCHID, Material.ALLIUM,
+                        Material.AZURE_BLUET, Material.RED_TULIP, Material.ORANGE_TULIP,
+                        Material.WHITE_TULIP, Material.PINK_TULIP};
+                int radius = ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_FLOWER_RADIUS;
+                for (int x = -radius; x <= radius; x++) {
+                    for (int z = -radius; z <= radius; z++) {
+                        if (x * x + z * z > radius * radius) continue;
+                        Block flower = state.center.clone().add(x, 0.0D, z).getBlock();
+                        Block ground = flower.getRelative(BlockFace.DOWN);
+                        if (!flower.isPassable() || ground.getType().isAir() || ground.isPassable()) continue;
+                        Material material = flowers[ThreadLocalRandom.current().nextInt(flowers.length)];
+                        state.flowerBlocks.put(flower, flower.getBlockData().clone());
+                        state.flowerMaterials.put(flower, material);
+                        flower.setType(material, false);
+                        world.playSound(flower.getLocation(), Sound.BLOCK_GRASS_PLACE, 0.25F, 1.2F);
+                    }
+                }
+                owner.playSound(owner.getLocation(), Sound.BLOCK_GRASS_PLACE, 1.0F, 1.0F);
+                continue;
+            }
+            if (now >= state.endsAt) {
+                restoreIvyBlocks(state.flowerBlocks, state.flowerMaterials);
+                ivyFloralLeaps.remove(ownerId);
+                continue;
+            }
+            if (now >= state.nextDamageAt) {
+                double radius = ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE_RADIUS;
+                int team = teams.getOrDefault(ownerId, -1);
+                for (Entity entity : world.getNearbyEntities(state.center, radius, radius, radius)) {
+                    if (!(entity instanceof LivingEntity target) || target.equals(owner)
+                            || !target.isValid() || target.isDead()
+                            || state.center.distanceSquared(target.getLocation()) > radius * radius
+                            || heroesOfGwenEntityTeam(target) == team
+                            || (target instanceof Player victim && !activePlayers.contains(victim.getUniqueId()))) continue;
+                    target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,
+                            ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_SLOW_TICKS,
+                            ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_SLOW_AMPLIFIER,
+                            false, false, true));
+                    target.damage(ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE, owner);
+                }
+                state.nextDamageAt = now + ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE_INTERVAL_MILLIS;
+            }
+            for (int i = 0; i < 8; i++) {
+                Location particle = state.center.clone().add(
+                        ThreadLocalRandom.current().nextDouble(-0.4D, 0.4D),
+                        0.1D + ThreadLocalRandom.current().nextDouble(0.0D, 0.8D),
+                        ThreadLocalRandom.current().nextDouble(-0.4D, 0.4D));
+                world.spawnParticle(Particle.HAPPY_VILLAGER, particle, 1, 0.0D, 0.0D, 0.0D, 0.01D);
+            }
+        }
+
+        for (Map.Entry<UUID, IvyThornWallState> entry : new HashMap<>(ivyThornWalls).entrySet()) {
+            UUID ownerId = entry.getKey();
+            Player owner = players.get(ownerId);
+            IvyThornWallState state = entry.getValue();
+            if (owner == null || !owner.isOnline() || !activePlayers.contains(ownerId)
+                    || !"ivy".equals(selectedHeroesOfGwen.get(ownerId)) || now >= state.endsAt) {
+                restoreIvyBlocks(state.originalBlocks, state.placedMaterials);
+                ivyThornWalls.remove(ownerId);
+                continue;
+            }
+            double radius = ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_BLOCK_RADIUS;
+            int team = teams.getOrDefault(ownerId, -1);
+            for (Player target : players.values()) {
+                if (!target.isOnline() || !activePlayers.contains(target.getUniqueId())
+                        || target.getLocation().distanceSquared(state.center) > radius * radius) continue;
+                if (teams.getOrDefault(target.getUniqueId(), -2) == team) {
+                    target.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION,
+                            (int) ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ALLY_REGEN_TICKS,
+                            ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ALLY_REGEN_AMPLIFIER,
+                            false, false, true));
+                    continue;
+                }
+                long nextRoot = state.nextRootAt.getOrDefault(target.getUniqueId(), 0L);
+                if (now >= nextRoot) {
+                    target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,
+                            (int) (ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_ROOT_MILLIS / 50L),
+                            10, true, true, true));
+                    state.nextRootAt.put(target.getUniqueId(),
+                            now + ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_ROOT_RECHARGE_MILLIS);
+                } else {
+                    long nextDamage = state.nextDamageAt.getOrDefault(target.getUniqueId(), 0L);
+                    if (now >= nextDamage) {
+                        target.damage(ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_DAMAGE, owner);
+                        state.nextDamageAt.put(target.getUniqueId(),
+                                now + ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_DAMAGE_RECHARGE_MILLIS);
+                    }
+                }
+            }
+            for (int angle = 0; angle < 360; angle += 30) {
+                double radians = Math.toRadians(angle);
+                Location edge = state.center.clone().add(
+                        Math.cos(radians) * radius, 0.15D, Math.sin(radians) * radius);
+                world.spawnParticle(Particle.CRIT, edge, 2, 0.1D, 0.08D, 0.1D, 0.02D);
+            }
+        }
+    }
+
+    private void restoreIvyBlocks(Map<Block, BlockData> originals, Map<Block, Material> placed) {
+        for (Map.Entry<Block, BlockData> entry : originals.entrySet()) {
+            Block block = entry.getKey();
+            if (block == null || block.getWorld() != world) continue;
+            Material expected = placed.get(block);
+            if (expected != null && block.getType() == expected) {
+                block.setBlockData(entry.getValue(), false);
+            }
+        }
+        originals.clear();
+        placed.clear();
+    }
+
+    private void removeIvyState(UUID ownerId) {
+        ivyHooks.remove(ownerId);
+        IvyFloralLeapState floral = ivyFloralLeaps.remove(ownerId);
+        if (floral != null) restoreIvyBlocks(floral.flowerBlocks, floral.flowerMaterials);
+        IvyThornWallState wall = ivyThornWalls.remove(ownerId);
+        if (wall != null) restoreIvyBlocks(wall.originalBlocks, wall.placedMaterials);
+    }
+
     private boolean isRowenaBombardmentItem(ItemStack item) {
         if (item == null || !item.hasItemMeta()) return false;
         return item.getItemMeta().getPersistentDataContainer()
