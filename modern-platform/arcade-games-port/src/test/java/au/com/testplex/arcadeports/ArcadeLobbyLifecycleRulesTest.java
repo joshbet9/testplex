@@ -17,6 +17,15 @@ class ArcadeLobbyLifecycleRulesTest {
         assertEquals(true, ArcadeLobbyLifecycleRules.gameplayInputAllowed(true));
     }
 
+    @Test void preparedTimeIsExcludedFromGameDeadlinesAndCooldowns() {
+        assertEquals(15_000L, ArcadeLobbyLifecycleRules.shiftPausedTimestamp(5_000L, 10_000L));
+        assertEquals(10_000L, ArcadeLobbyLifecycleRules.shiftPausedTimestamp(0L, 10_000L));
+        assertEquals(-1L, ArcadeLobbyLifecycleRules.shiftPausedTimestamp(-1L, 10_000L));
+        assertEquals(Long.MAX_VALUE,
+                ArcadeLobbyLifecycleRules.shiftPausedTimestamp(Long.MAX_VALUE - 1L, 10_000L));
+        assertEquals(5_000L, ArcadeLobbyLifecycleRules.shiftPausedTimestamp(5_000L, 0L));
+    }
+
     @Test void phaseDurationsAreBounded() {
         assertEquals(3, ArcadeLobbyLifecycleRules.prepareSeconds(-1));
         assertEquals(10, ArcadeLobbyLifecycleRules.prepareSeconds(10));
