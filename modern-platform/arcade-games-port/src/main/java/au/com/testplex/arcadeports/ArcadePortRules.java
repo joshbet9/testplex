@@ -2862,6 +2862,29 @@ public final class ArcadePortRules {
         return 0L;
     }
 
+    // Bardolf — source values from HeroBardolf, SkillSummonWolf, SkillWolfPounce and SkillFullMoon.
+    public static final int HEROES_OF_GWEN_BARDOLF_MAX_WOLVES = 5;
+    public static final double HEROES_OF_GWEN_BARDOLF_WOLF_HEALTH = 8.0D;
+    public static final long HEROES_OF_GWEN_BARDOLF_SUMMON_COOLDOWN_MILLIS = 5_000L;
+    public static final double HEROES_OF_GWEN_BARDOLF_OWNER_FOLLOW_MIN_DISTANCE_SQUARED = 2.0D;
+    public static final double HEROES_OF_GWEN_BARDOLF_OWNER_TELEPORT_DISTANCE_SQUARED = 100.0D;
+    public static final double HEROES_OF_GWEN_BARDOLF_ATTACK_DISTANCE_SQUARED = 9.0D;
+    public static final long HEROES_OF_GWEN_BARDOLF_ATTACK_INTERVAL_MILLIS = 500L;
+    public static final double HEROES_OF_GWEN_BARDOLF_WOLF_ATTACK_DAMAGE = 1.0D;
+    public static final double HEROES_OF_GWEN_BARDOLF_WOLF_FOLLOW_SPEED = 1.5D;
+    public static final double HEROES_OF_GWEN_BARDOLF_WOLF_ULTIMATE_SPEED = 2.0D;
+    public static final long HEROES_OF_GWEN_BARDOLF_POUNCE_COOLDOWN_MILLIS = 7_000L;
+    public static final long HEROES_OF_GWEN_BARDOLF_POUNCE_OVERRIDE_MILLIS = 6_500L;
+    public static final double HEROES_OF_GWEN_BARDOLF_POUNCE_TRIGGER_DISTANCE_SQUARED = 4.0D;
+    public static final double HEROES_OF_GWEN_BARDOLF_POUNCE_VELOCITY_MULTIPLIER = 1.5D;
+    public static final double HEROES_OF_GWEN_BARDOLF_POUNCE_MINIMUM_VERTICAL_VELOCITY = 0.8D;
+    public static final long HEROES_OF_GWEN_BARDOLF_FULL_MOON_DURATION_MILLIS = 10_000L;
+    public static final long HEROES_OF_GWEN_BARDOLF_FULL_MOON_COOLDOWN_MILLIS = 60_000L;
+    public static final long HEROES_OF_GWEN_BARDOLF_FULL_MOON_REUSE_DELAY_MILLIS = 70_000L;
+    public static final double HEROES_OF_GWEN_BARDOLF_FULL_MOON_WOLF_HEALTH = 20.0D;
+    public static final double HEROES_OF_GWEN_BARDOLF_FULL_MOON_DAMAGE_PER_WOLF = 1.0D;
+    public static final double HEROES_OF_GWEN_BARDOLF_FULL_MOON_SPEED_PER_WOLF = 0.05D;
+
     // Larissa — source values from the archived Heroes of Gwen kit implementations.
     public static final long HEROES_OF_GWEN_LARISSA_AQUA_CANNON_INTERVAL_MILLIS = 500L;
     public static final int HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE = 3;
