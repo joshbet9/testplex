@@ -13,6 +13,45 @@ class SkyWarsMixedArcadeRulesTest {
         assertFalse(SkyWarsMixedArcadeRules.hasRoom(16));
     }
 
+    @Test void sourceIslandOreSlotsUseTheEightBlockHorizontalRadius() {
+        assertTrue(SkyWarsMixedArcadeRules.isOreSlotInIsland(8.0D, 0.0D, 0.0D, 0.0D));
+        assertTrue(SkyWarsMixedArcadeRules.isOreSlotInIsland(4.0D, 4.0D, 0.0D, 0.0D));
+        assertFalse(SkyWarsMixedArcadeRules.isOreSlotInIsland(8.01D, 0.0D, 0.0D, 0.0D));
+        assertFalse(SkyWarsMixedArcadeRules.isOreSlotInIsland(0.0D, -8.01D, 0.0D, 0.0D));
+    }
+
+    @Test void sourceOreHiderExposesOreOnlyBesideNonOccludingBlocks() {
+        assertTrue(SkyWarsMixedArcadeRules.shouldHideOre(false));
+        assertFalse(SkyWarsMixedArcadeRules.shouldHideOre(true));
+    }
+
+    @Test void sourcePerIslandVeinCountsAndSizesArePreserved() {
+        assertEquals(3, SkyWarsMixedArcadeRules.DIAMOND_VEINS_PER_ISLAND);
+        assertEquals(2, SkyWarsMixedArcadeRules.DIAMOND_VEIN_SIZE);
+        assertEquals(7, SkyWarsMixedArcadeRules.IRON_VEINS_PER_ISLAND);
+        assertEquals(4, SkyWarsMixedArcadeRules.GRAVEL_VEINS_PER_ISLAND);
+        assertEquals(3, SkyWarsMixedArcadeRules.randomVeinSize(0));
+        assertEquals(4, SkyWarsMixedArcadeRules.randomVeinSize(1));
+        assertEquals(5, SkyWarsMixedArcadeRules.randomVeinSize(2));
+        assertThrows(IllegalArgumentException.class, () -> SkyWarsMixedArcadeRules.randomVeinSize(3));
+    }
+
+    @Test void sourceBonusDropsCoverWebGravelAndIronOreOnly() {
+        assertTrue(SkyWarsMixedArcadeRules.hasSourceBonusDrop("COBWEB"));
+        assertTrue(SkyWarsMixedArcadeRules.hasSourceBonusDrop("GRAVEL"));
+        assertTrue(SkyWarsMixedArcadeRules.hasSourceBonusDrop("IRON_ORE"));
+        assertFalse(SkyWarsMixedArcadeRules.hasSourceBonusDrop("STONE"));
+        assertFalse(SkyWarsMixedArcadeRules.hasSourceBonusDrop("DIAMOND_ORE"));
+    }
+
+    @Test void sourcePlacementCapAndForbiddenInventoryBlocksAreEnforced() {
+        assertFalse(SkyWarsMixedArcadeRules.shouldBlockSkyWarsPlacement("OAK_PLANKS", 100, 128));
+        assertTrue(SkyWarsMixedArcadeRules.shouldBlockSkyWarsPlacement("OAK_PLANKS", 125, 128));
+        assertTrue(SkyWarsMixedArcadeRules.shouldBlockSkyWarsPlacement("CHEST", 64, 128));
+        assertTrue(SkyWarsMixedArcadeRules.shouldBlockSkyWarsPlacement("HOPPER", 64, 128));
+        assertTrue(SkyWarsMixedArcadeRules.shouldBlockSkyWarsPlacement("STICKY_PISTON", 64, 128));
+    }
+
     @Test void mixedSkyWarsUsesShorterRoundCadence() {
         long start = 1_000_000L;
         assertEquals(start + 5_000L, SkyWarsMixedArcadeRules.liveStartsAt(start));
