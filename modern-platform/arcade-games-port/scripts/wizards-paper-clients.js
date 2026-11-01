@@ -55,33 +55,46 @@ function connect(username) {
     }
 
     const acknowledgedTeleports = new Set();
+    let pendingServerPosition = null;
+    let pendingPositionTimer = null;
     function acknowledgeServerPosition(packet, reason) {
       if (!packet || !Number.isFinite(Number(packet.teleportId))) return;
       const teleportId = Number(packet.teleportId);
       if (acknowledgedTeleports.has(teleportId)) return;
-      acknowledgedTeleports.add(teleportId);
-      try {
-        // Mirror the vanilla client after ServerPlayer changes worlds: accept
-        // the server's teleport id, then confirm our authoritative position.
-        // Paper clears ServerPlayer.isChangingDimension on this movement path;
-        // until then it rejects all ordinary damage sources.
-        client.write('teleport_confirm', { teleportId });
-        client.write('position_look', {
-          x: Number(packet.x), y: Number(packet.y), z: Number(packet.z),
-          yaw: Number(packet.yaw || 0), pitch: Number(packet.pitch || 0),
-          flags: { onGround: false, hasHorizontalCollision: false },
-        });
-        // Paper 26.3 allows one position-bearing packet per client tick. Vanilla
-        // closes the tick with ServerboundClientTickEndPacket (protocol name:
-        // tick_end); without it the next teleport acknowledgement is rejected.
-        client.write('tick_end', {});
-        log('BOT_TELEPORT_ACK|PASS|' + username + '|id=' + teleportId
-          + '|reason=' + reason + '|pos=' + packet.x + ',' + packet.y + ',' + packet.z);
-        log('BOT_TICK_END|PASS|' + username + '|after-position');
-        sendPlayerLoaded('teleport-' + teleportId);
-      } catch (error) {
-        log('BOT_TELEPORT_ACK|FAIL|' + username + '|id=' + teleportId + '|' + String(error));
-      }
+
+      // Paper/Arcade may immediately issue a second teleport from PlayerJoinEvent
+      // to the shared lobby. Coalesce the login spawn and that hand-off so a stale
+      // position packet cannot move a freshly teleported player backwards.
+      pendingServerPosition = { packet: { ...packet }, reason };
+      if (pendingPositionTimer) clearTimeout(pendingPositionTimer);
+      pendingPositionTimer = setTimeout(() => {
+        pendingPositionTimer = null;
+        const pending = pendingServerPosition;
+        pendingServerPosition = null;
+        if (!pending) return;
+        const latest = pending.packet;
+        const latestTeleportId = Number(latest.teleportId);
+        if (acknowledgedTeleports.has(latestTeleportId)) return;
+        try {
+          client.write('teleport_confirm', { teleportId: latestTeleportId });
+          client.write('position_look', {
+            x: Number(latest.x), y: Number(latest.y), z: Number(latest.z),
+            yaw: Number(latest.yaw || 0), pitch: Number(latest.pitch || 0),
+            // Protocol-777 movement flags are top-level booleans, not a nested flags object.
+            onGround: false,
+            hasHorizontalCollision: false,
+          });
+          client.write('tick_end', {});
+          acknowledgedTeleports.add(latestTeleportId);
+          log('BOT_TELEPORT_ACK|PASS|' + username + '|id=' + latestTeleportId
+            + '|reason=' + pending.reason + '|pos=' + latest.x + ',' + latest.y + ',' + latest.z
+            + '|flags=' + JSON.stringify(latest.flags || {}));
+          log('BOT_TICK_END|PASS|' + username + '|after-position');
+          sendPlayerLoaded('teleport-' + latestTeleportId);
+        } catch (error) {
+          log('BOT_TELEPORT_ACK|FAIL|' + username + '|id=' + latestTeleportId + '|' + String(error));
+        }
+      }, 100);
     }
 
     client.once('login', () => {
@@ -89,7 +102,6 @@ function connect(username) {
       settled = true;
       clearTimeout(timeout);
       log('BOT_LOGIN|PASS|' + username + '|protocol=' + client.protocolVersion);
-      sendPlayerLoaded('login');
       resolve(client);
     });
 
