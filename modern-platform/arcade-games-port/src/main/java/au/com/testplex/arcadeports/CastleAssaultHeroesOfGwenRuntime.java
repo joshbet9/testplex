@@ -1911,6 +1911,100 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
     }
 
+    private void recordCastleKill(Player killer, Player victim, boolean objectiveTnt) {
+        if (killer == null || victim == null || killer.equals(victim)) return;
+        UUID victimId = victim.getUniqueId();
+        if (!castleCreditedVictims.add(victimId)) return;
+        UUID killerId = killer.getUniqueId();
+        if (teams.getOrDefault(killerId, -1) < 0
+                || teams.getOrDefault(killerId, -1) == teams.getOrDefault(victimId, -2)) return;
+        castleKillsByPlayer.merge(killerId, 1, Integer::sum);
+        if (objectiveTnt) castleTntHolderKillsByPlayer.merge(killerId, 1, Integer::sum);
+    }
+
+    private void recordCastleAssaultResult(int winningTeam) {
+        if (game != ArcadePortGame.CASTLE_ASSAULT || castleResultRecorded || winningTeam < 0) return;
+        castleResultRecorded = true;
+        KingState winningKing = kings.get(winningTeam);
+        String basePath = "local-stats.";
+        for (Map.Entry<UUID, Integer> entry : teams.entrySet()) {
+            UUID playerId = entry.getKey();
+            if (entry.getValue() != winningTeam) {
+                plugin.getConfig().set(basePath + playerId + ".castle-assault.win-streak", 0);
+                continue;
+            }
+            String statsPath = basePath + playerId + ".castle-assault.";
+            int streak = plugin.getConfig().getInt(statsPath + "win-streak", 0) + 1;
+            plugin.getConfig().set(statsPath + "win-streak", streak);
+            int kills = castleKillsByPlayer.getOrDefault(playerId, 0);
+            int nextHighest = teams.entrySet().stream()
+                    .filter(other -> other.getValue() == winningTeam && !other.getKey().equals(playerId))
+                    .mapToInt(other -> castleKillsByPlayer.getOrDefault(other.getKey(), 0))
+                    .max().orElse(0);
+            if (castleFinalKingHitByPlayer.contains(playerId)) {
+                awardCastleAssaultAchievement(playerId, "one-man-army");
+            }
+            if (winningKing != null && winningKing.health < 50) {
+                awardCastleAssaultAchievement(playerId, "clutchness");
+            }
+            if (kills >= 8 && !castleRodUsed.contains(playerId)) {
+                awardCastleAssaultAchievement(playerId, "blasphemous");
+            }
+            if (kills > 0 && kills >= nextHighest * 2) {
+                awardCastleAssaultAchievement(playerId, "multiplicative");
+            }
+            if (castleTntHolderKillsByPlayer.getOrDefault(playerId, 0) >= 5) {
+                awardCastleAssaultAchievement(playerId, "moral-exercise");
+            }
+            if (streak >= 3) awardCastleAssaultAchievement(playerId, "remember-the-days");
+        }
+        plugin.saveConfig();
+    }
+
+    private void awardCastleAssaultAchievement(UUID playerId, String achievementId) {
+        if (playerId == null || achievementId == null || achievementId.isBlank()) return;
+        String key = "local-achievements." + playerId + ".castle-assault." + achievementId;
+        if (plugin.getConfig().getBoolean(key, false)) return;
+        plugin.getConfig().set(key, true);
+        Player player = players.get(playerId);
+        if (player != null && player.isOnline()) {
+            String name = ArcadeProgressCatalog.achievements("castle-assault").stream()
+                    .filter(achievement -> achievement.id().equals(achievementId))
+                    .map(ArcadeProgressCatalog.Achievement::name).findFirst().orElse(achievementId);
+            player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + name);
+        }
+    }
+
+    private void finishHeroesOfGwen(int winningTeam, String reason) {
+        if (game != ArcadePortGame.HEROES_OF_GWEN || heroesOfGwenResultRecorded || winningTeam < 0) return;
+        heroesOfGwenResultRecorded = true;
+        for (Player player : activeMatchPlayers()) {
+            UUID id = player.getUniqueId();
+            if (teams.getOrDefault(id, -1) != winningTeam) continue;
+            Set<String> finalHits = heroesOfGwenFinalObjectiveHits.getOrDefault(id, Set.of());
+            long towerFinalHits = finalHits.stream().filter(value -> value.startsWith("tower:")).distinct().count();
+            boolean finalBossHit = finalHits.stream().anyMatch(value -> value.startsWith("boss:"));
+            if (towerFinalHits >= 2 && finalBossHit) awardHeroesOfGwenAchievement(player, "mvp");
+            if (heroesOfGwenChangedAfterTowerLoss.contains(id)) {
+                awardHeroesOfGwenAchievement(player, "tactical-genius");
+            }
+        }
+        hooks.finish(firstPlayerOnTeam(winningTeam), winningTeam, reason == null ? "Heroes of Gwen finished" : reason);
+    }
+
+    private void awardHeroesOfGwenAchievement(Player player, String achievementId) {
+        if (player == null || achievementId == null || achievementId.isBlank()) return;
+        UUID playerId = player.getUniqueId();
+        String key = "local-achievements." + playerId + ".heroes-of-gwen." + achievementId;
+        if (plugin.getConfig().getBoolean(key, false)) return;
+        plugin.getConfig().set(key, true);
+        String name = ArcadeProgressCatalog.achievements("heroes-of-gwen").stream()
+                .filter(achievement -> achievement.id().equals(achievementId))
+                .map(ArcadeProgressCatalog.Achievement::name).findFirst().orElse(achievementId);
+        if (player.isOnline()) player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + name);
+        plugin.saveConfig();
+    }
+
     void onPlayerKill(Player killer) {
         if (stopped || killer == null) return;
         if (game == ArcadePortGame.HEROES_OF_GWEN) {
