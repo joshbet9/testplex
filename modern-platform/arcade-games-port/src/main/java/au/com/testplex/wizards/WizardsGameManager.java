@@ -1,6 +1,8 @@
 package au.com.testplex.wizards;
 
 import au.com.testplex.arcadeports.ArcadeMechanicsModernPlugin;
+import au.com.testplex.arcadeports.ArcadeGameModule;
+import au.com.testplex.arcadeports.ArcadePortGame;
 import au.com.testplex.arcadeports.SourceMapCatalog;
 
 import org.bukkit.Bukkit;
@@ -84,7 +86,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 
-public final class WizardsGameManager implements Listener {
+public final class WizardsGameManager implements Listener, ArcadeGameModule {
     private static final String SPELL_MENU_TITLE = ChatColor.DARK_PURPLE + "Wizards Spell Selector";
     private static final int MAX_WAND_SLOTS = WizardsRules.WAND_SLOT_COUNT;
     private static final int MENU_SLOT = 8;
@@ -133,7 +135,8 @@ public final class WizardsGameManager implements Listener {
     private SourceMapCatalog.MapData sourceMapData;
     private Location arenaCenter;
     private String activeMapResource;
-    private final BukkitTask tickTask;
+    private BukkitTask tickTask;
+    private boolean initialized;
     private boolean running;
     private long startedAt;
     private int tick;
@@ -164,8 +167,26 @@ public final class WizardsGameManager implements Listener {
         anvilLevelKey = new NamespacedKey(plugin, "anvil-level");
         meteorKey = new NamespacedKey(plugin, "endgame-meteor-size");
         lightningHitKey = new NamespacedKey(plugin, "wizard-lightning-hit");
+    }
+
+    @Override public ArcadePortGame game() { return ArcadePortGame.WIZARDS; }
+
+    @Override public void initialize() {
+        if (initialized) return;
         Bukkit.getPluginManager().registerEvents(this, plugin);
         tickTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 1L, 1L);
+        initialized = true;
+    }
+
+    @Override public boolean isGameRunning() { return running; }
+
+    /** A selected source map must exist before Wizards is available in the shared Arcade queue. */
+    public boolean hasAvailableSelectedMap() {
+        List<SourceMapCatalog.MapArchive> maps = SourceMapCatalog.mapsForFolders(
+                plugin, "wizards", enabledWizardsMapFolders());
+        String selected = SourceMapCatalog.selectedResourceForFolders(
+                plugin, "wizards", enabledWizardsMapFolders());
+        return selected != null && maps.stream().anyMatch(map -> selected.equals(map.resource()));
     }
 
     private World createArena() {
@@ -383,7 +404,6 @@ public final class WizardsGameManager implements Listener {
             player.sendMessage(ChatColor.RED + "The Wizards queue is full (" + maximumPlayers + " players).");
             return;
         }
-        if (queue.isEmpty()) plugin.prepareForWizards();
         queue.put(player.getUniqueId(), player);
         selectedKits.putIfAbsent(player.getUniqueId(), defaultKit());
         long requestedDeadline = tick + (quickStart ? 40L : 100L);
@@ -413,12 +433,9 @@ public final class WizardsGameManager implements Listener {
             player.sendMessage(ChatColor.RED + "Kits cannot be changed after the round starts.");
             return;
         }
-        if (!queue.containsKey(player.getUniqueId())) {
-            player.sendMessage(ChatColor.YELLOW + "Join the Wizards queue first with /arcadeport join wizards.");
-            return;
-        }
         selectedKits.put(player.getUniqueId(), kit);
-        player.sendMessage(ChatColor.GREEN + "Wizards kit set to " + ChatColor.WHITE + prettyKit(kit) + ChatColor.GREEN + ".");
+        player.sendMessage(ChatColor.GREEN + "Wizards kit set to " + ChatColor.WHITE + prettyKit(kit)
+                + ChatColor.GREEN + " for your next Wizards match.");
     }
 
     private WizardsKit defaultKit() {
@@ -427,13 +444,32 @@ public final class WizardsGameManager implements Listener {
     }
 
     public void start(org.bukkit.command.CommandSender sender) {
+        start(sender, null);
+    }
+
+    /** Start with participants already selected by ArcadePortManager's shared queue. */
+    public boolean startFromArcadeLifecycle(List<Player> participants) {
+        if (participants == null) return false;
+        return start(plugin.getServer().getConsoleSender(), participants);
+    }
+
+    private boolean start(org.bukkit.command.CommandSender sender, List<Player> arcadeParticipants) {
         if (running) {
             sender.sendMessage(ChatColor.RED + "Wizards is already running.");
-            return;
+            return false;
         }
         List<Player> entrants = new ArrayList<>();
-        for (Player player : queue.values()) {
-            if (player.isOnline()) entrants.add(player);
+        if (arcadeParticipants != null) {
+            for (Player player : arcadeParticipants) {
+                if (player != null && player.isOnline() && entrants.stream()
+                        .noneMatch(existing -> existing.getUniqueId().equals(player.getUniqueId()))) {
+                    entrants.add(player);
+                }
+            }
+        } else {
+            for (Player player : queue.values()) {
+                if (player.isOnline()) entrants.add(player);
+            }
         }
         int maximum = Math.max(2, Math.min(WizardsRules.MAX_PLAYERS,
                 plugin.getConfig().getInt("wizards.maximum-players", WizardsRules.MAX_PLAYERS)));
@@ -480,7 +516,6 @@ public final class WizardsGameManager implements Listener {
 
         // The shared Arcade manager must return any previous game to the lobby
         // before Wizards snapshots player inventory, location and movement state.
-        plugin.prepareForWizards();
         queueDeadlineTick = -1L;
         refillChests();
         running = true;
@@ -515,6 +550,7 @@ public final class WizardsGameManager implements Listener {
             player.sendMessage(ChatColor.GOLD + "Wizards" + ChatColor.DARK_GRAY + " » "
                     + ChatColor.YELLOW + "Find spellbooks and supplies in chests. Last wizard alive wins!");
         }
+        return true;
     }
 
     /**
