@@ -4,12 +4,16 @@
 import importlib.util
 import json
 from pathlib import Path
+import sys
 import unittest
+from zipfile import ZipFile
 
 SCRIPT = Path(__file__).with_name("audit_recovered_arcade_maps.py")
 SPEC = importlib.util.spec_from_file_location("map_audit", SCRIPT)
 audit = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(audit)
+sys.path.insert(0, str(SCRIPT.parent))
+import review_gladiators_bracket as bracket
 
 
 class AuditRecoveredArcadeMapsTest(unittest.TestCase):
@@ -42,6 +46,44 @@ CUSTOM_LOCS:16,17,18:
         self.assertEqual(counts["DATA:BLACK"], 30)
         self.assertEqual(counts["TEAM:GREEN"], 1)
         self.assertTrue(markers)
+
+    def test_invisible_barrier_roof_can_be_omitted_from_preview_only(self):
+        archive = (audit.ROOT / "update/map-recovery/nixuge/unconfigured/Gladiators/"
+                   "Gladiators_Bliss.zip")
+        normal, surface, _, _ = audit.scan_archive(archive, True)
+        revealed, under_roof, _, _ = audit.scan_archive(archive, True,
+                                                       hide_barriers=True)
+        self.assertEqual(normal, revealed)
+        self.assertEqual(surface[(0, 0)], (18, 166))
+        self.assertEqual(under_roof[(0, 0)], (5, 95))
+
+    def test_authentic_caged_in_calibrates_bracket_and_spawn_safety(self):
+        archive = audit.ROOT / "update/maps/Gladiators/Gladiators_Caged_In.zip"
+        with ZipFile(archive) as original:
+            marks = audit.parse_reborn_config(original.read("WorldConfig.dat").decode())
+        centres = [
+            {"name": f"{m['name']}-{index}", "tier": m["name"],
+             "x": m["x"], "z": m["z"]}
+            for index, m in enumerate(marks)
+            if m["kind"] == "DATA" and m["name"] in bracket.TIERS
+        ]
+        self.assertTrue(bracket.validate_tournament(centres)["valid_bracket_topology"])
+        world = bracket.WorldBlocks(archive)
+        black = [m for m in marks if m["kind"] == "DATA" and m["name"] == "BLACK"]
+        self.assertEqual(len(black), 30)
+        self.assertTrue(all(m["y"] in world.safe_feet_levels(int(m["x"]), int(m["z"]))
+                            for m in black))
+
+    def test_bliss_centres_are_only_review_candidates(self):
+        path = (audit.ROOT / "update/map-recovery/nixuge/review/"
+                "gladiators-bliss-stage-centres.json")
+        result = bracket.review_candidate(json.loads(path.read_text()))
+        self.assertTrue(result["valid_bracket_topology"], result["problems"])
+        self.assertTrue(result["observation_only_no_playable_metadata"])
+        self.assertEqual(len(result["links"]), 14)
+        self.assertEqual(len(result["stage_probes"]), 15)
+        self.assertTrue(all(6 in p["safe_feet_y_candidates"]
+                            for p in result["stage_probes"]))
 
     def test_quiver_twin_peaks_is_not_evolution_configured(self):
         ref = audit.ROOT / "update/maps/One in the Quiver/Quiver_Twin Peaks 2.0.zip"

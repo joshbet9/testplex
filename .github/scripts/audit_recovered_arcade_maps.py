@@ -148,7 +148,7 @@ def parse_reborn_config(contents: str):
     return markers
 
 
-def scan_archive(archive: Path, want_image: bool):
+def scan_archive(archive: Path, want_image: bool, hide_barriers: bool = False):
     summary = {"archive": archive.relative_to(ROOT).as_posix(), "worldconfig_present": False,
                "chunks": 0, "chunk_bounds": None, "version_formats": [],
                "emerald_ore_blocks": 0, "emerald_ore_bounds": None,
@@ -218,7 +218,12 @@ def scan_archive(archive: Path, want_image: bool):
                                     continue
                                 for local_y in range(15, -1, -1):
                                     block = blocks[local_y * 256 + local_z * 16 + local_x]
-                                    if block:
+                                    # Minecraft's barrier is invisible to players. WDL
+                                    # captures often have a broad barrier roof at Y=18
+                                    # that hides all arenas in a naive surface preview.
+                                    # Skipping only that block reveals the geometry
+                                    # underneath; the blocks remain in the world ZIP.
+                                    if block and not (hide_barriers and block == 166):
                                         surfaces[key] = (y0 + local_y, block)
                                         break
                     for (lx, lz), surface in surfaces.items():
@@ -243,7 +248,8 @@ def scan_archive(archive: Path, want_image: bool):
     return summary, top_blocks, emerald, markers
 
 
-def preview(path: Path, top_blocks: dict, emerald: list, markers: list):
+def preview(path: Path, top_blocks: dict, emerald: list, markers: list,
+            annotation_label: str = "marks: authored if present"):
     from PIL import Image, ImageDraw
     if not top_blocks:
         return
@@ -281,7 +287,7 @@ def preview(path: Path, top_blocks: dict, emerald: list, markers: list):
         draw.ellipse((px - 3, pz - 3, px + 3, pz + 3), fill=paint, outline="#111111", width=1)
     # Add explicit X and Z labels so reviewers can record coordinates without
     # treating a coloured dot or a world-download viewpoint as authored metadata.
-    labelled = Image.new("RGB", (width + 50, height + 52), (20, 25, 33))
+    labelled = Image.new("RGB", (width + 50, height + 70), (20, 25, 33))
     labelled.paste(image, (46, 32))
     labelled_draw = ImageDraw.Draw(labelled)
     for x in range((left // 32 + 1) * 32, right, 32):
@@ -290,7 +296,9 @@ def preview(path: Path, top_blocks: dict, emerald: list, markers: list):
     for z in range((top // 32 + 1) * 32, bottom, 32):
         pz = 32 + (z - top) // scale
         labelled_draw.text((2, pz - 5), str(z), fill="#dddddd")
-    labelled_draw.text((46, height + 36), f"X {left}..{right}, Z {top}..{bottom}; marks: authored if present", fill="#eeeeee")
+    labelled_draw.text((46, height + 35),
+                       f"X {left}..{right}, Z {top}..{bottom}", fill="#eeeeee")
+    labelled_draw.text((46, height + 49), annotation_label, fill="#eeeeee")
     path.parent.mkdir(parents=True, exist_ok=True)
     labelled.save(path)
 
@@ -299,6 +307,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--json", type=Path, help="Write audit JSON (else print to stdout)")
     parser.add_argument("--images", type=Path, help="Optional PNG preview output directory")
+    parser.add_argument("--hide-barriers", action="store_true",
+                        help="In PNG previews, see through invisible barrier blocks (166) to the underlying terrain")
     parser.add_argument("--game", choices=["Evolution", "Gladiators"], help="Audit one game")
     parser.add_argument("--references", action="store_true", help="Include configured Caged In and Quiver Twin Peaks references")
     args = parser.parse_args()
@@ -314,7 +324,8 @@ def main():
         actual_sha = hashlib.sha256(archive.read_bytes()).hexdigest()
         if actual_sha != item["sha256"]:
             raise ValueError(f"Recovered archive checksum mismatch: {archive}")
-        result, top, emerald, markers = scan_archive(archive, args.images is not None)
+        result, top, emerald, markers = scan_archive(archive, args.images is not None,
+                                                    hide_barriers=args.hide_barriers)
         result.update({"game": item["game"], "name": item["name"],
                        "sha256": item["sha256"],
                        "marker_status": "UNVERIFIED: never use level/player WDL coordinates as authentic game markers"})
@@ -327,7 +338,8 @@ def main():
                 ("Gladiators", "update/maps/Gladiators/Gladiators_Caged_In.zip"),
                 ("One in the Quiver", "update/maps/One in the Quiver/Quiver_Twin Peaks 2.0.zip")):
             archive = ROOT / rel
-            result, top, emerald, markers = scan_archive(archive, args.images is not None)
+            result, top, emerald, markers = scan_archive(archive, args.images is not None,
+                                                        hide_barriers=args.hide_barriers)
             result["game"] = game
             report["configured_references"].append(result)
             if args.images:

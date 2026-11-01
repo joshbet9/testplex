@@ -45,6 +45,43 @@ PNG previews (Pillow required) show top-down terrain, a 32-block coordinate
 grid, and reference authored markers for Caged In and Quiver Twin Peaks.
 They do not infer game-specific markers. All outputs stay outside playable maps.
 
+### Gladiators Bliss: provisional bracket review
+
+The 1.8 worlds sometimes have large **invisible barrier (ID 166) ceilings**
+above their fighting arenas. A naive top-down image of those *visible to an
+NBT reader but invisible to a Minecraft player* ceilings hides the stage
+geometry. For a meaningful terrain review, also render below those blocks:
+
+```bash
+python3 .github/scripts/audit_recovered_arcade_maps.py \
+  --game Gladiators --hide-barriers --images /tmp/gladiators-without-barrier-roofs \
+  --json /tmp/gladiators-without-barrier-roofs.json
+python3 .github/scripts/review_gladiators_bracket.py \
+  update/map-recovery/nixuge/review/gladiators-bliss-stage-centres.json \
+  --image /tmp/gladiators-bliss-inferred-stage-centres.png
+```
+
+From this view, **Bliss** has a symmetrical 15-room arena layout. The JSON
+under `update/map-recovery/nixuge/review/` records 15 approximate X/Z stage
+centres as explicitly `UNVERIFIED_GEOMETRY_ONLY`, keyed to the recovered
+ZIP's checksum. The read-only checker follows the source 1.8
+`Gladiators.parseArenas` nearest-child linking and finds one unique parent
+for each room. All 15 candidate centres have a solid, two-block-clear foot
+level at **Y=6**. The checker is calibrated against Caged In's authentic
+15-room tier topology and **all 30** real BLACK duel spawn coordinates.
+
+![Bliss provisional, unverified arena-centre overlay](../../../update/map-recovery/nixuge/review/gladiators-bliss-stage-centres.png)
+
+*Bliss, beneath its invisible barrier roof. The coloured circles are inferred
+stage centres for review only, **not** original Mineplex markers.*
+
+**This is not an original WorldConfig or a playable map.** An apparent
+arena centre does not establish the original BLACK spawn pairs, PINK particle
+points, emerald-ore gates (all missing in the WDL snapshot), or spectator
+and player paths. The validator refuses candidates marked playable and never
+writes to `update/maps`. Complete and human-review those remaining pieces
+before adding any map to rotation.
+
 ## Required evidence before adding one map to rotation
 
 1. Identify the exact original layout and preserve Nixuge's archive byte-for-

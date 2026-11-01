@@ -1,0 +1,25 @@
+{
+  "map": "Gladiators / Bliss",
+  "status": "UNVERIFIED_GEOMETRY_ONLY",
+  "source_archive": "update/map-recovery/nixuge/unconfigured/Gladiators/Gladiators_Bliss.zip",
+  "source_sha256": "09fecf5a9b45af05286005d38f211154687981872dd032002793cd3dc368dd62",
+  "method": "Provisional symmetrical centres observed in a barrier-transparent top-down block preview; not original WorldConfig data",
+  "limitations": "Approximate X/Z locations only. Heights, duel spawn points, progression points, gate blocks and collision/playability remain unverified; do not enable this map.",
+  "stages": [
+    {"name": "final", "tier": "RED", "x": 0, "z": 0},
+    {"name": "semi-north", "tier": "ORANGE", "x": 0, "z": -40},
+    {"name": "semi-south", "tier": "ORANGE", "x": 0, "z": 40},
+    {"name": "quarter-northwest", "tier": "YELLOW", "x": -32, "z": -40},
+    {"name": "quarter-northeast", "tier": "YELLOW", "x": 32, "z": -40},
+    {"name": "quarter-southwest", "tier": "YELLOW", "x": -32, "z": 40},
+    {"name": "quarter-southeast", "tier": "YELLOW", "x": 32, "z": 40},
+    {"name": "first-northwest-inner", "tier": "GREEN", "x": -32, "z": -64},
+    {"name": "first-northeast-inner", "tier": "GREEN", "x": 32, "z": -64},
+    {"name": "first-northwest-outer", "tier": "GREEN", "x": -56, "z": -40},
+    {"name": "first-northeast-outer", "tier": "GREEN", "x": 56, "z": -40},
+    {"name": "first-southwest-inner", "tier": "GREEN", "x": -32, "z": 64},
+    {"name": "first-southeast-inner", "tier": "GREEN", "x": 32, "z": 64},
+    {"name": "first-southwest-outer", "tier": "GREEN", "x": -56, "z": 40},
+    {"name": "first-southeast-outer", "tier": "GREEN", "x": 56, "z": 40}
+  ]
+}
