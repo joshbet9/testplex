@@ -409,4 +409,21 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
         assertEquals(6.0D, ArcadePortRules.HEROES_OF_GWEN_DEVON_INFINITY_HOMING_RANGE, 0.00001D);
         assertEquals(3_000L, ArcadePortRules.HEROES_OF_GWEN_DEVON_INFINITY_WITHER_DURATION_MILLIS);
     }
+
+    @Test
+    void witherTargetsHostileLivingEntitiesIncludingNeutralMobsButNotAlliesOrInactivePlayers() {
+        assertTrue(ArcadePortRules.heroesOfGwenWitherCanTarget(0, 1, true));
+        assertTrue(ArcadePortRules.heroesOfGwenWitherCanTarget(0, -1, true));
+        assertFalse(ArcadePortRules.heroesOfGwenWitherCanTarget(0, 0, true));
+        assertFalse(ArcadePortRules.heroesOfGwenWitherCanTarget(0, 1, false));
+        assertFalse(ArcadePortRules.heroesOfGwenWitherCanTarget(0, -1, false));
+    }
+
+    @Test
+    void witherDirectMovementUsesSourceTickPerBlockSpeed() {
+        assertEquals(0.2D, ArcadePortRules.heroesOfGwenWitherStepPerTick(
+                ArcadePortRules.HEROES_OF_GWEN_WITHER_TARGET_SPEED), 0.00001D);
+        assertEquals(0.3D, ArcadePortRules.heroesOfGwenWitherStepPerTick(
+                ArcadePortRules.HEROES_OF_GWEN_WITHER_HOME_SPEED), 0.00001D);
+    }
 }
