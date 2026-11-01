@@ -18426,6 +18426,9 @@ public final class ArcadePortManager implements Listener {
         if (event instanceof EntityDamageByEntityEvent byEntity && cancelPrepareAction(playerShooter(byEntity.getDamager()), event)) return;
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+        // Wizards runs its own source-faithful damage, armor and spell pipeline.
+        // The shared Arcade default cancellation below must not swallow its PvP.
+        if (session.type == ArcadePortGame.WIZARDS) return;
         if (session.type == ArcadePortGame.EVOLUTION
                 && event.getEntity() instanceof Player evolutionPlayer
                 && session.alive.contains(evolutionPlayer.getUniqueId())
