@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.UUID;
 import java.util.logging.Level;
 import java.util.Objects;
 
@@ -203,6 +204,10 @@ public final class MonsterMazePlugin {
     public boolean isGameRunning() { return gameManager != null && gameManager.isRunning(); }
 
     public ArcadeMechanicsModernPlugin getHostPlugin() { return host; }
+    public void recordFirstSafePad(UUID playerId) { host.recordMonsterMazeFirstSafePad(playerId); }
+    public void recordHighestStage(UUID playerId, int stage) { host.recordMonsterMazeHighestStage(playerId, stage); }
+    public void recordWin(UUID playerId, int stage) { host.recordMonsterMazeWin(playerId, stage); }
+    public void recordAchievement(UUID playerId, String achievementId) { host.recordMonsterMazeAchievement(playerId, achievementId); }
     public static MonsterMazePlugin getInstance() { return instance; }
     public GameManager getGameManager() { return gameManager; }
     public MobThemeManager getMobThemeManager() { return mobThemeManager; }

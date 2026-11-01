@@ -201,4 +201,22 @@ class SnakeRulesTest {
         assertEquals(-170.0F, SnakeRules.wrapYaw(190.0F), 0.0001F);
         assertEquals(Math.PI / 2.0D, SnakeRules.wrapRadians(5.0D * Math.PI / 2.0D), 0.000001D);
     }
+
+    @Test void snakeAchievementRulesRequireExactRouletteAndAbilityEvidence() {
+        assertEquals(1, SnakeRules.nextSameRouletteEffectCount(false, 8));
+        assertEquals(2, SnakeRules.nextSameRouletteEffectCount(true, 1));
+        assertTrue(SnakeRules.shouldAwardBusted(3));
+        assertFalse(SnakeRules.shouldAwardBusted(2));
+        assertTrue(SnakeRules.isTenSecondRouletteHit(10));
+        assertFalse(SnakeRules.isTenSecondRouletteHit(15));
+        assertTrue(SnakeRules.isWithinTenBlocksOfMapEdge(5.0D, 20.0D, 10.0D, 20.0D));
+        assertFalse(SnakeRules.isWithinTenBlocksOfMapEdge(20.0D, 20.0D, 20.0D, 20.0D));
+        assertFalse(SnakeRules.isWithinTenBlocksOfMapEdge(Double.NaN, 20.0D, 10.0D, 20.0D));
+        assertTrue(SnakeRules.isAbilityActive(100L, 101L, 0L, 0L));
+        assertFalse(SnakeRules.isAbilityActive(100L, 100L, 0L, 0L));
+        assertTrue(SnakeRules.shouldAwardFlawless(1, true));
+        assertFalse(SnakeRules.shouldAwardFlawless(0, true));
+        assertFalse(SnakeRules.shouldAwardFlawless(3, false));
+    }
+
 }

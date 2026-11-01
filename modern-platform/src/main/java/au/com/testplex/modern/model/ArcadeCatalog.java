@@ -7,7 +7,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Modern catalogue for all 25 Arcade games. Each game owns its own cosmetic
+ * Modern catalogue for all 27 Arcade games. Each game owns its own cosmetic
  * lines and win-scene choices; actual render/gameplay handlers are added with
  * each port rather than pretending global cosmetics are game-specific.
  */
@@ -148,7 +148,7 @@ public final class ArcadeCatalog {
                 win("falling-stars", "Falling Stars", "A narrow star shower descends onto the platform")));
 
         register(game("monster-maze", "Monster Maze", "ROTTEN_FLESH", "Reach the active Safe Pad while mobs pursue each stage.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(lineMulti("mob-sets", "Mob Forms", "Enable multiple mob forms independently for the round.", "CREEPER_HEAD",
                         single("creeper", "Creeper", "Creeper form"),
                         single("skeleton", "Skeleton", "Skeleton form"),
@@ -230,7 +230,7 @@ public final class ArcadeCatalog {
                 win("shepherd-crown", "Shepherd Crown", "A leafy crown forms above the winner")));
 
         register(game("snake", "Snake", "SLIME_BALL", "Collect food, avoid collisions, and use the Mario-Kart-style item roll.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("snake-identity", "Snake Identity", "A connected body pattern, not one generic particle trail.", "SLIME_BALL",
                         single("anaconda", "Anaconda", "Segmented heavy scales along the body."),
                         single("cobra", "Cobra", "A raised hood silhouette and alternating scales."),
@@ -256,13 +256,13 @@ public final class ArcadeCatalog {
 
         register(game("draw-my-thing", "Draw My Thing", "PAINTING",
                 "Take one 30-second drawing turn, reveal timed hints, and guess using a limited number of attempts.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(),
                 win("whiteboard-reveal", "Whiteboard Reveal", "The final drawing is framed above the winning guesser.")));
 
         register(game("master-builders", "Master Builders", "GRASS_BLOCK",
                 "Build your theme in three minutes, then review and rate the other plots.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(),
                 win("builders-podium", "Builder's Podium", "The top-rated build rises above the winning builder.")));
 

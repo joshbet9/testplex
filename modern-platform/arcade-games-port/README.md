@@ -2,6 +2,14 @@
 
 This plugin adds first-pass playable mechanics harnesses for the 17 Arcade games outside the dedicated Monster Maze and Snake modules. It is a compatibility/work-in-progress layer intended to expose API and game-loop problems early; it is **not** a claim that all original Mineplex mechanics or maps have been faithfully ported yet.
 
+## Current controlled acceptance queue
+
+The shared Paper 26.3 Testplex allow-list contains 20 games:
+
+Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons, Runner, Sheep Quest, Turf Wars, Snap (legacy ID `camera-shy`), Monster Maze, Snake, Draw My Thing and Master Builders.
+
+`READY_FOR_TEST` means available for the isolated shared test session. It does not mean the game has passed live multiplayer or map-by-map acceptance. See the game-specific acceptance plans for the required checks. Evolution, Castle Assault, Heroes of Gwen, Milk the Cow, Wither Assault, SkyWars Mixed and Sneaky Assassins remain gated.
+
 ## SkyWars — fast Mixed Arcade FFA
 
 SkyWars is registered as the isolated `skywars-mixed` variant for Paper 26.3. It uses the archived 1.8 SkyWars maps and authored player-island spawns, and accepts up to 16 players without modifying the legacy Solo SkyWars or Team SkyWars classes.

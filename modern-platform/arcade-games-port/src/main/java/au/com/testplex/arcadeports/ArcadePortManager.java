@@ -209,6 +209,7 @@ public final class ArcadePortManager implements Listener {
     private final Map<UUID, String> bombLobbersKitPreferences = new HashMap<>();
     private final Map<UUID, String> spleefKitPreferences = new HashMap<>();
     private final Map<UUID, String> microKitPreferences = new HashMap<>();
+    private final Map<UUID, String> evolutionKitPreferences = new HashMap<>();
     private final Map<UUID, String> quiverKitPreferences = new HashMap<>();
     private final Map<UUID, String> runnerKitPreferences = new HashMap<>();
     private final Map<UUID, String> sheepQuestKitPreferences = new HashMap<>();
@@ -783,6 +784,33 @@ public final class ArcadePortManager implements Listener {
         handleBaconBrawlHit(session, attacker, target, "melee");
     }
 
+    public void selectEvolutionKit(Player player, String requestedKit) {
+        if (player == null || requestedKit == null) return;
+        String kit = requestedKit.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        if (kit.equals("evolution-quick-evolver")) kit = "quick-evolver";
+        if (kit.equals("evolution-standard")) kit = "standard-evolution";
+        if (!kit.equals("quick-evolver") && !kit.equals("standard-evolution")) {
+            player.sendMessage(ChatColor.YELLOW + "Evolution kits: standard-evolution, quick-evolver.");
+            return;
+        }
+        UUID playerId = player.getUniqueId();
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.EVOLUTION && session.players.containsKey(playerId)
+                && (session.evolving.contains(playerId) || session.evolutionCharge.containsKey(playerId))) {
+            player.sendMessage(ChatColor.RED + "You cannot change Evolution kits while charging or transforming.");
+            return;
+        }
+        evolutionKitPreferences.put(playerId, kit);
+        plugin.getConfig().set("lobby-kit-preferences." + playerId + ".evolution", kit);
+        plugin.saveConfig();
+        if (session != null && session.type == ArcadePortGame.EVOLUTION && session.players.containsKey(playerId)) {
+            session.evolutionKits.put(playerId, kit);
+        }
+        player.sendMessage(ChatColor.GREEN + (kit.equals("quick-evolver")
+                ? "Quick Evolver selected — evolution is 25% faster."
+                : "Standard Evolution kit selected."));
+    }
+
     public void selectKit(Player player, String requestedKit) {
         if (player == null || requestedKit == null) return;
         if (isPreparingParticipant(player)) {
@@ -790,6 +818,11 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         String value = requestedKit.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        if (value.equals("quick-evolver") || value.equals("evolution-quick-evolver")
+                || value.equals("standard-evolution") || value.equals("evolution-standard")) {
+            selectEvolutionKit(player, value);
+            return;
+        }
         boolean explicitCameraShyKit = value.startsWith("camera-shy-");
         boolean cameraShyLobby = "camera-shy".equals(
                 plugin.getConfig().getString("lobby-selected-game", "bacon-brawl"));
@@ -2766,6 +2799,11 @@ public final class ArcadePortManager implements Listener {
             }
             if (type == ArcadePortGame.EVOLUTION) {
                 UUID evolutionId = player.getUniqueId();
+                String savedEvolutionKit = plugin.getConfig().getString(
+                        "lobby-kit-preferences." + evolutionId + ".evolution", "standard-evolution");
+                String evolutionKit = evolutionKitPreferences.getOrDefault(evolutionId, savedEvolutionKit);
+                session.evolutionKits.put(evolutionId,
+                        "quick-evolver".equalsIgnoreCase(evolutionKit) ? "quick-evolver" : "standard-evolution");
                 session.evolutionLevels.put(evolutionId, 0);
                 session.evolutionLifeKills.put(evolutionId, 0);
                 session.evolutionKillsSinceEvolution.put(evolutionId, 0);
@@ -3022,8 +3060,11 @@ public final class ArcadePortManager implements Listener {
         }
         if (type == ArcadePortGame.MILK_THE_COW) spawnMilkCowMapAnimals(session);
         if (type == ArcadePortGame.WITHER_ASSAULT) {
+            long activityStart = System.currentTimeMillis();
             for (Player player : alivePlayers(session)) {
-                if (session.teams.getOrDefault(player.getUniqueId(), 0) == 1) {
+                if (session.teams.getOrDefault(player.getUniqueId(), 0) == 0) {
+                    session.witherLastHumanActivityAt.put(player.getUniqueId(), activityStart);
+                } else {
                     player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 300, 0, false, false, false));
                 }
             }
@@ -6926,6 +6967,28 @@ public final class ArcadePortManager implements Listener {
             drawer.setFlying(false);drawer.setAllowFlight(false);drawer.setFlySpeed(0.1F);
             Location start=session.drawStartLocations.get(drawerId);if(start!=null)drawer.teleport(start);
         }
+        // Disconnected guessers no longer block the all-guessed award.
+        List<UUID> eligibleGuessers = session.players.keySet().stream()
+                .filter(id -> !id.equals(drawerId))
+                .filter(id -> {
+                    Player guesser = session.players.get(id);
+                    return guesser != null && guesser.isOnline();
+                }).toList();
+        if (!eligibleGuessers.isEmpty()
+                && session.drawCorrectGuessers.containsAll(eligibleGuessers)
+                && drawer != null && drawer.isOnline()) {
+            awardCatalogAchievement(drawer, "draw-my-thing", "for-the-people");
+        }
+        for (UUID guesserId : eligibleGuessers) {
+            int attempts = session.drawGuessAttempts.getOrDefault(guesserId, 0);
+            boolean correctInOne = attempts == 1 && session.drawCorrectGuessers.contains(guesserId);
+            if (correctInOne) {
+                session.drawLinguistPerfectRounds.merge(guesserId, 1, Integer::sum);
+            } else {
+                session.drawLinguistFailed.add(guesserId);
+            }
+            if (!correctInOne) session.drawFirstGuessStreaks.put(guesserId, 0);
+        }
         resetDrawCanvas(session);session.drawCurrentDrawer=null;session.drawWord=null;
         session.drawRoundEndsAt=0L;
         boolean hasRemainingDrawer = session.drawTurnOrder.subList(session.drawTurnIndex, session.drawTurnOrder.size())
@@ -6985,9 +7048,50 @@ public final class ArcadePortManager implements Listener {
         if(guess.equals(answer)){
             boolean first=session.drawCorrectGuessers.isEmpty();
             session.drawCorrectGuessers.add(playerId);session.scores.merge(playerId,first?3:1,Integer::sum);
-            if(first){Player d=session.players.get(session.drawCurrentDrawer);if(d!=null&&d.isOnline())session.scores.merge(d.getUniqueId(),2,Integer::sum);}
+            if (!testPlayers.isTestPlayer(playerId)) {
+                String path = localStatsPath(playerId, "draw-my-thing");
+                plugin.getConfig().set(path + "correct-guesses",
+                        plugin.getConfig().getInt(path + "correct-guesses", 0) + 1);
+                if (first) {
+                    plugin.getConfig().set(path + "first-guesses",
+                            plugin.getConfig().getInt(path + "first-guesses", 0) + 1);
+                }
+                plugin.saveConfig();
+            }
+            if(first){
+                if (used == 0) {
+                    int streak = session.drawFirstGuessStreaks.merge(playerId, 1, Integer::sum);
+                    if (ArcadeProgressRules.shouldAwardDrawMyThingTripleThreat(streak)) {
+                        awardCatalogAchievement(player, "draw-my-thing", "triple-threat");
+                    }
+                } else {
+                    session.drawFirstGuessStreaks.put(playerId, 0);
+                }
+                if (ArcadeProgressRules.shouldAwardDrawMyThingFastGuesser(System.currentTimeMillis() - session.drawRoundStartedAt)) {
+                    session.drawFastGuessRounds++;
+                }
+                Player d=session.players.get(session.drawCurrentDrawer);
+                if(d!=null&&d.isOnline())session.scores.merge(d.getUniqueId(),2,Integer::sum);
+            } else {
+                session.drawFirstGuessStreaks.put(playerId, 0);
+            }
+            int bestOtherScore = session.scores.entrySet().stream()
+                    .filter(entry -> !entry.getKey().equals(playerId))
+                    .mapToInt(Map.Entry::getValue).max().orElse(0);
+            if (bestOtherScore - session.scores.getOrDefault(playerId, 0) >= 10) {
+                session.drawComebackCandidates.add(playerId);
+            }
             announce(session,ChatColor.GREEN+player.getName()+" guessed the word"+(first?" first!":"!"));
-        }else player.sendMessage(ChatColor.GRAY+"Not quite. "+(DRAW_MY_THING_MAX_GUESSES-used-1)+" guesses remain.");
+        }else {
+            int bestOtherScore = session.scores.entrySet().stream()
+                    .filter(entry -> !entry.getKey().equals(playerId))
+                    .mapToInt(Map.Entry::getValue).max().orElse(0);
+            if (bestOtherScore - session.scores.getOrDefault(playerId, 0) >= 10) {
+                session.drawComebackCandidates.add(playerId);
+            }
+            session.drawFirstGuessStreaks.put(playerId, 0);
+            player.sendMessage(ChatColor.GRAY+"Not quite. "+(DRAW_MY_THING_MAX_GUESSES-used-1)+" guesses remain.");
+        }
     }
 
     private void handleDrawMyThingInteract(Session session,PlayerInteractEvent event) {
@@ -7100,6 +7204,52 @@ public final class ArcadePortManager implements Listener {
         }
         if(winner==null&&session.participantsAtStart==1)
             winner=session.players.values().stream().filter(p->p!=null&&p.isOnline()).findFirst().orElse(null);
+        if (winner != null) {
+            UUID winningId = winner.getUniqueId();
+            int highest = session.scores.getOrDefault(winningId, Integer.MIN_VALUE);
+            List<UUID> tiedFirst = session.scores.entrySet().stream()
+                    .filter(entry -> entry.getValue() == highest)
+                    .map(Map.Entry::getKey).toList();
+            if (tiedFirst.size() > 1) {
+                for (UUID tiedId : tiedFirst) {
+                    Player tiedPlayer = session.players.get(tiedId);
+                    if (tiedPlayer != null) awardCatalogAchievement(tiedPlayer, "master-builders", "sharing-is-caring");
+                }
+            }
+            Map<UUID, Integer> winnerVotes = session.masterBuilderVotes.getOrDefault(winningId, Map.of());
+            int winnerVoteSum = winnerVotes.values().stream().mapToInt(Integer::intValue).sum();
+            int winnerVoteCount = winnerVotes.size();
+            if (winnerVoteCount > 0) {
+                for (Map.Entry<UUID, Integer> scoreEntry : session.scores.entrySet()) {
+                    UUID voterId = scoreEntry.getKey();
+                    if (voterId.equals(winningId) || scoreEntry.getValue() >= highest) continue;
+                    Integer voteForWinner = winnerVotes.get(voterId);
+                    if (voteForWinner == null || voteForWinner <= 1) continue;
+                    int hypotheticalWinnerScore = ArcadeProgressRules.masterBuildersScoreIfVoteChangedToOne(
+                            winnerVoteSum, winnerVoteCount, voteForWinner);
+                    int ownScore = scoreEntry.getValue();
+                    int highestOtherScore = session.scores.entrySet().stream()
+                            .filter(other -> !other.getKey().equals(voterId)
+                                    && !other.getKey().equals(winningId))
+                            .mapToInt(Map.Entry::getValue).max().orElse(Integer.MIN_VALUE);
+                    if (ArcadeProgressRules.shouldAwardMasterBuildersGreaterGood(
+                            ownScore, hypotheticalWinnerScore, highestOtherScore)) {
+                        Player voter = session.players.get(voterId);
+                        if (voter != null) awardCatalogAchievement(voter, "master-builders", "for-the-greater-good");
+                    }
+                }
+            }
+            if (ArcadeProgressRules.isMasterBuildersPurist(
+                    session.masterBuilderPlacedBlockTypes.getOrDefault(winningId, Set.of()))) {
+                awardCatalogAchievement(winner, "master-builders", "purist");
+            }
+            int runnerUp = session.scores.entrySet().stream()
+                    .filter(entry -> !entry.getKey().equals(winningId))
+                    .mapToInt(Map.Entry::getValue).max().orElse(Integer.MIN_VALUE);
+            if (ArcadeProgressRules.shouldAwardMasterBuildersArchitect(highest, runnerUp)) {
+                awardCatalogAchievement(winner, "master-builders", "architect");
+            }
+        }
         finish(session,winner,true);
     }
 
@@ -11575,6 +11725,9 @@ public final class ArcadePortManager implements Listener {
             long eliminationTime = System.currentTimeMillis();
             recordEvolutionAssists(session, victimId, killer == null ? null : killer.getUniqueId(), eliminationTime);
             session.evolutionLifeKills.put(victimId, 0);
+            session.evolutionStartedAtMillis.remove(victimId);
+            session.evolutionLevelAtAttempt.remove(victimId);
+            session.evolutionQuickEvolverAtAttempt.remove(victimId);
             session.evolutionAvailable.remove(victimId);
             session.evolutionCharge.remove(victimId);
             session.evolving.remove(victimId);
@@ -11996,8 +12149,11 @@ public final class ArcadePortManager implements Listener {
                 continue;
             }
             float progress = session.evolutionCharge.getOrDefault(id, 0.0F);
+            boolean quickEvolver = "quick-evolver".equals(
+                    session.evolutionKits.getOrDefault(id, "standard-evolution"));
             progress = (float) Math.min(0.9999D, progress
-                    + ArcadePortRules.evolutionChargePerTick(session.evolutionLifeKills.getOrDefault(id, 0)));
+                    + ArcadePortRules.evolutionChargePerTick(
+                            session.evolutionLifeKills.getOrDefault(id, 0), quickEvolver));
             session.evolutionCharge.put(id, progress);
             player.setExp(progress);
             player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 4, 1, false, false, true));
@@ -12321,6 +12477,9 @@ public final class ArcadePortManager implements Listener {
         // cosmetic/lock animation finishes (140 ticks). Before that point, restore the
         // evolution unlock so the player can retry; after it, keep the new form.
         boolean transformationCommitted = !session.evolutionKillsAtAttempt.containsKey(id);
+        session.evolutionStartedAtMillis.remove(id);
+        session.evolutionLevelAtAttempt.remove(id);
+        session.evolutionQuickEvolverAtAttempt.remove(id);
         session.evolutionKillsAtAttempt.remove(id);
         if (!transformationCommitted) session.evolutionAvailable.add(id);
         session.evolutionLockedLocations.remove(id);
@@ -12336,6 +12495,13 @@ public final class ArcadePortManager implements Listener {
         UUID id = player.getUniqueId();
         if (active != session || !session.alive.contains(id)
                 || !session.evolutionAvailable.remove(id) || !session.evolving.add(id)) return;
+        session.evolutionStartedAtMillis.put(id, System.currentTimeMillis());
+        session.evolutionLevelAtAttempt.put(id, session.evolutionLevels.getOrDefault(id, 0));
+        boolean quickEvolver = "quick-evolver".equals(
+                session.evolutionKits.getOrDefault(id, "standard-evolution"));
+        session.evolutionQuickEvolverAtAttempt.put(id, quickEvolver);
+        long formChangeTicks = ArcadePortRules.evolutionFormChangeTicks(quickEvolver);
+        long totalAnimationTicks = ArcadePortRules.evolutionTotalAnimationTicks(quickEvolver);
         session.evolutionCharge.remove(id);
         // Overkill tracks kills since the last successful transformation, not just this life.
         session.evolutionKillsAtAttempt.put(id, session.evolutionKillsSinceEvolution.getOrDefault(id, 0));
@@ -12350,13 +12516,16 @@ public final class ArcadePortManager implements Listener {
         player.removePotionEffect(PotionEffectType.SLOWNESS);
         player.removePotionEffect(PotionEffectType.JUMP_BOOST);
         player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 0.8F, 1.0F);
-        player.sendTitle(ChatColor.GREEN + "EVOLVING", ChatColor.YELLOW + "Keep still...", 0, 44, 8);
+        player.sendTitle(ChatColor.GREEN + "EVOLVING", ChatColor.YELLOW + "Keep still...", 0, (int) formChangeTicks, 8);
         player.sendMessage(ChatColor.GREEN + "Evolution charge complete. Hold still while your form changes.");
 
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (active != session || !session.evolving.contains(id)) return;
             if (!player.isOnline() || !session.alive.contains(id)) {
                 session.evolving.remove(id);
+                session.evolutionStartedAtMillis.remove(id);
+                session.evolutionLevelAtAttempt.remove(id);
+                session.evolutionQuickEvolverAtAttempt.remove(id);
                 session.evolutionLockedLocations.remove(id);
                 session.evolutionKillsAtAttempt.remove(id);
                 cleanupEvolutionEggEffect(session, id);
@@ -12381,10 +12550,13 @@ public final class ArcadePortManager implements Listener {
             }
             giveEvolutionKit(session, player);
             player.sendMessage(ChatColor.GREEN + "You evolved into stage " + (nextLevel + 1) + "/5.");
-        }, ArcadePortRules.EVOLUTION_FORM_CHANGE_TICKS);
+        }, formChangeTicks);
 
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (active != session || !session.evolving.remove(id)) return;
+            session.evolutionStartedAtMillis.remove(id);
+            session.evolutionLevelAtAttempt.remove(id);
+            session.evolutionQuickEvolverAtAttempt.remove(id);
             session.evolutionLockedLocations.remove(id);
             cleanupEvolutionEggEffect(session, id);
             if (!player.isOnline() || !session.alive.contains(id)) return;
@@ -12397,7 +12569,7 @@ public final class ArcadePortManager implements Listener {
             player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0F, 1.0F);
             player.getWorld().spawnParticle(Particle.EXPLOSION, player.getLocation().add(0.0D, 1.0D, 0.0D),
                     1, 0.1D, 0.1D, 0.1D, 0.0D);
-        }, ArcadePortRules.EVOLUTION_TOTAL_ANIMATION_TICKS);
+        }, totalAnimationTicks);
     }
 
     /** Keep respawning team players on their own archived team spawns. */
@@ -13092,6 +13264,44 @@ public final class ArcadePortManager implements Listener {
             recordDeathTagRewards(session);
         }
         if (session.type != ArcadePortGame.PLEXBALL) recordLocalStats(session, winner, announceWinner);
+        if (announceWinner && session.type == ArcadePortGame.DRAW_MY_THING && winner != null) {
+            UUID winnerId = winner.getUniqueId();
+            int expectedGuessRounds = Math.max(0, session.participantsAtStart - 1);
+            if (ArcadeProgressRules.isDrawMyThingPixelLinguist(
+                    session.drawLinguistPerfectRounds.getOrDefault(winnerId, 0),
+                    expectedGuessRounds, session.drawLinguistFailed.contains(winnerId))) {
+                awardCatalogAchievement(winner, "draw-my-thing", "pixel-linguist");
+            }
+            if (session.drawFastGuessRounds >= 2) {
+                awardCatalogAchievement(winner, "draw-my-thing", "why-cant-we-have-nice-things");
+            }
+            if (session.drawComebackCandidates.contains(winnerId)) {
+                awardCatalogAchievement(winner, "draw-my-thing", "doubted-but-not-in-doubt");
+            }
+        }
+        if (announceWinner && session.type == ArcadePortGame.MILK_THE_COW && winner != null) {
+            UUID winnerId = winner.getUniqueId();
+            if (ArcadeProgressRules.shouldAwardMilkCowPerfectGame(session.milkDeathCounts.getOrDefault(winnerId, 0))) {
+                awardCatalogAchievement(winner, "milk-the-cow", "perfect-game");
+            }
+            if (session.milkComebackCandidates.contains(winnerId)) {
+                awardCatalogAchievement(winner, "milk-the-cow", "pure-skill");
+            }
+            if (session.milkPingerCandidates.contains(winnerId)) {
+                awardCatalogAchievement(winner, "milk-the-cow", "pinger");
+            }
+            if (ArcadeProgressRules.shouldAwardMilkCowHighClub(
+                    session.milkDrankAirborne.contains(winnerId),
+                    session.milkDrankGrounded.contains(winnerId))) {
+                awardCatalogAchievement(winner, "milk-the-cow", "milk-high-club");
+            }
+            boolean opponentLedThreeTimes = session.milkTimesLed.entrySet().stream()
+                    .anyMatch(entry -> !entry.getKey().equals(winnerId)
+                            && ArcadeProgressRules.shouldAwardMilkCowStopStopHeIsAlreadyDead(entry.getValue()));
+            if (opponentLedThreeTimes) {
+                awardCatalogAchievement(winner, "milk-the-cow", "stop-stop-hes-already-dead");
+            }
+        }
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
             removeAllMicroBorderWarnings(session);
             for (Player player : session.players.values()) restoreMicroMiddleGlassCosmetic(session, player);
@@ -13100,7 +13310,10 @@ public final class ArcadePortManager implements Listener {
             session.variantRuntime.stop();
             session.variantRuntime = null;
         }
-        if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) sneakyAssassins.stop();
+        if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) {
+            sneakyAssassins.finish(winner);
+            sneakyAssassins.stop();
+        }
         if (announceWinner && session.type == ArcadePortGame.BOMB_LOBBERS) {
             recordBombLobbersAchievements(session, winner);
         }
@@ -13489,11 +13702,74 @@ public final class ArcadePortManager implements Listener {
 
     private void recordEvolutionAchievements(Session session, Player winner) {
         UUID id = winner.getUniqueId();
+        long now = System.currentTimeMillis();
+        for (Player candidate : alivePlayers(session)) {
+            UUID candidateId = candidate.getUniqueId();
+            if (candidateId.equals(id)
+                    || session.evolutionQuickEvolverAtAttempt.getOrDefault(candidateId, false)) continue;
+            long startedAt = session.evolutionStartedAtMillis.getOrDefault(candidateId, 0L);
+            if (startedAt <= 0L) continue;
+            long elapsedTicks = Math.max(0L, (now - startedAt) / 50L);
+            int attemptedLevel = session.evolutionLevelAtAttempt.getOrDefault(candidateId, -1);
+            if (ArcadePortRules.shouldAwardEvolutionWrongKitChamp(
+                    attemptedLevel, false, session.evolving.contains(candidateId), elapsedTicks)) {
+                awardEvolutionAchievement(candidate, EvolutionAchievement.WRONG_KIT_CHAMP.configKey(candidateId),
+                        "Wrong Kit Champ — your standard evolution would have finished too late.");
+            }
+        }
         if (session.evolutionOverkillEligible.contains(id)
                 && ArcadePortRules.isEvolutionWinnerLevel(session.evolutionLevels.getOrDefault(id, 0))) {
             awardEvolutionAchievement(winner, EvolutionAchievement.OVERKILL.configKey(id),
                     "Overkill — got 2 kills before each evolution.");
         }
+    }
+
+    private void awardCatalogAchievement(Player player, String gameId, String achievementId) {
+        if (player == null || !player.isOnline() || testPlayers.isTestPlayer(player)
+                || gameId == null || achievementId == null) return;
+        Set<String> valid = switch (gameId) {
+            case "draw-my-thing" -> Set.of("pixel-linguist", "why-cant-we-have-nice-things",
+                    "doubted-but-not-in-doubt", "triple-threat", "for-the-people");
+            case "master-builders" -> Set.of("purist", "sharing-is-caring", "for-the-greater-good", "architect");
+            case "milk-the-cow" -> Set.of("pure-skill", "pinger", "milk-high-club", "perfect-game",
+                    "slaughterhouse", "stop-stop-hes-already-dead", "got-the-chops");
+            case "wither-assault" -> Set.of("lucid-dreams", "savior", "tormentor", "worst-wither-ever",
+                    "eye-candy", "split-up", "wither-world", "its-a-mans-world");
+            default -> Set.of();
+        };
+        if (!valid.contains(achievementId)) return;
+        String key = "local-achievements." + player.getUniqueId() + "." + gameId + "." + achievementId;
+        if (plugin.getConfig().getBoolean(key, false)) return;
+        plugin.getConfig().set(key, true);
+        String label = switch (achievementId) {
+            case "pixel-linguist" -> "Pixel Linguist";
+            case "why-cant-we-have-nice-things" -> "Why can't we have nice things";
+            case "doubted-but-not-in-doubt" -> "Doubted but not in doubt";
+            case "triple-threat" -> "Triple Threat";
+            case "for-the-people" -> "For the people";
+            case "purist" -> "Purist";
+            case "sharing-is-caring" -> "Sharing is Caring";
+            case "for-the-greater-good" -> "For the greater good";
+            case "architect" -> "Architect";
+            case "pure-skill" -> "Pure Skill";
+            case "pinger" -> "Pinger";
+            case "milk-high-club" -> "Milk High Club";
+            case "perfect-game" -> "Perfect Game";
+            case "slaughterhouse" -> "Slaughterhouse";
+            case "stop-stop-hes-already-dead" -> "Stop Stop he's already dead";
+            case "got-the-chops" -> "Got the Chops";
+            case "lucid-dreams" -> "Lucid Dreams";
+            case "savior" -> "Savior";
+            case "tormentor" -> "Tormentor";
+            case "worst-wither-ever" -> "Worst Wither Ever";
+            case "eye-candy" -> "Eye Candy";
+            case "split-up" -> "SPLIT UP!";
+            case "wither-world" -> "Wither World";
+            case "its-a-mans-world" -> "It's a man's world";
+            default -> achievementId.replace('-', ' ');
+        };
+        plugin.saveConfig();
+        player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + ChatColor.YELLOW + label);
     }
 
     private void awardEvolutionAchievement(Player player, String key, String description) {
@@ -13558,7 +13834,9 @@ public final class ArcadePortManager implements Listener {
         plugin.getConfig().set(path + "lifetime-kills", Math.max(0, lifetimeKills));
         plugin.getConfig().set(path + "lifetime-slimes", Math.max(0, lifetimeSlimes));
         plugin.getConfig().set(path + "best-tail-length", Math.max(0, bestTailLength));
-        for (String achievement : List.of("Cannibal", "ChooChoo", "SlimySheep")) {
+        for (String achievement : List.of("Cannibal", "ChooChoo", "SlimySheep",
+                "dont-want-none", "resilience-snakeified", "busted",
+                "one-of-the-ogs", "flawless", "bots-everywhere")) {
             plugin.getConfig().set(path + "achievements." + achievement,
                     achievements != null && achievements.contains(achievement));
         }
@@ -13801,8 +14079,12 @@ public final class ArcadePortManager implements Listener {
                     && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
             boolean superSploorWinner = session.type == ArcadePortGame.SUPER_SPLOOR
                     && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
+            boolean milkCowWinner = session.type == ArcadePortGame.MILK_THE_COW
+                    && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
+            boolean witherAssaultWinner = session.type == ArcadePortGame.WITHER_ASSAULT
+                    && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
             boolean won = winnerId != null && (winnerId.equals(id) || turfWarsWinner || paintballWinner
-                    || superSploorWinner
+                    || superSploorWinner || milkCowWinner || witherAssaultWinner
                     || ((session.type == ArcadePortGame.BOMB_LOBBERS
                             || session.type == ArcadePortGame.MICRO_BATTLES)
                         && session.alive.contains(id)
@@ -13810,11 +14092,41 @@ public final class ArcadePortManager implements Listener {
             if (won) {
                 plugin.getConfig().set(path + "wins",
                         plugin.getConfig().getInt(path + "wins", 0) + 1);
+                if (session.type == ArcadePortGame.MILK_THE_COW) {
+                    String roleWins = session.teams.getOrDefault(id, 0) == 1 ? "cow-wins" : "human-wins";
+                    plugin.getConfig().set(path + roleWins,
+                            plugin.getConfig().getInt(path + roleWins, 0) + 1);
+                }
+                if (session.type == ArcadePortGame.WITHER_ASSAULT) {
+                    boolean humanWinner = session.teams.getOrDefault(id, -1) == 0;
+                    String roleWins = humanWinner ? "human-wins" : "wither-wins";
+                    plugin.getConfig().set(path + roleWins,
+                            plugin.getConfig().getInt(path + roleWins, 0) + 1);
+                    if (humanWinner && ArcadeProgressRules.shouldAwardWitherLucidDreams(
+                            true, session.witherHumanDamaged.contains(id))) {
+                        awardCatalogAchievement(entry.getValue(), "wither-assault", "lucid-dreams");
+                    }
+                }
                 if (session.type == ArcadePortGame.TURF_WARS
                         && session.turfTeamsBelowSixLines.contains(winningTeam)) {
                     plugin.getConfig().set(path + "the-comeback",
                             plugin.getConfig().getInt(path + "the-comeback", 0) + 1);
                 }
+            }
+            if (session.type == ArcadePortGame.MILK_THE_COW) {
+                plugin.getConfig().set(path + "kills", plugin.getConfig().getInt(path + "kills", 0)
+                        + session.milkKillsByPlayer.getOrDefault(id, 0));
+                plugin.getConfig().set(path + "assists", plugin.getConfig().getInt(path + "assists", 0)
+                        + session.milkAssistsByPlayer.getOrDefault(id, 0));
+                plugin.getConfig().set(path + "buckets-digested",
+                        plugin.getConfig().getInt(path + "buckets-digested", 0)
+                                + session.milkBucketsDigested.getOrDefault(id, 0));
+            }
+            if (session.type == ArcadePortGame.WITHER_ASSAULT) {
+                plugin.getConfig().set(path + "kills", plugin.getConfig().getInt(path + "kills", 0)
+                        + session.witherKillsByPlayer.getOrDefault(id, 0));
+                plugin.getConfig().set(path + "revives", plugin.getConfig().getInt(path + "revives", 0)
+                        + session.witherRevivesByPlayer.getOrDefault(id, 0));
             }
             if (session.type == ArcadePortGame.RUNNER) {
                 int marathonDistance = (int) Math.round(session.runnerMarathonDistance.getOrDefault(id, 0.0D));
@@ -14275,14 +14587,24 @@ public final class ArcadePortManager implements Listener {
                         lore, "noop", null, null));
             }
         } else if ("snake".equals(gameId)) {
-            String[] ids = {"Cannibal", "ChooChoo", "SlimySheep"};
-            String[] names = {"Cannibal", "Choo Choo", "Slimy Sheep"};
+            String[] ids = {"Cannibal", "ChooChoo", "SlimySheep",
+                    "dont-want-none", "resilience-snakeified", "busted",
+                    "one-of-the-ogs", "flawless", "bots-everywhere"};
+            String[] names = {"Cannibal", "Choo Choo", "Slimy Sheep",
+                    "Don't want none", "Resilience Snakeified", "Busted",
+                    "One of the OGs", "Flawless", "Bots Everywhere!"};
             String[] requirements = {
                     "Get six kills in one Snake game.",
                     "Grow your tail to at least 60 sheep segments.",
-                    "Eat 20 green slime pickups in one Snake game."
+                    "Eat 20 green slime pickups in one Snake game.",
+                    "Win a game without getting a kill.",
+                    "Win after being hit by a 10-second Magma Cube nerf.",
+                    "Roll the same Magma Cube nerf 3 times in a row.",
+                    "Win a game without using an ability.",
+                    "Win with every kill earned while an ability is active.",
+                    "Win while staying within 10 blocks of the map edge throughout the game."
             };
-            int[] achievementSlots = {10, 12, 14};
+            int[] achievementSlots = {9, 10, 11, 12, 13, 14, 15, 16, 17};
             for (int i = 0; i < ids.length; i++) {
                 boolean unlocked = plugin.getConfig().getBoolean(path + "achievements." + ids[i], false);
                 inventory.setItem(achievementSlots[i], statsItem(
@@ -15908,8 +16230,9 @@ public final class ArcadePortManager implements Listener {
             }
             double damage = event.getFinalDamage();
             if (damage > 0.0D) {
+                session.witherHumanDamaged.add(witherTarget.getUniqueId());
                 if (witherTarget.getHealth() <= damage) {
-                    playerOutWitherAssault(session, witherTarget);
+                    playerOutWitherAssault(session, witherTarget, witherAttacker);
                     if (active != session) return;
                     if (witherAttacker != null) witherAttacker.sendMessage(ChatColor.GREEN + "Human stunned: " + witherTarget.getName());
                 } else witherTarget.setHealth(witherTarget.getHealth() - damage);
@@ -17571,6 +17894,17 @@ public final class ArcadePortManager implements Listener {
                 || event.getItem().getType() != Material.MILK_BUCKET
                 || !session.alive.contains(player.getUniqueId())
                 || session.teams.getOrDefault(player.getUniqueId(), 0) != 0) return;
+        UUID drinkerId = player.getUniqueId();
+        session.milkBucketsDigested.merge(drinkerId, 1, Integer::sum);
+        if (player.isOnGround()) session.milkDrankGrounded.add(drinkerId);
+        else session.milkDrankAirborne.add(drinkerId);
+        int drinkerScore = session.scores.getOrDefault(drinkerId, 0);
+        for (UUID otherId : session.alive) {
+            if (otherId.equals(drinkerId) || session.teams.getOrDefault(otherId, 0) != 0) continue;
+            if (session.scores.getOrDefault(otherId, 0) == drinkerScore) {
+                session.milkPingerCandidates.add(otherId);
+            }
+        }
         incrementMilkCowScore(session, player, MilkCowRules.SCORE_PER_MILK, "Milk drunk");
         if (active != session) return;
         player.setHealth(Math.min(player.getMaxHealth(), player.getHealth() + 2.0D));
@@ -17656,8 +17990,17 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void playerOutWitherAssault(Session session, Player player) {
+        playerOutWitherAssault(session, player, null);
+    }
+
+    private void playerOutWitherAssault(Session session, Player player, Player attacker) {
         if (active != session || player == null || !session.alive.remove(player.getUniqueId())) return;
         UUID id = player.getUniqueId();
+        if (attacker != null && attacker.isOnline()
+                && session.teams.getOrDefault(attacker.getUniqueId(), -1) == 1
+                && session.teams.getOrDefault(id, -1) == 0) {
+            recordWitherAssaultElimination(session, attacker, player);
+        }
         player.playEffect(EntityEffect.HURT);
         player.setHealth(player.getMaxHealth());
         player.setFlySpeed(0.1F);
@@ -17689,6 +18032,23 @@ public final class ArcadePortManager implements Listener {
         checkRoundEnd(session);
     }
 
+    private void recordWitherAssaultElimination(Session session, Player wither, Player human) {
+        if (session == null || wither == null || human == null) return;
+        long now = System.currentTimeMillis();
+        long lastActive = session.witherLastHumanActivityAt.getOrDefault(
+                human.getUniqueId(), session.startedAt);
+        boolean recentlyActive = ArcadeProgressRules.isRecentWitherHumanActivity(now, lastActive, 60_000L);
+        if (!recentlyActive) return;
+        UUID witherId = wither.getUniqueId();
+        session.witherKillsByPlayer.merge(witherId, 1, Integer::sum);
+        int sameHumanKills = session.witherKillsByAttackerTarget
+                .computeIfAbsent(witherId, ignored -> new HashMap<>())
+                .merge(human.getUniqueId(), 1, Integer::sum);
+        if (ArcadeProgressRules.shouldAwardWitherWorstWitherEver(sameHumanKills, recentlyActive)) {
+            awardCatalogAchievement(wither, "wither-assault", "worst-wither-ever");
+        }
+    }
+
     private void reviveWitherHuman(Session session, Player thrower, UUID revivedId) {
         if (active != session || thrower == null || !session.alive.contains(thrower.getUniqueId())
                 || session.teams.getOrDefault(thrower.getUniqueId(), 1) != 0) return;
@@ -17714,6 +18074,13 @@ public final class ArcadePortManager implements Listener {
         }, 4L);
         session.alive.add(revivedId);
         session.lastLocations.put(revivedId, at.clone());
+        session.witherRevivesByPlayer.merge(thrower.getUniqueId(), 1, Integer::sum);
+        Set<UUID> revivedHumans = session.witherRevivedByPlayer.computeIfAbsent(
+                thrower.getUniqueId(), ignored -> new HashSet<>());
+        if (revivedHumans.add(revivedId)
+                && ArcadeProgressRules.shouldAwardWitherSavior(revivedHumans.size())) {
+            awardCatalogAchievement(thrower, "wither-assault", "savior");
+        }
         revived.sendMessage(ChatColor.GREEN + "You have been revived by " + thrower.getName() + "!");
         thrower.sendMessage(ChatColor.GREEN + "Revived " + revived.getName() + ".");
         thrower.playSound(thrower.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.4F);
@@ -17986,6 +18353,19 @@ public final class ArcadePortManager implements Listener {
         UUID id = player.getUniqueId();
         int score = MilkCowRules.scoreAfterChange(session.scores.getOrDefault(id, 0), change);
         session.scores.put(id, score);
+        int bestOpponentScore = session.scores.entrySet().stream()
+                .filter(entry -> !entry.getKey().equals(id))
+                .mapToInt(Map.Entry::getValue).max().orElse(0);
+        if (bestOpponentScore - score >= 5) session.milkComebackCandidates.add(id);
+        int currentLeaderScore = session.scores.values().stream().mapToInt(Integer::intValue).max().orElse(0);
+        List<UUID> currentLeaders = session.scores.entrySet().stream()
+                .filter(entry -> entry.getValue() == currentLeaderScore)
+                .map(Map.Entry::getKey).toList();
+        UUID nextLeader = currentLeaders.size() == 1 ? currentLeaders.get(0) : null;
+        if (nextLeader != null && !nextLeader.equals(session.milkCurrentLeader)) {
+            session.milkTimesLed.merge(nextLeader, 1, Integer::sum);
+        }
+        session.milkCurrentLeader = nextLeader;
         player.sendMessage((change >= 0 ? ChatColor.GREEN : ChatColor.RED)
                 + reason + ": " + score + "/" + MilkCowRules.SCORE_TO_WIN);
         if (MilkCowRules.hasWon(score)) {
@@ -18129,7 +18509,35 @@ public final class ArcadePortManager implements Listener {
     private void damageMilkCowFarmer(Session session, Player target, Player attacker, double damage) {
         if (active != session || target == null || !session.alive.contains(target.getUniqueId())
                 || session.teams.getOrDefault(target.getUniqueId(), 0) != 0 || damage <= 0.0D) return;
+        UUID targetId = target.getUniqueId();
+        UUID attackerId = attacker == null ? null : attacker.getUniqueId();
+        long now = System.currentTimeMillis();
+        Map<UUID, Long> contributors = session.milkDamageAtByTarget.computeIfAbsent(
+                targetId, ignored -> new HashMap<>());
+        if (attackerId != null && session.teams.getOrDefault(attackerId, -1) == 1) {
+            contributors.put(attackerId, now);
+        }
         if (target.getHealth() <= damage) {
+            session.milkDeathCounts.merge(targetId, 1, Integer::sum);
+            if (attacker != null && session.teams.getOrDefault(attackerId, -1) == 1) {
+                session.milkKillsByPlayer.merge(attackerId, 1, Integer::sum);
+                if (!target.isOnGround()) {
+                    int airborneKills = session.milkAirborneKillsByPlayer.merge(attackerId, 1, Integer::sum);
+                    if (ArcadeProgressRules.shouldAwardMilkCowGotTheChops(airborneKills)) {
+                        awardCatalogAchievement(attacker, "milk-the-cow", "got-the-chops");
+                    }
+                }
+                for (Map.Entry<UUID, Long> contribution : contributors.entrySet()) {
+                    UUID assisterId = contribution.getKey();
+                    if (assisterId.equals(attackerId) || now - contribution.getValue() > 10_000L) continue;
+                    int assists = session.milkAssistsByPlayer.merge(assisterId, 1, Integer::sum);
+                    Player assister = session.players.get(assisterId);
+                    if (ArcadeProgressRules.shouldAwardMilkCowSlaughterhouse(assists) && assister != null) {
+                        awardCatalogAchievement(assister, "milk-the-cow", "slaughterhouse");
+                    }
+                }
+            }
+            session.milkDamageAtByTarget.remove(targetId);
             incrementMilkCowScore(session, target, -MilkCowRules.SCORE_LOST_ON_DEATH, "Farmer defeated");
             if (active != session) return;
             if (attacker != null && session.teams.getOrDefault(attacker.getUniqueId(), -1) == 1) {
@@ -18350,7 +18758,12 @@ public final class ArcadePortManager implements Listener {
                     && System.currentTimeMillis() < session.masterBuilderBuildEndsAt
                     && session.alive.contains(event.getPlayer().getUniqueId())
                     && isInsideMasterBuilderPlot(session, event.getPlayer().getUniqueId(), event.getBlockPlaced());
-            if (!allowed) event.setCancelled(true);
+            if (!allowed) {
+                event.setCancelled(true);
+            } else {
+                session.masterBuilderPlacedBlockTypes.computeIfAbsent(
+                        event.getPlayer().getUniqueId(), ignored -> new HashSet<>()).add(event.getBlockPlaced().getType());
+            }
             return;
         }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
@@ -19906,6 +20319,46 @@ public final class ArcadePortManager implements Listener {
         return false;
     }
 
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onWitherHumanMove(org.bukkit.event.player.PlayerMoveEvent event) {
+        Session session = active;
+        Player player = event.getPlayer();
+        if (session == null || session.type != ArcadePortGame.WITHER_ASSAULT
+                || !session.alive.contains(player.getUniqueId())
+                || session.teams.getOrDefault(player.getUniqueId(), 1) != 0
+                || event.getTo() == null) return;
+        Location from = event.getFrom();
+        Location to = event.getTo();
+        if (Math.abs(from.getX() - to.getX()) > 0.01D
+                || Math.abs(from.getY() - to.getY()) > 0.01D
+                || Math.abs(from.getZ() - to.getZ()) > 0.01D) {
+            session.witherLastHumanActivityAt.put(player.getUniqueId(), System.currentTimeMillis());
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onWitherHumanInteract(org.bukkit.event.player.PlayerInteractEvent event) {
+        Session session = active;
+        Player player = event.getPlayer();
+        if (session != null && session.type == ArcadePortGame.WITHER_ASSAULT
+                && session.alive.contains(player.getUniqueId())
+                && session.teams.getOrDefault(player.getUniqueId(), 1) == 0
+                && !"PHYSICAL".equals(event.getAction().name())) {
+            session.witherLastHumanActivityAt.put(player.getUniqueId(), System.currentTimeMillis());
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onWitherHumanEntityInteract(org.bukkit.event.player.PlayerInteractEntityEvent event) {
+        Session session = active;
+        Player player = event.getPlayer();
+        if (session != null && session.type == ArcadePortGame.WITHER_ASSAULT
+                && session.alive.contains(player.getUniqueId())
+                && session.teams.getOrDefault(player.getUniqueId(), 1) == 0) {
+            session.witherLastHumanActivityAt.put(player.getUniqueId(), System.currentTimeMillis());
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onWitherHumanDoubleJump(org.bukkit.event.player.PlayerToggleFlightEvent event) {
         if (cancelPrepareAction(event.getPlayer(), event)) return;
@@ -20071,6 +20524,7 @@ public final class ArcadePortManager implements Listener {
             double ageScale = 0.4D + 0.6D * Math.min(1.0D, skull.getTicksLived() / 20.0D);
             session.world.spawnParticle(Particle.EXPLOSION_EMITTER, blast, 1);
             session.world.playSound(blast, Sound.ENTITY_GENERIC_EXPLODE, 1.4F, 0.9F);
+            int humanKillsFromSkull = 0;
             for (Player target : alivePlayers(session)) {
                 if (session.teams.getOrDefault(target.getUniqueId(), 1) != 0) continue;
                 double distance = target.getLocation().distance(blast);
@@ -20083,8 +20537,15 @@ public final class ArcadePortManager implements Listener {
                         .setY(Math.max(0.3D, 0.65D * scale))));
                 target.getWorld().spawnParticle(Particle.CLOUD, target.getLocation().add(0.0D, 1.0D, 0.0D),
                         10, 0.35D, 0.4D, 0.35D, 0.04D);
-                if (target.getHealth() <= damage) playerOutWitherAssault(session, target);
-                else target.setHealth(target.getHealth() - damage);
+                session.witherHumanDamaged.add(target.getUniqueId());
+                if (target.getHealth() <= damage) {
+                    humanKillsFromSkull++;
+                    playerOutWitherAssault(session, target, owner);
+                    if (owner != null && owner.isOnline()
+                            && ArcadeProgressRules.shouldAwardWitherTormentor(humanKillsFromSkull)) {
+                        awardCatalogAchievement(owner, "wither-assault", "tormentor");
+                    }
+                } else target.setHealth(target.getHealth() - damage);
                 if (active != session) return;
                 if (owner != null) owner.sendActionBar(ChatColor.RED + "Wither Skull hit " + target.getName());
             }
@@ -20624,6 +21085,11 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> drawCorrectGuessers = new HashSet<>();
         final Map<UUID, Integer> drawGuessAttempts = new HashMap<>();
         final Set<Integer> drawRevealedLetters = new HashSet<>();
+        final Set<UUID> drawLinguistFailed = new HashSet<>();
+        final Map<UUID, Integer> drawLinguistPerfectRounds = new HashMap<>();
+        final Map<UUID, Integer> drawFirstGuessStreaks = new HashMap<>();
+        final Set<UUID> drawComebackCandidates = new HashSet<>();
+        int drawFastGuessRounds;
         final Set<String> drawUsedWords = new HashSet<>();
         UUID drawCurrentDrawer;
         String drawWord;
@@ -20636,6 +21102,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Integer> masterBuilderPlots = new LinkedHashMap<>();
         final List<UUID> masterBuilderReviewOrder = new ArrayList<>();
         final Map<UUID, Map<UUID, Integer>> masterBuilderVotes = new HashMap<>();
+        final Map<UUID, Set<Material>> masterBuilderPlacedBlockTypes = new HashMap<>();
         MasterBuildersPhase masterBuilderPhase = MasterBuildersPhase.BUILDING;
         String masterBuilderTheme;
         UUID masterBuilderCurrentTarget;
@@ -20663,6 +21130,10 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Integer> paintProjectileDamage = new HashMap<>();
         final Map<UUID, PaintballProjectileVisual> paintballProjectileCosmetics = new HashMap<>();
         final Map<UUID, Integer> evolutionLevels = new HashMap<>();
+        final Map<UUID, String> evolutionKits = new HashMap<>();
+        final Map<UUID, Long> evolutionStartedAtMillis = new HashMap<>();
+        final Map<UUID, Integer> evolutionLevelAtAttempt = new HashMap<>();
+        final Map<UUID, Boolean> evolutionQuickEvolverAtAttempt = new HashMap<>();
         final Map<UUID, Integer> evolutionLifeKills = new HashMap<>();
         /** Kills earned since the player's last successful Evolution transformation. */
         final Map<UUID, Integer> evolutionKillsSinceEvolution = new HashMap<>();
@@ -20726,7 +21197,25 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> milkBodySlamReadyAt = new HashMap<>();
         final Map<UUID, Cow> milkCowDisguises = new HashMap<>();
         final Map<UUID, Long> milkChargeHungerAt = new HashMap<>();
+        final Map<UUID, Integer> milkDeathCounts = new HashMap<>();
+        final Set<UUID> milkComebackCandidates = new HashSet<>();
+        final Set<UUID> milkPingerCandidates = new HashSet<>();
+        final Set<UUID> milkDrankAirborne = new HashSet<>();
+        final Set<UUID> milkDrankGrounded = new HashSet<>();
+        final Map<UUID, Integer> milkTimesLed = new HashMap<>();
+        final Map<UUID, Integer> milkKillsByPlayer = new HashMap<>();
+        final Map<UUID, Integer> milkAssistsByPlayer = new HashMap<>();
+        final Map<UUID, Integer> milkAirborneKillsByPlayer = new HashMap<>();
+        final Map<UUID, Integer> milkBucketsDigested = new HashMap<>();
+        final Map<UUID, Map<UUID, Long>> milkDamageAtByTarget = new HashMap<>();
+        UUID milkCurrentLeader;
         final Map<UUID, String> witherAssaultKits = new HashMap<>();
+        final Set<UUID> witherHumanDamaged = new HashSet<>();
+        final Map<UUID, Long> witherLastHumanActivityAt = new HashMap<>();
+        final Map<UUID, Set<UUID>> witherRevivedByPlayer = new HashMap<>();
+        final Map<UUID, Map<UUID, Integer>> witherKillsByAttackerTarget = new HashMap<>();
+        final Map<UUID, Integer> witherKillsByPlayer = new HashMap<>();
+        final Map<UUID, Integer> witherRevivesByPlayer = new HashMap<>();
         final Map<UUID, Wither> witherDisguises = new HashMap<>();
         final Map<UUID, Skeleton> witherOutCopies = new HashMap<>();
         final Map<UUID, UUID> witherMinionOwners = new HashMap<>();

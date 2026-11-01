@@ -25,8 +25,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     // Keep aligned with ArcadeCatalog's READY_FOR_TEST statuses.
     private static final java.util.List<String> READY_FOR_TEST_GAME_IDS = java.util.List.of(
             "death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl",
-            "gladiators", "micro-battles", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "runner", "sheep-quest", "turf-wars", "camera-shy");
-    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-dragon-escape-sheep-quest-turf-wars-super-sploor-dragons-runner-camera-shy-20261101-v4";
+            "gladiators", "micro-battles", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "runner", "sheep-quest", "turf-wars", "camera-shy", "monster-maze", "snake", "draw-my-thing", "master-builders");
+    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-20-games-monster-maze-snake-draw-my-thing-master-builders-20261101-v5";
 
     @Override
     public void onEnable() {
@@ -87,9 +87,9 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         getCommand("gamepreferences").setExecutor(this);
         publishArcadeRuntimeReadiness();
 
-        // Monster Maze remains embedded in this Arcade host, but is not currently
-        // on the playable allow-list. Keep its startup failure isolated from the
-        // games which have been cleared for the shared acceptance test queue.
+        // Monster Maze is embedded in this Arcade host and is part of the controlled
+        // acceptance queue. Startup remains isolated from the shared lobby; the
+        // deployment gate separately requires its registration readiness signal.
         try {
             monsterMazeReadiness.initializeAndAttach(
                     () -> {
@@ -244,6 +244,36 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             manager.recordSnakeStats(playerId, won, kills, knockedOut,
                     lifetimeKills, lifetimeSlimes, bestTailLength, achievements);
         }
+    }
+
+    private String monsterMazeStatsPath(java.util.UUID playerId) { return "local-stats." + playerId + ".monster-maze."; }
+    public void recordMonsterMazeFirstSafePad(java.util.UUID playerId) {
+        if (playerId == null) return;
+        String path = monsterMazeStatsPath(playerId);
+        getConfig().set(path + "first-safe-pads", getConfig().getInt(path + "first-safe-pads", 0) + 1);
+        saveConfig();
+    }
+    public void recordMonsterMazeHighestStage(java.util.UUID playerId, int stage) {
+        if (playerId == null || stage < 0) return;
+        String path = monsterMazeStatsPath(playerId);
+        getConfig().set(path + "highest-stage", Math.max(getConfig().getInt(path + "highest-stage", 0), stage));
+        saveConfig();
+    }
+    public void recordMonsterMazeWin(java.util.UUID playerId, int stage) {
+        if (playerId == null || stage < 0) return;
+        String path = monsterMazeStatsPath(playerId);
+        getConfig().set(path + "wins", getConfig().getInt(path + "wins", 0) + 1);
+        getConfig().set(path + "highest-stage", Math.max(getConfig().getInt(path + "highest-stage", 0), stage));
+        saveConfig();
+    }
+    public void recordMonsterMazeAchievement(java.util.UUID playerId, String achievementId) {
+        if (playerId == null || achievementId == null || !java.util.Set.of("jumpman", "just-to-suffer", "blizzard", "out-of-the-cup", "blackout", "stampede", "perfect-run", "breakaway", "photo-finish").contains(achievementId)) return;
+        String key = "local-achievements." + playerId + ".monster-maze." + achievementId;
+        if (getConfig().getBoolean(key, false)) return;
+        getConfig().set(key, true);
+        saveConfig();
+        Player player = Bukkit.getPlayer(playerId);
+        if (player != null && player.isOnline()) player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + ChatColor.YELLOW + achievementId.replace('-', ' '));
     }
 
     @EventHandler

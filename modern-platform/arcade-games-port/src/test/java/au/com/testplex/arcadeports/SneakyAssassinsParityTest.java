@@ -60,4 +60,29 @@ class SneakyAssassinsParityTest {
         assertEquals(144.0D, SneakyAssassinsRules.revealRadiusSquared(), 0.00001D);
         assertEquals(25.0D, SneakyAssassinsRules.smokeRadiusSquared(), 0.00001D);
     }
+
+    @Test void sneakAssassinAwardConditionsRejectFalsePositiveKills() {
+        assertTrue(SneakyAssassinsRules.shouldAwardYouNeedDirections(true, true, true, true));
+        assertFalse(SneakyAssassinsRules.shouldAwardYouNeedDirections(false, true, true, true));
+        assertFalse(SneakyAssassinsRules.shouldAwardYouNeedDirections(true, false, true, true));
+        assertFalse(SneakyAssassinsRules.shouldAwardYouNeedDirections(true, true, false, true));
+        assertFalse(SneakyAssassinsRules.shouldAwardYouNeedDirections(true, true, true, false));
+        assertTrue(SneakyAssassinsRules.shouldAwardNotSoSneaky("assassin", false));
+        assertFalse(SneakyAssassinsRules.shouldAwardNotSoSneaky("assassin", true));
+        assertFalse(SneakyAssassinsRules.shouldAwardNotSoSneaky("briber", false));
+        assertTrue(SneakyAssassinsRules.shouldAwardIdiot("escape-artist", false));
+        assertFalse(SneakyAssassinsRules.shouldAwardIdiot("escape-artist", true));
+        assertTrue(SneakyAssassinsRules.shouldAwardTheDuelsDuelsDuel(true, 2));
+        assertFalse(SneakyAssassinsRules.shouldAwardTheDuelsDuelsDuel(true, 1));
+        assertFalse(SneakyAssassinsRules.shouldAwardTheDuelsDuelsDuel(false, 3));
+        assertFalse(SneakyAssassinsRules.shouldAwardProsecutor(4));
+        assertTrue(SneakyAssassinsRules.shouldAwardProsecutor(5));
+        assertTrue(SneakyAssassinsRules.isPowerUpKillWindow(1_000, 1));
+        assertFalse(SneakyAssassinsRules.isPowerUpKillWindow(1_002, 1));
+        assertFalse(SneakyAssassinsRules.isPowerUpKillWindow(0, 1));
+        assertEquals(12_000L, SneakyAssassinsRules.firstPowerUpDelayMillis());
+        assertEquals(7_000L, SneakyAssassinsRules.nextPowerUpDelayMillis());
+        assertEquals(2, SneakyAssassinsRules.maxActivePowerUps());
+    }
+
 }

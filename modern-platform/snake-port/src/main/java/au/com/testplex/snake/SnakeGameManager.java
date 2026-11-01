@@ -450,6 +450,9 @@ public final class SnakeGameManager implements Listener {
                 head.addPassenger(state.player);
             }
             expireEffects(state, now);
+            if (state.edgeStayEligible && !isWithinTenBlocksOfMapEdge(state.player.getLocation())) {
+                state.edgeStayEligible = false;
+            }
             updateSnakeAppearance(state, now);
             if (state.reverseUntil > now) {
                 state.lastMovementLocation = head.getLocation().clone();
@@ -806,6 +809,13 @@ public final class SnakeGameManager implements Listener {
         ControlDebuff result = outcomes[ThreadLocalRandom.current().nextInt(outcomes.length)];
         state.rouletteHits++;
         int duration = SnakeRules.rouletteDurationSecondsForHit(state.rouletteHits);
+        boolean sameEffect = result == state.lastRouletteEffect;
+        state.sameRouletteEffectStreak = SnakeRules.nextSameRouletteEffectCount(
+                sameEffect, state.sameRouletteEffectStreak);
+        state.lastRouletteEffect = result;
+        if (SnakeRules.shouldAwardBusted(state.sameRouletteEffectStreak)) {
+            stats.awardAchievement(player.getUniqueId(), "busted");
+        }
         ItemStack original = player.getInventory().getItem(HOTBAR_ROULETTE_SLOT);
         state.rouletteOriginalItem = original == null ? null : original.clone();
         state.rouletteOriginalCaptured = true;
@@ -831,6 +841,7 @@ public final class SnakeGameManager implements Listener {
                 restoreRouletteSlot(state);
                 state.debuff = result;
                 state.debuffUntil = System.currentTimeMillis() + duration * 1000L;
+                if (SnakeRules.isTenSecondRouletteHit(duration)) state.hitByTenSecondNerf = true;
                 state.lastRawYaw = player.getLocation().getYaw();
                 state.laggedYaw = state.lastRawYaw;
                 Vector initial = player.getLocation().getDirection().setY(0.0D);
@@ -917,6 +928,11 @@ public final class SnakeGameManager implements Listener {
             SnakeState killerState = snakes.get(killer.getUniqueId());
             if (killerState != null && killerState.alive) {
                 killerState.kills++;
+                long killAt = System.currentTimeMillis();
+                if (!SnakeRules.isAbilityActive(killAt, killerState.speedUntil,
+                        killerState.reverseUntil, killerState.invulnerableUntil)) {
+                    killerState.allKillsDuringAbility = false;
+                }
                 stats.recordKill(killer, killerState.kills);
             }
         }
@@ -981,6 +997,16 @@ public final class SnakeGameManager implements Listener {
             if (recordStats) {
                 boolean won = winner != null && winner.getUniqueId().equals(state.player.getUniqueId());
                 boolean knockedOut = !state.alive;
+                if (won) {
+                    UUID playerId = state.player.getUniqueId();
+                    if (state.kills == 0) stats.awardAchievement(playerId, "dont-want-none");
+                    if (state.hitByTenSecondNerf) stats.awardAchievement(playerId, "resilience-snakeified");
+                    if (!state.abilityUsed) stats.awardAchievement(playerId, "one-of-the-ogs");
+                    if (SnakeRules.shouldAwardFlawless(state.kills, state.allKillsDuringAbility)) {
+                        stats.awardAchievement(playerId, "flawless");
+                    }
+                    if (state.edgeStayEligible) stats.awardAchievement(playerId, "bots-everywhere");
+                }
                 stats.recordGameEnd(state.player.getUniqueId(), won, state.kills);
                 stats.publishToArcadeStats(state.player.getUniqueId(), won, state.kills, knockedOut);
             }
@@ -1017,6 +1043,14 @@ public final class SnakeGameManager implements Listener {
 
     private DyeColor colorFor(int index) {
         return SnakeRules.colorForLegacyDyeData(index);
+    }
+
+    private boolean isWithinTenBlocksOfMapEdge(Location location) {
+        if (location == null || mapData == null || location.getWorld() != arena) return false;
+        double clampedX = mapData.clampX(location.getX(), 10.0D);
+        double clampedZ = mapData.clampZ(location.getZ(), 10.0D);
+        return SnakeRules.isWithinTenBlocksOfMapEdge(
+                location.getX(), location.getZ(), clampedX, clampedZ);
     }
 
     private boolean isKnownKit(String kit) {
@@ -1194,6 +1228,7 @@ public final class SnakeGameManager implements Listener {
         long now = System.currentTimeMillis();
         if (now < state.abilityCooldownUntil) return;
         consumeMainHand(event.getPlayer());
+        state.abilityUsed = true;
 
         if (material == Material.FEATHER && "speed".equals(state.kit)) {
             state.speedUntil = now + 2_000L;
@@ -1473,6 +1508,12 @@ public final class SnakeGameManager implements Listener {
         int kills;
         int slimesEaten;
         int maxTailLength;
+        boolean abilityUsed;
+        boolean allKillsDuringAbility = true;
+        boolean hitByTenSecondNerf;
+        boolean edgeStayEligible = true;
+        ControlDebuff lastRouletteEffect;
+        int sameRouletteEffectStreak;
         ItemStack rouletteOriginalItem;
         BukkitTask rouletteTask;
 
