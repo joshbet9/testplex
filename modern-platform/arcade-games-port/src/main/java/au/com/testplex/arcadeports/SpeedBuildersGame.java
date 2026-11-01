@@ -128,6 +128,52 @@ public final class SpeedBuildersGame implements Listener {
                 + " build=" + (currentTemplate == null ? "none" : currentTemplate.name());
     }
 
+    public static boolean isStatsRequest(String[] args) {
+        if (args == null || args.length == 0) return false;
+        return isSpeedBuildersId(args[0]) || (args.length > 1 && isSpeedBuildersId(args[1]));
+    }
+
+    public void showStats(Player viewer, String[] args) {
+        if (viewer == null || !viewer.isOnline()) return;
+        String subjectName = viewer.getName();
+        UUID subjectId = viewer.getUniqueId();
+        if (args != null && args.length > 1 && isSpeedBuildersId(args[1])) {
+            Player target = Bukkit.getPlayerExact(args[0]);
+            if (target == null) {
+                viewer.sendMessage(ChatColor.RED + "That player must be online to view their Speed Builders stats.");
+                return;
+            }
+            subjectName = target.getName();
+            subjectId = target.getUniqueId();
+        }
+        String root = "local-stats." + subjectId + ".speed-builders-arcade.";
+        viewer.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + subjectName + " — SPEED BUILDERS");
+        viewer.sendMessage(ChatColor.YELLOW + "Wins: " + ChatColor.WHITE + plugin.getConfig().getLong(root + "wins", 0L)
+                + ChatColor.YELLOW + " | Perfect builds: " + ChatColor.WHITE
+                + plugin.getConfig().getLong(root + "perfect-builds", 0L));
+        viewer.sendMessage(ChatColor.YELLOW + "Blocks placed: " + ChatColor.WHITE
+                + plugin.getConfig().getLong(root + "blocks-placed", 0L)
+                + ChatColor.YELLOW + " | Blocks broken: " + ChatColor.WHITE
+                + plugin.getConfig().getLong(root + "blocks-broken", 0L));
+        viewer.sendMessage(ChatColor.YELLOW + "Mobs built: " + ChatColor.WHITE
+                + plugin.getConfig().getLong(root + "mobs-built", 0L)
+                + ChatColor.YELLOW + " | First perfect: " + ChatColor.WHITE
+                + plugin.getConfig().getLong(root + "perfect-first", 0L));
+        viewer.sendMessage(ChatColor.YELLOW + "Perfect wins: " + ChatColor.WHITE
+                + plugin.getConfig().getLong(root + "perfectionist-wins", 0L)
+                + ChatColor.YELLOW + " | Builds under 10s: " + ChatColor.WHITE
+                + plugin.getConfig().getLong(root + "speediest-builderizer", 0L));
+    }
+
+    private static boolean isSpeedBuildersId(String requested) {
+        if (requested == null) return false;
+        String normalized = requested.toLowerCase(java.util.Locale.ROOT)
+                .replace('_', '-').replace(' ', '-');
+        return normalized.equals("speed-builders") || normalized.equals("speedbuilder")
+                || normalized.equals("speedbuilders") || normalized.equals("speed-builder");
+    }
+
+
     public void queue(Player player, boolean quickStart) {
         if (player == null || !player.isOnline()) return;
         if (isActive()) {
