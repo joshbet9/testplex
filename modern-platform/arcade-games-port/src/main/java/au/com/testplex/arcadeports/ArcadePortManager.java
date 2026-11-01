@@ -12791,7 +12791,10 @@ public final class ArcadePortManager implements Listener {
             session.variantRuntime.stop();
             session.variantRuntime = null;
         }
-        if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) sneakyAssassins.stop();
+        if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) {
+            sneakyAssassins.finish(winner);
+            sneakyAssassins.stop();
+        }
         if (announceWinner && session.type == ArcadePortGame.BOMB_LOBBERS) {
             recordBombLobbersAchievements(session, winner);
         }

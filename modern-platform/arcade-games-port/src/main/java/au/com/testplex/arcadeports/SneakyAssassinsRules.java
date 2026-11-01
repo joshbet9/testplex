@@ -6,6 +6,36 @@ import org.bukkit.Material;
 final class SneakyAssassinsRules {
     private SneakyAssassinsRules() { }
 
+    static boolean shouldAwardYouNeedDirections(boolean masterAssassin, boolean directPlayerAttack,
+            boolean actualMasterCompass, boolean lethalHit) {
+        return masterAssassin && directPlayerAttack && actualMasterCompass && lethalHit;
+    }
+
+    static boolean shouldAwardNotSoSneaky(String kit, boolean dealtMeleeDamage) {
+        return "assassin".equals(kit) && !dealtMeleeDamage;
+    }
+
+    static boolean shouldAwardIdiot(String kit, boolean usedSmokeBomb) {
+        return "escape-artist".equals(kit) && !usedSmokeBomb;
+    }
+
+    static boolean shouldAwardTheDuelsDuelsDuel(boolean winnerIsMasterAssassin, int otherMasterAssassins) {
+        return winnerIsMasterAssassin && otherMasterAssassins >= 2;
+    }
+
+    static boolean shouldAwardProsecutor(int distinctTargets) {
+        return distinctTargets >= 5;
+    }
+
+    static boolean isPowerUpKillWindow(long nowMillis, long collectedAtMillis) {
+        return collectedAtMillis > 0L && nowMillis >= collectedAtMillis
+                && nowMillis - collectedAtMillis <= 1_000L;
+    }
+
+    static long firstPowerUpDelayMillis() { return 12_000L; }
+    static long nextPowerUpDelayMillis() { return 7_000L; }
+    static int maxActivePowerUps() { return 2; }
+
     static double swordDamage(Material weapon) {
         if (weapon == null) return 0.0D;
         return switch (weapon) {

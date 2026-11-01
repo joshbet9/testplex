@@ -65,8 +65,9 @@ final class SneakyAssassinsMechanics {
     static final long REVEALER_DURATION_MILLIS = 5_000L;
     static final long SMOKE_CLOAK_DURATION_MILLIS = 1_200L;
     static final long BRIBE_COOLDOWN_MILLIS = 8_000L;
-    static final long FIRST_POWERUP_DELAY_MILLIS = 20_000L;
-    static final long NEXT_POWERUP_DELAY_MILLIS = 10_000L;
+    static final long FIRST_POWERUP_DELAY_MILLIS = SneakyAssassinsRules.firstPowerUpDelayMillis();
+    static final long NEXT_POWERUP_DELAY_MILLIS = SneakyAssassinsRules.nextPowerUpDelayMillis();
+    static final int MAX_ACTIVE_POWERUPS = SneakyAssassinsRules.maxActivePowerUps();
     static final double REVEALER_RADIUS = 12.0D;
     static final double SMOKE_RADIUS = 5.0D;
 
@@ -100,6 +101,11 @@ final class SneakyAssassinsMechanics {
     private final Map<UUID, Integer> powerUpCounts = new HashMap<>();
     private final Map<UUID, Long> masterCompassUpdateAt = new HashMap<>();
     private final Set<UUID> masterAssassins = new HashSet<>();
+    private final Map<UUID, UUID> pendingCompassKills = new HashMap<>();
+    private final Set<UUID> rangedAssassinMeleeDamage = new HashSet<>();
+    private final Set<UUID> escapeArtistSmokeUsed = new HashSet<>();
+    private final Map<UUID, Set<UUID>> revealerTargets = new HashMap<>();
+    private final Map<UUID, Long> lastPowerUpCollectedAt = new HashMap<>();
     private long nextPowerUpAt;
     private long nextGlobalRevealAt;
     private long globalRevealEndsAt;
@@ -666,6 +672,9 @@ final class SneakyAssassinsMechanics {
     }
 
     private void useSmokeBomb(Player player) {
+        if ("escape-artist".equals(selectedKit(player.getUniqueId()))) {
+            escapeArtistSmokeUsed.add(player.getUniqueId());
+        }
         long now = System.currentTimeMillis();
         cloakUntil.put(player.getUniqueId(), now + SMOKE_CLOAK_DURATION_MILLIS);
         Villager proxy = disguises.get(player.getUniqueId());
@@ -696,7 +705,9 @@ final class SneakyAssassinsMechanics {
     }
 
     private void updatePowerUps(long now) {
-        if (powerUps.isEmpty() && now >= nextPowerUpAt) spawnPowerUp(now);
+        if (powerUps.size() < MAX_ACTIVE_POWERUPS && now >= nextPowerUpAt) {
+            if (spawnPowerUp(now)) nextPowerUpAt = now + NEXT_POWERUP_DELAY_MILLIS;
+        }
         for (PowerUp powerUp : new ArrayList<>(powerUps)) {
             if (powerUp.item != null && (!powerUp.item.isValid() || powerUp.item.isDead())) {
                 removePowerUp(powerUp);
@@ -740,7 +751,6 @@ final class SneakyAssassinsMechanics {
             world.spawnParticle(Particle.HAPPY_VILLAGER, orbit, 1, 0.0D, 0.0D, 0.0D, 0.0D);
             for (Player player : players.values()) {
                 if (player == null || !player.isOnline() || !isAlive.test(player.getUniqueId())) continue;
-                if (powerUpCounts.getOrDefault(player.getUniqueId(), 0) >= 5) continue;
                 if (player.getLocation().distanceSquared(powerUp.item.getLocation()) <= 1.0D) {
                     collectPowerUp(player);
                     removePowerUp(powerUp);
@@ -774,7 +784,7 @@ final class SneakyAssassinsMechanics {
         }
     }
 
-    private void spawnPowerUp(long now) {
+    private boolean spawnPowerUp(long now) {
         Location[] points = {
                 new Location(world, -17.5D, 64.0D, -17.5D),
                 new Location(world, 17.5D, 64.0D, -17.5D),
@@ -789,7 +799,7 @@ final class SneakyAssassinsMechanics {
         if (available.size() > 1 && lastPowerUpLocation != null) {
             available.removeIf(point -> point.distanceSquared(lastPowerUpLocation) < 1.0D);
         }
-        if (available.isEmpty()) available = List.of(points[ThreadLocalRandom.current().nextInt(points.length)]);
+        if (available.isEmpty()) return false;
         Location location = available.get(ThreadLocalRandom.current().nextInt(available.size()));
         lastPowerUpLocation = location.clone();
         PowerUp powerUp = new PowerUp(location, now);
@@ -807,13 +817,26 @@ final class SneakyAssassinsMechanics {
         }
         powerUps.add(powerUp);
         announce(ChatColor.YELLOW + "Power-up spawning...");
+        return true;
     }
 
     private void collectPowerUp(Player player) {
         UUID id = player.getUniqueId();
         int count = powerUpCounts.getOrDefault(id, 0);
+        lastPowerUpCollectedAt.put(id, System.currentTimeMillis());
+        incrementLocalStat(id, "powerups");
         addSmokeBomb(player);
-        if (count == 4) {
+        if (count >= 5) {
+            var attribute = player.getAttribute(Attribute.MAX_HEALTH);
+            if (attribute != null) {
+                attribute.setBaseValue(Math.min(40.0D, attribute.getBaseValue() + 2.0D));
+                player.setHealth(Math.min(player.getMaxHealth(), player.getHealth() + 2.0D));
+            }
+            upgradeWeapon(player);
+            upgradeArmor(player);
+            player.sendMessage(ChatColor.GREEN + "Bonus power-up! +1 heart and a Smoke Bomb.");
+            announce(ChatColor.YELLOW + player.getName() + " collected a bonus power-up!");
+        } else if (count == 4) {
             masterAssassins.add(id);
             incrementLocalStat(id, "master-assassin");
             powerUpCounts.put(id, 5);
@@ -923,6 +946,13 @@ final class SneakyAssassinsMechanics {
             if (revealUntil.getOrDefault(id, 0L) <= now && ownerId != null) {
                 incrementLocalStat(ownerId, "i-see-you");
             }
+            if (ownerId != null) {
+                Set<UUID> distinctTargets = revealerTargets.computeIfAbsent(ownerId, ignored -> new HashSet<>());
+                if (distinctTargets.add(id) && SneakyAssassinsRules.shouldAwardProsecutor(distinctTargets.size())
+                    && thrower != null) {
+                    awardAchievement(thrower, "prosecutor", "Prosecutor");
+                }
+            }
             revealPlayer(id, now + REVEALER_DURATION_MILLIS);
             target.sendMessage(ChatColor.AQUA + "You have been revealed!");
             if (thrower != null) thrower.sendMessage(ChatColor.AQUA + "Revealed " + target.getName() + "!");
@@ -979,6 +1009,19 @@ final class SneakyAssassinsMechanics {
         }
         if (attacker != null && (!players.containsKey(attacker.getUniqueId())
                 || !isAlive.test(attacker.getUniqueId()) || attacker.equals(target))) attacker = null;
+        boolean directPlayerAttack = event instanceof EntityDamageByEntityEvent byEntity
+                && byEntity.getDamager() instanceof Player direct
+                && attacker != null && direct.getUniqueId().equals(attacker.getUniqueId());
+        if (directPlayerAttack && damage > 0.0D
+                && "assassin".equals(selectedKit(attacker.getUniqueId()))) {
+            rangedAssassinMeleeDamage.add(attacker.getUniqueId());
+        }
+        boolean lethalMasterCompassHit = directPlayerAttack && attacker != null
+                && SneakyAssassinsRules.shouldAwardYouNeedDirections(
+                        masterAssassins.contains(attacker.getUniqueId()), true,
+                        isMasterCompass(attacker.getInventory().getItemInMainHand()),
+                        target.getHealth() <= damage);
+        if (lethalMasterCompassHit) pendingCompassKills.put(target.getUniqueId(), attacker.getUniqueId());
         if (attacker != null) {
             cloakUntil.remove(attacker.getUniqueId());
             Villager proxy = disguises.get(attacker.getUniqueId());
@@ -1048,6 +1091,18 @@ final class SneakyAssassinsMechanics {
 
     void onKill(Player killer, Player victim) {
         if (killer == null || !killer.isOnline() || !players.containsKey(killer.getUniqueId())) return;
+        UUID killerId = killer.getUniqueId();
+        UUID compassKiller = victim == null ? null : pendingCompassKills.remove(victim.getUniqueId());
+        if (killerId.equals(compassKiller)) {
+            awardAchievement(killer, "you-need-directions", "You Need Directions?");
+        }
+        if (victim != null) {
+            Long collectedAt = lastPowerUpCollectedAt.get(victim.getUniqueId());
+            long now = System.currentTimeMillis();
+            if (collectedAt != null && SneakyAssassinsRules.isPowerUpKillWindow(now, collectedAt)) {
+                awardAchievement(killer, "disappointment-is-immeasurable", "Disappointment is Immeasurable");
+            }
+        }
         if (victim != null && powerUpCounts.getOrDefault(killer.getUniqueId(), 0) == 0
                 && powerUpCounts.getOrDefault(victim.getUniqueId(), 0) >= 4) {
             incrementLocalStat(killer.getUniqueId(), "the-masters-master");
@@ -1060,6 +1115,40 @@ final class SneakyAssassinsMechanics {
         }
         addSmokeBomb(killer);
         killer.sendMessage(ChatColor.GREEN + "Kill bonus: +1 heart and a Smoke Bomb.");
+    }
+
+    void finish(Player winner) {
+        if (winner == null || !players.containsKey(winner.getUniqueId())) return;
+        UUID winnerId = winner.getUniqueId();
+        String kit = selectedKit(winnerId);
+        if (SneakyAssassinsRules.shouldAwardNotSoSneaky(
+                kit, rangedAssassinMeleeDamage.contains(winnerId))) {
+            awardAchievement(winner, "not-so-sneaky", "Not So Sneaky");
+        }
+        if (SneakyAssassinsRules.shouldAwardIdiot(kit, escapeArtistSmokeUsed.contains(winnerId))) {
+            awardAchievement(winner, "idiot", "Idiot");
+        }
+        long otherMasters = masterAssassins.stream().filter(id -> !id.equals(winnerId)).count();
+        if (SneakyAssassinsRules.shouldAwardTheDuelsDuelsDuel(
+                masterAssassins.contains(winnerId), (int) Math.min(Integer.MAX_VALUE, otherMasters))) {
+            awardAchievement(winner, "the-duels-duels-duel", "The Duel’s Duel’s Duel");
+        }
+    }
+
+    private void awardAchievement(Player player, String id, String displayName) {
+        if (player == null || !player.isOnline() || isTestPlayer.test(player.getUniqueId()) || id == null) return;
+        String path = "local-achievements." + player.getUniqueId() + ".sneaky-assassins." + id;
+        if (plugin.getConfig().getBoolean(path, false)) return;
+        plugin.getConfig().set(path, true);
+        plugin.saveConfig();
+        player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + ChatColor.YELLOW + displayName);
+        player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.8F, 1.15F);
+    }
+
+    private boolean isMasterCompass(ItemStack item) {
+        return item != null && item.getType() == Material.COMPASS && item.hasItemMeta()
+                && "master-compass".equals(item.getItemMeta().getPersistentDataContainer()
+                        .get(itemKey, PersistentDataType.STRING));
     }
 
     void onDrop(PlayerDropItemEvent event) {
@@ -1144,6 +1233,11 @@ final class SneakyAssassinsMechanics {
         }
         for (UUID id : new ArrayList<>(revealerProjectiles.keySet())) removeRevealerProjectile(id);
         pendingProjectileDamage.clear();
+        pendingCompassKills.clear();
+        rangedAssassinMeleeDamage.clear();
+        escapeArtistSmokeUsed.clear();
+        revealerTargets.clear();
+        lastPowerUpCollectedAt.clear();
         npcIds.clear();
         bribes.clear();
         npcNextAttackAt.clear();
