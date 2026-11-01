@@ -188,6 +188,7 @@ jobs:
               bomb-lobbers) map_folders=("Bomb Lobbers") ;;
               bacon-brawl) map_folders=("Bacon Brawl") ;;
               castle-assault) map_folders=("Castle Assault") ;;
+              heroes-of-gwen) map_folders=("Heroes of GWEN") ;;
               gladiators) map_folders=("Gladiators") ;;
               micro-battles) map_folders=("Micro Battle") ;;
               milk-the-cow) map_folders=("Milk the Cow") ;;
@@ -232,7 +233,7 @@ jobs:
           grep -Fxq "enabled: true" <<< "$snake_config"
           grep -Fxq "readiness-revision: snake-controlled-acceptance-20261101-v1" <<< "$snake_config"
           grep -Fq 'private static final boolean READY_FOR_TEST = true;' modern-platform/snake-port/src/main/java/au/com/testplex/snake/SnakeModernPlugin.java
-          echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, 30 Arcade catalogue games are packaged, and the 29-game controlled acceptance queue includes all three separately selectable Monster Maze modes, Evolution and Speed Builders with its dedicated 16-player mechanics. CI compares all 420 original enabled map archives with the packaged JAR; Evolution, Wither Assault and Sneaky Assassins are explicitly generated-arena test exceptions. Wizards remains a separate disabled module; Hoops Remastered remains outside the enabled queue. Speed Builders is manually queued through /arcadeport play speed-builders."
+          echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, and all 30 controlled Arcade IDs are packaged and READY_FOR_TEST. The queue represents 28 distinct titles because Monster Maze (Original), Monster Maze (Speed) and Monster Maze (Modern) are selectable modes of one title; Heroes of Gwen is exposed once as an Arcade game. CI compares all 422 enabled source-map archives with the packaged JAR, including both Heroes of GWEN maps; Evolution, Wither Assault and Sneaky Assassins are explicitly generated-arena test exceptions. Wizards and Hoops Remastered remain the final two titles to integrate and enable. Speed Builders is manually queued through /arcadeport play speed-builders."
 
       - name: Validate independent deployment recovery and shell syntax
         shell: bash
@@ -274,12 +275,12 @@ jobs:
             echo
             echo "- Runtime/API baseline: Java 25 / Paper 26.3"
             echo "- Separate from legacy Java 8 build and deployment"
-            echo "- Catalogue: 30 Arcade games (29 READY_FOR_TEST, 1 MECHANICS_IN_PROGRESS)"
+            echo "- Catalogue: 30 Arcade selectable IDs (30 READY_FOR_TEST, 0 MECHANICS_IN_PROGRESS); 28 distinct titles because Monster Maze has three selectable modes"
             echo "- Built artifacts: TestplexModernArcade.jar, SnakeModern.jar, ArcadeMechanicsModern.jar and WizardsModern.jar (Monster Maze is compiled into the Testplex-owned Arcade module)"
             echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
             echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
-            echo "- Gameplay ports: 30 Arcade catalogue entries are packaged; the controlled READY_FOR_TEST queue now contains 29 game IDs, including Monster Maze (Original), Monster Maze (Speed) and Monster Maze (Modern), Evolution and Speed Builders (2–16 players), SkyWars Mixed, Wither Assault and Sneaky Assassins; Wizards remains separate and disabled, while Hoops Remastered remains outside the enabled queue"
-            echo "- Playable allow-list: Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Castle Assault, Gladiators, Micro Battles, Milk the Cow, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons, Evolution, Runner, Sheep Quest, Turf Wars, Snap, Monster Maze (Original), Monster Maze (Speed), Monster Maze (Modern), Snake, Draw My Thing, Master Builders, SkyWars Mixed, Wither Assault, Sneaky Assassins and Speed Builders (dedicated 16-player queue); Heroes of Gwen remains gated; Wizards and Hoops Remastered remain outside the enabled catalogue queue"
+            echo "- Gameplay ports: all 30 catalogue IDs are READY_FOR_TEST, including one Heroes of Gwen Arcade entry; 28 distinct titles are currently represented because Monster Maze (Original), Monster Maze (Speed) and Monster Maze (Modern) are separate modes of one title. Wizards and Hoops Remastered are the remaining two titles to add to reach 30 distinct Arcade games"
+            echo "- Playable allow-list: Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Castle Assault, Gladiators, Micro Battles, Milk the Cow, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons, Evolution, Runner, Sheep Quest, Turf Wars, Snap, Monster Maze (Original), Monster Maze (Speed), Monster Maze (Modern), Snake, Draw My Thing, Master Builders, SkyWars Mixed, Wither Assault, Sneaky Assassins, Speed Builders and Heroes of Gwen; Wizards and Hoops Remastered remain the two final titles to add"
             echo "- Deployment: successful pushes to feat/testplex-modern-26.3-platform automatically deploy through the isolated modern Hyper-V workflow"
           } >> "$GITHUB_STEP_SUMMARY"
 
