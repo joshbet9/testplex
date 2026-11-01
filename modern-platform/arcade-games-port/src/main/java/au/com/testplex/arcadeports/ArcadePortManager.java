@@ -18472,12 +18472,16 @@ public final class ArcadePortManager implements Listener {
                 if (entity != null && entity.isValid()) entity.remove();
                 continue;
             }
-            Player closeWither = withers.stream()
-                    .filter(wither -> wither.getLocation().add(0.0D, 3.0D, 0.0D).distanceSquared(arrow.getLocation())
-                            <= 36.0D)
-                    .findFirst().orElse(null);
-            if (closeWither != null) {
-                closeWither.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 80, 0, false, false, false));
+            List<Player> closeWithers = withers.stream()
+                    .filter(wither -> WitherAssaultRules.shouldSmokeArrowBlindAtDistanceSquared(
+                            wither.getLocation().add(0.0D, 3.0D, 0.0D).distanceSquared(arrow.getLocation()), 6.0D))
+                    .toList();
+            if (!closeWithers.isEmpty()) {
+                // The source perk checks every living Wither, not just the nearest target.
+                for (Player closeWither : closeWithers) {
+                    closeWither.addPotionEffect(new PotionEffect(
+                            PotionEffectType.BLINDNESS, 80, 0, false, false, false));
+                }
                 arrow.getWorld().spawnParticle(Particle.EXPLOSION, arrow.getLocation(), 1);
                 arrow.remove();
                 session.entities.remove(arrow);
@@ -20550,6 +20554,26 @@ public final class ArcadePortManager implements Listener {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Track every live Human Archer arrow for the source four-second Smoke Arrow
+     * blind on direct impact or at the six-block proximity threshold.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onWitherArcherSmokeArrow(EntityShootBowEvent event) {
+        if (!(event.getEntity() instanceof Player shooter)
+                || !(event.getProjectile() instanceof Arrow arrow)) return;
+        Session session = active;
+        UUID shooterId = shooter.getUniqueId();
+        if (session == null || session.type != ArcadePortGame.WITHER_ASSAULT
+                || shooter.getWorld() != session.world
+                || !WitherAssaultRules.isHumanArcherSmokeArrowEligible(
+                        session.teams.getOrDefault(shooterId, -1),
+                        session.witherAssaultKits.getOrDefault(shooterId, "archer"),
+                        session.alive.contains(shooterId))) return;
+        session.witherBlindArrows.add(arrow.getUniqueId());
+        session.entities.add(arrow);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
