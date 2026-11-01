@@ -1,8 +1,6 @@
 package au.com.testplex.arcadeports;
 
 import me.monstermaze.MonsterMazePlugin;
-import au.com.testplex.wizards.WizardsGameManager;
-import au.com.testplex.wizards.WizardsKit;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
@@ -569,8 +567,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport maps <game-id>");
                     return true;
                 }
-                if (isWizardsId(args[1])) mapMenu.openWizardsMapSelection(player);
-                else mapMenu.openMapSelection(player, ArcadePortGame.fromId(args[1]));
+                mapMenu.openMapSelection(player, ArcadePortGame.fromId(args[1]));
                 return true;
             case "start":
                 if (!hasAdminAccess(sender)) {
@@ -609,19 +606,6 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             case "kit":
                 if (!(sender instanceof Player player)) {
                     sender.sendMessage("Players only.");
-                    return true;
-                }
-                if (args.length >= 2 && isWizardsId(args[1])) {
-                    if (args.length < 3) {
-                        player.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport kit wizards <wizard|mage|sorcerer|mystic|witchdoctor>");
-                        return true;
-                    }
-                    WizardsKit kit = WizardsKit.parse(args[2]);
-                    if (kit == null) {
-                        player.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport kit wizards <wizard|mage|sorcerer|mystic|witchdoctor>");
-                    } else if (wizards != null) {
-                        wizards.setKit(player, kit);
-                    }
                     return true;
                 }
                 if (args.length < 2) {
@@ -694,11 +678,6 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 sender.sendMessage(ChatColor.YELLOW + "/stats plexball" + ChatColor.GRAY + " — view Plexball achievements, milestones and career stats");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport join <game-id>" + ChatColor.GRAY + " — queue to join a multiplayer test");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport start <game-id>" + ChatColor.GRAY + " — start a queued test now");
-                sender.sendMessage(ChatColor.YELLOW + "/arcadeport play wizards" + ChatColor.GRAY + " — quick-start the Wizards queue");
-                sender.sendMessage(ChatColor.YELLOW + "/arcadeport join wizards" + ChatColor.GRAY + " — join the Wizards queue");
-                sender.sendMessage(ChatColor.YELLOW + "/arcadeport leave wizards" + ChatColor.GRAY + " — leave the Wizards queue or match");
-                sender.sendMessage(ChatColor.YELLOW + "/arcadeport kit wizards <kit>" + ChatColor.GRAY + " — choose Mage, Sorcerer, Mystic or Witch Doctor");
-                sender.sendMessage(ChatColor.YELLOW + "/arcadeport start wizards" + ChatColor.GRAY + " — operator-only force start");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play <game-id>-mixed" + ChatColor.GRAY
                         + " — Mixed Arcade variants: Turf Wars, Castle Assault and Heroes of Gwen");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport lobby snap" + ChatColor.GRAY + " — select Snap and show its five lobby kit choices");
