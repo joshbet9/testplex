@@ -38,4 +38,19 @@ class ArcadeProgressRulesTest {
         assertFalse(ArcadeProgressRules.shouldAwardMasterBuildersGreaterGood(420, 420, 400));
         assertFalse(ArcadeProgressRules.shouldAwardMasterBuildersGreaterGood(430, 420, 430));
     }
+
+    @Test void milkTheCowAwardsUseLifetimeSafeInRoundConditions() {
+        assertTrue(ArcadeProgressRules.shouldAwardMilkCowPerfectGame(0));
+        assertFalse(ArcadeProgressRules.shouldAwardMilkCowPerfectGame(1));
+        assertTrue(ArcadeProgressRules.shouldAwardMilkCowHighClub(true, false));
+        assertFalse(ArcadeProgressRules.shouldAwardMilkCowHighClub(true, true));
+        assertFalse(ArcadeProgressRules.shouldAwardMilkCowHighClub(false, false));
+        assertFalse(ArcadeProgressRules.shouldAwardMilkCowStopStopHeIsAlreadyDead(2));
+        assertTrue(ArcadeProgressRules.shouldAwardMilkCowStopStopHeIsAlreadyDead(3));
+        assertFalse(ArcadeProgressRules.shouldAwardMilkCowGotTheChops(9));
+        assertTrue(ArcadeProgressRules.shouldAwardMilkCowGotTheChops(10));
+        assertFalse(ArcadeProgressRules.shouldAwardMilkCowSlaughterhouse(14));
+        assertTrue(ArcadeProgressRules.shouldAwardMilkCowSlaughterhouse(15));
+    }
+
 }
