@@ -756,8 +756,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         Location cursor = start.clone();
         List<Location> ordered = new ArrayList<>(remaining.size());
         while (!remaining.isEmpty()) {
+            Location current = cursor;
             Location next = remaining.stream()
-                    .min(java.util.Comparator.comparingDouble(point -> point.distanceSquared(cursor)))
+                    .min(java.util.Comparator.comparingDouble(point -> point.distanceSquared(current)))
                     .orElseThrow();
             ordered.add(next.clone());
             remaining.remove(next);
