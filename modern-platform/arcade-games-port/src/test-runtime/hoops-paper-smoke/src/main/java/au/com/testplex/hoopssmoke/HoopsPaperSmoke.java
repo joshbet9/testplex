@@ -554,11 +554,11 @@ public final class HoopsPaperSmoke extends JavaPlugin {
             Baseline baseline = baselines.get(player.getUniqueId());
             if (baseline == null || !baseline.matches(player)) return false;
             Location location = player.getLocation();
-            // All players are sent to the same lobby spawn. Collision physics immediately
-            // separates overlapping real clients, so require the canonical lobby area rather
-            // than impossible sub-0.1-block overlap after four simultaneous teleports.
+            // The lobby teleports every participant to the same spawn. Real players
+            // immediately separate under entity collision, so validate the lobby radius,
+            // not identical coordinates.
             if (!location.getWorld().equals(lobbySpawn.getWorld())
-                    || location.distanceSquared(lobbySpawn) > 64.0D) return false;
+                    || location.distanceSquared(lobbySpawn) > 144.0D) return false;
         }
         return true;
     }
