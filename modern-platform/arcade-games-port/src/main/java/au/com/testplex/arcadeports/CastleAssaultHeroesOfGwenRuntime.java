@@ -195,6 +195,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final Map<UUID, List<BiffTetherTarget>> biffTetherTargets = new HashMap<>();
     private final Map<UUID, Long> biffBattleLeapStartedAt = new HashMap<>();
     private final Map<UUID, BiffHorseState> biffHorses = new HashMap<>();
+    private final Map<UUID, IvyHookState> ivyHooks = new HashMap<>();
+    private final Map<UUID, IvyFloralLeapState> ivyFloralLeaps = new HashMap<>();
+    private final Map<UUID, IvyThornWallState> ivyThornWalls = new HashMap<>();
     private final List<StoreEntry> storeEntries = new ArrayList<>();
     private final Map<UUID, StoreHolder> openStores = new HashMap<>();
 
@@ -1307,7 +1310,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         String id = heroSkillId(dropped);
         if (id == null || !Set.of("hattori.ender_blade", "devon.infinity",
                 "anath.burn_beam", "anath.meteor_shower", "larissa.storm_blessing",
-                "bardolf.full_moon", "rowena.bombardment", "dana.rally", "biff.cavalry_charge").contains(id)) return;
+                "bardolf.full_moon", "rowena.bombardment", "dana.rally", "biff.cavalry_charge",
+                "ivy.thorn_wall").contains(id)) return;
         event.setCancelled(true);
         activateHeroesOfGwenSkill(player, id);
     }
@@ -1346,6 +1350,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             ItemStack skill = player.getInventory().getItem(2);
             if ("biff.battle_leap".equals(heroSkillId(skill))) {
                 activateHeroesOfGwenSkill(player, "biff.battle_leap");
+            }
+        } else if ("ivy".equals(hero)) {
+            ItemStack skill = player.getInventory().getItem(2);
+            if ("ivy.floral_leap".equals(heroSkillId(skill))) {
+                activateHeroesOfGwenSkill(player, "ivy.floral_leap");
             }
         }
     }
@@ -2714,6 +2723,16 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 player.getInventory().setItem(7, namedItem(Material.BLAZE_POWDER,
                         ChatColor.GOLD + "Embers", "Anath mage resource."));
             }
+            case "ivy" -> {
+                player.getInventory().setItem(0, namedItem(Material.WOODEN_SWORD,
+                        ChatColor.GREEN + "Sword", "Ivy's basic melee weapon."));
+                giveHeroesOfGwenSkillItem(player, 1, "ivy.vine_pull", Material.VINE,
+                        "Vine Pull", "Fire a nine-block vine beam: damage enemies and pull the first enemy hero toward you. 10-second cooldown.");
+                giveHeroesOfGwenSkillItem(player, 2, "ivy.floral_leap", Material.FEATHER,
+                        "Floral Leap", "Leap and create a 5-second flower bed; enemies within 5 blocks take 2 damage each second and are slowed. Click or sneak. 11-second cooldown.");
+                giveHeroesOfGwenSkillItem(player, 3, "ivy.thorn_wall", Material.NETHER_STAR,
+                        "Thorn Wall", "Create a 5-second square thorn ring. Allies regenerate; enemies are rooted or damaged. Drop to activate; 45-second cooldown.");
+            }
             case "biff" -> {
                 player.getInventory().setItem(0, namedItem(Material.WOODEN_SWORD,
                         ChatColor.GREEN + "Sword", "Biff's basic melee weapon."));
@@ -2911,6 +2930,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             case "biff.tether" -> activateBiffTether(player);
             case "biff.battle_leap" -> activateBiffBattleLeap(player);
             case "biff.cavalry_charge" -> activateBiffCavalryCharge(player);
+            case "ivy.vine_pull" -> activateIvyVinePull(player);
+            case "ivy.floral_leap" -> activateIvyFloralLeap(player);
+            case "ivy.thorn_wall" -> activateIvyThornWall(player);
             default -> player.sendMessage(ChatColor.YELLOW + "That hero ability is not yet available.");
         }
     }
