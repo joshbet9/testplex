@@ -22,6 +22,8 @@ public final class SpeedBuildersRules {
     public static final int REVIEW_SECONDS = 10;
     public static final int ELIMINATION_INTERVAL_SECONDS = 2;
     public static final int INTERMISSION_SECONDS = 3;
+    public static final long JUDGE_BEAM_HOLD_TICKS = 100L;
+    public static final long ELIMINATION_INTERVAL_TICKS = ELIMINATION_INTERVAL_SECONDS * 20L;
 
     private SpeedBuildersRules() { }
 
