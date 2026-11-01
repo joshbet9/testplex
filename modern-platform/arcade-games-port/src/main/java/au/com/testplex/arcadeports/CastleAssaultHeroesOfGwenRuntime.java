@@ -153,6 +153,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private HeroesOfGwenSidequestType heroesOfGwenSidequestType = HeroesOfGwenSidequestType.NONE;
     private List<Location> heroesOfGwenPumpkinBoundary = List.of();
     private WitherSkeleton heroesOfGwenPumpkinKing;
+    private Location heroesOfGwenPumpkinKingHome;
     private UUID heroesOfGwenPumpkinKingTarget;
     private long heroesOfGwenPumpkinKingRespawnAt;
     private long heroesOfGwenPumpkinKingNextAttackAt;
@@ -396,7 +397,15 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
 
         Map<String, List<Location>> sourceMapGroups = map.customLocationGroups();
-        if (sourceMapGroups.containsKey("HEROES_VALLEY")) {
+        if (sourceMapGroups.containsKey("MONOCHROME")) {
+            heroesOfGwenSidequestType = HeroesOfGwenSidequestType.MONOCHROME_SKELETONS;
+            if (map.dataLocations("BLACK").isEmpty()) {
+                plugin.getLogger().warning("Monochrome map " + map.mapName()
+                        + " has no BLACK Wither Skeleton challenge spawn markers; sidequest is unavailable.");
+                heroesOfGwenSidequestType = HeroesOfGwenSidequestType.NONE;
+            }
+        } else {
+            // Reborn defaults an untyped MOBA map to HEROES_VALLEY.
             heroesOfGwenSidequestType = HeroesOfGwenSidequestType.PUMPKIN_KING;
             List<Location> pumpkinBoundary = map.dataLocations("GRAY").stream()
                     .map(Location::clone).toList();
@@ -407,16 +416,6 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             } else {
                 heroesOfGwenPumpkinBoundary = orderBoundaryPoints(pumpkinBoundary);
             }
-        } else if (sourceMapGroups.containsKey("MONOCHROME")) {
-            heroesOfGwenSidequestType = HeroesOfGwenSidequestType.MONOCHROME_SKELETONS;
-            if (map.dataLocations("BLACK").isEmpty()) {
-                plugin.getLogger().warning("Monochrome map " + map.mapName()
-                        + " has no BLACK Wither Skeleton challenge spawn markers; sidequest is unavailable.");
-                heroesOfGwenSidequestType = HeroesOfGwenSidequestType.NONE;
-            }
-        } else {
-            plugin.getLogger().warning("Heroes of Gwen map " + map.mapName()
-                    + " has no recognised HEROES_VALLEY or MONOCHROME source map type; mid-match sidequest is disabled.");
         }
 
         int found = 0;
@@ -1019,6 +1018,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 + ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_HEALTH);
         king.setCustomNameVisible(true);
         heroesOfGwenPumpkinKing = king;
+        heroesOfGwenPumpkinKingHome = spawns.get(0).clone();
         heroesOfGwenPumpkinKingTarget = null;
         heroesOfGwenPumpkinKingNextAttackAt = now;
         heroesOfGwenPumpkinKingRespawnAt = 0L;
@@ -1062,7 +1062,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 ? null : Bukkit.getEntity(heroesOfGwenPumpkinKingTarget);
         LivingEntity current = currentEntity instanceof LivingEntity living ? living : null;
         if (isValidHeroesOfGwenPumpkinTarget(current)) return current;
-        Location home = heroesOfGwenPumpkinKing.getLocation();
+        Location home = heroesOfGwenPumpkinKingHome == null
+                ? heroesOfGwenPumpkinKing.getLocation() : heroesOfGwenPumpkinKingHome;
         return world.getEntities().stream()
                 .filter(entity -> entity instanceof LivingEntity)
                 .map(entity -> (LivingEntity) entity)
@@ -1088,7 +1089,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (king == null || !king.isValid() || king.isDead()) return;
         LivingEntity target = findHeroesOfGwenPumpkinTarget();
         heroesOfGwenPumpkinKingTarget = target == null ? null : target.getUniqueId();
-        moveHeroesOfGwenPumpkinKing(target == null ? map.dataLocations("BLACK").get(0) : target.getLocation(),
+        Location goal = target == null ? heroesOfGwenPumpkinKingHome : target.getLocation();
+        moveHeroesOfGwenPumpkinKing(goal,
                 target == null ? ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_HOME_SPEED
                         : ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_TARGET_SPEED);
         king.setCustomName(ChatColor.DARK_RED + "Pumpkin King " + ChatColor.RED + "❤ "
@@ -1854,6 +1856,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             event.getDrops().clear();
             event.setDroppedExp(0);
             heroesOfGwenPumpkinKing = null;
+            heroesOfGwenPumpkinKingHome = null;
             heroesOfGwenPumpkinKingTarget = null;
             heroesOfGwenPumpkinKingNextAttackAt = 0L;
             heroesOfGwenPumpkinKingRespawnAt = System.currentTimeMillis()
@@ -5559,6 +5562,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         witherDebris.clear();
         witherTargets.clear();
         heroesOfGwenPumpkinKing = null;
+        heroesOfGwenPumpkinKingHome = null;
         heroesOfGwenPumpkinKingTarget = null;
         heroesOfGwenPumpkinBoundary = List.of();
         heroesOfGwenMonochromeSkeletons.clear();
