@@ -434,6 +434,20 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     }
 
     @Test
+    void heroesOfGwenHealthManagerMatchesSourceFiveSecondRegenAndKillHeal() {
+        assertEquals(5_000L, ArcadePortRules.HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS);
+        assertEquals(0.66D, ArcadePortRules.HEROES_OF_GWEN_BASE_HP_REGEN_PER_INTERVAL, 0.00001D);
+        assertEquals(0.25D, ArcadePortRules.HEROES_OF_GWEN_BASE_KILL_HEAL_FACTOR, 0.00001D);
+        assertEquals(0.66D, ArcadePortRules.heroesOfGwenStoreHpRegenAmount(0.66D, List.of()), 0.00001D);
+        assertEquals(0.792D, ArcadePortRules.heroesOfGwenStoreHpRegenAmount(
+                0.66D, List.of("Urchin's Cap")), 0.00001D);
+        assertEquals(0.759D, ArcadePortRules.heroesOfGwenStoreHpRegenAmount(
+                0.66D, List.of("Archer's Bane Helmet")), 0.00001D);
+        assertEquals(0.792D, ArcadePortRules.heroesOfGwenStoreHpRegenAmount(
+                0.66D, List.of("Urchin's Cap", "Vampiric Helmet")), 0.00001D);
+    }
+
+    @Test
     void heroesOfGwenStorePassiveValuesMatchSourceEquipmentEffects() {
         assertEquals(0.10D, ArcadePortRules.heroesOfGwenStoreAbilityDamageFactor("Urchin's Leggings"), 0.00001D);
         assertEquals(0.20D, ArcadePortRules.heroesOfGwenStoreAbilityDamageFactor("Specialist's Bow"), 0.00001D);
