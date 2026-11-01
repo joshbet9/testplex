@@ -13,6 +13,9 @@ import org.bukkit.block.Sign;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Mob;
+import org.bukkit.block.data.Bisected;
+import org.bukkit.block.data.type.Bed;
+import org.bukkit.event.player.PlayerToggleFlightEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.block.data.Bisected;
 import org.bukkit.block.data.type.Bed;
@@ -65,10 +68,7 @@ public final class SpeedBuildersGame implements Listener {
     private static final String ARENA_WORLD_NAME = "testplex_speedbuilders_arena_v1";
     private static final String SOURCE_WORLD_NAME = "arcadeport_source_speedbuilders_v1";
     private static final String SOURCE_MAP_RESOURCE = "source-maps/Speed Builders/SpeedBuilders_Shroomland_Lake.zip";
-    private static final int FLOOR_Y = 65;
-    private static final int PLOT_SPACING = 18;
-    private static final int PLOT_MARGIN = 4;
-    private static final int REVIEW_Y = 92;
+    private static final int REVIEW_HEIGHT = 12;
     private static final long NORMAL_QUEUE_TICKS = 100L;
     private static final long QUICK_QUEUE_TICKS = 40L;
 
@@ -84,6 +84,9 @@ public final class SpeedBuildersGame implements Listener {
     private BukkitTask ticker;
     private World arena;
     private World sourceWorld;
+    private List<Plot> playerPlots = List.of();
+    private List<Location> playerSpawns = List.of();
+    private Plot reviewPlot;
     private Phase phase = Phase.IDLE;
     private long tick;
     private long queueDeadlineTick = -1L;
@@ -271,6 +274,8 @@ public final class SpeedBuildersGame implements Listener {
             round = 0;
             buildTimeTracker = SpeedBuildersRules.DEFAULT_BUILD_SECONDS;
             buildSeconds = SpeedBuildersRules.DEFAULT_BUILD_SECONDS;
+            firstPerfectBuildAwarded = false;
+            pendingEliminations.clear();
             unusedTemplates.clear();
             unusedTemplates.addAll(templates);
             Collections.shuffle(unusedTemplates);
@@ -329,10 +334,26 @@ public final class SpeedBuildersGame implements Listener {
         if (mapData == null) {
             throw new IllegalStateException("The original Speed Builders WorldConfig.dat could not be read.");
         }
-        int playerPlots = mapData.dataLocations("YELLOW").size();
-        if (mapData.dataLocations("RED").isEmpty() || playerPlots < SpeedBuildersRules.MAX_PLAYERS) {
+        List<Location> authoredPlots = mapData.dataLocations("YELLOW");
+        if (mapData.dataLocations("RED").isEmpty() || authoredPlots.size() < SpeedBuildersRules.MAX_PLAYERS) {
             throw new IllegalStateException("The original Speed Builders map is missing its RED centre or 16 YELLOW plots "
                     + "(found " + playerPlots + ").");
+        }
+
+        reviewPlot = createPlot(mapData.dataLocations("RED").getFirst());
+        playerPlots = authoredPlots.stream().limit(SpeedBuildersRules.MAX_PLAYERS)
+                .map(this::createPlot).toList();
+        playerSpawns = mapData.spawnLocations().stream().map(Location::clone).toList();
+        if (playerSpawns.isEmpty()) {
+            throw new IllegalStateException("The original Speed Builders map has no authored team spawn locations.");
+        }
+
+        if (mapData.hasBounds()) {
+            double centerX = (mapData.minX() + mapData.maxX()) / 2.0D;
+            double centerZ = (mapData.minZ() + mapData.maxZ()) / 2.0D;
+            double size = Math.max(mapData.maxX() - mapData.minX(), mapData.maxZ() - mapData.minZ()) + 16.0D;
+            sourceWorld.getWorldBorder().setCenter(centerX, centerZ);
+            sourceWorld.getWorldBorder().setSize(Math.max(32.0D, size));
         }
 
         List<Template> loaded = new ArrayList<>();
@@ -343,7 +364,16 @@ public final class SpeedBuildersGame implements Listener {
             String displayName = ChatColor.translateAlternateColorCodes('&', timing.displayName());
             Location origin = entry.getValue().getFirst().clone().subtract(0.5D, 0.0D, 0.5D);
             Location buildMin = origin.clone().subtract(3.0D, 10.0D, 3.0D);
+            Location groundMin = origin.clone().subtract(3.0D, 11.0D, 3.0D);
             List<SpeedBuildersRules.Cell> cells = new ArrayList<>();
+            List<GroundCell> ground = new ArrayList<>();
+            for (int x = 0; x < SpeedBuildersRules.BUILD_WIDTH; x++) {
+                for (int z = 0; z < SpeedBuildersRules.BUILD_WIDTH; z++) {
+                    Block floor = sourceWorld.getBlockAt(groundMin.getBlockX() + x,
+                            groundMin.getBlockY(), groundMin.getBlockZ() + z);
+                    ground.add(new GroundCell(x, z, floor.getType(), floor.getBlockData().getAsString()));
+                }
+            }
             List<MobCell> mobs = new ArrayList<>();
             for (int x = 0; x < SpeedBuildersRules.BUILD_WIDTH; x++) {
                 for (int y = 0; y < SpeedBuildersRules.BUILD_HEIGHT; y++) {
@@ -368,7 +398,7 @@ public final class SpeedBuildersGame implements Listener {
                 String id = entry.getKey().toLowerCase(java.util.Locale.ROOT)
                         .replaceAll("[^a-z0-9]+", "-").replaceAll("(^-|-$)", "");
                 loaded.add(new Template(id, displayName, List.copyOf(cells),
-                        List.copyOf(mobs), timing));
+                        List.copyOf(mobs), List.copyOf(ground), timing));
             }
         }
         if (loaded.isEmpty()) {
@@ -376,7 +406,8 @@ public final class SpeedBuildersGame implements Listener {
         }
         templates = List.copyOf(loaded);
         plugin.getLogger().info("Loaded " + templates.size() + " original Speed Builders templates from "
-                + mapData.mapName() + " with " + playerPlots + " authored build plots.");
+                + mapData.mapName() + " with " + playerPlots.size() + " authored build plots and "
+                + playerSpawns.size() + " source team spawns.");
     }
 
     private EntityType parseMobMarker(String marker) {
@@ -389,46 +420,46 @@ public final class SpeedBuildersGame implements Listener {
     }
 
     private World ensureArena() {
-        World existing = Bukkit.getWorld(ARENA_WORLD_NAME);
-        if (existing != null) return existing;
-        World created = new WorldCreator(ARENA_WORLD_NAME)
-                .type(WorldType.FLAT)
-                .generateStructures(false)
-                .createWorld();
-        if (created == null) throw new IllegalStateException("Paper could not create the Speed Builders arena world.");
-        created.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
-        created.setGameRule(GameRule.DO_WEATHER_CYCLE, false);
-        created.setGameRule(GameRule.DO_MOB_SPAWNING, false);
-        created.setGameRule(GameRule.DO_FIRE_TICK, false);
-        created.setTime(6000L);
-        created.setStorm(false);
-        created.setThundering(false);
-        created.setDifficulty(org.bukkit.Difficulty.PEACEFUL);
-        return created;
+        if (sourceWorld == null || Bukkit.getWorld(SOURCE_WORLD_NAME) == null) {
+            throw new IllegalStateException("The authentic Speed Builders source map is not loaded.");
+        }
+        sourceWorld.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
+        sourceWorld.setGameRule(GameRule.DO_WEATHER_CYCLE, false);
+        sourceWorld.setGameRule(GameRule.DO_MOB_SPAWNING, false);
+        sourceWorld.setGameRule(GameRule.DO_FIRE_TICK, false);
+        sourceWorld.setGameRule(GameRule.RANDOM_TICK_SPEED, 0);
+        sourceWorld.setTime(6000L);
+        sourceWorld.setStorm(false);
+        sourceWorld.setThundering(false);
+        sourceWorld.setDifficulty(org.bukkit.Difficulty.PEACEFUL);
+        return sourceWorld;
+    }
+
+    private Plot createPlot(Location marker) {
+        Location origin = marker.clone().subtract(0.5D, 0.0D, 0.5D);
+        List<GroundCell> originalGround = new ArrayList<>();
+        for (int x = 0; x < SpeedBuildersRules.BUILD_WIDTH; x++) {
+            for (int z = 0; z < SpeedBuildersRules.BUILD_WIDTH; z++) {
+                Block floor = sourceWorld.getBlockAt(origin.getBlockX() - 3 + x,
+                        origin.getBlockY() - 1, origin.getBlockZ() - 3 + z);
+                originalGround.add(new GroundCell(x, z, floor.getType(), floor.getBlockData().getAsString()));
+            }
+        }
+        return new Plot(origin.getBlockX(), origin.getBlockY(), origin.getBlockZ(), List.copyOf(originalGround));
+    }
+
+    private Location nearestSourceSpawn(Plot plot) {
+        Location centre = new Location(arena, plot.centerX() + 0.5D,
+                plot.baseY(), plot.centerZ() + 0.5D);
+        return playerSpawns.stream()
+                .min(java.util.Comparator.comparingDouble(spawn -> spawn.distanceSquared(centre)))
+                .map(Location::clone)
+                .orElse(centre.add(0.0D, 0.0D, 5.0D));
     }
 
     private void buildArenaFloor() {
-        for (int row = 0; row < 4; row++) {
-            for (int column = 0; column < 4; column++) {
-                Plot plot = new Plot(-27 + column * PLOT_SPACING, -27 + row * PLOT_SPACING);
-                clearPlot(plot);
-                for (int x = -PLOT_MARGIN; x <= PLOT_MARGIN; x++) {
-                    for (int z = -PLOT_MARGIN; z <= PLOT_MARGIN; z++) {
-                        Material floor = Math.abs(x) == PLOT_MARGIN || Math.abs(z) == PLOT_MARGIN
-                                ? Material.POLISHED_BLACKSTONE : Material.WHITE_CONCRETE;
-                        arena.getBlockAt(plot.centerX() + x, FLOOR_Y, plot.centerZ() + z).setType(floor, false);
-                    }
-                }
-            }
-        }
-        for (int x = -5; x <= 5; x++) {
-            for (int z = -5; z <= 5; z++) {
-                arena.getBlockAt(x, FLOOR_Y, z).setType(
-                    Math.abs(x) == 5 || Math.abs(z) == 5 ? Material.POLISHED_BLACKSTONE : Material.POLISHED_ANDESITE, false);
-            }
-        }
-        arena.getWorldBorder().setCenter(0.0D, 0.0D);
-        arena.getWorldBorder().setSize(128.0D);
+        // The authentic map already contains all sixteen yellow build plots and the red judge display.
+        // Preserve its architecture; only the per-round BuildData ground layer is replaced.
     }
 
     private void beginRound() {
