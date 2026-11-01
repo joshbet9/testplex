@@ -8410,6 +8410,7 @@ public final class ArcadePortManager implements Listener {
 
     private Player nearestDragonsSpectatorTarget(Session session, Player spectator) {
         return alivePlayers(session).stream()
+                .filter(target -> !session.dragonTamerControls.containsKey(target.getUniqueId()))
                 .min(java.util.Comparator.comparingDouble(target ->
                         target.getLocation().distanceSquared(spectator.getLocation())))
                 .orElse(null);
@@ -18327,6 +18328,55 @@ public final class ArcadePortManager implements Listener {
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
         Session currentSession = active;
+        if (currentSession != null && currentSession.type == ArcadePortGame.DRAGONS
+                && event.getView().getTopInventory().getHolder() instanceof DragonCompassMenuHolder holder) {
+            event.setCancelled(true);
+            if (!(event.getWhoClicked() instanceof Player spectator)
+                    || !holder.ownerId.equals(spectator.getUniqueId())
+                    || event.getClickedInventory() != event.getView().getTopInventory()) return;
+            if (active != currentSession || !currentSession.players.containsKey(spectator.getUniqueId())
+                    || currentSession.alive.contains(spectator.getUniqueId())) {
+                spectator.closeInventory();
+                return;
+            }
+
+            int slot = event.getRawSlot();
+            if (slot < 0 || slot >= event.getView().getTopInventory().getSize()) return;
+            if (slot == 53 || slot == 4) {
+                spectator.closeInventory();
+                return;
+            }
+
+            UUID targetId = holder.targetsBySlot.get(slot);
+            if (targetId == null) return;
+            Player target = currentSession.players.get(targetId);
+            if (target == null || !target.isOnline() || !currentSession.alive.contains(targetId)
+                    || currentSession.dragonTamerControls.containsKey(targetId)
+                    || target.getWorld() != currentSession.world) {
+                spectator.sendMessage(ChatColor.YELLOW + "That player is no longer available to track.");
+                populateDragonsSpectatorMenu(currentSession, spectator, holder);
+                return;
+            }
+
+            if (event.isLeftClick()) {
+                long now = System.currentTimeMillis();
+                long nextAllowed = currentSession.dragonCompassNextUseAt.getOrDefault(spectator.getUniqueId(), 0L);
+                if (!ArcadePortRules.canUseDragonSpectatorTeleport(now, nextAllowed)) return;
+                currentSession.dragonCompassNextUseAt.put(spectator.getUniqueId(),
+                        now + ArcadePortRules.DRAGONS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS);
+                spectator.setSpectatorTarget(null);
+                spectator.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
+                spectator.setCompassTarget(target.getLocation());
+                spectator.closeInventory();
+                return;
+            }
+            if (event.isRightClick()) {
+                spectator.setSpectatorTarget(target);
+                spectator.setCompassTarget(target.getLocation());
+                spectator.closeInventory();
+            }
+            return;
+        }
         if (currentSession != null && currentSession.type == ArcadePortGame.MICRO_BATTLES
                 && isMicroCompassMenuTitle(event.getView().getTitle())) {
             event.setCancelled(true);
