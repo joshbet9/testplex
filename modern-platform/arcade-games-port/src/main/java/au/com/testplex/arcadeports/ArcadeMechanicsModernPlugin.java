@@ -114,9 +114,9 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     public MonsterMazePlugin getMonsterMazeModule() { return monsterMaze; }
 
     /**
-     * Whether a cleared game can currently enter the weighted automatic rotation.
-     * A game that relies on an archived map is eligible only when its selected map
-     * has actually been imported and validated on this server.
+     * Whether a cleared game has the required bundled map archive to enter the
+     * weighted automatic rotation. Full archive import and in-world marker validation
+     * still run at game start; this method does not claim that those steps have passed.
      */
     public boolean isRotationCandidateAvailable(String gameId) {
         ArcadePortGame game = ArcadePortGame.fromId(gameId);
