@@ -3361,9 +3361,36 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         return item.getItemMeta().getPersistentDataContainer().get(heroSkillKey, PersistentDataType.STRING);
     }
 
+    private Set<String> heroesOfGwenEquippedStoreItemNames(Player player) {
+        Set<String> names = new HashSet<>();
+        if (player == null) return names;
+        List<ItemStack> equipped = new ArrayList<>();
+        equipped.add(player.getInventory().getItem(0));
+        equipped.addAll(List.of(player.getInventory().getArmorContents()));
+        for (ItemStack item : equipped) {
+            if (item == null || !item.hasItemMeta() || !item.getItemMeta().hasDisplayName()) continue;
+            String name = ChatColor.stripColor(item.getItemMeta().getDisplayName());
+            if (name != null && !name.isBlank()) names.add(name);
+        }
+        return names;
+    }
+
+    private long heroesOfGwenStoreAdjustedCooldown(Player player, long baseCooldown, boolean ammo) {
+        if (baseCooldown <= 0L) return baseCooldown;
+        long reductionMillis = 0L;
+        for (String itemName : heroesOfGwenEquippedStoreItemNames(player)) {
+            double factor = ammo
+                    ? ArcadePortRules.heroesOfGwenStoreAmmoCooldownReduction(itemName)
+                    : ArcadePortRules.heroesOfGwenStoreCooldownReduction(itemName);
+            if (factor > 0.0D) reductionMillis += (long) (baseCooldown * factor);
+        }
+        return Math.max(1L, baseCooldown - reductionMillis);
+    }
+
     private void setHeroSkillCooldown(Player player, String skill, long durationMillis) {
+        long adjustedDuration = heroesOfGwenStoreAdjustedCooldown(player, durationMillis, false);
         heroSkillReadyAt.computeIfAbsent(player.getUniqueId(), ignored -> new HashMap<>())
-                .put(skill, System.currentTimeMillis() + durationMillis);
+                .put(skill, System.currentTimeMillis() + adjustedDuration);
     }
 
     private boolean isHeroSkillReady(Player player, String skill) {
@@ -5532,7 +5559,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         } else ammo.setAmount(count + 1);
                         player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.5F, 1.3F);
                     }
-                    heroAmmoNextAt.put(id, now + fletcherReload);
+                    heroAmmoNextAt.put(id, now + heroesOfGwenStoreAdjustedCooldown(player, fletcherReload, true));
                 }
             }
             if (heroInfinityEndsAt.getOrDefault(id, 0L) > now) {
