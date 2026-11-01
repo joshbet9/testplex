@@ -98,8 +98,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         for (Player online : Bukkit.getOnlinePlayers()) {
             Bukkit.getScheduler().runTask(this, () -> {
                 if (online.isOnline() && manager != null) {
-                    boolean restoredCameraShy = cameraShy != null && cameraShy.restorePendingSnapshot(online);
-                    if (!restoredCameraShy) manager.returnPlayerToLobby(online);
+                    boolean restoredSpeedBuilders = speedBuilders != null && speedBuilders.restorePendingSnapshot(online);
+                    boolean restoredCameraShy = !restoredSpeedBuilders
+                            && cameraShy != null && cameraShy.restorePendingSnapshot(online);
+                    if (!restoredSpeedBuilders && !restoredCameraShy) manager.returnPlayerToLobby(online);
                     grantConfiguredAdmin(online);
                     manager.restoreMonsterMazeKitPreference(online);
                 }
@@ -203,8 +205,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 if (manager.isTestPlayer(player)) return;
                 // A Camera Shy disconnect must restore the captured pre-match snapshot
                 // instead of leaving the temporary spyglass/kit inventory on reconnect.
-                boolean restoredCameraShy = cameraShy != null && cameraShy.restorePendingSnapshot(player);
-                if (!restoredCameraShy) manager.returnPlayerToLobby(player);
+                boolean restoredSpeedBuilders = speedBuilders != null && speedBuilders.restorePendingSnapshot(player);
+                boolean restoredCameraShy = !restoredSpeedBuilders
+                        && cameraShy != null && cameraShy.restorePendingSnapshot(player);
+                if (!restoredSpeedBuilders && !restoredCameraShy) manager.returnPlayerToLobby(player);
                 grantConfiguredAdmin(player);
                 manager.restoreMonsterMazeKitPreference(player);
             }
