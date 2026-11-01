@@ -84,9 +84,9 @@ public final class ModernArcadeLobby implements Listener {
     }
 
     public World ensureWorld() {
-        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=lobby-world-ensure-start cached="
-                + (lobbyWorld != null) + " loaded=" + (Bukkit.getWorld(WORLD_NAME) != null));
         if (lobbyWorld != null) return lobbyWorld;
+        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=lobby-world-ensure-start cached=false loaded="
+                + (Bukkit.getWorld(WORLD_NAME) != null));
         World world = Bukkit.getWorld(WORLD_NAME);
         if (world == null) {
             WorldCreator creator = new WorldCreator(WORLD_NAME);
