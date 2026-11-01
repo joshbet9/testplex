@@ -22658,7 +22658,7 @@ public final class ArcadePortManager implements Listener {
             world.spawnParticle(Particle.FLAME, blast, 100, 1.05D, 0.75D, 1.05D, 0.12D);
             world.spawnParticle(Particle.LAVA, blast, 20, 0.8D, 0.2D, 0.8D, 0.0D);
         }
-        world.playEffect(blast, org.bukkit.Effect.EXPLOSION_HUGE, 0);
+        world.spawnParticle(Particle.EXPLOSION, blast, 1);
         world.playSound(blast, Sound.ENTITY_GENERIC_EXPLODE,
                 "super-tnt".equals(powerupType) ? 1.8F : 1.5F,
                 "fiery-tnt".equals(powerupType) ? 0.72F : 0.88F);

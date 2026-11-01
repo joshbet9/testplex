@@ -110,7 +110,7 @@ public final class ModernLobbyScoreboard {
                 ChatColor.WHITE + game,
                 spacer(2),
                 ChatColor.GOLD.toString() + ChatColor.BOLD + "Kit",
-                kit != null && kit.contains(ChatColor.COLOR_CHAR) ? kit : ChatColor.WHITE + kit,
+                kit != null && kit.indexOf(ChatColor.COLOR_CHAR) >= 0 ? kit : ChatColor.WHITE + kit,
                 spacer(3),
                 ChatColor.GREEN.toString() + ChatColor.BOLD + "Gems",
                 ChatColor.WHITE + gems,
