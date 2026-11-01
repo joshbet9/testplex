@@ -2650,6 +2650,11 @@ public final class ArcadePortRules {
     public static final double HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS = 8.0D;
     public static final double HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE = 4.0D;
 
+    /** Source MobaAI targets hostile living entities inside its team boundary, not only players. */
+    public static boolean heroesOfGwenWitherCanTarget(int ownerTeam, int targetTeam, boolean activeTarget) {
+        return ownerTeam >= 0 && activeTarget && targetTeam != ownerTeam;
+    }
+
     /** Source MobaDirectAIMethod interprets speed as ticks per block, then divides by 20. */
     public static double heroesOfGwenWitherStepPerTick(double sourceSpeed) {
         return Math.max(0.0D, sourceSpeed) / 20.0D;
