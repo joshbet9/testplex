@@ -1,6 +1,6 @@
-# The 27 shared Arcade catalogue entries are packaged in ArcadeMechanicsModern.jar.
+# The 28 Arcade catalogue entries are packaged in ArcadeMechanicsModern.jar.
 # READY_FOR_TEST games are available together for the shared controlled test session.
-# The 25-game controlled queue adds SkyWars Mixed plus generated-arena Wither Assault and Sneaky Assassins.
+# The 26-game controlled queue includes Speed Builders (dedicated 2–16 player queue).
 enabled-games:
   - death-tag
   - one-in-the-quiver
@@ -27,6 +27,7 @@ enabled-games:
   - skywars
   - wither-assault
   - sneaky-assassins
+  - speed-builders
 lobby-selected-game: death-tag
 
 # Base selection weights used by the Like/Dislike preference calculation.
@@ -35,7 +36,7 @@ lobby-selected-game: death-tag
 game-preferences:
   base-weights: {}
   automatic-rotation:
-    # Disabled by default so the controlled acceptance queue remains operator-driven.
+    # Disabled by default so the controlled acceptance queue remains operator-driven. Speed Builders is joined with /arcadeport play speed-builders, not automatic rotation.
     enabled: false
     # Match the original Mixed Arcade threshold and vote window when enabled.
     minimum-players: 6
