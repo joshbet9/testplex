@@ -13,10 +13,17 @@ class ArcadePortGameTest {
         assertEquals(java.util.List.of("Bacon Brawl"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.BACON_BRAWL));
         assertEquals(java.util.List.of("Bomb Lobbers"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.BOMB_LOBBERS));
         assertEquals(java.util.List.of("Dragon Escape"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.DRAGON_ESCAPE));
+        assertEquals(java.util.List.of("Dragons"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.DRAGONS));
+        assertEquals(java.util.List.of("Runner"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.RUNNER));
         assertEquals(java.util.List.of("Paintball", "Super Paintball"),
                 SourceMapCatalog.mapFoldersFor(ArcadePortGame.PAINTBALL));
+        assertEquals(java.util.List.of("Sploor"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.SUPER_SPLOOR));
         assertEquals(java.util.List.of("Speef", "Super Spleef"),
                 SourceMapCatalog.mapFoldersFor(ArcadePortGame.SPLEEF));
+        assertEquals(java.util.List.of("Death Tag"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.DEATH_TAG));
+        assertEquals(java.util.List.of("One in the Quiver"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.ONE_IN_THE_QUIVER));
+        assertEquals(java.util.List.of("Gladiators"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.GLADIATORS));
+        assertEquals(java.util.List.of("Micro Battle"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.MICRO_BATTLES));
         assertEquals(java.util.List.of("Turf Wars"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.TURF_WARS));
         assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.SNEAKY_ASSASSINS).isEmpty(),
                 "Sneaky Assassins has no archived map in Mineplex Reborn; do not invent one.");
@@ -28,6 +35,8 @@ class ArcadePortGameTest {
                 SourceMapCatalog.mapFoldersFor(ArcadePortGame.DRAW_MY_THING));
         assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.MASTER_BUILDERS).isEmpty(),
                 "Master Builders uses generated plots rather than a fabricated source map");
+        assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.CAMERA_SHY).isEmpty(),
+                "Camera Shy uses its dedicated procedural maze, not an invented legacy map archive");
     }
 
     @Test void selectedMapArchivePathsAreValidatedAgainstTheirGame() {
@@ -39,6 +48,12 @@ class ArcadePortGameTest {
                 ArcadePortGame.WITHER_ASSAULT, "source-maps/Milk the Cow/Milk_BobsFarm.zip"));
         assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
                 ArcadePortGame.PAINTBALL, "source-maps/Super Paintball/SP_Arena.zip"));
+        assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
+                ArcadePortGame.RUNNER, "source-maps/Runner/Runner_Clay Plaza.zip"));
+        assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
+                ArcadePortGame.RUNNER, "source-maps/Runner/Runner_ClayPlaza.zip"));
+        assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
+                ArcadePortGame.DRAGONS, "source-maps/Dragons/Dragons_Salt & Pepper.zip"));
         assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
                 ArcadePortGame.SKY_WARS, "source-maps/Skywars/Skywars_Aquarius.zip"));
         assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
@@ -132,8 +147,8 @@ class ArcadePortGameTest {
     }
 
 
-    @Test void exposesTheTwentyThreeMechanicsGamesAndIntegratedMonsterMazeModule() {
-        assertEquals(23, ArcadePortGame.values().length);
+    @Test void exposesTheMechanicsGamesAndIntegratedModules() {
+        assertEquals(26, ArcadePortGame.values().length);
         Set<String> ids = new HashSet<>();
         for (ArcadePortGame game : ArcadePortGame.values()) {
             assertTrue(ids.add(game.id()), "duplicate game id: " + game.id());
@@ -141,6 +156,26 @@ class ArcadePortGameTest {
             assertNotNull(game.floor());
         }
         assertEquals(ArcadePortGame.MONSTER_MAZE, ArcadePortGame.fromId("monster-maze"));
+        assertEquals(ArcadePortGame.PLEXBALL, ArcadePortGame.fromId("plexball"));
+        assertEquals(ArcadePortGame.CAMERA_SHY, ArcadePortGame.fromId("camera-shy"));
+        assertEquals(ArcadePortGame.SUPER_SPLOOR, ArcadePortGame.fromId("super-sploor"));
+        assertEquals("Plexball", ArcadePortGame.PLEXBALL.displayName());
+        java.util.List<String> enabled = java.util.List.of("death-tag", "plexball", "spleef", "super-sploor", "dragons", "runner", "camera-shy");
+        assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.PLEXBALL.id(), enabled),
+                "Plexball is promoted into the controlled READY_FOR_TEST queue.");
+        assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.SPLEEF.id(), enabled),
+                "Spleef is promoted into the controlled READY_FOR_TEST queue.");
+        assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.DRAGONS.id(), enabled),
+                "Dragons Solo is promoted into the controlled READY_FOR_TEST queue.");
+        assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.RUNNER.id(), enabled),
+                "Runner is promoted into the controlled READY_FOR_TEST queue.");
+        assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.SUPER_SPLOOR.id(), enabled),
+                "Super Sploor is promoted into the controlled READY_FOR_TEST queue.");
+        assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.CAMERA_SHY.id(), enabled),
+                "Camera Shy is promoted into the controlled READY_FOR_TEST queue.");
+        assertFalse(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.CAMERA_SHY.id(),
+                java.util.List.of("death-tag", "plexball", "spleef")),
+                "Camera Shy must remain gated when it is removed from the reviewed allow-list.");
         assertNull(ArcadePortGame.fromId("snake"));
         assertEquals(ArcadePortGame.DRAW_MY_THING, ArcadePortGame.fromId("Draw My Thing"));
         assertEquals(ArcadePortGame.MASTER_BUILDERS, ArcadePortGame.fromId("master_builders"));
@@ -159,6 +194,9 @@ class ArcadePortGameTest {
         assertEquals(2, ArcadePortGame.HEROES_OF_GWEN.lobbyTeamCount());
         assertEquals(4, ArcadePortGame.MICRO_BATTLES.lobbyTeamCount());
         assertEquals(4, ArcadePortGame.SHEEP_QUEST.lobbyTeamCount());
+        assertEquals(2, ArcadePortGame.SUPER_SPLOOR.lobbyTeamCount());
+        assertEquals(0, ArcadePortGame.PLEXBALL.lobbyTeamCount());
+        assertEquals(0, ArcadePortGame.CAMERA_SHY.lobbyTeamCount());
         assertEquals(0, ArcadePortGame.ONE_IN_THE_QUIVER.lobbyTeamCount());
         assertEquals(0, ArcadePortGame.MILK_THE_COW.lobbyTeamCount());
         assertEquals(0, ArcadePortGame.WITHER_ASSAULT.lobbyTeamCount());
@@ -663,6 +701,10 @@ class ArcadePortGameTest {
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DRAGON_ESCAPE));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DRAGONS));
         assertFalse(SourceMapCatalog.hasMap(ArcadePortGame.EVOLUTION));
+        assertFalse(SourceMapCatalog.hasMap(ArcadePortGame.CAMERA_SHY));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.SUPER_SPLOOR));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DRAGONS));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.RUNNER));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.GLADIATORS));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.MICRO_BATTLES));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.ONE_IN_THE_QUIVER));
@@ -756,6 +798,11 @@ class ArcadePortGameTest {
         assertEquals(500L, ArcadePortRules.DRAGONS_WATER_DAMAGE_INTERVAL_MILLIS);
         assertEquals(50L, ArcadePortRules.DRAGONS_BARRAGE_FIRE_INTERVAL_MILLIS);
         assertEquals(6, ArcadePortRules.DRAGONS_BARRAGE_MAX_ARROWS);
+    }
+
+    @Test void microBattlesUsesTheOriginalSourceMapArchive() {
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.MICRO_BATTLES));
+        assertEquals(java.util.List.of("Micro Battle"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.MICRO_BATTLES));
     }
 
     @Test void microBattlesSourceKitsFletcherAndIronSkinAreExplicit() {
@@ -1910,7 +1957,16 @@ class ArcadePortGameTest {
         assertEquals(3, ArcadePortRules.gladiatorsTierForRound(4));
     }
 
-    @Test void gladiatorsVoteModesExposeTheCorrectClassicToolAvailability() {
+    @Test void gladiatorsVoteModesExposeTheDefaultAndFourVariants() {
+        GladiatorsMode normal = GladiatorsMode.fromId("normal");
+        assertEquals(5, GladiatorsMode.values().length);
+        assertSame(GladiatorsMode.NORMAL, GladiatorsMode.defaultMode());
+        assertSame(GladiatorsMode.NORMAL, normal);
+        assertTrue(normal.rodAvailable());
+        assertTrue(normal.bowAvailable());
+        assertTrue(normal.hasClassicRangedTools());
+        assertSame(GladiatorsMode.NORMAL, GladiatorsMode.fromId("classic"));
+
         assertTrue(GladiatorsMode.fromId("rodless").bowAvailable());
         assertFalse(GladiatorsMode.fromId("rodless").rodAvailable());
         assertTrue(GladiatorsMode.fromId("bowless").rodAvailable());

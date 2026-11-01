@@ -7,7 +7,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Modern catalogue for all 21 Arcade games. Each game owns its own cosmetic
+ * Modern catalogue for all 25 Arcade games. Each game owns its own cosmetic
  * lines and win-scene choices; actual render/gameplay handlers are added with
  * each port rather than pretending global cosmetics are game-specific.
  */
@@ -16,7 +16,7 @@ public final class ArcadeCatalog {
 
     public ArcadeCatalog() {
         register(game("bacon-brawl", "Bacon Brawl", "PORKCHOP", "Torpedo into rivals and launch them from the arena.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("signature-impact", "Signature Impact", "Body-Slam/Torpedo presentation.", "FIREWORK_ROCKET",
                         single("pork-comet", "Pork Comet", "A bacon comet slams into the impact point."),
                         single("crispy-ring", "Crispy Ring", "A sizzling ring expands from the impact point."),
@@ -49,7 +49,7 @@ public final class ArcadeCatalog {
                 win("untouched-run", "Untouched Run", "A route map draws itself around the winner")));
 
         register(game("dragon-escape", "Dragon Escape", "DRAGON_HEAD", "Race the dragon through a collapsing parkour route.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("leader-marker", "Course Leader Marker", "A course-specific marker for the current leader.", "BEACON",
                         single("dragon-eye", "Dragon Eye", "An iris-like marker pulses above the leader."),
                         single("sky-compass", "Sky Compass", "A rotating compass motif follows the leader."),
@@ -63,7 +63,7 @@ public final class ArcadeCatalog {
                 win("cloud-throne", "Cloud Throne", "A cloud-built throne rises under the winner")));
 
         register(game("dragons", "Dragons", "BLAZE_POWDER", "Use Pyro platforms to survive dragon attacks.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("pyro-signature", "Pyro Signature", "Unique shape language for the Pyro ability.", "BLAZE_POWDER",
                         single("ember-wing", "Ember Wing", "A fan of flame-shaped particles."),
                         single("phoenix-arc", "Phoenix Arc", "A phoenix outline arcs through the air."),
@@ -93,7 +93,7 @@ public final class ArcadeCatalog {
                 win("gene-helix", "Gene Helix", "A double helix spirals into the sky")));
 
         register(game("gladiators", "Gladiators", "IRON_SWORD", "Fight for the last position in the duel arena.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("duel-intro", "Duel Entrance", "A distinct combat entrance before the first hit.", "IRON_SWORD",
                         single("arena-challenger", "Arena Challenger", "An arena bell and crossed-sword flash."),
                         single("red-sand", "Red Sand", "A compact sand burst under the fighter."),
@@ -108,43 +108,41 @@ public final class ArcadeCatalog {
                 win("arena-banners", "Arena Banners", "Banners unfurl around the final combatant")));
 
         register(game("micro-battles", "Micro Battles", "LIGHT_BLUE_STAINED_GLASS", "Fight on tiny platforms as the border closes.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
-                List.of(line("middle-glass-colour", "Middle Glass Colour",
-                                "Change the starting glass on your island. Only you see your selected colour.", "LIGHT_BLUE_STAINED_GLASS",
-                        single("light-blue", "Light Blue", "Personal light-blue starting glass."),
-                        single("white", "White", "Personal white starting glass."),
-                        single("orange", "Orange", "Personal orange starting glass."),
-                        single("magenta", "Magenta", "Personal magenta starting glass."),
-                        single("yellow", "Yellow", "Personal yellow starting glass."),
-                        single("lime", "Lime", "Personal lime starting glass."),
-                        single("pink", "Pink", "Personal pink starting glass."),
-                        single("gray", "Gray", "Personal gray starting glass."),
-                        single("light-gray", "Light Gray", "Personal light-gray starting glass."),
-                        single("cyan", "Cyan", "Personal cyan starting glass."),
-                        single("purple", "Purple", "Personal purple starting glass."),
-                        single("blue", "Blue", "Personal blue starting glass."),
-                        single("brown", "Brown", "Personal brown starting glass."),
-                        single("green", "Green", "Personal green starting glass."),
-                        single("red", "Red", "Personal red starting glass."),
-                        single("black", "Black", "Personal black starting glass.")),
-                     line("border-particle-colour", "Border Particle Colour",
-                                "Choose the colour of your vertical border warning. Everyone can see these particles.", "END_ROD",
-                        single("light-blue", "Light Blue", "Shared light-blue border particles."),
-                        single("white", "White", "Shared white border particles."),
-                        single("orange", "Orange", "Shared orange border particles."),
-                        single("magenta", "Magenta", "Shared magenta border particles."),
-                        single("yellow", "Yellow", "Shared yellow border particles."),
-                        single("lime", "Lime", "Shared lime border particles."),
-                        single("pink", "Pink", "Shared pink border particles."),
-                        single("gray", "Gray", "Shared gray border particles."),
-                        single("light-gray", "Light Gray", "Shared light-gray border particles."),
-                        single("cyan", "Cyan", "Shared cyan border particles."),
-                        single("purple", "Purple", "Shared purple border particles."),
-                        single("blue", "Blue", "Shared blue border particles."),
-                        single("brown", "Brown", "Shared brown border particles."),
-                        single("green", "Green", "Shared green border particles."),
-                        single("red", "Red", "Shared red border particles."),
-                        single("black", "Black", "Shared black border particles."))),
+                GameDefinition.PortStatus.READY_FOR_TEST,
+                List.of(lineMulti("island-visuals", "Island Glass & Border Colours",
+                                "Equip one private starting-glass colour and one shared border-particle colour.", "LIGHT_BLUE_STAINED_GLASS",
+                        grouped("glass-light-blue", "Light Blue Island Glass", "Only you see this light blue starting-glass colour.", "glass"),
+                        grouped("glass-white", "White Island Glass", "Only you see this white starting-glass colour.", "glass"),
+                        grouped("glass-orange", "Orange Island Glass", "Only you see this orange starting-glass colour.", "glass"),
+                        grouped("glass-magenta", "Magenta Island Glass", "Only you see this magenta starting-glass colour.", "glass"),
+                        grouped("glass-yellow", "Yellow Island Glass", "Only you see this yellow starting-glass colour.", "glass"),
+                        grouped("glass-lime", "Lime Island Glass", "Only you see this lime starting-glass colour.", "glass"),
+                        grouped("glass-pink", "Pink Island Glass", "Only you see this pink starting-glass colour.", "glass"),
+                        grouped("glass-gray", "Gray Island Glass", "Only you see this gray starting-glass colour.", "glass"),
+                        grouped("glass-light-gray", "Light Gray Island Glass", "Only you see this light gray starting-glass colour.", "glass"),
+                        grouped("glass-cyan", "Cyan Island Glass", "Only you see this cyan starting-glass colour.", "glass"),
+                        grouped("glass-purple", "Purple Island Glass", "Only you see this purple starting-glass colour.", "glass"),
+                        grouped("glass-blue", "Blue Island Glass", "Only you see this blue starting-glass colour.", "glass"),
+                        grouped("glass-brown", "Brown Island Glass", "Only you see this brown starting-glass colour.", "glass"),
+                        grouped("glass-green", "Green Island Glass", "Only you see this green starting-glass colour.", "glass"),
+                        grouped("glass-red", "Red Island Glass", "Only you see this red starting-glass colour.", "glass"),
+                        grouped("glass-black", "Black Island Glass", "Only you see this black starting-glass colour.", "glass"),
+                        grouped("border-light-blue", "Light Blue Border Particles", "Everyone sees your light blue border-warning particles.", "border"),
+                        grouped("border-white", "White Border Particles", "Everyone sees your white border-warning particles.", "border"),
+                        grouped("border-orange", "Orange Border Particles", "Everyone sees your orange border-warning particles.", "border"),
+                        grouped("border-magenta", "Magenta Border Particles", "Everyone sees your magenta border-warning particles.", "border"),
+                        grouped("border-yellow", "Yellow Border Particles", "Everyone sees your yellow border-warning particles.", "border"),
+                        grouped("border-lime", "Lime Border Particles", "Everyone sees your lime border-warning particles.", "border"),
+                        grouped("border-pink", "Pink Border Particles", "Everyone sees your pink border-warning particles.", "border"),
+                        grouped("border-gray", "Gray Border Particles", "Everyone sees your gray border-warning particles.", "border"),
+                        grouped("border-light-gray", "Light Gray Border Particles", "Everyone sees your light gray border-warning particles.", "border"),
+                        grouped("border-cyan", "Cyan Border Particles", "Everyone sees your cyan border-warning particles.", "border"),
+                        grouped("border-purple", "Purple Border Particles", "Everyone sees your purple border-warning particles.", "border"),
+                        grouped("border-blue", "Blue Border Particles", "Everyone sees your blue border-warning particles.", "border"),
+                        grouped("border-brown", "Brown Border Particles", "Everyone sees your brown border-warning particles.", "border"),
+                        grouped("border-green", "Green Border Particles", "Everyone sees your green border-warning particles.", "border"),
+                        grouped("border-red", "Red Border Particles", "Everyone sees your red border-warning particles.", "border"),
+                        grouped("border-black", "Black Border Particles", "Everyone sees your black border-warning particles.", "border"))),
                 win("last-tile", "Last Tile", "Only the winner's final tile stays lit."),
                 win("micro-monument", "Micro Monument", "A tiny monument assembles around the winner."),
                 win("falling-stars", "Falling Stars", "A narrow star shower descends onto the platform")));
@@ -183,7 +181,7 @@ public final class ArcadeCatalog {
                 win("archer-halo", "Archer Halo", "An archer's halo draws around the winner")));
 
         register(game("paintball", "Paintball", "SNOWBALL", "Control lanes with paintball weapons and team colours.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(lineMulti("weapon-and-pellet-identity", "Weapon & Pellet Identity",
                         "Equip one visible weapon finish and one visible in-flight pellet style. Both are shown to all players.",
                         "CROSSBOW",
@@ -198,7 +196,7 @@ public final class ArcadeCatalog {
                 win("splatter-crown", "Splatter Crown", "A crown of layered paint splashes")));
 
         register(game("runner", "Runner", "LEATHER_BOOTS", "Survive by running the course without falling into gaps.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("running-trail-colour", "Running Trail Colour",
                         "Choose a non-red trail colour. The selected map palette is checked to avoid clashes.",
                         "GLOW_INK_SAC",
@@ -222,7 +220,7 @@ public final class ArcadeCatalog {
                 win("runner-statue", "Runner Statue", "A running silhouette assembles into a statue")));
 
         register(game("sheep-quest", "Sheep Quest", "WHITE_WOOL", "Capture sheep and return them to your team's pen.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("capture-signature", "Capture Signature", "Distinct feedback when a sheep is secured.", "LEAD",
                         single("sheep-bell", "Sheep Bell", "A distinct bell and wool puff."),
                         single("wool-confetti", "Wool Confetti", "Colour-coded wool flecks burst outward."),
@@ -247,7 +245,7 @@ public final class ArcadeCatalog {
                 win("fruit-fountain", "Fruit Fountain", "Food items spiral into a colourful fountain")));
 
         register(game("spleef", "Spleef", "IRON_SHOVEL", "Break the floor beneath opponents and stay above the void.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("break-signature", "Block Break Signature", "A game-specific shape for each block break.", "IRON_SHOVEL",
                         grouped("snowburst", "Snowburst", "A short snow burst at the broken tile.", "signature"),
                         grouped("ice-shards", "Ice Shards", "Crystalline fragments spread outward.", "signature"),
@@ -307,7 +305,7 @@ public final class ArcadeCatalog {
                 win("skyfall-crown", "Skyfall Crown", "A floating crown of cloud and TNT frames the winner.")));
 
         register(game("turf-wars", "Turf Wars", "BOW", "Win ranged combat and control the central turf.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("arrow-mark", "Arrow Mark", "A block-impact mark that follows the player's team palette.", "TARGET",
                         single("team-sigil", "Team Sigil", "A team sigil appears at the impact point."),
                         single("turf-crack", "Turf Crack", "A short crack traces from the hit."),
@@ -322,6 +320,26 @@ public final class ArcadeCatalog {
                 List.of(),
                 win("last-assassin-standing", "Last Assassin Standing",
                         "A simple survivor podium; no additional game-specific cosmetics are claimed yet.")));
+
+        register(game("camera-shy", "Camera Shy", "SPYGLASS",
+                "Photograph opponents with a spyglass while avoiding five exposures. Last photographer standing wins.",
+                GameDefinition.PortStatus.READY_FOR_TEST,
+                List.of(),
+                win("last-photographer-standing", "Last Photographer Standing",
+                        "The winner is celebrated as the last photographer remaining in the maze.")));
+
+        register(game("plexball", "Plexball", "SNOWBALL",
+                "Take turns hitting a ball off a tee while every non-batter tries to catch it. Longest uncaught hit wins.",
+                GameDefinition.PortStatus.READY_FOR_TEST,
+                List.of(),
+                win("home-run-stage", "Home Run Stage", "A 100-metre marker rises behind the winner."),
+                win("golden-glove", "Golden Glove", "A golden glove and ball form a compact victory display.")));
+
+        register(game("super-sploor", "Super Sploor", "INK_SAC",
+                "Paint and reclaim territory as a five-kit team in the NANO-inspired Squid Turf War.",
+                GameDefinition.PortStatus.READY_FOR_TEST,
+                List.of(),
+                win("colour-surge", "Colour Surge", "A vivid wash of team-coloured ink rolls across the winning team's podium.")));
     }
 
     private void register(GameDefinition definition) {

@@ -8,17 +8,17 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ArcadeCatalogTest {
     @Test
-    void registersAllTwentyFourArcadeGames() {
+    void registersAllTwentySevenArcadeGames() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        assertEquals(24, catalog.size());
-        assertEquals(24, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
+        assertEquals(27, catalog.size());
+        assertEquals(27, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
     }
 
     @Test
     void eachGameHasItsOwnCosmeticLinesAndWinEffects() {
         ArcadeCatalog catalog = new ArcadeCatalog();
         for (GameDefinition game : catalog.getGames()) {
-            boolean gameplayFirstPort = Set.of("draw-my-thing", "master-builders", "sneaky-assassins", "castle-assault", "heroes-of-gwen", "milk-the-cow", "wither-assault").contains(game.getId());
+            boolean gameplayFirstPort = Set.of("draw-my-thing", "master-builders", "sneaky-assassins", "castle-assault", "heroes-of-gwen", "milk-the-cow", "wither-assault", "plexball", "super-sploor", "camera-shy").contains(game.getId());
             assertEquals(gameplayFirstPort, game.getCosmeticLines().isEmpty(),
                     game.getId() + " cosmetic lines should remain optional during this gameplay-first port");
             assertTrue(game.getWinEffects().size() >= (gameplayFirstPort ? 1 : 3),
@@ -75,50 +75,107 @@ class ArcadeCatalogTest {
     }
 
     @Test
-    void microBattlesHasIndependentPersonalGlassAndSharedBorderColourLines() {
+    void microBattlesUsesOneCombinedLineWithIndependentPrivateAndSharedColourGroups() {
         GameDefinition game = new ArcadeCatalog().getGame("micro-battles");
         assertNotNull(game);
-        CosmeticLineDefinition middleGlass = game.getCosmeticLines().stream()
-                .filter(line -> line.getId().equals("middle-glass-colour"))
-                .findFirst().orElseThrow();
-        CosmeticLineDefinition borderParticles = game.getCosmeticLines().stream()
-                .filter(line -> line.getId().equals("border-particle-colour"))
-                .findFirst().orElseThrow();
-
-        assertEquals(CosmeticLineDefinition.SelectionMode.SINGLE, middleGlass.getSelectionMode());
-        assertEquals(CosmeticLineDefinition.SelectionMode.SINGLE, borderParticles.getSelectionMode());
-        assertEquals("light-blue", middleGlass.getDefaultOptionId());
-        assertEquals("light-blue", borderParticles.getDefaultOptionId());
-        assertEquals(16, middleGlass.getOptions().size());
-        assertEquals(16, borderParticles.getOptions().size());
-        assertTrue(middleGlass.getDescription().contains("Only you"));
-        assertTrue(borderParticles.getDescription().contains("Everyone"));
-        assertEquals(
-                middleGlass.getOptions().stream().map(CosmeticOption::getId).toList(),
-                borderParticles.getOptions().stream().map(CosmeticOption::getId).toList());
+        assertEquals(1, game.getCosmeticLines().size());
+        CosmeticLineDefinition visuals = game.getCosmeticLines().get(0);
+        assertEquals("island-visuals", visuals.getId());
+        assertEquals(CosmeticLineDefinition.SelectionMode.MULTI, visuals.getSelectionMode());
+        assertEquals("glass-light-blue", visuals.getDefaultOptionId());
+        assertEquals(32, visuals.getOptions().size());
+        assertEquals(16, visuals.getOptions().stream()
+                .filter(option -> "glass".equals(option.getSelectionGroup())).count());
+        assertEquals(16, visuals.getOptions().stream()
+                .filter(option -> "border".equals(option.getSelectionGroup())).count());
+        assertTrue(visuals.getOptions().stream()
+                .filter(option -> "glass".equals(option.getSelectionGroup()))
+                .allMatch(option -> option.getDescription().contains("Only you")));
+        assertTrue(visuals.getOptions().stream()
+                .filter(option -> "border".equals(option.getSelectionGroup()))
+                .allMatch(option -> option.getDescription().contains("Everyone")));
     }
 
     @Test
-    void onlyExplicitlyClearedGamesAreReadyForInGameAcceptance() {
+    void explicitlyClearedGamesAreAvailableTogetherForInGameAcceptance() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        Set<String> readyIds = Set.of("death-tag", "one-in-the-quiver", "bomb-lobbers");
+        Set<String> readyIds = Set.of("death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl", "gladiators", "micro-battles", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "runner", "sheep-quest", "turf-wars", "camera-shy");
 
         for (GameDefinition game : catalog.getGames()) {
             if (readyIds.contains(game.getId())) {
                 assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, game.getPortStatus(),
-                        game.getId() + " is explicitly cleared for controlled in-game acceptance");
+                        game.getId() + " is explicitly cleared for the shared in-game test queue");
                 assertTrue(game.isReadyForTest());
             } else {
                 assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, game.getPortStatus(),
-                        game.getId() + " must remain gated until it is selected for acceptance");
+                        game.getId() + " must remain gated until it is promoted to the shared test queue");
                 assertFalse(game.isReadyForTest());
             }
         }
         long readyForTest = catalog.getGames().stream().filter(GameDefinition::isReadyForTest).count();
         long inProgress = catalog.getGames().stream()
                 .filter(game -> game.getPortStatus() == GameDefinition.PortStatus.MECHANICS_IN_PROGRESS).count();
-        assertEquals(3, readyForTest);
-        assertEquals(21, inProgress);
+        assertEquals(16, readyForTest);
+        assertEquals(11, inProgress);
+    }
+
+    @Test
+    void turfWarsIsPromotedForControlledSourceMapAcceptance() {
+        GameDefinition game = new ArcadeCatalog().getGame("turf-wars");
+        assertNotNull(game);
+        assertEquals("Turf Wars", game.getName());
+        assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, game.getPortStatus());
+        assertTrue(game.isReadyForTest());
+    }
+
+    @Test
+    void sheepQuestIsPromotedForControlledSourceMapAcceptance() {
+        GameDefinition game = new ArcadeCatalog().getGame("sheep-quest");
+        assertNotNull(game);
+        assertEquals("Sheep Quest", game.getName());
+        assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, game.getPortStatus());
+        assertTrue(game.isReadyForTest());
+    }
+
+    @Test
+    void dragonEscapeIsPromotedForControlledSourceMapAcceptance() {
+        GameDefinition game = new ArcadeCatalog().getGame("dragon-escape");
+        assertNotNull(game);
+        assertEquals("Dragon Escape", game.getName());
+        assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, game.getPortStatus());
+        assertTrue(game.isReadyForTest());
+    }
+
+    @Test
+    void dragonsAndRunnerArePromotedForControlledSourceMapAcceptance() {
+        ArcadeCatalog catalog = new ArcadeCatalog();
+        assertTrue(catalog.getGame("dragons").isReadyForTest());
+        assertTrue(catalog.getGame("runner").isReadyForTest());
+        assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, catalog.getGame("dragons").getPortStatus());
+        assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, catalog.getGame("runner").getPortStatus());
+    }
+
+    @Test
+    void cameraShyIsCataloguedForControlledSpyglassEliminationTesting() {
+        GameDefinition game = new ArcadeCatalog().getGame("camera-shy");
+        assertNotNull(game);
+        assertEquals("Camera Shy", game.getName());
+        assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, game.getPortStatus());
+        assertTrue(game.isReadyForTest());
+        assertTrue(game.getDescription().contains("five exposures"));
+        assertEquals(List.of("last-photographer-standing"),
+                game.getWinEffects().stream().map(CosmeticOption::getId).toList());
+        assertTrue(game.getCosmeticLines().isEmpty());
+    }
+
+    @Test
+    void superSploorIsCataloguedForControlledTeamTerritoryTesting() {
+        GameDefinition game = new ArcadeCatalog().getGame("super-sploor");
+        assertNotNull(game);
+        assertEquals("Super Sploor", game.getName());
+        assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, game.getPortStatus());
+        assertTrue(game.isReadyForTest());
+        assertTrue(game.getCosmeticLines().isEmpty());
     }
 
     @Test

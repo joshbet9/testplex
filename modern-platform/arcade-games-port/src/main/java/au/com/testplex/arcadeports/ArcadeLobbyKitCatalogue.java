@@ -164,6 +164,39 @@ final class ArcadeLobbyKitCatalogue {
                             Unlock.GEM, Zombie.class, Material.IRON_SWORD),
                     choice("turf-wars-shredder", "Shredder", Material.ARROW,
                             Unlock.GEM, Zombie.class, Material.BOW));
+            case SUPER_SPLOOR -> List.of(
+                    choice("sprayer", "Sprayer", Material.BLAZE_ROD,
+                            Unlock.FREE, Zombie.class, Material.BLAZE_ROD),
+                    choice("roller", "Roller", Material.IRON_HOE,
+                            Unlock.GEM, Zombie.class, Material.IRON_HOE),
+                    choice("charger", "Charger", Material.CROSSBOW,
+                            Unlock.GEM, Skeleton.class, Material.CROSSBOW),
+                    choice("lobber", "Lobber", Material.SNOWBALL,
+                            Unlock.GEM, Zombie.class, Material.SNOWBALL),
+                    choice("dualies", "Dualies", Material.FLINT,
+                            Unlock.ACHIEVEMENT, Zombie.class, Material.FLINT));
+            case PLEXBALL -> List.of(
+                    choice("slugger", "Slugger", Material.IRON_SWORD,
+                            Unlock.FREE, Zombie.class, Material.IRON_SWORD),
+                    choice("technician", "Technician", Material.SHIELD,
+                            Unlock.GEM, Zombie.class, Material.SHIELD),
+                    choice("curve-artist", "Curve Artist", Material.COMPASS,
+                            Unlock.GEM, Villager.class, Material.COMPASS),
+                    choice("sprinter", "Sprinter", Material.SUGAR,
+                            Unlock.GEM, Zombie.class, Material.SUGAR),
+                    choice("skyguard", "Skyguard", Material.FEATHER,
+                            Unlock.ACHIEVEMENT, Skeleton.class, Material.FEATHER));
+            case CAMERA_SHY -> List.of(
+                    choice("camera-shy-smoke-artist", "Smoke Artist", Material.POTION,
+                            Unlock.FREE, Villager.class, Material.POTION),
+                    choice("camera-shy-decoy", "Decoy", Material.FIREWORK_ROCKET,
+                            Unlock.GEM, Villager.class, Material.FIREWORK_ROCKET),
+                    choice("camera-shy-runner", "Runner", Material.SUGAR,
+                            Unlock.GEM, Villager.class, Material.SUGAR),
+                    choice("camera-shy-spotter", "Spotter", Material.COMPASS,
+                            Unlock.GEM, Villager.class, Material.COMPASS),
+                    choice("camera-shy-understudy", "Understudy", Material.ARMOR_STAND,
+                            Unlock.ACHIEVEMENT, Villager.class, Material.ARMOR_STAND));
             default -> List.of();
         };
         Set<String> hidden = new HashSet<>();

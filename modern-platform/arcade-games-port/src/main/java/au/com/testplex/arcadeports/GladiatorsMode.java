@@ -4,6 +4,7 @@ import java.util.Locale;
 
 /** Lobby-voted Gladiators combat rules. */
 public enum GladiatorsMode {
+    NORMAL("normal", "Normal", true, true),
     RODLESS("rodless", "Rodless", false, true),
     BOWLESS("bowless", "Bowless", true, false),
     MODERN("modern", "Modern", false, false),
@@ -27,9 +28,13 @@ public enum GladiatorsMode {
     public boolean bowAvailable() { return bowAvailable; }
     public boolean hasClassicRangedTools() { return rodAvailable || bowAvailable; }
 
+    /** The untouched Reborn-style loadout is the default when nobody votes or in solo practice. */
+    public static GladiatorsMode defaultMode() { return NORMAL; }
+
     public static GladiatorsMode fromId(String id) {
         if (id == null) return null;
         String normalized = id.toLowerCase(Locale.ROOT).trim();
+        if ("classic".equals(normalized)) return NORMAL;
         for (GladiatorsMode mode : values()) if (mode.id.equals(normalized)) return mode;
         return null;
     }

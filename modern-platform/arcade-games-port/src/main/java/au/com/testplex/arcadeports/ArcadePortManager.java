@@ -191,6 +191,7 @@ public final class ArcadePortManager implements Listener {
     private static final long JOIN_WINDOW_TICKS = 100L;
     static final int MANUAL_START_COUNTDOWN_SECONDS = 0;
     private final ArcadeMechanicsModernPlugin plugin;
+    private final SuperSploorRuntime superSploor;
     private final ArcadeTestPlayerManager testPlayers;
     private boolean testPlayerStartPending;
     private final SneakyAssassinsMechanics sneakyAssassins;
@@ -200,6 +201,7 @@ public final class ArcadePortManager implements Listener {
     private final Map<String, SourceMapCatalog.MapData> sourceMapData = new HashMap<>();
     private final Map<UUID, PlayerSnapshot> pendingRestore = new HashMap<>();
     private final Map<UUID, String> paintballKitPreferences = new HashMap<>();
+    private final Map<UUID, String> superSploorKitPreferences = new HashMap<>();
     private final Map<UUID, String> castleAssaultKitPreferences = new HashMap<>();
     private final Map<UUID, String> heroesOfGwenHeroPreferences = new HashMap<>();
     private final Map<UUID, String> deathTagRunnerKitPreferences = new HashMap<>();
@@ -249,9 +251,11 @@ public final class ArcadePortManager implements Listener {
     private final ModernArcadeLobby lobby;
     private final ModernArcadeLobbyRuntime lobbyRuntime;
     private MonsterMazePlugin monsterMazeModule;
+    private CameraShyGame cameraShyModule;
 
     ArcadePortManager(ArcadeMechanicsModernPlugin plugin) {
         this.plugin = plugin;
+        this.superSploor = new SuperSploorRuntime(plugin);
         this.testPlayers = new ArcadeTestPlayerManager(plugin);
         this.sneakyAssassins = new SneakyAssassinsMechanics(plugin, testPlayers::isTestPlayer);
         this.statsActionKey = new NamespacedKey(plugin, "stats-action");
@@ -313,6 +317,14 @@ public final class ArcadePortManager implements Listener {
         if (player != null && player.isOnline()) lobby.sendToLobby(player);
     }
 
+    ArcadeTestPlayerManager testPlayerManager() { return testPlayers; }
+
+    void setCameraShyModule(CameraShyGame game) { this.cameraShyModule = game; }
+
+    CameraShyGame cameraShyModule() { return cameraShyModule; }
+
+    boolean canStartCameraShy() { return active == null && !monsterMazeRunning(); }
+
     /** Start an explicit participant set through the same Testplex Arcade queue/manager path. */
     public boolean startMonsterMazeTournamentRound(List<Player> requestedParticipants) {
         if (requestedParticipants == null || requestedParticipants.isEmpty()
@@ -354,6 +366,9 @@ public final class ArcadePortManager implements Listener {
 
     public int queuedCount(ArcadePortGame type) {
         if (type == null) return 0;
+        if (type == ArcadePortGame.CAMERA_SHY) {
+            return cameraShyModule == null ? 0 : cameraShyModule.queuedCount();
+        }
         Map<UUID, Player> queued = queues.get(type.id());
         int count = queued == null ? 0
                 : (int) queued.values().stream().filter(p -> p != null && p.isOnline()).count();
@@ -411,6 +426,120 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         for (Map<UUID, Player> queued : queues.values()) queued.remove(player.getUniqueId());
         gladiatorLobbyVotes.remove(player.getUniqueId());
+        if (cameraShyModule != null) cameraShyModule.removeFromQueue(player.getUniqueId());
+    }
+
+    /** Online players in the active Arcade Session who are not alive participants. */
+    public List<Player> activeSpectators(ArcadePortGame type) {
+        Session session = active;
+        if (session == null || session.type != type) return List.of();
+        return session.players.entrySet().stream()
+                .filter(entry -> !session.alive.contains(entry.getKey()))
+                .map(Map.Entry::getValue)
+                .filter(player -> player != null && player.isOnline())
+                .toList();
+    }
+
+    public int activeSpectatorCount(ArcadePortGame type) {
+        return activeSpectators(type).size();
+    }
+
+    public boolean isActiveSpectator(ArcadePortGame type, UUID playerId) {
+        Session session = active;
+        return session != null && session.type == type && playerId != null
+                && session.players.containsKey(playerId) && !session.alive.contains(playerId);
+    }
+
+    public boolean isActiveSession(ArcadePortGame type) {
+        return active != null && active.type == type;
+    }
+
+    /** Add a viewer to the active global Arcade Session and capture their restore snapshot. */
+    public boolean joinSpectator(ArcadePortGame type, Player player, Location spectatorSpawn) {
+        Session session = active;
+        if (session == null || session.type != type || player == null || !player.isOnline()) return false;
+        UUID id = player.getUniqueId();
+        if (session.players.containsKey(id)) return false;
+        if (type == ArcadePortGame.PLEXBALL
+                && !PlexballRules.canJoinAsSpectator(true, false, activeSpectatorCount(type))) return false;
+
+        removeFromQueues(player);
+        PlayerSnapshot pending = pendingRestore.remove(id);
+        if (pending != null) pending.restore(player);
+        lobby.ensurePlayerInLobby(player);
+        PlayerSnapshot snapshot = new PlayerSnapshot(player);
+        session.players.put(id, player);
+        session.snapshots.put(id, snapshot);
+        player.closeInventory();
+        player.getInventory().clear();
+        player.setGameMode(GameMode.SPECTATOR);
+        player.setAllowFlight(true);
+        player.setFlying(true);
+        player.setSpectatorTarget(null);
+        if (spectatorSpawn != null && spectatorSpawn.getWorld() == session.world) player.teleport(spectatorSpawn);
+        return true;
+    }
+
+    /** Leave an eliminated/spectating role through the common Arcade restore path. */
+    public boolean leaveSpectator(ArcadePortGame type, Player player) {
+        Session session = active;
+        if (session == null || session.type != type || player == null || !player.isOnline()) return false;
+        UUID id = player.getUniqueId();
+        if (!session.players.containsKey(id) || session.alive.contains(id)) return false;
+        PlayerSnapshot snapshot = session.snapshots.remove(id);
+        session.players.remove(id);
+        session.scores.remove(id);
+        player.setSpectatorTarget(null);
+        if (snapshot != null) snapshot.restore(player);
+        lobby.sendToLobby(player);
+        if (type == ArcadePortGame.PLEXBALL && plugin.getPlexballGame() != null) {
+            plugin.getPlexballGame().onArcadeLifecycleSpectatorLeft(id);
+        }
+        checkRoundEnd(session);
+        return true;
+    }
+
+    /** Leave a global queue or an active eliminated/spectator role. */
+    public boolean leaveQueue(ArcadePortGame type, Player player) {
+        if (type == null || player == null) return false;
+        UUID id = player.getUniqueId();
+        boolean removed = false;
+        Map<UUID, Player> queue = queues.get(queueKey(type, false));
+        if (queue != null) removed = queue.remove(id) != null;
+        if (supportsMixedArcadeVariant(type)) {
+            Map<UUID, Player> mixed = queues.get(queueKey(type, true));
+            if (mixed != null) removed |= mixed.remove(id) != null;
+        }
+        if (removed) {
+            if (pendingStart != null && pendingType == type
+                    && onlineQueuedPlayers(type, pendingMixedArcadeVariant).size()
+                    < (type == ArcadePortGame.PLEXBALL ? PlexballRules.MIN_PLAYERS : 1)) {
+                pendingStart.cancel();
+                pendingStart = null;
+                pendingType = null;
+                pendingMixedArcadeVariant = false;
+            }
+            if (manualStartCountdown != null && manualStartType == type
+                    && onlineQueuedPlayers(type).size()
+                    < (type == ArcadePortGame.PLEXBALL ? PlexballRules.MIN_PLAYERS : 1)) {
+                cancelManualStartCountdown(type, ChatColor.YELLOW + "The queue no longer has enough players; the Arcade start countdown was cancelled.");
+            }
+            player.sendMessage(ChatColor.GREEN + "You left the " + type.displayName() + " queue.");
+            lobbyRuntime.refreshDisplays();
+            return true;
+        }
+        if (leaveSpectator(type, player)) {
+            player.sendMessage(ChatColor.GREEN + "You left the " + type.displayName() + " spectators.");
+            lobbyRuntime.refreshDisplays();
+            return true;
+        }
+        return false;
+    }
+
+    /** Finish a game-specific engine while preserving global Session cleanup and snapshots. */
+    public void finishExternalSession(ArcadePortGame type) {
+        Session session = active;
+        if (session != null && session.type == type) finish(session, null, false);
     }
 
     public boolean isActiveGame(World world, ArcadePortGame type) {
@@ -661,6 +790,16 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         String value = requestedKit.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        boolean explicitCameraShyKit = value.startsWith("camera-shy-");
+        boolean cameraShyLobby = "camera-shy".equals(
+                plugin.getConfig().getString("lobby-selected-game", "bacon-brawl"));
+        if (explicitCameraShyKit || cameraShyLobby) {
+            if (cameraShyModule != null) {
+                cameraShyModule.selectKit(player, explicitCameraShyKit
+                        ? value.substring("camera-shy-".length()) : value);
+                return;
+            }
+        }
         String catalogueKitId = value.startsWith("monster-maze-")
                 ? value.substring("monster-maze-".length()) : value;
         if (lobby.isLobbyWorld(player.getWorld())) {
@@ -721,6 +860,7 @@ public final class ArcadePortManager implements Listener {
                 case DRAGONS -> { selectDragonsKit(player, value); return; }
                 case DRAGON_ESCAPE -> { selectDragonEscapeKit(player, value); return; }
                 case PAINTBALL -> { selectPaintballKit(player, value); return; }
+                case SUPER_SPLOOR -> { selectSuperSploorKit(player, value); return; }
                 case DEATH_TAG -> { selectDeathTagRunnerKit(player, value); return; }
                 case RUNNER -> { selectRunnerKit(player, value); return; }
                 case SHEEP_QUEST -> {
@@ -729,8 +869,21 @@ public final class ArcadePortManager implements Listener {
                 }
                 case SNEAKY_ASSASSINS -> { sneakyAssassins.selectKit(player, value); return; }
                 case TURF_WARS -> { selectTurfWarsKit(player, value); return; }
+                case PLEXBALL -> {
+                    PlexballGame game = plugin.getPlexballGame();
+                    if (game != null) game.selectKit(player, value);
+                    return;
+                }
                 default -> { }
             }
+        }
+        if (ArcadePortGame.PLEXBALL.id().equalsIgnoreCase(
+                plugin.getConfig().getString("lobby-selected-game", ""))) {
+            PlexballGame game = plugin.getPlexballGame();
+            if (game != null && !game.selectKit(player, value)) {
+                player.sendMessage(ChatColor.RED + "Unknown Plexball kit. Choose Slugger, Technician, Curve Artist, Sprinter or Skyguard.");
+            }
+            return;
         }
         if (ArcadePortRules.normalizeCastleAssaultKit(value) != null) selectCastleAssaultKit(player, value);
         else if (ArcadePortRules.normalizeHeroesOfGwenHero(value) != null) selectHeroesOfGwenHero(player, value);
@@ -748,7 +901,46 @@ public final class ArcadePortManager implements Listener {
         else if (value.startsWith("runnerkit-")) selectRunnerKit(player, value);
         else if (SneakyAssassinsMechanics.normalizeKit(value) != null) sneakyAssassins.selectKit(player, value);
         else if (ArcadePortRules.normalizeTurfWarsKit(value) != null) selectTurfWarsKit(player, value);
+        else if (normalizeSuperSploorKit(value) != null) selectSuperSploorKit(player, value);
         else selectDeathTagRunnerKit(player, value);
+    }
+
+    private String normalizeSuperSploorKit(String requestedKit) {
+        if (requestedKit == null) return null;
+        String value = requestedKit.toLowerCase(java.util.Locale.ROOT)
+                .replace('_', '-').replace(' ', '-');
+        return Set.of("sprayer", "roller", "charger", "lobber", "dualies").contains(value) ? value : null;
+    }
+
+    private void selectSuperSploorKit(Player player, String requestedKit) {
+        if (player == null) return;
+        String kit = normalizeSuperSploorKit(requestedKit);
+        if (kit == null) {
+            player.sendMessage(ChatColor.YELLOW + "Super Sploor kits: sprayer, roller, charger, lobber, dualies.");
+            return;
+        }
+        UUID id = player.getUniqueId();
+        superSploorKitPreferences.put(id, kit);
+        plugin.getConfig().set("lobby-kit-preferences." + id + ".super-sploor", kit);
+        plugin.saveConfig();
+        boolean activeMatch = active != null && active.type == ArcadePortGame.SUPER_SPLOOR
+                && active.players.containsKey(id);
+        player.sendMessage(ChatColor.GREEN + "Super Sploor kit set to " + kit
+                + (activeMatch ? " for your next match. Kits are locked during a round." : "."));
+    }
+
+    private Map<UUID, String> superSploorKitSelections(Session session) {
+        Map<UUID, String> selected = new HashMap<>();
+        if (session == null) return selected;
+        for (UUID id : session.players.keySet()) {
+            String saved = superSploorKitPreferences.getOrDefault(id,
+                    plugin.getConfig().getString("lobby-kit-preferences." + id + ".super-sploor", "sprayer"));
+            String kit = normalizeSuperSploorKit(saved);
+            if (kit == null) kit = "sprayer";
+            superSploorKitPreferences.put(id, kit);
+            selected.put(id, kit);
+        }
+        return selected;
     }
 
     public void selectSkyWarsKit(Player player, String requestedKit) {
@@ -1361,6 +1553,37 @@ public final class ArcadePortManager implements Listener {
     }
 
     public void queue(ArcadePortGame type, Player player, boolean quickStart, boolean mixedArcadeVariant) {
+        if (player == null || !player.isOnline()) return;
+        if (type == ArcadePortGame.CAMERA_SHY) {
+            // Camera Shy uses a dedicated queue implementation, but it is still subject
+            // to the central acceptance allow-list and manual-rotation cancellation.
+            if (!isGameEnabled(type)) {
+                player.sendMessage(ChatColor.RED + type.displayName()
+                        + " is not cleared for in-game parity testing yet. Cleared game IDs: " + enabledGamesLabel() + ".");
+                return;
+            }
+            if (automaticRotationTask != null || automaticRotationOnReturn) {
+                cancelAutomaticRotationVote();
+                player.sendMessage(ChatColor.YELLOW + "The automatic preference vote was cancelled by a manual queue selection.");
+            }
+            if (active != null || monsterMazeRunning()) {
+                player.sendMessage(ChatColor.RED + "Another Arcade game is already running.");
+            } else if (cameraShyModule == null) {
+                player.sendMessage(ChatColor.RED + "Camera Shy is not loaded.");
+            } else {
+                for (LinkedHashMap<UUID, Player> existingQueue : queues.values()) {
+                    existingQueue.remove(player.getUniqueId());
+                }
+                gladiatorLobbyVotes.remove(player.getUniqueId());
+                cameraShyModule.queue(player, quickStart);
+            }
+            return;
+        }
+        if (cameraShyModule != null && cameraShyModule.isActive()) {
+            player.sendMessage(ChatColor.RED + "Camera Shy is already underway. Wait for the current round to finish.");
+            return;
+        }
+        if (cameraShyModule != null) cameraShyModule.removeFromQueue(player.getUniqueId());
         if (monsterMazeRunning()) {
             player.sendMessage(ChatColor.RED + "Monster Maze is already running. Wait for the current Testplex game to finish.");
             return;
@@ -1408,6 +1631,10 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.SKY_WARS && mixedArcadeVariant
                 && !SkyWarsMixedArcadeRules.hasRoom(queuedPlayers)) {
             player.sendMessage(ChatColor.RED + "SkyWars Mixed Arcade is full (16/16 players).");
+            return;
+        }
+        if (type == ArcadePortGame.PLEXBALL && queuedPlayers >= PlexballRules.MAX_PLAYERS) {
+            player.sendMessage(ChatColor.RED + "Plexball's Arcade queue is full (8/8 players).");
             return;
         }
 
@@ -1468,6 +1695,10 @@ public final class ArcadePortManager implements Listener {
             sender.sendMessage(ChatColor.RED + "Operator permission required to start a queued Arcade game.");
             return;
         }
+        if (cameraShyModule != null && cameraShyModule.isActive()) {
+            sender.sendMessage(ChatColor.RED + "Camera Shy is already underway.");
+            return;
+        }
         if (mixedArcadeVariant && !supportsMixedArcadeVariant(type)) {
             sender.sendMessage(ChatColor.RED + "Mixed Arcade variants are only available for Turf Wars, Castle Assault, and Heroes of Gwen.");
             return;
@@ -1506,6 +1737,29 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
         }
+        if (type == ArcadePortGame.CAMERA_SHY) {
+            if (!canStartCameraShy()) {
+                sender.sendMessage(ChatColor.RED + "Another Arcade game is already running.");
+                return;
+            }
+            if (cameraShyModule == null) {
+                sender.sendMessage(ChatColor.RED + "Camera Shy is not loaded.");
+                return;
+            }
+            if (sender instanceof Player requesting && requesting.isOnline()) lobby.ensurePlayerInLobby(requesting);
+            List<Player> lobbyPlayers = new ArrayList<>(Bukkit.getOnlinePlayers().stream()
+                    .filter(player -> player.isOnline() && !testPlayers.isTestPlayer(player)
+                            && lobby.isLobbyWorld(player.getWorld()))
+                    .toList());
+            for (Player player : lobbyPlayers) {
+                for (LinkedHashMap<UUID, Player> existingQueue : queues.values()) {
+                    existingQueue.remove(player.getUniqueId());
+                }
+                gladiatorLobbyVotes.remove(player.getUniqueId());
+            }
+            cameraShyModule.startFromLobby(sender, lobbyPlayers);
+            return;
+        }
 
         if (sender instanceof Player requestingPlayer && requestingPlayer.isOnline()) {
             // A tester who invokes Start Game from Paper's default world is moved
@@ -1515,6 +1769,7 @@ public final class ArcadePortManager implements Listener {
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (player.isOnline() && lobby.isLobbyWorld(player.getWorld())
                     && !testPlayers.isTestPlayer(player)) {
+                if (cameraShyModule != null) cameraShyModule.removeFromQueue(player.getUniqueId());
                 for (LinkedHashMap<UUID, Player> existingQueue : queues.values()) {
                     existingQueue.remove(player.getUniqueId());
                 }
@@ -1904,8 +2159,38 @@ public final class ArcadePortManager implements Listener {
             sender.sendMessage(ChatColor.YELLOW + "The previous round's end presentation is still running.");
             return;
         }
+        // Run the shared validation path before any game-specific queued starter.
+        // Camera Shy has its own arena/session owner, but must not bypass the
+        // accepted-game allow-list, active-game exclusion or selected-map check.
         if (type == null || !isGameEnabled(type) || active != null || monsterMazeRunning()) {
             startQueuedInternal(type, requester, sender, mixedArcadeVariant);
+            return;
+        }
+        if (cameraShyModule != null && cameraShyModule.isActive()) {
+            sender.sendMessage(ChatColor.RED + "Camera Shy is already underway.");
+            return;
+        }
+        if (type == ArcadePortGame.CAMERA_SHY) {
+            if (SourceMapCatalog.hasMap(type)) {
+                String selectedResource = plugin.getConfig().getString("selected-maps." + type.id(),
+                        SourceMapCatalog.selectedResource(plugin, type));
+                if (!SourceMapCatalog.isInstalledResource(plugin, type, selectedResource)) {
+                    sender.sendMessage(ChatColor.RED + "The selected map is no longer installed for " + type.displayName()
+                            + ". Open Set Game and choose an installed map again.");
+                    return;
+                }
+            }
+            if (!canStartCameraShy()) {
+                sender.sendMessage(ChatColor.RED + "Another Arcade game is already running.");
+            } else if (cameraShyModule == null) {
+                sender.sendMessage(ChatColor.RED + "Camera Shy is not loaded.");
+            } else {
+                cameraShyModule.startQueued(sender);
+            }
+            return;
+        }
+        if (type == ArcadePortGame.PLEXBALL) {
+            startQueuedInternal(type, requester, sender, false);
             return;
         }
         String selectedQueueKey = queueKey(type, mixedArcadeVariant);
@@ -2062,6 +2347,70 @@ public final class ArcadePortManager implements Listener {
                     + requestedId + " or /arcadeport play " + requestedId + ".");
             return;
         }
+        if (type == ArcadePortGame.PLEXBALL) {
+            if (!PlexballRules.hasValidPlayerCount(participants.size())) {
+                sender.sendMessage(ChatColor.RED + "Plexball requires between "
+                        + PlexballRules.MIN_PLAYERS + " and " + PlexballRules.MAX_PLAYERS + " queued players.");
+                return;
+            }
+            PlexballGame game = plugin.getPlexballGame();
+            if (game == null) {
+                sender.sendMessage(ChatColor.RED + "Plexball is not available inside Testplex Arcade.");
+                return;
+            }
+            World plexballWorld;
+            try {
+                plexballWorld = game.prepareArcadeArena();
+            } catch (RuntimeException failure) {
+                plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                        "Could not prepare the Plexball arena through ArcadePortManager.", failure);
+                sender.sendMessage(ChatColor.RED + "Plexball could not prepare its arena. Check the server log.");
+                return;
+            }
+            if (plexballWorld == null) {
+                sender.sendMessage(ChatColor.RED + "Plexball's arena could not be loaded.");
+                return;
+            }
+            if (queue != null) queues.remove(selectedQueueKey);
+            if (pendingStart != null && pendingType == type
+                    && pendingMixedArcadeVariant == mixedArcadeVariant) {
+                pendingStart.cancel();
+                pendingStart = null;
+                pendingType = null;
+                pendingMixedArcadeVariant = false;
+            }
+            Session session = new Session(type, plexballWorld, participants, false);
+            active = session;
+            try {
+                for (Player player : participants) {
+                    if (player == null || !player.isOnline()) continue;
+                    UUID id = player.getUniqueId();
+                    PlayerSnapshot pending = pendingRestore.remove(id);
+                    if (pending != null) pending.restore(player);
+                    lobby.ensurePlayerInLobby(player);
+                    PlayerSnapshot snapshot = new PlayerSnapshot(player);
+                    session.snapshots.put(id, snapshot);
+                    session.players.put(id, player);
+                    session.alive.add(id);
+                    session.scores.put(id, 0);
+                }
+                if (!game.startFromArcadeLifecycle(participants, plexballWorld)) {
+                    finish(session, null, false);
+                    sender.sendMessage(ChatColor.RED + "Plexball could not start with the current Arcade queue.");
+                    return;
+                }
+            } catch (RuntimeException failure) {
+                plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                        "Plexball failed while starting inside the shared Arcade lifecycle.", failure);
+                game.stopForArcadeLifecycle("Plexball failed during startup.");
+                finish(session, null, false);
+                sender.sendMessage(ChatColor.RED + "Plexball failed to start. Player state was restored; see the server log.");
+                return;
+            }
+            sender.sendMessage(ChatColor.GREEN + "Started Plexball through the shared Testplex Arcade lifecycle with "
+                    + session.alive.size() + " players.");
+            return;
+        }
         if (type == ArcadePortGame.MONSTER_MAZE) {
             if (monsterMazeModule == null) {
                 sender.sendMessage(ChatColor.RED + "Monster Maze module is not loaded by Testplex Arcade.");
@@ -2081,6 +2430,10 @@ public final class ArcadePortManager implements Listener {
             for (Player player : participants) {
                 if (player.isOnline()) player.sendMessage(ChatColor.AQUA + "Testplex has started Monster Maze.");
             }
+            return;
+        }
+        if (type == ArcadePortGame.SUPER_SPLOOR && participants.size() > 16) {
+            sender.sendMessage(ChatColor.RED + "Super Sploor supports up to 16 players (8 per team).");
             return;
         }
         if (type == ArcadePortGame.MASTER_BUILDERS
@@ -2189,6 +2542,17 @@ public final class ArcadePortManager implements Listener {
         }
         if (!sourceMapWorlds.contains(type.id())) buildArena(type, world);
         Session session = new Session(type, world, participants, mixedArcadeVariant);
+        if (type == ArcadePortGame.SUPER_SPLOOR) {
+            // Build the authoritative territory index before moving anyone out of the lobby.
+            session.superSploorEngine = new SuperSploorEngine(world, sourceMapData.get(type.id()));
+            if (session.superSploorEngine.redSpawnCount() < 8
+                    || session.superSploorEngine.blueSpawnCount() < 8) {
+                plugin.getLogger().warning("Super Sploor map has fewer than eight authored spawn points for a team "
+                        + "(Red=" + session.superSploorEngine.redSpawnCount()
+                        + ", Blue=" + session.superSploorEngine.blueSpawnCount()
+                        + "). Smaller tests can proceed, but 8v8 map acceptance is not met.");
+            }
+        }
         active = session;
         long now = System.currentTimeMillis();
         session.startedAt = now;
@@ -2225,7 +2589,7 @@ public final class ArcadePortManager implements Listener {
                 || type == ArcadePortGame.SNEAKY_ASSASSINS
                 || type == ArcadePortGame.DRAW_MY_THING
                 || type == ArcadePortGame.MASTER_BUILDERS
-                || type == ArcadePortGame.GLADIATORS
+                || type == ArcadePortGame.GLADIATORS || type == ArcadePortGame.SUPER_SPLOOR
                 ? 0L : now + (type == ArcadePortGame.SHEEP_QUEST ? ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS
                 : type == ArcadePortGame.GLADIATORS ? 0L
                 : type == ArcadePortGame.BOMB_LOBBERS ? ArcadePortRules.BOMB_LOBBERS_ROUND_MILLIS
@@ -2520,7 +2884,7 @@ public final class ArcadePortManager implements Listener {
             player.setGameMode(type == ArcadePortGame.MASTER_BUILDERS ? GameMode.CREATIVE
                     : type == ArcadePortGame.BACON_BRAWL || type == ArcadePortGame.DEATH_TAG
                     || type == ArcadePortGame.DRAGONS || type == ArcadePortGame.DRAW_MY_THING
-                    || type == ArcadePortGame.SNEAKY_ASSASSINS
+                    || type == ArcadePortGame.SNEAKY_ASSASSINS || type == ArcadePortGame.SUPER_SPLOOR
                     ? GameMode.ADVENTURE : GameMode.SURVIVAL);
             player.setHealth(player.getMaxHealth());
             player.setFoodLevel(20);
@@ -2645,26 +3009,6 @@ public final class ArcadePortManager implements Listener {
                 }
             }
         }
-        if (type == ArcadePortGame.MICRO_BATTLES && session.microBarrierBlocks.isEmpty()) {
-            // Source-map fallback: retain the same two-block team-island glass rings as the generated arena.
-            for (int team = 0; team < 4; team++) {
-                Location island = microSourceMap == null ? islandSpawn(team * 2) : microTeamCenter(session, team);
-                int cx = island.getBlockX(), cy = island.getBlockY(), cz = island.getBlockZ();
-                for (int offset = -4; offset <= 4; offset++) {
-                    for (int y = cy; y <= ArcadePortRules.microBattlesBarrierTopY(cy); y++) {
-                        Block[] ring = {
-                                session.world.getBlockAt(cx + offset, y, cz - 4),
-                                session.world.getBlockAt(cx + offset, y, cz + 4),
-                                session.world.getBlockAt(cx - 4, y, cz + offset),
-                                session.world.getBlockAt(cx + 4, y, cz + offset)
-                        };
-                        for (Block barrier : ring) {
-                            if (barrier.getType() == Material.GLASS) session.microBarrierBlocks.add(barrier);
-                        }
-                    }
-                }
-            }
-        }
         if (type == ArcadePortGame.DEATH_TAG) {
             for (Player player : participants) {
                 giveDeathTagKit(session, player, session.tagged.contains(player.getUniqueId()),
@@ -2691,7 +3035,7 @@ public final class ArcadePortManager implements Listener {
         } else if (type == ArcadePortGame.GLADIATORS && participants.size() == 1) {
             String savedVote = gladiatorLobbyVotes.remove(participants.get(0).getUniqueId());
             GladiatorsMode soloMode = GladiatorsMode.fromId(savedVote);
-            session.gladiatorMode = soloMode == null ? GladiatorsMode.RODLESS.id() : soloMode.id();
+            session.gladiatorMode = soloMode == null ? GladiatorsMode.defaultMode().id() : soloMode.id();
             giveGladiatorKit(session, participants.get(0));
             participants.get(0).sendMessage(ChatColor.YELLOW
                     + "Solo practice only: the double-elimination tournament begins when at least two players join.");
@@ -2761,6 +3105,11 @@ public final class ArcadePortManager implements Listener {
         // movement as well as gameplay input until the Live transition.
         session.startupComplete = true;
         session.tickTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> tick(session), 1L, 1L);
+        if (type == ArcadePortGame.SUPER_SPLOOR) {
+            superSploor.start(session.superSploorEngine, session.players, session.teams, session.lastLocations,
+                    superSploorKitSelections(session),
+                    winningTeam -> finish(session, superSploorRepresentative(session, winningTeam), true));
+        }
         sender.sendMessage(ChatColor.GREEN + "Started " + type.displayName() + " with " + participants.size() + (participants.size() == 1 ? " player." : " players."));
     }
 
@@ -3198,13 +3547,14 @@ public final class ArcadePortManager implements Listener {
                 GladiatorMenuType.VOTE, votes == gladiatorLobbyVotes);
         Inventory inventory = Bukkit.createInventory(holder, 27, title);
         holder.inventory = inventory;
-        Material[] icons = {Material.BOW, Material.FISHING_ROD, Material.SHIELD, Material.SPLASH_POTION};
+        Material[] icons = {Material.IRON_SWORD, Material.BOW, Material.FISHING_ROD, Material.SHIELD, Material.SPLASH_POTION};
         GladiatorsMode[] modes = GladiatorsMode.values();
-        int[] slots = {10, 12, 14, 16};
+        int[] slots = {9, 11, 13, 15, 17};
         for (int i = 0; i < modes.length; i++) {
             GladiatorsMode mode = modes[i];
             int count = (int) votes.values().stream().filter(mode.id()::equals).count();
             String details = switch (mode) {
+                case NORMAL -> "Classic loadout: sword, bow, arrows and fishing rod.";
                 case RODLESS -> "Bow available; fishing rod disabled.";
                 case BOWLESS -> "Fishing rod available; bow disabled.";
                 case MODERN -> "Sword, axe and shield. No bow or rod.";
@@ -3461,7 +3811,7 @@ public final class ArcadePortManager implements Listener {
             String vote = gladiatorLobbyVotes.remove(id);
             if (GladiatorsMode.fromId(vote) != null) session.gladiatorVotes.put(id, vote);
         }
-        session.gladiatorMode = GladiatorsMode.RODLESS.id();
+        session.gladiatorMode = GladiatorsMode.defaultMode().id();
         session.gladiatorVotingEndsAt = System.currentTimeMillis() + 15_000L;
         announce(session, ChatColor.GOLD + "Gladiators vote: choose the PvP rules for this tournament.");
         for (Player player : session.players.values()) {
@@ -3547,7 +3897,7 @@ public final class ArcadePortManager implements Listener {
             GladiatorsMode mode = GladiatorsMode.fromId(vote);
             if (mode != null) counts.merge(mode, 1, Integer::sum);
         }
-        GladiatorsMode selected = GladiatorsMode.RODLESS;
+        GladiatorsMode selected = GladiatorsMode.defaultMode();
         int highest = -1;
         for (GladiatorsMode mode : GladiatorsMode.values()) {
             int count = counts.getOrDefault(mode, 0);
@@ -3827,8 +4177,13 @@ public final class ArcadePortManager implements Listener {
         player.getInventory().setItemInOffHand(null);
         player.getInventory().addItem(new ItemStack(sword));
         GladiatorsMode mode = GladiatorsMode.fromId(session.gladiatorMode);
-        if (mode == null) mode = GladiatorsMode.RODLESS;
+        if (mode == null) mode = GladiatorsMode.defaultMode();
         switch (mode) {
+            case NORMAL -> {
+                player.getInventory().addItem(new ItemStack(Material.FISHING_ROD));
+                player.getInventory().addItem(new ItemStack(Material.BOW),
+                        new ItemStack(Material.ARROW, new int[]{3, 5, 7, 10}[tier]));
+            }
             case RODLESS -> {
                 player.getInventory().addItem(new ItemStack(Material.BOW),
                         new ItemStack(Material.ARROW, new int[]{3, 5, 7, 10}[tier]));
@@ -5803,8 +6158,19 @@ public final class ArcadePortManager implements Listener {
 
     private String microBattlesColourSelection(YamlConfiguration preferences, UUID playerId, String lineId) {
         if (preferences == null) return ArcadePortRules.MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR;
-        String selected = preferences.getString("players." + playerId + ".games.micro-battles.cosmetics."
-                + lineId + ".selected", ArcadePortRules.MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR);
+        String group = "middle-glass-colour".equals(lineId) ? "glass" : "border";
+        String groupedPath = "players." + playerId
+                + ".games.micro-battles.cosmetics.island-visuals.selected";
+        String groupedSelection = preferences.getStringList(groupedPath).stream()
+                .filter(optionId -> optionId != null && optionId.startsWith(group + "-"))
+                .map(optionId -> optionId.substring(group.length() + 1))
+                .findFirst().orElse(null);
+        // Read the previous independent cosmetic line as a migration fallback for existing players.
+        String legacySelection = preferences.getString("players." + playerId
+                + ".games.micro-battles.cosmetics." + lineId + ".selected", null);
+        String selected = groupedSelection != null ? groupedSelection
+                : legacySelection != null ? legacySelection
+                : ArcadePortRules.MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR;
         String normalized = ArcadePortRules.normalizeMicroBattlesColour(selected);
         return normalized == null ? ArcadePortRules.MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR : normalized;
     }
@@ -6922,6 +7288,10 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.PAINTBALL) {
             updatePaintballKitState(session, now);
             updatePaintballPelletCosmetics(session);
+        }
+        if (session.type == ArcadePortGame.SUPER_SPLOOR) {
+            superSploor.tick(now);
+            if (active != session) return;
         }
         if (session.type == ArcadePortGame.TURF_WARS) updateTurfWars(session, now);
          updateTitles(session);
@@ -10780,6 +11150,8 @@ public final class ArcadePortManager implements Listener {
             case MICRO_BATTLES -> "team " + (session.teams.getOrDefault(id, 0) + 1) + "/4";
             case ONE_IN_THE_QUIVER -> "kills " + scoreFor(session, id) + "/20";
             case PAINTBALL -> "armour " + session.paintPiecesRemaining.getOrDefault(id, 4) + "/4";
+            case SUPER_SPLOOR -> "ink " + player.getLevel() + "% | Squid "
+                    + (player.getInventory().getHeldItemSlot() == 7 ? "ON" : "OFF");
             case RUNNER -> "unstable tiles " + session.runnerBlocks.size();
             case SHEEP_QUEST -> "pens R" + sheepQuestTeamCount(session, 0)
                     + " A" + sheepQuestTeamCount(session, 1) + " G" + sheepQuestTeamCount(session, 2)
@@ -10800,6 +11172,8 @@ public final class ArcadePortManager implements Listener {
                     : "guesses " + Math.max(0, DRAW_MY_THING_MAX_GUESSES - session.drawGuessAttempts.getOrDefault(id, 0)) + "/10";
             case MASTER_BUILDERS -> session.masterBuilderPhase == MasterBuildersPhase.BUILDING
                     ? "building | " + session.masterBuilderTheme : "review | " + session.masterBuilderTheme;
+            case CAMERA_SHY -> "Camera Shy runs in its dedicated match controller";
+            case PLEXBALL -> "Plexball | " + session.alive.size() + " active";
             // Monster Maze owns its own in-process GameManager session and does not
             // create an ArcadePortManager Session object.
             case MONSTER_MAZE -> "Monster Maze";
@@ -10820,7 +11194,17 @@ public final class ArcadePortManager implements Listener {
 
     private void checkRoundEnd(Session session) {
         if (active != session) return;
-        if (session.type == ArcadePortGame.DRAW_MY_THING || session.type == ArcadePortGame.MASTER_BUILDERS) return;
+        if (session.type == ArcadePortGame.PLEXBALL) {
+            if (session.alive.isEmpty()) {
+                PlexballGame game = plugin.getPlexballGame();
+                if (game != null) game.stopForArcadeLifecycle("No Plexball players remain.");
+                finish(session, null, false);
+            }
+            return;
+        }
+        if (session.type == ArcadePortGame.SUPER_SPLOOR
+                || session.type == ArcadePortGame.DRAW_MY_THING
+                || session.type == ArcadePortGame.MASTER_BUILDERS) return;
         // Castle Assault and Heroes of Gwen end through their objective controllers, not last-player rules.
         if (session.type == ArcadePortGame.CASTLE_ASSAULT || session.type == ArcadePortGame.HEROES_OF_GWEN) {
             if (session.alive.isEmpty() && session.respawning.isEmpty()) finish(session, null, true);
@@ -12564,7 +12948,18 @@ public final class ArcadePortManager implements Listener {
      * Resolve time-limit winners using each game's actual objective. In team
      * modes, a personal high score must not announce a losing team as winner.
      */
+    private Player superSploorRepresentative(Session session, int winningTeam) {
+        if (session == null || winningTeam < 0) return null;
+        return session.players.values().stream()
+                .filter(player -> player != null && player.isOnline()
+                        && session.teams.getOrDefault(player.getUniqueId(), -1) == winningTeam)
+                .findFirst().orElse(null);
+    }
+
     private Player timeoutWinner(Session session) {
+        if (session.type == ArcadePortGame.SUPER_SPLOOR) {
+            return superSploorRepresentative(session, superSploor.leadingTeam());
+        }
         if (session.type == ArcadePortGame.DEATH_TAG) {
             List<Player> runners = alivePlayers(session).stream()
                     .filter(player -> !session.tagged.contains(player.getUniqueId()))
@@ -12661,6 +13056,11 @@ public final class ArcadePortManager implements Listener {
 
     private void finish(Session session, Player winner, boolean announceWinner) {
         if (active != session) return;
+        if (session.type == ArcadePortGame.SUPER_SPLOOR) {
+            session.superSploorPlayerStats = superSploor.snapshotStats();
+            session.superSploorTerritory = superSploor.snapshotTerritory();
+            superSploor.stop();
+        }
         automaticRotationOnReturn = announceWinner;
         lastAutomaticRotationGameId = session.type.id();
         if (postGameReturnTask != null) postGameReturnTask.cancel();
@@ -12692,7 +13092,7 @@ public final class ArcadePortManager implements Listener {
         if (announceWinner && session.type == ArcadePortGame.DEATH_TAG) {
             recordDeathTagRewards(session);
         }
-        recordLocalStats(session, winner, announceWinner);
+        if (session.type != ArcadePortGame.PLEXBALL) recordLocalStats(session, winner, announceWinner);
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
             removeAllMicroBorderWarnings(session);
             for (Player player : session.players.values()) restoreMicroMiddleGlassCosmetic(session, player);
@@ -12734,8 +13134,16 @@ public final class ArcadePortManager implements Listener {
                 } else {
                     announce(session, ChatColor.YELLOW + "Bacon Brawl ended with no pig left standing.");
                 }
-            } else {
-                announce(session, winner == null ? ChatColor.YELLOW + "Round ended." : ChatColor.GOLD + "" + ChatColor.BOLD + winner.getName() + " won " + session.type.displayName() + "!");
+            } else if (session.type == ArcadePortGame.SUPER_SPLOOR) {
+                if (winner == null) {
+                    announce(session, ChatColor.YELLOW + "Super Sploor ended in a draw.");
+                } else {
+                    int team = session.teams.getOrDefault(winner.getUniqueId(), -1);
+                    String teamName = team == 0 ? "Red" : "Blue";
+                    ChatColor teamColour = team == 0 ? ChatColor.RED : ChatColor.AQUA;
+                    announce(session, teamColour + "" + ChatColor.BOLD + teamName + " team won Super Sploor!");
+                }
+
             }
         }
         for (Map.Entry<Block, BlockData> entry : session.deathTagOriginalLightBlocks.entrySet()) {
@@ -13256,6 +13664,113 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private void awardSuperSploorAchievement(UUID playerId, Player player, String gameId, String achievementId) {
+        if (playerId == null || !"super-sploor".equals(gameId) || testPlayers.isTestPlayer(playerId)) return;
+        SuperSploorProgressCatalog.Achievement achievement = SuperSploorProgressCatalog.achievement(achievementId);
+        if (achievement == null) return;
+        String key = SuperSploorProgressCatalog.achievementConfigKey(playerId, achievementId);
+        if (plugin.getConfig().getBoolean(key, false)) return;
+        plugin.getConfig().set(key, true);
+        if (player != null && player.isOnline()) player.sendMessage(ChatColor.GOLD
+                + "Achievement unlocked: " + achievement.name());
+    }
+
+    private void recordSuperSploorPlayerStats(Session session, UUID playerId,
+            Player player, boolean won, String statsPath) {
+        SuperSploorRuntime.PlayerMatchStats stats = session.superSploorPlayerStats.get(playerId);
+        if (stats == null) return;
+
+        plugin.getConfig().set(statsPath + "territory-blocks-painted",
+                plugin.getConfig().getLong(statsPath + "territory-blocks-painted", 0L) + stats.territoryPainted());
+        plugin.getConfig().set(statsPath + "enemy-blocks-reclaimed",
+                plugin.getConfig().getLong(statsPath + "enemy-blocks-reclaimed", 0L)
+                        + stats.enemyTerritoryReclaimed());
+        plugin.getConfig().set(statsPath + "neutral-territory-claimed",
+                plugin.getConfig().getLong(statsPath + "neutral-territory-claimed", 0L)
+                        + stats.neutralTerritoryClaimed());
+        plugin.getConfig().set(statsPath + "splats",
+                plugin.getConfig().getInt(statsPath + "splats", 0) + stats.splats());
+        plugin.getConfig().set(statsPath + "deaths",
+                plugin.getConfig().getInt(statsPath + "deaths", 0) + stats.deaths());
+        plugin.getConfig().set(statsPath + "assists",
+                plugin.getConfig().getInt(statsPath + "assists", 0) + stats.assists());
+        plugin.getConfig().set(statsPath + "squid-distance-blocks",
+                plugin.getConfig().getLong(statsPath + "squid-distance-blocks", 0L)
+                        + Math.max(0L, Math.round(stats.squidTravelBlocks())));
+        plugin.getConfig().set(statsPath + "wall-climb-blocks",
+                plugin.getConfig().getLong(statsPath + "wall-climb-blocks", 0L)
+                        + Math.max(0L, Math.round(stats.wallClimbBlocks())));
+        plugin.getConfig().set(statsPath + "specials-used",
+                plugin.getConfig().getInt(statsPath + "specials-used", 0) + stats.specialsUsed());
+        plugin.getConfig().set(statsPath + "roller-territory",
+                plugin.getConfig().getLong(statsPath + "roller-territory", 0L) + stats.rollerTerritory());
+        plugin.getConfig().set(statsPath + "charger-full-hits",
+                plugin.getConfig().getInt(statsPath + "charger-full-hits", 0) + stats.chargerFullHits());
+        plugin.getConfig().set(statsPath + "lobber-enemy-reclaimed",
+                plugin.getConfig().getLong(statsPath + "lobber-enemy-reclaimed", 0L) + stats.lobberEnemyReclaimed());
+        plugin.getConfig().set(statsPath + "dualies-post-roll-splats",
+                plugin.getConfig().getInt(statsPath + "dualies-post-roll-splats", 0) + stats.dualiesPostRollSplats());
+        plugin.getConfig().set(statsPath + "best-special-targets",
+                Math.max(plugin.getConfig().getInt(statsPath + "best-special-targets", 0), stats.bestSpecialTargets()));
+
+        awardSuperSploorAchievement(playerId, player, "super-sploor", "first-splash");
+        if (stats.neutralTerritoryClaimed() >= 500L) {
+            awardSuperSploorAchievement(playerId, player, "super-sploor", "fresh-canvas");
+        }
+        if (stats.enemyTerritoryReclaimed() >= 200L) {
+            awardSuperSploorAchievement(playerId, player, "super-sploor", "reclaimer");
+        }
+        if (stats.squidTravelBlocks() >= 500.0D) {
+            awardSuperSploorAchievement(playerId, player, "super-sploor", "squid-express");
+        }
+        if (stats.wallClimbBlocks() >= 25.0D) {
+            awardSuperSploorAchievement(playerId, player, "super-sploor", "wall-to-wall");
+        }
+        if (stats.assists() >= 5) {
+            awardSuperSploorAchievement(playerId, player, "super-sploor", "team-palette");
+        }
+        if (won && stats.deaths() == 0) {
+            awardSuperSploorAchievement(playerId, player, "super-sploor", "clean-sweep");
+        }
+        if ("sprayer".equals(stats.kit()) && stats.neutralTerritoryClaimed() >= 350L) {
+            awardSuperSploorAchievement(playerId, player, "super-sploor", "colour-outside-the-lines");
+        }
+        if (stats.rollerTerritory() >= 500L) {
+            awardSuperSploorAchievement(playerId, player, "super-sploor", "road-roller");
+        }
+        if (stats.chargerFullHits() >= 5) {
+            awardSuperSploorAchievement(playerId, player, "super-sploor", "needle-threader");
+        }
+        if (stats.lobberEnemyReclaimed() >= 150L) {
+            awardSuperSploorAchievement(playerId, player, "super-sploor", "splash-zone");
+        }
+        if (stats.dualiesPostRollSplats() >= 3) {
+            awardSuperSploorAchievement(playerId, player, "super-sploor", "blink-and-youll-miss-it");
+        }
+        if (stats.bestSpecialTargets() >= 3) {
+            awardSuperSploorAchievement(playerId, player, "super-sploor", "special-delivery");
+        }
+        if (won) {
+            String kit = stats.kit() == null ? "sprayer" : stats.kit();
+            String kitWinsPath = statsPath + "kit-wins." + kit;
+            plugin.getConfig().set(kitWinsPath, plugin.getConfig().getInt(kitWinsPath, 0) + 1);
+            boolean masteredAllKits = List.of("sprayer", "roller", "charger", "lobber", "dualies")
+                    .stream().allMatch(value -> plugin.getConfig().getInt(statsPath + "kit-wins." + value, 0) > 0);
+            if (masteredAllKits) {
+                awardSuperSploorAchievement(playerId, player, "super-sploor", "master-of-the-palette");
+            }
+        }
+        if (won && session.superSploorTerritory != null) {
+            int total = Math.max(1, session.superSploorTerritory.totalUnits());
+            int margin = Math.abs(session.superSploorTerritory.redUnits()
+                    - session.superSploorTerritory.blueUnits());
+            if (margin * 100.0D <= total * 2.0D) {
+                awardSuperSploorAchievement(playerId, player, "super-sploor", "close-shave");
+            }
+        }
+    }
+
+
     private void recordLocalStats(Session session, Player winner, boolean completed) {
         if (!completed) return;
         if (session.type == ArcadePortGame.DRAGONS && winner != null && !testPlayers.isTestPlayer(winner)) {
@@ -13285,7 +13800,10 @@ public final class ArcadePortManager implements Listener {
                     && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
             boolean paintballWinner = session.type == ArcadePortGame.PAINTBALL
                     && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
+            boolean superSploorWinner = session.type == ArcadePortGame.SUPER_SPLOOR
+                    && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
             boolean won = winnerId != null && (winnerId.equals(id) || turfWarsWinner || paintballWinner
+                    || superSploorWinner
                     || ((session.type == ArcadePortGame.BOMB_LOBBERS
                             || session.type == ArcadePortGame.MICRO_BATTLES)
                         && session.alive.contains(id)
@@ -13319,6 +13837,9 @@ public final class ArcadePortManager implements Listener {
                 plugin.getConfig().set(path + "blocks-broken",
                         plugin.getConfig().getInt(path + "blocks-broken", 0)
                                 + session.spleefBlocksBroken.getOrDefault(id, 0));
+            }
+            if (session.type == ArcadePortGame.SUPER_SPLOOR) {
+                recordSuperSploorPlayerStats(session, id, entry.getValue(), won, path);
             }
             if (session.type == ArcadePortGame.DEATH_TAG) {
                 int roundKills = Math.max(0, session.scores.getOrDefault(id, 0));
@@ -13463,6 +13984,7 @@ public final class ArcadePortManager implements Listener {
             {"turf-wars", "Turf Wars", "RED_TERRACOTTA"},
             {"runner", "Runner", "LEATHER_BOOTS"},
             {"spleef", "Super Spleef", "IRON_SHOVEL"},
+            {"super-sploor", "Super Sploor", "INK_SAC"},
             {"death-tag", "Death Tag", "SKELETON_SKULL"},
             {"snake", "Snake", "GRAY_WOOL"},
             {"bacon-brawl", "Bacon Brawl", "PORKCHOP"},
@@ -13471,7 +13993,8 @@ public final class ArcadePortManager implements Listener {
             {"evolution", "Evolution", "SLIME_SPAWN_EGG"},
             {"monster-maze", "Monster Maze", "ROTTEN_FLESH"},
             {"gladiators", "Gladiators", "IRON_SWORD"},
-            {"sneaky-assassins", "Sneaky Assassins", "VILLAGER_SPAWN_EGG"}
+            {"sneaky-assassins", "Sneaky Assassins", "VILLAGER_SPAWN_EGG"},
+            {"camera-shy", "Camera Shy", "SPYGLASS"}
     };
 
     private static final List<String> DRAGON_ESCAPE_BEACON_COLOR_NAMES =
@@ -13691,7 +14214,35 @@ public final class ArcadePortManager implements Listener {
         int score = plugin.getConfig().getInt(path + "score", 0);
         int knockouts = plugin.getConfig().getInt(path + "knockouts", 0);
         Inventory inventory = createStatsInventory(StatsPage.GAME, targetId, targetName, displayName, gameId);
-        if ("bacon-brawl".equals(gameId)) {
+        if ("camera-shy".equals(gameId)) {
+            int[] achievementSlots = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21,
+                    23, 24, 25, 28, 29, 30, 31, 32, 33, 34};
+            List<CameraShyProgressCatalog.Achievement> achievements = CameraShyProgressCatalog.achievements();
+            for (int i = 0; i < achievements.size(); i++) {
+                CameraShyProgressCatalog.Achievement achievement = achievements.get(i);
+                boolean unlocked = plugin.getConfig().getBoolean(
+                        "local-achievements." + targetId + ".camera-shy." + achievement.id(), false);
+                inventory.setItem(achievementSlots[i], statsItem(
+                        unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                        (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.name(),
+                        List.of(" ", ChatColor.GRAY + achievement.requirement(), " ",
+                                unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked"),
+                        "noop", null, null));
+            }
+            int[] milestoneSlots = {37, 40, 43};
+            for (int i = 0; i < CameraShyProgressCatalog.milestones().size(); i++) {
+                CameraShyProgressCatalog.Milestone milestone = CameraShyProgressCatalog.milestones().get(i);
+                int value = plugin.getConfig().getInt(path + milestone.statKey(), 0);
+                boolean complete = value >= milestone.target();
+                inventory.setItem(milestoneSlots[i], statsItem(
+                        complete ? Material.NETHER_STAR : Material.CLOCK,
+                        (complete ? ChatColor.GREEN + "✓ " : ChatColor.GOLD) + milestone.name(),
+                        List.of(" ", ChatColor.GRAY + "Progress: " + ChatColor.WHITE + value + "/" + milestone.target(),
+                                ChatColor.GRAY + "Lifetime " + milestone.unit() + ".",
+                                complete ? ChatColor.GREEN + "Milestone complete" : ChatColor.YELLOW + "In progress"),
+                        "noop", null, null));
+            }
+        } else if ("bacon-brawl".equals(gameId)) {
             // Match the 1.8 achievement-bottle pattern: unlocked achievements use
             // experience bottles, and unearned achievements use glass bottles.
             int[] achievementSlots = {10, 11, 12, 13, 14};
@@ -13928,6 +14479,39 @@ public final class ArcadePortManager implements Listener {
                                 ChatColor.DARK_GRAY + "Local source-style stat tracker."),
                         "noop", null, null));
             }
+        } else if ("super-sploor".equals(gameId)) {
+            int[] achievementSlots = {10, 11, 12, 13, 14, 15, 16, 17, 19, 20, 21, 23, 24, 25, 26};
+            List<SuperSploorProgressCatalog.Achievement> achievements = SuperSploorProgressCatalog.achievements();
+            for (int i = 0; i < achievements.size(); i++) {
+                SuperSploorProgressCatalog.Achievement achievement = achievements.get(i);
+                boolean unlocked = plugin.getConfig().getBoolean(
+                        SuperSploorProgressCatalog.achievementConfigKey(targetId, achievement.id()), false);
+                inventory.setItem(achievementSlots[i], statsItem(
+                        unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                        (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.name(),
+                        List.of(" ", ChatColor.GRAY + achievement.requirement(), " ",
+                                unlocked ? ChatColor.GREEN + "Achievement unlocked" : "Not yet unlocked"),
+                        "noop", null, null));
+            }
+            int[] statSlots = {29, 30, 31, 32, 33, 34, 35, 36};
+            String[] statKeys = {"territory-blocks-painted", "enemy-blocks-reclaimed", "neutral-territory-claimed",
+                    "splats", "deaths", "assists", "squid-distance-blocks", "specials-used"};
+            String[] statNames = {"Territory Painted", "Enemy Turf Reclaimed", "Neutral Turf Claimed",
+                    "Splats", "Deaths", "Assists", "Squid Travel", "Specials Used"};
+            Material[] statIcons = {Material.PAINTING, Material.CYAN_DYE, Material.WHITE_DYE,
+                    Material.IRON_SWORD, Material.SKELETON_SKULL, Material.GREEN_DYE,
+                    Material.INK_SAC, Material.FIREWORK_ROCKET};
+            for (int i = 0; i < statKeys.length; i++) {
+                long value = plugin.getConfig().getLong(path + statKeys[i], 0L);
+                inventory.setItem(statSlots[i], statsItem(value > 0L ? Material.EXPERIENCE_BOTTLE : statIcons[i],
+                        (value > 0L ? ChatColor.GREEN : ChatColor.GRAY) + statNames[i],
+                        List.of(" ", ChatColor.GRAY + "Recorded by this local Testplex server: " + ChatColor.WHITE + value),
+                        "noop", null, null));
+            }
+            inventory.setItem(40, statsItem(Material.AMETHYST_SHARD, ChatColor.LIGHT_PURPLE + "Milestones",
+                    List.of(" ", ChatColor.GRAY + "Seven lifetime tracks, each with four stages.",
+                            ChatColor.RESET + "Click to view your Super Sploor milestones."),
+                    "open-super-sploor-milestones", null, gameId));
         } else {
             int[] slots = {29, 30, 31, 32};
             int[] values = {played, wins, score, knockouts};
@@ -13954,6 +14538,45 @@ public final class ArcadePortManager implements Listener {
                 "back-arcade", null, null));
         inventory.setItem(49, statsItem(Material.BARRIER, ChatColor.RED + "Close", List.of(),
                 "close", null, null));
+        viewer.openInventory(inventory);
+    }
+
+    private void openSuperSploorMilestones(Player viewer, UUID targetId, String targetName) {
+        String gameId = "super-sploor";
+        Inventory inventory = createStatsInventory(StatsPage.GAME, targetId, targetName,
+                targetName + "'s Super Sploor Milestones", gameId);
+        String path = localStatsPath(targetId, gameId);
+        int slot = 10;
+        for (SuperSploorProgressCatalog.Milestone milestone : SuperSploorProgressCatalog.milestones()) {
+            long value = Math.max(0L, plugin.getConfig().getLong(path + milestone.statKey(), 0L));
+            long[] stages = milestone.stages();
+            int completed = 0;
+            for (long stage : stages) if (value >= stage) completed++;
+            long next = completed < stages.length ? stages[completed] : milestone.maximum();
+            List<String> lore = new ArrayList<>();
+            lore.add(" ");
+            lore.add(ChatColor.GRAY + "Progress: " + ChatColor.WHITE + String.format(java.util.Locale.ROOT,
+                    "%,d %s", value, milestone.unit()) + ChatColor.GRAY + " / " + ChatColor.WHITE
+                    + String.format(java.util.Locale.ROOT, "%,d %s", milestone.maximum(), milestone.unit()));
+            lore.add(ChatColor.LIGHT_PURPLE + "Stages completed: " + completed + "/" + stages.length);
+            if (completed < stages.length) {
+                lore.add(ChatColor.YELLOW + "Next stage: " + ChatColor.WHITE
+                        + String.format(java.util.Locale.ROOT, "%,d %s", next, milestone.unit()));
+                int filled = next <= 0 ? 10 : (int) Math.min(10L, value * 10L / next);
+                lore.add(ChatColor.LIGHT_PURPLE + "▰".repeat(filled)
+                        + ChatColor.DARK_GRAY + "▱".repeat(10 - filled));
+            } else lore.add(ChatColor.GREEN + "Milestone maxed out!");
+            lore.add(" ");
+            lore.add(ChatColor.DARK_GRAY + "Stages: " + java.util.Arrays.stream(stages)
+                    .mapToObj(stage -> String.format(java.util.Locale.ROOT, "%,d", stage))
+                    .collect(java.util.stream.Collectors.joining(" → ")));
+            inventory.setItem(slot++, statsItem(completed == stages.length ? Material.NETHER_STAR : Material.AMETHYST_SHARD,
+                    (completed == stages.length ? ChatColor.GREEN : ChatColor.LIGHT_PURPLE) + milestone.name(),
+                    lore, "noop", null, gameId));
+        }
+        inventory.setItem(4, statsItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back", List.of(),
+                "back-super-sploor", null, gameId));
+        inventory.setItem(49, statsItem(Material.BARRIER, ChatColor.RED + "Close", List.of(), "close", null, null));
         viewer.openInventory(inventory);
     }
 
@@ -14026,9 +14649,34 @@ public final class ArcadePortManager implements Listener {
         lore.add(ChatColor.GRAY + "Wins: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "wins", 0));
         lore.add(ChatColor.GRAY + "Score / Kills: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "score", 0));
         lore.add(ChatColor.GRAY + "Knockouts: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "knockouts", 0));
+        if ("camera-shy".equals(gameId)) {
+            lore.add(ChatColor.GRAY + "Photographs: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "photos", 0));
+            lore.add(ChatColor.GRAY + "Eliminations: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "eliminations", 0));
+            lore.add(ChatColor.GRAY + "Exposures Received: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "exposures-received", 0));
+            long unlocked = CameraShyProgressCatalog.achievements().stream()
+                    .filter(achievement -> plugin.getConfig().getBoolean(
+                            "local-achievements." + targetId + ".camera-shy." + achievement.id(), false))
+                    .count();
+            lore.add(ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE + unlocked + "/"
+                    + CameraShyProgressCatalog.achievements().size());
+        }
         if ("spleef".equals(gameId)) {
             lore.add(ChatColor.GRAY + "Blocks Broken: " + ChatColor.WHITE
                     + plugin.getConfig().getInt(path + "blocks-broken", 0));
+        }
+        if ("super-sploor".equals(gameId)) {
+            lore.add(ChatColor.GRAY + "Territory Painted: " + ChatColor.WHITE
+                    + plugin.getConfig().getLong(path + "territory-blocks-painted", 0L));
+            lore.add(ChatColor.GRAY + "Enemy Turf Reclaimed: " + ChatColor.WHITE
+                    + plugin.getConfig().getLong(path + "enemy-blocks-reclaimed", 0L));
+            lore.add(ChatColor.GRAY + "Splats: " + ChatColor.WHITE
+                    + plugin.getConfig().getInt(path + "splats", 0));
+            long unlocked = SuperSploorProgressCatalog.achievements().stream()
+                    .filter(achievement -> plugin.getConfig().getBoolean(
+                            SuperSploorProgressCatalog.achievementConfigKey(targetId, achievement.id()), false))
+                    .count();
+            lore.add(ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE + unlocked + "/"
+                    + SuperSploorProgressCatalog.achievements().size());
         }
         if ("turf-wars".equals(gameId)) {
             lore.add(ChatColor.GRAY + "Blocks Placed: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "blocks-placed", 0));
@@ -14156,6 +14804,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     public void stop(String reason) {
+        boolean cameraShyWasActive = cameraShyModule != null && cameraShyModule.isActive();
+        if (cameraShyModule != null) cameraShyModule.stop(reason);
         automaticRotationOnReturn = false;
         cancelAutomaticRotationVote();
         if (postGameReturnTask != null) postGameReturnTask.cancel();
@@ -14176,12 +14826,17 @@ public final class ArcadePortManager implements Listener {
         Session stopping = active;
         List<Player> participantsToReturn = stopping == null
                 ? List.of() : new ArrayList<>(stopping.players.values());
+        if (stopping != null && stopping.type == ArcadePortGame.PLEXBALL
+                && plugin.getPlexballGame() != null) {
+            plugin.getPlexballGame().stopForArcadeLifecycle(reason);
+        }
         if (stopping != null) finish(stopping, null, false);
         if (monsterMazeRunning() && monsterMazeModule != null
                 && monsterMazeModule.getGameManager() != null) {
             monsterMazeModule.getGameManager().forceStop();
         }
-        testPlayers.despawnSessionPlayers();
+        if (!cameraShyWasActive) testPlayers.despawnSessionPlayers();
+        // Camera Shy owns and has already released its own AFK roster when it was active.
         // Make the explicit Stop Game action authoritative: every participant from
         // the stopped session is put at the lobby spawn after round state is cleaned.
         for (Player player : participantsToReturn) {
@@ -14193,6 +14848,11 @@ public final class ArcadePortManager implements Listener {
     }
 
     public String status() {
+        if (cameraShyModule != null
+                && (cameraShyModule.isActive() || cameraShyModule.queuedCount() > 0)) {
+            return "Camera Shy (" + cameraShyModule.status() + "); queued=" + cameraShyModule.queuedCount()
+                    + "; cleared-games=" + enabledGamesLabel();
+        }
         String variant = active != null && active.mixedArcadeVariant ? " (Mixed Arcade)" : "";
         String game = active == null
                 ? (monsterMazeRunning() ? "Monster Maze (" + monsterMazeModule.getGameManager().getStage() + " stages reached)" : "idle")
@@ -14210,6 +14870,7 @@ public final class ArcadePortManager implements Listener {
         manualStartType = null;
         clearLobbyCountdownStatus();
         stop("plugin shutdown");
+        if (cameraShyModule != null) cameraShyModule.shutdown();
         testPlayers.shutdown();
         lobbyRuntime.shutdown();
         unregisterOptionalBaconPacketBridge();
@@ -18137,6 +18798,10 @@ public final class ArcadePortManager implements Listener {
                 case "open-category" -> openStatsCategory(player, holder.targetId, holder.targetName,
                         category == null ? "global" : category);
                 case "open-game" -> openStatsGame(player, holder.targetId, holder.targetName, gameId);
+                case "open-super-sploor-milestones" ->
+                        openSuperSploorMilestones(player, holder.targetId, holder.targetName);
+                case "back-super-sploor" ->
+                        openStatsGame(player, holder.targetId, holder.targetName, "super-sploor");
                 case "open-dragon-escape-pbs" -> openDragonEscapePersonalBests(player, holder.targetId, holder.targetName);
                 case "open-dragon-escape-colours" -> openDragonEscapeBeaconColours(player, holder.targetId, holder.targetName);
                 case "toggle-dragon-ghost" -> {
@@ -19596,8 +20261,26 @@ public final class ArcadePortManager implements Listener {
         UUID id = event.getPlayer().getUniqueId();
         PlayerSnapshot endingSnapshot = endingSnapshots.remove(id);
         if (endingSnapshot != null) pendingRestore.put(id, endingSnapshot);
-        for (Map<UUID, Player> queue : queues.values()) queue.remove(id);
+        boolean wasQueued = false;
+        for (Map<UUID, Player> queue : queues.values()) wasQueued |= queue.remove(id) != null;
         gladiatorLobbyVotes.remove(id);
+        if (wasQueued) {
+            if (pendingStart != null && pendingType != null
+                    && onlineQueuedPlayers(pendingType, pendingMixedArcadeVariant).size()
+                    < (pendingType == ArcadePortGame.PLEXBALL ? PlexballRules.MIN_PLAYERS : 1)) {
+                pendingStart.cancel();
+                pendingStart = null;
+                pendingType = null;
+                pendingMixedArcadeVariant = false;
+            }
+            if (manualStartCountdown != null && manualStartType != null
+                    && onlineQueuedPlayers(manualStartType).size()
+                    < (manualStartType == ArcadePortGame.PLEXBALL ? PlexballRules.MIN_PLAYERS : 1)) {
+                cancelManualStartCountdown(manualStartType, ChatColor.YELLOW
+                        + "The queue no longer has enough players; the Arcade start countdown was cancelled.");
+            }
+            lobbyRuntime.refreshDisplays();
+        }
         Session session = active;
         if (session == null || !session.players.containsKey(id)) return;
         Player player = event.getPlayer();
@@ -19613,6 +20296,9 @@ public final class ArcadePortManager implements Listener {
             wasAlive = false;
         } else {
             wasAlive = session.alive.remove(id);
+        }
+        if (session.type == ArcadePortGame.PLEXBALL && plugin.getPlexballGame() != null) {
+            plugin.getPlexballGame().onArcadeLifecycleQuit(player, wasAlive);
         }
         if (session.type == ArcadePortGame.DRAGONS && wasAlive) {
             session.dragonEliminationOrder.add(id);
@@ -19924,6 +20610,9 @@ public final class ArcadePortManager implements Listener {
 
     private static final class Session {
         final Map<Block, Long> evolutionWebs = new HashMap<>();
+        SuperSploorEngine superSploorEngine;
+        Map<UUID, SuperSploorRuntime.PlayerMatchStats> superSploorPlayerStats = Map.of();
+        SuperSploorRuntime.TerritorySummary superSploorTerritory;
         final ArcadePortGame type;
         final World world;
         final Map<UUID, Player> players = new LinkedHashMap<>();

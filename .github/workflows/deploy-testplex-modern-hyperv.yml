@@ -261,14 +261,22 @@ jobs:
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=40)
-          # Every modern deployment used to leave a full maps archive under a new commit-specific
-          # directory in /var/tmp. The legacy and modern deploy jobs share one Hyper-V disk and are
-          # serialized by testplex-isolated-hyperv-server, so only these generated staging directories
-          # are safe to prune here; never clean server worlds, plugin directories, databases or backups.
-          timeout --foreground --signal=TERM --kill-after=15s 5m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$BUILD_SHA" <<'REMOTE_STAGE_PREP'
+          # The legacy and modern deploy jobs share one Hyper-V disk and are serialized.
+          # Only generated, abandoned staging directories are eligible for pruning; never
+          # clean server worlds, installed plugins, databases or recovery backups.
+          stage_kb="$(du -sk "$STAGE_DIR" | awk '{print $1}')"
+          [[ "$stage_kb" =~ ^[0-9]+$ ]] && (( stage_kb > 0 )) || { echo "Could not determine the verified deployment payload size." >&2; exit 1; }
+          # Uploaded chunk parts are replaced by sequential assembly, deleting each part only
+          # after it has been appended. Peak staging use stays within one payload copy.
+          # Keep a full 1 GiB free after reserving the single staged payload.
+          required_free_kb=$((stage_kb + 1048576))
+          timeout --foreground --signal=TERM --kill-after=15s 5m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$BUILD_SHA" "$required_free_kb" "$stage_kb" <<'REMOTE_STAGE_PREP'
           set -euo pipefail
           build_sha="$1"
+          required_free_kb="$2"
+          stage_kb="$3"
           [[ "$build_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid build SHA for artifact staging." >&2; exit 1; }
+          [[ "$required_free_kb" =~ ^[0-9]+$ && "$stage_kb" =~ ^[0-9]+$ ]] || { echo "Invalid deployment storage budget." >&2; exit 1; }
           upload_dir="/var/tmp/testplex-modern-artifacts-$build_sha"
           echo "Disk usage before staging-cache cleanup:"
           df -h /var/tmp
@@ -292,15 +300,20 @@ jobs:
             fi
           done
           sudo -n rm -rf -- "$upload_dir"
-          echo "Disk usage after staging-cache cleanup:"
+          # Downloaded package archives are reproducible cache, not installed software.
+          # This safely recovers small amounts of space without touching worlds or backups.
+          apt_cache_before="$(sudo -n du -sh /var/cache/apt/archives 2>/dev/null | cut -f1 || true)"
+          sudo -n apt-get clean
+          echo "Cleared downloaded APT package cache (${apt_cache_before:-size unavailable}); installed packages were not removed."
+          echo "Disk usage after staging-cache and package-cache cleanup:"
           df -h /var/tmp
           df -i /var/tmp
           avail_kb="$(df -Pk /var/tmp | awk 'END {print $4}')"
-          if [[ ! "$avail_kb" =~ ^[0-9]+$ ]] || (( avail_kb < 2097152 )); then
-            echo "Only ${avail_kb:-unknown} KiB free in /var/tmp after staging cleanup; refusing upload unless at least 2 GiB is available." >&2
+          if [[ ! "$avail_kb" =~ ^[0-9]+$ ]] || (( avail_kb < required_free_kb )); then
+            echo "Only ${avail_kb:-unknown} KiB free in /var/tmp after staging cleanup; deployment needs at least $required_free_kb KiB (one $stage_kb KiB payload copy plus a 1 GiB safety reserve)." >&2
             exit 1
           fi
-          echo "Available space after stale-cache cleanup: $((avail_kb / 1024)) MiB."
+          echo "Available space: $((avail_kb / 1024)) MiB; payload: $((stage_kb / 1024)) MiB; required free-space reserve: $((required_free_kb / 1024)) MiB."
           install -d -m 0700 -- "$upload_dir"
           REMOTE_STAGE_PREP
           # Use the SFTP subsystem rather than legacy SCP's single remote sink process.
@@ -343,12 +356,21 @@ jobs:
           arcade_parts=(ArcadeMechanicsModern.jar.part.*)
           [[ ${#map_parts[@]} -gt 0 ]] || { echo "No map archive parts arrived." >&2; exit 1; }
           [[ ${#arcade_parts[@]} -gt 0 ]] || { echo "No Arcade JAR parts arrived." >&2; exit 1; }
-          cat "${map_parts[@]}" > MonsterMazeMaps.tar.gz.tmp
+          # Assemble each payload in place: remove a chunk only after it has been
+          # appended successfully. This bounds the peak of (remaining parts + output)
+          # to one copy of each source file instead of retaining two full copies.
+          : > MonsterMazeMaps.tar.gz.tmp
+          for part in "${map_parts[@]}"; do
+            cat "$part" >> MonsterMazeMaps.tar.gz.tmp
+            rm -- "$part"
+          done
           mv MonsterMazeMaps.tar.gz.tmp MonsterMazeMaps.tar.gz
-          rm -f -- "${map_parts[@]}"
-          cat "${arcade_parts[@]}" > ArcadeMechanicsModern.jar.tmp
+          : > ArcadeMechanicsModern.jar.tmp
+          for part in "${arcade_parts[@]}"; do
+            cat "$part" >> ArcadeMechanicsModern.jar.tmp
+            rm -- "$part"
+          done
           mv ArcadeMechanicsModern.jar.tmp ArcadeMechanicsModern.jar
-          rm -f -- "${arcade_parts[@]}"
           echo "Assembled MonsterMazeMaps.tar.gz ($(stat -c %s MonsterMazeMaps.tar.gz) bytes)."
           echo "Assembled ArcadeMechanicsModern.jar ($(stat -c %s ArcadeMechanicsModern.jar) bytes)."
           REMOTE_ASSEMBLE_ARCADE
@@ -923,7 +945,7 @@ jobs:
           sudo -n grep -F 'TESTPLEX_ARCADE_LOBBY_READY' "$SERVER_DIR/logs/latest.log" | tail -n 1 || true
 
           sudo -n /usr/local/sbin/testplex-modern-recovery --locked set-phase DEPLOYMENT_VERIFIED
-          echo "Modern Paper 26.3 is ready with the Testplex Arcade 100x100 lobby; Death Tag and One in the Quiver are enabled for acceptance; Monster Maze registration is reported separately above; Snake, Wizards and all other unfinished game ports remain disabled; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
+          echo "Modern Paper 26.3 is ready with the Testplex Arcade 100x100 lobby and the thirteen-game controlled acceptance queue, including Super Sploor, Dragons (Solo), Runner and Camera Shy; Monster Maze registration is reported separately above; Snake, Wizards and all other unfinished game ports remain disabled; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
           echo "On successful deployment, testplex-reborn.service remains stopped if it was active during preflight; a failed deployment restores services that were active before preflight. Separate Monster Maze project services/data were not modified."
           REMOTE_DEPLOY
 

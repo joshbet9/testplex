@@ -165,8 +165,10 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             display(world, "team-display", ChatColor.GOLD + "ROLES ASSIGNED AUTOMATICALLY"
                     + ChatColor.WHITE + " | Queued: " + manager.queuedCount(selectedGame));
         } else {
-            display(world, "team-display", ChatColor.BLUE + "FREE FOR ALL"
-                    + ChatColor.WHITE + " | Queued: " + manager.queuedCount(selectedGame));
+            String queueLabel = selectedGame == ArcadePortGame.PLEXBALL ? "INDIVIDUAL QUEUE" : "FREE FOR ALL";
+            display(world, "team-display", ChatColor.BLUE + queueLabel
+                    + ChatColor.WHITE + " | Queued: " + manager.queuedCount(selectedGame)
+                    + ChatColor.GRAY + " | Test Players: created on Start Game");
         }
     }
 
@@ -461,12 +463,23 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             case SHEEP_QUEST -> new String[] {"sheep-bell", "wool-confetti", "shepherd-flare"};
             case SPLEEF -> new String[] {"snowburst", "ice-shards", "chalk-grid"};
             case TURF_WARS -> new String[] {"team-sigil", "turf-crack", "painted-chevron"};
+            case CAMERA_SHY -> new String[] {"smoke-artist", "decoy", "runner", "spotter", "understudy"};
             default -> new String[] {"classic", "inferno", "frost"};
         };
     }
 
     private Material showcaseIcon(ArcadePortGame game, String option) {
         String value = option == null ? "" : option.toLowerCase(Locale.ROOT);
+        if (game == ArcadePortGame.CAMERA_SHY) {
+            return switch (value) {
+                case "smoke-artist" -> Material.POTION;
+                case "decoy" -> Material.FIREWORK_ROCKET;
+                case "runner" -> Material.SUGAR;
+                case "spotter" -> Material.COMPASS;
+                case "understudy" -> Material.ARMOR_STAND;
+                default -> Material.SPYGLASS;
+            };
+        }
         if (game == ArcadePortGame.BOMB_LOBBERS) {
             if (value.contains("tnt") || "classic".equals(value) || "ember".equals(value)) return Material.TNT;
             if ("shockwave".equals(value)) return Material.TARGET;
@@ -636,8 +649,11 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 refreshDisplays();
                 openQueueMenu(p);
             } else if ("queue-leave".equals(action)) {
-                manager.removeFromQueues(p);
-                p.sendMessage(ChatColor.YELLOW + "You have left the Arcade queue.");
+                if (manager.leaveQueue(selectedGame, p)) {
+                    p.sendMessage(ChatColor.YELLOW + "You have left the Arcade queue.");
+                } else {
+                    p.sendMessage(ChatColor.YELLOW + "You are not queued for " + selectedGame.displayName() + ".");
+                }
                 refreshDisplays();
                 openQueueMenu(p);
             } else if (e.getSlot() == 22) p.closeInventory();

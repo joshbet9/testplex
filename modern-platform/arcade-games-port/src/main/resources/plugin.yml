@@ -3,15 +3,15 @@ version: 0.1.0-SNAPSHOT
 main: au.com.testplex.arcadeports.ArcadeMechanicsModernPlugin
 api-version: '26.3'
 author: Testplex
-description: Shared Testplex Arcade game mechanics, lobby lifecycle and preference rotation for Paper 26.3
+description: Controlled Arcade game implementations for Paper 26.3
 softdepend:
   - TestplexModernArcade
   - packetevents
   - FakePlayerPlugin
 commands:
   stats:
-    description: Open local Testplex Arcade statistics (optionally for an online player).
-    usage: /stats [player]
+    description: Open local Testplex Arcade statistics, including Camera Shy and Plexball career progression.
+    usage: /stats [plexball] | /stats [player] camera-shy [page]
     aliases: [arcadestats]
   gamepreferences:
     description: Rate Arcade games and view their weighted rotation likelihood.
@@ -19,7 +19,7 @@ commands:
     aliases: [gameprefs]
   arcadeport:
     description: Start and test a modern Arcade game
-    usage: /arcadeport <play|join|start|kit|ghost|maps|lobby|bot|status|stop>
+    usage: /arcadeport <play|join|leave|spectate|start|kit|stats|ghost|maps|lobby|bot|status|stop>
   mm:
     description: Monster Maze game commands managed by Testplex Arcade
     usage: /mm <start|stop|kit|kits|map|mode|pattern|stats|pb|lb|status>
