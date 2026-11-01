@@ -2671,6 +2671,17 @@ public final class ArcadePortRules {
     public static final long HEROES_OF_GWEN_POWER_POTION_DURATION_MILLIS = 90_000L;
     public static final long HEROES_OF_GWEN_SPEED_POTION_DURATION_MILLIS = 180_000L;
 
+    /** Resolve a source role-store item into its single replaceable equipment category. */
+    public static String heroesOfGwenStoreEquipmentSlot(String materialName) {
+        if (materialName == null) return null;
+        if (materialName.endsWith("_HELMET")) return "helmet";
+        if (materialName.endsWith("_CHESTPLATE")) return "chestplate";
+        if (materialName.endsWith("_LEGGINGS")) return "leggings";
+        if (materialName.endsWith("_BOOTS")) return "boots";
+        if (materialName.endsWith("_SWORD") || "BOW".equals(materialName)) return "weapon";
+        return null;
+    }
+
     /** Original role-store equipment enchantment family by display name. */
     public static String heroesOfGwenStoreEnchantment(String itemName) {
         if (itemName == null) return "";
