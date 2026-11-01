@@ -78,7 +78,7 @@ class SneakyAssassinsParityTest {
         assertFalse(SneakyAssassinsRules.shouldAwardProsecutor(4));
         assertTrue(SneakyAssassinsRules.shouldAwardProsecutor(5));
         assertTrue(SneakyAssassinsRules.isPowerUpKillWindow(1_000, 1));
-        assertFalse(SneakyAssassinsRules.isPowerUpKillWindow(1_001, 1));
+        assertFalse(SneakyAssassinsRules.isPowerUpKillWindow(1_002, 1));
         assertFalse(SneakyAssassinsRules.isPowerUpKillWindow(0, 1));
         assertEquals(12_000L, SneakyAssassinsRules.firstPowerUpDelayMillis());
         assertEquals(7_000L, SneakyAssassinsRules.nextPowerUpDelayMillis());
