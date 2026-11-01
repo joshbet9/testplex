@@ -49,7 +49,7 @@ Modern server provisioning and deployment use a separate directory, unit (`testp
 
 ## Complete 29-game programme register (1 November 2026)
 
-The overall programme tracks 29 titles/variants: **27 shared Arcade catalogue games**, the separately packaged **Wizards** module, and the planned **Speed Builders Arcade** variant. Speed Builders currently has no implementation branch or runtime code; it is tracked as planned work rather than represented by a non-functional placeholder.
+The overall programme tracks 30 titles/variants: **27 shared Arcade catalogue games**, the separately packaged **Wizards** module, **Speed Builders Arcade**, and **Hoops Remastered**. Speed Builders has a source-map implementation in draft PR #86 but is not enabled; Hoops has a playable mechanics slice in draft PR #74 but its latest four-client smoke acceptance found a player-restoration failure.
 
 | # | Game | Current implementation state | Test access |
 |---:|---|---|---|
@@ -61,26 +61,27 @@ The overall programme tracks 29 titles/variants: **27 shared Arcade catalogue ga
 | 6 | Evolution | Mechanics in progress | Disabled |
 | 7 | Gladiators | Controlled acceptance; Normal default plus four voteable rulesets and tournament lifecycle implemented | Enabled |
 | 8 | Micro Battles | Controlled acceptance; original map, four-team combat, kits and achievements implemented | Enabled |
-| 9 | Monster Maze | Embedded in Testplex Arcade lifecycle; mechanics in progress | Disabled |
+| 9 | Monster Maze | Embedded in Testplex Arcade lifecycle; controlled acceptance available, full gameplay acceptance ongoing | Enabled |
 | 10 | One in the Quiver | Acceptance-ready | Enabled |
 | 11 | Paintball | Controlled acceptance; original maps, four kits, team combat and SAVE ME revival implemented | Enabled |
 | 12 | Runner | Source implementation prepared; controlled gameplay acceptance required | Enabled |
 | 13 | Sheep Quest | Controlled acceptance candidate; four-team capture, three source kits and original map implemented | Enabled |
-| 14 | Snake | Separate modern module; mechanics in progress | Disabled |
+| 14 | Snake | Separate modern module; controlled acceptance available, mechanics in progress | Enabled |
 | 15 | Spleef | Controlled acceptance candidate; all 37 original archives across Spleef and Super Spleef, three kits and source block mechanics | Enabled |
 | 16 | Turf Wars | Controlled acceptance candidate; 42 original maps, three source kits, standard and Mixed Arcade rules | Enabled |
-| 17 | Draw My Thing | Mechanics in progress; large-lobby turn scaling present | Disabled |
-| 18 | Master Builders | Mechanics in progress; plot/review work present | Disabled |
-| 19 | Castle Assault | Mechanics in progress | Disabled |
+| 17 | Draw My Thing | Mechanics in progress; original Stadium archive and controlled acceptance available | Enabled |
+| 18 | Master Builders | Mechanics in progress; 16 isolated plots and review flow available for controlled acceptance | Enabled |
+| 19 | Castle Assault | Controlled acceptance; 11 original maps and objective markers validated | Enabled |
 | 20 | Heroes of Gwen | Mechanics in progress | Disabled |
-| 21 | Sneaky Assassins | Mechanics in progress; no archived source map | Disabled |
-| 22 | SkyWars Mixed | Mechanics-first 16-player port integrated | Disabled |
-| 23 | Milk the Cow | Mechanics-first port integrated | Disabled |
-| 24 | Wither Assault | Mechanics-first port integrated; generated test arena | Disabled |
+| 21 | Sneaky Assassins | Controlled mechanics testing in generated town; no authentic map/NMS patrol routes | Enabled |
+| 22 | SkyWars Mixed | Controlled testing; 16-player FFA, 50 original maps and source ore/block mechanics | Enabled |
+| 23 | Milk the Cow | Controlled acceptance; original BobsFarm archive and animal markers validated | Enabled |
+| 24 | Wither Assault | Controlled mechanics testing in generated arena; Human Medic passives/source maps remain incomplete | Enabled |
 | 25 | Plexball | Controlled acceptance; server-authoritative batting/fielding, kits, HUD, progression and shared Arcade lifecycle; modern arena (no 1.8 map archive) | Enabled |
 | 26 | Camera Shy | Spyglass-based photographic elimination game; five exposures eliminate; full live acceptance pending | Enabled for controlled testing |
 | 27 | Super Sploor | NANO-inspired five-kit team territory shooter with original Sploor map | Enabled for controlled testing |
-| 28 | Wizards | Separate resource-packless module; 10 of 21 spell effects implemented | Disabled |
-| 29 | Speed Builders Arcade | Planned; implementation not started | Not available |
+| 28 | Wizards | Shared Arcade lifecycle integration remains in draft; 21 spells implemented and CI two-client smoke passed; no VM deployment | Disabled |
+| 29 | Speed Builders Arcade | Source-map implementation in draft PR #86; build and live acceptance still pending | Disabled |
+| 30 | Hoops Remastered | Playable 2–16 player basketball slice in draft PR #74; four-client smoke exposed winner-transition restoration failure | Disabled |
 
-**Readiness rule:** Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons (Solo), Runner, Sheep Quest, Turf Wars and Camera Shy form the shared controlled test queue. Being enabled means a game is available for controlled testing, not that every mechanic has already passed live acceptance. Fix issues found during combined testing, keep playable games available, and expand the queue as other games become testable. The 357 archived map ZIPs for enabled games are tracked in [the legacy map parity register](arcade-games-port/LEGACY-MAP-PARITY.md); Plexball is explicitly documented as using a modern arena.
+**Readiness rule:** The 25-game controlled queue is Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Castle Assault, Gladiators, Micro Battles, Milk the Cow, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons (Solo), Runner, Sheep Quest, Turf Wars, Snap, Monster Maze, Snake, Draw My Thing, Master Builders, SkyWars Mixed, Wither Assault and Sneaky Assassins. `READY_FOR_TEST` means available for isolated controlled testing, not live gameplay acceptance or full source parity. Wither Assault and Sneaky Assassins use generated arenas; SkyWars Mixed carries all 50 original source map archives. The 419 archived ZIPs for enabled map-backed games are tracked in [the legacy map parity register](arcade-games-port/LEGACY-MAP-PARITY.md); Plexball, Snap, Master Builders, Wither Assault and Sneaky Assassins use modern/generated arenas.
