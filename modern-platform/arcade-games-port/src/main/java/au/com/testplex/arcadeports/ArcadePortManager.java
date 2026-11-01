@@ -5091,39 +5091,103 @@ public final class ArcadePortManager implements Listener {
         player.sendMessage(ChatColor.YELLOW + "Skill: " + ChatColor.GREEN + "You used Leap.");
     }
 
+    private boolean isDragonFrostPlacementSafe(Session session, Block block, UUID exemptPlayerId) {
+        if (block == null || block.getWorld() != session.world
+                || !ArcadePortRules.isDragonFrostBridgeSurface(block.getType())) return false;
+        SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
+        if (mapData == null || !mapData.hasBounds()) return false;
+        int x = block.getX(), y = block.getY(), z = block.getZ();
+        if (x < mapData.minX() || x >= mapData.maxX()
+                || z < mapData.minZ() || z >= mapData.maxZ()) return false;
+        if (mapData.hasVerticalBounds() && (y < mapData.minY() || y >= mapData.maxY())) return false;
+        if (!block.getRelative(BlockFace.UP).isPassable()
+                || !block.getRelative(0, 2, 0).isPassable()) return false;
+        BoundingBox candidate = new BoundingBox(x, y, z, x + 1.0D, y + 1.0D, z + 1.0D);
+        for (Player other : session.players.values()) {
+            if (other == null || !other.isOnline() || !session.alive.contains(other.getUniqueId())
+                    || other.getUniqueId().equals(exemptPlayerId)) continue;
+            if (other.getBoundingBox().overlaps(candidate)) return false;
+        }
+        return true;
+    }
+
+    /** Three parallel 16-block lanes, matching the source IcePathData layout and forward sorting. */
+    private List<Block> createDragonFrostBridgePath(Session session, Player player) {
+        Location origin = player.getLocation().clone().add(0.0D, 1.0D, 0.0D);
+        Vector facing = origin.getDirection();
+        double horizontal = Math.sqrt(facing.getX() * facing.getX() + facing.getZ() * facing.getZ());
+        if (horizontal < 0.001D) return List.of();
+
+        List<Location> laneStarts = new ArrayList<>();
+        laneStarts.add(origin.clone());
+        if (Math.abs(facing.getX()) > Math.abs(facing.getZ())) {
+            laneStarts.add(origin.clone().add(0.0D, 0.0D, 1.0D));
+            laneStarts.add(origin.clone().add(0.0D, 0.0D, -1.0D));
+        } else {
+            laneStarts.add(origin.clone().add(1.0D, 0.0D, 0.0D));
+            laneStarts.add(origin.clone().add(-1.0D, 0.0D, 0.0D));
+        }
+
+        Set<Block> unique = new HashSet<>();
+        List<Block> blocks = new ArrayList<>();
+        for (Location laneStart : laneStarts) {
+            Location cursor = laneStart.clone().subtract(0.0D, 1.0D, 0.0D);
+            Vector direction = cursor.getDirection();
+            double laneHorizontal = Math.sqrt(direction.getX() * direction.getX()
+                    + direction.getZ() * direction.getZ());
+            if (laneHorizontal < 0.001D) continue;
+            direction.setY(ArcadePortRules.dragonsFrostPathVerticalComponent(
+                    direction.getY(), laneHorizontal));
+            direction.normalize();
+            cursor.subtract(direction.clone().multiply(2.0D));
+
+            double distance = 0.0D;
+            while (distance < ArcadePortRules.DRAGONS_FROST_BRIDGE_LENGTH) {
+                distance += 0.2D;
+                cursor.add(direction.clone().multiply(0.2D));
+                Block candidate = cursor.getBlock();
+                if (!isDragonFrostPlacementSafe(session, candidate, player.getUniqueId())) continue;
+                if (unique.add(candidate)) blocks.add(candidate);
+            }
+        }
+        blocks.sort(java.util.Comparator.comparingDouble(block ->
+                block.getLocation().add(0.5D, 0.5D, 0.5D).distanceSquared(origin)));
+        return blocks;
+    }
+
     private void activateDragonFrostBridge(Session session, Player player, long now) {
         UUID id = player.getUniqueId();
         long readyAt = session.dragonFrostReadyAt.getOrDefault(id, 0L);
-        if (now < readyAt) { player.sendMessage(ChatColor.YELLOW + "Ice Bridge ready in " + Math.max(1L, (readyAt - now + 999L) / 1000L) + "s."); return; }
-        Vector direction = player.getLocation().getDirection().setY(0.0D);
-        if (direction.lengthSquared() < 0.001D) direction = new Vector(0.0D, 0.0D, 1.0D);
-        direction.normalize();
-        int baseY = player.getLocation().getBlockY() - 1;
-        SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
-        int placed = 0;
-        for (int step = 1; step <= ArcadePortRules.DRAGONS_FROST_BRIDGE_LENGTH; step++) {
-            int x = player.getLocation().getBlockX() + (int) Math.round(direction.getX() * step);
-            int z = player.getLocation().getBlockZ() + (int) Math.round(direction.getZ() * step);
-            if (mapData != null && mapData.hasBounds()
-                    && (x < mapData.minX() || x >= mapData.maxX() || z < mapData.minZ() || z >= mapData.maxZ())) continue;
-            Block block = session.world.getBlockAt(x, baseY, z);
-            if (!block.getType().isAir() || block.isLiquid()
-                    || !block.getRelative(BlockFace.UP).isPassable()
-                    || !block.getRelative(0, 2, 0).isPassable()) continue;
-            BoundingBox candidate = new BoundingBox(x, baseY, z, x + 1.0D, baseY + 1.0D, z + 1.0D);
-            boolean intersectsPlayer = session.players.values().stream()
-                    .filter(other -> other != null && other.isOnline() && session.alive.contains(other.getUniqueId()))
-                    .anyMatch(other -> other.getBoundingBox().overlaps(candidate));
-            if (intersectsPlayer) continue;
-            session.dragonIceBridgeOriginals.putIfAbsent(block, block.getBlockData().clone());
-            session.dragonIceBridgeExpiresAt.put(block, now + ArcadePortRules.DRAGONS_FROST_BRIDGE_LIFETIME_MILLIS);
-            block.setType(Material.PACKED_ICE, false); placed++;
+        if (now < readyAt) {
+            player.sendMessage(ChatColor.YELLOW + "Ice Bridge ready in "
+                    + Math.max(1L, (readyAt - now + 999L) / 1000L) + "s.");
+            return;
         }
-        if (placed == 0) { player.sendMessage(ChatColor.YELLOW + "There is no clear space ahead for an ice bridge."); return; }
+
+        Location launch = player.getLocation().clone().add(0.0D, 1.0D, 0.0D);
+        if (!launch.getBlock().isPassable()
+                || !launch.getBlock().getRelative(BlockFace.UP).isPassable()) {
+            player.sendMessage(ChatColor.YELLOW + "There is not enough headroom to use Ice Bridge here.");
+            return;
+        }
+        List<Block> path = createDragonFrostBridgePath(session, player);
+        if (path.isEmpty()) {
+            player.sendMessage(ChatColor.YELLOW + "There is no safe Ice Bridge path within this map.");
+            return;
+        }
+        if (!player.teleport(launch)) {
+            player.sendMessage(ChatColor.YELLOW + "Ice Bridge could not safely lift you from this position.");
+            return;
+        }
+
+        player.setVelocity(new Vector(0.0D, 0.5D, 0.0D));
+        session.dragonFrostBridgePaths.put(id, path);
+        session.dragonFrostBridgePathIndexes.put(id, 0);
         session.dragonFrostReadyAt.put(id, now + ArcadePortRules.DRAGONS_FROST_COOLDOWN_MILLIS);
         player.getWorld().playSound(player.getLocation(), Sound.BLOCK_GLASS_PLACE, 0.9F, 1.5F);
-        player.getWorld().spawnParticle(Particle.SNOWFLAKE, player.getLocation().clone().add(0.0D, 0.3D, 0.0D), 14, 0.3D, 0.15D, 0.3D, 0.03D);
-        player.sendMessage(ChatColor.AQUA + "Ice Bridge! " + placed + " temporary blocks placed.");
+        player.getWorld().spawnParticle(Particle.SNOWFLAKE,
+                player.getLocation().clone().add(0.0D, 0.3D, 0.0D), 14, 0.3D, 0.15D, 0.3D, 0.03D);
+        player.sendMessage(ChatColor.AQUA + "Ice Bridge! Your temporary three-lane path is forming.");
     }
 
     private void activateDragonGlider(Session session, Player player, long now) {
@@ -5212,9 +5276,14 @@ public final class ArcadePortManager implements Listener {
     private void restoreDragonFrostBlocks(Session session) {
         for (Map.Entry<Block, BlockData> entry : new ArrayList<>(session.dragonIceBridgeOriginals.entrySet())) {
             Block block = entry.getKey();
-            if (block != null && block.getWorld() == session.world && block.getType() == Material.PACKED_ICE) block.setBlockData(entry.getValue(), false);
+            if (block != null && block.getWorld() == session.world && block.getType() == Material.ICE) {
+                block.setBlockData(entry.getValue(), false);
+            }
         }
-        session.dragonIceBridgeOriginals.clear(); session.dragonIceBridgeExpiresAt.clear();
+        session.dragonIceBridgeOriginals.clear();
+        session.dragonIceBridgeExpiresAt.clear();
+        session.dragonFrostBridgePaths.clear();
+        session.dragonFrostBridgePathIndexes.clear();
     }
 
     private void updateDragonAbilityTimers(Session session, long now) {
@@ -5222,9 +5291,37 @@ public final class ArcadePortManager implements Listener {
             Map.Entry<Block, Long> entry = it.next();
             if (now < entry.getValue()) continue;
             Block block = entry.getKey(); BlockData original = session.dragonIceBridgeOriginals.remove(block);
-            if (block != null && block.getWorld() == session.world && original != null && block.getType() == Material.PACKED_ICE) block.setBlockData(original, false);
+            if (block != null && block.getWorld() == session.world && original != null
+                    && block.getType() == Material.ICE) block.setBlockData(original, false);
             it.remove();
         }
+
+        // Legacy IcePathData emits one block each server tick and restores it after a short melt window.
+        for (Map.Entry<UUID, List<Block>> pathEntry
+                : new ArrayList<>(session.dragonFrostBridgePaths.entrySet())) {
+            UUID playerId = pathEntry.getKey();
+            List<Block> path = pathEntry.getValue();
+            int index = session.dragonFrostBridgePathIndexes.getOrDefault(playerId, 0);
+            if (!session.alive.contains(playerId) || index >= path.size()) {
+                session.dragonFrostBridgePaths.remove(playerId);
+                session.dragonFrostBridgePathIndexes.remove(playerId);
+                continue;
+            }
+            Block block = path.get(index);
+            session.dragonFrostBridgePathIndexes.put(playerId, index + 1);
+            if (isDragonFrostPlacementSafe(session, block, null)) {
+                session.dragonIceBridgeOriginals.putIfAbsent(block, block.getBlockData().clone());
+                session.dragonIceBridgeExpiresAt.put(block,
+                        now + ArcadePortRules.DRAGONS_FROST_BRIDGE_LIFETIME_MILLIS);
+                block.setType(Material.ICE, false);
+                block.getWorld().playEffect(block.getLocation(), Effect.STEP_SOUND, Material.ICE);
+            }
+            if (index + 1 >= path.size()) {
+                session.dragonFrostBridgePaths.remove(playerId);
+                session.dragonFrostBridgePathIndexes.remove(playerId);
+            }
+        }
+
         for (UUID id : new ArrayList<>(session.dragonGliderUntil.keySet()))
             if (now >= session.dragonGliderUntil.getOrDefault(id, Long.MAX_VALUE) || !session.alive.contains(id)) endDragonGlider(session, id);
         for (Map.Entry<UUID, DragonTamerControl> entry : new ArrayList<>(session.dragonTamerControls.entrySet())) {
@@ -11167,6 +11264,8 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.DRAGONS) {
             endDragonTamer(session, eliminatedId, "You were eliminated; dragon control ended.", true);
             endDragonGlider(session, eliminatedId);
+            session.dragonFrostBridgePaths.remove(eliminatedId);
+            session.dragonFrostBridgePathIndexes.remove(eliminatedId);
         }
         if (!session.alive.remove(eliminatedId)) return;
         if (session.type == ArcadePortGame.DRAGONS) {
@@ -19907,6 +20006,8 @@ public final class ArcadePortManager implements Listener {
             endDragonTamer(session, id, "Dragon control ended because you disconnected.", false);
             endDragonGlider(session, id);
             session.dragonFrostReadyAt.remove(id);
+            session.dragonFrostBridgePaths.remove(id);
+            session.dragonFrostBridgePathIndexes.remove(id);
             session.dragonGliderReadyAt.remove(id);
             session.dragonTamerReadyAt.remove(id);
             session.dragonSurviveFiveAwarded.remove(id);
@@ -20334,6 +20435,8 @@ public final class ArcadePortManager implements Listener {
         final Map<String, Long> dragonContactCooldowns = new HashMap<>();
         final Map<Block, BlockData> dragonIceBridgeOriginals = new HashMap<>();
         final Map<Block, Long> dragonIceBridgeExpiresAt = new HashMap<>();
+        final Map<UUID, List<Block>> dragonFrostBridgePaths = new HashMap<>();
+        final Map<UUID, Integer> dragonFrostBridgePathIndexes = new HashMap<>();
         final Map<UUID, Long> dragonFrostReadyAt = new HashMap<>();
         final Map<UUID, Long> dragonGliderReadyAt = new HashMap<>();
         final Map<UUID, Long> dragonGliderUntil = new HashMap<>();

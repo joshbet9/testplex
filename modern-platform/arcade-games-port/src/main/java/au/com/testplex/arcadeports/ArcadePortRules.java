@@ -548,8 +548,8 @@ public final class ArcadePortRules {
     public static final long DRAGONS_TAMER_DURATION_MILLIS = 15_000L;
     public static final long DRAGONS_SURVIVE_FIVE_MINUTES_MILLIS = 5 * 60_000L;
     public static final int DRAGONS_WIN_STREAK_ACHIEVEMENT = 3;
-    public static final int DRAGONS_FROST_BRIDGE_LENGTH = 7;
-    public static final long DRAGONS_FROST_BRIDGE_LIFETIME_MILLIS = 8_000L;
+    public static final int DRAGONS_FROST_BRIDGE_LENGTH = 16;
+    public static final long DRAGONS_FROST_BRIDGE_LIFETIME_MILLIS = 6_000L;
     public static final long DRAGONS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS = 3_000L;
     public static final int DRAGONS_MARKSMAN_START_ARROWS = 1;
     public static final long DRAGONS_CONTACT_COOLDOWN_MILLIS = 2_000L;
@@ -706,6 +706,18 @@ public final class ArcadePortRules {
             case "tamer", "dragon-tamer" -> "tamer";
             default -> null;
         };
+    }
+
+    /** Matches legacy IcePathData's cap for steep paths before normalisation. */
+    public static double dragonsFrostPathVerticalComponent(double vertical, double horizontalMagnitude) {
+        if (!Double.isFinite(vertical) || !Double.isFinite(horizontalMagnitude)) return 0.0D;
+        double horizontal = Math.max(0.0D, Math.abs(horizontalMagnitude));
+        return Math.abs(vertical) > horizontal ? Math.copySign(horizontal, vertical) : vertical;
+    }
+
+    /** The source Ice Path replaces only AIR and SNOW; all other map blocks are protected. */
+    public static boolean isDragonFrostBridgeSurface(Material material) {
+        return material != null && (material.isAir() || material == Material.SNOW);
     }
 
     public static boolean shouldAwardDragonsSurviveFiveMinutes(long liveElapsedMillis) {

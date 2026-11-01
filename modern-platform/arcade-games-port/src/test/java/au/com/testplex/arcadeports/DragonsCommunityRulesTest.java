@@ -16,10 +16,24 @@ class DragonsCommunityRulesTest {
 
     @Test void requestedCooldownsAndDurationsAreExact() {
         assertEquals(25_000L, ArcadePortRules.DRAGONS_FROST_COOLDOWN_MILLIS);
+        assertEquals(16, ArcadePortRules.DRAGONS_FROST_BRIDGE_LENGTH);
+        assertEquals(6_000L, ArcadePortRules.DRAGONS_FROST_BRIDGE_LIFETIME_MILLIS);
         assertEquals(15_000L, ArcadePortRules.DRAGONS_GLIDER_COOLDOWN_MILLIS);
         assertEquals(3_500L, ArcadePortRules.DRAGONS_GLIDER_DURATION_MILLIS);
         assertEquals(90_000L, ArcadePortRules.DRAGONS_TAMER_COOLDOWN_MILLIS);
         assertEquals(15_000L, ArcadePortRules.DRAGONS_TAMER_DURATION_MILLIS);
+    }
+
+    @Test void frostPathClampsSteepDirectionsAndOnlyUsesAirOrSnow() {
+        assertEquals(0.5D, ArcadePortRules.dragonsFrostPathVerticalComponent(1.0D, 0.5D), 0.00001D);
+        assertEquals(-0.5D, ArcadePortRules.dragonsFrostPathVerticalComponent(-1.0D, 0.5D), 0.00001D);
+        assertEquals(0.3D, ArcadePortRules.dragonsFrostPathVerticalComponent(0.3D, 0.5D), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.dragonsFrostPathVerticalComponent(Double.NaN, 0.5D), 0.00001D);
+        assertTrue(ArcadePortRules.isDragonFrostBridgeSurface(org.bukkit.Material.AIR));
+        assertTrue(ArcadePortRules.isDragonFrostBridgeSurface(org.bukkit.Material.CAVE_AIR));
+        assertTrue(ArcadePortRules.isDragonFrostBridgeSurface(org.bukkit.Material.SNOW));
+        assertFalse(ArcadePortRules.isDragonFrostBridgeSurface(org.bukkit.Material.STONE));
+        assertFalse(ArcadePortRules.isDragonFrostBridgeSurface(org.bukkit.Material.WATER));
     }
 
     @Test void survivalAchievementStartsAtExactlyFiveLiveMinutes() {
