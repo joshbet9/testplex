@@ -2728,6 +2728,25 @@ public final class ArcadePortRules {
         };
     }
 
+    /**
+     * Source MobaItemEffect modifiers stack additively against the original cooldown.
+     * Ammo effects are deliberately separate from ability cooldown modifiers.
+     */
+    public static long heroesOfGwenStoreAdjustedCooldown(long baseCooldown,
+            Collection<String> equippedItemNames, boolean ammo) {
+        if (baseCooldown <= 0L) return baseCooldown;
+        long reductionMillis = 0L;
+        if (equippedItemNames != null) {
+            for (String itemName : equippedItemNames) {
+                double factor = ammo
+                        ? heroesOfGwenStoreAmmoCooldownReduction(itemName)
+                        : heroesOfGwenStoreCooldownReduction(itemName);
+                if (factor > 0.0D) reductionMillis += (long) (baseCooldown * factor);
+            }
+        }
+        return Math.max(1L, baseCooldown - reductionMillis);
+    }
+
     /** Return red/blue challenge winner, or -1 for a tie. */
     public static int heroesOfGwenMonochromeWinner(int redKills, int blueKills) {
         return redKills == blueKills ? -1 : redKills > blueKills ? 0 : 1;
