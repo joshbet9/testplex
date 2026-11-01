@@ -187,7 +187,7 @@ public final class SpeedBuildersGame implements Listener {
             return;
         }
         if (queue.size() >= SpeedBuildersRules.MAX_PLAYERS) {
-            player.sendMessage(ChatColor.RED + "The Speed Builders queue is full (16 players).");
+            player.sendMessage(ChatColor.RED + "The Speed Builders queue is full (" + SpeedBuildersRules.MAX_PLAYERS + " builders).");
             return;
         }
         queue.add(player.getUniqueId());
