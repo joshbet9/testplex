@@ -189,9 +189,19 @@ final class ArcadeTestPlayerManager {
                 }
                 startupCleanupSucceeded = true;
             } catch (Exception exception) {
-                host.getLogger().warning("Could not inspect FakePlayerPlugin for stale Testplex bots: "
-                        + rootMessage(exception));
-                startupCleanupSucceeded = false;
+                // A disposable real-client smoke server has no FakePlayerPlugin at
+                // all. Absence is safe only when no TPXTEST player survived a
+                // previous session; it must not block a fully human match.
+                // Any match needing bots still checks the FPP damageable API.
+                boolean pluginMissing = Bukkit.getPluginManager().getPlugin(FPP_PLUGIN_NAME) == null;
+                startupCleanupSucceeded = pluginMissing && noOnlineTestPlayersRemain();
+                if (startupCleanupSucceeded) {
+                    host.getLogger().info("No FakePlayerPlugin installed and no stale TPXTEST players present; "
+                            + "allowing a human-only Arcade match.");
+                } else {
+                    host.getLogger().warning("Could not verify cleanup of stale FakePlayerPlugin test players: "
+                            + rootMessage(exception));
+                }
             } finally {
                 if (!cleanupScheduled) startupCleanupComplete = true;
             }
