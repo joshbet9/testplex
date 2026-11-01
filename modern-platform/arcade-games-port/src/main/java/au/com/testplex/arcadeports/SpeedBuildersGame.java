@@ -539,8 +539,9 @@ public final class SpeedBuildersGame implements Listener {
             state.score = score(state);
             state.empty = isPlotEmpty(state);
             boolean wasAlreadyPerfect = state.perfect;
-            state.perfect = state.score == currentTemplate.expectedScore();
-            if (state.perfect && !wasAlreadyPerfect) state.perfectBuilds++;
+            boolean perfectBuild = state.score == currentTemplate.expectedScore();
+            if (perfectBuild && !wasAlreadyPerfect) markPerfectBuild(state);
+            else state.perfect = perfectBuild;
             state.player.getInventory().clear();
             state.player.setGameMode(GameMode.SPECTATOR);
             Location view = reviewViewLocation(i);
@@ -683,6 +684,10 @@ public final class SpeedBuildersGame implements Listener {
         SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "blocks-placed", state.blocksPlaced);
         SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "blocks-broken", state.blocksBroken);
         SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "mobs-built", state.mobsBuilt);
+        SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "perfect-builds", state.perfectBuilds);
+        if (round > 0 && state.perfectBuilds == round) {
+            SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "perfectionist-wins", 1L);
+        }
         plugin.saveConfig();
     }
 
@@ -877,10 +882,6 @@ public final class SpeedBuildersGame implements Listener {
 
     private List<PlayerState> alivePlayers() {
         return players.values().stream().filter(state -> !state.eliminated && state.player.isOnline()).toList();
-    }
-
-    private boolean isInsidePlot(PlayerState state, Location location) {
-        return location.getWorld() == arena;
     }
 
     private boolean isInBuildVolume(PlayerState state, org.bukkit.block.Block block) {
@@ -1110,26 +1111,31 @@ public final class SpeedBuildersGame implements Listener {
         return view;
     }
 
+    private void markPerfectBuild(PlayerState state) {
+        if (state.perfect || !state.player.isOnline()) return;
+        state.perfect = true;
+        state.perfectBuilds++;
+        long elapsedMillis = Math.max(0L, tick - buildPhaseStartedTick) * 50L;
+        if (!firstPerfectBuildAwarded) {
+            firstPerfectBuildAwarded = true;
+            SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(), "perfect-first", 1L);
+        }
+        if (elapsedMillis < 10_000L) {
+            SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(), "speediest-builderizer", 1L);
+        }
+        plugin.saveConfig();
+        state.player.sendTitle(ChatColor.GREEN + "PERFECT BUILD!",
+                ChatColor.YELLOW + "You've recreated every block.",
+                0, 40, 10);
+        state.player.playSound(state.player.getLocation(), org.bukkit.Sound.UI_TOAST_CHALLENGE_COMPLETE,
+                0.8F, 1.15F);
+    }
+
     private void checkPerfectBuild(PlayerState state) {
         if (phase != Phase.BUILDING || state.eliminated || state.perfect || !state.player.isOnline()) return;
         int score = score(state);
         if (score == currentTemplate.expectedScore()) {
-            state.perfect = true;
-            state.perfectBuilds++;
-            long elapsedMillis = Math.max(0L, tick - buildPhaseStartedTick) * 50L;
-            if (!firstPerfectBuildAwarded) {
-                firstPerfectBuildAwarded = true;
-                SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(), "perfect-first", 1L);
-            }
-            if (elapsedMillis < 10_000L) {
-                SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(), "speediest-builderizer", 1L);
-            }
-            plugin.saveConfig();
-            state.player.sendTitle(ChatColor.GREEN + "PERFECT BUILD!",
-                    ChatColor.YELLOW + "You've recreated every block.",
-                    0, 40, 10);
-            state.player.playSound(state.player.getLocation(), org.bukkit.Sound.UI_TOAST_CHALLENGE_COMPLETE,
-                    0.8F, 1.15F);
+            markPerfectBuild(state);
             if (alivePlayers().stream().allMatch(player -> player.perfect)) finishBuildingPhase();
         }
     }
