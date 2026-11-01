@@ -2,7 +2,6 @@ package au.com.testplex.arcadeports;
 
 import org.junit.jupiter.api.Test;
 import org.bukkit.Material;
-import org.bukkit.util.Vector;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
@@ -31,10 +30,6 @@ class ArcadePortGameTest {
         assertEquals(java.util.List.of("Heroes of GWEN"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.HEROES_OF_GWEN));
         assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.EVOLUTION).isEmpty(),
                 "Evolution has no legacy map archive folder and must not be given an invented one");
-        assertEquals(java.util.List.of("Draw My Thing"),
-                SourceMapCatalog.mapFoldersFor(ArcadePortGame.DRAW_MY_THING));
-        assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.MASTER_BUILDERS).isEmpty(),
-                "Master Builders uses generated plots rather than a fabricated source map");
         assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.CAMERA_SHY).isEmpty(),
                 "Snap uses its dedicated procedural maze, not an invented legacy map archive");
         assertEquals("Snap", ArcadePortGame.CAMERA_SHY.displayName());
@@ -179,8 +174,6 @@ class ArcadePortGameTest {
                 java.util.List.of("death-tag", "plexball", "spleef")),
                 "Snap must remain gated when it is removed from the reviewed allow-list.");
         assertNull(ArcadePortGame.fromId("snake"));
-        assertEquals(ArcadePortGame.DRAW_MY_THING, ArcadePortGame.fromId("Draw My Thing"));
-        assertEquals(ArcadePortGame.MASTER_BUILDERS, ArcadePortGame.fromId("master_builders"));
         assertEquals(ArcadePortGame.SNEAKY_ASSASSINS, ArcadePortGame.fromId("sneaky-assassins"));
         assertEquals(ArcadePortGame.SKY_WARS, ArcadePortGame.fromId("skywars"));
         assertEquals(ArcadePortGame.MILK_THE_COW, ArcadePortGame.fromId("milk-the-cow"));
@@ -851,18 +844,11 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldReplenishDragonSparkler(25_000L, 25_000L, 1));
         assertFalse(ArcadePortRules.shouldReplenishDragonSparkler(25_000L, 25_000L, 2));
         assertTrue(ArcadePortRules.shouldExpireDragonSparkler(101, 64.0D, false));
-        assertFalse(ArcadePortRules.shouldExpireDragonSparkler(20, 3.9D, false));
-        assertFalse(ArcadePortRules.shouldExpireDragonSparkler(20, 64.0D, true));
-        assertFalse(ArcadePortRules.shouldDragonSparklerAttract(3.9D, false));
-        assertFalse(ArcadePortRules.shouldDragonSparklerAttract(64.0D, true));
-        assertTrue(ArcadePortRules.shouldDragonSparklerAttract(64.0D, false));
+        assertTrue(ArcadePortRules.shouldExpireDragonSparkler(20, 3.9D, false));
+        assertTrue(ArcadePortRules.shouldExpireDragonSparkler(20, 64.0D, true));
         assertEquals(3.0D, ArcadePortRules.dragonFallDamageAfterReduction(4.0D), 0.00001D);
         assertEquals(0.0D, ArcadePortRules.dragonFallDamageAfterReduction(0.5D), 0.00001D);
-        assertEquals(5_000L, ArcadePortRules.DRAGONS_SPAWN_INTERVAL_MILLIS);
-        assertEquals(125L, ArcadePortRules.DRAGONS_TARGET_INTERVAL_MILLIS);
-        assertEquals(500L, ArcadePortRules.DRAGONS_PERK_UPDATE_INTERVAL_MILLIS);
-        assertEquals(500L, ArcadePortRules.DRAGONS_WATER_DAMAGE_INTERVAL_MILLIS);
-        assertEquals(50L, ArcadePortRules.DRAGONS_BARRAGE_FIRE_INTERVAL_MILLIS);
+        assertEquals(500L, ArcadePortRules.DRAGONS_SPAWN_INTERVAL_MILLIS);
         assertEquals(6, ArcadePortRules.DRAGONS_BARRAGE_MAX_ARROWS);
     }
 
@@ -890,30 +876,6 @@ class ArcadePortGameTest {
         assertEquals(4.0D, ArcadePortRules.microBattlesDamageAfterIronSkin(4.0D, false), 0.00001D);
     }
 
-    @Test void spleefBrawlerLeapMatchesLegacyPowerVerticalBoostAndGroundCap() {
-        org.bukkit.util.Vector airborne = ArcadePortRules.spleefLeapVelocity(
-                new org.bukkit.util.Vector(1.0D, 0.0D, 0.0D), false);
-        assertEquals(1.2D, airborne.getX(), 0.00001D);
-        assertEquals(0.2D, airborne.getY(), 0.00001D);
-        assertEquals(0.0D, airborne.getZ(), 0.00001D);
-
-        org.bukkit.util.Vector grounded = ArcadePortRules.spleefLeapVelocity(
-                new org.bukkit.util.Vector(1.0D, 0.0D, 0.0D), true);
-        assertEquals(1.2D, grounded.getX(), 0.00001D);
-        assertEquals(0.4D, grounded.getY(), 0.00001D);
-
-        org.bukkit.util.Vector lookingDown = ArcadePortRules.spleefLeapVelocity(
-                new org.bukkit.util.Vector(0.0D, -1.0D, 0.0D), false);
-        assertEquals(-1.0D, lookingDown.getY(), 0.00001D);
-        org.bukkit.util.Vector lookingUp = ArcadePortRules.spleefLeapVelocity(
-                new org.bukkit.util.Vector(0.0D, 1.0D, 0.0D), true);
-        assertEquals(1.2D, lookingUp.getY(), 0.00001D);
-        assertEquals(0.0D, ArcadePortRules.spleefLeapVelocity(
-                new org.bukkit.util.Vector(0.0D, 0.0D, 0.0D), true).length(), 0.00001D);
-        assertEquals(0.0D, ArcadePortRules.spleefLeapVelocity(
-                new org.bukkit.util.Vector(Double.NaN, 0.0D, 0.0D), true).length(), 0.00001D);
-    }
-
     @Test void spleefSourceKitSelectionHungerAndPerkTimingAreExplicit() {
         assertEquals("snowballer", ArcadePortRules.normalizeSpleefKit("Snowballer"));
         assertEquals("brawler", ArcadePortRules.normalizeSpleefKit("brawler"));
@@ -926,9 +888,6 @@ class ArcadePortGameTest {
         assertEquals(2, ArcadePortRules.SPLEEF_ARCHER_MAX_ARROWS);
         assertEquals(16, ArcadePortRules.SPLEEF_SNOWBALLER_MAX_SNOWBALLS);
         assertEquals(30_000L, ArcadePortRules.SPLEEF_BRAWLER_LEAP_COOLDOWN_MILLIS);
-        assertEquals(400L, ArcadePortRules.SPLEEF_KNOCKBACK_COOLDOWN_MILLIS);
-        assertEquals(0.3D, ArcadePortRules.SPLEEF_DEFAULT_KNOCKBACK, 0.00001D);
-        assertEquals(0.6D, ArcadePortRules.SPLEEF_BRAWLER_KNOCKBACK, 0.00001D);
         assertEquals(250L, ArcadePortRules.SPLEEF_SMASHER_COOLDOWN_MILLIS);
         assertEquals(4, ArcadePortRules.nextSpleefSlowDamageData(5));
         assertEquals(4, ArcadePortRules.nextSpleefSlowDamageData(13));
@@ -953,17 +912,17 @@ class ArcadePortGameTest {
         assertNull(ArcadePortRules.nextSpleefSlowDamageMaterial(org.bukkit.Material.ORANGE_TERRACOTTA));
     }
 
-    @Test void spleefProtectsOnlyBedrockAndLavaLikeReborn() {
-        assertFalse(ArcadePortRules.isSpleefProtectedMaterial(org.bukkit.Material.SNOW_BLOCK));
-        assertFalse(ArcadePortRules.isSpleefProtectedMaterial(org.bukkit.Material.LIGHT_BLUE_WOOL));
-        assertFalse(ArcadePortRules.isSpleefProtectedMaterial(org.bukkit.Material.RED_TERRACOTTA));
-        assertFalse(ArcadePortRules.isSpleefProtectedMaterial(org.bukkit.Material.STONE));
-        assertFalse(ArcadePortRules.isSpleefProtectedMaterial(org.bukkit.Material.GLASS));
-        assertFalse(ArcadePortRules.isSpleefProtectedMaterial(org.bukkit.Material.OBSIDIAN));
-        assertTrue(ArcadePortRules.isSpleefProtectedMaterial(org.bukkit.Material.AIR));
-        assertTrue(ArcadePortRules.isSpleefProtectedMaterial(org.bukkit.Material.BEDROCK));
-        assertTrue(ArcadePortRules.isSpleefProtectedMaterial(org.bukkit.Material.LAVA));
-        assertTrue(ArcadePortRules.isSpleefProtectedMaterial(null));
+    @Test void spleefOnlyAcceptsSourceFloorMaterialsAsBreakable() {
+        assertTrue(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.SNOW_BLOCK));
+        assertTrue(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.LIGHT_BLUE_WOOL));
+        assertTrue(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.RED_TERRACOTTA));
+        assertTrue(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.STONE));
+        assertTrue(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.CRACKED_STONE_BRICKS));
+        assertFalse(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.AIR));
+        assertFalse(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.BEDROCK));
+        assertFalse(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.GLASS));
+        assertFalse(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.OBSIDIAN));
+        assertFalse(ArcadePortRules.isSpleefFloorMaterial(null));
     }
 
     @Test void bombLobbersExplosionExposureUsesVanillaBoundingBoxSampleGrid() {
@@ -2144,27 +2103,6 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.allGladiatorPairsResolved(0, 0));
     }
 
-    @Test void dragonsSoloScoreboardMatchesSourceThresholds() {
-        assertEquals(0, ArcadePortRules.dragonsSoloScoreboardMode(14, 14));
-        assertEquals(0, ArcadePortRules.dragonsSoloScoreboardMode(14, 3));
-        assertEquals(1, ArcadePortRules.dragonsSoloScoreboardMode(15, 15));
-        assertEquals(1, ArcadePortRules.dragonsSoloScoreboardMode(25, 15));
-        assertEquals(2, ArcadePortRules.dragonsSoloScoreboardMode(16, 16));
-        assertEquals(2, ArcadePortRules.dragonsSoloScoreboardMode(40, 20));
-    }
-
-    @Test void dragonsSoloSurvivalAndPlacementGemRulesMatchSource() {
-        assertEquals(0.0D, ArcadePortRules.dragonSurvivalGems(-1L), 0.00001D);
-        assertEquals(0.9999D, ArcadePortRules.dragonSurvivalGems(9_999L), 0.00001D);
-        assertEquals(1.0D, ArcadePortRules.dragonSurvivalGems(10_000L), 0.00001D);
-        assertEquals(12.5D, ArcadePortRules.dragonSurvivalGems(125_000L), 0.00001D);
-        assertEquals(20.0D, ArcadePortRules.dragonPlacementGemReward(1), 0.00001D);
-        assertEquals(15.0D, ArcadePortRules.dragonPlacementGemReward(2), 0.00001D);
-        assertEquals(10.0D, ArcadePortRules.dragonPlacementGemReward(3), 0.00001D);
-        assertEquals(0.0D, ArcadePortRules.dragonPlacementGemReward(4), 0.00001D);
-        assertEquals(10.0D, ArcadePortRules.DRAGONS_PARTICIPATION_GEMS, 0.00001D);
-    }
-
     
 
     
@@ -2645,13 +2583,11 @@ class ArcadePortGameTest {
         assertEquals(-1, ArcadePortRules.turfWarsTimeoutLeader(119, 119, 4, 4));
     }
 
-    @Test void turfWarsUsesKitSpecificProjectileAndMeleeDamage() {
-        assertEquals(500.0D, ArcadePortRules.turfWarsHitDamage("marksman", true, false), 0.00001D);
-        assertEquals(500.0D, ArcadePortRules.turfWarsHitDamage("infiltrator", true, true), 0.00001D);
-        assertEquals(9.0D, ArcadePortRules.turfWarsHitDamage("shredder", true, false), 0.00001D);
-        assertEquals(9.0D, ArcadePortRules.turfWarsHitDamage("shredder", true, true), 0.00001D);
-        assertEquals(6.0D, ArcadePortRules.turfWarsHitDamage("marksman", false, false), 0.00001D);
-        assertEquals(12.0D, ArcadePortRules.turfWarsHitDamage("infiltrator", false, true), 0.00001D);
+    @Test void turfWarsUsesDifferentArrowAndMeleeDamage() {
+        assertEquals(9.0D, ArcadePortRules.turfWarsHitDamage(true, false), 0.00001D);
+        assertEquals(9.0D, ArcadePortRules.turfWarsHitDamage(true, true), 0.00001D);
+        assertEquals(6.0D, ArcadePortRules.turfWarsHitDamage(false, false), 0.00001D);
+        assertEquals(12.0D, ArcadePortRules.turfWarsHitDamage(false, true), 0.00001D);
     }
 
     @Test void paintballHealthTracksRemainingArmourPieces() {

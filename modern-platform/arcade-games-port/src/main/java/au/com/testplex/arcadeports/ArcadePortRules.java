@@ -3,10 +3,7 @@ package au.com.testplex.arcadeports;
 import org.bukkit.Material;
 import org.bukkit.Color;
 import org.bukkit.util.Vector;
-import org.bukkit.util.Vector;
 import java.util.Collection;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Small deterministic rules used by the mechanics-first Arcade prototypes.
@@ -480,22 +477,7 @@ public final class ArcadePortRules {
     public static final int SPLEEF_ARCHER_MAX_ARROWS = 2;
     public static final int SPLEEF_SNOWBALLER_MAX_SNOWBALLS = 16;
     public static final long SPLEEF_BRAWLER_LEAP_COOLDOWN_MILLIS = 30_000L;
-    public static final long SPLEEF_KNOCKBACK_COOLDOWN_MILLIS = 400L;
-    public static final double SPLEEF_DEFAULT_KNOCKBACK = 0.3D;
-    public static final double SPLEEF_BRAWLER_KNOCKBACK = 0.6D;
     public static final long SPLEEF_SMASHER_COOLDOWN_MILLIS = 250L;
-
-    /** Reborn PerkLeap: forward power 1.2, Y +0.2, max Y 1.2, plus a 0.2 ground boost. */
-    public static Vector spleefLeapVelocity(Vector facing, boolean grounded) {
-        if (facing == null || !Double.isFinite(facing.getX()) || !Double.isFinite(facing.getY())
-                || !Double.isFinite(facing.getZ()) || facing.lengthSquared() <= 1.0E-12D) {
-            return new Vector(0.0D, 0.0D, 0.0D);
-        }
-        Vector velocity = facing.clone().normalize().multiply(1.2D);
-        velocity.setY(Math.min(1.2D, velocity.getY() + 0.2D + (grounded ? 0.2D : 0.0D)));
-        return velocity;
-    }
-    public static final long TURF_WARS_GAME_TIMEOUT_MILLIS = 900_000L;
     public static final long TURF_WARS_INITIAL_BUILD_PHASE_MILLIS = 40_000L;
     public static final long TURF_WARS_BUILD_PHASE_MILLIS = 20_000L;
     public static final long TURF_WARS_COMBAT_PHASE_MILLIS = 90_000L;
@@ -830,9 +812,7 @@ public final class ArcadePortRules {
     }
 
     public static boolean shouldExpireDragonSparkler(int livedTicks, double y, boolean inLiquid) {
-        // PerkSparkler removes at >100 ticks. Dragons skips a low/submerged lure for targeting
-        // but it remains alive until the perk's lifetime cleanup.
-        return livedTicks > DRAGONS_SPARKLER_LIFETIME_TICKS;
+        return livedTicks > DRAGONS_SPARKLER_LIFETIME_TICKS || y < 4.0D || inLiquid;
     }
 
     public static double dragonFallDamageAfterReduction(double damage) {
@@ -896,11 +876,19 @@ public final class ArcadePortRules {
         };
     }
 
-    /** Reborn protects only bedrock and lava; every other non-air block can be punched away. */
-    public static boolean isSpleefProtectedMaterial(Material material) {
-        return material == null
-                || material == Material.AIR || material == Material.CAVE_AIR || material == Material.VOID_AIR
-                || material == Material.BEDROCK || material == Material.LAVA;
+    /** Legacy Spleef wool/clay data transitions: green -> yellow -> red -> broken. */
+    /** Blocks which are part of the supported source Spleef floor palette. */
+    public static boolean isSpleefFloorMaterial(Material material) {
+        if (material == null) return false;
+        String name = material.name();
+        if (name.endsWith("_WOOL") || name.endsWith("_TERRACOTTA") || material == Material.TERRACOTTA) {
+            return true;
+        }
+        return switch (material) {
+            case SNOW_BLOCK, CLAY, STONE, COBBLESTONE, STONE_BRICKS, MOSSY_STONE_BRICKS,
+                    CRACKED_STONE_BRICKS, GRASS_BLOCK, DIRT, SPRUCE_PLANKS, OAK_PLANKS, BIRCH_PLANKS -> true;
+            default -> false;
+        };
     }
 
     /** Apply the source's green/lime -> yellow -> red -> broken material sequence. */
@@ -1756,12 +1744,6 @@ public final class ArcadePortRules {
         return remainingPieces <= 0;
     }
 
-    public static double paintballHealthAfterHit(int remainingPieces) {
-        return Math.max(2.0D, Math.max(0, remainingPieces) * 5.0D + 1.0D);
-    }
-
-    /** Mirrors Reborn's per-kit armour-paint counts and the Sniper scope damage gauge. */
-    public static int paintballPaintAmount(String kit, boolean arrow, double scopeCharge) {
         String safeKit = kit == null ? "rifle" : kit.toLowerCase(java.util.Locale.ROOT);
         if ("rifle".equals(safeKit)) return 3;
         if ("sniper".equals(safeKit) && arrow) return paintballSniperPaintDamage(scopeCharge);
@@ -2717,65 +2699,14 @@ public final class ArcadePortRules {
     }
 
     public static double turfWarsHitDamage(boolean projectile, boolean ironSword) {
-        return turfWarsHitDamage("marksman", projectile, ironSword);
-    }
-
-    public static double turfWarsHitDamage(String kit, boolean projectile, boolean ironSword) {
-        if (projectile) {
-            return "shredder".equals(normalizeTurfWarsKit(kit))
-                    ? TURF_WARS_SHREDDER_ARROW_DAMAGE : 500.0D;
-        }
-        return ironSword ? TURF_WARS_IRON_SWORD_DAMAGE : TURF_WARS_MELEE_DAMAGE;
-    }
-
-    public static long turfWarsInitialBuildPhaseMillis(boolean mixedArcadeVariant) {
-        return mixedArcadeVariant ? TURF_WARS_MIXED_ARCADE_INITIAL_BUILD_PHASE_MILLIS
-                : TURF_WARS_INITIAL_BUILD_PHASE_MILLIS;
-    }
-
-    public static long turfWarsBuildPhaseMillis(boolean mixedArcadeVariant) {
-        return mixedArcadeVariant ? TURF_WARS_MIXED_ARCADE_BUILD_PHASE_MILLIS
-                : TURF_WARS_BUILD_PHASE_MILLIS;
-    }
-
-    public static long turfWarsCombatPhaseMillis(boolean mixedArcadeVariant) {
-        return mixedArcadeVariant ? TURF_WARS_MIXED_ARCADE_COMBAT_PHASE_MILLIS
-                : TURF_WARS_COMBAT_PHASE_MILLIS;
+        if (projectile) return 9.0D;
+        return ironSword ? 12.0D : 6.0D;
     }
 
     public static int advanceTurfFrontline(int currentFrontline, int teamId) {
-        return advanceTurfFrontline(currentFrontline, teamId, 1);
-    }
-
-    public static int advanceTurfFrontline(int currentFrontline, int teamId, boolean mixedArcadeVariant) {
-        return advanceTurfFrontline(currentFrontline, teamId, mixedArcadeVariant
-                ? TURF_WARS_MIXED_ARCADE_TURF_ADVANCE_BLOCKS : 1);
-    }
-
-    public static int advanceTurfFrontline(int currentFrontline, int teamId, int blocks) {
-        int distance = Math.max(0, blocks);
-        if (teamId == 0) return currentFrontline + distance;
-        if (teamId == 1) return currentFrontline - distance;
+        if (teamId == 0) return currentFrontline + 1;
+        if (teamId == 1) return currentFrontline - 1;
         return currentFrontline;
-    }
-
-    /**
-     * Every newly captured column must be repainted when a kill advances the line.
-     * The maximum X coordinate is exclusive, matching the source map bounds.
-     */
-    public static List<Integer> turfWarsCapturedColumns(int oldFrontline, int newFrontline,
-            int teamId, int minX, int maxXExclusive) {
-        if ((teamId != 0 && teamId != 1) || maxXExclusive <= minX || oldFrontline == newFrontline) {
-            return List.of();
-        }
-        int first = teamId == 0 ? oldFrontline + 1 : newFrontline + 1;
-        int last = teamId == 0 ? newFrontline : oldFrontline;
-        first = Math.max(first, minX);
-        last = Math.min(last, maxXExclusive - 1);
-        if (first > last) return List.of();
-        List<Integer> columns = new ArrayList<>(last - first + 1);
-        for (int x = first; x <= last; x++) columns.add(x);
-        return List.copyOf(columns);
     }
 
     /**
