@@ -15723,11 +15723,12 @@ public final class ArcadePortManager implements Listener {
                 }
             }
             if (won) {
-                plugin.getConfig().set(path + "wins",
-                        plugin.getConfig().getInt(path + "wins", 0) + 1);
+                int totalWins = plugin.getConfig().getInt(path + "wins", 0) + 1;
+                plugin.getConfig().set(path + "wins", totalWins);
                 if (session.type == ArcadePortGame.DEATH_TAG) {
                     String roleWins = session.tagged.contains(id) ? "chaser-wins" : "runner-wins";
                     plugin.getConfig().set(path + roleWins, plugin.getConfig().getInt(path + roleWins, 0) + 1);
+                    if (totalWins >= 50) awardCatalogAchievement(id, entry.getValue(), "death-tag", "death-proof");
                     long statueSince = session.deathTagStatueSince.getOrDefault(id, Long.MAX_VALUE);
                     if (System.currentTimeMillis() - statueSince >= 180_000L) awardCatalogAchievement(entry.getValue(), "death-tag", "statue");
                 }
