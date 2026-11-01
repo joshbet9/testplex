@@ -19,6 +19,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     private ArcadeMapSelectionMenu mapMenu;
     private GamePreferenceMenu preferenceMenu;
     private CameraShyGame cameraShy;
+    private SpeedBuildersGame speedBuilders;
     private MineplexCoreRankBridge mineplexCoreRankBridge;
     private final MonsterMazeRegistrationReadiness monsterMazeReadiness = new MonsterMazeRegistrationReadiness();
 
@@ -78,6 +79,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         plexball = new PlexballGame(this);
         getServer().getPluginManager().registerEvents(plexball, this);
         mapMenu = new ArcadeMapSelectionMenu(this);
+        speedBuilders = new SpeedBuildersGame(this);
+        getServer().getPluginManager().registerEvents(speedBuilders, this);
         preferenceMenu = new GamePreferenceMenu(this, manager);
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(mapMenu, this);
@@ -120,8 +123,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         for (Player online : Bukkit.getOnlinePlayers()) {
             Bukkit.getScheduler().runTask(this, () -> {
                 if (online.isOnline() && manager != null) {
-                    boolean restoredCameraShy = cameraShy != null && cameraShy.restorePendingSnapshot(online);
-                    if (!restoredCameraShy) manager.returnPlayerToLobby(online);
+                    boolean restoredSpeedBuilders = speedBuilders != null && speedBuilders.restorePendingSnapshot(online);
+                    boolean restoredCameraShy = !restoredSpeedBuilders
+                            && cameraShy != null && cameraShy.restorePendingSnapshot(online);
+                    if (!restoredSpeedBuilders && !restoredCameraShy) manager.returnPlayerToLobby(online);
                     grantConfiguredAdmin(online);
                     manager.restoreMonsterMazeKitPreference(online);
                 }
@@ -132,6 +137,20 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     public MonsterMazePlugin getMonsterMazeModule() { return monsterMaze; }
     public ArcadePortManager getArcadePortManager() { return manager; }
     public PlexballGame getPlexballGame() { return plexball; }
+    public SpeedBuildersGame getSpeedBuildersGame() { return speedBuilders; }
+
+    public boolean canStartSpeedBuilders() {
+        return manager != null && manager.canStartCameraShy()
+                && (plexball == null || !plexball.isActive())
+                && (cameraShy == null || !cameraShy.isActive());
+    }
+
+    public void prepareForSpeedBuilders() {
+        if (!canStartSpeedBuilders()) {
+            throw new IllegalStateException("Another Arcade, Plexball, Snap or Monster Maze session is active. "
+                    + "Speed Builders has kept its queue; retry /arcadeport start speed-builders after that match.");
+        }
+    }
 
     /** Returns null when the optional Mineplex CoreClient service is not available or not loaded for this player. */
     MineplexCoreRankBridge.RankPresentation mineplexRankPresentation(Player player) {
@@ -198,6 +217,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         } catch (java.io.IOException exception) {
             getLogger().warning("Could not remove an Arcade runtime readiness record: " + exception.getMessage());
         }
+        if (speedBuilders != null) speedBuilders.shutdown();
         if (manager != null) manager.shutdown();
         if (plexball != null) plexball.shutdown();
         if (monsterMaze != null) monsterMaze.shutdown();
@@ -283,7 +303,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             if (player.isOnline() && manager != null) {
                 // Session fake players must remain in the game lifecycle that just admitted them.
                 if (manager.isTestPlayer(player)) return;
-                if (cameraShy != null) cameraShy.restorePendingSnapshot(player);
+                boolean restoredSpeedBuilders = speedBuilders != null && speedBuilders.restorePendingSnapshot(player);
+                if (!restoredSpeedBuilders && cameraShy != null) cameraShy.restorePendingSnapshot(player);
                 grantConfiguredAdmin(player);
                 manager.restoreMonsterMazeKitPreference(player);
             }
@@ -366,6 +387,13 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 || normalized.equals("mixed-skywars") || normalized.equals("mixed-sky-wars");
     }
 
+    private static boolean isSpeedBuildersId(String requested) {
+        if (requested == null) return false;
+        String normalized = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        return normalized.equals("speed-builders") || normalized.equals("speedbuilder")
+                || normalized.equals("speedbuilders") || normalized.equals("speed-builder");
+    }
+
     private static boolean isSnapStatsArgument(String argument) {
         return "snap".equalsIgnoreCase(argument) || "camera-shy".equalsIgnoreCase(argument);
     }
@@ -425,6 +453,15 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 else sender.sendMessage(ChatColor.RED + "Plexball progression is unavailable.");
                 return true;
             }
+            if (SpeedBuildersGame.isStatsRequest(args)) {
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage("Players only.");
+                    return true;
+                }
+                if (speedBuilders != null) speedBuilders.showStats(player, args);
+                else sender.sendMessage(ChatColor.RED + "Speed Builders statistics are unavailable.");
+                return true;
+            }
             return handleStatsCommand(sender, args);
         }
         if (command.getName().equalsIgnoreCase("gamepreferences")) {
@@ -447,6 +484,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport " + sub + " <game-id>");
                     return true;
                 }
+                if (isSpeedBuildersId(args[1])) {
+                    if (speedBuilders != null) speedBuilders.queue(player, sub.equals("play"));
+                    return true;
+                }
                 ArcadePortGame mixedJoinGame = mixedArcadeGameFromId(args[1]);
                 boolean mixedArcadeVariant = mixedJoinGame != null;
                 ArcadePortGame requestedGame = mixedArcadeVariant ? mixedJoinGame : ArcadePortGame.fromId(args[1]);
@@ -459,10 +500,15 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 }
                 if (args.length < 2) {
                     if (cameraShy != null) cameraShy.leaveQueue(leavingPlayer);
+                    if (speedBuilders != null) speedBuilders.leaveQueue(leavingPlayer);
                     return true;
                 }
                 if (isSnapStatsArgument(args[1])) {
                     if (cameraShy != null) cameraShy.leaveQueue(leavingPlayer);
+                    return true;
+                }
+                if (isSpeedBuildersId(args[1])) {
+                    if (speedBuilders != null) speedBuilders.leaveQueue(leavingPlayer);
                     return true;
                 }
                 ArcadePortGame leavingGame = ArcadePortGame.fromId(args[1]);
@@ -528,6 +574,14 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 }
                 if (args.length < 2) {
                     sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport start <game-id>");
+                    return true;
+                }
+                if (isSpeedBuildersId(args[1])) {
+                    if (!hasAdminAccess(sender)) {
+                        sender.sendMessage(ChatColor.RED + "Operator permission required to force-start Speed Builders.");
+                        return true;
+                    }
+                    if (speedBuilders != null) speedBuilders.startQueued();
                     return true;
                 }
                 if ("plexball".equalsIgnoreCase(args[1])) {
@@ -597,16 +651,20 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             case "status":
                 sender.sendMessage(ChatColor.GOLD + "Modern Arcade ports: " + ChatColor.WHITE + manager.status());
                 if (plexball != null) sender.sendMessage(ChatColor.GOLD + "Plexball: " + ChatColor.WHITE + plexball.status());
+                if (speedBuilders != null) sender.sendMessage(ChatColor.GOLD + "Speed Builders: " + ChatColor.WHITE + speedBuilders.status());
                 return true;
             case "stop":
                 if (!hasAdminAccess(sender)) {
                     sender.sendMessage(ChatColor.RED + "Operator permission required.");
                     return true;
                 }
+                if (speedBuilders != null) speedBuilders.stop("Stopped by an operator.");
                 manager.stop("Stopped by an operator.");
                 return true;
             default:
                 sender.sendMessage(ChatColor.GOLD + "=== Modern Arcade Mechanics Prototypes ===");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport play speed-builders" + ChatColor.GRAY + " — queue for an isolated Speed Builders match");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport start speed-builders" + ChatColor.GRAY + " — operator start of the Speed Builders queue");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play <game-id>" + ChatColor.GRAY + " — quick solo test; starts after a short join window");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play plexball" + ChatColor.GRAY + " — queue for Plexball");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport join plexball" + ChatColor.GRAY + " — join the Plexball queue");
