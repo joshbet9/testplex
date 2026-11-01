@@ -365,4 +365,48 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
         assertEquals(900L, ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_DAMAGE_RECHARGE_MILLIS);
         assertEquals(2, ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_DAMAGE);
     }
+
+    @Test
+    void hattoriDoubleJumpMatchesSourcePowerHeightAndRecharge() {
+        assertEquals(1.0D, ArcadePortRules.HEROES_OF_GWEN_HATTORI_DOUBLE_JUMP_POWER, 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.HEROES_OF_GWEN_HATTORI_DOUBLE_JUMP_HEIGHT_LIMIT, 0.00001D);
+        assertEquals(3_000L, ArcadePortRules.HEROES_OF_GWEN_HATTORI_DOUBLE_JUMP_COOLDOWN_MILLIS);
+    }
+
+    @Test
+    void hattoriShurikenNinjaDashAndEnderBladeMatchSourceValues() {
+        assertEquals(3, ArcadePortRules.HEROES_OF_GWEN_HATTORI_SHURIKEN_COUNT);
+        assertEquals(3, ArcadePortRules.HEROES_OF_GWEN_HATTORI_SHURIKEN_DAMAGE);
+        assertEquals(1_500L, ArcadePortRules.HEROES_OF_GWEN_HATTORI_SHURIKEN_COOLDOWN_MILLIS);
+        assertEquals(4L, ArcadePortRules.HEROES_OF_GWEN_HATTORI_SHURIKEN_SPACING_TICKS);
+        assertEquals(7_000L, ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_COOLDOWN_MILLIS);
+        assertEquals(10.0D, ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_RANGE, 0.00001D);
+        assertEquals(2.0D, ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_COLLISION_RADIUS, 0.00001D);
+        assertEquals(8, ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_DAMAGE);
+        assertEquals(7_000L, ArcadePortRules.HEROES_OF_GWEN_HATTORI_ENDER_BLADE_ACTIVE_MILLIS);
+        assertEquals(60_000L, ArcadePortRules.HEROES_OF_GWEN_HATTORI_ENDER_BLADE_COOLDOWN_MILLIS);
+        assertEquals(67_000L, ArcadePortRules.HEROES_OF_GWEN_HATTORI_ENDER_BLADE_REUSE_DELAY_MILLIS);
+        assertEquals(9.0D, ArcadePortRules.HEROES_OF_GWEN_HATTORI_ENDER_BLADE_DAMAGE_BONUS, 0.00001D);
+    }
+
+    @Test
+    void devonTntArrowsMatchSourceShotCountCooldownAndBowDamageScaling() {
+        assertEquals(3, ArcadePortRules.HEROES_OF_GWEN_DEVON_TNT_ARROW_COUNT);
+        assertEquals(17_000L, ArcadePortRules.HEROES_OF_GWEN_DEVON_TNT_ARROW_COOLDOWN_MILLIS);
+        assertEquals(5.0D, ArcadePortRules.HEROES_OF_GWEN_DEVON_TNT_EXPLOSION_RADIUS, 0.00001D);
+        assertEquals(10.0D, ArcadePortRules.heroesOfGwenDevonTntArrowDamage(0), 0.00001D);
+        assertEquals(12.5D, ArcadePortRules.heroesOfGwenDevonTntArrowDamage(1), 0.00001D);
+        assertEquals(15.0D, ArcadePortRules.heroesOfGwenDevonTntArrowDamage(2), 0.00001D);
+    }
+
+    @Test
+    void devonHuntersBoostAndInfinityMatchSourceActiveAndCooldownWindows() {
+        assertEquals(10_000L, ArcadePortRules.HEROES_OF_GWEN_DEVON_HUNTERS_BOOST_COOLDOWN_MILLIS);
+        assertEquals(3_000L, ArcadePortRules.HEROES_OF_GWEN_DEVON_HUNTERS_BOOST_DURATION_MILLIS);
+        assertEquals(7_000L, ArcadePortRules.HEROES_OF_GWEN_DEVON_INFINITY_ACTIVE_MILLIS);
+        assertEquals(60_000L, ArcadePortRules.HEROES_OF_GWEN_DEVON_INFINITY_COOLDOWN_MILLIS);
+        assertEquals(67_000L, ArcadePortRules.HEROES_OF_GWEN_DEVON_INFINITY_REUSE_DELAY_MILLIS);
+        assertEquals(6.0D, ArcadePortRules.HEROES_OF_GWEN_DEVON_INFINITY_HOMING_RANGE, 0.00001D);
+        assertEquals(3_000L, ArcadePortRules.HEROES_OF_GWEN_DEVON_INFINITY_WITHER_DURATION_MILLIS);
+    }
 }
