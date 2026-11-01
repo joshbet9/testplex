@@ -5208,8 +5208,6 @@ public final class ArcadePortManager implements Listener {
                     "Wither Minions", "Left-click to summon two skeletal minions. Recharges every 10 seconds."));
             player.getInventory().setItem(2, namedItem(Material.COMPASS,
                     "Smell Humans", "Right-click to reveal every living Human. Recharges every 30 seconds."));
-            player.getInventory().setItemInOffHand(namedItem(Material.SHIELD,
-                    "Fire Storm", "Hold right-click to release a charged arrow storm."));
             return;
         }
 
@@ -17496,14 +17494,16 @@ public final class ArcadePortManager implements Listener {
                     && session.alive.contains(player.getUniqueId());
             String bombKit = session.bombLobbersKits.getOrDefault(player.getUniqueId(), "jumper");
             boolean forceWitherBlast = session.type == ArcadePortGame.WITHER_ASSAULT
-                    && event.getAction().isLeftClick() && heldItem != null
-                    && (heldItem.getType() == Material.GOLDEN_SWORD || heldItem.getType() == Material.DIAMOND_SWORD)
+                    && heldItem != null
+                    && ((event.getAction().isLeftClick()
+                            && (heldItem.getType() == Material.GOLDEN_SWORD || heldItem.getType() == Material.DIAMOND_SWORD))
+                            || (event.getAction().isRightClick()
+                            && (heldItem.getType() == Material.GOLDEN_SWORD || heldItem.getType() == Material.DIAMOND_SWORD)))
                     && session.teams.getOrDefault(player.getUniqueId(), 0) == 1
                     && session.alive.contains(player.getUniqueId());
             boolean forceWitherMinionOrScent = session.type == ArcadePortGame.WITHER_ASSAULT
-                    && heldItem != null
-                    && ((heldItem.getType() == Material.DIAMOND_SWORD && event.getAction().isLeftClick())
-                            || (heldItem.getType() == Material.COMPASS && event.getAction().isRightClick()))
+                    && heldItem != null && event.getAction().isRightClick()
+                    && heldItem.getType() == Material.COMPASS
                     && session.teams.getOrDefault(player.getUniqueId(), 0) == 1
                     && session.alive.contains(player.getUniqueId());
             boolean forceBombControlClick = session.type == ArcadePortGame.BOMB_LOBBERS
@@ -17655,14 +17655,19 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.WITHER_ASSAULT
                 && session.teams.getOrDefault(player.getUniqueId(), 0) == 1) {
             long now = System.currentTimeMillis();
-            if (item == Material.GOLDEN_SWORD && event.getAction().isLeftClick()) {
+            if (WitherAssaultRules.shouldLaunchSkull(item.name(), event.getAction().isLeftClick())) {
                 event.setCancelled(true);
                 launchWitherAssaultSkull(session, player, now);
                 return;
             }
-            if (item == Material.DIAMOND_SWORD && event.getAction().isLeftClick()) {
+            if (WitherAssaultRules.shouldLaunchMinions(item.name(), event.getAction().isLeftClick())) {
                 event.setCancelled(true);
                 launchWitherMinions(session, player, now);
+                return;
+            }
+            if (WitherAssaultRules.shouldStartFireStorm(item.name(), event.getAction().isRightClick())) {
+                event.setCancelled(true);
+                startWitherFireStorm(session, player);
                 return;
             }
             if (item == Material.COMPASS && event.getAction().isRightClick()) {
@@ -18335,7 +18340,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         session.witherMinionReadyAt.put(owner, now + 10_000L);
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < 3; i++) {
             Skeleton minion = session.world.spawn(player.getEyeLocation(), Skeleton.class);
             minion.setRemoveWhenFarAway(false);
             minion.setCustomName(ChatColor.DARK_GRAY + "Skeletal Minion");
@@ -18455,9 +18460,10 @@ public final class ArcadePortManager implements Listener {
             }
         }
 
-        // Fire Storm: blocking with the shield spends the charge bar and releases a pair of arrows per tick.
+        // Fire Storm: right-click either source sword to spend the XP charge on an arrow storm.
         for (Player wither : withers) {
-            if (!wither.isBlocking()) {
+            UUID witherId = wither.getUniqueId();
+            if (!session.witherFireStormActive.contains(witherId)) {
                 wither.setExp(Math.min(0.999F, wither.getExp() + 0.05F));
             } else if (wither.getExp() > 0.0F) {
                 wither.setExp(Math.max(0.0F, wither.getExp() - 0.05F));
@@ -18472,6 +18478,9 @@ public final class ArcadePortManager implements Listener {
                     session.entities.add(arrow);
                 }
                 wither.getWorld().playSound(wither.getLocation(), Sound.BLOCK_FIRE_AMBIENT, 0.1F, 0.5F);
+            } else {
+                session.witherFireStormActive.remove(witherId);
+                wither.sendActionBar(ChatColor.YELLOW + "Fire Storm is recharging.");
             }
         }
 
@@ -18508,6 +18517,17 @@ public final class ArcadePortManager implements Listener {
             if (isWitherRevivalPotion(item)) return true;
         }
         return false;
+    }
+
+    private void startWitherFireStorm(Session session, Player player) {
+        UUID id = player.getUniqueId();
+        if (player.getExp() <= 0.0F) {
+            player.sendMessage(ChatColor.YELLOW + "Fire Storm is recharging.");
+            return;
+        }
+        if (!session.witherFireStormActive.add(id)) return;
+        player.sendMessage(ChatColor.RED + "Fire Storm unleashed!");
+        player.playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 1.0F, 0.75F);
     }
 
     private void launchWitherAssaultSkull(Session session, Player player, long now) {
@@ -21470,6 +21490,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> witherFletcherNextAt = new HashMap<>();
         final Set<UUID> witherBlindArrows = new HashSet<>();
         final Set<UUID> witherFireArrows = new HashSet<>();
+        final Set<UUID> witherFireStormActive = new HashSet<>();
         final Map<Block, BlockData> witherExplosionBlocks = new HashMap<>();
         final Set<Block> witherEditorBlocks = new HashSet<>();
         final Map<Block, BlockData> witherEditorReplacedBlocks = new HashMap<>();
