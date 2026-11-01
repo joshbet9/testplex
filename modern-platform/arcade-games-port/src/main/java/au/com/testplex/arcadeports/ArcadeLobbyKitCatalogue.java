@@ -159,12 +159,13 @@ final class ArcadeLobbyKitCatalogue {
                             Unlock.GEM, Zombie.class, Material.BOW));
             default -> List.of();
         };
-        if (hiddenKitIds == null || hiddenKitIds.isEmpty()) return choices;
         Set<String> hidden = new HashSet<>();
-        for (String value : hiddenKitIds) {
-            if (value != null && !value.isBlank()) hidden.add(value.trim().toLowerCase(Locale.ROOT));
+        if (hiddenKitIds != null) {
+            for (String value : hiddenKitIds) {
+                if (value != null && !value.isBlank()) hidden.add(value.trim().toLowerCase(Locale.ROOT));
+            }
         }
-        List<KitChoice> visible = choices.stream().filter(choice -> !hidden.contains(
+        List<KitChoice> visible = hidden.isEmpty() ? choices : choices.stream().filter(choice -> !hidden.contains(
                 game.id().toLowerCase(Locale.ROOT) + ":" + choice.id.toLowerCase(Locale.ROOT))).toList();
         if (configuredOrder == null || configuredOrder.isEmpty()) return visible;
 
