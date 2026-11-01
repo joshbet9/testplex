@@ -185,10 +185,10 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.SUPER_SPLOOR.id(), enabled),
                 "Super Sploor is promoted into the controlled READY_FOR_TEST queue.");
         assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.CAMERA_SHY.id(), enabled),
-                "Camera Shy is promoted into the controlled READY_FOR_TEST queue.");
+                "Snap is promoted into the controlled READY_FOR_TEST queue.");
         assertFalse(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.CAMERA_SHY.id(),
                 java.util.List.of("death-tag", "plexball", "spleef")),
-                "Camera Shy must remain gated when it is removed from the reviewed allow-list.");
+                "Snap must remain gated when it is removed from the reviewed allow-list.");
         assertNull(ArcadePortGame.fromId("snake"));
         assertEquals(ArcadePortGame.DRAW_MY_THING, ArcadePortGame.fromId("Draw My Thing"));
         assertEquals(ArcadePortGame.MASTER_BUILDERS, ArcadePortGame.fromId("master_builders"));
