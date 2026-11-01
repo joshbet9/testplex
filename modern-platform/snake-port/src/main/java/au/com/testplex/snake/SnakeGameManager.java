@@ -1053,14 +1053,6 @@ public final class SnakeGameManager implements Listener {
                 location.getX(), location.getZ(), clampedX, clampedZ);
     }
 
-    private boolean isWithinTenBlocksOfMapEdge(Location location) {
-        if (location == null || mapData == null || location.getWorld() != arena) return false;
-        double clampedX = mapData.clampX(location.getX(), 10.0D);
-        double clampedZ = mapData.clampZ(location.getZ(), 10.0D);
-        return SnakeRules.isWithinTenBlocksOfMapEdge(
-                location.getX(), location.getZ(), clampedX, clampedZ);
-    }
-
     private boolean isKnownKit(String kit) {
         if (kit == null) return false;
         String normalized = kit.toLowerCase(java.util.Locale.ROOT);
