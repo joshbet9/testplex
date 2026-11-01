@@ -302,4 +302,39 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
         assertEquals(4.0D, ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_DAMAGE, 0.00001D);
         assertEquals(1.0D, ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_JUMP_STRENGTH, 0.00001D);
     }
+
+    @Test
+    void biffTetherMatchesSourceRangeSlowAndActiveCooldownWindow() {
+        assertEquals(12_000L, ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_COOLDOWN_MILLIS);
+        assertEquals(5_000L, ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_ACTIVE_MILLIS);
+        assertEquals(17_000L, ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_REUSE_DELAY_MILLIS);
+        assertEquals(8.0D, ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_RANGE, 0.00001D);
+        assertEquals(100.0D, ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_BREAK_DISTANCE_SQUARED, 0.00001D);
+        assertEquals(4.0D, ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_PULL_STOP_DISTANCE_SQUARED, 0.00001D);
+        assertEquals(5_000L, ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_SLOW_DURATION_MILLIS);
+        assertEquals(1, ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_SLOW_AMPLIFIER);
+    }
+
+    @Test
+    void biffBattleLeapMatchesSourceLeapLandingDamageAndKnockUp() {
+        assertEquals(11_000L, ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_COOLDOWN_MILLIS);
+        assertEquals(1.0D, ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_VERTICAL_VELOCITY, 0.00001D);
+        assertEquals(1_000L, ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_MINIMUM_FLIGHT_MILLIS);
+        assertEquals(5.0D, ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_LANDING_RADIUS, 0.00001D);
+        assertEquals(4.0D, ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_DAMAGE, 0.00001D);
+        assertEquals(0.6D, ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_MINIMUM_KNOCK_UP, 0.00001D);
+        assertEquals(0.5D, ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_RANDOM_KNOCK_UP, 0.00001D);
+    }
+
+    @Test
+    void biffCavalryChargeMatchesSourceMountDurationRootAndCooldown() {
+        assertEquals(45_000L, ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_COOLDOWN_MILLIS);
+        assertEquals(50_500L, ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_REUSE_DELAY_MILLIS);
+        assertEquals(6_000L, ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_DURATION_MILLIS);
+        assertEquals(2_000L, ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_ROOT_RECHARGE_MILLIS);
+        assertEquals(1_000L, ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_ROOT_DURATION_MILLIS);
+        assertEquals(5.0D, ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_RADIUS, 0.00001D);
+        assertEquals(4.0D, ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_DAMAGE, 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_JUMP_STRENGTH, 0.00001D);
+    }
 }
