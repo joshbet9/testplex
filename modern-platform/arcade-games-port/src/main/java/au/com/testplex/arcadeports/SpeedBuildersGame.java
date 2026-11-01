@@ -477,8 +477,9 @@ public final class SpeedBuildersGame implements Listener {
         removeMobs(reviewMobs);
         restorePlot(reviewPlot);
         round++;
-        if (round > 1) buildTimeTracker = Math.max(1, buildTimeTracker - 1);
         buildSeconds = currentTemplate.timing().buildSeconds(buildTimeTracker);
+        // Reborn computes the next round's time before decrementing the tracker.
+        if (round > 1) buildTimeTracker = Math.max(1, buildTimeTracker - 1);
         phase = Phase.VIEWING;
         phaseDeadlineTick = tick + SpeedBuildersRules.DEFAULT_VIEW_SECONDS * 20L;
 
