@@ -57,6 +57,8 @@
                     <include>Turf Wars/**/*.zip</include>
                     <include>Milk the Cow/**/*.zip</include>
                     <include>Speed Builders/**/*.zip</include>
+                    <include>Wizards/**/*.zip</include>
+                    <include>Nano Wizards/**/*.zip</include>
                 </includes>
             </resource>
             <resource>

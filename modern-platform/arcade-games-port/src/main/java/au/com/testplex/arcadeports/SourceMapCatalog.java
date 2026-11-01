@@ -254,7 +254,7 @@ public final class SourceMapCatalog {
         String[] prefixes = {
                 "BaconBrawl_", "CastleAssault_", "HOG_", "Lobbers_", "DeathTag_", "DragonEscape_", "Dragons_",
                 "DR_", "Gladiators_", "Micro_", "OITQ_", "Quiver_", "Paintball_",
-                "Runner_", "Spleef_", "SP_", "TF_", "Draw_", "NanoGames_"
+                "Runner_", "Spleef_", "SP_", "TF_", "Draw_", "Wizards_", "NanoWizards_", "NW_", "NanoGames_"
         };
         for (String prefix : prefixes) {
             if (name.regionMatches(true, 0, prefix, 0, prefix.length())) {
