@@ -72,7 +72,9 @@ public class ArenaListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onSnowForm(EntityBlockFormEvent event) {
-        if (event.getEntity() instanceof Snowman) event.setCancelled(true);
+        if (event.getEntity() instanceof Snowman && inArena(event.getEntity().getLocation())) {
+            event.setCancelled(true);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -101,8 +103,10 @@ public class ArenaListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPlayerHitPlayer(EntityDamageByEntityEvent event) {
-        if (game.getState() == GameState.IDLE) { event.setCancelled(true); return; }
+        // The embedded Monster Maze listener must not cancel PvP for other Arcade games.
+        // Its no-PvP rule only applies to players inside an active Monster Maze arena.
         if (!(event.getEntity() instanceof Player)) return;
+        if (!inArena(event.getEntity().getLocation())) return;
         if (event.getDamager() instanceof Player) {
             event.setCancelled(true);
             return;
@@ -113,8 +117,8 @@ public class ArenaListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onMonsterAttackPlayer(EntityDamageByEntityEvent event) {
-        if (game.getState() == GameState.IDLE) return;
         if (!(event.getEntity() instanceof Player)) return;
+        if (!inArena(event.getEntity().getLocation())) return;
         Entity damager = event.getDamager();
         if (damager instanceof Snowman) {
             Player player = (Player) event.getEntity();
@@ -132,8 +136,8 @@ public class ArenaListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onRegain(EntityRegainHealthEvent event) {
-        if (game.getState() == GameState.IDLE) return;
         if (!(event.getEntity() instanceof Player)) return;
+        if (!inArena(event.getEntity().getLocation())) return;
         event.setCancelled(true);
     }
 
