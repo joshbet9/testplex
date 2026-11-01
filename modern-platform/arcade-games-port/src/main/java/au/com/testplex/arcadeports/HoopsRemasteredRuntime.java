@@ -470,6 +470,10 @@ public final class HoopsRemasteredRuntime implements Listener {
         }
         updateHops(current, now);
         tickBall(current, now);
+        // Scoring can synchronously finish the shared Arcade session and
+        // unregister its scoreboard. Do not continue this same tick into HUD
+        // updates once the match has ended or the runtime has been detached.
+        if (match != current || current.ending) return;
         if (now - current.lastHudAt >= 500L) {
             current.lastHudAt = now;
             updateHud(current, false);
@@ -933,6 +937,7 @@ public final class HoopsRemasteredRuntime implements Listener {
     private void complete(Match current, int winningTeam) {
         if (match != current || current.ending) return;
         current.ending = true;
+        if (current.task != null) current.task.cancel();
         Player representative = current.players.values().stream()
                 .filter(player -> player != null && player.isOnline()
                         && current.teams.getOrDefault(player.getUniqueId(), -1) == winningTeam)
