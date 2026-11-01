@@ -124,8 +124,42 @@ final class SneakyAssassinsRules {
         return 200;
     }
 
-    /** Town NPCs persist until killed or their entity disappears; never cull a live villager by timer. */
+    /** Source NpcManager removes one random town NPC every four seconds while Live. */
+    static long npcCullIntervalMillis() {
+        return 4_000L;
+    }
+
+    static boolean shouldCullTownNpc(boolean live, long nowMillis, long nextCullAtMillis, int npcCount) {
+        return live && npcCount > 0 && nowMillis >= nextCullAtMillis;
+    }
+
+    /** Invalid or missing entities are pruned from the runtime's UUID index. */
     static boolean shouldPruneTownNpc(boolean entityExists, boolean validVillager) {
         return !entityExists || !validVillager;
     }
+    /** Reborn considers only town spawn points within sixteen blocks on each horizontal axis. */
+    static boolean isNpcPatrolAnchorNearby(double npcX, double npcZ, double anchorX, double anchorZ) {
+        return Double.isFinite(npcX) && Double.isFinite(npcZ)
+                && Double.isFinite(anchorX) && Double.isFinite(anchorZ)
+                && Math.abs(npcX - anchorX) <= 16.0D
+                && Math.abs(npcZ - anchorZ) <= 16.0D;
+    }
+
+    /** Reborn picks one independent patrol waypoint attempt with probability 1/40 each tick. */
+    static boolean shouldIssueNpcPatrolOrder(int randomRoll) {
+        return randomRoll >= 0 && randomRoll < 40;
+    }
+
+    /** A generated-town patrol destination needs support, two clear blocks and no liquid floor. */
+    static boolean isSafeNpcPatrolDestination(boolean solidFloor, boolean liquidFloor,
+            boolean feetPassable, boolean headPassable) {
+        return solidFloor && !liquidFloor && feetPassable && headPassable;
+    }
+
+    /** Reborn applies a recovery jump when a bribed villager cannot move for 800 ms. */
+    static boolean shouldRecoverBribedNpc(long nowMillis, long lastMovementAtMillis) {
+        return lastMovementAtMillis > 0L && nowMillis >= lastMovementAtMillis
+                && nowMillis - lastMovementAtMillis >= 800L;
+    }
+
 }
