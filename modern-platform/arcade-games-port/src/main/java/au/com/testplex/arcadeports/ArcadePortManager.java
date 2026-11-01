@@ -256,10 +256,14 @@ public final class ArcadePortManager implements Listener {
     private CameraShyGame cameraShyModule;
 
     ArcadePortManager(ArcadeMechanicsModernPlugin plugin) {
+        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=arcade-manager-constructor-start");
         this.plugin = plugin;
         this.superSploor = new SuperSploorRuntime(plugin);
+        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=super-sploor-runtime-ready");
         this.testPlayers = new ArcadeTestPlayerManager(plugin);
+        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=test-player-manager-ready");
         this.sneakyAssassins = new SneakyAssassinsMechanics(plugin, testPlayers::isTestPlayer);
+        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=sneaky-assassins-mechanics-ready");
         this.statsActionKey = new NamespacedKey(plugin, "stats-action");
         this.statsCategoryKey = new NamespacedKey(plugin, "stats-category");
         this.statsGameKey = new NamespacedKey(plugin, "stats-game");
@@ -269,6 +273,7 @@ public final class ArcadePortManager implements Listener {
         this.gladiatorMenuValueKey = new NamespacedKey(plugin, "gladiators-menu-value");
         this.gladiatorPotionKey = new NamespacedKey(plugin, "gladiators-healing-pot");
         this.gladiatorHotbarKey = new NamespacedKey(plugin, "gladiators-hotbar-editor");
+        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=manager-keys-ready");
         this.lobby = new ModernArcadeLobby(plugin);
         World lobbyWorld = lobby.ensureWorld();
         if (lobbyWorld == null) {
