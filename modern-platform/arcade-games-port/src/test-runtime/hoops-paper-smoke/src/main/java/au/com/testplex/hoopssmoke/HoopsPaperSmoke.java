@@ -756,6 +756,8 @@ public final class HoopsPaperSmoke extends JavaPlugin {
                 ItemStack item = items[slot];
                 if (slot == 4) {
                     if (item == null || item.getType() != Material.CHEST) return false;
+                } else if (slot == 6) {
+                    if (item == null || item.getType() != Material.WRITABLE_BOOK) return false;
                 } else if (slot == 8) {
                     if (item == null || item.getType() != Material.GLISTERING_MELON_SLICE) return false;
                 } else if (item != null && !item.getType().isAir()) {
