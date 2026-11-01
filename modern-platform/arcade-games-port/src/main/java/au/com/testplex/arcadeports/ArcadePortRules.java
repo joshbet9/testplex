@@ -2862,6 +2862,30 @@ public final class ArcadePortRules {
         return 0L;
     }
 
+    // Dana — source values from SkillPulseHeal, SkillDanaDash and SkillRally.
+    public static final long HEROES_OF_GWEN_DANA_PULSE_HEAL_COOLDOWN_MILLIS = 8_000L;
+    public static final double HEROES_OF_GWEN_DANA_PULSE_HEAL_RADIUS = 7.0D;
+    public static final double HEROES_OF_GWEN_DANA_PULSE_HEAL_SELF = 2.0D;
+    public static final double HEROES_OF_GWEN_DANA_PULSE_HEAL_ALLY = 4.0D;
+    public static final long HEROES_OF_GWEN_DANA_KNOCK_UP_COOLDOWN_MILLIS = 10_000L;
+    public static final long HEROES_OF_GWEN_DANA_KNOCK_UP_DURATION_MILLIS = 600L;
+    public static final double HEROES_OF_GWEN_DANA_KNOCK_UP_SPEED = 1.0D;
+    public static final double HEROES_OF_GWEN_DANA_KNOCK_UP_COLLISION_RADIUS = 2.0D;
+    public static final long HEROES_OF_GWEN_DANA_KNOCK_UP_TARGET_RECHARGE_MILLIS = 500L;
+    public static final double HEROES_OF_GWEN_DANA_KNOCK_UP_PLAYER_DAMAGE = 12.0D;
+    public static final double HEROES_OF_GWEN_DANA_KNOCK_UP_MINION_DAMAGE = 8.0D;
+    public static final double HEROES_OF_GWEN_DANA_KNOCK_UP_PLAYER_LIFT = 1.0D;
+    public static final double HEROES_OF_GWEN_DANA_KNOCK_UP_MINION_LIFT = 0.5D;
+    public static final long HEROES_OF_GWEN_DANA_RALLY_COOLDOWN_MILLIS = 40_000L;
+    public static final long HEROES_OF_GWEN_DANA_RALLY_REUSE_DELAY_MILLIS = 47_000L;
+    public static final double HEROES_OF_GWEN_DANA_RALLY_JUMP_VERTICAL_VELOCITY = 1.5D;
+    public static final long HEROES_OF_GWEN_DANA_RALLY_MINIMUM_FLIGHT_MILLIS = 1_000L;
+    public static final long HEROES_OF_GWEN_DANA_RALLY_BANNER_DURATION_MILLIS = 7_000L;
+    public static final double HEROES_OF_GWEN_DANA_RALLY_HEAL_RADIUS = 5.0D;
+    public static final double HEROES_OF_GWEN_DANA_RALLY_HEAL_PER_SECOND = 3.0D;
+    public static final double HEROES_OF_GWEN_DANA_RALLY_LANDING_DAMAGE_RADIUS = 3.0D;
+    public static final double HEROES_OF_GWEN_DANA_RALLY_LANDING_DAMAGE = 7.0D;
+
     // Rowena — source values from SkillLightArrows, SkillCombatDash and SkillBombardment.
     public static final int HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_COUNT = 5;
     public static final long HEROES_OF_GWEN_ROWENA_LIGHT_ARROWS_COOLDOWN_MILLIS = 12_000L;
