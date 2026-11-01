@@ -187,6 +187,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final Map<UUID, Map<UUID, Long>> rowenaLightArrowNextHitAt = new HashMap<>();
     private final Map<UUID, Long> rowenaCombatSlideEndsAt = new HashMap<>();
     private final Map<UUID, RowenaBombardmentState> rowenaBombardments = new HashMap<>();
+    private final Map<UUID, Long> danaKnockUpEndsAt = new HashMap<>();
+    private final Map<UUID, Map<UUID, Long>> danaKnockUpNextHitAt = new HashMap<>();
+    private final Map<UUID, DanaRallyState> danaRallies = new HashMap<>();
     private final List<StoreEntry> storeEntries = new ArrayList<>();
     private final Map<UUID, StoreHolder> openStores = new HashMap<>();
 
@@ -1298,7 +1301,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         String id = heroSkillId(dropped);
         if (id == null || !Set.of("hattori.ender_blade", "devon.infinity",
                 "anath.burn_beam", "anath.meteor_shower", "larissa.storm_blessing",
-                "bardolf.full_moon", "rowena.bombardment").contains(id)) return;
+                "bardolf.full_moon", "rowena.bombardment", "dana.rally").contains(id)) return;
         event.setCancelled(true);
         activateHeroesOfGwenSkill(player, id);
     }
@@ -1327,6 +1330,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             ItemStack skill = player.getInventory().getItem(2);
             if ("rowena.combat_slide".equals(heroSkillId(skill))) {
                 activateHeroesOfGwenSkill(player, "rowena.combat_slide");
+            }
+        } else if ("dana".equals(hero)) {
+            ItemStack skill = player.getInventory().getItem(2);
+            if ("dana.knock_up".equals(heroSkillId(skill))) {
+                activateHeroesOfGwenSkill(player, "dana.knock_up");
             }
         }
     }
@@ -2665,6 +2673,16 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 player.getInventory().setItem(7, namedItem(Material.BLAZE_POWDER,
                         ChatColor.GOLD + "Embers", "Anath mage resource."));
             }
+            case "dana" -> {
+                player.getInventory().setItem(0, namedItem(Material.WOODEN_SWORD,
+                        ChatColor.GREEN + "Sword", "Dana's basic melee weapon."));
+                giveHeroesOfGwenSkillItem(player, 1, "dana.pulse_heal", Material.LIME_DYE,
+                        "Pulse Heal", "Heal yourself for 2 HP and nearby allies/minions for 4 HP within 7 blocks. 8-second cooldown.");
+                giveHeroesOfGwenSkillItem(player, 2, "dana.knock_up", Material.FEATHER,
+                        "Knock Up", "Dash horizontally for 600 ms; enemies touched take 12 player / 8 minion damage and are launched. 10-second cooldown.");
+                giveHeroesOfGwenSkillItem(player, 3, "dana.rally", Material.NETHER_STAR,
+                        "Rally", "Leap, then plant a 7-second banner that heals nearby allies and damages enemies on landing. Drop to activate; 40-second cooldown after the banner.");
+            }
             case "rowena" -> {
                 ItemStack bow = new ItemStack(Material.BOW);
                 ItemMeta bowMeta = bow.getItemMeta();
@@ -2836,6 +2854,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             case "rowena.light_arrows" -> activateRowenaLightArrows(player);
             case "rowena.combat_slide" -> activateRowenaCombatSlide(player);
             case "rowena.bombardment" -> beginRowenaBombardment(player);
+            case "dana.pulse_heal" -> activateDanaPulseHeal(player);
+            case "dana.knock_up" -> activateDanaKnockUp(player);
+            case "dana.rally" -> beginDanaRally(player);
             default -> player.sendMessage(ChatColor.YELLOW + "That hero ability is not yet available.");
         }
     }
