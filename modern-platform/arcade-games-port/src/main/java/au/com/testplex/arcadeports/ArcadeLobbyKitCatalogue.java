@@ -141,6 +141,13 @@ final class ArcadeLobbyKitCatalogue {
                             Unlock.GEM, Skeleton.class, Material.BOW),
                     choice("runnerkit-frosty", "Frosty", Material.SNOWBALL,
                             Unlock.GEM, Skeleton.class, Material.SNOWBALL));
+            case WITHER_ASSAULT -> List.of(
+                    choice("archer", "Archer", Material.BOW,
+                            Unlock.FREE, Skeleton.class, Material.BOW),
+                    choice("medic", "Medic", Material.POTION,
+                            Unlock.FREE, Villager.class, Material.SPLASH_POTION),
+                    choice("editor", "Editor", Material.STONE_PICKAXE,
+                            Unlock.FREE, Zombie.class, Material.STONE_PICKAXE));
             case SNEAKY_ASSASSINS -> List.of(
                     choice("escape-artist", "Escape Artist", Material.INK_SAC,
                             Unlock.FREE, Villager.class, Material.INK_SAC),
