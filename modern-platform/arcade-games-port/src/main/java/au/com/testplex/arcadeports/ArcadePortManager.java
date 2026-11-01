@@ -1460,6 +1460,10 @@ public final class ArcadePortManager implements Listener {
 
     public void startFromLobby(ArcadePortGame type, org.bukkit.command.CommandSender sender,
             boolean mixedArcadeVariant) {
+        if (!plugin.hasAdminAccess(sender)) {
+            sender.sendMessage(ChatColor.RED + "Operator permission required to start a queued Arcade game.");
+            return;
+        }
         if (mixedArcadeVariant && !supportsMixedArcadeVariant(type)) {
             sender.sendMessage(ChatColor.RED + "Mixed Arcade variants are only available for Turf Wars, Castle Assault, and Heroes of Gwen.");
             return;
