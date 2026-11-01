@@ -131,7 +131,8 @@ runtime_record_matches() {
   local sha="$1" invocation="$2" pid="$3" readiness="$SERVER_DIR/plugins/ArcadeMechanicsModern/.testplex-arcade-readiness.properties" nonce
   nonce="$(sed -n 's/^nonce=//p' "$SERVER_DIR/plugins/ArcadeMechanicsModern/.testplex-modern-deploy-identity.properties" 2>/dev/null | head -n 1 || true)"
   [[ -n "$nonce" && -s "$readiness" ]] || return 1
-  grep -Fxq 'status=READY' "$readiness" && grep -Fxq 'module=arcade-lobby' "$readiness" &&
+  grep -Fxq 'status=READY' "$readiness" && grep -Fxq 'module=arcade-runtime' "$readiness" &&
+    grep -Fxq 'monster_maze=READY' "$readiness" &&
     grep -Fxq 'manager=testplex-arcade' "$readiness" &&
     grep -Fxq 'world=testplex_arcade_lobby_v1' "$readiness" &&
     grep -Fxq 'plane=100x100' "$readiness" && grep -Fxq 'floor_y=100' "$readiness" &&
