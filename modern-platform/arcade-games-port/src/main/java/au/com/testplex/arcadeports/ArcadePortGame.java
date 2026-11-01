@@ -30,7 +30,9 @@ public enum ArcadePortGame {
     TURF_WARS("turf-wars", "Turf Wars", Material.GREEN_WOOL, 2),
     DRAW_MY_THING("draw-my-thing", "Draw My Thing", Material.WHITE_WOOL, 0),
     MASTER_BUILDERS("master-builders", "Master Builders", Material.GRASS_BLOCK, 0),
-    MONSTER_MAZE("monster-maze", "Monster Maze", Material.ROTTEN_FLESH, 0),
+    MONSTER_MAZE("monster-maze", "Monster Maze (Original)", Material.ROTTEN_FLESH, 0),
+    MONSTER_MAZE_SPEED("monster-maze-speed", "Monster Maze (Speed)", Material.ROTTEN_FLESH, 0),
+    MONSTER_MAZE_MODERN("monster-maze-modern", "Monster Maze (Modern)", Material.ROTTEN_FLESH, 0),
     SNEAKY_ASSASSINS("sneaky-assassins", "Sneaky Assassins", Material.EMERALD_BLOCK, 0),
     SKY_WARS("skywars", "SkyWars", Material.END_STONE_BRICKS, 0),
     MILK_THE_COW("milk-the-cow", "Milk the Cow", Material.GRASS_BLOCK, 0, true),
@@ -65,6 +67,11 @@ public enum ArcadePortGame {
 
     /** True when a game has roles but assigns them without lobby team selection. */
     public boolean lobbyRolesAssignedAutomatically() { return lobbyRolesAssignedAutomatically; }
+
+    /** True for the three Arcade-selectable Monster Maze modes backed by one gameplay runtime. */
+    public boolean isMonsterMaze() {
+        return this == MONSTER_MAZE || this == MONSTER_MAZE_SPEED || this == MONSTER_MAZE_MODERN;
+    }
 
     public static ArcadePortGame fromId(String id) {
         if (id == null) return null;
