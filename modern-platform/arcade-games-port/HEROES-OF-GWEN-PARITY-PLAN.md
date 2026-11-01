@@ -73,3 +73,18 @@ Reference: [Mineplex Wiki — Heroes of Gwen gameplay and classes](https://minep
 - [ ] No ability damages teammates, friendly structures or invalid targets unless the source explicitly allows it.
 
 **Enablement gate:** keep `heroes-of-gwen` at `MECHANICS_IN_PROGRESS` and outside `enabled-games` until automated tests, both-map acceptance and live multi-player testing pass. The ability gaps and lane-minion gap are blockers, not cosmetic polish.
+
+
+## Modern Paper 26.3 implementation progress — lane minion slice
+
+The first missing objective-runtime slice is now implemented on branch feat/heroes-of-gwen-minion-lanes-20261101:
+
+- Red baby zombies and blue baby pigmen spawn in six-unit team waves every 10 seconds from the original team spawn markers.
+- Minions acquire opposing minions first, then advance towards the next active enemy tower.
+- Guardian tower target-entry times are tracked continuously. Minions take priority unless an opposing player entered the 10-block tower radius first; equal-entry ties go to minions.
+- Towers damage minions as well as players. Player damage to a tower is rejected outside the 10-block radius.
+- Destroying the final tower upgrades subsequent waves for the attacking team with iron armour.
+- Passive income is corrected to 5 gold every 5 seconds; each owned capture point adds another 5 gold per interval, and capture awards 25 gold.
+- Added deterministic rule tests for the wave/economy constants and tower-entry priority.
+
+**Validation boundary:** this slice is awaiting the Paper 26.3 CI run. It does not make Heroes of Gwen READY_FOR_TEST; seven hero ability sets, Wither/source parity, the Heroes Valley sidequest, shops/passives, both-map checks and live multiplayer acceptance remain open.
