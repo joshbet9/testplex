@@ -310,7 +310,7 @@ public final class MenuService implements Listener {
                         List.of(ChatColor.GRAY + "Acceptance status: " + ChatColor.GREEN + "Cleared",
                                 ChatColor.GRAY + "Rotation pool: "
                                         + (included ? ChatColor.GREEN + "Included" : ChatColor.RED + "Excluded"),
-                                ChatColor.GRAY + "Map availability: "
+                                ChatColor.GRAY + "Bundled map archive: "
                                         + (available ? ChatColor.GREEN + "Ready" : ChatColor.RED + "Missing / invalid"),
                                 ChatColor.DARK_GRAY + "Likelihood is shown in Game Preferences."));
                 inventory.setItem(slots[index - start], item);
@@ -394,7 +394,7 @@ public final class MenuService implements Listener {
                 lore = List.of(
                         ChatColor.GRAY + "Acceptance status: " + (ready ? ChatColor.GREEN + "Cleared" : ChatColor.RED + "Not cleared"),
                         ChatColor.GRAY + "Rotation pool: " + (included ? ChatColor.GREEN + "Included" : ChatColor.RED + "Excluded"),
-                        ChatColor.GRAY + "Map availability: " + (rotationAvailable
+                        ChatColor.GRAY + "Bundled map archive: " + (rotationAvailable
                                 ? ChatColor.GREEN + "Ready" : ChatColor.RED + "Missing / invalid"),
                         ChatColor.YELLOW + "Click to " + (included ? "remove from" : "add to") + " rotation.",
                         ChatColor.DARK_GRAY + "The selector ignores games without an installed map.");
@@ -879,7 +879,7 @@ public final class MenuService implements Listener {
                 boolean included = rotation.contains(game.getId());
                 if (!included && !rotationCandidateAvailable(engine, game.getId())) {
                     player.sendMessage(ChatColor.RED + game.getName()
-                            + " cannot be added yet: its selected map is missing or invalid.");
+                            + " cannot be added yet: its selected map archive is not bundled for this game.");
                     int page = 0;
                     try { page = Integer.parseInt(optionId); } catch (NumberFormatException ignored) { }
                     openGameSelection(player, true, page);
