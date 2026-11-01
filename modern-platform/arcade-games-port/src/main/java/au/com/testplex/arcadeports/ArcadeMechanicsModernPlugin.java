@@ -17,7 +17,9 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     private PlexballGame plexball;
     private MonsterMazePlugin monsterMaze;
     private ArcadeMapSelectionMenu mapMenu;
+    private GamePreferenceMenu preferenceMenu;
     private CameraShyGame cameraShy;
+    private MineplexCoreRankBridge mineplexCoreRankBridge;
     private final MonsterMazeRegistrationReadiness monsterMazeReadiness = new MonsterMazeRegistrationReadiness();
 
     // Keep aligned with ArcadeCatalog's READY_FOR_TEST statuses.
@@ -28,6 +30,13 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
 
     @Override
     public void onEnable() {
+        mineplexCoreRankBridge = MineplexCoreRankBridge.connect(this, this::refreshRankScoreboard)
+                .orElse(null);
+        if (mineplexCoreRankBridge != null) {
+            getLogger().info("Connected to Mineplex Hub/CoreClient: authoritative primary ranks and inherited ADMIN access are enabled.");
+        } else {
+            getLogger().info("Mineplex Hub/CoreClient is unavailable; isolated Testplex rank overrides remain active.");
+        }
         saveDefaultConfig();
 
         // Replace the previous broad acceptance list once, then enforce the reviewed
@@ -40,6 +49,19 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         enabledGames.removeIf(gameId -> !READY_FOR_TEST_GAME_IDS.contains(gameId));
         enabledGames = new java.util.ArrayList<>(new java.util.LinkedHashSet<>(enabledGames));
         getConfig().set("enabled-games", enabledGames);
+
+        // The automatic selector's pool is a subset of the explicitly cleared test games.
+        // Preserve an explicitly empty pool, but seed a missing setting from the acceptance allow-list.
+        String rotationPoolPath = "game-preferences.automatic-rotation.enabled-games";
+        if (!getConfig().contains(rotationPoolPath)) {
+            getConfig().set(rotationPoolPath, new java.util.ArrayList<>(enabledGames));
+        } else {
+            java.util.List<String> rotationPool = new java.util.ArrayList<>();
+            for (String gameId : getConfig().getStringList(rotationPoolPath)) {
+                if (enabledGames.contains(gameId) && !rotationPool.contains(gameId)) rotationPool.add(gameId);
+            }
+            getConfig().set(rotationPoolPath, rotationPool);
+        }
 
         String selectedLobbyGame = getConfig().getString("lobby-selected-game", "death-tag");
         if (!enabledGames.contains(selectedLobbyGame)) {
@@ -56,10 +78,13 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         plexball = new PlexballGame(this);
         getServer().getPluginManager().registerEvents(plexball, this);
         mapMenu = new ArcadeMapSelectionMenu(this);
+        preferenceMenu = new GamePreferenceMenu(this, manager);
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(mapMenu, this);
+        getServer().getPluginManager().registerEvents(preferenceMenu, this);
         getCommand("stats").setExecutor(this);
         getCommand("arcadeport").setExecutor(this);
+        getCommand("gamepreferences").setExecutor(this);
         publishArcadeRuntimeReadiness();
 
         // Monster Maze remains embedded in this Arcade host, but is not currently
@@ -107,6 +132,41 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     public MonsterMazePlugin getMonsterMazeModule() { return monsterMaze; }
     public ArcadePortManager getArcadePortManager() { return manager; }
     public PlexballGame getPlexballGame() { return plexball; }
+
+    /** Returns null when the optional Mineplex CoreClient service is not available or not loaded for this player. */
+    MineplexCoreRankBridge.RankPresentation mineplexRankPresentation(Player player) {
+        return mineplexCoreRankBridge == null || player == null
+                ? null : mineplexCoreRankBridge.rankPresentation(player).orElse(null);
+    }
+
+    String mineplexRankId(Player player) {
+        MineplexCoreRankBridge.RankPresentation presentation = mineplexRankPresentation(player);
+        return presentation == null ? null : presentation.rankId();
+    }
+
+    private void refreshRankScoreboard(Player changedPlayer) {
+        if (changedPlayer == null || !changedPlayer.isOnline()
+                || !ModernArcadeLobby.WORLD_NAME.equals(changedPlayer.getWorld().getName())) return;
+        // Every lobby player owns a separate scoreboard instance. Refresh all viewers
+        // so the changed player's prefix and rank sort are consistent for everyone.
+        ModernLobbyScoreboard scoreboard = new ModernLobbyScoreboard(this);
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            if (viewer.isOnline() && ModernArcadeLobby.WORLD_NAME.equals(viewer.getWorld().getName())) {
+                scoreboard.apply(viewer);
+            }
+        }
+    }
+
+    /**
+     * Whether a cleared game has the required bundled map archive to enter the
+     * weighted automatic rotation. Full archive import and in-world marker validation
+     * still run at game start; this method does not claim that those steps have passed.
+     */
+    public boolean isRotationCandidateAvailable(String gameId) {
+        ArcadePortGame game = ArcadePortGame.fromId(gameId);
+        return manager != null && manager.isRotationCandidateAvailable(game);
+    }
+
     public void returnPlayerToArcadeLobby(Player player) {
         if (manager != null && player != null && player.isOnline()) {
             manager.returnPlayerToLobby(player);
@@ -117,6 +177,11 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             });
         }
     }
+    /** Called only after a natural Testplex-managed Monster Maze round completion. */
+    public void onMonsterMazeRoundCompleted() {
+        if (manager != null) manager.onExternalGameCompleted(ArcadePortGame.MONSTER_MAZE);
+    }
+
     public void stopMonsterMazeRound(String reason) {
         if (manager != null) manager.stop(reason == null ? "Monster Maze stopped" : reason);
     }
@@ -188,10 +253,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             if (player.isOnline() && manager != null) {
                 // Session fake players must remain in the game lifecycle that just admitted them.
                 if (manager.isTestPlayer(player)) return;
-                // A Camera Shy disconnect must restore the captured pre-match snapshot
-                // instead of leaving the temporary spyglass/kit inventory on reconnect.
-                boolean restoredCameraShy = cameraShy != null && cameraShy.restorePendingSnapshot(player);
-                if (!restoredCameraShy) manager.returnPlayerToLobby(player);
+                if (cameraShy != null) cameraShy.restorePendingSnapshot(player);
                 grantConfiguredAdmin(player);
                 manager.restoreMonsterMazeKitPreference(player);
             }
@@ -200,31 +262,49 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
 
     private boolean isConfiguredOwner(Player player) {
         java.util.List<String> owners = new java.util.ArrayList<>(getConfig().getStringList("owner-usernames"));
-        if (owners.stream().noneMatch(name -> "jn_playzmc".equalsIgnoreCase(name))) owners.add("jn_playzmc");
+        addDefaultAdminNames(owners);
         return owners.stream().anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
     }
 
-    private boolean hasAdminAccess(CommandSender sender) {
+    private void addDefaultAdminNames(java.util.List<String> names) {
+        for (String defaultName : java.util.List.of("jn_playzmc", "joshbet9")) {
+            if (names.stream().noneMatch(name -> defaultName.equalsIgnoreCase(name))) names.add(defaultName);
+        }
+    }
+
+    private boolean isConfiguredCohost(Player player) {
+        org.bukkit.plugin.Plugin panel = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
+        if (!(panel instanceof JavaPlugin modernPanel)) return false;
+        String uuid = player.getUniqueId().toString();
+        return modernPanel.getConfig().getStringList("panel-cohosts").stream()
+                .anyMatch(record -> record != null
+                        && (record.equals(uuid) || record.startsWith(uuid + "|")));
+    }
+
+    /** Shared admin check for the Game Panel, Arcade commands and embedded game settings. */
+    public boolean hasAdminAccess(CommandSender sender) {
         if (sender.isOp() || sender.hasPermission("testplex.arcadeports.admin")) return true;
         if (!(sender instanceof Player player)) return false;
+        if (mineplexCoreRankBridge != null
+                && mineplexCoreRankBridge.hasAdminAccess(player).orElse(false)) return true;
 
-        // The sandbox owner must not be blocked by a stale OP/permission cache.
+        // Keep the repository owner and sandbox operator aligned with the Game Panel.
         if (isConfiguredOwner(player)) {
             if (!player.isOp()) player.setOp(true);
             return true;
         }
 
         java.util.List<String> configured = new java.util.ArrayList<>(getConfig().getStringList("admin-usernames"));
-        if (configured.stream().noneMatch(name -> "jn_playzmc".equalsIgnoreCase(name))) configured.add("jn_playzmc");
+        addDefaultAdminNames(configured);
         boolean match = configured.stream().anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
         if (match && !player.isOp()) player.setOp(true);
-        return match;
+        return match || isConfiguredCohost(player);
     }
 
     private void grantConfiguredAdmin(Player player) {
         java.util.List<String> configured = new java.util.ArrayList<>(getConfig().getStringList("admin-usernames"));
         configured.addAll(getConfig().getStringList("owner-usernames"));
-        if (configured.stream().noneMatch(name -> "jn_playzmc".equalsIgnoreCase(name))) configured.add("jn_playzmc");
+        addDefaultAdminNames(configured);
         boolean match = configured.stream().anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
         if (!match) return;
         if (!player.isOp()) {
@@ -313,6 +393,14 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             }
             return handleStatsCommand(sender, args);
         }
+        if (command.getName().equalsIgnoreCase("gamepreferences")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("Players only.");
+                return true;
+            }
+            preferenceMenu.open(player);
+            return true;
+        }
         String sub = args.length == 0 ? "help" : args[0].toLowerCase(java.util.Locale.ROOT);
         switch (sub) {
             case "join":
@@ -362,6 +450,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 return true;
             case "lobby":
             case "selectgame":
+                if (!hasAdminAccess(sender)) {
+                    sender.sendMessage(ChatColor.RED + "Operator permission required to change the lobby game.");
+                    return true;
+                }
                 if (args.length < 2) {
                     sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport lobby <game-id>");
                     return true;
@@ -381,6 +473,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 return true;
             case "maps":
             case "map":
+                if (!hasAdminAccess(sender)) {
+                    sender.sendMessage(ChatColor.RED + "Operator permission required to change the selected map.");
+                    return true;
+                }
                 if (!(sender instanceof Player player)) {
                     sender.sendMessage("Players only.");
                     return true;
@@ -392,6 +488,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 mapMenu.openMapSelection(player, ArcadePortGame.fromId(args[1]));
                 return true;
             case "start":
+                if (!hasAdminAccess(sender)) {
+                    sender.sendMessage(ChatColor.RED + "Operator permission required to start a queued Arcade game.");
+                    return true;
+                }
                 if (args.length < 2) {
                     sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport start <game-id>");
                     return true;

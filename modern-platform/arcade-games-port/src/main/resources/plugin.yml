@@ -5,6 +5,7 @@ api-version: '26.3'
 author: Testplex
 description: Controlled Arcade game implementations for Paper 26.3
 softdepend:
+  - Hub
   - TestplexModernArcade
   - packetevents
   - FakePlayerPlugin
@@ -13,6 +14,10 @@ commands:
     description: Open local Testplex Arcade statistics, including Camera Shy and Plexball career progression.
     usage: /stats [plexball] | /stats [player] camera-shy [page]
     aliases: [arcadestats]
+  gamepreferences:
+    description: Rate Arcade games and view their weighted rotation likelihood.
+    usage: /gamepreferences
+    aliases: [gameprefs]
   arcadeport:
     description: Start and test a modern Arcade game
     usage: /arcadeport <play|join|leave|spectate|start|kit|stats|ghost|maps|lobby|bot|status|stop>
@@ -26,3 +31,18 @@ permissions:
   testplex.arcadeports.admin:
     description: Allows stopping and resetting an Arcade prototype
     default: op
+  testplex.rank.owner:
+    description: Displays the Testplex Owner rank in the Arcade tab list.
+    default: false
+  testplex.rank.admin:
+    description: Displays the Testplex Admin rank in the Arcade tab list.
+    default: false
+  testplex.rank.mod:
+    description: Displays the Testplex Moderator rank in the Arcade tab list.
+    default: false
+  testplex.rank.helper:
+    description: Displays the Testplex Helper rank in the Arcade tab list.
+    default: false
+  testplex.rank.ultra:
+    description: Displays the Testplex ULTRA rank in the Arcade tab list.
+    default: false

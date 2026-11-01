@@ -156,6 +156,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private int castleKillCountBlue;
     private boolean ready;
     private boolean stopped;
+    private boolean listenersRegistered;
 
     CastleAssaultHeroesOfGwenRuntime(
             JavaPlugin plugin,
@@ -192,7 +193,6 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 : game == ArcadePortGame.HEROES_OF_GWEN && prepareHeroesOfGwen();
         this.ready = prepared;
         if (prepared) {
-            Bukkit.getPluginManager().registerEvents(this, plugin);
             long now = System.currentTimeMillis();
             objectiveRespawnAt = now + objectiveDelay();
             nextChestRefillAt = now + 120_000L;
@@ -203,8 +203,25 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
     }
 
+    /**
+     * The mixed-mode runtime owns separate respawn/refill/update clocks from the
+     * parent Arcade session. Pause those clocks as well when Prepare completes.
+     */
+    void shiftPrepareTimers(long pausedMillis) {
+        for (String failure : SessionTimestampShifter.shift(this, pausedMillis)) {
+            plugin.getLogger().warning("Could not pause a mixed-mode runtime timer: " + failure);
+        }
+    }
+
     boolean isReady() {
         return ready && !stopped;
+    }
+
+    /** Activate the mixed-mode event handlers only after the parent match enters Live. */
+    void startLive() {
+        if (!isReady() || listenersRegistered) return;
+        Bukkit.getPluginManager().registerEvents(this, plugin);
+        listenersRegistered = true;
     }
 
     private boolean prepareCastleAssault() {
@@ -2276,6 +2293,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     void stop() {
         if (stopped) return;
         stopped = true;
+        if (listenersRegistered) {
+            org.bukkit.event.HandlerList.unregisterAll(this);
+            listenersRegistered = false;
+        }
         if (objectiveItem != null && objectiveItem.isValid()) objectiveItem.remove();
         objectiveItem = null;
         for (UUID id : new ArrayList<>(carriedTntOldHelmet.keySet())) {

@@ -86,34 +86,23 @@ class ArcadePortGameTest {
                 primaryWorld.resolveSibling("arcadeport_source_other"), "arcadeport_source_bacon_brawl"));
     }
 
-    @Test void selectingBaconBrawlUsesItsOwnLobbyScoreboardAndLegacyStartCountdown() {
-        assertTrue(ModernLobbyScoreboard.usesBaconBrawlLobbySidebar("bacon-brawl"));
-        assertTrue(ModernLobbyScoreboard.usesBaconBrawlLobbySidebar("BACON_BRAWL"));
-        assertFalse(ModernLobbyScoreboard.usesBaconBrawlLobbySidebar("paintball"));
-        assertEquals("BACON BRAWL", org.bukkit.ChatColor.stripColor(
-                ModernLobbyScoreboard.scoreboardTitleForGame("bacon-brawl", "Testplex")));
-        assertEquals("Testplex",
-                ModernLobbyScoreboard.scoreboardTitleForGame("paintball", "Testplex"));
+    @Test void modernLobbyScoreboardMatchesTheOriginalArcadeFieldsAndLifecycleTitle() {
+        assertEquals("Waiting for players",
+                org.bukkit.ChatColor.stripColor(
+                        ModernLobbyScoreboard.scoreboardTitleForStatus("Waiting for players")));
+        assertEquals("2/16",
+                ModernLobbyScoreboard.formatPlayerCount(2, 16));
+        assertEquals("El Muchacho Pigo",
+                ModernLobbyScoreboard.formatKitName("el-muchacho-pigo"));
+        assertEquals("None",
+                ModernLobbyScoreboard.formatKitName("None"));
         assertEquals(0, ArcadePortManager.MANUAL_START_COUNTDOWN_SECONDS,
                 "The modern lobby Start Game action should start immediately without a countdown.");
     }
 
-    @Test void modernLobbyScoreboardShowsSelectedGameAndKitAsReadableLabels() {
-        assertEquals("Bacon Brawl", ModernLobbyScoreboard.formatGameName("bacon-brawl"));
-        assertEquals("Monster Maze", ModernLobbyScoreboard.formatGameName("monster-maze"));
-        assertEquals("El Muchacho Pigo", ModernLobbyScoreboard.formatKitName("el-muchacho-pigo"));
-        assertEquals("Default", ModernLobbyScoreboard.formatKitName("Default"));
-        assertEquals("Not selected", ModernLobbyScoreboard.formatGameName(""));
-    }
-
-    @Test void configuredTestplexOwnerReceivesOwnerRankInsteadOfGenericAdminRank() {
-        assertEquals("Owner", ModernLobbyScoreboard.rankName(true, true));
-        assertEquals("Admin", ModernLobbyScoreboard.rankName(false, true));
-        assertEquals("No Rank", ModernLobbyScoreboard.rankName(false, false));
-    }
-
     @Test void modernArcadeLobbyHotbarMatchesLegacyTestplexSandboxItems() {
         assertEquals(4, ModernArcadeLobby.HOTBAR_COSMETICS_SLOT);
+        assertEquals(6, ModernArcadeLobby.HOTBAR_GAME_PREFERENCES_SLOT);
         assertEquals(8, ModernArcadeLobby.HOTBAR_GAME_PANEL_SLOT);
     }
 
@@ -194,6 +183,44 @@ class ArcadePortGameTest {
         assertEquals(ArcadePortGame.SKY_WARS, ArcadePortGame.fromId("skywars"));
         assertEquals(ArcadePortGame.MILK_THE_COW, ArcadePortGame.fromId("milk-the-cow"));
         assertEquals(ArcadePortGame.WITHER_ASSAULT, ArcadePortGame.fromId("wither-assault"));
+    }
+
+    @Test void lobbyQueueTeamCountsAreDeclaredByTheSharedGameCatalogue() {
+        assertEquals(0, ArcadePortGame.BACON_BRAWL.lobbyTeamCount());
+        assertEquals(2, ArcadePortGame.BOMB_LOBBERS.lobbyTeamCount());
+        assertEquals(2, ArcadePortGame.PAINTBALL.lobbyTeamCount());
+        assertEquals(2, ArcadePortGame.TURF_WARS.lobbyTeamCount());
+        assertEquals(2, ArcadePortGame.CASTLE_ASSAULT.lobbyTeamCount());
+        assertEquals(2, ArcadePortGame.HEROES_OF_GWEN.lobbyTeamCount());
+        assertEquals(4, ArcadePortGame.MICRO_BATTLES.lobbyTeamCount());
+        assertEquals(4, ArcadePortGame.SHEEP_QUEST.lobbyTeamCount());
+        assertEquals(2, ArcadePortGame.SUPER_SPLOOR.lobbyTeamCount());
+        assertEquals(0, ArcadePortGame.PLEXBALL.lobbyTeamCount());
+        assertEquals(0, ArcadePortGame.CAMERA_SHY.lobbyTeamCount());
+        assertEquals(0, ArcadePortGame.ONE_IN_THE_QUIVER.lobbyTeamCount());
+        assertEquals(0, ArcadePortGame.MILK_THE_COW.lobbyTeamCount());
+        assertEquals(0, ArcadePortGame.WITHER_ASSAULT.lobbyTeamCount());
+        assertTrue(ArcadePortGame.MILK_THE_COW.lobbyRolesAssignedAutomatically());
+        assertTrue(ArcadePortGame.WITHER_ASSAULT.lobbyRolesAssignedAutomatically());
+        assertFalse(ArcadePortGame.PAINTBALL.lobbyRolesAssignedAutomatically());
+        assertFalse(ArcadePortGame.BACON_BRAWL.lobbyRolesAssignedAutomatically());
+        assertEquals(ArcadePortGame.MICRO_BATTLES.lobbyTeamCount(),
+                ArcadePortManager.teamCountForGame(ArcadePortGame.MICRO_BATTLES));
+        assertEquals(ArcadePortGame.BOMB_LOBBERS.lobbyTeamCount(),
+                ArcadePortManager.teamCountForGame(ArcadePortGame.BOMB_LOBBERS));
+    }
+
+    @Test void lobbyKitCatalogueIdsResolveForActiveAndLobbySelectionPaths() {
+        assertEquals("archer", ArcadePortRules.normalizeMicroBattlesKit("micro-archer"));
+        assertEquals("worker", ArcadePortRules.normalizeMicroBattlesKit("micro-worker"));
+        assertEquals("fighter", ArcadePortRules.normalizeMicroBattlesKit("micro-fighter"));
+        assertEquals("snowballer", ArcadePortRules.normalizeSpleefKit("spleef-snowballer"));
+        assertEquals("brawler", ArcadePortRules.normalizeSpleefKit("spleef-brawler"));
+        assertEquals("archer", ArcadePortRules.normalizeSpleefKit("spleef-archer"));
+        assertEquals("basher", ArcadePortRules.normalizeDeathTagRunnerKit("runner-basher"));
+        assertEquals("archer", ArcadePortRules.normalizeDeathTagRunnerKit("runner-archer"));
+        assertEquals("traitor", ArcadePortRules.normalizeDeathTagRunnerKit("runner-traitor"));
+        assertNull(ArcadePortRules.normalizeDeathTagRunnerKit("runner-invalid"));
     }
 
     @Test void normalizesSpacesAndUnderscoresInTestCommands() {

@@ -17,6 +17,10 @@ public class DebugSoloModeListener implements Listener {
         String[] parts = event.getMessage().trim().split("\\s+");
         if (parts.length < 2 || !parts[0].equalsIgnoreCase("/mm") || !parts[1].equalsIgnoreCase("solomode")) return;
         event.setCancelled(true);
+        if (!plugin.getHostPlugin().hasAdminAccess(event.getPlayer())) {
+            event.getPlayer().sendMessage(ChatColor.RED + "Operator permission required to change Monster Maze solo mode.");
+            return;
+        }
         if (!plugin.isDebug()) { event.getPlayer().sendMessage(ChatColor.RED + "Debug commands are disabled on this server."); return; }
         if (parts.length < 3 || !(parts[2].equalsIgnoreCase("true") || parts[2].equalsIgnoreCase("false"))) {
             event.getPlayer().sendMessage(ChatColor.YELLOW + "Usage: /mm solomode <true|false>");

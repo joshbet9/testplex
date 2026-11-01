@@ -419,6 +419,15 @@ public void startGame(Location preferCenter, int requestedPattern) {
     }
 
     public void forceStop() {
+        forceStop(false);
+    }
+
+    /**
+     * Normal win/round completion is distinct from an operator reset or plugin
+     * shutdown: only a completed Testplex-managed round may start next-game rotation.
+     */
+    private void forceStop(boolean completedNormally) {
+        boolean notifyTestplexCompletion = completedNormally && testplexManagedRound;
         state = GameState.ENDING;
         if (mainTask != null) { mainTask.cancel(); mainTask = null; }
         if (secondTask != null) { secondTask.cancel(); secondTask = null; }
@@ -464,6 +473,9 @@ public void startGame(Location preferCenter, int requestedPattern) {
         roundParticipants.clear();
         testplexManagedRound = false;
         testplexReturnToLobby = null;
+        if (notifyTestplexCompletion) {
+            plugin.getHostPlugin().onMonsterMazeRoundCompleted();
+        }
     }
 
     private void cleanupEntities() {
@@ -786,7 +798,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
                 state = GameState.ENDING;
                 broadcast(ChatColor.GOLD + "Solo run over — reached stage " + curSafe + "!");
                 Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
-                    @Override public void run() { forceStop(); }
+                    @Override public void run() { forceStop(true); }
                 }, 80L);
             }
             return;
@@ -812,7 +824,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
             // Transition state after recording
             state = GameState.ENDING;
             Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
-                @Override public void run() { forceStop(); }
+                @Override public void run() { forceStop(true); }
             }, 100L);
         }
     }

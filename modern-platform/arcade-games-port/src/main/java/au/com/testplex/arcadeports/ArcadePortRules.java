@@ -828,6 +828,7 @@ public final class ArcadePortRules {
     public static String normalizeMicroBattlesKit(String requested) {
         if (requested == null) return null;
         String kit = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        if (kit.startsWith("micro-")) kit = kit.substring("micro-".length());
         return switch (kit) {
             case "archer" -> "archer";
             case "worker" -> "worker";
@@ -871,6 +872,7 @@ public final class ArcadePortRules {
     public static String normalizeSpleefKit(String requested) {
         if (requested == null) return null;
         String value = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        if (value.startsWith("spleef-")) value = value.substring("spleef-".length());
         return switch (value) {
             case "snowballer" -> "snowballer";
             case "brawler" -> "brawler";
@@ -1371,6 +1373,17 @@ public final class ArcadePortRules {
 
     public static boolean shouldDropRunnerBlock(long elapsedMillis) {
         return elapsedMillis >= RUNNER_BLOCK_DECAY_MILLIS;
+    }
+
+    public static String normalizeDeathTagRunnerKit(String requested) {
+        if (requested == null) return null;
+        String kit = requested.toLowerCase(java.util.Locale.ROOT)
+                .replace('_', '-').replace(' ', '-');
+        if (kit.startsWith("runner-")) kit = kit.substring("runner-".length());
+        return switch (kit) {
+            case "basher", "archer", "traitor", "null" -> kit;
+            default -> null;
+        };
     }
 
     public static String normalizeRunnerKit(String requested) {

@@ -46,6 +46,7 @@ public final class ModernArcadeLobby implements Listener {
     public static final int PLANE_MAX_EXCLUSIVE = 50;
     public static final int FLOOR_Y = 100;
     public static final int HOTBAR_COSMETICS_SLOT = 4;
+    public static final int HOTBAR_GAME_PREFERENCES_SLOT = 6;
     public static final int HOTBAR_GAME_PANEL_SLOT = 8;
 
     public static final double SPAWN_X = 0.0D;
@@ -188,6 +189,12 @@ public final class ModernArcadeLobby implements Listener {
                         ChatColor.YELLOW + "Right-click to browse.",
                         ChatColor.DARK_GRAY + "Command: /cosmetics"), "cosmetics"));
         // Speckled Melon (1.8) became Glistering Melon Slice in modern Minecraft.
+        inventory.setItem(HOTBAR_GAME_PREFERENCES_SLOT, createHotbarItem(Material.WRITABLE_BOOK,
+                ChatColor.AQUA + "Game Preferences",
+                List.of(ChatColor.GRAY + "Like, dislike or stay neutral on each game.",
+                        ChatColor.YELLOW + "Right-click to rate games.",
+                        ChatColor.GRAY + "See the live selection likelihood for each game.",
+                        ChatColor.DARK_GRAY + "Command: /gamepreferences"), "gamepreferences"));
         inventory.setItem(HOTBAR_GAME_PANEL_SLOT, createHotbarItem(Material.GLISTERING_MELON_SLICE,
                 ChatColor.GREEN + "" + ChatColor.BOLD + "Game Panel",
                 List.of(ChatColor.GRAY + "Open the Testplex Arcade game selector.",
@@ -356,16 +363,24 @@ public final class ModernArcadeLobby implements Listener {
         display(world, "game-panel", new Location(world, 0.0D, 106.0D, 3.0D),
                 ChatColor.AQUA + "" + ChatColor.BOLD + "GAME PANEL");
         display(world, "game-text", new Location(world, 0.0D, 130.0D, GAME_TEXT_Z),
-                ChatColor.AQUA + "" + ChatColor.BOLD + "ARCADE GAME PANEL");
+                ChatColor.AQUA + "" + ChatColor.BOLD + "ARCADE");
+        display(world, "game-map", new Location(world, 0.0D, 124.0D, GAME_TEXT_Z),
+                ChatColor.WHITE + "Map: Default");
+        display(world, "game-mode", new Location(world, 0.0D, 118.0D, GAME_TEXT_Z),
+                ChatColor.WHITE + "Mode: Standard");
+        display(world, "game-status", new Location(world, 0.0D, 112.0D, GAME_TEXT_Z),
+                ChatColor.GREEN + "Waiting for players");
         display(world, "kit-text", new Location(world, KIT_TEXT_X, KIT_TEXT_Y, 0.0D),
                 ChatColor.GREEN + "" + ChatColor.BOLD + "KIT SELECT");
         display(world, "team-text", new Location(world, TEAM_TEXT_X, TEAM_TEXT_Y, 0.0D),
                 ChatColor.BLUE + "" + ChatColor.BOLD + "TEAM SELECT");
         display(world, "adv-text", new Location(world, 0.0D, ADV_TEXT_Y, ADV_TEXT_Z),
                 ChatColor.GOLD + "" + ChatColor.BOLD + "ARCADE INFORMATION");
-        display(world, "kit-display", new Location(world, KIT_DISPLAY_X, FLOOR_Y + 2.5D, 0.0D),
+        // Keep station labels above the NPCs instead of at their spawn point.
+        // Y=102.5 overlapped the centre kit and queue NPCs.
+        display(world, "kit-display", new Location(world, KIT_DISPLAY_X, FLOOR_Y + 5.0D, 0.0D),
                 ChatColor.GREEN + "Kit display datapoint");
-        display(world, "team-display", new Location(world, TEAM_DISPLAY_X, FLOOR_Y + 2.5D, 0.0D),
+        display(world, "team-display", new Location(world, TEAM_DISPLAY_X, FLOOR_Y + 5.0D, 0.0D),
                 ChatColor.BLUE + "Team display datapoint");
         display(world, "podium", new Location(world, 0.0D, FLOOR_Y + 3.0D, AMP_STAND_Z),
                 ChatColor.GOLD + "Podium / amplifier datapoint");
@@ -396,8 +411,14 @@ public final class ModernArcadeLobby implements Listener {
     }
 
     private void display(World world, String id, Location location, String name) {
-        for (ArmorStand stand : world.getEntitiesByClass(ArmorStand.class)) {
-            if (id.equals(stand.getPersistentDataContainer().get(displayKey, PersistentDataType.STRING))) return;
+        for (ArmorStand existing : world.getEntitiesByClass(ArmorStand.class)) {
+            if (!id.equals(existing.getPersistentDataContainer().get(displayKey, PersistentDataType.STRING))) {
+                continue;
+            }
+            if (!existing.getLocation().equals(location)) existing.teleport(location);
+            existing.setCustomName(name);
+            existing.setCustomNameVisible(true);
+            return;
         }
         ArmorStand stand = world.spawn(location, ArmorStand.class);
         stand.setCustomName(name);

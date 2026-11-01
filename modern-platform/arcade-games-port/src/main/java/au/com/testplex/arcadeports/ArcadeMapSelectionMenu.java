@@ -36,6 +36,10 @@ public final class ArcadeMapSelectionMenu implements Listener {
     }
 
     public void openMapSelection(Player player, ArcadePortGame game) {
+        if (!(plugin instanceof ArcadeMechanicsModernPlugin arcade) || !arcade.hasAdminAccess(player)) {
+            player.sendMessage(ChatColor.RED + "Operator permission required to change the selected map.");
+            return;
+        }
         if (game == ArcadePortGame.MONSTER_MAZE) {
             openMonsterMazeMapSelection(player, 0);
             return;
@@ -167,6 +171,11 @@ public final class ArcadeMapSelectionMenu implements Listener {
         if (!(event.getWhoClicked() instanceof Player player)
                 || event.getClickedInventory() == null
                 || event.getClickedInventory() != event.getView().getTopInventory()) return;
+        if (!(plugin instanceof ArcadeMechanicsModernPlugin arcade) || !arcade.hasAdminAccess(player)) {
+            player.closeInventory();
+            player.sendMessage(ChatColor.RED + "Operator permission required to change the selected map.");
+            return;
+        }
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || clicked.getType().isAir() || !clicked.hasItemMeta()) return;
         ItemMeta meta = clicked.getItemMeta();
@@ -185,7 +194,6 @@ public final class ArcadeMapSelectionMenu implements Listener {
                 openMapSelection(player, game, page);
             }
         } else if ("select-map".equals(action) && game == ArcadePortGame.MONSTER_MAZE && resource != null
-                && plugin instanceof ArcadeMechanicsModernPlugin arcade
                 && arcade.getMonsterMazeModule() != null) {
             me.monstermaze.MonsterMazePlugin module = arcade.getMonsterMazeModule();
             if (!module.getMapManager().setActiveMap(resource)) {

@@ -35,7 +35,7 @@ public final class MenuService implements Listener {
     private static final String COHOST_ADD_TITLE = "Give Co-Host";
     private static final String COHOST_REMOVE_TITLE = "Remove Co-Host";
     private static final String WHITELIST_TITLE = "Whitelisted Players";
-    private static final String VOTING_TITLE = "Game Voting";
+    private static final String VOTING_TITLE = "Rotation Status";
     private static final String CORE_COSMETICS_TITLE = "Cosmetics";
     private static final String COSMETICS_TITLE = "Arcade Cosmetics | Games";
     private static final String GAME_TITLE = "Arcade Cosmetics | Game | ";
@@ -67,6 +67,10 @@ public final class MenuService implements Listener {
 
     /** Legacy Game Panel geometry from Reborn's four-row MenuPage. */
     public void openGamePanel(Player player) {
+        if (!isAdmin(player)) {
+            player.sendMessage(ChatColor.RED + "Operator permission required to open the Game Panel.");
+            return;
+        }
         Inventory inventory = Bukkit.createInventory(null, 36, PANEL_TITLE);
         inventory.setItem(4, makeItem(Material.BEACON,
                 ChatColor.GREEN + "" + ChatColor.BOLD + "Testplex Arcade Game Panel",
@@ -85,7 +89,7 @@ public final class MenuService implements Listener {
         panelButton(inventory, 13, Material.DIAMOND_SWORD, "Give Co-Host", "panel-cohost-add");
         panelButton(inventory, 22, Material.GOLDEN_SWORD, "Remove Co-Host", "panel-cohost-remove");
         panelButton(inventory, 26, Material.TNT, "Kill Private Server", "panel-kill-server");
-        panelButton(inventory, 30, Material.BOOKSHELF, "Game Voting", "panel-voting");
+        panelButton(inventory, 30, Material.BOOKSHELF, "Rotation Status", "panel-voting");
         panelButton(inventory, 32, Material.PAPER, "Whitelisted Players", "panel-whitelist");
         player.openInventory(inventory);
     }
@@ -96,30 +100,70 @@ public final class MenuService implements Listener {
         inventory.setItem(slot, item);
     }
 
-    private boolean defaultPanelOption(String id) {
-        return "public-server".equals(id);
+    private JavaPlugin arcadeMechanicsPlugin() {
+        org.bukkit.plugin.Plugin candidate = Bukkit.getPluginManager().getPlugin("ArcadeMechanicsModern");
+        return candidate instanceof JavaPlugin engine && candidate.isEnabled() ? engine : null;
+    }
+
+    /**
+     * The Arcade mechanics engine is a separate plugin JAR. Keep this menu module
+     * decoupled from its compile-time classes while using the engine's authoritative
+     * map/acceptance eligibility check when the API is present.
+     */
+    private boolean rotationCandidateAvailable(JavaPlugin engine, String gameId) {
+        if (engine == null || gameId == null) return false;
+        try {
+            Object result = engine.getClass()
+                    .getMethod("isRotationCandidateAvailable", String.class)
+                    .invoke(engine, gameId);
+            return Boolean.TRUE.equals(result);
+        } catch (ReflectiveOperationException | RuntimeException exception) {
+            plugin.getLogger().warning("Could not query Arcade rotation eligibility for "
+                    + gameId + ": " + exception.getMessage());
+            return false;
+        }
+    }
+
+    private boolean gameOptionEnabled(String id) {
+        return switch (id) {
+            case "public-server" -> !Bukkit.hasWhitelist();
+            case "enforce-whitelist" -> Bukkit.hasWhitelist();
+            case "game-auto-start" -> {
+                JavaPlugin engine = arcadeMechanicsPlugin();
+                yield engine != null && engine.getConfig().getBoolean(
+                        "game-preferences.automatic-rotation.enabled", false);
+            }
+            default -> false;
+        };
     }
 
     private void openGameOptions(Player player) {
         Inventory inventory = Bukkit.createInventory(null, 54, GAME_OPTIONS_TITLE);
-        String[] ids = {"public-server", "enforce-whitelist", "force-team-balance",
-                "game-auto-start", "game-timeout", "kick-idle-players"};
-        String[] labels = {"Public Server", "Enforce Whitelist", "Force Team Balancing",
-                "Game Auto Start", "Game Timeout", "Kick Idle Players"};
-        Material[] materials = {Material.ENDER_EYE, Material.PAPER, Material.COMPARATOR,
-                Material.SLIME_BALL, Material.COMPASS, Material.CLOCK};
-        int[] slots = {11, 13, 15, 38, 40, 42};
+        String[] ids = {"public-server", "enforce-whitelist", "game-auto-start"};
+        String[] labels = {"Public Server", "Enforce Whitelist", "Automatic Game Rotation"};
+        Material[] materials = {Material.ENDER_EYE, Material.PAPER, Material.COMPASS};
+        int[] slots = {11, 15, 31};
+        JavaPlugin engine = arcadeMechanicsPlugin();
         for (int i = 0; i < ids.length; i++) {
-            boolean enabled = plugin.getConfig().getBoolean("test-options." + ids[i], defaultPanelOption(ids[i]));
-            ItemStack item = makeItem(materials[i],
-                    (enabled ? ChatColor.GREEN : ChatColor.RED) + labels[i],
-                    List.of(enabled ? ChatColor.GREEN + "Enabled" : ChatColor.RED + "Disabled",
-                            ChatColor.GRAY + "Click to toggle this isolated test-server option."));
+            boolean available = !"game-auto-start".equals(ids[i]) || engine != null;
+            boolean enabled = gameOptionEnabled(ids[i]);
+            String state = !available ? ChatColor.RED + "Unavailable"
+                    : enabled ? ChatColor.GREEN + "Enabled" : ChatColor.RED + "Disabled";
+            String description = switch (ids[i]) {
+                case "public-server" -> "Public access is enabled when the server whitelist is off.";
+                case "enforce-whitelist" -> "Only whitelisted players may join.";
+                default -> "Runs preference-weighted rotation after each completed round.";
+            };
+            ItemStack item = makeItem(available ? materials[i] : Material.BARRIER,
+                    (enabled && available ? ChatColor.GREEN : available ? ChatColor.RED : ChatColor.GRAY)
+                            + labels[i],
+                    List.of(state, ChatColor.GRAY + description,
+                            ChatColor.YELLOW + "Click to change."));
             mark(item, "panel-option-toggle", null, null, ids[i]);
             inventory.setItem(slots[i], item);
             inventory.setItem(slots[i] + 9, makeItem(Material.GRAY_STAINED_GLASS_PANE,
-                    (enabled ? ChatColor.GREEN : ChatColor.RED) + labels[i],
-                    List.of(enabled ? ChatColor.GREEN + "Enabled" : ChatColor.RED + "Disabled")));
+                    (enabled && available ? ChatColor.GREEN : ChatColor.RED) + labels[i],
+                    List.of(state)));
         }
         inventory.setItem(4, backItem("Go Back", "back-panel", null));
         inventory.setItem(49, makeItem(Material.BARRIER, ChatColor.RED + "Close", List.of()));
@@ -224,30 +268,80 @@ public final class MenuService implements Listener {
     }
 
     private void openGameVoting(Player viewer) {
+        openGameVoting(viewer, 0);
+    }
+
+    private void openGameVoting(Player viewer, int requestedPage) {
         Inventory inventory = Bukkit.createInventory(null, 54, VOTING_TITLE);
-        int[] slots = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34, 37, 39, 41, 43};
-        java.util.Map<String, Integer> votes = new java.util.HashMap<>();
-        var storedVotes = plugin.getConfig().getConfigurationSection("game-panel.votes");
-        if (storedVotes != null) {
-            for (String voter : storedVotes.getKeys(false)) {
-                String voted = storedVotes.getString(voter);
-                if (voted != null) votes.merge(voted, 1, Integer::sum);
+        JavaPlugin engine = arcadeMechanicsPlugin();
+        if (engine == null) {
+            inventory.setItem(22, makeItem(Material.BARRIER, ChatColor.RED + "Arcade engine unavailable",
+                    List.of(ChatColor.GRAY + "ArcadeMechanicsModern is not enabled.")));
+        } else {
+            List<String> cleared = engine.getConfig().getStringList("enabled-games");
+            String poolPath = "game-preferences.automatic-rotation.enabled-games";
+            List<String> rotation = engine.getConfig().contains(poolPath)
+                    ? engine.getConfig().getStringList(poolPath) : cleared;
+            boolean automatic = engine.getConfig().getBoolean("game-preferences.automatic-rotation.enabled", false);
+            inventory.setItem(4, makeItem(Material.COMPASS,
+                    ChatColor.AQUA + "" + ChatColor.BOLD + "Preference-weighted Rotation",
+                    List.of(ChatColor.GRAY + "Automatic rotation: "
+                                    + (automatic ? ChatColor.GREEN + "Enabled" : ChatColor.RED + "Disabled"),
+                            ChatColor.GRAY + "Minimum players: " + ChatColor.WHITE
+                                    + engine.getConfig().getInt("game-preferences.automatic-rotation.minimum-players", 6),
+                            ChatColor.GRAY + "Vote window: " + ChatColor.WHITE
+                                    + engine.getConfig().getInt("game-preferences.automatic-rotation.vote-seconds", 60) + " seconds",
+                            ChatColor.YELLOW + "Players rate games in /gamepreferences.")));
+
+            List<GameDefinition> clearedGames = catalog.getGames().stream()
+                    .filter(game -> cleared.contains(game.getId())).toList();
+            int[] slots = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34, 37, 39, 41, 43};
+            int pageCount = Math.max(1, (clearedGames.size() + slots.length - 1) / slots.length);
+            int page = Math.max(0, Math.min(requestedPage, pageCount - 1));
+            int start = page * slots.length;
+            int end = Math.min(clearedGames.size(), start + slots.length);
+            for (int index = start; index < end; index++) {
+                GameDefinition game = clearedGames.get(index);
+                boolean included = rotation.contains(game.getId());
+                boolean available = rotationCandidateAvailable(engine, game.getId());
+                ItemStack item = makeItem(icon(game.getIcon()),
+                        (included ? available ? ChatColor.GREEN : ChatColor.RED : ChatColor.YELLOW)
+                                + game.getName(),
+                        List.of(ChatColor.GRAY + "Acceptance status: " + ChatColor.GREEN + "Cleared",
+                                ChatColor.GRAY + "Rotation pool: "
+                                        + (included ? ChatColor.GREEN + "Included" : ChatColor.RED + "Excluded"),
+                                ChatColor.GRAY + "Selected map availability: "
+                                        + (available ? ChatColor.GREEN + "Ready" : ChatColor.RED + "Missing / invalid"),
+                                ChatColor.DARK_GRAY + "Likelihood is shown in Game Preferences."));
+                inventory.setItem(slots[index - start], item);
             }
+            if (clearedGames.isEmpty()) inventory.setItem(22, makeItem(Material.BARRIER,
+                    ChatColor.RED + "No games cleared for acceptance",
+                    List.of(ChatColor.GRAY + "The reviewed 26.3 acceptance allow-list is empty.")));
+            if (page > 0) {
+                ItemStack previous = makeItem(Material.ARROW, ChatColor.YELLOW + "Previous Page", List.of());
+                mark(previous, "panel-rotation-status-page", null, null, String.valueOf(page - 1));
+                inventory.setItem(46, previous);
+            }
+            if (page + 1 < pageCount) {
+                ItemStack next = makeItem(Material.ARROW, ChatColor.YELLOW + "Next Page", List.of());
+                mark(next, "panel-rotation-status-page", null, null, String.valueOf(page + 1));
+                inventory.setItem(52, next);
+            }
+            inventory.setItem(48, makeItem(Material.MAP, ChatColor.AQUA + "Page " + (page + 1) + "/" + pageCount,
+                    List.of(ChatColor.GRAY.toString() + clearedGames.size() + " cleared game(s) in this status list.")));
         }
-        int index = 0;
-        for (GameDefinition game : catalog.getGames()) {
-            if (index >= slots.length) break;
-            boolean ready = ("bacon-brawl".equals(game.getId()) || "monster-maze".equals(game.getId()))
-                    && Bukkit.getPluginManager().isPluginEnabled("ArcadeMechanicsModern");
-            ItemStack item = makeItem(ready ? icon(game.getIcon()) : Material.BARRIER,
-                    (ready ? ChatColor.GREEN : ChatColor.RED) + game.getName(),
-                    List.of(ChatColor.GRAY + "Votes: " + votes.getOrDefault(game.getId(), 0),
-                            ChatColor.YELLOW + (ready ? "Click to vote for the next test." : "Not enabled for 26.3 acceptance yet.")));
-            mark(item, "panel-game-vote", game, null, null);
-            inventory.setItem(slots[index++], item);
-        }
-        inventory.setItem(4, backItem("Go Back", "back-panel", null));
-        inventory.setItem(49, makeItem(Material.BARRIER, ChatColor.RED + "Close", List.of()));
+        inventory.setItem(45, backItem("Go Back", "back-panel", null));
+        inventory.setItem(49, makeItem(Material.WRITABLE_BOOK, ChatColor.AQUA + "How voting works",
+                List.of(ChatColor.GRAY + "Like / Dislike / Neutral ratings are collected",
+                        ChatColor.GRAY + "through /gamepreferences and weighted together.",
+                        ChatColor.YELLOW + "Edit Game Rotation controls the eligible pool.")));
+        ItemStack preferences = makeItem(Material.WRITABLE_BOOK, ChatColor.GREEN + "Rate Games",
+                List.of(ChatColor.GRAY + "Open your Like / Dislike / Neutral preferences.",
+                        ChatColor.YELLOW + "Click to open Game Preferences."));
+        mark(preferences, "panel-open-preferences", null, null, null);
+        inventory.setItem(50, preferences);
+        inventory.setItem(53, makeItem(Material.BARRIER, ChatColor.RED + "Close", List.of()));
         viewer.openInventory(inventory);
     }
 
@@ -265,28 +359,73 @@ public final class MenuService implements Listener {
 
 
     public void openSetGamePage(Player player) {
-        openGameSelection(player, false);
+        openGameSelection(player, false, 0);
     }
 
     private void openGameSelection(Player player, boolean rotation) {
+        openGameSelection(player, rotation, 0);
+    }
+
+    private void openGameSelection(Player player, boolean rotation, int requestedPage) {
         Inventory inventory = Bukkit.createInventory(null, 54, rotation ? "Edit Game Rotation" : SET_GAME_TITLE);
-        int[] legacyGameSlots = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34, 37, 39, 41, 43};
-        int index = 0;
-        for (GameDefinition game : catalog.getGames()) {
-            if (index >= legacyGameSlots.length) break;
-            boolean ready = ("bacon-brawl".equals(game.getId()) || "monster-maze".equals(game.getId()))
-                    && Bukkit.getPluginManager().isPluginEnabled("ArcadeMechanicsModern");
-            ItemStack item = makeItem(icon(game.getIcon()),
-                    (ready ? ChatColor.GREEN : ChatColor.WHITE) + game.getName(),
-                    List.of(ChatColor.RESET + ChatColor.GRAY.toString() + "Select this as the next game.",
-                            "§1",
-                            ChatColor.YELLOW + "Left-Click " + ChatColor.GRAY + (ready
-                                    ? "to select this game."
-                                    : "to select the lobby game; starting stays gated until parity is cleared."),
-                            ChatColor.YELLOW + "Right-Click " + ChatColor.GRAY + "to choose an installed map.",
-                            ChatColor.DARK_GRAY + "Port status: " + game.getPortStatus().getDisplay()));
-            mark(item, rotation ? "panel-rotation-select" : "panel-game-select", game, null, null);
-            inventory.setItem(legacyGameSlots[index++], item);
+        int[] slots = LEGACY_GAME_SLOTS;
+        int pageCount = Math.max(1, (catalog.getGames().size() + slots.length - 1) / slots.length);
+        int page = Math.max(0, Math.min(requestedPage, pageCount - 1));
+        int start = page * slots.length;
+        int end = Math.min(catalog.getGames().size(), start + slots.length);
+        JavaPlugin engine = arcadeMechanicsPlugin();
+        List<String> cleared = engine == null ? List.of() : engine.getConfig().getStringList("enabled-games");
+        String rotationPath = "game-preferences.automatic-rotation.enabled-games";
+        List<String> rotationPool = engine == null ? List.of()
+                : engine.getConfig().contains(rotationPath)
+                ? engine.getConfig().getStringList(rotationPath) : cleared;
+
+        for (int index = start; index < end; index++) {
+            GameDefinition game = catalog.getGames().get(index);
+            boolean ready = cleared.contains(game.getId());
+            boolean included = rotationPool.contains(game.getId());
+            boolean rotationAvailable = engine != null && rotationCandidateAvailable(engine, game.getId());
+            ChatColor colour = rotation
+                    ? !ready ? ChatColor.RED
+                    : included ? rotationAvailable ? ChatColor.GREEN : ChatColor.RED : ChatColor.YELLOW
+                    : ready ? ChatColor.GREEN : ChatColor.WHITE;
+            List<String> lore;
+            if (rotation) {
+                lore = List.of(
+                        ChatColor.GRAY + "Acceptance status: " + (ready ? ChatColor.GREEN + "Cleared" : ChatColor.RED + "Not cleared"),
+                        ChatColor.GRAY + "Rotation pool: " + (included ? ChatColor.GREEN + "Included" : ChatColor.RED + "Excluded"),
+                        ChatColor.GRAY + "Selected map availability: " + (rotationAvailable
+                                ? ChatColor.GREEN + "Ready" : ChatColor.RED + "Missing / invalid"),
+                        ChatColor.YELLOW + "Click to " + (included ? "remove from" : "add to") + " rotation.",
+                        ChatColor.DARK_GRAY + "The selector ignores games without an installed map.");
+            } else {
+                lore = List.of(ChatColor.RESET + ChatColor.GRAY.toString() + "Select this as the next lobby game.",
+                        ChatColor.YELLOW + "Left-Click " + ChatColor.GRAY + "to select this game.",
+                        ChatColor.YELLOW + "Right-Click " + ChatColor.GRAY + "to choose an installed map.",
+                        ChatColor.DARK_GRAY + "Acceptance status: "
+                                + (ready ? ChatColor.GREEN + "Cleared" : ChatColor.RED + "Not cleared"),
+                        ChatColor.DARK_GRAY + "Port status: " + game.getPortStatus().getDisplay());
+            }
+            ItemStack item = makeItem(icon(game.getIcon()), colour + game.getName(), lore);
+            mark(item, rotation ? "panel-rotation-select" : "panel-game-select",
+                    game, null, rotation ? String.valueOf(page) : null);
+            inventory.setItem(slots[index - start], item);
+        }
+        if (page > 0) {
+            ItemStack previous = makeItem(Material.ARROW, ChatColor.YELLOW + "Previous Page",
+                    List.of(ChatColor.GRAY + "Return to page " + page + "."));
+            mark(previous, "panel-game-page", null, null, String.valueOf(page - 1));
+            inventory.setItem(45, previous);
+        }
+        inventory.setItem(49, makeItem(Material.MAP, ChatColor.AQUA + "Page " + (page + 1) + "/" + pageCount,
+                List.of(ChatColor.GRAY.toString() + catalog.getGames().size() + " games in the catalogue.",
+                        ChatColor.GRAY + (rotation ? "Toggle games in the shared preference rotation pool."
+                                : "Select any game to inspect its lobby integration."))));
+        if (page + 1 < pageCount) {
+            ItemStack next = makeItem(Material.ARROW, ChatColor.YELLOW + "Next Page",
+                    List.of(ChatColor.GRAY + "Continue to page " + (page + 2) + "."));
+            mark(next, "panel-game-page", null, null, String.valueOf(page + 1));
+            inventory.setItem(53, next);
         }
         inventory.setItem(4, backItem("Go Back", "back-panel", null));
         player.openInventory(inventory);
@@ -483,13 +622,69 @@ public final class MenuService implements Listener {
         String optionId = meta.getPersistentDataContainer().get(optionKey, PersistentDataType.STRING);
         GameDefinition game = catalog.getGame(gameId);
 
+        if (VOTING_TITLE.equals(title) && "panel-open-preferences".equals(action)) {
+            player.closeInventory();
+            player.performCommand("gamepreferences");
+            return;
+        }
+
+        if (VOTING_TITLE.equals(title) && "panel-rotation-status-page".equals(action)
+                && optionId != null) {
+            try {
+                openGameVoting(player, Integer.parseInt(optionId));
+            } catch (NumberFormatException ignored) {
+                player.sendMessage(ChatColor.RED + "Invalid rotation status page.");
+            }
+            return;
+        }
+
+        if (("Edit Game Rotation".equals(title) || SET_GAME_TITLE.equals(title))
+                && "panel-game-page".equals(action) && optionId != null) {
+            if (!isAdmin(player)) {
+                player.sendMessage(ChatColor.RED + "Operator permission required to browse game settings.");
+                return;
+            }
+            try {
+                openGameSelection(player, "Edit Game Rotation".equals(title), Integer.parseInt(optionId));
+            } catch (NumberFormatException ignored) {
+                player.sendMessage(ChatColor.RED + "Invalid game catalogue page.");
+            }
+            return;
+        }
+
         if (GAME_OPTIONS_TITLE.equals(title) && "panel-option-toggle".equals(action) && optionId != null) {
-            String key = "test-options." + optionId;
-            boolean next = !plugin.getConfig().getBoolean(key, defaultPanelOption(optionId));
-            plugin.getConfig().set(key, next);
-            if ("enforce-whitelist".equals(optionId) && next) plugin.getConfig().set("test-options.public-server", false);
-            if ("public-server".equals(optionId) && next) plugin.getConfig().set("test-options.enforce-whitelist", false);
-            plugin.saveConfig();
+            if (!isAdmin(player)) {
+                player.sendMessage(ChatColor.RED + "Operator permission required to change Game Options.");
+                return;
+            }
+            switch (optionId) {
+                // These are two views of one server access mode, not independent toggles.
+                // Public Server always means whitelist OFF; Enforce Whitelist means ON.
+                case "public-server" -> Bukkit.setWhitelist(false);
+                case "enforce-whitelist" -> Bukkit.setWhitelist(true);
+                case "game-auto-start" -> {
+                    JavaPlugin engine = arcadeMechanicsPlugin();
+                    if (engine == null) {
+                        player.sendMessage(ChatColor.RED + "ArcadeMechanicsModern is not enabled.");
+                        openGameOptions(player);
+                        return;
+                    }
+                    boolean next = !engine.getConfig().getBoolean(
+                            "game-preferences.automatic-rotation.enabled", false);
+                    engine.getConfig().set("game-preferences.automatic-rotation.enabled", next);
+                    engine.saveConfig();
+                    player.sendMessage(ChatColor.GREEN + "Automatic game rotation "
+                            + (next ? "enabled." : "disabled."));
+                }
+                default -> {
+                    player.sendMessage(ChatColor.RED + "That Game Option is not supported.");
+                    return;
+                }
+            }
+            if ("public-server".equals(optionId) || "enforce-whitelist".equals(optionId)) {
+                player.sendMessage(ChatColor.GREEN + "Server whitelist "
+                        + (Bukkit.hasWhitelist() ? "enabled." : "disabled; public access is enabled."));
+            }
             openGameOptions(player);
             return;
         }
@@ -554,18 +749,7 @@ public final class MenuService implements Listener {
             openWhitelistPage(player);
             return;
         }
-        if (VOTING_TITLE.equals(title) && "panel-game-vote".equals(action) && game != null) {
-            if (!"bacon-brawl".equals(game.getId())
-                    || !Bukkit.getPluginManager().isPluginEnabled("ArcadeMechanicsModern")) {
-                player.sendMessage(ChatColor.RED + "That game is not enabled for 26.3 acceptance.");
-            } else {
-                plugin.getConfig().set("game-panel.votes." + player.getUniqueId(), game.getId());
-                plugin.saveConfig();
-                player.sendMessage(ChatColor.GREEN + "Vote recorded for " + game.getName() + ".");
-                openGameVoting(player);
-            }
-            return;
-        }
+
 
         if (CORE_COSMETICS_TITLE.equals(title)) {
             if ("core-arcade-cosmetics".equals(action)) openCosmeticsHome(player);
@@ -609,6 +793,10 @@ public final class MenuService implements Listener {
         }
         if (SET_GAME_TITLE.equals(title) && "panel-game-select".equals(action)
                 && game != null && event.getClick().isRightClick()) {
+            if (!isAdmin(player)) {
+                player.sendMessage(ChatColor.RED + "Operator permission required to change the selected game's map.");
+                return;
+            }
             plugin.getConfig().set("game-panel.selected-game", game.getId());
             plugin.saveConfig();
             if (!Bukkit.getPluginManager().isPluginEnabled("ArcadeMechanicsModern")) {
@@ -623,8 +811,13 @@ public final class MenuService implements Listener {
             return;
         }
         if (PANEL_TITLE.equals(title)) {
-            if ("panel-set-game".equals(action)) openGameSelection(player, false);
-            else if ("panel-rotation".equals(action)) openGameSelection(player, true);
+            if ("panel-set-game".equals(action)) {
+                if (isAdmin(player)) openGameSelection(player, false);
+                else player.sendMessage(ChatColor.RED + "Operator permission required to select the lobby game.");
+            } else if ("panel-rotation".equals(action)) {
+                if (isAdmin(player)) openGameSelection(player, true);
+                else player.sendMessage(ChatColor.RED + "Operator permission required to edit game rotation.");
+            }
             else if ("panel-options".equals(action)) openGameOptions(player);
             else if ("panel-remove".equals(action)) openPlayerList(player, false);
             else if ("panel-unremove".equals(action)) openPlayerList(player, true);
@@ -638,7 +831,7 @@ public final class MenuService implements Listener {
                 if (!isAdmin(player)) {
                     player.sendMessage(ChatColor.RED + "Operator permission required to start a game.");
                 } else {
-                    String selectedGame = plugin.getConfig().getString("game-panel.selected-game", "bacon-brawl");
+                    String selectedGame = plugin.getConfig().getString("game-panel.selected-game", "death-tag");
                     player.closeInventory();
                     try {
                         boolean handled = player.performCommand("arcadeport start " + selectedGame);
@@ -663,21 +856,44 @@ public final class MenuService implements Listener {
             }
         } else if ((SET_GAME_TITLE.equals(title) || "Edit Game Rotation".equals(title))
                 && ("panel-game-select".equals(action) || "panel-rotation-select".equals(action))) {
+            if (!isAdmin(player)) {
+                player.sendMessage(ChatColor.RED + "Operator permission required to change game settings.");
+                return;
+            }
             if (game == null) return;
             if ("panel-rotation-select".equals(action)) {
-                if (!"bacon-brawl".equals(game.getId())
-                        || !Bukkit.getPluginManager().isPluginEnabled("ArcadeMechanicsModern")) {
-                    player.sendMessage(ChatColor.RED + game.getName()
-                            + " is not cleared for the modern test rotation yet.");
-                } else {
-                    plugin.getConfig().set("game-panel.selected-game", game.getId());
-                    List<String> rotation = new ArrayList<>(plugin.getConfig().getStringList("game-panel.rotation"));
-                    if (!rotation.contains(game.getId())) rotation.add(game.getId());
-                    plugin.getConfig().set("game-panel.rotation", rotation);
-                    plugin.saveConfig();
-                    player.sendMessage(ChatColor.GREEN + game.getName() + " added to the local test rotation.");
-                    openGameSelection(player, true);
+                JavaPlugin engine = arcadeMechanicsPlugin();
+                if (engine == null) {
+                    player.sendMessage(ChatColor.RED + "ArcadeMechanicsModern is not enabled.");
+                    return;
                 }
+                List<String> cleared = engine.getConfig().getStringList("enabled-games");
+                if (!cleared.contains(game.getId())) {
+                    player.sendMessage(ChatColor.RED + game.getName()
+                            + " is not on the reviewed 26.3 acceptance allow-list.");
+                    return;
+                }
+                String rotationPath = "game-preferences.automatic-rotation.enabled-games";
+                List<String> rotation = new ArrayList<>(engine.getConfig().contains(rotationPath)
+                        ? engine.getConfig().getStringList(rotationPath) : cleared);
+                boolean included = rotation.contains(game.getId());
+                if (!included && !rotationCandidateAvailable(engine, game.getId())) {
+                    player.sendMessage(ChatColor.RED + game.getName()
+                            + " cannot be added yet: its selected map or physical world is not available.");
+                    int page = 0;
+                    try { page = Integer.parseInt(optionId); } catch (NumberFormatException ignored) { }
+                    openGameSelection(player, true, page);
+                    return;
+                }
+                if (included) rotation.removeIf(id -> game.getId().equals(id));
+                else rotation.add(game.getId());
+                engine.getConfig().set(rotationPath, rotation);
+                engine.saveConfig();
+                player.sendMessage(ChatColor.GREEN + game.getName()
+                        + (included ? " removed from" : " added to") + " the preference rotation pool.");
+                int page = 0;
+                try { page = Integer.parseInt(optionId); } catch (NumberFormatException ignored) { }
+                openGameSelection(player, true, page);
             } else {
                 plugin.getConfig().set("game-panel.selected-game", game.getId());
                 plugin.saveConfig();
@@ -686,8 +902,7 @@ public final class MenuService implements Listener {
                     player.closeInventory();
                     player.performCommand("arcadeport lobby " + game.getId());
                     player.sendMessage(ChatColor.GREEN + "Selected " + game.getName()
-                            + ". The lobby kit/team displays and Game/Kit scoreboard have been refreshed. "
-                            + "Start Game remains gated until this game's parity is cleared.");
+                            + ". The lobby kit/team displays and Game/Kit scoreboard have been refreshed.");
                 } else {
                     player.closeInventory();
                     player.sendMessage(ChatColor.YELLOW + game.getName()
