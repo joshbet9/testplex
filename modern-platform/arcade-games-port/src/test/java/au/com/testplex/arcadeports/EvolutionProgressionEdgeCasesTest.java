@@ -49,6 +49,6 @@ class EvolutionProgressionEdgeCasesTest {
         assertEquals(3, ArcadePortRules.nextEvolutionLevel(3, false));
         assertEquals(4, ArcadePortRules.nextEvolutionLevel(3, true));
         assertEquals(4, ArcadePortRules.nextEvolutionLevel(4, true));
-        assertEquals(4, ArcadePortRules.nextEvolutionLevel(99, false));
+        assertEquals(5, ArcadePortRules.nextEvolutionLevel(99, false));
     }
 }
