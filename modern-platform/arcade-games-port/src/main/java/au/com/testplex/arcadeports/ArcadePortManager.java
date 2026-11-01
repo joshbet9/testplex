@@ -669,6 +669,21 @@ public final class ArcadePortManager implements Listener {
                 player.sendMessage(ChatColor.RED + "That kit is not available for " + lobbyGame.displayName() + ".");
                 return;
             }
+            if (lobbyGame == ArcadePortGame.SHEEP_QUEST && !value.startsWith("monster-maze-")) {
+                String sheepKit = ArcadePortRules.normalizeSheepQuestKit(value);
+                if (sheepKit == null) {
+                    player.sendMessage(ChatColor.YELLOW + "Sheep Quest kits: Beserker, Archer or Brute.");
+                    return;
+                }
+                sheepQuestKitPreferences.put(player.getUniqueId(), sheepKit);
+                plugin.getConfig().set("lobby-kit-preferences." + player.getUniqueId() + ".sheep-quest", sheepKit);
+                plugin.saveConfig();
+                lobby.refreshPlayerScoreboard(player);
+                player.sendMessage(ChatColor.GREEN + "Selected "
+                        + ("beserker".equals(sheepKit) ? "Berserker" : Character.toUpperCase(sheepKit.charAt(0))
+                                + sheepKit.substring(1)) + " for Sheep Quest.");
+                return;
+            }
         }
         boolean explicitMonsterMazeKit = value.startsWith("monster-maze-");
         if (explicitMonsterMazeKit) value = value.substring("monster-maze-".length());
@@ -708,6 +723,10 @@ public final class ArcadePortManager implements Listener {
                 case PAINTBALL -> { selectPaintballKit(player, value); return; }
                 case DEATH_TAG -> { selectDeathTagRunnerKit(player, value); return; }
                 case RUNNER -> { selectRunnerKit(player, value); return; }
+                case SHEEP_QUEST -> {
+                    player.sendMessage(ChatColor.RED + "Sheep Quest kits are locked once the round starts.");
+                    return;
+                }
                 case SNEAKY_ASSASSINS -> { sneakyAssassins.selectKit(player, value); return; }
                 case TURF_WARS -> { selectTurfWarsKit(player, value); return; }
                 default -> { }
