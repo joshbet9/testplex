@@ -746,6 +746,7 @@ jobs:
           printf '%s\n' "$BUILD_SHA" | sudo -n tee "$SERVER_DIR/.testplex-modern-deployed-build" >/dev/null
           printf '%s\n' "$paper_build" | sudo -n tee "$SERVER_DIR/.testplex-paper-build" >/dev/null
           # A fresh nonce prevents prior startups, stale log lines, or unrelated plugins from satisfying readiness.
+          # Also remove the obsolete per-Monster-Maze marker left by older integrated builds.
           DEPLOYMENT_NONCE="$(cat /proc/sys/kernel/random/uuid)"
           ARCADE_PLUGIN_DATA="$SERVER_DIR/plugins/ArcadeMechanicsModern"
           sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$ARCADE_PLUGIN_DATA"
