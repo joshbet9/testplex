@@ -138,6 +138,7 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
 
 import java.io.BufferedInputStream;
@@ -5259,17 +5260,30 @@ public final class ArcadePortManager implements Listener {
                     player.getInventory().setArmorContents(new ItemStack[] {
                             new ItemStack(Material.GOLDEN_BOOTS), new ItemStack(Material.GOLDEN_LEGGINGS),
                             new ItemStack(Material.GOLDEN_CHESTPLATE), new ItemStack(Material.GOLDEN_HELMET) });
+                } else if ("frost".equals(kit)) {
+                    player.getInventory().addItem(namedItem(Material.SNOWBALL, "Ice Bridge",
+                            "Right-click to lay a temporary bridge of ice (25-second cooldown)."));
+                    player.getInventory().setArmorContents(new ItemStack[] {
+                            new ItemStack(Material.LEATHER_BOOTS), new ItemStack(Material.LEATHER_LEGGINGS),
+                            new ItemStack(Material.LEATHER_CHESTPLATE), new ItemStack(Material.LEATHER_HELMET) });
+                } else if ("glider".equals(kit)) {
+                    player.getInventory().addItem(namedItem(Material.FEATHER, "Glide",
+                            "Right-click to glide with an elytra for 3.5 seconds (15-second cooldown)."));
+                    player.getInventory().setArmorContents(new ItemStack[] {
+                            new ItemStack(Material.CHAINMAIL_BOOTS), new ItemStack(Material.CHAINMAIL_LEGGINGS),
+                            new ItemStack(Material.CHAINMAIL_CHESTPLATE), new ItemStack(Material.CHAINMAIL_HELMET) });
+                } else if ("tamer".equals(kit)) {
+                    player.getInventory().addItem(namedItem(Material.END_CRYSTAL, "Tame Dragon",
+                            "Right-click to control the closest dragon for 15 seconds (90-second cooldown)."));
+                    player.getInventory().setArmorContents(new ItemStack[] {
+                            new ItemStack(Material.IRON_BOOTS), new ItemStack(Material.IRON_LEGGINGS),
+                            new ItemStack(Material.IRON_CHESTPLATE), new ItemStack(Material.IRON_HELMET) });
                 } else {
                     player.getInventory().addItem(namedItem(Material.IRON_AXE, "Leap",
                             "Right-click to leap forward (8-second cooldown)."));
                     player.getInventory().setArmorContents(new ItemStack[] {
                             new ItemStack(Material.LEATHER_BOOTS), new ItemStack(Material.LEATHER_LEGGINGS),
                             new ItemStack(Material.LEATHER_CHESTPLATE), new ItemStack(Material.LEATHER_HELMET) });
-                }
-                int flares = ArcadePortRules.dragonsFlareCharges(kit);
-                if (flares > 0) {
-                    player.getInventory().addItem(namedItem(Material.FIREWORK_ROCKET, "Dragon Flare",
-                            "Right-click to repel dragons from you and the surrounding area.", flares));
                 }
                 break;
             }
@@ -5559,6 +5573,268 @@ public final class ArcadePortManager implements Listener {
         player.setFallDistance(0.0F);
         player.playEffect(player.getLocation(), Effect.BLAZE_SHOOT, 8);
         player.sendMessage(ChatColor.YELLOW + "Skill: " + ChatColor.GREEN + "You used Leap.");
+    }
+
+    private boolean isDragonFrostPlacementSafe(Session session, Block block, UUID exemptPlayerId) {
+        if (block == null || block.getWorld() != session.world
+                || !ArcadePortRules.isDragonFrostBridgeSurface(block.getType())) return false;
+        SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
+        if (mapData == null || !mapData.hasBounds()) return false;
+        int x = block.getX(), y = block.getY(), z = block.getZ();
+        if (x < mapData.minX() || x >= mapData.maxX()
+                || z < mapData.minZ() || z >= mapData.maxZ()) return false;
+        if (mapData.hasVerticalBounds() && (y < mapData.minY() || y >= mapData.maxY())) return false;
+        if (!block.getRelative(BlockFace.UP).isPassable()
+                || !block.getRelative(0, 2, 0).isPassable()) return false;
+        BoundingBox candidate = new BoundingBox(x, y, z, x + 1.0D, y + 1.0D, z + 1.0D);
+        for (Player other : session.players.values()) {
+            if (other == null || !other.isOnline() || !session.alive.contains(other.getUniqueId())
+                    || other.getUniqueId().equals(exemptPlayerId)) continue;
+            if (other.getBoundingBox().overlaps(candidate)) return false;
+        }
+        return true;
+    }
+
+    /** Three parallel 16-block lanes, matching the source IcePathData layout and forward sorting. */
+    private List<Block> createDragonFrostBridgePath(Session session, Player player) {
+        Location origin = player.getLocation().clone().add(0.0D, 1.0D, 0.0D);
+        Vector facing = origin.getDirection();
+        double horizontal = Math.sqrt(facing.getX() * facing.getX() + facing.getZ() * facing.getZ());
+        if (horizontal < 0.001D) return List.of();
+
+        List<Location> laneStarts = new ArrayList<>();
+        laneStarts.add(origin.clone());
+        if (Math.abs(facing.getX()) > Math.abs(facing.getZ())) {
+            laneStarts.add(origin.clone().add(0.0D, 0.0D, 1.0D));
+            laneStarts.add(origin.clone().add(0.0D, 0.0D, -1.0D));
+        } else {
+            laneStarts.add(origin.clone().add(1.0D, 0.0D, 0.0D));
+            laneStarts.add(origin.clone().add(-1.0D, 0.0D, 0.0D));
+        }
+
+        Set<Block> unique = new HashSet<>();
+        List<Block> blocks = new ArrayList<>();
+        for (Location laneStart : laneStarts) {
+            Location cursor = laneStart.clone().subtract(0.0D, 1.0D, 0.0D);
+            Vector direction = cursor.getDirection();
+            double laneHorizontal = Math.sqrt(direction.getX() * direction.getX()
+                    + direction.getZ() * direction.getZ());
+            if (laneHorizontal < 0.001D) continue;
+            direction.setY(ArcadePortRules.dragonsFrostPathVerticalComponent(
+                    direction.getY(), laneHorizontal));
+            direction.normalize();
+            cursor.subtract(direction.clone().multiply(2.0D));
+
+            double distance = 0.0D;
+            while (distance < ArcadePortRules.DRAGONS_FROST_BRIDGE_LENGTH) {
+                distance += 0.2D;
+                cursor.add(direction.clone().multiply(0.2D));
+                Block candidate = cursor.getBlock();
+                if (!isDragonFrostPlacementSafe(session, candidate, player.getUniqueId())) continue;
+                if (unique.add(candidate)) blocks.add(candidate);
+            }
+        }
+        blocks.sort(java.util.Comparator.comparingDouble(block ->
+                block.getLocation().add(0.5D, 0.5D, 0.5D).distanceSquared(origin)));
+        return blocks;
+    }
+
+    private void activateDragonFrostBridge(Session session, Player player, long now) {
+        UUID id = player.getUniqueId();
+        long readyAt = session.dragonFrostReadyAt.getOrDefault(id, 0L);
+        if (now < readyAt) {
+            player.sendMessage(ChatColor.YELLOW + "Ice Bridge ready in "
+                    + Math.max(1L, (readyAt - now + 999L) / 1000L) + "s.");
+            return;
+        }
+
+        Location launch = player.getLocation().clone().add(0.0D, 1.0D, 0.0D);
+        if (!launch.getBlock().isPassable()
+                || !launch.getBlock().getRelative(BlockFace.UP).isPassable()) {
+            player.sendMessage(ChatColor.YELLOW + "There is not enough headroom to use Ice Bridge here.");
+            return;
+        }
+        List<Block> path = createDragonFrostBridgePath(session, player);
+        if (path.isEmpty()) {
+            player.sendMessage(ChatColor.YELLOW + "There is no safe Ice Bridge path within this map.");
+            return;
+        }
+        if (!player.teleport(launch)) {
+            player.sendMessage(ChatColor.YELLOW + "Ice Bridge could not safely lift you from this position.");
+            return;
+        }
+
+        player.setVelocity(new Vector(0.0D, 0.5D, 0.0D));
+        session.dragonFrostBridgePaths.put(id, path);
+        session.dragonFrostBridgePathIndexes.put(id, 0);
+        session.dragonFrostReadyAt.put(id, now + ArcadePortRules.DRAGONS_FROST_COOLDOWN_MILLIS);
+        player.getWorld().playSound(player.getLocation(), Sound.BLOCK_GLASS_PLACE, 0.9F, 1.5F);
+        player.getWorld().spawnParticle(Particle.SNOWFLAKE,
+                player.getLocation().clone().add(0.0D, 0.3D, 0.0D), 14, 0.3D, 0.15D, 0.3D, 0.03D);
+        player.sendMessage(ChatColor.AQUA + "Ice Bridge! Your temporary three-lane path is forming.");
+    }
+
+    private void activateDragonGlider(Session session, Player player, long now) {
+        UUID id = player.getUniqueId();
+        long readyAt = session.dragonGliderReadyAt.getOrDefault(id, 0L);
+        if (now < readyAt) { player.sendMessage(ChatColor.YELLOW + "Glide ready in " + Math.max(1L, (readyAt - now + 999L) / 1000L) + "s."); return; }
+        if (session.dragonGliderUntil.containsKey(id)) { player.sendMessage(ChatColor.YELLOW + "You are already gliding."); return; }
+        ItemStack chestplate = player.getInventory().getChestplate();
+        session.dragonGliderOriginalChestplates.put(id, chestplate == null ? new ItemStack(Material.AIR) : chestplate.clone());
+        player.getInventory().setChestplate(namedItem(Material.ELYTRA, "Temporary Glider", "Temporary movement ability; restored automatically."));
+        player.setFallDistance(0.0F);
+        Vector glide = player.getLocation().getDirection().normalize().multiply(0.72D);
+        glide.setY(Math.max(0.08D, Math.min(0.42D, glide.getY() + 0.12D)));
+        player.setVelocity(glide); player.setGliding(true);
+        session.dragonGliderUntil.put(id, now + ArcadePortRules.DRAGONS_GLIDER_DURATION_MILLIS);
+        session.dragonGliderReadyAt.put(id, now + ArcadePortRules.DRAGONS_GLIDER_COOLDOWN_MILLIS);
+        player.playSound(player.getLocation(), Sound.ITEM_ELYTRA_FLYING, 0.9F, 1.15F);
+        player.sendMessage(ChatColor.AQUA + "Glider activated for 3.5 seconds.");
+    }
+
+    private void endDragonGlider(Session session, UUID playerId) {
+        session.dragonGliderUntil.remove(playerId);
+        ItemStack original = session.dragonGliderOriginalChestplates.remove(playerId);
+        Player player = session.players.get(playerId);
+        if (player == null || !player.isOnline()) return;
+        player.setGliding(false);
+        if (original != null) player.getInventory().setChestplate(original.getType().isAir() ? null : original);
+        if (session.alive.contains(playerId)) player.sendMessage(ChatColor.GRAY + "Your glide has ended.");
+    }
+
+    private void activateDragonTamer(Session session, Player player, long now) {
+        UUID playerId = player.getUniqueId();
+        if (session.dragonTamerControls.containsKey(playerId)) { player.sendMessage(ChatColor.YELLOW + "You are already controlling a dragon."); return; }
+        long readyAt = session.dragonTamerReadyAt.getOrDefault(playerId, 0L);
+        if (now < readyAt) { player.sendMessage(ChatColor.YELLOW + "Tamer ready in " + Math.max(1L, (readyAt - now + 999L) / 1000L) + "s."); return; }
+        EnderDragon dragon = session.entities.stream().filter(e -> e instanceof EnderDragon && e.isValid() && !e.isDead())
+                .map(e -> (EnderDragon) e).filter(e -> !session.dragonTamerByDragon.containsKey(e.getUniqueId()))
+                .min(java.util.Comparator.comparingDouble(e -> e.getLocation().distanceSquared(player.getLocation()))).orElse(null);
+        if (dragon == null) { player.sendMessage(ChatColor.YELLOW + "There is no available dragon to control yet."); return; }
+        DragonTamerControl control = new DragonTamerControl(dragon.getUniqueId(), player.getLocation().clone(),
+                player.getGameMode(), now + ArcadePortRules.DRAGONS_TAMER_DURATION_MILLIS);
+        session.dragonTamerControls.put(playerId, control);
+        session.dragonTamerByDragon.put(dragon.getUniqueId(), playerId);
+        session.dragonTamerReadyAt.put(playerId, now + ArcadePortRules.DRAGONS_TAMER_COOLDOWN_MILLIS);
+        session.dragonTargetPlayers.remove(dragon.getUniqueId()); session.dragonTargetLocations.remove(dragon.getUniqueId());
+        player.setGameMode(GameMode.SPECTATOR); player.setSpectatorTarget(dragon);
+        player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 0.9F, 1.2F);
+        player.sendTitle(ChatColor.DARK_PURPLE + "DRAGON TAMER", ChatColor.LIGHT_PURPLE + "Look where you want the dragon to fly", 0, 35, 8);
+        player.sendMessage(ChatColor.LIGHT_PURPLE + "You control the closest dragon for 15 seconds.");
+    }
+
+    private Location safeDragonTamerReturnLocation(Location origin) {
+        if (origin == null || origin.getWorld() == null) return null;
+        World world = origin.getWorld();
+        for (int radius = 0; radius <= 8; radius++) {
+            for (int dx = -radius; dx <= radius; dx++) for (int dz = -radius; dz <= radius; dz++) {
+                if (Math.max(Math.abs(dx), Math.abs(dz)) != radius) continue;
+                for (int y = origin.getBlockY() - 1; y <= origin.getBlockY() + 3; y++) {
+                    if (y < world.getMinHeight() || y + 2 >= world.getMaxHeight()) continue;
+                    Block support = world.getBlockAt(origin.getBlockX() + dx, y, origin.getBlockZ() + dz);
+                    Block feet = support.getRelative(BlockFace.UP), head = feet.getRelative(BlockFace.UP);
+                    if (!support.getType().isSolid() || feet.isLiquid() || head.isLiquid() || !feet.isPassable() || !head.isPassable()) continue;
+                    return new Location(world, support.getX() + 0.5D, support.getY() + 1.0D, support.getZ() + 0.5D, origin.getYaw(), origin.getPitch());
+                }
+            }
+        }
+        return null;
+    }
+
+    private void endDragonTamer(Session session, UUID playerId, String message, boolean restorePlayer) {
+        DragonTamerControl control = session.dragonTamerControls.remove(playerId);
+        if (control == null) return;
+        session.dragonTamerByDragon.remove(control.dragonId(), playerId);
+        Player player = session.players.get(playerId);
+        if (!restorePlayer || player == null || !player.isOnline()) return;
+        player.setSpectatorTarget(null);
+        if (session.alive.contains(playerId)) {
+            player.setGameMode(control.previousGameMode() == GameMode.SPECTATOR ? GameMode.ADVENTURE : control.previousGameMode());
+            Location safe = safeDragonTamerReturnLocation(control.returnLocation());
+            if (safe == null) safe = safeDragonTamerReturnLocation(session.world.getSpawnLocation());
+            if (safe == null) {
+                plugin.getLogger().severe("No safe supporting block could be found for Tamer return in " + session.world.getName());
+                safe = session.world.getSpawnLocation();
+            }
+            player.teleport(safe);
+            player.setFallDistance(0.0F); player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+            player.sendMessage(ChatColor.LIGHT_PURPLE + message);
+        }
+    }
+
+    private void restoreDragonFrostBlocks(Session session) {
+        for (Map.Entry<Block, BlockData> entry : new ArrayList<>(session.dragonIceBridgeOriginals.entrySet())) {
+            Block block = entry.getKey();
+            if (block != null && block.getWorld() == session.world && block.getType() == Material.ICE) {
+                block.setBlockData(entry.getValue(), false);
+            }
+        }
+        session.dragonIceBridgeOriginals.clear();
+        session.dragonIceBridgeExpiresAt.clear();
+        session.dragonFrostBridgePaths.clear();
+        session.dragonFrostBridgePathIndexes.clear();
+    }
+
+    private void updateDragonAbilityTimers(Session session, long now) {
+        for (Iterator<Map.Entry<Block, Long>> it = session.dragonIceBridgeExpiresAt.entrySet().iterator(); it.hasNext();) {
+            Map.Entry<Block, Long> entry = it.next();
+            if (now < entry.getValue()) continue;
+            Block block = entry.getKey(); BlockData original = session.dragonIceBridgeOriginals.remove(block);
+            if (block != null && block.getWorld() == session.world && original != null
+                    && block.getType() == Material.ICE) block.setBlockData(original, false);
+            it.remove();
+        }
+
+        // Legacy IcePathData emits one block each server tick and restores it after a short melt window.
+        for (Map.Entry<UUID, List<Block>> pathEntry
+                : new ArrayList<>(session.dragonFrostBridgePaths.entrySet())) {
+            UUID playerId = pathEntry.getKey();
+            List<Block> path = pathEntry.getValue();
+            int index = session.dragonFrostBridgePathIndexes.getOrDefault(playerId, 0);
+            if (!session.alive.contains(playerId) || index >= path.size()) {
+                session.dragonFrostBridgePaths.remove(playerId);
+                session.dragonFrostBridgePathIndexes.remove(playerId);
+                continue;
+            }
+            Block block = path.get(index);
+            session.dragonFrostBridgePathIndexes.put(playerId, index + 1);
+            if (isDragonFrostPlacementSafe(session, block, null)) {
+                session.dragonIceBridgeOriginals.putIfAbsent(block, block.getBlockData().clone());
+                session.dragonIceBridgeExpiresAt.put(block,
+                        now + ArcadePortRules.DRAGONS_FROST_BRIDGE_LIFETIME_MILLIS);
+                block.setType(Material.ICE, false);
+                block.getWorld().playEffect(block.getLocation(), Effect.STEP_SOUND, Material.ICE);
+            }
+            if (index + 1 >= path.size()) {
+                session.dragonFrostBridgePaths.remove(playerId);
+                session.dragonFrostBridgePathIndexes.remove(playerId);
+            }
+        }
+
+        for (UUID id : new ArrayList<>(session.dragonGliderUntil.keySet()))
+            if (now >= session.dragonGliderUntil.getOrDefault(id, Long.MAX_VALUE) || !session.alive.contains(id)) endDragonGlider(session, id);
+        for (Map.Entry<UUID, DragonTamerControl> entry : new ArrayList<>(session.dragonTamerControls.entrySet())) {
+            UUID id = entry.getKey(); DragonTamerControl control = entry.getValue();
+            Entity dragon = session.world.getEntities().stream().filter(e -> e.getUniqueId().equals(control.dragonId())).findFirst().orElse(null);
+            if (now >= control.endsAtMillis() || !session.alive.contains(id) || dragon == null || !dragon.isValid())
+                endDragonTamer(session, id, "Your 15-second dragon control has ended.", true);
+        }
+    }
+
+    private void awardDragonAchievement(UUID id, Player player, String achievementId, String description) {
+        if (id == null || testPlayers.isTestPlayer(id)) return;
+        String key = "local-achievements." + id + ".dragons." + achievementId;
+        if (plugin.getConfig().getBoolean(key, false)) return;
+        plugin.getConfig().set(key, true);
+        if (player != null && player.isOnline()) player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + description);
+        plugin.saveConfig();
+    }
+
+    private void awardDragonsSurvivalTime(Session session, long now) {
+        if (session.dragonRoundStartedAt <= 0L || !ArcadePortRules.shouldAwardDragonsSurviveFiveMinutes(now - session.dragonRoundStartedAt)) return;
+        for (UUID id : new ArrayList<>(session.alive)) if (session.dragonSurviveFiveAwarded.add(id))
+            awardDragonAchievement(id, session.players.get(id), "survive-five-minutes",
+                    "Survive 5 minutes — remain alive for five live minutes in Dragons.");
     }
 
     private void useQuiverGroundPound(Session session, Player player, long now) {
@@ -7456,6 +7732,8 @@ public final class ArcadePortManager implements Listener {
             // Reborn checks water on FASTER and applies a separate 500ms Recharge to each player.
             for (Player player : new ArrayList<>(alivePlayers(session))) {
                 UUID id = player.getUniqueId();
+                // Tamer is piloting the dragon as a hidden spectator; its camera position is not a combatant.
+                if (session.dragonTamerControls.containsKey(id)) continue;
                 long nextDamageAt = session.dragonWaterDamageNextAt.getOrDefault(id, 0L);
                 if (now < nextDamageAt) continue;
                 session.dragonWaterDamageNextAt.put(id,
@@ -7468,6 +7746,7 @@ public final class ArcadePortManager implements Listener {
                     eliminate(session, player, null, "was lost to the water");
                     if (active != session) return;
                 } else {
+                    session.dragonDamagedPlayers.add(id);
                     player.setHealth(player.getHealth() - damage);
                     player.playSound(player.getLocation(), Sound.ENTITY_GENERIC_SPLASH, 0.8F,
                             1.0F + ThreadLocalRandom.current().nextFloat() * 0.5F);
@@ -8500,14 +8779,18 @@ public final class ArcadePortManager implements Listener {
     private void spawnTestDragons(Session session) {
         // Reborn's SEC_05 update adds at most one dragon every five seconds.
         // The first spawn is delayed until the first source update after round start.
-        session.dragonNextSpawnAt = System.currentTimeMillis() + ArcadePortRules.DRAGONS_SPAWN_INTERVAL_MILLIS;
+        session.dragonRoundStartedAt = System.currentTimeMillis();
+        session.dragonSurviveFiveAwarded.clear();
+        session.dragonDamagedPlayers.clear();
+        session.dragonNextSpawnAt = session.dragonRoundStartedAt + ArcadePortRules.DRAGONS_SPAWN_INTERVAL_MILLIS;
         announce(session, ChatColor.DARK_PURPLE
                 + "The dragons are hunting! Use your kit ability, and keep moving.");
     }
 
     private void updateTestDragons(Session session, long now) {
         if (active != session) return;
-        pruneDragonFlareZones(session, now);
+        updateDragonAbilityTimers(session, now);
+        awardDragonsSurvivalTime(session, now);
 
         // The source uses FASTEST (125 ms) for dragon pursuit/contact and FAST (500 ms)
         // for Sparkler/Fletcher perk updates. Barrage itself remains a TICK ability.
@@ -8523,6 +8806,9 @@ public final class ArcadePortManager implements Listener {
             Entity entity = it.next();
             if (entity instanceof EnderDragon dragon && (!dragon.isValid() || dragon.isDead())) {
                 UUID id = dragon.getUniqueId();
+                UUID controllerId = session.dragonTamerByDragon.get(id);
+                if (controllerId != null) endDragonTamer(session, controllerId,
+                        "Your controlled dragon is no longer available.", true);
                 session.dragonTargetLocations.remove(id);
                 session.dragonTargetPlayers.remove(id);
                 it.remove();
@@ -8604,23 +8890,37 @@ public final class ArcadePortManager implements Listener {
         if (targetUpdate) {
             for (EnderDragon dragon : dragons) {
                 UUID dragonId = dragon.getUniqueId();
+                UUID controllerId = session.dragonTamerByDragon.get(dragonId);
+                if (controllerId != null) {
+                    Player controller = session.players.get(controllerId);
+                    DragonTamerControl control = session.dragonTamerControls.get(controllerId);
+                    if (controller == null || !controller.isOnline() || control == null
+                            || !session.alive.contains(controllerId) || now >= control.endsAtMillis()) {
+                        endDragonTamer(session, controllerId, "Your 15-second dragon control has ended.", true);
+                    } else {
+                        Vector facing = controller.getLocation().getDirection();
+                        if (facing.lengthSquared() < 0.001D) facing = new Vector(0.0D, 0.0D, 1.0D);
+                        facing.normalize();
+                        Vector movement = facing.clone().multiply(0.42D);
+                        movement.setY(Math.max(-0.14D, Math.min(0.14D, facing.getY() * 0.30D)));
+                        dragon.setVelocity(movement);
+                        session.dragonTargetPlayers.remove(dragonId);
+                        session.dragonTargetLocations.put(dragonId, dragon.getLocation().clone().add(facing.clone().multiply(12.0D)));
+                        continue;
+                    }
+                }
                 UUID targetPlayerId = session.dragonTargetPlayers.get(dragonId);
                 Location target = session.dragonTargetLocations.get(dragonId);
                 if (targetPlayerId != null) {
                     Player targetPlayer = session.players.get(targetPlayerId);
                     if (targetPlayer != null && targetPlayer.isOnline() && session.alive.contains(targetPlayerId)
-                            && !isDragonPlayerProtected(session, targetPlayer, now)) {
+                            && !session.dragonTamerControls.containsKey(targetPlayerId)) {
                         target = targetPlayer.getLocation().clone();
                         session.dragonTargetLocations.put(dragonId, target.clone());
                     } else {
                         session.dragonTargetPlayers.remove(dragonId);
                         target = null;
                     }
-                }
-
-                if (target != null && isDragonLocationProtected(session, target, now)) {
-                    session.dragonTargetPlayers.remove(dragonId);
-                    target = null;
                 }
 
                 // MineplexDragon.updateTarget() runs on FASTEST: if below Y=10, target sky;
@@ -8653,7 +8953,7 @@ public final class ArcadePortManager implements Listener {
                     }
                 }
                 for (Player player : alive) {
-                    if (!isDragonPlayerProtected(session, player, now)
+                    if (!session.dragonTamerControls.containsKey(player.getUniqueId())
                             && dragon.getBoundingBox().overlaps(player.getBoundingBox())) {
                         applyDragonContactHit(session, dragon, player, now);
                     }
@@ -8668,13 +8968,14 @@ public final class ArcadePortManager implements Listener {
             if (!item.isValid() || ArcadePortRules.shouldExpireDragonSparkler(
                     item.getTicksLived(), item.getLocation().getY(), item.getLocation().getBlock().isLiquid())) {
                 session.dragonSparklerItems.remove(sparklerId);
+                session.dragonSparklerStyles.remove(sparklerId);
                 it.remove();
                 item.remove();
                 continue;
             }
             if (perkUpdate) {
                 Location itemLocation = item.getLocation();
-                renderDragonSparklerBurst(itemLocation);
+                renderDragonSparklerBurst(itemLocation, session.dragonSparklerStyles.getOrDefault(sparklerId, "golden-thread"));
             }
             if (!targetUpdate) continue;
             Location itemLocation = item.getLocation();
@@ -8682,7 +8983,6 @@ public final class ArcadePortManager implements Listener {
             // itself remains until PerkSparkler's >100 tick cleanup.
             if (!ArcadePortRules.shouldDragonSparklerAttract(
                     itemLocation.getY(), itemLocation.getBlock().isLiquid())) continue;
-            if (isDragonLocationProtected(session, itemLocation, now)) continue;
             for (EnderDragon dragon : dragons) {
                 if (dragon.getLocation().distanceSquared(itemLocation)
                         > ArcadePortRules.DRAGONS_SPARKLER_RANGE_SQUARED) continue;
@@ -8730,17 +9030,10 @@ public final class ArcadePortManager implements Listener {
     private Location randomDragonSkyTarget(Session session) {
         Location center = session.dragonSpectatorLocation == null
                 ? session.world.getSpawnLocation() : session.dragonSpectatorLocation;
-        for (int attempt = 0; attempt < 24; attempt++) {
-            // MineplexDragon.targetSky uses UtilMath.rRange: inclusive integer offsets
-            // of -50..50 horizontally and 20..40 vertically, with no map-bound clamping.
-            double x = center.getX() + ThreadLocalRandom.current().nextInt(-50, 51);
-            double y = center.getY() + ThreadLocalRandom.current().nextInt(20, 41);
-            double z = center.getZ() + ThreadLocalRandom.current().nextInt(-50, 51);
-            Location candidate = new Location(session.world, x, y, z);
-            if (!isDragonLocationProtected(session, candidate, System.currentTimeMillis())) return candidate;
-        }
-        // If overlapping flares cover the floor, place the sky target above their vertical envelope.
-        return new Location(session.world, center.getX(), center.getY() + 60.0D, center.getZ());
+        double x = center.getX() + ThreadLocalRandom.current().nextInt(-50, 51);
+        double y = center.getY() + ThreadLocalRandom.current().nextInt(20, 41);
+        double z = center.getZ() + ThreadLocalRandom.current().nextInt(-50, 51);
+        return new Location(session.world, x, y, z);
     }
 
     private void setDragonTargetSky(Session session, EnderDragon dragon) {
@@ -8757,6 +9050,7 @@ public final class ArcadePortManager implements Listener {
 
     private Player nearestDragonsSpectatorTarget(Session session, Player spectator) {
         return alivePlayers(session).stream()
+                .filter(target -> !session.dragonTamerControls.containsKey(target.getUniqueId()))
                 .min(java.util.Comparator.comparingDouble(target ->
                         target.getLocation().distanceSquared(spectator.getLocation())))
                 .orElse(null);
@@ -8764,6 +9058,7 @@ public final class ArcadePortManager implements Listener {
 
     private void openDragonsSpectatorMenu(Session session, Player spectator) {
         List<Player> targets = alivePlayers(session).stream()
+                .filter(player -> !session.dragonTamerControls.containsKey(player.getUniqueId()))
                 .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
         if (targets.isEmpty()) {
@@ -8789,6 +9084,7 @@ public final class ArcadePortManager implements Listener {
     private boolean populateDragonsSpectatorMenu(
             Session session, Player spectator, DragonCompassMenuHolder holder) {
         List<Player> targets = alivePlayers(session).stream()
+                .filter(player -> !session.dragonTamerControls.containsKey(player.getUniqueId()))
                 .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
         holder.inventory.clear();
@@ -8799,6 +9095,8 @@ public final class ArcadePortManager implements Listener {
         teamMeta.setLore(List.of(" ", ChatColor.YELLOW + "Players Alive: " + ChatColor.WHITE + targets.size()));
         teamHeader.setItemMeta(teamMeta);
         holder.inventory.setItem(13, teamHeader);
+        holder.inventory.setItem(4, namedItem(Material.BARRIER, ChatColor.RED + "Close",
+                "Close the Dragons spectator menu."));
 
         int slot = 19;
         for (Player target : targets) {
@@ -8832,7 +9130,9 @@ public final class ArcadePortManager implements Listener {
         long now = System.currentTimeMillis();
         if (now >= session.dragonNextCompassUpdateAt) {
             session.dragonNextCompassUpdateAt = now + 250L; // CompassModule uses UpdateType.FASTER.
-            List<Player> alive = alivePlayers(session);
+            List<Player> alive = alivePlayers(session).stream()
+                    .filter(player -> !session.dragonTamerControls.containsKey(player.getUniqueId()))
+                    .toList();
             if (!alive.isEmpty()) {
                 for (Player spectator : session.players.values()) {
                     if (spectator == null || !spectator.isOnline()
@@ -8878,138 +9178,61 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    private void pruneDragonFlareZones(Session session, long now) {
-        session.dragonFlareZones.removeIf(zone -> !ArcadePortRules.isDragonFlareActive(now, zone.expiresAtMillis()));
-    }
-
-    private boolean isDragonLocationProtected(Session session, Location location, long now) {
-        if (location == null || location.getWorld() != session.world) return false;
-        for (DragonFlareZone zone : session.dragonFlareZones) {
-            if (!ArcadePortRules.isDragonFlareActive(now, zone.expiresAtMillis())
-                    || zone.center().getWorld() != location.getWorld()) continue;
-            double dx = location.getX() - zone.center().getX();
-            double dz = location.getZ() - zone.center().getZ();
-            double dy = location.getY() - zone.center().getY();
-            if (ArcadePortRules.isDragonFlareLocationProtected(dx * dx + dz * dz, dy)) return true;
-        }
-        return false;
-    }
-
-    private boolean isDragonPlayerProtected(Session session, Player player, long now) {
-        if (player == null || player.getWorld() != session.world) return false;
-        UUID playerId = player.getUniqueId();
-        Location current = player.getLocation();
-        for (DragonFlareZone zone : session.dragonFlareZones) {
-            if (!ArcadePortRules.isDragonFlareActive(now, zone.expiresAtMillis())) continue;
-            Location center = zone.center();
-            if (center.getWorld() != current.getWorld()) continue;
-            double dx = current.getX() - center.getX();
-            double dz = current.getZ() - center.getZ();
-            double dy = current.getY() - center.getY();
-            if (ArcadePortRules.isDragonFlareLocationProtected(dx * dx + dz * dz, dy)) return true;
-        }
-        return false;
-    }
-
     private List<Player> dragonTargetCandidates(Session session, List<Player> alive, long now) {
-        return alive.stream().filter(player -> !isDragonPlayerProtected(session, player, now)).toList();
+        return alive.stream().filter(player -> !session.dragonTamerControls.containsKey(player.getUniqueId())).toList();
     }
 
-    private void retargetDragonAwayFromFlare(Session session, EnderDragon dragon, long now) {
-        List<Player> candidates = dragonTargetCandidates(session, alivePlayers(session), now);
-        if (session.dragonSpectatorLocation != null
-                && dragon.getLocation().getY() > session.dragonSpectatorLocation.getY()
-                && !candidates.isEmpty()) {
-            Player target = candidates.get(ThreadLocalRandom.current().nextInt(candidates.size()));
-            session.dragonTargetPlayers.put(dragon.getUniqueId(), target.getUniqueId());
-            session.dragonTargetLocations.put(dragon.getUniqueId(), target.getLocation().clone());
-        } else {
-            setDragonTargetSky(session, dragon);
-        }
-    }
-
-    private void activateDragonFlare(Session session, Player player, long now) {
-        if (active != session || !session.alive.contains(player.getUniqueId())) return;
-        ItemStack held = player.getInventory().getItemInMainHand();
-        if (held == null || held.getType() != Material.FIREWORK_ROCKET || !held.hasItemMeta()
-                || !held.getItemMeta().hasDisplayName()
-                || !"Dragon Flare".equals(ChatColor.stripColor(held.getItemMeta().getDisplayName()))) return;
-
-        consumeHeld(player);
-        Location center = player.getLocation().clone();
-        session.dragonFlareZones.add(new DragonFlareZone(player.getUniqueId(), center.clone(),
-                now + ArcadePortRules.DRAGONS_FLARE_DURATION_MILLIS));
-
-        for (Entity entity : session.entities) {
-            if (!(entity instanceof EnderDragon dragon) || !dragon.isValid()) continue;
-            UUID targetPlayerId = session.dragonTargetPlayers.get(dragon.getUniqueId());
-            Player targetPlayer = targetPlayerId == null ? null : session.players.get(targetPlayerId);
-            Location targetLocation = session.dragonTargetLocations.get(dragon.getUniqueId());
-            if (player.getUniqueId().equals(targetPlayerId)
-                    || isDragonPlayerProtected(session, targetPlayer, now)
-                    || isDragonLocationProtected(session, targetLocation, now)) {
-                retargetDragonAwayFromFlare(session, dragon, now);
-            }
-        }
-
-        playDragonFlareEffect(player, center);
-        player.sendMessage(ChatColor.AQUA + "Dragon Flare! Nearby players are protected from dragon targeting.");
-    }
-
-    private void playDragonFlareEffect(Player player, Location location) {
-        String effect = "classic";
+    private String selectedDragonCosmetic(UUID playerId, String lineId, String defaultOption) {
         Plugin cosmeticsPlugin = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
-        if (cosmeticsPlugin != null && cosmeticsPlugin.isEnabled()) {
-            File preferencesFile = new File(cosmeticsPlugin.getDataFolder(), "player-preferences.yml");
-            YamlConfiguration preferences = YamlConfiguration.loadConfiguration(preferencesFile);
-            String selected = preferences.getString("players." + player.getUniqueId()
-                    + ".games.dragons.cosmetics.flare-effects.selected", "classic");
-            if (selected != null) effect = selected.toLowerCase(java.util.Locale.ROOT);
-        }
+        if (cosmeticsPlugin == null || !cosmeticsPlugin.isEnabled()) return defaultOption;
+        File preferencesFile = new File(cosmeticsPlugin.getDataFolder(), "player-preferences.yml");
+        YamlConfiguration preferences = YamlConfiguration.loadConfiguration(preferencesFile);
+        String selected = preferences.getString("players." + playerId
+                + ".games.dragons.cosmetics." + lineId + ".selected", defaultOption);
+        return selected == null || selected.isBlank() ? defaultOption : selected.toLowerCase(java.util.Locale.ROOT);
+    }
 
+    private void renderDragonSparklerBurst(Location location, String style) {
+        if (location == null || location.getWorld() == null) return;
         var world = location.getWorld();
-        if (world == null) return;
-        world.playSound(location, Sound.ENTITY_FIREWORK_ROCKET_BLAST, 1.2F, 1.1F);
-        switch (effect) {
-            case "ember" -> {
-                world.spawnParticle(Particle.FLAME, location, 42, 0.7D, 0.6D, 0.7D, 0.08D);
-                world.spawnParticle(Particle.LAVA, location, 12, 0.6D, 0.5D, 0.6D, 0.02D);
+        FireworkEffect.Builder effect = FireworkEffect.builder().with(FireworkEffect.Type.BURST);
+        switch (style == null ? "golden-thread" : style) {
+            case "cinder-drift" -> { effect.withColor(Color.ORANGE, Color.RED); world.spawnParticle(Particle.FLAME, location, 5, 0.10D, 0.10D, 0.10D, 0.01D); }
+            case "glacier-dust" -> { effect.withColor(Color.AQUA, Color.WHITE); world.spawnParticle(Particle.SNOWFLAKE, location, 5, 0.10D, 0.10D, 0.10D, 0.01D); }
+            case "void-motes" -> { effect.withColor(Color.PURPLE, Color.FUCHSIA); world.spawnParticle(Particle.PORTAL, location, 6, 0.10D, 0.10D, 0.10D, 0.02D); }
+            case "starlight" -> { effect.withColor(Color.YELLOW, Color.WHITE); world.spawnParticle(Particle.ELECTRIC_SPARK, location, 7, 0.12D, 0.12D, 0.12D, 0.02D); }
+            case "prismatic" -> { effect.withColor(Color.AQUA, Color.LIME, Color.FUCHSIA); world.spawnParticle(Particle.ENCHANT, location, 5, 0.12D, 0.12D, 0.12D, 0.02D); }
+            default -> { effect.withColor(Color.YELLOW, Color.WHITE); world.spawnParticle(Particle.END_ROD, location, 4, 0.09D, 0.09D, 0.09D, 0.01D); }
+        }
+        Firework firework = world.spawn(location, Firework.class);
+        FireworkMeta meta = firework.getFireworkMeta();
+        meta.clearEffects(); meta.addEffect(effect.build()); meta.setPower(0);
+        firework.setFireworkMeta(meta); firework.detonate();
+    }
+
+    private void renderDragonPyroSignature(Location location, String signature) {
+        if (location == null || location.getWorld() == null) return;
+        var world = location.getWorld();
+        switch (signature == null ? "ember-wing" : signature) {
+            case "phoenix-arc" -> {
+                for (int i = 0; i <= 12; i++) {
+                    double angle = Math.PI * i / 12.0D;
+                    world.spawnParticle(Particle.FLAME, location.clone().add(Math.cos(angle) * 0.7D, Math.sin(angle) * 0.45D, 0.0D), 2, 0.03D, 0.03D, 0.03D, 0.0D);
+                }
             }
-            case "frost" -> {
-                world.spawnParticle(Particle.SNOWFLAKE, location, 42, 0.7D, 0.6D, 0.7D, 0.06D);
-                world.spawnParticle(Particle.CLOUD, location, 14, 0.45D, 0.25D, 0.45D, 0.02D);
-            }
-            case "ender" -> {
-                world.spawnParticle(Particle.PORTAL, location, 48, 0.75D, 0.7D, 0.75D, 0.35D);
-                world.spawnParticle(Particle.WITCH, location, 16, 0.4D, 0.5D, 0.4D, 0.02D);
-            }
-            case "solar" -> {
-                world.spawnParticle(Particle.FLASH, location, 1, 0.0D, 0.0D, 0.0D, 0.0D);
-                world.spawnParticle(Particle.END_ROD, location, 36, 0.65D, 0.55D, 0.65D, 0.08D);
-            }
-            case "aurora" -> {
-                world.spawnParticle(Particle.ELECTRIC_SPARK, location, 36, 0.75D, 0.55D, 0.75D, 0.05D);
-                world.spawnParticle(Particle.ENCHANT, location, 30, 0.65D, 0.8D, 0.65D, 0.5D);
+            case "molten-orbit" -> {
+                for (int i = 0; i < 12; i++) {
+                    double angle = Math.PI * 2.0D * i / 12.0D;
+                    world.spawnParticle(Particle.LAVA, location.clone().add(Math.cos(angle) * 0.55D, 0.15D, Math.sin(angle) * 0.55D), 1, 0.02D, 0.02D, 0.02D, 0.0D);
+                }
             }
             default -> {
-                world.spawnParticle(Particle.FIREWORK, location, 42, 0.7D, 0.6D, 0.7D, 0.08D);
-                world.spawnParticle(Particle.END_ROD, location, 14, 0.45D, 0.4D, 0.45D, 0.02D);
+                for (int i = -4; i <= 4; i++) {
+                    world.spawnParticle(Particle.FLAME, location.clone().add(i * 0.12D, 0.15D, 0.35D), 1, 0.02D, 0.02D, 0.02D, 0.0D);
+                    world.spawnParticle(Particle.FLAME, location.clone().add(i * 0.12D, 0.15D, -0.35D), 1, 0.02D, 0.02D, 0.02D, 0.0D);
+                }
             }
         }
-    }
-
-    private void renderDragonSparklerBurst(Location location) {
-        if (location == null || location.getWorld() == null) return;
-        Firework firework = location.getWorld().spawn(location, Firework.class);
-        FireworkMeta meta = firework.getFireworkMeta();
-        meta.clearEffects();
-        meta.addEffect(FireworkEffect.builder()
-                .with(FireworkEffect.Type.BURST)
-                .withColor(Color.YELLOW)
-                .build());
-        meta.setPower(0);
-        firework.setFireworkMeta(meta);
-        firework.detonate();
     }
 
     private void updateDragonBarrageCharge(Session session, Player player, long now) {
@@ -11688,6 +11911,12 @@ public final class ArcadePortManager implements Listener {
             killer = recentMicroBattlesKiller(session, player.getUniqueId());
         }
         UUID eliminatedId = player.getUniqueId();
+        if (session.type == ArcadePortGame.DRAGONS) {
+            endDragonTamer(session, eliminatedId, "You were eliminated; dragon control ended.", true);
+            endDragonGlider(session, eliminatedId);
+            session.dragonFrostBridgePaths.remove(eliminatedId);
+            session.dragonFrostBridgePathIndexes.remove(eliminatedId);
+        }
         if (!session.alive.remove(eliminatedId)) return;
         if (session.type == ArcadePortGame.DRAGONS) {
             session.dragonEliminationOrder.add(eliminatedId);
@@ -13326,6 +13555,14 @@ public final class ArcadePortManager implements Listener {
         if (announceWinner && session.type == ArcadePortGame.SHEEP_QUEST) {
             recordSheepQuestRewards(session, winner);
         }
+        if (session.type == ArcadePortGame.DRAGONS) {
+            for (UUID playerId : new ArrayList<>(session.dragonTamerControls.keySet())) {
+                endDragonTamer(session, playerId, "The round ended; dragon control was released.", true);
+            }
+            for (UUID playerId : new ArrayList<>(session.dragonGliderUntil.keySet())) endDragonGlider(session, playerId);
+            restoreDragonFrostBlocks(session);
+            session.dragonSparklerStyles.clear();
+        }
         active = null;
         if (session.tickTask != null) session.tickTask.cancel();
         if (announceWinner && session.type == ArcadePortGame.BACON_BRAWL && winner != null) {
@@ -13404,7 +13641,6 @@ public final class ArcadePortManager implements Listener {
         session.bombMvpPressurePlayers.clear();
         session.bombPlayersDamaged.clear();
         session.dragonContactCooldowns.clear();
-        session.dragonFlareZones.clear();
         session.dragonWaterDamageNextAt.clear();
         session.paintProjectileDamage.clear();
         session.paintProjectileTeams.clear();
@@ -14089,6 +14325,20 @@ public final class ArcadePortManager implements Listener {
                             || session.type == ArcadePortGame.MICRO_BATTLES)
                         && session.alive.contains(id)
                         && session.teams.getOrDefault(id, -2) == winningTeam));
+            if (session.type == ArcadePortGame.DRAGONS) {
+                int previousStreak = plugin.getConfig().getInt(path + "win-streak", 0);
+                int streak = ArcadePortRules.nextDragonsWinStreak(previousStreak, won);
+                plugin.getConfig().set(path + "win-streak", streak);
+                if (ArcadePortRules.shouldAwardDragonsWinStreak(streak)) {
+                    awardDragonAchievement(id, entry.getValue(), "win-three-in-a-row",
+                            "Win 3 in a row — three consecutive Dragons wins.");
+                }
+                if (ArcadePortRules.shouldAwardDragonsNoDamageWin(
+                        won, session.dragonDamagedPlayers.contains(id))) {
+                    awardDragonAchievement(id, entry.getValue(), "no-damage-win",
+                            "Untouched — win a Dragons game without taking damage.");
+                }
+            }
             if (won) {
                 plugin.getConfig().set(path + "wins",
                         plugin.getConfig().getInt(path + "wins", 0) + 1);
@@ -14643,6 +14893,24 @@ public final class ArcadePortManager implements Listener {
                     List.of(" ", ChatColor.GRAY + "Times eliminated: " + ChatColor.WHITE + knockouts),
                     "noop", null, null));
         } else if ("dragons".equals(gameId)) {
+            String[] achievementIds = {"win-three-in-a-row", "survive-five-minutes", "no-damage-win"};
+            String[] achievementNames = {"Win 3 in a row", "Survive 5 minutes", "Untouched"};
+            String[] requirements = {
+                    "Win three completed Dragons games consecutively.",
+                    "Stay alive for at least five live minutes in one Dragons game.",
+                    "Win a Dragons game without taking any damage."
+            };
+            int[] achievementSlots = {10, 12, 14};
+            for (int i = 0; i < achievementIds.length; i++) {
+                boolean unlocked = plugin.getConfig().getBoolean(
+                        "local-achievements." + targetId + ".dragons." + achievementIds[i], false);
+                inventory.setItem(achievementSlots[i], statsItem(
+                        unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                        (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievementNames[i],
+                        List.of(" ", ChatColor.GRAY + requirements[i], " ",
+                                unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked"),
+                        "noop", null, null));
+            }
             int sparklez = plugin.getConfig().getInt(path + "sparklez", 0);
             double testGems = plugin.getConfig().getDouble(path + "test-gems", 0.0D)
                     + plugin.getConfig().getDouble(path + "survival-gems", 0.0D);
@@ -14970,6 +15238,14 @@ public final class ArcadePortManager implements Listener {
         lore.add(ChatColor.GRAY + "Wins: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "wins", 0));
         lore.add(ChatColor.GRAY + "Score / Kills: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "score", 0));
         lore.add(ChatColor.GRAY + "Knockouts: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "knockouts", 0));
+        if ("dragons".equals(gameId)) {
+            long unlocked = java.util.stream.Stream.of("win-three-in-a-row", "survive-five-minutes", "no-damage-win")
+                    .filter(id -> plugin.getConfig().getBoolean(
+                            "local-achievements." + targetId + ".dragons." + id, false)).count();
+            lore.add(ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE + unlocked + "/3");
+            lore.add(ChatColor.GRAY + "Current win streak: " + ChatColor.WHITE
+                    + plugin.getConfig().getInt(path + "win-streak", 0));
+        }
         if ("camera-shy".equals(gameId)) {
             lore.add(ChatColor.GRAY + "Photographs: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "photos", 0));
             lore.add(ChatColor.GRAY + "Eliminations: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "eliminations", 0));
@@ -16099,12 +16375,30 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onDragonsDamageRecorded(EntityDamageEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.DRAGONS
+                || !(event.getEntity() instanceof Player player)
+                || player.getWorld() != session.world
+                || !session.alive.contains(player.getUniqueId())
+                || session.dragonTamerControls.containsKey(player.getUniqueId())
+                || event.getFinalDamage() <= 0.0D) return;
+        session.dragonDamagedPlayers.add(player.getUniqueId());
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDamage(EntityDamageEvent event) {
         if (event.getEntity() instanceof Player prepareVictim && cancelPrepareAction(prepareVictim, event)) return;
         if (event instanceof EntityDamageByEntityEvent byEntity && cancelPrepareAction(playerShooter(byEntity.getDamager()), event)) return;
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.DRAGONS
+                && event.getEntity() instanceof Player controlledPlayer
+                && session.dragonTamerControls.containsKey(controlledPlayer.getUniqueId())) {
+            event.setCancelled(true);
+            return;
+        }
         if ((session.type == ArcadePortGame.CASTLE_ASSAULT || session.type == ArcadePortGame.HEROES_OF_GWEN)
                 && event.getEntity() instanceof Player teamTarget
                 && session.players.containsKey(teamTarget.getUniqueId())) {
@@ -17275,6 +17569,11 @@ public final class ArcadePortManager implements Listener {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Session session = active;
         if (session == null) return;
+        if (session.type == ArcadePortGame.DRAGONS
+                && session.dragonTamerControls.containsKey(event.getPlayer().getUniqueId())) {
+            event.setCancelled(true);
+            return;
+        }
         if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) {
             sneakyAssassins.handlePlayerInteract(event);
             return;
@@ -17577,13 +17876,21 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.DRAGONS) {
             UUID id = player.getUniqueId();
             String kit = session.dragonKits.getOrDefault(id, "coward");
-            if (item == Material.FIREWORK_ROCKET && event.getAction().isRightClick()
-                    && heldItem != null && heldItem.hasItemMeta()
-                    && heldItem.getItemMeta().hasDisplayName()
-                    && "Dragon Flare".equals(ChatColor.stripColor(heldItem.getItemMeta().getDisplayName()))) {
-                event.setCancelled(true);
-                activateDragonFlare(session, player, System.currentTimeMillis());
-                return;
+
+            if ("frost".equals(kit) && item == Material.SNOWBALL && event.getAction().isRightClick()
+                    && heldItem != null && heldItem.hasItemMeta() && heldItem.getItemMeta().hasDisplayName()
+                    && "Ice Bridge".equals(ChatColor.stripColor(heldItem.getItemMeta().getDisplayName()))) {
+                event.setCancelled(true); activateDragonFrostBridge(session, player, System.currentTimeMillis()); return;
+            }
+            if ("glider".equals(kit) && item == Material.FEATHER && event.getAction().isRightClick()
+                    && heldItem != null && heldItem.hasItemMeta() && heldItem.getItemMeta().hasDisplayName()
+                    && "Glide".equals(ChatColor.stripColor(heldItem.getItemMeta().getDisplayName()))) {
+                event.setCancelled(true); activateDragonGlider(session, player, System.currentTimeMillis()); return;
+            }
+            if ("tamer".equals(kit) && item == Material.END_CRYSTAL && event.getAction().isRightClick()
+                    && heldItem != null && heldItem.hasItemMeta() && heldItem.getItemMeta().hasDisplayName()
+                    && "Tame Dragon".equals(ChatColor.stripColor(heldItem.getItemMeta().getDisplayName()))) {
+                event.setCancelled(true); activateDragonTamer(session, player, System.currentTimeMillis()); return;
             }
             if ("coward".equals(kit) && item == Material.IRON_AXE && event.getAction().isRightClick()
                     && !isDragonUsableBlock(event.getClickedBlock())) {
@@ -17604,6 +17911,10 @@ public final class ArcadePortManager implements Listener {
                 sparkler.setVelocity(direction.multiply(0.8D).setY(direction.getY() * 0.8D + 0.1D));
                 session.entities.add(sparkler);
                 session.dragonSparklerItems.add(sparkler.getUniqueId());
+                session.dragonSparklerStyles.put(sparkler.getUniqueId(),
+                        selectedDragonCosmetic(id, "sparkler-effects", "golden-thread"));
+                renderDragonPyroSignature(sparkler.getLocation(),
+                        selectedDragonCosmetic(id, "pyro-signature", "ember-wing"));
                 if (!testPlayers.isTestPlayer(id)) {
                     String sparklezPath = localStatsPath(id, "dragons") + "sparklez";
                     plugin.getConfig().set(sparklezPath, plugin.getConfig().getInt(sparklezPath, 0) + 1);
@@ -17750,6 +18061,11 @@ public final class ArcadePortManager implements Listener {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Session session = active;
         if (session == null) return;
+        if (session.type == ArcadePortGame.DRAGONS
+                && session.dragonTamerControls.containsKey(event.getPlayer().getUniqueId())) {
+            event.setCancelled(true);
+            return;
+        }
         if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) {
             sneakyAssassins.handleEntityInteract(event);
             return;
@@ -18986,8 +19302,9 @@ public final class ArcadePortManager implements Listener {
         ItemMeta meta = item.getItemMeta();
         if (!meta.hasDisplayName()) return false;
         String name = ChatColor.stripColor(meta.getDisplayName());
-        return "Dragon Flare".equals(name) || "Throwing Sparkler".equals(name)
-                || "Tracking Compass".equals(name)
+        return "Throwing Sparkler".equals(name) || "Tracking Compass".equals(name)
+                || "Ice Bridge".equals(name) || "Glide".equals(name) || "Tame Dragon".equals(name)
+                || "Temporary Glider".equals(name)
                 || (item.getType() == Material.ARROW && name.contains("Fletched Arrow"));
     }
 
@@ -19033,6 +19350,55 @@ public final class ArcadePortManager implements Listener {
     public void onInventoryClick(InventoryClickEvent event) {
         if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session currentSession = active;
+        if (currentSession != null && currentSession.type == ArcadePortGame.DRAGONS
+                && event.getView().getTopInventory().getHolder() instanceof DragonCompassMenuHolder holder) {
+            event.setCancelled(true);
+            if (!(event.getWhoClicked() instanceof Player spectator)
+                    || !holder.ownerId.equals(spectator.getUniqueId())
+                    || event.getClickedInventory() != event.getView().getTopInventory()) return;
+            if (active != currentSession || !currentSession.players.containsKey(spectator.getUniqueId())
+                    || currentSession.alive.contains(spectator.getUniqueId())) {
+                spectator.closeInventory();
+                return;
+            }
+
+            int slot = event.getRawSlot();
+            if (slot < 0 || slot >= event.getView().getTopInventory().getSize()) return;
+            if (slot == 53 || slot == 4) {
+                spectator.closeInventory();
+                return;
+            }
+
+            UUID targetId = holder.targetsBySlot.get(slot);
+            if (targetId == null) return;
+            Player target = currentSession.players.get(targetId);
+            if (target == null || !target.isOnline() || !currentSession.alive.contains(targetId)
+                    || currentSession.dragonTamerControls.containsKey(targetId)
+                    || target.getWorld() != currentSession.world) {
+                spectator.sendMessage(ChatColor.YELLOW + "That player is no longer available to track.");
+                populateDragonsSpectatorMenu(currentSession, spectator, holder);
+                return;
+            }
+
+            if (event.isLeftClick()) {
+                long now = System.currentTimeMillis();
+                long nextAllowed = currentSession.dragonCompassNextUseAt.getOrDefault(spectator.getUniqueId(), 0L);
+                if (!ArcadePortRules.canUseDragonSpectatorTeleport(now, nextAllowed)) return;
+                currentSession.dragonCompassNextUseAt.put(spectator.getUniqueId(),
+                        now + ArcadePortRules.DRAGONS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS);
+                spectator.setSpectatorTarget(null);
+                spectator.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
+                spectator.setCompassTarget(target.getLocation());
+                spectator.closeInventory();
+                return;
+            }
+            if (event.isRightClick()) {
+                spectator.setSpectatorTarget(target);
+                spectator.setCompassTarget(target.getLocation());
+                spectator.closeInventory();
+            }
+            return;
+        }
         if (currentSession != null && currentSession.type == ArcadePortGame.MICRO_BATTLES
                 && isMicroCompassMenuTitle(event.getView().getTitle())) {
             event.setCancelled(true);
@@ -20777,6 +21143,19 @@ public final class ArcadePortManager implements Listener {
             session.turfBarrageFiring.remove(id);
         }
         if (session.type == ArcadePortGame.DRAGONS) {
+            if (!testPlayers.isTestPlayer(id)) {
+                plugin.getConfig().set(localStatsPath(id, "dragons") + "win-streak", 0);
+                plugin.saveConfig();
+            }
+            endDragonTamer(session, id, "Dragon control ended because you disconnected.", false);
+            endDragonGlider(session, id);
+            session.dragonFrostReadyAt.remove(id);
+            session.dragonFrostBridgePaths.remove(id);
+            session.dragonFrostBridgePathIndexes.remove(id);
+            session.dragonGliderReadyAt.remove(id);
+            session.dragonTamerReadyAt.remove(id);
+            session.dragonSurviveFiveAwarded.remove(id);
+            session.dragonDamagedPlayers.remove(id);
             session.dragonMarksmanCharge.remove(id);
             session.dragonMarksmanNextChargeAt.remove(id);
             session.dragonMarksmanFiring.remove(id);
@@ -21062,7 +21441,7 @@ public final class ArcadePortManager implements Listener {
             float yaw, float pitch, boolean sneaking, boolean sprinting, boolean onGround) {
     }
 
-    private record DragonFlareZone(UUID ownerId, Location center, long expiresAtMillis) { }
+    private record DragonTamerControl(UUID dragonId, Location returnLocation, GameMode previousGameMode, long endsAtMillis) { }
 
     private enum MasterBuildersPhase { BUILDING, REVIEW }
 
@@ -21414,7 +21793,21 @@ public final class ArcadePortManager implements Listener {
         Team dragonDeadScoreboardTeam;
         long dragonNextScoreboardUpdateAt;
         final Map<String, Long> dragonContactCooldowns = new HashMap<>();
-        final List<DragonFlareZone> dragonFlareZones = new ArrayList<>();
+        final Map<Block, BlockData> dragonIceBridgeOriginals = new HashMap<>();
+        final Map<Block, Long> dragonIceBridgeExpiresAt = new HashMap<>();
+        final Map<UUID, List<Block>> dragonFrostBridgePaths = new HashMap<>();
+        final Map<UUID, Integer> dragonFrostBridgePathIndexes = new HashMap<>();
+        final Map<UUID, Long> dragonFrostReadyAt = new HashMap<>();
+        final Map<UUID, Long> dragonGliderReadyAt = new HashMap<>();
+        final Map<UUID, Long> dragonGliderUntil = new HashMap<>();
+        final Map<UUID, ItemStack> dragonGliderOriginalChestplates = new HashMap<>();
+        final Map<UUID, Long> dragonTamerReadyAt = new HashMap<>();
+        final Map<UUID, DragonTamerControl> dragonTamerControls = new HashMap<>();
+        final Map<UUID, UUID> dragonTamerByDragon = new HashMap<>();
+        final Set<UUID> dragonSurviveFiveAwarded = new HashSet<>();
+        final Set<UUID> dragonDamagedPlayers = new HashSet<>();
+        final Map<UUID, String> dragonSparklerStyles = new HashMap<>();
+        long dragonRoundStartedAt;
         final Set<UUID> dragonSurvivalGemsPaid = new HashSet<>();
         final List<UUID> dragonEliminationOrder = new ArrayList<>();
         boolean dragonEndGemsPaid;
