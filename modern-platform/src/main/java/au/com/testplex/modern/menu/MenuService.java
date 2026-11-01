@@ -67,6 +67,10 @@ public final class MenuService implements Listener {
 
     /** Legacy Game Panel geometry from Reborn's four-row MenuPage. */
     public void openGamePanel(Player player) {
+        if (!isAdmin(player)) {
+            player.sendMessage(ChatColor.RED + "Operator permission required to open the Game Panel.");
+            return;
+        }
         Inventory inventory = Bukkit.createInventory(null, 36, PANEL_TITLE);
         inventory.setItem(4, makeItem(Material.BEACON,
                 ChatColor.GREEN + "" + ChatColor.BOLD + "Testplex Arcade Game Panel",
