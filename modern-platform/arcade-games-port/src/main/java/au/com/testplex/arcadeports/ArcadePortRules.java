@@ -2776,6 +2776,20 @@ public final class ArcadePortRules {
         return "Leather Cap of Holding".equals(itemName) ? 1 : 0;
     }
 
+    public static String heroesOfGwenStoreHitCondition(String itemName) {
+        if ("Bow of Pursuit".equals(itemName)) return "SPEED";
+        if ("Frostbound Sword".equals(itemName)) return "SLOWNESS";
+        return "";
+    }
+
+    public static long heroesOfGwenStoreHitConditionDurationMillis(String itemName) {
+        return heroesOfGwenStoreHitCondition(itemName).isEmpty() ? 0L : 3_000L;
+    }
+
+    public static int heroesOfGwenStoreHitConditionAmplifier(String itemName) {
+        return "Bow of Pursuit".equals(itemName) ? 1 : 0;
+    }
+
     /** Original role-store equipment enchantment family by display name. */
     public static String heroesOfGwenStoreEnchantment(String itemName) {
         if (itemName == null) return "";
