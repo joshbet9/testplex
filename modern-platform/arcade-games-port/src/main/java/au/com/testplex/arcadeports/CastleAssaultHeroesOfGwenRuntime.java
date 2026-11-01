@@ -3381,15 +3381,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private long heroesOfGwenStoreAdjustedCooldown(Player player, long baseCooldown, boolean ammo) {
-        if (baseCooldown <= 0L) return baseCooldown;
-        long reductionMillis = 0L;
-        for (String itemName : heroesOfGwenEquippedStoreItemNames(player)) {
-            double factor = ammo
-                    ? ArcadePortRules.heroesOfGwenStoreAmmoCooldownReduction(itemName)
-                    : ArcadePortRules.heroesOfGwenStoreCooldownReduction(itemName);
-            if (factor > 0.0D) reductionMillis += (long) (baseCooldown * factor);
-        }
-        return Math.max(1L, baseCooldown - reductionMillis);
+        return ArcadePortRules.heroesOfGwenStoreAdjustedCooldown(
+                baseCooldown, heroesOfGwenEquippedStoreItemNames(player), ammo);
     }
 
     private void setHeroSkillCooldown(Player player, String skill, long durationMillis) {
