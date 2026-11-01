@@ -242,9 +242,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     }
 
     private void publishArcadeRuntimeReadiness() {
-        if (manager == null || !manager.isMonsterMazeModuleRegistered() || !manager.isWizardsModuleRegistered()) {
+        if (manager == null || !manager.isMonsterMazeModuleRegistered() || !manager.isWizardsModuleRegistered()
+                || !manager.isRotationCandidateAvailable(ArcadePortGame.WIZARDS)) {
             throw new IllegalStateException(
-                    "The shared Arcade runtime cannot be marked ready without its integrated Monster Maze and Wizards game modules.");
+                    "The shared Arcade runtime cannot be marked ready without its integrated Monster Maze and Wizards Arcade modules and installed Wizards source maps.");
         }
         try {
             java.nio.file.Path identityPath = getDataFolder().toPath()
@@ -255,10 +256,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     + " invocation-id-present=" + (System.getenv("INVOCATION_ID") != null));
             boolean deploymentSignal = ArcadeRuntimeReadinessSignal.publish(
                     getDataFolder().toPath(), System.getenv("INVOCATION_ID"), ProcessHandle.current().pid(),
-                    manager.isMonsterMazeModuleRegistered() && manager.isWizardsModuleRegistered());
+                    manager.isMonsterMazeModuleRegistered(), manager.isWizardsModuleRegistered());
             getLogger().info("TESTPLEX_ARCADE_RUNTIME_READY world=" + ModernArcadeLobby.WORLD_NAME
                     + " plane=100x100 floor-y=" + ModernArcadeLobby.FLOOR_Y
-                    + " monster-maze=READY deployment-signal=" + deploymentSignal);
+                    + " monster-maze=READY wizards=READY deployment-signal=" + deploymentSignal);
             if (!deploymentSignal && System.getenv("TESTPLEX_DEPLOYED_BUILD_SHA") != null) {
                 throw new IllegalStateException("Systemd deployment identity is missing from "
                         + getDataFolder() + "; refusing to report the complete Arcade runtime as deployment-ready.");
