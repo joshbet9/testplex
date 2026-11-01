@@ -270,6 +270,20 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         release.setDirection(new Vector(hoopX - release.getX(), 66.2D - 65.62D, 0.0D));
         shooter.teleport(release);
         shooter.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+        // Clear every non-shooter out of the first controlled shot lane. The
+        // match's normal interception/catch logic remains active; this test
+        // should validate the scoring flight rather than a defender left at spawn.
+        int safeLane = 0;
+        for (Player other : players) {
+            if (other.equals(shooter)) continue;
+            double safeZ = switch (safeLane++) {
+                case 0 -> -12.0D;
+                case 1 -> 0.0D;
+                default -> 12.0D;
+            };
+            other.teleport(new Location(world, 0.0D, 64.0D, safeZ));
+            other.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+        }
         int[] scores = (int[]) field(firstMatch, "teamScore");
         scores[team] = 19;
         firstPasserId = passerId;
