@@ -23,8 +23,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     // Keep aligned with ArcadeCatalog's READY_FOR_TEST statuses.
     private static final java.util.List<String> READY_FOR_TEST_GAME_IDS = java.util.List.of(
             "death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl",
-            "gladiators", "micro-battles", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "runner", "sheep-quest", "turf-wars", "camera-shy");
-    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-dragon-escape-sheep-quest-turf-wars-super-sploor-dragons-runner-camera-shy-20261101-v4";
+            "gladiators", "micro-battles", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "runner", "sheep-quest", "turf-wars", "camera-shy", "monster-maze", "snake", "draw-my-thing", "master-builders");
+    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-20-games-monster-maze-snake-draw-my-thing-master-builders-20261101-v5";
 
     @Override
     public void onEnable() {
@@ -62,9 +62,9 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         getCommand("arcadeport").setExecutor(this);
         publishArcadeRuntimeReadiness();
 
-        // Monster Maze remains embedded in this Arcade host, but is not currently
-        // on the playable allow-list. Keep its startup failure isolated from the
-        // games which have been cleared for the shared acceptance test queue.
+        // Monster Maze is embedded in this Arcade host and is part of the controlled
+        // acceptance queue. Startup remains isolated from the shared lobby; the
+        // deployment gate separately requires its registration readiness signal.
         try {
             monsterMazeReadiness.initializeAndAttach(
                     () -> {
