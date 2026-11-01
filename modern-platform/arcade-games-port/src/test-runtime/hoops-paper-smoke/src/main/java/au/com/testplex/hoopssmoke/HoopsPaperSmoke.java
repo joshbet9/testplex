@@ -301,7 +301,7 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         double hoopX = team == 0 ? 20.0D : -20.0D;
         Location release = new Location(world, team == 0 ? 12.0D : -12.0D, 64.0D, 0.0D);
         release.setDirection(new Vector(hoopX - release.getX(), 66.2D - 65.62D, 0.0D));
-        shooter.teleport(release);
+        require(shooter.teleport(release), "could not teleport the shooter to the controlled shot release");
         shooter.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
         // Clear every non-shooter out of the first controlled shot lane. The
         // match's normal interception/catch logic remains active; this test
@@ -326,7 +326,12 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         Object shot = field(firstMatch, "ball");
         require(shot != null && "SHOT".equals(String.valueOf(field(shot, "mode"))),
                 "right-click shooting did not create a shot trajectory");
-        require(((Integer) field(shot, "points")) == 2, "eight-block release was not scored as two points");
+        int actualShotPoints = (Integer) field(shot, "points");
+        double actualReleaseDistance = (Double) field(shot, "releaseDistance");
+        require(actualShotPoints == 2, "eight-block release was not scored as two points: points="
+                + actualShotPoints + ", releaseDistance=" + actualReleaseDistance
+                + ", threshold=" + HoopsRemasteredRules.THREE_POINT_DISTANCE + ", team=" + team
+                + ", hoopX=" + hoopX + ", shooterLocation=" + shooter.getLocation());
         require(((Boolean) field(shot, "reboundEligible")), "missed-shot recovery was not enabled");
         require(passerId.equals(field(shot, "passerId")), "shot lost its pass/assist attribution");
         Location actualEye = shooter.getEyeLocation();
