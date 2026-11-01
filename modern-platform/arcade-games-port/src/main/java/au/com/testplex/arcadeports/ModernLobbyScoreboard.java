@@ -52,7 +52,7 @@ public final class ModernLobbyScoreboard {
         String gameName = formatGameName(selectedGameId);
         String selectedKitId = plugin.getConfig().getString(
                 "lobby-kit-preferences." + player.getUniqueId() + "." + selectedGameId, "None");
-        String kitName = formatKitName(selectedKitId);
+        String kitName = formatKitDisplayName(selectedGameId, selectedKitId);
         String serverName = plugin.getConfig().getString(
                 "lobby-scoreboard.server-name", "Testplex Modern");
         String gems = String.valueOf(plugin.getConfig().getInt(
@@ -110,7 +110,7 @@ public final class ModernLobbyScoreboard {
                 ChatColor.WHITE + game,
                 spacer(2),
                 ChatColor.GOLD.toString() + ChatColor.BOLD + "Kit",
-                ChatColor.WHITE + kit,
+                kit != null && kit.contains(ChatColor.COLOR_CHAR) ? kit : ChatColor.WHITE + kit,
                 spacer(3),
                 ChatColor.GREEN.toString() + ChatColor.BOLD + "Gems",
                 ChatColor.WHITE + gems,
@@ -139,6 +139,20 @@ public final class ModernLobbyScoreboard {
     static String formatKitName(String kitId) {
         if (kitId == null || kitId.isBlank()) return "None";
         return titleCase(kitId);
+    }
+
+    static String formatKitDisplayName(String gameId, String kitId) {
+        if (kitId == null || kitId.isBlank() || "none".equalsIgnoreCase(kitId)) {
+            return ChatColor.WHITE + "None";
+        }
+        ArcadePortGame game = ArcadePortGame.fromId(gameId);
+        if (game != null) {
+            for (ArcadeLobbyKitCatalogue.KitChoice choice :
+                    ArcadeLobbyKitCatalogue.forGame(game, List.of())) {
+                if (choice.id.equalsIgnoreCase(kitId)) return choice.unlock.nameColor + choice.name;
+            }
+        }
+        return ChatColor.WHITE + formatKitName(kitId);
     }
 
     /**

@@ -57,6 +57,8 @@ public final class ArcadeProgressCatalog {
                     a("over-9000", "Over 9000", "Win a 1v3 clutch using only powerups."),
                     a("grenade-from-the-grave", "Grenade From the Grave", "Get 2 kills after you die in one Bomb Lobbers game."))),
             Map.entry("death-tag", List.of(
+                    a("death-proof", "Death Proof", "Win 50 games of Death Tag."),
+                    a("come-at-me-bro", "Come At Me Bro!", "Kill 2 Undead Chasers in a single game."),
                     a("statue", "Statue", "Win while staying in the same 5×5 area for 3 minutes."),
                     a("gallows", "Gallows", "As Runner Traitor, assist 3 comrade deaths in one game."))),
             Map.entry("dragon-escape", List.of(

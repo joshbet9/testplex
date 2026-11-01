@@ -48,6 +48,8 @@ final class ArcadeLobbyKitCatalogue {
                     choice("pig", "Pig Cloak", Material.PHANTOM_MEMBRANE,
                             Unlock.GEM, Sheep.class, null, DyeColor.PINK),
                     choice("brutus-bacon", "Brutus Bacon", Material.SHIELD,
+                            Unlock.ACHIEVEMENT, Pig.class, null),
+                    choice("chris-p-bacon", "Chris P Bacon", Material.COOKED_PORKCHOP,
                             Unlock.ACHIEVEMENT, Pig.class, null));
             case BOMB_LOBBERS -> List.of(
                     choice("jumper", "Jumper", Material.RABBIT_FOOT,

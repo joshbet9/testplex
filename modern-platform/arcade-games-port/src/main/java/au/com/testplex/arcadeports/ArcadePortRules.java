@@ -984,12 +984,8 @@ public final class ArcadePortRules {
 
     /** More players in the match lobby produce more frequent power-up spawns. */
     public static long bombLobbersPowerupSpawnIntervalMillis(int lobbyPlayers) {
-        int players = Math.max(1, lobbyPlayers);
-        if (players <= 2) return 30_000L;
-        if (players <= 4) return 25_000L;
-        if (players <= 8) return 20_000L;
-        if (players <= 12) return 15_000L;
-        return 12_000L;
+        // Team-local random scheduling averages about once a minute.
+        return 60_000L;
     }
 
     /** Keep small matches readable while allowing more simultaneous drops in larger lobbies. */
@@ -1335,6 +1331,7 @@ public final class ArcadePortRules {
             case "mama", "mama-pig", "mama-piggles" -> "mama-piggles";
             case "pig", "sneaky-pig", "sheep", "sheep-pig", "pig-cloak", "cloak-pig" -> "pig";
             case "brutus", "brutus-bacon", "bacon-brutus", "brutus-pig" -> "brutus-bacon";
+            case "chris-p-bacon", "chris-p", "chris", "crispy-bacon" -> "chris-p-bacon";
             default -> null;
         };
     }
