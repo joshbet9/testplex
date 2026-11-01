@@ -701,9 +701,11 @@ public final class SpeedBuildersGame implements Listener {
             finishMatch(null, "No builders remain connected.");
             return;
         }
-        int bestScore = builders.stream().mapToInt(state -> state.totalPoints).max().orElse(0);
+        Map<String, Integer> totals = builders.stream().collect(java.util.stream.Collectors.toMap(
+                state -> state.player.getUniqueId().toString(), state -> state.totalPoints));
+        Set<String> winnerIds = new LinkedHashSet<>(SpeedBuildersRules.highestScorers(totals));
         List<PlayerState> winners = builders.stream()
-                .filter(state -> state.totalPoints == bestScore)
+                .filter(state -> winnerIds.contains(state.player.getUniqueId().toString()))
                 .sorted(java.util.Comparator.comparing(state -> state.player.getName(),
                         String.CASE_INSENSITIVE_ORDER))
                 .toList();
