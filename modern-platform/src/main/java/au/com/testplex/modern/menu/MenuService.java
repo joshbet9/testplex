@@ -245,6 +245,10 @@ public final class MenuService implements Listener {
     }
 
     private void openGameVoting(Player viewer) {
+        openGameVoting(viewer, 0);
+    }
+
+    private void openGameVoting(Player viewer, int requestedPage) {
         Inventory inventory = Bukkit.createInventory(null, 54, VOTING_TITLE);
         JavaPlugin engine = arcadeMechanicsPlugin();
         if (engine == null) {
@@ -265,22 +269,44 @@ public final class MenuService implements Listener {
                             ChatColor.GRAY + "Vote window: " + ChatColor.WHITE
                                     + engine.getConfig().getInt("game-preferences.automatic-rotation.vote-seconds", 60) + " seconds",
                             ChatColor.YELLOW + "Players rate games in /gamepreferences.")));
+
+            List<GameDefinition> clearedGames = catalog.getGames().stream()
+                    .filter(game -> cleared.contains(game.getId())).toList();
             int[] slots = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34, 37, 39, 41, 43};
-            int index = 0;
-            for (GameDefinition game : catalog.getGames()) {
-                if (!cleared.contains(game.getId()) || index >= slots.length) continue;
+            int pageCount = Math.max(1, (clearedGames.size() + slots.length - 1) / slots.length);
+            int page = Math.max(0, Math.min(requestedPage, pageCount - 1));
+            int start = page * slots.length;
+            int end = Math.min(clearedGames.size(), start + slots.length);
+            for (int index = start; index < end; index++) {
+                GameDefinition game = clearedGames.get(index);
                 boolean included = rotation.contains(game.getId());
+                boolean available = engine.isRotationCandidateAvailable(game.getId());
                 ItemStack item = makeItem(icon(game.getIcon()),
-                        (included ? ChatColor.GREEN : ChatColor.YELLOW) + game.getName(),
+                        (included ? available ? ChatColor.GREEN : ChatColor.RED : ChatColor.YELLOW)
+                                + game.getName(),
                         List.of(ChatColor.GRAY + "Acceptance status: " + ChatColor.GREEN + "Cleared",
                                 ChatColor.GRAY + "Rotation pool: "
                                         + (included ? ChatColor.GREEN + "Included" : ChatColor.RED + "Excluded"),
+                                ChatColor.GRAY + "Map availability: "
+                                        + (available ? ChatColor.GREEN + "Ready" : ChatColor.RED + "Missing / invalid"),
                                 ChatColor.DARK_GRAY + "Likelihood is shown in Game Preferences."));
-                inventory.setItem(slots[index++], item);
+                inventory.setItem(slots[index - start], item);
             }
-            if (index == 0) inventory.setItem(22, makeItem(Material.BARRIER,
-                    ChatColor.RED + "No games in the rotation pool",
-                    List.of(ChatColor.GRAY + "Use Edit Game Rotation to add cleared games.")));
+            if (clearedGames.isEmpty()) inventory.setItem(22, makeItem(Material.BARRIER,
+                    ChatColor.RED + "No games cleared for acceptance",
+                    List.of(ChatColor.GRAY + "The reviewed 26.3 acceptance allow-list is empty.")));
+            if (page > 0) {
+                ItemStack previous = makeItem(Material.ARROW, ChatColor.YELLOW + "Previous Page");
+                mark(previous, "panel-rotation-status-page", null, null, String.valueOf(page - 1));
+                inventory.setItem(46, previous);
+            }
+            if (page + 1 < pageCount) {
+                ItemStack next = makeItem(Material.ARROW, ChatColor.YELLOW + "Next Page");
+                mark(next, "panel-rotation-status-page", null, null, String.valueOf(page + 1));
+                inventory.setItem(52, next);
+            }
+            inventory.setItem(48, makeItem(Material.MAP, ChatColor.AQUA + "Page " + (page + 1) + "/" + pageCount,
+                    List.of(ChatColor.GRAY + clearedGames.size() + " cleared game(s) in this status list.")));
         }
         inventory.setItem(45, backItem("Go Back", "back-panel", null));
         inventory.setItem(49, makeItem(Material.WRITABLE_BOOK, ChatColor.AQUA + "How voting works",
@@ -330,16 +356,20 @@ public final class MenuService implements Listener {
             GameDefinition game = catalog.getGames().get(index);
             boolean ready = cleared.contains(game.getId());
             boolean included = rotationPool.contains(game.getId());
+            boolean rotationAvailable = engine != null && engine.isRotationCandidateAvailable(game.getId());
             ChatColor colour = rotation
-                    ? ready ? included ? ChatColor.GREEN : ChatColor.YELLOW : ChatColor.RED
+                    ? !ready ? ChatColor.RED
+                    : included ? rotationAvailable ? ChatColor.GREEN : ChatColor.RED : ChatColor.YELLOW
                     : ready ? ChatColor.GREEN : ChatColor.WHITE;
             List<String> lore;
             if (rotation) {
                 lore = List.of(
                         ChatColor.GRAY + "Acceptance status: " + (ready ? ChatColor.GREEN + "Cleared" : ChatColor.RED + "Not cleared"),
                         ChatColor.GRAY + "Rotation pool: " + (included ? ChatColor.GREEN + "Included" : ChatColor.RED + "Excluded"),
+                        ChatColor.GRAY + "Map availability: " + (rotationAvailable
+                                ? ChatColor.GREEN + "Ready" : ChatColor.RED + "Missing / invalid"),
                         ChatColor.YELLOW + "Click to " + (included ? "remove from" : "add to") + " rotation.",
-                        ChatColor.DARK_GRAY + "Only cleared games with installed maps can be selected.");
+                        ChatColor.DARK_GRAY + "The selector ignores games without an installed map.");
             } else {
                 lore = List.of(ChatColor.RESET + ChatColor.GRAY.toString() + "Select this as the next lobby game.",
                         ChatColor.YELLOW + "Left-Click " + ChatColor.GRAY + "to select this game.",
@@ -563,6 +593,16 @@ public final class MenuService implements Listener {
         String lineId = meta.getPersistentDataContainer().get(lineKey, PersistentDataType.STRING);
         String optionId = meta.getPersistentDataContainer().get(optionKey, PersistentDataType.STRING);
         GameDefinition game = catalog.getGame(gameId);
+
+        if (VOTING_TITLE.equals(title) && "panel-rotation-status-page".equals(action)
+                && optionId != null) {
+            try {
+                openGameVoting(player, Integer.parseInt(optionId));
+            } catch (NumberFormatException ignored) {
+                player.sendMessage(ChatColor.RED + "Invalid rotation status page.");
+            }
+            return;
+        }
 
         if (("Edit Game Rotation".equals(title) || SET_GAME_TITLE.equals(title))
                 && "panel-game-page".equals(action) && optionId != null) {
@@ -801,6 +841,14 @@ public final class MenuService implements Listener {
                 List<String> rotation = new ArrayList<>(engine.getConfig().contains(rotationPath)
                         ? engine.getConfig().getStringList(rotationPath) : cleared);
                 boolean included = rotation.contains(game.getId());
+                if (!included && !engine.isRotationCandidateAvailable(game.getId())) {
+                    player.sendMessage(ChatColor.RED + game.getName()
+                            + " cannot be added yet: its selected map is missing or invalid.");
+                    int page = 0;
+                    try { page = Integer.parseInt(optionId); } catch (NumberFormatException ignored) { }
+                    openGameSelection(player, true, page);
+                    return;
+                }
                 if (included) rotation.removeIf(id -> game.getId().equals(id));
                 else rotation.add(game.getId());
                 engine.getConfig().set(rotationPath, rotation);
