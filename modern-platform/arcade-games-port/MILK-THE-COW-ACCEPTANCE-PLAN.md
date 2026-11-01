@@ -1,6 +1,6 @@
 # Milk the Cow controlled-acceptance plan
 
-Milk the Cow has the original BobsFarm archive and a mechanics-first Paper 26.3 runtime. The new archive test checks that the packaged WorldConfig retains the three animal marker groups used by the runtime (WHITE chickens, PINK pigs and PURPLE villagers). This is a source-asset gate, not a replacement for a two-human play test.
+Milk the Cow is now READY_FOR_TEST in the shared controlled queue. It uses the original BobsFarm archive and a mechanics-first Paper 26.3 runtime. The archive test checks that the packaged WorldConfig retains the three animal marker groups used by the runtime (WHITE chickens, PINK pigs and PURPLE villagers). This source-asset gate does not replace a two-human play test.
 
 ## Required gameplay pass
 
@@ -11,4 +11,4 @@ Milk the Cow has the original BobsFarm archive and a mechanics-first Paper 26.3 
 5. Exercise Pure Skill, Pinger, Milk High Club, Perfect Game, Slaughterhouse, Stop Stop He's Already Dead and Got the Chops using their real event triggers.
 6. Confirm wins, role wins, kills, assists and buckets digested persist; disconnect/reconnect, repeated rounds and teardown must restore the lobby without leaving herd/disguise entities.
 
-Milk the Cow remains a candidate for the controlled acceptance queue only after the original BobsFarm world loads and the two-human round is accepted on Paper 26.3.
+Milk the Cow is available for controlled testing after the packaged BobsFarm archive passes CI. The two-human and multi-human round must still be exercised on Paper 26.3 before declaring live gameplay acceptance.
