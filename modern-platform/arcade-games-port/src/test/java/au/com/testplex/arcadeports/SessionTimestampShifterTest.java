@@ -19,6 +19,11 @@ class SessionTimestampShifterTest {
         fixture.pairedArenaStartsAtByPair.put(2, new HashMap<>(Map.of(player, 400L)));
         fixture.infiltration.put(player, new TimerCarrier(600L, 700L));
         fixture.activeFlareZones.add(new Expiry("flare", 800L));
+        fixture.baconSlams.put(player, 900L);
+        fixture.runnerBlocks.put("unstable-tile", 1_000L);
+        fixture.microCombatContributors.put(player, new HashMap<>(Map.of(player, 1_100L)));
+        fixture.evolutionDamageContributors.put(player, new HashMap<>(Map.of(player, 1_200L)));
+        fixture.bombDamageContributors.put(player, new HashMap<>(Map.of(player, 1_300L)));
 
         List<String> failures = SessionTimestampShifter.shift(fixture, 10_000L);
 
@@ -29,6 +34,11 @@ class SessionTimestampShifterTest {
         assertEquals(10_600L, fixture.infiltration.get(player).lastSecondAt);
         assertEquals(10_700L, fixture.infiltration.get(player).lastSlowAt);
         assertEquals(10_800L, fixture.activeFlareZones.getFirst().expiresAtMillis());
+        assertEquals(10_900L, fixture.baconSlams.get(player));
+        assertEquals(11_000L, fixture.runnerBlocks.get("unstable-tile"));
+        assertEquals(11_100L, fixture.microCombatContributors.get(player).get(player));
+        assertEquals(11_200L, fixture.evolutionDamageContributors.get(player).get(player));
+        assertEquals(11_300L, fixture.bombDamageContributors.get(player).get(player));
     }
 
     @Test
@@ -80,6 +90,11 @@ class SessionTimestampShifterTest {
         final Map<Integer, Map<UUID, Long>> pairedArenaStartsAtByPair = new HashMap<>();
         final Map<UUID, TimerCarrier> infiltration = new HashMap<>();
         final List<Expiry> activeFlareZones = new java.util.ArrayList<>();
+        final Map<UUID, Long> baconSlams = new HashMap<>();
+        final Map<String, Long> runnerBlocks = new HashMap<>();
+        final Map<UUID, Map<UUID, Long>> microCombatContributors = new HashMap<>();
+        final Map<UUID, Map<UUID, Long>> evolutionDamageContributors = new HashMap<>();
+        final Map<UUID, Map<UUID, Long>> bombDamageContributors = new HashMap<>();
     }
 
     private static final class TimerCarrier {
