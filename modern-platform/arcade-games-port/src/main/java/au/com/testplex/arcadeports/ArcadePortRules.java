@@ -1821,16 +1821,19 @@ public final class ArcadePortRules {
                 && nearestOtherDistanceSquared < ownDistanceSquared;
     }
 
-    /**
-     * Horizontal distance to the closest vertical face of the configured square world border.
+    /** Horizontal distance to the closest vertical face of the configured square world border. */
+
+    /** Clamp food to the source minimum of two and maximum hunger bar value. */
     public static int microBattlesMinimumFoodLevel(int foodLevel) {
         return Math.max(2, Math.min(20, foodLevel));
     }
 
+    /** Only unowned, tracked dragon entities can hurt players in Dragons. */
     public static boolean isWorldDragonHazard(ArcadePortGame game, boolean trackedEntity, boolean playerOwned) {
         return game == ArcadePortGame.DRAGONS && trackedEntity && !playerOwned;
     }
 
+    /** Throttle repeated contact hits to the dragon's next permitted hit time. */
     public static boolean shouldApplyDragonContactHit(long nowMillis, long nextAllowedMillis) {
         return nowMillis >= nextAllowedMillis;
     }
@@ -2722,6 +2725,20 @@ public final class ArcadePortRules {
         double distance = microBattlesDistanceToBorder(playerX, playerZ, centerX, centerZ, borderSize);
         return Double.isFinite(distance) && distance >= 0.0D
                 && distance <= MICRO_BATTLES_BORDER_PARTICLE_DISTANCE;
+    }
+
+    /** Normalise the 16 supported stained-glass and dust colour names. */
+    public static String normalizeMicroBattlesColour(String requested) {
+        if (requested == null) return null;
+        String colour = requested.trim().toLowerCase(java.util.Locale.ROOT)
+                .replace('_', '-').replace(' ', '-');
+        return switch (colour) {
+            case "white", "orange", "magenta", "light-blue", "yellow", "lime", "pink",
+                    "gray", "light-gray", "cyan", "purple", "blue", "brown", "green", "red", "black" -> colour;
+            case "lightblue", "aqua" -> "light-blue";
+            case "silver", "lightgray", "grey" -> "light-gray";
+            default -> null;
+        };
     }
 
     public static Material microBattlesGlassMaterial(String requested) {
