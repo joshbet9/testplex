@@ -11,8 +11,8 @@ softdepend:
   - FakePlayerPlugin
 commands:
   stats:
-    description: Open local Testplex Arcade statistics, including Camera Shy and Plexball career progression.
-    usage: /stats [plexball] | /stats [player] camera-shy [page]
+    description: Open the shared local Testplex Arcade statistics menu and game-specific progression.
+        usage: /stats [player] | /stats [player] snap [page] | /stats plexball | /stats [player] speed-builders
     aliases: [arcadestats]
   gamepreferences:
     description: Rate Arcade games and view their weighted rotation likelihood.

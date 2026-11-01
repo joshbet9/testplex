@@ -541,10 +541,15 @@ public final class ArcadePortRules {
     /** PerkBarrage fires queued arrows once per TICK (approximately 20 per second). */
     public static final long DRAGONS_BARRAGE_FIRE_INTERVAL_MILLIS = 50L;
     public static final double DRAGONS_PARTICIPATION_GEMS = 10.0D;
-    public static final double DRAGONS_FLARE_RADIUS = 24.0D;
-    public static final double DRAGONS_FLARE_RADIUS_SQUARED = DRAGONS_FLARE_RADIUS * DRAGONS_FLARE_RADIUS;
-    public static final double DRAGONS_FLARE_VERTICAL_RANGE = 24.0D;
-    public static final long DRAGONS_FLARE_DURATION_MILLIS = 6_000L;
+    public static final long DRAGONS_FROST_COOLDOWN_MILLIS = 25_000L;
+    public static final long DRAGONS_GLIDER_COOLDOWN_MILLIS = 15_000L;
+    public static final long DRAGONS_GLIDER_DURATION_MILLIS = 3_500L;
+    public static final long DRAGONS_TAMER_COOLDOWN_MILLIS = 90_000L;
+    public static final long DRAGONS_TAMER_DURATION_MILLIS = 15_000L;
+    public static final long DRAGONS_SURVIVE_FIVE_MINUTES_MILLIS = 5 * 60_000L;
+    public static final int DRAGONS_WIN_STREAK_ACHIEVEMENT = 3;
+    public static final int DRAGONS_FROST_BRIDGE_LENGTH = 16;
+    public static final long DRAGONS_FROST_BRIDGE_LIFETIME_MILLIS = 6_000L;
     public static final long DRAGONS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS = 3_000L;
     public static final int DRAGONS_MARKSMAN_START_ARROWS = 1;
     public static final long DRAGONS_CONTACT_COOLDOWN_MILLIS = 2_000L;
@@ -696,21 +701,40 @@ public final class ArcadePortRules {
             case "coward" -> "coward";
             case "marksman", "markman" -> "marksman";
             case "pyrotechnic", "pyro" -> "pyrotechnic";
+            case "frost", "ice", "ice-bridge" -> "frost";
+            case "glider", "glide" -> "glider";
+            case "tamer", "dragon-tamer" -> "tamer";
             default -> null;
         };
     }
 
-    public static int dragonsFlareCharges(String requestedKit) {
-        return switch (normalizeDragonsKit(requestedKit) == null ? "" : normalizeDragonsKit(requestedKit)) {
-            case "marksman" -> 3;
-            case "pyrotechnic" -> 2;
-            case "coward" -> 1;
-            default -> 0;
-        };
+    /** Matches legacy IcePathData's cap for steep paths before normalisation. */
+    public static double dragonsFrostPathVerticalComponent(double vertical, double horizontalMagnitude) {
+        if (!Double.isFinite(vertical) || !Double.isFinite(horizontalMagnitude)) return 0.0D;
+        double horizontal = Math.max(0.0D, Math.abs(horizontalMagnitude));
+        return Math.abs(vertical) > horizontal ? Math.copySign(horizontal, vertical) : vertical;
     }
 
-    public static boolean isDragonFlareActive(long nowMillis, long expiresAtMillis) {
-        return expiresAtMillis > nowMillis;
+    /** The source Ice Path replaces only AIR and SNOW; all other map blocks are protected. */
+    public static boolean isDragonFrostBridgeSurface(Material material) {
+        return material == Material.AIR || material == Material.CAVE_AIR
+                || material == Material.VOID_AIR || material == Material.SNOW;
+    }
+
+    public static boolean shouldAwardDragonsSurviveFiveMinutes(long liveElapsedMillis) {
+        return liveElapsedMillis >= DRAGONS_SURVIVE_FIVE_MINUTES_MILLIS;
+    }
+
+    public static int nextDragonsWinStreak(int previousStreak, boolean won) {
+        return won ? Math.max(0, previousStreak) + 1 : 0;
+    }
+
+    public static boolean shouldAwardDragonsWinStreak(int streak) {
+        return streak >= DRAGONS_WIN_STREAK_ACHIEVEMENT;
+    }
+
+    public static boolean shouldAwardDragonsNoDamageWin(boolean won, boolean tookDamage) {
+        return won && !tookDamage;
     }
 
     public static boolean shouldCancelDragonsPvp(boolean directPlayerDamager, boolean playerProjectileShooter) {
@@ -777,16 +801,6 @@ public final class ArcadePortRules {
         return nowMillis >= nextAllowedMillis;
     }
 
-    /** Horizontal radius is circular; the vertical limit prevents one flare protecting an entire tower. */
-    public static boolean isDragonFlareLocationProtected(
-            double horizontalDistanceSquared, double verticalDistance) {
-        return Double.isFinite(horizontalDistanceSquared) && horizontalDistanceSquared >= 0.0D
-                && horizontalDistanceSquared <= DRAGONS_FLARE_RADIUS_SQUARED
-                && Double.isFinite(verticalDistance)
-                && Math.abs(verticalDistance) <= DRAGONS_FLARE_VERTICAL_RANGE;
-    }
-
-
 
     /** SoloGame awards one survival gem per ten seconds alive. */
 
@@ -844,6 +858,7 @@ public final class ArcadePortRules {
      * The source perk leaves damage of one point or less unchanged.
      */
     public static double microBattlesDamageAfterIronSkin(double damage, boolean fighter) {
+        if (!Double.isFinite(damage) || damage <= 0.0D) return 0.0D;
         if (!Double.isFinite(damage) || damage <= 0.0D) return 0.0D;
         if (!fighter || damage <= 1.0D) return damage;
         return Math.max(0.0D, damage - 0.5D);
@@ -1483,6 +1498,18 @@ public final class ArcadePortRules {
         return Math.min(0.022D, 0.012D + 0.003D * extraKills);
     }
 
+    public static final long BACON_BLAST_KILL_COMBO_WINDOW_MILLIS = BACON_FALL_KILL_CREDIT_WINDOW_MILLIS;
+
+    public static boolean shouldCountMamaCameraBlastKill(boolean mamaPiggles,
+            boolean directBlastKill, java.util.UUID killerId, java.util.UUID comboOwnerId,
+            long nowMillis, long lastComboHitAtMillis) {
+        if (!mamaPiggles) return false;
+        if (directBlastKill) return true;
+        return killerId != null && killerId.equals(comboOwnerId)
+                && lastComboHitAtMillis > 0L && nowMillis >= lastComboHitAtMillis
+                && nowMillis - lastComboHitAtMillis <= BACON_BLAST_KILL_COMBO_WINDOW_MILLIS;
+    }
+
     public static long evolutionPityRemainingMillis(long pityDeadline, long now) {
         return Math.max(0L, pityDeadline - now);
     }
@@ -1817,6 +1844,152 @@ public final class ArcadePortRules {
 
     /**
      * Horizontal distance to the closest vertical face of the configured square world border.
+     * A negative value means the player is already outside the border.
+     */
+    public static double microBattlesDistanceToBorder(double playerX, double playerZ,
+            double centerX, double centerZ, double borderSize) {
+        if (!Double.isFinite(playerX) || !Double.isFinite(playerZ)
+                || !Double.isFinite(centerX) || !Double.isFinite(centerZ)
+                || !Double.isFinite(borderSize) || borderSize <= 0.0D) return Double.NaN;
+        double halfSize = borderSize / 2.0D;
+        double distanceToXFace = halfSize - Math.abs(playerX - centerX);
+        double distanceToZFace = halfSize - Math.abs(playerZ - centerZ);
+        return Math.min(distanceToXFace, distanceToZFace);
+    }
+
+    /** The border cue is shown on the safe side, up to and including three blocks from the face. */
+    public static boolean shouldShowMicroBattlesBorderParticles(double playerX, double playerZ,
+            double centerX, double centerZ, double borderSize) {
+        double distance = microBattlesDistanceToBorder(playerX, playerZ, centerX, centerZ, borderSize);
+        return Double.isFinite(distance) && distance >= 0.0D
+                && distance <= MICRO_BATTLES_BORDER_PARTICLE_DISTANCE;
+    }
+
+    /** Normalise the 16 supported stained-glass / dust colour names. */
+    public static String normalizeMicroBattlesColour(String requested) {
+        if (requested == null) return null;
+        String colour = requested.trim().toLowerCase(java.util.Locale.ROOT)
+                .replace('_', '-').replace(' ', '-');
+        return switch (colour) {
+            case "white", "orange", "magenta", "light-blue", "yellow", "lime", "pink",
+                    "gray", "light-gray", "cyan", "purple", "blue", "brown", "green", "red", "black" -> colour;
+            case "lightblue", "aqua" -> "light-blue";
+            case "silver", "lightgray", "grey" -> "light-gray";
+            default -> null;
+        };
+    }
+
+    /** Resolve the player's personal middle-glass choice without changing the shared world block. */
+    public static Material microBattlesGlassMaterial(String requested) {
+        String colour = normalizeMicroBattlesColour(requested);
+        if (colour == null) colour = MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR;
+        Material material = Material.matchMaterial(colour.toUpperCase(java.util.Locale.ROOT).replace('-', '_')
+                + "_STAINED_GLASS");
+        return material == null ? Material.LIGHT_BLUE_STAINED_GLASS : material;
+    }
+
+    /** Minecraft dye RGB values used by the shared border dust particles. */
+    public static Color microBattlesParticleColour(String requested) {
+        String colour = normalizeMicroBattlesColour(requested);
+        if (colour == null) colour = MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR;
+        return switch (colour) {
+            case "white" -> Color.fromRGB(249, 255, 254);
+            case "orange" -> Color.fromRGB(249, 128, 29);
+            case "magenta" -> Color.fromRGB(199, 78, 189);
+            case "yellow" -> Color.fromRGB(254, 216, 61);
+            case "lime" -> Color.fromRGB(128, 199, 31);
+            case "pink" -> Color.fromRGB(243, 139, 170);
+            case "gray" -> Color.fromRGB(71, 79, 82);
+            case "light-gray" -> Color.fromRGB(157, 157, 151);
+            case "cyan" -> Color.fromRGB(22, 156, 156);
+            case "purple" -> Color.fromRGB(137, 50, 184);
+            case "blue" -> Color.fromRGB(60, 68, 170);
+            case "brown" -> Color.fromRGB(131, 84, 50);
+            case "green" -> Color.fromRGB(94, 124, 22);
+            case "red" -> Color.fromRGB(176, 46, 38);
+            case "black" -> Color.fromRGB(29, 29, 33);
+            default -> Color.fromRGB(58, 179, 218);
+        };
+    }
+
+    /**
+     * Choose from every Micro Battles team, using survivors first and team kills as
+     * a tiebreak. A true tie returns -1 rather than incorrectly favouring teams 0/1.
+     */
+    /** Isolated equivalent of the source KillsWithinGameStatTracker(8, "Annihilation"). */
+    public static boolean shouldAwardMicroBattlesAnnihilation(int killsThisGame) {
+        return killsThisGame == MICRO_BATTLES_ANNIHILATION_KILLS;
+    }
+
+    /** The Reborn Last2Tracker grants mission progress when exactly two teams remain alive. */
+    public static boolean shouldAwardMicroBattlesLastTwo(int aliveTeams) {
+        return aliveTeams == 2;
+    }
+
+    /** Stable local test-server key; production Mineplex achievement storage remains separate. */
+    public static String microBattlesAchievementConfigKey(java.util.UUID playerId, String achievementSlug) {
+        if (playerId == null || achievementSlug == null
+                || !achievementSlug.matches("[a-z0-9-]+")) return "";
+        return "test-achievements.micro-battles." + playerId + "." + achievementSlug;
+    }
+
+    public static int microBattlesTimeoutTeam(int[] aliveByTeam, int[] killsByTeam) {
+        if (aliveByTeam == null || killsByTeam == null || aliveByTeam.length < 2
+                || aliveByTeam.length != killsByTeam.length) return -1;
+        int bestTeam = -1;
+        int bestAlive = -1;
+        int bestKills = -1;
+        boolean tied = false;
+        for (int team = 0; team < aliveByTeam.length; team++) {
+            if (aliveByTeam[team] < 0 || killsByTeam[team] < 0) return -1;
+            if (aliveByTeam[team] > bestAlive
+                    || (aliveByTeam[team] == bestAlive && killsByTeam[team] > bestKills)) {
+                bestTeam = team;
+                bestAlive = aliveByTeam[team];
+                bestKills = killsByTeam[team];
+                tied = false;
+            } else if (aliveByTeam[team] == bestAlive && killsByTeam[team] == bestKills) {
+                tied = true;
+            }
+        }
+        return bestAlive <= 0 || tied ? -1 : bestTeam;
+    }
+
+    /** Reborn DamageManager.WeaponDamage: non-weapons deal 1; wooden swords 3; stone 4; diamond 7; gold 6. */
+    public static double microBattlesMeleeDamage(String materialName) {
+        if (materialName == null) return 1.0D;
+        String material = materialName.toUpperCase(java.util.Locale.ROOT);
+        if (!material.endsWith("_SWORD") && !material.endsWith("_AXE")) return 1.0D;
+        int damage = 6;
+        if (material.contains("WOOD")) damage -= 3;
+        else if (material.contains("STONE")) damage -= 2;
+        else if (material.contains("DIAMOND")) damage += 1;
+        return damage;
+    }
+
+    /** Reborn DamageManager uses arrow velocity length multiplied by three as raw arrow damage. */
+    public static double microBattlesArrowDamage(double velocityLength) {
+        if (!Double.isFinite(velocityLength) || velocityLength <= 0.0D) return 0.0D;
+        return velocityLength * 3.0D;
+    }
+
+    /** Reborn's legacy armour path multiplies damage by (25 - armourPoints) / 25; falls ignore armour. */
+    public static double microBattlesDamageAfterArmour(double damage, double armourPoints, boolean ignoreArmour) {
+        if (!Double.isFinite(damage) || damage <= 0.0D) return 0.0D;
+        if (ignoreArmour) return damage;
+        double armour = Double.isFinite(armourPoints) ? Math.max(0.0D, Math.min(20.0D, armourPoints)) : 0.0D;
+        return damage * (25.0D - armour) / 25.0D;
+    }
+
+    /** DamageManager starts with log10(max(damage, 2)); Micro's arrow listener multiplies it by 1.6. */
+    public static double microBattlesKnockbackStrength(double damage, boolean projectile) {
+        if (!Double.isFinite(damage)) return 0.0D;
+        return Math.log10(Math.max(damage, 2.0D)) * (projectile ? 1.6D : 1.0D);
+    }
+
+    public static boolean isMicroBattlesCombatContributionFresh(long nowMillis, long lastDamageAtMillis) {
+        return nowMillis >= lastDamageAtMillis
+                && nowMillis - lastDamageAtMillis < MICRO_BATTLES_COMBAT_LOG_EXPIRE_MILLIS;
      * A negative value means the player is already outside the border.
      */
     public static double microBattlesDistanceToBorder(double playerX, double playerZ,
