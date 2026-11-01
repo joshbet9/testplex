@@ -8,17 +8,33 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ArcadeCatalogTest {
     @Test
-    void registersAllTwentyEightArcadeGames() {
+    void registersAllThirtyArcadeGames() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        assertEquals(28, catalog.size());
-        assertEquals(28, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
+        assertEquals(30, catalog.size());
+        assertEquals(30, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
+    }
+
+    @Test
+    void monsterMazeOriginalSpeedAndModernAreSeparateReadyToTestGames() {
+        ArcadeCatalog catalog = new ArcadeCatalog();
+        assertEquals("Monster Maze (Original)", catalog.getGame("monster-maze").getName());
+        assertEquals("Monster Maze (Speed)", catalog.getGame("monster-maze-speed").getName());
+        assertEquals("Monster Maze (Modern)", catalog.getGame("monster-maze-modern").getName());
+        for (String id : List.of("monster-maze", "monster-maze-speed", "monster-maze-modern")) {
+            GameDefinition game = catalog.getGame(id);
+            assertNotNull(game);
+            assertTrue(game.isReadyForTest(), id + " must use the standard ready-game selection flow");
+            if ("monster-maze".equals(id)) assertEquals(2, game.getCosmeticLines().size());
+            else assertTrue(game.getCosmeticLines().isEmpty(),
+                    "Speed and Modern must reuse the single Monster Maze cosmetics page");
+        }
     }
 
     @Test
     void eachGameHasItsOwnCosmeticLinesAndWinEffects() {
         ArcadeCatalog catalog = new ArcadeCatalog();
         for (GameDefinition game : catalog.getGames()) {
-            boolean gameplayFirstPort = Set.of("draw-my-thing", "master-builders", "sneaky-assassins", "castle-assault", "heroes-of-gwen", "milk-the-cow", "wither-assault", "plexball", "super-sploor", "camera-shy", "speed-builders").contains(game.getId());
+            boolean gameplayFirstPort = Set.of("draw-my-thing", "master-builders", "sneaky-assassins", "castle-assault", "heroes-of-gwen", "milk-the-cow", "wither-assault", "plexball", "super-sploor", "camera-shy", "speed-builders", "monster-maze-speed", "monster-maze-modern").contains(game.getId());
             assertEquals(gameplayFirstPort, game.getCosmeticLines().isEmpty(),
                     game.getId() + " cosmetic lines should remain optional during this gameplay-first port");
             assertTrue(game.getWinEffects().size() >= (gameplayFirstPort ? 1 : 3),
@@ -108,7 +124,7 @@ class ArcadeCatalogTest {
     @Test
     void explicitlyClearedGamesAreAvailableTogetherForInGameAcceptance() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        Set<String> readyIds = Set.of("death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl", "castle-assault", "gladiators", "micro-battles", "milk-the-cow", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "runner", "sheep-quest", "turf-wars", "camera-shy", "monster-maze", "snake", "draw-my-thing", "master-builders", "skywars", "wither-assault", "sneaky-assassins", "speed-builders", "evolution");
+        Set<String> readyIds = Set.of("death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl", "castle-assault", "gladiators", "micro-battles", "milk-the-cow", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "runner", "sheep-quest", "turf-wars", "camera-shy", "monster-maze", "monster-maze-speed", "monster-maze-modern", "snake", "draw-my-thing", "master-builders", "skywars", "wither-assault", "sneaky-assassins", "speed-builders", "evolution");
 
         for (GameDefinition game : catalog.getGames()) {
             if (readyIds.contains(game.getId())) {
@@ -124,7 +140,7 @@ class ArcadeCatalogTest {
         long readyForTest = catalog.getGames().stream().filter(GameDefinition::isReadyForTest).count();
         long inProgress = catalog.getGames().stream()
                 .filter(game -> game.getPortStatus() == GameDefinition.PortStatus.MECHANICS_IN_PROGRESS).count();
-        assertEquals(27, readyForTest);
+        assertEquals(29, readyForTest);
         assertEquals(1, inProgress);
     }
 

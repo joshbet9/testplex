@@ -504,7 +504,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         testplexManagedRound = false;
         testplexReturnToLobby = null;
         if (notifyTestplexCompletion) {
-            plugin.getHostPlugin().onMonsterMazeRoundCompleted();
+            plugin.notifyTestplexRoundCompleted();
         }
     }
 

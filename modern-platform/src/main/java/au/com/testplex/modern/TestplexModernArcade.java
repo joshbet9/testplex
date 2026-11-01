@@ -137,7 +137,7 @@ public final class TestplexModernArcade extends JavaPlugin implements Listener {
         if (playerId == null || gameId == null || selectionGroup == null || catalog == null || preferences == null) {
             return null;
         }
-        GameDefinition game = catalog.getGame(gameId);
+        GameDefinition game = catalog.getGame(cosmeticGameId(gameId));
         if (game == null) return null;
         String group = selectionGroup.toLowerCase(java.util.Locale.ROOT);
         for (var line : game.getCosmeticLines()) {
@@ -159,7 +159,7 @@ public final class TestplexModernArcade extends JavaPlugin implements Listener {
     public boolean chooseCosmeticOption(UUID playerId, String gameId, String lineId, String optionId) {
         if (playerId == null || gameId == null || lineId == null || optionId == null
                 || catalog == null || preferences == null) return false;
-        GameDefinition game = catalog.getGame(gameId);
+        GameDefinition game = catalog.getGame(cosmeticGameId(gameId));
         if (game == null) return false;
         for (var line : game.getCosmeticLines()) {
             if (!lineId.equals(line.getId())) continue;
@@ -171,6 +171,13 @@ public final class TestplexModernArcade extends JavaPlugin implements Listener {
             }
         }
         return false;
+    }
+
+    private String cosmeticGameId(String gameId) {
+        if ("monster-maze-speed".equals(gameId) || "monster-maze-modern".equals(gameId)) {
+            return "monster-maze";
+        }
+        return gameId;
     }
 
     public ArcadeCatalog getCatalog() { return catalog; }

@@ -1,6 +1,7 @@
 package me.monstermaze;
 
 import au.com.testplex.arcadeports.ArcadeMechanicsModernPlugin;
+import au.com.testplex.arcadeports.ArcadePortGame;
 import me.monstermaze.command.MMCommand;
 import me.monstermaze.command.MMUtilityCommandListener;
 import me.monstermaze.command.PauseCommand;
@@ -53,6 +54,7 @@ public final class MonsterMazePlugin {
     private FileConfiguration config;
 
     private GameManager gameManager;
+    private ArcadePortGame activeArcadeGame = ArcadePortGame.MONSTER_MAZE;
     private MobThemeManager mobThemeManager;
     private MapManager mapManager;
     private MapThemeApplier mapThemeApplier;
@@ -85,9 +87,9 @@ public final class MonsterMazePlugin {
     }
 
     /** Initialise Monster Maze managers without taking ownership of player joins or the server lobby. */
-    public void enable() {
+    public void initialize() {
         instance = this;
-        getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=enable-start data-folder=" + dataFolder);
+        getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=module-initialize-start data-folder=" + dataFolder);
         saveDefaultConfig();
         getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=config-loaded");
         this.backendClient = new BackendClient(this);
@@ -192,7 +194,7 @@ public final class MonsterMazePlugin {
         getLogger().info("Active map: " + mapManager.getActiveMap());
         getLogger().info("Mode: " + mode.id);
         getLogger().info("Run recording: " + recordRuns);
-        getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=enable-complete");
+        getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=module-initialize-complete");
     }
 
     public void shutdown() {
@@ -214,8 +216,35 @@ public final class MonsterMazePlugin {
         if (gameManager != null) gameManager.setTestplexReturnToLobby(callback);
     }
     public boolean startTestplexGame(java.util.List<Player> participants) {
-        return gameManager != null && gameManager.startTestplexRound(participants,
+        return startTestplexGame(participants, MazeMode.ORIGINAL, ArcadePortGame.MONSTER_MAZE);
+    }
+
+    /** Start one of the three Arcade identities through the same embedded game controller. */
+    public boolean startTestplexGame(java.util.List<Player> participants, MazeMode selectedMode,
+                                     ArcadePortGame arcadeGame) {
+        if (gameManager == null || gameManager.isRunning() || arcadeGame == null || !arcadeGame.isMonsterMaze()) {
+            return false;
+        }
+        setMode(selectedMode);
+        activeArcadeGame = arcadeGame;
+        boolean started = gameManager.startTestplexRound(participants,
                 player -> host.returnPlayerToArcadeLobby(player));
+        if (!started) activeArcadeGame = ArcadePortGame.MONSTER_MAZE;
+        return started;
+    }
+
+    public ArcadePortGame getActiveArcadeGame() { return activeArcadeGame; }
+
+    /** Natural completion enters the standard Arcade preference-rotation callback with the selected ID. */
+    public void notifyTestplexRoundCompleted() {
+        ArcadePortGame completedGame = activeArcadeGame;
+        activeArcadeGame = ArcadePortGame.MONSTER_MAZE;
+        host.onMonsterMazeRoundCompleted(completedGame);
+    }
+
+    /** Explicit Stop Game also clears the selected mode after the module is idle. */
+    public void clearActiveArcadeGame() {
+        if (gameManager == null || !gameManager.isRunning()) activeArcadeGame = ArcadePortGame.MONSTER_MAZE;
     }
     public boolean isGameRunning() { return gameManager != null && gameManager.isRunning(); }
 

@@ -7,7 +7,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Modern catalogue for all 28 Arcade games. Each game owns its own cosmetic
+ * Modern catalogue for all 30 Arcade games. Each game owns its own cosmetic
  * lines and win-scene choices; actual render/gameplay handlers are added with
  * each port rather than pretending global cosmetics are game-specific.
  */
@@ -147,22 +147,12 @@ public final class ArcadeCatalog {
                 win("micro-monument", "Micro Monument", "A tiny monument assembles around the winner."),
                 win("falling-stars", "Falling Stars", "A narrow star shower descends onto the platform")));
 
-        register(game("monster-maze", "Monster Maze", "ROTTEN_FLESH", "Reach the active Safe Pad while mobs pursue each stage.",
-                GameDefinition.PortStatus.READY_FOR_TEST,
-                List.of(lineMulti("mob-sets", "Mob Forms", "Enable multiple mob forms independently for the round.", "CREEPER_HEAD",
-                        single("creeper", "Creeper", "Creeper form"),
-                        single("skeleton", "Skeleton", "Skeleton form"),
-                        single("spider", "Spider", "Spider form"),
-                        single("zombie", "Zombie", "Zombie form"),
-                        single("witch", "Witch", "Witch form"),
-                        single("slime", "Slime", "Slime form"),
-                        single("enderman", "Enderman", "Enderman form"),
-                        single("guardian", "Guardian", "Guardian form")),
-                     line("objective-palette", "Objective Palette per Mob Set", "Keep beacon-glass colour and Safe Pad surface colour independent for every mob set.", "STAINED_GLASS",
-                        single("per-mob-set", "Configure Each Mob Set", "Select a mob set, then edit beacon and pad colours independently."))),
-                win("maze-blueprint", "Maze Blueprint", "A miniature maze trace forms above the winner."),
-                win("mob-procession", "Mob Procession", "The round's selected mob forms parade behind the winner."),
-                win("safe-pad-coronation", "Safe Pad Coronation", "The Safe Pad raises into a compact victory dais")));
+        register(monsterMazeGame("monster-maze", "Monster Maze (Original)",
+                "The original Monster Maze experience, recreated as faithfully as possible."));
+        register(monsterMazeModeGame("monster-maze-speed", "Monster Maze (Speed)",
+                "The Speed mode keeps the original timer and monster spawning with the Speed gameplay rules."));
+        register(monsterMazeModeGame("monster-maze-modern", "Monster Maze (Modern)",
+                "The Modern mode accelerates stages, increases monster counts and expands kit abilities."));
 
         register(game("one-in-the-quiver", "One in the Quiver", "ARROW", "Land the decisive bow shot with one arrow at a time.",
                 GameDefinition.PortStatus.READY_FOR_TEST,
@@ -347,6 +337,36 @@ public final class ArcadeCatalog {
                 List.of(),
                 win("highest-accuracy", "Highest Accuracy",
                         "The builder with the highest cumulative model accuracy is announced as the winner.")));
+    }
+
+    /** Speed and Modern share Original's one player-facing Monster Maze cosmetics page. */
+    private static GameDefinition monsterMazeModeGame(String id, String name, String description) {
+        return game(id, name, "ROTTEN_FLESH", description,
+                GameDefinition.PortStatus.READY_FOR_TEST,
+                List.of(),
+                win("maze-blueprint", "Maze Blueprint", "A miniature maze trace forms above the winner."));
+    }
+
+    private static GameDefinition monsterMazeGame(String id, String name, String description) {
+        return game(id, name, "ROTTEN_FLESH", description,
+                GameDefinition.PortStatus.READY_FOR_TEST,
+                List.of(lineMulti("mob-sets", "Mob Forms", "Enable multiple mob forms independently for the round.", "CREEPER_HEAD",
+                                single("creeper", "Creeper", "Creeper form"),
+                                single("skeleton", "Skeleton", "Skeleton form"),
+                                single("spider", "Spider", "Spider form"),
+                                single("zombie", "Zombie", "Zombie form"),
+                                single("witch", "Witch", "Witch form"),
+                                single("slime", "Slime", "Slime form"),
+                                single("enderman", "Enderman", "Enderman form"),
+                                single("guardian", "Guardian", "Guardian form")),
+                        line("objective-palette", "Objective Palette per Mob Set",
+                                "Keep beacon-glass colour and Safe Pad surface colour independent for every mob set.",
+                                "STAINED_GLASS",
+                                single("per-mob-set", "Configure Each Mob Set",
+                                        "Select a mob set, then edit beacon and pad colours independently."))),
+                win("maze-blueprint", "Maze Blueprint", "A miniature maze trace forms above the winner."),
+                win("mob-procession", "Mob Procession", "The round's selected mob forms parade behind the winner."),
+                win("safe-pad-coronation", "Safe Pad Coronation", "The Safe Pad raises into a compact victory dais"));
     }
 
     private void register(GameDefinition definition) {

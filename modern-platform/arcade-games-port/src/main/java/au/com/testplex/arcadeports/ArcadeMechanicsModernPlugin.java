@@ -15,7 +15,6 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements CommandExecutor, Listener {
     private ArcadePortManager manager;
     private PlexballGame plexball;
-    private MonsterMazePlugin monsterMaze;
     private ArcadeMapSelectionMenu mapMenu;
     private GamePreferenceMenu preferenceMenu;
     private CameraShyGame cameraShy;
@@ -25,9 +24,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     // Includes shared catalogue games plus dedicated standalone test queues.
     private static final java.util.List<String> READY_FOR_TEST_GAME_IDS = java.util.List.of(
             "death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl",
-            "castle-assault", "gladiators", "micro-battles", "milk-the-cow", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "runner", "sheep-quest", "turf-wars", "camera-shy", "monster-maze", "snake", "draw-my-thing", "master-builders",
+            "castle-assault", "gladiators", "micro-battles", "milk-the-cow", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "runner", "sheep-quest", "turf-wars", "camera-shy",
+            "monster-maze", "monster-maze-speed", "monster-maze-modern", "snake", "draw-my-thing", "master-builders",
             "skywars", "wither-assault", "sneaky-assassins", "speed-builders", "evolution");
-    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-27-games-plus-evolution-20261101-v9";
+    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-29-games-plus-three-monster-maze-modes-20261101-v10";
 
     @Override
     public void onEnable() {
@@ -95,35 +95,9 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         getCommand("gamepreferences").setExecutor(this);
         getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=commands-and-menus-registered");
 
-        // Monster Maze is a built-in game in this Arcade runtime, not a separate
-        // Bukkit plugin or deployment integration. Its managers, commands, map
-        // selection and queue/session callbacks are owned by this same lifecycle.
-        try {
-            monsterMaze = new MonsterMazePlugin(this);
-            monsterMaze.enable();
-            if (monsterMaze.getGameManager() == null) {
-                throw new IllegalStateException("Monster Maze GameManager was not initialised.");
-            }
-            manager.setMonsterMazeModule(monsterMaze);
-            if (!manager.isMonsterMazeModuleRegistered(monsterMaze)) {
-                throw new IllegalStateException("The Arcade manager did not retain the integrated Monster Maze runtime.");
-            }
-            getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=monster-maze-registered map="
-                    + monsterMaze.getMapManager().getActiveMap());
-        } catch (RuntimeException | Error startupFailure) {
-            if (monsterMaze != null) {
-                try {
-                    monsterMaze.shutdown();
-                } catch (Throwable shutdownFailure) {
-                    getLogger().log(java.util.logging.Level.WARNING,
-                            "Monster Maze cleanup after failed Arcade startup was incomplete.", shutdownFailure);
-                }
-            }
-            monsterMaze = null;
-            throw new IllegalStateException(
-                    "The integrated Monster Maze game failed to initialise; the Arcade runtime cannot be marked ready.",
-                    startupFailure);
-        }
+        // ArcadePortManager registers and initializes manager-owned game modules through
+        // one lifecycle entry point. It owns startup failure cleanup and eventual shutdown.
+        manager.initializeGameModules();
 
         // Publish one process-correlated readiness record only after the shared
         // lobby and every game required by the controlled acceptance queue exist.
@@ -144,7 +118,9 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         }
     }
 
-    public MonsterMazePlugin getMonsterMazeModule() { return monsterMaze; }
+    public MonsterMazePlugin getMonsterMazeModule() {
+        return manager == null ? null : manager.getMonsterMazeModule();
+    }
     public ArcadePortManager getArcadePortManager() { return manager; }
     public PlexballGame getPlexballGame() { return plexball; }
     public SpeedBuildersGame getSpeedBuildersGame() { return speedBuilders; }
@@ -220,8 +196,9 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     }
 
     /** Called only after a natural Testplex-managed Monster Maze round completion. */
-    public void onMonsterMazeRoundCompleted() {
-        if (manager != null) manager.onExternalGameCompleted(ArcadePortGame.MONSTER_MAZE);
+    public void onMonsterMazeRoundCompleted(ArcadePortGame completedGame) {
+        if (manager != null) manager.onExternalGameCompleted(
+                completedGame != null && completedGame.isMonsterMaze() ? completedGame : ArcadePortGame.MONSTER_MAZE);
     }
 
     public void stopMonsterMazeRound(String reason) {
@@ -242,11 +219,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         if (speedBuilders != null) speedBuilders.shutdown();
         if (manager != null) manager.shutdown();
         if (plexball != null) plexball.shutdown();
-        if (monsterMaze != null) monsterMaze.shutdown();
     }
 
     private void publishArcadeRuntimeReadiness() {
-        if (manager == null || monsterMaze == null || !manager.isMonsterMazeModuleRegistered(monsterMaze)) {
+        if (manager == null || !manager.isMonsterMazeModuleRegistered()) {
             throw new IllegalStateException(
                     "The shared Arcade runtime cannot be marked ready without its integrated Monster Maze game.");
         }
@@ -259,7 +235,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     + " invocation-id-present=" + (System.getenv("INVOCATION_ID") != null));
             boolean deploymentSignal = ArcadeRuntimeReadinessSignal.publish(
                     getDataFolder().toPath(), System.getenv("INVOCATION_ID"), ProcessHandle.current().pid(),
-                    manager.isMonsterMazeModuleRegistered(monsterMaze));
+                    manager.isMonsterMazeModuleRegistered());
             getLogger().info("TESTPLEX_ARCADE_RUNTIME_READY world=" + ModernArcadeLobby.WORLD_NAME
                     + " plane=100x100 floor-y=" + ModernArcadeLobby.FLOOR_Y
                     + " monster-maze=READY deployment-signal=" + deploymentSignal);
