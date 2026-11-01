@@ -316,6 +316,9 @@ public final class ArcadePortManager implements Listener {
 
     boolean canStartCameraShy() { return active == null && !monsterMazeRunning(); }
 
+    /** Availability guard for standalone Arcade-hosted test modules. */
+    public boolean canStartExternalGame() { return active == null && !monsterMazeRunning(); }
+
     /** Start an explicit participant set through the same Testplex Arcade queue/manager path. */
     public boolean startMonsterMazeTournamentRound(List<Player> requestedParticipants) {
         if (requestedParticipants == null || requestedParticipants.isEmpty()
