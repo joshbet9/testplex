@@ -48,7 +48,12 @@ public final class GamePreferenceWeights {
 
     public static double finalWeight(double baseWeight, int likes, int dislikes, int eligiblePlayers) {
         if (!Double.isFinite(baseWeight) || baseWeight <= 0.0D) return 0.0D;
-        return baseWeight * preferenceMultiplier(likes, dislikes, eligiblePlayers);
+        double multiplier = preferenceMultiplier(likes, dislikes, eligiblePlayers);
+        // Saturate the standalone helper when the mathematical product exceeds
+        // the largest representable double. Selection normalization below scales
+        // base weights first so relative odds are still preserved exactly enough.
+        return baseWeight > Double.MAX_VALUE / multiplier
+                ? Double.MAX_VALUE : baseWeight * multiplier;
     }
 
     /**
@@ -59,20 +64,37 @@ public final class GamePreferenceWeights {
             Map<String, Double> baseWeights,
             Map<String, Counts> preferenceCounts,
             int eligiblePlayers) {
-        Map<String, Double> weighted = new LinkedHashMap<>();
-        double totalWeight = 0.0D;
+        Map<String, Double> weights = new LinkedHashMap<>();
+        Map<String, Counts> countsByGame = preferenceCounts == null ? Map.of() : preferenceCounts;
+        double maximumBaseWeight = 0.0D;
 
+        if (baseWeights == null || baseWeights.isEmpty()) return Map.of();
+        for (Map.Entry<String, Double> entry : baseWeights.entrySet()) {
+            double baseWeight = entry.getValue() == null ? 0.0D : entry.getValue();
+            if (Double.isFinite(baseWeight) && baseWeight > maximumBaseWeight) {
+                maximumBaseWeight = baseWeight;
+            }
+        }
+
+        // Scale by the largest base weight before applying the preference curve.
+        // Each adjusted value is therefore in [0, 1.95], so neither multiplication
+        // nor the total can overflow even for Double.MAX_VALUE config values.
+        double totalWeight = 0.0D;
         for (Map.Entry<String, Double> entry : baseWeights.entrySet()) {
             String gameId = entry.getKey();
             double baseWeight = entry.getValue() == null ? 0.0D : entry.getValue();
-            Counts counts = preferenceCounts.getOrDefault(gameId, new Counts(0, 0));
-            double weight = finalWeight(baseWeight, counts.likes(), counts.dislikes(), eligiblePlayers);
-            weighted.put(gameId, weight);
-            totalWeight += weight;
+            double scaledWeight = 0.0D;
+            if (maximumBaseWeight > 0.0D && Double.isFinite(baseWeight) && baseWeight > 0.0D) {
+                Counts counts = countsByGame.getOrDefault(gameId, new Counts(0, 0));
+                scaledWeight = (baseWeight / maximumBaseWeight)
+                        * preferenceMultiplier(counts.likes(), counts.dislikes(), eligiblePlayers);
+            }
+            weights.put(gameId, scaledWeight);
+            totalWeight += scaledWeight;
         }
 
         Map<String, Double> probabilities = new LinkedHashMap<>();
-        for (Map.Entry<String, Double> entry : weighted.entrySet()) {
+        for (Map.Entry<String, Double> entry : weights.entrySet()) {
             double probability = totalWeight > 0.0D ? entry.getValue() / totalWeight : 0.0D;
             probabilities.put(entry.getKey(), probability);
         }
