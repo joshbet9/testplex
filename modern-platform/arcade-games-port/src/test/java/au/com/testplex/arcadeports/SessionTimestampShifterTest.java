@@ -102,7 +102,7 @@ final class TopLevelTimerFixture {
     final Map<UUID, Long> nextAbilityAt = new HashMap<>();
     final Map<UUID, PlayerTimer> playerStates = new HashMap<>();
 
-    private static final class PlayerTimer {
+    static final class PlayerTimer {
         long nextUpdateAt;
 
         private PlayerTimer(long nextUpdateAt) {
