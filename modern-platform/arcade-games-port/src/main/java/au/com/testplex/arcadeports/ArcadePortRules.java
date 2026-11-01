@@ -802,25 +802,6 @@ public final class ArcadePortRules {
     }
 
 
-    /** SoloGame awards one survival gem per ten seconds alive. */
-
-
-    /** SoloGame end-of-round placement rewards, one-based. */
-
-
-    /** SoloGame sidebar: 0=all alive/dead names, 1=alive names, 2=alive/dead counts. */
-
-
-    /** Mirrors UtilAction.velocity(entity, facing, 1.2, false, 0, 0.2, 1.0, true). */
-
-
-    /** Mirrors UtilAction.velocity(entity, trajectory, 1.0, false, 0, 0.6, 2.0, true). */
-
-
-
-    /** Horizontal radius is circular; the vertical limit prevents one flare protecting an entire tower. */
-
-
     public static boolean shouldSpawnTestDragon(int currentCount, long now, long nextSpawnAt) {
         return currentCount < DRAGONS_MAX_DRAGONS && now >= nextSpawnAt;
     }
