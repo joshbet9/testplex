@@ -1609,7 +1609,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void applySessionTeamTabTeams(Session session) {
-        if (teamCountForGame(session.type) < 2) return;
+        if (session == null) return;
+        int teamCount = teamCountForGame(session.type);
         for (Player viewer : session.players.values()) {
             if (viewer == null || !viewer.isOnline()) continue;
             Scoreboard board = viewer.getScoreboard();
@@ -1627,9 +1628,9 @@ public final class ArcadePortManager implements Listener {
 
             for (Player tabPlayer : Bukkit.getOnlinePlayers()) {
                 if (tabPlayer == null || !tabPlayer.isOnline()) continue;
-                int teamId = session.players.containsKey(tabPlayer.getUniqueId())
+                int teamId = teamCount >= 2 && session.players.containsKey(tabPlayer.getUniqueId())
                         ? session.teams.getOrDefault(tabPlayer.getUniqueId(), -1) : -1;
-                if (teamId < 0 || teamId >= teamCountForGame(session.type)) teamId = -1;
+                if (teamId < 0 || teamId >= teamCount) teamId = -1;
 
                 String rank = ModernLobbyScoreboard.rankId(plugin, tabPlayer);
                 String groupName = ModernLobbyScoreboard.tabTeamSortKey(rank, teamId);
@@ -19646,6 +19647,8 @@ public final class ArcadePortManager implements Listener {
             if (snapshot != null) snapshot.restore(player);
             if (!lobby.isLobbyWorld(player.getWorld())) lobby.sendToLobby(player);
             else lobby.ensurePanelItem(player);
+            Session currentSession = active;
+            if (currentSession != null) applySessionTeamTabTeams(currentSession);
             lobby.refreshLobbyScoreboards();
         });
     }
