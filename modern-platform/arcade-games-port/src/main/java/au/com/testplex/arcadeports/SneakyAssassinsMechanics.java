@@ -110,7 +110,6 @@ final class SneakyAssassinsMechanics {
     private long nextGlobalRevealAt;
     private long globalRevealEndsAt;
     private long lastHudUpdateAt;
-    private long nextNpcCullAt;
     private int globalRevealWarning = -1;
     private Scoreboard scoreboard;
     private Objective scoreboardObjective;
@@ -308,7 +307,6 @@ final class SneakyAssassinsMechanics {
         long now = System.currentTimeMillis();
         nextPowerUpAt = now + FIRST_POWERUP_DELAY_MILLIS;
         nextGlobalRevealAt = now + GLOBAL_REVEAL_INTERVAL_MILLIS;
-        nextNpcCullAt = now + 4_000L;
         setupScoreboard();
         announce(ChatColor.GOLD + "Sneaky Assassins: stay disguised, collect power-ups and be the last assassin alive!");
         plugin.getLogger().info("Sneaky Assassins started with " + players.size()
@@ -557,11 +555,14 @@ final class SneakyAssassinsMechanics {
     private void updateNpcMovement(long now) {
         for (UUID id : new ArrayList<>(npcIds)) {
             Entity entity = Bukkit.getEntity(id);
-            if (!(entity instanceof Villager npc) || !npc.isValid()) {
+            boolean validVillager = entity instanceof Villager npc && npc.isValid();
+            if (SneakyAssassinsRules.shouldPruneTownNpc(entity != null, validVillager)) {
                 npcIds.remove(id);
                 bribes.remove(id);
+                npcNextAttackAt.remove(id);
                 continue;
             }
+            Villager npc = (Villager) entity;
             Bribe bribe = bribes.get(id);
             if (bribe != null) {
                 Player target = nearestEnemy(npc.getLocation(), bribe.owner);
@@ -586,19 +587,6 @@ final class SneakyAssassinsMechanics {
                 double angle = ThreadLocalRandom.current().nextDouble(0.0D, Math.PI * 2.0D);
                 Vector motion = new Vector(Math.cos(angle) * 0.13D, 0.0D, Math.sin(angle) * 0.13D);
                 npc.setVelocity(motion);
-            }
-        }
-        if (now >= nextNpcCullAt && !npcIds.isEmpty()) {
-            nextNpcCullAt = now + 4_000L;
-            UUID id = npcIds.stream().skip(ThreadLocalRandom.current().nextInt(npcIds.size())).findFirst().orElse(null);
-            if (id != null) {
-                Entity entity = Bukkit.getEntity(id);
-                if (entity != null) {
-                    entity.getWorld().spawnParticle(Particle.LARGE_SMOKE, entity.getLocation(), 12, 0.25D, 0.35D, 0.25D, 0.03D);
-                    entity.remove();
-                }
-                npcIds.remove(id);
-                bribes.remove(id);
             }
         }
     }
