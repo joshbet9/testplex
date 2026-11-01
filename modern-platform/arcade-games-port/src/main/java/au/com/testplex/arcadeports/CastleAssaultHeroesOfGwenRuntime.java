@@ -3632,6 +3632,252 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         removeBardolfPack(ownerId);
     }
 
+
+    private boolean isRowenaBombardmentItem(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return false;
+        return item.getItemMeta().getPersistentDataContainer()
+                .has(rowenaBombardmentItemKey, PersistentDataType.BYTE);
+    }
+
+    private ItemStack rowenaBombardmentActiveItem() {
+        ItemStack item = namedItem(Material.DIAMOND_HORSE_ARMOR,
+                ChatColor.DARK_RED + "Bombardment", "Click to fire an explosive shot. Three shots remain in the flight.");
+        ItemMeta meta = item.getItemMeta();
+        meta.getPersistentDataContainer().set(rowenaBombardmentItemKey, PersistentDataType.BYTE, (byte) 1);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private void activateRowenaLightArrows(Player player) {
+        UUID id = player.getUniqueId();
+        if (!isHeroSkillReady(player, "rowena.light_arrows")) return;
+        rowenaLightArrowsRemaining.put(id, ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_COUNT);
+        ItemStack item = player.getInventory().getItem(1);
+        if (item != null && "rowena.light_arrows".equals(heroSkillId(item))) {
+            item.setAmount(ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_COUNT);
+        }
+        player.sendMessage(ChatColor.GOLD + "Your next five arrows are Light Arrows.");
+        player.playSound(player.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 0.8F, 1.5F);
+    }
+
+    private void activateRowenaCombatSlide(Player player) {
+        String skill = "rowena.combat_slide";
+        if (!isHeroSkillReady(player, skill)) return;
+        long now = System.currentTimeMillis();
+        rowenaCombatSlideEndsAt.put(player.getUniqueId(),
+                now + ArcadePortRules.HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_DURATION_MILLIS);
+        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_COOLDOWN_MILLIS);
+        player.getWorld().playSound(player.getLocation(), Sound.ENTITY_BAT_TAKEOFF, 1.0F, 1.0F);
+        world.spawnParticle(Particle.CLOUD, player.getLocation().clone().add(0.0D, 1.0D, 0.0D),
+                20, 0.5D, 0.5D, 0.5D, 0.001D);
+    }
+
+    private void beginRowenaBombardment(Player player) {
+        UUID id = player.getUniqueId();
+        if (rowenaBombardments.containsKey(id) || !isHeroSkillReady(player, "rowena.bombardment")) return;
+        Location flightLocation = player.getLocation().clone()
+                .add(0.0D, ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_ASCENT_BLOCKS, 0.0D);
+        Block anchorBlock = flightLocation.getBlock().getRelative(BlockFace.DOWN);
+        BlockData originalBlock = anchorBlock.getBlockData().clone();
+        ItemStack originalBow = player.getInventory().getItem(0) == null
+                ? null : player.getInventory().getItem(0).clone();
+
+        if (!player.teleport(flightLocation)) return;
+        anchorBlock.setType(Material.BARRIER, false);
+        RowenaBombardmentState state = new RowenaBombardmentState(anchorBlock, originalBlock,
+                originalBow, System.currentTimeMillis()
+                        + ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_DURATION_MILLIS,
+                ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_SHOTS);
+        rowenaBombardments.put(id, state);
+        player.getInventory().setItem(0, rowenaBombardmentActiveItem());
+        player.getInventory().setHeldItemSlot(0);
+        player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+        player.sendMessage(ChatColor.GOLD + "Bombardment active: fire three explosive shots before landing.");
+        player.playSound(player.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 1.0F, 0.8F);
+    }
+
+    private void fireRowenaLightArrow(Player player) {
+        ItemStack bow = player.getInventory().getItem(0);
+        int power = bow == null ? 0 : bow.getEnchantmentLevel(Enchantment.POWER);
+        double damage = ArcadePortRules.heroesOfGwenRowenaLightArrowDamage(power);
+        Location origin = player.getEyeLocation().clone();
+        Vector direction = player.getLocation().getDirection().normalize();
+        int team = teams.getOrDefault(player.getUniqueId(), -1);
+        Map<UUID, Long> nextHitAt = rowenaLightArrowNextHitAt.computeIfAbsent(player.getUniqueId(),
+                ignored -> new HashMap<>());
+
+        for (double distance = ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_STEP;
+                distance <= ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_RANGE;
+                distance += ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_STEP) {
+            Location point = origin.clone().add(direction.clone().multiply(distance));
+            world.spawnParticle(Particle.FIREWORK, point, 1, 0.0D, 0.0D, 0.0D, 0.0D);
+            for (Entity entity : world.getNearbyEntities(point,
+                    ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_HIT_RADIUS,
+                    ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_HIT_RADIUS,
+                    ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_HIT_RADIUS)) {
+                if (!(entity instanceof LivingEntity target) || target.equals(player) || target.isDead()
+                        || !target.isValid()) continue;
+                int targetTeam = heroesOfGwenEntityTeam(target);
+                if (targetTeam >= 0 && targetTeam == team) continue;
+                if (target instanceof Player targetPlayer && !activePlayers.contains(targetPlayer.getUniqueId())) continue;
+                if (entity instanceof Wolf wolf && teams.getOrDefault(
+                        bardolfOwnerId(wolf), -2) == team) continue;
+                if (nextHitAt.getOrDefault(target.getUniqueId(), 0L) > System.currentTimeMillis()) continue;
+                nextHitAt.put(target.getUniqueId(), System.currentTimeMillis()
+                        + ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_TARGET_RECHARGE_MILLIS);
+
+                TowerState tower = towerFor(target);
+                if (tower != null) {
+                    if (tower.owner != team && canDamageMobaTower(tower, team)
+                            && player.getLocation().distanceSquared(tower.location) <= MOBA_TOWER_RANGE_SQUARED) {
+                        damageMobaTower(tower, damage, player);
+                    }
+                    continue;
+                }
+                if (target instanceof Wither wither) {
+                    Integer enemyTeam = withers.entrySet().stream()
+                            .filter(entry -> entry.getValue().equals(wither))
+                            .map(Map.Entry::getKey).findFirst().orElse(null);
+                    if (enemyTeam != null && enemyTeam != team && witherDamageable.getOrDefault(enemyTeam, false)) {
+                        if (wither.getHealth() <= damage) {
+                            finishHeroesOfGwen(team, "enemy Wither defeated by Rowena's Light Arrow");
+                            return;
+                        }
+                        wither.setHealth(wither.getHealth() - damage);
+                    }
+                } else {
+                    target.damage(damage, player);
+                }
+                player.playSound(player.getLocation(), Sound.ENTITY_ARROW_HIT_PLAYER, 0.7F, 1.3F);
+            }
+        }
+    }
+
+    private void fireRowenaBombardmentShot(Player player) {
+        UUID id = player.getUniqueId();
+        RowenaBombardmentState state = rowenaBombardments.get(id);
+        if (state == null || state.shotsRemaining <= 0) return;
+        ItemStack bow = state.originalBow;
+        int power = bow == null ? 0 : bow.getEnchantmentLevel(Enchantment.POWER);
+        double damage = ArcadePortRules.heroesOfGwenRowenaBombardmentDamage(power);
+        Location origin = player.getEyeLocation().clone();
+        Vector direction = player.getLocation().getDirection().normalize();
+        Location destination = origin.clone();
+        for (double distance = ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_STEP;
+                distance <= ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_RANGE;
+                distance += ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_STEP) {
+            Location point = origin.clone().add(direction.clone().multiply(distance));
+            destination = point;
+            if (!point.getBlock().isPassable()) break;
+            world.spawnParticle(Particle.FIREWORK, point, 1, 0.0D, 0.0D, 0.0D, 0.0D);
+        }
+
+        world.playSound(destination, Sound.ENTITY_GENERIC_EXPLODE, 1.0F, 0.8F);
+        world.spawnParticle(Particle.EXPLOSION, destination, 2, 0.2D, 0.2D, 0.2D, 0.02D);
+        int team = teams.getOrDefault(id, -1);
+        double radius = ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_BLAST_RADIUS;
+        for (Entity entity : world.getNearbyEntities(destination, radius, radius, radius)) {
+            if (!(entity instanceof LivingEntity target) || target.equals(player) || !target.isValid()
+                    || target.isDead() || destination.distanceSquared(target.getLocation()) > radius * radius) continue;
+            if (target instanceof Player targetPlayer && !activePlayers.contains(targetPlayer.getUniqueId())) continue;
+            int targetTeam = heroesOfGwenEntityTeam(target);
+            if (targetTeam >= 0 && targetTeam == team) continue;
+            TowerState tower = towerFor(target);
+            if (tower != null) {
+                if (tower.owner != team && canDamageMobaTower(tower, team)
+                        && player.getLocation().distanceSquared(tower.location) <= MOBA_TOWER_RANGE_SQUARED) {
+                    damageMobaTower(tower, damage, player);
+                }
+            } else if (target instanceof Wither wither) {
+                Integer enemyTeam = withers.entrySet().stream()
+                        .filter(entry -> entry.getValue().equals(wither))
+                        .map(Map.Entry::getKey).findFirst().orElse(null);
+                if (enemyTeam != null && enemyTeam != team && witherDamageable.getOrDefault(enemyTeam, false)) {
+                    if (wither.getHealth() <= damage) {
+                        finishHeroesOfGwen(team, "enemy Wither defeated by Rowena's Bombardment");
+                        endRowenaBombardment(id, true);
+                        return;
+                    }
+                    wither.setHealth(wither.getHealth() - damage);
+                }
+            } else {
+                target.damage(damage, player);
+            }
+        }
+        state.shotsRemaining--;
+        if (state.shotsRemaining <= 0) endRowenaBombardment(id, true);
+        else {
+            ItemStack active = rowenaBombardmentActiveItem();
+            ItemMeta meta = active.getItemMeta();
+            meta.setLore(List.of(ChatColor.GRAY + "Shots remaining: " + state.shotsRemaining,
+                    ChatColor.GRAY + "Click to fire the next explosive shot."));
+            active.setItemMeta(meta);
+            player.getInventory().setItem(0, active);
+        }
+    }
+
+    private void endRowenaBombardment(UUID ownerId, boolean applyCooldown) {
+        RowenaBombardmentState state = rowenaBombardments.remove(ownerId);
+        if (state == null) return;
+        if (state.anchorBlock.getType() == Material.BARRIER) {
+            state.anchorBlock.setBlockData(state.originalBlock, false);
+        }
+        Player player = players.get(ownerId);
+        if (player != null && player.isOnline()) {
+            if (selectedHeroesOfGwen.getOrDefault(ownerId, "").equals("rowena")) {
+                player.getInventory().setItem(0, state.originalBow == null
+                        ? namedItem(Material.BOW, ChatColor.GREEN + "Bow", "Rowena's bow.")
+                        : state.originalBow.clone());
+                player.updateInventory();
+                if (applyCooldown) {
+                    setHeroSkillCooldown(player, "rowena.bombardment",
+                            ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_REUSE_DELAY_MILLIS);
+                }
+            }
+        }
+    }
+
+    private void removeRowenaState(UUID ownerId) {
+        rowenaLightArrowsRemaining.remove(ownerId);
+        rowenaLightArrowNextHitAt.remove(ownerId);
+        rowenaCombatSlideEndsAt.remove(ownerId);
+        endRowenaBombardment(ownerId, false);
+    }
+
+    private void updateRowenaAbilities(long now) {
+        for (Map.Entry<UUID, Long> entry : new HashMap<>(rowenaCombatSlideEndsAt).entrySet()) {
+            UUID id = entry.getKey();
+            Player player = players.get(id);
+            if (now >= entry.getValue() || player == null || !player.isOnline()
+                    || !activePlayers.contains(id) || !"rowena".equals(selectedHeroesOfGwen.get(id))) {
+                if (player != null && player.isOnline()) player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+                rowenaCombatSlideEndsAt.remove(id);
+                continue;
+            }
+            Vector direction = player.getLocation().getDirection();
+            direction.setY(0.0D);
+            if (direction.lengthSquared() > 0.001D) {
+                player.setVelocity(direction.normalize().multiply(
+                        ArcadePortRules.HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_SPEED));
+            }
+            world.spawnParticle(Particle.CLOUD, player.getLocation().clone().add(0.0D, 0.8D, 0.0D),
+                    4, 0.3D, 0.2D, 0.3D, 0.01D);
+        }
+
+        for (UUID id : new ArrayList<>(rowenaBombardments.keySet())) {
+            Player player = players.get(id);
+            RowenaBombardmentState state = rowenaBombardments.get(id);
+            if (state == null) continue;
+            if (player == null || !player.isOnline() || !activePlayers.contains(id)
+                    || !"rowena".equals(selectedHeroesOfGwen.get(id))) {
+                endRowenaBombardment(id, false);
+                continue;
+            }
+            player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+            if (now >= state.expiresAt) endRowenaBombardment(id, true);
+        }
+    }
+
     private void markHeroProjectile(Projectile projectile, Player owner, String type) {
         projectile.getPersistentDataContainer().set(heroProjectileTypeKey, PersistentDataType.STRING, type);
         projectile.getPersistentDataContainer().set(heroProjectileOwnerKey, PersistentDataType.STRING,
