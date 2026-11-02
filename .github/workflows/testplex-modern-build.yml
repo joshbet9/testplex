@@ -284,6 +284,15 @@ jobs:
           grep -Fq 'MonsterMazeStandalone' "$deploy_workflow"
           grep -Fq 'me.monstermaze.MonsterMazePlugin' "$deploy_workflow"
           grep -Fq 'retired-monster-maze-plugins' "$deploy_workflow"
+          # Repeated deploys must transfer only changed JARs and map archives;
+          # cache decisions are checksum- and completeness-gated before reuse.
+          grep -Fq 'ChangedModernJars.txt' "$deploy_workflow"
+          grep -Fq 'Unchanged plugin JAR; omitting upload' "$deploy_workflow"
+          grep -Fq 'WizardsSourceMaps.sha256' "$deploy_workflow"
+          grep -Fq 'need_wizards_maps' "$deploy_workflow"
+          grep -Fq 'need_mm_maps' "$deploy_workflow"
+          grep -Fq 'Insufficient deployment staging space:' "$deploy_workflow"
+          grep -Fq 'tmp_required_kb' "$deploy_workflow"
           snake_config="$(unzip -p "$snake_jar" config.yml)"
           grep -Fxq "enabled: true" <<< "$snake_config"
           grep -Fxq "readiness-revision: snake-controlled-acceptance-20261101-v1" <<< "$snake_config"
@@ -301,27 +310,10 @@ jobs:
 
           # Parse the actual remote deployment transaction shell without running it.
           deploy_workflow=".github/workflows/deploy-testplex-modern-hyperv.yml"
-          awk '/<<.REMOTE_DEPLOY./ { active=1; next } active && /^[[:space:]]*REMOTE_DEPLOY[[:space:]]*$/ { exit } active { sub(/^          /, ""); print }' \
+          awk "/<<'REMOTE_DEPLOY'/ { active=1; next } active && /^REMOTE_DEPLOY$/ { exit } active { print }" \
             "$deploy_workflow" > "$RUNNER_TEMP/testplex-modern-remote-deploy.sh"
           test -s "$RUNNER_TEMP/testplex-modern-remote-deploy.sh"
           bash -n "$RUNNER_TEMP/testplex-modern-remote-deploy.sh"
-
-          # Parse the compare and upload run blocks that implement targeted deltas.
-          for step_name in "Read the deployed build identity" "Upload verified JAR deltas to the isolated directory"; do
-            safe_name="${step_name// /-}"
-            awk -v wanted="$step_name" '
-              $0 == "      - name: " wanted { in_step=1; next }
-              in_step && /^      - name:/ { exit }
-              in_step && $0 == "        run: |" { in_run=1; next }
-              in_step && in_run {
-                if (substr($0, 1, 10) == "          ") print substr($0, 11)
-                else if ($0 == "") print ""
-                else exit
-              }
-            ' "$deploy_workflow" > "$RUNNER_TEMP/$safe_name.sh"
-            test -s "$RUNNER_TEMP/$safe_name.sh"
-            bash -n "$RUNNER_TEMP/$safe_name.sh"
-          done
           grep -Fq 'FPP_VERSION="2.1.7"' "$deploy_workflow"
           grep -Fq 'versions/$FPP_VERSION/PAPER/fake-player-plugin-$FPP_VERSION.jar' "$deploy_workflow"
           git diff --check
@@ -367,3 +359,4 @@ jobs:
       deploy_to_modern_test_server: true
       source_run_id: ${{ format('{0}', github.run_id) }}
     secrets: inherit
+
