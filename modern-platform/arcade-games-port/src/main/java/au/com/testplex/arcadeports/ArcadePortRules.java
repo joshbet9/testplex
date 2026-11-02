@@ -246,7 +246,8 @@ public final class ArcadePortRules {
     }
 
     public static boolean shouldRecordKnockoutsStat(ArcadePortGame game) {
-        return game != null && game != ArcadePortGame.BACON_BRAWL;
+        return game != null && game != ArcadePortGame.BACON_BRAWL
+                && game != ArcadePortGame.BOMB_LOBBERS;
     }
 
     public static boolean canUseBaconMeterAbility(int percent) {

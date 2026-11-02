@@ -241,6 +241,7 @@ public final class ArcadePortManager implements Listener {
     private final NamespacedKey statsCategoryKey;
     private final NamespacedKey statsGameKey;
     private final NamespacedKey bombPowerupKey;
+    private final NamespacedKey bombPowerupTeamKey;
     private final NamespacedKey microTeamItemKey;
     private final NamespacedKey gladiatorMenuActionKey;
     private final NamespacedKey gladiatorMenuValueKey;
@@ -273,6 +274,7 @@ public final class ArcadePortManager implements Listener {
         this.statsCategoryKey = new NamespacedKey(plugin, "stats-category");
         this.statsGameKey = new NamespacedKey(plugin, "stats-game");
         this.bombPowerupKey = new NamespacedKey(plugin, "bomb-lobbers-powerup");
+        this.bombPowerupTeamKey = new NamespacedKey(plugin, "bomb-lobbers-powerup-team");
         this.microTeamItemKey = new NamespacedKey(plugin, "micro-team-item");
         this.gladiatorMenuActionKey = new NamespacedKey(plugin, "gladiators-menu-action");
         this.gladiatorMenuValueKey = new NamespacedKey(plugin, "gladiators-menu-value");
@@ -438,7 +440,18 @@ public final class ArcadePortManager implements Listener {
         String selected = plugin.getConfig().getString(
                 "lobby-kit-preferences." + player.getUniqueId() + ".monster-maze", "jumper");
         me.monstermaze.kit.KitType kit = me.monstermaze.kit.KitType.byName(selected);
-        if (kit != null) monsterMazeModule.getGameManager().getKitManager().setKit(player, kit);
+        if (kit == null) return;
+        ArcadePortGame lobbyGame = ArcadePortGame.fromId(
+                plugin.getConfig().getString("lobby-selected-game", "death-tag"));
+        me.monstermaze.game.MazeMode mode = lobbyGame == ArcadePortGame.MONSTER_MAZE_SPEED
+                ? me.monstermaze.game.MazeMode.SPEED
+                : lobbyGame == ArcadePortGame.MONSTER_MAZE_MODERN
+                        ? me.monstermaze.game.MazeMode.MODERN : me.monstermaze.game.MazeMode.ORIGINAL;
+        // Restoring a saved QOL-only kit in the Original lobby mode invokes the old
+        // standalone rejection message on every login. Keep the preference saved and
+        // let the integrated game use its normal Jumper fallback until a QOL mode is selected.
+        if (kit.qolOnly() && !mode.qolEnabled()) return;
+        monsterMazeModule.getGameManager().getKitManager().setKit(player, kit);
     }
 
     private boolean monsterMazeRunning() {
@@ -5060,11 +5073,24 @@ public final class ArcadePortManager implements Listener {
         int blue = (int) alivePlayers(session).stream()
                 .filter(player -> session.teams.getOrDefault(player.getUniqueId(), -1) == 1).count();
         if (session.bombRedScoreboardLine != null) {
-            session.bombRedScoreboardLine.setSuffix(ChatColor.WHITE + Integer.toString(red));
+            session.bombRedScoreboardLine.setSuffix(bombLobbersPowerupScoreboardText(session, 0)
+                    + ChatColor.WHITE + Integer.toString(red));
         }
         if (session.bombBlueScoreboardLine != null) {
-            session.bombBlueScoreboardLine.setSuffix(ChatColor.WHITE + Integer.toString(blue));
+            session.bombBlueScoreboardLine.setSuffix(bombLobbersPowerupScoreboardText(session, 1)
+                    + ChatColor.WHITE + Integer.toString(blue));
         }
+    }
+
+    private String bombLobbersPowerupScoreboardText(Session session, int team) {
+        BombLobbersPowerupStatus status = session.bombPowerupStatusByTeam.get(team);
+        if (status == null) return "";
+        ChatColor color = switch (status) {
+            case SPAWNED -> ChatColor.DARK_GRAY;
+            case OBTAINED -> ChatColor.YELLOW;
+            case ACTIVATED -> ChatColor.GREEN;
+        };
+        return color + " Powerup " + ChatColor.RESET;
     }
 
     private void updateDeathTagLights(Session session, long now) {
@@ -8486,6 +8512,7 @@ public final class ArcadePortManager implements Listener {
             for (Player player : session.players.values()) {
                 if (player == null || !player.isOnline() || !session.alive.contains(player.getUniqueId())) continue;
                 player.setInvulnerable(false);
+                if (session.type == ArcadePortGame.BOMB_LOBBERS) player.setCollidable(false);
                 player.setWalkSpeed(0.2F);
                 player.sendTitle(ChatColor.GREEN + "In Progress...", ChatColor.GRAY + session.type.displayName(), 5, 25, 5);
                 player.playSound(player.getLocation(), Sound.UI_TOAST_IN, 0.8F, 1.1F);
@@ -15194,6 +15221,8 @@ public final class ArcadePortManager implements Listener {
         session.bombPowerupClutchUsed.clear();
         session.bombPowerTypes.clear();
         session.bombPowerupDrops.clear();
+        session.bombPowerupTeamByDrop.clear();
+        session.bombPowerupStatusByTeam.clear();
         session.bombLastThrowAt.clear();
         session.bombLastPitchAdjustAt.clear();
         session.bombLastWallerAt.clear();
@@ -15210,6 +15239,7 @@ public final class ArcadePortManager implements Listener {
         session.bombDamageContributors.clear();
         session.bombAssists.clear();
         session.bombDoubleJumpUsed.clear();
+        session.bombDoubleJumpCounts.clear();
         session.bombMvpPressurePlayers.clear();
         session.bombPlayersDamaged.clear();
         session.dragonContactCooldowns.clear();
@@ -15512,14 +15542,7 @@ public final class ArcadePortManager implements Listener {
                     && !session.bombImmediateImpactThrowers.contains(id)) {
                 awardCatalogAchievement(player, "bomb-lobbers", "wonderkid");
             }
-            if (session.bombJumpCounts.getOrDefault(id, 0) >= 100) {
-                awardCatalogAchievement(player, "bomb-lobbers", "calma");
-            }
-            if (session.scores.getOrDefault(id, 0) >= 3
-                    && !session.bombImmediateImpactThrowers.contains(id)) {
-                awardCatalogAchievement(player, "bomb-lobbers", "wonderkid");
-            }
-            if (session.bombJumpCounts.getOrDefault(id, 0) >= 100) {
+            if (session.bombDoubleJumpCounts.getOrDefault(id, 0) >= 100) {
                 awardCatalogAchievement(player, "bomb-lobbers", "calma");
             }
             if (ArcadePortRules.shouldAwardBombLobbersUltimateKiller(session.scores.getOrDefault(id, 0))) {
@@ -15537,11 +15560,12 @@ public final class ArcadePortManager implements Listener {
             if (session.teams.getOrDefault(winnerId, -2) != winningTeam) continue;
             Player winningPlayer = session.players.get(winnerId);
             if (winningPlayer == null) continue;
-            if (ArcadePortRules.shouldAwardBombLobbersDoubleJump(true, true,
+            if ("jumper".equals(session.bombLobbersKits.getOrDefault(winnerId, "jumper"))
+                    && ArcadePortRules.shouldAwardBombLobbersDoubleJump(true, true,
                     session.bombDoubleJumpUsed.contains(winnerId))) {
                 awardBombLobbersAchievement(winningPlayer,
                         BombLobbersAchievement.WHATS_A_DOUBLE_JUMP.configKey(winnerId),
-                        "What's a double jump? — won without double jumping while alive.");
+                        "What's a double jump? — won as Jumper without double jumping while alive.");
             }
             if (bombLobbersAliveTeammates(session, winnerId) == 1
                     && session.bombMvpPressurePlayers.contains(winnerId)) {
@@ -17136,7 +17160,7 @@ public final class ArcadePortManager implements Listener {
         lore.add(" ");
         lore.add(ChatColor.GRAY + "Games Played: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "games-played", 0));
         lore.add(ChatColor.GRAY + "Wins: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "wins", 0));
-        if ("bacon-brawl".equals(gameId)) {
+        if ("bacon-brawl".equals(gameId) || "bomb-lobbers".equals(gameId)) {
             int kills = plugin.getConfig().getInt(path + "kills", plugin.getConfig().getInt(path + "score", 0));
             lore.add(ChatColor.GRAY + "Kills: " + ChatColor.WHITE + kills);
         } else {
@@ -17505,7 +17529,6 @@ public final class ArcadePortManager implements Listener {
         if (session == null || !session.players.containsKey(playerId)
                 || player.getWorld() != session.world) return;
         if (session.type == ArcadePortGame.RUNNER) session.runnerJumpCounts.merge(playerId, 1, Integer::sum);
-        if (session.type == ArcadePortGame.BOMB_LOBBERS) session.bombJumpCounts.merge(playerId, 1, Integer::sum);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -18344,7 +18367,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         ItemStack held = attacker.getInventory().getItemInMainHand();
-        if (held != null && held.getType() == Material.TNT) {
+        if (isBombLobbersThrownTnt(held)) {
             event.setCancelled(true);
             throwBombLobbersTnt(session, attacker);
             return;
@@ -18469,6 +18492,13 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.BOMB_LOBBERS
                 && event instanceof EntityDamageByEntityEvent byEntity
                 && byEntity.getDamager() instanceof Player attacker) {
+            if (!session.players.containsKey(attacker.getUniqueId())) {
+                event.setCancelled(true);
+                return;
+            }
+            event.setCancelled(true);
+            ItemStack teammateHitItem = attacker.getInventory().getItemInMainHand();
+            if (!isBombLobbersThrownTnt(teammateHitItem)) return;
             long lastThrow = session.bombLastThrowAt.getOrDefault(attacker.getUniqueId(), 0L);
             if (lastThrow > 0L && System.currentTimeMillis() - lastThrow < 180L) {
                 // The left-click interaction already threw and consumed TNT.
@@ -18476,7 +18506,7 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
             ItemStack held = attacker.getInventory().getItemInMainHand();
-            if (held != null && held.getType() == Material.TNT) {
+            if (isBombLobbersThrownTnt(held)) {
                 // Left-clicking an entity is delivered as damage, not an interact event.
                 event.setCancelled(true);
                 throwBombLobbersTnt(session, attacker);
@@ -18577,31 +18607,9 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
             if (event instanceof EntityDamageByEntityEvent byEntity) {
-                // Native PvP is enabled in Reborn Bomb Lobbers. Cancel the native health
-                // mutation and resolve it here so kills, assists, elimination, and win checks
-                // stay in sync with TNT damage instead of leaving a dead player marked alive.
+                // Combat between players only uses Bomb Lobbers' custom TNT paths.
+                // Fists, weapons and player-fired projectiles cannot damage participants.
                 event.setCancelled(true);
-                if (!(byEntity.getDamager() instanceof Player attacker)
-                        || !session.players.containsKey(attacker.getUniqueId())
-                        || !ArcadePortRules.shouldProcessBombLobbersPlayerHit(
-                                session.alive.contains(attacker.getUniqueId()),
-                                session.alive.contains(bombTarget.getUniqueId()))) return;
-                double damage = event.getFinalDamage();
-                if (damage <= 0.0D) return;
-                UUID targetId = bombTarget.getUniqueId();
-                session.bombPlayersDamaged.add(targetId);
-                recordBombLobbersDamage(session, bombTarget, attacker.getUniqueId(), System.currentTimeMillis());
-                bombTarget.setNoDamageTicks(20);
-                Vector push = bombTarget.getLocation().toVector().subtract(attacker.getLocation().toVector()).setY(0.0D);
-                if (push.lengthSquared() > 0.001D) {
-                    bombTarget.setVelocity(bombTarget.getVelocity().add(push.normalize().multiply(0.35D).setY(0.18D)));
-                }
-                if (bombTarget.getHealth() <= damage) {
-                    eliminate(session, bombTarget, attacker, "was defeated by " + attacker.getName());
-                } else {
-                    bombTarget.setHealth(bombTarget.getHealth() - damage);
-                    bombTarget.playSound(bombTarget.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
-                }
                 return;
             }
 
@@ -19864,8 +19872,9 @@ public final class ArcadePortManager implements Listener {
                     && session.alive.contains(player.getUniqueId());
             boolean forceBombControlClick = session.type == ArcadePortGame.BOMB_LOBBERS
                     && heldItem != null
-                    && (heldItem.getType() == Material.TNT
+                    && (isBombLobbersThrownTnt(heldItem)
                         || "wind-charge".equals(bombLobbersPowerupType(heldItem))
+                        || "speed-boost".equals(bombLobbersPowerupType(heldItem))
                         || ("pitcher".equals(bombKit) && heldItem.getType() == Material.LEVER)
                         || ("waller".equals(bombKit) && heldItem.getType() == Material.STONE_SHOVEL))
                     && (event.getAction().isRightClick() || event.getAction().isLeftClick())
@@ -20053,6 +20062,12 @@ public final class ArcadePortManager implements Listener {
             throwBombLobbersWindCharge(session, player);
             return;
         }
+        if (session.type == ArcadePortGame.BOMB_LOBBERS && event.getAction().isRightClick()
+                && "speed-boost".equals(bombLobbersPowerupType(heldItem))) {
+            event.setCancelled(true);
+            useBombLobbersSpeedBoost(session, player, heldItem);
+            return;
+        }
         if (session.type == ArcadePortGame.RUNNER) {
             String kit = session.runnerKits.getOrDefault(player.getUniqueId(), "leaper");
             if ("leaper".equals(kit) && item == Material.IRON_AXE && event.getAction().isRightClick()) {
@@ -20205,7 +20220,7 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
         }
-        if (session.type == ArcadePortGame.BOMB_LOBBERS && item == Material.TNT) {
+        if (session.type == ArcadePortGame.BOMB_LOBBERS && isBombLobbersThrownTnt(heldItem)) {
             event.setCancelled(true);
             throwBombLobbersTnt(session, player);
             return;
@@ -20325,7 +20340,7 @@ public final class ArcadePortManager implements Listener {
         }
 
         if (session.type != ArcadePortGame.BOMB_LOBBERS) return;
-        if (item == Material.TNT) {
+        if (isBombLobbersThrownTnt(heldItem)) {
             event.setCancelled(true);
             throwBombLobbersTnt(session, player);
             return;
@@ -20366,8 +20381,9 @@ public final class ArcadePortManager implements Listener {
         Material item = heldItem.getType();
         return switch (session.type) {
             case BACON_BRAWL -> item == Material.IRON_AXE;
-            case BOMB_LOBBERS -> item == Material.TNT
+            case BOMB_LOBBERS -> isBombLobbersThrownTnt(heldItem)
                     || "wind-charge".equals(bombLobbersPowerupType(heldItem))
+                    || "speed-boost".equals(bombLobbersPowerupType(heldItem))
                     || ("pitcher".equals(session.bombLobbersKits.getOrDefault(id, "jumper"))
                             && item == Material.LEVER)
                     || ("waller".equals(session.bombLobbersKits.getOrDefault(id, "jumper"))
@@ -22547,14 +22563,20 @@ public final class ArcadePortManager implements Listener {
 
         String[] choices = {"wind-charge", "super-tnt", "fiery-tnt", "speed-boost"};
         int spawned = 0;
-        int onlyTeam = -1;
         for (int team = 0; team < 2; team++) {
-            boolean alreadyDropped = session.bombPowerupTeamByDrop.containsValue(team);
-            if (alreadyDropped) continue;
+            BombLobbersPowerupStatus status = session.bombPowerupStatusByTeam.get(team);
+            if (status == BombLobbersPowerupStatus.SPAWNED
+                    || status == BombLobbersPowerupStatus.OBTAINED) continue;
             Location spawn = findBombLobbersPowerupSpawn(session, team);
             if (spawn == null) continue;
             String powerup = choices[ThreadLocalRandom.current().nextInt(choices.length)];
-            Item drop = session.world.dropItem(spawn, createBombLobbersPowerupStack(powerup));
+            ItemStack powerupStack = createBombLobbersPowerupStack(powerup);
+            ItemMeta powerupMeta = powerupStack.getItemMeta();
+            if (powerupMeta != null) {
+                powerupMeta.getPersistentDataContainer().set(bombPowerupTeamKey, PersistentDataType.INTEGER, team);
+                powerupStack.setItemMeta(powerupMeta);
+            }
+            Item drop = session.world.dropItem(spawn, powerupStack);
             drop.setVelocity(new Vector(0.0D, 0.04D, 0.0D));
             drop.setPickupDelay(10);
             drop.setInvulnerable(true);
@@ -22565,26 +22587,20 @@ public final class ArcadePortManager implements Listener {
             session.entities.add(drop);
             session.bombPowerupDrops.put(drop.getUniqueId(), drop);
             session.bombPowerupTeamByDrop.put(drop.getUniqueId(), team);
+            session.bombPowerupStatusByTeam.put(team, BombLobbersPowerupStatus.SPAWNED);
             session.world.spawnParticle(Particle.HAPPY_VILLAGER, spawn.clone().add(0.0D, 0.5D, 0.0D),
                     28, 0.55D, 0.65D, 0.55D, 0.04D);
             session.world.spawnParticle(Particle.END_ROD, spawn.clone().add(0.0D, 0.6D, 0.0D),
                     8, 0.25D, 0.35D, 0.25D, 0.02D);
             session.world.playSound(spawn, Sound.BLOCK_NOTE_BLOCK_PLING, 0.9F, 1.6F);
             spawned++;
-            onlyTeam = team;
         }
         // Both sides share one unpredictable wave clock, not two frequent announcements.
         long nextWave = now + (spawned == 0 ? 10_000L : nextBombLobbersPowerupDelayMillis());
         for (int team = 0; team < 2; team++) {
             session.bombNextPowerupSpawnAtByTeam.put(team, nextWave);
         }
-        if (spawned == 2) {
-            announce(session, ChatColor.AQUA + "Random power-ups have appeared on both team sides!");
-        } else if (spawned == 1) {
-            announce(session, ChatColor.AQUA + "A random power-up appeared on the "
-                    + (onlyTeam == 0 ? ChatColor.RED + "Red" : ChatColor.BLUE + "Blue")
-                    + ChatColor.AQUA + " side!");
-        }
+        if (spawned > 0) updateBombLobbersScoreboard(session);
     }
 
     private Location findBombLobbersPowerupSpawn(Session session, int requestedTeam) {
@@ -22658,6 +22674,20 @@ public final class ArcadePortManager implements Listener {
                 .get(bombPowerupKey, PersistentDataType.STRING);
     }
 
+    private boolean isBombLobbersThrownTnt(ItemStack item) {
+        if (item == null) return false;
+        String powerupType = bombLobbersPowerupType(item);
+        return item.getType() == Material.TNT
+                || "super-tnt".equals(powerupType)
+                || "fiery-tnt".equals(powerupType);
+    }
+
+    private Integer bombLobbersPowerupTeam(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return null;
+        return item.getItemMeta().getPersistentDataContainer()
+                .get(bombPowerupTeamKey, PersistentDataType.INTEGER);
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBombLobbersPowerupPickup(EntityPickupItemEvent event) {
         if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
@@ -22672,29 +22702,42 @@ public final class ArcadePortManager implements Listener {
         if (powerup == null) return;
 
         player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.9F, 1.35F);
-        if ("speed-boost".equals(powerup)) {
-            event.setCancelled(true);
-            player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,
-                    ArcadePortRules.BOMB_LOBBERS_POWERUP_SPEED_DURATION_TICKS, 1, false, true));
-            player.getWorld().spawnParticle(Particle.CLOUD,
-                    player.getLocation().add(0.0D, 1.0D, 0.0D), 16, 0.35D, 0.5D, 0.35D, 0.04D);
-            player.sendMessage(ChatColor.GREEN + "Speed Boost! " + ChatColor.WHITE + "Speed II for 12 seconds.");
-            Item drop = event.getItem();
-            session.bombPowerupDrops.remove(drop.getUniqueId());
-            session.entities.remove(drop);
-            drop.remove();
-        } else {
-            player.sendMessage(ChatColor.GOLD + "Power-up collected: "
-                    + ChatColor.YELLOW + bombLobbersPowerupName(powerup) + ChatColor.GRAY
-                    + ("wind-charge".equals(powerup) ? " — right-click to use." : " — throw with your TNT."));
-            Item drop = event.getItem();
-            Bukkit.getScheduler().runTask(plugin, () -> {
-                if (!drop.isValid()) {
-                    session.bombPowerupDrops.remove(drop.getUniqueId());
-                    session.entities.remove(drop);
-                }
-            });
+        Item drop = event.getItem();
+        Integer powerupTeam = session.bombPowerupTeamByDrop.get(drop.getUniqueId());
+        if (powerupTeam != null) {
+            session.bombPowerupStatusByTeam.put(powerupTeam, BombLobbersPowerupStatus.OBTAINED);
         }
+        player.sendMessage(ChatColor.GOLD + "Power-up collected: "
+                + ChatColor.YELLOW + bombLobbersPowerupName(powerup) + ChatColor.GRAY
+                + ("wind-charge".equals(powerup) || "speed-boost".equals(powerup)
+                        ? " - right-click to activate." : " - throw with your TNT to activate."));
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!drop.isValid()) {
+                session.bombPowerupDrops.remove(drop.getUniqueId());
+                session.bombPowerupTeamByDrop.remove(drop.getUniqueId());
+                session.entities.remove(drop);
+            }
+        });
+        updateBombLobbersScoreboard(session);
+    }
+
+    private void activateBombLobbersPowerup(Session session, Integer team) {
+        if (session == null || team == null) return;
+        session.bombPowerupStatusByTeam.put(team, BombLobbersPowerupStatus.ACTIVATED);
+        updateBombLobbersScoreboard(session);
+    }
+
+    private void useBombLobbersSpeedBoost(Session session, Player player, ItemStack held) {
+        if (session == null || active != session || player == null || held == null
+                || !session.alive.contains(player.getUniqueId())
+                || !"speed-boost".equals(bombLobbersPowerupType(held))) return;
+        activateBombLobbersPowerup(session, bombLobbersPowerupTeam(held));
+        consumeHeld(player);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,
+                ArcadePortRules.BOMB_LOBBERS_POWERUP_SPEED_DURATION_TICKS, 1, false, true));
+        player.getWorld().spawnParticle(Particle.CLOUD,
+                player.getLocation().add(0.0D, 1.0D, 0.0D), 16, 0.35D, 0.5D, 0.35D, 0.04D);
+        player.sendMessage(ChatColor.GREEN + "Speed Boost! " + ChatColor.WHITE + "Speed II for 12 seconds.");
     }
 
     private void updateBombLobbers(Session session) {
@@ -23091,6 +23134,7 @@ public final class ArcadePortManager implements Listener {
                 || !session.alive.contains(player.getUniqueId())) return;
         ItemStack held = player.getInventory().getItemInMainHand();
         if (!"wind-charge".equals(bombLobbersPowerupType(held))) return;
+        activateBombLobbersPowerup(session, bombLobbersPowerupTeam(held));
         consumeHeld(player);
         Snowball gust = player.launchProjectile(Snowball.class);
         gust.setItem(new ItemStack(Material.WIND_CHARGE));
@@ -23169,9 +23213,10 @@ public final class ArcadePortManager implements Listener {
         if (lastThrow > 0L && now - lastThrow < 180L) return true;
 
         ItemStack held = player.getInventory().getItemInMainHand();
-        if (held == null || held.getType() != Material.TNT) return false;
+        if (!isBombLobbersThrownTnt(held)) return false;
         String powerupType = bombLobbersPowerupType(held);
         if (powerupType == null) powerupType = "normal";
+        if (!"normal".equals(powerupType)) activateBombLobbersPowerup(session, bombLobbersPowerupTeam(held));
         if (session.bombMvpPressurePlayers.contains(ownerId) && "normal".equals(powerupType)) {
             session.bombPowerupClutchEligible.remove(ownerId);
         }
@@ -23445,6 +23490,7 @@ public final class ArcadePortManager implements Listener {
         player.setFlying(false);
         player.setAllowFlight(false);
         session.bombDoubleJumpUsed.add(id);
+        session.bombDoubleJumpCounts.merge(id, 1, Integer::sum);
         String kit = session.bombLobbersKits.getOrDefault(id, "jumper");
         double power = "jumper".equals(kit) || "waller".equals(kit) ? 1.2D : 0.9D;
         Vector velocity = ArcadePortRules.bombLobbersDoubleJumpVelocity(
@@ -24087,6 +24133,7 @@ public final class ArcadePortManager implements Listener {
     private record DragonTamerControl(UUID dragonId, Location returnLocation, GameMode previousGameMode, long endsAtMillis) { }
 
     private enum MasterBuildersPhase { BUILDING, REVIEW }
+    private enum BombLobbersPowerupStatus { SPAWNED, OBTAINED, ACTIVATED }
 
     private record SkyWarsCrumbleCandidate(Block block, double distanceSquared, long sequence) { }
     private record MicroPlacedBlockOwner(UUID ownerId, long placedAtMillis) { }
@@ -24424,6 +24471,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, UUID> bombOwners = new HashMap<>();
         final Map<UUID, Item> bombPowerupDrops = new HashMap<>();
         final Map<UUID, Integer> bombPowerupTeamByDrop = new HashMap<>();
+        final Map<Integer, BombLobbersPowerupStatus> bombPowerupStatusByTeam = new HashMap<>();
         final Map<Integer, Long> bombNextPowerupSpawnAtByTeam = new HashMap<>();
         Scoreboard bombLobbersScoreboard;
         Objective bombLobbersScoreboardObjective;
@@ -24448,7 +24496,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Integer> bombPitchLevels = new HashMap<>();
         final Set<UUID> bombDoubleJumpAvailable = new HashSet<>();
         final Set<UUID> bombDoubleJumpUsed = new HashSet<>();
-        final Map<UUID, Integer> bombJumpCounts = new HashMap<>();
+        final Map<UUID, Integer> bombDoubleJumpCounts = new HashMap<>();
         final Set<UUID> bombImmediateImpactThrowers = new HashSet<>();
         final Set<UUID> bombPowerupClutchEligible = new HashSet<>();
         final Map<UUID, Set<UUID>> bombCloseRangeTargets = new HashMap<>();

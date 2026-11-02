@@ -39,6 +39,8 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 
@@ -289,7 +291,11 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         npc.setCanPickupItems(false);
         npc.setRotation(at.getYaw(), 0.0F);
         if (npc instanceof Mob mob) mob.setAI(false);
-        if (npc instanceof Zombie zombie) zombie.setShouldBurnInDay(false);
+        if (npc instanceof Zombie zombie) {
+            zombie.setShouldBurnInDay(false);
+            zombie.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE,
+                    Integer.MAX_VALUE, 0, false, false, false));
+        }
         npc.setFireTicks(0);
         npc.setVisualFire(false);
         if (npc instanceof Sheep sheep && choice.entityColor != null) {
@@ -374,9 +380,9 @@ public final class ModernArcadeLobbyRuntime implements Listener {
 
     private List<ArcadeLobbyKitCatalogue.KitChoice> kitChoicesFor(ArcadePortGame game) {
         List<String> order = plugin.getConfig().getStringList("lobby-kits.order." + game.id());
-        // Dragons is in the controlled test queue: never let stale hidden-kit
-        // entries from an older VM config hide five of its six acceptance kits.
-        if (game == ArcadePortGame.DRAGONS) {
+        // Keep every source kit available for these games even if an older
+        // server config still lists one of them as hidden.
+        if (game == ArcadePortGame.DRAGONS || game == ArcadePortGame.BOMB_LOBBERS) {
             return ArcadeLobbyKitCatalogue.forGame(game, List.of(), order);
         }
         return ArcadeLobbyKitCatalogue.forGame(
