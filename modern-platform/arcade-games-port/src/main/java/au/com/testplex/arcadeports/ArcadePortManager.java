@@ -3427,11 +3427,7 @@ public final class ArcadePortManager implements Listener {
             player.closeInventory();
             player.leaveVehicle();
             player.teleport(spawn);
-            player.setGameMode(type == ArcadePortGame.MASTER_BUILDERS ? GameMode.CREATIVE
-                    : type == ArcadePortGame.BACON_BRAWL || type == ArcadePortGame.DEATH_TAG
-                    || type == ArcadePortGame.DRAGONS || type == ArcadePortGame.DRAW_MY_THING
-                    || type == ArcadePortGame.SNEAKY_ASSASSINS || type == ArcadePortGame.SUPER_SPLOOR
-                    ? GameMode.ADVENTURE : GameMode.SURVIVAL);
+            player.setGameMode(arcadePlayerGameMode(type));
             player.setHealth(player.getMaxHealth());
             player.setFoodLevel(20);
             player.setSaturation(20.0F);
@@ -3508,6 +3504,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (type == ArcadePortGame.BOMB_LOBBERS) {
             setupBombLobbersScoreboard(session);
+            refreshBombLobbersTestPlayerArmor(session);
         }
         if (type == ArcadePortGame.DRAGONS) {
             setupDragonsScoreboard(session);
@@ -5425,6 +5422,8 @@ public final class ArcadePortManager implements Listener {
         // A Chaser who is defeated remains a Chaser. Respawn that role rather than
         // sending them through runner-to-Chaser conversion again.
         if (session.tagged.contains(player.getUniqueId())) {
+            if (session.deathTagRespawnGraceUntil.getOrDefault(player.getUniqueId(), 0L)
+                    > System.currentTimeMillis()) return;
             awardDeathTagKill(session, killer);
             respawnDeathTagChaser(session, player);
             return;
@@ -5459,6 +5458,7 @@ public final class ArcadePortManager implements Listener {
         else session.alphaChasers.remove(player.getUniqueId());
         awardDeathTagKill(session, killer);
         if (player.isOnline()) {
+            session.deathTagRespawnGraceUntil.put(convertedPlayerId, System.currentTimeMillis() + 2_500L);
             // Preserve in-place conversion on safe ground, but do not strand a new
             // Chaser in lava, void or a blocked source-map marker.
             if (!isSafeDeathTagRespawnSpawn(player.getLocation())) {
@@ -5471,7 +5471,7 @@ public final class ArcadePortManager implements Listener {
             player.setFireTicks(0);
             player.setFallDistance(0.0F);
             player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
-            session.deathTagRespawnGraceUntil.put(convertedPlayerId, System.currentTimeMillis() + 2_500L);
+            player.setWalkSpeed(0.2F);
             player.setNoDamageTicks(50);
             giveDeathTagKit(session, player, true, session.alphaChasers.contains(player.getUniqueId()));
             player.playSound(player.getLocation(), Sound.ENTITY_ZOMBIE_AMBIENT, 1.0F, 1.0F);
@@ -5601,9 +5601,12 @@ public final class ArcadePortManager implements Listener {
 
     private void respawnDeathTagChaser(Session session, Player player) {
         if (active != session || player == null || !player.isOnline()) return;
-        session.deathTagDeathsByPlayer.merge(player.getUniqueId(), 1, Integer::sum);
+        UUID playerId = player.getUniqueId();
+        long now = System.currentTimeMillis();
+        if (session.deathTagRespawnGraceUntil.getOrDefault(playerId, 0L) > now) return;
+        session.deathTagDeathsByPlayer.merge(playerId, 1, Integer::sum);
+        session.deathTagRespawnGraceUntil.put(playerId, now + 2_500L);
         player.teleport(deathTagChaserRespawnSpawn(session, player));
-        session.deathTagRespawnGraceUntil.put(player.getUniqueId(), System.currentTimeMillis() + 2_500L);
         player.leaveVehicle();
         player.setGameMode(GameMode.ADVENTURE);
         player.setHealth(player.getMaxHealth());
@@ -5612,6 +5615,7 @@ public final class ArcadePortManager implements Listener {
         player.setFireTicks(0);
         player.setFallDistance(0.0F);
         player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+        player.setWalkSpeed(0.2F);
         player.setNoDamageTicks(50);
         giveDeathTagKit(session, player, true, session.alphaChasers.contains(player.getUniqueId()));
         player.sendMessage(ChatColor.RED + "You respawned as a Chaser.");
@@ -7000,6 +7004,22 @@ public final class ArcadePortManager implements Listener {
             armor = new ItemStack[4];
         }
         player.getInventory().setArmorContents(armor);
+        player.updateInventory();
+    }
+
+    /** FakePlayerPlugin may finish its player equipment sync after Arcade gives the kit. */
+    private void refreshBombLobbersTestPlayerArmor(Session session) {
+        if (session == null || session.type != ArcadePortGame.BOMB_LOBBERS) return;
+        for (UUID playerId : session.players.keySet()) {
+            if (!testPlayers.isTestPlayer(playerId)) continue;
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (active != session || !session.alive.contains(playerId)) return;
+                Player player = session.players.get(playerId);
+                if (player == null || !player.isOnline()) return;
+                setBombLobbersArmor(session, player,
+                        session.bombLobbersKits.getOrDefault(playerId, "jumper"));
+            }, 2L);
+        }
     }
 
     /** Sends the chosen glass only to its owner; the server world stays unchanged for everyone else. */
@@ -8677,6 +8697,7 @@ public final class ArcadePortManager implements Listener {
                 player.setInvulnerable(false);
                 if (session.type == ArcadePortGame.BOMB_LOBBERS) player.setCollidable(false);
                 player.setWalkSpeed(0.2F);
+                if (session.type == ArcadePortGame.DEATH_TAG) player.sendActionBar(Component.empty());
                 player.sendTitle(ChatColor.GREEN + "In Progress...", ChatColor.GRAY + session.type.displayName(), 5, 25, 5);
                 player.playSound(player.getLocation(), Sound.UI_TOAST_IN, 0.8F, 1.1F);
             }
@@ -17621,8 +17642,21 @@ public final class ArcadePortManager implements Listener {
         return location != null && location.getWorld() == session.world;
     }
 
+    private GameMode arcadePlayerGameMode(ArcadePortGame type) {
+        if (type == ArcadePortGame.MASTER_BUILDERS) return GameMode.CREATIVE;
+        if (type == ArcadePortGame.BACON_BRAWL || type == ArcadePortGame.DEATH_TAG
+                || type == ArcadePortGame.DRAGONS || type == ArcadePortGame.DRAW_MY_THING
+                || type == ArcadePortGame.SNEAKY_ASSASSINS || type == ArcadePortGame.SUPER_SPLOOR) {
+            return GameMode.ADVENTURE;
+        }
+        return GameMode.SURVIVAL;
+    }
+
     private void checkPlayerArena(Session session, Player player) {
         if (!session.alive.contains(player.getUniqueId())) return;
+        if (session.type == ArcadePortGame.DEATH_TAG
+                && session.deathTagRespawnGraceUntil.getOrDefault(player.getUniqueId(), 0L)
+                        > System.currentTimeMillis()) return;
         Location location = player.getLocation();
         if (session.type == ArcadePortGame.GLADIATORS) {
             Integer pair = session.gladiatorPairs.get(player.getUniqueId());
@@ -24059,6 +24093,22 @@ public final class ArcadePortManager implements Listener {
             Session session = active;
             if (session == null || !session.players.containsKey(playerId)) return;
             session.players.put(playerId, respawned);
+            if (session.alive.contains(playerId)) {
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (active != session || !session.alive.contains(playerId)) return;
+                    Player current = session.players.get(playerId);
+                    if (current == null || !current.isOnline()) return;
+                    current.setGameMode(arcadePlayerGameMode(session.type));
+                    if (session.type == ArcadePortGame.DEATH_TAG) {
+                        boolean chaser = session.tagged.contains(playerId);
+                        giveDeathTagKit(session, current, chaser,
+                                chaser && session.alphaChasers.contains(playerId));
+                    } else {
+                        giveKit(session, current);
+                    }
+                    applySessionTeamTabTeams(session);
+                }, 1L);
+            }
             if (session.variantRuntime != null) {
                 session.variantRuntime.onPlayerRespawn(respawned);
             }
