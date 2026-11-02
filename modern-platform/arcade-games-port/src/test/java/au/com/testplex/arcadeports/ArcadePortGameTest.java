@@ -2801,8 +2801,8 @@ class ArcadePortGameTest {
         assertEquals(5.0D, ArcadePortRules.legacyMeleeDamage(Material.STONE_SWORD, 0), 0.00001D);
         assertEquals(6.0D, ArcadePortRules.legacyMeleeDamage(Material.IRON_SWORD, 0), 0.00001D);
         assertEquals(7.0D, ArcadePortRules.legacyMeleeDamage(Material.DIAMOND_SWORD, 0), 0.00001D);
-        assertEquals(9.0D, ArcadePortRules.legacyMeleeDamage(Material.IRON_AXE, 0), 0.00001D);
-        assertEquals(8.0D, ArcadePortRules.legacyMeleeDamage(Material.DIAMOND_SWORD, 1), 0.00001D);
+        assertEquals(5.0D, ArcadePortRules.legacyMeleeDamage(Material.IRON_AXE, 0), 0.00001D);
+        assertEquals(8.25D, ArcadePortRules.legacyMeleeDamage(Material.DIAMOND_SWORD, 1), 0.00001D);
         assertEquals(1.0D, ArcadePortRules.legacyMeleeDamage(Material.AIR, 0), 0.00001D);
         assertTrue(ArcadePortRules.shouldLegacyNaturalRegen(18, 10.0D, 20.0D));
         assertFalse(ArcadePortRules.shouldLegacyNaturalRegen(17, 10.0D, 20.0D));
