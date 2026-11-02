@@ -89,4 +89,15 @@ class ArcadeLobbyKitCatalogueTest {
                 ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.WITHER_ASSAULT, List.of())
                         .stream().map(choice -> choice.id).toList());
     }
+    @Test
+    void everyLobbyKitNpcArmourFitsTheFourVanillaEquipmentSlots() {
+        for (ArcadePortGame game : ArcadePortGame.values()) {
+            for (ArcadeLobbyKitCatalogue.KitChoice choice
+                    : ArcadeLobbyKitCatalogue.forGame(game, List.of())) {
+                assertTrue(choice.armour.length <= 4,
+                        game.id() + "/" + choice.id + " has " + choice.armour.length + " armour entries");
+            }
+        }
+    }
+
 }
