@@ -11,7 +11,7 @@ import java.util.Locale;
 public enum ArcadePortGame {
     BACON_BRAWL("bacon-brawl", "Bacon Brawl", Material.IRON_BLOCK, 0),
     CASTLE_ASSAULT("castle-assault", "Castle Assault", Material.COBBLESTONE, 2),
-    BOMB_LOBBERS("bomb-lobbers", "Bomb Lobbers", Material.SMOOTH_STONE, 2),
+    BOMB_LOBBERS("bomb-lobbers", "Bomb Lobbers", Material.FIRE_CHARGE, 2),
     DEATH_TAG("death-tag", "Death Tag", Material.MOSS_BLOCK, 0),
     DRAGON_ESCAPE("dragon-escape", "Dragon Escape", Material.STONE_BRICKS, 0),
     DRAGONS("dragons", "Dragons", Material.STONE_BRICKS, 0),

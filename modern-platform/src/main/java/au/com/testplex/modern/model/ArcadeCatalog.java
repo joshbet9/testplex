@@ -28,7 +28,7 @@ public final class ArcadeCatalog {
                 win("bacon-crown", "Bacon Crown", "A floating bacon crown and victory fanfare."),
                 win("crispy-finale", "Crispy Finale", "A sizzling floor burst and smoke columns")));
 
-        register(game("bomb-lobbers", "Bomb Lobbers", "TNT", "Land direct TNT hits while surviving the Turtles arena.",
+        register(game("bomb-lobbers", "Bomb Lobbers", "FIRE_CHARGE", "Land direct TNT hits while surviving the Turtles arena.",
                 GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("tnt-impact", "TNT Impact Signature", "A signature effect on every TNT detonation.", "TNT",
                         single("turtle-shell", "Turtle Shell", "A spinning shell-shaped ring."),

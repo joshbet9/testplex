@@ -1512,9 +1512,9 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldCreditBaconKill(testPlayerVictim, testPlayerVictim, true));
     }
 
-    @Test void baconBrawlTracksKillsWithoutAddingKnockoutsToStats() {
+    @Test void baconBrawlAndBombLobbersTrackKillsWithoutAddingKnockoutsToStats() {
         assertFalse(ArcadePortRules.shouldRecordKnockoutsStat(ArcadePortGame.BACON_BRAWL));
-        assertTrue(ArcadePortRules.shouldRecordKnockoutsStat(ArcadePortGame.BOMB_LOBBERS));
+        assertFalse(ArcadePortRules.shouldRecordKnockoutsStat(ArcadePortGame.BOMB_LOBBERS));
         assertFalse(ArcadePortRules.shouldRecordKnockoutsStat(null));
     }
 

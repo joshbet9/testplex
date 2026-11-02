@@ -9,7 +9,7 @@ final class ArcadeGameDirectory {
 
     private static final List<Game> GAMES = List.of(
             new Game("bacon-brawl", "Bacon Brawl", Material.PORKCHOP),
-            new Game("bomb-lobbers", "Bomb Lobbers", Material.TNT),
+            new Game("bomb-lobbers", "Bomb Lobbers", Material.FIRE_CHARGE),
             new Game("castle-assault", "Castle Assault", Material.COBBLESTONE),
             new Game("death-tag", "Death Tag", Material.SKELETON_SKULL),
             new Game("dragon-escape", "Dragon Escape", Material.DRAGON_HEAD),
