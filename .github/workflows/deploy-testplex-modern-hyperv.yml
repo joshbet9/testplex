@@ -544,32 +544,43 @@ jobs:
           fi
           "$JAVA_BIN" -version
 
-          echo "Fetching a stable Paper build for Minecraft 26.3 from PaperMC's official downloads service."
-          echo "[deploy] querying Paper 26.3 metadata (4 minute limit)."
-          builds_json="$(timeout --foreground --signal=TERM 4m curl --fail --silent --show-error --retry 3 --user-agent "$USER_AGENT" \
-            "https://fill.papermc.io/v3/projects/paper/versions/26.3/builds")"
-          if printf '%s' "$builds_json" | jq -e '.ok == false' >/dev/null 2>&1; then
-            printf '%s\n' "$builds_json" | jq -r '.message // "PaperMC downloads API returned an error."' >&2
-            exit 1
-          fi
-          paper_build="$(printf '%s' "$builds_json" | jq -er 'first(.[] | select(.channel == "STABLE") | .id)')"
-          paper_url="$(printf '%s' "$builds_json" | jq -er 'first(.[] | select(.channel == "STABLE") | .downloads."server:default".url)')"
-          paper_sha="$(printf '%s' "$builds_json" | jq -er 'first(.[] | select(.channel == "STABLE") | .downloads."server:default".checksums.sha256)')"
-          paper_tmp="$UPLOAD_DIR/paper-26.3-$paper_build.jar"
-          echo "[deploy] downloading Paper build $paper_build (8 minute limit)."
-          timeout --foreground --signal=TERM 8m curl --fail --location --retry 3 --user-agent "$USER_AGENT" "$paper_url" -o "$paper_tmp"
-          printf '%s  %s\n' "$paper_sha" "$paper_tmp" | sha256sum -c -
-
-          # FakePlayerPlugin is a separate Paper plugin with its own distribution terms.
-          # Fetch the unmodified, pinned release directly onto the user's administered VM:
-          # it is intentionally not bundled into or redistributed with Testplex artifacts.
           FPP_VERSION="2.1.7"
-          FPP_TMP="$UPLOAD_DIR/fake-player-plugin-$FPP_VERSION.jar"
-          FPP_URL="https://hangarcdn.papermc.io/plugins/Janky-Development/FakePlayerPlugin/versions/$FPP_VERSION/PAPER/fake-player-plugin-$FPP_VERSION.jar"
-          echo "[deploy] downloading FakePlayerPlugin $FPP_VERSION from the official Hangar release (6 minute limit)."
-          timeout --foreground --signal=TERM 6m curl --fail --location --retry 3 --user-agent "$USER_AGENT" \
-            "$FPP_URL" -o "$FPP_TMP"
-          unzip -tq "$FPP_TMP" >/dev/null
+          if [[ "$DEPLOYMENT_SCOPE" == full ]]; then
+            echo "Fetching a stable Paper build for Minecraft 26.3 from PaperMC's official downloads service."
+            echo "[deploy] querying Paper 26.3 metadata (4 minute limit)."
+            builds_json="$(timeout --foreground --signal=TERM 4m curl --fail --silent --show-error --retry 3 --user-agent "$USER_AGENT" \
+              "https://fill.papermc.io/v3/projects/paper/versions/26.3/builds")"
+            if printf '%s' "$builds_json" | jq -e '.ok == false' >/dev/null 2>&1; then
+              printf '%s\n' "$builds_json" | jq -r '.message // "PaperMC downloads API returned an error."' >&2
+              exit 1
+            fi
+            paper_build="$(printf '%s' "$builds_json" | jq -er 'first(.[] | select(.channel == "STABLE") | .id)')"
+            paper_url="$(printf '%s' "$builds_json" | jq -er 'first(.[] | select(.channel == "STABLE") | .downloads."server:default".url)')"
+            paper_sha="$(printf '%s' "$builds_json" | jq -er 'first(.[] | select(.channel == "STABLE") | .downloads."server:default".checksums.sha256)')"
+            paper_tmp="$UPLOAD_DIR/paper-26.3-$paper_build.jar"
+            echo "[deploy] downloading Paper build $paper_build."
+            timeout --foreground --signal=TERM 8m curl --fail --location --retry 3 --user-agent "$USER_AGENT" "$paper_url" -o "$paper_tmp"
+            printf '%s  %s\n' "$paper_sha" "$paper_tmp" | sha256sum -c -
+
+            # Fetch the unmodified, pinned FakePlayerPlugin release from Hangar.
+            FPP_TMP="$UPLOAD_DIR/fake-player-plugin-$FPP_VERSION.jar"
+            FPP_URL="https://hangarcdn.papermc.io/plugins/Janky-Development/FakePlayerPlugin/versions/$FPP_VERSION/PAPER/fake-player-plugin-$FPP_VERSION.jar"
+            echo "[deploy] downloading FakePlayerPlugin $FPP_VERSION from Hangar."
+            timeout --foreground --signal=TERM 6m curl --fail --location --retry 3 --user-agent "$USER_AGENT" \
+              "$FPP_URL" -o "$FPP_TMP"
+            unzip -tq "$FPP_TMP" >/dev/null
+          else
+            # Keep plugin-only redeploys short: verify and reuse the installed
+            # Paper/FPP versions instead of downloading or replacing them.
+            paper_build="$(sudo -n cat "$SERVER_DIR/.testplex-paper-build")"
+            paper_tmp="$SERVER_DIR/paper.jar"
+            FPP_TMP="$SERVER_DIR/plugins/FakePlayerPlugin.jar"
+            sudo -n test -s "$paper_tmp" && sudo -n test -s "$FPP_TMP" || {
+              echo "Plugin-only deployment requires the already installed Paper and FakePlayerPlugin jars." >&2
+              exit 1
+            }
+            echo "[deploy] reusing installed Paper build $paper_build and FakePlayerPlugin $FPP_VERSION."
+          fi
           fpp_descriptor="$(unzip -p "$FPP_TMP" plugin.yml)"
           yaml_descriptor_value() {
             local key="$1" descriptor="$2"
@@ -740,51 +751,70 @@ jobs:
             sudo -n install -o monstermaze -g monstermaze -m 0644 "$UPLOAD_DIR/$jar" "$SERVER_DIR/plugins/$jar"
           done
 
-          # Retire any previously installed FakePlayerPlugin version by descriptor,
-          # not filename. The existing pre-deployment plugins snapshot preserves the
-          # exact prior plugin set for rollback; then install the pinned unmodified jar.
-          for plugin_jar in "$SERVER_DIR"/plugins/*.jar; do
-            [[ -f "$plugin_jar" ]] || continue
-            descriptor="$(sudo -n unzip -p "$plugin_jar" plugin.yml 2>/dev/null || true)"
-            [[ -n "$descriptor" ]] || continue
-            plugin_name="$(yaml_descriptor_value name "$descriptor")"
-            plugin_main="$(yaml_descriptor_value main "$descriptor")"
-            if [[ "$plugin_name" == "FakePlayerPlugin" || "$plugin_main" == "me.bill.fakePlayerPlugin.FakePlayerPlugin" ]]; then
-              sudo -n rm -f -- "$plugin_jar"
-              echo "Replaced previous FakePlayerPlugin jar $plugin_jar with the pinned Paper 26.3 release."
-            fi
-          done
-          sudo -n install -o monstermaze -g monstermaze -m 0644 \
-            "$FPP_TMP" "$SERVER_DIR/plugins/FakePlayerPlugin.jar"
+          if [[ "$DEPLOYMENT_SCOPE" == full ]]; then
+            # Retire any previously installed FakePlayerPlugin version by descriptor,
+            # not filename. The existing pre-deployment plugins snapshot preserves the
+            # exact prior plugin set for rollback; then install the pinned unmodified jar.
+            for plugin_jar in "$SERVER_DIR"/plugins/*.jar; do
+              [[ -f "$plugin_jar" ]] || continue
+              descriptor="$(sudo -n unzip -p "$plugin_jar" plugin.yml 2>/dev/null || true)"
+              [[ -n "$descriptor" ]] || continue
+              plugin_name="$(yaml_descriptor_value name "$descriptor")"
+              plugin_main="$(yaml_descriptor_value main "$descriptor")"
+              if [[ "$plugin_name" == "FakePlayerPlugin" || "$plugin_main" == "me.bill.fakePlayerPlugin.FakePlayerPlugin" ]]; then
+                sudo -n rm -f -- "$plugin_jar"
+                echo "Replaced previous FakePlayerPlugin jar $plugin_jar with the pinned Paper 26.3 release."
+              fi
+            done
+            sudo -n install -o monstermaze -g monstermaze -m 0644 \
+              "$FPP_TMP" "$SERVER_DIR/plugins/FakePlayerPlugin.jar"
 
-          # Disable FPP restart persistence before Paper starts. Its own onEnable
-          # restores saved bots before Testplex can sweep them, so this prevents a
-          # previous match roster from briefly becoming a global lobby population
-          # after a crash/restart. Existing FPP settings are preserved otherwise.
-          FPP_DATA_DIR="$SERVER_DIR/plugins/FakePlayerPlugin"
-          FPP_CONFIG="$FPP_DATA_DIR/config.yml"
-          sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$FPP_DATA_DIR"
-          if ! sudo -n test -f "$FPP_CONFIG"; then
-            sudo -n unzip -p "$FPP_TMP" config.yml | sudo -n tee "$FPP_CONFIG" >/dev/null
-          fi
-          FPP_CONFIG_TMP="$FPP_CONFIG.testplex-tmp"
-          sudo -n awk '
-            /^persistence:[[:space:]]*$/ { in_persistence=1; print; next }
-            in_persistence && /^[^[:space:]#]/ { in_persistence=0 }
-            in_persistence && /^  enabled:[[:space:]]*/ { print "  enabled: false"; updated=1; next }
-            { print }
-            END { if (!updated) exit 41 }
-          ' "$FPP_CONFIG" > "$FPP_CONFIG_TMP" || {
+            # Disable FPP restart persistence before Paper starts. Its own onEnable
+            # restores saved bots before Testplex can sweep them, so this prevents a
+            # previous match roster from briefly becoming a global lobby population
+            # after a crash/restart. Existing FPP settings are preserved otherwise.
+            FPP_DATA_DIR="$SERVER_DIR/plugins/FakePlayerPlugin"
+            FPP_CONFIG="$FPP_DATA_DIR/config.yml"
+            sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$FPP_DATA_DIR"
+            if ! sudo -n test -f "$FPP_CONFIG"; then
+              sudo -n unzip -p "$FPP_TMP" config.yml | sudo -n tee "$FPP_CONFIG" >/dev/null
+            fi
+            FPP_CONFIG_TMP="$FPP_CONFIG.testplex-tmp"
+            sudo -n awk '
+              /^persistence:[[:space:]]*$/ { in_persistence=1; print; next }
+              in_persistence && /^[^[:space:]#]/ { in_persistence=0 }
+              in_persistence && /^  enabled:[[:space:]]*/ { print "  enabled: false"; updated=1; next }
+              { print }
+              END { if (!updated) exit 41 }
+            ' "$FPP_CONFIG" > "$FPP_CONFIG_TMP" || {
+              sudo -n rm -f -- "$FPP_CONFIG_TMP"
+              echo "Could not safely disable FakePlayerPlugin restart persistence in $FPP_CONFIG." >&2
+              exit 1
+            }
+            sudo -n install -o monstermaze -g monstermaze -m 0640 "$FPP_CONFIG_TMP" "$FPP_CONFIG"
             sudo -n rm -f -- "$FPP_CONFIG_TMP"
-            echo "Could not safely disable FakePlayerPlugin restart persistence in $FPP_CONFIG." >&2
-            exit 1
-          }
-          sudo -n install -o monstermaze -g monstermaze -m 0640 "$FPP_CONFIG_TMP" "$FPP_CONFIG"
-          sudo -n rm -f -- "$FPP_CONFIG_TMP"
-          sudo -n grep -A 2 '^persistence:' "$FPP_CONFIG" | grep -Fxq '  enabled: false' || {
-            echo "FakePlayerPlugin restart persistence is not disabled before server startup." >&2
-            exit 1
-          }
+            sudo -n grep -A 2 '^persistence:' "$FPP_CONFIG" | grep -Fxq '  enabled: false' || {
+              echo "FakePlayerPlugin restart persistence is not disabled before server startup." >&2
+              exit 1
+            }
+
+
+          else
+            fpp_name="$(yaml_descriptor_value name "$fpp_descriptor")"
+            fpp_version="$(yaml_descriptor_value version "$fpp_descriptor")"
+            fpp_main="$(yaml_descriptor_value main "$fpp_descriptor")"
+            [[ "$fpp_name" == "FakePlayerPlugin" && "$fpp_version" == "$FPP_VERSION" \
+               && "$fpp_main" == "me.bill.fakePlayerPlugin.FakePlayerPlugin" ]] || {
+              echo "Installed FakePlayerPlugin is not the expected pinned release." >&2
+              exit 1
+            }
+            sudo -n grep -A 2 '^persistence:' "$SERVER_DIR/plugins/FakePlayerPlugin/config.yml" \
+              | grep -Fxq '  enabled: false' || {
+                echo "Plugin-only deployment requires FakePlayerPlugin persistence to remain disabled." >&2
+                exit 1
+              }
+            echo "[deploy] validated pinned FakePlayerPlugin; left its jar and configuration untouched."
+          fi
 
           # Migrate persistent state from both historical standalone data-folder names.
           # The 1.21 source plugin.yml names the plugin MonsterMazeStandalone, so
@@ -951,58 +981,64 @@ jobs:
             timeout --foreground --signal=TERM 10s sudo -n tail -n 100 "$SERVER_DIR/logs/latest.log" 2>/dev/null || true
           }
 
-          # Install fresh source maps only after a recoverable snapshot is ready.
-          # Previous worlds are in the verified snapshot; move them aside rather than deleting them.
-          install_source_worlds() (
-            set -euo pipefail
-            sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$BACKUP_DIR/replaced-source-worlds"
-            for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
-              if sudo -n test -e "$SERVER_DIR/$world"; then
-                sudo -n mv -- "$SERVER_DIR/$world" "$BACKUP_DIR/replaced-source-worlds/$world"
-              fi
-            done
-            for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
-              sudo -n cp -a "$MAP_STAGE_DIR/$world" "$SERVER_DIR/$world"
-              sudo -n chown -R monstermaze:monstermaze "$SERVER_DIR/$world"
-            done
-            sudo -n install -o monstermaze -g monstermaze -m 0644 \
-              "$UPLOAD_DIR/MonsterMazeMapsSource.txt" "$SERVER_DIR/.testplex-mm-source-maps"
-          )
-          if ! install_source_worlds; then
-            echo "Failed to install Monster Maze source worlds; rolling back the modern-only deployment." >&2
-            rollback
-            exit 1
-          fi
-          echo "Installed Monster Maze map source commit $(cat "$UPLOAD_DIR/MonsterMazeMapsSource.txt")."
-
-          # Install both original Wizards pools into the external source-map directory
-          # consumed by ArcadeMechanicsModern. Existing map folders were snapshotted
-          # above, so the standard deployment recovery helper can restore them.
-          WIZARDS_MAP_STAGE="$UPLOAD_DIR/wizards-map-stage"
-          sudo -n rm -rf -- "$WIZARDS_MAP_STAGE"
-          sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$WIZARDS_MAP_STAGE"
-          sudo -n tar -xzf "$UPLOAD_DIR/WizardsSourceMaps.tar.gz" -C "$WIZARDS_MAP_STAGE"
-          for folder in "Wizards" "Nano Wizards"; do
-            [[ "$(sudo -n find "$WIZARDS_MAP_STAGE/$folder" -maxdepth 1 -type f -iname '*.zip' | wc -l | tr -d ' ')" == "10" ]] || {
-              echo "Extracted Wizards map pool is incomplete: ${folder}." >&2
+          if [[ "$DEPLOYMENT_SCOPE" == full ]]; then
+            # Install fresh source maps only after a recoverable snapshot is ready.
+            # Previous worlds are in the verified snapshot; move them aside rather than deleting them.
+            install_source_worlds() (
+              set -euo pipefail
+              sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$BACKUP_DIR/replaced-source-worlds"
+              for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+                if sudo -n test -e "$SERVER_DIR/$world"; then
+                  sudo -n mv -- "$SERVER_DIR/$world" "$BACKUP_DIR/replaced-source-worlds/$world"
+                fi
+              done
+              for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+                sudo -n cp -a "$MAP_STAGE_DIR/$world" "$SERVER_DIR/$world"
+                sudo -n chown -R monstermaze:monstermaze "$SERVER_DIR/$world"
+              done
+              sudo -n install -o monstermaze -g monstermaze -m 0644 \
+                "$UPLOAD_DIR/MonsterMazeMapsSource.txt" "$SERVER_DIR/.testplex-mm-source-maps"
+            )
+            if ! install_source_worlds; then
+              echo "Failed to install Monster Maze source worlds; rolling back the modern-only deployment." >&2
               rollback
               exit 1
-            }
-            while IFS= read -r archive; do
-              sudo -n unzip -tq "$archive" >/dev/null || {
-                echo "Extracted Wizards archive failed CRC validation: $archive." >&2
+            fi
+            echo "Installed Monster Maze map source commit $(cat "$UPLOAD_DIR/MonsterMazeMapsSource.txt")."
+
+            # Install both original Wizards pools into the external source-map directory
+            # consumed by ArcadeMechanicsModern. Existing map folders were snapshotted
+            # above, so the standard deployment recovery helper can restore them.
+            WIZARDS_MAP_STAGE="$UPLOAD_DIR/wizards-map-stage"
+            sudo -n rm -rf -- "$WIZARDS_MAP_STAGE"
+            sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$WIZARDS_MAP_STAGE"
+            sudo -n tar -xzf "$UPLOAD_DIR/WizardsSourceMaps.tar.gz" -C "$WIZARDS_MAP_STAGE"
+            for folder in "Wizards" "Nano Wizards"; do
+              [[ "$(sudo -n find "$WIZARDS_MAP_STAGE/$folder" -maxdepth 1 -type f -iname '*.zip' | wc -l | tr -d ' ')" == "10" ]] || {
+                echo "Extracted Wizards map pool is incomplete: ${folder}." >&2
                 rollback
                 exit 1
               }
-            done < <(sudo -n find "$WIZARDS_MAP_STAGE/$folder" -maxdepth 1 -type f -iname '*.zip' -print)
-          done
-          sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$SERVER_DIR/update/maps"
-          for folder in "Wizards" "Nano Wizards"; do
-            sudo -n rm -rf -- "$SERVER_DIR/update/maps/$folder"
-            sudo -n cp -a "$WIZARDS_MAP_STAGE/$folder" "$SERVER_DIR/update/maps/$folder"
-            sudo -n chown -R monstermaze:monstermaze "$SERVER_DIR/update/maps/$folder"
-          done
-          echo "Installed 20 original Wizards/Nano Wizards map archives under $SERVER_DIR/update/maps."
+              while IFS= read -r archive; do
+                sudo -n unzip -tq "$archive" >/dev/null || {
+                  echo "Extracted Wizards archive failed CRC validation: $archive." >&2
+                  rollback
+                  exit 1
+                }
+              done < <(sudo -n find "$WIZARDS_MAP_STAGE/$folder" -maxdepth 1 -type f -iname '*.zip' -print)
+            done
+            sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$SERVER_DIR/update/maps"
+            for folder in "Wizards" "Nano Wizards"; do
+              sudo -n rm -rf -- "$SERVER_DIR/update/maps/$folder"
+              sudo -n cp -a "$WIZARDS_MAP_STAGE/$folder" "$SERVER_DIR/update/maps/$folder"
+              sudo -n chown -R monstermaze:monstermaze "$SERVER_DIR/update/maps/$folder"
+            done
+            echo "Installed 20 original Wizards/Nano Wizards map archives under $SERVER_DIR/update/maps."
+
+
+          else
+            echo "[deploy] plugin-only scope: preserved seven Monster Maze worlds and twenty Wizards map archives."
+          fi
 
           echo "[deploy] restarting testplex-modern.service (90 second limit)."
           if ! timeout --foreground --signal=TERM 90s sudo -n systemctl restart testplex-modern.service; then
