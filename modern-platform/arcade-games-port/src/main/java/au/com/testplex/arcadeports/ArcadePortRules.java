@@ -181,6 +181,37 @@ public final class ArcadePortRules {
 
     /** Meter charge comes from the source damage value recorded for each successful hit. */
     public static final int BACON_BLAST_PROJECTILE_STACK_SIZE = 16;
+    /** Classic combat's swing input has no modern cooldown; high enough to cover real CPS. */
+    public static final double LEGACY_ATTACK_SPEED = 1_024.0D;
+    /** 1.8 natural healing: one health point every 80 ticks while food is at least 18. */
+    public static final int LEGACY_HEALTH_REGEN_TICKS = 80;
+
+    public static double legacyMeleeDamage(Material weapon, int sharpnessLevel) {
+        double damage = switch (weapon) {
+            case WOODEN_SWORD, GOLDEN_SWORD -> 4.0D;
+            case STONE_SWORD -> 5.0D;
+            case IRON_SWORD -> 6.0D;
+            case DIAMOND_SWORD, NETHERITE_SWORD -> 7.0D;
+            case WOODEN_AXE, GOLDEN_AXE -> 7.0D;
+            case STONE_AXE, IRON_AXE, DIAMOND_AXE, NETHERITE_AXE -> 9.0D;
+            case WOODEN_PICKAXE, GOLDEN_PICKAXE -> 2.0D;
+            case STONE_PICKAXE -> 3.0D;
+            case IRON_PICKAXE -> 4.0D;
+            case DIAMOND_PICKAXE, NETHERITE_PICKAXE -> 5.0D;
+            case WOODEN_SHOVEL, GOLDEN_SHOVEL -> 2.5D;
+            case STONE_SHOVEL -> 3.5D;
+            case IRON_SHOVEL -> 4.5D;
+            case DIAMOND_SHOVEL, NETHERITE_SHOVEL -> 5.5D;
+            default -> 1.0D;
+        };
+        int sharpness = Math.max(0, sharpnessLevel);
+        return damage + (sharpness == 0 ? 0.0D : 0.5D + 0.5D * sharpness);
+    }
+
+    public static boolean shouldLegacyNaturalRegen(int foodLevel, double health, double maxHealth) {
+        return foodLevel >= 18 && health > 0.0D && health < maxHealth;
+    }
+
     public static final int BACON_METER_MAX = 100;
     public static final int BACON_METER_MIN_ABILITY = 50;
     /** Per attacker-victim throttle, allowing the classic ten hits per second. */
