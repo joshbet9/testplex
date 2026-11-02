@@ -302,14 +302,14 @@ jobs:
           timeout --foreground --signal=TERM --kill-after=15s 4m ssh "${ssh_opts[@]}" "$remote" bash -s <<'REMOTE_RSYNC_SETUP'
           set -euo pipefail
           if command -v rsync >/dev/null 2>&1; then
-            rsync --version | head -n 1
+            rsync --version | sed -n '1p'
             echo "Remote rsync is ready."
           else
             echo "Installing only the rsync transfer utility; Paper and game server services are untouched."
             timeout --foreground --signal=TERM 3m sudo -n apt-get update
             timeout --foreground --signal=TERM 3m sudo -n apt-get install -y rsync
             command -v rsync >/dev/null
-            rsync --version | head -n 1
+            rsync --version | sed -n '1p'
           fi
           REMOTE_RSYNC_SETUP
 
