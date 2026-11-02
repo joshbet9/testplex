@@ -301,7 +301,7 @@ jobs:
 
           # Parse the actual remote deployment transaction shell without running it.
           deploy_workflow=".github/workflows/deploy-testplex-modern-hyperv.yml"
-          awk "/<<'REMOTE_DEPLOY'/ { active=1; next } active && /^REMOTE_DEPLOY$/ { exit } active { print }" \
+          awk "/<<'REMOTE_DEPLOY'/ { active=1; next } active && /^[[:space:]]*REMOTE_DEPLOY[[:space:]]*$/ { exit } active { sub(/^[[:space:]]{10}/, ""); print }" \
             "$deploy_workflow" > "$RUNNER_TEMP/testplex-modern-remote-deploy.sh"
           test -s "$RUNNER_TEMP/testplex-modern-remote-deploy.sh"
           bash -n "$RUNNER_TEMP/testplex-modern-remote-deploy.sh"
