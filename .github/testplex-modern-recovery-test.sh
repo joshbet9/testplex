@@ -386,4 +386,3 @@ grep -Fxq 'status=NO_PRIOR_DEPLOYMENT_RESTORED' "$FIRST_STATE/current.properties
 echo 'PASS first-install recovery verifies prior absence and retains failed artifacts'
 
 echo 'All independent recovery tests passed.'
-
