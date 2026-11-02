@@ -404,6 +404,58 @@ verify_already_recovered() {
   printf 'Rollback already verified: restored artifact SHA=%s; verified runtime SHA=%s; prior_active=%s.\n' "$previous_sha" "$runtime_sha" "$prior_active"
 }
 
+verify_forward_redeploy_ready() {
+  local previous_sha
+  previous_sha="$(value previous_sha || true)"
+  [[ "$(value status || true)" == FORWARD_REDEPLOY_READY ]] || fail "transaction is not prepared for a forward redeployment"
+  [[ "$(value replacement_started || true)" == true && "$(value previous_state || true)" == deployed ]] ||
+    fail "forward redeployment requires a restored prior deployment snapshot"
+  [[ "$previous_sha" =~ ^[0-9a-f]{40}$ && "$(value restored_artifact_sha || true)" == "$previous_sha" ]] ||
+    fail "forward redeployment lacks a verified restored artifact identity"
+  assert_backup_complete
+  [[ "$(cat "$SERVER_DIR/.testplex-modern-deployed-build" 2>/dev/null || true)" == "$previous_sha" ]] ||
+    fail "live artifact marker differs from the verified restored snapshot"
+  [[ -d "$SERVER_DIR" && ! -L "$SERVER_DIR" ]] || fail "restored server directory is missing or unsafe"
+  [[ "$(systemctl_query is-enabled "$SERVICE" 2>/dev/null || true)" == "$(value previous_enabled)" ]] ||
+    fail "modern service enablement differs from the restored prior state"
+  ! service_active || fail "modern service is active while forward redeployment is pending"
+  ! port_listening || fail "port 25568 is occupied while forward redeployment is pending"
+}
+
+prepare_forward_redeploy() {
+  local previous_sha pid sandbox_marker
+  validate_transaction
+  [[ "$(value status || true)" == RESTORED ]] || fail "only a fully restored transaction can be prepared for forward redeployment"
+  [[ "$(value replacement_started || true)" == true && "$(value previous_state || true)" == deployed ]] ||
+    fail "forward redeployment requires a restored prior deployment snapshot"
+  assert_backup_complete
+  previous_sha="$(value previous_sha || true)"
+  [[ "$previous_sha" =~ ^[0-9a-f]{40}$ && "$(value restored_artifact_sha || true)" == "$previous_sha" ]] ||
+    fail "restored artifact identity does not match the prior deployment"
+  [[ "$(cat "$SERVER_DIR/.testplex-modern-deployed-build" 2>/dev/null || true)" == "$previous_sha" ]] ||
+    fail "live artifact marker differs from the verified restored snapshot"
+  sandbox_marker="$(cat "$SERVER_DIR/.testplex-modern-sandbox" 2>/dev/null || true)"
+  [[ "$sandbox_marker" == "TESTPLEX MODERN ISOLATED TEST SERVER - NOT LEGACY" ]] ||
+    fail "modern sandbox identity is missing or invalid"
+
+  if service_active; then
+    pid="$(systemctl_query show --property=MainPID --value "$SERVICE" 2>/dev/null || true)"
+    [[ "$pid" =~ ^[1-9][0-9]*$ ]] || fail "active modern service has no verifiable process to stop"
+    running_process_matches_service "$pid" || fail "active service process does not match the isolated Paper server; refusing to stop it"
+    systemctl_bounded stop "$SERVICE" || fail "could not stop the failed restored modern runtime"
+  fi
+  ! service_active || fail "modern service remains active after stopping the failed restored runtime"
+  ! port_listening || fail "port 25568 remains occupied after stopping the failed restored runtime"
+  restore_systemd_enablement
+  write_manifest runtime_sha unknown
+  write_manifest runtime_invocation_id unknown
+  write_manifest runtime_pid unknown
+  write_manifest forward_redeploy_prepared_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  set_status FORWARD_REDEPLOY_READY
+  verify_forward_redeploy_ready
+  printf 'Forward redeployment ready: restored artifact SHA=%s is checksum-verified; failed modern runtime stopped; port 25568 is free. Legacy services were not changed.\n' "$previous_sha"
+}
+
 run_locked() {
   local command status replacement_started
   command="$1"
@@ -411,8 +463,13 @@ run_locked() {
     assert-deployable)
       [[ -f "$MANIFEST" ]] || { echo "No unresolved modern deployment transaction."; return 0; }
       status="$(value status || true)"
-      case "$status" in DEPLOYMENT_VERIFIED|RECOVERY_VERIFIED|NO_PRIOR_DEPLOYMENT_RESTORED) echo "Previous transaction $status." ;; *) fail "unresolved transaction ($status); independent recovery is required" ;; esac
+      case "$status" in
+        DEPLOYMENT_VERIFIED|RECOVERY_VERIFIED|NO_PRIOR_DEPLOYMENT_RESTORED) echo "Previous transaction $status." ;;
+        FORWARD_REDEPLOY_READY) verify_forward_redeploy_ready; echo "Previous transaction FORWARD_REDEPLOY_READY." ;;
+        *) fail "unresolved transaction ($status); independent recovery is required" ;;
+      esac
       ;;
+    prepare-forward-redeploy) prepare_forward_redeploy ;;
     begin)
       local deployment_id="$2" target_sha="$3" backup_dir="$4" previous_sha="$5" previous_state="$6"
       local previous_active="$7" previous_enabled="$8" previous_reborn_active="$9"
@@ -430,7 +487,7 @@ run_locked() {
       case "$backup_dir" in "$STATE_DIR"/backups/*) ;; *) fail "invalid backup path" ;; esac
       if [[ -f "$MANIFEST" ]]; then
         local existing_status="$(value status || true)"
-        case "$existing_status" in DEPLOYMENT_VERIFIED|RECOVERY_VERIFIED|NO_PRIOR_DEPLOYMENT_RESTORED) ;; *) fail "unresolved transaction blocks journal creation" ;; esac
+        case "$existing_status" in DEPLOYMENT_VERIFIED|RECOVERY_VERIFIED|NO_PRIOR_DEPLOYMENT_RESTORED|FORWARD_REDEPLOY_READY) ;; *) fail "unresolved transaction blocks journal creation" ;; esac
       fi
       mkdir -p "$STATE_DIR" "$backup_dir"
       cat > "$STATE_DIR/current.properties.tmp" <<EOF
@@ -488,6 +545,7 @@ EOF
       case "$status" in
         RECOVERY_VERIFIED) verify_already_recovered; return 0 ;;
         NO_PRIOR_DEPLOYMENT_RESTORED) verify_already_recovered; return 0 ;;
+        FORWARD_REDEPLOY_READY) verify_forward_redeploy_ready; echo "Forward redeployment is ready; restored artifacts are intact and the modern service is stopped."; return 0 ;;
         DEPLOYMENT_VERIFIED) verify_deployed_runtime; return 0 ;;
       esac
       replacement_started="$(value replacement_started || true)"
@@ -524,3 +582,4 @@ main() {
   run_locked "$@"
 }
 main "$@"
+
