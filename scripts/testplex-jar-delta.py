@@ -71,6 +71,10 @@ def create_delta(base_path: Path, target_path: Path, delta_path: Path, manifest_
     target, target_index = index_archive(target_path)
     try:
         changed = []
+        base_entries = [
+            {"name": name, "sha256": entry_sha256(base, name)}
+            for name in base_index
+        ]
         target_entries = []
         for name, info in target_index.items():
             digest = entry_sha256(target, name)
@@ -93,6 +97,7 @@ def create_delta(base_path: Path, target_path: Path, delta_path: Path, manifest_
         manifest = {
             "format": 1,
             "base_sha256": sha256_file(base_path),
+            "base_entries": base_entries,
             "target_sha256": sha256_file(target_path),
             "target_comment": base64.b64encode(target.comment).decode("ascii"),
             "target_entries": target_entries,
@@ -113,10 +118,25 @@ def apply_delta(base_path: Path, delta_path: Path, manifest_path: Path, output_p
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if manifest.get("format") != 1:
         raise ValueError("unsupported JAR delta format")
-    if sha256_file(base_path) != manifest.get("base_sha256"):
-        raise ValueError("installed JAR does not match the patch base SHA-256")
-
+    actual_base_sha = sha256_file(base_path)
     base, base_index = index_archive(base_path)
+    if actual_base_sha != manifest.get("base_sha256"):
+        base_entries = manifest.get("base_entries")
+        if not isinstance(base_entries, list):
+            raise ValueError("installed JAR differs from the patch base and no entry manifest is available")
+        expected_base: dict[str, str] = {}
+        for entry in base_entries:
+            if not isinstance(entry, dict) or not safe_name(str(entry.get("name", ""))):
+                raise ValueError("patch base manifest contains an unsafe entry name")
+            name = str(entry["name"])
+            if name in expected_base or not isinstance(entry.get("sha256"), str):
+                raise ValueError(f"invalid or duplicate base manifest entry: {name}")
+            expected_base[name] = str(entry["sha256"])
+        if set(base_index) != set(expected_base):
+            raise ValueError("installed JAR entry list does not match the deployed base artifact")
+        for name, digest in expected_base.items():
+            if entry_sha256(base, name) != digest:
+                raise ValueError(f"installed JAR entry differs from the deployed base artifact: {name}")
     delta, delta_index = index_archive(delta_path)
     expected_entries = manifest.get("target_entries")
     changed_entries = manifest.get("changed_entries")
