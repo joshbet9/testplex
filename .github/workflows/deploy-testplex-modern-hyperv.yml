@@ -450,7 +450,16 @@ jobs:
           sudo -n install -d -m 0700 "$STATE_DIR/backups"
           if ! sudo -n "$RECOVERY_HELPER" --locked assert-deployable; then
             echo "[deploy] unresolved prior transaction detected; attempting verified recovery before this deployment."
-            sudo -n "$RECOVERY_HELPER" --locked recover
+            prior_status="$(sudo -n sed -n 's/^status=//p' "$STATE_DIR/current.properties" | head -n 1 || true)"
+            if [[ "$prior_status" == RESTORED ]]; then
+              echo "[deploy] prior artifacts are restored but the previous runtime is unhealthy; preparing a guarded forward redeployment."
+              sudo -n "$RECOVERY_HELPER" --locked prepare-forward-redeploy
+            elif ! sudo -n "$RECOVERY_HELPER" --locked recover; then
+              prior_status="$(sudo -n sed -n 's/^status=//p' "$STATE_DIR/current.properties" | head -n 1 || true)"
+              [[ "$prior_status" == RESTORED ]] || exit 1
+              echo "[deploy] artifact rollback completed but prior runtime verification failed; preparing a guarded forward redeployment."
+              sudo -n "$RECOVERY_HELPER" --locked prepare-forward-redeploy
+            fi
             sudo -n "$RECOVERY_HELPER" --locked assert-deployable
           fi
           # Separate Monster Maze services are deliberately outside this deployment's scope.
