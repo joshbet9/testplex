@@ -685,7 +685,7 @@ jobs:
               fi
             done
           else
-            for item in server.properties eula.txt .testplex-modern-deployed-build .testplex-paper-build .testplex-plugin-sha256sums .testplex-modern-sandbox; do
+            for item in paper.jar server.properties eula.txt .testplex-modern-deployed-build .testplex-paper-build .testplex-plugin-sha256sums .testplex-modern-sandbox; do
               if [[ "$SERVER_DIR_EXISTS" == true ]] && sudo -n test -e "$SERVER_DIR/$item"; then
                 snapshot_items+=("$item"); prior_files="${prior_files:+$prior_files,}$item"
               fi
