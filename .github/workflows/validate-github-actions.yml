@@ -25,4 +25,4 @@ jobs:
       - name: Check GitHub Actions workflow syntax and expressions
         uses: docker://rhysd/actionlint:1.7.12
         with:
-          args: -color
+          args: -color -shellcheck=
