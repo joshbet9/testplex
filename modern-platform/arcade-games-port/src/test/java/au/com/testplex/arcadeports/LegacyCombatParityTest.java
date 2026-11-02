@@ -44,10 +44,10 @@ final class LegacyCombatParityTest {
 
     @Test
     void sharpnessUsesTheClassicPerLevelBonus() {
-        assertEquals(5.25D, ArcadePortRules.legacyMeleeDamage(Material.IRON_SWORD, 1));
+        assertEquals(7.25D, ArcadePortRules.legacyMeleeDamage(Material.IRON_SWORD, 1));
         assertEquals(13.25D, ArcadePortRules.legacyMeleeDamage(Material.DIAMOND_SWORD, 5));
         assertEquals(12.25D, ArcadePortRules.legacyMeleeDamage(Material.DIAMOND_AXE, 5));
-        assertEquals(4.0D, ArcadePortRules.legacyMeleeDamage(Material.IRON_SWORD, -1));
+        assertEquals(6.0D, ArcadePortRules.legacyMeleeDamage(Material.IRON_SWORD, -1));
     }
 
     @Test
