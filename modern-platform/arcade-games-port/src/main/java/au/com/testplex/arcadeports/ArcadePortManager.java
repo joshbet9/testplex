@@ -20546,7 +20546,7 @@ public final class ArcadePortManager implements Listener {
         }
 
         if (session.type != ArcadePortGame.BOMB_LOBBERS) return;
-        if (isBombLobbersThrownTnt(heldItem)) {
+        if (isBombLobbersThrownTnt(held)) {
             event.setCancelled(true);
             throwBombLobbersTnt(session, player);
             return;
