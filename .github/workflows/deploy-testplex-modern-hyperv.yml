@@ -440,7 +440,11 @@ jobs:
             rm -- "$part"
           done
           mv ArcadeMechanicsModern.jar.tmp ArcadeMechanicsModern.jar
-          echo "Assembled MonsterMazeMaps.tar.gz ($(stat -c %s MonsterMazeMaps.tar.gz) bytes)."
+          if [[ "$deployment_scope" == full ]]; then
+            echo "Assembled MonsterMazeMaps.tar.gz ($(stat -c %s MonsterMazeMaps.tar.gz) bytes)."
+          else
+            echo "Plugin-only transfer: map archive assemblies skipped."
+          fi
           echo "Assembled ArcadeMechanicsModern.jar ($(stat -c %s ArcadeMechanicsModern.jar) bytes)."
           REMOTE_ASSEMBLE_ARCADE
           timeout --foreground --signal=TERM --kill-after=15s 3m scp "${scp_opts[@]}" \
@@ -495,7 +499,7 @@ jobs:
             sudo -n test -s "$UPLOAD_DIR/WizardsSourceMaps.tar.gz"
           fi
           sudo -n test -s "$UPLOAD_DIR/SHA256SUMS"
-          echo "[deploy] build=$BUILD_SHA scope=$DEPLOYMENT_SCOPE; plugin payload SHA-256 verified before transaction."
+          echo "[deploy] build=$BUILD_SHA scope=$DEPLOYMENT_SCOPE; staged payload hashes will be verified before transaction."
 
           STATE_DIR=/var/lib/testplex-modern-deploy
           RECOVERY_HELPER=/usr/local/sbin/testplex-modern-recovery
@@ -681,7 +685,7 @@ jobs:
               fi
             done
           else
-            for item in .testplex-modern-deployed-build .testplex-plugin-sha256sums .testplex-modern-sandbox; do
+            for item in server.properties eula.txt .testplex-modern-deployed-build .testplex-paper-build .testplex-plugin-sha256sums .testplex-modern-sandbox; do
               if [[ "$SERVER_DIR_EXISTS" == true ]] && sudo -n test -e "$SERVER_DIR/$item"; then
                 snapshot_items+=("$item"); prior_files="${prior_files:+$prior_files,}$item"
               fi
@@ -1331,6 +1335,8 @@ jobs:
             echo "## Testplex Modern Paper 26.3 deployment"
             echo
             echo "- Source build SHA: $SOURCE_SHA"
+            echo "- Deployment scope: ${{ inputs.deployment_scope }}"
+            echo "- Plugin JARs are SHA-256 checked before replacement; plugins-only scope preserves installed source maps and snapshots only plugin/config state."
             echo "- Destination: /home/monstermaze/servers/testplex-modern"
             echo "- Dedicated unit: testplex-modern.service"
             echo "- Dedicated Minecraft port: 25568"
