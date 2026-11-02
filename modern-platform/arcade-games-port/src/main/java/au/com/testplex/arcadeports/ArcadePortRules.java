@@ -185,27 +185,35 @@ public final class ArcadePortRules {
     public static final double LEGACY_ATTACK_SPEED = 1_024.0D;
     /** 1.8 natural healing: one health point every 80 ticks while food is at least 18. */
     public static final int LEGACY_HEALTH_REGEN_TICKS = 80;
+    /** FoodStats.addExhaustion(3.0F) is applied after each 1.8 natural heal. */
+    public static final float LEGACY_REGEN_EXHAUSTION = 3.0F;
 
+    /**
+     * 1.8 item damage before armor. These values are the ItemSword/ItemTool
+     * attackDamage modifiers, including the tool material's damage bonus.
+     */
     public static double legacyMeleeDamage(Material weapon, int sharpnessLevel) {
         double damage = switch (weapon) {
             case WOODEN_SWORD, GOLDEN_SWORD -> 4.0D;
             case STONE_SWORD -> 5.0D;
             case IRON_SWORD -> 6.0D;
             case DIAMOND_SWORD, NETHERITE_SWORD -> 7.0D;
-            case WOODEN_AXE, GOLDEN_AXE -> 7.0D;
-            case STONE_AXE, IRON_AXE, DIAMOND_AXE, NETHERITE_AXE -> 9.0D;
+            case WOODEN_AXE, GOLDEN_AXE -> 3.0D;
+            case STONE_AXE -> 4.0D;
+            case IRON_AXE -> 5.0D;
+            case DIAMOND_AXE, NETHERITE_AXE -> 6.0D;
             case WOODEN_PICKAXE, GOLDEN_PICKAXE -> 2.0D;
             case STONE_PICKAXE -> 3.0D;
             case IRON_PICKAXE -> 4.0D;
             case DIAMOND_PICKAXE, NETHERITE_PICKAXE -> 5.0D;
-            case WOODEN_SHOVEL, GOLDEN_SHOVEL -> 2.5D;
-            case STONE_SHOVEL -> 3.5D;
-            case IRON_SHOVEL -> 4.5D;
-            case DIAMOND_SHOVEL, NETHERITE_SHOVEL -> 5.5D;
+            case WOODEN_SHOVEL, GOLDEN_SHOVEL -> 1.0D;
+            case STONE_SHOVEL -> 2.0D;
+            case IRON_SHOVEL -> 3.0D;
+            case DIAMOND_SHOVEL, NETHERITE_SHOVEL -> 4.0D;
             default -> 1.0D;
         };
         int sharpness = Math.max(0, sharpnessLevel);
-        return damage + (sharpness == 0 ? 0.0D : 0.5D + 0.5D * sharpness);
+        return damage + sharpness * 1.25D;
     }
 
     public static boolean shouldLegacyNaturalRegen(int foodLevel, double health, double maxHealth) {
