@@ -1428,7 +1428,7 @@ jobs:
             echo "- Source build SHA: $SOURCE_SHA"
             echo "- Deployment scope: ${{ inputs.deployment_scope }}"
             echo "- Changed plugin JARs: ${{ steps.build-deltas.outputs.changed_jars || 'none (no-op)' }}"
-            echo "- Only plugin JARs whose installed SHA-256 differs are rebuilt from verified changed-entry patches; unchanged JARs are untouched."
+            echo "- Only plugin JARs with changed entry contents are rebuilt from verified entry patches; unchanged JARs are untouched."
             echo "- Destination: /home/monstermaze/servers/testplex-modern"
             echo "- Dedicated unit: testplex-modern.service"
             echo "- Dedicated Minecraft port: 25568"
