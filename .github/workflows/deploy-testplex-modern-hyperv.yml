@@ -12,6 +12,11 @@ on:
         description: Successful Testplex Modern Paper 26.3 build run ID
         required: true
         type: string
+      deployment_scope:
+        description: Select plugin-only updates or a full server/map deployment
+        required: false
+        type: string
+        default: plugins-only
   workflow_dispatch:
     inputs:
       deploy_to_modern_test_server:
@@ -24,6 +29,14 @@ on:
         required: true
         type: string
         default: "40819650403"
+      deployment_scope:
+        description: Select plugin-only updates or a full server/map deployment
+        required: true
+        type: choice
+        options:
+          - plugins-only
+          - full
+        default: plugins-only
 
 permissions:
   contents: read
@@ -43,7 +56,7 @@ jobs:
         env:
           DEPLOY: ${{ inputs.deploy_to_modern_test_server }}
           SOURCE_RUN_ID: ${{ inputs.source_run_id }}
-          DEPLOYMENT_SCOPE: plugins-only
+          DEPLOYMENT_SCOPE: ${{ inputs.deployment_scope }}
         shell: bash
         run: |
           set -euo pipefail
@@ -157,7 +170,7 @@ jobs:
         shell: bash
         env:
           SOURCE_SHA: ${{ steps.source-artifact.outputs.source_sha }}
-          DEPLOYMENT_SCOPE: plugins-only
+          DEPLOYMENT_SCOPE: ${{ inputs.deployment_scope }}
         run: |
           set -euo pipefail
           source_dir="$RUNNER_TEMP/testplex-modern-artifact"
@@ -214,7 +227,7 @@ jobs:
           HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
           HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
           HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
-          DEPLOYMENT_SCOPE: plugins-only
+          DEPLOYMENT_SCOPE: ${{ inputs.deployment_scope }}
         run: |
           set -euo pipefail
           test -n "$HYPERV_SSH_HOST" || { echo 'HYPERV_SSH_HOST is not configured.' >&2; exit 1; }
@@ -464,7 +477,7 @@ jobs:
           BUILD_SHA: ${{ steps.source-artifact.outputs.source_sha }}
           STAGE_DIR: ${{ steps.stage-jars.outputs.stage_dir }}
           DELTA_DIR: ${{ steps.build-deltas.outputs.delta_dir }}
-          DEPLOYMENT_SCOPE: plugins-only
+          DEPLOYMENT_SCOPE: ${{ inputs.deployment_scope }}
           CHANGED_JARS: ${{ steps.jar-diff.outputs.changed_jars }}
         run: |
           set -euo pipefail
@@ -557,7 +570,7 @@ jobs:
           HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
           BUILD_SHA: ${{ steps.source-artifact.outputs.source_sha }}
           UPLOAD_DIR: ${{ steps.upload.outputs.upload_dir }}
-          DEPLOYMENT_SCOPE: plugins-only
+          DEPLOYMENT_SCOPE: ${{ inputs.deployment_scope }}
           CHANGED_JARS: ${{ steps.jar-diff.outputs.changed_jars }}
           # EULA accepted per the user's explicit instruction for this isolated test server.
           ACCEPT_EULA: "true"
@@ -1438,7 +1451,7 @@ jobs:
             echo "## Testplex Modern Paper 26.3 deployment"
             echo
             echo "- Source build SHA: $SOURCE_SHA"
-            echo "- Deployment scope: plugins-only"
+            echo "- Deployment scope: ${{ inputs.deployment_scope }}"
             echo "- Changed plugin JARs: ${{ steps.jar-diff.outputs.changed_jars || 'none (no-op)' }}"
             echo "- Only plugin JARs whose installed SHA-256 differs are rebuilt from verified changed-entry patches; unchanged JARs are untouched."
             echo "- Destination: /home/monstermaze/servers/testplex-modern"
