@@ -545,7 +545,8 @@ jobs:
           timeout --foreground --signal=TERM --kill-after=20s 5m ssh "${ssh_opts[@]}" "$remote" bash -s <<< "$remote_apply"
           echo "upload_dir=$upload_dir" >> "$GITHUB_OUTPUT"
           echo "Built and uploaded entry-level deltas for: $CHANGED_JARS"
-\n      - name: Provision and start only testplex-modern.service
+
+      - name: Provision and start only testplex-modern.service
         if: ${{ steps.jar-diff.outputs.changed_jars != '' }}
         id: install-and-start
         shell: bash
