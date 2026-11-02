@@ -14598,16 +14598,18 @@ public final class ArcadePortManager implements Listener {
             if (player == null || !player.isOnline() || !session.alive.contains(player.getUniqueId())) continue;
             UUID id = player.getUniqueId();
             double maxHealth = player.getMaxHealth();
-            if (!ArcadePortRules.shouldLegacyNaturalRegen(player.getFoodLevel(), player.getHealth(), maxHealth)) {
+            if (!ArcadePortRules.legacyNaturalRegenerationEnabled(session.type)
+                    || !ArcadePortRules.shouldLegacyNaturalRegen(
+                            player.getFoodLevel(), player.getHealth(), maxHealth)) {
                 session.legacyNaturalRegenTicks.remove(id);
                 continue;
             }
             int timer = session.legacyNaturalRegenTicks.getOrDefault(id, 0) + 1;
             if (timer >= ArcadePortRules.LEGACY_HEALTH_REGEN_TICKS) {
                 player.setHealth(Math.min(maxHealth, player.getHealth() + 1.0D));
-                // 1.8 natural regeneration adds six exhaustion; vanilla food handling
-                // converts that to saturation/food depletion on its normal tick.
-                player.setExhaustion(Math.min(40.0F, player.getExhaustion() + 6.0F));
+                // FoodStats.addExhaustion(3.0F) is the 1.8 natural-regeneration cost.
+                player.setExhaustion(Math.min(40.0F,
+                        player.getExhaustion() + ArcadePortRules.LEGACY_REGEN_EXHAUSTION));
                 session.legacyNaturalRegenTicks.remove(id);
             } else {
                 session.legacyNaturalRegenTicks.put(id, timer);
@@ -18784,6 +18786,13 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
         if (session.type.isMonsterMaze()) return;
+        if (event.getEntity() instanceof Player fallTarget
+                && event.getCause() == EntityDamageEvent.DamageCause.FALL
+                && !ArcadePortRules.shouldApplyLegacyFallDamage(session.type)) {
+            event.setCancelled(true);
+            fallTarget.setFallDistance(0.0F);
+            return;
+        }
         if (session.type != ArcadePortGame.WIZARDS
                 && event instanceof EntityDamageByEntityEvent melee && melee.getDamager() instanceof Player attacker
                 && event.getEntity() instanceof Player && session.players.containsKey(attacker.getUniqueId())) {
