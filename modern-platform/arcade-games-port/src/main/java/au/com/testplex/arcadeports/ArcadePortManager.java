@@ -14598,7 +14598,9 @@ public final class ArcadePortManager implements Listener {
             if (player == null || !player.isOnline() || !session.alive.contains(player.getUniqueId())) continue;
             UUID id = player.getUniqueId();
             double maxHealth = player.getMaxHealth();
-            if (!ArcadePortRules.shouldLegacyNaturalRegen(player.getFoodLevel(), player.getHealth(), maxHealth)) {
+            if (!ArcadePortRules.legacyNaturalRegenerationEnabled(session.type)
+                    || !ArcadePortRules.shouldLegacyNaturalRegen(
+                            player.getFoodLevel(), player.getHealth(), maxHealth)) {
                 session.legacyNaturalRegenTicks.remove(id);
                 continue;
             }
