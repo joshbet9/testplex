@@ -165,7 +165,7 @@ jobs:
           ref: 231fb1830ca53a3cdd7451391ac3d384a03ec5bb
           path: monstermaze-source
 
-      - name: Verify and stage the four Testplex JARs and Monster Maze worlds
+      - name: Verify and stage the four Testplex JARs and optional source maps
         id: stage-jars
         shell: bash
         env:
@@ -184,16 +184,23 @@ jobs:
             unzip -tq "$source_jar" >/dev/null
             cp "$source_jar" "$stage_dir/$jar"
           done
-          if [[ "$DEPLOYMENT_SCOPE" == full ]]; then
-            maps_archive="$(find "$source_dir" -type f -name WizardsSourceMaps.tar.gz -print -quit)"
-            [[ -n "$maps_archive" && -s "$maps_archive" ]] || { echo "The verified build artifact is missing WizardsSourceMaps.tar.gz." >&2; exit 1; }
-            map_count="$(tar -tzf "$maps_archive" | grep -Ei '\.zip"$GITHUB_WORKSPACE/deployment-source/.github/testplex-modern-recovery.sh"
+          recovery_helper="$GITHUB_WORKSPACE/deployment-source/.github/testplex-modern-recovery.sh"
           test -s "$recovery_helper" || { echo "Independent modern recovery helper is missing." >&2; exit 1; }
           cp "$recovery_helper" "$stage_dir/testplex-modern-recovery.sh"
           chmod 0755 "$stage_dir/testplex-modern-recovery.sh"
 
+          manifest=( *.jar testplex-modern-recovery.sh )
           if [[ "$DEPLOYMENT_SCOPE" == full ]]; then
-            # These physical worlds are required by the Monster Maze game module bundled inside ArcadeMechanicsModern.
+            maps_archive="$(find "$source_dir" -type f -name WizardsSourceMaps.tar.gz -print -quit)"
+            [[ -n "$maps_archive" && -s "$maps_archive" ]] || { echo "The verified build artifact is missing WizardsSourceMaps.tar.gz." >&2; exit 1; }
+            map_count="$(tar -tzf "$maps_archive" | grep -Ei '\.zip$' | wc -l | tr -d ' ')"
+            [[ "$map_count" == "20" ]] || { echo "Wizards deployment payload must contain exactly 20 map ZIPs; found $map_count." >&2; exit 1; }
+            for folder in "Wizards" "Nano Wizards"; do
+              folder_count="$(tar -tzf "$maps_archive" | grep -E "^$folder/.*\.zip$" | wc -l | tr -d ' ')"
+              [[ "$folder_count" == "10" ]] || { echo "Wizards map payload has $folder_count ZIPs in $folder; expected 10." >&2; exit 1; }
+            done
+            cp "$maps_archive" "$stage_dir/WizardsSourceMaps.tar.gz"
+
             map_root="$GITHUB_WORKSPACE/monstermaze-source/solo/1.21/maps"
             map_source_sha="$(git -C "$GITHUB_WORKSPACE/monstermaze-source" rev-parse HEAD)"
             for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
@@ -204,10 +211,10 @@ jobs:
               -C "$map_root" mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido
             printf '%s\n' "$map_source_sha" > "$stage_dir/MonsterMazeMapsSource.txt"
             tar -tzf "$stage_dir/MonsterMazeMaps.tar.gz" >/dev/null
-          fi
-          manifest=( *.jar testplex-modern-recovery.sh )
-          if [[ "$DEPLOYMENT_SCOPE" == full ]]; then
             manifest+=( MonsterMazeMaps.tar.gz MonsterMazeMapsSource.txt WizardsSourceMaps.tar.gz )
+            echo "Staged both verified source-map payloads for a full deployment."
+          else
+            echo "Plugin-only deployment selected: source maps will remain untouched."
           fi
           (cd "$stage_dir" && sha256sum "${manifest[@]}" > SHA256SUMS)
           echo "stage_dir=$stage_dir" >> "$GITHUB_OUTPUT"
