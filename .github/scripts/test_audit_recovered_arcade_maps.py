@@ -3,6 +3,7 @@
 
 import importlib.util
 import json
+import math
 from pathlib import Path
 import sys
 import unittest
@@ -73,6 +74,16 @@ CUSTOM_LOCS:16,17,18:
         self.assertEqual(len(black), 30)
         self.assertTrue(all(m["y"] in world.safe_feet_levels(int(m["x"]), int(m["z"]))
                             for m in black))
+        # This original, authored control also has no freely traversable
+        # inter-round paths in the static pre-game ZIP. Therefore a blocked
+        # spatial route is a gate/transition REVIEW signal, not a proof that
+        # the map is corrupt or that teleport fallback cannot work.
+        by_name = {s["name"]: s for s in centres}
+        for link in bracket.validate_tournament(centres)["links"]:
+            child, parent = by_name[link["child"]], by_name[link["stage"]]
+            self.assertFalse(world.traversable(
+                (int(child["x"]), 4, int(child["z"])),
+                (int(parent["x"]), 4, int(parent["z"]))))
 
     def test_bliss_centres_are_only_review_candidates(self):
         path = (audit.ROOT / "update/map-recovery/nixuge/review/"
@@ -86,6 +97,14 @@ CUSTOM_LOCS:16,17,18:
                             for p in result["stage_probes"]))
         self.assertTrue(all(p["connected_safe_floor_cells_at_y6_within_radius7"] >= 60
                             for p in result["stage_probes"]))
+        self.assertTrue(result["duel_probe"]["valid_duel_proposals"],
+                        result["duel_probe"]["problems"])
+        self.assertEqual(result["duel_probe"]["proposed_black_count"], 30)
+        self.assertEqual(len(result["transition_routes"]), 14)
+        # The WDL capture has no demonstrably open routes between rounds.
+        # Even safe spawns cannot justify promotion without reviewed gates.
+        self.assertFalse(any(route["walkable_in_captured_world"]
+                             for route in result["transition_routes"]))
 
     def test_quiver_twin_peaks_is_not_evolution_configured(self):
         ref = audit.ROOT / "update/maps/One in the Quiver/Quiver_Twin Peaks 2.0.zip"
@@ -102,8 +121,17 @@ CUSTOM_LOCS:16,17,18:
         # two-block clearance, so the old map is worth a manual Evo review.
         self.assertTrue(all(m["y"] in world.safe_feet_levels(int(m["x"]), int(m["z"]), 1, 80)
                             for m in spawns))
+        closest_xz = min(
+            ((a, b) for i, a in enumerate(spawns) for b in spawns[i + 1:]),
+            key=lambda pair: math.hypot(pair[0]["x"] - pair[1]["x"],
+                                        pair[0]["z"] - pair[1]["z"]))
+        self.assertEqual(math.hypot(closest_xz[0]["x"] - closest_xz[1]["x"],
+                                    closest_xz[0]["z"] - closest_xz[1]["z"]), 2.0)
+        self.assertEqual(abs(closest_xz[0]["y"] - closest_xz[1]["y"]), 21.0)
         # Being collision-safe does NOT demonstrate safe Evolution PvP
-        # distances or supply the missing RED/GREEN/YELLOW station trio.
+        # distances. Two points nearly overlap in XZ but sit 21 blocks apart
+        # vertically; full mobility and spawn-camping review is necessary.
+        # The RED/GREEN/YELLOW station trio is still missing.
 
     def test_nixuge_recovery_still_has_no_authored_spawns(self):
         provenance = json.loads(audit.PROVENANCE.read_text())

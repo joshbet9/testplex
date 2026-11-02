@@ -2,11 +2,12 @@
 """Review reconstructed Gladiators bracket *candidates*, without creating maps.
 
 The original Reborn WorldConfig.dat is absent from Nixuge's WDL archives.
-Stage-centre annotations in review/ are hypotheses inferred from visible
-terrain, NOT original data points, spawn positions, or playable map metadata.
+Stage-centre and duel-pair annotations in review/ are hypotheses inferred from
+visible terrain, NOT original data points or playable map metadata.
 This tool checks the exact nearest-child algorithm used by 1.8 Gladiators
-and probes actual 1.8 block columns. It does not infer BLACK spawns, PINK
-progression markers, emerald-ore gates, or create a WorldConfig.dat.
+and nearest-BLACK selection, probing actual 1.8 blocks and route connectivity.
+It does not establish authentic spawns, PINK points or emerald-ore gates, and
+never creates a WorldConfig.dat.
 """
 
 from __future__ import annotations
@@ -80,14 +81,15 @@ class WorldBlocks:
         return [[y, block] for y in range(high + 1)
                 if (block := self.block(x, y, z)) not in (None, 0)]
 
-    def reachable_floor_cells(self, x: int, z: int, y: int, radius: int = 7) -> int:
-        """How many local foot positions are connected to the candidate centre?
+    def reachable_floor_positions(self, x: int, z: int, y: int,
+                                  radius: int = 7) -> set[tuple[int, int]]:
+        """Local foot positions connected to the candidate centre.
 
         Uses 4-neighbour horizontal steps at the same elevation. This measures
         immediately usable floor area, not an arena boundary or a gate route.
         """
         if y not in self.safe_feet_levels(x, z, y, y):
-            return 0
+            return set()
         seen = {(x, z)}
         pending = deque([(x, z)])
         while pending:
@@ -99,7 +101,43 @@ class WorldBlocks:
                     continue
                 seen.add((nx, nz))
                 pending.append((nx, nz))
-        return len(seen)
+        return seen
+
+    def reachable_floor_cells(self, x: int, z: int, y: int, radius: int = 7) -> int:
+        return len(self.reachable_floor_positions(x, z, y, radius))
+
+    def traversable(self, start: tuple[int, int, int],
+                    finish: tuple[int, int, int], margin: int = 12) -> bool:
+        """Conservative walking/jumping reachability across an arena transition.
+
+        Nodes are clear two-block-high feet locations, with four-direction
+        movement and at most a one-block vertical step. This detects blocked
+        round transitions in the WDL capture; it cannot certify gate mechanics.
+        """
+        if start[1] not in self.safe_feet_levels(start[0], start[2], start[1], start[1]):
+            return False
+        lowx, highx = min(start[0], finish[0]) - margin, max(start[0], finish[0]) + margin
+        lowz, highz = min(start[2], finish[2]) - margin, max(start[2], finish[2]) + margin
+        visited = {start}
+        pending = deque([start])
+        while pending:
+            x, y, z = pending.popleft()
+            if (x, y, z) == finish:
+                return True
+            for nx, nz in ((x - 1, z), (x + 1, z), (x, z - 1), (x, z + 1)):
+                if not (lowx <= nx <= highx and lowz <= nz <= highz):
+                    continue
+                for ny in (y - 1, y, y + 1):
+                    point = (nx, ny, nz)
+                    if ny < 3 or ny > 10 or point in visited:
+                        continue
+                    if ny > y and self.block(x, y + 2, z) != 0:
+                        continue
+                    if ny not in self.safe_feet_levels(nx, nz, ny, ny):
+                        continue
+                    visited.add(point)
+                    pending.append(point)
+        return False
 
 
 def closest_two(parent: dict, choices: list[dict]) -> list[dict]:
@@ -137,6 +175,68 @@ def validate_tournament(stages: list[dict]) -> dict:
     return {"valid_bracket_topology": not problems, "problems": problems, "links": links}
 
 
+def validate_duel_proposals(stages: list[dict], proposals: list[dict],
+                            world: WorldBlocks) -> dict:
+    """Validate BLACK-position *proposals*, never claim original authorship."""
+    problems = []
+    by_name = {s["name"]: s for s in stages}
+    if len(by_name) != 15:
+        problems.append("Stage names must be unique")
+    if len(proposals) != 15 or {p["arena"] for p in proposals} != set(by_name):
+        problems.append("Expected exactly one two-spawn proposal for each arena")
+    black = []
+    for proposal in proposals:
+        name = proposal["arena"]
+        stage = by_name.get(name)
+        if not stage:
+            problems.append(f"Unknown arena {name}")
+            continue
+        if proposal.get("status") != "RECONSTRUCTED_UNVERIFIED":
+            problems.append(f"{name}: proposals cannot be labelled authenticated/playable")
+        points = proposal.get("points", [])
+        if len(points) != 2:
+            problems.append(f"{name}: expected two opposite spawns")
+            continue
+        if any(len(point) != 3 or any(type(v) is not int for v in point)
+               for point in points):
+            problems.append(f"{name}: coordinates must be integer X,Y,Z triples")
+            continue
+        a, b = points
+        for point in points:
+            x, y, z = point
+            black.append((name, (x, y, z)))
+            if y != 6:
+                problems.append(f"{name}: proposed Y must be separately verified")
+            if not all(y in world.safe_feet_levels(x + dx, z + dz, y, y)
+                       for dx in (-1, 0, 1) for dz in (-1, 0, 1)):
+                problems.append(f"{name}: no 3x3 clear floor around {point}")
+            if (x, z) not in world.reachable_floor_positions(
+                    stage["x"], stage["z"], y, radius=12):
+                problems.append(f"{name}: no same-level route from centre to {point}")
+        ax, az = a[0] - stage["x"], a[2] - stage["z"]
+        bx, bz = b[0] - stage["x"], b[2] - stage["z"]
+        if (ax - bx) ** 2 + (az - bz) ** 2 < 144:
+            problems.append(f"{name}: proposed duel spawns closer than 12 blocks")
+        if ax * bx + az * bz > -0.75 * (
+                (ax * ax + az * az) * (bx * bx + bz * bz)) ** 0.5:
+            problems.append(f"{name}: duel spawns are not opposing one another")
+    if len(black) != 30 or len({coords for _, coords in black}) != 30:
+        problems.append("Expected 30 distinct BLACK spawn proposals")
+    if len(black) == 30:
+        for stage in stages:
+            # Arena.setupSpawns clones all BLACK points, chooses its nearest,
+            # removes that point, and chooses the second nearest to its mid.
+            closest = sorted(black, key=lambda entry:
+                             (entry[1][0] - stage["x"]) ** 2
+                             + (entry[1][1] - 6) ** 2
+                             + (entry[1][2] - stage["z"]) ** 2)[:2]
+            if {name for name, _ in closest} != {stage["name"]}:
+                problems.append(f"{stage['name']}: legacy closest-BLACK pairing leaks "
+                                f"into other arenas")
+    return {"valid_duel_proposals": not problems, "problems": problems,
+            "proposed_black_count": len(black)}
+
+
 def review_candidate(candidate: dict) -> dict:
     if candidate.get("status") != "UNVERIFIED_GEOMETRY_ONLY":
         raise ValueError("Refusing a candidate without explicit unverified status")
@@ -161,7 +261,19 @@ def review_candidate(candidate: dict) -> dict:
             world.reachable_floor_cells(s["x"], s["z"], 6),
         "blocks_in_column": world.column(s["x"], s["z"]),
     } for s in stages]
-    # No condition here claims an arena centre is a suitable duel spawn.
+    if "duel_spawn_proposals" in candidate:
+        result["duel_probe"] = validate_duel_proposals(
+            stages, candidate["duel_spawn_proposals"], world)
+    by_name = {s["name"]: s for s in stages}
+    result["transition_routes"] = [
+        {"child": link["child"], "stage": link["stage"],
+         "walkable_in_captured_world": world.traversable(
+             (by_name[link["child"]]["x"], 6, by_name[link["child"]]["z"]),
+             (by_name[link["stage"]]["x"], 6, by_name[link["stage"]]["z"]))}
+        for link in result["links"]
+    ]
+    # A geometry-only review with unverified round transitions is NEVER enough
+    # to construct a playable source map or certify game-specific markers.
     return result
 
 
@@ -170,6 +282,8 @@ def main():
     parser.add_argument("candidate", type=Path, help="Geometry-only review JSON")
     parser.add_argument("--image", type=Path,
                         help="Optional preview with clearly marked UNVERIFIED candidate tiers")
+    parser.add_argument("--centres-only", action="store_true",
+                        help="On a preview, show only the candidate stage centres")
     args = parser.parse_args()
     candidate = json.loads(args.candidate.read_text())
     print(json.dumps(review_candidate(candidate), indent=2))
@@ -179,8 +293,15 @@ def main():
         marks = [{"kind": "CANDIDATE", "name": stage["tier"],
                   "x": stage["x"], "y": 6, "z": stage["z"]}
                  for stage in candidate["stages"]]
+        if not args.centres_only:
+            for duel in candidate.get("duel_spawn_proposals", []):
+                marks.extend({"kind": "CANDIDATE", "name": "BLACK",
+                              "x": x, "y": y, "z": z}
+                             for x, y, z in duel["points"])
         preview(args.image, top, [], marks,
-                annotation_label="UNVERIFIED centres (colour = round)")
+                annotation_label=("UNVERIFIED centres (colour = round)"
+                                  if args.centres_only
+                                  else "UNVERIFIED centres + white duel pairs"))
 
 
 if __name__ == "__main__":

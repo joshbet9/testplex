@@ -27,7 +27,10 @@ acceptance checks.
   They are a *real, physically plausible starting-point reference*, not
   authenticated Evolution PvP placements. There is *no* Evolution
   RED/GREEN/YELLOW evolution platform data, so this cannot yet be loaded as
-  an Evolution map. Matching names alone do not make the layout equivalent.
+  an Evolution map. Two Quiver starts are just **two blocks apart horizontally**
+  but **21 blocks apart vertically**, so cover, level transitions and
+  spawn-camping require a separate Evolution playtest. Matching names alone
+  do not make the layout equivalent.
 
 ## Reproducible spatial review
 
@@ -62,33 +65,61 @@ python3 .github/scripts/audit_recovered_arcade_maps.py \
   --json /tmp/gladiators-without-barrier-roofs.json
 python3 .github/scripts/review_gladiators_bracket.py \
   update/map-recovery/nixuge/review/gladiators-bliss-stage-centres.json \
-  --image /tmp/gladiators-bliss-inferred-stage-centres.png
+  --image /tmp/gladiators-bliss-inferred-centres-and-duels.png
 ```
 
 From this view, **Bliss** has a symmetrical 15-room arena layout. The JSON
-under `update/map-recovery/nixuge/review/` records 15 approximate X/Z stage
-centres as explicitly `UNVERIFIED_GEOMETRY_ONLY`, keyed to the recovered
+under `update/map-recovery/nixuge/review/` records 15 provisional X/Z stage
+centres, now refined to the more symmetrical open-fighting floors at Y=6.
+These are explicitly `UNVERIFIED_GEOMETRY_ONLY` and keyed to the recovered
 ZIP's checksum. The read-only checker follows the source 1.8
 `Gladiators.parseArenas` nearest-child linking and finds one unique parent
 for each room. All 15 candidate centres have a solid, two-block-clear foot
 level at **Y=6**. The checker is calibrated against Caged In's authentic
 15-room tier topology and **all 30** real BLACK duel spawn coordinates.
-Each provisional centre also connects to at least **66** two-block-clear
+Each refined centre also connects to at least **112** two-block-clear
 standing cells within a seven-block horizontal radius at Y=6; the checker
 requires at least 60. These are local, measured floor areas, not verified
-combat boundaries, routes or spawn positions.
+combat boundaries, routes or spawn positions. The first-pass centre estimates
+were moved by a few blocks to avoid decorations and arena edges.
 
 ![Bliss provisional, unverified arena-centre overlay](../../../update/map-recovery/nixuge/review/gladiators-bliss-stage-centres.png)
 
 *Bliss, beneath its invisible barrier roof. The coloured circles are inferred
 stage centres for review only, **not** original Mineplex markers.*
 
-**This is not an original WorldConfig or a playable map.** An apparent
-arena centre does not establish the original BLACK spawn pairs, PINK particle
-points, emerald-ore gates (all missing in the WDL snapshot), or spectator
-and player paths. The validator refuses candidates marked playable and never
-writes to `update/maps`. Complete and human-review those remaining pieces
-before adding any map to rotation.
+The same JSON now contains **30 newly reconstructed BLACK duel spawn
+proposals**, two per room, labelled `RECONSTRUCTED_UNVERIFIED`. All 30 are
+distinct, have a solid floor and clear 3×3 horizontal footprint with two air
+blocks overhead, and can be reached at Y=6 from the corresponding centre.
+The two spawns in each room face opposite sides, are at least 12 blocks
+apart, and remain the room's own nearest two BLACK positions when evaluated
+against *all 30* using the original `Arena.setupSpawns` rule. No part of
+this derives the positions from original authored marker data.
+
+![Bliss provisional, unverified stage centres and duel spawns](../../../update/map-recovery/nixuge/review/gladiators-bliss-duel-proposals.png)
+
+*Coloured circles: inferred stage centres. White circles: **proposed** BLACK
+duel spawns. Neither set is authenticated source metadata.*
+
+**Round transitions and progression remain the blocker.** A limited 3D
+walking/jumping reachability check on the captured Bliss world finds **none
+of the 14** inter-round connections freely open. However the *authentic
+Caged In control* also has no freely traversable round transitions in its
+static ZIP; a closed pre-game route is therefore **not proof of a broken
+match**. The original Gladiators game can eventually teleport slow movers
+to the next stage. We still do not know which physical gate blocks (if any)
+and PINK progression points were authored for Bliss, or whether routes will
+open appropriately on victory. The WDL capture provides no emerald-ore
+gate markers. Human round-progression and teleport-fallback testing must
+precede any playable configuration.
+
+**This is not an original WorldConfig or a playable map.** Geometry-based
+stage and duel suggestions do not establish the original Mineplex markers.
+The validator rejects candidates labelled playable or authenticated and
+never writes to `update/maps`. Review the PINK points, doorway construction,
+spectator and player routes, and run full multiplayer acceptance before any
+promotion.
 
 ## Required evidence before adding one map to rotation
 

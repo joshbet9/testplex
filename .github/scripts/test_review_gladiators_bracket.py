@@ -2,6 +2,7 @@
 """Tests for non-playable arena geometry review and bracket linking."""
 
 import importlib.util
+import copy
 import json
 from pathlib import Path
 import sys
@@ -31,6 +32,29 @@ class GladiatorsBracketReviewTest(unittest.TestCase):
                             for stage in result["stage_probes"]))
         self.assertTrue(all(stage["connected_safe_floor_cells_at_y6_within_radius7"] >= 60
                             for stage in result["stage_probes"]))
+        self.assertTrue(result["duel_probe"]["valid_duel_proposals"],
+                        result["duel_probe"]["problems"])
+        self.assertEqual(result["duel_probe"]["proposed_black_count"], 30)
+        self.assertEqual(len(result["transition_routes"]), 14)
+        self.assertTrue(all(not route["walkable_in_captured_world"]
+                            for route in result["transition_routes"]))
+
+    def test_duel_review_detects_unsafe_or_misassigned_proposals(self):
+        world = review.WorldBlocks(review.ROOT / self.candidate["source_archive"])
+        bad = copy.deepcopy(self.candidate["duel_spawn_proposals"])
+        bad[0]["points"][0] = [100000, 6, 100000]
+        report = review.validate_duel_proposals(self.candidate["stages"], bad, world)
+        self.assertFalse(report["valid_duel_proposals"])
+        self.assertTrue(any("no 3x3 clear floor" in issue for issue in report["problems"]))
+        self.assertTrue(any("closest-BLACK pairing" in issue for issue in report["problems"]))
+
+    def test_duel_review_rejects_invented_authenticity(self):
+        world = review.WorldBlocks(review.ROOT / self.candidate["source_archive"])
+        bad = copy.deepcopy(self.candidate["duel_spawn_proposals"])
+        bad[0]["status"] = "AUTHENTIC"
+        report = review.validate_duel_proposals(self.candidate["stages"], bad, world)
+        self.assertFalse(report["valid_duel_proposals"])
+        self.assertTrue(any("authenticated" in issue for issue in report["problems"]))
 
     def test_missing_or_duplicated_bracket_child_is_rejected(self):
         stages = [dict(s) for s in self.candidate["stages"]]
