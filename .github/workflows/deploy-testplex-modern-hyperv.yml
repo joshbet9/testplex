@@ -12,6 +12,11 @@ on:
         description: Successful Testplex Modern Paper 26.3 build run ID
         required: true
         type: string
+      deployment_scope:
+        description: Select plugin-only updates or a full server/map deployment
+        required: false
+        type: string
+        default: plugins-only
   workflow_dispatch:
     inputs:
       deploy_to_modern_test_server:
@@ -24,6 +29,14 @@ on:
         required: true
         type: string
         default: "40819650403"
+      deployment_scope:
+        description: Select plugin-only updates or a full server/map deployment
+        required: true
+        type: choice
+        options:
+          - plugins-only
+          - full
+        default: plugins-only
 
 permissions:
   contents: read
@@ -43,7 +56,7 @@ jobs:
         env:
           DEPLOY: ${{ inputs.deploy_to_modern_test_server }}
           SOURCE_RUN_ID: ${{ inputs.source_run_id }}
-          DEPLOYMENT_SCOPE: plugins-only
+          DEPLOYMENT_SCOPE: ${{ inputs.deployment_scope }}
         shell: bash
         run: |
           set -euo pipefail
@@ -157,7 +170,7 @@ jobs:
         shell: bash
         env:
           SOURCE_SHA: ${{ steps.source-artifact.outputs.source_sha }}
-          DEPLOYMENT_SCOPE: plugins-only
+          DEPLOYMENT_SCOPE: ${{ inputs.deployment_scope }}
         run: |
           set -euo pipefail
           source_dir="$RUNNER_TEMP/testplex-modern-artifact"
@@ -214,7 +227,7 @@ jobs:
           HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
           HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
           HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
-          DEPLOYMENT_SCOPE: plugins-only
+          DEPLOYMENT_SCOPE: ${{ inputs.deployment_scope }}
         run: |
           set -euo pipefail
           test -n "$HYPERV_SSH_HOST" || { echo 'HYPERV_SSH_HOST is not configured.' >&2; exit 1; }
@@ -285,7 +298,7 @@ jobs:
           echo "Read-only preflight passed: Testplex target is isolated; service states, enablement, and port are readable. State-changing preflight runs under the deployment lock after journaling."
           REMOTE_PREFLIGHT
 
-      - name: Ensure rsync is available for block-delta transfer
+      - name: Ensure Python is available for entry-level patches
         shell: bash
         env:
           HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
@@ -299,28 +312,23 @@ jobs:
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
-          timeout --foreground --signal=TERM --kill-after=15s 4m ssh "${ssh_opts[@]}" "$remote" bash -s <<'REMOTE_RSYNC_SETUP'
+          timeout --foreground --signal=TERM --kill-after=15s 3m ssh "${ssh_opts[@]}" "$remote" bash -s <<'REMOTE_PYTHON_CHECK'
           set -euo pipefail
-          if command -v rsync >/dev/null 2>&1; then
-            rsync --version | sed -n '1p'
-            echo "Remote rsync is ready."
-          else
-            echo "Installing only the rsync transfer utility; Paper and game server services are untouched."
-            timeout --foreground --signal=TERM 3m sudo -n apt-get update
-            timeout --foreground --signal=TERM 3m sudo -n apt-get install -y rsync
-            command -v rsync >/dev/null
-            rsync --version | sed -n '1p'
-          fi
-          REMOTE_RSYNC_SETUP
+          command -v python3 >/dev/null || {
+            echo "Python 3 is required to verify and reconstruct plugin JAR entry patches." >&2
+            exit 1
+          }
+          python3 --version
+          REMOTE_PYTHON_CHECK
 
-      - name: Compare staged JAR hashes with installed plugins
+      - name: Read the deployed build identity
         id: jar-diff
         shell: bash
         env:
           HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
           HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
           HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
-          STAGE_DIR: ${{ steps.stage-jars.outputs.stage_dir }}
+          BUILD_SHA: ${{ steps.source-artifact.outputs.source_sha }}
         run: |
           set -euo pipefail
           SSH_PORT="${HYPERV_SSH_PORT:-22}"
@@ -329,38 +337,112 @@ jobs:
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
-          records=()
-          for jar in TestplexModernArcade.jar SnakeModern.jar ArcadeMechanicsModern.jar WizardsModern.jar; do
-            expected="$(awk -v name="$jar" '$2 == name {print $1}' "$STAGE_DIR/SHA256SUMS")"
-            [[ "$expected" =~ ^[0-9a-f]{64}$ ]] || { echo "Missing staged checksum for $jar." >&2; exit 1; }
-            records+=("$jar=$expected")
-          done
-          comparison="$(timeout --foreground --signal=TERM --kill-after=15s 3m ssh "${ssh_opts[@]}" "$remote" bash -s -- "${records[@]}" <<'REMOTE_JAR_DIFF'
+          comparison="$(timeout --foreground --signal=TERM --kill-after=15s 3m ssh "${ssh_opts[@]}" "$remote" bash -s <<'REMOTE_BUILD_ID'
           set -euo pipefail
           server_dir=/home/monstermaze/servers/testplex-modern
-          for record in "$@"; do
-            jar="${record%%=*}"
-            expected="${record#*=}"
-            case "$jar" in TestplexModernArcade.jar|SnakeModern.jar|ArcadeMechanicsModern.jar|WizardsModern.jar) ;; *) exit 2 ;; esac
-            [[ "$expected" =~ ^[0-9a-f]{64}$ ]] || exit 2
-            installed="$server_dir/plugins/$jar"
-            actual=missing
-            if sudo -n test -s "$installed"; then actual="$(sudo -n sha256sum "$installed" | awk '{print $1}')"; fi
-            if [[ "$actual" == "$expected" ]]; then
-              echo "JAR_DIFF $jar unchanged sha256=$actual"
-            else
-              echo "JAR_DIFF $jar replace installed=$actual target=$expected"
-              echo "CHANGED_JAR=$jar"
-            fi
-          done
-          REMOTE_JAR_DIFF
+          deployed_sha="$(sudo -n cat "$server_dir/.testplex-modern-deployed-build" 2>/dev/null || true)"
+          if [[ "$deployed_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "DEPLOYED_BUILD_SHA=$deployed_sha"
+          else
+            echo "DEPLOYED_BUILD_SHA=unknown"
+          fi
+          REMOTE_BUILD_ID
           )"
           printf '%s\n' "$comparison"
-          changed_jars="$(sed -n 's/^CHANGED_JAR=//p' <<< "$comparison" | paste -sd, -)"
-          echo "changed_jars=$changed_jars" >> "$GITHUB_OUTPUT"
-          [[ -n "$changed_jars" ]] || echo "All plugin hashes match; deployment is a no-op."
+          deployed_sha="$(sed -n 's/^DEPLOYED_BUILD_SHA=//p' <<< "$comparison" | tail -n 1)"
+          echo "deployed_build_sha=$deployed_sha" >> "$GITHUB_OUTPUT"
+          if [[ "$deployed_sha" == "$BUILD_SHA" ]]; then
+            echo "candidate_jars=" >> "$GITHUB_OUTPUT"
+            echo "Source build is already deployed; deployment is a no-op."
+          else
+            echo "candidate_jars=TestplexModernArcade.jar,SnakeModern.jar,ArcadeMechanicsModern.jar,WizardsModern.jar" >> "$GITHUB_OUTPUT"
+            echo "Source build changed; checking plugin entry contents against the deployed base."
+          fi
 
-      - name: Upload verified JARs to the isolated directory
+      - name: Resolve the deployed build artifact for patching
+        if: ${{ steps.jar-diff.outputs.candidate_jars != '' }}
+        id: base-artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_SHA: ${{ steps.jar-diff.outputs.deployed_build_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "The running server has no valid deployed-build marker; refusing an unbased JAR patch." >&2
+            exit 1
+          }
+          runs_json="$RUNNER_TEMP/testplex-modern-base-runs.json"
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$BASE_SHA&per_page=100" -o "$runs_json"
+          base_run="$(jq -er --arg sha "$BASE_SHA" '
+            [.workflow_runs[] | select(
+              .head_sha == $sha and .status == "completed" and .conclusion == "success" and
+              .path == ".github/workflows/testplex-modern-build.yml" and
+              .head_branch == "feat/testplex-modern-26.3-platform"
+            )] | sort_by(.created_at) | last | .id
+          ' "$runs_json")"
+          artifacts_json="$RUNNER_TEMP/testplex-modern-base-artifacts.json"
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$base_run/artifacts" -o "$artifacts_json"
+          base_artifact="$(jq -ce '[.artifacts[] | select(.expired == false and .name == "testplex-modern-paper-26.3")] | if length == 1 then .[0] else error("expected one unexpired base artifact") end' "$artifacts_json")"
+          artifact_id="$(jq -er '.id' <<< "$base_artifact")"
+          base_dir="$RUNNER_TEMP/testplex-modern-base"
+          mkdir -p "$base_dir"
+          curl -fsSL --retry 3 -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" \
+            -o "$RUNNER_TEMP/testplex-modern-base.zip"
+          unzip -q "$RUNNER_TEMP/testplex-modern-base.zip" -d "$base_dir"
+          for jar in TestplexModernArcade.jar SnakeModern.jar ArcadeMechanicsModern.jar WizardsModern.jar; do
+            count="$(find "$base_dir" -type f -name "$jar" | wc -l | tr -d ' ')"
+            [[ "$count" == "1" ]] || { echo "Base artifact must contain exactly one $jar; found $count." >&2; exit 1; }
+          done
+          echo "base_run_id=$base_run" >> "$GITHUB_OUTPUT"
+          echo "base_dir=$base_dir" >> "$GITHUB_OUTPUT"
+          echo "Resolved deployed build $BASE_SHA to successful build run $base_run."
+
+      - name: Build changed-entry JAR patches
+        if: ${{ steps.jar-diff.outputs.candidate_jars != '' }}
+        id: build-deltas
+        shell: bash
+        env:
+          BASE_DIR: ${{ steps.base-artifact.outputs.base_dir }}
+          STAGE_DIR: ${{ steps.stage-jars.outputs.stage_dir }}
+          CANDIDATE_JARS: ${{ steps.jar-diff.outputs.candidate_jars }}
+        run: |
+          set -euo pipefail
+          delta_dir="$RUNNER_TEMP/testplex-modern-deltas"
+          mkdir -p "$delta_dir"
+          cp deployment-source/scripts/testplex-jar-delta.py "$delta_dir/testplex-jar-delta.py"
+          chmod 0755 "$delta_dir/testplex-jar-delta.py"
+          IFS=, read -r -a candidate_jars <<< "$CANDIDATE_JARS"
+          changed_jars=()
+          for jar in "${candidate_jars[@]}"; do
+            case "$jar" in TestplexModernArcade.jar|SnakeModern.jar|ArcadeMechanicsModern.jar|WizardsModern.jar) ;; *) echo "Rejected unexpected candidate JAR: $jar." >&2; exit 2 ;; esac
+            base_jar="$(find "$BASE_DIR" -type f -name "$jar" -print -quit)"
+            [[ -s "$base_jar" ]] || { echo "Could not resolve the deployed base JAR for $jar." >&2; exit 1; }
+            output="$(python3 "$delta_dir/testplex-jar-delta.py" create \
+              "$base_jar" "$STAGE_DIR/$jar" \
+              "$delta_dir/$jar.delta.zip" "$delta_dir/$jar.delta.json")"
+            printf '%s\n' "$output"
+            changed_entries="$(sed -n 's/^changed_entry_count=//p' <<< "$output" | tail -n 1)"
+            [[ "$changed_entries" =~ ^[0-9]+$ ]] || { echo "Missing changed-entry count for $jar." >&2; exit 1; }
+            if (( changed_entries > 0 )); then
+              changed_jars+=("$jar")
+            else
+              rm -f -- "$delta_dir/$jar.delta.zip" "$delta_dir/$jar.delta.json"
+              echo "$jar has identical entry contents; excluding it from deployment."
+            fi
+          done
+          changed_jars_csv="$(IFS=,; echo "${changed_jars[*]}")"
+          echo "changed_jars=$changed_jars_csv" >> "$GITHUB_OUTPUT"
+          echo "delta_dir=$delta_dir" >> "$GITHUB_OUTPUT"
+          if [[ -z "$changed_jars_csv" ]]; then
+            echo "No plugin entry contents changed; deployment is a no-op."
+          else
+            echo "Created entry-level patches for: $changed_jars_csv"
+          fi
+      - name: Upload verified JAR deltas to the isolated directory
         id: upload
         shell: bash
         env:
@@ -369,22 +451,22 @@ jobs:
           HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
           BUILD_SHA: ${{ steps.source-artifact.outputs.source_sha }}
           STAGE_DIR: ${{ steps.stage-jars.outputs.stage_dir }}
-          DEPLOYMENT_SCOPE: plugins-only
-          CHANGED_JARS: ${{ steps.jar-diff.outputs.changed_jars }}
+          DELTA_DIR: ${{ steps.build-deltas.outputs.delta_dir }}
+          DEPLOYMENT_SCOPE: ${{ inputs.deployment_scope }}
+          CHANGED_JARS: ${{ steps.build-deltas.outputs.changed_jars }}
         run: |
           set -euo pipefail
-          SSH_PORT="$HYPERV_SSH_PORT"
-          [[ -n "$SSH_PORT" ]] || SSH_PORT=22
+          SSH_PORT="${HYPERV_SSH_PORT:-22}"
           remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
           upload_dir="/var/tmp/testplex-modern-artifacts-$BUILD_SHA"
           ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
-            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=20)
           scp_opts=(-P "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
-            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=40)
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=12)
           IFS=, read -r -a changed_jars <<< "$CHANGED_JARS"
           if [[ -z "$CHANGED_JARS" ]]; then
             echo "changed_jars=" >> "$GITHUB_OUTPUT"
@@ -392,105 +474,68 @@ jobs:
             echo "No changed plugin JARs; skipping upload."
             exit 0
           fi
-          selected_names=()
-          for jar in "${changed_jars[@]}"; do
-            case "$jar" in TestplexModernArcade.jar|SnakeModern.jar|ArcadeMechanicsModern.jar|WizardsModern.jar) selected_names+=("$jar") ;; *) exit 2 ;; esac
-          done
-          selected_names+=(testplex-modern-recovery.sh)
-          selected_manifest="$RUNNER_TEMP/testplex-modern-selected-SHA256SUMS"
-          (cd "$STAGE_DIR" && sha256sum "${selected_names[@]}" > "$selected_manifest")
-          # The legacy and modern deploy jobs share one Hyper-V disk and are serialized.
-          # Only generated, abandoned staging directories are eligible for pruning; never
-          # clean server worlds, installed plugins, databases or recovery backups.
-          stage_kb="$(du -sk "$STAGE_DIR" | awk '{print $1}')"
-          [[ "$stage_kb" =~ ^[0-9]+$ ]] && (( stage_kb > 0 )) || { echo "Could not determine the verified deployment payload size." >&2; exit 1; }
-          # Uploaded chunk parts are replaced by sequential assembly, deleting each part only
-          # after it has been appended. Peak staging use stays within one payload copy.
-          # Keep a full 1 GiB free after reserving the single staged payload.
-          required_free_kb=$((stage_kb * 2 + 524288))
-          timeout --foreground --signal=TERM --kill-after=15s 5m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$BUILD_SHA" "$required_free_kb" "$stage_kb" "$CHANGED_JARS" <<'REMOTE_STAGE_PREP'
+
+          # The patch is built from the successful artifact matching the server's
+          # deployed SHA. The receiver rechecks each installed base hash before use.
+          payload_kb="$(du -sk "$DELTA_DIR" | awk '{print $1}')"
+          [[ "$payload_kb" =~ ^[0-9]+$ && "$payload_kb" -gt 0 ]] || { echo "Invalid entry-delta payload size." >&2; exit 1; }
+          target_size_kb="$(du -sk "$STAGE_DIR"/*.jar | awk '{sum += $1} END {print sum+0}')"
+          [[ "$target_size_kb" =~ ^[0-9]+$ && "$target_size_kb" -gt 0 ]] || { echo "Could not size target JARs." >&2; exit 1; }
+          required_free_kb=$((payload_kb + target_size_kb * 2 + 524288))
+          echo "Entry-patch payload: $((payload_kb / 1024)) MiB; reconstructed JAR budget: $((target_size_kb / 1024)) MiB."
+          timeout --foreground --signal=TERM --kill-after=15s 4m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$BUILD_SHA" "$required_free_kb" "$CHANGED_JARS" <<'REMOTE_STAGE'
           set -euo pipefail
           build_sha="$1"
           required_free_kb="$2"
-          stage_kb="$3"
-          changed_jars_csv="$4"
-          [[ "$build_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid build SHA for artifact staging." >&2; exit 1; }
-          [[ "$required_free_kb" =~ ^[0-9]+$ && "$stage_kb" =~ ^[0-9]+$ ]] || { echo "Invalid deployment storage budget." >&2; exit 1; }
+          changed_jars_csv="$3"
+          [[ "$build_sha" =~ ^[0-9a-f]{40}$ && "$required_free_kb" =~ ^[0-9]+$ ]] || exit 2
           upload_dir="/var/tmp/testplex-modern-artifacts-$build_sha"
-          echo "Disk usage before staging-cache cleanup:"
-          df -h /var/tmp
-          df -i /var/tmp
-          shopt -s nullglob
-          now_epoch="$(date +%s)"
-          for existing in /var/tmp/testplex-modern-artifacts-*; do
-            [[ -d "$existing" && ! -L "$existing" ]] || continue
-            name="${existing##*/}"
-            [[ "$name" =~ ^testplex-modern-artifacts-[0-9a-f]{40}$ ]] || continue
-            [[ "$existing" == "$upload_dir" ]] && continue
-            # Another workflow may be actively uploading to a different SHA-named
-            # directory. Only prune caches that have been untouched for >24h.
-            mtime="$(stat -c %Y -- "$existing" 2>/dev/null || printf '0')"
-            if [[ "$mtime" =~ ^[0-9]+$ ]] && (( now_epoch - mtime > 86400 )); then
-              size="$(du -sh -- "$existing" 2>/dev/null | cut -f1 || true)"
-              echo "Removing abandoned modern deployment cache (>24h old): $existing (${size:-size unavailable})"
-              sudo -n rm -rf -- "$existing"
-            else
-              echo "Leaving recent/possibly active modern staging directory untouched: $existing"
-            fi
-          done
+          server_dir=/home/monstermaze/servers/testplex-modern
           sudo -n rm -rf -- "$upload_dir"
-          # Downloaded package archives are reproducible cache, not installed software.
-          # This safely recovers small amounts of space without touching worlds or backups.
-          apt_cache_before="$(sudo -n du -sh /var/cache/apt/archives 2>/dev/null | cut -f1 || true)"
           sudo -n apt-get clean
-          echo "Cleared downloaded APT package cache (${apt_cache_before:-size unavailable}); installed packages were not removed."
-          echo "Disk usage after staging-cache and package-cache cleanup:"
-          df -h /var/tmp
-          df -i /var/tmp
           avail_kb="$(df -Pk /var/tmp | awk 'END {print $4}')"
-          if [[ ! "$avail_kb" =~ ^[0-9]+$ ]] || (( avail_kb < required_free_kb )); then
-            echo "Only ${avail_kb:-unknown} KiB free in /var/tmp after staging cleanup; deployment needs at least $required_free_kb KiB (seed plus incoming payload and a 512 MiB safety reserve)." >&2
+          [[ "$avail_kb" =~ ^[0-9]+$ ]] && (( avail_kb >= required_free_kb )) || {
+            echo "Insufficient staging space: available=${avail_kb:-unknown}KiB required=$required_free_kb KiB." >&2
             exit 1
-          fi
-          echo "Available space: $((avail_kb / 1024)) MiB; payload: $((stage_kb / 1024)) MiB; required free-space reserve: $((required_free_kb / 1024)) MiB."
+          }
           install -d -m 0700 -- "$upload_dir"
           IFS=, read -r -a changed_jars <<< "$changed_jars_csv"
           for jar in "${changed_jars[@]}"; do
-            case "$jar" in
-              TestplexModernArcade.jar|SnakeModern.jar|ArcadeMechanicsModern.jar|WizardsModern.jar) ;;
-              *) echo "Rejected unexpected changed JAR name while preparing delta seed." >&2; exit 2 ;;
-            esac
-            installed="/home/monstermaze/servers/testplex-modern/plugins/$jar"
-            if [[ -s "$installed" ]]; then
-              cp --reflink=auto -- "$installed" "$upload_dir/$jar"
-              chmod u+rw -- "$upload_dir/$jar"
-              echo "Seeded delta comparison with installed $jar ($(stat -c %s "$upload_dir/$jar") bytes)."
-            fi
+            case "$jar" in TestplexModernArcade.jar|SnakeModern.jar|ArcadeMechanicsModern.jar|WizardsModern.jar) ;; *) exit 2 ;; esac
+            installed="$server_dir/plugins/$jar"
+            [[ -s "$installed" ]] || { echo "Missing installed patch base for $jar." >&2; exit 1; }
+            cp --reflink=auto -- "$installed" "$upload_dir/$jar.base"
+            chmod u+rw -- "$upload_dir/$jar.base"
           done
-          REMOTE_STAGE_PREP
-          # rsync's rolling block checksums reuse unchanged regions inside large JARs.
-          # The remote stage directory is pre-seeded from installed JARs; only changed
-          # blocks travel over Tailscale, while the final full-file SHA is still verified.
-          rsync_ssh="ssh -p $SSH_PORT -i $HOME/.ssh/testplex_hyperv -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=40"
-          rsync_opts=(-rt --checksum --partial --inplace --human-readable --stats -e "$rsync_ssh")
-          for jar in "${changed_jars[@]}"; do
-            case "$jar" in
-              TestplexModernArcade.jar|SnakeModern.jar|ArcadeMechanicsModern.jar|WizardsModern.jar) ;;
-              *) echo "Rejected unexpected changed JAR name during rsync." >&2; exit 2 ;;
-            esac
-            echo "Delta transferring $jar against its installed version."
-            timeout --foreground --signal=TERM --kill-after=30s 8m rsync "${rsync_opts[@]}" "$STAGE_DIR/$jar" "$remote:$upload_dir/$jar"
-          done
-          timeout --foreground --signal=TERM --kill-after=15s 3m rsync -rt --partial -e "$rsync_ssh" \
-            "$STAGE_DIR/testplex-modern-recovery.sh" "$remote:$upload_dir/testplex-modern-recovery.sh"
+          echo "$upload_dir"
+          REMOTE_STAGE
           timeout --foreground --signal=TERM --kill-after=15s 3m scp "${scp_opts[@]}" \
-            "$selected_manifest" "$remote:$upload_dir/SHA256SUMS"
-          timeout --foreground --signal=TERM --kill-after=15s 3m ssh "${ssh_opts[@]}" "$remote" \
-            "echo 'Disk after delta transfer:'; df -h /var/tmp; du -sh '$upload_dir'; cd '$upload_dir' && sha256sum -c SHA256SUMS"
+            "$DELTA_DIR/testplex-jar-delta.py" "$remote:$upload_dir/testplex-jar-delta.py"
+          transfer_files=()
+          for jar in "${changed_jars[@]}"; do
+            transfer_files+=("$DELTA_DIR/$jar.delta.zip" "$DELTA_DIR/$jar.delta.json")
+          done
+          timeout --foreground --signal=TERM --kill-after=20s 4m scp "${scp_opts[@]}" \
+            "${transfer_files[@]}" "$remote:$upload_dir/"
+          timeout --foreground --signal=TERM --kill-after=15s 3m scp "${scp_opts[@]}" \
+            "$STAGE_DIR/testplex-modern-recovery.sh" "$remote:$upload_dir/testplex-modern-recovery.sh"
+          # Rebuild each JAR in the isolated staging directory; never write into the
+          # live plugins directory before the guarded deployment transaction begins.
+          printf -v remote_apply 'set -euo pipefail\nupload_dir=%q\n' "$upload_dir"
+          for jar in "${changed_jars[@]}"; do
+            remote_apply+="python3 \"\$upload_dir/testplex-jar-delta.py\" apply \"\$upload_dir/$jar.base\" \"\$upload_dir/$jar.delta.zip\" \"\$upload_dir/$jar.delta.json\" \"\$upload_dir/$jar.rebuilt\"\n"
+            remote_apply+="mv -- \"\$upload_dir/$jar.rebuilt\" \"\$upload_dir/$jar\"\n"
+            remote_apply+="rm -f -- \"\$upload_dir/$jar.base\" \"\$upload_dir/$jar.delta.zip\" \"\$upload_dir/$jar.delta.json\"\n"
+          done
+          remote_apply+='cd "$upload_dir"\nsha256sum '
+          for jar in "${changed_jars[@]}"; do remote_apply+="\"$jar\" "; done
+          remote_apply+='"testplex-modern-recovery.sh" > SHA256SUMS\nsha256sum -c SHA256SUMS\n'
+          timeout --foreground --signal=TERM --kill-after=20s 5m ssh "${ssh_opts[@]}" "$remote" bash -s <<< "$remote_apply"
           echo "upload_dir=$upload_dir" >> "$GITHUB_OUTPUT"
+          echo "Built and uploaded entry-level deltas for: $CHANGED_JARS"
 
       - name: Provision and start only testplex-modern.service
-        if: ${{ steps.jar-diff.outputs.changed_jars != '' }}
+        if: ${{ steps.build-deltas.outputs.changed_jars != '' }}
         id: install-and-start
         shell: bash
         timeout-minutes: 35
@@ -500,8 +545,8 @@ jobs:
           HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
           BUILD_SHA: ${{ steps.source-artifact.outputs.source_sha }}
           UPLOAD_DIR: ${{ steps.upload.outputs.upload_dir }}
-          DEPLOYMENT_SCOPE: plugins-only
-          CHANGED_JARS: ${{ steps.jar-diff.outputs.changed_jars }}
+          DEPLOYMENT_SCOPE: ${{ inputs.deployment_scope }}
+          CHANGED_JARS: ${{ steps.build-deltas.outputs.changed_jars }}
           # EULA accepted per the user's explicit instruction for this isolated test server.
           ACCEPT_EULA: "true"
         run: |
@@ -1381,9 +1426,9 @@ jobs:
             echo "## Testplex Modern Paper 26.3 deployment"
             echo
             echo "- Source build SHA: $SOURCE_SHA"
-            echo "- Deployment scope: plugins-only"
-            echo "- Changed plugin JARs: ${{ steps.jar-diff.outputs.changed_jars || 'none (no-op)' }}"
-            echo "- Only JARs whose installed SHA-256 differs from the successful build are transferred and replaced."
+            echo "- Deployment scope: ${{ inputs.deployment_scope }}"
+            echo "- Changed plugin JARs: ${{ steps.build-deltas.outputs.changed_jars || 'none (no-op)' }}"
+            echo "- Only plugin JARs with changed entry contents are rebuilt from verified entry patches; unchanged JARs are untouched."
             echo "- Destination: /home/monstermaze/servers/testplex-modern"
             echo "- Dedicated unit: testplex-modern.service"
             echo "- Dedicated Minecraft port: 25568"
