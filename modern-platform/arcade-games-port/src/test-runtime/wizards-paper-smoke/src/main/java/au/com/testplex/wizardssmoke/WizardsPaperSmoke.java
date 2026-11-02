@@ -696,14 +696,22 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
         require(Math.abs(player.getWalkSpeed() - baseline.walkSpeed()) < 0.001F
                         && Math.abs(player.getFlySpeed() - baseline.flySpeed()) < 0.001F,
                 player.getName() + " movement speed settings were not restored");
-        long elapsedTicks = Math.max(0L, (System.currentTimeMillis() - baseline.capturedAtMillis()) / 50L);
-        int minimumRemainingFireTicks = Math.max(0,
-                baseline.fireTicks() - (int) Math.min(Integer.MAX_VALUE, elapsedTicks + 4L));
-        require(player.getFireTicks() <= baseline.fireTicks()
-                        && player.getFireTicks() >= minimumRemainingFireTicks,
-                player.getName() + " fire timer was not restored within elapsed tick decay"
-                        + " (baseline=" + baseline.fireTicks() + ", elapsedTicks=" + elapsedTicks
-                        + ", minimum=" + minimumRemainingFireTicks + ", actual=" + player.getFireTicks() + ")");
+        int actualFireTicks = player.getFireTicks();
+        if (baseline.fireTicks() <= 0) {
+            // Paper uses -20 as the non-burning sentinel. It must stay non-burning
+            // across the match, but that negative sentinel is not a live timer.
+            require(actualFireTicks <= 0,
+                    player.getName() + " became burning after a non-burning baseline"
+                            + " (baseline=" + baseline.fireTicks() + ", actual=" + actualFireTicks + ")");
+        } else {
+            long elapsedTicks = Math.max(0L, (System.currentTimeMillis() - baseline.capturedAtMillis()) / 50L);
+            int minimumRemainingFireTicks = Math.max(0,
+                    baseline.fireTicks() - (int) Math.min(Integer.MAX_VALUE, elapsedTicks + 4L));
+            require(actualFireTicks <= baseline.fireTicks() && actualFireTicks >= minimumRemainingFireTicks,
+                    player.getName() + " fire timer was not restored within elapsed tick decay"
+                            + " (baseline=" + baseline.fireTicks() + ", elapsedTicks=" + elapsedTicks
+                            + ", minimum=" + minimumRemainingFireTicks + ", actual=" + actualFireTicks + ")");
+        }
         require(baseline.compassTarget() == null || (player.getCompassTarget() != null
                         && player.getCompassTarget().getWorld().equals(baseline.compassTarget().getWorld())
                         && player.getCompassTarget().distanceSquared(baseline.compassTarget()) < 0.01D),
