@@ -8728,7 +8728,7 @@ public final class ArcadePortManager implements Listener {
         }
         long now = System.currentTimeMillis();
         session.ticks++;
-        updateLegacyNaturalRegeneration(session);
+        if (session.liveStarted) updateLegacyNaturalRegeneration(session);
         if (session.type.isMonsterMaze()) {
             if (!monsterMazeRunning()) finish(session, null, true);
             return;
