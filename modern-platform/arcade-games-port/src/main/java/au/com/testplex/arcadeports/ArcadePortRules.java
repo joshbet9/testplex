@@ -220,6 +220,11 @@ public final class ArcadePortRules {
         return foodLevel >= 18 && health > 0.0D && health < maxHealth;
     }
 
+    /** These source games cancel hunger-based natural regeneration outright. */
+    public static boolean legacyNaturalRegenerationEnabled(ArcadePortGame game) {
+        return game != null && game != ArcadePortGame.PAINTBALL && !game.isMonsterMaze();
+    }
+
     /** The legacy Gladiators constructor explicitly disables fall damage. */
     public static boolean shouldApplyLegacyFallDamage(ArcadePortGame game) {
         return game != null && game != ArcadePortGame.GLADIATORS && !game.isMonsterMaze();
