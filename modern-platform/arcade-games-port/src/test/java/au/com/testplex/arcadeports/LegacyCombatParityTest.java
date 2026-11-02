@@ -59,6 +59,16 @@ final class LegacyCombatParityTest {
         assertFalse(ArcadePortRules.shouldLegacyNaturalRegen(20, 0.0D, 20.0D));
     }
 
+    @Test
+    void fallDamageMatchesLegacyGameFlags() {
+        assertFalse(ArcadePortRules.shouldApplyLegacyFallDamage(ArcadePortGame.GLADIATORS));
+        assertFalse(ArcadePortRules.shouldApplyLegacyFallDamage(ArcadePortGame.MONSTER_MAZE));
+        assertFalse(ArcadePortRules.shouldApplyLegacyFallDamage(ArcadePortGame.MONSTER_MAZE_SPEED));
+        assertFalse(ArcadePortRules.shouldApplyLegacyFallDamage(ArcadePortGame.MONSTER_MAZE_MODERN));
+        assertTrue(ArcadePortRules.shouldApplyLegacyFallDamage(ArcadePortGame.DEATH_TAG));
+        assertTrue(ArcadePortRules.shouldApplyLegacyFallDamage(ArcadePortGame.BOMB_LOBBERS));
+    }
+
     private static void assertDamage(Material weapon, double expected) {
         assertEquals(expected, ArcadePortRules.legacyMeleeDamage(weapon, 0), 0.0001D, weapon.name());
     }
