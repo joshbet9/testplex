@@ -60,6 +60,16 @@ final class LegacyCombatParityTest {
     }
 
     @Test
+    void gameSpecificNaturalRegenerationOverridesArePreserved() {
+        assertFalse(ArcadePortRules.legacyNaturalRegenerationEnabled(ArcadePortGame.PAINTBALL));
+        assertFalse(ArcadePortRules.legacyNaturalRegenerationEnabled(ArcadePortGame.MONSTER_MAZE));
+        assertFalse(ArcadePortRules.legacyNaturalRegenerationEnabled(ArcadePortGame.MONSTER_MAZE_SPEED));
+        assertFalse(ArcadePortRules.legacyNaturalRegenerationEnabled(ArcadePortGame.MONSTER_MAZE_MODERN));
+        assertTrue(ArcadePortRules.legacyNaturalRegenerationEnabled(ArcadePortGame.DEATH_TAG));
+        assertTrue(ArcadePortRules.legacyNaturalRegenerationEnabled(ArcadePortGame.BOMB_LOBBERS));
+    }
+
+    @Test
     void fallDamageMatchesLegacyGameFlags() {
         assertFalse(ArcadePortRules.shouldApplyLegacyFallDamage(ArcadePortGame.GLADIATORS));
         assertFalse(ArcadePortRules.shouldApplyLegacyFallDamage(ArcadePortGame.MONSTER_MAZE));
