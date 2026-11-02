@@ -598,6 +598,7 @@ public final class ArcadePortManager implements Listener {
         PlayerSnapshot snapshot = new PlayerSnapshot(player);
         session.players.put(id, player);
         session.snapshots.put(id, snapshot);
+        applyLegacyAttackSpeed(player);
         player.closeInventory();
         player.getInventory().clear();
         player.setGameMode(GameMode.SPECTATOR);
@@ -1976,6 +1977,7 @@ public final class ArcadePortManager implements Listener {
         lobby.ensurePlayerInLobby(player);
         PlayerSnapshot snapshot = new PlayerSnapshot(player);
         session.snapshots.put(id, snapshot);
+        applyLegacyAttackSpeed(player);
         session.players.put(id, player);
         session.alive.add(id);
         session.scores.put(id, 0);
@@ -2334,6 +2336,77 @@ public final class ArcadePortManager implements Listener {
         return lastAutomaticRotationGameId;
     }
 
+    /** Start Monster Maze as a normal Arcade Session while keeping its engine as the game module. */
+    private boolean startMonsterMazeSession(ArcadePortGame type, List<Player> participants, CommandSender sender) {
+        if (monsterMazeModule == null || !isMonsterMazeModuleRegistered()) {
+            sender.sendMessage(ChatColor.RED + "Monster Maze is not registered by the shared Arcade manager.");
+            return false;
+        }
+        Location center = monsterMazeModule.getMapManager().defaultCenter();
+        if (center == null || center.getWorld() == null) {
+            String map = monsterMazeModule.getMapManager().getActiveMap();
+            plugin.getLogger().severe("Monster Maze could not launch: selected map '" + map
+                    + "' has no installed world or valid center.");
+            sender.sendMessage(ChatColor.RED + "Monster Maze map '" + map
+                    + "' is unavailable. Install its world and check the server log.");
+            return false;
+        }
+
+        Session session = new Session(type, center.getWorld(), participants, false);
+        active = session;
+        try {
+            for (Player player : participants) {
+                if (player == null || !player.isOnline()) continue;
+                UUID id = player.getUniqueId();
+                PlayerSnapshot pending = pendingRestore.remove(id);
+                if (pending != null) pending.restore(player);
+                lobby.ensurePlayerInLobby(player);
+                PlayerSnapshot snapshot = new PlayerSnapshot(player);
+                session.snapshots.put(id, snapshot);
+                applyLegacyAttackSpeed(player);
+                session.players.put(id, player);
+                session.alive.add(id);
+                session.scores.put(id, 0);
+                session.lastLocations.put(id, player.getLocation().clone());
+            }
+            long now = System.currentTimeMillis();
+            session.startedAt = now;
+            session.prepareDurationMillis = 0L;
+            session.prepareEndsAt = now;
+            session.lastPrepareSecond = 0;
+            session.liveStarted = true;
+            session.endsAt = 0L;
+            session.startupComplete = true;
+            if (!monsterMazeModule.startTestplexGame(participants, mazeModeFor(type), type)) {
+                finish(session, null, false);
+                sender.sendMessage(ChatColor.RED + type.displayName()
+                        + " could not start. Its selected map, server logs, and module state were checked.");
+                return false;
+            }
+            session.tickTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> tick(session), 1L, 1L);
+            return true;
+        } catch (RuntimeException failure) {
+            plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                    type.displayName() + " failed while starting inside the shared Arcade lifecycle.", failure);
+            if (monsterMazeModule.getGameManager() != null && monsterMazeModule.getGameManager().isRunning()) {
+                monsterMazeModule.getGameManager().forceStop();
+            }
+            if (active == session) finish(session, null, false);
+            sender.sendMessage(ChatColor.RED + type.displayName()
+                    + " failed to start. Player state was restored; see the server log.");
+            return false;
+        }
+    }
+
+    private me.monstermaze.game.MazeMode mazeModeFor(ArcadePortGame type) {
+        return switch (type) {
+            case MONSTER_MAZE -> me.monstermaze.game.MazeMode.ORIGINAL;
+            case MONSTER_MAZE_SPEED -> me.monstermaze.game.MazeMode.SPEED;
+            case MONSTER_MAZE_MODERN -> me.monstermaze.game.MazeMode.MODERN;
+            default -> throw new IllegalArgumentException("Not a Monster Maze game: " + type.id());
+        };
+    }
+
     /**
      * Completes the common Arcade lifecycle for a game module hosted inside this
      * manager. Natural Monster Maze completion returns its participants first,
@@ -2342,6 +2415,11 @@ public final class ArcadePortManager implements Listener {
     void onExternalGameCompleted(ArcadePortGame game) {
         if (game == null) return;
         lastAutomaticRotationGameId = game.id();
+        Session session = active;
+        if (session != null && session.type == game) {
+            finish(session, null, true);
+            return;
+        }
         if (active != null || monsterMazeRunning() || wizardsRunning()) return;
         beginAutomaticRotationVote();
     }
@@ -2809,6 +2887,7 @@ public final class ArcadePortManager implements Listener {
                     lobby.ensurePlayerInLobby(player);
                     PlayerSnapshot snapshot = new PlayerSnapshot(player);
                     session.snapshots.put(id, snapshot);
+                    applyLegacyAttackSpeed(player);
                     session.players.put(id, player);
                     session.alive.add(id);
                     session.scores.put(id, 0);
@@ -2831,30 +2910,19 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (type.isMonsterMaze()) {
-            if (monsterMazeModule == null) {
-                sender.sendMessage(ChatColor.RED + "Monster Maze module is not loaded by Testplex Arcade.");
-                return;
-            }
-            me.monstermaze.game.MazeMode selectedMode = switch (type) {
-                case MONSTER_MAZE -> me.monstermaze.game.MazeMode.ORIGINAL;
-                case MONSTER_MAZE_SPEED -> me.monstermaze.game.MazeMode.SPEED;
-                case MONSTER_MAZE_MODERN -> me.monstermaze.game.MazeMode.MODERN;
-                default -> throw new IllegalStateException("Unexpected Monster Maze game identity: " + type.id());
-            };
-            if (!monsterMazeModule.startTestplexGame(participants, selectedMode, type)) {
-                sender.sendMessage(ChatColor.RED + type.displayName()
-                        + " could not start. Check its map and game status in the server log.");
-                return;
-            }
+            if (!startMonsterMazeSession(type, participants, sender)) return;
             if (queue != null) queues.remove(selectedQueueKey);
-            if (pendingStart != null && pendingType == type) {
+            if (pendingStart != null && pendingType == type
+                    && pendingMixedArcadeVariant == mixedArcadeVariant) {
                 pendingStart.cancel();
                 pendingStart = null;
                 pendingType = null;
                 pendingMixedArcadeVariant = false;
             }
             for (Player player : participants) {
-                if (player.isOnline()) player.sendMessage(ChatColor.AQUA + "Testplex has started " + type.displayName() + ".");
+                if (player != null && player.isOnline()) {
+                    player.sendMessage(ChatColor.AQUA + "Testplex has started " + type.displayName() + ".");
+                }
             }
             return;
         }
@@ -2881,6 +2949,7 @@ public final class ArcadePortManager implements Listener {
                 lobby.ensurePlayerInLobby(participant);
                 PlayerSnapshot snapshot = new PlayerSnapshot(participant);
                 session.snapshots.put(id, snapshot);
+                applyLegacyAttackSpeed(participant);
                 session.players.put(id, participant);
                 session.alive.add(id);
                 session.scores.put(id, 0);
@@ -3265,6 +3334,7 @@ public final class ArcadePortManager implements Listener {
             // Always snapshot the controlled lobby state, never the server's old survival spawn.
             PlayerSnapshot snapshot = new PlayerSnapshot(player);
             session.snapshots.put(player.getUniqueId(), snapshot);
+            applyLegacyAttackSpeed(player);
             session.players.put(player.getUniqueId(), player);
             session.alive.add(player.getUniqueId());
             session.scores.put(player.getUniqueId(), 0);
@@ -8657,6 +8727,11 @@ public final class ArcadePortManager implements Listener {
         }
         long now = System.currentTimeMillis();
         session.ticks++;
+        updateLegacyNaturalRegeneration(session);
+        if (session.type.isMonsterMaze()) {
+            if (!monsterMazeRunning()) finish(session, null, true);
+            return;
+        }
         if (!session.liveStarted) {
             long remainingMillis = session.prepareEndsAt - now;
             int seconds = (int) Math.max(0L, (remainingMillis + 999L) / 1_000L);
@@ -10022,7 +10097,8 @@ public final class ArcadePortManager implements Listener {
             knockbackMultiplier *= ArcadePortRules.baconBrawlKnockbackMultiplier(true);
             target.playSound(target.getLocation(), Sound.ENTITY_PIG_DEATH, 1.0F, 2.0F);
         }
-        target.setVelocity(baconBrawlKnockbackVelocity(attacker, target, rawDamage,
+        target.setVelocity(baconBrawlKnockbackVelocity(attacker, target,
+                normalTimedHit && "melee".equals(source) ? 2.0D : rawDamage,
                 knockbackMultiplier, projectileVelocity));
         target.getWorld().spawnParticle(Particle.CLOUD, target.getLocation().add(0, 1, 0),
                 10, 0.35D, 0.4D, 0.35D, 0.04D);
@@ -14510,6 +14586,34 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private void applyLegacyAttackSpeed(Player player) {
+        if (player == null) return;
+        var attackSpeed = player.getAttribute(Attribute.ATTACK_SPEED);
+        if (attackSpeed != null) attackSpeed.setBaseValue(ArcadePortRules.LEGACY_ATTACK_SPEED);
+    }
+
+    private void updateLegacyNaturalRegeneration(Session session) {
+        for (Player player : session.players.values()) {
+            if (player == null || !player.isOnline() || !session.alive.contains(player.getUniqueId())) continue;
+            UUID id = player.getUniqueId();
+            double maxHealth = player.getMaxHealth();
+            if (!ArcadePortRules.shouldLegacyNaturalRegen(player.getFoodLevel(), player.getHealth(), maxHealth)) {
+                session.legacyNaturalRegenTicks.remove(id);
+                continue;
+            }
+            int timer = session.legacyNaturalRegenTicks.getOrDefault(id, 0) + 1;
+            if (timer >= ArcadePortRules.LEGACY_HEALTH_REGEN_TICKS) {
+                player.setHealth(Math.min(maxHealth, player.getHealth() + 1.0D));
+                // 1.8 natural regeneration adds six exhaustion; vanilla food handling
+                // converts that to saturation/food depletion on its normal tick.
+                player.setExhaustion(Math.min(40.0F, player.getExhaustion() + 6.0F));
+                session.legacyNaturalRegenTicks.remove(id);
+            } else {
+                session.legacyNaturalRegenTicks.put(id, timer);
+            }
+        }
+    }
+
     private void handlePlayerHit(Session session, Player attacker, Player target, String source) {
         handlePlayerHit(session, attacker, target, source, 1);
     }
@@ -15259,7 +15363,7 @@ public final class ArcadePortManager implements Listener {
         if (announceWinner && session.type == ArcadePortGame.DEATH_TAG) {
             recordDeathTagRewards(session);
         }
-        if (session.type != ArcadePortGame.PLEXBALL) recordLocalStats(session, winner, announceWinner);
+        if (session.type != ArcadePortGame.PLEXBALL && !session.type.isMonsterMaze()) recordLocalStats(session, winner, announceWinner);
         if (announceWinner && session.type == ArcadePortGame.MICRO_BATTLES) {
             for (Map.Entry<UUID, Integer> assists : session.microAssists.entrySet()) {
                 if (assists.getValue() >= 8) {
@@ -18664,11 +18768,28 @@ public final class ArcadePortManager implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onNaturalRegainHealth(org.bukkit.event.entity.EntityRegainHealthEvent event) {
+        if (!(event.getEntity() instanceof Player player)
+                || event.getRegainReason() != org.bukkit.event.entity.EntityRegainHealthEvent.RegainReason.SATIATED) return;
+        Session session = active;
+        if (session != null && session.players.containsKey(player.getUniqueId())
+                && player.getWorld() == session.world) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDamage(EntityDamageEvent event) {
         if (event.getEntity() instanceof Player prepareVictim && cancelPrepareAction(prepareVictim, event)) return;
         if (event instanceof EntityDamageByEntityEvent byEntity && cancelPrepareAction(playerShooter(byEntity.getDamager()), event)) return;
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+        if (session.type.isMonsterMaze()) return;
+        if (event instanceof EntityDamageByEntityEvent melee && melee.getDamager() instanceof Player attacker
+                && event.getEntity() instanceof Player && session.players.containsKey(attacker.getUniqueId())) {
+            ItemStack weapon = attacker.getInventory().getItemInMainHand();
+            int sharpness = weapon == null ? 0 : weapon.getEnchantmentLevel(Enchantment.DAMAGE_ALL);
+            event.setDamage(ArcadePortRules.legacyMeleeDamage(
+                    weapon == null ? Material.AIR : weapon.getType(), sharpness));
+        }
         // Wizards runs its own source-faithful damage, armor and spell pipeline.
         // The shared Arcade default cancellation below must not swallow its PvP.
         if (session.type == ArcadePortGame.WIZARDS) return;
@@ -19145,6 +19266,22 @@ public final class ArcadePortManager implements Listener {
             if (session.type == ArcadePortGame.RUNNER && event instanceof EntityDamageByEntityEvent runnerDamage) {
                 Entity damager = runnerDamage.getDamager();
                 if (damager instanceof Player || damager instanceof Projectile) return;
+            }
+            boolean playerCausedDamage = event instanceof EntityDamageByEntityEvent attributed
+                    && (attributed.getDamager() instanceof Player
+                        || attributed.getDamager() instanceof Projectile projectile
+                            && projectile.getShooter() instanceof Player);
+            if (!playerCausedDamage && incomingDamage > 0.0D
+                    && session.alive.contains(target.getUniqueId())) {
+                target.playEffect(EntityEffect.HURT);
+                target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.9F, 0.85F);
+                target.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
+                        target.getLocation().clone().add(0.0D, 1.0D, 0.0D),
+                        6, 0.25D, 0.3D, 0.25D, 0.02D);
+                String reason = event.getCause().name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
+                if (target.getHealth() <= incomingDamage) eliminate(session, target, null, reason);
+                else target.setHealth(target.getHealth() - incomingDamage);
+                return;
             }
             if (event instanceof EntityDamageByEntityEvent byEntity) {
                 Entity damager = byEntity.getDamager();
@@ -24665,6 +24802,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> baconSlams = new HashMap<>();
         final Map<UUID, Long> baconBrutusUntil = new HashMap<>();
         final Map<UUID, Long> baconCloakUntil = new HashMap<>();
+        final Map<UUID, Integer> legacyNaturalRegenTicks = new HashMap<>();
         final Map<UUID, Long> baconLastSwingAt = new HashMap<>();
         final Map<UUID, Map<UUID, Long>> baconRecentHitsByAttacker = new HashMap<>();
         final Map<UUID, Double> baconSwingTimingMultiplierById = new HashMap<>();
@@ -25119,6 +25257,7 @@ public final class ArcadePortManager implements Listener {
         final double health;
         final double maxHealthBase;
         final double absorption;
+        final double attackSpeedBase;
         final int food;
         final float saturation;
         final float walkSpeed;
@@ -25144,6 +25283,8 @@ public final class ArcadePortManager implements Listener {
             flying = p.isFlying();
             health = p.getHealth();
             absorption = p.getAbsorptionAmount();
+            var attackSpeedAttribute = p.getAttribute(Attribute.ATTACK_SPEED);
+            attackSpeedBase = attackSpeedAttribute == null ? 4.0D : attackSpeedAttribute.getBaseValue();
             var maxHealthAttribute = p.getAttribute(Attribute.MAX_HEALTH);
             maxHealthBase = maxHealthAttribute == null ? p.getMaxHealth() : maxHealthAttribute.getBaseValue();
             food = p.getFoodLevel();
@@ -25178,6 +25319,8 @@ public final class ArcadePortManager implements Listener {
             p.setFlySpeed(flySpeed);
             p.setSprinting(sprinting);
             p.setFireTicks(fireTicks);
+            var attackSpeedAttribute = p.getAttribute(Attribute.ATTACK_SPEED);
+            if (attackSpeedAttribute != null) attackSpeedAttribute.setBaseValue(attackSpeedBase);
             p.setCompassTarget(compassTarget == null ? null : compassTarget.clone());
             p.setCollidable(collidable);
             p.setInvulnerable(invulnerable);
