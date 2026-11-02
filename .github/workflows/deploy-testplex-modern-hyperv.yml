@@ -443,8 +443,9 @@ jobs:
             arcade_changed=true
             split -b 4M -d -a 3 "$STAGE_DIR/ArcadeMechanicsModern.jar" "$chunk_dir/ArcadeMechanicsModern.jar.part."
           fi
-          mapfile -t arcade_chunks < <(printf '%s\n' "$chunk_dir"/ArcadeMechanicsModern.jar.part.* | sort)
+          arcade_chunks=()
           if [[ "$arcade_changed" == true ]]; then
+            mapfile -t arcade_chunks < <(printf '%s\n' "$chunk_dir"/ArcadeMechanicsModern.jar.part.* | sort)
             test "${#arcade_chunks[@]}" -gt 0
           fi
           world_chunks=()
