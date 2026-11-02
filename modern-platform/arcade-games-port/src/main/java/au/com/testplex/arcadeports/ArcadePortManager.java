@@ -25106,7 +25106,7 @@ public final class ArcadePortManager implements Listener {
             Location currentCompassTarget = p.getCompassTarget();
             compassTarget = currentCompassTarget == null ? null : currentCompassTarget.clone();
             collidable = p.isCollidable();
-            invulnerable = p.isMarkedInvulnerable();
+            invulnerable = readMarkedInvulnerability(p);
             scoreboard = p.getScoreboard();
             playerListName = p.getPlayerListName();
         }
@@ -25146,6 +25146,15 @@ public final class ArcadePortManager implements Listener {
             ItemStack[] copy = new ItemStack[items.length];
             for (int i=0;i<items.length;i++) copy[i] = items[i] == null ? null : items[i].clone();
             return copy;
+        }
+        private static boolean readMarkedInvulnerability(Player player) {
+            try {
+                Object marked = player.getClass().getMethod("isMarkedInvulnerable").invoke(player);
+                if (marked instanceof Boolean flag) return flag;
+            } catch (ReflectiveOperationException | SecurityException ignored) { }
+            // Paper 26.3 adds the marked-state getter; keep the older API fallback
+            // for compatibility with the project's shared Bukkit compile surface.
+            return player.isInvulnerable();
         }
     }
 }
