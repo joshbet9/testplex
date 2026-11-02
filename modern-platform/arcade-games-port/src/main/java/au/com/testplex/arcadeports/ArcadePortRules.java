@@ -183,6 +183,8 @@ public final class ArcadePortRules {
     public static final int BACON_BLAST_PROJECTILE_STACK_SIZE = 16;
     public static final int BACON_METER_MAX = 100;
     public static final int BACON_METER_MIN_ABILITY = 50;
+    /** Per attacker-victim throttle, allowing the classic ten hits per second. */
+    public static final long BACON_HIT_COOLDOWN_MILLIS = 100L;
     public static final long BACON_CRISPY_DASH_DURATION_MILLIS = 250L;
     public static final double BACON_CRISPY_DASH_SPEED = 1.0D;
     public static final long BACON_CRISPY_DASH_FIRE_MILLIS = 3_000L;
@@ -235,9 +237,7 @@ public final class ArcadePortRules {
     public static List<String> baconBrawlSidebarLines(Collection<String> playerNames) {
         List<String> names = playerNames == null ? List.of() : new ArrayList<>(playerNames);
         if (names.size() <= 15) return List.copyOf(names);
-        List<String> lines = new ArrayList<>(names.subList(0, 14));
-        lines.add(names.size() + " players remaining");
-        return List.copyOf(lines);
+        return List.of(names.size() + " players remaining");
     }
 
     /** Fake-player test participants are eligible for round kill credit just like online users. */
@@ -405,15 +405,11 @@ public final class ArcadePortRules {
     public static boolean isBaconArenaKnockoutReason(String reason) {
         if (reason == null) return false;
         String value = reason.toLowerCase(java.util.Locale.ROOT).replace('_', ' ').trim();
-        return value.equals("fell from the arena")
-                || value.equals("fall")
-                || value.equals("was lost to the water")
-                || value.equals("lava")
-                || value.equals("fire")
-                || value.equals("hot floor")
-                || value.equals("magma block")
-                || value.equals("drowning")
-                || value.equals("void");
+        return value.contains("fell") || value.contains("fall")
+                || value.contains("void") || value.contains("water")
+                || value.contains("lava") || value.contains("fire")
+                || value.contains("hot floor") || value.contains("magma")
+                || value.contains("drown");
     }
 
     public static boolean shouldCreditBaconFallKill(long nowMillis, long lastHitAtMillis,
