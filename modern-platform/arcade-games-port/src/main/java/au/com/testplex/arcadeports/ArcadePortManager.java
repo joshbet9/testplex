@@ -18784,7 +18784,8 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
         if (session.type.isMonsterMaze()) return;
-        if (event instanceof EntityDamageByEntityEvent melee && melee.getDamager() instanceof Player attacker
+        if (session.type != ArcadePortGame.WIZARDS
+                && event instanceof EntityDamageByEntityEvent melee && melee.getDamager() instanceof Player attacker
                 && event.getEntity() instanceof Player && session.players.containsKey(attacker.getUniqueId())) {
             ItemStack weapon = attacker.getInventory().getItemInMainHand();
             int sharpness = weapon == null ? 0 : weapon.getEnchantmentLevel(Enchantment.SHARPNESS);
