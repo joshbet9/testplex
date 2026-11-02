@@ -94,6 +94,7 @@ def create_delta(base_path: Path, target_path: Path, delta_path: Path, manifest_
                 patch_info.create_system = info.create_system
                 delta.writestr(patch_info, target.read(name))
 
+        removed = [name for name in base_index if name not in target_index]
         manifest = {
             "format": 1,
             "base_sha256": sha256_file(base_path),
@@ -102,11 +103,13 @@ def create_delta(base_path: Path, target_path: Path, delta_path: Path, manifest_
             "target_comment": base64.b64encode(target.comment).decode("ascii"),
             "target_entries": target_entries,
             "changed_entries": changed,
+            "removed_entries": removed,
         }
         manifest_path.write_text(json.dumps(manifest, separators=(",", ":")) + "\n", encoding="utf-8")
         print(f"base_bytes={base_path.stat().st_size}")
         print(f"target_bytes={target_path.stat().st_size}")
-        print(f"changed_entries={len(changed)}")
+        print(f"changed_entry_count={len(changed) + len(removed)}")
+        print(f"removed_entries={len(removed)}")
         print(f"delta_bytes={delta_path.stat().st_size}")
         print(f"target_sha256={manifest['target_sha256']}")
     finally:
