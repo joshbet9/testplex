@@ -220,6 +220,11 @@ public final class ArcadePortRules {
         return foodLevel >= 18 && health > 0.0D && health < maxHealth;
     }
 
+    /** The legacy Gladiators constructor explicitly disables fall damage. */
+    public static boolean shouldApplyLegacyFallDamage(ArcadePortGame game) {
+        return game != null && game != ArcadePortGame.GLADIATORS && !game.isMonsterMaze();
+    }
+
     public static final int BACON_METER_MAX = 100;
     public static final int BACON_METER_MIN_ABILITY = 50;
     /** Per attacker-victim throttle, allowing the classic ten hits per second. */
