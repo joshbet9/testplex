@@ -99,9 +99,12 @@ assert_backup_complete() {
   fi
   IFS=',' read -r -a files_to_verify <<< "$prior_files"
   for file in "${files_to_verify[@]}"; do
-    [[ "$file" =~ ^(paper\.jar|server\.properties|eula\.txt|\.testplex-modern-deployed-build|\.testplex-paper-build|\.testplex-mm-source-maps|\.testplex-plugin-sha256sums|\.testplex-modern-sandbox)$ ]] ||
-      fail "transaction names an unsupported server artifact"
+    case "$file" in
+      paper\.jar|server\.properties|eula.txt|.testplex-modern-deployed-build|.testplex-paper-build|.testplex-mm-source-maps|.testplex-plugin-sha256sums|.testplex-modern-sandbox|update/maps/Wizards|update/maps/Nano\ Wizards) ;;
+      *) fail "transaction names an unsupported server artifact" ;;
+    esac
     grep -Fxq "$file" "$archive_listing" || grep -Fxq "./$file" "$archive_listing" ||
+      grep -Fxq "$file/" "$archive_listing" || grep -Fxq "./$file/" "$archive_listing" ||
       fail "snapshot omits previously installed artifact $file"
   done
   declared_worlds="$(value worlds || true)"
