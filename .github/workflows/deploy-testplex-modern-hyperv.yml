@@ -425,7 +425,7 @@ jobs:
               "$base_jar" "$STAGE_DIR/$jar" \
               "$delta_dir/$jar.delta.zip" "$delta_dir/$jar.delta.json")"
             printf '%s\n' "$output"
-            changed_entries="$(sed -n 's/^changed_entries=//p' <<< "$output" | tail -n 1)"
+            changed_entries="$(sed -n 's/^changed_entry_count=//p' <<< "$output" | tail -n 1)"
             [[ "$changed_entries" =~ ^[0-9]+$ ]] || { echo "Missing changed-entry count for $jar." >&2; exit 1; }
             if (( changed_entries > 0 )); then
               changed_jars+=("$jar")
