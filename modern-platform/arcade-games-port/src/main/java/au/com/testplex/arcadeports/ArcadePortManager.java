@@ -154,6 +154,7 @@ import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.command.CommandSender;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.projectiles.ProjectileSource;
@@ -18786,7 +18787,7 @@ public final class ArcadePortManager implements Listener {
         if (event instanceof EntityDamageByEntityEvent melee && melee.getDamager() instanceof Player attacker
                 && event.getEntity() instanceof Player && session.players.containsKey(attacker.getUniqueId())) {
             ItemStack weapon = attacker.getInventory().getItemInMainHand();
-            int sharpness = weapon == null ? 0 : weapon.getEnchantmentLevel(Enchantment.DAMAGE_ALL);
+            int sharpness = weapon == null ? 0 : weapon.getEnchantmentLevel(Enchantment.SHARPNESS);
             event.setDamage(ArcadePortRules.legacyMeleeDamage(
                     weapon == null ? Material.AIR : weapon.getType(), sharpness));
         }
