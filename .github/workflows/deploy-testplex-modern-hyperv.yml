@@ -189,7 +189,7 @@ jobs:
           cp "$recovery_helper" "$stage_dir/testplex-modern-recovery.sh"
           chmod 0755 "$stage_dir/testplex-modern-recovery.sh"
 
-          manifest=( *.jar testplex-modern-recovery.sh )
+          manifest=( TestplexModernArcade.jar SnakeModern.jar ArcadeMechanicsModern.jar WizardsModern.jar testplex-modern-recovery.sh )
           if [[ "$DEPLOYMENT_SCOPE" == full ]]; then
             maps_archive="$(find "$source_dir" -type f -name WizardsSourceMaps.tar.gz -print -quit)"
             [[ -n "$maps_archive" && -s "$maps_archive" ]] || { echo "The verified build artifact is missing WizardsSourceMaps.tar.gz." >&2; exit 1; }
