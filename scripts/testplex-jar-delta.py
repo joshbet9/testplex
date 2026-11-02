@@ -94,6 +94,7 @@ def create_delta(base_path: Path, target_path: Path, delta_path: Path, manifest_
             "format": 1,
             "base_sha256": sha256_file(base_path),
             "target_sha256": sha256_file(target_path),
+            "target_comment": base64.b64encode(target.comment).decode("ascii"),
             "target_entries": target_entries,
             "changed_entries": changed,
         }
@@ -139,7 +140,7 @@ def apply_delta(base_path: Path, delta_path: Path, manifest_path: Path, output_p
     temporary = output_path.with_name(output_path.name + ".assembling")
     try:
         with zipfile.ZipFile(temporary, "w", allowZip64=True) as output:
-            output.comment = base.comment
+            output.comment = base64.b64decode(str(manifest.get("target_comment", "")))
             for name, entry in expected.items():
                 source = delta if name in delta_index else base
                 if name not in delta_index and name not in base_index:
