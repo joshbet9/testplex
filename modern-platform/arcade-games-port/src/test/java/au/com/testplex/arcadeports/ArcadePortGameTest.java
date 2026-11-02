@@ -1498,10 +1498,7 @@ class ArcadePortGameTest {
 
         assertEquals(fifteen, ArcadePortRules.baconBrawlSidebarLines(fifteen));
         List<String> lines = ArcadePortRules.baconBrawlSidebarLines(sixteen);
-        assertEquals(15, lines.size());
-        assertEquals("Player14", lines.get(13));
-        assertEquals("16 players remaining", lines.get(14));
-        assertFalse(lines.contains("Player15, Player16"));
+        assertEquals(List.of("16 players remaining"), lines);
     }
 
     @Test void baconBrawlKillCreditIncludesTestPlayerParticipantsAndExcludesSelfKnockouts() {
