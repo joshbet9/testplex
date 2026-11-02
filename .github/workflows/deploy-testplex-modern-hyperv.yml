@@ -417,14 +417,21 @@ jobs:
           # Keep the active recovery point and unresolved transactions. Only remove older
           # snapshots whose terminal state and restored/running artifact identity were verified.
           current_backup="$(sudo -n sed -n 's/^backup_dir=//p' "$state_dir/current.properties" 2>/dev/null || true)"
-          if [[ "$current_backup" != "$backup_root/"* || ! -d "$current_backup" || -L "$current_backup" ]]; then
+          if [[ "$current_backup" != "$backup_root/"* ]] ||
+             ! sudo -n test -d "$current_backup" || sudo -n test -L "$current_backup"; then
             echo "Current recovery snapshot is not verified; preserving all deployment backups."
             current_backup=""
           fi
-          shopt -s nullglob
-          for old_backup in "$backup_root"/*; do
+          # The backup tree is root-owned. Enumerate and validate it as root so ordinary
+          # SSH-user directory permissions do not silently disable retention cleanup.
+          if ! backup_dirs="$(sudo -n find "$backup_root" -mindepth 1 -maxdepth 1 -type d -printf '%p\\n')"; then
+            echo "Could not safely enumerate deployment backups; refusing preflight." >&2
+            exit 1
+          fi
+          while IFS= read -r old_backup; do
+            [[ -n "$old_backup" ]] || continue
             [[ -n "$current_backup" ]] || continue
-            [[ -d "$old_backup" && ! -L "$old_backup" ]] || continue
+            sudo -n test -d "$old_backup" && ! sudo -n test -L "$old_backup" || continue
             [[ "$old_backup" == "$current_backup" ]] && continue
             name="${old_backup##*/}"
             [[ "$name" =~ ^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{40}-[0-9a-f-]{36}$ ]] || continue
@@ -448,7 +455,7 @@ jobs:
               echo "Removing superseded, verified deployment snapshot: $old_backup ($size)"
               sudo -n rm -rf -- "$old_backup"
             fi
-          done
+          done <<< "$backup_dirs"
 
           snapshot_paths=()
           for item in paper.jar server.properties eula.txt .testplex-modern-deployed-build .testplex-paper-build .testplex-mm-source-maps .testplex-plugin-sha256sums .testplex-modern-sandbox; do
