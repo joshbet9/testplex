@@ -307,7 +307,7 @@ jobs:
           bash -n "$RUNNER_TEMP/testplex-modern-remote-deploy.sh"
 
           # Parse the compare and upload run blocks that implement targeted deltas.
-          for step_name in "Compare staged JAR hashes with installed plugins" "Upload verified JARs to the isolated directory"; do
+          for step_name in "Read the deployed build identity" "Upload verified JAR deltas to the isolated directory"; do
             safe_name="${step_name// /-}"
             awk -v wanted="$step_name" '
               $0 == "      - name: " wanted { in_step=1; next }
