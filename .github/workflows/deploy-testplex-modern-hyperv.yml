@@ -1209,4 +1209,3 @@ jobs:
             echo "- Memory safety: only Testplex's own legacy service is stopped; separate Monster Maze services are left untouched, and deployment aborts rather than stopping them when memory is insufficient; successful deployments leave only modern Paper running"
             echo "- Rollback: modern-only backup created before replacement; startup is checked before success"
           } >> "$GITHUB_STEP_SUMMARY"
-
