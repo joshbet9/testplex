@@ -461,14 +461,14 @@ jobs:
           install -d -m 0700 -- "$upload_dir"
           REMOTE_STAGE_PREP
           # Use the SFTP subsystem rather than legacy SCP's single remote sink process.
-          # Split the large JAR into smaller files and keep only four SFTP writes outstanding;
-          # this avoids leaving the VM unresponsive while its /var/tmp storage flushes a large write.
+          # Keep the SSH upload window bounded, while allowing enough in-flight data to fill
+          # the high-latency Tailscale link (32 x 64 KiB = 2 MiB outstanding).
           sftp_opts=(-P "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15
             -o ServerAliveCountMax=40 -o TCPKeepAlive=yes
-            -B 65536 -R 4)
+            -B 65536 -R 32)
           chunk_dir="$RUNNER_TEMP/testplex-modern-arcade-chunks"
           mkdir -p "$chunk_dir"
           arcade_chunks=()
@@ -512,8 +512,15 @@ jobs:
               printf 'put "%s" "%s"\n' "$file" "${file##*/}"
             done
           } > "$batch_file"
-          echo "Uploading verified modern artifacts with SFTP, ${#arcade_chunks[@]} 4 MiB Arcade JAR parts and ${#world_chunks[@]} 512 KiB map parts."
+          upload_payload_bytes="$(du -sb "$STAGE_DIR" | awk '{print $1}')"
+          [[ "$upload_payload_bytes" =~ ^[0-9]+$ ]] || { echo "Could not measure verified upload payload." >&2; exit 1; }
+          upload_started_epoch="$(date +%s)"
+          echo "Uploading $((upload_payload_bytes / 1048576)) MiB of verified modern artifacts with SFTP, ${#arcade_chunks[@]} 4 MiB Arcade JAR parts and ${#world_chunks[@]} 512 KiB map parts; request window is 2 MiB."
           timeout --foreground --signal=TERM --kill-after=30s 15m sftp "${sftp_opts[@]}" -b "$batch_file" "$remote"
+          upload_elapsed_seconds=$(( $(date +%s) - upload_started_epoch ))
+          if (( upload_elapsed_seconds > 0 )); then
+            awk -v bytes="$upload_payload_bytes" -v seconds="$upload_elapsed_seconds" 'BEGIN { printf "Verified SFTP upload completed: %.1f MiB in %d seconds (%.2f MiB/s).\\n", bytes/1048576, seconds, bytes/1048576/seconds }'
+          fi
           timeout --foreground --signal=TERM --kill-after=30s 6m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" "$MM_MAPS_REQUIRED" <<'REMOTE_ASSEMBLE_ARCADE'
           set -euo pipefail
           upload_dir="$1"
@@ -1402,7 +1409,7 @@ jobs:
               -o BatchMode=yes -o StrictHostKeyChecking=yes
               -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
               -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
-            timeout --foreground --signal=TERM --kill-after=10s 2m ssh "${ssh_opts[@]}" "$remote" sudo -n bash -s <<'REMOTE_DIAGNOSTICS' >> "$diagnostics" 2>&1
+            if timeout --foreground --signal=TERM --kill-after=10s 2m ssh "${ssh_opts[@]}" "$remote" sudo -n bash -s <<'REMOTE_DIAGNOSTICS' >> "$diagnostics" 2>&1
           set +e
           SERVER_DIR=/home/monstermaze/servers/testplex-modern
           STATE_DIR=/var/lib/testplex-modern-deploy
@@ -1426,8 +1433,12 @@ jobs:
             sudo -n find "$backup_dir/failed-artifacts" -maxdepth 2 -type d -print | sort
           fi
           REMOTE_DIAGNOSTICS
-            remote_rc=$?
-            if [[ "$remote_rc" -ne 0 ]]; then echo "Remote diagnostics SSH exited with status $remote_rc." >> "$diagnostics"; fi
+            then
+              remote_rc=0
+            else
+              remote_rc=$?
+            fi
+            if [[ "$remote_rc" -ne 0 ]]; then echo "Remote diagnostics SSH exited with status $remote_rc; deployment outcome is recorded separately above." >> "$diagnostics"; fi
           fi
           cat "$diagnostics"
           {
