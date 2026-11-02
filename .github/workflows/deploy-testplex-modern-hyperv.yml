@@ -490,18 +490,19 @@ jobs:
           state_device="$(df -P "$state_dir" | awk 'END {print $1}')"
           reserve_kb=524288
           tmp_required_kb="$stage_kb"
-          server_required_kb="$((2 * map_expanded_kb + reserve_kb))"
-          state_required_kb="$snapshot_kb"
+          server_required_kb=0
+          state_required_kb=0
           if [[ "$tmp_device" == "$server_device" ]]; then
-            tmp_required_kb=$((tmp_required_kb + 2 * map_expanded_kb))
-            server_required_kb=0
+            tmp_required_kb=$((tmp_required_kb + 2 * map_expanded_kb + reserve_kb))
+          else
+            server_required_kb=$((2 * map_expanded_kb + reserve_kb))
           fi
-          if [[ "$state_device" == "$server_device" ]]; then
-            server_required_kb=$((server_required_kb + snapshot_kb))
-            state_required_kb=0
-          elif [[ "$state_device" == "$tmp_device" ]]; then
+          if [[ "$state_device" == "$tmp_device" ]]; then
             tmp_required_kb=$((tmp_required_kb + snapshot_kb))
-            state_required_kb=0
+          elif [[ "$state_device" == "$server_device" ]]; then
+            server_required_kb=$((server_required_kb + snapshot_kb))
+          else
+            state_required_kb="$snapshot_kb"
           fi
           tmp_avail_kb="$(df -Pk /var/tmp | awk 'END {print $4}')"
           server_avail_kb="$(df -Pk "$server_fs" | awk 'END {print $4}')"
