@@ -18784,6 +18784,13 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
         if (session.type.isMonsterMaze()) return;
+        if (event.getEntity() instanceof Player fallTarget
+                && event.getCause() == EntityDamageEvent.DamageCause.FALL
+                && !ArcadePortRules.shouldApplyLegacyFallDamage(session.type)) {
+            event.setCancelled(true);
+            fallTarget.setFallDistance(0.0F);
+            return;
+        }
         if (session.type != ArcadePortGame.WIZARDS
                 && event instanceof EntityDamageByEntityEvent melee && melee.getDamager() instanceof Player attacker
                 && event.getEntity() instanceof Player && session.players.containsKey(attacker.getUniqueId())) {
