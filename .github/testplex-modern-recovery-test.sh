@@ -235,6 +235,20 @@ grep -Fxq 'runtime_sha=unknown' "$STATE/current.properties"
 if run_helper assert-deployable >/dev/null 2>&1; then echo 'FAIL unresolved recovery state allowed a new deployment' >&2; exit 1; fi
 echo 'PASS unavailable restored service leaves recovery unresolved'
 
+# A checksum-verified restored snapshot may proceed to a new deployment when
+# the old runtime cannot be brought up. Only the dedicated modern Paper process
+# may be stopped, and the port must be clear before the state becomes deployable.
+printf '%s\n' 'TESTPLEX MODERN ISOLATED TEST SERVER - NOT LEGACY' > "$SERVER/.testplex-modern-sandbox"
+output="$(run_helper prepare-forward-redeploy)"
+grep -q "Forward redeployment ready: restored artifact SHA=$old_sha" <<< "$output"
+grep -Fxq 'status=FORWARD_REDEPLOY_READY' "$STATE/current.properties"
+grep -Fxq "restored_artifact_sha=$old_sha" "$STATE/current.properties"
+grep -Fxq 'runtime_sha=unknown' "$STATE/current.properties"
+run_helper assert-deployable >/dev/null
+run_helper recover "$target_sha" >/dev/null
+grep -Fxq 'status=FORWARD_REDEPLOY_READY' "$STATE/current.properties"
+echo 'PASS a verified restored artifact with an unhealthy runtime permits a guarded forward redeployment'
+
 # A different unresolved deployment cannot be recovered by this job's identity.
 write_txn REPLACING true true
 if run_helper recover cccccccccccccccccccccccccccccccccccccccc >/dev/null 2>&1; then echo 'FAIL mismatched deployment identity accepted' >&2; exit 1; fi
@@ -372,3 +386,4 @@ grep -Fxq 'status=NO_PRIOR_DEPLOYMENT_RESTORED' "$FIRST_STATE/current.properties
 echo 'PASS first-install recovery verifies prior absence and retains failed artifacts'
 
 echo 'All independent recovery tests passed.'
+
