@@ -10,9 +10,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 final class LegacyCombatParityTest {
     @Test
     void keepsThePreCooldownSwingAndNaturalHealingCadence() {
-        assertEquals(1_024.0D, ArcadePortRules.LEGACY_ATTACK_SPEED);
+        assertEquals(1_024.0D, ArcadePortRules.LEGACY_ATTACK_SPEED, 0.0D);
         assertEquals(80, ArcadePortRules.LEGACY_HEALTH_REGEN_TICKS);
-        assertEquals(3.0F, ArcadePortRules.LEGACY_REGEN_EXHAUSTION);
+        assertEquals(3.0F, ArcadePortRules.LEGACY_REGEN_EXHAUSTION, 0.0F);
     }
 
     @Test
