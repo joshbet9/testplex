@@ -458,6 +458,7 @@ jobs:
           HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
           BUILD_SHA: ${{ steps.source-artifact.outputs.source_sha }}
           UPLOAD_DIR: ${{ steps.upload.outputs.upload_dir }}
+          DEPLOYMENT_SCOPE: ${{ inputs.deployment_scope }}
           # EULA accepted per the user's explicit instruction for this isolated test server.
           ACCEPT_EULA: "true"
         run: |
@@ -471,11 +472,12 @@ jobs:
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=20)
           echo "[deploy] opening an exclusive remote deployment lock."
           deploy_exit=0
-          timeout --foreground --signal=TERM --kill-after=30s 28m ssh "${ssh_opts[@]}" "$remote" sudo -n flock -n /var/lock/testplex-modern-deploy.lock bash -s -- "$BUILD_SHA" "$UPLOAD_DIR" "$ACCEPT_EULA" <<'REMOTE_DEPLOY' || deploy_exit=$?
+          timeout --foreground --signal=TERM --kill-after=30s 28m ssh "${ssh_opts[@]}" "$remote" sudo -n flock -n /var/lock/testplex-modern-deploy.lock bash -s -- "$BUILD_SHA" "$UPLOAD_DIR" "$ACCEPT_EULA" "$DEPLOYMENT_SCOPE" <<'REMOTE_DEPLOY' || deploy_exit=$?
           set -euo pipefail
           BUILD_SHA="$1"
           UPLOAD_DIR="$2"
           ACCEPT_EULA="$3"
+          DEPLOYMENT_SCOPE="$4"
           SERVER_DIR="/home/monstermaze/servers/testplex-modern"
           JAVA_HOME="/opt/testplex/java25"
           JAVA_BIN="$JAVA_HOME/bin/java"
@@ -487,9 +489,13 @@ jobs:
             sudo -n test -s "$UPLOAD_DIR/$jar"
           done
           sudo -n test -s "$UPLOAD_DIR/testplex-modern-recovery.sh"
-          sudo -n test -s "$UPLOAD_DIR/MonsterMazeMaps.tar.gz"
-          sudo -n test -s "$UPLOAD_DIR/MonsterMazeMapsSource.txt"
+          if [[ "$DEPLOYMENT_SCOPE" == full ]]; then
+            sudo -n test -s "$UPLOAD_DIR/MonsterMazeMaps.tar.gz"
+            sudo -n test -s "$UPLOAD_DIR/MonsterMazeMapsSource.txt"
+            sudo -n test -s "$UPLOAD_DIR/WizardsSourceMaps.tar.gz"
+          fi
           sudo -n test -s "$UPLOAD_DIR/SHA256SUMS"
+          echo "[deploy] build=$BUILD_SHA scope=$DEPLOYMENT_SCOPE; plugin payload SHA-256 verified before transaction."
 
           STATE_DIR=/var/lib/testplex-modern-deploy
           RECOVERY_HELPER=/usr/local/sbin/testplex-modern-recovery
@@ -579,14 +585,29 @@ jobs:
             exit 1
           }
 
-          # Stage and validate source worlds outside the live Bukkit world folders.
+          # Full scope stages maps outside live Bukkit world folders. Plugin-only scope
+          # leaves all installed map assets untouched and validates them before replacement.
           MAP_STAGE_DIR="$UPLOAD_DIR/mm-map-stage"
-          mkdir -p "$MAP_STAGE_DIR"
-          tar -xzf "$UPLOAD_DIR/MonsterMazeMaps.tar.gz" -C "$MAP_STAGE_DIR"
-          for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
-            test -s "$MAP_STAGE_DIR/$world/level.dat"
-            test -d "$MAP_STAGE_DIR/$world/region"
-          done
+          if [[ "$DEPLOYMENT_SCOPE" == full ]]; then
+            mkdir -p "$MAP_STAGE_DIR"
+            tar -xzf "$UPLOAD_DIR/MonsterMazeMaps.tar.gz" -C "$MAP_STAGE_DIR"
+            for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+              test -s "$MAP_STAGE_DIR/$world/level.dat"
+              test -d "$MAP_STAGE_DIR/$world/region"
+            done
+          else
+            for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+              sudo -n test -s "$SERVER_DIR/$world/level.dat" && sudo -n test -d "$SERVER_DIR/$world/region" || {
+                echo "Plugin-only transaction requires the existing Monster Maze map $world." >&2
+                exit 1
+              }
+            done
+            for folder in "Wizards" "Nano Wizards"; do
+              count="$(sudo -n find "$SERVER_DIR/update/maps/$folder" -maxdepth 1 -type f -iname '*.zip' 2>/dev/null | wc -l | tr -d ' ')"
+              [[ "$count" == 10 ]] || { echo "Plugin-only transaction requires 10 existing $folder map archives; found $count." >&2; exit 1; }
+            done
+            echo "[deploy] revalidated existing source maps under the exclusive transaction lock."
+          fi
 
           STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
           DEPLOYMENT_ID="$(cat /proc/sys/kernel/random/uuid)"
@@ -632,22 +653,30 @@ jobs:
             sudo -n test -d "$SERVER_DIR/plugins" && HAD_OLD_PLUGINS=true || true
           fi
           prior_files=""; worlds_before=""; snapshot_items=()
-          for item in paper.jar server.properties eula.txt .testplex-modern-deployed-build .testplex-paper-build .testplex-mm-source-maps .testplex-plugin-sha256sums .testplex-modern-sandbox; do
-            if [[ "$SERVER_DIR_EXISTS" == true ]] && sudo -n test -e "$SERVER_DIR/$item"; then
-              snapshot_items+=("$item"); prior_files="${prior_files:+$prior_files,}$item"
-            fi
-          done
-          for item in "update/maps/Wizards" "update/maps/Nano Wizards"; do
-            if [[ "$SERVER_DIR_EXISTS" == true ]] && sudo -n test -e "$SERVER_DIR/$item"; then
-              snapshot_items+=("$item"); prior_files="${prior_files:+$prior_files,}$item"
-            fi
-          done
+          if [[ "$DEPLOYMENT_SCOPE" == full ]]; then
+            for item in paper.jar server.properties eula.txt .testplex-modern-deployed-build .testplex-paper-build .testplex-mm-source-maps .testplex-plugin-sha256sums .testplex-modern-sandbox; do
+              if [[ "$SERVER_DIR_EXISTS" == true ]] && sudo -n test -e "$SERVER_DIR/$item"; then
+                snapshot_items+=("$item"); prior_files="${prior_files:+$prior_files,}$item"
+              fi
+            done
+            for item in "update/maps/Wizards" "update/maps/Nano Wizards"; do
+              if [[ "$SERVER_DIR_EXISTS" == true ]] && sudo -n test -e "$SERVER_DIR/$item"; then
+                snapshot_items+=("$item"); prior_files="${prior_files:+$prior_files,}$item"
+              fi
+            done
+            for item in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+              if [[ "$SERVER_DIR_EXISTS" == true ]] && sudo -n test -e "$SERVER_DIR/$item"; then
+                snapshot_items+=("$item"); worlds_before="${worlds_before:+$worlds_before,}$item"
+              fi
+            done
+          else
+            for item in .testplex-modern-deployed-build .testplex-plugin-sha256sums .testplex-modern-sandbox; do
+              if [[ "$SERVER_DIR_EXISTS" == true ]] && sudo -n test -e "$SERVER_DIR/$item"; then
+                snapshot_items+=("$item"); prior_files="${prior_files:+$prior_files,}$item"
+              fi
+            done
+          fi
           if [[ "$HAD_OLD_PLUGINS" == true ]]; then snapshot_items+=(plugins); fi
-          for item in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
-            if [[ "$SERVER_DIR_EXISTS" == true ]] && sudo -n test -e "$SERVER_DIR/$item"; then
-              snapshot_items+=("$item"); worlds_before="${worlds_before:+$worlds_before,}$item"
-            fi
-          done
           if [[ "$PREVIOUS_STATE" == none ]]; then
             [[ "$HAD_OLD_UNIT" == false && "$HAD_OLD_PAPER" == false && "$HAD_OLD_PLUGINS" == false && -z "$prior_files" && -z "$worlds_before" ]] || {
               echo "Unmarked deployment artifacts exist; refusing to treat this as a first installation." >&2; exit 1;
@@ -700,7 +729,11 @@ jobs:
             printf '%s\n' "TESTPLEX MODERN ISOLATED TEST SERVER - NOT LEGACY" | sudo -n tee "$SERVER_DIR/.testplex-modern-sandbox" >/dev/null
             sudo -n chown monstermaze:monstermaze "$SERVER_DIR/.testplex-modern-sandbox"
           fi
-          sudo -n install -o monstermaze -g monstermaze -m 0644 "$paper_tmp" "$SERVER_DIR/paper.jar"
+          if [[ "$DEPLOYMENT_SCOPE" == full ]]; then
+            sudo -n install -o monstermaze -g monstermaze -m 0644 "$paper_tmp" "$SERVER_DIR/paper.jar"
+          else
+            echo "[deploy] plugin-only scope: Paper jar, server properties and world assets are preserved."
+          fi
           # Install all four Bukkit plugins owned by the Testplex Modern server.
           # Monster Maze gameplay is compiled into ArcadeMechanicsModern and is not a plugin of its own.
           for jar in TestplexModernArcade.jar SnakeModern.jar ArcadeMechanicsModern.jar WizardsModern.jar; do
