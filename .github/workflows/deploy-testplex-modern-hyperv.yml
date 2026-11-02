@@ -227,6 +227,7 @@ jobs:
           HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
           HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
           HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
+          DEPLOYMENT_SCOPE: ${{ inputs.deployment_scope }}
         run: |
           set -euo pipefail
           test -n "$HYPERV_SSH_HOST" || { echo 'HYPERV_SSH_HOST is not configured.' >&2; exit 1; }
@@ -239,8 +240,9 @@ jobs:
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
 
-          timeout --foreground --signal=TERM --kill-after=15s 5m ssh "${ssh_opts[@]}" "$remote" bash -s <<'REMOTE_PREFLIGHT'
+          timeout --foreground --signal=TERM --kill-after=15s 5m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$DEPLOYMENT_SCOPE" <<'REMOTE_PREFLIGHT'
           set -euo pipefail
+          deployment_scope="$1"
           sudo -n true
           server_dir="/home/monstermaze/servers/testplex-modern"
           if [[ -L "$server_dir" ]]; then
@@ -250,6 +252,22 @@ jobs:
           if [[ -e "$server_dir" ]] && ! sudo -n test -f "$server_dir/.testplex-modern-sandbox"; then
             echo "Target exists without .testplex-modern-sandbox; refusing to risk overwriting an unrelated directory." >&2
             exit 1
+          fi
+          if [[ "$deployment_scope" == plugins-only ]]; then
+            for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+              sudo -n test -s "$server_dir/$world/level.dat" && sudo -n test -d "$server_dir/$world/region" || {
+                echo "Plugin-only deployment requires the existing Monster Maze map $world; refusing to change service state." >&2
+                exit 1
+              }
+            done
+            for folder in "Wizards" "Nano Wizards"; do
+              count="$(sudo -n find "$server_dir/update/maps/$folder" -maxdepth 1 -type f -iname '*.zip' 2>/dev/null | wc -l | tr -d ' ')"
+              [[ "$count" == 10 ]] || {
+                echo "Plugin-only deployment requires 10 verified $folder map archives; found $count." >&2
+                exit 1
+              }
+            done
+            echo "Existing seven Monster Maze worlds and twenty Wizards archives are present; map payloads will be preserved."
           fi
           for unit in testplex-modern.service testplex-reborn.service; do
             active="$(sudo -n systemctl is-active "$unit" 2>/dev/null || true)"
@@ -289,6 +307,7 @@ jobs:
           HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
           BUILD_SHA: ${{ steps.source-artifact.outputs.source_sha }}
           STAGE_DIR: ${{ steps.stage-jars.outputs.stage_dir }}
+          DEPLOYMENT_SCOPE: ${{ inputs.deployment_scope }}
         run: |
           set -euo pipefail
           SSH_PORT="$HYPERV_SSH_PORT"
@@ -370,44 +389,51 @@ jobs:
           chunk_dir="$RUNNER_TEMP/testplex-modern-arcade-chunks"
           mkdir -p "$chunk_dir"
           split -b 4M -d -a 3 "$STAGE_DIR/ArcadeMechanicsModern.jar" "$chunk_dir/ArcadeMechanicsModern.jar.part."
-          split -b 512K -d -a 3 "$STAGE_DIR/MonsterMazeMaps.tar.gz" "$chunk_dir/MonsterMazeMaps.tar.gz.part."
           mapfile -t arcade_chunks < <(printf '%s\n' "$chunk_dir"/ArcadeMechanicsModern.jar.part.* | sort)
-          mapfile -t world_chunks < <(printf '%s\n' "$chunk_dir"/MonsterMazeMaps.tar.gz.part.* | sort)
           test "${#arcade_chunks[@]}" -gt 0
-          test "${#world_chunks[@]}" -gt 0
+          world_chunks=()
+          if [[ "$DEPLOYMENT_SCOPE" == full ]]; then
+            split -b 512K -d -a 3 "$STAGE_DIR/MonsterMazeMaps.tar.gz" "$chunk_dir/MonsterMazeMaps.tar.gz.part."
+            mapfile -t world_chunks < <(printf '%s\n' "$chunk_dir"/MonsterMazeMaps.tar.gz.part.* | sort)
+            test "${#world_chunks[@]}" -gt 0
+          fi
           batch_file="$RUNNER_TEMP/testplex-modern-upload.sftp"
           {
             printf 'cd "%s"\n' "$upload_dir"
             printf 'put "%s" "%s"\n' "$STAGE_DIR/TestplexModernArcade.jar" "TestplexModernArcade.jar"
             printf 'put "%s" "%s"\n' "$STAGE_DIR/SnakeModern.jar" "SnakeModern.jar"
             printf 'put "%s" "%s"\n' "$STAGE_DIR/WizardsModern.jar" "WizardsModern.jar"
-            printf 'put "%s" "%s"\n' "$STAGE_DIR/WizardsSourceMaps.tar.gz" "WizardsSourceMaps.tar.gz"
-            printf 'put "%s" "%s"\n' "$STAGE_DIR/MonsterMazeMapsSource.txt" "MonsterMazeMapsSource.txt"
             printf 'put "%s" "%s"\n' "$STAGE_DIR/testplex-modern-recovery.sh" "testplex-modern-recovery.sh"
+            if [[ "$DEPLOYMENT_SCOPE" == full ]]; then
+              printf 'put "%s" "%s"\n' "$STAGE_DIR/WizardsSourceMaps.tar.gz" "WizardsSourceMaps.tar.gz"
+              printf 'put "%s" "%s"\n' "$STAGE_DIR/MonsterMazeMapsSource.txt" "MonsterMazeMapsSource.txt"
+            fi
             for file in "${world_chunks[@]}" "${arcade_chunks[@]}"; do
               printf 'put "%s" "%s"\n' "$file" "${file##*/}"
             done
           } > "$batch_file"
-          echo "Uploading verified modern artifacts with SFTP, ${#arcade_chunks[@]} 4 MiB Arcade JAR parts and ${#world_chunks[@]} 512 KiB map parts."
+          echo "Uploading verified modern artifacts with SFTP; scope=$DEPLOYMENT_SCOPE, Arcade chunks=${#arcade_chunks[@]}, map chunks=${#world_chunks[@]}."
           timeout --foreground --signal=TERM --kill-after=30s 15m sftp "${sftp_opts[@]}" -b "$batch_file" "$remote"
-          timeout --foreground --signal=TERM --kill-after=30s 6m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" <<'REMOTE_ASSEMBLE_ARCADE'
+          timeout --foreground --signal=TERM --kill-after=30s 6m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" "$DEPLOYMENT_SCOPE" <<'REMOTE_ASSEMBLE_ARCADE'
           set -euo pipefail
           upload_dir="$1"
+          deployment_scope="$2"
           cd "$upload_dir"
           shopt -s nullglob
-          map_parts=(MonsterMazeMaps.tar.gz.part.*)
           arcade_parts=(ArcadeMechanicsModern.jar.part.*)
-          [[ ${#map_parts[@]} -gt 0 ]] || { echo "No map archive parts arrived." >&2; exit 1; }
           [[ ${#arcade_parts[@]} -gt 0 ]] || { echo "No Arcade JAR parts arrived." >&2; exit 1; }
-          # Assemble each payload in place: remove a chunk only after it has been
-          # appended successfully. This bounds the peak of (remaining parts + output)
-          # to one copy of each source file instead of retaining two full copies.
-          : > MonsterMazeMaps.tar.gz.tmp
-          for part in "${map_parts[@]}"; do
-            cat "$part" >> MonsterMazeMaps.tar.gz.tmp
-            rm -- "$part"
-          done
-          mv MonsterMazeMaps.tar.gz.tmp MonsterMazeMaps.tar.gz
+          if [[ "$deployment_scope" == full ]]; then
+            map_parts=(MonsterMazeMaps.tar.gz.part.*)
+            [[ ${#map_parts[@]} -gt 0 ]] || { echo "No map archive parts arrived." >&2; exit 1; }
+            : > MonsterMazeMaps.tar.gz.tmp
+            for part in "${map_parts[@]}"; do
+              cat "$part" >> MonsterMazeMaps.tar.gz.tmp
+              rm -- "$part"
+            done
+            mv MonsterMazeMaps.tar.gz.tmp MonsterMazeMaps.tar.gz
+          fi
+          # Assemble the Arcade JAR in place, deleting parts only after append.
+          : 
           : > ArcadeMechanicsModern.jar.tmp
           for part in "${arcade_parts[@]}"; do
             cat "$part" >> ArcadeMechanicsModern.jar.tmp
