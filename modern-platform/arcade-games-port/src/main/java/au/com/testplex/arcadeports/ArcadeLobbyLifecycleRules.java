@@ -2,7 +2,7 @@ package au.com.testplex.arcadeports;
 
 final class ArcadeLobbyLifecycleRules {
     static final int MINIMUM_TEST_PLAYERS = 1;
-    static final int DEFAULT_PREPARE_SECONDS = 10;
+    static final int DEFAULT_PREPARE_SECONDS = 3;
     static final int DEFAULT_END_PRESENTATION_SECONDS = 10;
     private ArcadeLobbyLifecycleRules() { }
     static int recruitCountdownSeconds(int players, int minimumPlayers, int capacity) {

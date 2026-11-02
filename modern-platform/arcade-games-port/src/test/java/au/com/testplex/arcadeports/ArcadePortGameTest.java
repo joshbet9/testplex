@@ -5,6 +5,7 @@ import org.bukkit.Material;
 import org.bukkit.util.Vector;
 import java.nio.file.Path;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -1247,7 +1248,8 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.isBaconTimedCritical(900L));
         assertFalse(ArcadePortRules.isBaconTimedCritical(499L));
         assertFalse(ArcadePortRules.isBaconTimedCritical(901L));
-        assertEquals(950L, ArcadePortRules.baconAbilityDurationMillis(10));
+        assertEquals(0L, ArcadePortRules.baconAbilityDurationMillis(10));
+        assertEquals(2_750L, ArcadePortRules.baconAbilityDurationMillis(50));
         assertEquals(ArcadePortRules.BACON_PIG_INVINCIBILITY_MAX_MILLIS,
                 ArcadePortRules.baconAbilityDurationMillis(100));
     }
@@ -1290,21 +1292,23 @@ class ArcadePortGameTest {
 
     @Test void baconBrawlMetersRewardDamageAndControlAbilityStrength() {
         assertEquals(100, ArcadePortRules.BACON_METER_MAX);
-        assertEquals(10, ArcadePortRules.BACON_METER_MIN_ABILITY);
-        assertEquals(10, ArcadePortRules.baconMeterGainForDamage(2.0D));
-        assertEquals(30, ArcadePortRules.baconMeterGainForDamage(6.0D));
-        assertEquals(0, ArcadePortRules.baconMeterGainForDamage(Double.NaN));
-        assertEquals(0, ArcadePortRules.baconMeterGainForDamage(-1.0D));
-        assertEquals(30, ArcadePortRules.nextBaconMeter(20, 2.0D));
-        assertEquals(100, ArcadePortRules.nextBaconMeter(95, 6.0D));
-        assertFalse(ArcadePortRules.canUseBaconMeterAbility(9));
-        assertTrue(ArcadePortRules.canUseBaconMeterAbility(10));
-        assertEquals(0.55D, ArcadePortRules.baconBodySlamMeterMultiplier(10), 0.00001D);
+        assertEquals(50, ArcadePortRules.BACON_METER_MIN_ABILITY);
+        assertEquals(5, ArcadePortRules.baconMeterGainForHit(false, 16));
+        assertEquals(10, ArcadePortRules.baconMeterGainForHit(true, 16));
+        assertEquals(10, ArcadePortRules.baconMeterGainForHit(false, 2));
+        assertEquals(20, ArcadePortRules.baconMeterGainForHit(true, 2));
+        assertEquals(6, ArcadePortRules.baconMeterGainForHit(false, 15));
+        assertEquals(11, ArcadePortRules.baconMeterGainForHit(true, 15));
+        assertEquals(25, ArcadePortRules.nextBaconMeter(20, false, 16));
+        assertEquals(100, ArcadePortRules.nextBaconMeter(95, true, 2));
+        assertFalse(ArcadePortRules.canUseBaconMeterAbility(49));
+        assertTrue(ArcadePortRules.canUseBaconMeterAbility(50));
+        assertEquals(0.75D, ArcadePortRules.baconBodySlamMeterMultiplier(50), 0.00001D);
         assertEquals(1.0D, ArcadePortRules.baconBodySlamMeterMultiplier(100), 0.00001D);
-        assertEquals(0L, ArcadePortRules.baconPigInvincibilityDurationMillis(9));
-        assertEquals(1_175L, ArcadePortRules.baconPigInvincibilityDurationMillis(15));
+        assertEquals(0L, ArcadePortRules.baconPigInvincibilityDurationMillis(49));
+        assertEquals(2_750L, ArcadePortRules.baconPigInvincibilityDurationMillis(50));
         assertEquals(5_000L, ArcadePortRules.baconPigInvincibilityDurationMillis(100));
-        assertEquals(0.65D, ArcadePortRules.baconBlastPowerMultiplier(10), 0.00001D);
+        assertEquals(1.25D, ArcadePortRules.baconBlastPowerMultiplier(50), 0.00001D);
         assertEquals(2.0D, ArcadePortRules.baconBlastPowerMultiplier(100), 0.00001D);
     }
 
@@ -1318,6 +1322,9 @@ class ArcadePortGameTest {
         assertEquals(1.25D, ArcadePortRules.baconTimedHitKnockbackMultiplier(901L), 0.00001D);
         assertEquals(1.25D, ArcadePortRules.baconTimedHitKnockbackMultiplier(1_400L), 0.00001D);
         assertEquals(1.0D, ArcadePortRules.baconTimedHitKnockbackMultiplier(1_401L), 0.00001D);
+        assertEquals(1_000L, ArcadePortRules.baconTimingWindowMillis(500L, 3.0D));
+        assertEquals(1_800L, ArcadePortRules.baconTimingWindowMillis(900L, 3.0D));
+        assertTrue(ArcadePortRules.isBaconTimedCritical(1_400L, 3.0D));
     }
 
 
@@ -1325,7 +1332,8 @@ class ArcadePortGameTest {
         assertEquals(500L, ArcadePortRules.BACON_PIG_INVINCIBILITY_MIN_MILLIS);
         assertEquals(5_000L, ArcadePortRules.BACON_PIG_INVINCIBILITY_MAX_MILLIS);
         assertEquals(0L, ArcadePortRules.baconPigInvincibilityDurationMillis(9));
-        assertEquals(1_175L, ArcadePortRules.baconPigInvincibilityDurationMillis(15));
+        assertEquals(0L, ArcadePortRules.baconPigInvincibilityDurationMillis(15));
+        assertEquals(2_750L, ArcadePortRules.baconPigInvincibilityDurationMillis(50));
         assertEquals(5_000L, ArcadePortRules.baconPigInvincibilityDurationMillis(100));
         assertTrue(ArcadePortRules.isBaconInvincibilityActive(1_000L, 1_001L));
         assertFalse(ArcadePortRules.isBaconInvincibilityActive(1_001L, 1_001L));
@@ -1479,6 +1487,34 @@ class ArcadePortGameTest {
                 ArcadePortRules.isBaconArenaKnockoutReason("hot_floor")));
         assertFalse(ArcadePortRules.shouldCreditBaconFallKill(10_000L, 5_001L,
                 ArcadePortRules.isBaconArenaKnockoutReason("starved")));
+    }
+
+    @Test void baconBrawlSidebarUsesPlayerCountInsteadOfMergingNames() {
+        List<String> fifteen = java.util.stream.IntStream.rangeClosed(1, 15)
+                .mapToObj(index -> "Player" + index).toList();
+        List<String> sixteen = java.util.stream.IntStream.rangeClosed(1, 16)
+                .mapToObj(index -> "Player" + index).toList();
+
+        assertEquals(fifteen, ArcadePortRules.baconBrawlSidebarLines(fifteen));
+        List<String> lines = ArcadePortRules.baconBrawlSidebarLines(sixteen);
+        assertEquals(15, lines.size());
+        assertEquals("Player14", lines.get(13));
+        assertEquals("16 players remaining", lines.get(14));
+        assertFalse(lines.contains("Player15, Player16"));
+    }
+
+    @Test void baconBrawlKillCreditIncludesTestPlayerParticipantsAndExcludesSelfKnockouts() {
+        java.util.UUID testPlayerVictim = java.util.UUID.randomUUID();
+        java.util.UUID humanKiller = java.util.UUID.randomUUID();
+        assertTrue(ArcadePortRules.shouldCreditBaconKill(testPlayerVictim, humanKiller, true));
+        assertFalse(ArcadePortRules.shouldCreditBaconKill(testPlayerVictim, humanKiller, false));
+        assertFalse(ArcadePortRules.shouldCreditBaconKill(testPlayerVictim, testPlayerVictim, true));
+    }
+
+    @Test void baconBrawlTracksKillsWithoutAddingKnockoutsToStats() {
+        assertFalse(ArcadePortRules.shouldRecordKnockoutsStat(ArcadePortGame.BACON_BRAWL));
+        assertTrue(ArcadePortRules.shouldRecordKnockoutsStat(ArcadePortGame.BOMB_LOBBERS));
+        assertFalse(ArcadePortRules.shouldRecordKnockoutsStat(null));
     }
 
     @Test void baconBrawlRoundUsesLastPigStandingInsteadOfKillScoreTimeout() {
