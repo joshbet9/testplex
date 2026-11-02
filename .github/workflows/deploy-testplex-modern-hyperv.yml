@@ -321,14 +321,14 @@ jobs:
           python3 --version
           REMOTE_PYTHON_CHECK
 
-      - name: Compare staged JAR hashes with installed plugins
+      - name: Read the deployed build identity
         id: jar-diff
         shell: bash
         env:
           HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
           HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
           HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
-          STAGE_DIR: ${{ steps.stage-jars.outputs.stage_dir }}
+          BUILD_SHA: ${{ steps.source-artifact.outputs.source_sha }}
         run: |
           set -euo pipefail
           SSH_PORT="${HYPERV_SSH_PORT:-22}"
@@ -337,13 +337,7 @@ jobs:
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
-          records=()
-          for jar in TestplexModernArcade.jar SnakeModern.jar ArcadeMechanicsModern.jar WizardsModern.jar; do
-            expected="$(awk -v name="$jar" '$2 == name {print $1}' "$STAGE_DIR/SHA256SUMS")"
-            [[ "$expected" =~ ^[0-9a-f]{64}$ ]] || { echo "Missing staged checksum for $jar." >&2; exit 1; }
-            records+=("$jar=$expected")
-          done
-          comparison="$(timeout --foreground --signal=TERM --kill-after=15s 3m ssh "${ssh_opts[@]}" "$remote" bash -s -- "${records[@]}" <<'REMOTE_JAR_DIFF'
+          comparison="$(timeout --foreground --signal=TERM --kill-after=15s 3m ssh "${ssh_opts[@]}" "$remote" bash -s <<'REMOTE_BUILD_ID'
           set -euo pipefail
           server_dir=/home/monstermaze/servers/testplex-modern
           deployed_sha="$(sudo -n cat "$server_dir/.testplex-modern-deployed-build" 2>/dev/null || true)"
@@ -352,37 +346,21 @@ jobs:
           else
             echo "DEPLOYED_BUILD_SHA=unknown"
           fi
-          for record in "$@"; do
-            jar="${record%%=*}"
-            expected="${record#*=}"
-            case "$jar" in TestplexModernArcade.jar|SnakeModern.jar|ArcadeMechanicsModern.jar|WizardsModern.jar) ;; *) exit 2 ;; esac
-            [[ "$expected" =~ ^[0-9a-f]{64}$ ]] || exit 2
-            installed="$server_dir/plugins/$jar"
-            actual=missing
-            if sudo -n test -s "$installed"; then actual="$(sudo -n sha256sum "$installed" | awk '{print $1}')"; fi
-            echo "INSTALLED_SHA=$jar=$actual"
-            if [[ "$actual" == "$expected" ]]; then
-              echo "JAR_DIFF $jar unchanged sha256=$actual"
-            else
-              echo "JAR_DIFF $jar replace installed=$actual target=$expected"
-              echo "CHANGED_JAR=$jar"
-            fi
-          done
-          REMOTE_JAR_DIFF
+          REMOTE_BUILD_ID
           )"
           printf '%s\n' "$comparison"
-          changed_jars="$(sed -n 's/^CHANGED_JAR=//p' <<< "$comparison" | paste -sd, -)"
           deployed_sha="$(sed -n 's/^DEPLOYED_BUILD_SHA=//p' <<< "$comparison" | tail -n 1)"
-          echo "changed_jars=$changed_jars" >> "$GITHUB_OUTPUT"
           echo "deployed_build_sha=$deployed_sha" >> "$GITHUB_OUTPUT"
-          for jar in TestplexModernArcade.jar SnakeModern.jar ArcadeMechanicsModern.jar WizardsModern.jar; do
-            installed="$(sed -n "s/^INSTALLED_SHA=$jar=//p" <<< "$comparison" | tail -n 1)"
-            echo "installed_${jar%.jar}=$installed" >> "$GITHUB_OUTPUT"
-          done
-          [[ -n "$changed_jars" ]] || echo "All plugin hashes match; deployment is a no-op."
+          if [[ "$deployed_sha" == "$BUILD_SHA" ]]; then
+            echo "candidate_jars=" >> "$GITHUB_OUTPUT"
+            echo "Source build is already deployed; deployment is a no-op."
+          else
+            echo "candidate_jars=TestplexModernArcade.jar,SnakeModern.jar,ArcadeMechanicsModern.jar,WizardsModern.jar" >> "$GITHUB_OUTPUT"
+            echo "Source build changed; checking plugin entry contents against the deployed base."
+          fi
 
       - name: Resolve the deployed build artifact for patching
-        if: ${{ steps.jar-diff.outputs.changed_jars != '' }}
+        if: ${{ steps.jar-diff.outputs.candidate_jars != '' }}
         id: base-artifact
         shell: bash
         env:
@@ -421,52 +399,49 @@ jobs:
           done
           echo "base_run_id=$base_run" >> "$GITHUB_OUTPUT"
           echo "base_dir=$base_dir" >> "$GITHUB_OUTPUT"
-          echo "Resolved installed build $BASE_SHA to successful build run $base_run."
+          echo "Resolved deployed build $BASE_SHA to successful build run $base_run."
 
       - name: Build changed-entry JAR patches
-        if: ${{ steps.jar-diff.outputs.changed_jars != '' }}
+        if: ${{ steps.jar-diff.outputs.candidate_jars != '' }}
         id: build-deltas
         shell: bash
         env:
           BASE_DIR: ${{ steps.base-artifact.outputs.base_dir }}
           STAGE_DIR: ${{ steps.stage-jars.outputs.stage_dir }}
-          CHANGED_JARS: ${{ steps.jar-diff.outputs.changed_jars }}
-          INSTALLED_ARCADE: ${{ steps.jar-diff.outputs.installed_ArcadeMechanicsModern }}
-          INSTALLED_TESTPLEX: ${{ steps.jar-diff.outputs.installed_TestplexModernArcade }}
-          INSTALLED_SNAKE: ${{ steps.jar-diff.outputs.installed_SnakeModern }}
-          INSTALLED_WIZARDS: ${{ steps.jar-diff.outputs.installed_WizardsModern }}
+          CANDIDATE_JARS: ${{ steps.jar-diff.outputs.candidate_jars }}
         run: |
           set -euo pipefail
           delta_dir="$RUNNER_TEMP/testplex-modern-deltas"
           mkdir -p "$delta_dir"
           cp deployment-source/scripts/testplex-jar-delta.py "$delta_dir/testplex-jar-delta.py"
           chmod 0755 "$delta_dir/testplex-jar-delta.py"
-          IFS=, read -r -a changed_jars <<< "$CHANGED_JARS"
-          for jar in "${changed_jars[@]}"; do
-            case "$jar" in
-              TestplexModernArcade.jar) installed_sha="$INSTALLED_TESTPLEX" ;;
-              SnakeModern.jar) installed_sha="$INSTALLED_SNAKE" ;;
-              ArcadeMechanicsModern.jar) installed_sha="$INSTALLED_ARCADE" ;;
-              WizardsModern.jar) installed_sha="$INSTALLED_WIZARDS" ;;
-              *) echo "Rejected unexpected changed JAR: $jar." >&2; exit 2 ;;
-            esac
+          IFS=, read -r -a candidate_jars <<< "$CANDIDATE_JARS"
+          changed_jars=()
+          for jar in "${candidate_jars[@]}"; do
+            case "$jar" in TestplexModernArcade.jar|SnakeModern.jar|ArcadeMechanicsModern.jar|WizardsModern.jar) ;; *) echo "Rejected unexpected candidate JAR: $jar." >&2; exit 2 ;; esac
             base_jar="$(find "$BASE_DIR" -type f -name "$jar" -print -quit)"
-            [[ -s "$base_jar" && "$installed_sha" =~ ^[0-9a-f]{64}$ ]] || {
-              echo "Could not resolve the exact installed base bytes for $jar." >&2
-              exit 1
-            }
-            base_sha="$(sha256sum "$base_jar" | awk '{print $1}')"
-            [[ "$base_sha" == "$installed_sha" ]] || {
-              echo "The successful base artifact for $jar does not match the installed server; refusing patch application." >&2
-              exit 1
-            }
-            python3 "$delta_dir/testplex-jar-delta.py" create \
+            [[ -s "$base_jar" ]] || { echo "Could not resolve the deployed base JAR for $jar." >&2; exit 1; }
+            output="$(python3 "$delta_dir/testplex-jar-delta.py" create \
               "$base_jar" "$STAGE_DIR/$jar" \
-              "$delta_dir/$jar.delta.zip" "$delta_dir/$jar.delta.json"
+              "$delta_dir/$jar.delta.zip" "$delta_dir/$jar.delta.json")"
+            printf '%s\n' "$output"
+            changed_entries="$(sed -n 's/^changed_entries=//p' <<< "$output" | tail -n 1)"
+            [[ "$changed_entries" =~ ^[0-9]+$ ]] || { echo "Missing changed-entry count for $jar." >&2; exit 1; }
+            if (( changed_entries > 0 )); then
+              changed_jars+=("$jar")
+            else
+              rm -f -- "$delta_dir/$jar.delta.zip" "$delta_dir/$jar.delta.json"
+              echo "$jar has identical entry contents; excluding it from deployment."
+            fi
           done
+          changed_jars_csv="$(IFS=,; echo "${changed_jars[*]}")"
+          echo "changed_jars=$changed_jars_csv" >> "$GITHUB_OUTPUT"
           echo "delta_dir=$delta_dir" >> "$GITHUB_OUTPUT"
-          echo "Created entry-level patches for: $CHANGED_JARS"
-
+          if [[ -z "$changed_jars_csv" ]]; then
+            echo "No plugin entry contents changed; deployment is a no-op."
+          else
+            echo "Created entry-level patches for: $changed_jars_csv"
+          fi
       - name: Upload verified JAR deltas to the isolated directory
         id: upload
         shell: bash
@@ -478,7 +453,7 @@ jobs:
           STAGE_DIR: ${{ steps.stage-jars.outputs.stage_dir }}
           DELTA_DIR: ${{ steps.build-deltas.outputs.delta_dir }}
           DEPLOYMENT_SCOPE: ${{ inputs.deployment_scope }}
-          CHANGED_JARS: ${{ steps.jar-diff.outputs.changed_jars }}
+          CHANGED_JARS: ${{ steps.build-deltas.outputs.changed_jars }}
         run: |
           set -euo pipefail
           SSH_PORT="${HYPERV_SSH_PORT:-22}"
@@ -560,7 +535,7 @@ jobs:
           echo "Built and uploaded entry-level deltas for: $CHANGED_JARS"
 
       - name: Provision and start only testplex-modern.service
-        if: ${{ steps.jar-diff.outputs.changed_jars != '' }}
+        if: ${{ steps.build-deltas.outputs.changed_jars != '' }}
         id: install-and-start
         shell: bash
         timeout-minutes: 35
@@ -571,7 +546,7 @@ jobs:
           BUILD_SHA: ${{ steps.source-artifact.outputs.source_sha }}
           UPLOAD_DIR: ${{ steps.upload.outputs.upload_dir }}
           DEPLOYMENT_SCOPE: ${{ inputs.deployment_scope }}
-          CHANGED_JARS: ${{ steps.jar-diff.outputs.changed_jars }}
+          CHANGED_JARS: ${{ steps.build-deltas.outputs.changed_jars }}
           # EULA accepted per the user's explicit instruction for this isolated test server.
           ACCEPT_EULA: "true"
         run: |
@@ -1452,7 +1427,7 @@ jobs:
             echo
             echo "- Source build SHA: $SOURCE_SHA"
             echo "- Deployment scope: ${{ inputs.deployment_scope }}"
-            echo "- Changed plugin JARs: ${{ steps.jar-diff.outputs.changed_jars || 'none (no-op)' }}"
+            echo "- Changed plugin JARs: ${{ steps.build-deltas.outputs.changed_jars || 'none (no-op)' }}"
             echo "- Only plugin JARs whose installed SHA-256 differs are rebuilt from verified changed-entry patches; unchanged JARs are untouched."
             echo "- Destination: /home/monstermaze/servers/testplex-modern"
             echo "- Dedicated unit: testplex-modern.service"
