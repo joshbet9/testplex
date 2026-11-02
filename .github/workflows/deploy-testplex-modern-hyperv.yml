@@ -407,7 +407,7 @@ jobs:
           # Uploaded chunk parts are replaced by sequential assembly, deleting each part only
           # after it has been appended. Peak staging use stays within one payload copy.
           # Keep a full 1 GiB free after reserving the single staged payload.
-          required_free_kb=$((stage_kb * 2 + 1048576))
+          required_free_kb=$((stage_kb * 2 + 524288))
           timeout --foreground --signal=TERM --kill-after=15s 5m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$BUILD_SHA" "$required_free_kb" "$stage_kb" "$CHANGED_JARS" <<'REMOTE_STAGE_PREP'
           set -euo pipefail
           build_sha="$1"
@@ -449,7 +449,7 @@ jobs:
           df -i /var/tmp
           avail_kb="$(df -Pk /var/tmp | awk 'END {print $4}')"
           if [[ ! "$avail_kb" =~ ^[0-9]+$ ]] || (( avail_kb < required_free_kb )); then
-            echo "Only ${avail_kb:-unknown} KiB free in /var/tmp after staging cleanup; deployment needs at least $required_free_kb KiB (seed plus incoming payload and a 1 GiB safety reserve)." >&2
+            echo "Only ${avail_kb:-unknown} KiB free in /var/tmp after staging cleanup; deployment needs at least $required_free_kb KiB (seed plus incoming payload and a 512 MiB safety reserve)." >&2
             exit 1
           fi
           echo "Available space: $((avail_kb / 1024)) MiB; payload: $((stage_kb / 1024)) MiB; required free-space reserve: $((required_free_kb / 1024)) MiB."
