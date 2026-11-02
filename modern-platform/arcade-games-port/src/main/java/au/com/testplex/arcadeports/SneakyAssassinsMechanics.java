@@ -77,6 +77,7 @@ final class SneakyAssassinsMechanics {
     }
 
     private final ArcadeMechanicsModernPlugin plugin;
+    private final AbilityCooldownProgress cooldownProgress;
     private final Predicate<UUID> isTestPlayer;
     private final NamespacedKey itemKey;
     private final Map<UUID, String> kitPreferences = new HashMap<>();
@@ -125,6 +126,7 @@ final class SneakyAssassinsMechanics {
 
     SneakyAssassinsMechanics(ArcadeMechanicsModernPlugin plugin, Predicate<UUID> isTestPlayer) {
         this.plugin = plugin;
+        this.cooldownProgress = AbilityCooldownProgress.forPlugin(plugin);
         this.isTestPlayer = isTestPlayer == null ? ignored -> false : isTestPlayer;
         this.itemKey = new NamespacedKey(plugin, "sneaky-assassins-item");
     }
@@ -784,6 +786,7 @@ final class SneakyAssassinsMechanics {
             return;
         }
         bribeReadyAt.put(player.getUniqueId(), now + BRIBE_COOLDOWN_MILLIS);
+        cooldownProgress.start(player, "Bribe", BRIBE_COOLDOWN_MILLIS);
         consumeHeld(player);
         bribes.put(villager.getUniqueId(), new Bribe(player));
         villager.setCustomName(ChatColor.GOLD + "Bribed");

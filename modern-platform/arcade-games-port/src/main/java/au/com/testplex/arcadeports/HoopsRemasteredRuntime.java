@@ -79,12 +79,14 @@ public final class HoopsRemasteredRuntime implements Listener {
 
     private final JavaPlugin plugin;
     private final Hooks hooks;
+    private final AbilityCooldownProgress cooldownProgress;
     private final NamespacedKey ballItemKey;
     private Match match;
 
     public HoopsRemasteredRuntime(JavaPlugin plugin, Hooks hooks) {
         this.plugin = plugin;
         this.hooks = hooks;
+        this.cooldownProgress = AbilityCooldownProgress.forPlugin(plugin);
         this.ballItemKey = new NamespacedKey(plugin, "hoops-basketball");
     }
 
@@ -821,6 +823,7 @@ public final class HoopsRemasteredRuntime implements Listener {
         PlayerStats stats = current.playerStats.get(defender.getUniqueId());
         if (stats == null) return;
         current.blockReadyAt.put(defender.getUniqueId(), now + HoopsRemasteredRules.BLOCK_COOLDOWN_MILLIS);
+        cooldownProgress.start(defender, "Block", HoopsRemasteredRules.BLOCK_COOLDOWN_MILLIS);
         ball.velocity.add(defender.getLocation().getDirection().normalize().multiply(0.6D).setY(0.35D));
         ball.mode = BallMode.LOOSE;
         ball.lastToucher = defender.getUniqueId();
@@ -843,6 +846,7 @@ public final class HoopsRemasteredRuntime implements Listener {
                 || !attacker.hasLineOfSight(target) || toHolder.lengthSquared() < 0.001D
                 || attacker.getEyeLocation().getDirection().normalize().dot(toHolder.normalize()) < 0.20D) return;
         current.stealReadyAt.put(attacker.getUniqueId(), now + 3_000L);
+        cooldownProgress.start(attacker, "Steal", 3_000L);
         current.playerStats.get(attacker.getUniqueId()).steals++;
         current.lastPasserId = null;
         current.shotClockEndsAt = now + HoopsRemasteredRules.SHOT_CLOCK_MILLIS;
@@ -1198,6 +1202,7 @@ public final class HoopsRemasteredRuntime implements Listener {
         player.setAllowFlight(false);
         player.setVelocity(new Vector(direction.getX(), 0.78D, direction.getZ()));
         current.hopsReadyAt.put(player.getUniqueId(), now + HoopsRemasteredRules.HOPS_COOLDOWN_MILLIS);
+        cooldownProgress.start(player, "Hops", HoopsRemasteredRules.HOPS_COOLDOWN_MILLIS);
         player.getWorld().spawnParticle(org.bukkit.Particle.CLOUD,
                 player.getLocation().clone().add(0.0D, 0.15D, 0.0D), 12, 0.28D, 0.08D, 0.28D, 0.04D);
         player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 0.7F, 1.5F);

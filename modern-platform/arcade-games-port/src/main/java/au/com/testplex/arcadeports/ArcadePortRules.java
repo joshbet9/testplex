@@ -19,8 +19,7 @@ public final class ArcadePortRules {
 
     /** Mixed Arcade halves the wait between objective TNT spawns. */
     public static long castleAssaultObjectiveTntRespawnMillis(boolean mixedArcadeVariant) {
-        return mixedArcadeVariant
-                ? CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS / 2L
+        return mixedArcadeVariant ? CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS / 2L
                 : CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS;
     }
 
@@ -90,11 +89,11 @@ public final class ArcadePortRules {
     public static final double DRAGON_ESCAPE_BLOCK_RADIUS = 10.0D;
     public static final double DRAGON_ESCAPE_FINISH_RADIUS = 3.0D;
     public static final double DRAGON_ESCAPE_RACE_GAP_ESTIMATED_SPEED = 5.0D;
-    /** Only discard effectively coincident markers; close BLACK markers are valid route steps. */
-    public static final double DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE = 0.75D;
+    /** Reborn ParseData ignores a marker closer than three blocks when another remains. */
+    public static final double DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE = 3.0D;
     public static final String[] DRAGON_ESCAPE_BEACON_COLORS = {
-            "white", "red", "orange", "yellow", "lime", "green", "cyan",
-            "light-blue", "blue", "purple", "magenta", "pink"
+            "white", "orange", "magenta", "light-blue", "yellow", "lime", "pink", "gray",
+            "silver", "cyan", "purple", "blue", "brown", "green", "red", "black"
     };
 
     public static String dragonEscapeMapStorageKey(String mapResource) {
@@ -476,6 +475,8 @@ public final class ArcadePortRules {
     public static final long BACON_MIN_KNOCKBACK_INTERVAL_MILLIS = 5_000L;
     public static final long BACON_SLOW_UPDATE_INTERVAL_MILLIS = 4_000L;
     public static final long BACON_HUNGER_INTERVAL_MILLIS = 4_000L;
+    /** Mineplex 1.8 ClientCombat.CanHurt rate limit per attacker and target. */
+    public static final long BACON_1_8_HIT_DELAY_MILLIS = 400L;
     public static final int BACON_HUNGER_DRAIN_PER_INTERVAL = 2;
     public static final int BACON_HUNGER_RESTORE_PER_HIT = 2;
     public static final float BACON_SATURATION_ON_FOOD_CHANGE = 5.0F;
