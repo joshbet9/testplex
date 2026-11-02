@@ -305,6 +305,23 @@ jobs:
             "$deploy_workflow" > "$RUNNER_TEMP/testplex-modern-remote-deploy.sh"
           test -s "$RUNNER_TEMP/testplex-modern-remote-deploy.sh"
           bash -n "$RUNNER_TEMP/testplex-modern-remote-deploy.sh"
+
+          # Parse the compare and upload run blocks that implement targeted deltas.
+          for step_name in "Compare staged JAR hashes with installed plugins" "Upload verified JARs to the isolated directory"; do
+            safe_name="${step_name// /-}"
+            awk -v wanted="$step_name" '
+              $0 == "      - name: " wanted { in_step=1; next }
+              in_step && /^      - name:/ { exit }
+              in_step && $0 == "        run: |" { in_run=1; next }
+              in_step && in_run {
+                if (substr($0, 1, 10) == "          ") print substr($0, 11)
+                else if ($0 == "") print ""
+                else exit
+              }
+            ' "$deploy_workflow" > "$RUNNER_TEMP/$safe_name.sh"
+            test -s "$RUNNER_TEMP/$safe_name.sh"
+            bash -n "$RUNNER_TEMP/$safe_name.sh"
+          done
           grep -Fq 'FPP_VERSION="2.1.7"' "$deploy_workflow"
           grep -Fq 'versions/$FPP_VERSION/PAPER/fake-player-plugin-$FPP_VERSION.jar' "$deploy_workflow"
           git diff --check
