@@ -184,6 +184,8 @@ public final class ModernArcadeLobby implements Listener {
      * slots 1, 5 and 9 respectively (Bukkit slots 0, 4 and 8).
      */
     public void ensurePanelItem(Player player) {
+        // The dedicated Arcade lobby protects players from damage, including after a match snapshot is restored.
+        player.setInvulnerable(true);
         org.bukkit.inventory.PlayerInventory inventory = player.getInventory();
         for (int slot = 0; slot < inventory.getStorageContents().length; slot++) {
             ItemStack item = inventory.getItem(slot);
