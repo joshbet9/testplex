@@ -57,7 +57,7 @@ public final class SourceMapCatalog {
             case DEATH_TAG -> List.of("Death Tag");
             case DRAGON_ESCAPE -> List.of("Dragon Escape");
             case DRAGONS -> List.of("Dragons");
-            case EVOLUTION -> List.of();
+            case EVOLUTION -> List.of("Evolution");
             case GLADIATORS -> List.of("Gladiators");
             case HEROES_OF_GWEN -> List.of("Heroes of GWEN");
             case MICRO_BATTLES -> List.of("Micro Battle");
@@ -84,10 +84,16 @@ public final class SourceMapCatalog {
      * the repository makes it available without another hand-written Java entry.
      */
     private static List<String> bundledMapResources(JavaPlugin plugin, ArcadePortGame game) {
-        return bundledMapResources(plugin, mapFoldersFor(game), game == null ? "Arcade" : game.displayName());
+        return bundledMapResources(plugin, mapFoldersFor(game),
+                game == null ? "Arcade" : game.displayName(), game);
     }
 
     private static List<String> bundledMapResources(JavaPlugin plugin, List<String> mapFolders, String label) {
+        return bundledMapResources(plugin, mapFolders, label, null);
+    }
+
+    private static List<String> bundledMapResources(JavaPlugin plugin, List<String> mapFolders,
+            String label, ArcadePortGame game) {
         List<String> prefixes = mapFolders == null ? List.of() : mapFolders.stream()
                 .filter(folder -> folder != null && !folder.isBlank())
                 .map(folder -> "source-maps/" + folder + "/")
@@ -107,6 +113,7 @@ public final class SourceMapCatalog {
                                 .map(value -> "source-maps/" + value.replace('\\', '/'))
                                 .filter(value -> prefixes.stream().anyMatch(value::startsWith))
                                 .filter(value -> value.toLowerCase(java.util.Locale.ROOT).endsWith(".zip"))
+                                .filter(value -> hasRequiredGameMarkers(plugin, game, value))
                                 .forEach(resources::add);
                     }
                 }
@@ -115,6 +122,7 @@ public final class SourceMapCatalog {
                     jar.stream().map(java.util.jar.JarEntry::getName)
                             .filter(value -> prefixes.stream().anyMatch(value::startsWith))
                             .filter(value -> value.toLowerCase(java.util.Locale.ROOT).endsWith(".zip"))
+                            .filter(value -> hasRequiredGameMarkers(plugin, game, value))
                             .forEach(resources::add);
                 }
             }
@@ -319,13 +327,13 @@ public final class SourceMapCatalog {
             for (String resource : resources) {
                 if (mapNameFromResource(resource).equalsIgnoreCase(legacyName)) return resource;
             }
-            if (plugin.getResource(configured) != null) return configured;
+            if (isInstalledResource(plugin, game, configured)) return configured;
         }
         if (isResourceForGame(plugin, game, configured)) return configured;
         for (String resource : resources) {
             if (mapNameFromResource(resource).equalsIgnoreCase(legacyName)) return resource;
         }
-        if (legacy != null && plugin.getResource(legacy) != null) return legacy;
+        if (legacy != null && isInstalledResource(plugin, game, legacy)) return legacy;
         return resources.isEmpty() ? null : resources.get(0);
     }
 
@@ -335,8 +343,124 @@ public final class SourceMapCatalog {
      * resources remain valid for backwards-compatible configurations.
      */
     public static boolean isInstalledResource(JavaPlugin plugin, ArcadePortGame game, String resource) {
-        return plugin != null && resourcePathBelongsToGame(game, resource)
-                && plugin.getResource(resource) != null;
+        if (plugin == null || !resourcePathBelongsToGame(game, resource)) return false;
+        if (game == ArcadePortGame.EVOLUTION || game == ArcadePortGame.GLADIATORS) {
+            return hasRequiredGameMarkers(plugin, game, resource);
+        }
+        try (InputStream raw = plugin.getResource(resource)) {
+            return raw != null;
+        } catch (IOException ignored) {
+            return false;
+        }
+    }
+
+    /**
+     * Fail closed for source maps requiring game-specific metadata. A ZIP with
+     * level.dat and terrain but without a complete Reborn bracket or evolution
+     * station must never become selectable simply because it was copied under
+     * update/maps. This checks only the config shape; physical spawn safety and
+     * map acceptance are separate gates.
+     */
+    private static boolean hasRequiredGameMarkers(JavaPlugin plugin, ArcadePortGame game, String resource) {
+        if (game != ArcadePortGame.EVOLUTION && game != ArcadePortGame.GLADIATORS) return true;
+        if (plugin == null || resource == null) return false;
+        try (InputStream raw = plugin.getResource(resource)) {
+            if (raw == null) return false;
+            try (ZipInputStream zip = new ZipInputStream(raw)) {
+                ZipEntry entry;
+                while ((entry = zip.getNextEntry()) != null) {
+                    String name = entry.getName().replace('\\', '/');
+                    if (name.equals("WorldConfig.dat") || name.endsWith("/WorldConfig.dat")) {
+                        byte[] bytes = zip.readNBytes(128 * 1024 + 1);
+                        return bytes.length <= 128 * 1024
+                                && hasCompleteGameMarkers(game, new String(bytes, StandardCharsets.UTF_8));
+                    }
+                    zip.closeEntry();
+                }
+            }
+        } catch (IOException exception) {
+            plugin.getLogger().warning("Cannot verify " + game.displayName()
+                    + " source-map markers in " + resource + ": " + exception.getMessage());
+        }
+        return false;
+    }
+
+    static boolean hasCompleteGameMarkers(ArcadePortGame game, String config) {
+        if (game != ArcadePortGame.EVOLUTION && game != ArcadePortGame.GLADIATORS) return true;
+        if (config == null || config.isBlank()) return false;
+        Map<String, List<double[]>> markers = new LinkedHashMap<>();
+        Map<String, Integer> bounds = new LinkedHashMap<>();
+        String group = "";
+        String name = "";
+        boolean hasName = false;
+        for (String line : config.split("\\R")) {
+            int colon = line.indexOf(':');
+            if (colon <= 0) continue;
+            String key = line.substring(0, colon).trim().toUpperCase(java.util.Locale.ROOT);
+            String value = line.substring(colon + 1).trim();
+            switch (key) {
+                case "MAP_NAME" -> hasName = !value.isBlank();
+                case "MIN_X", "MAX_X", "MIN_Y", "MAX_Y", "MIN_Z", "MAX_Z" -> {
+                    try { bounds.put(key, Integer.parseInt(value)); }
+                    catch (NumberFormatException ignored) { }
+                }
+                case "TEAM_NAME" -> { group = "TEAM"; name = value.toUpperCase(java.util.Locale.ROOT); }
+                case "DATA_NAME" -> { group = "DATA"; name = value.toUpperCase(java.util.Locale.ROOT); }
+                case "TEAM_SPAWNS", "DATA_LOCS" -> {
+                    String expected = key.equals("TEAM_SPAWNS") ? "TEAM" : "DATA";
+                    if (!expected.equals(group) || name.isBlank()) continue;
+                    List<double[]> points = markers.computeIfAbsent(group + ":" + name,
+                            ignored -> new ArrayList<>());
+                    for (String token : value.split(":")) {
+                        String[] parts = token.split(",");
+                        if (parts.length != 3) continue;
+                        try {
+                            double x = Double.parseDouble(parts[0].trim());
+                            double y = Double.parseDouble(parts[1].trim());
+                            double z = Double.parseDouble(parts[2].trim());
+                            if (Double.isFinite(x) && Double.isFinite(y) && Double.isFinite(z)) {
+                                points.add(new double[]{x, y, z});
+                            }
+                        } catch (NumberFormatException ignored) { }
+                    }
+                }
+                default -> { }
+            }
+        }
+        if (!hasName || markerCount(markers, "TEAM:GREEN") < 1
+                || bounds.size() != 6
+                || bounds.get("MIN_X") >= bounds.get("MAX_X")
+                || bounds.get("MIN_Y") >= bounds.get("MAX_Y")
+                || bounds.get("MIN_Z") >= bounds.get("MAX_Z")) return false;
+        if (game == ArcadePortGame.GLADIATORS) {
+            return markerCount(markers, "DATA:RED") == 1
+                    && markerCount(markers, "DATA:ORANGE") >= 2
+                    && markerCount(markers, "DATA:YELLOW") >= 4
+                    && markerCount(markers, "DATA:GREEN") >= 8
+                    && markerCount(markers, "DATA:BLACK") >= 30
+                    && markerCount(markers, "DATA:PINK") >= 14;
+        }
+        if (markerCount(markers, "TEAM:GREEN") < 16) return false;
+        for (double[] platform : markers.getOrDefault("DATA:RED", List.of())) {
+            for (double[] viewing : markers.getOrDefault("DATA:GREEN", List.of())) {
+                if (distanceSquared(platform, viewing) > 64.0D) continue;
+                for (double[] storage : markers.getOrDefault("DATA:YELLOW", List.of())) {
+                    if (distanceSquared(platform, storage) <= 64.0D) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static int markerCount(Map<String, List<double[]>> markers, String name) {
+        return markers.getOrDefault(name, List.of()).size();
+    }
+
+    private static double distanceSquared(double[] left, double[] right) {
+        double x = left[0] - right[0];
+        double y = left[1] - right[1];
+        double z = left[2] - right[2];
+        return x * x + y * y + z * z;
     }
 
     /** Pure path validation, kept separate so the game's resource mapping is unit-testable. */
@@ -639,8 +763,24 @@ public final class SourceMapCatalog {
 
         Path region = dimensions.resolve("region");
         if (!Files.isDirectory(region)) {
+            Path legacy = root.resolve("region");
+            String rootEntries;
+            try (Stream<Path> entries = Files.list(root)) {
+                rootEntries = entries.map(entry -> entry.getFileName().toString()).sorted()
+                        .limit(30).collect(java.util.stream.Collectors.joining(", "));
+            }
+            String modernEntries = "(dimension root missing)";
+            if (Files.isDirectory(dimensions)) {
+                try (Stream<Path> entries = Files.list(dimensions)) {
+                    modernEntries = entries.map(entry -> entry.getFileName().toString()).sorted()
+                            .limit(20).collect(java.util.stream.Collectors.joining(", "));
+                }
+            }
             throw new IOException("Archived map has no region directory at " + region
-                    + " (expected legacy region/ to be moved into Paper 26.3 dimension layout).");
+                    + " (legacyExists=" + Files.exists(legacy) + ", convertedExists="
+                    + Files.exists(region) + ", rootEntries=[" + rootEntries
+                    + "], dimensionEntries=[" + modernEntries
+                    + "]). Expected original region/ to migrate into the Paper 26.3 dimension layout.");
         }
         try (Stream<Path> files = Files.list(region)) {
             if (files.noneMatch(path -> Files.isRegularFile(path)
@@ -828,8 +968,19 @@ public final class SourceMapCatalog {
                 try (ZipInputStream zip = new ZipInputStream(input)) {
                     ZipEntry entry;
                     while ((entry = zip.getNextEntry()) != null) {
-                        Path output = staging.resolve(entry.getName()).normalize();
-                        if (!output.startsWith(staging)) {
+                        // Mineplex legacy archives are a mixture of Unix-style '/' and
+                        // Windows-style '\\' ZIP entry paths. Linux treats backslashes as
+                        // literal filename characters: Gladiators_Caged_In.zip then
+                        // extracts region\\r.*.mca into the world root instead of region/,
+                        // leaving Paper with no terrain to migrate.
+                        String entryName = entry.getName().replace('\\', '/');
+                        if (entryName.isBlank() || entryName.startsWith("/")
+                                || entryName.matches("(?i)^[a-z]:.*")
+                                || entryName.indexOf((char) 0) >= 0) {
+                            throw new IOException("Unsafe archive entry: " + entry.getName());
+                        }
+                        Path output = staging.resolve(entryName).normalize();
+                        if (!output.startsWith(staging) || output.equals(staging)) {
                             throw new IOException("Unsafe archive entry: " + entry.getName());
                         }
                         if (entry.isDirectory()) {
@@ -848,6 +999,15 @@ public final class SourceMapCatalog {
 
             Path archiveRoot = allowWizardsWorldWithoutConfig
                     ? locateWizardsMapRoot(staging) : locateMapRoot(staging);
+            if (archiveRoot != null) {
+                // Log the extracted layout before moving it. This made the
+                // Windows ZIP-separator bug in the original Caged In visible.
+                plugin.getLogger().info("Original map extraction " + resource
+                        + ": root=" + archiveRoot + ", hasRegion="
+                        + Files.isDirectory(archiveRoot.resolve("region"))
+                        + ", hasDimensionRegion=" + Files.isDirectory(archiveRoot.resolve(
+                                "dimensions/minecraft/overworld/region")));
+            }
             if (archiveRoot == null) {
                 String entries;
                 try (Stream<Path> paths = Files.list(staging)) {

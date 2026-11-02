@@ -1,0 +1,190 @@
+{
+  "source": "https://github.com/Nixuge/McMapsBackup-Website/blob/25769ad922824befd327cea37919fc0b4ed64b56/src/ts/servers/mineplex/MineplexData.ts",
+  "source_commit": "25769ad922824befd327cea37919fc0b4ed64b56",
+  "download_base": "https://maps.nixuge.me/static/mineplex/zip",
+  "excluded_existing": [
+    "Gladiators/Caged In"
+  ],
+  "maps": [
+    {
+      "game": "Evolution",
+      "name": "Twin Peaks 2.0",
+      "file": "twinpeaks20.zip",
+      "id": 2000
+    },
+    {
+      "game": "Evolution",
+      "name": "Revelation",
+      "file": "revelation.zip",
+      "id": 2001
+    },
+    {
+      "game": "Evolution",
+      "name": "Guardian Island",
+      "file": "guardianisland.zip",
+      "id": 2002
+    },
+    {
+      "game": "Evolution",
+      "name": "Winterhold",
+      "file": "winterhold.zip",
+      "id": 2003
+    },
+    {
+      "game": "Evolution",
+      "name": "Oasis",
+      "file": "oasis.zip",
+      "id": 2004
+    },
+    {
+      "game": "Evolution",
+      "name": "Tropics",
+      "file": "tropics.zip",
+      "id": 2005
+    },
+    {
+      "game": "Evolution",
+      "name": "Bonzai",
+      "file": "bonzai.zip",
+      "id": 2006
+    },
+    {
+      "game": "Gladiators",
+      "name": "Tribal Battleground",
+      "file": "tribalbattleground.zip",
+      "id": 2100
+    },
+    {
+      "game": "Gladiators",
+      "name": "Bliss",
+      "file": "bliss.zip",
+      "id": 2101
+    },
+    {
+      "game": "Gladiators",
+      "name": "Fierce Desert",
+      "file": "fiercedesert.zip",
+      "id": 2102
+    },
+    {
+      "game": "Gladiators",
+      "name": "Alberwood Creek",
+      "file": "alberwoodcreek.zip",
+      "id": 2103
+    },
+    {
+      "game": "Gladiators",
+      "name": "Autumn Kingdom",
+      "file": "autumnkingdom.zip",
+      "id": 2104
+    },
+    {
+      "game": "Gladiators",
+      "name": "Tropics",
+      "file": "tropics.zip",
+      "id": 2105
+    },
+    {
+      "game": "Gladiators",
+      "name": "Cherry Bomb",
+      "file": "cherrybomb.zip",
+      "id": 2106
+    },
+    {
+      "game": "Gladiators",
+      "name": "Mythical Forests",
+      "file": "mythicalforests.zip",
+      "id": 2107
+    },
+    {
+      "game": "Gladiators",
+      "name": "Choco Valley",
+      "file": "chocovalley.zip",
+      "id": 2108
+    },
+    {
+      "game": "Gladiators",
+      "name": "Under the Sea",
+      "file": "underthesea.zip",
+      "id": 2109
+    },
+    {
+      "game": "Gladiators",
+      "name": "Urban",
+      "file": "urban.zip",
+      "id": 2110
+    },
+    {
+      "game": "Gladiators",
+      "name": "Clockwork",
+      "file": "clockwork.zip",
+      "id": 2111
+    },
+    {
+      "game": "Gladiators",
+      "name": "Savanna",
+      "file": "savanna.zip",
+      "id": 2112
+    },
+    {
+      "game": "Gladiators",
+      "name": "Ethereal Caverns",
+      "file": "etherealcaverns.zip",
+      "id": 2113
+    },
+    {
+      "game": "Gladiators",
+      "name": "Castaway Cove",
+      "file": "castawaycove.zip",
+      "id": 2114
+    },
+    {
+      "game": "Gladiators",
+      "name": "Primitive",
+      "file": "primitive.zip",
+      "id": 2115
+    },
+    {
+      "game": "Gladiators",
+      "name": "Harmony",
+      "file": "harmony.zip",
+      "id": 2116
+    },
+    {
+      "game": "Gladiators",
+      "name": "Flushed Away",
+      "file": "flushedaway.zip",
+      "id": 2117
+    },
+    {
+      "game": "Gladiators",
+      "name": "Cosmos",
+      "file": "cosmos.zip",
+      "id": 2118
+    },
+    {
+      "game": "Gladiators",
+      "name": "OutLaw",
+      "file": "outlaw.zip",
+      "id": 2119
+    },
+    {
+      "game": "Gladiators",
+      "name": "Planet Douglas",
+      "file": "planetdouglas.zip",
+      "id": 2120
+    },
+    {
+      "game": "Gladiators",
+      "name": "The Shire",
+      "file": "theshire.zip",
+      "id": 2121
+    },
+    {
+      "game": "Gladiators",
+      "name": "Caged In",
+      "file": "cagedin.zip",
+      "id": 2122
+    }
+  ]
+}

@@ -1957,9 +1957,12 @@ public final class ArcadePortRules {
     /** Use the selected source map's actual vertical bounds for its fall-out threshold. */
     public static double dragonEscapeVoidThresholdY(String mapName, boolean hasVerticalBounds, int minY) {
         String name = mapName == null ? "" : mapName.toLowerCase(java.util.Locale.ROOT);
+        // An authored vertical minimum is authoritative for imported source maps.
+        // The old name-based overrides (especially Through Hell) could mark a
+        // legitimate low course as a void before anyone even moved.
+        if (hasVerticalBounds) return sourceMapVoidThresholdY(true, minY);
         if (name.contains("hell")) return 24.0D;
         if (name.contains("pirate")) return 0.0D;
-        if (hasVerticalBounds) return sourceMapVoidThresholdY(true, minY);
         return 58.0D;
     }
 

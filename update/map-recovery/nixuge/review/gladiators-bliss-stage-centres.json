@@ -1,0 +1,42 @@
+{
+  "map": "Gladiators / Bliss",
+  "status": "UNVERIFIED_GEOMETRY_ONLY",
+  "source_archive": "update/map-recovery/nixuge/unconfigured/Gladiators/Gladiators_Bliss.zip",
+  "source_sha256": "09fecf5a9b45af05286005d38f211154687981872dd032002793cd3dc368dd62",
+  "method": "Provisional symmetrical centres refined against connected Y=6 walkable-floor geometry under invisible barrier roofs; not original WorldConfig data",
+  "limitations": "Stage centres and duel pairs are geometry-based reconstructed PROPOSALS, not source WorldConfig markers. No PINK progression data, gate restoration, full 3D route, spectator review or human gameplay acceptance; do not enable this map.",
+  "stages": [
+    {"name": "final", "tier": "RED", "x": 0, "z": 0},
+    {"name": "semi-north", "tier": "ORANGE", "x": 0, "z": -34},
+    {"name": "semi-south", "tier": "ORANGE", "x": 0, "z": 34},
+    {"name": "quarter-northwest", "tier": "YELLOW", "x": -34, "z": -34},
+    {"name": "quarter-northeast", "tier": "YELLOW", "x": 34, "z": -34},
+    {"name": "quarter-southwest", "tier": "YELLOW", "x": -34, "z": 34},
+    {"name": "quarter-southeast", "tier": "YELLOW", "x": 34, "z": 34},
+    {"name": "first-northwest-inner", "tier": "GREEN", "x": -32, "z": -60},
+    {"name": "first-northeast-inner", "tier": "GREEN", "x": 32, "z": -60},
+    {"name": "first-northwest-outer", "tier": "GREEN", "x": -58, "z": -34},
+    {"name": "first-northeast-outer", "tier": "GREEN", "x": 58, "z": -34},
+    {"name": "first-southwest-inner", "tier": "GREEN", "x": -32, "z": 60},
+    {"name": "first-southeast-inner", "tier": "GREEN", "x": 32, "z": 60},
+    {"name": "first-southwest-outer", "tier": "GREEN", "x": -58, "z": 34},
+    {"name": "first-southeast-outer", "tier": "GREEN", "x": 58, "z": 34}
+  ],
+  "duel_spawn_proposals": [
+    {"arena": "final", "status": "RECONSTRUCTED_UNVERIFIED", "points": [[-9, 6, 0], [9, 6, 0]]},
+    {"arena": "semi-north", "status": "RECONSTRUCTED_UNVERIFIED", "points": [[-9, 6, -34], [9, 6, -34]]},
+    {"arena": "semi-south", "status": "RECONSTRUCTED_UNVERIFIED", "points": [[-9, 6, 34], [9, 6, 34]]},
+    {"arena": "quarter-northwest", "status": "RECONSTRUCTED_UNVERIFIED", "points": [[-35, 6, -40], [-33, 6, -28]]},
+    {"arena": "quarter-northeast", "status": "RECONSTRUCTED_UNVERIFIED", "points": [[33, 6, -28], [35, 6, -40]]},
+    {"arena": "quarter-southwest", "status": "RECONSTRUCTED_UNVERIFIED", "points": [[-35, 6, 40], [-33, 6, 28]]},
+    {"arena": "quarter-southeast", "status": "RECONSTRUCTED_UNVERIFIED", "points": [[33, 6, 28], [35, 6, 40]]},
+    {"arena": "first-northwest-inner", "status": "RECONSTRUCTED_UNVERIFIED", "points": [[-39, 6, -60], [-25, 6, -60]]},
+    {"arena": "first-northeast-inner", "status": "RECONSTRUCTED_UNVERIFIED", "points": [[25, 6, -60], [39, 6, -60]]},
+    {"arena": "first-northwest-outer", "status": "RECONSTRUCTED_UNVERIFIED", "points": [[-58, 6, -41], [-58, 6, -27]]},
+    {"arena": "first-northeast-outer", "status": "RECONSTRUCTED_UNVERIFIED", "points": [[58, 6, -41], [58, 6, -27]]},
+    {"arena": "first-southwest-inner", "status": "RECONSTRUCTED_UNVERIFIED", "points": [[-39, 6, 60], [-25, 6, 60]]},
+    {"arena": "first-southeast-inner", "status": "RECONSTRUCTED_UNVERIFIED", "points": [[25, 6, 60], [39, 6, 60]]},
+    {"arena": "first-southwest-outer", "status": "RECONSTRUCTED_UNVERIFIED", "points": [[-58, 6, 27], [-58, 6, 41]]},
+    {"arena": "first-southeast-outer", "status": "RECONSTRUCTED_UNVERIFIED", "points": [[58, 6, 27], [58, 6, 41]]}
+  ]
+}

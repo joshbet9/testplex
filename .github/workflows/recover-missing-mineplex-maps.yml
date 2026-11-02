@@ -1,0 +1,82 @@
+name: Recover missing authentic Mineplex 1.8 maps
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - ".github/workflows/recover-missing-mineplex-maps.yml"
+      - ".github/scripts/recover_nixuge_mineplex_maps.py"
+      - "modern-platform/arcade-games-port/map-recovery/nixuge-standard-catalog.json"
+
+# This workflow only runs for the owner's same-repository recovery branch.
+# Downloading from third-party sources must never affect protected branches.
+permissions:
+  contents: write
+
+jobs:
+  recover-authentic-maps:
+    name: Download and verify missing Nixuge map archives
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'fix/arcade-authentic-map-loading-20261102' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Check out actual recovery branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: true
+
+      - name: Verify original 1.8 source archive inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s 'update/maps/Gladiators/Gladiators_Caged_In.zip'
+          if find update/maps -type f -iname '*Evolution*.zip' -print -quit | grep -q .; then
+            echo 'An Evolution map archive already exists in the 1.8 source. Review before import.' >&2
+            exit 1
+          fi
+          echo 'Original source contains Caged In and no Evolution archives.'
+
+      - name: Download original Nixuge worlds and classify source metadata
+        id: recover
+        shell: bash
+        run: |
+          set +e
+          python3 .github/scripts/recover_nixuge_mineplex_maps.py
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Publish acquisition audit and original ZIP artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: authenticated-nixuge-legacy-map-recovery
+          path: |
+            update/map-recovery/nixuge/**
+            update/maps/Evolution/**
+            update/maps/Gladiators/*.zip
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Commit only the verified missing source archives to recovery PR
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A -- update/maps update/map-recovery/nixuge
+          if git diff --cached --quiet; then
+            echo 'No new ZIP files or provenance data to commit.'
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Import missing authentic Evolution and Gladiators world backups from Nixuge"
+          git push origin HEAD:refs/heads/fix/arcade-authentic-map-loading-20261102
+
+      - name: Report incomplete downloads without misrepresenting acceptance
+        if: steps.recover.outputs.exit_code != '0'
+        shell: bash
+        run: |
+          echo 'One or more Nixuge originals could not be downloaded or verified.' >&2
+          cat update/map-recovery/nixuge/provenance.json | tail -n 80 >&2
+          exit 1

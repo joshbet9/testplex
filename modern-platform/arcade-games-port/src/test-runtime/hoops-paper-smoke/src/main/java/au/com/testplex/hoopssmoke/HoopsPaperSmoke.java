@@ -5,6 +5,7 @@ import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
+import org.bukkit.WorldCreator;
 import org.bukkit.boss.BossBar;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.Player;
@@ -63,6 +64,7 @@ public final class HoopsPaperSmoke extends JavaPlugin {
     private int stage;
     private long ticks;
     private boolean closing;
+    private boolean authenticGladiatorsMapVerified;
 
     @Override
     public void onEnable() {
@@ -75,6 +77,10 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         if (closing) return;
         ticks++;
         try {
+            if (!authenticGladiatorsMapVerified) {
+                authenticGladiatorsMapVerified = true;
+                verifyOriginalGladiatorsMapInPaper();
+            }
             switch (stage) {
                 case 0 -> waitForClientsAndStartFirstMatch();
                 case 1 -> verifyFirstMatchAndPass();
@@ -88,6 +94,104 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         } catch (Throwable failure) {
             fail(rootCause(failure));
         }
+    }
+
+    /** Real Paper world-load acceptance for the archived 1.8 Gladiators map.
+     * Unit tests cannot reproduce a 26.3 WorldCreator migration failure. */
+    private void verifyOriginalGladiatorsMapInPaper() throws Exception {
+        JavaPlugin arcadePlugin = (JavaPlugin) Bukkit.getPluginManager().getPlugin("ArcadeMechanicsModern");
+        require(arcadePlugin != null && arcadePlugin.isEnabled(),
+                "ArcadeMechanicsModern is not active for original-map validation");
+        Class<?> catalog = Class.forName("au.com.testplex.arcadeports.SourceMapCatalog");
+        String archive = "source-maps/Gladiators/Gladiators_Caged_In.zip";
+        String worldName = "arcadeport_source_gladiators_paper_smoke";
+        boolean installed = (Boolean) catalog.getMethod("installResource",
+                JavaPlugin.class, String.class, String.class, String.class)
+                .invoke(null, arcadePlugin, "Gladiators", archive, worldName);
+        require(installed, "Gladiators Caged In failed source-map archive install");
+        World world = new WorldCreator(worldName).environment(World.Environment.NORMAL)
+                .generateStructures(false).createWorld();
+        require(world != null, "Gladiators Caged In failed WorldCreator.createWorld()");
+        Object metadata = catalog.getMethod("readResource",
+                JavaPlugin.class, String.class, String.class, World.class)
+                .invoke(null, arcadePlugin, "Gladiators", archive, world);
+        require(metadata != null, "Gladiators Caged In failed WorldConfig.dat import");
+        @SuppressWarnings("unchecked")
+        List<Location> spawns = (List<Location>) metadata.getClass()
+                .getMethod("spawnLocations").invoke(metadata);
+        require(!spawns.isEmpty(), "Gladiators original map is missing player starts");
+        boolean terrain = false;
+        for (Location start : spawns) {
+            for (int d = 1; d <= 7; d++) {
+                if (!world.getBlockAt(start.getBlockX(), start.getBlockY() - d, start.getBlockZ())
+                        .getType().isAir()) { terrain = true; break; }
+            }
+            if (terrain) break;
+        }
+        require(terrain, "Gladiators Caged In world loaded without original spawn terrain");
+        getLogger().info("MAP_SMOKE|PASS|gladiators|Caged In|spawns=" + spawns.size()
+                + "|first=" + spawns.getFirst());
+        require(Bukkit.unloadWorld(world, false), "Gladiators disposable world failed unload");
+        verifyOriginalDragonEscapeMapInPaper(arcadePlugin, catalog,
+                "DragonEscape_Through Hell.zip", "through_hell", 0);
+        verifyOriginalDragonEscapeMapInPaper(arcadePlugin, catalog,
+                "DragonEscape_Steve's Swamp.zip", "steves_swamp", 31);
+    }
+
+    /** Proves that Paper imports actual Dragon Escape terrain and the GREEN team
+     * starts are supported by real blocks, independently of speed DATA_LOCS. */
+    private void verifyOriginalDragonEscapeMapInPaper(JavaPlugin arcadePlugin,
+            Class<?> catalog, String archiveName, String worldSuffix, int expectedMinY)
+            throws Exception {
+        String resource = "source-maps/Dragon Escape/" + archiveName;
+        String worldName = "arcadeport_source_dragon_escape_" + worldSuffix + "_smoke";
+        boolean installed = (Boolean) catalog.getMethod("installResource",
+                JavaPlugin.class, String.class, String.class, String.class)
+                .invoke(null, arcadePlugin, "Dragon Escape", resource, worldName);
+        require(installed, "Dragon Escape " + archiveName + " failed archive install");
+        World world = new WorldCreator(worldName).environment(World.Environment.NORMAL)
+                .generateStructures(false).createWorld();
+        require(world != null, "Dragon Escape " + archiveName + " failed Paper world import");
+        Object metadata = catalog.getMethod("readResource",
+                JavaPlugin.class, String.class, String.class, World.class)
+                .invoke(null, arcadePlugin, "Dragon Escape", resource, world);
+        require(metadata != null, "Dragon Escape " + archiveName + " has no source metadata");
+        int minY = ((Number) metadata.getClass().getMethod("minY").invoke(metadata)).intValue();
+        require(minY == expectedMinY, "Dragon Escape " + archiveName
+                + " wrong authentic lower bound: " + minY + " vs " + expectedMinY);
+        @SuppressWarnings("unchecked")
+        List<Location> starts = (List<Location>) metadata.getClass()
+                .getMethod("teamSpawnLocationsForName", String.class).invoke(metadata, "Green");
+        require(!starts.isEmpty(), "Dragon Escape " + archiveName + " missing GREEN team starts");
+        @SuppressWarnings("unchecked")
+        List<Location> douglas = (List<Location>) metadata.getClass()
+                .getMethod("dataLocations", String.class).invoke(metadata, "RED");
+        @SuppressWarnings("unchecked")
+        List<Location> route = (List<Location>) metadata.getClass()
+                .getMethod("dataLocations", String.class).invoke(metadata, "BLACK");
+        require(!douglas.isEmpty() && !route.isEmpty(),
+                "Dragon Escape " + archiveName + " missing Douglas RED/BLACK route");
+        int validStarts = 0;
+        for (Location start : starts) {
+            boolean onTerrain = false;
+            for (int dy = 1; dy <= 8; dy++) {
+                if (start.getBlockY() - dy < world.getMinHeight()) break;
+                Material under = world.getBlockAt(start.getBlockX(), start.getBlockY() - dy,
+                        start.getBlockZ()).getType();
+                if (under.isSolid() || under == Material.WATER) {
+                    onTerrain = true;
+                    break;
+                }
+            }
+            if (onTerrain) validStarts++;
+        }
+        require(validStarts > 0, "Dragon Escape " + archiveName
+                + " imported but all GREEN team starts are over missing/void terrain");
+        getLogger().info("MAP_SMOKE|PASS|dragon-escape|" + archiveName
+                + "|greenStarts=" + starts.size() + "|supportedStarts=" + validStarts
+                + "|minY=" + minY + "|first=" + starts.getFirst());
+        require(Bukkit.unloadWorld(world, false),
+                "Dragon Escape " + archiveName + " disposable world failed unload");
     }
 
     private void waitForClientsAndStartFirstMatch() throws Exception {
