@@ -629,7 +629,7 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
                 player.getHealth(), player.getAbsorptionAmount(),
                 player.getFoodLevel(), player.getSaturation(), player.getLevel(), player.getExp(),
                 player.getAllowFlight(), player.isFlying(), player.isSprinting(),
-                player.getWalkSpeed(), player.getFlySpeed(), player.getFireTicks(),
+                player.getWalkSpeed(), player.getFlySpeed(), player.getFireTicks(), System.currentTimeMillis(),
                 player.getCompassTarget() == null ? null : player.getCompassTarget().clone(),
                 new ArrayList<>(player.getActivePotionEffects()));
     }
@@ -696,8 +696,14 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
         require(Math.abs(player.getWalkSpeed() - baseline.walkSpeed()) < 0.001F
                         && Math.abs(player.getFlySpeed() - baseline.flySpeed()) < 0.001F,
                 player.getName() + " movement speed settings were not restored");
-        require(player.getFireTicks() == baseline.fireTicks(),
-                player.getName() + " fire timer was not restored");
+        long elapsedTicks = Math.max(0L, (System.currentTimeMillis() - baseline.capturedAtMillis()) / 50L);
+        int minimumRemainingFireTicks = Math.max(0,
+                baseline.fireTicks() - (int) Math.min(Integer.MAX_VALUE, elapsedTicks + 4L));
+        require(player.getFireTicks() <= baseline.fireTicks()
+                        && player.getFireTicks() >= minimumRemainingFireTicks,
+                player.getName() + " fire timer was not restored within elapsed tick decay"
+                        + " (baseline=" + baseline.fireTicks() + ", elapsedTicks=" + elapsedTicks
+                        + ", minimum=" + minimumRemainingFireTicks + ", actual=" + player.getFireTicks() + ")");
         require(baseline.compassTarget() == null || (player.getCompassTarget() != null
                         && player.getCompassTarget().getWorld().equals(baseline.compassTarget().getWorld())
                         && player.getCompassTarget().distanceSquared(baseline.compassTarget()) < 0.01D),
@@ -738,7 +744,7 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
             World world, Location location, ItemStack[] inventory, ItemStack[] armour, GameMode gameMode,
             Scoreboard scoreboard, boolean invulnerable, double health, double absorption, int foodLevel, float saturation,
             int level, float exp, boolean allowFlight, boolean flying, boolean sprinting,
-            float walkSpeed, float flySpeed, int fireTicks, Location compassTarget,
+            float walkSpeed, float flySpeed, int fireTicks, long capturedAtMillis, Location compassTarget,
             List<PotionEffect> effects) {}
 
     /**
