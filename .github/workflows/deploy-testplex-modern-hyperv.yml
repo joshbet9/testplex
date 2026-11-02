@@ -442,8 +442,8 @@ jobs:
           server_fs=/home/monstermaze/servers
           tmp_device="$(df -P /var/tmp | awk 'END {print $1}')"
           server_device="$(df -P "$server_fs" | awk 'END {print $1}')"
-          tmp_required_kb=$((stage_kb + map_expanded_kb + 262144))
-          server_required_kb=$((map_expanded_kb + 262144))
+          tmp_required_kb=$((stage_kb + map_expanded_kb + 65536))
+          server_required_kb=$((map_expanded_kb + 65536))
           if [[ "$tmp_device" == "$server_device" ]]; then
             # One copy is extracted under /var/tmp and another is installed beside
             # the live Paper server while the archive and staged extraction still exist.
@@ -454,7 +454,7 @@ jobs:
           server_avail_kb="$(df -Pk "$server_fs" | awk 'END {print $4}')"
           if [[ ! "$tmp_avail_kb" =~ ^[0-9]+$ || ! "$server_avail_kb" =~ ^[0-9]+$ ]] || \
              (( tmp_avail_kb < tmp_required_kb || server_avail_kb < server_required_kb )); then
-            echo "Insufficient deployment staging space: /var/tmp available=${tmp_avail_kb:-unknown} KiB required=$tmp_required_kb KiB; server filesystem available=${server_avail_kb:-unknown} KiB required=$server_required_kb KiB; payload=$stage_kb KiB; expanded Wizards and Monster Maze maps=$map_expanded_kb KiB; reserve=262144 KiB per filesystem." >&2
+            echo "Insufficient deployment staging space: /var/tmp available=${tmp_avail_kb:-unknown} KiB required=$tmp_required_kb KiB; server filesystem available=${server_avail_kb:-unknown} KiB required=$server_required_kb KiB; payload=$stage_kb KiB; expanded Wizards and Monster Maze maps=$map_expanded_kb KiB; reserve=65536 KiB per filesystem." >&2
             exit 1
           fi
           echo "Staging space passed: /var/tmp=$((tmp_avail_kb / 1024)) MiB free (needs $((tmp_required_kb / 1024)) MiB); server filesystem=$((server_avail_kb / 1024)) MiB free (needs $((server_required_kb / 1024)) MiB); payload=$((stage_kb / 1024)) MiB; map expansion=$((map_expanded_kb / 1024)) MiB."
