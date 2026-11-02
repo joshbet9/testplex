@@ -285,6 +285,34 @@ jobs:
           echo "Read-only preflight passed: Testplex target is isolated; service states, enablement, and port are readable. State-changing preflight runs under the deployment lock after journaling."
           REMOTE_PREFLIGHT
 
+      - name: Ensure rsync is available for block-delta transfer
+        shell: bash
+        env:
+          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
+          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
+          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
+        run: |
+          set -euo pipefail
+          SSH_PORT="${HYPERV_SSH_PORT:-22}"
+          remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
+          ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
+            -o BatchMode=yes -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
+          timeout --foreground --signal=TERM --kill-after=15s 4m ssh "${ssh_opts[@]}" "$remote" bash -s <<'REMOTE_RSYNC_SETUP'
+          set -euo pipefail
+          if command -v rsync >/dev/null 2>&1; then
+            rsync --version | head -n 1
+            echo "Remote rsync is ready."
+          else
+            echo "Installing only the rsync transfer utility; Paper and game server services are untouched."
+            timeout --foreground --signal=TERM 3m sudo -n apt-get update
+            timeout --foreground --signal=TERM 3m sudo -n apt-get install -y rsync
+            command -v rsync >/dev/null
+            rsync --version | head -n 1
+          fi
+          REMOTE_RSYNC_SETUP
+
       - name: Compare staged JAR hashes with installed plugins
         id: jar-diff
         shell: bash
