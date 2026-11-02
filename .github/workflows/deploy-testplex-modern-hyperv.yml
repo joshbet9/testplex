@@ -9,14 +9,9 @@ on:
         required: true
         type: boolean
       source_run_id:
-        description: Successful Testplex Modern Paper 26.3 build run ID
+        description: Successful Testplex Modern Paper 26.3 build run ID (uploads only changed JARs and map data)
         required: true
         type: string
-      deployment_scope:
-        description: Select plugin-only updates or a full server/map deployment
-        required: false
-        type: string
-        default: plugins-only
   workflow_dispatch:
     inputs:
       deploy_to_modern_test_server:
@@ -25,18 +20,10 @@ on:
         type: boolean
         default: false
       source_run_id:
-        description: Successful Testplex Modern Paper 26.3 build run ID
+        description: Successful Testplex Modern Paper 26.3 build run ID (uploads only changed JARs and map data)
         required: true
         type: string
         default: "40819650403"
-      deployment_scope:
-        description: Select plugin-only updates or a full server/map deployment
-        required: true
-        type: choice
-        options:
-          - plugins-only
-          - full
-        default: plugins-only
 
 permissions:
   contents: read
@@ -56,15 +43,11 @@ jobs:
         env:
           DEPLOY: ${{ inputs.deploy_to_modern_test_server }}
           SOURCE_RUN_ID: ${{ inputs.source_run_id }}
-          DEPLOYMENT_SCOPE: ${{ inputs.deployment_scope }}
         shell: bash
         run: |
           set -euo pipefail
           [[ "$DEPLOY" == "true" ]] || { echo "Deployment was not explicitly enabled." >&2; exit 1; }
           [[ "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]] || { echo "source_run_id must be numeric." >&2; exit 1; }
-          [[ "$DEPLOYMENT_SCOPE" == plugins-only || "$DEPLOYMENT_SCOPE" == full ]] || {
-            echo "deployment_scope must be plugins-only or full." >&2; exit 1;
-          }
 
   deploy_modern_test_server:
     name: Deploy isolated Paper 26.3 server
@@ -157,7 +140,6 @@ jobs:
           path: deployment-source
 
       - name: Checkout pinned Monster Maze source world assets
-        if: ${{ inputs.deployment_scope == 'full' }}
         uses: actions/checkout@v4
         with:
           repository: joshbet9/MonsterMaze
@@ -165,12 +147,14 @@ jobs:
           ref: 231fb1830ca53a3cdd7451391ac3d384a03ec5bb
           path: monstermaze-source
 
-      - name: Verify and stage the four Testplex JARs and optional source maps
+      - name: Verify and stage the four Testplex JARs and Monster Maze worlds
         id: stage-jars
         shell: bash
         env:
           SOURCE_SHA: ${{ steps.source-artifact.outputs.source_sha }}
-          DEPLOYMENT_SCOPE: ${{ inputs.deployment_scope }}
+          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
+          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
+          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
         run: |
           set -euo pipefail
           source_dir="$RUNNER_TEMP/testplex-modern-artifact"
@@ -184,41 +168,144 @@ jobs:
             unzip -tq "$source_jar" >/dev/null
             cp "$source_jar" "$stage_dir/$jar"
           done
+          maps_archive="$(find "$source_dir" -type f -name WizardsSourceMaps.tar.gz -print -quit)"
+          [[ -n "$maps_archive" && -s "$maps_archive" ]] || { echo "The verified build artifact is missing WizardsSourceMaps.tar.gz." >&2; exit 1; }
+          map_count="$(tar -tzf "$maps_archive" | grep -Ei '\.zip$' | wc -l | tr -d ' ')"
+          [[ "$map_count" == "20" ]] || { echo "Wizards deployment payload must contain exactly 20 map ZIPs; found $map_count." >&2; exit 1; }
+          for folder in "Wizards" "Nano Wizards"; do
+            folder_count="$(tar -tzf "$maps_archive" | grep -E "^$folder/.*\.zip$" | wc -l | tr -d ' ')"
+            [[ "$folder_count" == "10" ]] || { echo "Wizards map payload has $folder_count ZIPs in $folder; expected 10." >&2; exit 1; }
+          done
           recovery_helper="$GITHUB_WORKSPACE/deployment-source/.github/testplex-modern-recovery.sh"
           test -s "$recovery_helper" || { echo "Independent modern recovery helper is missing." >&2; exit 1; }
           cp "$recovery_helper" "$stage_dir/testplex-modern-recovery.sh"
           chmod 0755 "$stage_dir/testplex-modern-recovery.sh"
 
-          manifest=( TestplexModernArcade.jar SnakeModern.jar ArcadeMechanicsModern.jar WizardsModern.jar testplex-modern-recovery.sh )
-          if [[ "$DEPLOYMENT_SCOPE" == full ]]; then
-            maps_archive="$(find "$source_dir" -type f -name WizardsSourceMaps.tar.gz -print -quit)"
-            [[ -n "$maps_archive" && -s "$maps_archive" ]] || { echo "The verified build artifact is missing WizardsSourceMaps.tar.gz." >&2; exit 1; }
-            map_count="$(tar -tzf "$maps_archive" | grep -Ei '\.zip$' | wc -l | tr -d ' ')"
-            [[ "$map_count" == "20" ]] || { echo "Wizards deployment payload must contain exactly 20 map ZIPs; found $map_count." >&2; exit 1; }
-            for folder in "Wizards" "Nano Wizards"; do
-              folder_count="$(tar -tzf "$maps_archive" | grep -E "^$folder/.*\.zip$" | wc -l | tr -d ' ')"
-              [[ "$folder_count" == "10" ]] || { echo "Wizards map payload has $folder_count ZIPs in $folder; expected 10." >&2; exit 1; }
-            done
+          # These physical worlds are required by the Monster Maze game module bundled inside ArcadeMechanicsModern.
+          map_root="$GITHUB_WORKSPACE/monstermaze-source/solo/1.21/maps"
+          map_source_sha="$(git -C "$GITHUB_WORKSPACE/monstermaze-source" rev-parse HEAD)"
+          for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+            test -s "$map_root/$world/level.dat" || { echo "Missing source level.dat for $world" >&2; exit 1; }
+            test -d "$map_root/$world/region" || { echo "Missing source region folder for $world" >&2; exit 1; }
+          done
+          printf '%s\n' "$map_source_sha" > "$stage_dir/MonsterMazeMapsSource.txt"
+          SSH_PORT="${HYPERV_SSH_PORT:-22}"
+          remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
+          ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
+            -o BatchMode=yes -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
+          wizards_maps_sha="$(sha256sum "$maps_archive" | awk '{print $1}')"
+          printf '%s\n' "$wizards_maps_sha" > "$stage_dir/WizardsSourceMaps.sha256"
+          need_wizards_maps="$(timeout --foreground --signal=TERM --kill-after=10s 2m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$wizards_maps_sha" <<'REMOTE_WIZARDS_CACHE_CHECK'
+          set -euo pipefail
+          target_sha="$1"
+          maps_dir=/home/monstermaze/servers/testplex-modern/update/maps
+          marker="$maps_dir/Wizards/.testplex-source-maps-sha256"
+          if [[ ! -s "$marker" ]] || [[ "$(sudo -n cat "$marker" 2>/dev/null || true)" != "$target_sha" ]]; then
+            echo true
+            exit 0
+          fi
+          for folder in "Wizards" "Nano Wizards"; do
+            [[ -d "$maps_dir/$folder" ]] || { echo true; exit 0; }
+            count="$(sudo -n find "$maps_dir/$folder" -maxdepth 1 -type f -iname '*.zip' | wc -l | tr -d ' ')"
+            [[ "$count" == 10 ]] || { echo true; exit 0; }
+          done
+          echo false
+          REMOTE_WIZARDS_CACHE_CHECK
+          )"
+          [[ "$need_wizards_maps" == true || "$need_wizards_maps" == false ]] || { echo "Remote Wizards map-cache check returned an invalid result." >&2; exit 1; }
+          if [[ "$need_wizards_maps" == true ]]; then
             cp "$maps_archive" "$stage_dir/WizardsSourceMaps.tar.gz"
-
-            map_root="$GITHUB_WORKSPACE/monstermaze-source/solo/1.21/maps"
-            map_source_sha="$(git -C "$GITHUB_WORKSPACE/monstermaze-source" rev-parse HEAD)"
-            for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
-              test -s "$map_root/$world/level.dat" || { echo "Missing source level.dat for $world" >&2; exit 1; }
-              test -d "$map_root/$world/region" || { echo "Missing source region folder for $world" >&2; exit 1; }
-            done
+            wizards_measure_dir="$RUNNER_TEMP/wizards-map-measure-$GITHUB_RUN_ID"
+            mkdir -p "$wizards_measure_dir"
+            tar -xzf "$maps_archive" -C "$wizards_measure_dir"
+            wizards_expanded_kb="$(du -sk "$wizards_measure_dir/Wizards" "$wizards_measure_dir/Nano Wizards" | awk '{sum += $1} END {print sum+0}')"
+            echo "Wizards source-map checksum changed or a cached pool is incomplete; staging the 20 validated archives."
+          else
+            wizards_expanded_kb=0
+            echo "Wizards map archive checksum and both installed pools are verified; omitting unchanged map payload."
+          fi
+          # Monster Maze's source worlds are pinned and normally unchanged between code
+          # deploys. Reuse the verified installed copy when its source marker and every
+          # required world are present; only stage the multi-gigabyte archive on a map update.
+          need_mm_maps="$(timeout --foreground --signal=TERM --kill-after=10s 2m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$map_source_sha" <<'REMOTE_MAP_CACHE_CHECK'
+          set -euo pipefail
+          source_sha="$1"
+          server_dir=/home/monstermaze/servers/testplex-modern
+          if [[ ! -d "$server_dir" || -L "$server_dir" ]] ||
+             [[ "$(sudo -n cat "$server_dir/.testplex-mm-source-maps" 2>/dev/null || true)" != "$source_sha" ]]; then
+            echo true
+            exit 0
+          fi
+          for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+            if [[ ! -s "$server_dir/$world/level.dat" || ! -d "$server_dir/$world/region" ]]; then
+              echo true
+              exit 0
+            fi
+          done
+          echo false
+          REMOTE_MAP_CACHE_CHECK
+          )"
+          [[ "$need_mm_maps" == true || "$need_mm_maps" == false ]] || { echo "Remote Monster Maze map-cache check returned an invalid result." >&2; exit 1; }
+          if [[ "$need_mm_maps" == true ]]; then
             tar --exclude='*/session.lock' --exclude='*/uid.dat' -czf "$stage_dir/MonsterMazeMaps.tar.gz" \
               -C "$map_root" mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido
-            printf '%s\n' "$map_source_sha" > "$stage_dir/MonsterMazeMapsSource.txt"
             tar -tzf "$stage_dir/MonsterMazeMaps.tar.gz" >/dev/null
-            manifest+=( MonsterMazeMaps.tar.gz MonsterMazeMapsSource.txt WizardsSourceMaps.tar.gz )
-            echo "Staged both verified source-map payloads for a full deployment."
+            map_expanded_kb="$(du -sk "$map_root"/mm_void "$map_root"/mm_volcano "$map_root"/mm_colombia "$map_root"/mm_sandycoast "$map_root"/mm_siberian "$map_root"/mm_swampland "$map_root"/mm_tesorohundido | awk '{sum += $1} END {print sum+0}')"
+            echo "Monster Maze source changed or is incomplete on the VM; staging its source-world archive."
           else
-            echo "Plugin-only deployment selected: source maps will remain untouched."
+            map_expanded_kb=0
+            echo "Monster Maze source SHA $map_source_sha and all seven installed worlds are verified; omitting unchanged world archive."
           fi
-          (cd "$stage_dir" && sha256sum "${manifest[@]}" > SHA256SUMS)
+          map_expanded_kb=$((map_expanded_kb + wizards_expanded_kb))
+          echo "map_expanded_kb=$map_expanded_kb" >> "$GITHUB_OUTPUT"
+          echo "mm_maps_required=$need_mm_maps" >> "$GITHUB_OUTPUT"
+          echo "wizards_maps_required=$need_wizards_maps" >> "$GITHUB_OUTPUT"
           echo "stage_dir=$stage_dir" >> "$GITHUB_OUTPUT"
-          echo "Verified four Testplex Modern JARs ($SOURCE_SHA); deployment scope=$DEPLOYMENT_SCOPE."
+          echo "Verified four Testplex Modern JARs ($SOURCE_SHA), with Monster Maze bundled in ArcadeMechanicsModern, and seven source worlds ($map_source_sha)"
+
+      - name: Keep only changed plugin artifacts in the upload payload
+        id: jar-diff
+        shell: bash
+        env:
+          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
+          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
+          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
+          STAGE_DIR: ${{ steps.stage-jars.outputs.stage_dir }}
+          MM_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.mm_maps_required }}
+          WIZARDS_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.wizards_maps_required }}
+        run: |
+          set -euo pipefail
+          SSH_PORT="${HYPERV_SSH_PORT:-22}"
+          remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
+          ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
+            -o BatchMode=yes -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
+          changed=()
+          for jar in TestplexModernArcade.jar SnakeModern.jar ArcadeMechanicsModern.jar WizardsModern.jar; do
+            local_sha="$(sha256sum "$STAGE_DIR/$jar" | awk '{print $1}')"
+            installed_sha="$(timeout --foreground --signal=TERM --kill-after=10s 90s ssh "${ssh_opts[@]}" "$remote" \
+              sudo -n sha256sum "/home/monstermaze/servers/testplex-modern/plugins/$jar" 2>/dev/null | awk '{print $1}' || true)"
+            if [[ "$local_sha" == "$installed_sha" ]]; then
+              rm -- "$STAGE_DIR/$jar"
+              echo "Unchanged plugin JAR; omitting upload: $jar ($local_sha)"
+            else
+              changed+=("$jar")
+              echo "Changed plugin JAR; will replace: $jar (installed=${installed_sha:-missing}, target=$local_sha)"
+            fi
+          done
+          printf '%s\n' "${changed[@]}" > "$STAGE_DIR/ChangedModernJars.txt"
+          checksum_files=("$STAGE_DIR/ChangedModernJars.txt" "$STAGE_DIR/MonsterMazeMapsSource.txt" "$STAGE_DIR/WizardsSourceMaps.sha256" "$STAGE_DIR/testplex-modern-recovery.sh")
+          [[ ! -f "$STAGE_DIR/MonsterMazeMaps.tar.gz" ]] || checksum_files+=("$STAGE_DIR/MonsterMazeMaps.tar.gz")
+          [[ ! -f "$STAGE_DIR/WizardsSourceMaps.tar.gz" ]] || checksum_files+=("$STAGE_DIR/WizardsSourceMaps.tar.gz")
+          shopt -s nullglob
+          staged_jars=("$STAGE_DIR"/*.jar)
+          checksum_files+=("${staged_jars[@]}")
+          (cd "$STAGE_DIR" && sha256sum "${checksum_files[@]/$STAGE_DIR\//}" > SHA256SUMS)
+          echo "changed_jars=$(IFS=,; echo "${changed[*]}")" >> "$GITHUB_OUTPUT"
+          echo "Changed JARs: ${changed[*]:-(none)}"
 
       - name: Validate isolated target without changing service state
         id: remote-preflight
@@ -227,7 +314,6 @@ jobs:
           HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
           HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
           HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
-          DEPLOYMENT_SCOPE: ${{ inputs.deployment_scope }}
         run: |
           set -euo pipefail
           test -n "$HYPERV_SSH_HOST" || { echo 'HYPERV_SSH_HOST is not configured.' >&2; exit 1; }
@@ -240,9 +326,8 @@ jobs:
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
 
-          timeout --foreground --signal=TERM --kill-after=15s 5m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$DEPLOYMENT_SCOPE" <<'REMOTE_PREFLIGHT'
+          timeout --foreground --signal=TERM --kill-after=15s 5m ssh "${ssh_opts[@]}" "$remote" bash -s <<'REMOTE_PREFLIGHT'
           set -euo pipefail
-          deployment_scope="$1"
           sudo -n true
           server_dir="/home/monstermaze/servers/testplex-modern"
           if [[ -L "$server_dir" ]]; then
@@ -253,31 +338,15 @@ jobs:
             echo "Target exists without .testplex-modern-sandbox; refusing to risk overwriting an unrelated directory." >&2
             exit 1
           fi
-          if [[ "$deployment_scope" == plugins-only ]]; then
-            for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
-              sudo -n test -s "$server_dir/$world/level.dat" && sudo -n test -d "$server_dir/$world/region" || {
-                echo "Plugin-only deployment requires the existing Monster Maze map $world; refusing to change service state." >&2
-                exit 1
-              }
-            done
-            for folder in "Wizards" "Nano Wizards"; do
-              count="$(sudo -n find "$server_dir/update/maps/$folder" -maxdepth 1 -type f -iname '*.zip' 2>/dev/null | wc -l | tr -d ' ')"
-              [[ "$count" == 10 ]] || {
-                echo "Plugin-only deployment requires 10 verified $folder map archives; found $count." >&2
-                exit 1
-              }
-            done
-            echo "Existing seven Monster Maze worlds and twenty Wizards archives are present; map payloads will be preserved."
-          fi
           for unit in testplex-modern.service testplex-reborn.service; do
             active="$(sudo -n systemctl is-active "$unit" 2>/dev/null || true)"
             enabled="$(sudo -n systemctl is-enabled "$unit" 2>/dev/null || true)"
             if [[ "$active" == unknown && "$enabled" == not-found ]]; then active=inactive; fi
-            # systemd reports a stopped unit after a failed start as "failed".
-            # Treat it as non-running here; the explicit port check below still
-            # blocks replacement if anything owns the modern server port.
-            if [[ "$active" == failed ]]; then
-              echo "$unit is failed/stopped; leaving it untouched and continuing read-only preflight."
+            # systemd reports a failed unit as "failed", not "inactive". It is
+            # definitively not running; tolerate this only for the legacy Reborn
+            # unit, which this deployment never replaces or restarts.
+            if [[ "$unit" == testplex-reborn.service && "$active" == failed ]]; then
+              echo "Legacy Reborn unit is failed/stopped; leaving it untouched and continuing modern preflight."
               active=inactive
             fi
             [[ "$active" == active || "$active" == inactive ]] || {
@@ -298,151 +367,7 @@ jobs:
           echo "Read-only preflight passed: Testplex target is isolated; service states, enablement, and port are readable. State-changing preflight runs under the deployment lock after journaling."
           REMOTE_PREFLIGHT
 
-      - name: Ensure Python is available for entry-level patches
-        shell: bash
-        env:
-          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
-          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
-          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
-        run: |
-          set -euo pipefail
-          SSH_PORT="${HYPERV_SSH_PORT:-22}"
-          remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
-          ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
-            -o BatchMode=yes -o StrictHostKeyChecking=yes
-            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
-            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
-          timeout --foreground --signal=TERM --kill-after=15s 3m ssh "${ssh_opts[@]}" "$remote" bash -s <<'REMOTE_PYTHON_CHECK'
-          set -euo pipefail
-          command -v python3 >/dev/null || {
-            echo "Python 3 is required to verify and reconstruct plugin JAR entry patches." >&2
-            exit 1
-          }
-          python3 --version
-          REMOTE_PYTHON_CHECK
-
-      - name: Read the deployed build identity
-        id: jar-diff
-        shell: bash
-        env:
-          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
-          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
-          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
-          BUILD_SHA: ${{ steps.source-artifact.outputs.source_sha }}
-        run: |
-          set -euo pipefail
-          SSH_PORT="${HYPERV_SSH_PORT:-22}"
-          remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
-          ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
-            -o BatchMode=yes -o StrictHostKeyChecking=yes
-            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
-            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
-          comparison="$(timeout --foreground --signal=TERM --kill-after=15s 3m ssh "${ssh_opts[@]}" "$remote" bash -s <<'REMOTE_BUILD_ID'
-          set -euo pipefail
-          server_dir=/home/monstermaze/servers/testplex-modern
-          deployed_sha="$(sudo -n cat "$server_dir/.testplex-modern-deployed-build" 2>/dev/null || true)"
-          if [[ "$deployed_sha" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "DEPLOYED_BUILD_SHA=$deployed_sha"
-          else
-            echo "DEPLOYED_BUILD_SHA=unknown"
-          fi
-          REMOTE_BUILD_ID
-          )"
-          printf '%s\n' "$comparison"
-          deployed_sha="$(sed -n 's/^DEPLOYED_BUILD_SHA=//p' <<< "$comparison" | tail -n 1)"
-          echo "deployed_build_sha=$deployed_sha" >> "$GITHUB_OUTPUT"
-          if [[ "$deployed_sha" == "$BUILD_SHA" ]]; then
-            echo "candidate_jars=" >> "$GITHUB_OUTPUT"
-            echo "Source build is already deployed; deployment is a no-op."
-          else
-            echo "candidate_jars=TestplexModernArcade.jar,SnakeModern.jar,ArcadeMechanicsModern.jar,WizardsModern.jar" >> "$GITHUB_OUTPUT"
-            echo "Source build changed; checking plugin entry contents against the deployed base."
-          fi
-
-      - name: Resolve the deployed build artifact for patching
-        if: ${{ steps.jar-diff.outputs.candidate_jars != '' }}
-        id: base-artifact
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BASE_SHA: ${{ steps.jar-diff.outputs.deployed_build_sha }}
-        run: |
-          set -euo pipefail
-          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
-            echo "The running server has no valid deployed-build marker; refusing an unbased JAR patch." >&2
-            exit 1
-          }
-          runs_json="$RUNNER_TEMP/testplex-modern-base-runs.json"
-          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
-            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$BASE_SHA&per_page=100" -o "$runs_json"
-          base_run="$(jq -er --arg sha "$BASE_SHA" '
-            [.workflow_runs[] | select(
-              .head_sha == $sha and .status == "completed" and .conclusion == "success" and
-              .path == ".github/workflows/testplex-modern-build.yml" and
-              .head_branch == "feat/testplex-modern-26.3-platform"
-            )] | sort_by(.created_at) | last | .id
-          ' "$runs_json")"
-          artifacts_json="$RUNNER_TEMP/testplex-modern-base-artifacts.json"
-          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
-            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$base_run/artifacts" -o "$artifacts_json"
-          base_artifact="$(jq -ce '[.artifacts[] | select(.expired == false and .name == "testplex-modern-paper-26.3")] | if length == 1 then .[0] else error("expected one unexpired base artifact") end' "$artifacts_json")"
-          artifact_id="$(jq -er '.id' <<< "$base_artifact")"
-          base_dir="$RUNNER_TEMP/testplex-modern-base"
-          mkdir -p "$base_dir"
-          curl -fsSL --retry 3 -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
-            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" \
-            -o "$RUNNER_TEMP/testplex-modern-base.zip"
-          unzip -q "$RUNNER_TEMP/testplex-modern-base.zip" -d "$base_dir"
-          for jar in TestplexModernArcade.jar SnakeModern.jar ArcadeMechanicsModern.jar WizardsModern.jar; do
-            count="$(find "$base_dir" -type f -name "$jar" | wc -l | tr -d ' ')"
-            [[ "$count" == "1" ]] || { echo "Base artifact must contain exactly one $jar; found $count." >&2; exit 1; }
-          done
-          echo "base_run_id=$base_run" >> "$GITHUB_OUTPUT"
-          echo "base_dir=$base_dir" >> "$GITHUB_OUTPUT"
-          echo "Resolved deployed build $BASE_SHA to successful build run $base_run."
-
-      - name: Build changed-entry JAR patches
-        if: ${{ steps.jar-diff.outputs.candidate_jars != '' }}
-        id: build-deltas
-        shell: bash
-        env:
-          BASE_DIR: ${{ steps.base-artifact.outputs.base_dir }}
-          STAGE_DIR: ${{ steps.stage-jars.outputs.stage_dir }}
-          CANDIDATE_JARS: ${{ steps.jar-diff.outputs.candidate_jars }}
-        run: |
-          set -euo pipefail
-          delta_dir="$RUNNER_TEMP/testplex-modern-deltas"
-          mkdir -p "$delta_dir"
-          cp deployment-source/scripts/testplex-jar-delta.py "$delta_dir/testplex-jar-delta.py"
-          chmod 0755 "$delta_dir/testplex-jar-delta.py"
-          IFS=, read -r -a candidate_jars <<< "$CANDIDATE_JARS"
-          changed_jars=()
-          for jar in "${candidate_jars[@]}"; do
-            case "$jar" in TestplexModernArcade.jar|SnakeModern.jar|ArcadeMechanicsModern.jar|WizardsModern.jar) ;; *) echo "Rejected unexpected candidate JAR: $jar." >&2; exit 2 ;; esac
-            base_jar="$(find "$BASE_DIR" -type f -name "$jar" -print -quit)"
-            [[ -s "$base_jar" ]] || { echo "Could not resolve the deployed base JAR for $jar." >&2; exit 1; }
-            output="$(python3 "$delta_dir/testplex-jar-delta.py" create \
-              "$base_jar" "$STAGE_DIR/$jar" \
-              "$delta_dir/$jar.delta.zip" "$delta_dir/$jar.delta.json")"
-            printf '%s\n' "$output"
-            changed_entries="$(sed -n 's/^changed_entry_count=//p' <<< "$output" | tail -n 1)"
-            [[ "$changed_entries" =~ ^[0-9]+$ ]] || { echo "Missing changed-entry count for $jar." >&2; exit 1; }
-            if (( changed_entries > 0 )); then
-              changed_jars+=("$jar")
-            else
-              rm -f -- "$delta_dir/$jar.delta.zip" "$delta_dir/$jar.delta.json"
-              echo "$jar has identical entry contents; excluding it from deployment."
-            fi
-          done
-          changed_jars_csv="$(IFS=,; echo "${changed_jars[*]}")"
-          echo "changed_jars=$changed_jars_csv" >> "$GITHUB_OUTPUT"
-          echo "delta_dir=$delta_dir" >> "$GITHUB_OUTPUT"
-          if [[ -z "$changed_jars_csv" ]]; then
-            echo "No plugin entry contents changed; deployment is a no-op."
-          else
-            echo "Created entry-level patches for: $changed_jars_csv"
-          fi
-      - name: Upload verified JAR deltas to the isolated directory
+      - name: Upload verified JARs to the isolated directory
         id: upload
         shell: bash
         env:
@@ -451,104 +376,188 @@ jobs:
           HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
           BUILD_SHA: ${{ steps.source-artifact.outputs.source_sha }}
           STAGE_DIR: ${{ steps.stage-jars.outputs.stage_dir }}
-          DELTA_DIR: ${{ steps.build-deltas.outputs.delta_dir }}
-          DEPLOYMENT_SCOPE: ${{ inputs.deployment_scope }}
-          CHANGED_JARS: ${{ steps.build-deltas.outputs.changed_jars }}
+          MM_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.mm_maps_required }}
+          MAP_EXPANDED_KB: ${{ steps.stage-jars.outputs.map_expanded_kb }}
+          WIZARDS_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.wizards_maps_required }}
         run: |
           set -euo pipefail
-          SSH_PORT="${HYPERV_SSH_PORT:-22}"
+          SSH_PORT="$HYPERV_SSH_PORT"
+          [[ -n "$SSH_PORT" ]] || SSH_PORT=22
           remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
           upload_dir="/var/tmp/testplex-modern-artifacts-$BUILD_SHA"
           ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
-            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=20)
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
           scp_opts=(-P "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
-            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=12)
-          IFS=, read -r -a changed_jars <<< "$CHANGED_JARS"
-          if [[ -z "$CHANGED_JARS" ]]; then
-            echo "changed_jars=" >> "$GITHUB_OUTPUT"
-            echo "upload_dir=" >> "$GITHUB_OUTPUT"
-            echo "No changed plugin JARs; skipping upload."
-            exit 0
-          fi
-
-          # The patch is built from the successful artifact matching the server's
-          # deployed SHA. The receiver rechecks each installed base hash before use.
-          payload_kb="$(du -sk "$DELTA_DIR" | awk '{print $1}')"
-          [[ "$payload_kb" =~ ^[0-9]+$ && "$payload_kb" -gt 0 ]] || { echo "Invalid entry-delta payload size." >&2; exit 1; }
-          target_size_kb="$(du -sk "$STAGE_DIR"/*.jar | awk '{sum += $1} END {print sum+0}')"
-          [[ "$target_size_kb" =~ ^[0-9]+$ && "$target_size_kb" -gt 0 ]] || { echo "Could not size target JARs." >&2; exit 1; }
-          required_free_kb=$((payload_kb + target_size_kb * 2 + 524288))
-          echo "Entry-patch payload: $((payload_kb / 1024)) MiB; reconstructed JAR budget: $((target_size_kb / 1024)) MiB."
-          timeout --foreground --signal=TERM --kill-after=15s 4m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$BUILD_SHA" "$required_free_kb" "$CHANGED_JARS" <<'REMOTE_STAGE'
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=40)
+          # The legacy and modern deploy jobs share one Hyper-V disk and are serialized.
+          # Only generated, abandoned staging directories are eligible for pruning; never
+          # clean server worlds, installed plugins, databases or recovery backups.
+          stage_kb="$(du -sk "$STAGE_DIR" | awk '{print $1}')"
+          [[ "$stage_kb" =~ ^[0-9]+$ ]] && (( stage_kb > 0 )) || { echo "Could not determine the verified deployment payload size." >&2; exit 1; }
+          # Uploaded chunk parts are replaced by sequential assembly, deleting each part only
+          # after it has been appended. Peak staging use stays within one payload copy.
+          [[ "$MAP_EXPANDED_KB" =~ ^[0-9]+$ ]] || { echo "Invalid map expansion budget." >&2; exit 1; }
+          timeout --foreground --signal=TERM --kill-after=15s 5m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$BUILD_SHA" "$stage_kb" "$MAP_EXPANDED_KB" <<'REMOTE_STAGE_PREP'
           set -euo pipefail
           build_sha="$1"
-          required_free_kb="$2"
-          changed_jars_csv="$3"
-          [[ "$build_sha" =~ ^[0-9a-f]{40}$ && "$required_free_kb" =~ ^[0-9]+$ ]] || exit 2
+          stage_kb="$2"
+          map_expanded_kb="$3"
+          [[ "$build_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid build SHA for artifact staging." >&2; exit 1; }
+          [[ "$stage_kb" =~ ^[0-9]+$ && "$map_expanded_kb" =~ ^[0-9]+$ ]] || { echo "Invalid deployment storage budget." >&2; exit 1; }
           upload_dir="/var/tmp/testplex-modern-artifacts-$build_sha"
-          server_dir=/home/monstermaze/servers/testplex-modern
+          echo "Disk usage before staging-cache cleanup:"
+          df -h /var/tmp
+          df -i /var/tmp
+          shopt -s nullglob
+          now_epoch="$(date +%s)"
+          for existing in /var/tmp/testplex-modern-artifacts-*; do
+            [[ -d "$existing" && ! -L "$existing" ]] || continue
+            name="${existing##*/}"
+            [[ "$name" =~ ^testplex-modern-artifacts-[0-9a-f]{40}$ ]] || continue
+            [[ "$existing" == "$upload_dir" ]] && continue
+            # Another workflow may be actively uploading to a different SHA-named
+            # directory. Only prune caches that have been untouched for >24h.
+            mtime="$(stat -c %Y -- "$existing" 2>/dev/null || printf '0')"
+            if [[ "$mtime" =~ ^[0-9]+$ ]] && (( now_epoch - mtime > 86400 )); then
+              size="$(du -sh -- "$existing" 2>/dev/null | cut -f1 || true)"
+              echo "Removing abandoned modern deployment cache (>24h old): $existing (${size:-size unavailable})"
+              sudo -n rm -rf -- "$existing"
+            else
+              echo "Leaving recent/possibly active modern staging directory untouched: $existing"
+            fi
+          done
           sudo -n rm -rf -- "$upload_dir"
+          # Downloaded package archives are reproducible cache, not installed software.
+          # This safely recovers small amounts of space without touching worlds or backups.
+          apt_cache_before="$(sudo -n du -sh /var/cache/apt/archives 2>/dev/null | cut -f1 || true)"
           sudo -n apt-get clean
-          avail_kb="$(df -Pk /var/tmp | awk 'END {print $4}')"
-          [[ "$avail_kb" =~ ^[0-9]+$ ]] && (( avail_kb >= required_free_kb )) || {
-            echo "Insufficient staging space: available=${avail_kb:-unknown}KiB required=$required_free_kb KiB." >&2
+          echo "Cleared downloaded APT package cache (${apt_cache_before:-size unavailable}); installed packages were not removed."
+          echo "Disk usage after staging-cache and package-cache cleanup:"
+          df -h /var/tmp
+          df -i /var/tmp
+          server_fs=/home/monstermaze/servers
+          tmp_device="$(df -P /var/tmp | awk 'END {print $1}')"
+          server_device="$(df -P "$server_fs" | awk 'END {print $1}')"
+          tmp_required_kb=$((stage_kb + map_expanded_kb + 262144))
+          server_required_kb=$((map_expanded_kb + 262144))
+          if [[ "$tmp_device" == "$server_device" ]]; then
+            # One copy is extracted under /var/tmp and another is installed beside
+            # the live Paper server while the archive and staged extraction still exist.
+            tmp_required_kb=$((tmp_required_kb + map_expanded_kb))
+            server_required_kb=0
+          fi
+          tmp_avail_kb="$(df -Pk /var/tmp | awk 'END {print $4}')"
+          server_avail_kb="$(df -Pk "$server_fs" | awk 'END {print $4}')"
+          if [[ ! "$tmp_avail_kb" =~ ^[0-9]+$ || ! "$server_avail_kb" =~ ^[0-9]+$ ]] || \
+             (( tmp_avail_kb < tmp_required_kb || server_avail_kb < server_required_kb )); then
+            echo "Insufficient deployment staging space: /var/tmp available=${tmp_avail_kb:-unknown} KiB required=$tmp_required_kb KiB; server filesystem available=${server_avail_kb:-unknown} KiB required=$server_required_kb KiB; payload=$stage_kb KiB; expanded Wizards and Monster Maze maps=$map_expanded_kb KiB; reserve=262144 KiB per filesystem." >&2
             exit 1
-          }
+          fi
+          echo "Staging space passed: /var/tmp=$((tmp_avail_kb / 1024)) MiB free (needs $((tmp_required_kb / 1024)) MiB); server filesystem=$((server_avail_kb / 1024)) MiB free (needs $((server_required_kb / 1024)) MiB); payload=$((stage_kb / 1024)) MiB; map expansion=$((map_expanded_kb / 1024)) MiB."
           install -d -m 0700 -- "$upload_dir"
-          IFS=, read -r -a changed_jars <<< "$changed_jars_csv"
-          for jar in "${changed_jars[@]}"; do
-            case "$jar" in TestplexModernArcade.jar|SnakeModern.jar|ArcadeMechanicsModern.jar|WizardsModern.jar) ;; *) exit 2 ;; esac
-            installed="$server_dir/plugins/$jar"
-            [[ -s "$installed" ]] || { echo "Missing installed patch base for $jar." >&2; exit 1; }
-            cp --reflink=auto -- "$installed" "$upload_dir/$jar.base"
-            chmod u+rw -- "$upload_dir/$jar.base"
-          done
-          echo "$upload_dir"
-          REMOTE_STAGE
-          timeout --foreground --signal=TERM --kill-after=15s 3m scp "${scp_opts[@]}" \
-            "$DELTA_DIR/testplex-jar-delta.py" "$remote:$upload_dir/testplex-jar-delta.py"
-          transfer_files=()
-          for jar in "${changed_jars[@]}"; do
-            transfer_files+=("$DELTA_DIR/$jar.delta.zip" "$DELTA_DIR/$jar.delta.json")
-          done
-          timeout --foreground --signal=TERM --kill-after=20s 4m scp "${scp_opts[@]}" \
-            "${transfer_files[@]}" "$remote:$upload_dir/"
-          timeout --foreground --signal=TERM --kill-after=15s 3m scp "${scp_opts[@]}" \
-            "$STAGE_DIR/testplex-modern-recovery.sh" "$remote:$upload_dir/testplex-modern-recovery.sh"
-          # Rebuild each JAR in isolation; only entry patches cross the network.
-          timeout --foreground --signal=TERM --kill-after=20s 5m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" "${changed_jars[@]}" <<'REMOTE_APPLY'
+          REMOTE_STAGE_PREP
+          # Use the SFTP subsystem rather than legacy SCP's single remote sink process.
+          # Split the large JAR into smaller files and keep only four SFTP writes outstanding;
+          # this avoids leaving the VM unresponsive while its /var/tmp storage flushes a large write.
+          sftp_opts=(-P "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
+            -o BatchMode=yes -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+            -o ConnectTimeout=20 -o ServerAliveInterval=15
+            -o ServerAliveCountMax=40 -o TCPKeepAlive=yes
+            -B 65536 -R 4)
+          chunk_dir="$RUNNER_TEMP/testplex-modern-arcade-chunks"
+          mkdir -p "$chunk_dir"
+          arcade_chunks=()
+          if [[ -f "$STAGE_DIR/ArcadeMechanicsModern.jar" ]]; then
+            split -b 4M -d -a 3 "$STAGE_DIR/ArcadeMechanicsModern.jar" "$chunk_dir/ArcadeMechanicsModern.jar.part."
+            mapfile -t arcade_chunks < <(printf '%s\n' "$chunk_dir"/ArcadeMechanicsModern.jar.part.* | sort)
+            test "${#arcade_chunks[@]}" -gt 0
+          fi
+          world_chunks=()
+          if [[ "$MM_MAPS_REQUIRED" == true ]]; then
+            split -b 512K -d -a 3 "$STAGE_DIR/MonsterMazeMaps.tar.gz" "$chunk_dir/MonsterMazeMaps.tar.gz.part."
+            mapfile -t world_chunks < <(printf '%s\n' "$chunk_dir"/MonsterMazeMaps.tar.gz.part.* | sort)
+            test "${#world_chunks[@]}" -gt 0
+          elif [[ "$MM_MAPS_REQUIRED" != false ]]; then
+            echo "Invalid Monster Maze map staging flag: $MM_MAPS_REQUIRED" >&2
+            exit 1
+          fi
+          batch_file="$RUNNER_TEMP/testplex-modern-upload.sftp"
+          {
+            printf 'cd "%s"\n' "$upload_dir"
+            while IFS= read -r jar; do
+              [[ -n "$jar" ]] || continue
+              case "$jar" in
+                TestplexModernArcade.jar|SnakeModern.jar|ArcadeMechanicsModern.jar|WizardsModern.jar) ;;
+                *) echo "Invalid changed JAR in manifest: $jar" >&2; exit 1 ;;
+              esac
+              [[ "$jar" == ArcadeMechanicsModern.jar ]] && continue
+              printf 'put "%s" "%s"\n' "$STAGE_DIR/$jar" "$jar"
+            done < "$STAGE_DIR/ChangedModernJars.txt"
+            printf 'put "%s" "%s"\n' "$STAGE_DIR/ChangedModernJars.txt" "ChangedModernJars.txt"
+            printf 'put "%s" "%s"\n' "$STAGE_DIR/MonsterMazeMapsSource.txt" "MonsterMazeMapsSource.txt"
+            printf 'put "%s" "%s"\n' "$STAGE_DIR/WizardsSourceMaps.sha256" "WizardsSourceMaps.sha256"
+            if [[ "$WIZARDS_MAPS_REQUIRED" == true ]]; then
+              printf 'put "%s" "%s"\n' "$STAGE_DIR/WizardsSourceMaps.tar.gz" "WizardsSourceMaps.tar.gz"
+            elif [[ "$WIZARDS_MAPS_REQUIRED" != false ]]; then
+              echo "Invalid Wizards map staging flag: $WIZARDS_MAPS_REQUIRED" >&2
+              exit 1
+            fi
+            printf 'put "%s" "%s"\n' "$STAGE_DIR/testplex-modern-recovery.sh" "testplex-modern-recovery.sh"
+            for file in "${world_chunks[@]}" "${arcade_chunks[@]}"; do
+              printf 'put "%s" "%s"\n' "$file" "${file##*/}"
+            done
+          } > "$batch_file"
+          echo "Uploading verified modern artifacts with SFTP, ${#arcade_chunks[@]} 4 MiB Arcade JAR parts and ${#world_chunks[@]} 512 KiB map parts."
+          timeout --foreground --signal=TERM --kill-after=30s 15m sftp "${sftp_opts[@]}" -b "$batch_file" "$remote"
+          timeout --foreground --signal=TERM --kill-after=30s 6m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" "$MM_MAPS_REQUIRED" <<'REMOTE_ASSEMBLE_ARCADE'
           set -euo pipefail
           upload_dir="$1"
-          shift
-          [[ -d "$upload_dir" && ! -L "$upload_dir" && "$#" -gt 0 ]] || {
-            echo "Invalid upload directory or empty patch list." >&2
-            exit 2
-          }
-          for jar in "$@"; do
-            case "$jar" in
-              TestplexModernArcade.jar|SnakeModern.jar|ArcadeMechanicsModern.jar|WizardsModern.jar) ;;
-              *) echo "Rejected unexpected patch JAR name: $jar." >&2; exit 2 ;;
-            esac
-            python3 "$upload_dir/testplex-jar-delta.py" apply \
-              "$upload_dir/$jar.base" "$upload_dir/$jar.delta.zip" \
-              "$upload_dir/$jar.delta.json" "$upload_dir/$jar.rebuilt"
-            mv -- "$upload_dir/$jar.rebuilt" "$upload_dir/$jar"
-            rm -f -- "$upload_dir/$jar.base" "$upload_dir/$jar.delta.zip" "$upload_dir/$jar.delta.json"
-            echo "Reconstructed and verified staged $jar."
-          done
+          mm_maps_required="$2"
           cd "$upload_dir"
-          sha256sum "$@" testplex-modern-recovery.sh > SHA256SUMS
-          sha256sum -c SHA256SUMS
-          REMOTE_APPLY
+          shopt -s nullglob
+          map_parts=(MonsterMazeMaps.tar.gz.part.*)
+          arcade_parts=(ArcadeMechanicsModern.jar.part.*)
+          # Assemble each payload in place: remove a chunk only after it has been
+          # appended successfully. This bounds the peak of (remaining parts + output)
+          # to one copy of each source file instead of retaining two full copies.
+          if [[ "$mm_maps_required" == true ]]; then
+            [[ ${#map_parts[@]} -gt 0 ]] || { echo "Monster Maze map update requested but no archive parts arrived." >&2; exit 1; }
+            : > MonsterMazeMaps.tar.gz.tmp
+            for part in "${map_parts[@]}"; do
+              cat "$part" >> MonsterMazeMaps.tar.gz.tmp
+              rm -- "$part"
+            done
+            mv MonsterMazeMaps.tar.gz.tmp MonsterMazeMaps.tar.gz
+            echo "Assembled MonsterMazeMaps.tar.gz ($(stat -c %s MonsterMazeMaps.tar.gz) bytes)."
+          elif [[ "$mm_maps_required" != false || ${#map_parts[@]} -ne 0 ]]; then
+            echo "Unexpected Monster Maze map payload for unchanged source maps." >&2
+            exit 1
+          fi
+          if grep -Fxq ArcadeMechanicsModern.jar ChangedModernJars.txt; then
+            [[ ${#arcade_parts[@]} -gt 0 ]] || { echo "Changed Arcade JAR manifest has no uploaded parts." >&2; exit 1; }
+            : > ArcadeMechanicsModern.jar.tmp
+            for part in "${arcade_parts[@]}"; do
+              cat "$part" >> ArcadeMechanicsModern.jar.tmp
+              rm -- "$part"
+            done
+            mv ArcadeMechanicsModern.jar.tmp ArcadeMechanicsModern.jar
+            echo "Assembled ArcadeMechanicsModern.jar ($(stat -c %s ArcadeMechanicsModern.jar) bytes)."
+          elif [[ ${#arcade_parts[@]} -ne 0 ]]; then
+            echo "Unexpected Arcade JAR parts arrived for an unchanged artifact." >&2
+            exit 1
+          fi
+          REMOTE_ASSEMBLE_ARCADE
+          timeout --foreground --signal=TERM --kill-after=15s 3m scp "${scp_opts[@]}" \
+            "$STAGE_DIR/SHA256SUMS" "$remote:$upload_dir/SHA256SUMS"
+          timeout --foreground --signal=TERM --kill-after=15s 3m ssh "${ssh_opts[@]}" "$remote" "echo 'Disk after transfer:'; df -h /var/tmp; du -sh '$upload_dir'; cd '$upload_dir' && sha256sum -c SHA256SUMS"
           echo "upload_dir=$upload_dir" >> "$GITHUB_OUTPUT"
-          echo "Built and uploaded entry-level deltas for: $CHANGED_JARS"
 
       - name: Provision and start only testplex-modern.service
-        if: ${{ steps.build-deltas.outputs.changed_jars != '' }}
         id: install-and-start
         shell: bash
         timeout-minutes: 35
@@ -558,8 +567,8 @@ jobs:
           HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
           BUILD_SHA: ${{ steps.source-artifact.outputs.source_sha }}
           UPLOAD_DIR: ${{ steps.upload.outputs.upload_dir }}
-          DEPLOYMENT_SCOPE: ${{ inputs.deployment_scope }}
-          CHANGED_JARS: ${{ steps.build-deltas.outputs.changed_jars }}
+          MM_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.mm_maps_required }}
+          WIZARDS_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.wizards_maps_required }}
           # EULA accepted per the user's explicit instruction for this isolated test server.
           ACCEPT_EULA: "true"
         run: |
@@ -573,13 +582,13 @@ jobs:
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=20)
           echo "[deploy] opening an exclusive remote deployment lock."
           deploy_exit=0
-          timeout --foreground --signal=TERM --kill-after=30s 28m ssh "${ssh_opts[@]}" "$remote" sudo -n flock -n /var/lock/testplex-modern-deploy.lock bash -s -- "$BUILD_SHA" "$UPLOAD_DIR" "$ACCEPT_EULA" "$DEPLOYMENT_SCOPE" "$CHANGED_JARS" <<'REMOTE_DEPLOY' || deploy_exit=$?
+          timeout --foreground --signal=TERM --kill-after=30s 28m ssh "${ssh_opts[@]}" "$remote" sudo -n flock -n /var/lock/testplex-modern-deploy.lock bash -s -- "$BUILD_SHA" "$UPLOAD_DIR" "$ACCEPT_EULA" "$MM_MAPS_REQUIRED" "$WIZARDS_MAPS_REQUIRED" <<'REMOTE_DEPLOY' || deploy_exit=$?
           set -euo pipefail
           BUILD_SHA="$1"
           UPLOAD_DIR="$2"
           ACCEPT_EULA="$3"
-          DEPLOYMENT_SCOPE="$4"
-          CHANGED_JARS="$5"
+          MM_MAPS_REQUIRED="$4"
+          WIZARDS_MAPS_REQUIRED="$5"
           SERVER_DIR="/home/monstermaze/servers/testplex-modern"
           JAVA_HOME="/opt/testplex/java25"
           JAVA_BIN="$JAVA_HOME/bin/java"
@@ -587,22 +596,32 @@ jobs:
 
           [[ "$BUILD_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid source build SHA." >&2; exit 1; }
           [[ "$ACCEPT_EULA" == "true" ]] || { echo "Minecraft EULA acknowledgement missing." >&2; exit 1; }
-          IFS=, read -r -a changed_jars <<< "$CHANGED_JARS"
-          [[ "${#changed_jars[@]}" -gt 0 ]] || { echo "No changed JARs were passed to a deployment transaction." >&2; exit 1; }
+          sudo -n test -s "$UPLOAD_DIR/ChangedModernJars.txt"
+          mapfile -t changed_jars < <(sudo -n cat "$UPLOAD_DIR/ChangedModernJars.txt")
           for jar in "${changed_jars[@]}"; do
+            [[ -n "$jar" ]] || continue
             case "$jar" in
-              TestplexModernArcade.jar|SnakeModern.jar|ArcadeMechanicsModern.jar|WizardsModern.jar) sudo -n test -s "$UPLOAD_DIR/$jar" ;;
-              *) echo "Rejected unexpected changed JAR name: $jar." >&2; exit 1 ;;
+              TestplexModernArcade.jar|SnakeModern.jar|ArcadeMechanicsModern.jar|WizardsModern.jar) ;;
+              *) echo "Invalid changed plugin JAR in verified manifest: $jar" >&2; exit 1 ;;
             esac
+            sudo -n test -s "$UPLOAD_DIR/$jar"
           done
           sudo -n test -s "$UPLOAD_DIR/testplex-modern-recovery.sh"
-          if [[ "$DEPLOYMENT_SCOPE" == full ]]; then
+          sudo -n test -s "$UPLOAD_DIR/MonsterMazeMapsSource.txt"
+          sudo -n test -s "$UPLOAD_DIR/WizardsSourceMaps.sha256"
+          if [[ "$MM_MAPS_REQUIRED" == true ]]; then
             sudo -n test -s "$UPLOAD_DIR/MonsterMazeMaps.tar.gz"
-            sudo -n test -s "$UPLOAD_DIR/MonsterMazeMapsSource.txt"
+          elif [[ "$MM_MAPS_REQUIRED" != false || -e "$UPLOAD_DIR/MonsterMazeMaps.tar.gz" ]]; then
+            echo "Invalid Monster Maze map payload state; refusing deployment." >&2
+            exit 1
+          fi
+          if [[ "$WIZARDS_MAPS_REQUIRED" == true ]]; then
             sudo -n test -s "$UPLOAD_DIR/WizardsSourceMaps.tar.gz"
+          elif [[ "$WIZARDS_MAPS_REQUIRED" != false || -e "$UPLOAD_DIR/WizardsSourceMaps.tar.gz" ]]; then
+            echo "Invalid Wizards map payload state; refusing deployment." >&2
+            exit 1
           fi
           sudo -n test -s "$UPLOAD_DIR/SHA256SUMS"
-          echo "[deploy] build=$BUILD_SHA scope=$DEPLOYMENT_SCOPE; staged payload hashes will be verified before transaction."
 
           STATE_DIR=/var/lib/testplex-modern-deploy
           RECOVERY_HELPER=/usr/local/sbin/testplex-modern-recovery
@@ -651,43 +670,32 @@ jobs:
           fi
           "$JAVA_BIN" -version
 
-          FPP_VERSION="2.1.7"
-          if [[ "$DEPLOYMENT_SCOPE" == full ]]; then
-            echo "Fetching a stable Paper build for Minecraft 26.3 from PaperMC's official downloads service."
-            echo "[deploy] querying Paper 26.3 metadata (4 minute limit)."
-            builds_json="$(timeout --foreground --signal=TERM 4m curl --fail --silent --show-error --retry 3 --user-agent "$USER_AGENT" \
-              "https://fill.papermc.io/v3/projects/paper/versions/26.3/builds")"
-            if printf '%s' "$builds_json" | jq -e '.ok == false' >/dev/null 2>&1; then
-              printf '%s\n' "$builds_json" | jq -r '.message // "PaperMC downloads API returned an error."' >&2
-              exit 1
-            fi
-            paper_build="$(printf '%s' "$builds_json" | jq -er 'first(.[] | select(.channel == "STABLE") | .id)')"
-            paper_url="$(printf '%s' "$builds_json" | jq -er 'first(.[] | select(.channel == "STABLE") | .downloads."server:default".url)')"
-            paper_sha="$(printf '%s' "$builds_json" | jq -er 'first(.[] | select(.channel == "STABLE") | .downloads."server:default".checksums.sha256)')"
-            paper_tmp="$UPLOAD_DIR/paper-26.3-$paper_build.jar"
-            echo "[deploy] downloading Paper build $paper_build."
-            timeout --foreground --signal=TERM 8m curl --fail --location --retry 3 --user-agent "$USER_AGENT" "$paper_url" -o "$paper_tmp"
-            printf '%s  %s\n' "$paper_sha" "$paper_tmp" | sha256sum -c -
-
-            # Fetch the unmodified, pinned FakePlayerPlugin release from Hangar.
-            FPP_TMP="$UPLOAD_DIR/fake-player-plugin-$FPP_VERSION.jar"
-            FPP_URL="https://hangarcdn.papermc.io/plugins/Janky-Development/FakePlayerPlugin/versions/$FPP_VERSION/PAPER/fake-player-plugin-$FPP_VERSION.jar"
-            echo "[deploy] downloading FakePlayerPlugin $FPP_VERSION from Hangar."
-            timeout --foreground --signal=TERM 6m curl --fail --location --retry 3 --user-agent "$USER_AGENT" \
-              "$FPP_URL" -o "$FPP_TMP"
-            unzip -tq "$FPP_TMP" >/dev/null
-          else
-            # Keep plugin-only redeploys short: verify and reuse the installed
-            # Paper/FPP versions instead of downloading or replacing them.
-            paper_build="$(sudo -n cat "$SERVER_DIR/.testplex-paper-build")"
-            paper_tmp="$SERVER_DIR/paper.jar"
-            FPP_TMP="$SERVER_DIR/plugins/FakePlayerPlugin.jar"
-            sudo -n test -s "$paper_tmp" && sudo -n test -s "$FPP_TMP" || {
-              echo "Plugin-only deployment requires the already installed Paper and FakePlayerPlugin jars." >&2
-              exit 1
-            }
-            echo "[deploy] reusing installed Paper build $paper_build and FakePlayerPlugin $FPP_VERSION."
+          echo "Fetching a stable Paper build for Minecraft 26.3 from PaperMC's official downloads service."
+          echo "[deploy] querying Paper 26.3 metadata (4 minute limit)."
+          builds_json="$(timeout --foreground --signal=TERM 4m curl --fail --silent --show-error --retry 3 --user-agent "$USER_AGENT" \
+            "https://fill.papermc.io/v3/projects/paper/versions/26.3/builds")"
+          if printf '%s' "$builds_json" | jq -e '.ok == false' >/dev/null 2>&1; then
+            printf '%s\n' "$builds_json" | jq -r '.message // "PaperMC downloads API returned an error."' >&2
+            exit 1
           fi
+          paper_build="$(printf '%s' "$builds_json" | jq -er 'first(.[] | select(.channel == "STABLE") | .id)')"
+          paper_url="$(printf '%s' "$builds_json" | jq -er 'first(.[] | select(.channel == "STABLE") | .downloads."server:default".url)')"
+          paper_sha="$(printf '%s' "$builds_json" | jq -er 'first(.[] | select(.channel == "STABLE") | .downloads."server:default".checksums.sha256)')"
+          paper_tmp="$UPLOAD_DIR/paper-26.3-$paper_build.jar"
+          echo "[deploy] downloading Paper build $paper_build (8 minute limit)."
+          timeout --foreground --signal=TERM 8m curl --fail --location --retry 3 --user-agent "$USER_AGENT" "$paper_url" -o "$paper_tmp"
+          printf '%s  %s\n' "$paper_sha" "$paper_tmp" | sha256sum -c -
+
+          # FakePlayerPlugin is a separate Paper plugin with its own distribution terms.
+          # Fetch the unmodified, pinned release directly onto the user's administered VM:
+          # it is intentionally not bundled into or redistributed with Testplex artifacts.
+          FPP_VERSION="2.1.7"
+          FPP_TMP="$UPLOAD_DIR/fake-player-plugin-$FPP_VERSION.jar"
+          FPP_URL="https://hangarcdn.papermc.io/plugins/Janky-Development/FakePlayerPlugin/versions/$FPP_VERSION/PAPER/fake-player-plugin-$FPP_VERSION.jar"
+          echo "[deploy] downloading FakePlayerPlugin $FPP_VERSION from the official Hangar release (6 minute limit)."
+          timeout --foreground --signal=TERM 6m curl --fail --location --retry 3 --user-agent "$USER_AGENT" \
+            "$FPP_URL" -o "$FPP_TMP"
+          unzip -tq "$FPP_TMP" >/dev/null
           fpp_descriptor="$(unzip -p "$FPP_TMP" plugin.yml)"
           yaml_descriptor_value() {
             local key="$1" descriptor="$2"
@@ -703,10 +711,9 @@ jobs:
             exit 1
           }
 
-          # Full scope stages maps outside live Bukkit world folders. Plugin-only scope
-          # leaves all installed map assets untouched and validates them before replacement.
+          # Stage and validate source worlds outside the live Bukkit world folders.
           MAP_STAGE_DIR="$UPLOAD_DIR/mm-map-stage"
-          if [[ "$DEPLOYMENT_SCOPE" == full ]]; then
+          if [[ "$MM_MAPS_REQUIRED" == true ]]; then
             mkdir -p "$MAP_STAGE_DIR"
             tar -xzf "$UPLOAD_DIR/MonsterMazeMaps.tar.gz" -C "$MAP_STAGE_DIR"
             for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
@@ -716,15 +723,14 @@ jobs:
           else
             for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
               sudo -n test -s "$SERVER_DIR/$world/level.dat" && sudo -n test -d "$SERVER_DIR/$world/region" || {
-                echo "Plugin-only transaction requires the existing Monster Maze map $world." >&2
+                echo "Verified Monster Maze world $world disappeared after staging preflight; refusing deployment." >&2
                 exit 1
               }
             done
-            for folder in "Wizards" "Nano Wizards"; do
-              count="$(sudo -n find "$SERVER_DIR/update/maps/$folder" -maxdepth 1 -type f -iname '*.zip' 2>/dev/null | wc -l | tr -d ' ')"
-              [[ "$count" == 10 ]] || { echo "Plugin-only transaction requires 10 existing $folder map archives; found $count." >&2; exit 1; }
-            done
-            echo "[deploy] revalidated existing source maps under the exclusive transaction lock."
+            [[ "$(sudo -n cat "$SERVER_DIR/.testplex-mm-source-maps")" == "$(sudo -n cat "$UPLOAD_DIR/MonsterMazeMapsSource.txt")" ]] || {
+              echo "Monster Maze source marker changed after staging preflight; refusing a code-only deployment." >&2
+              exit 1
+            }
           fi
 
           STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -733,10 +739,6 @@ jobs:
           previous_enabled="$(sudo -n systemctl is-enabled testplex-modern.service 2>/dev/null || true)"
           active_state="$(sudo -n systemctl is-active testplex-modern.service 2>/dev/null || true)"
           if [[ "$active_state" == unknown && "$previous_enabled" == not-found ]]; then active_state=inactive; fi
-          # systemd reports a failed unit as non-running; forward recovery has
-          # already stopped the isolated process and the port check below must
-          # still prove that nothing is listening before replacement.
-          if [[ "$active_state" == failed ]]; then active_state=inactive; fi
           reborn_active_state="$(sudo -n systemctl is-active testplex-reborn.service 2>/dev/null || true)"
           reborn_enabled_state="$(sudo -n systemctl is-enabled testplex-reborn.service 2>/dev/null || true)"
           if [[ "$reborn_active_state" == unknown && "$reborn_enabled_state" == not-found ]]; then reborn_active_state=inactive; fi
@@ -771,30 +773,22 @@ jobs:
             sudo -n test -d "$SERVER_DIR/plugins" && HAD_OLD_PLUGINS=true || true
           fi
           prior_files=""; worlds_before=""; snapshot_items=()
-          if [[ "$DEPLOYMENT_SCOPE" == full ]]; then
-            for item in paper.jar server.properties eula.txt .testplex-modern-deployed-build .testplex-paper-build .testplex-mm-source-maps .testplex-plugin-sha256sums .testplex-modern-sandbox; do
-              if [[ "$SERVER_DIR_EXISTS" == true ]] && sudo -n test -e "$SERVER_DIR/$item"; then
-                snapshot_items+=("$item"); prior_files="${prior_files:+$prior_files,}$item"
-              fi
-            done
-            for item in "update/maps/Wizards" "update/maps/Nano Wizards"; do
-              if [[ "$SERVER_DIR_EXISTS" == true ]] && sudo -n test -e "$SERVER_DIR/$item"; then
-                snapshot_items+=("$item"); prior_files="${prior_files:+$prior_files,}$item"
-              fi
-            done
-            for item in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
-              if [[ "$SERVER_DIR_EXISTS" == true ]] && sudo -n test -e "$SERVER_DIR/$item"; then
-                snapshot_items+=("$item"); worlds_before="${worlds_before:+$worlds_before,}$item"
-              fi
-            done
-          else
-            for item in paper.jar server.properties eula.txt .testplex-modern-deployed-build .testplex-paper-build .testplex-plugin-sha256sums .testplex-modern-sandbox; do
-              if [[ "$SERVER_DIR_EXISTS" == true ]] && sudo -n test -e "$SERVER_DIR/$item"; then
-                snapshot_items+=("$item"); prior_files="${prior_files:+$prior_files,}$item"
-              fi
-            done
-          fi
+          for item in paper.jar server.properties eula.txt .testplex-modern-deployed-build .testplex-paper-build .testplex-mm-source-maps .testplex-plugin-sha256sums .testplex-modern-sandbox; do
+            if [[ "$SERVER_DIR_EXISTS" == true ]] && sudo -n test -e "$SERVER_DIR/$item"; then
+              snapshot_items+=("$item"); prior_files="${prior_files:+$prior_files,}$item"
+            fi
+          done
+          for item in "update/maps/Wizards" "update/maps/Nano Wizards"; do
+            if [[ "$SERVER_DIR_EXISTS" == true ]] && sudo -n test -e "$SERVER_DIR/$item"; then
+              snapshot_items+=("$item"); prior_files="${prior_files:+$prior_files,}$item"
+            fi
+          done
           if [[ "$HAD_OLD_PLUGINS" == true ]]; then snapshot_items+=(plugins); fi
+          for item in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+            if [[ "$SERVER_DIR_EXISTS" == true ]] && sudo -n test -e "$SERVER_DIR/$item"; then
+              snapshot_items+=("$item"); worlds_before="${worlds_before:+$worlds_before,}$item"
+            fi
+          done
           if [[ "$PREVIOUS_STATE" == none ]]; then
             [[ "$HAD_OLD_UNIT" == false && "$HAD_OLD_PAPER" == false && "$HAD_OLD_PLUGINS" == false && -z "$prior_files" && -z "$worlds_before" ]] || {
               echo "Unmarked deployment artifacts exist; refusing to treat this as a first installation." >&2; exit 1;
@@ -847,82 +841,59 @@ jobs:
             printf '%s\n' "TESTPLEX MODERN ISOLATED TEST SERVER - NOT LEGACY" | sudo -n tee "$SERVER_DIR/.testplex-modern-sandbox" >/dev/null
             sudo -n chown monstermaze:monstermaze "$SERVER_DIR/.testplex-modern-sandbox"
           fi
-          if [[ "$DEPLOYMENT_SCOPE" == full ]]; then
-            sudo -n install -o monstermaze -g monstermaze -m 0644 "$paper_tmp" "$SERVER_DIR/paper.jar"
-          else
-            echo "[deploy] plugin-only scope: Paper jar, server properties and world assets are preserved."
-          fi
-          # Install all four Bukkit plugins owned by the Testplex Modern server.
+          sudo -n install -o monstermaze -g monstermaze -m 0644 "$paper_tmp" "$SERVER_DIR/paper.jar"
+          # Replace only plugin JARs whose verified SHA-256 differs from the installed JAR.
           # Monster Maze gameplay is compiled into ArcadeMechanicsModern and is not a plugin of its own.
           for jar in "${changed_jars[@]}"; do
+            [[ -n "$jar" ]] || continue
             sudo -n install -o monstermaze -g monstermaze -m 0644 "$UPLOAD_DIR/$jar" "$SERVER_DIR/plugins/$jar"
-            echo "[deploy] replaced changed plugin JAR: $jar"
           done
 
-          if [[ "$DEPLOYMENT_SCOPE" == full ]]; then
-            # Retire any previously installed FakePlayerPlugin version by descriptor,
-            # not filename. The existing pre-deployment plugins snapshot preserves the
-            # exact prior plugin set for rollback; then install the pinned unmodified jar.
-            for plugin_jar in "$SERVER_DIR"/plugins/*.jar; do
-              [[ -f "$plugin_jar" ]] || continue
-              descriptor="$(sudo -n unzip -p "$plugin_jar" plugin.yml 2>/dev/null || true)"
-              [[ -n "$descriptor" ]] || continue
-              plugin_name="$(yaml_descriptor_value name "$descriptor")"
-              plugin_main="$(yaml_descriptor_value main "$descriptor")"
-              if [[ "$plugin_name" == "FakePlayerPlugin" || "$plugin_main" == "me.bill.fakePlayerPlugin.FakePlayerPlugin" ]]; then
-                sudo -n rm -f -- "$plugin_jar"
-                echo "Replaced previous FakePlayerPlugin jar $plugin_jar with the pinned Paper 26.3 release."
-              fi
-            done
-            sudo -n install -o monstermaze -g monstermaze -m 0644 \
-              "$FPP_TMP" "$SERVER_DIR/plugins/FakePlayerPlugin.jar"
-
-            # Disable FPP restart persistence before Paper starts. Its own onEnable
-            # restores saved bots before Testplex can sweep them, so this prevents a
-            # previous match roster from briefly becoming a global lobby population
-            # after a crash/restart. Existing FPP settings are preserved otherwise.
-            FPP_DATA_DIR="$SERVER_DIR/plugins/FakePlayerPlugin"
-            FPP_CONFIG="$FPP_DATA_DIR/config.yml"
-            sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$FPP_DATA_DIR"
-            if ! sudo -n test -f "$FPP_CONFIG"; then
-              sudo -n unzip -p "$FPP_TMP" config.yml | sudo -n tee "$FPP_CONFIG" >/dev/null
+          # Retire any previously installed FakePlayerPlugin version by descriptor,
+          # not filename. The existing pre-deployment plugins snapshot preserves the
+          # exact prior plugin set for rollback; then install the pinned unmodified jar.
+          for plugin_jar in "$SERVER_DIR"/plugins/*.jar; do
+            [[ -f "$plugin_jar" ]] || continue
+            descriptor="$(sudo -n unzip -p "$plugin_jar" plugin.yml 2>/dev/null || true)"
+            [[ -n "$descriptor" ]] || continue
+            plugin_name="$(yaml_descriptor_value name "$descriptor")"
+            plugin_main="$(yaml_descriptor_value main "$descriptor")"
+            if [[ "$plugin_name" == "FakePlayerPlugin" || "$plugin_main" == "me.bill.fakePlayerPlugin.FakePlayerPlugin" ]]; then
+              sudo -n rm -f -- "$plugin_jar"
+              echo "Replaced previous FakePlayerPlugin jar $plugin_jar with the pinned Paper 26.3 release."
             fi
-            FPP_CONFIG_TMP="$FPP_CONFIG.testplex-tmp"
-            sudo -n awk '
-              /^persistence:[[:space:]]*$/ { in_persistence=1; print; next }
-              in_persistence && /^[^[:space:]#]/ { in_persistence=0 }
-              in_persistence && /^  enabled:[[:space:]]*/ { print "  enabled: false"; updated=1; next }
-              { print }
-              END { if (!updated) exit 41 }
-            ' "$FPP_CONFIG" > "$FPP_CONFIG_TMP" || {
-              sudo -n rm -f -- "$FPP_CONFIG_TMP"
-              echo "Could not safely disable FakePlayerPlugin restart persistence in $FPP_CONFIG." >&2
-              exit 1
-            }
-            sudo -n install -o monstermaze -g monstermaze -m 0640 "$FPP_CONFIG_TMP" "$FPP_CONFIG"
-            sudo -n rm -f -- "$FPP_CONFIG_TMP"
-            sudo -n grep -A 2 '^persistence:' "$FPP_CONFIG" | grep -Fxq '  enabled: false' || {
-              echo "FakePlayerPlugin restart persistence is not disabled before server startup." >&2
-              exit 1
-            }
+          done
+          sudo -n install -o monstermaze -g monstermaze -m 0644 \
+            "$FPP_TMP" "$SERVER_DIR/plugins/FakePlayerPlugin.jar"
 
-
-          else
-            fpp_name="$(yaml_descriptor_value name "$fpp_descriptor")"
-            fpp_version="$(yaml_descriptor_value version "$fpp_descriptor")"
-            fpp_main="$(yaml_descriptor_value main "$fpp_descriptor")"
-            [[ "$fpp_name" == "FakePlayerPlugin" && "$fpp_version" == "$FPP_VERSION" \
-               && "$fpp_main" == "me.bill.fakePlayerPlugin.FakePlayerPlugin" ]] || {
-              echo "Installed FakePlayerPlugin is not the expected pinned release." >&2
-              exit 1
-            }
-            sudo -n grep -A 2 '^persistence:' "$SERVER_DIR/plugins/FakePlayerPlugin/config.yml" \
-              | grep -Fxq '  enabled: false' || {
-                echo "Plugin-only deployment requires FakePlayerPlugin persistence to remain disabled." >&2
-                exit 1
-              }
-            echo "[deploy] validated pinned FakePlayerPlugin; left its jar and configuration untouched."
+          # Disable FPP restart persistence before Paper starts. Its own onEnable
+          # restores saved bots before Testplex can sweep them, so this prevents a
+          # previous match roster from briefly becoming a global lobby population
+          # after a crash/restart. Existing FPP settings are preserved otherwise.
+          FPP_DATA_DIR="$SERVER_DIR/plugins/FakePlayerPlugin"
+          FPP_CONFIG="$FPP_DATA_DIR/config.yml"
+          sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$FPP_DATA_DIR"
+          if ! sudo -n test -f "$FPP_CONFIG"; then
+            sudo -n unzip -p "$FPP_TMP" config.yml | sudo -n tee "$FPP_CONFIG" >/dev/null
           fi
+          FPP_CONFIG_TMP="$FPP_CONFIG.testplex-tmp"
+          sudo -n awk '
+            /^persistence:[[:space:]]*$/ { in_persistence=1; print; next }
+            in_persistence && /^[^[:space:]#]/ { in_persistence=0 }
+            in_persistence && /^  enabled:[[:space:]]*/ { print "  enabled: false"; updated=1; next }
+            { print }
+            END { if (!updated) exit 41 }
+          ' "$FPP_CONFIG" > "$FPP_CONFIG_TMP" || {
+            sudo -n rm -f -- "$FPP_CONFIG_TMP"
+            echo "Could not safely disable FakePlayerPlugin restart persistence in $FPP_CONFIG." >&2
+            exit 1
+          }
+          sudo -n install -o monstermaze -g monstermaze -m 0640 "$FPP_CONFIG_TMP" "$FPP_CONFIG"
+          sudo -n rm -f -- "$FPP_CONFIG_TMP"
+          sudo -n grep -A 2 '^persistence:' "$FPP_CONFIG" | grep -Fxq '  enabled: false' || {
+            echo "FakePlayerPlugin restart persistence is not disabled before server startup." >&2
+            exit 1
+          }
 
           # Migrate persistent state from both historical standalone data-folder names.
           # The 1.21 source plugin.yml names the plugin MonsterMazeStandalone, so
@@ -1089,34 +1060,38 @@ jobs:
             timeout --foreground --signal=TERM 10s sudo -n tail -n 100 "$SERVER_DIR/logs/latest.log" 2>/dev/null || true
           }
 
-          if [[ "$DEPLOYMENT_SCOPE" == full ]]; then
-            # Install fresh source maps only after a recoverable snapshot is ready.
-            # Previous worlds are in the verified snapshot; move them aside rather than deleting them.
-            install_source_worlds() (
-              set -euo pipefail
-              sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$BACKUP_DIR/replaced-source-worlds"
-              for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
-                if sudo -n test -e "$SERVER_DIR/$world"; then
-                  sudo -n mv -- "$SERVER_DIR/$world" "$BACKUP_DIR/replaced-source-worlds/$world"
-                fi
-              done
-              for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
-                sudo -n cp -a "$MAP_STAGE_DIR/$world" "$SERVER_DIR/$world"
-                sudo -n chown -R monstermaze:monstermaze "$SERVER_DIR/$world"
-              done
-              sudo -n install -o monstermaze -g monstermaze -m 0644 \
-                "$UPLOAD_DIR/MonsterMazeMapsSource.txt" "$SERVER_DIR/.testplex-mm-source-maps"
-            )
+          # Install fresh source maps only after a recoverable snapshot is ready.
+          # Previous worlds are in the verified snapshot; move them aside rather than deleting them.
+          install_source_worlds() (
+            set -euo pipefail
+            sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$BACKUP_DIR/replaced-source-worlds"
+            for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+              if sudo -n test -e "$SERVER_DIR/$world"; then
+                sudo -n mv -- "$SERVER_DIR/$world" "$BACKUP_DIR/replaced-source-worlds/$world"
+              fi
+            done
+            for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+              sudo -n cp -a "$MAP_STAGE_DIR/$world" "$SERVER_DIR/$world"
+              sudo -n chown -R monstermaze:monstermaze "$SERVER_DIR/$world"
+            done
+            sudo -n install -o monstermaze -g monstermaze -m 0644 \
+              "$UPLOAD_DIR/MonsterMazeMapsSource.txt" "$SERVER_DIR/.testplex-mm-source-maps"
+          )
+          if [[ "$MM_MAPS_REQUIRED" == true ]]; then
             if ! install_source_worlds; then
               echo "Failed to install Monster Maze source worlds; rolling back the modern-only deployment." >&2
               rollback
               exit 1
             fi
             echo "Installed Monster Maze map source commit $(cat "$UPLOAD_DIR/MonsterMazeMapsSource.txt")."
+          else
+            echo "Monster Maze source worlds unchanged and verified; retained the installed map set."
+          fi
 
-            # Install both original Wizards pools into the external source-map directory
-            # consumed by ArcadeMechanicsModern. Existing map folders were snapshotted
-            # above, so the standard deployment recovery helper can restore them.
+          # Install both original Wizards pools into the external source-map directory
+          # consumed by ArcadeMechanicsModern. Existing map folders were snapshotted
+          # above, so the standard deployment recovery helper can restore them.
+          if [[ "$WIZARDS_MAPS_REQUIRED" == true ]]; then
             WIZARDS_MAP_STAGE="$UPLOAD_DIR/wizards-map-stage"
             sudo -n rm -rf -- "$WIZARDS_MAP_STAGE"
             sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$WIZARDS_MAP_STAGE"
@@ -1141,11 +1116,24 @@ jobs:
               sudo -n cp -a "$WIZARDS_MAP_STAGE/$folder" "$SERVER_DIR/update/maps/$folder"
               sudo -n chown -R monstermaze:monstermaze "$SERVER_DIR/update/maps/$folder"
             done
+            sudo -n install -o monstermaze -g monstermaze -m 0644 \
+              "$UPLOAD_DIR/WizardsSourceMaps.sha256" "$SERVER_DIR/update/maps/Wizards/.testplex-source-maps-sha256"
             echo "Installed 20 original Wizards/Nano Wizards map archives under $SERVER_DIR/update/maps."
-
-
           else
-            echo "[deploy] plugin-only scope: preserved seven Monster Maze worlds and twenty Wizards map archives."
+            target_wizards_sha="$(sudo -n cat "$UPLOAD_DIR/WizardsSourceMaps.sha256")"
+            [[ "$(sudo -n cat "$SERVER_DIR/update/maps/Wizards/.testplex-source-maps-sha256" 2>/dev/null || true)" == "$target_wizards_sha" ]] || {
+              echo "Wizards map cache changed after staging preflight; rolling back instead of applying code against unverified maps." >&2
+              rollback
+              exit 1
+            }
+            for folder in "Wizards" "Nano Wizards"; do
+              [[ "$(sudo -n find "$SERVER_DIR/update/maps/$folder" -maxdepth 1 -type f -iname '*.zip' | wc -l | tr -d ' ')" == "10" ]] || {
+                echo "Cached Wizards map pool is incomplete: $folder; rolling back." >&2
+                rollback
+                exit 1
+              }
+            done
+            echo "Wizards map checksum and both ten-archive pools verified; retained unchanged maps."
           fi
 
           echo "[deploy] restarting testplex-modern.service (90 second limit)."
@@ -1362,7 +1350,6 @@ jobs:
           if ! grep -Eq '^Rollback (verified|already verified):' <<< "$recovery_output" &&
              ! grep -Eq '^Deployment already verified:' <<< "$recovery_output" &&
              ! grep -Eq '^no-prior-deployment-restored:' <<< "$recovery_output" &&
-             ! grep -Eq '^Forward redeployment ready:' <<< "$recovery_output" &&
              ! grep -Fxq 'No durable transaction is present; no rollback was claimed.' <<< "$recovery_output"; then
             echo "Recovery helper returned no recognized transaction outcome; no rollback success is claimed." >&2
             exit 1
@@ -1373,8 +1360,6 @@ jobs:
             echo "The remote transaction had already recorded successful deployment verification; rollback and legacy restart were skipped."
           elif grep -Eq '^no-prior-deployment-restored:' <<< "$recovery_output"; then
             echo "The verified pre-installation absence of the deployment was restored."
-          elif grep -Eq '^Forward redeployment ready:' <<< "$recovery_output"; then
-            echo "Restored artifacts are checksum-verified and the failed modern service remains stopped; a guarded forward redeployment is ready. No running rollback is claimed."
           else
             echo "No deployment transaction existed; no rollback was needed or claimed."
           fi
@@ -1390,6 +1375,76 @@ jobs:
             echo "Recovery host remained unreachable or independent recovery failed after five bounded sessions; remote state is unknown and no rollback success is claimed." >&2
             exit 1
           fi
+
+      - name: Capture remote deployment diagnostics
+        if: always()
+        continue-on-error: true
+        shell: bash
+        env:
+          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
+          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
+          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
+        run: |
+          set -u
+          diagnostics="$RUNNER_TEMP/testplex-modern-deploy-diagnostics.txt"
+          {
+            echo "Workflow run: $GITHUB_RUN_ID"
+            echo "Workflow commit: $GITHUB_SHA"
+            echo "Captured at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo
+          } > "$diagnostics"
+          if [[ ! -f "$HOME/.ssh/testplex_hyperv" || ! -f "$HOME/.ssh/known_hosts" ]]; then
+            echo "SSH credentials unavailable; remote diagnostics could not be collected." >> "$diagnostics"
+          else
+            SSH_PORT="${HYPERV_SSH_PORT:-22}"
+            remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
+            ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
+              -o BatchMode=yes -o StrictHostKeyChecking=yes
+              -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+              -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
+            timeout --foreground --signal=TERM --kill-after=10s 2m ssh "${ssh_opts[@]}" "$remote" sudo -n bash -s <<'REMOTE_DIAGNOSTICS' >> "$diagnostics" 2>&1
+          set +e
+          SERVER_DIR=/home/monstermaze/servers/testplex-modern
+          STATE_DIR=/var/lib/testplex-modern-deploy
+          echo '=== Deployment transaction ==='
+          sudo -n cat "$STATE_DIR/current.properties"
+          echo '=== Service state ==='
+          sudo -n systemctl status testplex-modern.service --no-pager -l
+          sudo -n systemctl show testplex-modern.service -p ActiveState -p SubState -p Result -p MainPID -p InvocationID
+          echo '=== Port 25568 ==='
+          sudo -n ss -ltnp | grep -E ':25568$' || true
+          echo '=== Latest systemd journal ==='
+          sudo -n journalctl -u testplex-modern.service -n 120 --no-pager -o short-iso
+          echo '=== Latest Paper log ==='
+          sudo -n tail -n 180 "$SERVER_DIR/logs/latest.log" 2>/dev/null || true
+          echo '=== Installed modern artifacts ==='
+          sudo -n cat "$SERVER_DIR/.testplex-modern-deployed-build" 2>/dev/null || true
+          sudo -n sha256sum "$SERVER_DIR/paper.jar" "$SERVER_DIR"/plugins/*.jar 2>/dev/null || true
+          echo '=== Recovery attempts ==='
+          backup_dir="$(sudo -n sed -n 's/^backup_dir=//p' "$STATE_DIR/current.properties" | head -n 1)"
+          if [[ -n "$backup_dir" && -d "$backup_dir/failed-artifacts" ]]; then
+            sudo -n find "$backup_dir/failed-artifacts" -maxdepth 2 -type d -print | sort
+          fi
+          REMOTE_DIAGNOSTICS
+            remote_rc=$?
+            if [[ "$remote_rc" -ne 0 ]]; then echo "Remote diagnostics SSH exited with status $remote_rc." >> "$diagnostics"; fi
+          fi
+          cat "$diagnostics"
+          {
+            echo '## Remote deployment diagnostics'
+            echo '```text'
+            cat "$diagnostics"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload deployment diagnostics artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testplex-modern-deploy-diagnostics-${{ github.run_id }}
+          path: ${{ runner.temp }}/testplex-modern-deploy-diagnostics.txt
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Remove temporary modern deployment artifacts
         if: always()
@@ -1434,17 +1489,21 @@ jobs:
         shell: bash
         env:
           SOURCE_SHA: ${{ steps.source-artifact.outputs.source_sha }}
+          CHANGED_JARS: ${{ steps.jar-diff.outputs.changed_jars }}
+          MM_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.mm_maps_required }}
+          WIZARDS_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.wizards_maps_required }}
         run: |
           {
             echo "## Testplex Modern Paper 26.3 deployment"
             echo
             echo "- Source build SHA: $SOURCE_SHA"
-            echo "- Deployment scope: ${{ inputs.deployment_scope }}"
-            echo "- Changed plugin JARs: ${{ steps.build-deltas.outputs.changed_jars || 'none (no-op)' }}"
-            echo "- Only plugin JARs with changed entry contents are rebuilt from verified entry patches; unchanged JARs are untouched."
+            echo "- Replaced plugin JARs: ${CHANGED_JARS:-none}"
+            echo "- Monster Maze maps uploaded: ${MM_MAPS_REQUIRED:-unknown}"
+            echo "- Wizards map archive uploaded: ${WIZARDS_MAPS_REQUIRED:-unknown}"
             echo "- Destination: /home/monstermaze/servers/testplex-modern"
             echo "- Dedicated unit: testplex-modern.service"
             echo "- Dedicated Minecraft port: 25568"
             echo "- Memory safety: only Testplex's own legacy service is stopped; separate Monster Maze services are left untouched, and deployment aborts rather than stopping them when memory is insufficient; successful deployments leave only modern Paper running"
             echo "- Rollback: modern-only backup created before replacement; startup is checked before success"
           } >> "$GITHUB_STEP_SUMMARY"
+
