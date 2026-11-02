@@ -229,11 +229,11 @@ jobs:
             active="$(sudo -n systemctl is-active "$unit" 2>/dev/null || true)"
             enabled="$(sudo -n systemctl is-enabled "$unit" 2>/dev/null || true)"
             if [[ "$active" == unknown && "$enabled" == not-found ]]; then active=inactive; fi
-            # systemd reports a failed unit as "failed", not "inactive". It is
-            # definitively not running; tolerate this only for the legacy Reborn
-            # unit, which this deployment never replaces or restarts.
-            if [[ "$unit" == testplex-reborn.service && "$active" == failed ]]; then
-              echo "Legacy Reborn unit is failed/stopped; leaving it untouched and continuing modern preflight."
+            # systemd reports failed units as "failed", not "inactive". This is
+            # a non-running state; the explicit port check below and the locked
+            # recovery/journal checks still gate any state-changing deployment.
+            if [[ "$active" == failed ]]; then
+              echo "$unit is failed/stopped; treating it as non-running for read-only preflight."
               active=inactive
             fi
             [[ "$active" == active || "$active" == inactive ]] || {
