@@ -394,21 +394,69 @@ jobs:
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=40)
           # The legacy and modern deploy jobs share one Hyper-V disk and are serialized.
-          # Only generated, abandoned staging directories are eligible for pruning; never
-          # clean server worlds, installed plugins, databases or recovery backups.
+          # Remove only old, terminal deployment snapshots that are superseded by the current
+          # transaction. Keep the current recovery snapshot and all unresolved transactions.
+          state_dir=/var/lib/testplex-modern-deploy
+          backup_root="$state_dir/backups"
+          current_backup="$(sudo -n sed -n 's/^backup_dir=//p' "$state_dir/current.properties" 2>/dev/null || true)"
+          now_epoch="$(date +%s)"
+          shopt -s nullglob
+          for old_backup in "$backup_root"/*; do
+            [[ -d "$old_backup" && ! -L "$old_backup" ]] || continue
+            [[ "$old_backup" == "$current_backup" ]] && continue
+            name="${old_backup##*/}"
+            [[ "$name" =~ ^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{40}-[0-9a-f-]{36}$ ]] || continue
+            mtime="$(stat -c %Y -- "$old_backup" 2>/dev/null || printf '0')"
+            [[ "$mtime" =~ ^[0-9]+$ ]] && (( now_epoch - mtime > 3600 )) || continue
+            transaction="$old_backup/transaction.properties"
+            old_status="$(sudo -n sed -n 's/^status=//p' "$transaction" 2>/dev/null || true)"
+            backup_complete="$(sudo -n sed -n 's/^backup_complete=//p' "$transaction" 2>/dev/null || true)"
+            previous_sha="$(sudo -n sed -n 's/^previous_sha=//p' "$transaction" 2>/dev/null || true)"
+            restored_sha="$(sudo -n sed -n 's/^restored_artifact_sha=//p' "$transaction" 2>/dev/null || true)"
+            runtime_sha="$(sudo -n sed -n 's/^runtime_sha=//p' "$transaction" 2>/dev/null || true)"
+            runtime_pid="$(sudo -n sed -n 's/^runtime_pid=//p' "$transaction" 2>/dev/null || true)"
+            safe_to_prune=false
+            if [[ "$backup_complete" == true && "$old_status" == DEPLOYMENT_VERIFIED ]]; then
+              safe_to_prune=true
+            elif [[ "$backup_complete" == true && "$old_status" == RESTORED &&
+                    "$previous_sha" =~ ^[0-9a-f]{40}$ && "$restored_sha" == "$previous_sha" &&
+                    "$runtime_sha" == "$previous_sha" && "$runtime_pid" =~ ^[1-9][0-9]*$ ]]; then
+              safe_to_prune=true
+            fi
+            if [[ "$safe_to_prune" == true ]]; then
+              size="$(sudo -n du -sh -- "$old_backup" | cut -f1)"
+              echo "Removing superseded, verified deployment snapshot: $old_backup ($size)"
+              sudo -n rm -rf -- "$old_backup"
+            fi
+          done
+
           stage_kb="$(du -sk "$STAGE_DIR" | awk '{print $1}')"
           [[ "$stage_kb" =~ ^[0-9]+$ ]] && (( stage_kb > 0 )) || { echo "Could not determine the verified deployment payload size." >&2; exit 1; }
-          # Uploaded chunk parts are replaced by sequential assembly, deleting each part only
-          # after it has been appended. Peak staging use stays within one payload copy.
           [[ "$MAP_EXPANDED_KB" =~ ^[0-9]+$ ]] || { echo "Invalid map expansion budget." >&2; exit 1; }
-          timeout --foreground --signal=TERM --kill-after=15s 5m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$BUILD_SHA" "$stage_kb" "$MAP_EXPANDED_KB" <<'REMOTE_STAGE_PREP'
-          set -euo pipefail
-          build_sha="$1"
-          stage_kb="$2"
-          map_expanded_kb="$3"
-          [[ "$build_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid build SHA for artifact staging." >&2; exit 1; }
-          [[ "$stage_kb" =~ ^[0-9]+$ && "$map_expanded_kb" =~ ^[0-9]+$ ]] || { echo "Invalid deployment storage budget." >&2; exit 1; }
-          upload_dir="/var/tmp/testplex-modern-artifacts-$build_sha"
+          # The rollback tar contains the current Paper JAR, plugin directory, selected map
+          # pools and all seven Monster Maze worlds. Budget its apparent bytes before stopping
+          # the service or writing the snapshot, plus a 512 MiB reserve for Paper startup/save.
+          server_dir=/home/monstermaze/servers/testplex-modern
+          snapshot_paths=()
+          if [[ -d "$server_dir" && ! -L "$server_dir" ]]; then
+            for item in paper.jar server.properties eula.txt .testplex-modern-deployed-build .testplex-paper-build .testplex-mm-source-maps .testplex-plugin-sha256sums .testplex-modern-sandbox; do
+              [[ -e "$server_dir/$item" || -L "$server_dir/$item" ]] && snapshot_paths+=("$server_dir/$item")
+            done
+            for item in "update/maps/Wizards" "update/maps/Nano Wizards"; do
+              [[ -e "$server_dir/$item" || -L "$server_dir/$item" ]] && snapshot_paths+=("$server_dir/$item")
+            done
+            [[ ! -d "$server_dir/plugins" ]] || snapshot_paths+=("$server_dir/plugins")
+            for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+              [[ ! -e "$server_dir/$world" ]] || snapshot_paths+=("$server_dir/$world")
+            done
+          fi
+          snapshot_kb=0
+          if (("${#snapshot_paths[@]}" > 0)); then
+            snapshot_kb="$(sudo -n du -sk --apparent-size --count-links -- "${snapshot_paths[@]}" | awk '{sum += $1} END {print sum+1024}')"
+          fi
+          [[ "$snapshot_kb" =~ ^[0-9]+$ ]] || { echo "Could not estimate the rollback snapshot size." >&2; exit 1; }
+          echo "Rollback snapshot estimate: $((snapshot_kb / 1024)) MiB; runtime reserve: 512 MiB."
+
           echo "Disk usage before staging-cache cleanup:"
           df -h /var/tmp
           df -i /var/tmp
@@ -419,8 +467,6 @@ jobs:
             name="${existing##*/}"
             [[ "$name" =~ ^testplex-modern-artifacts-[0-9a-f]{40}$ ]] || continue
             [[ "$existing" == "$upload_dir" ]] && continue
-            # Another workflow may be actively uploading to a different SHA-named
-            # directory. Only prune caches that have been untouched for >24h.
             mtime="$(stat -c %Y -- "$existing" 2>/dev/null || printf '0')"
             if [[ "$mtime" =~ ^[0-9]+$ ]] && (( now_epoch - mtime > 86400 )); then
               size="$(du -sh -- "$existing" 2>/dev/null | cut -f1 || true)"
@@ -431,33 +477,41 @@ jobs:
             fi
           done
           sudo -n rm -rf -- "$upload_dir"
-          # Downloaded package archives are reproducible cache, not installed software.
-          # This safely recovers small amounts of space without touching worlds or backups.
           apt_cache_before="$(sudo -n du -sh /var/cache/apt/archives 2>/dev/null | cut -f1 || true)"
           sudo -n apt-get clean
           echo "Cleared downloaded APT package cache (${apt_cache_before:-size unavailable}); installed packages were not removed."
-          echo "Disk usage after staging-cache and package-cache cleanup:"
+          echo "Disk usage after staging-cache and verified-backup cleanup:"
           df -h /var/tmp
           df -i /var/tmp
+
           server_fs=/home/monstermaze/servers
           tmp_device="$(df -P /var/tmp | awk 'END {print $1}')"
           server_device="$(df -P "$server_fs" | awk 'END {print $1}')"
-          tmp_required_kb=$((stage_kb + map_expanded_kb + 65536))
-          server_required_kb=$((map_expanded_kb + 65536))
+          state_device="$(df -P "$state_dir" | awk 'END {print $1}')"
+          reserve_kb=524288
+          tmp_required_kb="$stage_kb"
+          server_required_kb="$((2 * map_expanded_kb + reserve_kb))"
+          state_required_kb="$snapshot_kb"
           if [[ "$tmp_device" == "$server_device" ]]; then
-            # One copy is extracted under /var/tmp and another is installed beside
-            # the live Paper server while the archive and staged extraction still exist.
-            tmp_required_kb=$((tmp_required_kb + map_expanded_kb))
+            tmp_required_kb=$((tmp_required_kb + 2 * map_expanded_kb))
             server_required_kb=0
+          fi
+          if [[ "$state_device" == "$server_device" ]]; then
+            server_required_kb=$((server_required_kb + snapshot_kb))
+            state_required_kb=0
+          elif [[ "$state_device" == "$tmp_device" ]]; then
+            tmp_required_kb=$((tmp_required_kb + snapshot_kb))
+            state_required_kb=0
           fi
           tmp_avail_kb="$(df -Pk /var/tmp | awk 'END {print $4}')"
           server_avail_kb="$(df -Pk "$server_fs" | awk 'END {print $4}')"
-          if [[ ! "$tmp_avail_kb" =~ ^[0-9]+$ || ! "$server_avail_kb" =~ ^[0-9]+$ ]] || \
-             (( tmp_avail_kb < tmp_required_kb || server_avail_kb < server_required_kb )); then
-            echo "Insufficient deployment staging space: /var/tmp available=${tmp_avail_kb:-unknown} KiB required=$tmp_required_kb KiB; server filesystem available=${server_avail_kb:-unknown} KiB required=$server_required_kb KiB; payload=$stage_kb KiB; expanded Wizards and Monster Maze maps=$map_expanded_kb KiB; reserve=65536 KiB per filesystem." >&2
+          state_avail_kb="$(df -Pk "$state_dir" | awk 'END {print $4}')"
+          if [[ ! "$tmp_avail_kb" =~ ^[0-9]+$ || ! "$server_avail_kb" =~ ^[0-9]+$ || ! "$state_avail_kb" =~ ^[0-9]+$ ]] || \
+             (( tmp_avail_kb < tmp_required_kb || server_avail_kb < server_required_kb || state_avail_kb < state_required_kb )); then
+            echo "Insufficient deployment staging space: /var/tmp available=${tmp_avail_kb:-unknown} KiB required=$tmp_required_kb KiB; server filesystem available=${server_avail_kb:-unknown} KiB required=$server_required_kb KiB; backup filesystem available=${state_avail_kb:-unknown} KiB required=$state_required_kb KiB; payload=$stage_kb KiB; map expansion=$map_expanded_kb KiB; rollback snapshot=$snapshot_kb KiB; runtime reserve=$reserve_kb KiB." >&2
             exit 1
           fi
-          echo "Staging space passed: /var/tmp=$((tmp_avail_kb / 1024)) MiB free (needs $((tmp_required_kb / 1024)) MiB); server filesystem=$((server_avail_kb / 1024)) MiB free (needs $((server_required_kb / 1024)) MiB); payload=$((stage_kb / 1024)) MiB; map expansion=$((map_expanded_kb / 1024)) MiB."
+          echo "Staging space passed: /var/tmp=$((tmp_avail_kb / 1024)) MiB (needs $((tmp_required_kb / 1024)) MiB); server filesystem=$((server_avail_kb / 1024)) MiB (needs $((server_required_kb / 1024)) MiB); backup filesystem=$((state_avail_kb / 1024)) MiB (needs $((state_required_kb / 1024)) MiB); payload=$((stage_kb / 1024)) MiB; maps=$((map_expanded_kb / 1024)) MiB; rollback snapshot=$((snapshot_kb / 1024)) MiB; reserve=512 MiB."
           install -d -m 0700 -- "$upload_dir"
           REMOTE_STAGE_PREP
           # Use the SFTP subsystem rather than legacy SCP's single remote sink process.
