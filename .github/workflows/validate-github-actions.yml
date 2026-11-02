@@ -1,0 +1,28 @@
+name: Validate GitHub Actions workflows
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/**"
+      - "scripts/testplex-jar-delta.py"
+  push:
+    branches:
+      - "feat/plugin-entry-delta-deploy-20261102"
+    paths:
+      - ".github/workflows/**"
+      - "scripts/testplex-jar-delta.py"
+
+permissions:
+  contents: read
+
+jobs:
+  actionlint:
+    name: Lint workflows and embedded shell
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check GitHub Actions workflow syntax and expressions
+        uses: docker://rhysd/actionlint:1.7.12
+        with:
+          args: -color
