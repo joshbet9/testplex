@@ -424,7 +424,7 @@ jobs:
           fi
           # The backup tree is root-owned. Enumerate and validate it as root so ordinary
           # SSH-user directory permissions do not silently disable retention cleanup.
-          if ! backup_dirs="$(sudo -n find "$backup_root" -mindepth 1 -maxdepth 1 -type d -printf '%p\\n')"; then
+          if ! backup_dirs="$(sudo -n find "$backup_root" -mindepth 1 -maxdepth 1 -type d -printf '%p\n')"; then
             echo "Could not safely enumerate deployment backups; refusing preflight." >&2
             exit 1
           fi
