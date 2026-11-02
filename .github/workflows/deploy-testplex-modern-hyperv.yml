@@ -364,6 +364,13 @@ jobs:
             echo "No changed plugin JARs; skipping upload."
             exit 0
           fi
+          selected_names=()
+          for jar in "${changed_jars[@]}"; do
+            case "$jar" in TestplexModernArcade.jar|SnakeModern.jar|ArcadeMechanicsModern.jar|WizardsModern.jar) selected_names+=("$jar") ;; *) exit 2 ;; esac
+          done
+          selected_names+=(testplex-modern-recovery.sh)
+          selected_manifest="$RUNNER_TEMP/testplex-modern-selected-SHA256SUMS"
+          (cd "$STAGE_DIR" && sha256sum "${selected_names[@]}" > "$selected_manifest")
           # The legacy and modern deploy jobs share one Hyper-V disk and are serialized.
           # Only generated, abandoned staging directories are eligible for pruning; never
           # clean server worlds, installed plugins, databases or recovery backups.
@@ -447,7 +454,11 @@ jobs:
           {
             printf 'cd "%s"\n' "$upload_dir"
             for jar in "${changed_jars[@]}"; do
-              case "$jar" in TestplexModernArcade.jar|SnakeModern.jar|ArcadeMechanicsModern.jar|WizardsModern.jar) printf 'put "%s" "%s"\n' "$STAGE_DIR/$jar" "$jar" ;; *) exit 2 ;; esac
+              case "$jar" in
+                ArcadeMechanicsModern.jar) ;;
+                TestplexModernArcade.jar|SnakeModern.jar|WizardsModern.jar) printf 'put "%s" "%s"\n' "$STAGE_DIR/$jar" "$jar" ;;
+                *) exit 2 ;;
+              esac
             done
             printf 'put "%s" "%s"\n' "$STAGE_DIR/testplex-modern-recovery.sh" "testplex-modern-recovery.sh"
             if [[ "$DEPLOYMENT_SCOPE" == full ]]; then
@@ -495,10 +506,14 @@ jobs:
           else
             echo "Plugin-only transfer: map archive assemblies skipped."
           fi
-          echo "Assembled ArcadeMechanicsModern.jar ($(stat -c %s ArcadeMechanicsModern.jar) bytes)."
+          if [[ "$arcade_changed" == true ]]; then
+            echo "Assembled ArcadeMechanicsModern.jar ($(stat -c %s ArcadeMechanicsModern.jar) bytes)."
+          else
+            echo "ArcadeMechanicsModern.jar was unchanged and was not transferred."
+          fi
           REMOTE_ASSEMBLE_ARCADE
           timeout --foreground --signal=TERM --kill-after=15s 3m scp "${scp_opts[@]}" \
-            "$STAGE_DIR/SHA256SUMS" "$remote:$upload_dir/SHA256SUMS"
+            "$selected_manifest" "$remote:$upload_dir/SHA256SUMS"
           timeout --foreground --signal=TERM --kill-after=15s 3m ssh "${ssh_opts[@]}" "$remote" "echo 'Disk after transfer:'; df -h /var/tmp; du -sh '$upload_dir'; cd '$upload_dir' && sha256sum -c SHA256SUMS"
           echo "upload_dir=$upload_dir" >> "$GITHUB_OUTPUT"
 
@@ -1395,7 +1410,8 @@ jobs:
             echo
             echo "- Source build SHA: $SOURCE_SHA"
             echo "- Deployment scope: plugins-only"
-            echo "- Plugin JARs are SHA-256 checked before replacement; plugins-only scope preserves installed source maps and snapshots only plugin/config state."
+            echo "- Changed plugin JARs: ${{ steps.jar-diff.outputs.changed_jars || 'none (no-op)' }}"
+            echo "- Only JARs whose installed SHA-256 differs from the successful build are transferred and replaced."
             echo "- Destination: /home/monstermaze/servers/testplex-modern"
             echo "- Dedicated unit: testplex-modern.service"
             echo "- Dedicated Minecraft port: 25568"
