@@ -393,11 +393,29 @@ jobs:
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=40)
-          # The legacy and modern deploy jobs share one Hyper-V disk and are serialized.
-          # Remove only old, terminal deployment snapshots that are superseded by the current
-          # transaction. Keep the current recovery snapshot and all unresolved transactions.
+          # Measure this Actions-runner payload locally, then do all VM inspection,
+          # cleanup, capacity checks, and directory creation in one bounded SSH session.
+          stage_kb="$(du -sk "$STAGE_DIR" | awk '{print $1}')"
+          [[ "$stage_kb" =~ ^[0-9]+$ ]] && (( stage_kb > 0 )) || { echo "Could not determine the verified deployment payload size." >&2; exit 1; }
+          [[ "$MAP_EXPANDED_KB" =~ ^[0-9]+$ ]] || { echo "Invalid map expansion budget." >&2; exit 1; }
+
+          timeout --foreground --signal=TERM --kill-after=20s 3m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" "$stage_kb" "$MAP_EXPANDED_KB" <<'REMOTE_STAGE_PREP'
+          set -euo pipefail
+          upload_dir="$1"
+          stage_kb="$2"
+          map_expanded_kb="$3"
           state_dir=/var/lib/testplex-modern-deploy
           backup_root="$state_dir/backups"
+          server_dir=/home/monstermaze/servers/testplex-modern
+          server_fs=/home/monstermaze/servers
+
+          [[ -d "$server_dir" && ! -L "$server_dir" ]] || { echo "Modern server directory is missing or unsafe; refusing deployment." >&2; exit 1; }
+          sudo -n test -f "$server_dir/.testplex-modern-sandbox" || { echo "Modern server sandbox marker is missing; refusing deployment." >&2; exit 1; }
+          sudo -n test -s "$server_dir/paper.jar" || { echo "Current Paper JAR is missing; cannot make a rollback snapshot." >&2; exit 1; }
+          sudo -n test -d "$server_dir/plugins" || { echo "Current plugins directory is missing; cannot make a rollback snapshot." >&2; exit 1; }
+
+          # Keep the active recovery point and unresolved transactions. Only remove older
+          # snapshots whose terminal state and restored/running artifact identity were verified.
           current_backup="$(sudo -n sed -n 's/^backup_dir=//p' "$state_dir/current.properties" 2>/dev/null || true)"
           if [[ "$current_backup" != "$backup_root/"* || ! -d "$current_backup" || -L "$current_backup" ]]; then
             echo "Current recovery snapshot is not verified; preserving all deployment backups."
@@ -432,37 +450,24 @@ jobs:
             fi
           done
 
-          stage_kb="$(du -sk "$STAGE_DIR" | awk '{print $1}')"
-          [[ "$stage_kb" =~ ^[0-9]+$ ]] && (( stage_kb > 0 )) || { echo "Could not determine the verified deployment payload size." >&2; exit 1; }
-          [[ "$MAP_EXPANDED_KB" =~ ^[0-9]+$ ]] || { echo "Invalid map expansion budget." >&2; exit 1; }
-          # The rollback tar contains the current Paper JAR, plugin directory, selected map
-          # pools and all seven Monster Maze worlds. Budget its apparent bytes before stopping
-          # the service or writing the snapshot, plus a 512 MiB reserve for Paper startup/save.
-          server_dir=/home/monstermaze/servers/testplex-modern
           snapshot_paths=()
-          if [[ -d "$server_dir" && ! -L "$server_dir" ]]; then
-            for item in paper.jar server.properties eula.txt .testplex-modern-deployed-build .testplex-paper-build .testplex-mm-source-maps .testplex-plugin-sha256sums .testplex-modern-sandbox; do
-              [[ -e "$server_dir/$item" || -L "$server_dir/$item" ]] && snapshot_paths+=("$server_dir/$item")
-            done
-            for item in "update/maps/Wizards" "update/maps/Nano Wizards"; do
-              [[ -e "$server_dir/$item" || -L "$server_dir/$item" ]] && snapshot_paths+=("$server_dir/$item")
-            done
-            [[ ! -d "$server_dir/plugins" ]] || snapshot_paths+=("$server_dir/plugins")
-            for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
-              [[ ! -e "$server_dir/$world" ]] || snapshot_paths+=("$server_dir/$world")
-            done
-          fi
-          snapshot_kb=0
-          if (( ${#snapshot_paths[@]} > 0 )); then
-            snapshot_kb="$(sudo -n du -sk --apparent-size --count-links -- "${snapshot_paths[@]}" | awk '{sum += $1} END {print sum+1024}')"
-          fi
-          [[ "$snapshot_kb" =~ ^[0-9]+$ ]] || { echo "Could not estimate the rollback snapshot size." >&2; exit 1; }
+          for item in paper.jar server.properties eula.txt .testplex-modern-deployed-build .testplex-paper-build .testplex-mm-source-maps .testplex-plugin-sha256sums .testplex-modern-sandbox; do
+            [[ -e "$server_dir/$item" || -L "$server_dir/$item" ]] && snapshot_paths+=("$server_dir/$item")
+          done
+          for item in "update/maps/Wizards" "update/maps/Nano Wizards"; do
+            [[ -e "$server_dir/$item" || -L "$server_dir/$item" ]] && snapshot_paths+=("$server_dir/$item")
+          done
+          snapshot_paths+=("$server_dir/plugins")
+          for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+            [[ ! -e "$server_dir/$world" ]] || snapshot_paths+=("$server_dir/$world")
+          done
+          snapshot_kb="$(sudo -n du -sk --apparent-size --count-links -- "${snapshot_paths[@]}" | awk '{sum += $1} END {print sum+1024}')"
+          [[ "$snapshot_kb" =~ ^[0-9]+$ ]] && (( snapshot_kb > 1024 )) || { echo "Could not estimate a non-empty rollback snapshot." >&2; exit 1; }
           echo "Rollback snapshot estimate: $((snapshot_kb / 1024)) MiB; runtime reserve: 512 MiB."
 
           echo "Disk usage before staging-cache cleanup:"
-          df -h /var/tmp
-          df -i /var/tmp
-          shopt -s nullglob
+          df -h /var/tmp "$server_fs" "$state_dir"
+          df -i /var/tmp "$server_fs" "$state_dir"
           now_epoch="$(date +%s)"
           for existing in /var/tmp/testplex-modern-artifacts-*; do
             [[ -d "$existing" && ! -L "$existing" ]] || continue
@@ -483,10 +488,9 @@ jobs:
           sudo -n apt-get clean
           echo "Cleared downloaded APT package cache (${apt_cache_before:-size unavailable}); installed packages were not removed."
           echo "Disk usage after staging-cache and verified-backup cleanup:"
-          df -h /var/tmp
-          df -i /var/tmp
+          df -h /var/tmp "$server_fs" "$state_dir"
+          df -i /var/tmp "$server_fs" "$state_dir"
 
-          server_fs=/home/monstermaze/servers
           tmp_device="$(df -P /var/tmp | awk 'END {print $1}')"
           server_device="$(df -P "$server_fs" | awk 'END {print $1}')"
           state_device="$(df -P "$state_dir" | awk 'END {print $1}')"
@@ -515,7 +519,7 @@ jobs:
             exit 1
           fi
           echo "Staging space passed: /var/tmp=$((tmp_avail_kb / 1024)) MiB (needs $((tmp_required_kb / 1024)) MiB); server filesystem=$((server_avail_kb / 1024)) MiB (needs $((server_required_kb / 1024)) MiB); backup filesystem=$((state_avail_kb / 1024)) MiB (needs $((state_required_kb / 1024)) MiB); payload=$((stage_kb / 1024)) MiB; maps=$((map_expanded_kb / 1024)) MiB; rollback snapshot=$((snapshot_kb / 1024)) MiB; reserve=512 MiB."
-          install -d -m 0700 -- "$upload_dir"
+          sudo -n install -d -m 0700 -- "$upload_dir"
           REMOTE_STAGE_PREP
           # Use the SFTP subsystem rather than legacy SCP's single remote sink process.
           # Keep the SSH upload window bounded, while allowing enough in-flight data to fill
