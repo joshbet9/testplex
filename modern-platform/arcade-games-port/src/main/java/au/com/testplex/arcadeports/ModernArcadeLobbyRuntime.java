@@ -307,7 +307,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             equipment.setItemInMainHand(choice.heldItem == null ? null : new ItemStack(choice.heldItem));
             equipment.setItemInMainHandDropChance(0.0F);
             ItemStack[] armour = new ItemStack[4];
-            for (int slot = 0; slot < choice.armour.length; slot++) {
+            for (int slot = 0; slot < Math.min(choice.armour.length, armour.length); slot++) {
                 Material material = choice.armour[slot];
                 if (material != null) armour[slot] = new ItemStack(material);
             }

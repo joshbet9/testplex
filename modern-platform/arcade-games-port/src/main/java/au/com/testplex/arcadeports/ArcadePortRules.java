@@ -181,8 +181,41 @@ public final class ArcadePortRules {
 
     /** Meter charge comes from the source damage value recorded for each successful hit. */
     public static final int BACON_BLAST_PROJECTILE_STACK_SIZE = 16;
+    /** Classic combat's swing input has no modern cooldown; high enough to cover real CPS. */
+    public static final double LEGACY_ATTACK_SPEED = 1_024.0D;
+    /** 1.8 natural healing: one health point every 80 ticks while food is at least 18. */
+    public static final int LEGACY_HEALTH_REGEN_TICKS = 80;
+
+    public static double legacyMeleeDamage(Material weapon, int sharpnessLevel) {
+        double damage = switch (weapon) {
+            case WOODEN_SWORD, GOLDEN_SWORD -> 4.0D;
+            case STONE_SWORD -> 5.0D;
+            case IRON_SWORD -> 6.0D;
+            case DIAMOND_SWORD, NETHERITE_SWORD -> 7.0D;
+            case WOODEN_AXE, GOLDEN_AXE -> 7.0D;
+            case STONE_AXE, IRON_AXE, DIAMOND_AXE, NETHERITE_AXE -> 9.0D;
+            case WOODEN_PICKAXE, GOLDEN_PICKAXE -> 2.0D;
+            case STONE_PICKAXE -> 3.0D;
+            case IRON_PICKAXE -> 4.0D;
+            case DIAMOND_PICKAXE, NETHERITE_PICKAXE -> 5.0D;
+            case WOODEN_SHOVEL, GOLDEN_SHOVEL -> 2.5D;
+            case STONE_SHOVEL -> 3.5D;
+            case IRON_SHOVEL -> 4.5D;
+            case DIAMOND_SHOVEL, NETHERITE_SHOVEL -> 5.5D;
+            default -> 1.0D;
+        };
+        int sharpness = Math.max(0, sharpnessLevel);
+        return damage + (sharpness == 0 ? 0.0D : 0.5D + 0.5D * sharpness);
+    }
+
+    public static boolean shouldLegacyNaturalRegen(int foodLevel, double health, double maxHealth) {
+        return foodLevel >= 18 && health > 0.0D && health < maxHealth;
+    }
+
     public static final int BACON_METER_MAX = 100;
     public static final int BACON_METER_MIN_ABILITY = 50;
+    /** Per attacker-victim throttle, allowing the classic ten hits per second. */
+    public static final long BACON_HIT_COOLDOWN_MILLIS = 100L;
     public static final long BACON_CRISPY_DASH_DURATION_MILLIS = 250L;
     public static final double BACON_CRISPY_DASH_SPEED = 1.0D;
     public static final long BACON_CRISPY_DASH_FIRE_MILLIS = 3_000L;
@@ -235,9 +268,7 @@ public final class ArcadePortRules {
     public static List<String> baconBrawlSidebarLines(Collection<String> playerNames) {
         List<String> names = playerNames == null ? List.of() : new ArrayList<>(playerNames);
         if (names.size() <= 15) return List.copyOf(names);
-        List<String> lines = new ArrayList<>(names.subList(0, 14));
-        lines.add(names.size() + " players remaining");
-        return List.copyOf(lines);
+        return List.of(names.size() + " players remaining");
     }
 
     /** Fake-player test participants are eligible for round kill credit just like online users. */
@@ -405,15 +436,11 @@ public final class ArcadePortRules {
     public static boolean isBaconArenaKnockoutReason(String reason) {
         if (reason == null) return false;
         String value = reason.toLowerCase(java.util.Locale.ROOT).replace('_', ' ').trim();
-        return value.equals("fell from the arena")
-                || value.equals("fall")
-                || value.equals("was lost to the water")
-                || value.equals("lava")
-                || value.equals("fire")
-                || value.equals("hot floor")
-                || value.equals("magma block")
-                || value.equals("drowning")
-                || value.equals("void");
+        return value.contains("fell") || value.contains("fall")
+                || value.contains("void") || value.contains("water")
+                || value.contains("lava") || value.contains("fire")
+                || value.contains("hot floor") || value.contains("magma")
+                || value.contains("drown");
     }
 
     public static boolean shouldCreditBaconFallKill(long nowMillis, long lastHitAtMillis,

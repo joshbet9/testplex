@@ -1498,10 +1498,7 @@ class ArcadePortGameTest {
 
         assertEquals(fifteen, ArcadePortRules.baconBrawlSidebarLines(fifteen));
         List<String> lines = ArcadePortRules.baconBrawlSidebarLines(sixteen);
-        assertEquals(15, lines.size());
-        assertEquals("Player14", lines.get(13));
-        assertEquals("16 players remaining", lines.get(14));
-        assertFalse(lines.contains("Player15, Player16"));
+        assertEquals(List.of("16 players remaining"), lines);
     }
 
     @Test void baconBrawlKillCreditIncludesTestPlayerParticipantsAndExcludesSelfKnockouts() {
@@ -2797,4 +2794,20 @@ class ArcadePortGameTest {
         assertEquals(1, ArcadePortRules.turfWarsTimeoutLeader(-1, 4, 5));
         assertEquals(-1, ArcadePortRules.turfWarsTimeoutLeader(-1, 5, 5));
     }
+    @Test void legacyCombatAndRegenerationMatchTheShared18Rules() {
+        assertEquals(1_024.0D, ArcadePortRules.LEGACY_ATTACK_SPEED, 0.0D);
+        assertEquals(80, ArcadePortRules.LEGACY_HEALTH_REGEN_TICKS);
+        assertEquals(4.0D, ArcadePortRules.legacyMeleeDamage(Material.WOODEN_SWORD, 0), 0.00001D);
+        assertEquals(5.0D, ArcadePortRules.legacyMeleeDamage(Material.STONE_SWORD, 0), 0.00001D);
+        assertEquals(6.0D, ArcadePortRules.legacyMeleeDamage(Material.IRON_SWORD, 0), 0.00001D);
+        assertEquals(7.0D, ArcadePortRules.legacyMeleeDamage(Material.DIAMOND_SWORD, 0), 0.00001D);
+        assertEquals(9.0D, ArcadePortRules.legacyMeleeDamage(Material.IRON_AXE, 0), 0.00001D);
+        assertEquals(8.0D, ArcadePortRules.legacyMeleeDamage(Material.DIAMOND_SWORD, 1), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.legacyMeleeDamage(Material.AIR, 0), 0.00001D);
+        assertTrue(ArcadePortRules.shouldLegacyNaturalRegen(18, 10.0D, 20.0D));
+        assertFalse(ArcadePortRules.shouldLegacyNaturalRegen(17, 10.0D, 20.0D));
+        assertFalse(ArcadePortRules.shouldLegacyNaturalRegen(20, 20.0D, 20.0D));
+        assertFalse(ArcadePortRules.shouldLegacyNaturalRegen(20, 0.0D, 20.0D));
+    }
+
 }

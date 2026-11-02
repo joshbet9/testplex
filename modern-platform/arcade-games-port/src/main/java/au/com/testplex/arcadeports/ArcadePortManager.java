@@ -154,6 +154,7 @@ import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.command.CommandSender;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.projectiles.ProjectileSource;
@@ -598,6 +599,7 @@ public final class ArcadePortManager implements Listener {
         PlayerSnapshot snapshot = new PlayerSnapshot(player);
         session.players.put(id, player);
         session.snapshots.put(id, snapshot);
+        applyLegacyAttackSpeed(player);
         player.closeInventory();
         player.getInventory().clear();
         player.setGameMode(GameMode.SPECTATOR);
@@ -806,8 +808,7 @@ public final class ArcadePortManager implements Listener {
         }
         int meter = ArcadePortRules.nextBaconMeter(session.baconMeters.getOrDefault(id, 0),
                 session.baconSwingCritical.contains(id), session.alive.size());
-        session.baconMeters.put(id, meter);
-        updateBaconMeterItem(session, attacker);
+        recordBaconMeterHit(session, attacker, session.baconSwingCritical.contains(id));
         updateBaconMeterScoreboard(session);
         attacker.playSound(attacker.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 0.8F, 1.1F);
         return new BaconBrawlBotHitResult(meter, timingMultiplier);
@@ -1977,6 +1978,7 @@ public final class ArcadePortManager implements Listener {
         lobby.ensurePlayerInLobby(player);
         PlayerSnapshot snapshot = new PlayerSnapshot(player);
         session.snapshots.put(id, snapshot);
+        applyLegacyAttackSpeed(player);
         session.players.put(id, player);
         session.alive.add(id);
         session.scores.put(id, 0);
@@ -2335,6 +2337,77 @@ public final class ArcadePortManager implements Listener {
         return lastAutomaticRotationGameId;
     }
 
+    /** Start Monster Maze as a normal Arcade Session while keeping its engine as the game module. */
+    private boolean startMonsterMazeSession(ArcadePortGame type, List<Player> participants, CommandSender sender) {
+        if (monsterMazeModule == null || !isMonsterMazeModuleRegistered()) {
+            sender.sendMessage(ChatColor.RED + "Monster Maze is not registered by the shared Arcade manager.");
+            return false;
+        }
+        Location center = monsterMazeModule.getMapManager().defaultCenter();
+        if (center == null || center.getWorld() == null) {
+            String map = monsterMazeModule.getMapManager().getActiveMap();
+            plugin.getLogger().severe("Monster Maze could not launch: selected map '" + map
+                    + "' has no installed world or valid center.");
+            sender.sendMessage(ChatColor.RED + "Monster Maze map '" + map
+                    + "' is unavailable. Install its world and check the server log.");
+            return false;
+        }
+
+        Session session = new Session(type, center.getWorld(), participants, false);
+        active = session;
+        try {
+            for (Player player : participants) {
+                if (player == null || !player.isOnline()) continue;
+                UUID id = player.getUniqueId();
+                PlayerSnapshot pending = pendingRestore.remove(id);
+                if (pending != null) pending.restore(player);
+                lobby.ensurePlayerInLobby(player);
+                PlayerSnapshot snapshot = new PlayerSnapshot(player);
+                session.snapshots.put(id, snapshot);
+                applyLegacyAttackSpeed(player);
+                session.players.put(id, player);
+                session.alive.add(id);
+                session.scores.put(id, 0);
+                session.lastLocations.put(id, player.getLocation().clone());
+            }
+            long now = System.currentTimeMillis();
+            session.startedAt = now;
+            session.prepareDurationMillis = 0L;
+            session.prepareEndsAt = now;
+            session.lastPrepareSecond = 0;
+            session.liveStarted = true;
+            session.endsAt = 0L;
+            session.startupComplete = true;
+            if (!monsterMazeModule.startTestplexGame(participants, mazeModeFor(type), type)) {
+                finish(session, null, false);
+                sender.sendMessage(ChatColor.RED + type.displayName()
+                        + " could not start. Its selected map, server logs, and module state were checked.");
+                return false;
+            }
+            session.tickTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> tick(session), 1L, 1L);
+            return true;
+        } catch (RuntimeException failure) {
+            plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                    type.displayName() + " failed while starting inside the shared Arcade lifecycle.", failure);
+            if (monsterMazeModule.getGameManager() != null && monsterMazeModule.getGameManager().isRunning()) {
+                monsterMazeModule.getGameManager().forceStop();
+            }
+            if (active == session) finish(session, null, false);
+            sender.sendMessage(ChatColor.RED + type.displayName()
+                    + " failed to start. Player state was restored; see the server log.");
+            return false;
+        }
+    }
+
+    private me.monstermaze.game.MazeMode mazeModeFor(ArcadePortGame type) {
+        return switch (type) {
+            case MONSTER_MAZE -> me.monstermaze.game.MazeMode.ORIGINAL;
+            case MONSTER_MAZE_SPEED -> me.monstermaze.game.MazeMode.SPEED;
+            case MONSTER_MAZE_MODERN -> me.monstermaze.game.MazeMode.MODERN;
+            default -> throw new IllegalArgumentException("Not a Monster Maze game: " + type.id());
+        };
+    }
+
     /**
      * Completes the common Arcade lifecycle for a game module hosted inside this
      * manager. Natural Monster Maze completion returns its participants first,
@@ -2343,6 +2416,11 @@ public final class ArcadePortManager implements Listener {
     void onExternalGameCompleted(ArcadePortGame game) {
         if (game == null) return;
         lastAutomaticRotationGameId = game.id();
+        Session session = active;
+        if (session != null && session.type == game) {
+            finish(session, null, true);
+            return;
+        }
         if (active != null || monsterMazeRunning() || wizardsRunning()) return;
         beginAutomaticRotationVote();
     }
@@ -2810,6 +2888,7 @@ public final class ArcadePortManager implements Listener {
                     lobby.ensurePlayerInLobby(player);
                     PlayerSnapshot snapshot = new PlayerSnapshot(player);
                     session.snapshots.put(id, snapshot);
+                    applyLegacyAttackSpeed(player);
                     session.players.put(id, player);
                     session.alive.add(id);
                     session.scores.put(id, 0);
@@ -2832,30 +2911,19 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (type.isMonsterMaze()) {
-            if (monsterMazeModule == null) {
-                sender.sendMessage(ChatColor.RED + "Monster Maze module is not loaded by Testplex Arcade.");
-                return;
-            }
-            me.monstermaze.game.MazeMode selectedMode = switch (type) {
-                case MONSTER_MAZE -> me.monstermaze.game.MazeMode.ORIGINAL;
-                case MONSTER_MAZE_SPEED -> me.monstermaze.game.MazeMode.SPEED;
-                case MONSTER_MAZE_MODERN -> me.monstermaze.game.MazeMode.MODERN;
-                default -> throw new IllegalStateException("Unexpected Monster Maze game identity: " + type.id());
-            };
-            if (!monsterMazeModule.startTestplexGame(participants, selectedMode, type)) {
-                sender.sendMessage(ChatColor.RED + type.displayName()
-                        + " could not start. Check its map and game status in the server log.");
-                return;
-            }
+            if (!startMonsterMazeSession(type, participants, sender)) return;
             if (queue != null) queues.remove(selectedQueueKey);
-            if (pendingStart != null && pendingType == type) {
+            if (pendingStart != null && pendingType == type
+                    && pendingMixedArcadeVariant == mixedArcadeVariant) {
                 pendingStart.cancel();
                 pendingStart = null;
                 pendingType = null;
                 pendingMixedArcadeVariant = false;
             }
             for (Player player : participants) {
-                if (player.isOnline()) player.sendMessage(ChatColor.AQUA + "Testplex has started " + type.displayName() + ".");
+                if (player != null && player.isOnline()) {
+                    player.sendMessage(ChatColor.AQUA + "Testplex has started " + type.displayName() + ".");
+                }
             }
             return;
         }
@@ -2882,6 +2950,7 @@ public final class ArcadePortManager implements Listener {
                 lobby.ensurePlayerInLobby(participant);
                 PlayerSnapshot snapshot = new PlayerSnapshot(participant);
                 session.snapshots.put(id, snapshot);
+                applyLegacyAttackSpeed(participant);
                 session.players.put(id, participant);
                 session.alive.add(id);
                 session.scores.put(id, 0);
@@ -3266,6 +3335,7 @@ public final class ArcadePortManager implements Listener {
             // Always snapshot the controlled lobby state, never the server's old survival spawn.
             PlayerSnapshot snapshot = new PlayerSnapshot(player);
             session.snapshots.put(player.getUniqueId(), snapshot);
+            applyLegacyAttackSpeed(player);
             session.players.put(player.getUniqueId(), player);
             session.alive.add(player.getUniqueId());
             session.scores.put(player.getUniqueId(), 0);
@@ -8658,6 +8728,11 @@ public final class ArcadePortManager implements Listener {
         }
         long now = System.currentTimeMillis();
         session.ticks++;
+        if (session.liveStarted) updateLegacyNaturalRegeneration(session);
+        if (session.type.isMonsterMaze()) {
+            if (!monsterMazeRunning()) finish(session, null, true);
+            return;
+        }
         if (!session.liveStarted) {
             long remainingMillis = session.prepareEndsAt - now;
             int seconds = (int) Math.max(0L, (remainingMillis + 999L) / 1_000L);
@@ -9115,6 +9190,22 @@ public final class ArcadePortManager implements Listener {
         return ChatColor.GREEN + "█".repeat(filled) + ChatColor.DARK_GRAY + "░".repeat(10 - filled);
     }
 
+    private void recordBaconMeterHit(Session session, Player player, boolean critical) {
+        UUID id = player.getUniqueId();
+        int previous = session.baconMeters.getOrDefault(id, 0);
+        int meter = ArcadePortRules.nextBaconMeter(previous, critical, session.alive.size());
+        session.baconMeters.put(id, meter);
+        if (previous < ArcadePortRules.BACON_METER_MIN_ABILITY
+                && meter >= ArcadePortRules.BACON_METER_MIN_ABILITY) {
+            player.sendMessage(ChatColor.GREEN + "Your ability is ready!");
+        }
+        if (previous < ArcadePortRules.BACON_METER_MAX && meter >= ArcadePortRules.BACON_METER_MAX) {
+            player.sendMessage(ChatColor.GOLD + "Your ability is maxed!");
+        }
+        updateBaconMeterItem(session, player);
+        updateBaconMeterScoreboard(session);
+    }
+
     /** The vanilla XP bar is the ability meter during Bacon Brawl. */
     private void updateBaconMeterItem(Session session, Player player) {
         if (session.type != ArcadePortGame.BACON_BRAWL || player == null || !player.isOnline()
@@ -9159,17 +9250,26 @@ public final class ArcadePortManager implements Listener {
         }, 18L);
     }
 
-    private void showBaconHitFeedback(Session session, Player attacker, Player target, boolean critical) {
-        if (!critical) return;
+    private void showBaconHitFeedback(Session session, Player attacker, Player target,
+            boolean critical, boolean backstab) {
         long until = System.currentTimeMillis() + ArcadePortRules.BACON_HIT_FEEDBACK_MILLIS;
         session.baconHitFeedbackUntil.put(attacker.getUniqueId(), until);
         session.baconHitFeedbackUntil.put(target.getUniqueId(), until);
-        showFloatingCombatLabel(session, target.getLocation(), "Critical!", ChatColor.GOLD);
+        String label = backstab ? "Backstab!" : critical ? "Critical!" : "Hit!";
+        ChatColor colour = backstab ? ChatColor.RED : critical ? ChatColor.GOLD : ChatColor.WHITE;
+        showFloatingCombatLabel(session, target.getLocation(), label, colour);
         Location impact = target.getLocation().clone().add(0.0D, 1.0D, 0.0D);
-        target.getWorld().spawnParticle(Particle.CRIT, impact, 10, 0.3D, 0.35D, 0.3D, 0.08D);
-        target.getWorld().spawnParticle(Particle.ELECTRIC_SPARK, impact, 5, 0.2D, 0.25D, 0.2D, 0.04D);
-        attacker.playSound(attacker.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 0.8F, 1.25F);
-        target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 0.8F, 1.0F);
+        if (critical) {
+            target.getWorld().spawnParticle(Particle.CRIT, impact, 10, 0.3D, 0.35D, 0.3D, 0.08D);
+            target.getWorld().spawnParticle(Particle.ELECTRIC_SPARK, impact, 5, 0.2D, 0.25D, 0.2D, 0.04D);
+            attacker.playSound(attacker.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 0.8F, 1.25F);
+            target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 0.8F, 1.0F);
+        } else {
+            target.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR, impact, 8,
+                    0.3D, 0.35D, 0.3D, 0.01D);
+            if (backstab) target.getWorld().spawnParticle(Particle.CRIT, impact, 10,
+                    0.3D, 0.35D, 0.3D, 0.08D);
+        }
     }
 
     /**
@@ -9622,6 +9722,13 @@ public final class ArcadePortManager implements Listener {
                     handleBaconBrawlHit(session, owner, target, "bacon-blast", 6.0D, null, blastPower);
                     if (session.baconCrispyProjectiles.contains(blastId) && target.isOnline()) {
                         target.setFireTicks(60);
+                        LivingEntity avatar = baconPlayerAvatar(session, target.getUniqueId());
+                        if (avatar != null) {
+                            avatar.setFireTicks(60);
+                            avatar.getWorld().spawnParticle(Particle.FLAME,
+                                    avatar.getLocation().add(0.0D, 0.8D, 0.0D), 18,
+                                    0.25D, 0.45D, 0.25D, 0.02D);
+                        }
                         session.baconCrispyFlamedUntil.put(target.getUniqueId(), now + 3_000L);
                     } else {
                         target.getWorld().playSound(target.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING,
@@ -9680,11 +9787,7 @@ public final class ArcadePortManager implements Listener {
         UUID id = player.getUniqueId();
         String kit = session.baconKits.getOrDefault(id, "el-muchacho-pigo");
         int charge = session.baconMeters.getOrDefault(id, 0);
-        if (!ArcadePortRules.canUseBaconMeterAbility(charge)) {
-            player.sendMessage(ChatColor.YELLOW + "Your ability meter needs "
-                    + ArcadePortRules.BACON_METER_MIN_ABILITY + "% charge.");
-            return;
-        }
+        if (!ArcadePortRules.canUseBaconMeterAbility(charge)) return;
         // Abilities are gated only by earned damage meter, never by a wall-clock cooldown.
         session.baconAbilitiesUsed.add(id);
         session.baconMeters.put(id, 0);
@@ -9711,7 +9814,6 @@ public final class ArcadePortManager implements Listener {
                 player.getWorld().spawnParticle(Particle.SOUL_FIRE_FLAME,
                         player.getEyeLocation(), Math.max(2, charge / 10), 0.2D, 0.2D, 0.2D, 0.01D);
                 player.playSound(player.getLocation(), Sound.ENTITY_PIG_AMBIENT, 1.0F, 1.5F);
-                player.sendMessage(ChatColor.GREEN + "Bacon Blast! Power: " + Math.round(power * 100) + "%.");
                 break;
             }
             case "chris-p-bacon": {
@@ -9739,7 +9841,6 @@ public final class ArcadePortManager implements Listener {
                 }
                 player.getWorld().spawnParticle(Particle.FLAME, launch, 12, 0.2D, 0.2D, 0.2D, 0.03D);
                 player.playSound(player.getLocation(), Sound.ENTITY_PIG_AMBIENT, 1.0F, 1.2F);
-                player.sendMessage(ChatColor.GREEN + "Crispy Bacon launched!");
                 break;
             }
             case "pig": {
@@ -9755,9 +9856,6 @@ public final class ArcadePortManager implements Listener {
                     player.getWorld().spawnParticle(Particle.BLOCK, player.getLocation(), 3,
                             0.25D, 0.15D, 0.25D, 0.0D, Material.SNOW_BLOCK.createBlockData());
                 }
-                player.sendMessage(ChatColor.GREEN + "Pig Cloak active for "
-                        + String.format(java.util.Locale.ROOT, "%.1f", duration / 1000.0D)
-                        + " seconds. Landing a hit or running out of time reveals you.");
                 break;
             }
             case "brutus-bacon": {
@@ -9774,9 +9872,6 @@ public final class ArcadePortManager implements Listener {
                         player.getLocation().add(0.0D, 1.0D, 0.0D),
                         Math.max(8, charge / 3), 0.45D, 0.65D, 0.45D, 0.02D);
                 player.getWorld().playSound(player.getLocation(), Sound.ITEM_TOTEM_USE, 0.9F, 1.3F);
-                player.sendMessage(ChatColor.GREEN + "Brutus Guard active for "
-                        + String.format(java.util.Locale.ROOT, "%.1f", duration / 1000.0D)
-                        + " seconds. Frontal hits are blocked; a backstab breaks the guard.");
                 break;
             }
             default: {
@@ -9791,7 +9886,6 @@ public final class ArcadePortManager implements Listener {
                 player.getWorld().spawnParticle(Particle.ELECTRIC_SPARK,
                         player.getLocation(), Math.max(8, charge / 3), 0.3D, 0.25D, 0.3D, 0.05D);
                 player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1.0F, 0.8F + charge / 150.0F);
-                player.sendMessage(ChatColor.GREEN + "Body Slam charged to " + charge + "%!");
                 break;
             }
         }
@@ -9806,7 +9900,6 @@ public final class ArcadePortManager implements Listener {
                 new BaconCrispyDashState(direction, now + ArcadePortRules.BACON_CRISPY_DASH_DURATION_MILLIS));
         player.setVelocity(direction.clone().multiply(ArcadePortRules.BACON_CRISPY_DASH_SPEED));
         player.getWorld().playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 0.8F, 1.5F);
-        player.sendMessage(ChatColor.GOLD + "Crispy dash!");
         updateBaconCrispyDash(session, player, now);
     }
 
@@ -9826,8 +9919,15 @@ public final class ArcadePortManager implements Listener {
         flame.getWorld().spawnParticle(Particle.FLAME, flame, 5, 0.16D, 0.08D, 0.16D, 0.005D);
         placeBaconDashFireBlock(session, flame);
         for (Player target : alivePlayers(session)) {
-            if (target.equals(player) || target.getLocation().distanceSquared(flame) > 1.0D) continue;
+            if (target.equals(player) || target.getLocation().distanceSquared(flame) > 2.25D) continue;
             target.setFireTicks(Math.max(target.getFireTicks(), 60));
+            LivingEntity avatar = baconPlayerAvatar(session, target.getUniqueId());
+            if (avatar != null) {
+                avatar.setFireTicks(Math.max(avatar.getFireTicks(), 60));
+                avatar.getWorld().spawnParticle(Particle.FLAME,
+                        avatar.getLocation().add(0.0D, 0.8D, 0.0D), 18,
+                        0.25D, 0.45D, 0.25D, 0.02D);
+            }
             session.baconCrispyFlamedUntil.put(target.getUniqueId(), now + 3_000L);
         }
     }
@@ -9943,6 +10043,14 @@ public final class ArcadePortManager implements Listener {
             endBaconBrutus(session, targetId, target);
             target.playSound(target.getLocation(), Sound.ITEM_SHIELD_BREAK, 0.9F, 0.8F);
         }
+        boolean normalTimedHit = "melee".equals(source) || "projectile hit".equals(source);
+        if (normalTimedHit) {
+            Map<UUID, Long> attackerHits = session.baconRecentHitsByAttacker.computeIfAbsent(
+                    attacker.getUniqueId(), ignored -> new HashMap<>());
+            long previousHitAt = attackerHits.getOrDefault(target.getUniqueId(), 0L);
+            if (previousHitAt > 0L && now - previousHitAt < ArcadePortRules.BACON_HIT_COOLDOWN_MILLIS) return;
+            attackerHits.put(target.getUniqueId(), now);
+        }
         boolean attackerCloaked = session.baconCloakUntil.getOrDefault(attackerId, 0L) > now;
         if (session.baconCloakUntil.containsKey(attackerId)) {
             endBaconCloak(session, attackerId, attacker);
@@ -9968,7 +10076,6 @@ public final class ArcadePortManager implements Listener {
         session.baconLastHitBackstab.put(targetId, backstab);
         session.baconLastHitCloaked.put(targetId, attackerCloaked);
 
-        boolean normalTimedHit = "melee".equals(source) || "projectile hit".equals(source);
         double timingMultiplier = normalTimedHit
                 ? session.baconSwingTimingMultiplierById.getOrDefault(attackerId, 1.0D) : 1.0D;
         boolean vanillaCritical = !attacker.isOnGround() && attacker.getFallDistance() > 0.0F
@@ -9991,17 +10098,15 @@ public final class ArcadePortManager implements Listener {
             knockbackMultiplier *= ArcadePortRules.baconBrawlKnockbackMultiplier(true);
             target.playSound(target.getLocation(), Sound.ENTITY_PIG_DEATH, 1.0F, 2.0F);
         }
-        target.setVelocity(baconBrawlKnockbackVelocity(attacker, target, rawDamage,
+        target.setVelocity(baconBrawlKnockbackVelocity(attacker, target,
+                normalTimedHit && "melee".equals(source) ? 2.0D : rawDamage,
                 knockbackMultiplier, projectileVelocity));
         target.getWorld().spawnParticle(Particle.CLOUD, target.getLocation().add(0, 1, 0),
                 10, 0.35D, 0.4D, 0.35D, 0.04D);
 
         // Only normal timed melee/projectile hits add charge; ability damage does not.
         if (normalTimedHit) {
-            int meter = ArcadePortRules.nextBaconMeter(
-                    session.baconMeters.getOrDefault(attackerId, 0), critical, session.alive.size());
-            session.baconMeters.put(attackerId, meter);
-            updateBaconMeterItem(session, attacker);
+            recordBaconMeterHit(session, attacker, critical);
         }
         // Reborn restores hunger to the attacker for each successful hit.
         attacker.setFoodLevel(Math.min(20,
@@ -10014,7 +10119,8 @@ public final class ArcadePortManager implements Listener {
         LivingEntity avatar = baconPlayerAvatar(session, targetId);
         if (avatar != null) avatar.playEffect(EntityEffect.HURT);
         target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.9F, 0.85F);
-        showBaconHitFeedback(session, attacker, target, critical);
+        showBaconHitFeedback(session, attacker, target, critical,
+                "pig".equals(kit) && "melee".equals(source) && backstab);
         if ("melee".equals(source)) {
             session.baconSwingCritical.remove(attackerId);
             session.baconSwingTimingMultiplierById.put(attackerId, 1.0D);
@@ -13260,7 +13366,11 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.BACON_BRAWL
                 && session.alive.contains(player.getUniqueId())) {
             UUID playerId = player.getUniqueId();
-            if (killer == null && reason != null) {
+            UUID suppliedKillerId = killer == null ? null : killer.getUniqueId();
+            boolean suppliedKillerIsValid = suppliedKillerId != null
+                    && !suppliedKillerId.equals(playerId)
+                    && session.scores.containsKey(suppliedKillerId);
+            if (!suppliedKillerIsValid && reason != null) {
                 boolean fallKnockout = ArcadePortRules.isBaconArenaKnockoutReason(reason);
                 long lastHitAt = session.baconLastDamagedAt.getOrDefault(playerId, 0L);
                 if (ArcadePortRules.shouldCreditBaconFallKill(
@@ -14477,6 +14587,34 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private void applyLegacyAttackSpeed(Player player) {
+        if (player == null) return;
+        var attackSpeed = player.getAttribute(Attribute.ATTACK_SPEED);
+        if (attackSpeed != null) attackSpeed.setBaseValue(ArcadePortRules.LEGACY_ATTACK_SPEED);
+    }
+
+    private void updateLegacyNaturalRegeneration(Session session) {
+        for (Player player : session.players.values()) {
+            if (player == null || !player.isOnline() || !session.alive.contains(player.getUniqueId())) continue;
+            UUID id = player.getUniqueId();
+            double maxHealth = player.getMaxHealth();
+            if (!ArcadePortRules.shouldLegacyNaturalRegen(player.getFoodLevel(), player.getHealth(), maxHealth)) {
+                session.legacyNaturalRegenTicks.remove(id);
+                continue;
+            }
+            int timer = session.legacyNaturalRegenTicks.getOrDefault(id, 0) + 1;
+            if (timer >= ArcadePortRules.LEGACY_HEALTH_REGEN_TICKS) {
+                player.setHealth(Math.min(maxHealth, player.getHealth() + 1.0D));
+                // 1.8 natural regeneration adds six exhaustion; vanilla food handling
+                // converts that to saturation/food depletion on its normal tick.
+                player.setExhaustion(Math.min(40.0F, player.getExhaustion() + 6.0F));
+                session.legacyNaturalRegenTicks.remove(id);
+            } else {
+                session.legacyNaturalRegenTicks.put(id, timer);
+            }
+        }
+    }
+
     private void handlePlayerHit(Session session, Player attacker, Player target, String source) {
         handlePlayerHit(session, attacker, target, source, 1);
     }
@@ -15226,7 +15364,7 @@ public final class ArcadePortManager implements Listener {
         if (announceWinner && session.type == ArcadePortGame.DEATH_TAG) {
             recordDeathTagRewards(session);
         }
-        if (session.type != ArcadePortGame.PLEXBALL) recordLocalStats(session, winner, announceWinner);
+        if (session.type != ArcadePortGame.PLEXBALL && !session.type.isMonsterMaze()) recordLocalStats(session, winner, announceWinner);
         if (announceWinner && session.type == ArcadePortGame.MICRO_BATTLES) {
             for (Map.Entry<UUID, Integer> assists : session.microAssists.entrySet()) {
                 if (assists.getValue() >= 8) {
@@ -15531,6 +15669,7 @@ public final class ArcadePortManager implements Listener {
         session.baconBlastLastLocations.clear();
         session.baconBlastCreatedAt.clear();
         session.baconLastDamager.clear();
+        session.baconRecentHitsByAttacker.clear();
         session.baconLastDamagedAt.clear();
         session.baconLastHitSource.clear();
         session.baconBlastCombosByVictim.clear();
@@ -18630,11 +18769,29 @@ public final class ArcadePortManager implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onNaturalRegainHealth(org.bukkit.event.entity.EntityRegainHealthEvent event) {
+        if (!(event.getEntity() instanceof Player player)
+                || event.getRegainReason() != org.bukkit.event.entity.EntityRegainHealthEvent.RegainReason.SATIATED) return;
+        Session session = active;
+        if (session != null && session.players.containsKey(player.getUniqueId())
+                && player.getWorld() == session.world) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDamage(EntityDamageEvent event) {
         if (event.getEntity() instanceof Player prepareVictim && cancelPrepareAction(prepareVictim, event)) return;
         if (event instanceof EntityDamageByEntityEvent byEntity && cancelPrepareAction(playerShooter(byEntity.getDamager()), event)) return;
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+        if (session.type.isMonsterMaze()) return;
+        if (session.type != ArcadePortGame.WIZARDS
+                && event instanceof EntityDamageByEntityEvent melee && melee.getDamager() instanceof Player attacker
+                && event.getEntity() instanceof Player && session.players.containsKey(attacker.getUniqueId())) {
+            ItemStack weapon = attacker.getInventory().getItemInMainHand();
+            int sharpness = weapon == null ? 0 : weapon.getEnchantmentLevel(Enchantment.SHARPNESS);
+            event.setDamage(ArcadePortRules.legacyMeleeDamage(
+                    weapon == null ? Material.AIR : weapon.getType(), sharpness));
+        }
         // Wizards runs its own source-faithful damage, armor and spell pipeline.
         // The shared Arcade default cancellation below must not swallow its PvP.
         if (session.type == ArcadePortGame.WIZARDS) return;
@@ -19111,6 +19268,22 @@ public final class ArcadePortManager implements Listener {
             if (session.type == ArcadePortGame.RUNNER && event instanceof EntityDamageByEntityEvent runnerDamage) {
                 Entity damager = runnerDamage.getDamager();
                 if (damager instanceof Player || damager instanceof Projectile) return;
+            }
+            boolean playerCausedDamage = event instanceof EntityDamageByEntityEvent attributed
+                    && (attributed.getDamager() instanceof Player
+                        || attributed.getDamager() instanceof Projectile projectile
+                            && projectile.getShooter() instanceof Player);
+            if (!playerCausedDamage && incomingDamage > 0.0D
+                    && session.alive.contains(target.getUniqueId())) {
+                target.playEffect(EntityEffect.HURT);
+                target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.9F, 0.85F);
+                target.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
+                        target.getLocation().clone().add(0.0D, 1.0D, 0.0D),
+                        6, 0.25D, 0.3D, 0.25D, 0.02D);
+                String reason = event.getCause().name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
+                if (target.getHealth() <= incomingDamage) eliminate(session, target, null, reason);
+                else target.setHealth(target.getHealth() - incomingDamage);
+                return;
             }
             if (event instanceof EntityDamageByEntityEvent byEntity) {
                 Entity damager = byEntity.getDamager();
@@ -24294,7 +24467,21 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
     public void onPrepareSneakToggle(PlayerToggleSneakEvent event) {
-        cancelPrepareAction(event.getPlayer(), event);
+        Player player = event.getPlayer();
+        cancelPrepareAction(player, event);
+        if (event.isCancelled() || !event.isSneaking()) return;
+        Session session = active;
+        UUID id = player.getUniqueId();
+        if (session == null || session.type != ArcadePortGame.BACON_BRAWL
+                || !session.liveStarted || !session.alive.contains(id)
+                || !"chris-p-bacon".equals(session.baconKits.getOrDefault(id, ""))) return;
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (active != session || !player.isOnline() || !player.isSneaking()
+                    || !player.isOnGround() || !session.alive.contains(id)
+                    || session.baconCrispyDashes.containsKey(id)
+                    || !ArcadePortRules.canUseBaconMeterAbility(session.baconMeters.getOrDefault(id, 0))) return;
+            useBaconBrawlAbility(session, player, System.currentTimeMillis());
+        });
     }
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
@@ -24617,7 +24804,9 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> baconSlams = new HashMap<>();
         final Map<UUID, Long> baconBrutusUntil = new HashMap<>();
         final Map<UUID, Long> baconCloakUntil = new HashMap<>();
+        final Map<UUID, Integer> legacyNaturalRegenTicks = new HashMap<>();
         final Map<UUID, Long> baconLastSwingAt = new HashMap<>();
+        final Map<UUID, Map<UUID, Long>> baconRecentHitsByAttacker = new HashMap<>();
         final Map<UUID, Double> baconSwingTimingMultiplierById = new HashMap<>();
         final Set<UUID> baconSwingCritical = new HashSet<>();
         final Map<UUID, Long> baconCrispyFlamedUntil = new HashMap<>();
@@ -25070,6 +25259,7 @@ public final class ArcadePortManager implements Listener {
         final double health;
         final double maxHealthBase;
         final double absorption;
+        final double attackSpeedBase;
         final int food;
         final float saturation;
         final float walkSpeed;
@@ -25095,6 +25285,8 @@ public final class ArcadePortManager implements Listener {
             flying = p.isFlying();
             health = p.getHealth();
             absorption = p.getAbsorptionAmount();
+            var attackSpeedAttribute = p.getAttribute(Attribute.ATTACK_SPEED);
+            attackSpeedBase = attackSpeedAttribute == null ? 4.0D : attackSpeedAttribute.getBaseValue();
             var maxHealthAttribute = p.getAttribute(Attribute.MAX_HEALTH);
             maxHealthBase = maxHealthAttribute == null ? p.getMaxHealth() : maxHealthAttribute.getBaseValue();
             food = p.getFoodLevel();
@@ -25129,6 +25321,8 @@ public final class ArcadePortManager implements Listener {
             p.setFlySpeed(flySpeed);
             p.setSprinting(sprinting);
             p.setFireTicks(fireTicks);
+            var attackSpeedAttribute = p.getAttribute(Attribute.ATTACK_SPEED);
+            if (attackSpeedAttribute != null) attackSpeedAttribute.setBaseValue(attackSpeedBase);
             p.setCompassTarget(compassTarget == null ? null : compassTarget.clone());
             p.setCollidable(collidable);
             p.setInvulnerable(invulnerable);
