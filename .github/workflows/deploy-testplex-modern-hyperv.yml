@@ -405,6 +405,7 @@ jobs:
           fi
           shopt -s nullglob
           for old_backup in "$backup_root"/*; do
+            [[ -n "$current_backup" ]] || continue
             [[ -d "$old_backup" && ! -L "$old_backup" ]] || continue
             [[ "$old_backup" == "$current_backup" ]] && continue
             name="${old_backup##*/}"
