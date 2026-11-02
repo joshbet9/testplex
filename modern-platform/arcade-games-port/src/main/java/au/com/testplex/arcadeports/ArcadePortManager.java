@@ -25069,10 +25069,13 @@ public final class ArcadePortManager implements Listener {
         final boolean flying;
         final double health;
         final double maxHealthBase;
+        final double absorption;
         final int food;
         final float saturation;
         final float walkSpeed;
         final float flySpeed;
+        final boolean sprinting;
+        final int fireTicks;
         final Location compassTarget;
         final boolean collidable;
         final boolean invulnerable;
@@ -25091,16 +25094,19 @@ public final class ArcadePortManager implements Listener {
             allowFlight = p.getAllowFlight();
             flying = p.isFlying();
             health = p.getHealth();
+            absorption = p.getAbsorptionAmount();
             var maxHealthAttribute = p.getAttribute(Attribute.MAX_HEALTH);
             maxHealthBase = maxHealthAttribute == null ? p.getMaxHealth() : maxHealthAttribute.getBaseValue();
             food = p.getFoodLevel();
             saturation = p.getSaturation();
             walkSpeed = p.getWalkSpeed();
             flySpeed = p.getFlySpeed();
+            sprinting = p.isSprinting();
+            fireTicks = p.getFireTicks();
             Location currentCompassTarget = p.getCompassTarget();
             compassTarget = currentCompassTarget == null ? null : currentCompassTarget.clone();
             collidable = p.isCollidable();
-            invulnerable = p.isInvulnerable();
+            invulnerable = readMarkedInvulnerability(p);
             scoreboard = p.getScoreboard();
             playerListName = p.getPlayerListName();
         }
@@ -25121,6 +25127,8 @@ public final class ArcadePortManager implements Listener {
             p.setSaturation(saturation);
             p.setWalkSpeed(walkSpeed);
             p.setFlySpeed(flySpeed);
+            p.setSprinting(sprinting);
+            p.setFireTicks(fireTicks);
             p.setCompassTarget(compassTarget == null ? null : compassTarget.clone());
             p.setCollidable(collidable);
             p.setInvulnerable(invulnerable);
@@ -25131,12 +25139,22 @@ public final class ArcadePortManager implements Listener {
             if (maxHealthAttribute != null) maxHealthAttribute.setBaseValue(maxHealthBase);
             double maxHealth = p.getMaxHealth();
             p.setHealth(Math.max(1.0D, Math.min(health, maxHealth)));
+            p.setAbsorptionAmount(absorption);
             if (allowFlight) p.setFlying(flying);
         }
         private static ItemStack[] cloneItems(ItemStack[] items) {
             ItemStack[] copy = new ItemStack[items.length];
             for (int i=0;i<items.length;i++) copy[i] = items[i] == null ? null : items[i].clone();
             return copy;
+        }
+        private static boolean readMarkedInvulnerability(Player player) {
+            try {
+                Object marked = player.getClass().getMethod("isMarkedInvulnerable").invoke(player);
+                if (marked instanceof Boolean flag) return flag;
+            } catch (ReflectiveOperationException | SecurityException ignored) { }
+            // Paper 26.3 adds the marked-state getter; keep the older API fallback
+            // for compatibility with the project's shared Bukkit compile surface.
+            return player.isInvulnerable();
         }
     }
 }
