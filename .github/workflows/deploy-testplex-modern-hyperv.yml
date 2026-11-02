@@ -472,7 +472,7 @@ jobs:
           # The remote stage directory is pre-seeded from installed JARs; only changed
           # blocks travel over Tailscale, while the final full-file SHA is still verified.
           rsync_ssh="ssh -p $SSH_PORT -i $HOME/.ssh/testplex_hyperv -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=40"
-          rsync_opts=(-a --checksum --partial --inplace --human-readable --stats -e "$rsync_ssh")
+          rsync_opts=(-rt --checksum --partial --inplace --human-readable --stats -e "$rsync_ssh")
           for jar in "${changed_jars[@]}"; do
             case "$jar" in
               TestplexModernArcade.jar|SnakeModern.jar|ArcadeMechanicsModern.jar|WizardsModern.jar) ;;
@@ -481,7 +481,7 @@ jobs:
             echo "Delta transferring $jar against its installed version."
             timeout --foreground --signal=TERM --kill-after=30s 8m rsync "${rsync_opts[@]}" "$STAGE_DIR/$jar" "$remote:$upload_dir/$jar"
           done
-          timeout --foreground --signal=TERM --kill-after=15s 3m rsync -a --partial -e "$rsync_ssh" \
+          timeout --foreground --signal=TERM --kill-after=15s 3m rsync -rt --partial -e "$rsync_ssh" \
             "$STAGE_DIR/testplex-modern-recovery.sh" "$remote:$upload_dir/testplex-modern-recovery.sh"
           timeout --foreground --signal=TERM --kill-after=15s 3m scp "${scp_opts[@]}" \
             "$selected_manifest" "$remote:$upload_dir/SHA256SUMS"
