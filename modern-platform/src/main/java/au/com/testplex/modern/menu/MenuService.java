@@ -297,11 +297,9 @@ public final class MenuService implements Listener {
                                     + engine.getConfig().getInt("game-preferences.automatic-rotation.vote-seconds", 60) + " seconds",
                             ChatColor.YELLOW + "Players rate games in /gamepreferences.")));
 
-            List<GameDefinition> clearedGames = catalog.getGames().stream()
+            List<GameDefinition> clearedGames = gamesAlphabetically().stream()
                     .filter(game -> cleared.contains(game.getId()))
                     .filter(game -> !isMonsterMazeModeAlias(game))
-                    .sorted(java.util.Comparator.comparing(GameDefinition::getName,
-                            String.CASE_INSENSITIVE_ORDER))
                     .toList();
             int[] slots = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34, 37, 39, 41, 43};
             int pageCount = Math.max(1, (clearedGames.size() + slots.length - 1) / slots.length);
@@ -376,11 +374,12 @@ public final class MenuService implements Listener {
 
     private void openGameSelection(Player player, boolean rotation, int requestedPage) {
         Inventory inventory = Bukkit.createInventory(null, 54, rotation ? "Edit Game Rotation" : SET_GAME_TITLE);
+        List<GameDefinition> games = gamesAlphabetically();
         int[] slots = LEGACY_GAME_SLOTS;
-        int pageCount = Math.max(1, (catalog.getGames().size() + slots.length - 1) / slots.length);
+        int pageCount = Math.max(1, (games.size() + slots.length - 1) / slots.length);
         int page = Math.max(0, Math.min(requestedPage, pageCount - 1));
         int start = page * slots.length;
-        int end = Math.min(catalog.getGames().size(), start + slots.length);
+        int end = Math.min(games.size(), start + slots.length);
         JavaPlugin engine = arcadeMechanicsPlugin();
         List<String> cleared = engine == null ? List.of() : engine.getConfig().getStringList("enabled-games");
         String rotationPath = "game-preferences.automatic-rotation.enabled-games";
@@ -389,7 +388,7 @@ public final class MenuService implements Listener {
                 ? engine.getConfig().getStringList(rotationPath) : cleared;
 
         for (int index = start; index < end; index++) {
-            GameDefinition game = catalog.getGames().get(index);
+            GameDefinition game = games.get(index);
             boolean ready = cleared.contains(game.getId());
             boolean included = rotationPool.contains(game.getId());
             boolean rotationAvailable = engine != null && rotationCandidateAvailable(engine, game.getId());
@@ -426,7 +425,7 @@ public final class MenuService implements Listener {
             inventory.setItem(45, previous);
         }
         inventory.setItem(49, makeItem(Material.MAP, ChatColor.AQUA + "Page " + (page + 1) + "/" + pageCount,
-                List.of(ChatColor.GRAY.toString() + catalog.getGames().size() + " games in the catalogue.",
+                List.of(ChatColor.GRAY.toString() + games.size() + " games in the catalogue.",
                         ChatColor.GRAY + (rotation ? "Toggle games in the shared preference rotation pool."
                                 : "Select any game to inspect its lobby integration."))));
         if (page + 1 < pageCount) {
@@ -501,7 +500,7 @@ public final class MenuService implements Listener {
     private void openWinEffectsHome(Player player) {
         Inventory inventory = Bukkit.createInventory(null, 54, WIN_HOME_TITLE);
         int index = 0;
-        for (GameDefinition game : catalog.getGames()) {
+        for (GameDefinition game : gamesAlphabetically()) {
             if (isMonsterMazeModeAlias(game)) continue;
             if (index >= LEGACY_GAME_SLOTS.length) break;
             ItemStack item = makeItem(icon(game.getIcon()), ChatColor.YELLOW + game.getName(),
@@ -518,7 +517,7 @@ public final class MenuService implements Listener {
         Inventory inventory = Bukkit.createInventory(null, 54, ChatColor.BLACK + COSMETICS_TITLE);
         int index = 0;
         int[] legacySlots = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34, 37, 39, 41, 43};
-        for (GameDefinition game : catalog.getGames()) {
+        for (GameDefinition game : gamesAlphabetically()) {
             if (isMonsterMazeModeAlias(game)) continue;
             if (index >= legacySlots.length) break;
             ItemStack item = makeItem(icon(game.getIcon()), ChatColor.YELLOW + game.getName(), List.of(
@@ -537,6 +536,13 @@ public final class MenuService implements Listener {
     private boolean isMonsterMazeModeAlias(GameDefinition game) {
         return game != null && ("monster-maze-speed".equals(game.getId())
                 || "monster-maze-modern".equals(game.getId()));
+    }
+
+    private List<GameDefinition> gamesAlphabetically() {
+        return catalog.getGames().stream()
+                .sorted(java.util.Comparator.comparing(GameDefinition::getName, String.CASE_INSENSITIVE_ORDER)
+                        .thenComparing(GameDefinition::getId, String.CASE_INSENSITIVE_ORDER))
+                .toList();
     }
 
     /** Original ArcadeCosmeticsMenu game page: inset feature grid and back/close controls. */
