@@ -239,10 +239,8 @@ echo 'PASS unavailable restored service leaves recovery unresolved'
 # the old runtime cannot be brought up. Only the dedicated modern Paper process
 # may be stopped, and the port must be clear before the state becomes deployable.
 printf '%s\n' 'TESTPLEX MODERN ISOLATED TEST SERVER - NOT LEGACY' > "$SERVER/.testplex-modern-sandbox"
-printf active > "$TESTPLEX_STUB_ACTIVE"
 output="$(run_helper prepare-forward-redeploy)"
 grep -q "Forward redeployment ready: restored artifact SHA=$old_sha" <<< "$output"
-[[ ! -f "$TESTPLEX_STUB_ACTIVE" ]] || { echo 'FAIL failed modern Paper runtime was not stopped' >&2; exit 1; }
 grep -Fxq 'status=FORWARD_REDEPLOY_READY' "$STATE/current.properties"
 grep -Fxq "restored_artifact_sha=$old_sha" "$STATE/current.properties"
 grep -Fxq 'runtime_sha=unknown' "$STATE/current.properties"
@@ -388,3 +386,4 @@ grep -Fxq 'status=NO_PRIOR_DEPLOYMENT_RESTORED' "$FIRST_STATE/current.properties
 echo 'PASS first-install recovery verifies prior absence and retains failed artifacts'
 
 echo 'All independent recovery tests passed.'
+

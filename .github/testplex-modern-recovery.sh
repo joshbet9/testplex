@@ -582,3 +582,4 @@ main() {
   run_locked "$@"
 }
 main "$@"
+
