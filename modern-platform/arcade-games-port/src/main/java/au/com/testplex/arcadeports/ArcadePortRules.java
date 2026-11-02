@@ -6,6 +6,7 @@ import org.bukkit.util.Vector;
 import java.util.Collection;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Small deterministic rules used by the mechanics-first Arcade prototypes.
@@ -181,8 +182,10 @@ public final class ArcadePortRules {
     /** Meter charge comes from the source damage value recorded for each successful hit. */
     public static final int BACON_BLAST_PROJECTILE_STACK_SIZE = 16;
     public static final int BACON_METER_MAX = 100;
-    public static final int BACON_METER_MIN_ABILITY = 10;
-    public static final double BACON_METER_GAIN_PER_DAMAGE = 5.0D;
+    public static final int BACON_METER_MIN_ABILITY = 50;
+    public static final long BACON_CRISPY_DASH_DURATION_MILLIS = 250L;
+    public static final double BACON_CRISPY_DASH_SPEED = 1.0D;
+    public static final long BACON_CRISPY_DASH_FIRE_MILLIS = 3_000L;
     public static final long BACON_TIMED_HIT_SPAM_WINDOW_MILLIS = 250L;
     public static final long BACON_TIMED_HIT_GOOD_MIN_MILLIS = 500L;
     public static final long BACON_TIMED_HIT_GOOD_MAX_MILLIS = 900L;
@@ -216,15 +219,34 @@ public final class ArcadePortRules {
     public static boolean shouldAwardBaconKingOfBacon(int totalWins) {
         return totalWins >= BACON_BRAWL_KING_OF_BACON_WINS;
     }
-    public static int baconMeterGainForDamage(double damage) {
-        if (!Double.isFinite(damage) || damage <= 0.0D) return 0;
-        return (int) Math.min(BACON_METER_MAX,
-                Math.ceil(damage * BACON_METER_GAIN_PER_DAMAGE));
+    public static int baconMeterGainForHit(boolean critical, int alivePlayers) {
+        int alive = Math.max(1, Math.min(16, alivePlayers));
+        double scale = 1.0D + (16 - alive) / 14.0D;
+        int base = critical ? 10 : 5;
+        return (int) Math.ceil(base * scale);
     }
 
-    public static int nextBaconMeter(int current, double damage) {
+    public static int nextBaconMeter(int current, boolean critical, int alivePlayers) {
         int charge = Math.max(0, Math.min(BACON_METER_MAX, current));
-        return Math.min(BACON_METER_MAX, charge + baconMeterGainForDamage(damage));
+        return Math.min(BACON_METER_MAX, charge + baconMeterGainForHit(critical, alivePlayers));
+    }
+
+    /** Keep the Bacon Brawl sidebar within Minecraft's 15-row limit without merging names. */
+    public static List<String> baconBrawlSidebarLines(Collection<String> playerNames) {
+        List<String> names = playerNames == null ? List.of() : new ArrayList<>(playerNames);
+        if (names.size() <= 15) return List.copyOf(names);
+        List<String> lines = new ArrayList<>(names.subList(0, 14));
+        lines.add(names.size() + " players remaining");
+        return List.copyOf(lines);
+    }
+
+    /** Fake-player test participants are eligible for round kill credit just like online users. */
+    public static boolean shouldCreditBaconKill(UUID victimId, UUID killerId, boolean killerInMatch) {
+        return victimId != null && killerId != null && !victimId.equals(killerId) && killerInMatch;
+    }
+
+    public static boolean shouldRecordKnockoutsStat(ArcadePortGame game) {
+        return game != null && game != ArcadePortGame.BACON_BRAWL;
     }
 
     public static boolean canUseBaconMeterAbility(int percent) {
@@ -251,9 +273,19 @@ public final class ArcadePortRules {
         return baconAbilityDurationMillis(percent);
     }
 
+    public static long baconTimingWindowMillis(long baseMillis, double knockbackMultiplier) {
+        double safeMultiplier = Double.isFinite(knockbackMultiplier)
+                ? Math.max(0.1D, knockbackMultiplier) : 1.5D;
+        return Math.max(1L, Math.round(baseMillis * safeMultiplier / 1.5D));
+    }
+
+    public static boolean isBaconTimedCritical(long intervalMillis, double knockbackMultiplier) {
+        return intervalMillis >= baconTimingWindowMillis(BACON_TIMED_HIT_GOOD_MIN_MILLIS, knockbackMultiplier)
+                && intervalMillis <= baconTimingWindowMillis(BACON_TIMED_HIT_GOOD_MAX_MILLIS, knockbackMultiplier);
+    }
+
     public static boolean isBaconTimedCritical(long intervalMillis) {
-        return intervalMillis >= BACON_TIMED_HIT_GOOD_MIN_MILLIS
-                && intervalMillis <= BACON_TIMED_HIT_GOOD_MAX_MILLIS;
+        return isBaconTimedCritical(intervalMillis, 1.5D);
     }
 
     /** Brutus blocks a frontal hit; a true backstab disables the guard before normal knockback. */
@@ -268,15 +300,23 @@ public final class ArcadePortRules {
     }
 
     /** Spamming within the same short click window weakens hits; well-timed hits are rewarded. */
-    public static double baconTimedHitKnockbackMultiplier(long intervalMillis) {
+    public static double baconTimedHitKnockbackMultiplier(long intervalMillis, double knockbackMultiplier) {
+        long spam = baconTimingWindowMillis(BACON_TIMED_HIT_SPAM_WINDOW_MILLIS, knockbackMultiplier);
+        long goodMin = baconTimingWindowMillis(BACON_TIMED_HIT_GOOD_MIN_MILLIS, knockbackMultiplier);
+        long goodMax = baconTimingWindowMillis(BACON_TIMED_HIT_GOOD_MAX_MILLIS, knockbackMultiplier);
+        long okMin = baconTimingWindowMillis(BACON_TIMED_HIT_OK_MIN_MILLIS, knockbackMultiplier);
+        long okMax = baconTimingWindowMillis(BACON_TIMED_HIT_OK_MAX_MILLIS, knockbackMultiplier);
+        long lateMax = baconTimingWindowMillis(BACON_TIMED_HIT_LATE_MAX_MILLIS, knockbackMultiplier);
         if (intervalMillis < 0L) return 1.0D;
-        if (intervalMillis <= BACON_TIMED_HIT_SPAM_WINDOW_MILLIS) return 0.65D;
-        if (intervalMillis >= BACON_TIMED_HIT_GOOD_MIN_MILLIS
-                && intervalMillis <= BACON_TIMED_HIT_GOOD_MAX_MILLIS) return 1.6D;
-        if (intervalMillis >= BACON_TIMED_HIT_OK_MIN_MILLIS
-                && intervalMillis <= BACON_TIMED_HIT_OK_MAX_MILLIS) return 1.1D;
-        if (intervalMillis <= BACON_TIMED_HIT_LATE_MAX_MILLIS) return 1.25D;
+        if (intervalMillis <= spam) return 0.65D;
+        if (intervalMillis >= goodMin && intervalMillis <= goodMax) return 1.6D;
+        if (intervalMillis >= okMin && intervalMillis <= okMax) return 1.1D;
+        if (intervalMillis <= lateMax) return 1.25D;
         return 1.0D;
+    }
+
+    public static double baconTimedHitKnockbackMultiplier(long intervalMillis) {
+        return baconTimedHitKnockbackMultiplier(intervalMillis, 1.5D);
     }
 
     public static final double BACON_AVATAR_MAX_ATTACK_DISTANCE_SQUARED = 12.25D;
@@ -391,6 +431,7 @@ public final class ArcadePortRules {
     public static final long BACON_SLOW_UPDATE_INTERVAL_MILLIS = 4_000L;
     public static final long BACON_HUNGER_INTERVAL_MILLIS = 4_000L;
     public static final int BACON_HUNGER_DRAIN_PER_INTERVAL = 2;
+    public static final int BACON_HUNGER_RESTORE_PER_HIT = 2;
     public static final float BACON_SATURATION_ON_FOOD_CHANGE = 5.0F;
     public static final double BACON_STARVATION_DAMAGE = 4.0D;
     /** Ordinary Bacon Brawl hits use knockback; health loss is reserved for arena/environment hazards. */

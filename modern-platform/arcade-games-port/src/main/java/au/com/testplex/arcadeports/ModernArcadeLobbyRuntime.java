@@ -235,15 +235,15 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         for (int i = 0; i < choices.size(); i++) {
             ArcadeLobbyKitCatalogue.KitChoice choice = choices.get(i);
             int centerZ = pedestals.get(i).centerZ;
-            Location at = new Location(world, KIT_PEDESTAL_X,
-                    ModernArcadeLobby.FLOOR_Y + 2.5D, centerZ);
+            Location at = new Location(world, KIT_PEDESTAL_X + 0.5D,
+                    ModernArcadeLobby.FLOOR_Y + 2.5D, centerZ + 0.5D);
             at.setYaw(-90.0F);
             kitNpcs.add(spawnKitNpc(world, at, choice));
         }
         if (teamCount > 0) {
             for (int team = 0; team < teamCount; team++) {
-                Location at = new Location(world, QUEUE_PEDESTAL_X,
-                        ModernArcadeLobby.FLOOR_Y + 2.5D, teamCentres[team]);
+                Location at = new Location(world, QUEUE_PEDESTAL_X + 0.5D,
+                        ModernArcadeLobby.FLOOR_Y + 2.5D, teamCentres[team] + 0.5D);
                 at.setYaw(90.0F);
                 Sheep sheep = world.spawn(at, Sheep.class);
                 sheep.setColor(teamDyes[team]);
@@ -252,8 +252,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 teamNpcs.add(sheep);
             }
         } else {
-            Location at = new Location(world, QUEUE_PEDESTAL_X,
-                    ModernArcadeLobby.FLOOR_Y + 2.5D, 0.0D);
+            Location at = new Location(world, QUEUE_PEDESTAL_X + 0.5D,
+                    ModernArcadeLobby.FLOOR_Y + 2.5D, 0.5D);
             at.setYaw(90.0F);
             Sheep queue = world.spawn(at, Sheep.class);
             String queueName = selectedGame.lobbyRolesAssignedAutomatically()

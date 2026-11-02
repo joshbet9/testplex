@@ -27,6 +27,7 @@ class ArcadeLobbyLifecycleRulesTest {
     }
 
     @Test void phaseDurationsAreBounded() {
+        assertEquals(3, ArcadeLobbyLifecycleRules.DEFAULT_PREPARE_SECONDS);
         assertEquals(3, ArcadeLobbyLifecycleRules.prepareSeconds(-1));
         assertEquals(10, ArcadeLobbyLifecycleRules.prepareSeconds(10));
         assertEquals(30, ArcadeLobbyLifecycleRules.prepareSeconds(100));
