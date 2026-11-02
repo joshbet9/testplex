@@ -14605,9 +14605,9 @@ public final class ArcadePortManager implements Listener {
             int timer = session.legacyNaturalRegenTicks.getOrDefault(id, 0) + 1;
             if (timer >= ArcadePortRules.LEGACY_HEALTH_REGEN_TICKS) {
                 player.setHealth(Math.min(maxHealth, player.getHealth() + 1.0D));
-                // 1.8 natural regeneration adds six exhaustion; vanilla food handling
-                // converts that to saturation/food depletion on its normal tick.
-                player.setExhaustion(Math.min(40.0F, player.getExhaustion() + 6.0F));
+                // FoodStats.addExhaustion(3.0F) is the 1.8 natural-regeneration cost.
+                player.setExhaustion(Math.min(40.0F,
+                        player.getExhaustion() + ArcadePortRules.LEGACY_REGEN_EXHAUSTION));
                 session.legacyNaturalRegenTicks.remove(id);
             } else {
                 session.legacyNaturalRegenTicks.put(id, timer);
