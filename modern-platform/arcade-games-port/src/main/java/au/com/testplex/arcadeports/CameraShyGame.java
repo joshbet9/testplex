@@ -49,6 +49,10 @@ import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.scoreboard.DisplaySlot;
+import org.bukkit.scoreboard.Objective;
+import org.bukkit.scoreboard.Scoreboard;
+import org.bukkit.scoreboard.Team;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.RayTraceResult;
@@ -181,6 +185,7 @@ public final class CameraShyGame implements Listener {
         final int fireTicks;
         final float fallDistance;
         final Vector velocity;
+        final Scoreboard scoreboard;
         PlayerSnapshot(Player player) {
             location = player.getLocation().clone();
             contents = cloneItems(player.getInventory().getContents());
@@ -199,6 +204,7 @@ public final class CameraShyGame implements Listener {
             fireTicks = player.getFireTicks();
             fallDistance = player.getFallDistance();
             velocity = player.getVelocity().clone();
+            scoreboard = player.getScoreboard();
         }
         PlayerSnapshot(ConfigurationSection section) {
             Object savedLocation = section.get("location");
@@ -239,6 +245,7 @@ public final class CameraShyGame implements Listener {
             fallDistance = (float) section.getDouble("fall-distance", 0.0D);
             Object savedVelocity = section.get("velocity");
             velocity = savedVelocity instanceof Vector saved ? saved.clone() : new Vector(0.0D, 0.0D, 0.0D);
+            scoreboard = null;
         }
         private static ItemStack[] readItems(List<?> values) {
             if (values == null) return new ItemStack[0];
@@ -316,6 +323,7 @@ public final class CameraShyGame implements Listener {
             player.setFireTicks(Math.max(0, fireTicks));
             player.setFallDistance(Math.max(0.0F, fallDistance));
             player.setVelocity(velocity.clone());
+            if (scoreboard != null) player.setScoreboard(scoreboard);
         }
         private static ItemStack[] cloneItems(ItemStack[] source) {
             ItemStack[] result = new ItemStack[source.length];
@@ -371,6 +379,11 @@ public final class CameraShyGame implements Listener {
     private final List<FakeFlash> fakeFlashes = new ArrayList<>();
     private final Map<UUID, ArmorStand> understudyStands = new HashMap<>();
     private final Map<UUID, BossBar> bossBars = new HashMap<>();
+    private Scoreboard matchScoreboard;
+    private Objective matchScoreboardObjective;
+    private final List<Team> matchScoreboardTeams = new ArrayList<>();
+    private final List<String> matchScoreboardEntries = new ArrayList<>();
+    private long nextScoreboardUpdateAt;
     private final Map<UUID, Long> spotlightGlowUntil = new HashMap<>();
     private final Map<UUID, Boolean> spotlightOriginalGlow = new HashMap<>();
     private final Map<UUID, Location> spawnLocations = new HashMap<>();
@@ -724,6 +737,7 @@ public final class CameraShyGame implements Listener {
                 if (player != null && player.isOnline()) setupPlayer(player, spawnLocations.get(id));
             }
             phase = Phase.LIVE;
+            setupMatchScoreboard();
         } catch (RuntimeException startupFailure) {
             plugin.getLogger().log(java.util.logging.Level.SEVERE,
                     "Snap could not finish preparing every player; restoring the captured pre-match state.",
@@ -745,6 +759,98 @@ public final class CameraShyGame implements Listener {
             }
         }
         plugin.getLogger().info("Snap started with " + humans.size() + " humans and " + bots.size() + " AFK test players.");
+    }
+
+    private void setupMatchScoreboard() {
+        if (Bukkit.getScoreboardManager() == null) return;
+        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
+        Objective objective = scoreboard.registerNewObjective("snap", "dummy", ChatColor.GOLD + "SNAP");
+        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+        matchScoreboard = scoreboard;
+        matchScoreboardObjective = objective;
+        for (int index = 0; index < 15; index++) {
+            Team line = scoreboard.registerNewTeam("snapline" + index);
+            String entry = ChatColor.values()[index].toString() + ChatColor.RESET;
+            line.addEntry(entry);
+            matchScoreboardTeams.add(line);
+            matchScoreboardEntries.add(entry);
+        }
+        for (Player player : players.values()) {
+            if (player != null && player.isOnline()) player.setScoreboard(scoreboard);
+        }
+        updateMatchScoreboard(System.currentTimeMillis());
+    }
+
+    private void updateMatchScoreboard(long now) {
+        if (matchScoreboardObjective == null || now < nextScoreboardUpdateAt) return;
+        nextScoreboardUpdateAt = now + 500L;
+        List<String> lines = new ArrayList<>();
+        lines.add(finalSnapshot ? ChatColor.GOLD + "FINAL SNAPSHOT" : ChatColor.GREEN + "In Progress");
+        lines.add(ChatColor.YELLOW + "Objective");
+        lines.add(ChatColor.WHITE + "Photograph players 5 times");
+        lines.add(" ");
+        lines.add(ChatColor.GREEN + "Players Alive: " + ChatColor.WHITE + alive.size() + "/" + players.size());
+        lines.add(ChatColor.AQUA + "Photos Taken: " + ChatColor.WHITE
+                + photos.values().stream().mapToInt(Integer::intValue).sum());
+        lines.add(ChatColor.RED + "Eliminations: " + ChatColor.WHITE
+                + eliminations.values().stream().mapToInt(Integer::intValue).sum());
+        lines.add("  ");
+        lines.add(ChatColor.GOLD + "Most Exposed");
+        players.values().stream()
+                .filter(player -> player != null)
+                .sorted(java.util.Comparator
+                        .comparingInt((Player player) -> exposures.getOrDefault(player.getUniqueId(), 0)).reversed()
+                        .thenComparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
+                .limit(4)
+                .forEach(player -> lines.add((alive.contains(player.getUniqueId()) ? ChatColor.YELLOW : ChatColor.GRAY)
+                        + player.getName() + ChatColor.WHITE + " "
+                        + exposures.getOrDefault(player.getUniqueId(), 0) + "/5"));
+        lines.add("   ");
+        lines.add(ChatColor.YELLOW + "Time Left: " + ChatColor.WHITE
+                + formatScoreboardTime(Math.max(0L, endsAt - now)));
+
+        for (int index = 0; index < matchScoreboardTeams.size(); index++) {
+            Team line = matchScoreboardTeams.get(index);
+            String entry = matchScoreboardEntries.get(index);
+            if (index < lines.size()) {
+                line.setPrefix(limitScoreboardLine(lines.get(index)));
+                matchScoreboardObjective.getScore(entry).setScore(lines.size() - index);
+            } else {
+                line.setPrefix("");
+                matchScoreboard.resetScores(entry);
+            }
+        }
+        for (Player player : players.values()) {
+            if (player != null && player.isOnline() && player.getScoreboard() != matchScoreboard) {
+                player.setScoreboard(matchScoreboard);
+            }
+        }
+    }
+
+    private String formatScoreboardTime(long millis) {
+        long seconds = (Math.max(0L, millis) + 999L) / 1_000L;
+        return String.format(Locale.ROOT, "%d:%02d", seconds / 60L, seconds % 60L);
+    }
+
+    private String limitScoreboardLine(String line) {
+        return line.length() <= 64 ? line : line.substring(0, 64);
+    }
+
+    private void clearMatchScoreboard() {
+        if (matchScoreboard == null) return;
+        try {
+            for (Team team : new ArrayList<>(matchScoreboardTeams)) {
+                if (matchScoreboard.getTeam(team.getName()) != null) team.unregister();
+            }
+            if (matchScoreboardObjective != null) matchScoreboardObjective.unregister();
+        } catch (IllegalArgumentException | IllegalStateException ignored) {
+            // Participants have already had their original board restored.
+        }
+        matchScoreboardTeams.clear();
+        matchScoreboardEntries.clear();
+        matchScoreboard = null;
+        matchScoreboardObjective = null;
+        nextScoreboardUpdateAt = 0L;
     }
 
     private void setupPlayer(Player player, Location spawn) {
@@ -810,6 +916,7 @@ public final class CameraShyGame implements Listener {
         if (phase != Phase.LIVE) return;
 
         long now = System.currentTimeMillis();
+        updateMatchScoreboard(now);
         if (now >= endsAt) {
             finish(selectTimeoutWinner(), "Time expired. The player with the fewest exposures wins.", true);
             return;
@@ -1659,6 +1766,7 @@ public final class CameraShyGame implements Listener {
                 }
             }
         }
+        clearMatchScoreboard();
         if (pendingRestoreChanged) plugin.saveConfig();
         testPlayers.despawnSessionPlayers();
         phase = Phase.IDLE;
