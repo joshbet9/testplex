@@ -6,7 +6,9 @@ import org.bukkit.World;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.IOException;
+import java.io.BufferedReader;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -60,6 +62,7 @@ public final class SourceMapCatalog {
             case GLADIATORS -> List.of("Gladiators");
             case HEROES_OF_GWEN -> List.of("Heroes of GWEN");
             case MICRO_BATTLES -> List.of("Micro Battle");
+            case EVOLUTION -> List.of("Evolution");
             case ONE_IN_THE_QUIVER -> List.of("One in the Quiver");
             case PAINTBALL -> List.of("Paintball", "Super Paintball");
             case SUPER_SPLOOR -> List.of("Sploor");
@@ -68,11 +71,12 @@ public final class SourceMapCatalog {
             case SPLEEF -> List.of("Speef", "Super Spleef");
             case TURF_WARS -> List.of("Turf Wars");
             case DRAW_MY_THING -> List.of("Draw My Thing");
-            case MASTER_BUILDERS -> List.of();
+            case MASTER_BUILDERS -> List.of("Master Builders");
             case CAMERA_SHY -> List.of();
             case SKY_WARS -> List.of("Skywars");
             case MILK_THE_COW -> List.of("Milk the Cow");
-            case WITHER_ASSAULT -> List.of();
+            case SNEAKY_ASSASSINS -> List.of("Sneaky Assassins");
+            case WITHER_ASSAULT -> List.of("Wither Assault");
             default -> List.of();
         };
     }
@@ -253,7 +257,9 @@ public final class SourceMapCatalog {
         String[] prefixes = {
                 "BaconBrawl_", "CastleAssault_", "HOG_", "Lobbers_", "DeathTag_", "DragonEscape_", "Dragons_",
                 "DR_", "Gladiators_", "Micro_", "OITQ_", "Quiver_", "Paintball_",
-                "Runner_", "Spleef_", "SP_", "TF_", "Draw_", "Wizards_", "NanoWizards_", "NW_"
+                "Runner_", "Spleef_", "SP_", "TF_", "TurfWars_", "Draw_", "Wizards_", "NanoWizards_", "NW_",
+                "Evolution_", "MasterBuilders_", "MilkTheCow_", "SheepQuest_", "Skywars_", "Snake_",
+                "SneakyAssassins_", "SpeedBuilders_", "WitherAssault_", "Sploor_"
         };
         for (String prefix : prefixes) {
             if (name.regionMatches(true, 0, prefix, 0, prefix.length())) {
@@ -264,7 +270,11 @@ public final class SourceMapCatalog {
         return name.replace('_', ' ').trim();
     }
 
-    public record MapArchive(String resource, String displayName) {}
+    public record MapArchive(String resource, String displayName, boolean inferredMetadata) {
+        public MapArchive(String resource, String displayName) {
+            this(resource, displayName, false);
+        }
+    }
 
     /** Discover all bundled source archives from a named set of legacy map folders. */
     public static List<MapArchive> mapsForFolders(JavaPlugin plugin, String selectionKey, List<String> mapFolders) {
@@ -272,7 +282,9 @@ public final class SourceMapCatalog {
         String selected = selectedResourceForFolders(plugin, selectionKey, mapFolders);
         List<MapArchive> maps = new ArrayList<>();
         for (String resource : availableMapResources(plugin, mapFolders, selectionKey)) {
-            maps.add(new MapArchive(resource, displayName(plugin, resource)));
+            boolean inferred = isInferredTestArchive(plugin, resource);
+            String name = inferred ? mapNameFromResource(resource) : displayName(plugin, resource);
+            maps.add(new MapArchive(resource, name, inferred));
         }
         maps.sort((left, right) -> {
             if (left.resource().equals(selected)) return right.resource().equals(selected) ? 0 : -1;
@@ -360,14 +372,14 @@ public final class SourceMapCatalog {
         if (game == null) return List.of();
         List<MapArchive> maps = new ArrayList<>();
         for (String resource : availableMapResources(plugin, mapFoldersFor(game), game.displayName())) {
-            maps.add(new MapArchive(resource, mapNameFromResource(resource)));
+            maps.add(new MapArchive(resource, mapNameFromResource(resource), isInferredTestArchive(plugin, resource)));
         }
 
         String legacy = resourceFor(game);
         if (legacy != null && archiveAvailable(plugin, legacy)) {
             String legacyName = displayName(plugin, legacy);
             boolean duplicate = maps.stream().anyMatch(map -> map.displayName().equalsIgnoreCase(legacyName));
-            if (!duplicate) maps.add(new MapArchive(legacy, legacyName));
+            if (!duplicate) maps.add(new MapArchive(legacy, legacyName, isInferredTestArchive(plugin, legacy)));
         }
 
         String selected = selectedResource(plugin, game);
@@ -655,8 +667,8 @@ public final class SourceMapCatalog {
                 && Files.isRegularFile(folder.resolve("WorldConfig.dat"));
     }
 
-    /** WorldDownloader map snapshots have level.dat and legacy region files, but no Reborn config. */
-    private static boolean hasWizardsTerrainMetadata(Path folder) {
+    /** WorldDownloader map snapshots have level.dat and legacy region files, but may omit Reborn config. */
+    private static boolean hasWorldDownloaderTerrainMetadata(Path folder) {
         if (folder == null || !Files.isRegularFile(folder.resolve("level.dat"))) return false;
         Path region = folder.resolve("region");
         if (!Files.isDirectory(region) || Files.isSymbolicLink(region)) return false;
@@ -682,15 +694,15 @@ public final class SourceMapCatalog {
     }
 
     /** Locate one unambiguous world root from a level.dat plus region/*.mca snapshot. */
-    static Path locateWizardsMapRoot(Path extractedRoot) throws IOException {
+    static Path locateWorldDownloaderMapRoot(Path extractedRoot) throws IOException {
         if (extractedRoot == null || !Files.isDirectory(extractedRoot)) return null;
         Path root = extractedRoot.toAbsolutePath().normalize();
-        if (hasWizardsTerrainMetadata(root)) return root;
+        if (hasWorldDownloaderTerrainMetadata(root)) return root;
         List<Path> candidates;
         try (Stream<Path> paths = Files.walk(root, 6)) {
             candidates = paths.filter(Files::isDirectory)
                     .filter(path -> !path.equals(root))
-                    .filter(SourceMapCatalog::hasWizardsTerrainMetadata)
+                    .filter(SourceMapCatalog::hasWorldDownloaderTerrainMetadata)
                     .sorted(Comparator.comparingInt(Path::getNameCount))
                     .toList();
         }
@@ -717,7 +729,58 @@ public final class SourceMapCatalog {
 
     /** Extract a game's selected source archive into its dedicated, isolated test world. */
     public static boolean install(JavaPlugin plugin, ArcadePortGame game, String worldName) {
-        return installResource(plugin, selectedResource(plugin, game), worldName, mapFoldersFor(game));
+        List<String> folders = mapFoldersFor(game);
+        String resource = selectedResource(plugin, game);
+        if (!resourcePathBelongsToFolders(folders, resource)) {
+            plugin.getLogger().severe("Refusing to install a source map outside the approved folder pool for "
+                    + (game == null ? "unknown game" : game.displayName()) + ": " + resource);
+            return false;
+        }
+        return installResourceInternal(plugin, resource, worldName, true);
+    }
+
+    private static boolean archiveHasWorldConfig(JavaPlugin plugin, String resource) {
+        try (InputStream input = openMapArchive(plugin, resource);
+             ZipInputStream zip = input == null ? null : new ZipInputStream(input)) {
+            if (zip == null) return false;
+            ZipEntry entry;
+            while ((entry = zip.getNextEntry()) != null) {
+                String name = entry.getName().replace('\\', '/');
+                if (name.equals("WorldConfig.dat") || name.endsWith("/WorldConfig.dat")) return true;
+                zip.closeEntry();
+            }
+        } catch (IOException ignored) {
+            // The map selector labels unreadable archives as inferred; installation reports the real error.
+        }
+        return false;
+    }
+
+    private static boolean isInferredTestArchive(JavaPlugin plugin, String resource) {
+        Boolean manifestValue = inferredManifestValue(plugin, resource);
+        return manifestValue != null ? manifestValue : !archiveHasWorldConfig(plugin, resource);
+    }
+
+    /** Return a positive bundled manifest result, or null when this resource has no entry. */
+    private static Boolean inferredManifestValue(JavaPlugin plugin, String resource) {
+        if (plugin == null || resource == null || !resource.startsWith("source-maps/")) return null;
+        int separator = resource.lastIndexOf('/');
+        if (separator < "source-maps/".length()) return null;
+        String manifest = resource.substring(0, separator + 1) + "INFERRED-MAPS.txt";
+        String filename = resource.substring(separator + 1);
+        try (InputStream input = plugin.getResource(manifest)) {
+            if (input == null) return null;
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    String entry = line.trim();
+                    if (entry.isEmpty() || entry.startsWith("#")) continue;
+                    if (entry.equals(filename)) return true;
+                }
+            }
+            return null;
+        } catch (IOException ignored) {
+            return null;
+        }
     }
 
     private static boolean archiveAvailable(JavaPlugin plugin, String resource) {
@@ -775,7 +838,7 @@ public final class SourceMapCatalog {
     }
 
     private static boolean installResourceInternal(
-            JavaPlugin plugin, String resource, String worldName, boolean allowWizardsWorldWithoutConfig) {
+            JavaPlugin plugin, String resource, String worldName, boolean allowWorldDownloaderWithoutConfig) {
         if (plugin == null || resource == null || resource.isBlank()) {
             if (plugin != null) plugin.getLogger().warning("Selected source map resource is missing: " + resource);
             return false;
@@ -804,7 +867,7 @@ public final class SourceMapCatalog {
             return false;
         }
         if (hasWorldMetadata(root)
-                || (allowWizardsWorldWithoutConfig && hasWizardsTerrainMetadata(root))) {
+                || (allowWorldDownloaderWithoutConfig && hasWorldDownloaderTerrainMetadata(root))) {
             try {
                 preparePaper26WorldStorage(root);
                 return true;
@@ -845,8 +908,8 @@ public final class SourceMapCatalog {
                 }
             }
 
-            Path archiveRoot = allowWizardsWorldWithoutConfig
-                    ? locateWizardsMapRoot(staging) : locateMapRoot(staging);
+            Path archiveRoot = allowWorldDownloaderWithoutConfig
+                    ? locateWorldDownloaderMapRoot(staging) : locateMapRoot(staging);
             if (archiveRoot == null) {
                 String entries;
                 try (Stream<Path> paths = Files.list(staging)) {
@@ -854,7 +917,7 @@ public final class SourceMapCatalog {
                             .collect(java.util.stream.Collectors.joining(", "));
                 }
                 plugin.getLogger().warning("Selected map archive " + resource
-                        + " did not contain an unambiguous level.dat and WorldConfig.dat world root. "
+                        + " did not contain an unambiguous level.dat and terrain-region world root. "
                         + "Extraction root entries: [" + entries + "].");
                 return false;
             }
@@ -877,7 +940,7 @@ public final class SourceMapCatalog {
             preparePaper26WorldStorage(root);
 
             if (!hasWorldMetadata(root)
-                    && !(allowWizardsWorldWithoutConfig && hasPaper26TerrainMetadata(root))) {
+                    && !(allowWorldDownloaderWithoutConfig && hasPaper26TerrainMetadata(root))) {
                 plugin.getLogger().warning("Original map archive " + resource
                         + " was extracted but its normalized world root is missing required terrain/metadata at " + root);
                 return false;
@@ -949,36 +1012,45 @@ public final class SourceMapCatalog {
                     + ": no selected archive is configured.");
             return null;
         }
-        try (InputStream input = openMapArchive(plugin, resource)) {
-            if (input == null) {
-                plugin.getLogger().warning("Cannot read source map metadata for " + game.displayName()
-                        + ": the selected bundled or server-local archive is missing: " + resource);
-                return null;
-            }
-            try (ZipInputStream zip = new ZipInputStream(input)) {
-                ZipEntry entry;
-                while ((entry = zip.getNextEntry()) != null) {
-                    if (entry.getName().replace('\\', '/').endsWith("/WorldConfig.dat")
-                            || entry.getName().equals("WorldConfig.dat")) {
-                        String contents = new String(zip.readAllBytes(), StandardCharsets.UTF_8);
-                        MapData parsed = parseMapConfig(world, java.util.Arrays.asList(contents.split("\\R", -1)));
-                        if (parsed != null) {
-                            plugin.getLogger().info("Loaded " + game.displayName()
-                                    + " WorldConfig.dat from the selected embedded archive " + resource
-                                    + " (Paper's custom-world migration does not retain this Reborn-only file).");
-                        }
-                        return parsed;
-                    }
-                    zip.closeEntry();
-                }
-            }
-            plugin.getLogger().warning("Selected map archive " + resource + " has no WorldConfig.dat entry.");
-            return null;
-        } catch (IOException exception) {
-            plugin.getLogger().log(java.util.logging.Level.WARNING,
-                    "Could not read WorldConfig.dat from selected map archive " + resource, exception);
+        MapData authored = readResource(plugin, resource, world);
+        if (authored != null) return authored;
+        return readInferredResource(plugin, resource, world);
+    }
+
+    /**
+     * Infer only a bounded playable test area and safe starts from WorldDownloader
+     * terrain. This intentionally does not invent source objective/data markers.
+     */
+    private static MapData readInferredResource(JavaPlugin plugin, String resource, World world) {
+        ChunkBounds bounds = readRegionChunkBounds(plugin, resource);
+        if (bounds == null) {
+            plugin.getLogger().warning("Map archive " + resource
+                    + " has no populated region chunks from which to infer test bounds.");
             return null;
         }
+        MapData inferred = new MapData();
+        inferred.mapName = mapNameFromResource(resource);
+        inferred.inferredMetadata = true;
+        inferred.minX = bounds.minChunkX() * 16;
+        inferred.maxX = (bounds.maxChunkX() + 1) * 16 - 1;
+        inferred.minZ = bounds.minChunkZ() * 16;
+        inferred.maxZ = (bounds.maxChunkZ() + 1) * 16 - 1;
+        inferred.minY = world.getMinHeight();
+        inferred.maxY = world.getMaxHeight() - 1;
+        inferred.hasMinX = inferred.hasMaxX = inferred.hasMinZ = inferred.hasMaxZ = true;
+        inferred.hasMinY = inferred.hasMaxY = true;
+
+        List<Location> starts = findSafeSurfaceLocations(world, inferred, 64, 0.28D, bounds.populatedChunks());
+        if (starts.isEmpty()) {
+            plugin.getLogger().warning("Map archive " + resource
+                    + " yielded no terrain-checked inferred player starts; refusing to launch it.");
+            return null;
+        }
+        inferred.teamSpawns.put("INFERRED_TEST_STARTS", starts);
+        plugin.getLogger().warning("Using INFERRED TEST CONFIG for " + resource + ": bounds came from "
+                + bounds.activeChunks() + " populated terrain chunks and " + starts.size()
+                + " safe surface starts. Original WorldConfig.dat objectives and authored spawns are absent.");
+        return inferred;
     }
 
     /**
@@ -1080,6 +1152,7 @@ public final class SourceMapCatalog {
 
         MapData inferred = new MapData();
         inferred.mapName = mapNameFromResource(resource);
+        inferred.inferredMetadata = true;
         inferred.minX = bounds.minChunkX() * 16;
         inferred.maxX = (bounds.maxChunkX() + 1) * 16 - 1;
         inferred.minZ = bounds.minChunkZ() * 16;
@@ -1170,12 +1243,12 @@ public final class SourceMapCatalog {
                 count += region.activeChunks();
                 populatedChunks.addAll(region.populatedChunks());
                 if (count > 8192 || maxX - minX > 128 || maxZ - minZ > 128) {
-                    plugin.getLogger().warning("Refusing oversized Wizards source-map chunk bounds for " + resource);
+                    plugin.getLogger().warning("Refusing oversized source-map chunk bounds for " + resource);
                     return null;
                 }
             }
         } catch (IOException exception) {
-            plugin.getLogger().warning("Could not derive Wizards chunk bounds from " + resource + ": "
+            plugin.getLogger().warning("Could not derive source-map chunk bounds from " + resource + ": "
                     + exception.getMessage());
             return null;
         }
@@ -1415,6 +1488,7 @@ public final class SourceMapCatalog {
 
     public static final class MapData {
         private String mapName = "Unknown";
+        private boolean inferredMetadata;
         private boolean hasMinX, hasMaxX, hasMinZ, hasMaxZ, hasMinY, hasMaxY;
         private int minX = -40, maxX = 40, minZ = -40, maxZ = 40, minY = 0, maxY = 128;
         private final Map<String, List<Location>> teamSpawns = new LinkedHashMap<>();
@@ -1441,6 +1515,7 @@ public final class SourceMapCatalog {
         }
 
         public String mapName() { return mapName; }
+        public boolean inferredMetadata() { return inferredMetadata; }
         public boolean hasBounds() { return hasMinX && hasMaxX && hasMinZ && hasMaxZ; }
         public boolean hasVerticalBounds() { return hasMinY && hasMaxY && maxY >= minY; }
         public int minX() { return minX; }

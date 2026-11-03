@@ -1,0 +1,14 @@
+# Catalog WorldDownloader archives without WorldConfig.dat
+These archives use inferred test metadata. See ../../INFERRED-METADATA-NOTE.md.
+
+SneakyAssassins_Ant Field.zip
+SneakyAssassins_Caliente.zip
+SneakyAssassins_Chilly Peaks.zip
+SneakyAssassins_China Town.zip
+SneakyAssassins_Harbor Market.zip
+SneakyAssassins_Locum Castris.zip
+SneakyAssassins_Maya.zip
+SneakyAssassins_Sandy Castle.zip
+SneakyAssassins_Sp00ked.zip
+SneakyAssassins_Spaghetti.zip
+SneakyAssassins_Tribal Shore.zip

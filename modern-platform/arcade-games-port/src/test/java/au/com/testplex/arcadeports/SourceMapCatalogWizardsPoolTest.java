@@ -80,7 +80,7 @@ class SourceMapCatalogWizardsPoolTest {
         Path region = Files.createDirectories(world.resolve("region"));
         Files.write(region.resolve("r.0.0.mca"), new byte[8192]);
 
-        assertEquals(world.toAbsolutePath().normalize(), SourceMapCatalog.locateWizardsMapRoot(extracted));
+        assertEquals(world.toAbsolutePath().normalize(), SourceMapCatalog.locateWorldDownloaderMapRoot(extracted));
     }
 
     @Test
@@ -92,7 +92,7 @@ class SourceMapCatalogWizardsPoolTest {
             Files.write(region.resolve("r.0.0.mca"), new byte[8192]);
         }
 
-        assertNull(SourceMapCatalog.locateWizardsMapRoot(extracted));
+        assertNull(SourceMapCatalog.locateWorldDownloaderMapRoot(extracted));
     }
 
     @Test

@@ -1,0 +1,25 @@
+# Catalog WorldDownloader archives without WorldConfig.dat
+These archives use inferred test metadata. See ../../INFERRED-METADATA-NOTE.md.
+
+Gladiators_Alberwood Creek.zip
+Gladiators_Autumn Kingdom.zip
+Gladiators_Bliss.zip
+Gladiators_Castaway Cove.zip
+Gladiators_Cherry Bomb.zip
+Gladiators_Choco Valley.zip
+Gladiators_Clockwork.zip
+Gladiators_Cosmos.zip
+Gladiators_Ethereal Caverns.zip
+Gladiators_Fierce Desert.zip
+Gladiators_Flushed Away.zip
+Gladiators_Harmony.zip
+Gladiators_Mythical Forests.zip
+Gladiators_OutLaw.zip
+Gladiators_Planet Douglas.zip
+Gladiators_Primitive.zip
+Gladiators_Savanna.zip
+Gladiators_The Shire.zip
+Gladiators_Tribal Battleground.zip
+Gladiators_Tropics.zip
+Gladiators_Under the Sea.zip
+Gladiators_Urban.zip

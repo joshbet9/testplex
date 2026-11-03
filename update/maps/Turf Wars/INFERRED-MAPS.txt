@@ -1,0 +1,8 @@
+# Catalog WorldDownloader archives without WorldConfig.dat
+These archives use inferred test metadata. See ../../INFERRED-METADATA-NOTE.md.
+
+TurfWars_Book Shelves.zip
+TurfWars_Forces Awoken.zip
+TurfWars_Incense.zip
+TurfWars_Industrial.zip
+TurfWars_Muddii's Turf Wars Map.zip

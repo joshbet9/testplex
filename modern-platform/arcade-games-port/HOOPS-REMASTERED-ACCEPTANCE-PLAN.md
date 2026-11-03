@@ -37,7 +37,7 @@
 - Confirm RED / BLUE vanilla dyed leather uniforms and name colours survive the match and are fully restored afterward.
 - Verify bossbar, sidebar, floating scoreboard, team-coloured names and tab-list entries stay in sync for every player.
 - Verify the native results dialog appears after return-to-lobby cleanup for every connected participant and displays their own statistics.
-- Test crosshair shooting at several angles, layups, rising-jump dunks, both hoops, two/three-point line boundary, missed-shot rebound and blocked shot.
+- Test crosshair shooting at several angles, layups, rising-jump dunks, both hoops, two/three-point line boundary, missed-shot rebound and blocked shot; confirm the basketball display survives the full play and the white net is clearly visible from court level.
 - Test passes under pressure, teammate catches, missed pass recovery, facing-dependent steals, timed/facing-dependent blocks, shot-clock turnover, inventory/drop protection and disconnect while holding the ball.
 - Run 2, 3, 6, 8, 10, 12, 14 and 16-player matches; confirm equal team assignment, eight unique spawn lanes per side, and no team with a player advantage greater than one.
 - Specifically test a full 8v8 match for readable player spacing, pass target selection, interceptions, rebound races, steals and blocks.

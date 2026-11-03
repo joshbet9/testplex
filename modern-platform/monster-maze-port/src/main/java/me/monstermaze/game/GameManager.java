@@ -49,7 +49,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Consumer;
 
 /**
  * Full game loop closer to original Mineplex Monster Maze.
@@ -72,10 +71,12 @@ public class GameManager implements Listener {
     /** Active game mode (Original / Speed / Modern). */
     private MazeMode mode = MazeMode.ORIGINAL;
 
-    private final Set<UUID> alive = new HashSet<UUID>();
-    private final Set<UUID> spectators = new HashSet<UUID>();
+    private Set<UUID> alive = new HashSet<UUID>();
+    private Set<UUID> spectators = new HashSet<UUID>();
     /** UUIDs included at round start; late entrants in this world must remain outside the match. */
-    private final Set<UUID> roundParticipants = new HashSet<UUID>();
+    private Set<UUID> roundParticipants = new HashSet<UUID>();
+    /** The shared Arcade session owns the roster when this controller runs inside Testplex. */
+    private ArcadeSessionContext arcadeSession;
     private final List<Player> playersOnPad = new ArrayList<Player>();
     /** Players who have landed on this stage's Safe Pad; jumping does not clear this lock-in. */
     private final Set<UUID> padLockIns = new HashSet<UUID>();
@@ -95,7 +96,6 @@ public class GameManager implements Listener {
     private BukkitTask secondTask;
     private BukkitTask startingTask;   // runs the jump lock during STARTING (pre-glass fall)
     private List<Player> pendingTestplexParticipants;
-    private Consumer<Player> testplexReturnToLobby;
     private boolean testplexManagedRound;
 
 
@@ -120,6 +120,9 @@ public class GameManager implements Listener {
     }
 
     public GameState getState() { return state; }
+    private void publishArcadePhase() {
+        if (arcadeSession != null) arcadeSession.phaseChanged(state.name());
+    }
     public boolean isRunning() { return state != GameState.IDLE && state != GameState.ENDING; }
     public boolean isLive() { return state == GameState.LIVE; }
     public int getStage() { return curSafe; }
@@ -186,30 +189,35 @@ public class GameManager implements Listener {
     // -------------------- Start / Stop --------------------
 
 /** Configure a round whose participants and return path are owned by Testplex Arcade. */
-public boolean startTestplexRound(List<Player> participants, Consumer<Player> returnToLobby) {
+public boolean startTestplexRound(List<Player> participants, ArcadeSessionContext arcadeSession) {
     if (state != GameState.IDLE || participants == null || participants.isEmpty()) return false;
+    if (arcadeSession == null || arcadeSession.players() == null
+            || arcadeSession.alivePlayers() == null || arcadeSession.participants() == null
+            || arcadeSession.spectators() == null || arcadeSession.scores() == null) return false;
     List<Player> selected = new ArrayList<>();
     for (Player player : participants) {
-        if (player != null && player.isOnline() && !selected.contains(player)) selected.add(player);
+        if (player == null || !player.isOnline() || selected.contains(player)) continue;
+        UUID id = player.getUniqueId();
+        if (!arcadeSession.players().containsKey(id) || !arcadeSession.participants().contains(id)) return false;
+        selected.add(player);
     }
     if (selected.isEmpty()) return false;
+    this.arcadeSession = arcadeSession;
+    this.alive = arcadeSession.alivePlayers();
+    this.spectators = arcadeSession.spectators();
+    this.roundParticipants = arcadeSession.participants();
     this.pendingTestplexParticipants = selected;
-    this.testplexReturnToLobby = returnToLobby;
     this.testplexManagedRound = true;
     // Testplex's MM configuration commands set the mode and pattern before
     // queueing; the Arcade manager remains the only way to begin a round.
     startGame(null, plugin.getConfig().getInt("forced-pattern", -1));
     if (state != GameState.STARTING && state != GameState.LIVE) {
         this.pendingTestplexParticipants = null;
-        this.testplexReturnToLobby = null;
         this.testplexManagedRound = false;
+        this.arcadeSession = null;
         return false;
     }
     return true;
-}
-
-public void setTestplexReturnToLobby(Consumer<Player> returnToLobby) {
-    this.testplexReturnToLobby = returnToLobby;
 }
 
 public boolean isTestplexManagedRound() { return testplexManagedRound; }
@@ -286,6 +294,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         phaseTimerStart = phaseTimer;
 
         state = GameState.STARTING;
+        publishArcadePhase();
         broadcast(ChatColor.GOLD + "" + ChatColor.BOLD + "=== Monster Maze ===");
         broadcast(ChatColor.YELLOW + "Generating maze... (server stays responsive)");
 
@@ -392,6 +401,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
 
     private void beginLive() {
         state = GameState.LIVE;
+        publishArcadePhase();
         if (startingTask != null) { startingTask.cancel(); startingTask = null; }
         liveStartMs = System.currentTimeMillis();
         mazeGenerator.dropContainment();
@@ -459,6 +469,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
     private void forceStop(boolean completedNormally) {
         boolean notifyTestplexCompletion = completedNormally && testplexManagedRound;
         state = GameState.ENDING;
+        publishArcadePhase();
         if (mainTask != null) { mainTask.cancel(); mainTask = null; }
         if (secondTask != null) { secondTask.cancel(); secondTask = null; }
         if (startingTask != null) { startingTask.cancel(); startingTask = null; }
@@ -474,38 +485,32 @@ public void startGame(Location preferCenter, int requestedPattern) {
         mazeGenerator.cleanup();
         scoreboard.clear(arenaPlayers);
 
-        for (Player p : arenaPlayers) {
-            p.setExp(0); p.setLevel(0);
-            p.getInventory().clear();
-            p.getInventory().setArmorContents(null);
-            kitManager.resetPlayerState(p);
-            p.setGameMode(GameMode.SURVIVAL);
-            p.setCollidable(true);
-            
-            // Restore visibility for all players in lobby
-            for (Player target : arenaPlayers) {
-                p.showPlayer(target);
-            }
+        if (!testplexManagedRound) {
+            for (Player p : arenaPlayers) {
+                p.setExp(0); p.setLevel(0);
+                p.getInventory().clear();
+                p.getInventory().setArmorContents(null);
+                kitManager.resetPlayerState(p);
+                p.setGameMode(GameMode.SURVIVAL);
+                p.setCollidable(true);
 
-            if (testplexReturnToLobby != null) testplexReturnToLobby.accept(p);
-            else plugin.getHostPlugin().returnPlayerToArcadeLobby(p);
+                // Restore visibility for all players in lobby
+                for (Player target : arenaPlayers) p.showPlayer(target);
+
+                plugin.getHostPlugin().returnPlayerToArcadeLobby(p);
+            }
         }
         alive.clear();
         spectators.clear();
         state = GameState.IDLE;
-        // Testplex owns the only player lobby. The standalone Monster Maze lobby
-        // remains available only for isolated module tests.
-        if (testplexManagedRound) {
-            for (Player p : arenaPlayers) {
-                if (p.isOnline()) p.sendMessage(ChatColor.GREEN + "Monster Maze finished. Returned to the Testplex Arcade lobby.");
-            }
-        }
+        publishArcadePhase();
+        // The shared Arcade session owns player restoration and post-game presentation.
         roundParticipants.clear();
         testplexManagedRound = false;
-        testplexReturnToLobby = null;
         if (notifyTestplexCompletion) {
             plugin.notifyTestplexRoundCompleted();
         }
+        arcadeSession = null;
     }
 
     private void cleanupEntities() {
@@ -835,6 +840,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         if (soloMode) {
             if (remaining.isEmpty()) {
                 state = GameState.ENDING;
+                publishArcadePhase();
                 broadcast(ChatColor.GOLD + "Solo run over — reached stage " + curSafe + "!");
                 Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
                     @Override public void run() { forceStop(true); }
@@ -867,6 +873,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
             
             // Transition state after recording
             state = GameState.ENDING;
+            publishArcadePhase();
             Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
                 @Override public void run() { forceStop(true); }
             }, 100L);
@@ -1100,8 +1107,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         }
         if (shouldRedirectUnregisteredPlayer(state, roundParticipants.contains(id),
                 arenaWorld, player.getWorld())) {
-            if (testplexReturnToLobby != null) testplexReturnToLobby.accept(player);
-            else plugin.getHostPlugin().returnPlayerToArcadeLobby(player);
+            plugin.getHostPlugin().returnPlayerToArcadeLobby(player);
             return;
         }
         if (!roundParticipants.contains(id)

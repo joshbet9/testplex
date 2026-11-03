@@ -4,6 +4,8 @@ Master Builders is promoted to the shared controlled queue. The modern port crea
 
 ## Queue and plot assignment
 
+The current runtime generates a 4×4 plot arena. The 1.8 source gets plot locations from its configured arena world (`WorldData.GetDataLocs("YELLOW")`); this checkout contains no Master Builders arena archive to import, so the original arena asset remains outstanding.
+
 - [ ] Launch through the shared Game Panel and verify the expected supported player range and 16-player upper limit.
 - [ ] Confirm every builder receives a unique plot, teleports to that plot at the start of the creative phase and cannot access another player's plot.
 - [ ] Verify plot boundaries, floor/air space, player spawn orientation and separation between adjacent builds.
@@ -11,14 +13,15 @@ Master Builders is promoted to the shared controlled queue. The modern port crea
 
 ## Creative phase
 
-- [ ] Verify the three-minute build timer and countdown presentation.
+- [ ] Verify adaptive build and per-plot review timers total five minutes, with the current phase and remaining time visible on the sidebar.
 - [ ] Confirm block placement and breaking are allowed only within the assigned plot and only during the creative phase.
 - [ ] Verify placement and breaking stop at the exact build deadline, including delayed and off-hand interactions.
 - [ ] Test representative blocks, block states, containers and multi-block structures; confirm no build can escape its plot or alter the lobby.
 
 ## Review and voting
 
-- [ ] Verify the review phase begins only after building ends and visits the expected eligible plots.
+- [ ] Verify the review phase begins only after building ends, visits human-built plots, and gives each plot an 18-second viewing period with voting open for the first 14 seconds.
+- [ ] Confirm human reviewers have distinct positions around each plot, AFK test players remain in the match without crowding the view, and rating instructions are clear.
 - [ ] Confirm ratings are accepted only during the review phase and are limited to the supported 1–6 range.
 - [ ] Verify each player can rate a plot only once; off-hand duplicate vote events must not count twice.
 - [ ] Test empty plots, incomplete reviews, player disconnects and a match with only the minimum supported number of participants.

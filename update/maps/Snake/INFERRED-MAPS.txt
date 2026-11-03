@@ -1,0 +1,31 @@
+# Catalog WorldDownloader archives without WorldConfig.dat
+These archives use inferred test metadata. See ../../INFERRED-METADATA-NOTE.md.
+
+Snake_Anaconda.zip
+Snake_Ancient Egypt.zip
+Snake_Athens.zip
+Snake_B-44.zip
+Snake_Bullseye.zip
+Snake_Candy Land.zip
+Snake_Chess Board.zip
+Snake_Colosseum.zip
+Snake_Gamble.zip
+Snake_Gladiator.zip
+Snake_Helix.zip
+Snake_Hungry Hungry Hippos!.zip
+Snake_Jungle Relived.zip
+Snake_Orange.zip
+Snake_Ruins of Picchu.zip
+Snake_Rupture.zip
+Snake_Settlement.zip
+Snake_Tale As Old As Time.zip
+Snake_Tasty Meal.zip
+Snake_Through The Woods.zip
+Snake_Tiki.zip
+Snake_Tranquillity.zip
+Snake_Under the Sea.zip
+Snake_Urban.zip
+Snake_Verdant.zip
+Snake_What's Cookin' Good Lookin'.zip
+Snake_Wishing Well.zip
+Snake_Worms After Rain.zip

@@ -117,6 +117,12 @@ public final class ArcadeProgressCatalog {
                     a("gravedigger", "Gravedigger", "Get a melee kill with a shovel."))),
 
             Map.entry("one-in-the-quiver", List.of(
+                    a("the-perfect-game", "The Perfect Game", "Achieve a Perfect Run killstreak in a game."),
+                    a("perfectionist", "Perfectionist", "Win a game without dying."),
+                    a("sharpshooter", "Sharpshooter", "Land 8 arrow hits without missing."),
+                    a("whats-a-bow", "What's A bow?", "Win with 20 kills without using archery."),
+                    a("speedrunner", "Speedrunner", "Win a game in under 1:30."),
+                    a("thats-not-a-sword", "That's not a sword…", "Get 3 kills with fist/bow punch."),
                     a("heads", "HEADS!", "Kill a player with a high-arced bow shot."),
                     a("rhythm-heaven", "Rhythm Heaven", "Win a game with 10 separate two-kill streaks."))),
             Map.entry("paintball", List.of(

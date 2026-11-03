@@ -22,11 +22,13 @@ final class SkyWarsMixedMapArchiveTest {
     private static final String SOURCE_FOLDER = "Skywars";
 
     @Test
-    void sourceFolderContainsAllFiftyOriginalSkyWarsArchives() throws Exception {
+    void sourceFolderRetainsOriginalSkyWarsArchivesAndRecoveredMaps() throws Exception {
         Path sourceFolder = findRepositoryRoot().resolve("update/maps/" + SOURCE_FOLDER);
         assertTrue(Files.isDirectory(sourceFolder), "The original SkyWars source-map folder must exist");
-        assertEquals(EXPECTED_MAP_COUNT, zipNames(sourceFolder).size(),
-                "Keep the complete original SkyWars archive collection");
+        assertTrue(zipNames(sourceFolder).size() >= EXPECTED_MAP_COUNT,
+                "Keep the complete original SkyWars archive collection alongside catalog imports");
+        assertEquals(Set.of("Skywars_Bamboo Waters.zip", "Skywars_Viking Battleground.zip"), inferredArchives(),
+                "Recovered terrain-only maps must be marked as inferred test maps");
     }
 
     @Test
@@ -40,13 +42,20 @@ final class SkyWarsMixedMapArchiveTest {
     }
 
     @Test
-    void everyOriginalMapHasTheSpawnGeneratorAndThreeLootMarkerFamilies() throws Exception {
+    void authoredMapsRetainGameplayMarkersAndRecoveredMapsAreExplicitlyInferred() throws Exception {
         Path sourceFolder = findRepositoryRoot().resolve("update/maps/" + SOURCE_FOLDER);
+        Set<String> inferred = inferredArchives();
         for (String fileName : zipNames(sourceFolder)) {
             String resource = "source-maps/" + SOURCE_FOLDER + "/" + fileName;
             SourceMapCatalog.MapData map = readMap(resource);
 
-            assertNotNull(map, resource + " must include a parseable WorldConfig.dat");
+            if (map == null) {
+                assertTrue(inferred.contains(fileName),
+                        resource + " lacks WorldConfig.dat and must be marked as inferred test data");
+                continue;
+            }
+            assertFalse(inferred.contains(fileName),
+                    resource + " has authored WorldConfig.dat and should not be marked inferred");
             assertFalse(map.mapName().isBlank(), resource + " must retain its source map identity");
             List<org.bukkit.Location> starts = map.spawnLocations();
             if (starts.isEmpty()) starts = map.dataLocations("GREEN");
@@ -60,6 +69,17 @@ final class SkyWarsMixedMapArchiveTest {
                     resource + " needs Connector chest locations");
             assertFalse(map.dataLocations("BLACK").isEmpty(),
                     resource + " needs Middle chest locations");
+        }
+    }
+
+    private Set<String> inferredArchives() throws Exception {
+        try (InputStream input = getClass().getClassLoader()
+                .getResourceAsStream("source-maps/" + SOURCE_FOLDER + "/INFERRED-MAPS.txt")) {
+            assertNotNull(input, "Recovered SkyWars maps need a packaged inferred-metadata manifest");
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8).lines()
+                    .map(String::trim)
+                    .filter(line -> line.toLowerCase(java.util.Locale.ROOT).endsWith(".zip"))
+                    .collect(Collectors.toSet());
         }
     }
 

@@ -1690,11 +1690,12 @@ public final class PlexballGame implements Listener {
     }
 
     private void teleportToField(Player player, int playerIndex) {
-        int slot = Math.floorMod(playerIndex, 8);
-        double[] lane = {-0.72D, 0.0D, 0.72D, -0.72D, 0.0D, 0.72D, -0.45D, 0.45D};
-        double[] depth = {-20.0D, -20.0D, -20.0D, -46.0D, -46.0D, -46.0D, -76.0D, -76.0D};
-        double z = depth[slot];
-        double x = lane[slot] * PlexballRules.fieldHalfWidthAtZ(z);
+        int slot = Math.floorMod(playerIndex, PlexballRules.MAX_PLAYERS);
+        int row = slot / 4;
+        int column = slot % 4;
+        double z = -22.0D - row * 22.0D;
+        double lane = (column - 1.5D) * 0.45D;
+        double x = lane * PlexballRules.fieldHalfWidthAtZ(z);
         player.teleport(new Location(arena, x + 0.5D, FLOOR_Y + 1.0D, z + 0.5D, 0.0F, 0.0F));
     }
 

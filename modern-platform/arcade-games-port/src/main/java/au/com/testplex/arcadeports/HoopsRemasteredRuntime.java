@@ -222,11 +222,17 @@ public final class HoopsRemasteredRuntime implements Listener {
         world.getBlockAt(rimX + 1, 66, 0).setType(Material.IRON_BARS, false);
         world.getBlockAt(rimX, 66, -1).setType(Material.IRON_BARS, false);
         world.getBlockAt(rimX, 66, 1).setType(Material.IRON_BARS, false);
-        // Four short chain drops form a visible net while keeping the centre open.
-        world.getBlockAt(rimX - 1, 65, 0).setType(Material.IRON_CHAIN, false);
-        world.getBlockAt(rimX + 1, 65, 0).setType(Material.IRON_CHAIN, false);
-        world.getBlockAt(rimX, 65, -1).setType(Material.IRON_CHAIN, false);
-        world.getBlockAt(rimX, 65, 1).setType(Material.IRON_CHAIN, false);
+        // White pane mesh makes the hanging net visible from the court while
+        // leaving its centre open for the authoritative ball trajectory.
+        for (int y = FLOOR_Y + 1; y <= FLOOR_Y + 2; y++) {
+            for (int x = -1; x <= 1; x++) {
+                for (int z = -1; z <= 1; z++) {
+                    if (x != 0 || z != 0) {
+                        world.getBlockAt(rimX + x, y, z).setType(Material.WHITE_STAINED_GLASS_PANE, false);
+                    }
+                }
+            }
+        }
         // A white target square is built into the coloured glass backboard.
         for (int y = 68; y <= 69; y++) {
             for (int z = -1; z <= 1; z++) {
@@ -499,8 +505,23 @@ public final class HoopsRemasteredRuntime implements Listener {
         Ball ball = current.ball;
         if (ball == null) return;
         if (ball.display == null || !ball.display.isValid()) {
-            current.ball = null;
-            return;
+            if (ball.display != null) current.entities.remove(ball.display.getUniqueId());
+            try {
+                ball.display = spawnBallDisplay(current, ball.location);
+            } catch (RuntimeException failure) {
+                if (!ball.warnedDisplayRecoveryFailure) {
+                    plugin.getLogger().warning("Could not restore the Hoops basketball display: "
+                            + failure.getMessage());
+                    ball.warnedDisplayRecoveryFailure = true;
+                }
+                Player recovery = nearestPlayer(current, ball.location);
+                if (recovery != null) {
+                    announce(current, ChatColor.YELLOW + "The ball was reset to a nearby player after a display error.");
+                    givePossession(current, recovery, true);
+                }
+                return;
+            }
+            ball.warnedDisplayRecoveryFailure = false;
         }
         Location previous = ball.location.clone();
         ball.velocity.setY(ball.velocity.getY() - BALL_GRAVITY);
@@ -559,7 +580,7 @@ public final class HoopsRemasteredRuntime implements Listener {
             }
             return;
         }
-        ball.display.teleport(ball.location);
+        if (ball.display != null && ball.display.isValid()) ball.display.teleport(ball.location);
         for (Player player : alivePlayers(current)) {
             if (player.getUniqueId().equals(ball.shooterId)) {
                 // Passes begin at the thrower's eye position and must not be
@@ -611,11 +632,12 @@ public final class HoopsRemasteredRuntime implements Listener {
      */
     private boolean isOpenRimHardware(Ball ball, Block block) {
         Material type = block.getType();
-        if (type != Material.IRON_BARS && type != Material.IRON_CHAIN) return false;
+        if (type != Material.IRON_BARS && type != Material.IRON_CHAIN
+                && type != Material.WHITE_STAINED_GLASS_PANE) return false;
         double hoopX = ball.defendingTeam == 0 ? LEFT_HOOP_X : RIGHT_HOOP_X;
         return Math.abs(block.getX() - hoopX) <= 1
                 && Math.abs(block.getZ()) <= 1
-                && block.getY() >= FLOOR_Y + 2
+                && block.getY() >= FLOOR_Y + 1
                 && block.getY() <= FLOOR_Y + 3;
     }
 
@@ -859,6 +881,15 @@ public final class HoopsRemasteredRuntime implements Listener {
     private void spawnLooseBall(Match current, Location location, Vector velocity,
             BallMode mode, UUID shooter, UUID passer, int defendingTeam) {
         removeBall(current);
+        ItemDisplay display = spawnBallDisplay(current, location);
+        Ball ball = new Ball(display, location.clone(), velocity.clone(), mode, shooter, passer,
+                defendingTeam, System.currentTimeMillis());
+        ball.lastToucher = shooter;
+        ball.reboundEligible = mode == BallMode.SHOT;
+        current.ball = ball;
+    }
+
+    private ItemDisplay spawnBallDisplay(Match current, Location location) {
         ItemDisplay display = current.world.spawn(location, ItemDisplay.class);
         display.setItemStack(ballDisplayItem());
         display.setBillboard(Display.Billboard.CENTER);
@@ -868,11 +899,7 @@ public final class HoopsRemasteredRuntime implements Listener {
         display.setPersistent(false);
         display.setGlowing(false);
         current.entities.add(display.getUniqueId());
-        Ball ball = new Ball(display, location.clone(), velocity.clone(), mode, shooter, passer,
-                defendingTeam, System.currentTimeMillis());
-        ball.lastToucher = shooter;
-        ball.reboundEligible = mode == BallMode.SHOT;
-        current.ball = ball;
+        return display;
     }
 
     private ItemStack basketballItem() {
@@ -1323,7 +1350,7 @@ public final class HoopsRemasteredRuntime implements Listener {
     private enum BallMode { PASS, SHOT, LOOSE }
 
     private static final class Ball {
-        final ItemDisplay display;
+        ItemDisplay display;
         final Location location;
         final Location origin;
         final Vector velocity;
@@ -1337,6 +1364,7 @@ public final class HoopsRemasteredRuntime implements Listener {
         int bounces;
         boolean reboundEligible;
         boolean dunk;
+        boolean warnedDisplayRecoveryFailure;
         double releaseDistance;
         long passedAt;
 

@@ -45,7 +45,9 @@
                     <include>Dragons/**/*.zip</include>
                     <include>Gladiators/**/*.zip</include>
                     <include>Heroes of GWEN/**/*.zip</include>
+                    <include>Evolution/**/*.zip</include>
                     <include>Micro Battle/**/*.zip</include>
+                    <include>Master Builders/**/*.zip</include>
                     <include>One in the Quiver/**/*.zip</include>
                     <include>Paintball/**/*.zip</include>
                     <include>Super Paintball/**/*.zip</include>
@@ -57,6 +59,10 @@
                     <include>Skywars/**/*.zip</include>
                     <include>Turf Wars/**/*.zip</include>
                     <include>Milk the Cow/**/*.zip</include>
+                    <include>Snake/**/*.zip</include>
+                    <include>Sneaky Assassins/**/*.zip</include>
+                    <include>Wither Assault/**/*.zip</include>
+                    <include>**/INFERRED-MAPS.txt</include>
                     <include>Speed Builders/**/*.zip</include>
                     <!-- Original Wizards plus the Nano Wizards compatibility pool. -->
                     <include>Wizards/**/*.zip</include>

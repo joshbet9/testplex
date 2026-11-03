@@ -12,7 +12,7 @@ import java.util.Set;
  * anti-cheat signal.
  */
 public final class PlexballRules {
-    public static final int MAX_PLAYERS = 8;
+    public static final int MAX_PLAYERS = 16;
     public static final int MAX_SPECTATORS = 16;
     public static final int MIN_PLAYERS = 2;
     public static final int MATCH_LIMIT_TICKS = 20 * 180;

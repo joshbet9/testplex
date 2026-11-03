@@ -33,7 +33,7 @@ class ArcadeProgressCatalogTest {
         String[] games = {"bacon-brawl", "bomb-lobbers", "death-tag", "dragon-escape", "dragons",
                 "evolution", "gladiators", "micro-battles", "monster-maze", "one-in-the-quiver",
                 "paintball", "runner", "sheep-quest", "snake", "spleef", "turf-wars"};
-        int[] achievementCounts = {5, 4, 4, 4, 3, 5, 4, 6, 9, 2, 5, 7, 8, 6, 7, 9};
+        int[] achievementCounts = {5, 4, 4, 4, 3, 5, 4, 6, 9, 8, 5, 7, 8, 6, 7, 9};
         for (int i = 0; i < games.length; i++) {
             assertTrue(ArcadeProgressCatalog.milestones(games[i]).size() >= 2, games[i]);
             assertTrue(ArcadeProgressCatalog.achievements(games[i]).size() >= achievementCounts[i], games[i]);
@@ -82,6 +82,9 @@ class ArcadeProgressCatalogTest {
 
     @Test
     void newAchievementCatalogContainsAllRequestedNames() {
+        assertTrue(hasAchievement("one-in-the-quiver", "the-perfect-game", "The Perfect Game"));
+        assertTrue(hasAchievement("one-in-the-quiver", "perfectionist", "Perfectionist"));
+        assertTrue(hasAchievement("one-in-the-quiver", "sharpshooter", "Sharpshooter"));
         assertTrue(hasAchievement("one-in-the-quiver", "heads", "HEADS!"));
         assertTrue(hasAchievement("paintball", "aura", "AURA"));
         assertTrue(hasAchievement("runner", "special-play", "Special Play"));

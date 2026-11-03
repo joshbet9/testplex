@@ -1,0 +1,5 @@
+# Catalog WorldDownloader archives without WorldConfig.dat
+These archives use inferred test metadata. See ../../INFERRED-METADATA-NOTE.md.
+
+Skywars_Bamboo Waters.zip
+Skywars_Viking Battleground.zip
