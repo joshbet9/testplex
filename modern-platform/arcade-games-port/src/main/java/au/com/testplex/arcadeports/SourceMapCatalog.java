@@ -75,7 +75,6 @@ public final class SourceMapCatalog {
             case CAMERA_SHY -> List.of();
             case SKY_WARS -> List.of("Skywars");
             case MILK_THE_COW -> List.of("Milk the Cow");
-            case SNAKE -> List.of("Snake");
             case SNEAKY_ASSASSINS -> List.of("Sneaky Assassins");
             case WITHER_ASSAULT -> List.of("Wither Assault");
             default -> List.of();
