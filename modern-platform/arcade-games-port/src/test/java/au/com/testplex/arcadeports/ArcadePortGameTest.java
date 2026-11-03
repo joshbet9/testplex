@@ -26,16 +26,16 @@ class ArcadePortGameTest {
         assertEquals(java.util.List.of("Gladiators"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.GLADIATORS));
         assertEquals(java.util.List.of("Micro Battle"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.MICRO_BATTLES));
         assertEquals(java.util.List.of("Turf Wars"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.TURF_WARS));
-        assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.SNEAKY_ASSASSINS).isEmpty(),
-                "Sneaky Assassins has no archived map in Mineplex Reborn; do not invent one.");
+        assertEquals(java.util.List.of("Sneaky Assassins"),
+                SourceMapCatalog.mapFoldersFor(ArcadePortGame.SNEAKY_ASSASSINS));
         assertEquals(java.util.List.of("Castle Assault"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.CASTLE_ASSAULT));
         assertEquals(java.util.List.of("Heroes of GWEN"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.HEROES_OF_GWEN));
         assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.EVOLUTION).isEmpty(),
                 "Evolution has no legacy map archive folder and must not be given an invented one");
         assertEquals(java.util.List.of("Draw My Thing"),
                 SourceMapCatalog.mapFoldersFor(ArcadePortGame.DRAW_MY_THING));
-        assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.MASTER_BUILDERS).isEmpty(),
-                "Master Builders uses generated plots rather than a fabricated source map");
+        assertEquals(java.util.List.of("Master Builders"),
+                SourceMapCatalog.mapFoldersFor(ArcadePortGame.MASTER_BUILDERS));
         assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.CAMERA_SHY).isEmpty(),
                 "Snap uses its dedicated procedural maze, not an invented legacy map archive");
         assertEquals("Snap", ArcadePortGame.CAMERA_SHY.displayName());
@@ -714,15 +714,18 @@ class ArcadePortGameTest {
         assertEquals(1, SourceMapCatalog.MapData.orderedRouteMarkers(start, null, 0.75D).size());
     }
 
-    @Test void originalMapCatalogEmbedsFourteenSourceWorldsAndLeavesUnmappedGamesExplicitlyUnmapped() {
+    @Test void mapCatalogIncludesBundledAndRecoveredMapsAndLeavesUnmappedGamesExplicitlyUnmapped() {
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.BACON_BRAWL));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.CASTLE_ASSAULT));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.HEROES_OF_GWEN));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DRAW_MY_THING));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.SKY_WARS));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.MILK_THE_COW));
-        assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.WITHER_ASSAULT).isEmpty());
-        assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.MASTER_BUILDERS).isEmpty());
+        assertEquals(java.util.List.of("Wither Assault"),
+                SourceMapCatalog.mapFoldersFor(ArcadePortGame.WITHER_ASSAULT));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.WITHER_ASSAULT));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.MASTER_BUILDERS));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.SNEAKY_ASSASSINS));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.BOMB_LOBBERS));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DEATH_TAG));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DRAGON_ESCAPE));

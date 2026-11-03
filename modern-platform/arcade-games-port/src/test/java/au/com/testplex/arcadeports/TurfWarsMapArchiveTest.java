@@ -62,20 +62,24 @@ final class TurfWarsMapArchiveTest {
     );
 
     @Test
-    void sourceFolderContainsTheExactFortyTwoOriginalArchives() throws Exception {
+    void sourceFolderRetainsAllOriginalArchivesAlongsideCatalogImports() throws Exception {
         Path sourceFolder = findRepositoryRoot().resolve("update/maps/Turf Wars");
         assertTrue(Files.isDirectory(sourceFolder), "The original Turf Wars source map folder must exist");
-        assertEquals(EXPECTED_ARCHIVES, zipNames(sourceFolder),
+        assertTrue(zipNames(sourceFolder).containsAll(EXPECTED_ARCHIVES),
                 "Preserve every original filename, including the TF_ aliases and source spelling");
     }
 
     @Test
-    void packagedPluginContainsTheSameFortyTwoArchives() throws Exception {
+    void packagedPluginContainsEverySourceAndRecoveredArchive() throws Exception {
         URL packagedFolder = getClass().getClassLoader().getResource("source-maps/Turf Wars");
         assertNotNull(packagedFolder,
                 "Maven must package Turf Wars archives under source-maps/Turf Wars");
-        assertEquals(EXPECTED_ARCHIVES, zipNames(Path.of(packagedFolder.toURI())),
-                "The plugin must contain the exact source filename set, not a sampled map list");
+        Path sourceFolder = findRepositoryRoot().resolve("update/maps/Turf Wars");
+        Set<String> packaged = zipNames(Path.of(packagedFolder.toURI()));
+        assertTrue(packaged.containsAll(EXPECTED_ARCHIVES),
+                "The plugin must preserve every original source filename");
+        assertEquals(zipNames(sourceFolder), packaged,
+                "The plugin must package the full source and recovered map set");
     }
 
     private static Set<String> zipNames(Path folder) throws Exception {

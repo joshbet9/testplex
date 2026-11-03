@@ -19,20 +19,24 @@ final class SheepQuestMapArchiveTest {
     private static final Set<String> EXPECTED_ARCHIVES = Set.of("Sheep_BiomeSplit.zip");
 
     @Test
-    void sourceFolderContainsTheExactOriginalArchive() throws Exception {
+    void sourceFolderRetainsTheOriginalArchiveAlongsideRecoveredMaps() throws Exception {
         Path sourceFolder = findRepositoryRoot().resolve("update/maps/Sheep Quest");
         assertTrue(Files.isDirectory(sourceFolder), "The original Sheep Quest source map folder must exist");
-        assertEquals(EXPECTED_ARCHIVES, zipNames(sourceFolder),
-                "Preserve the original Sheep Quest archive filename");
+        assertTrue(zipNames(sourceFolder).containsAll(EXPECTED_ARCHIVES),
+                "Preserve the original Sheep Quest archive filename alongside catalog imports");
     }
 
     @Test
-    void packagedPluginContainsTheSameOriginalArchive() throws Exception {
+    void packagedPluginContainsAllSourceAndRecoveredArchives() throws Exception {
+        Path sourceFolder = findRepositoryRoot().resolve("update/maps/Sheep Quest");
         URL packagedFolder = getClass().getClassLoader().getResource("source-maps/Sheep Quest");
         assertNotNull(packagedFolder,
                 "Maven must package Sheep Quest archives under source-maps/Sheep Quest");
-        assertEquals(EXPECTED_ARCHIVES, zipNames(Path.of(packagedFolder.toURI())),
-                "The plugin must include the exact source archive, not only a convenience bundle");
+        Set<String> packaged = zipNames(Path.of(packagedFolder.toURI()));
+        assertTrue(packaged.containsAll(EXPECTED_ARCHIVES),
+                "The plugin must include the original archive, not only recovered maps");
+        assertEquals(zipNames(sourceFolder), packaged,
+                "The plugin must package every source and recovered Sheep Quest archive");
     }
 
     private static Set<String> zipNames(Path folder) throws Exception {
