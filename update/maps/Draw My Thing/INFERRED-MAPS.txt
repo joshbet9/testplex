@@ -1,0 +1,18 @@
+# Catalog WorldDownloader archives without WorldConfig.dat
+These archives use inferred test metadata. See ../../INFERRED-METADATA-NOTE.md.
+
+Draw_Everlasting.zip
+Draw_Forest.zip
+Draw_Garden of the Artist.zip
+Draw_Lost Meadows.zip
+Draw_Luminous Cherubims.zip
+Draw_Opera House.zip
+Draw_Overpowered.zip
+Draw_Paint Factory.zip
+Draw_Playroom.zip
+Draw_Reminisce.zip
+Draw_Selva.zip
+Draw_Sugar Rush.zip
+Draw_Taiga.zip
+Draw_The Race.zip
+Draw_The Raging Jungle.zip

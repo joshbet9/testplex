@@ -1,0 +1,11 @@
+# Catalog WorldDownloader archives without WorldConfig.dat
+These archives use inferred test metadata. See ../../INFERRED-METADATA-NOTE.md.
+
+MilkTheCow_Aidan's Acreage.zip
+MilkTheCow_Alaskan Cream.zip
+MilkTheCow_Peruvian Expedition.zip
+MilkTheCow_Rashda.zip
+MilkTheCow_Rice Pudding.zip
+MilkTheCow_Sakura Valley.zip
+MilkTheCow_Tropic Cavern.zip
+MilkTheCow_Wayne's Ranch.zip

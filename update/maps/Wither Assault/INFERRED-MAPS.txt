@@ -1,0 +1,8 @@
+# Catalog WorldDownloader archives without WorldConfig.dat
+These archives use inferred test metadata. See ../../INFERRED-METADATA-NOTE.md.
+
+WitherAssault_Forest Village.zip
+WitherAssault_Industrial West.zip
+WitherAssault_Labyrinth.zip
+WitherAssault_Marigold.zip
+WitherAssault_Sky Ruins.zip

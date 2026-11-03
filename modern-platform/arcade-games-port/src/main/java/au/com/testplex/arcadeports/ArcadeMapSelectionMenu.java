@@ -201,14 +201,17 @@ public final class ArcadeMapSelectionMenu implements Listener {
                     (isSelected ? ChatColor.GREEN + "✓ " : ChatColor.YELLOW.toString()) + map.displayName(),
                     ChatColor.GRAY + "Source: " + game.displayName(),
                     ChatColor.YELLOW + "Left-click to select this map.",
-                    isSelected ? ChatColor.GREEN + "Currently selected" : ChatColor.DARK_GRAY + "Authentic 1.8 map archive");
+                    isSelected ? ChatColor.GREEN + "Currently selected" : ChatColor.DARK_GRAY + "Mineplex source map archive",
+                    map.inferredMetadata()
+                            ? ChatColor.GOLD + "Inferred test config: spawn/objective markers may need adjustment."
+                            : ChatColor.DARK_GREEN + "Original map config included");
             mark(item, "select-map", game, map.resource());
             inventory.setItem(slot++, item);
         }
 
         ItemStack pageInfo = createItem(Material.MAP,
                 ChatColor.AQUA + "Page " + (page + 1) + "/" + pageCount,
-                ChatColor.GRAY.toString() + maps.size() + " authentic maps available for " + game.displayName() + ".");
+                ChatColor.GRAY.toString() + maps.size() + " source maps available for " + game.displayName() + ".");
         inventory.setItem(49, pageInfo);
 
         if (page > 0) {

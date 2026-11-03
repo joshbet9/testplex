@@ -1,0 +1,9 @@
+# Catalog WorldDownloader archives without WorldConfig.dat
+These archives use inferred test metadata. See ../../INFERRED-METADATA-NOTE.md.
+
+Evolution_Bonzai.zip
+Evolution_Guardian Island.zip
+Evolution_Oasis.zip
+Evolution_Revelation.zip
+Evolution_Tropics.zip
+Evolution_Winterhold.zip

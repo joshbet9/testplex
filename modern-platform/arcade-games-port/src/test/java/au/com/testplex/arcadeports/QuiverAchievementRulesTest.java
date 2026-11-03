@@ -27,4 +27,12 @@ class QuiverAchievementRulesTest {
         assertTrue(QuiverAchievementRules.hasTenTwoKillStreaks(10));
         assertTrue(QuiverAchievementRules.hasTenTwoKillStreaks(11));
     }
+
+    @Test
+    void sharpshooterRequiresEightShotsAndEightConfirmedHits() {
+        assertFalse(QuiverAchievementRules.shouldAwardSharpshooter(7, 7));
+        assertTrue(QuiverAchievementRules.shouldAwardSharpshooter(8, 8));
+        assertFalse(QuiverAchievementRules.shouldAwardSharpshooter(9, 8));
+        assertFalse(QuiverAchievementRules.shouldAwardSharpshooter(8, 7));
+    }
 }

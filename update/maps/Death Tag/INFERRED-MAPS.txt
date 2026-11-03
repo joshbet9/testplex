@@ -1,0 +1,14 @@
+# Catalog WorldDownloader archives without WorldConfig.dat
+These archives use inferred test metadata. See ../../INFERRED-METADATA-NOTE.md.
+
+DeathTag_Bathroom.zip
+DeathTag_Bedroom.zip
+DeathTag_Boscage.zip
+DeathTag_Cave Dwelling.zip
+DeathTag_Colorido.zip
+DeathTag_Half-Moon Island.zip
+DeathTag_Lost Jungle.zip
+DeathTag_National Park.zip
+DeathTag_Pirates Harbor.zip
+DeathTag_Trial K04.zip
+DeathTag_Wild West.zip

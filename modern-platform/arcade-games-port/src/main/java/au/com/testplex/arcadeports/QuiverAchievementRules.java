@@ -17,4 +17,9 @@ public final class QuiverAchievementRules {
     public static boolean hasTenTwoKillStreaks(int separateTwoKillStreaks) {
         return separateTwoKillStreaks >= 10;
     }
+
+    /** Source Sharpshooter unlocks on the eighth confirmed arrow hit only if none missed. */
+    public static boolean shouldAwardSharpshooter(int arrowsShot, int arrowsHit) {
+        return arrowsShot == 8 && arrowsHit == 8;
+    }
 }

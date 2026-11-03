@@ -1,0 +1,23 @@
+# Catalog WorldDownloader archives without WorldConfig.dat
+These archives use inferred test metadata. See ../../INFERRED-METADATA-NOTE.md.
+
+SheepQuest_Air Drop.zip
+SheepQuest_Alpine Stronghold.zip
+SheepQuest_Apple Meadows.zip
+SheepQuest_Barn Battles.zip
+SheepQuest_Boneyard.zip
+SheepQuest_Bustle.zip
+SheepQuest_Deadly Wasteland.zip
+SheepQuest_Earthshattered.zip
+SheepQuest_Frontier.zip
+SheepQuest_Isle of Sheep.zip
+SheepQuest_Lost Temple.zip
+SheepQuest_Mushroom Crater.zip
+SheepQuest_Rocky Highlands.zip
+SheepQuest_Roots.zip
+SheepQuest_Sheep Arena.zip
+SheepQuest_Sheep Shoplifters.zip
+SheepQuest_Subaquatic.zip
+SheepQuest_Tiger Sanctuary.zip
+SheepQuest_Warriors Sanctuary.zip
+SheepQuest_Winter Realm.zip

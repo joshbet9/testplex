@@ -21,7 +21,10 @@ class MonsterMazeGameModuleContractTest {
         assertTrue(ArcadePortGame.MONSTER_MAZE_MODERN.isMonsterMaze());
         assertFalse(ArcadePortGame.BACON_BRAWL.isMonsterMaze());
         assertDoesNotThrow(() -> MonsterMazePlugin.class.getDeclaredMethod(
-                "startTestplexGame", java.util.List.class, MazeMode.class, ArcadePortGame.class));
+                "startTestplexGame", java.util.List.class, MazeMode.class,
+                ArcadePortGame.class, me.monstermaze.game.ArcadeSessionContext.class));
+        assertThrows(NoSuchMethodException.class,
+                () -> MonsterMazePlugin.class.getDeclaredMethod("startTestplexGame", java.util.List.class));
         assertDoesNotThrow(() -> MonsterMazePlugin.class.getDeclaredMethod("shutdown"));
         assertThrows(NoSuchMethodException.class,
                 () -> MonsterMazePlugin.class.getDeclaredMethod("enable"));

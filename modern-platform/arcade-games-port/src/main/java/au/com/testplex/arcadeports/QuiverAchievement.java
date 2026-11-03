@@ -6,6 +6,10 @@ import java.util.UUID;
 public enum QuiverAchievement {
     THE_PERFECT_GAME("the-perfect-game", "The Perfect Game",
             "Achieve a Perfect Run killstreak in a game."),
+    PERFECTIONIST("perfectionist", "Perfectionist",
+            "Win a game without dying."),
+    SHARPSHOOTER("sharpshooter", "Sharpshooter",
+            "Land 8 arrow hits without missing."),
     WHATS_A_BOW("whats-a-bow", "What's A bow?",
             "Win a game by getting 20 kills without using archery."),
     SPEEDRUNNER("speedrunner", "Speedrunner",

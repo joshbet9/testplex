@@ -306,9 +306,10 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         if (equipment != null) {
             equipment.setItemInMainHand(choice.heldItem == null ? null : new ItemStack(choice.heldItem));
             equipment.setItemInMainHandDropChance(0.0F);
-            ItemStack[] armour = new ItemStack[4];
-            for (int slot = 0; slot < Math.min(choice.armour.length, armour.length); slot++) {
-                Material material = choice.armour[slot];
+            Material[] armourSlots = npcArmorSlots(choice.armour);
+            ItemStack[] armour = new ItemStack[armourSlots.length];
+            for (int slot = 0; slot < armourSlots.length; slot++) {
+                Material material = armourSlots[slot];
                 if (material != null) armour[slot] = new ItemStack(material);
             }
             equipment.setArmorContents(armour);
@@ -320,6 +321,12 @@ public final class ModernArcadeLobbyRuntime implements Listener {
 
         npc.getPersistentDataContainer().set(kitNpcKey, PersistentDataType.STRING, choice.id);
         return npc;
+    }
+
+    static Material[] npcArmorSlots(Material[] kitArmour) {
+        Material[] slots = new Material[4];
+        if (kitArmour != null) System.arraycopy(kitArmour, 0, slots, 0, Math.min(kitArmour.length, slots.length));
+        return slots;
     }
 
     private void clearKitAndQueuePedestalAreas(World world) {

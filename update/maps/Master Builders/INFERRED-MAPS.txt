@@ -1,0 +1,20 @@
+# Catalog WorldDownloader archives without WorldConfig.dat
+These archives use inferred test metadata. See ../../INFERRED-METADATA-NOTE.md.
+
+MasterBuilders_Agrippa.zip
+MasterBuilders_Atlas Academy.zip
+MasterBuilders_Breeze.zip
+MasterBuilders_Conservatorium.zip
+MasterBuilders_Deep Sea.zip
+MasterBuilders_Desert Palace.zip
+MasterBuilders_Elven.zip
+MasterBuilders_Fate.zip
+MasterBuilders_Harvest.zip
+MasterBuilders_Lignum.zip
+MasterBuilders_Parliament.zip
+MasterBuilders_Pecunia.zip
+MasterBuilders_Radian Citadel.zip
+MasterBuilders_Radioactive.zip
+MasterBuilders_Royal.zip
+MasterBuilders_Sonrisa.zip
+MasterBuilders_Tranquil Courtyard.zip

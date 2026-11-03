@@ -1,6 +1,6 @@
 # Plexball — Paper 26.3 test plan
 
-Plexball is a `READY_FOR_TEST` `ArcadePortGame` hosted by `ArcadeMechanicsModern` and started through the shared `ArcadePortManager` lifecycle. It is enabled in the controlled Testplex Arcade acceptance queue, not a claim of public production readiness. The shared manager owns its queue, 2–8 player limit, countdown, active Session, participant/spectator membership, player snapshots, disconnect handling, stop and lobby restoration. Plexball owns only its game rules, batting turn order, ball simulation, scoreboard and progression. Its generated world is `testplex_plexball_arena_v1`.
+Plexball is a `READY_FOR_TEST` `ArcadePortGame` hosted by `ArcadeMechanicsModern` and started through the shared `ArcadePortManager` lifecycle. It is enabled in the controlled Testplex Arcade acceptance queue, not a claim of public production readiness. The shared manager owns its queue, 2–16 player limit, countdown, active Session, participant/spectator membership, player snapshots, disconnect handling, stop and lobby restoration. Plexball owns only its game rules, batting turn order, ball simulation, scoreboard and progression. Its generated world is `testplex_plexball_arena_v1`.
 
 ## Start and kit selection
 
@@ -15,11 +15,11 @@ Plexball is a `READY_FOR_TEST` `ArcadePortGame` hosted by `ArcadeMechanicsModern
 - `/arcadeport play plexball` — join the same Arcade queue and request the standard global quick-start window.
 - `/arcadeport spectate plexball` — join the active Arcade Session as a non-playing spectator.
 - `/arcadeport leave plexball` — use the global Arcade manager to leave the queue or active spectator role.
-- `/arcadeport start plexball` — operator-only start of the global Plexball queue (2–8 players).
+- `/arcadeport start plexball` — operator-only start of the global Plexball queue (2–16 players).
 - `/arcadeport status` — shows the Plexball queue or current phase.
 - `/arcadeport stop` — operator stop and return to lobby.
 
-At least two and at most eight real queued players are supported. Plexball bypasses the generic 16-player FakePlayerPlugin fixture; the game must never be inflated with AFK test bodies. Queue admission, quick-start scheduling, explicit start and pre-game waiting are the same shared Arcade lifecycle used by other games; there is no Plexball-owned queue or countdown. On start, ArcadePortManager creates the active Session and captures player snapshots. Each player gets one initial batting turn. Everyone other than the current batter fields. The first round is capped at ten seconds per batter. Multiple home runs enter five-second sudden death, bounded by the same 180-second wall-clock match limit.
+Plexball supports two to sixteen total participants. The shared Arcade manager fills a short human queue with ordinary FakePlayerPlugin `Player` participants, capped at sixteen; those AFK players receive the same match setup, equipment, turn and fielding rules as humans. Queue admission, quick-start scheduling, explicit start and pre-game waiting are the same shared Arcade lifecycle used by other games; there is no Plexball-owned queue or countdown. On start, ArcadePortManager creates the active Session and captures player snapshots. Each player gets one initial batting turn. Everyone other than the current batter fields. The first round is capped at ten seconds per batter. Multiple home runs enter five-second sudden death, bounded by the same 180-second wall-clock match limit.
 
 ## Achievements
 
@@ -57,7 +57,7 @@ The progression file is plugins/ArcadeMechanicsModern/plexball-progression.yml. 
 
 | Test | Expected |
 | --- | --- |
-| Join with 2–8 players | The shared queue accepts no more than eight real participants; at least two are required; no 16-player fake-player fixture is spawned; every participant enters the separate Plexball arena. |
+| Join with 2–16 players | The shared queue accepts no more than sixteen real participants; at least two are required; the shared 16-player fixture may be spawned; every participant enters the separate Plexball arena. |
 | Spectate active match | `/arcadeport spectate plexball` adds the viewer to the global Arcade Session's `players` and `snapshots` maps but not its `alive` set; spectators do not bat, field, score, unlock progression or change match results. |
 | Queue leave | A player can remove themselves while queued; countdown resets if the queue falls below two players. |
 | Queue disconnect | A queued player's disconnect immediately updates the queue and cancels the countdown if fewer than two players remain. |

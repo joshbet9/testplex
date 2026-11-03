@@ -1,0 +1,4 @@
+# Catalog WorldDownloader archives without WorldConfig.dat
+These archives use inferred test metadata. See ../../INFERRED-METADATA-NOTE.md.
+
+Spleef_Where'd The Witch Go.zip

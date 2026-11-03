@@ -14,7 +14,8 @@ class PlexballRulesTest {
         assertFalse(PlexballRules.hasValidPlayerCount(1));
         assertTrue(PlexballRules.hasValidPlayerCount(2));
         assertTrue(PlexballRules.hasValidPlayerCount(8));
-        assertFalse(PlexballRules.hasValidPlayerCount(9));
+        assertTrue(PlexballRules.hasValidPlayerCount(16));
+        assertFalse(PlexballRules.hasValidPlayerCount(17));
     }
 
     @Test

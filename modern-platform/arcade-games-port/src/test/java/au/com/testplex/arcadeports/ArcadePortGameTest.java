@@ -790,10 +790,12 @@ class ArcadePortGameTest {
     }
 
     @Test void quiverAchievementSetMatchesTheUpdatedRequirements() {
-        assertEquals(6, QuiverAchievement.values().length);
+        assertEquals(8, QuiverAchievement.values().length);
         assertEquals("The Perfect Game", QuiverAchievement.THE_PERFECT_GAME.displayName());
         assertEquals("Achieve a Perfect Run killstreak in a game.",
                 QuiverAchievement.THE_PERFECT_GAME.requirement());
+        assertEquals("Win a game without dying.", QuiverAchievement.PERFECTIONIST.requirement());
+        assertEquals("Land 8 arrow hits without missing.", QuiverAchievement.SHARPSHOOTER.requirement());
         assertEquals("Win a game by getting 20 kills without using archery.",
                 QuiverAchievement.WHATS_A_BOW.requirement());
         assertEquals("Win a game in under 1:30.", QuiverAchievement.SPEEDRUNNER.requirement());

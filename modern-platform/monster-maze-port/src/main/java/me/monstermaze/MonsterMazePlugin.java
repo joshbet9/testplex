@@ -9,6 +9,7 @@ import me.monstermaze.command.DebugSoloModeListener;
 import me.monstermaze.entity.MonsterEntityListener;
 import me.monstermaze.game.BuildBypassListener;
 import me.monstermaze.game.GameManager;
+import me.monstermaze.game.ArcadeSessionContext;
 import me.monstermaze.game.MazeMode;
 import me.monstermaze.stats.BackendClient;
 import me.monstermaze.stats.ChallengeManager;
@@ -212,23 +213,15 @@ public final class MonsterMazePlugin {
         saveConfig();
     }
 
-    public void setReturnToTestplex(java.util.function.Consumer<Player> callback) {
-        if (gameManager != null) gameManager.setTestplexReturnToLobby(callback);
-    }
-    public boolean startTestplexGame(java.util.List<Player> participants) {
-        return startTestplexGame(participants, MazeMode.ORIGINAL, ArcadePortGame.MONSTER_MAZE);
-    }
-
-    /** Start one of the three Arcade identities through the same embedded game controller. */
+    /** Start one of the three Arcade identities through the shared Arcade session. */
     public boolean startTestplexGame(java.util.List<Player> participants, MazeMode selectedMode,
-                                     ArcadePortGame arcadeGame) {
+                                     ArcadePortGame arcadeGame, ArcadeSessionContext sharedSession) {
         if (gameManager == null || gameManager.isRunning() || arcadeGame == null || !arcadeGame.isMonsterMaze()) {
             return false;
         }
         setMode(selectedMode);
         activeArcadeGame = arcadeGame;
-        boolean started = gameManager.startTestplexRound(participants,
-                player -> host.returnPlayerToArcadeLobby(player));
+        boolean started = gameManager.startTestplexRound(participants, sharedSession);
         if (!started) activeArcadeGame = ArcadePortGame.MONSTER_MAZE;
         return started;
     }
