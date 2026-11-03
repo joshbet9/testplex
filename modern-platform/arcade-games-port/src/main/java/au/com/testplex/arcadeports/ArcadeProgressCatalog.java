@@ -112,7 +112,7 @@ public final class ArcadeProgressCatalog {
                     a("micro-battles-king", "Micro Battles King", "Use a placed block to knock a jumper into lava/water and get 3 kills."),
                     a("mosh-pit-playroom", "Mosh-Pit Playroom", "Get 8 assists in one game."),
                     a("built-for-this", "Built for This", "As Fighter, win the final 1v1 where another kit would have lost."),
-                    a("speedrunner", "Speedrunner", "Win a Micro Battles game in under 1:30. Unlocks the Dasher kit."),
+                    a("speedster", "Speedster", "Win a Micro Battles game in under 1:30. Unlocks the Dasher kit."),
                     a("sniper-dawg", "Sniper Dawg", "As Archer, knock a player from every team off a skybase in one game."),
                     a("gravedigger", "Gravedigger", "Get a melee kill with a shovel."))),
 

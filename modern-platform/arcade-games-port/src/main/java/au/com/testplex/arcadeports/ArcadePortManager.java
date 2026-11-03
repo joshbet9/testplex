@@ -1446,12 +1446,12 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         String kit = ArcadePortRules.normalizeMicroBattlesKit(requestedKit);
         if (kit == null) {
-            player.sendMessage(ChatColor.YELLOW + "Micro Battles kits: archer, worker, fighter, dasher (unlocked by Speedrunner).");
+            player.sendMessage(ChatColor.YELLOW + "Micro Battles kits: archer, worker, fighter, dasher (unlocked by Speedster).");
             return;
         }
         UUID playerId = player.getUniqueId();
         if ("dasher".equals(kit)
-                && !plugin.getConfig().getBoolean(MicroBattlesAchievement.SPEEDRUNNER.configKey(playerId), false)) {
+                && !plugin.getConfig().getBoolean(MicroBattlesAchievement.SPEEDSTER.configKey(playerId), false)) {
             player.sendMessage(ChatColor.RED + "Dasher is locked. Win a Micro Battles game in under 1:30 to unlock it.");
             return;
         }
@@ -17174,10 +17174,10 @@ public final class ArcadePortManager implements Listener {
                 plugin.getConfig().set(path + "wins", lifetimeWins);
                 if (session.type == ArcadePortGame.MICRO_BATTLES
                         && System.currentTimeMillis() - session.startedAt
-                                < ArcadePortRules.MICRO_BATTLES_SPEEDRUNNER_MAX_GAME_MILLIS) {
+                                < ArcadePortRules.MICRO_BATTLES_SPEEDSTER_MAX_GAME_MILLIS) {
                     awardMicroBattlesAchievement(entry.getValue(),
-                            MicroBattlesAchievement.SPEEDRUNNER.configKey(id),
-                            "Speedrunner — win Micro Battles in under 1:30.");
+                            MicroBattlesAchievement.SPEEDSTER.configKey(id),
+                            "Speedster — win Micro Battles in under 1:30.");
                 }
                 if (session.type == ArcadePortGame.DEATH_TAG) {
                     if (lifetimeWins >= 50) {

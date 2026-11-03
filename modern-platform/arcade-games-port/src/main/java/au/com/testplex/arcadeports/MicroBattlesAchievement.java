@@ -11,7 +11,7 @@ public enum MicroBattlesAchievement {
             "Use a placed block to knock a jumper into lava or water and get 3 kills."),
     BUILT_FOR_THIS("built-for-this", "Built for This",
             "As Fighter, win the final 1v1 where another kit would have lost."),
-    SPEEDRUNNER("speedrunner", "Speedrunner", "Win a Micro Battles game in under 1:30. Unlocks the Dasher kit."),
+    SPEEDSTER("speedster", "Speedster", "Win a Micro Battles game in under 1:30. Unlocks the Dasher kit."),
     SNIPER_DAWG("sniper-dawg", "Sniper Dawg",
             "As Archer, knock a player from every opposing team off a skybase in one game.");
 
