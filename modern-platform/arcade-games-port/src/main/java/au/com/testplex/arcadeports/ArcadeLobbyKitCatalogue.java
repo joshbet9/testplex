@@ -108,7 +108,9 @@ final class ArcadeLobbyKitCatalogue {
                     choice("micro-worker", "Worker", Material.IRON_PICKAXE,
                             Unlock.FREE, Zombie.class, Material.STONE_PICKAXE),
                     choice("micro-fighter", "Fighter", Material.IRON_SWORD,
-                            Unlock.FREE, Zombie.class, Material.WOODEN_SWORD));
+                            Unlock.FREE, Zombie.class, Material.WOODEN_SWORD),
+                    choice("dasher", "Dasher", Material.FEATHER,
+                            Unlock.ACHIEVEMENT, Zombie.class, Material.WOODEN_SWORD));
             case SHEEP_QUEST -> List.of(
                     choice("beserker", "Berserker", Material.RABBIT_FOOT,
                             Unlock.FREE, Zombie.class, Material.IRON_AXE),

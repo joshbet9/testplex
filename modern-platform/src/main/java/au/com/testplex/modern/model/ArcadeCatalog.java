@@ -48,7 +48,7 @@ public final class ArcadeCatalog {
                 win("last-survivor", "Last Survivor", "The arena dims as lanterns light one by one."),
                 win("untouched-run", "Untouched Run", "A route map draws itself around the winner")));
 
-        register(game("dragon-escape", "Dragon Escape", "DRAGON_HEAD", "Race the dragon through a collapsing parkour route.",
+        register(game("dragon-escape", "Dragon Escape", "DRAGON_EGG", "Race the dragon through a collapsing parkour route.",
                 GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("leader-marker", "Course Leader Marker", "A course-specific marker for the current leader.", "BEACON",
                         single("dragon-eye", "Dragon Eye", "An iris-like marker pulses above the leader."),
@@ -79,7 +79,7 @@ public final class ArcadeCatalog {
                 win("dragon-perch", "Dragon Perch", "The winner stands on a stylised dragon perch."),
                 win("cloud-throne", "Cloud Throne", "A cloud-built throne rises under the winner")));
 
-        register(game("dragons", "Dragons", "BLAZE_POWDER", "Use Pyro platforms to survive dragon attacks.",
+        register(game("dragons", "Dragons", "END_STONE", "Use Pyro platforms to survive dragon attacks.",
                 GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("pyro-signature", "Pyro Signature", "Unique shape language for the Pyro ability.", "BLAZE_POWDER",
                         single("ember-wing", "Ember Wing", "A fan of flame-shaped particles."),
@@ -96,7 +96,7 @@ public final class ArcadeCatalog {
                 win("phoenix-rise", "Phoenix Rise", "The winner rises through a phoenix-shaped flame arc."),
                 win("last-platform", "Last Platform", "The remaining platform is spotlighted as the arena fades")));
 
-        register(game("evolution", "Evolution", "DRAGON_EGG",
+        register(game("evolution", "Evolution", "EMERALD",
                 "Earn evolutions through kills or the 90-second pity clock; progress through five forms.",
                 GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("metamorphosis", "Dragon Egg Variants",
@@ -124,7 +124,7 @@ public final class ArcadeCatalog {
                 win("crossed-steel", "Crossed Steel", "Two swords frame the winner."),
                 win("arena-banners", "Arena Banners", "Banners unfurl around the final combatant")));
 
-        register(game("micro-battles", "Micro Battles", "LIGHT_BLUE_STAINED_GLASS", "Fight on tiny platforms as the border closes.",
+        register(game("micro-battles", "Micro Battles", "LAVA_BUCKET", "Fight on tiny platforms as the border closes.",
                 GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(lineMulti("island-visuals", "Island Glass & Border Colours",
                                 "Equip one private starting-glass colour and one shared border-particle colour.", "LIGHT_BLUE_STAINED_GLASS",
@@ -187,7 +187,7 @@ public final class ArcadeCatalog {
                 win("quiverless", "Quiverless", "A single arrow hangs above the last archer."),
                 win("archer-halo", "Archer Halo", "An archer's halo draws around the winner")));
 
-        register(game("paintball", "Paintball", "SNOWBALL", "Control lanes with paintball weapons and team colours.",
+        register(game("paintball", "Paintball", "ENDER_PEARL", "Control lanes with paintball weapons and team colours.",
                 GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(lineMulti("weapon-and-pellet-identity", "Weapon & Pellet Identity",
                         "Equip one visible weapon finish and one visible in-flight pellet style. Both are shown to all players.",
@@ -226,7 +226,7 @@ public final class ArcadeCatalog {
                 win("finish-tape", "Finish Tape", "A finish-line tape snaps across the arena."),
                 win("runner-statue", "Runner Statue", "A running silhouette assembles into a statue")));
 
-        register(game("sheep-quest", "Sheep Quest", "WHITE_WOOL", "Capture sheep and return them to your team's pen.",
+        register(game("sheep-quest", "Sheep Quest", "YELLOW_WOOL", "Capture sheep and return them to your team's pen.",
                 GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("capture-signature", "Capture Signature", "Distinct feedback when a sheep is secured.", "LEAD",
                         single("sheep-bell", "Sheep Bell", "A distinct bell and wool puff."),
@@ -236,7 +236,7 @@ public final class ArcadeCatalog {
                 win("golden-fleece", "Golden Fleece", "A golden fleece appears on a wool pedestal."),
                 win("shepherd-crown", "Shepherd Crown", "A leafy crown forms above the winner")));
 
-        register(game("snake", "Snake", "SLIME_BALL", "Collect food, avoid collisions, and use the Mario-Kart-style item roll.",
+        register(game("snake", "Snake", "WHITE_WOOL", "Collect food, avoid collisions, and use the Mario-Kart-style item roll.",
                 GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("snake-identity", "Snake Identity", "A connected body pattern, not one generic particle trail.", "SLIME_BALL",
                         single("anaconda", "Anaconda", "Segmented heavy scales along the body."),
@@ -261,19 +261,19 @@ public final class ArcadeCatalog {
                 win("last-snowflake", "Last Snowflake", "A single snowflake floats above the winner."),
                 win("shovel-salute", "Shovel Salute", "A ceremonial row of shovels rises from the floor")));
 
-        register(game("draw-my-thing", "Draw My Thing", "PAINTING",
+        register(game("draw-my-thing", "Draw My Thing", "WRITABLE_BOOK",
                 "Take one 30-second drawing turn, reveal timed hints, and guess using a limited number of attempts.",
                 GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(),
                 win("whiteboard-reveal", "Whiteboard Reveal", "The final drawing is framed above the winning guesser.")));
 
-        register(game("master-builders", "Master Builders", "GRASS_BLOCK",
+        register(game("master-builders", "Master Builders", "OAK_PLANKS",
                 "Build your theme in three minutes, then review and rate the other plots.",
                 GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(),
                 win("builders-podium", "Builder's Podium", "The top-rated build rises above the winning builder.")));
 
-        register(game("castle-assault", "Castle Assault", "TNT",
+        register(game("castle-assault", "Castle Assault", "DIAMOND_CHESTPLATE",
                 "Destroy the enemy sentry crystals and defeat their King. Mixed Arcade doubles objective TNT spawns.",
                 GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(),
@@ -289,7 +289,7 @@ public final class ArcadeCatalog {
                 win("beacon-crown", "Beacon Crown", "Captured beacons form a crown around the victor."),
                 win("wither-fall", "Wither Fall", "The defeated Wither fades behind the winning team.")));
 
-        register(game("hoops-remastered", "Hoops Remastered", "BIRCH_PLANKS",
+        register(game("hoops-remastered", "Hoops Remastered", "MAGMA_CREAM",
                 "Play a fast 2–16 player RED versus BLUE basketball match with passing, shooting, layups, dunks, steals and blocks.",
                 GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(),
@@ -297,7 +297,7 @@ public final class ArcadeCatalog {
                 win("buzzer-beater", "Buzzer Beater", "The decisive final basket lights up the arena clock."),
                 win("court-dominance", "Court Dominance", "The winning lineup takes centre court.")));
 
-        register(game("wizards", "Wizards", "ENCHANTING_TABLE",
+        register(game("wizards", "Wizards", "BLAZE_ROD",
                 "Choose a wizard kit, explore the original Wizards and Nano Wizards maps, collect spellbooks and be the last wizard standing.",
                 GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(),
@@ -315,7 +315,7 @@ public final class ArcadeCatalog {
                 GameDefinition.PortStatus.READY_FOR_TEST, List.of(),
                 win("wither-victory", "Wither Victory", "The surviving team stands above the defeated Wither")));
 
-        register(game("skywars", "SkyWars Mixed", "TNT",
+        register(game("skywars", "SkyWars Mixed", "FEATHER",
                 "Fast 16-player Mixed Arcade free-for-all: loot your island, throw TNT and survive the collapse.",
                 GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("sky-combat-signature", "Sky Combat Signature",
@@ -327,7 +327,7 @@ public final class ArcadeCatalog {
                 win("last-survivor", "Last Survivor", "A beacon shines over the last player standing."),
                 win("skyfall-crown", "Skyfall Crown", "A floating crown of cloud and TNT frames the winner.")));
 
-        register(game("turf-wars", "Turf Wars", "BOW", "Win ranged combat and control the central turf.",
+        register(game("turf-wars", "Turf Wars", "RED_TERRACOTTA", "Win ranged combat and control the central turf.",
                 GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("arrow-mark", "Arrow Mark", "A block-impact mark that follows the player's team palette.", "TARGET",
                         single("team-sigil", "Team Sigil", "A team sigil appears at the impact point."),
@@ -337,7 +337,7 @@ public final class ArcadeCatalog {
                 win("stadium-finale", "Stadium Finale", "Stadium lights sweep towards the winning team."),
                 win("banner-wave", "Banner Wave", "A moving wall of team banners celebrates the winner")));
 
-        register(game("sneaky-assassins", "Sneaky Assassins", "VILLAGER_SPAWN_EGG",
+        register(game("sneaky-assassins", "Sneaky Assassins", "INK_SAC",
                 "Stay disguised as a villager, collect power-ups and be the last assassin alive. Controlled testing uses a generated town while authentic map and NMS patrol parity remain outstanding.",
                 GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(),
@@ -351,20 +351,20 @@ public final class ArcadeCatalog {
                 win("last-photographer-standing", "Last Photographer Standing",
                         "The winner is celebrated as the last photographer remaining in the maze.")));
 
-        register(game("plexball", "Plexball", "SNOWBALL",
+        register(game("plexball", "Plexball", "CHAINMAIL_HELMET",
                 "Take turns hitting a ball off a tee while every non-batter tries to catch it. Longest uncaught hit wins.",
                 GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(),
                 win("home-run-stage", "Home Run Stage", "A 100-metre marker rises behind the winner."),
                 win("golden-glove", "Golden Glove", "A golden glove and ball form a compact victory display.")));
 
-        register(game("super-sploor", "Super Sploor", "INK_SAC",
+        register(game("super-sploor", "Super Sploor", "DIAMOND_HORSE_ARMOR",
                 "Paint and reclaim territory as a five-kit team in the NANO-inspired Squid Turf War.",
                 GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(),
                 win("colour-surge", "Colour Surge", "A vivid wash of team-coloured ink rolls across the winning team's podium.")));
 
-        register(game("speed-builders", "Speed Builders", "CRAFTING_TABLE",
+        register(game("speed-builders", "Speed Builders", "QUARTZ_BLOCK",
                 "Recreate Mineplex build models in your own plot. Up to sixteen builders compete across synchronized mirrored arenas, scored automatically by build accuracy.",
                 GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(),
