@@ -220,6 +220,7 @@ public final class SnakeGameManager implements Listener {
             player.leaveVehicle();
             player.teleport(spawn);
             player.setGameMode(GameMode.SURVIVAL);
+            player.setCollidable(false);
             player.setHealth(player.getMaxHealth());
             player.setFoodLevel(20);
             player.setSaturation(5.0F);

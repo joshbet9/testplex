@@ -865,7 +865,7 @@ public final class CameraShyGame implements Listener {
         player.setFallDistance(0.0F);
         player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
         player.setInvulnerable(true);
-        player.setCollidable(true);
+        player.setCollidable(false);
         player.setAllowFlight(false);
         player.setFlying(false);
         player.getInventory().clear();

@@ -484,7 +484,7 @@ final class SneakyAssassinsMechanics {
         proxy.setSilent(true);
         proxy.setPersistent(true);
         proxy.setRemoveWhenFarAway(false);
-        proxy.setCollidable(true);
+        proxy.setCollidable(false);
         proxy.setInvulnerable(false);
         proxy.setCanPickupItems(false);
         proxy.setGravity(false);
