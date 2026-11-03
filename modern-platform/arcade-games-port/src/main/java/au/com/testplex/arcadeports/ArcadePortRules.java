@@ -224,9 +224,10 @@ public final class ArcadePortRules {
         return game != null && game != ArcadePortGame.PAINTBALL && !game.isMonsterMaze();
     }
 
-    /** The legacy Gladiators constructor explicitly disables fall damage. */
+    /** Legacy Gladiators and Paintball cancel fall damage; Monster Maze owns its damage rules. */
     public static boolean shouldApplyLegacyFallDamage(ArcadePortGame game) {
-        return game != null && game != ArcadePortGame.GLADIATORS && !game.isMonsterMaze();
+        return game != null && game != ArcadePortGame.GLADIATORS
+                && game != ArcadePortGame.PAINTBALL && !game.isMonsterMaze();
     }
 
     public static final int BACON_METER_MAX = 100;
