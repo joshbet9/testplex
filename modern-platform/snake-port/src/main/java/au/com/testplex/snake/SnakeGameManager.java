@@ -449,7 +449,8 @@ public final class SnakeGameManager implements Listener {
             Team line = matchScoreboardTeams.get(index);
             String entry = matchScoreboardEntries.get(index);
             if (index < lines.size()) {
-                line.setPrefix(lines.get(index));
+                line.setPrefix(lines.get(index).length() <= 64
+                        ? lines.get(index) : lines.get(index).substring(0, 64));
                 matchScoreboardObjective.getScore(entry).setScore(lines.size() - index);
             } else {
                 line.setPrefix("");

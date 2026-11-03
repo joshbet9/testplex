@@ -5158,10 +5158,10 @@ public final class ArcadePortManager implements Listener {
                     HOOPS_REMASTERED, ONE_IN_THE_QUIVER, PAINTBALL,
                     SUPER_SPLOOR, PLEXBALL, MASTER_BUILDERS, SNEAKY_ASSASSINS,
                     MONSTER_MAZE, MONSTER_MAZE_SPEED, MONSTER_MAZE_MODERN,
-                    WIZARDS -> false;
+                    WIZARDS, CAMERA_SHY -> false;
             case EVOLUTION, MICRO_BATTLES, RUNNER, SHEEP_QUEST, SPLEEF,
                     TURF_WARS, DRAW_MY_THING, SKY_WARS, MILK_THE_COW,
-                    WITHER_ASSAULT, CAMERA_SHY -> true;
+                    WITHER_ASSAULT -> true;
         };
     }
 
@@ -5237,7 +5237,8 @@ public final class ArcadePortManager implements Listener {
             Team line = session.sharedMatchScoreboardTeams.get(index);
             String entry = session.sharedMatchScoreboardEntries.get(index);
             if (index < lines.size()) {
-                line.setPrefix(lines.get(index));
+                line.setPrefix(lines.get(index).length() <= 64
+                        ? lines.get(index) : lines.get(index).substring(0, 64));
                 objective.getScore(entry).setScore(lines.size() - index);
             } else {
                 line.setPrefix("");

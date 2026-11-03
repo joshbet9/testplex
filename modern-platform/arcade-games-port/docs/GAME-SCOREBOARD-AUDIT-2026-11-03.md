@@ -29,11 +29,12 @@ Every playable game needs an in-game sidebar. The shared Arcade session now has 
 | Monster Maze (Speed) | Existing per-player maze scoreboard |
 | Monster Maze (Modern) | Existing per-player maze scoreboard |
 | Sneaky Assassins | Existing reveal/player scoreboard |
+| Speed Builders | Existing build-phase scoreboard |
 | SkyWars | Shared match scoreboard |
 | Milk the Cow | Shared match scoreboard |
 | Wither Assault | Shared match scoreboard |
 | Wizards | Existing match scoreboard |
-| Snap (Camera Shy) | Shared match scoreboard |
+| Snap (Camera Shy) | New game-specific scoreboard |
 | Snake | New Snake match scoreboard |
 
 The Snake scoreboard is scoped to the standalone Snake manager. It updates during preparation and live play, restores each player's prior scoreboard on leave/end, and reports map, countdown/elapsed time, survivors, food, and top Snake stats.
