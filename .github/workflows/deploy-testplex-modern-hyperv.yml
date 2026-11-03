@@ -367,6 +367,34 @@ jobs:
           echo "Read-only preflight passed: Testplex target is isolated; service states, enablement, and port are readable. State-changing preflight runs under the deployment lock after journaling."
           REMOTE_PREFLIGHT
 
+      - name: Ensure rsync is available for block-delta transfer
+        shell: bash
+        env:
+          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
+          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
+          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
+        run: |
+          set -euo pipefail
+          SSH_PORT="${HYPERV_SSH_PORT:-22}"
+          remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
+          ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
+            -o BatchMode=yes -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
+          timeout --foreground --signal=TERM --kill-after=15s 4m ssh "${ssh_opts[@]}" "$remote" bash -s <<'REMOTE_RSYNC_SETUP'
+          set -euo pipefail
+          if command -v rsync >/dev/null 2>&1; then
+            rsync --version | sed -n '1p'
+            echo "Remote rsync is ready."
+          else
+            echo "Installing the rsync transfer utility; server services are untouched."
+            timeout --foreground --signal=TERM 3m sudo -n apt-get update
+            timeout --foreground --signal=TERM 3m sudo -n apt-get install -y rsync
+            command -v rsync >/dev/null
+            rsync --version | sed -n '1p'
+          fi
+          REMOTE_RSYNC_SETUP
+
       - name: Upload verified JARs to the isolated directory
         id: upload
         shell: bash
@@ -376,6 +404,7 @@ jobs:
           HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
           BUILD_SHA: ${{ steps.source-artifact.outputs.source_sha }}
           STAGE_DIR: ${{ steps.stage-jars.outputs.stage_dir }}
+          CHANGED_JARS: ${{ steps.jar-diff.outputs.changed_jars }}
           MM_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.mm_maps_required }}
           MAP_EXPANDED_KB: ${{ steps.stage-jars.outputs.map_expanded_kb }}
           WIZARDS_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.wizards_maps_required }}
@@ -397,13 +426,23 @@ jobs:
           # cleanup, capacity checks, and directory creation in one bounded SSH session.
           stage_kb="$(du -sk "$STAGE_DIR" | awk '{print $1}')"
           [[ "$stage_kb" =~ ^[0-9]+$ ]] && (( stage_kb > 0 )) || { echo "Could not determine the verified deployment payload size." >&2; exit 1; }
+          shopt -s nullglob
+          staged_jars=("$STAGE_DIR"/*.jar)
+          staged_jar_kb=0
+          for jar in "${staged_jars[@]}"; do
+            jar_kb="$(du -sk "$jar" | awk '{print $1}')"
+            [[ "$jar_kb" =~ ^[0-9]+$ ]] || { echo "Could not size staged plugin JAR: $jar" >&2; exit 1; }
+            staged_jar_kb=$((staged_jar_kb + jar_kb))
+          done
           [[ "$MAP_EXPANDED_KB" =~ ^[0-9]+$ ]] || { echo "Invalid map expansion budget." >&2; exit 1; }
 
-          timeout --foreground --signal=TERM --kill-after=20s 3m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" "$stage_kb" "$MAP_EXPANDED_KB" <<'REMOTE_STAGE_PREP'
+          timeout --foreground --signal=TERM --kill-after=20s 3m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" "$stage_kb" "$staged_jar_kb" "$MAP_EXPANDED_KB" "$CHANGED_JARS" <<'REMOTE_STAGE_PREP'
           set -euo pipefail
           upload_dir="$1"
           stage_kb="$2"
-          map_expanded_kb="$3"
+          staged_jar_kb="$3"
+          map_expanded_kb="$4"
+          changed_jars_csv="$5"
           state_dir=/var/lib/testplex-modern-deploy
           backup_root="$state_dir/backups"
           server_dir=/home/monstermaze/servers/testplex-modern
@@ -502,7 +541,26 @@ jobs:
           server_device="$(df -P "$server_fs" | awk 'END {print $1}')"
           state_device="$(df -P "$state_dir" | awk 'END {print $1}')"
           reserve_kb=524288
-          tmp_required_kb="$stage_kb"
+          # Seed the remote staging JARs from the installed copy, then rsync the new
+          # JARs in place. The peak is unchanged from a full copy when sizes match.
+          # Account for an older installed JAR being larger than its replacement.
+          seed_jars_kb=0
+          IFS=, read -r -a changed_jars <<< "$changed_jars_csv"
+          for jar in "${changed_jars[@]}"; do
+            [[ -n "$jar" ]] || continue
+            case "$jar" in TestplexModernArcade.jar|SnakeModern.jar|ArcadeMechanicsModern.jar|WizardsModern.jar) ;; *) echo "Invalid changed JAR name in upload request: $jar" >&2; exit 2 ;; esac
+            installed="$server_dir/plugins/$jar"
+            if sudo -n test -s "$installed"; then
+              jar_kb="$(sudo -n du -sk -- "$installed" | awk '{print $1}')"
+              [[ "$jar_kb" =~ ^[0-9]+$ ]] || { echo "Could not size installed plugin JAR: $jar" >&2; exit 1; }
+              seed_jars_kb=$((seed_jars_kb + jar_kb))
+            fi
+          done
+          non_jar_payload_kb=$((stage_kb - staged_jar_kb))
+          (( non_jar_payload_kb >= 0 )) || { echo "Invalid JAR/payload size accounting." >&2; exit 1; }
+          jar_stage_kb="$staged_jar_kb"
+          (( seed_jars_kb <= jar_stage_kb )) || jar_stage_kb="$seed_jars_kb"
+          tmp_required_kb=$((non_jar_payload_kb + jar_stage_kb))
           server_required_kb=0
           state_required_kb=0
           if [[ "$tmp_device" == "$server_device" ]]; then
@@ -525,12 +583,20 @@ jobs:
             echo "Insufficient deployment staging space: /var/tmp available=${tmp_avail_kb:-unknown} KiB required=$tmp_required_kb KiB; server filesystem available=${server_avail_kb:-unknown} KiB required=$server_required_kb KiB; backup filesystem available=${state_avail_kb:-unknown} KiB required=$state_required_kb KiB; payload=$stage_kb KiB; map expansion=$map_expanded_kb KiB; rollback snapshot=$snapshot_kb KiB; runtime reserve=$reserve_kb KiB." >&2
             exit 1
           fi
-          echo "Staging space passed: /var/tmp=$((tmp_avail_kb / 1024)) MiB (needs $((tmp_required_kb / 1024)) MiB); server filesystem=$((server_avail_kb / 1024)) MiB (needs $((server_required_kb / 1024)) MiB); backup filesystem=$((state_avail_kb / 1024)) MiB (needs $((state_required_kb / 1024)) MiB); payload=$((stage_kb / 1024)) MiB; maps=$((map_expanded_kb / 1024)) MiB; rollback snapshot=$((snapshot_kb / 1024)) MiB; reserve=512 MiB."
+          echo "Staging space passed: /var/tmp=$((tmp_avail_kb / 1024)) MiB (needs $((tmp_required_kb / 1024)) MiB); server filesystem=$((server_avail_kb / 1024)) MiB (needs $((server_required_kb / 1024)) MiB); backup filesystem=$((state_avail_kb / 1024)) MiB (needs $((state_required_kb / 1024)) MiB); payload=$((stage_kb / 1024)) MiB; changed JARs=$((staged_jar_kb / 1024)) MiB; installed JAR seeds=$((seed_jars_kb / 1024)) MiB; maps=$((map_expanded_kb / 1024)) MiB; rollback snapshot=$((snapshot_kb / 1024)) MiB; reserve=512 MiB."
           install -d -m 0700 -- "$upload_dir"
+          for jar in "${changed_jars[@]}"; do
+            [[ -n "$jar" ]] || continue
+            installed="$server_dir/plugins/$jar"
+            if sudo -n test -s "$installed"; then
+              cp --reflink=auto -- "$installed" "$upload_dir/$jar"
+              chmod u+rw -- "$upload_dir/$jar"
+              echo "Seeded rsync delta base: $jar ($(stat -c %s "$upload_dir/$jar") bytes)."
+            fi
+          done
           REMOTE_STAGE_PREP
-          # Use the SFTP subsystem rather than legacy SCP's single remote sink process.
-          # Keep the SSH upload window bounded, while allowing enough in-flight data to fill
-          # the high-latency Tailscale link (32 x 64 KiB = 2 MiB outstanding).
+          # Send plugin JAR updates as rsync block deltas against copies of the
+          # installed JARs; only changed blocks cross Tailscale.
           sftp_opts=(-P "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
@@ -539,12 +605,6 @@ jobs:
             -B 65536 -R 32)
           chunk_dir="$RUNNER_TEMP/testplex-modern-arcade-chunks"
           mkdir -p "$chunk_dir"
-          arcade_chunks=()
-          if [[ -f "$STAGE_DIR/ArcadeMechanicsModern.jar" ]]; then
-            split -b 4M -d -a 3 "$STAGE_DIR/ArcadeMechanicsModern.jar" "$chunk_dir/ArcadeMechanicsModern.jar.part."
-            mapfile -t arcade_chunks < <(printf '%s\n' "$chunk_dir"/ArcadeMechanicsModern.jar.part.* | sort)
-            test "${#arcade_chunks[@]}" -gt 0
-          fi
           world_chunks=()
           if [[ "$MM_MAPS_REQUIRED" == true ]]; then
             split -b 512K -d -a 3 "$STAGE_DIR/MonsterMazeMaps.tar.gz" "$chunk_dir/MonsterMazeMaps.tar.gz.part."
@@ -563,8 +623,6 @@ jobs:
                 TestplexModernArcade.jar|SnakeModern.jar|ArcadeMechanicsModern.jar|WizardsModern.jar) ;;
                 *) echo "Invalid changed JAR in manifest: $jar" >&2; exit 1 ;;
               esac
-              [[ "$jar" == ArcadeMechanicsModern.jar ]] && continue
-              printf 'put "%s" "%s"\n' "$STAGE_DIR/$jar" "$jar"
             done < "$STAGE_DIR/ChangedModernJars.txt"
             printf 'put "%s" "%s"\n' "$STAGE_DIR/ChangedModernJars.txt" "ChangedModernJars.txt"
             printf 'put "%s" "%s"\n' "$STAGE_DIR/MonsterMazeMapsSource.txt" "MonsterMazeMapsSource.txt"
@@ -576,18 +634,31 @@ jobs:
               exit 1
             fi
             printf 'put "%s" "%s"\n' "$STAGE_DIR/testplex-modern-recovery.sh" "testplex-modern-recovery.sh"
-            for file in "${world_chunks[@]}" "${arcade_chunks[@]}"; do
+            for file in "${world_chunks[@]}"; do
               printf 'put "%s" "%s"\n' "$file" "${file##*/}"
             done
           } > "$batch_file"
           upload_payload_bytes="$(du -sb "$STAGE_DIR" | awk '{print $1}')"
           [[ "$upload_payload_bytes" =~ ^[0-9]+$ ]] || { echo "Could not measure verified upload payload." >&2; exit 1; }
           upload_started_epoch="$(date +%s)"
-          echo "Uploading $((upload_payload_bytes / 1048576)) MiB of verified modern artifacts with SFTP, ${#arcade_chunks[@]} 4 MiB Arcade JAR parts and ${#world_chunks[@]} 512 KiB map parts; request window is 2 MiB."
-          timeout --foreground --signal=TERM --kill-after=30s 15m sftp "${sftp_opts[@]}" -b "$batch_file" "$remote"
+          rsync_ssh="ssh -p $SSH_PORT -i $HOME/.ssh/testplex_hyperv -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=40"
+          rsync_opts=(-a --checksum --partial --inplace --human-readable --stats -e "$rsync_ssh")
+          IFS=, read -r -a changed_jars <<< "$CHANGED_JARS"
+          for jar in "${changed_jars[@]}"; do
+            [[ -n "$jar" ]] || continue
+            case "$jar" in
+              TestplexModernArcade.jar|SnakeModern.jar|ArcadeMechanicsModern.jar|WizardsModern.jar) ;;
+              *) echo "Invalid changed JAR for delta transfer: $jar" >&2; exit 1 ;;
+            esac
+            echo "Applying rsync block delta for $jar."
+            timeout --foreground --signal=TERM --kill-after=30s 8m rsync "${rsync_opts[@]}" \
+              "$STAGE_DIR/$jar" "$remote:$upload_dir/$jar"
+          done
+          echo "Uploading map/config/recovery payload ($((upload_payload_bytes / 1048576)) MiB before JAR exclusion) with SFTP."
+          timeout --foreground --signal=TERM --kill-after=30s 8m sftp "${sftp_opts[@]}" -b "$batch_file" "$remote"
           upload_elapsed_seconds=$(( $(date +%s) - upload_started_epoch ))
           if (( upload_elapsed_seconds > 0 )); then
-            awk -v bytes="$upload_payload_bytes" -v seconds="$upload_elapsed_seconds" 'BEGIN { printf "Verified SFTP upload completed: %.1f MiB in %d seconds (%.2f MiB/s).\\n", bytes/1048576, seconds, bytes/1048576/seconds }'
+            echo "Rsync delta and SFTP map transfer completed in ${upload_elapsed_seconds}s."
           fi
           timeout --foreground --signal=TERM --kill-after=30s 6m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" "$MM_MAPS_REQUIRED" <<'REMOTE_ASSEMBLE_ARCADE'
           set -euo pipefail
@@ -613,17 +684,8 @@ jobs:
             echo "Unexpected Monster Maze map payload for unchanged source maps." >&2
             exit 1
           fi
-          if grep -Fxq ArcadeMechanicsModern.jar ChangedModernJars.txt; then
-            [[ ${#arcade_parts[@]} -gt 0 ]] || { echo "Changed Arcade JAR manifest has no uploaded parts." >&2; exit 1; }
-            : > ArcadeMechanicsModern.jar.tmp
-            for part in "${arcade_parts[@]}"; do
-              cat "$part" >> ArcadeMechanicsModern.jar.tmp
-              rm -- "$part"
-            done
-            mv ArcadeMechanicsModern.jar.tmp ArcadeMechanicsModern.jar
-            echo "Assembled ArcadeMechanicsModern.jar ($(stat -c %s ArcadeMechanicsModern.jar) bytes)."
-          elif [[ ${#arcade_parts[@]} -ne 0 ]]; then
-            echo "Unexpected Arcade JAR parts arrived for an unchanged artifact." >&2
+          if [[ ${#arcade_parts[@]} -ne 0 ]]; then
+            echo "Unexpected legacy Arcade JAR chunks arrived alongside rsync transfer." >&2
             exit 1
           fi
           REMOTE_ASSEMBLE_ARCADE
@@ -757,27 +819,50 @@ jobs:
           paper_url="$(printf '%s' "$builds_json" | jq -er 'first(.[] | select(.channel == "STABLE") | .downloads."server:default".url)')"
           paper_sha="$(printf '%s' "$builds_json" | jq -er 'first(.[] | select(.channel == "STABLE") | .downloads."server:default".checksums.sha256)')"
           paper_tmp="$UPLOAD_DIR/paper-26.3-$paper_build.jar"
-          echo "[deploy] downloading Paper build $paper_build (8 minute limit)."
-          timeout --foreground --signal=TERM 8m curl --fail --location --retry 3 --user-agent "$USER_AGENT" "$paper_url" -o "$paper_tmp"
-          printf '%s  %s\n' "$paper_sha" "$paper_tmp" | sha256sum -c -
+          installed_paper_build="$(sudo -n cat "$SERVER_DIR/.testplex-paper-build" 2>/dev/null || true)"
+          PAPER_REPLACE=true
+          if [[ "$installed_paper_build" == "$paper_build" ]] && sudo -n test -s "$SERVER_DIR/paper.jar"; then
+            PAPER_REPLACE=false
+            echo "Paper build $paper_build is already installed; skipping its download and replacement."
+          else
+            echo "[deploy] downloading Paper build $paper_build (8 minute limit)."
+            timeout --foreground --signal=TERM 8m curl --fail --location --retry 3 --user-agent "$USER_AGENT" "$paper_url" -o "$paper_tmp"
+            printf '%s  %s\n' "$paper_sha" "$paper_tmp" | sha256sum -c -
+          fi
 
           # FakePlayerPlugin is a separate Paper plugin with its own distribution terms.
           # Fetch the unmodified, pinned release directly onto the user's administered VM:
           # it is intentionally not bundled into or redistributed with Testplex artifacts.
           FPP_VERSION="2.1.7"
           FPP_TMP="$UPLOAD_DIR/fake-player-plugin-$FPP_VERSION.jar"
+          FPP_INSTALLED="$SERVER_DIR/plugins/FakePlayerPlugin.jar"
           FPP_URL="https://hangarcdn.papermc.io/plugins/Janky-Development/FakePlayerPlugin/versions/$FPP_VERSION/PAPER/fake-player-plugin-$FPP_VERSION.jar"
-          echo "[deploy] downloading FakePlayerPlugin $FPP_VERSION from the official Hangar release (6 minute limit)."
-          timeout --foreground --signal=TERM 6m curl --fail --location --retry 3 --user-agent "$USER_AGENT" \
-            "$FPP_URL" -o "$FPP_TMP"
-          unzip -tq "$FPP_TMP" >/dev/null
-          fpp_descriptor="$(unzip -p "$FPP_TMP" plugin.yml)"
           yaml_descriptor_value() {
             local key="$1" descriptor="$2"
             awk -F': *' -v key="$key" \
               '$1 == key && !found { gsub(/["\047\r]/, "", $2); sub(/[[:space:]]+$/, "", $2); print $2; found=1 }' \
               <<< "$descriptor"
           }
+          FPP_REPLACE=true
+          if sudo -n test -s "$FPP_INSTALLED" && unzip -tq "$FPP_INSTALLED" >/dev/null 2>&1; then
+            fpp_descriptor="$(unzip -p "$FPP_INSTALLED" plugin.yml 2>/dev/null || true)"
+            fpp_name="$(yaml_descriptor_value name "$fpp_descriptor")"
+            fpp_version="$(yaml_descriptor_value version "$fpp_descriptor")"
+            fpp_main="$(yaml_descriptor_value main "$fpp_descriptor")"
+            if [[ "$fpp_name" == "FakePlayerPlugin" && "$fpp_version" == "$FPP_VERSION" \
+               && "$fpp_main" == "me.bill.fakePlayerPlugin.FakePlayerPlugin" ]]; then
+              FPP_TMP="$FPP_INSTALLED"
+              FPP_REPLACE=false
+              echo "FakePlayerPlugin $FPP_VERSION is already installed; skipping its download and replacement."
+            fi
+          fi
+          if [[ "$FPP_REPLACE" == true ]]; then
+            echo "[deploy] downloading FakePlayerPlugin $FPP_VERSION from the official Hangar release (6 minute limit)."
+            timeout --foreground --signal=TERM 6m curl --fail --location --retry 3 --user-agent "$USER_AGENT" \
+              "$FPP_URL" -o "$FPP_TMP"
+            unzip -tq "$FPP_TMP" >/dev/null
+            fpp_descriptor="$(unzip -p "$FPP_TMP" plugin.yml)"
+          fi
           fpp_name="$(yaml_descriptor_value name "$fpp_descriptor")"
           fpp_version="$(yaml_descriptor_value version "$fpp_descriptor")"
           fpp_main="$(yaml_descriptor_value main "$fpp_descriptor")"
@@ -917,7 +1002,9 @@ jobs:
             printf '%s\n' "TESTPLEX MODERN ISOLATED TEST SERVER - NOT LEGACY" | sudo -n tee "$SERVER_DIR/.testplex-modern-sandbox" >/dev/null
             sudo -n chown monstermaze:monstermaze "$SERVER_DIR/.testplex-modern-sandbox"
           fi
-          sudo -n install -o monstermaze -g monstermaze -m 0644 "$paper_tmp" "$SERVER_DIR/paper.jar"
+          if [[ "$PAPER_REPLACE" == true ]]; then
+            sudo -n install -o monstermaze -g monstermaze -m 0644 "$paper_tmp" "$SERVER_DIR/paper.jar"
+          fi
           # Replace only plugin JARs whose verified SHA-256 differs from the installed JAR.
           # Monster Maze gameplay is compiled into ArcadeMechanicsModern and is not a plugin of its own.
           for jar in "${changed_jars[@]}"; do
@@ -935,12 +1022,16 @@ jobs:
             plugin_name="$(yaml_descriptor_value name "$descriptor")"
             plugin_main="$(yaml_descriptor_value main "$descriptor")"
             if [[ "$plugin_name" == "FakePlayerPlugin" || "$plugin_main" == "me.bill.fakePlayerPlugin.FakePlayerPlugin" ]]; then
-              sudo -n rm -f -- "$plugin_jar"
-              echo "Replaced previous FakePlayerPlugin jar $plugin_jar with the pinned Paper 26.3 release."
+              if [[ "$plugin_jar" != "$FPP_INSTALLED" || "$FPP_REPLACE" == true ]]; then
+                sudo -n rm -f -- "$plugin_jar"
+                echo "Removed duplicate/old FakePlayerPlugin jar $plugin_jar."
+              fi
             fi
           done
-          sudo -n install -o monstermaze -g monstermaze -m 0644 \
-            "$FPP_TMP" "$SERVER_DIR/plugins/FakePlayerPlugin.jar"
+          if [[ "$FPP_REPLACE" == true ]]; then
+            sudo -n install -o monstermaze -g monstermaze -m 0644 \
+              "$FPP_TMP" "$SERVER_DIR/plugins/FakePlayerPlugin.jar"
+          fi
 
           # Disable FPP restart persistence before Paper starts. Its own onEnable
           # restores saved bots before Testplex can sweep them, so this prevents a
@@ -1578,6 +1669,8 @@ jobs:
             echo
             echo "- Source build SHA: $SOURCE_SHA"
             echo "- Replaced plugin JARs: ${CHANGED_JARS:-none}"
+            echo "- Plugin transfer: checksummed rsync block deltas against installed JARs"
+            echo "- Paper and FakePlayerPlugin: reused when the installed versions match"
             echo "- Monster Maze maps uploaded: ${MM_MAPS_REQUIRED:-unknown}"
             echo "- Wizards map archive uploaded: ${WIZARDS_MAPS_REQUIRED:-unknown}"
             echo "- Destination: /home/monstermaze/servers/testplex-modern"

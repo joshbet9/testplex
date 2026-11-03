@@ -2639,6 +2639,7 @@ public final class ArcadePortManager implements Listener {
                 String groupName = ModernLobbyScoreboard.tabTeamSortKey(plugin, tabPlayer, teamId);
                 Team group = board.getTeam(groupName);
                 if (group == null) group = board.registerNewTeam(groupName);
+                group.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
                 group.setPrefix(ModernLobbyScoreboard.rankPrefix(plugin, tabPlayer));
                 if (teamId >= 0) {
                     group.setColor(switch (teamId) {
@@ -6325,6 +6326,11 @@ public final class ArcadePortManager implements Listener {
             session.paintballScoreboardEntries.add(line);
             session.paintballScoreboardObjective.getScore(line).setScore(score--);
         }
+        for (Player player : session.players.values()) {
+            if (player != null && player.isOnline() && player.getScoreboard() != session.paintballScoreboard) {
+                player.setScoreboard(session.paintballScoreboard);
+            }
+        }
     }
 
     private void updateBombLobbersScoreboard(Session session) {
@@ -9025,6 +9031,7 @@ public final class ArcadePortManager implements Listener {
         }
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
+            ensurePaintballArmor(session, player);
             String kit = session.paintballKits.getOrDefault(id, "rifle");
             if ("sniper".equals(kit)) {
                 ItemStack held = player.getInventory().getItemInMainHand();
@@ -9214,6 +9221,26 @@ public final class ArcadePortManager implements Listener {
                 paintballArmorPiece(Material.LEATHER_HELMET, teamColor)
         };
         player.getInventory().setArmorContents(armor);
+    }
+
+    /** Refill only missing armor slots so hit-painted purple pieces keep their progress. */
+    private void ensurePaintballArmor(Session session, Player player) {
+        if (session == null || player == null) return;
+        Color teamColor = ArcadePortRules.paintballTeamColor(session.teams.getOrDefault(player.getUniqueId(), 0));
+        Material[] materials = {
+                Material.LEATHER_BOOTS,
+                Material.LEATHER_LEGGINGS,
+                Material.LEATHER_CHESTPLATE,
+                Material.LEATHER_HELMET
+        };
+        ItemStack[] armor = player.getInventory().getArmorContents();
+        boolean changed = false;
+        for (int slot = 0; slot < materials.length; slot++) {
+            if (armor[slot] != null && !armor[slot].getType().isAir()) continue;
+            armor[slot] = paintballArmorPiece(materials[slot], teamColor);
+            changed = true;
+        }
+        if (changed) player.getInventory().setArmorContents(armor);
     }
 
     /** FakePlayerPlugin may apply its equipment snapshot just after a match gives kits. */
