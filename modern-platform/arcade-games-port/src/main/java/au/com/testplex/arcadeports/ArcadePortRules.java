@@ -652,6 +652,7 @@ public final class ArcadePortRules {
     public static final long DRAGONS_COWARD_LEAP_COOLDOWN_MILLIS = 8_000L;
     public static final long MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS = 20_000L;
     public static final int MICRO_BATTLES_FLETCHER_MAX_ARROWS = 3;
+    public static final long MICRO_BATTLES_DASHER_JUMP_COOLDOWN_MILLIS = 15_000L;
     public static final double MICRO_BATTLES_BORDER_PARTICLE_DISTANCE = 3.0D;
     public static final int MICRO_BATTLES_BORDER_PARTICLE_INTERVAL_TICKS = 4;
     public static final int MICRO_BATTLES_BORDER_PARTICLE_VERTICAL_POINTS = 3;
@@ -915,6 +916,7 @@ public final class ArcadePortRules {
             case "archer" -> "archer";
             case "worker" -> "worker";
             case "fighter" -> "fighter";
+            case "dasher" -> "dasher";
             default -> null;
         };
     }
@@ -3505,8 +3507,9 @@ public final class ArcadePortRules {
     // Heroes of Gwen: source-derived lane minion and economy timings.
     public static final long HEROES_OF_GWEN_MINION_WAVE_INTERVAL_MILLIS = 10_000L;
     public static final int HEROES_OF_GWEN_MINIONS_PER_WAVE = 6;
+    /** Source MinionWave route AI updates on every 20 TPS tick. */
     public static final long HEROES_OF_GWEN_MINION_TARGET_UPDATE_MILLIS = 1_000L;
-    public static final double HEROES_OF_GWEN_MINION_TARGET_RANGE_SQUARED = 576.0D;
+    public static final double HEROES_OF_GWEN_MINION_TARGET_RANGE_SQUARED = 100.0D;
     public static final long HEROES_OF_GWEN_GOLD_INTERVAL_MILLIS = 5_000L;
     public static final int HEROES_OF_GWEN_BASE_GOLD_PER_INTERVAL = 5;
     public static final int HEROES_OF_GWEN_CAPTURE_POINT_GOLD_PER_INTERVAL = 5;
