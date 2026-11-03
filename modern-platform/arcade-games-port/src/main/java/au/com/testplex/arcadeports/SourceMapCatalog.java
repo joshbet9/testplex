@@ -57,7 +57,7 @@ public final class SourceMapCatalog {
             case DEATH_TAG -> List.of("Death Tag");
             case DRAGON_ESCAPE -> List.of("Dragon Escape");
             case DRAGONS -> List.of("Dragons");
-            case EVOLUTION -> List.of();
+            case EVOLUTION -> List.of("Evolution");
             case GLADIATORS -> List.of("Gladiators");
             case HEROES_OF_GWEN -> List.of("Heroes of GWEN");
             case MICRO_BATTLES -> List.of("Micro Battle");
@@ -310,7 +310,7 @@ public final class SourceMapCatalog {
         String configured = plugin.getConfig().getString("selected-maps." + game.id());
         String legacy = resourceFor(game);
         String legacyName = displayName(plugin, legacy);
-        List<String> resources = bundledMapResources(plugin, game);
+        List<String> resources = availableMapResources(plugin, mapFoldersFor(game), game.displayName());
 
         // Older builds persisted the single hand-bundled ZIP as the selected map.
         // Translate that setting to the matching archive from update/maps when it
@@ -336,7 +336,7 @@ public final class SourceMapCatalog {
      */
     public static boolean isInstalledResource(JavaPlugin plugin, ArcadePortGame game, String resource) {
         return plugin != null && resourcePathBelongsToGame(game, resource)
-                && plugin.getResource(resource) != null;
+                && archiveAvailable(plugin, resource);
     }
 
     /** Pure path validation, kept separate so the game's resource mapping is unit-testable. */
@@ -360,12 +360,12 @@ public final class SourceMapCatalog {
     public static List<MapArchive> mapsFor(JavaPlugin plugin, ArcadePortGame game) {
         if (game == null) return List.of();
         List<MapArchive> maps = new ArrayList<>();
-        for (String resource : bundledMapResources(plugin, game)) {
+        for (String resource : availableMapResources(plugin, mapFoldersFor(game), game.displayName())) {
             maps.add(new MapArchive(resource, mapNameFromResource(resource)));
         }
 
         String legacy = resourceFor(game);
-        if (legacy != null && plugin.getResource(legacy) != null) {
+        if (legacy != null && archiveAvailable(plugin, legacy)) {
             String legacyName = displayName(plugin, legacy);
             boolean duplicate = maps.stream().anyMatch(map -> map.displayName().equalsIgnoreCase(legacyName));
             if (!duplicate) maps.add(new MapArchive(legacy, legacyName));

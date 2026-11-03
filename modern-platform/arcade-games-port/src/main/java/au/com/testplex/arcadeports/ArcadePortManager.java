@@ -172,18 +172,168 @@ public final class ArcadePortManager implements Listener {
     private static final int HALF_SIZE = 20;
     private static final long ROUND_MS = 180_000L;
     private static final int DRAW_MY_THING_MAX_GUESSES = 10;
+    private static final List<Material> DRAW_MY_THING_COLOURS = List.of(
+            Material.WHITE_WOOL, Material.ORANGE_WOOL, Material.MAGENTA_WOOL, Material.LIGHT_BLUE_WOOL,
+            Material.YELLOW_WOOL, Material.LIME_WOOL, Material.PINK_WOOL, Material.GRAY_WOOL,
+            Material.LIGHT_GRAY_WOOL, Material.CYAN_WOOL, Material.PURPLE_WOOL, Material.BLUE_WOOL,
+            Material.BROWN_WOOL, Material.GREEN_WOOL, Material.RED_WOOL, Material.BLACK_WOOL);
     private static final long MASTER_BUILDERS_BUILD_MILLIS = 180_000L;
     private static final long MASTER_BUILDERS_REVIEW_MILLIS = 8_000L;
     private static final List<String> DRAW_MY_THING_WORDS = List.of(
-            "Airplane", "Anchor", "Apple", "Astronaut", "Balloon", "Banana", "Basketball", "Bee",
-            "Bicycle", "Bridge", "Burger", "Butterfly", "Camera", "Campfire", "Castle", "Cat",
-            "Cactus", "Clock", "Cloud", "Coconut", "Computer", "Crown", "Dinosaur", "Dolphin",
-            "Dragon", "Elephant", "Fireworks", "Fish", "Flower", "Football", "Frog", "Ghost",
-            "Guitar", "Hamburger", "Helicopter", "Ice Cream", "Kangaroo", "Key", "Lighthouse",
-            "Lion", "Mermaid", "Moon", "Mountain", "Mushroom", "Octopus", "Paintbrush", "Penguin",
-            "Piano", "Pizza", "Rainbow", "Robot", "Rocket", "Sandcastle", "Shark", "Snowman",
-            "Spaceship", "Spider", "Submarine", "Sunflower", "Telescope", "Tiger", "Toaster",
-            "Treasure", "Turtle", "Volcano", "Waterfall", "Whale", "Windmill", "Wizard", "Zebra");
+            "Bird", "Volcano", "Sloth", "Love", "Dance", "Hair",
+            "Glasses", "Domino", "Dice", "Computer", "Top Hat", "Beard",
+            "Wind", "Rain", "Minecraft", "Push", "Fighting", "Juggle",
+            "Clown", "Miner", "Creeper", "Ghast", "Spider", "Punch",
+            "Roll", "River", "Desert", "Cold", "Photo", "Quick",
+            "Mario", "Luigi", "Bridge", "Turtle", "Door Knob", "Mineplex",
+            "Binoculars", "Telescope", "Planet", "Mountain Bike", "Moon", "Comet",
+            "Flower", "Squirrel", "Horse Riding", "Chef", "Elephant", "Yoshi",
+            "Shotgun", "Pistol", "James Bond", "Money", "Salt and Pepper", "Truck",
+            "Helicopter", "Hot Air Balloon", "Sprout", "Yelling", "Muscles", "Skinny",
+            "Zombie", "Lava", "Snake", "Motorbike", "Whale", "Boat",
+            "Letterbox", "Window", "Lollipop", "Handcuffs", "Police", "Uppercut",
+            "Windmill", "Eyepatch", "Campfire", "Rainbow", "Storm", "Pikachu",
+            "Charmander", "Tornado", "Crying", "King", "Hobo", "Worm",
+            "Snail", "XBox", "Playstation", "Nintendo", "Duck", "Pull",
+            "Dinosaur", "Alligator", "Ankle", "Angel", "Acorn", "Bread",
+            "Booty", "Bacon", "Crown", "Donut", "Drill", "Leash",
+            "Magic", "Wizard", "Igloo", "Plant", "Screw", "Rifle",
+            "Puppy", "Stool", "Stamp", "Letter", "Witch", "Zebra",
+            "Wagon", "Compass", "Watch", "Clock", "Time", "Cyclops",
+            "Coconut", "Hang", "Penguin", "Confused", "Bucket", "Lion",
+            "Rubbish", "Spaceship", "Bowl", "Shark", "Pizza", "Pyramid",
+            "Dress", "Pants", "Shorts", "Boots", "Boy", "Girl",
+            "Math", "Sunglasses", "Frog", "Chair", "Cake", "Grapes",
+            "Kiss", "Snorlax", "Earth", "Spaghetti", "Couch", "Family",
+            "Milk", "Pig", "Giraffe", "Mouse", "Couch", "Fat",
+            "Chocolate", "Camel", "Cheese", "Beans", "Water", "Chicken",
+            "Zipper", "Book", "Swimming", "Horse", "Paper", "Toaster",
+            "Television", "Hammer", "Piano", "Sleeping", "Yawn", "Sheep",
+            "Night", "Chest", "Lamp", "Redstone", "Grass", "Plane",
+            "Ocean", "Lake", "Melon", "Pumpkin", "Gift", "Fishing",
+            "Pirate", "Lightning", "Stomach", "Belly Button", "Fishing Rod", "Iron Ore",
+            "Diamonds", "Emeralds", "Nether Portal", "Ender Dragon", "Rabbit", "Harry Potter",
+            "Torch", "Light", "Battery", "Zombie Pigman", "Telephone", "Tent",
+            "Hand", "Traffic Lights", "Anvil", "Tail", "Umbrella", "Piston",
+            "Skeleton", "Spikes", "Bridge", "Bomb", "Spoon", "Rainbow",
+            "Staircase", "Poop", "Dragon", "Fire", "Apple", "Shoe",
+            "Squid", "Cookie", "Tooth", "Camera", "Sock", "Monkey",
+            "Unicorn", "Smile", "Pool", "Rabbit", "Cupcake", "Pancake",
+            "Princess", "Castle", "Flag", "Planet", "Stars", "Camp Fire",
+            "Rose", "Spray", "Pencil", "Ice Cream", "Toilet", "Moose",
+            "Bear", "Batman", "Eggs", "Teapot", "Golf Club", "Tennis Racket",
+            "Shield", "Crab", "Pot of Gold", "Cactus", "Television", "Pumpkin Pie",
+            "Chimney", "Stable", "Nether", "Wither", "Beach", "Stop Sign",
+            "Chestplate", "Pokeball", "Christmas Tree", "Present", "Snowflake", "Laptop",
+            "Superman", "Football", "Basketball", "Creeper", "Tetris", "Jump",
+            "Ninja", "Baby", "Troll Face", "Grim Reaper", "Temple", "Explosion",
+            "Vomit", "Ants", "Barn", "Burn", "Baggage", "Frisbee",
+            "Iceberg", "Sleeping", "Dream", "Snorlax", "Balloons", "Elevator",
+            "Alligator", "Bikini", "Butterfly", "Bumblebee", "Pizza", "Jellyfish",
+            "Sideburns", "Speedboat", "Treehouse", "Water Gun", "Drink", "Hook",
+            "Dance", "Fall", "Summer", "Autumn", "Spring", "Winter",
+            "Night Time", "Galaxy", "Sunrise", "Sunset", "Picnic", "Snowflake",
+            "Holding Hands", "America", "Laptop", "Anvil", "Bagel", "Bench",
+            "Darts", "Muffin", "Queen", "Wheat", "Dolphin", "Scarf",
+            "Swing", "Thumb", "Tomato", "Armor", "Alien", "Beans",
+            "Cheek", "Phone", "Keyboard", "Orange", "Calculator", "Paper",
+            "Desk", "Disco", "Elbow", "Drool", "Giant", "Golem",
+            "Grave", "Llama", "Moose", "Party", "Panda", "Plumber",
+            "Salsa", "Salad", "Skunk", "Skull", "Stump", "Sugar",
+            "Ruler", "Bookcase", "Hamster", "Soup", "Teapot", "Towel",
+            "Waist", "Archer", "Anchor", "Bamboo", "Branch", "Booger",
+            "Carrot", "Cereal", "Coffee", "Wolf", "Crayon", "Finger",
+            "Forest", "Hotdog", "Burger", "Obsidian", "Pillow", "Swing",
+            "YouTube", "Farm", "Rain", "Cloud", "Frozen", "Garbage",
+            "Music", "Twitter", "Facebook", "Santa Hat", "Rope", "Neck",
+            "Sponge", "Sushi", "Noodles", "Soup", "Tower", "Berry",
+            "Capture", "Prison", "Robot", "Trash", "School", "Skype",
+            "Snowman", "Crowd", "Bank", "Mudkip", "Joker", "Lizard",
+            "Tiger", "Royal", "Erupt", "Wizard", "Stain", "Cinema",
+            "Notebook", "Blanket", "Paint", "Guard", "Astronaut", "Slime",
+            "Mansion", "Radar", "Thorn", "Tears", "Tiny", "Candy",
+            "Pepsi", "Flint", "Draw My Thing", "Rice", "Shout", "Prize",
+            "Skirt", "Thief", "Syrup", "Kirby", "Brush", "Violin",
+            "Car", "Sun", "Eye", "Bow", "Axe", "Face",
+            "Mushroom", "Guitar", "Pickle", "Banana", "Crab", "Sugar",
+            "Soda", "Cookie", "Burger", "Fries", "Speaker", "Pillow",
+            "Rug", "Purse", "Monitor", "Bow", "Pen", "Cat",
+            "Kitten", "Puppy", "Bed", "Button", "Computer", "Key",
+            "Spoon", "Lamp", "Bottle", "Card", "Newspaper", "Glasses",
+            "Mountain", "Minecraft", "Shirt", "Truck", "Car", "Phone",
+            "Cork", "iPod", "Paper", "Bag", "USB", "CD",
+            "Wallet", "Cow", "Pig", "Sheep", "Tomato", "Painting",
+            "Chair", "Keyboard", "Chocolate", "Duck", "Clock", "Balloon",
+            "Remote", "Bread", "Ring", "Necklace", "Hippo", "Flag",
+            "Window", "Door", "Radio", "Television", "Boat", "Fridge",
+            "House", "Piano", "Guitar", "Trumpet", "Drums", "Speaker",
+            "Helmet", "Tree", "Slippers", "Table", "Doll", "Headphones",
+            "Box", "Flower", "Book", "Carrot", "Egg", "Sun",
+            "Hill", "Candle", "Food", "Mouse", "Money", "Emerald",
+            "Magnet", "Camera", "Movie", "Video Game", "Teddy", "Lake",
+            "Violin", "Cheese", "Burger", "Peasant", "King", "Queen",
+            "Prince", "Princess", "Mother", "Father", "Taco", "Racecar",
+            "Car", "Truck", "Tree", "Elephant", "Lion", "Pig",
+            "Cow", "Chicken", "Dog", "Cat", "Moon", "Stars",
+            "Sun", "Diamond", "Gold", "Redstone", "Skateboard", "Bike",
+            "Swimming Pool", "Cookie", "Computer", "Laptop", "Piano", "Guitar",
+            "Trumpet", "Drums", "Flute", "Helicopter", "Plane", "Football",
+            "Tennis", "Hockey", "Water", "Ocean", "Microsoft", "Twitter",
+            "Godzilla", "Building", "House", "Rainbow", "Barbie", "Girl",
+            "Boy", "Children", "Bomb", "Explosion", "Gun", "Tank",
+            "Penguin", "Eagle", "America", "Kangaroo", "Sea", "Raspberry",
+            "Strawberry", "Jam", "Sandwich", "Owl", "Watermelon", "Australia",
+            "Canada", "United States", "Diary", "Airplane", "Alarm clock", "Alien",
+            "Alligator", "Ant", "Apple", "Arm", "Autumn", "Baby",
+            "Ball", "Balloon", "Banana", "Barn", "Base", "Baseball",
+            "Basketball", "Bat", "Bathroom", "Battery", "Beach", "Bear",
+            "Beaver", "Bed", "Beehive", "Bell", "Bicycle", "Bike",
+            "Bird", "Birthday cake", "Blocks", "Boat", "Bone", "Book",
+            "Boot", "Bottle", "Bowtie", "Boy", "Bracelet", "Brain",
+            "Branch", "Bread", "Bridge", "Bubble", "Bug", "Bunny",
+            "Bus", "Cage", "Cake", "Camera", "Cape", "Carrot",
+            "Castle", "Cat", "Cave", "Chair", "Chalk", "Cheek",
+            "Cheese", "Cheeseburger", "Cherry", "Chess", "Chicken", "Chin",
+            "Christmas", "Circle", "Circus", "Clock", "Cloud", "Coal",
+            "Coat", "Coconut", "Computer", "Cone", "Cookie", "Corn",
+            "Cow", "Crab", "Crib", "Cup", "Cupcake", "Desert",
+            "Desk", "Dinosaur", "Dog", "Doll", "Dominoes", "Door",
+            "Doormat", "Drum", "Duck", "Ear", "Ears", "Egg",
+            "Electricity", "Elephant", "Eraser", "Eyes", "Face", "Farm",
+            "Fishing pole", "Fist", "Flamingo", "Flashlight", "Flower", "Flute",
+            "Fly", "Football", "Forest", "Fountain", "Frenchfries", "Frog",
+            "Garbage", "Garden", "Gate", "Ghost", "Gingerbread man", "Giraffe",
+            "Girl", "Glasses", "Grapes", "Grass", "Graveyard", "Hair dryer",
+            "Halloween", "Hat", "Head", "Heart", "Hippo", "Hockey",
+            "Hook", "Hopscotch", "Horse", "Hospital", "House", "Hula hoop",
+            "Ice", "Icecream", "Jacket", "Jar", "Jellyfish", "Jungle",
+            "Kangaroo", "Key", "Kitchen", "Kite", "Knot", "Lamp",
+            "Lawnmower", "Leaf", "Light", "Lightbulb", "Lighthouse", "Lightsaber",
+            "Lips", "Lipstick", "Lobster", "Lollipop", "Mail", "Mailman",
+            "Mattress", "Milk", "Money", "Monkey", "Moon", "Mosquito",
+            "Mouse", "Mouth", "Muffin", "Mushroom", "Music", "Nail",
+            "Newspaper", "Nightmare", "Nose", "Ocean", "Orange", "Owl",
+            "Pajamas", "Palace", "Park", "Party", "Peach", "Peanut",
+            "Pen", "Pencil", "Penguin", "Person", "Photograph", "Piano",
+            "Pie", "Pig", "Pillow", "Pineapple", "Ping pong", "Pinwheel",
+            "Pirate", "Pizza", "Plate", "Pool Party", "Popcorn", "Popsicle",
+            "Potato", "Pretzel", "Prison", "Puppet", "Purse", "Queen",
+            "Rain", "Rainbow", "Restaurant", "Rhinoceros", "Ring", "River",
+            "Road", "Robot", "Rocket", "Rocking chair", "Roof", "Round",
+            "Rug", "Ruins", "Saddle", "Sailboat", "Salt and pepper", "Scale",
+            "School", "Scissors", "Seahorse", "Seashell", "Seesaw", "Shark",
+            "Sheep", "Shirt", "Shoe", "Shopping cart", "Shovel", "Skate",
+            "Skateboard", "Ski", "Skirt", "Slide", "Smile", "Snail",
+            "Snake", "Snowball", "Snowflake", "Snowman", "Soap", "Socks",
+            "Soda", "Song", "Spaceship", "Spider", "Spider web", "Spoon",
+            "Spring", "Stage", "Stairs", "Star", "State", "Statue",
+            "Stingray", "Stoplight", "Storm", "Suitcase", "Summer", "Sun",
+            "Sunflower", "Swimming pool", "Swing", "Swordfish", "Tail", "Taxi",
+            "Teapot", "Telephone", "Thief", "Toast", "Toothbrush", "Torch",
+            "Treasure", "Tree", "Truck", "Trumpet", "Turtle", "TV",
+            "Vest", "Violin", "Volcano", "Washing machine", "Water", "Waterfall",
+            "Watering can", "Whale", "Whisk", "Whistle", "Windmill", "Winter",
+            "Worm", "Wrench", "Yo-yo", "Zoo");
     private static final long JOIN_WINDOW_TICKS = 100L;
     static final int MANUAL_START_COUNTDOWN_SECONDS = 0;
     private final ArcadeMechanicsModernPlugin plugin;
@@ -1296,7 +1446,7 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         String kit = ArcadePortRules.normalizeMicroBattlesKit(requestedKit);
         if (kit == null) {
-            player.sendMessage(ChatColor.YELLOW + "Micro Battles kits: archer, worker, fighter.");
+            player.sendMessage(ChatColor.YELLOW + "Micro Battles kits: archer, worker, fighter, dasher.");
             return;
         }
         UUID playerId = player.getUniqueId();
@@ -1308,10 +1458,15 @@ public final class ArcadePortManager implements Listener {
             session.microNextArrowAt.put(playerId,
                     System.currentTimeMillis() + ArcadePortRules.MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS);
             giveKit(session, player);
-            player.sendMessage(ChatColor.GREEN + "Micro Battles kit changed to " + kit + ".");
+            player.sendMessage(ChatColor.GREEN + "Micro Battles kit changed to " + microKitName(kit) + ".");
         } else {
-            player.sendMessage(ChatColor.GREEN + "Micro Battles kit set to " + kit + " for your next test.");
+            player.sendMessage(ChatColor.GREEN + "Micro Battles kit set to " + microKitName(kit) + " for your next test.");
         }
+    }
+
+    private String microKitName(String kit) {
+        return kit == null || kit.isBlank() ? "Micro Battles" :
+                kit.substring(0, 1).toUpperCase(java.util.Locale.ROOT) + kit.substring(1);
     }
 
     public void selectQuiverKit(Player player, String requestedKit) {
@@ -1428,16 +1583,14 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         UUID id = player.getUniqueId();
-        heroesOfGwenHeroPreferences.put(id, hero);
         String display = ArcadePortRules.heroesOfGwenHeroDisplayName(hero);
         String role = ArcadePortRules.heroesOfGwenHeroRole(hero);
         Session session = active;
         if (session != null && session.type == ArcadePortGame.HEROES_OF_GWEN
                 && session.players.containsKey(id) && session.variantRuntime != null) {
-            session.variantRuntime.setHeroesOfGwenHero(player, hero);
-            player.sendMessage(ChatColor.GREEN + "Heroes of Gwen hero set to " + display + " (" + role + "). "
-                    + ChatColor.YELLOW + "Hero abilities are still being ported; your current combat loadout is unchanged.");
+            player.sendMessage(ChatColor.YELLOW + "Use the Change Hero compass in your hotbar to choose an available hero.");
         } else {
+            heroesOfGwenHeroPreferences.put(id, hero);
             player.sendMessage(ChatColor.GREEN + "Heroes of Gwen hero set to " + display
                     + " (" + role + ") for your next game.");
         }
@@ -3900,6 +4053,11 @@ public final class ArcadePortManager implements Listener {
                         public void finish(Player winner, int winningTeam, String reason) {
                             if (active == session) ArcadePortManager.this.finish(session, winner, winner != null);
                         }
+
+                        @Override
+                        public void heroSelected(Player player, String hero) {
+                            heroesOfGwenHeroPreferences.put(player.getUniqueId(), hero);
+                        }
                     });
             if (!session.variantRuntime.isReady()) {
                 sender.sendMessage(ChatColor.RED + "The authentic " + type.displayName()
@@ -4194,6 +4352,19 @@ public final class ArcadePortManager implements Listener {
             return chosen;
         }
         SourceMapCatalog.MapData sourceMap = sourceMapData.get(type.id());
+        if (sourceMap != null && type == ArcadePortGame.MILK_THE_COW) {
+            // Bobs Farm stores player starts as TEAM_NAME:Green / TEAM_SPAWNS and
+            // has no generic SPAWNS entry. Using the center fallback drops players
+            // from above the farm, causing immediate fall deaths and respawn loops.
+            List<Location> authoredSpawns = sourceMap.teamSpawnLocationsForName("Green");
+            if (!authoredSpawns.isEmpty()) {
+                List<Location> chosen = new ArrayList<>();
+                for (int i = 0; i < Math.max(1, count); i++) {
+                    chosen.add(authoredSpawns.get(i % authoredSpawns.size()).clone());
+                }
+                return chosen;
+            }
+        }
         if (sourceMap != null && type == ArcadePortGame.BACON_BRAWL) {
             // The archived Mighty Lava Arena stores the 16 free-for-all starts in TEAM_NAME:Green /
             // TEAM_SPAWNS, rather than under DATA_LOCS. Prefer that authored spawn group.
@@ -6159,12 +6330,12 @@ public final class ArcadePortManager implements Listener {
 
     private void updateMicroBarrier(Session session, long now) {
         if (!session.microBarrierActive || !ArcadePortRules.shouldRemoveMicroBarrier(now - session.startedAt)) return;
-        if (!session.microBarrierBlocks.isEmpty()) {
-            for (Block block : session.microBarrierBlocks) {
-                if (block.getType() == Material.GLASS) block.setType(Material.AIR, false);
-            }
-            session.microBarrierBlocks.clear();
-        } else for (int team = 0; team < 4; team++) {
+        for (Block block : session.microBarrierBlocks) {
+            if (block.getType() == Material.GLASS) block.setType(Material.AIR, false);
+        }
+        // Some imported maps have incomplete glass marker metadata. Clear the
+        // expected island rings too, regardless of whether marker blocks were found.
+        for (int team = 0; team < 4; team++) {
             SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
             Location island = mapData == null ? islandSpawn(team * 2) : microTeamCenter(session, team);
             int cx = island.getBlockX();
@@ -6184,6 +6355,7 @@ public final class ArcadePortManager implements Listener {
                 }
             }
         }
+        session.microBarrierBlocks.clear();
         session.microBarrierActive = false;
         announce(session, ChatColor.AQUA + "Glass barriers are down! Fight for your team.");
     }
@@ -6560,6 +6732,8 @@ public final class ArcadePortManager implements Listener {
                 break;
             case MICRO_BATTLES: {
                 String kit = session.microKits.getOrDefault(player.getUniqueId(), "archer");
+                player.setAllowFlight(false);
+                player.setFlying(false);
                 switch (kit) {
                     case "worker":
                         player.getInventory().addItem(new ItemStack(Material.WOODEN_SWORD));
@@ -6571,6 +6745,10 @@ public final class ArcadePortManager implements Listener {
                     case "fighter":
                         player.getInventory().addItem(new ItemStack(Material.WOODEN_SWORD));
                         player.getInventory().addItem(new ItemStack(Material.APPLE, 5));
+                        break;
+                    case "dasher":
+                        player.getInventory().addItem(new ItemStack(Material.WOODEN_SWORD));
+                        player.getInventory().addItem(new ItemStack(Material.APPLE, 3));
                         break;
                     default:
                         player.getInventory().addItem(new ItemStack(Material.WOODEN_SWORD));
@@ -7460,6 +7638,18 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private void updateMicroDasherJumpAvailability(Session session, long now) {
+        for (Player player : alivePlayers(session)) {
+            UUID id = player.getUniqueId();
+            if (!"dasher".equals(session.microKits.getOrDefault(id, "archer"))) continue;
+            if (player.isOnGround()
+                    && now >= session.microDasherJumpReadyAt.getOrDefault(id, 0L)
+                    && !player.getAllowFlight()) {
+                player.setAllowFlight(true);
+            }
+        }
+    }
+
     private void setBombLobbersArmor(Session session, Player player, String kit) {
         UUID id = player.getUniqueId();
         int team = session.teams.getOrDefault(id, 0);
@@ -7733,6 +7923,9 @@ public final class ArcadePortManager implements Listener {
                 microTeamArmorPiece(Material.LEATHER_HELMET, teamColor, chatColor)
         };
         player.getInventory().setArmorContents(armor);
+        // Test bots use a server-side Player inventory; refresh their client replica
+        // after assigning armor so the equipment is visible in game.
+        player.updateInventory();
     }
 
     /** Sends the chosen glass only to its owner; the server world stays unchanged for everyone else. */
@@ -8764,24 +8957,30 @@ public final class ArcadePortManager implements Listener {
                     }
                 }
             }
+            // The archived Stadium map stores its board as custom block id 159,
+            // rather than PINK corner markers. These authored locations are the
+            // real canvas; do not create a wool panel in front of it as a fallback.
+            if (session.drawCanvasBlocks.isEmpty()) {
+                for (Location marker : map.customLocations("159")) {
+                    Block block = marker.getBlock();
+                    if (block.getWorld() == session.world && !block.getType().isAir()) {
+                        session.drawCanvasBlocks.add(block);
+                    }
+                }
+            }
             if (session.drawDrawerLocation == null && !map.spawnLocations().isEmpty())
                 session.drawDrawerLocation = map.spawnLocations().get(0).clone();
         }
         if (session.drawDrawerLocation == null)
             session.drawDrawerLocation = session.world.getSpawnLocation().clone().add(0,2,0);
         if (session.drawCanvasBlocks.isEmpty()) {
-            Location c=session.drawDrawerLocation.clone().add(0,0,8);
-            for(int x=-7;x<=7;x++) for(int y=0;y<10;y++) {
-                Block block=session.world.getBlockAt(c.getBlockX()+x,c.getBlockY()+y,c.getBlockZ());
-                block.setType(Material.WHITE_WOOL,false); session.drawCanvasBlocks.add(block);
-            }
+            plugin.getLogger().severe("Draw My Thing map has no authored canvas markers; no fallback wool panel was created.");
         }
         resetDrawCanvas(session);
     }
 
     private void resetDrawCanvas(Session session) {
-        for(Block block:session.drawCanvasBlocks) if(block!=null && block.getWorld()==session.world)
-            block.setType(Material.WHITE_WOOL,false);
+        DrawMyThingCanvas.clear(session.drawCanvasBlocks);
     }
 
     private String chooseDrawWord(Session session) {
@@ -8793,13 +8992,27 @@ public final class ArcadePortManager implements Listener {
         return word;
     }
 
-    private void giveDrawPaintPalette(Player drawer) {
+    private void giveDrawPaintPalette(Session session, Player drawer) {
         drawer.getInventory().clear();
-        Material[] colours={Material.WHITE_WOOL,Material.ORANGE_WOOL,Material.MAGENTA_WOOL,
-                Material.LIGHT_BLUE_WOOL,Material.YELLOW_WOOL,Material.LIME_WOOL,
-                Material.PINK_WOOL,Material.GRAY_WOOL,Material.LIGHT_GRAY_WOOL};
-        for(int i=0;i<colours.length;i++)
-            drawer.getInventory().setItem(i,namedItem(colours[i],colours[i].name().replace("_WOOL","")+" Paint","Right-click canvas to paint."));
+        Material[] tools = {Material.WOODEN_SWORD, Material.IRON_SWORD, Material.STONE_SWORD,
+                Material.GOLDEN_SWORD, Material.DIAMOND_SWORD, Material.BOW,
+                Material.IRON_HOE, Material.GOLDEN_HOE};
+        String[] names = {"Pencil", "Paint Brush", "Line Tool", "Square Tool", "Circle Tool",
+                "Spray Can", "Paint Bucket", "Clear Canvas"};
+        String[] descriptions = {"Click canvas to draw a thin stroke.", "Click canvas to draw a thick stroke.",
+                "Click two canvas points to draw a line.", "Click two canvas corners to draw a square.",
+                "Click two canvas corners to draw a circle.", "Click canvas to spray nearby pixels.",
+                "Click a region to fill it.", "Click to clear the canvas."};
+        for (int i = 0; i < tools.length; i++) {
+            drawer.getInventory().setItem(i, namedItem(tools[i], names[i], descriptions[i]));
+        }
+        for (int i = 0; i < DRAW_MY_THING_COLOURS.size(); i++) {
+            Material colour = DRAW_MY_THING_COLOURS.get(i);
+            String label = colour.name().replace("_WOOL", "").replace('_', ' ');
+            drawer.getInventory().setItem(i + 9,
+                    namedItem(colour, label + " Paint", "Select this colour, then use a drawing tool."));
+        }
+        session.drawBrushColours.put(drawer.getUniqueId(), Material.BLACK_WOOL);
     }
 
     private void startNextDrawMyThingRound(Session session,long now) {
@@ -8820,8 +9033,12 @@ public final class ArcadePortManager implements Listener {
         session.drawWord=chooseDrawWord(session);
         session.drawCorrectGuessers.clear();session.drawGuessAttempts.clear();session.drawRevealedLetters.clear();
         session.drawRoundStartedAt=now;session.drawRoundEndsAt=now+session.drawRoundDurationMillis;session.drawNextRoundAt=0L;
-        drawer.teleport(session.drawDrawerLocation);drawer.setAllowFlight(true);drawer.setFlying(true);drawer.setFlySpeed(0.12F);
-        giveDrawPaintPalette(drawer);
+        session.drawStartedPainting = false;
+        session.drawShapeStarts.remove(drawer.getUniqueId());
+        session.drawShapeTools.remove(drawer.getUniqueId());
+        session.drawPreviousPaintPoints.remove(drawer.getUniqueId());
+        drawer.teleport(session.drawDrawerLocation);drawer.setAllowFlight(true);drawer.setFlying(true);drawer.setFlySpeed(0.4F);
+        giveDrawPaintPalette(session, drawer);
         drawer.sendMessage(ChatColor.GREEN+"Your word is: "+ChatColor.YELLOW+session.drawWord);
         announce(session,ChatColor.GOLD+drawer.getName()+" is drawing! Guess the word.");
         for(Player p:session.players.values()) if(p!=null&&p.isOnline()&&!p.equals(drawer)){
@@ -8837,6 +9054,7 @@ public final class ArcadePortManager implements Listener {
         if(drawer!=null&&drawer.isOnline()){
             drawer.setFlying(false);drawer.setAllowFlight(false);drawer.setFlySpeed(0.1F);
             Location start=session.drawStartLocations.get(drawerId);if(start!=null)drawer.teleport(start);
+            drawer.getInventory().clear();
         }
         // Disconnected guessers no longer block the all-guessed award.
         List<UUID> eligibleGuessers = session.players.keySet().stream()
@@ -8853,12 +9071,18 @@ public final class ArcadePortManager implements Listener {
         for (UUID guesserId : eligibleGuessers) {
             int attempts = session.drawGuessAttempts.getOrDefault(guesserId, 0);
             boolean correctInOne = attempts == 1 && session.drawCorrectGuessers.contains(guesserId);
+            if (!session.drawCorrectGuessers.contains(guesserId)) session.drawKeenEyeFailed.add(guesserId);
             if (correctInOne) {
                 session.drawLinguistPerfectRounds.merge(guesserId, 1, Integer::sum);
             } else {
                 session.drawLinguistFailed.add(guesserId);
             }
             if (!correctInOne) session.drawFirstGuessStreaks.put(guesserId, 0);
+        }
+        for (UUID playerId : session.players.keySet()) {
+            if (!playerId.equals(drawerId) && !session.drawCorrectGuessers.contains(playerId)) {
+                session.drawKeenEyeFailed.add(playerId);
+            }
         }
         resetDrawCanvas(session);session.drawCurrentDrawer=null;session.drawWord=null;
         session.drawRoundEndsAt=0L;
@@ -8913,6 +9137,11 @@ public final class ArcadePortManager implements Listener {
         int used=session.drawGuessAttempts.getOrDefault(playerId,0);
         if(used>=DRAW_MY_THING_MAX_GUESSES){player.sendMessage(ChatColor.RED+"No guesses remaining.");return;}
         session.drawGuessAttempts.put(playerId,used+1);
+        String statPath = localStatsPath(playerId, "draw-my-thing");
+        if (!testPlayers.isTestPlayer(playerId)) {
+            plugin.getConfig().set(statPath + "total-guesses",
+                    plugin.getConfig().getInt(statPath + "total-guesses", 0) + 1);
+        }
         String guess=raw==null?"":raw.toLowerCase(java.util.Locale.ROOT)
                 .replaceAll("[^a-z0-9 ]"," ").replaceAll("\\s+"," ").trim();
         String answer=session.drawWord.toLowerCase(java.util.Locale.ROOT);
@@ -8920,12 +9149,30 @@ public final class ArcadePortManager implements Listener {
             boolean first=session.drawCorrectGuessers.isEmpty();
             session.drawCorrectGuessers.add(playerId);session.scores.merge(playerId,first?3:1,Integer::sum);
             if (!testPlayers.isTestPlayer(playerId)) {
-                String path = localStatsPath(playerId, "draw-my-thing");
-                plugin.getConfig().set(path + "correct-guesses",
-                        plugin.getConfig().getInt(path + "correct-guesses", 0) + 1);
+                plugin.getConfig().set(statPath + "correct-guesses",
+                        plugin.getConfig().getInt(statPath + "correct-guesses", 0) + 1);
                 if (first) {
-                    plugin.getConfig().set(path + "first-guesses",
-                            plugin.getConfig().getInt(path + "first-guesses", 0) + 1);
+                    plugin.getConfig().set(statPath + "first-guesses",
+                            plugin.getConfig().getInt(statPath + "first-guesses", 0) + 1);
+                }
+                long elapsed = System.currentTimeMillis() - session.drawRoundStartedAt;
+                if (elapsed < 8_000L) {
+                    plugin.getConfig().set(statPath + "pure-luck",
+                            plugin.getConfig().getInt(statPath + "pure-luck", 0) + 1);
+                }
+                if (first && elapsed < 15_000L) {
+                    UUID drawerId = session.drawCurrentDrawer;
+                    String drawerPath = localStatsPath(drawerId, "draw-my-thing");
+                    int fastDraws = plugin.getConfig().getInt(drawerPath + "fast-draw-rounds", 0) + 1;
+                    plugin.getConfig().set(drawerPath + "fast-draw-rounds", fastDraws);
+                    // Reborn's Mr Squiggle requires two fast first guesses as drawer.
+                    // Modern Draw intentionally gives each player one turn per match,
+                    // so retain the two-round requirement across that player's games.
+                    if (fastDraws >= 2) {
+                        plugin.getConfig().set(drawerPath + "mr-squiggle",
+                                plugin.getConfig().getInt(drawerPath + "mr-squiggle", 0) + 1);
+                        plugin.getConfig().set(drawerPath + "fast-draw-rounds", 0);
+                    }
                 }
                 plugin.saveConfig();
             }
@@ -8965,17 +9212,100 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    private void handleDrawMyThingInteract(Session session,PlayerInteractEvent event) {
+    private void handleDrawMyThingInteract(Session session, PlayerInteractEvent event) {
         event.setCancelled(true);
-        if(!event.getAction().isRightClick()||session.drawCurrentDrawer==null||
-                !event.getPlayer().getUniqueId().equals(session.drawCurrentDrawer))return;
-        ItemStack held=event.getItem();
-        if(held==null||held.getType().isAir()||!held.getType().name().endsWith("_WOOL"))return;
-        Block target=event.getClickedBlock();
-        if(target==null)target=event.getPlayer().getTargetBlockExact(32);
-        if(target==null||!session.drawCanvasBlocks.contains(target))return;
-        target.setType(held.getType(),false);
-        session.world.playSound(target.getLocation(),Sound.BLOCK_WOOL_PLACE,0.5F,1.2F);
+        Player player = event.getPlayer();
+        UUID id = player.getUniqueId();
+        if (!event.getAction().isRightClick() || session.drawCurrentDrawer == null
+                || !id.equals(session.drawCurrentDrawer) || !session.alive.contains(id)) return;
+        ItemStack held = event.getItem();
+        if (held == null || !held.hasItemMeta() || !held.getItemMeta().hasDisplayName()) return;
+        String name = ChatColor.stripColor(held.getItemMeta().getDisplayName());
+        if (name == null) return;
+        if (name.endsWith(" Paint") && DRAW_MY_THING_COLOURS.contains(held.getType())) {
+            session.drawBrushColours.put(id, held.getType());
+            Block target = drawCanvasTarget(session, player, event.getClickedBlock());
+            if (target == null) player.sendMessage(ChatColor.GREEN + name.replace(" Paint", "") + " selected.");
+            else paintDrawBlock(session, player, target, false);
+            return;
+        }
+        Block target = drawCanvasTarget(session, player, event.getClickedBlock());
+        if (target != null) performDrawToolAction(session, player, target, name);
+    }
+
+    private Block drawCanvasTarget(Session session, Player player, Block clicked) {
+        if (clicked != null && session.drawCanvasBlocks.contains(clicked)) return clicked;
+        Block target = player.getTargetBlockExact(64);
+        return target != null && session.drawCanvasBlocks.contains(target) ? target : null;
+    }
+
+    private void performDrawToolAction(Session session, Player player, Block target, String tool) {
+        UUID id = player.getUniqueId();
+        Material colour = session.drawBrushColours.getOrDefault(id, Material.BLACK_WOOL);
+        switch (tool) {
+            case "Pencil" -> paintDrawBlock(session, player, target, false);
+            case "Paint Brush" -> paintDrawBlock(session, player, target, true);
+            case "Line Tool", "Square Tool", "Circle Tool" -> {
+                Block start = session.drawShapeStarts.remove(id);
+                String previousTool = session.drawShapeTools.remove(id);
+                if (start == null || !tool.equals(previousTool)) {
+                    session.drawShapeStarts.put(id, target);
+                    session.drawShapeTools.put(id, tool);
+                    player.sendMessage(ChatColor.YELLOW + "First point selected. Click a second point to finish the "
+                            + tool.replace(" Tool", "").toLowerCase(java.util.Locale.ROOT) + ".");
+                    return;
+                }
+                if ("Line Tool".equals(tool)) {
+                    DrawMyThingCanvas.line(session.drawCanvasBlocks, start, target, colour, false);
+                } else if ("Square Tool".equals(tool)) {
+                    DrawMyThingCanvas.rectangle(session.drawCanvasBlocks, start, target, colour);
+                } else {
+                    DrawMyThingCanvas.ellipse(session.drawCanvasBlocks, start, target, colour);
+                }
+                markDrawPainted(session);
+            }
+            case "Spray Can" -> {
+                DrawMyThingCanvas.point(session.drawCanvasBlocks, target, colour, true);
+                for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST,
+                        BlockFace.WEST, BlockFace.UP, BlockFace.DOWN)) {
+                    Block adjacent = target.getRelative(face);
+                    if (session.drawCanvasBlocks.contains(adjacent) && ThreadLocalRandom.current().nextBoolean()) {
+                        DrawMyThingCanvas.point(session.drawCanvasBlocks, adjacent, colour, false);
+                    }
+                }
+                markDrawPainted(session);
+            }
+            case "Paint Bucket" -> {
+                DrawMyThingCanvas.fill(session.drawCanvasBlocks, target, colour);
+                markDrawPainted(session);
+            }
+            case "Clear Canvas" -> {
+                resetDrawCanvas(session);
+                session.drawPreviousPaintPoints.remove(id);
+                session.drawShapeStarts.remove(id);
+                session.drawShapeTools.remove(id);
+                markDrawPainted(session);
+            }
+            default -> { return; }
+        }
+        session.world.playSound(target.getLocation(), Sound.BLOCK_WOOL_PLACE, 0.5F, 1.2F);
+    }
+
+    private void paintDrawBlock(Session session, Player player, Block target, boolean thick) {
+        UUID id = player.getUniqueId();
+        Material colour = session.drawBrushColours.getOrDefault(id, Material.BLACK_WOOL);
+        Block previous = session.drawPreviousPaintPoints.put(id, target);
+        if (previous != null && session.drawCanvasBlocks.contains(previous)) {
+            DrawMyThingCanvas.line(session.drawCanvasBlocks, previous, target, colour, thick);
+        } else {
+            DrawMyThingCanvas.point(session.drawCanvasBlocks, target, colour, thick);
+        }
+        markDrawPainted(session);
+        session.world.playSound(target.getLocation(), Sound.BLOCK_WOOL_PLACE, 0.3F, 1.2F);
+    }
+
+    private void markDrawPainted(Session session) {
+        session.drawStartedPainting = true;
     }
 
     @EventHandler(priority=EventPriority.LOWEST)
@@ -9247,6 +9577,7 @@ public final class ArcadePortManager implements Listener {
             updateMicroBorderWarnings(session);
             updateMicroBattlesBorderParticles(session);
             updateMicroSpectatorCompass(session);
+            updateMicroDasherJumpAvailability(session, now);
             if (session.ticks % 20 == 0) updateMicroLastTwoMission(session);
             enforceMicroBattlesHunger(session);
             updateMicroBattlesArrows(session, now);
@@ -10789,17 +11120,8 @@ public final class ArcadePortManager implements Listener {
                     if (controller == null || !controller.isOnline() || control == null
                             || !session.alive.contains(controllerId) || now >= control.endsAtMillis()) {
                         endDragonTamer(session, controllerId, "Your 15-second dragon control has ended.", true);
-                    } else {
-                        Vector facing = controller.getLocation().getDirection();
-                        if (facing.lengthSquared() < 0.001D) facing = new Vector(0.0D, 0.0D, 1.0D);
-                        facing.normalize();
-                        Vector movement = facing.clone().multiply(0.42D);
-                        movement.setY(Math.max(-0.14D, Math.min(0.14D, facing.getY() * 0.30D)));
-                        dragon.setVelocity(movement);
-                        session.dragonTargetPlayers.remove(dragonId);
-                        session.dragonTargetLocations.put(dragonId, dragon.getLocation().clone().add(facing.clone().multiply(12.0D)));
-                        continue;
                     }
+                    if (session.dragonTamerControls.containsKey(controllerId)) continue;
                 }
                 UUID targetPlayerId = session.dragonTargetPlayers.get(dragonId);
                 Location target = session.dragonTargetLocations.get(dragonId);
@@ -10835,16 +11157,44 @@ public final class ArcadePortManager implements Listener {
                 }
             }
 
-            for (EnderDragon dragon : dragons) {
-                Location target = session.dragonTargetLocations.get(dragon.getUniqueId());
+        }
+
+        // The EnderDragon controller overrides Bukkit velocity when AI is disabled.
+        // Move it by position each tick, as the Dragon Escape port does for Douglas,
+        // while keeping source target selection and contact checks on FASTEST (125 ms).
+        for (EnderDragon dragon : dragons) {
+            UUID dragonId = dragon.getUniqueId();
+            UUID controllerId = session.dragonTamerByDragon.get(dragonId);
+            Vector flight = null;
+            if (controllerId != null && session.dragonTamerControls.containsKey(controllerId)) {
+                Player controller = session.players.get(controllerId);
+                if (controller != null && controller.isOnline()) {
+                    Vector facing = controller.getLocation().getDirection();
+                    if (facing.lengthSquared() < 0.001D) facing = new Vector(0.0D, 0.0D, 1.0D);
+                    facing.normalize();
+                    flight = facing.clone().multiply(0.42D);
+                    flight.setY(Math.max(-0.14D, Math.min(0.14D, facing.getY() * 0.30D)));
+                    session.dragonTargetPlayers.remove(dragonId);
+                    session.dragonTargetLocations.put(dragonId,
+                            dragon.getLocation().clone().add(facing.clone().multiply(12.0D)));
+                }
+            } else {
+                Location target = session.dragonTargetLocations.get(dragonId);
                 if (target != null) {
                     Vector direction = target.toVector().subtract(dragon.getLocation().toVector());
                     if (direction.lengthSquared() > 1.0D) {
-                        Vector flight = direction.normalize().multiply(0.32D);
+                        flight = direction.normalize().multiply(0.32D);
                         flight.setY(Math.max(-0.08D, Math.min(0.16D, flight.getY() + 0.04D)));
-                        dragon.setVelocity(flight);
                     }
                 }
+            }
+            if (flight != null) {
+                Location next = dragon.getLocation().clone().add(flight);
+                next.setDirection(flight);
+                dragon.teleport(next);
+                dragon.setVelocity(new Vector());
+            }
+            if (targetUpdate) {
                 for (Player player : alive) {
                     if (!session.dragonTamerControls.containsKey(player.getUniqueId())
                             && dragon.getBoundingBox().overlaps(player.getBoundingBox())) {
@@ -13350,9 +13700,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void updateTitles(Session session) {
-        int alive = session.alive.size();
         long now = System.currentTimeMillis();
-        long seconds = Math.max(0L, (session.endsAt - now) / 1000L);
         if (session.type == ArcadePortGame.BACON_BRAWL) updateBaconMeterScoreboard(session);
         if (session.type == ArcadePortGame.DRAGONS) updateDragonsScoreboard(session, now);
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) updateDragonEscapeRaceUi(session, now);
@@ -13418,39 +13766,16 @@ public final class ArcadePortManager implements Listener {
                     && session.variantRuntime.isObjectiveCarrier(id)) continue;
             if (session.type == ArcadePortGame.BOMB_LOBBERS
                     || session.type == ArcadePortGame.DEATH_TAG
-                    || session.type == ArcadePortGame.DRAGONS) continue;
-            int score = session.scores.getOrDefault(id, 0);
-            String specific = gameStatusText(session, p);
-            String timeText = session.type == ArcadePortGame.DRAGON_ESCAPE
-                    ? String.format(java.util.Locale.ROOT, "%.1fs",
-                            Math.max(0L, now - session.startedAt) / 1_000.0D)
-                    : session.type == ArcadePortGame.SHEEP_QUEST && session.sheepQuestOvertime
-                            ? "OVERTIME" : session.endsAt > 0L ? seconds + "s" : "survive";
+                    || session.type == ArcadePortGame.DRAGONS
+                    || session.type == ArcadePortGame.DRAW_MY_THING) continue;
             if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
-                String pbDelta = dragonEscapePbDeltaText(session, p, now);
-                if (!pbDelta.isEmpty()) specific += (specific.isEmpty() ? "" : ChatColor.DARK_GRAY + " | ") + pbDelta;
-            }
-            if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
+                String timeText = String.format(java.util.Locale.ROOT, "%.1fs",
+                        Math.max(0L, now - session.startedAt) / 1_000.0D);
                 String pbDelta = dragonEscapePbDeltaText(session, p, now);
                 p.sendActionBar(ChatColor.WHITE + "TIME " + timeText
                         + (pbDelta.isEmpty() ? "" : ChatColor.DARK_GRAY + " | " + pbDelta));
-                continue;
             }
-            p.sendActionBar(ChatColor.GOLD + session.type.displayName() + ChatColor.GRAY + " | " + timeText
-                    + ChatColor.DARK_GRAY + " | " + ChatColor.GREEN + "alive " + alive
-                    + ChatColor.DARK_GRAY + " | " + ChatColor.YELLOW + "score " + score
-                    + (specific.isEmpty() ? "" : ChatColor.DARK_GRAY + " | " + specific));
         }
-    }
-
-    private String dragonEscapeStatusText(Session session, Player player) {
-        if (!session.dragonEscapeWaypoints.isEmpty()) {
-            int waypoint = dragonEscapePlayerProgress(session, player);
-            return "route " + Math.min(waypoint + 1, session.dragonEscapeWaypoints.size())
-                    + "/" + session.dragonEscapeWaypoints.size();
-        }
-        return "finish " + Math.max(0, player.getLocation().getBlockZ()) + "/"
-                + (int) ArcadePortRules.DRAGON_ESCAPE_FINISH_Z;
     }
 
     /** Live timing guide: the green section is the 500–900 ms critical window. */
@@ -13500,69 +13825,6 @@ public final class ArcadePortManager implements Listener {
             state = ChatColor.GRAY + "swing";
         }
         return ChatColor.AQUA + bar.toString() + " " + state;
-    }
-
-    private String gameStatusText(Session session, Player player) {
-        UUID id = player.getUniqueId();
-        return switch (session.type) {
-            case CASTLE_ASSAULT -> "objective TNT | kills " + scoreFor(session, id);
-            case HEROES_OF_GWEN -> "gold store | team " + (session.teams.getOrDefault(id, 0) + 1);
-            case WIZARDS -> "spellcasting | " + session.alive.size() + " wizards alive";
-            case BACON_BRAWL -> "meter " + session.baconMeters.getOrDefault(id, 0) + "% | knockback x"
-                    + String.format(java.util.Locale.ROOT, "%.1f", session.baconKnockback)
-                    + " | " + baconTimingStatusText(session, id, System.currentTimeMillis());
-            case BOMB_LOBBERS -> "bombs " + inventoryCount(player, Material.TNT);
-            case DEATH_TAG -> "IT " + session.tagged.stream().filter(session.alive::contains).count() + " | runners "
-                    + Math.max(0, session.alive.size() - session.tagged.stream().filter(session.alive::contains).count());
-            case DRAGON_ESCAPE -> dragonEscapeStatusText(session, player);
-            case DRAGONS -> "dragons " + session.entities.stream().filter(EnderDragon.class::isInstance).count();
-            case EVOLUTION -> "stage " + (session.evolutionLevels.getOrDefault(id, 0) + 1) + "/5";
-            case GLADIATORS -> {
-                String tier = switch (session.gladiatorRound) {
-                    case 1 -> "yellow";
-                    case 2 -> "orange";
-                    case 3 -> "red";
-                    default -> "green";
-                };
-                long matches = session.gladiatorPairBrackets.keySet().stream()
-                        .filter(pair -> !session.gladiatorResolvedPairs.contains(pair)).count();
-                yield tier + " | " + session.gladiatorMode + " | W " + session.gladiatorWinnerQueue.size()
-                        + " / L " + session.gladiatorLoserQueue.size() + " | fights " + matches;
-            }
-            case MICRO_BATTLES -> "team " + (session.teams.getOrDefault(id, 0) + 1) + "/4";
-            case ONE_IN_THE_QUIVER -> "kills " + scoreFor(session, id) + "/20";
-            case PAINTBALL -> "armour " + session.paintPiecesRemaining.getOrDefault(id, 4) + "/4";
-            case SUPER_SPLOOR -> "ink " + player.getLevel() + "% | Squid "
-                    + (player.getInventory().getHeldItemSlot() == 7 ? "ON" : "OFF");
-            case RUNNER -> "unstable tiles " + session.runnerBlocks.size();
-            case SHEEP_QUEST -> "pens R" + sheepQuestTeamCount(session, 0)
-                    + " A" + sheepQuestTeamCount(session, 1) + " G" + sheepQuestTeamCount(session, 2)
-                    + " Y" + sheepQuestTeamCount(session, 3);
-            case SPLEEF -> "snowballs " + inventoryCount(player, Material.SNOWBALL);
-            case SNEAKY_ASSASSINS -> sneakyAssassins.statusText(id);
-            case SKY_WARS -> (session.skyWarsLive ? "alive " : "starting ")
-                    + session.alive.size() + " | TNT " + inventoryCount(player, Material.TNT);
-            case MILK_THE_COW -> "milk " + scoreFor(session, id) + "/" + MilkCowRules.SCORE_TO_WIN
-                    + (session.teams.getOrDefault(id, 0) == 1 ? " | COW" : " | FARMER");
-            case WITHER_ASSAULT -> (session.teams.getOrDefault(id, 0) == 1 ? "WITHER" : "HUMAN")
-                    + " | " + Math.max(0, (int) ((session.endsAt - System.currentTimeMillis()) / 1_000L)) + "s";
-            case TURF_WARS -> (session.turfCombat ? "COMBAT" : "BUILD") + " | R:"
-                    + turfWarsRemainingLines(session, 0) + " B:" + turfWarsRemainingLines(session, 1);
-            case DRAW_MY_THING -> session.drawCurrentDrawer == null ? "waiting for next drawing"
-                    : session.drawCurrentDrawer.equals(id) ? "drawing"
-                    : session.drawCorrectGuessers.contains(id) ? "guessed correctly"
-                    : "guesses " + Math.max(0, DRAW_MY_THING_MAX_GUESSES - session.drawGuessAttempts.getOrDefault(id, 0)) + "/10";
-            case MASTER_BUILDERS -> session.masterBuilderPhase == MasterBuildersPhase.BUILDING
-                    ? "building | " + session.masterBuilderTheme : "review | " + session.masterBuilderTheme;
-            case HOOPS_REMASTERED -> "basketball | "
-                    + (session.teams.getOrDefault(id, 0) == 0 ? "RED" : "BLUE")
-                    + " | " + scoreFor(session, id) + " pts";
-            case CAMERA_SHY -> "Camera Shy runs in its dedicated match controller";
-            case PLEXBALL -> "Plexball | " + session.alive.size() + " active";
-            // Monster Maze owns its own in-process GameManager session and does not
-            // create an ArcadePortManager Session object.
-            case MONSTER_MAZE, MONSTER_MAZE_SPEED, MONSTER_MAZE_MODERN -> "Monster Maze";
-        };
     }
 
     private int scoreFor(Session session, UUID id) {
@@ -14064,6 +14326,8 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.EVOLUTION && player.isOnline()) {
             UUID victimId = player.getUniqueId();
             long eliminationTime = System.currentTimeMillis();
+            session.evolutionDeaths.add(victimId);
+            boolean victimWasCharging = session.evolutionCharge.containsKey(victimId);
             recordEvolutionAssists(session, victimId, killer == null ? null : killer.getUniqueId(), eliminationTime);
             session.evolutionLifeKills.put(victimId, 0);
             session.evolutionStartedAtMillis.remove(victimId);
@@ -14091,6 +14355,21 @@ public final class ArcadePortManager implements Listener {
             player.removePotionEffect(PotionEffectType.JUMP_BOOST);
             if (killer != null && session.alive.contains(killer.getUniqueId())) {
                 UUID killerId = killer.getUniqueId();
+                if (victimWasCharging) {
+                    String evolvingKillsPath = localStatsPath(killerId, ArcadePortGame.EVOLUTION.id())
+                            + "kills-while-evolving";
+                    int evolvingKills = plugin.getConfig().getInt(evolvingKillsPath, 0) + 1;
+                    plugin.getConfig().set(evolvingKillsPath, evolvingKills);
+                    if (evolvingKills >= 25) awardCatalogAchievement(killer, "evolution", "no-evolve-5-u");
+                }
+                long priorKillAt = session.evolutionFastKillTimes.getOrDefault(killerId, 0L);
+                int fastKills = priorKillAt > 0L && eliminationTime - priorKillAt <= 5_000L
+                        ? session.evolutionFastKillCounts.getOrDefault(killerId, 0) + 1 : 1;
+                session.evolutionFastKillTimes.put(killerId, eliminationTime);
+                session.evolutionFastKillCounts.put(killerId, fastKills);
+                if (fastKills >= 3) awardCatalogAchievement(killer, "evolution", "rampage");
+                session.evolutionFastKillTimes.remove(victimId);
+                session.evolutionFastKillCounts.remove(victimId);
                 session.scores.merge(killerId, 1, Integer::sum);
                 int lifeKills = session.evolutionLifeKills.merge(killerId, 1, Integer::sum);
                 int attackerMob = session.evolutionLevels.getOrDefault(killerId, 0);
@@ -14697,10 +14976,10 @@ public final class ArcadePortManager implements Listener {
         if (active != session || attacker == null || target == null || attacker.equals(target)
                 || !session.alive.contains(attacker.getUniqueId())
                 || !session.alive.contains(target.getUniqueId())) return;
-        if (session.evolving.contains(attacker.getUniqueId())) return;
-        if (session.evolving.contains(target.getUniqueId())) interruptEvolutionForHit(session, target);
+        if (session.evolving.contains(attacker.getUniqueId())
+                || session.evolving.contains(target.getUniqueId())) return;
         recordEvolutionDamage(session, target, attacker, System.currentTimeMillis());
-        cancelEvolutionCharge(session, target);
+        reduceEvolutionChargeAfterHit(session, target);
         Vector away = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
         if (away.lengthSquared() < 0.001D) away = attacker.getLocation().getDirection().multiply(-1.0D);
         target.setVelocity(away.normalize().multiply(knockback).setY(Math.max(0.35D, knockback * 0.35D)));
@@ -14723,6 +15002,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         session.evolutionGolemSlamReadyAt.put(id, now + ArcadePortRules.EVOLUTION_GOLEM_SLAM_COOLDOWN_MILLIS);
+        session.evolutionAbilitiesUsed.add(id);
         cooldownProgress.start(player, "Seismic Slam", ArcadePortRules.EVOLUTION_GOLEM_SLAM_COOLDOWN_MILLIS);
         Vector direction = player.getLocation().getDirection();
         if (direction.getY() < 0.0D) direction.setY(-direction.getY());
@@ -14742,6 +15022,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         session.evolutionBlazeReadyAt.put(id, now + ArcadePortRules.EVOLUTION_BLAZE_FLAMETHROWER_COOLDOWN_MILLIS);
+        session.evolutionAbilitiesUsed.add(id);
         cooldownProgress.start(player, "Flamethrower", ArcadePortRules.EVOLUTION_BLAZE_FLAMETHROWER_COOLDOWN_MILLIS);
         session.evolutionBlazeActiveUntil.put(id, now + ArcadePortRules.EVOLUTION_BLAZE_FLAMETHROWER_DURATION_MILLIS);
         session.evolutionBlazeNextShotAt.put(id, now);
@@ -14758,6 +15039,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         session.evolutionSlimeSlamReadyAt.put(id, now + ArcadePortRules.EVOLUTION_SLIME_SLAM_COOLDOWN_MILLIS);
+        session.evolutionAbilitiesUsed.add(id);
         cooldownProgress.start(player, "Slime Slam", ArcadePortRules.EVOLUTION_SLIME_SLAM_COOLDOWN_MILLIS);
         session.evolutionSlimeSlamStartedAt.put(id, now);
         session.evolutionSlimeSlamActive.add(id);
@@ -14774,6 +15056,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         consumeOne(player, Material.EGG);
+        session.evolutionAbilitiesUsed.add(player.getUniqueId());
         Egg egg = player.launchProjectile(Egg.class);
         egg.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(1.35D));
         session.entities.add(egg);
@@ -14900,6 +15183,15 @@ public final class ArcadePortManager implements Listener {
         // Slowness is charge feedback. Jump Boost belongs to the Slime evolution form,
         // so cancelling a charge must not remove that form's gameplay perk.
         player.removePotionEffect(PotionEffectType.SLOWNESS);
+    }
+
+    private void reduceEvolutionChargeAfterHit(Session session, Player player) {
+        UUID id = player.getUniqueId();
+        Float charge = session.evolutionCharge.get(id);
+        if (charge == null) return;
+        float remaining = Math.max(0.0F, charge * 0.92F);
+        session.evolutionCharge.put(id, remaining);
+        player.setExp(remaining);
     }
 
     private void interruptEvolutionForHit(Session session, Player player) {
@@ -15086,12 +15378,11 @@ public final class ArcadePortManager implements Listener {
                 && session.deathTagRespawnGraceUntil.getOrDefault(target.getUniqueId(), 0L)
                     > System.currentTimeMillis()) return;
         if (session.type == ArcadePortGame.EVOLUTION) {
-            if (session.evolving.contains(attacker.getUniqueId())) return;
-            if (session.evolving.contains(target.getUniqueId())) {
-                interruptEvolutionForHit(session, target);
-            }
+            if (session.evolving.contains(attacker.getUniqueId())
+                    || session.evolving.contains(target.getUniqueId())) return;
+            if ("melee".equalsIgnoreCase(source)) session.evolutionMeleeUsed.add(attacker.getUniqueId());
             recordEvolutionDamage(session, target, attacker, System.currentTimeMillis());
-            cancelEvolutionCharge(session, target);
+            reduceEvolutionChargeAfterHit(session, target);
         }
         if (session.type == ArcadePortGame.GLADIATORS) {
             Integer attackerPair = session.gladiatorPairs.get(attacker.getUniqueId());
@@ -15826,6 +16117,15 @@ public final class ArcadePortManager implements Listener {
             recordDeathTagRewards(session);
         }
         if (session.type != ArcadePortGame.PLEXBALL && !session.type.isMonsterMaze()) recordLocalStats(session, winner, announceWinner);
+        if (announceWinner && session.type == ArcadePortGame.DRAW_MY_THING) {
+            for (UUID playerId : session.players.keySet()) {
+                if (testPlayers.isTestPlayer(playerId) || session.drawKeenEyeFailed.contains(playerId)) continue;
+                String statsPath = localStatsPath(playerId, "draw-my-thing");
+                plugin.getConfig().set(statsPath + "keen-eye",
+                        plugin.getConfig().getInt(statsPath + "keen-eye", 0) + 1);
+            }
+            plugin.saveConfig();
+        }
         if (announceWinner && session.type == ArcadePortGame.MICRO_BATTLES) {
             for (Map.Entry<UUID, Integer> assists : session.microAssists.entrySet()) {
                 if (assists.getValue() >= 8) {
@@ -16383,37 +16683,19 @@ public final class ArcadePortManager implements Listener {
 
     private void recordEvolutionAchievements(Session session, Player winner) {
         UUID id = winner.getUniqueId();
-        long now = System.currentTimeMillis();
-        for (Player candidate : alivePlayers(session)) {
-            UUID candidateId = candidate.getUniqueId();
-            if (candidateId.equals(id)
-                    || session.evolutionQuickEvolverAtAttempt.getOrDefault(candidateId, false)) continue;
-            long startedAt = session.evolutionStartedAtMillis.getOrDefault(candidateId, 0L);
-            if (startedAt <= 0L) continue;
-            long elapsedTicks = Math.max(0L, (now - startedAt) / 50L);
-            int attemptedLevel = session.evolutionLevelAtAttempt.getOrDefault(candidateId, -1);
-            if (ArcadePortRules.shouldAwardEvolutionWrongKitChamp(
-                    attemptedLevel, false, session.evolving.contains(candidateId), elapsedTicks)) {
-                awardEvolutionAchievement(candidate, EvolutionAchievement.WRONG_KIT_CHAMP.configKey(candidateId),
-                        "Wrong Kit Champ — your standard evolution would have finished too late.");
-            }
+        String statsPath = localStatsPath(id, ArcadePortGame.EVOLUTION.id());
+        if (plugin.getConfig().getInt(statsPath + "wins", 0) >= 20) {
+            awardCatalogAchievement(winner, "evolution", "expert-evolver");
         }
-        if (session.evolutionOverkillEligible.contains(id)
-                && ArcadePortRules.isEvolutionWinnerLevel(session.evolutionLevels.getOrDefault(id, 0))) {
-            awardEvolutionAchievement(winner, EvolutionAchievement.OVERKILL.configKey(id),
-                    "Overkill — got 2 kills before each evolution.");
+        if (!session.evolutionDeaths.contains(id)) awardCatalogAchievement(winner, "evolution", "perfect-game");
+        if (!session.evolutionDamageWhileCharging.contains(id)) {
+            awardCatalogAchievement(winner, "evolution", "stealth-mastah");
         }
-        if (!session.evolutionManualEvolved.contains(id)) {
-            awardCatalogAchievement(winner, "evolution", "mercy-rule");
+        if (!session.evolutionAbilitiesUsed.contains(id)) {
+            awardCatalogAchievement(winner, "evolution", "melee-monster");
         }
-        if (session.evolutionSameMobOnly.contains(id)) {
-            awardCatalogAchievement(winner, "evolution", "objection");
-        }
-        if (session.evolutionChickenGolemKillers.contains(id)) {
-            awardCatalogAchievement(winner, "evolution", "turns-tabled");
-        }
-        if (session.evolutionAssistOnlyEvolutions.getOrDefault(id, 0) >= 3) {
-            awardCatalogAchievement(winner, "evolution", "try-again");
+        if (!session.evolutionMeleeUsed.contains(id)) {
+            awardCatalogAchievement(winner, "evolution", "ability-assassin");
         }
     }
 
@@ -16655,9 +16937,6 @@ public final class ArcadePortManager implements Listener {
         double amount = ArcadePortRules.dragonSurvivalGems(Math.max(0L, outAt - session.startedAt));
         if (amount <= 0.0D) return;
         String path = localStatsPath(playerId, "dragons");
-        plugin.getConfig().set(path + "survival-millis",
-                plugin.getConfig().getLong(path + "survival-millis", 0L)
-                        + Math.max(0L, outAt - session.startedAt));
         plugin.getConfig().set(path + "survival-millis",
                 plugin.getConfig().getLong(path + "survival-millis", 0L)
                         + Math.max(0L, outAt - session.startedAt));
@@ -17760,6 +18039,20 @@ public final class ArcadePortManager implements Listener {
                             ChatColor.DARK_GRAY + "Recorded locally by this Testplex server."),
                     "noop", null, null));
         }
+        if (!milestones && "draw-my-thing".equals(gameId)) {
+            String[] statKeys = {"total-guesses", "pure-luck", "keen-eye", "mr-squiggle"};
+            String[] statNames = {"Total Guesses", "Lucky Guesses", "Keen Eye", "Mr Squiggle"};
+            Material[] icons = {Material.PAPER, Material.FIREWORK_STAR, Material.SPYGLASS, Material.PAINTING};
+            int[] statSlots = {29, 30, 31, 32};
+            for (int i = 0; i < statKeys.length; i++) {
+                int value = plugin.getConfig().getInt(path + statKeys[i], 0);
+                inventory.setItem(statSlots[i], statsItem(value > 0 ? Material.EXPERIENCE_BOTTLE : icons[i],
+                        (value > 0 ? ChatColor.GREEN : ChatColor.GRAY) + statNames[i],
+                        List.of(" ", ChatColor.GRAY + "Recorded by this local Testplex server: "
+                                + ChatColor.WHITE + value),
+                        "noop", null, null));
+            }
+        }
         inventory.setItem(22, statsSummaryItem(Material.BOOK, ChatColor.BOLD + displayName + " Stats",
                 gameStatsLore(targetId, gameId, false)));
         inventory.setItem(4, statsItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back", List.of(),
@@ -18059,6 +18352,20 @@ public final class ArcadePortManager implements Listener {
                     .count();
             lore.add(ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE + unlocked + "/"
                     + CameraShyProgressCatalog.achievements().size());
+        }
+        if ("draw-my-thing".equals(gameId)) {
+            lore.add(ChatColor.GRAY + "Total Guesses: " + ChatColor.WHITE
+                    + plugin.getConfig().getInt(path + "total-guesses", 0));
+            lore.add(ChatColor.GRAY + "Lucky Guesses: " + ChatColor.WHITE
+                    + plugin.getConfig().getInt(path + "pure-luck", 0));
+            lore.add(ChatColor.GRAY + "Keen Eye: " + ChatColor.WHITE
+                    + plugin.getConfig().getInt(path + "keen-eye", 0));
+            lore.add(ChatColor.GRAY + "Mr Squiggle: " + ChatColor.WHITE
+                    + plugin.getConfig().getInt(path + "mr-squiggle", 0));
+        }
+        if ("evolution".equals(gameId)) {
+            lore.add(ChatColor.GRAY + "Kills while evolving: " + ChatColor.WHITE
+                    + plugin.getConfig().getInt(path + "kills-while-evolving", 0));
         }
         if ("spleef".equals(gameId)) {
             lore.add(ChatColor.GRAY + "Blocks Broken: " + ChatColor.WHITE
@@ -18460,6 +18767,18 @@ public final class ArcadePortManager implements Listener {
                     event.setTo(from);
                 }
             }
+            return;
+        }
+        if (session.type == ArcadePortGame.DRAW_MY_THING
+                && playerId.equals(session.drawCurrentDrawer) && !session.drawStartedPainting
+                && session.drawDrawerLocation != null
+                && event.getFrom().distanceSquared(event.getTo()) > 1.0D
+                && !(event instanceof PlayerTeleportEvent)) {
+            Location locked = session.drawDrawerLocation.clone();
+            locked.setYaw(event.getTo().getYaw());
+            locked.setPitch(event.getTo().getPitch());
+            event.setTo(locked);
+            player.sendActionBar(Component.text("Start drawing to move freely."));
             return;
         }
         if (session.type == ArcadePortGame.DEATH_TAG && session.alive.contains(playerId)
@@ -19380,16 +19699,31 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.WIZARDS) return;
         if (session.type == ArcadePortGame.EVOLUTION
                 && event.getEntity() instanceof Player evolutionPlayer
-                && session.alive.contains(evolutionPlayer.getUniqueId())
-                && event.getCause() == EntityDamageEvent.DamageCause.FALL) {
-            int form = session.evolutionLevels.getOrDefault(evolutionPlayer.getUniqueId(), 0);
-            double multiplier = ArcadePortRules.evolutionFallDamageMultiplier(form);
-            if (multiplier <= 0.0D) {
+                && session.alive.contains(evolutionPlayer.getUniqueId())) {
+            if (session.evolutionCharge.containsKey(evolutionPlayer.getUniqueId())) {
+                session.evolutionDamageWhileCharging.add(evolutionPlayer.getUniqueId());
+            }
+            if (session.evolving.contains(evolutionPlayer.getUniqueId())) {
                 event.setCancelled(true);
-                evolutionPlayer.setFallDistance(0.0F);
                 return;
             }
-            if (multiplier < 1.0D) event.setDamage(event.getDamage() * multiplier);
+            if (event instanceof EntityDamageByEntityEvent byEntity) {
+                Player attacker = playerShooter(byEntity.getDamager());
+                if (attacker != null && session.evolving.contains(attacker.getUniqueId())) {
+                    event.setCancelled(true);
+                    return;
+                }
+            }
+            if (event.getCause() == EntityDamageEvent.DamageCause.FALL) {
+                int form = session.evolutionLevels.getOrDefault(evolutionPlayer.getUniqueId(), 0);
+                double multiplier = ArcadePortRules.evolutionFallDamageMultiplier(form);
+                if (multiplier <= 0.0D) {
+                    event.setCancelled(true);
+                    evolutionPlayer.setFallDistance(0.0F);
+                    return;
+                }
+                if (multiplier < 1.0D) event.setDamage(event.getDamage() * multiplier);
+            }
         }
         if (session.type == ArcadePortGame.DRAGONS
                 && event.getEntity() instanceof Player controlledPlayer
@@ -20017,6 +20351,7 @@ public final class ArcadePortManager implements Listener {
             player.setAllowFlight(false);
             return;
         }
+        session.evolutionAbilitiesUsed.add(id);
         player.setAllowFlight(false);
         Vector direction = player.getLocation().getDirection().normalize().multiply(
                 ArcadePortRules.EVOLUTION_CHICKEN_DOUBLE_JUMP_HORIZONTAL);
@@ -22421,11 +22756,12 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onBlockBreak(BlockBreakEvent event) {
         if (cancelPrepareAction(event.getPlayer(), event)) return;
         Session session = active;
         if (session == null || event.getBlock().getWorld() != session.world) return;
+        if (event.isCancelled() && session.type != ArcadePortGame.MICRO_BATTLES) return;
         if (session.type == ArcadePortGame.SKY_WARS
                 && session.alive.contains(event.getPlayer().getUniqueId())) {
             Block broken = event.getBlock();
@@ -22505,6 +22841,7 @@ public final class ArcadePortManager implements Listener {
                 event.setCancelled(true);
                 return;
             }
+            event.setCancelled(false);
             session.microCrumbleBlocks.remove(event.getBlock());
             session.microPlacedBlockOwners.remove(event.getBlock());
             return;
@@ -24167,6 +24504,7 @@ public final class ArcadePortManager implements Listener {
         }
         session.evolutionSulphurBombReadyAt.put(playerId,
                 ArcadePortRules.nextEvolutionSulphurBombReadyAt(now));
+        session.evolutionAbilitiesUsed.add(playerId);
         cooldownProgress.start(player, "Sulphur Bomb",
                 Math.max(1L, ArcadePortRules.nextEvolutionSulphurBombReadyAt(now) - now));
         Snowball projectile = player.launchProjectile(Snowball.class);
@@ -24447,6 +24785,36 @@ public final class ArcadePortManager implements Listener {
         velocity.setY(Math.max(0.7D, Math.min(0.9D, velocity.getY() + 0.45D)));
         player.setVelocity(velocity);
         player.setFallDistance(0.0F);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onMicroDasherDoubleJump(org.bukkit.event.player.PlayerToggleFlightEvent event) {
+        if (cancelPrepareAction(event.getPlayer(), event)) return;
+        Player player = event.getPlayer();
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.MICRO_BATTLES || !session.liveStarted
+                || !session.alive.contains(player.getUniqueId())
+                || !"dasher".equals(session.microKits.getOrDefault(player.getUniqueId(), "archer"))) return;
+        event.setCancelled(true);
+        player.setFlying(false);
+        player.setAllowFlight(false);
+        UUID id = player.getUniqueId();
+        long now = System.currentTimeMillis();
+        long readyAt = session.microDasherJumpReadyAt.getOrDefault(id, 0L);
+        if (now < readyAt) {
+            player.sendActionBar(ChatColor.YELLOW + "Double Jump is recharging.");
+            return;
+        }
+        long cooldown = ArcadePortRules.MICRO_BATTLES_DASHER_JUMP_COOLDOWN_MILLIS;
+        session.microDasherJumpReadyAt.put(id, now + cooldown);
+        cooldownProgress.start(player, "Double Jump", cooldown);
+        Vector velocity = player.getLocation().getDirection().clone();
+        velocity.setY(0.0D);
+        if (velocity.lengthSquared() > 0.0001D) velocity.normalize().multiply(0.45D);
+        velocity.setY(0.55D);
+        player.setVelocity(velocity);
+        player.setFallDistance(0.0F);
+        player.playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 0.65F, 1.4F);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -25221,6 +25589,11 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> drawCorrectGuessers = new HashSet<>();
         final Map<UUID, Integer> drawGuessAttempts = new HashMap<>();
         final Set<Integer> drawRevealedLetters = new HashSet<>();
+        final Map<UUID, Material> drawBrushColours = new HashMap<>();
+        final Map<UUID, Block> drawPreviousPaintPoints = new HashMap<>();
+        final Map<UUID, Block> drawShapeStarts = new HashMap<>();
+        final Map<UUID, String> drawShapeTools = new HashMap<>();
+        final Set<UUID> drawKeenEyeFailed = new HashSet<>();
         final Set<UUID> drawLinguistFailed = new HashSet<>();
         final Map<UUID, Integer> drawLinguistPerfectRounds = new HashMap<>();
         final Map<UUID, Integer> drawFirstGuessStreaks = new HashMap<>();
@@ -25230,6 +25603,7 @@ public final class ArcadePortManager implements Listener {
         UUID drawCurrentDrawer;
         String drawWord;
         Location drawDrawerLocation;
+        boolean drawStartedPainting;
         long drawRoundStartedAt;
         long drawRoundDurationMillis;
         long drawRoundEndsAt;
@@ -25266,6 +25640,12 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Integer> paintProjectileDamage = new HashMap<>();
         final Map<UUID, PaintballProjectileVisual> paintballProjectileCosmetics = new HashMap<>();
         final Map<UUID, Integer> evolutionLevels = new HashMap<>();
+        final Set<UUID> evolutionDeaths = new HashSet<>();
+        final Set<UUID> evolutionDamageWhileCharging = new HashSet<>();
+        final Set<UUID> evolutionAbilitiesUsed = new HashSet<>();
+        final Set<UUID> evolutionMeleeUsed = new HashSet<>();
+        final Map<UUID, Integer> evolutionFastKillCounts = new HashMap<>();
+        final Map<UUID, Long> evolutionFastKillTimes = new HashMap<>();
         final Map<UUID, String> evolutionKits = new HashMap<>();
         final Map<UUID, Long> evolutionStartedAtMillis = new HashMap<>();
         final Map<UUID, Integer> evolutionLevelAtAttempt = new HashMap<>();
@@ -25650,6 +26030,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Integer> turfInfiltratorKillStreak = new HashMap<>();
         final Set<UUID> turfInfiltratorReturned = new HashSet<>();
         final Map<UUID, String> microKits = new HashMap<>();
+        final Map<UUID, Long> microDasherJumpReadyAt = new HashMap<>();
         final Map<Block, MicroPlacedBlockOwner> microPlacedBlockOwners = new HashMap<>();
         final Map<UUID, MicroPlacedBlockKnock> microPlacedBlockKnocks = new HashMap<>();
         final Map<UUID, Integer> microPlacedBlockKnockKills = new HashMap<>();
