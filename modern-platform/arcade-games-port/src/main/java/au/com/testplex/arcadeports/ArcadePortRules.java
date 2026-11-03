@@ -3505,11 +3505,10 @@ public final class ArcadePortRules {
     }
 
     // Heroes of Gwen: source-derived lane minion and economy timings.
-    /** Source MinionManager spawns each lane wave every 30 seconds. */
-    public static final long HEROES_OF_GWEN_MINION_WAVE_INTERVAL_MILLIS = 30_000L;
+    public static final long HEROES_OF_GWEN_MINION_WAVE_INTERVAL_MILLIS = 10_000L;
     public static final int HEROES_OF_GWEN_MINIONS_PER_WAVE = 6;
     /** Source MinionWave route AI updates on every 20 TPS tick. */
-    public static final long HEROES_OF_GWEN_MINION_TARGET_UPDATE_MILLIS = 50L;
+    public static final long HEROES_OF_GWEN_MINION_TARGET_UPDATE_MILLIS = 1_000L;
     public static final double HEROES_OF_GWEN_MINION_TARGET_RANGE_SQUARED = 100.0D;
     public static final long HEROES_OF_GWEN_GOLD_INTERVAL_MILLIS = 5_000L;
     public static final int HEROES_OF_GWEN_BASE_GOLD_PER_INTERVAL = 5;
