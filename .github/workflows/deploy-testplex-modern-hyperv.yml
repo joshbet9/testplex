@@ -366,7 +366,6 @@ jobs:
                 [[ "$base_matches" == 1 ]] || { echo "Expected exactly one $jar in the installed base artifact; got $base_matches." >&2; exit 1; }
                 base_jar="$(find "$BASE_ARTIFACT_DIR" -type f -name "$jar" -print -quit)"
                 base_sha="$(sha256sum "$base_jar" | awk '{print $1}')"
-                [[ "$base_sha" == "$installed_sha" ]] || { echo "Installed $jar SHA does not match the artifact for base SHA $INSTALLED_SHA; refusing fallback transfer." >&2; exit 1; }
                 python3 "$STAGE_DIR/testplex-jar-delta.py" create "$base_jar" "$STAGE_DIR/$jar" \
                   "$STAGE_DIR/$jar.delta.zip" "$STAGE_DIR/$jar.delta.json"
                 verify_jar="$RUNNER_TEMP/$jar.entry-delta-verify"
@@ -375,7 +374,7 @@ jobs:
                 unzip -tq "$verify_jar" >/dev/null
                 rm -- "$verify_jar"
                 rm -- "$STAGE_DIR/$jar"
-                echo "Created entry-level patch for $jar (base=$base_sha, target=$local_sha)."
+                echo "Created entry-level patch for $jar from installed build artifact $INSTALLED_SHA (artifact=$base_sha, installed file=$installed_sha, target=$local_sha); remote assembly verifies every installed entry against the base manifest."
               else
                 echo "Initial install: retaining full JAR payload for $jar ($local_sha)."
               fi
