@@ -472,6 +472,7 @@ jobs:
           HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
           BUILD_SHA: ${{ steps.source-artifact.outputs.source_sha }}
           STAGE_DIR: ${{ steps.stage-jars.outputs.stage_dir }}
+          CHANGED_JARS: ${{ steps.jar-diff.outputs.changed_jars }}
           MM_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.mm_maps_required }}
           MAP_EXPANDED_KB: ${{ steps.stage-jars.outputs.map_expanded_kb }}
           WIZARDS_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.wizards_maps_required }}
