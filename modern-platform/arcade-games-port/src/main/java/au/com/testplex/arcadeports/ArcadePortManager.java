@@ -1446,10 +1446,15 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         String kit = ArcadePortRules.normalizeMicroBattlesKit(requestedKit);
         if (kit == null) {
-            player.sendMessage(ChatColor.YELLOW + "Micro Battles kits: archer, worker, fighter, dasher.");
+            player.sendMessage(ChatColor.YELLOW + "Micro Battles kits: archer, worker, fighter, dasher (unlocked by Speedster).");
             return;
         }
         UUID playerId = player.getUniqueId();
+        if ("dasher".equals(kit)
+                && !plugin.getConfig().getBoolean(MicroBattlesAchievement.SPEEDSTER.configKey(playerId), false)) {
+            player.sendMessage(ChatColor.RED + "Dasher is locked. Win a Micro Battles game in under 1:30 to unlock it.");
+            return;
+        }
         microKitPreferences.put(playerId, kit);
         Session session = active;
         if (session != null && session.type == ArcadePortGame.MICRO_BATTLES
@@ -17167,6 +17172,13 @@ public final class ArcadePortManager implements Listener {
             if (won) {
                 int lifetimeWins = plugin.getConfig().getInt(path + "wins", 0) + 1;
                 plugin.getConfig().set(path + "wins", lifetimeWins);
+                if (session.type == ArcadePortGame.MICRO_BATTLES
+                        && System.currentTimeMillis() - session.startedAt
+                                < ArcadePortRules.MICRO_BATTLES_SPEEDSTER_MAX_GAME_MILLIS) {
+                    awardMicroBattlesAchievement(entry.getValue(),
+                            MicroBattlesAchievement.SPEEDSTER.configKey(id),
+                            "Speedster — win Micro Battles in under 1:30.");
+                }
                 if (session.type == ArcadePortGame.DEATH_TAG) {
                     if (lifetimeWins >= 50) {
                         awardCatalogAchievement(entry.getValue(), "death-tag", "death-proof");
@@ -17730,7 +17742,7 @@ public final class ArcadePortManager implements Listener {
             }
         } else if ("micro-battles".equals(gameId)) {
             MicroBattlesAchievement[] achievements = MicroBattlesAchievement.values();
-            int[] achievementSlots = {12, 13};
+            int[] achievementSlots = {10, 11, 12, 13, 14, 15, 16};
             for (int i = 0; i < achievements.length; i++) {
                 MicroBattlesAchievement achievement = achievements[i];
                 boolean unlocked = plugin.getConfig().getBoolean(achievement.configKey(targetId), false);

@@ -652,6 +652,7 @@ public final class ArcadePortRules {
     public static final long DRAGONS_COWARD_LEAP_COOLDOWN_MILLIS = 8_000L;
     public static final long MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS = 20_000L;
     public static final int MICRO_BATTLES_FLETCHER_MAX_ARROWS = 3;
+    public static final long MICRO_BATTLES_SPEEDSTER_MAX_GAME_MILLIS = 90_000L;
     public static final long MICRO_BATTLES_DASHER_JUMP_COOLDOWN_MILLIS = 15_000L;
     public static final double MICRO_BATTLES_BORDER_PARTICLE_DISTANCE = 3.0D;
     public static final int MICRO_BATTLES_BORDER_PARTICLE_INTERVAL_TICKS = 4;
