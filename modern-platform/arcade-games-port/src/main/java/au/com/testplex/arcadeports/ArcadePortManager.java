@@ -4201,6 +4201,7 @@ public final class ArcadePortManager implements Listener {
                         + (mixedArcadeVariant ? "Middle towers are removed and store prices are halved." : "Earn gold to buy upgrades."));
             }
         }
+        if (usesSharedMatchScoreboard(type)) setupSharedMatchScoreboard(session);
         if (participants.size() == 1) announce(session, ChatColor.GRAY + "Solo test mode: the run will remain available for practice until the timer ends or you reset it.");
         // All initial spawns/teleports are complete. Prepare now freezes participant
         // movement as well as gameplay input until the Live transition.
@@ -5142,6 +5143,175 @@ public final class ArcadePortManager implements Listener {
         for (Player voter : session.players.values()) {
             if (voter != null && voter.isOnline()) openGladiatorVoteMenu(voter);
         }
+    }
+
+    /**
+     * Games with a dedicated scoreboard keep their source-shaped layout. Every
+     * other shared-session game gets the common live match board below. Keep
+     * this switch exhaustive so adding a game requires an explicit scoreboard
+     * choice in the same change.
+     */
+    private boolean usesSharedMatchScoreboard(ArcadePortGame type) {
+        return switch (type) {
+            case BACON_BRAWL, CASTLE_ASSAULT, BOMB_LOBBERS, DEATH_TAG,
+                    DRAGON_ESCAPE, DRAGONS, GLADIATORS, HEROES_OF_GWEN,
+                    HOOPS_REMASTERED, ONE_IN_THE_QUIVER, PAINTBALL,
+                    SUPER_SPLOOR, PLEXBALL, MASTER_BUILDERS, SNEAKY_ASSASSINS,
+                    MONSTER_MAZE, MONSTER_MAZE_SPEED, MONSTER_MAZE_MODERN,
+                    WIZARDS -> false;
+            case EVOLUTION, MICRO_BATTLES, RUNNER, SHEEP_QUEST, SPLEEF,
+                    TURF_WARS, DRAW_MY_THING, SKY_WARS, MILK_THE_COW,
+                    WITHER_ASSAULT, CAMERA_SHY -> true;
+        };
+    }
+
+    private void setupSharedMatchScoreboard(Session session) {
+        if (session == null || Bukkit.getScoreboardManager() == null) return;
+        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
+        Objective objective = scoreboard.registerNewObjective("arcadematch", "dummy",
+                ChatColor.GOLD + session.type.displayName().toUpperCase(java.util.Locale.ROOT));
+        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+        session.sharedMatchScoreboard = scoreboard;
+        session.sharedMatchScoreboardObjective = objective;
+        for (int index = 0; index < 15; index++) {
+            Team line = scoreboard.registerNewTeam("matchline" + index);
+            String entry = ChatColor.values()[index].toString() + ChatColor.RESET;
+            line.addEntry(entry);
+            session.sharedMatchScoreboardTeams.add(line);
+            session.sharedMatchScoreboardEntries.add(entry);
+        }
+        for (Player player : session.players.values()) {
+            if (player != null && player.isOnline()) player.setScoreboard(scoreboard);
+        }
+        applySessionTeamTabTeams(session);
+        updateSharedMatchScoreboard(session, System.currentTimeMillis());
+    }
+
+    private void updateSharedMatchScoreboard(Session session, long now) {
+        if (session == null || session.sharedMatchScoreboardObjective == null
+                || now < session.sharedMatchNextScoreboardAt) return;
+        session.sharedMatchNextScoreboardAt = now + 500L;
+
+        List<String> lines = new ArrayList<>();
+        if (!session.liveStarted) {
+            long remaining = Math.max(0L, session.prepareEndsAt - now);
+            lines.add(ChatColor.YELLOW + "Starting in " + formatMatchScoreboardTime(remaining));
+        } else {
+            lines.add(ChatColor.GREEN + "In Progress");
+        }
+
+        SourceMapCatalog.MapData map = sourceMapData.get(session.type.id());
+        String mapName = map == null ? null : map.mapName();
+        if (mapName != null && !mapName.isBlank() && !"Unknown".equalsIgnoreCase(mapName)) {
+            lines.add(ChatColor.GRAY + "Map: " + ChatColor.WHITE + mapName);
+        }
+        lines.add(" ");
+        lines.add(ChatColor.YELLOW + "Objective");
+        lines.add(ChatColor.WHITE + sharedMatchObjective(session.type));
+        lines.add("  ");
+        lines.add(ChatColor.GREEN + "Players Alive: " + ChatColor.WHITE + session.alive.size()
+                + "/" + session.participantIds.size());
+
+        List<String> scoreLines = sharedMatchScoreLines(session);
+        if (!scoreLines.isEmpty()) {
+            lines.add("   ");
+            lines.add(ChatColor.AQUA + (session.teams.values().stream().distinct().count() > 1
+                    ? "Team Scores" : "Top Scores"));
+            lines.addAll(scoreLines);
+        }
+
+        lines.add("    ");
+        if (!session.liveStarted) {
+            lines.add(ChatColor.YELLOW + "Live begins shortly");
+        } else if (session.endsAt > 0L) {
+            lines.add(ChatColor.YELLOW + "Time Left: "
+                    + ChatColor.WHITE + formatMatchScoreboardTime(Math.max(0L, session.endsAt - now)));
+        } else {
+            lines.add(ChatColor.YELLOW + "Time: " + ChatColor.WHITE
+                    + formatMatchScoreboardTime(Math.max(0L, now - session.startedAt)));
+        }
+
+        Scoreboard scoreboard = session.sharedMatchScoreboard;
+        Objective objective = session.sharedMatchScoreboardObjective;
+        for (int index = 0; index < session.sharedMatchScoreboardTeams.size(); index++) {
+            Team line = session.sharedMatchScoreboardTeams.get(index);
+            String entry = session.sharedMatchScoreboardEntries.get(index);
+            if (index < lines.size()) {
+                line.setPrefix(lines.get(index));
+                objective.getScore(entry).setScore(lines.size() - index);
+            } else {
+                line.setPrefix("");
+                scoreboard.resetScores(entry);
+            }
+        }
+
+        for (Player player : session.players.values()) {
+            if (player != null && player.isOnline() && player.getScoreboard() != scoreboard) {
+                player.setScoreboard(scoreboard);
+            }
+        }
+        applySessionTeamTabTeams(session);
+    }
+
+    private List<String> sharedMatchScoreLines(Session session) {
+        List<String> lines = new ArrayList<>();
+        List<Integer> teamIds = session.teams.values().stream().distinct().sorted().toList();
+        if (teamIds.size() > 1) {
+            ChatColor[] colors = {ChatColor.RED, ChatColor.BLUE, ChatColor.GREEN, ChatColor.YELLOW,
+                    ChatColor.AQUA, ChatColor.LIGHT_PURPLE, ChatColor.GOLD, ChatColor.WHITE};
+            String[] names = {"Red", "Blue", "Green", "Yellow", "Aqua", "Pink", "Gold", "White"};
+            for (int index = 0; index < Math.min(teamIds.size(), 4); index++) {
+                int teamId = teamIds.get(index);
+                int alive = 0;
+                int score = 0;
+                for (UUID playerId : session.participantIds) {
+                    if (session.teams.getOrDefault(playerId, -1) != teamId) continue;
+                    if (session.alive.contains(playerId)) alive++;
+                    score += session.scores.getOrDefault(playerId, 0);
+                }
+                lines.add(colors[index] + names[index] + ChatColor.WHITE + ": " + alive
+                        + " alive  " + ChatColor.GRAY + score + " pts");
+            }
+            return lines;
+        }
+
+        List<Player> leaders = session.participantIds.stream()
+                .map(session.players::get)
+                .filter(player -> player != null)
+                .sorted(java.util.Comparator
+                        .comparingInt((Player player) -> session.scores.getOrDefault(player.getUniqueId(), 0)).reversed()
+                        .thenComparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
+                .limit(4)
+                .toList();
+        for (int index = 0; index < leaders.size(); index++) {
+            Player player = leaders.get(index);
+            lines.add(ChatColor.GRAY + "#" + (index + 1) + " " + ChatColor.WHITE
+                    + player.getName() + ChatColor.YELLOW + " "
+                    + session.scores.getOrDefault(player.getUniqueId(), 0));
+        }
+        return lines;
+    }
+
+    private String sharedMatchObjective(ArcadePortGame type) {
+        return switch (type) {
+            case EVOLUTION -> "Survive each evolution";
+            case MICRO_BATTLES -> "Be the last team standing";
+            case RUNNER -> "Reach the finish";
+            case SHEEP_QUEST -> "Capture sheep for points";
+            case SPLEEF -> "Be the last player standing";
+            case TURF_WARS -> "Build, then fight for turf";
+            case DRAW_MY_THING -> "Draw or guess the word";
+            case SKY_WARS -> "Be the last player standing";
+            case MILK_THE_COW -> "First team to 15 points";
+            case WITHER_ASSAULT -> "Humans survive; Withers hunt";
+            case CAMERA_SHY -> "Avoid the camera and survive";
+            default -> type.displayName();
+        };
+    }
+
+    private String formatMatchScoreboardTime(long millis) {
+        long seconds = (Math.max(0L, millis) + 999L) / 1_000L;
+        return String.format(java.util.Locale.ROOT, "%d:%02d", seconds / 60L, seconds % 60L);
     }
 
     private void setupGladiatorsScoreboard(Session session) {
@@ -9916,6 +10086,7 @@ public final class ArcadePortManager implements Listener {
         disableParticipantCollisions(session);
         long now = System.currentTimeMillis();
         session.ticks++;
+        if (session.sharedMatchScoreboardObjective != null) updateSharedMatchScoreboard(session, now);
         if (session.liveStarted) updateLegacyNaturalRegeneration(session);
         if (session.type.isMonsterMaze()) {
             if (!monsterMazeRunning()) finish(session, null, true);
@@ -26223,6 +26394,11 @@ public final class ArcadePortManager implements Listener {
         Objective masterBuildersScoreboardObjective;
         final List<String> masterBuildersScoreboardEntries = new ArrayList<>();
         long masterBuildersNextScoreboardAt;
+        Scoreboard sharedMatchScoreboard;
+        Objective sharedMatchScoreboardObjective;
+        final List<Team> sharedMatchScoreboardTeams = new ArrayList<>();
+        final List<String> sharedMatchScoreboardEntries = new ArrayList<>();
+        long sharedMatchNextScoreboardAt;
         final Map<UUID, Integer> paintPiecesRemaining = new HashMap<>();
         Scoreboard paintballScoreboard;
         Objective paintballScoreboardObjective;

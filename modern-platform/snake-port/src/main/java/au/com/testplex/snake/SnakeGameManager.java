@@ -47,6 +47,10 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.scoreboard.DisplaySlot;
+import org.bukkit.scoreboard.Objective;
+import org.bukkit.scoreboard.Scoreboard;
+import org.bukkit.scoreboard.Team;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayDeque;
@@ -99,6 +103,11 @@ public final class SnakeGameManager implements Listener {
     private long liveAt;
     private int lastAnnouncedCountdownSecond = -1;
     private int startingPlayerCount;
+    private Scoreboard matchScoreboard;
+    private Objective matchScoreboardObjective;
+    private final List<Team> matchScoreboardTeams = new ArrayList<>();
+    private final List<String> matchScoreboardEntries = new ArrayList<>();
+    private long nextScoreboardUpdateAt;
     private int tick;
     private long startedAt;
     private long nextFoodAt;
@@ -233,6 +242,8 @@ public final class SnakeGameManager implements Listener {
             snakes.put(player.getUniqueId(), state);
             grantKit(player, kit);
         }
+
+        setupMatchScoreboard();
 
         announce(ChatColor.YELLOW + "Map: " + SnakeMapCatalog.displayName(mapResource));
         announce(ChatColor.GOLD + "Snake preparation: stay on your starting pad. The round begins in 9 seconds.");
@@ -383,10 +394,85 @@ public final class SnakeGameManager implements Listener {
         if (stats != null) stats.flush();
     }
 
+    private void setupMatchScoreboard() {
+        if (Bukkit.getScoreboardManager() == null) return;
+        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
+        Objective objective = scoreboard.registerNewObjective("snake", "dummy",
+                ChatColor.GREEN + "SNAKE");
+        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+        matchScoreboard = scoreboard;
+        matchScoreboardObjective = objective;
+        for (int index = 0; index < 15; index++) {
+            Team line = scoreboard.registerNewTeam("snakeline" + index);
+            String entry = ChatColor.values()[index].toString() + ChatColor.RESET;
+            line.addEntry(entry);
+            matchScoreboardTeams.add(line);
+            matchScoreboardEntries.add(entry);
+        }
+        for (SnakeState state : snakes.values()) {
+            if (state.player.isOnline()) state.player.setScoreboard(scoreboard);
+        }
+        updateMatchScoreboard(System.currentTimeMillis());
+    }
+
+    private void updateMatchScoreboard(long now) {
+        if (matchScoreboardObjective == null || now < nextScoreboardUpdateAt) return;
+        nextScoreboardUpdateAt = now + 500L;
+        List<String> lines = new ArrayList<>();
+        if (!live) {
+            lines.add(ChatColor.YELLOW + "Starts in " + formatScoreboardTime(Math.max(0L, liveAt - now)));
+        } else {
+            lines.add(ChatColor.GREEN + "In Progress");
+        }
+        lines.add(ChatColor.GRAY + "Map: " + ChatColor.WHITE + SnakeMapCatalog.displayName(mapResource));
+        lines.add(" ");
+        long alive = snakes.values().stream().filter(state -> state.alive && state.player.isOnline()).count();
+        lines.add(ChatColor.AQUA + "Players: " + ChatColor.WHITE + alive + "/" + startingPlayerCount);
+        lines.add(ChatColor.YELLOW + "Food: " + ChatColor.WHITE + foods.size());
+        lines.add("  ");
+        lines.add(ChatColor.GOLD + "Top Snakes");
+        snakes.values().stream()
+                .filter(state -> state.player != null)
+                .sorted(java.util.Comparator
+                        .comparingInt((SnakeState state) -> state.kills).reversed()
+                        .thenComparing(java.util.Comparator.comparingInt(
+                                (SnakeState state) -> state.maxTailLength).reversed())
+                        .thenComparing(state -> state.player.getName(), String.CASE_INSENSITIVE_ORDER))
+                .limit(4)
+                .forEach(state -> lines.add((state.alive ? ChatColor.GREEN : ChatColor.GRAY)
+                        + state.player.getName() + ChatColor.WHITE + " " + state.kills + "K"));
+        lines.add("   ");
+        lines.add(ChatColor.YELLOW + "Time: " + ChatColor.WHITE
+                + formatScoreboardTime(Math.max(0L, now - startedAt)));
+
+        for (int index = 0; index < matchScoreboardTeams.size(); index++) {
+            Team line = matchScoreboardTeams.get(index);
+            String entry = matchScoreboardEntries.get(index);
+            if (index < lines.size()) {
+                line.setPrefix(lines.get(index));
+                matchScoreboardObjective.getScore(entry).setScore(lines.size() - index);
+            } else {
+                line.setPrefix("");
+                matchScoreboard.resetScores(entry);
+            }
+        }
+        for (SnakeState state : snakes.values()) {
+            if (state.player.isOnline() && state.player.getScoreboard() != matchScoreboard) {
+                state.player.setScoreboard(matchScoreboard);
+            }
+        }
+    }
+
+    private String formatScoreboardTime(long millis) {
+        long seconds = (Math.max(0L, millis) + 999L) / 1_000L;
+        return String.format(java.util.Locale.ROOT, "%d:%02d", seconds / 60L, seconds % 60L);
+    }
+
     private void tick() {
         if (!running || arena == null) return;
         tick++;
         long now = System.currentTimeMillis();
+        updateMatchScoreboard(now);
 
         if (!live) {
             // Reborn's PrepareFreeze phase keeps players on their starting sheep until the 9-second countdown ends.
@@ -1021,6 +1107,7 @@ public final class SnakeGameManager implements Listener {
         }
         for (Slime slime : foods) if (slime != null && slime.isValid()) slime.remove();
         for (MagmaCube cube : hazards) if (cube != null && cube.isValid()) cube.remove();
+        clearMatchScoreboard();
         foods.clear();
         hazards.clear();
         snakes.clear();
@@ -1031,6 +1118,23 @@ public final class SnakeGameManager implements Listener {
         nextGrowAt = Long.MAX_VALUE;
         nextHazardAt = Long.MAX_VALUE;
         stats.flush();
+    }
+
+    private void clearMatchScoreboard() {
+        if (matchScoreboard == null) return;
+        try {
+            for (Team team : new ArrayList<>(matchScoreboardTeams)) {
+                if (matchScoreboard.getTeam(team.getName()) != null) team.unregister();
+            }
+            if (matchScoreboardObjective != null) matchScoreboardObjective.unregister();
+        } catch (IllegalArgumentException | IllegalStateException ignored) {
+            // Players' original scoreboards have already been restored.
+        }
+        matchScoreboardTeams.clear();
+        matchScoreboardEntries.clear();
+        matchScoreboard = null;
+        matchScoreboardObjective = null;
+        nextScoreboardUpdateAt = 0L;
     }
 
     private void grantKit(Player player, String kit) {
@@ -1550,6 +1654,7 @@ public final class SnakeGameManager implements Listener {
         final float exhaustion;
         final int fireTicks;
         final float walkSpeed;
+        final Scoreboard scoreboard;
 
         PlayerSnapshot(Player player) {
             location = player.getLocation().clone();
@@ -1571,6 +1676,7 @@ public final class SnakeGameManager implements Listener {
             exhaustion = player.getExhaustion();
             fireTicks = player.getFireTicks();
             walkSpeed = player.getWalkSpeed();
+            scoreboard = player.getScoreboard();
         }
 
         void restore(Player player) {
@@ -1598,6 +1704,7 @@ public final class SnakeGameManager implements Listener {
             for (PotionEffect effect : potionEffects) player.addPotionEffect(effect);
             player.setAllowFlight(allowFlight);
             if (allowFlight) player.setFlying(flying);
+            if (scoreboard != null) player.setScoreboard(scoreboard);
         }
 
         private static ItemStack[] cloneItems(ItemStack[] items) {
