@@ -744,7 +744,7 @@ class ArcadePortGameTest {
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.SPLEEF));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.TURF_WARS));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.MILK_THE_COW));
-        assertFalse(SourceMapCatalog.hasMap(ArcadePortGame.WITHER_ASSAULT));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.WITHER_ASSAULT));
         assertNull(SourceMapCatalog.resourceFor(ArcadePortGame.EVOLUTION));
         assertNull(SourceMapCatalog.resourceFor(ArcadePortGame.WITHER_ASSAULT));
     }
