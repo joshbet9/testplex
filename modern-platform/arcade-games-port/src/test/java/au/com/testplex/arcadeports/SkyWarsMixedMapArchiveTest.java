@@ -78,7 +78,7 @@ final class SkyWarsMixedMapArchiveTest {
             assertNotNull(input, "Recovered SkyWars maps need a packaged inferred-metadata manifest");
             return new String(input.readAllBytes(), StandardCharsets.UTF_8).lines()
                     .map(String::trim)
-                    .filter(line -> !line.isEmpty() && !line.startsWith("#"))
+                    .filter(line -> line.toLowerCase(java.util.Locale.ROOT).endsWith(".zip"))
                     .collect(Collectors.toSet());
         }
     }

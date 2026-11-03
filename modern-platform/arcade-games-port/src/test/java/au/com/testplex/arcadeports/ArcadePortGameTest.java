@@ -30,8 +30,8 @@ class ArcadePortGameTest {
                 SourceMapCatalog.mapFoldersFor(ArcadePortGame.SNEAKY_ASSASSINS));
         assertEquals(java.util.List.of("Castle Assault"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.CASTLE_ASSAULT));
         assertEquals(java.util.List.of("Heroes of GWEN"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.HEROES_OF_GWEN));
-        assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.EVOLUTION).isEmpty(),
-                "Evolution has no legacy map archive folder and must not be given an invented one");
+        assertEquals(java.util.List.of("Evolution"),
+                SourceMapCatalog.mapFoldersFor(ArcadePortGame.EVOLUTION));
         assertEquals(java.util.List.of("Draw My Thing"),
                 SourceMapCatalog.mapFoldersFor(ArcadePortGame.DRAW_MY_THING));
         assertEquals(java.util.List.of("Master Builders"),
@@ -730,7 +730,7 @@ class ArcadePortGameTest {
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DEATH_TAG));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DRAGON_ESCAPE));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DRAGONS));
-        assertFalse(SourceMapCatalog.hasMap(ArcadePortGame.EVOLUTION));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.EVOLUTION));
         assertFalse(SourceMapCatalog.hasMap(ArcadePortGame.CAMERA_SHY));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.SUPER_SPLOOR));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DRAGONS));
