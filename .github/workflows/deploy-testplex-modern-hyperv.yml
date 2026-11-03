@@ -1618,6 +1618,7 @@ jobs:
           HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
           HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
           HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
+          DEPLOY_OUTCOME: ${{ steps.install-and-start.outcome }}
         run: |
           set -u
           diagnostics="$RUNNER_TEMP/testplex-modern-deploy-diagnostics.txt"
@@ -1636,24 +1637,30 @@ jobs:
               -o BatchMode=yes -o StrictHostKeyChecking=yes
               -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
               -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
-            if timeout --foreground --signal=TERM --kill-after=10s 2m ssh "${ssh_opts[@]}" "$remote" sudo -n bash -s <<'REMOTE_DIAGNOSTICS' >> "$diagnostics" 2>&1
+            if timeout --foreground --signal=TERM --kill-after=10s 2m ssh "${ssh_opts[@]}" "$remote" sudo -n bash -s -- "$DEPLOY_OUTCOME" <<'REMOTE_DIAGNOSTICS' >> "$diagnostics" 2>&1
           set +e
+          deploy_outcome="$1"
           SERVER_DIR=/home/monstermaze/servers/testplex-modern
           STATE_DIR=/var/lib/testplex-modern-deploy
           echo '=== Deployment transaction ==='
           sudo -n cat "$STATE_DIR/current.properties"
           echo '=== Service state ==='
-          sudo -n systemctl status testplex-modern.service --no-pager -l
           sudo -n systemctl show testplex-modern.service -p ActiveState -p SubState -p Result -p MainPID -p InvocationID
           echo '=== Port 25568 ==='
           sudo -n ss -ltnp | grep -E ':25568$' || true
-          echo '=== Latest systemd journal ==='
-          sudo -n journalctl -u testplex-modern.service -n 120 --no-pager -o short-iso
-          echo '=== Latest Paper log ==='
-          sudo -n tail -n 180 "$SERVER_DIR/logs/latest.log" 2>/dev/null || true
           echo '=== Installed modern artifacts ==='
           sudo -n cat "$SERVER_DIR/.testplex-modern-deployed-build" 2>/dev/null || true
           sudo -n sha256sum "$SERVER_DIR/paper.jar" "$SERVER_DIR"/plugins/*.jar 2>/dev/null || true
+          echo '=== Arcade readiness identity ==='
+          sudo -n cat "$SERVER_DIR/plugins/ArcadeMechanicsModern/.testplex-arcade-readiness.properties" 2>/dev/null || true
+          if [[ "$deploy_outcome" != success ]]; then
+            echo '=== Latest systemd journal ==='
+            sudo -n journalctl -u testplex-modern.service -n 120 --no-pager -o short-iso
+            echo '=== Latest Paper log ==='
+            sudo -n tail -n 180 "$SERVER_DIR/logs/latest.log" 2>/dev/null || true
+          else
+            echo 'Successful deployment diagnostics: verbose journals omitted; transaction, process, port, JAR hashes, and readiness identity are recorded above.'
+          fi
           echo '=== Recovery attempts ==='
           backup_dir="$(sudo -n sed -n 's/^backup_dir=//p' "$STATE_DIR/current.properties" | head -n 1)"
           if [[ -n "$backup_dir" && -d "$backup_dir/failed-artifacts" ]]; then
