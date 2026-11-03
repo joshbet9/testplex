@@ -1588,6 +1588,37 @@ public final class SourceMapCatalog {
             return result;
         }
 
+        /** Reproduce Reborn Dragon Escape's ParseData nearest-marker route ordering. */
+        public static List<Location> legacyNearestRouteMarkers(Location start, List<Location> markers) {
+            List<Location> remaining = new ArrayList<>();
+            if (markers != null) {
+                for (Location marker : markers) if (marker != null) remaining.add(marker.clone());
+            }
+            List<Location> route = new ArrayList<>();
+            if (start == null) return route;
+            Location last = start.clone();
+            while (!remaining.isEmpty()) {
+                Location nearest = null;
+                double nearestDistance = Double.POSITIVE_INFINITY;
+                for (Location marker : remaining) {
+                    double distance = last.distance(marker);
+                    if (nearest == null || distance < nearestDistance) {
+                        nearest = marker;
+                        nearestDistance = distance;
+                    }
+                }
+                if (nearestDistance < ArcadePortRules.DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE
+                        && remaining.size() > 1) {
+                    remaining.remove(nearest);
+                    continue;
+                }
+                route.add(nearest.clone());
+                remaining.remove(nearest);
+                last = nearest.clone().subtract(0.0D, 1.0D, 0.0D);
+            }
+            return route;
+        }
+
         public List<Location> dataLocations(String name) {
             return copyLocations(dataLocations.get(name == null ? "" : name.toUpperCase(java.util.Locale.ROOT)));
         }

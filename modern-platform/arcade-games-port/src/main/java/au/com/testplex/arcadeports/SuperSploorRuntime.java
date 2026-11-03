@@ -136,6 +136,7 @@ public final class SuperSploorRuntime implements Listener {
     private static final int SQUID_SLOT = 7;
 
     private final JavaPlugin plugin;
+    private final AbilityCooldownProgress cooldownProgress;
     private final NamespacedKey projectileKey;
     private final Map<UUID, Player> players = new LinkedHashMap<>();
     private final Map<UUID, Integer> teams = new HashMap<>();
@@ -201,6 +202,7 @@ public final class SuperSploorRuntime implements Listener {
 
     public SuperSploorRuntime(JavaPlugin plugin) {
         this.plugin = plugin;
+        this.cooldownProgress = AbilityCooldownProgress.forPlugin(plugin);
         this.projectileKey = new NamespacedKey(plugin, "super-sploor-projectile");
         Bukkit.getPluginManager().registerEvents(this, plugin);
     }
@@ -291,6 +293,46 @@ public final class SuperSploorRuntime implements Listener {
             player.sendMessage(ChatColor.YELLOW + "Right-click your selected primary weapon to paint. Select the Ink Sac on slot 8 while standing on friendly paint to enter Squid Mode.");
         }
         updateScoreboard(now);
+    }
+
+    public boolean onMidGamePlayerJoined(Player player, int team, Location spawn, String requestedKit) {
+        if (!running || engine == null || player == null || !player.isOnline()
+                || (team != RED && team != BLUE) || spawn == null || spawn.getWorld() != world
+                || players.containsKey(player.getUniqueId())) return false;
+        UUID id = player.getUniqueId();
+        long now = System.currentTimeMillis();
+        String kit = normalizeKit(requestedKit);
+        players.put(id, player);
+        teams.put(id, team);
+        spawns.put(id, spawn.clone());
+        kits.put(id, kit);
+        ink.put(id, SuperSploorRules.MAX_INK);
+        marks.put(id, 0);
+        lastShotAt.put(id, now - 2_000L);
+        lastInkRegenAt.put(id, now);
+        lastInkUseAt.put(id, now);
+        spawnProtectedUntil.put(id, now + SuperSploorRules.SPAWN_PROTECTION_MILLIS);
+        kills.put(id, 0);
+        MutableStats stats = new MutableStats();
+        stats.kit = kit;
+        playerStats.put(id, stats);
+        specialCharge.put(id, 0.0D);
+        secondaryReadyAt.put(id, now);
+        specialTargetsThisActivation.put(id, new HashSet<>());
+        contributors.put(id, new HashSet<>());
+        contributorTimes.put(id, new HashMap<>());
+        if ("dualies".equals(kit)) {
+            dodgeRollCharges.put(id, 2);
+            nextDodgeRollRechargeAt.put(id, Long.MAX_VALUE);
+            dualiesRollTargets.put(id, new HashSet<>());
+            dualiesPostRollUniqueTargets.put(id, new HashSet<>());
+        }
+        giveStarterLoadout(player, team, kit);
+        player.setGameMode(GameMode.ADVENTURE);
+        player.setInvulnerable(false);
+        updateInkBar(player, id);
+        updateScoreboard(now);
+        return true;
     }
 
     public void tick(long now) {
@@ -460,6 +502,7 @@ public final class SuperSploorRuntime implements Listener {
         ink.put(id, SuperSploorRules.spendInk(current, cost));
         lastInkUseAt.put(id, now);
         secondaryReadyAt.put(id, now + 4_000L);
+        cooldownProgress.start(player, secondaryName(kit), 4_000L);
 
         if ("roller".equals(kit)) {
             Location mineLocation = player.getLocation().getBlock().getRelative(0, -1, 0)
@@ -1033,6 +1076,7 @@ public final class SuperSploorRuntime implements Listener {
         dodgeRollCharges.put(id, SuperSploorRules.dodgeRollChargesAfterUse(charges));
         if (charges == SuperSploorRules.DODGE_ROLL_MAX_CHARGES) {
             nextDodgeRollRechargeAt.put(id, now + SuperSploorRules.DODGE_ROLL_RECHARGE_MILLIS);
+            cooldownProgress.start(player, "Dodge Roll", SuperSploorRules.DODGE_ROLL_RECHARGE_MILLIS);
         }
         dualiesRollExpiresAt.put(id, now + 5_000L);
         dualiesRollTargets.computeIfAbsent(id, ignored -> new HashSet<>()).clear();
@@ -1057,6 +1101,12 @@ public final class SuperSploorRuntime implements Listener {
             nextDodgeRollRechargeAt.put(id,
                     dodgeRollCharges.getOrDefault(id, 0) < SuperSploorRules.DODGE_ROLL_MAX_CHARGES
                             ? now + SuperSploorRules.DODGE_ROLL_RECHARGE_MILLIS : Long.MAX_VALUE);
+            if (dodgeRollCharges.getOrDefault(id, 0) < SuperSploorRules.DODGE_ROLL_MAX_CHARGES) {
+                Player player = players.get(id);
+                if (player != null && player.isOnline()) {
+                    cooldownProgress.start(player, "Dodge Roll", SuperSploorRules.DODGE_ROLL_RECHARGE_MILLIS);
+                }
+            }
         }
     }
 

@@ -75,6 +75,9 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scoreboard.DisplaySlot;
+import org.bukkit.scoreboard.Objective;
+import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 
@@ -102,6 +105,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private static final int CASTLE_KING_HEALTH = 600;
+    private static final int CASTLE_KING_HEALTH_REFERENCE_PLAYERS = 15;
     private static final int CASTLE_CRYSTAL_COUNT = 2;
     private static final long CASTLE_NORMAL_TNT_DELAY = 60_000L;
     private static final long MOBA_PASSIVE_GOLD_INTERVAL = ArcadePortRules.HEROES_OF_GWEN_GOLD_INTERVAL_MILLIS;
@@ -244,7 +248,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private UUID objectiveCarrier;
     private long objectiveRespawnAt;
     private long objectiveCarryStartedAt;
+    private long objectiveCarrierLastEffectAt;
     private long nextChestRefillAt;
+    private long nextCastleScoreboardAt;
     private long nextGoldAt;
     private long nextStructureUpdateAt;
     private long nextCapturePointUpdateAt;
@@ -257,6 +263,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private boolean ready;
     private boolean stopped;
     private boolean listenersRegistered;
+    private Scoreboard castleScoreboard;
+    private Objective castleScoreboardObjective;
 
     CastleAssaultHeroesOfGwenRuntime(
             JavaPlugin plugin,
@@ -303,6 +311,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             long now = System.currentTimeMillis();
             objectiveRespawnAt = now + objectiveDelay();
             nextChestRefillAt = now + 120_000L;
+            if (game == ArcadePortGame.CASTLE_ASSAULT) {
+                createCastleScoreboard();
+                updateCastleScoreboard(now);
+            }
             nextGoldAt = now + MOBA_PASSIVE_GOLD_INTERVAL;
             if (game == ArcadePortGame.HEROES_OF_GWEN) {
                 nextMinionWaveAt = now + MOBA_MINION_WAVE_INTERVAL;
@@ -384,11 +396,67 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         king.setSilent(true);
         king.setInvulnerable(false);
         king.setRemoveWhenFarAway(false);
-        king.setCustomName(teamColour(team) + name + ChatColor.RED + " ❤ " + CASTLE_KING_HEALTH);
+        king.getEquipment().setHelmet(castleArmour(Material.DIAMOND_HELMET, null, 0));
+        king.getEquipment().setChestplate(castleArmour(Material.DIAMOND_CHESTPLATE, null, 0));
+        king.getEquipment().setLeggings(castleArmour(Material.DIAMOND_LEGGINGS, null, 0));
+        king.getEquipment().setBoots(castleArmour(Material.DIAMOND_BOOTS, null, 0));
+        king.getEquipment().setItemInMainHandDropChance(0.0F);
+        king.getEquipment().setItemInOffHandDropChance(0.0F);
+        king.getEquipment().setHelmetDropChance(0.0F);
+        king.getEquipment().setChestplateDropChance(0.0F);
+        king.getEquipment().setLeggingsDropChance(0.0F);
+        king.getEquipment().setBootsDropChance(0.0F);
+        int kingHealth = castleKingHealthForOpponents(team);
+        king.setCustomName(teamColour(team) + name + ChatColor.RED + " ❤ " + kingHealth);
         king.setCustomNameVisible(true);
         king.getPersistentDataContainer().set(kingKey, PersistentDataType.INTEGER, team);
-        kings.put(team, new KingState(team, name, location.clone(), king, CASTLE_KING_HEALTH));
+        kings.put(team, new KingState(team, name, location.clone(), king, kingHealth));
         entities.add(king);
+    }
+
+    private int castleKingHealthForOpponents(int kingTeam) {
+        int opponentCount = (int) teams.values().stream().filter(team -> team == 1 - kingTeam).count();
+        int scaledPlayers = Math.min(CASTLE_KING_HEALTH_REFERENCE_PLAYERS, opponentCount);
+        return Math.max(1, (int) Math.ceil(CASTLE_KING_HEALTH * scaledPlayers
+                / (double) CASTLE_KING_HEALTH_REFERENCE_PLAYERS));
+    }
+
+    boolean isCastleAssaultLateJoinLocked() {
+        if (game != ArcadePortGame.CASTLE_ASSAULT) return false;
+        return kings.values().stream().anyMatch(king -> king.activeCrystals() == 0);
+    }
+
+    int castleAssaultLosingTeam() {
+        if (game != ArcadePortGame.CASTLE_ASSAULT) return -1;
+        int redCrystals = kings.containsKey(0) ? kings.get(0).activeCrystals() : CASTLE_CRYSTAL_COUNT;
+        int blueCrystals = kings.containsKey(1) ? kings.get(1).activeCrystals() : CASTLE_CRYSTAL_COUNT;
+        return redCrystals == blueCrystals ? -1 : redCrystals < blueCrystals ? 0 : 1;
+    }
+
+    boolean onMidGamePlayerJoined(Player player, int team) {
+        if (stopped || !ready || player == null || !player.isOnline()
+                || (team != 0 && team != 1) || players.containsKey(player.getUniqueId())) return false;
+        if (game == ArcadePortGame.CASTLE_ASSAULT && isCastleAssaultLateJoinLocked()) return false;
+        UUID id = player.getUniqueId();
+        players.put(id, player);
+        activePlayers.add(id);
+        teams.put(id, team);
+        if (game == ArcadePortGame.CASTLE_ASSAULT) {
+            for (KingState king : kings.values()) {
+                king.maxHealth = castleKingHealthForOpponents(king.team);
+                king.health = king.maxHealth;
+                if (king.entity != null && king.entity.isValid()) {
+                    king.entity.setCustomName(teamColour(king.team) + king.name + ChatColor.RED
+                            + " ❤ " + king.health);
+                }
+            }
+        } else {
+            heroesOfGwenCounterpartOnly.add(id);
+            playerGold.put(id, 0);
+            addPlayerToWitherTeamHud(player);
+        }
+        if (castleScoreboard != null) player.setScoreboard(castleScoreboard);
+        return true;
     }
 
     private void spawnCrystals(int team, List<Location> locations) {
@@ -1473,6 +1541,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private void tickCastleAssault(long now) {
         refillCastleArcherArrows(now);
+        if (now >= nextCastleScoreboardAt) updateCastleScoreboard(now);
         if (objectiveItem != null && objectiveItem.isValid() && activeObjectiveSpawn != null) {
             objectiveItem.teleport(activeObjectiveSpawn);
             objectiveItem.setVelocity(new Vector());
@@ -1488,6 +1557,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             } else if (now - objectiveCarryStartedAt >= CASTLE_NORMAL_TNT_DELAY
                     || isAtEnemyCrystal(carrier)) {
                 detonateObjectiveTnt(carrier);
+            } else {
+                updateObjectiveCarrierProgress(carrier, now);
             }
         }
         if (now >= nextChestRefillAt) {
@@ -1512,6 +1583,69 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             spawnObjectiveItem(activeObjectiveSpawn);
         }
         checkTeamDeparture();
+    }
+
+    private void createCastleScoreboard() {
+        castleScoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
+        castleScoreboardObjective = castleScoreboard.registerNewObjective("castleassault", "dummy",
+                ChatColor.DARK_RED + "Castle Assault");
+        castleScoreboardObjective.setDisplaySlot(DisplaySlot.SIDEBAR);
+        for (Player player : players.values()) {
+            if (player != null && player.isOnline()) player.setScoreboard(castleScoreboard);
+        }
+    }
+
+    private void updateCastleScoreboard(long now) {
+        nextCastleScoreboardAt = now + 1_000L;
+        if (castleScoreboard == null || castleScoreboardObjective == null) return;
+        for (String entry : new ArrayList<>(castleScoreboard.getEntries())) castleScoreboard.resetScores(entry);
+        int score = 8;
+        castleScoreboardObjective.getScore(ChatColor.GREEN + "Chest Refill").setScore(score--);
+        castleScoreboardObjective.getScore(ChatColor.WHITE + castleCountdown(nextChestRefillAt - now)
+                + ChatColor.GREEN).setScore(score--);
+        castleScoreboardObjective.getScore(ChatColor.GREEN + "TNT Spawn").setScore(score--);
+        String tntStatus = objectiveItem != null && objectiveItem.isValid() ? "Spawned"
+                : castleCountdown(objectiveRespawnAt - now);
+        castleScoreboardObjective.getScore(ChatColor.WHITE + tntStatus + ChatColor.GOLD).setScore(score--);
+        castleScoreboardObjective.getScore(ChatColor.RED + "Red King").setScore(score--);
+        KingState redKing = kings.get(0);
+        castleScoreboardObjective.getScore(ChatColor.WHITE + castleKingStatus(redKing) + ChatColor.RED).setScore(score--);
+        castleScoreboardObjective.getScore(ChatColor.AQUA + "Blue King").setScore(score--);
+        KingState blueKing = kings.get(1);
+        castleScoreboardObjective.getScore(ChatColor.WHITE + castleKingStatus(blueKing) + ChatColor.AQUA).setScore(score);
+    }
+
+    private String castleKingStatus(KingState king) {
+        if (king == null) return "Unavailable";
+        int active = king.activeCrystals();
+        return active > 0 ? active + "/" + CASTLE_CRYSTAL_COUNT + " Crystals Active"
+                : Math.max(0, king.health) + " Health";
+    }
+
+    private static String castleCountdown(long millis) {
+        long seconds = Math.max(0L, (millis + 999L) / 1_000L);
+        return String.format(Locale.ROOT, "%d:%02d", seconds / 60L, seconds % 60L);
+    }
+
+    private void updateObjectiveCarrierProgress(Player carrier, long now) {
+        long elapsed = Math.max(0L, now - objectiveCarryStartedAt);
+        double progress = Math.min(1.0D, elapsed / (double) CASTLE_NORMAL_TNT_DELAY);
+        int filled = (int) Math.floor(progress * 24.0D);
+        StringBuilder bar = new StringBuilder(ChatColor.GREEN.toString());
+        for (int i = 0; i < 24; i++) {
+            if (i == filled) bar.append(ChatColor.RED);
+            bar.append('█');
+        }
+        long secondsLeft = Math.max(0L, (CASTLE_NORMAL_TNT_DELAY - elapsed + 999L) / 1_000L);
+        carrier.sendActionBar(ChatColor.BOLD + "TNT Detonation " + ChatColor.RESET + bar
+                + ChatColor.RESET + " " + secondsLeft + "s");
+        if (now >= objectiveCarrierLastEffectAt) {
+            Color burst = teams.getOrDefault(carrier.getUniqueId(), -1) == 0 ? Color.RED : Color.AQUA;
+            world.spawnParticle(Particle.FIREWORK, carrier.getEyeLocation(), 4, 0.12D, 0.12D, 0.12D, 0.01D);
+            world.spawnParticle(Particle.DUST, carrier.getEyeLocation(), 4, 0.15D, 0.15D, 0.15D,
+                    new Particle.DustOptions(burst, 1.0F));
+            objectiveCarrierLastEffectAt = now + 250L;
+        }
     }
 
     private void spawnObjectiveItem(Location spawn) {
@@ -1620,6 +1754,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private void fillCastleChest(Block block) {
         if (block == null || (block.getType() != Material.CHEST && block.getType() != Material.TRAPPED_CHEST)) return;
         if (!(block.getState() instanceof Chest chest)) return;
+        // Map chests can carry a native loot table that is generated on first open,
+        // replacing the source game's manually assigned inventory.
+        chest.setLootTable(null);
         Inventory inventory = chest.getBlockInventory();
         inventory.clear();
         Set<Integer> slots = new HashSet<>();
@@ -1658,6 +1795,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             inventory.setItem(slot, loot);
         }
         chest.update(true, false);
+    }
+
+    boolean isObjectiveCarrier(UUID playerId) {
+        return game == ArcadePortGame.CASTLE_ASSAULT && playerId != null && playerId.equals(objectiveCarrier);
     }
 
     private static ItemStack namedItem(Material material, String name, String lore, int amount) {
@@ -1728,10 +1869,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private void spawnObjectiveTnt() {
         if (objectiveTntSpawns.isEmpty()) return;
         Location spawn = objectiveTntSpawns.get(ThreadLocalRandom.current().nextInt(objectiveTntSpawns.size())).clone();
+        spawn.setX(spawn.getBlockX() + 0.5D);
+        spawn.setZ(spawn.getBlockZ() + 0.5D);
         Block platform = spawn.getBlock().getRelative(BlockFace.DOWN);
         rememberBlock(platform);
         platform.setType(Material.REDSTONE_BLOCK, false);
-        activeObjectiveSpawn = spawn.clone();
         activeObjectiveSpawn = spawn.clone();
         spawnObjectiveItem(spawn);
         world.spawnParticle(Particle.FIREWORK, spawn, 24, 0.3D, 0.3D, 0.3D, 0.03D);
@@ -1768,6 +1910,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             activeObjectiveSpawn = null;
         }
         announce(ChatColor.GOLD + player.getName() + " picked up Objective TNT! Get to the enemy sentries.");
+        player.sendMessage(ChatColor.GOLD + "You picked up Objective TNT.");
+        player.sendMessage(ChatColor.GRAY + "Right-click to detonate yourself, or reach an enemy sentry crystal.");
+        updateObjectiveCarrierProgress(player, objectiveCarryStartedAt);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
@@ -2647,6 +2792,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private void destroyCastleCrystal(KingState king, EnderCrystal crystal, Player attacker) {
         if (!king.crystals.remove(crystal)) return;
+        Location crystalLocation = crystal.getLocation().clone();
+        world.spawnParticle(Particle.EXPLOSION_EMITTER, crystalLocation, 1);
+        world.spawnParticle(Particle.CLOUD, crystalLocation, 30, 0.65D, 0.65D, 0.65D, 0.08D);
+        world.playSound(crystalLocation, Sound.ENTITY_GENERIC_EXPLODE, 1.3F, 0.9F);
         entities.remove(crystal);
         crystal.remove();
         castleCrystalsDestroyedByPlayer.merge(attacker.getUniqueId(), 1, Integer::sum);
@@ -3938,6 +4087,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         long adjustedDuration = heroesOfGwenStoreAdjustedCooldown(player, durationMillis, false);
         heroSkillReadyAt.computeIfAbsent(player.getUniqueId(), ignored -> new HashMap<>())
                 .put(skill, System.currentTimeMillis() + adjustedDuration);
+        AbilityCooldownProgress.forPlugin(plugin).start(player,
+                skill.substring(skill.indexOf('.') + 1).replace('_', ' '), adjustedDuration);
     }
 
     private boolean isHeroSkillReady(Player player, String skill) {
@@ -6241,12 +6392,14 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         final Zombie entity;
         final List<EnderCrystal> crystals = new ArrayList<>();
         int health;
+        int maxHealth;
         KingState(int team, String name, Location location, Zombie entity, int health) {
             this.team = team;
             this.name = name;
             this.location = location;
             this.entity = entity;
             this.health = health;
+            this.maxHealth = health;
         }
         int activeCrystals() {
             return (int) crystals.stream().filter(crystal -> crystal != null && crystal.isValid()).count();

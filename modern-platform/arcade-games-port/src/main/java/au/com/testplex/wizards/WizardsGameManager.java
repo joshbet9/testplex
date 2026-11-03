@@ -1,5 +1,6 @@
 package au.com.testplex.wizards;
 
+import au.com.testplex.arcadeports.AbilityCooldownProgress;
 import au.com.testplex.arcadeports.ArcadeMechanicsModernPlugin;
 import au.com.testplex.arcadeports.ArcadeGameModule;
 import au.com.testplex.arcadeports.ArcadePortGame;
@@ -100,6 +101,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
     }
 
     private final ArcadeMechanicsModernPlugin plugin;
+    private final AbilityCooldownProgress cooldownProgress;
     private final NamespacedKey spellKey;
     private final NamespacedKey wandKey;
     private final NamespacedKey menuKey;
@@ -160,6 +162,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
 
     public WizardsGameManager(ArcadeMechanicsModernPlugin plugin) {
         this.plugin = plugin;
+        this.cooldownProgress = AbilityCooldownProgress.forPlugin(plugin);
         spellKey = new NamespacedKey(plugin, "spell");
         wandKey = new NamespacedKey(plugin, "wand");
         menuKey = new NamespacedKey(plugin, "spell-menu");
@@ -1892,6 +1895,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         state.mana -= manaCost;
         int cooldown = spell.cooldownSeconds(level, state.cooldownModifier);
         state.cooldowns.put(spell, now + cooldown * 1000L);
+        cooldownProgress.start(player, spell.displayName(), cooldown * 1_000L);
         refreshManaBar(player, state);
         updateWandLabels(player, state);
         player.sendMessage(ChatColor.DARK_AQUA + spell.displayName() + ChatColor.GRAY + " cast • " +

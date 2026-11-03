@@ -1863,11 +1863,12 @@ class ArcadePortGameTest {
         assertEquals(0.0D, ArcadePortRules.interpolateDragonEscapeCoordinate(0.0D, 10.0D, Double.NaN), 0.00001D);
     }
 
-    @Test void dragonEscapeRouteOnlyDeduplicatesCoincidentWaypoints() {
+    @Test void dragonEscapeRouteUsesSourceThreeBlockDuplicateThreshold() {
         assertTrue(ArcadePortRules.isDuplicateDragonEscapeWaypoint(0.0D));
         assertTrue(ArcadePortRules.isDuplicateDragonEscapeWaypoint(0.5D));
-        assertFalse(ArcadePortRules.isDuplicateDragonEscapeWaypoint(0.75D));
-        assertFalse(ArcadePortRules.isDuplicateDragonEscapeWaypoint(2.0D));
+        assertTrue(ArcadePortRules.isDuplicateDragonEscapeWaypoint(0.75D));
+        assertTrue(ArcadePortRules.isDuplicateDragonEscapeWaypoint(2.0D));
+        assertFalse(ArcadePortRules.isDuplicateDragonEscapeWaypoint(3.0D));
         assertFalse(ArcadePortRules.isDuplicateDragonEscapeWaypoint(Double.NaN));
     }
 

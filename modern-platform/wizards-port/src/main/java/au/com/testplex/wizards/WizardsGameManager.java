@@ -110,6 +110,7 @@ public final class WizardsGameManager implements Listener {
     private final Map<UUID, MeteorData> endgameMeteors = new HashMap<>();
     private final List<Location> chests = new ArrayList<>();
     private final Random random = new Random();
+    private final WizardsCooldownProgress cooldownProgress;
 
     private final World arena;
     private final BukkitTask tickTask;
@@ -131,6 +132,7 @@ public final class WizardsGameManager implements Listener {
 
     public WizardsGameManager(WizardsModernPlugin plugin) {
         this.plugin = plugin;
+        this.cooldownProgress = new WizardsCooldownProgress(plugin);
         spellKey = new NamespacedKey(plugin, "spell");
         wandKey = new NamespacedKey(plugin, "wand");
         menuKey = new NamespacedKey(plugin, "spell-menu");
@@ -1378,6 +1380,7 @@ public final class WizardsGameManager implements Listener {
         state.mana -= manaCost;
         int cooldown = spell.cooldownSeconds(level, state.cooldownModifier);
         state.cooldowns.put(spell, now + cooldown * 1000L);
+        cooldownProgress.start(player, spell.displayName(), cooldown * 1_000L);
         refreshManaBar(player, state);
         updateWandLabels(player, state);
         player.sendMessage(ChatColor.DARK_AQUA + spell.displayName() + ChatColor.GRAY + " cast • " +

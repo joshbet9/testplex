@@ -326,6 +326,7 @@ public final class CameraShyGame implements Listener {
 
     private final JavaPlugin plugin;
     private final ArcadePortManager manager;
+    private final AbilityCooldownProgress cooldownProgress;
     private final ArcadeTestPlayerManager testPlayers;
     private final NamespacedKey abilityKey;
     private final NamespacedKey decoyStandKey;
@@ -395,6 +396,7 @@ public final class CameraShyGame implements Listener {
     public CameraShyGame(JavaPlugin plugin, ArcadePortManager manager) {
         this.plugin = plugin;
         this.manager = manager;
+        this.cooldownProgress = AbilityCooldownProgress.forPlugin(plugin);
         this.testPlayers = manager.testPlayerManager();
         this.abilityKey = new NamespacedKey(plugin, "camera-shy-ability");
         this.decoyStandKey = new NamespacedKey(plugin, "camera-shy-understudy");
@@ -1064,6 +1066,7 @@ public final class CameraShyGame implements Listener {
         if (hit instanceof ArmorStand stand && stand.getPersistentDataContainer()
                 .has(decoyStandKey, PersistentDataType.BYTE)) {
             cameraReadyAt.put(shooterId, now + cooldown);
+            cooldownProgress.start(shooter, "Camera", cooldown);
             takeUnderstudyPhoto(shooter, stand);
             emitCameraFlash(shooter.getLocation());
             return;
@@ -1084,6 +1087,7 @@ public final class CameraShyGame implements Listener {
             if (second != null) targets.add(second);
         }
         cameraReadyAt.put(shooterId, now + cooldown);
+        cooldownProgress.start(shooter, "Camera", cooldown);
         if (group && targets.size() >= 2) groupPhotoCharges.remove(shooterId);
         emitCameraFlash(shooter.getLocation());
         for (Player photographed : targets) registerPhoto(shooter, photographed, now);
@@ -1264,6 +1268,7 @@ public final class CameraShyGame implements Listener {
             return;
         }
         abilityReadyAt.put(id, now + cooldown);
+        cooldownProgress.start(player, kit.name().replace('_', ' '), cooldown);
         switch (kit) {
             case SMOKE_ARTIST -> {
                 Location center = player.getLocation().clone().add(0.0D, 1.0D, 0.0D);
