@@ -1203,8 +1203,8 @@ class ArcadePortGameTest {
         assertEquals(2.0D, ArcadePortRules.BACON_BODY_SLAM_KNOCKBACK_MULTIPLIER, 0.00001D);
         assertEquals(100, ArcadePortRules.BACON_METER_MAX,
                 "ability charge is damage-metered rather than time-cooled");
-        assertEquals(1.8D, ArcadePortRules.initialBaconKnockback(2), 0.00001D,
-                "two-player rounds start with stronger knockback");
+        assertEquals(1.5D, ArcadePortRules.initialBaconKnockback(2), 0.00001D,
+                "all rounds start with the source knockback magnitude");
         assertEquals(1.5D, ArcadePortRules.initialBaconKnockback(3), 0.00001D);
         assertEquals(1.8D, ArcadePortRules.nextBaconKnockback(1.5D), 0.00001D);
     }
@@ -1413,8 +1413,8 @@ class ArcadePortGameTest {
     @Test void baconBlastResolvesTheFirstCollisionAlongItsSweptPath() {
         assertTrue(ArcadePortRules.isBaconBlastPlayerBeforeBlock(0.2D, 0.8D, 2.0D));
         assertTrue(ArcadePortRules.isBaconBlastPlayerBeforeBlock(0.6D, 0.8D, 2.0D));
-        assertFalse(ArcadePortRules.isBaconBlastPlayerBeforeBlock(0.8D, 0.5D, 2.0D));
-        // A half-block segment is within the projectile radius of the player's collision volume.
+        assertTrue(ArcadePortRules.isBaconBlastPlayerBeforeBlock(0.8D, 0.5D, 2.0D));
+        // Swept collision includes the edge of a player hitbox rather than requiring a center hit.
         assertTrue(ArcadePortRules.isBaconBlastPlayerBeforeBlock(0.8D, 0.1D, 0.5D));
         assertFalse(ArcadePortRules.isBaconBlastPlayerBeforeBlock(0.8D, 0.1D, 2.0D));
         assertTrue(ArcadePortRules.isBaconBlastPlayerBeforeBlock(0.8D, -1.0D, 2.0D));
@@ -1424,8 +1424,8 @@ class ArcadePortGameTest {
 
     @Test void baconBlastThrownItemUsesSweptHitRadiusAndSafeExpiry() {
         assertTrue(ArcadePortRules.isBaconBlastNearPlayer(0.0D));
-        assertTrue(ArcadePortRules.isBaconBlastNearPlayer(0.25D));
-        assertFalse(ArcadePortRules.isBaconBlastNearPlayer(0.26D));
+        assertTrue(ArcadePortRules.isBaconBlastNearPlayer(0.64D));
+        assertFalse(ArcadePortRules.isBaconBlastNearPlayer(0.65D));
         assertFalse(ArcadePortRules.isBaconBlastNearPlayer(Double.NaN));
         assertFalse(ArcadePortRules.isBaconBlastNearPlayer(-1.0D));
 
@@ -2529,8 +2529,8 @@ class ArcadePortGameTest {
                 start, end, null)));
     }
 
-    @Test void baconBrawlStartsWithExtraKnockbackForTwoPlayers() {
-        assertEquals(1.8D, ArcadePortRules.initialBaconKnockback(2), 0.00001D);
+    @Test void baconBrawlStartsWithSourceKnockbackForEveryPlayerCount() {
+        assertEquals(1.5D, ArcadePortRules.initialBaconKnockback(2), 0.00001D);
         assertEquals(1.5D, ArcadePortRules.initialBaconKnockback(1), 0.00001D);
         assertEquals(1.5D, ArcadePortRules.initialBaconKnockback(3), 0.00001D);
     }

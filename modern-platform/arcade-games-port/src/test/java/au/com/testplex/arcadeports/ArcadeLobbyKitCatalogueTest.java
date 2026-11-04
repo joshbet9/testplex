@@ -48,15 +48,14 @@ class ArcadeLobbyKitCatalogueTest {
     }
 
     @Test
-    void dragonsCommunityKitsAreAvailableFromTheSharedKitCatalogue() {
+    void dragonsOnlyExposesTheSelectedSixKitsFromTheSharedKitCatalogue() {
         List<ArcadeLobbyKitCatalogue.KitChoice> choices =
                 ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.DRAGONS, List.of());
-        assertEquals(List.of("coward", "marksman", "pyrotechnic", "frost", "glider", "tamer", "dragon-warden"),
+        assertEquals(List.of("coward", "marksman", "pyrotechnic", "frost", "glider", "tamer"),
                 choices.stream().map(choice -> choice.id).toList());
         assertEquals(ArcadeLobbyKitCatalogue.Unlock.FREE, choices.get(0).unlock);
-        assertTrue(choices.subList(1, 6).stream()
+        assertTrue(choices.subList(1, choices.size()).stream()
                 .allMatch(choice -> choice.unlock == ArcadeLobbyKitCatalogue.Unlock.GEM));
-        assertEquals(ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT, choices.get(6).unlock);
     }
 
     @Test

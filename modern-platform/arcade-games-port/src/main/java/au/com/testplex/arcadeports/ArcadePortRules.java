@@ -475,7 +475,9 @@ public final class ArcadePortRules {
     /** Bacon Blast is a thrown pork item that ends on impact or after five seconds in flight. */
     public static final long BACON_BLAST_MAX_FLIGHT_MILLIS = 5_000L;
     /** Reborn's ProjectileManager AddThrow uses a 0.5-block collision radius. */
-    public static final double BACON_BLAST_PLAYER_COLLISION_RADIUS_SQUARED = 0.25D;
+    // The moving pork item has its own small hitbox. Expand the swept test enough to cover a
+    // player's full standing hitbox, rather than requiring the projectile path through its centre.
+    public static final double BACON_BLAST_PLAYER_COLLISION_RADIUS_SQUARED = 0.64D;
 
     public static boolean isBaconBlastBlockImpact(boolean onGround, boolean inLiquid,
             boolean insideSolidBlock, boolean stationaryAgainstSolidBlock) {
@@ -781,7 +783,6 @@ public final class ArcadePortRules {
             case "frost", "ice", "ice-bridge" -> "frost";
             case "glider", "glide" -> "glider";
             case "tamer", "dragon-tamer" -> "tamer";
-            case "dragon-warden", "warden" -> "dragon-warden";
             default -> null;
         };
     }
@@ -1432,7 +1433,8 @@ public final class ArcadePortRules {
     }
 
     public static double initialBaconKnockback(int playerCount) {
-        return playerCount == 2 ? 1.8D : 1.5D;
+        // BaconBrawl sets _knockbackMagnitude to 1.5 for every match size.
+        return 1.5D;
     }
 
     public static double nextBaconKnockback(double current) {
@@ -3078,7 +3080,7 @@ public final class ArcadePortRules {
                 .replace('_', '-').replace(' ', '-');
         if ("demo".equals(value) || "demolition".equals(value)) value = "demolitionist";
         return switch (value) {
-            case "alchemist", "archer", "demolitionist", "fighter", "tank", "breacher" -> value;
+            case "alchemist", "archer", "demolitionist", "fighter", "tank" -> value;
             default -> null;
         };
     }
@@ -3091,7 +3093,7 @@ public final class ArcadePortRules {
         if ("bob".equals(value) || "ross".equals(value) || "bobross".equals(value)) value = "bob-ross";
         return switch (value) {
             case "hattori", "devon", "anath", "dana", "biff", "larissa",
-                    "bardolf", "rowena", "ivy", "bob-ross", "tactician" -> value;
+                    "bardolf", "rowena", "ivy", "bob-ross" -> value;
             default -> null;
         };
     }
@@ -3103,7 +3105,7 @@ public final class ArcadePortRules {
         return switch (canonical) {
             case "hattori", "bardolf" -> "Assassin";
             case "devon", "rowena" -> "Hunter";
-            case "anath", "larissa", "bob-ross", "tactician" -> "Mage";
+            case "anath", "larissa", "bob-ross" -> "Mage";
             case "dana", "biff", "ivy" -> "Warrior";
             default -> null;
         };

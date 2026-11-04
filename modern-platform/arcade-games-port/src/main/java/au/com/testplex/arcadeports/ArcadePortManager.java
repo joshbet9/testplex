@@ -1209,8 +1209,7 @@ public final class ArcadePortManager implements Listener {
         }
         String value = requestedKit.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
         if (value.equals("quick-evolver") || value.equals("evolution-quick-evolver")
-                || value.equals("standard-evolution") || value.equals("evolution-standard")
-                || value.equals("apex")) {
+                || value.equals("standard-evolution") || value.equals("evolution-standard")) {
             selectEvolutionKit(player, value);
             return;
         }
@@ -1345,8 +1344,7 @@ public final class ArcadePortManager implements Listener {
         else if (ArcadePortRules.normalizeSpleefKit(value) != null) selectSpleefKit(player, value);
         else if (ArcadePortRules.normalizeMicroBattlesKit(value) != null) selectMicroBattlesKit(player, value);
         else if (value.equals("quick-evolver") || value.equals("evolution-quick-evolver")
-                || value.equals("standard-evolution") || value.equals("evolution-standard")
-                || value.equals("apex")) {
+                || value.equals("standard-evolution") || value.equals("evolution-standard")) {
             selectEvolutionKit(player, value);
         }
         else if (Set.of("rifle", "sniper", "shotgun", "machine-gun", "machinegun").contains(value)) selectPaintballKit(player, value);
@@ -1363,16 +1361,11 @@ public final class ArcadePortManager implements Listener {
     static String achievementKitUnlock(ArcadePortGame game, String kit) {
         if (game == null || kit == null) return null;
         return switch (game) {
-            case CASTLE_ASSAULT -> "breacher".equals(kit) ? "moral-exercise" : null;
-            case HEROES_OF_GWEN -> "tactician".equals(kit) ? "know-your-enemy" : null;
-            case SKY_WARS -> "tnt-specialist".equals(kit) ? "death-bomber" : null;
             case DEATH_TAG -> switch (kit) {
                 case "runner-turtle" -> "turtle-shell";
                 case "runner-trickster" -> "smoke-and-mirrors";
                 default -> null;
             };
-            case DRAGONS -> "dragon-warden".equals(kit) ? "sharpshooter" : null;
-            case EVOLUTION -> "apex".equals(kit) ? "ability-assassin" : null;
             case SHEEP_QUEST -> "shepherd".equals(kit) ? "cheeky" : null;
             case WITHER_ASSAULT -> "warden".equals(kit) ? "savior" : null;
             default -> null;
@@ -1450,8 +1443,8 @@ public final class ArcadePortManager implements Listener {
     public void selectSkyWarsKit(Player player, String requestedKit) {
         if (player == null || requestedKit == null) return;
         String kit = requestedKit.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
-        if (!Set.of("ice", "fire", "air", "metal", "earth", "tnt-specialist").contains(kit)) {
-            player.sendMessage(ChatColor.YELLOW + "SkyWars kits: ice, fire, air, metal, earth, TNT Specialist.");
+        if (!Set.of("ice", "fire", "air", "metal", "earth").contains(kit)) {
+            player.sendMessage(ChatColor.YELLOW + "SkyWars kits: ice, fire, air, metal or earth.");
             return;
         }
         skyWarsKitPreferences.put(player.getUniqueId(), kit);
@@ -1541,9 +1534,9 @@ public final class ArcadePortManager implements Listener {
                 .replace('_', '-').replace(' ', '-');
         if (kit.equals("evolution-quick-evolver")) kit = "quick-evolver";
         if (kit.equals("evolution-standard")) kit = "standard-evolution";
-        if (!kit.equals("quick-evolver") && !kit.equals("standard-evolution") && !kit.equals("apex")) {
+        if (!kit.equals("quick-evolver") && !kit.equals("standard-evolution")) {
             player.sendMessage(ChatColor.YELLOW
-                    + "Evolution kits: standard-evolution, quick-evolver, apex.");
+                    + "Evolution kits: standard-evolution or quick-evolver.");
             return;
         }
         UUID playerId = player.getUniqueId();
@@ -1564,8 +1557,7 @@ public final class ArcadePortManager implements Listener {
         }
             player.sendMessage(ChatColor.GREEN + (kit.equals("quick-evolver")
                     ? "Quick Evolver selected — evolution is 25% faster."
-                    : kit.equals("apex") ? "Apex selected — you start each evolution stage with a Golden Apple."
-                            : "Standard Evolution kit selected."));
+                    : "Standard Evolution kit selected."));
     }
 
     public void selectMicroBattlesKit(Player player, String requestedKit) {
@@ -7564,13 +7556,6 @@ public final class ArcadePortManager implements Listener {
                     player.getInventory().setArmorContents(new ItemStack[] {
                             new ItemStack(Material.IRON_BOOTS), new ItemStack(Material.IRON_LEGGINGS),
                             new ItemStack(Material.IRON_CHESTPLATE), new ItemStack(Material.IRON_HELMET) });
-                } else if ("dragon-warden".equals(kit)) {
-                    player.getInventory().addItem(new ItemStack(Material.SHIELD),
-                            namedItem(Material.WIND_CHARGE, "Dragon Guard",
-                                    "Deflect a dragon's dive or recover from a dangerous launch.", 2));
-                    player.getInventory().setArmorContents(new ItemStack[] {
-                            new ItemStack(Material.IRON_BOOTS), new ItemStack(Material.CHAINMAIL_LEGGINGS),
-                            new ItemStack(Material.CHAINMAIL_CHESTPLATE), new ItemStack(Material.IRON_HELMET) });
                 } else {
                     player.getInventory().addItem(namedItem(Material.IRON_AXE, "Leap",
                             "Right-click to leap forward (8-second cooldown)."));
@@ -7764,7 +7749,7 @@ public final class ArcadePortManager implements Listener {
             case "shepherd" -> {
                 player.getInventory().setItem(0, new ItemStack(Material.WOODEN_SWORD));
                 player.getInventory().setItem(1, namedItem(Material.SADDLE, "Herding Saddle",
-                        "Carry up to four sheep at once; carrying slows you more."));
+                        "Carry unlimited sheep. Slowness increases every two sheep."));
                 player.getInventory().setItem(2, new ItemStack(Material.SHEARS));
             }
             default -> {
@@ -8110,8 +8095,6 @@ public final class ArcadePortManager implements Listener {
                         "Throwable Dirt", "Right-click to throw dirt (maximum 4).", true));
                 session.skyWarsNextDirtAt.put(id, System.currentTimeMillis());
             }
-            case "tnt-specialist" -> player.getInventory().addItem(
-                    namedItem(Material.TNT, "Throwable TNT", "Right-click to throw. 3 charges.", 3));
             default -> player.getInventory().addItem(skyWarsKitItem(Material.ICE,
                     "Ice Bridge", "Launch forward and lay a temporary ice bridge (30-second cooldown).", false));
         }
@@ -11464,6 +11447,7 @@ public final class ArcadePortManager implements Listener {
         // Advance thrown Bacon Blast items each tick; hunger/escalation stay on the slow cadence.
         updateBaconBlastProjectiles(session, now);
         if (active != session) return;
+        updateCrispyBaconBurning(session, now);
         // Source UpdateType.SLOW runs every 4 seconds. Keep ability contact/expiry checks
         // on every tick, but gate hunger and knockback escalation on that slower cadence.
         updateBaconBrawlAbilities(session, now);
@@ -11504,6 +11488,30 @@ public final class ArcadePortManager implements Listener {
         announce(session, escalationMessage);
         for (Player player : alivePlayers(session)) {
             player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_FLAP, 1.0F, 0.7F);
+        }
+    }
+
+    private void updateCrispyBaconBurning(Session session, long now) {
+        for (Map.Entry<UUID, Long> entry : new ArrayList<>(session.baconCrispyFlamedUntil.entrySet())) {
+            UUID targetId = entry.getKey();
+            Player target = session.players.get(targetId);
+            if (target == null || !target.isOnline() || !session.alive.contains(targetId)
+                    || entry.getValue() <= now) {
+                session.baconCrispyFlamedUntil.remove(targetId);
+                continue;
+            }
+            if (session.ticks % 4 != 0) continue;
+            target.setFireTicks(Math.max(target.getFireTicks(), 40));
+            Location playerFlames = target.getLocation().clone().add(0.0D, 0.9D, 0.0D);
+            target.getWorld().spawnParticle(Particle.FLAME, playerFlames, 3,
+                    0.22D, 0.35D, 0.22D, 0.005D);
+            LivingEntity avatar = baconPlayerAvatar(session, targetId);
+            if (avatar != null) {
+                avatar.setFireTicks(Math.max(avatar.getFireTicks(), 40));
+                avatar.getWorld().spawnParticle(Particle.FLAME,
+                        avatar.getLocation().clone().add(0.0D, 0.8D, 0.0D), 3,
+                        0.22D, 0.35D, 0.22D, 0.005D);
+            }
         }
     }
 
@@ -12184,7 +12192,7 @@ public final class ArcadePortManager implements Listener {
             if (blockFraction >= 0.0D && !playerFirst) {
                 Location blockImpact = previous.clone().add(
                         current.toVector().subtract(previous.toVector()).multiply(blockFraction));
-                spawnBaconBlastImpact(session, blockImpact);
+                spawnBaconBlastImpact(session, blockImpact, blastId);
                 removeBaconBlastItem(session, blastId);
                 continue;
             }
@@ -12195,23 +12203,23 @@ public final class ArcadePortManager implements Listener {
                         current.toVector().subtract(previous.toVector()).multiply(bestTargetFraction));
                 // Reborn resolves the first swept collision, then dispatches custom projectile
                 // damage for the target's knockback and kill attribution.
-                spawnBaconBlastImpact(session, playerImpact);
+                spawnBaconBlastImpact(session, playerImpact, blastId);
                 if (owner != null && owner.isOnline() && session.alive.contains(ownerId)
                         && active == session && session.alive.contains(target.getUniqueId())) {
                     handleBaconBrawlHit(session, owner, target, "bacon-blast", 6.0D, null, blastPower);
                     if (session.baconCrispyProjectiles.contains(blastId) && target.isOnline()) {
-                        target.setFireTicks(60);
+                        target.setFireTicks(Math.max(target.getFireTicks(), 100));
+                        target.getWorld().spawnParticle(Particle.FLAME,
+                                target.getLocation().add(0.0D, 0.9D, 0.0D), 18,
+                                0.25D, 0.45D, 0.25D, 0.02D);
                         LivingEntity avatar = baconPlayerAvatar(session, target.getUniqueId());
                         if (avatar != null) {
-                            avatar.setFireTicks(60);
+                            avatar.setFireTicks(Math.max(avatar.getFireTicks(), 100));
                             avatar.getWorld().spawnParticle(Particle.FLAME,
                                     avatar.getLocation().add(0.0D, 0.8D, 0.0D), 18,
                                     0.25D, 0.45D, 0.25D, 0.02D);
                         }
                         session.baconCrispyFlamedUntil.put(target.getUniqueId(), now + 3_000L);
-                    } else {
-                        target.getWorld().playSound(target.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING,
-                                1.0F, 1.65F);
                     }
                 }
                 removeBaconBlastItem(session, blastId);
@@ -12228,7 +12236,7 @@ public final class ArcadePortManager implements Listener {
                     stationaryAgainstBlock);
             long createdAt = session.baconBlastCreatedAt.getOrDefault(blastId, 0L);
             if (ArcadePortRules.shouldExpireBaconBlast(now, createdAt, touchingBlock)) {
-                spawnBaconBlastImpact(session, current);
+                spawnBaconBlastImpact(session, current, blastId);
                 removeBaconBlastItem(session, blastId);
                 continue;
             }
@@ -12236,7 +12244,7 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    private void spawnBaconBlastImpact(Session session, Location impact) {
+    private void spawnBaconBlastImpact(Session session, Location impact, UUID blastId) {
         // Reborn creates a 0.5-power, non-incendiary, non-block-breaking explosion on impact.
         // Damage events are synchronous; suppress only its explosion health damage while keeping
         // the native explosion impulse and the custom swept-hit knockback.
@@ -12247,6 +12255,12 @@ public final class ArcadePortManager implements Listener {
             session.baconBlastExplosionDepth--;
         }
         session.world.spawnParticle(Particle.CLOUD, impact, 14, 0.25D, 0.25D, 0.25D, 0.04D);
+        UUID ownerId = session.baconBlastOwners.get(blastId);
+        if (ownerId != null
+                && "mama-piggles".equals(session.baconKits.getOrDefault(ownerId, "el-muchacho-pigo"))) {
+            // Reborn's item impact effect is silent; Testplex adds the requested landing cue.
+            session.world.playSound(impact, Sound.BLOCK_NOTE_BLOCK_PLING, 1.2F, 1.65F);
+        }
     }
 
     private void removeBaconBlastItem(Session session, UUID blastId) {
@@ -12263,6 +12277,10 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void useBaconBrawlAbility(Session session, Player player, long now) {
+        useBaconBrawlAbility(session, player, now, false);
+    }
+
+    private void useBaconBrawlAbility(Session session, Player player, long now, boolean crouchDash) {
         UUID id = player.getUniqueId();
         String kit = session.baconKits.getOrDefault(id, "el-muchacho-pigo");
         int charge = session.baconMeters.getOrDefault(id, 0);
@@ -12296,7 +12314,7 @@ public final class ArcadePortManager implements Listener {
                 break;
             }
             case "chris-p-bacon": {
-                if (player.isSneaking() && player.isOnGround()) {
+                if (crouchDash) {
                     useCrispyBaconDash(session, player, charge);
                     break;
                 }
@@ -12377,7 +12395,10 @@ public final class ArcadePortManager implements Listener {
         long now = System.currentTimeMillis();
         session.baconCrispyDashes.put(player.getUniqueId(),
                 new BaconCrispyDashState(direction, now + ArcadePortRules.BACON_CRISPY_DASH_DURATION_MILLIS));
-        player.setVelocity(direction.clone().multiply(ArcadePortRules.BACON_CRISPY_DASH_SPEED));
+        Vector dashVelocity = direction.clone().multiply(ArcadePortRules.BACON_CRISPY_DASH_SPEED);
+        player.setVelocity(dashVelocity.clone());
+        LivingEntity avatar = baconPlayerAvatar(session, player.getUniqueId());
+        if (avatar != null) avatar.setVelocity(dashVelocity.clone());
         player.getWorld().playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 0.8F, 1.5F);
         updateBaconCrispyDash(session, player, now);
     }
@@ -12393,18 +12414,20 @@ public final class ArcadePortManager implements Listener {
         }
         Vector velocity = dash.direction.clone().multiply(ArcadePortRules.BACON_CRISPY_DASH_SPEED);
         velocity.setY(Math.max(-0.08D, Math.min(0.12D, player.getVelocity().getY())));
-        player.setVelocity(velocity);
+        player.setVelocity(velocity.clone());
+        LivingEntity avatar = baconPlayerAvatar(session, id);
+        if (avatar != null) avatar.setVelocity(velocity.clone());
         Location flame = player.getLocation();
         flame.getWorld().spawnParticle(Particle.FLAME, flame, 5, 0.16D, 0.08D, 0.16D, 0.005D);
         placeBaconDashFireBlock(session, flame);
         for (Player target : alivePlayers(session)) {
             if (target.equals(player) || target.getLocation().distanceSquared(flame) > 2.25D) continue;
             target.setFireTicks(Math.max(target.getFireTicks(), 60));
-            LivingEntity avatar = baconPlayerAvatar(session, target.getUniqueId());
-            if (avatar != null) {
-                avatar.setFireTicks(Math.max(avatar.getFireTicks(), 60));
-                avatar.getWorld().spawnParticle(Particle.FLAME,
-                        avatar.getLocation().add(0.0D, 0.8D, 0.0D), 18,
+            LivingEntity targetAvatar = baconPlayerAvatar(session, target.getUniqueId());
+            if (targetAvatar != null) {
+                targetAvatar.setFireTicks(Math.max(targetAvatar.getFireTicks(), 60));
+                targetAvatar.getWorld().spawnParticle(Particle.FLAME,
+                        targetAvatar.getLocation().add(0.0D, 0.8D, 0.0D), 18,
                         0.25D, 0.45D, 0.25D, 0.02D);
             }
             session.baconCrispyFlamedUntil.put(target.getUniqueId(), now + 3_000L);
@@ -12486,8 +12509,10 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void handleBaconBrawlHit(Session session, Player attacker, Player target, String source) {
+        // The source gives Bacon Brawl an iron axe. In 1.8 its normal attack damage is six;
+        // DamageManager then converts that damage to knockback with log10(damage) * 1.5.
         double rawDamage = switch (source) {
-            case "body-slam", "bacon-blast" -> 6.0D;
+            case "body-slam", "bacon-blast", "melee", "projectile hit" -> 6.0D;
             default -> 2.0D;
         };
         handleBaconBrawlHit(session, attacker, target, source, rawDamage, null, 1.0D);
@@ -12579,7 +12604,7 @@ public final class ArcadePortManager implements Listener {
             target.playSound(target.getLocation(), Sound.ENTITY_PIG_DEATH, 1.0F, 2.0F);
         }
         target.setVelocity(baconBrawlKnockbackVelocity(attacker, target,
-                normalTimedHit && "melee".equals(source) ? 2.0D : rawDamage,
+                "melee".equals(source) ? 6.0D : rawDamage,
                 knockbackMultiplier, projectileVelocity));
         target.getWorld().spawnParticle(Particle.CLOUD, target.getLocation().add(0, 1, 0),
                 10, 0.35D, 0.4D, 0.35D, 0.04D);
@@ -14825,8 +14850,9 @@ public final class ArcadePortManager implements Listener {
             vehicle = passenger;
         }
         carrier.setExp(0.0F);
+        carrier.setLevel(0);
         carrier.removePotionEffect(PotionEffectType.SLOWNESS);
-        for (int slot = 4; slot <= 6; slot++) {
+        for (int slot = 4; slot <= 7; slot++) {
             ItemStack item = carrier.getInventory().getItem(slot);
             if (item != null && item.getType().name().endsWith("_WOOL")) carrier.getInventory().setItem(slot, null);
         }
@@ -14863,16 +14889,24 @@ public final class ArcadePortManager implements Listener {
         List<Sheep> carried = session.sheepCarriers.entrySet().stream()
                 .filter(entry -> player.getUniqueId().equals(entry.getValue()))
                 .map(Map.Entry::getKey).collect(java.util.stream.Collectors.toList());
-        int carryLimit = "shepherd".equals(session.sheepQuestKits.get(player.getUniqueId()))
-                ? ArcadePortRules.SHEEP_QUEST_MAX_CARRY + 1 : ArcadePortRules.SHEEP_QUEST_MAX_CARRY;
-        int count = Math.min(carryLimit, carried.size());
-        player.setExp(count / (float) carryLimit);
-        for (int index = 0; index < carryLimit; index++) {
-            player.getInventory().setItem(4 + index, index < count ? sheepQuestWoolIcon(carried.get(index)) : null);
+        boolean shepherd = "shepherd".equals(session.sheepQuestKits.get(player.getUniqueId()));
+        int count = shepherd ? carried.size()
+                : Math.min(ArcadePortRules.SHEEP_QUEST_MAX_CARRY, carried.size());
+        if (shepherd) {
+            player.setLevel(count);
+            player.setExp(0.0F);
+        } else {
+            player.setLevel(0);
+            player.setExp(count / (float) ArcadePortRules.SHEEP_QUEST_MAX_CARRY);
+        }
+        int visibleCount = Math.min(count, 4);
+        for (int index = 0; index < 4; index++) {
+            player.getInventory().setItem(4 + index,
+                    index < visibleCount ? sheepQuestWoolIcon(carried.get(index)) : null);
         }
         if (count > 0) {
-            int amplifier = "shepherd".equals(session.sheepQuestKits.get(player.getUniqueId()))
-                    ? Math.min(ArcadePortRules.SHEEP_QUEST_MAX_CARRY, count - 1)
+            int amplifier = shepherd
+                    ? Math.min(127, (count - 1) / 2)
                     : ArcadePortRules.sheepQuestCarrySlownessAmplifier(count);
             player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60,
                     Math.max(0, amplifier), false, false, true));
@@ -14892,9 +14926,8 @@ public final class ArcadePortManager implements Listener {
             return false;
         }
         int carriedCount = sheepCarriedBy(session, playerId);
-        int carryLimit = "shepherd".equals(session.sheepQuestKits.get(playerId))
-                ? ArcadePortRules.SHEEP_QUEST_MAX_CARRY + 1 : ArcadePortRules.SHEEP_QUEST_MAX_CARRY;
-        if (carriedCount >= carryLimit) return false;
+        boolean shepherd = "shepherd".equals(session.sheepQuestKits.get(playerId));
+        if (!shepherd && !ArcadePortRules.canCarryAnotherSheep(carriedCount)) return false;
         int team = session.teams.getOrDefault(playerId, -1);
         if (team < 0 || team > 3) return false;
         int owner = session.sheepOwners.getOrDefault(sheep, -1);
@@ -15762,7 +15795,9 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void eliminate(Session session, Player player, Player killer, String reason) {
-        if (active != session || player == null) return;
+        if (active != session || player == null || !session.players.containsKey(player.getUniqueId())
+                || !session.alive.contains(player.getUniqueId())) return;
+        broadcastSourceStyleDeathMessage(session, player, killer, reason);
         if (session.type == ArcadePortGame.DRAGON_ESCAPE && reason != null
                 && reason.toLowerCase(java.util.Locale.ROOT).contains("fell")) {
             UUID victimId = player.getUniqueId();
@@ -16547,9 +16582,6 @@ public final class ArcadePortManager implements Listener {
                 player.getInventory().setItem(1, new ItemStack(Material.EGG, 3));
                 player.setAllowFlight(false);
                 break;
-        }
-        if ("apex".equals(session.evolutionKits.getOrDefault(id, "standard-evolution"))) {
-            player.getInventory().addItem(new ItemStack(Material.GOLDEN_APPLE));
         }
         player.sendMessage(ChatColor.GREEN + "Evolution stage restored: " + (level + 1) + "/5.");
         player.updateInventory();
@@ -20405,6 +20437,56 @@ public final class ArcadePortManager implements Listener {
 
     private void announce(Session session, String text) {
         for (Player player : session.players.values()) if (player != null && player.isOnline()) player.sendMessage(text);
+    }
+
+    /** Mineplex F.main format: blue module header, then gray message body. */
+    private static String sourceStyleChat(String module, String body) {
+        return ChatColor.BLUE + module + "> " + ChatColor.GRAY + body;
+    }
+
+    /** Recreate the source CombatManager death output for Arcade games using detailed messages. */
+    private void broadcastSourceStyleDeathMessage(Session session, Player victim, Player killer, String reason) {
+        if (session.type == ArcadePortGame.EVOLUTION || session.type == ArcadePortGame.SUPER_SPLOOR) {
+            // These source games select DeathMessageType.Simple: only the victim and killer receive it.
+            if (killer != null && killer.isOnline() && !killer.getUniqueId().equals(victim.getUniqueId())) {
+                killer.sendMessage(sourceStyleChat("Combat", "You killed " + victim.getName() + "."));
+                victim.sendMessage(sourceStyleChat("Combat", killer.getName() + " killed you."));
+            } else {
+                victim.sendMessage(sourceStyleChat("Combat",
+                        reason == null || reason.isBlank() ? "You have died." : "You were killed by " + reason + "."));
+            }
+            return;
+        }
+        String body;
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
+            String normalized = reason == null ? "" : reason.toLowerCase(java.util.Locale.ROOT);
+            if (normalized.contains("dragon")) {
+                body = victim.getName() + " was caught by Douglas the Dragon!";
+            } else if (normalized.contains("fell") || normalized.contains("fall")) {
+                body = victim.getName() + " fell from the Skylands course!";
+            } else {
+                body = victim.getName() + " couldn't escape the dragon!";
+            }
+        } else if (killer != null && killer.isOnline() && !killer.getUniqueId().equals(victim.getUniqueId())) {
+            body = victim.getName() + " was killed by " + killer.getName() + ".";
+        } else {
+            body = victim.getName() + " " + sourceDeathCause(reason) + ".";
+        }
+        String message = sourceStyleChat("Combat", body);
+        for (Player participant : session.players.values()) {
+            if (participant != null && participant.isOnline()) participant.sendMessage(message);
+        }
+    }
+
+    private static String sourceDeathCause(String reason) {
+        if (reason == null || reason.isBlank()) return "has died";
+        String normalized = reason.toLowerCase(java.util.Locale.ROOT).trim();
+        if (normalized.contains("fell") || normalized.contains("fall")) return "fell to their death";
+        if (normalized.contains("void")) return "fell into the void";
+        if (normalized.contains("starv")) return "starved to death";
+        if (normalized.contains("burn")) return "burned to death";
+        if (normalized.startsWith("was ")) return normalized;
+        return "was killed by " + normalized;
     }
 
     public void stop(String reason) {
@@ -27565,11 +27647,12 @@ public final class ArcadePortManager implements Listener {
                 || !session.liveStarted || !session.alive.contains(id)
                 || !"chris-p-bacon".equals(session.baconKits.getOrDefault(id, ""))) return;
         Bukkit.getScheduler().runTask(plugin, () -> {
-            if (active != session || !player.isOnline() || !player.isSneaking()
-                    || !player.isOnGround() || !session.alive.contains(id)
+            // Sneak toggles arrive before Paper updates the player's pose/on-ground state. Chris
+            // rides a pig avatar, so checking Player.isOnGround() here rejects valid ground dashes.
+            if (active != session || !player.isOnline() || !session.alive.contains(id)
                     || session.baconCrispyDashes.containsKey(id)
                     || !ArcadePortRules.canUseBaconMeterAbility(session.baconMeters.getOrDefault(id, 0))) return;
-            useBaconBrawlAbility(session, player, System.currentTimeMillis());
+            useBaconBrawlAbility(session, player, System.currentTimeMillis(), true);
         });
     }
 
