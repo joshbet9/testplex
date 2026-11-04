@@ -144,7 +144,9 @@ class ArcadeProgressCatalogTest {
         assertTrue(hasAchievement("master-builders", "architect", "Architect"));
         assertTrue(hasAchievement("heroes-of-gwen", "know-your-enemy", "Know Your Enemy"));
         assertTrue(hasAchievement("castle-assault", "moral-exercise", "Moral Exercise"));
-        assertTrue(ArcadeProgressCatalog.achievements("skywars").isEmpty());
+        assertTrue(hasAchievement("skywars", "death-bomber", "Death Bomber"));
+        assertTrue(hasAchievement("skywars", "no-chest", "No Chest"));
+        assertTrue(hasAchievement("skywars", "no-armor", "No Armor"));
     }
 
     @Test

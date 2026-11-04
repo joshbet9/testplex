@@ -189,7 +189,7 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.CAMERA_SHY.id(),
                 java.util.List.of("death-tag", "plexball", "spleef")),
                 "Snap must remain gated when it is removed from the reviewed allow-list.");
-        assertNull(ArcadePortGame.fromId("snake"));
+        assertEquals(ArcadePortGame.SNAKE, ArcadePortGame.fromId("snake"));
         assertEquals(ArcadePortGame.DRAW_MY_THING, ArcadePortGame.fromId("Draw My Thing"));
         assertEquals(ArcadePortGame.MASTER_BUILDERS, ArcadePortGame.fromId("master_builders"));
         assertEquals(ArcadePortGame.SNEAKY_ASSASSINS, ArcadePortGame.fromId("sneaky-assassins"));
