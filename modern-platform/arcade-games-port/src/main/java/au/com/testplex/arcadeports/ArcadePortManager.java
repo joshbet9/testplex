@@ -11782,9 +11782,16 @@ public final class ArcadePortManager implements Listener {
         long until = System.currentTimeMillis() + ArcadePortRules.BACON_HIT_FEEDBACK_MILLIS;
         session.baconHitFeedbackUntil.put(attacker.getUniqueId(), until);
         session.baconHitFeedbackUntil.put(target.getUniqueId(), until);
-        String label = backstab ? "Backstab!" : critical ? "Critical!" : "Hit!";
-        ChatColor colour = backstab ? ChatColor.RED : critical ? ChatColor.GOLD : ChatColor.WHITE;
-        showFloatingCombatLabel(session, target.getLocation(), label, colour);
+        if (backstab && critical) {
+            Location targetLocation = target.getLocation();
+            showFloatingCombatLabel(session, targetLocation, "Backstab!", ChatColor.RED);
+            showFloatingCombatLabel(session, targetLocation.clone().add(0.0D, 0.45D, 0.0D),
+                    "Critical!", ChatColor.GOLD);
+        } else {
+            String label = backstab ? "Backstab!" : critical ? "Critical!" : "Hit!";
+            ChatColor colour = backstab ? ChatColor.RED : critical ? ChatColor.GOLD : ChatColor.WHITE;
+            showFloatingCombatLabel(session, target.getLocation(), label, colour);
+        }
         Location impact = target.getLocation().clone().add(0.0D, 1.0D, 0.0D);
         if (critical) {
             target.getWorld().spawnParticle(Particle.CRIT, impact, 10, 0.3D, 0.35D, 0.3D, 0.08D);
@@ -16010,7 +16017,15 @@ public final class ArcadePortManager implements Listener {
             if (!session.alive.remove(playerId)) return;
             if (killer != null && ArcadePortRules.shouldCreditBaconKill(
                     playerId, killer.getUniqueId(), session.scores.containsKey(killer.getUniqueId()))) {
-                int kills = session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
+                UUID killerId = killer.getUniqueId();
+                int kills = session.scores.merge(killerId, 1, Integer::sum);
+                if (ArcadeTestPlayerManager.shouldPersistProgression(
+                        killerId, testPlayers.isTestPlayer(killerId))) {
+                    String statsPath = localStatsPath(killerId, ArcadePortGame.BACON_BRAWL.id());
+                    plugin.getConfig().set(statsPath + "kills",
+                            plugin.getConfig().getInt(statsPath + "kills", 0) + 1);
+                    plugin.saveConfig();
+                }
                 killer.sendMessage(ChatColor.GREEN + "Bacon Brawl kill! " + kills + " kills.");
                 if (ArcadePortRules.shouldAwardBaconPigsInBlankets(kills)
                         && session.baconPigsInBlanketsAwarded.add(killer.getUniqueId())) {
@@ -19160,7 +19175,7 @@ public final class ArcadePortManager implements Listener {
                 plugin.getConfig().set(path + "revives", plugin.getConfig().getInt(path + "revives", 0)
                         + session.witherRevivesByPlayer.getOrDefault(id, 0));
             }
-            if (java.util.Set.of("bacon-brawl", "bomb-lobbers", "evolution", "gladiators", "micro-battles").contains(session.type.id())) {
+            if (java.util.Set.of("bomb-lobbers", "evolution", "gladiators", "micro-battles").contains(session.type.id())) {
                 plugin.getConfig().set(path + "kills", plugin.getConfig().getInt(path + "kills", 0) + score);
             }
             if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
