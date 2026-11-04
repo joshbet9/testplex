@@ -200,6 +200,11 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         return manager != null && manager.isRotationCandidateAvailable(game);
     }
 
+    /** Whether the shared lobby runtime can expose kit/team queue datapoints for this game. */
+    public boolean hasLobbyIntegrationFor(String gameId) {
+        return manager != null && ArcadePortGame.fromId(gameId) != null;
+    }
+
     public void returnPlayerToArcadeLobby(Player player) {
         if (manager != null && player != null && player.isOnline()) {
             manager.returnPlayerToLobby(player);

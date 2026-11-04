@@ -992,10 +992,18 @@ public final class MenuService implements Listener {
     }
 
     private boolean isMechanicsPortGame(String gameId) {
-        return List.of("bacon-brawl", "bomb-lobbers", "death-tag", "dragon-escape", "dragons",
-                "evolution", "gladiators", "micro-battles", "one-in-the-quiver", "paintball",
-                "runner", "sheep-quest", "spleef", "turf-wars", "draw-my-thing", "master-builders",
-                "monster-maze", "monster-maze-speed", "monster-maze-modern").contains(gameId);
+        org.bukkit.plugin.Plugin mechanics = Bukkit.getPluginManager().getPlugin("ArcadeMechanicsModern");
+        if (!(mechanics instanceof JavaPlugin engine) || !mechanics.isEnabled() || gameId == null) return false;
+        try {
+            Object result = engine.getClass()
+                    .getMethod("hasLobbyIntegrationFor", String.class)
+                    .invoke(engine, gameId);
+            return Boolean.TRUE.equals(result);
+        } catch (ReflectiveOperationException | RuntimeException exception) {
+            plugin.getLogger().warning("Could not query Arcade lobby integration for "
+                    + gameId + ": " + exception.getMessage());
+            return false;
+        }
     }
 
     private boolean isCohost(Player player) {

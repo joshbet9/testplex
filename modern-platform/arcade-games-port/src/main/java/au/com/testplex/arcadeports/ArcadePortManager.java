@@ -119,6 +119,7 @@ import org.bukkit.event.entity.EntityTargetEvent;
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.ItemSpawnEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.PlayerLeashEntityEvent;
 import org.bukkit.event.entity.PotionSplashEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
@@ -11673,13 +11674,23 @@ public final class ArcadePortManager implements Listener {
         session.baconMeters.put(id, meter);
         if (previous < ArcadePortRules.BACON_METER_MIN_ABILITY
                 && meter >= ArcadePortRules.BACON_METER_MIN_ABILITY) {
-            player.sendMessage(ChatColor.GREEN + "Your ability is ready!");
+            player.sendMessage(ChatColor.GREEN + baconAbilityName(session, id) + " is ready!");
         }
         if (previous < ArcadePortRules.BACON_METER_MAX && meter >= ArcadePortRules.BACON_METER_MAX) {
-            player.sendMessage(ChatColor.GOLD + "Your ability is maxed!");
+            player.sendMessage(ChatColor.GOLD + baconAbilityName(session, id) + " is maxed!");
         }
         updateBaconMeterItem(session, player);
         updateBaconMeterScoreboard(session);
+    }
+
+    private String baconAbilityName(Session session, UUID playerId) {
+        return switch (session.baconKits.getOrDefault(playerId, "el-muchacho-pigo")) {
+            case "mama-piggles" -> "Bacon Blast";
+            case "chris-p-bacon" -> "Crispy Bacon";
+            case "pig" -> "Pig Cloak";
+            case "brutus-bacon" -> "Brutus Bacon";
+            default -> "Body Slam";
+        };
     }
 
     /** The vanilla XP bar is the ability meter during Bacon Brawl. */
@@ -12170,29 +12181,24 @@ public final class ArcadePortManager implements Listener {
             double segmentLength = Math.sqrt(previous.distanceSquared(current));
             double blockFraction = baconBlastFirstBlockFraction(session, previous, current);
             Player target = null;
-            double bestDistanceSquared = Double.POSITIVE_INFINITY;
             double bestTargetFraction = Double.POSITIVE_INFINITY;
             for (Player candidate : alivePlayers(session)) {
                 if (candidate.getUniqueId().equals(ownerId)) continue;
-                Location targetCenter = candidate.getLocation().clone().add(0.0D, 0.9D, 0.0D);
-                double distanceSquared = distanceSquaredToSegment(targetCenter, previous, current);
-                if (!ArcadePortRules.isBaconBlastNearPlayer(distanceSquared)) continue;
-                double targetFraction = baconBlastSegmentFraction(targetCenter, previous, current);
-                if (targetFraction < bestTargetFraction
-                        || (Math.abs(targetFraction - bestTargetFraction) < 1.0E-6D
-                            && distanceSquared < bestDistanceSquared)) {
+                double targetFraction = baconBlastPlayerHitFraction(candidate, previous, current, segmentLength);
+                if (targetFraction >= 0.0D && targetFraction < bestTargetFraction) {
                     target = candidate;
-                    bestDistanceSquared = distanceSquared;
                     bestTargetFraction = targetFraction;
                 }
             }
 
-            boolean playerFirst = target != null && ArcadePortRules.isBaconBlastPlayerBeforeBlock(
-                    bestTargetFraction, blockFraction, segmentLength);
+            // The player's fraction is the first actual hitbox intersection, not its centre;
+            // compare that point directly with the first solid block along the sweep.
+            boolean playerFirst = target != null
+                    && (blockFraction < 0.0D || bestTargetFraction <= blockFraction + 1.0E-4D);
             if (blockFraction >= 0.0D && !playerFirst) {
                 Location blockImpact = previous.clone().add(
                         current.toVector().subtract(previous.toVector()).multiply(blockFraction));
-                spawnBaconBlastImpact(session, blockImpact, blastId);
+                spawnBaconBlastImpact(session, blockImpact, blastId, !crispy, true);
                 removeBaconBlastItem(session, blastId);
                 continue;
             }
@@ -12201,25 +12207,17 @@ public final class ArcadePortManager implements Listener {
                 Player owner = ownerId == null ? null : session.players.get(ownerId);
                 Location playerImpact = previous.clone().add(
                         current.toVector().subtract(previous.toVector()).multiply(bestTargetFraction));
-                // Reborn resolves the first swept collision, then dispatches custom projectile
-                // damage for the target's knockback and kill attribution.
-                spawnBaconBlastImpact(session, playerImpact, blastId);
+                // Crispy Bacon's projectile ignites players without blast damage or impulse.
+                spawnBaconBlastImpact(session, playerImpact, blastId, !crispy, false);
                 if (owner != null && owner.isOnline() && session.alive.contains(ownerId)
                         && active == session && session.alive.contains(target.getUniqueId())) {
-                    handleBaconBrawlHit(session, owner, target, "bacon-blast", 6.0D, null, blastPower);
-                    if (session.baconCrispyProjectiles.contains(blastId) && target.isOnline()) {
-                        target.setFireTicks(Math.max(target.getFireTicks(), 100));
-                        target.getWorld().spawnParticle(Particle.FLAME,
-                                target.getLocation().add(0.0D, 0.9D, 0.0D), 18,
-                                0.25D, 0.45D, 0.25D, 0.02D);
-                        LivingEntity avatar = baconPlayerAvatar(session, target.getUniqueId());
-                        if (avatar != null) {
-                            avatar.setFireTicks(Math.max(avatar.getFireTicks(), 100));
-                            avatar.getWorld().spawnParticle(Particle.FLAME,
-                                    avatar.getLocation().add(0.0D, 0.8D, 0.0D), 18,
-                                    0.25D, 0.45D, 0.25D, 0.02D);
+                    if (crispy) {
+                        igniteCrispyBaconTarget(session, target, now);
+                    } else {
+                        handleBaconBrawlHit(session, owner, target, "bacon-blast", 6.0D, null, blastPower);
+                        if (active == session && session.alive.contains(target.getUniqueId())) {
+                            target.playSound(target.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.2F, 1.65F);
                         }
-                        session.baconCrispyFlamedUntil.put(target.getUniqueId(), now + 3_000L);
                     }
                 }
                 removeBaconBlastItem(session, blastId);
@@ -12236,7 +12234,7 @@ public final class ArcadePortManager implements Listener {
                     stationaryAgainstBlock);
             long createdAt = session.baconBlastCreatedAt.getOrDefault(blastId, 0L);
             if (ArcadePortRules.shouldExpireBaconBlast(now, createdAt, touchingBlock)) {
-                spawnBaconBlastImpact(session, current, blastId);
+                spawnBaconBlastImpact(session, current, blastId, !crispy, true);
                 removeBaconBlastItem(session, blastId);
                 continue;
             }
@@ -12245,22 +12243,44 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void spawnBaconBlastImpact(Session session, Location impact, UUID blastId) {
+        spawnBaconBlastImpact(session, impact, blastId, true, true);
+    }
+
+    private void spawnBaconBlastImpact(Session session, Location impact, UUID blastId,
+            boolean includeExplosion, boolean playLandingSound) {
         // Reborn creates a 0.5-power, non-incendiary, non-block-breaking explosion on impact.
-        // Damage events are synchronous; suppress only its explosion health damage while keeping
-        // the native explosion impulse and the custom swept-hit knockback.
-        session.baconBlastExplosionDepth++;
-        try {
-            session.world.createExplosion(impact.getX(), impact.getY(), impact.getZ(), 0.5F, false, false);
-        } finally {
-            session.baconBlastExplosionDepth--;
+        // Suppress health damage; crispy impacts are visual-only and have no explosion impulse.
+        if (includeExplosion) {
+            session.baconBlastExplosionDepth++;
+            try {
+                session.world.createExplosion(impact.getX(), impact.getY(), impact.getZ(), 0.5F, false, false);
+            } finally {
+                session.baconBlastExplosionDepth--;
+            }
         }
         session.world.spawnParticle(Particle.CLOUD, impact, 14, 0.25D, 0.25D, 0.25D, 0.04D);
         UUID ownerId = session.baconBlastOwners.get(blastId);
-        if (ownerId != null
+        if (playLandingSound && ownerId != null
                 && "mama-piggles".equals(session.baconKits.getOrDefault(ownerId, "el-muchacho-pigo"))) {
             // Reborn's item impact effect is silent; Testplex adds the requested landing cue.
             session.world.playSound(impact, Sound.BLOCK_NOTE_BLOCK_PLING, 1.2F, 1.65F);
         }
+    }
+
+    private void igniteCrispyBaconTarget(Session session, Player target, long now) {
+        if (target == null || !target.isOnline()) return;
+        target.setFireTicks(Math.max(target.getFireTicks(), 100));
+        target.getWorld().spawnParticle(Particle.FLAME,
+                target.getLocation().add(0.0D, 0.9D, 0.0D), 18,
+                0.25D, 0.45D, 0.25D, 0.02D);
+        LivingEntity avatar = baconPlayerAvatar(session, target.getUniqueId());
+        if (avatar != null) {
+            avatar.setFireTicks(Math.max(avatar.getFireTicks(), 100));
+            avatar.getWorld().spawnParticle(Particle.FLAME,
+                    avatar.getLocation().add(0.0D, 0.8D, 0.0D), 18,
+                    0.25D, 0.45D, 0.25D, 0.02D);
+        }
+        session.baconCrispyFlamedUntil.put(target.getUniqueId(), now + 5_000L);
     }
 
     private void removeBaconBlastItem(Session session, UUID blastId) {
@@ -12543,12 +12563,14 @@ public final class ArcadePortManager implements Listener {
             target.playSound(target.getLocation(), Sound.ITEM_SHIELD_BLOCK, 0.8F, 1.5F);
             return;
         }
-        if (!allowBaconCombatHit(session, attackerId, targetId, now)) return;
+        boolean normalTimedHit = "melee".equals(source) || "projectile hit".equals(source);
+        // The source combat timer applies to ordinary attacks. Ability projectiles resolve each
+        // physical collision independently and must not disappear inside that melee cooldown.
+        if (normalTimedHit && !allowBaconCombatHit(session, attackerId, targetId, now)) return;
         if (brutusActive && brutusBackstab) {
             endBaconBrutus(session, targetId, target);
             target.playSound(target.getLocation(), Sound.ITEM_SHIELD_BREAK, 0.9F, 0.8F);
         }
-        boolean normalTimedHit = "melee".equals(source) || "projectile hit".equals(source);
         if (normalTimedHit) {
             Map<UUID, Long> attackerHits = session.baconRecentHitsByAttacker.computeIfAbsent(
                     attacker.getUniqueId(), ignored -> new HashMap<>());
@@ -12596,7 +12618,7 @@ public final class ArcadePortManager implements Listener {
             knockbackMultiplier *= ArcadePortRules.BACON_BODY_SLAM_KNOCKBACK_MULTIPLIER
                     * ArcadePortRules.baconBodySlamMeterMultiplier(charge);
         }
-        if ("chris-p-bacon".equals(kit) && crispyFlamed) {
+        if (crispyFlamed) {
             knockbackMultiplier *= 1.30D;
         }
         if ("pig".equals(kit) && "melee".equals(source) && backstab) {
@@ -21764,6 +21786,21 @@ public final class ArcadePortManager implements Listener {
                 0.25D, 0.35D, 0.25D, 0.0D, new Particle.DustOptions(Color.RED, 1.0F));
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onPlayerDeath(PlayerDeathEvent event) {
+        Session session = active;
+        Player player = event.getEntity();
+        if (session == null || player.getWorld() != session.world
+                || !session.players.containsKey(player.getUniqueId())) return;
+        // eliminate() broadcasts the game's source-style Combat message. Do not append the
+        // vanilla death line after that custom message.
+        event.setDeathMessage(null);
+        if (session.type == ArcadePortGame.BACON_BRAWL
+                && session.alive.contains(player.getUniqueId())) {
+            eliminate(session, player, null, "fell into the void");
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDamage(EntityDamageEvent event) {
         if (event.getEntity() instanceof Player prepareVictim && cancelPrepareAction(prepareVictim, event)) return;
@@ -27065,25 +27102,20 @@ public final class ArcadePortManager implements Listener {
         return -1.0D;
     }
 
-    /** Projection of a point onto the swept projectile segment, clamped to the current tick. */
-    private double baconBlastSegmentFraction(Location point, Location start, Location end) {
-        Vector segment = end.toVector().subtract(start.toVector());
-        double lengthSquared = segment.lengthSquared();
-        if (!Double.isFinite(lengthSquared) || lengthSquared < 1.0E-9D) return 0.0D;
-        double fraction = point.toVector().subtract(start.toVector()).dot(segment) / lengthSquared;
-        return Math.max(0.0D, Math.min(1.0D, fraction));
-    }
-
-    private double distanceSquaredToSegment(Location point, Location start, Location end) {
-        Vector p = point.toVector();
-        Vector a = start.toVector();
-        Vector b = end.toVector();
-        Vector segment = b.clone().subtract(a);
-        double lengthSquared = segment.lengthSquared();
-        if (lengthSquared < 1.0E-9D) return p.distanceSquared(a);
-        double amount = Math.max(0.0D, Math.min(1.0D, p.clone().subtract(a).dot(segment) / lengthSquared));
-        Vector nearest = a.add(segment.multiply(amount));
-        return p.distanceSquared(nearest);
+    /** First point where the swept bacon item intersects a player's actual entity hitbox. */
+    private double baconBlastPlayerHitFraction(Player candidate, Location start, Location end,
+            double segmentLength) {
+        if (candidate == null || start == null || end == null
+                || candidate.getWorld() != start.getWorld() || start.getWorld() != end.getWorld()) return -1.0D;
+        BoundingBox hitbox = candidate.getBoundingBox().expand(0.05D);
+        Vector startVector = start.toVector();
+        if (segmentLength <= 1.0E-6D) return hitbox.contains(end.toVector()) ? 0.0D : -1.0D;
+        if (hitbox.contains(startVector)) return 0.0D;
+        Vector direction = end.toVector().subtract(startVector).multiply(1.0D / segmentLength);
+        org.bukkit.util.RayTraceResult hit = hitbox.rayTrace(startVector, direction, segmentLength);
+        if (hit == null || hit.getHitPosition() == null) return -1.0D;
+        return Math.max(0.0D, Math.min(1.0D,
+                startVector.distance(hit.getHitPosition()) / segmentLength));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
