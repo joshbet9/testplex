@@ -67,6 +67,7 @@ import org.bukkit.util.Vector;
 public final class HoopsRemasteredRuntime implements Listener {
     public interface Hooks {
         void finish(Player representativeWinner, boolean announceWinner);
+        default String cosmeticOption(Player player, String lineId, String fallback) { return fallback; }
     }
 
     private static final int FLOOR_Y = 63;
@@ -443,6 +444,7 @@ public final class HoopsRemasteredRuntime implements Listener {
 
     private void tick(Match current) {
         if (match != current || current.ending) return;
+        for (Player player : current.players.values()) ArcadeCollisionRules.disable(player);
         long now = System.currentTimeMillis();
         if (current.holderId != null) {
             Player holder = current.players.get(current.holderId);
@@ -662,6 +664,10 @@ public final class HoopsRemasteredRuntime implements Listener {
         }
         int points = ball.points;
         current.teamScore[scoringTeam] += points;
+        Location hoop = new Location(current.world, scoringTeam == 0 ? LEFT_HOOP_X : RIGHT_HOOP_X,
+                HOOP_Y, 0.0D);
+        GameAbilityCosmetics.hit(shooter, hoop,
+                hooks.cosmeticOption(shooter, "score-flares", "golden-burst"));
         PlayerStats shooterStats = current.playerStats.get(ball.shooterId);
         shooterStats.points += points;
         shooterStats.shotsMade++;

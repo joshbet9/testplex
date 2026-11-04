@@ -17,6 +17,7 @@ import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Interaction;
 import org.bukkit.entity.ItemDisplay;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -569,6 +570,7 @@ public final class PlexballGame implements Listener {
     private void tick() {
         serverTick++;
         if (phase == Phase.IDLE) return;
+        for (UUID playerId : matchPlayers) ArcadeCollisionRules.disable(Bukkit.getPlayer(playerId));
         recordPlayerSnapshots();
         if (serverTick % 10L == 0L) refreshScoreboards();
         if (serverTick % 4L == 0L && plugin.getArcadePortManager()
@@ -1707,7 +1709,7 @@ public final class PlexballGame implements Listener {
                 FLOOR_Y + 2.1D, (random.nextDouble() - 0.5D) * 0.36D);
         Location ballLocation = new Location(arena, teeBallPosition.getX(), teeBallPosition.getY(), teeBallPosition.getZ());
         ballDisplay = arena.spawn(ballLocation, ItemDisplay.class);
-        ballDisplay.setItemStack(new ItemStack(Material.SNOWBALL));
+        ballDisplay.setItemStack(new ItemStack(ballCosmeticMaterial(batterId)));
         ballDisplay.setGravity(false);
         ballDisplay.setInvulnerable(true);
         ballDisplay.setPersistent(false);
@@ -1717,6 +1719,26 @@ public final class PlexballGame implements Listener {
         teeInteraction.setResponsive(true);
         teeInteraction.setInvulnerable(true);
         teeInteraction.setPersistent(false);
+    }
+
+    private Material ballCosmeticMaterial(UUID ownerId) {
+        String option = "carbon";
+        Plugin cosmetics = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
+        if (ownerId != null && cosmetics != null && cosmetics.isEnabled()) {
+            try {
+                Object selected = cosmetics.getClass()
+                        .getMethod("getSelectedCosmeticOption", UUID.class, String.class, String.class)
+                        .invoke(cosmetics, ownerId, "plexball", "ball-styles");
+                if (selected instanceof String value && !value.isBlank()) option = value;
+            } catch (ReflectiveOperationException | LinkageError exception) {
+                plugin.getLogger().fine("Plexball cosmetic preference bridge unavailable: " + exception.getMessage());
+            }
+        }
+        return switch (option) {
+            case "prism" -> Material.AMETHYST_SHARD;
+            case "solar" -> Material.MAGMA_CREAM;
+            default -> Material.COAL;
+        };
     }
 
     private void cleanupTeeInteraction() {

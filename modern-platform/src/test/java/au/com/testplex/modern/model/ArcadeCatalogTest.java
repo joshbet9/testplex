@@ -4,11 +4,17 @@ import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class ArcadeCatalogTest {
+    private static final Set<String> NO_COSMETIC_LINE = Set.of(
+            "death-tag", "draw-my-thing", "heroes-of-gwen", "one-in-the-quiver", "master-builders",
+            "milk-the-cow", "sneaky-assassins", "skywars", "speed-builders", "spleef",
+            "turf-wars", "wither-assault");
+
     @Test
     void registersAllThirtyTwoSelectableArcadeIds() {
         ArcadeCatalog catalog = new ArcadeCatalog();
@@ -17,52 +23,84 @@ class ArcadeCatalogTest {
     }
 
     @Test
-    void everyGameHasExactlyOneSingleSelectAbilityEffectsLineAndSeparateWinEffects() {
+    void preservesApprovedGameSpecificLinesAndAllowsGamesWithoutOne() {
         ArcadeCatalog catalog = new ArcadeCatalog();
+        Map<String, String> expectedLineIds = Map.ofEntries(
+                Map.entry("bacon-brawl", "ability-effects"),
+                Map.entry("bomb-lobbers", "tnt-explosions"),
+                Map.entry("castle-assault", "siege-effects"),
+                Map.entry("dragon-escape", "winner-beacon-colour"),
+                Map.entry("dragons", "sparkler-effects"),
+                Map.entry("evolution", "metamorphosis"),
+                Map.entry("gladiators", "kill-messages"),
+                Map.entry("hoops-remastered", "score-flares"),
+                Map.entry("micro-battles", "start-glass-colour"),
+                Map.entry("monster-maze", "mob-sets"),
+                Map.entry("monster-maze-speed", "mob-sets"),
+                Map.entry("monster-maze-modern", "mob-sets"),
+                Map.entry("paintball", "pellet-styles"),
+                Map.entry("plexball", "ball-styles"),
+                Map.entry("runner", "trail-colour"),
+                Map.entry("sheep-quest", "capture-effects"),
+                Map.entry("snake", "ability-effects"),
+                Map.entry("super-sploor", "ability-effects"),
+                Map.entry("camera-shy", "camera-flash"),
+                Map.entry("wizards", "spell-effects"));
+
         for (GameDefinition game : catalog.getGames()) {
+            assertFalse(game.getWinEffects().isEmpty(), game.getId() + " keeps separate win effects");
+            assertTrue(game.getWinEffects().stream().anyMatch(effect -> effect.getId().equals(game.getDefaultWinEffectId())),
+                    game.getId() + " keeps a valid win-effect default");
+            if (NO_COSMETIC_LINE.contains(game.getId())) {
+                assertTrue(game.getCosmeticLines().isEmpty(), game.getId() + " should have no game cosmetic line");
+                continue;
+            }
+            String lineId = expectedLineIds.get(game.getId());
+            assertNotNull(lineId, "Unexpected game without a reviewed cosmetic decision: " + game.getId());
             assertEquals(1, game.getCosmeticLines().size(), game.getId());
             CosmeticLineDefinition line = game.getCosmeticLines().get(0);
-            assertEquals("ability-effects", line.getId(), game.getId());
-            assertEquals(CosmeticLineDefinition.SelectionMode.SINGLE, line.getSelectionMode(), game.getId());
-            assertTrue(line.getOptions().size() >= 2, game.getId() + " needs preview choices");
-            assertNotNull(line.getDefaultOptionId(), game.getId());
+            assertEquals(lineId, line.getId(), game.getId());
+            assertTrue(line.getOptions().size() >= 2, game.getId() + " needs test choices");
             assertTrue(line.getOptions().stream().anyMatch(option -> option.getId().equals(line.getDefaultOptionId())),
-                    game.getId() + " default ability style must be selectable");
+                    game.getId() + " default option must be selectable");
             Set<String> optionIds = new HashSet<>();
             for (CosmeticOption option : line.getOptions()) {
-                assertTrue(optionIds.add(option.getId()), game.getId() + " has a duplicate ability style");
-                assertNull(option.getSelectionGroup(), game.getId() + " should not split a style across categories");
+                assertTrue(optionIds.add(option.getId()), game.getId() + " has duplicate options");
             }
-            assertTrue(line.getDescription().contains("does not change global cosmetics"), game.getId());
-            assertFalse(game.getWinEffects().isEmpty(), game.getId() + " win celebrations remain independent");
-            assertTrue(game.getWinEffects().stream().anyMatch(effect -> effect.getId().equals(game.getDefaultWinEffectId())),
-                    game.getId() + " keeps a valid separate default win effect");
         }
+        assertEquals(expectedLineIds.keySet(), catalog.getGames().stream()
+                .filter(game -> !game.getCosmeticLines().isEmpty())
+                .map(GameDefinition::getId).collect(java.util.stream.Collectors.toSet()));
     }
 
     @Test
-    void monsterMazeModesShareOneAbilityLineWithoutASeparateCosmeticArchitecture() {
+    void monsterMazeModesShareOneMobSetLine() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        List<String> expected = List.of("maze-pulse", "soul-grid", "glow-path");
+        List<String> expected = List.of("map_default", "creeper", "skeleton", "spider", "zombie",
+                "witch", "slime", "enderman", "guardian", "axolotl", "allay", "frog", "goat",
+                "fox", "panda", "parrot", "turtle", "bee", "sniffer", "armadillo");
         for (String id : List.of("monster-maze", "monster-maze-speed", "monster-maze-modern")) {
             GameDefinition game = catalog.getGame(id);
             assertNotNull(game);
             assertTrue(game.isReadyForTest(), id);
             assertEquals(1, game.getCosmeticLines().size(), id);
-            assertEquals("ability-effects", game.getCosmeticLines().get(0).getId(), id);
+            assertEquals("mob-sets", game.getCosmeticLines().get(0).getId(), id);
+            assertEquals(CosmeticLineDefinition.SelectionMode.MULTI,
+                    game.getCosmeticLines().get(0).getSelectionMode(), id);
             assertEquals(expected, game.getCosmeticLines().get(0).getOptions().stream()
                     .map(CosmeticOption::getId).toList(), id);
         }
     }
 
     @Test
-    void stylesMatchTheGamesAbilityIdentityAndPreserveRunnerRedFallback() {
+    void catalogKeepsApprovedStyleSpecificOptions() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        assertEquals("phoenix-arc", line(catalog, "dragons").getDefaultOptionId());
-        assertEquals(Set.of("chrome-marker", "colourburst", "stencil-stamp"), optionIds(catalog, "paintball"));
-        assertEquals("trail-red", line(catalog, "runner").getDefaultOptionId());
-        assertEquals(Set.of("snowburst", "ice-shards", "chalk-grid"), optionIds(catalog, "spleef"));
-        assertEquals(Set.of("ink-current", "prism-splat", "neon-squid"), optionIds(catalog, "super-sploor"));
+        assertEquals(Set.of("ember-ring", "arcane-burst", "frost-shards", "starburst"),
+                optionIds(catalog, "bomb-lobbers"));
+        assertEquals(Set.of("royal-gold", "void-siege", "verdant-siege"), optionIds(catalog, "castle-assault"));
+        assertEquals(Set.of("wool-burst", "golden-bell", "pasture-bloom"), optionIds(catalog, "sheep-quest"));
+        assertEquals(Set.of("vintage-flash", "neon-shutter", "polaroid-frame"), optionIds(catalog, "camera-shy"));
+        assertEquals("red", line(catalog, "runner").getDefaultOptionId());
     }
 
     @Test

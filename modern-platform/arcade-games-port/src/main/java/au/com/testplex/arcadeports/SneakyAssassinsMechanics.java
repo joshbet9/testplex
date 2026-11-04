@@ -331,6 +331,7 @@ final class SneakyAssassinsMechanics {
 
     void tick() {
         if (world == null) return;
+        for (Player player : players.values()) ArcadeCollisionRules.disable(player);
         tick++;
         long now = System.currentTimeMillis();
         updateDisguises(now);

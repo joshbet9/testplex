@@ -1896,6 +1896,13 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         }
         if (!applySpell(player, state, spell, level, target, clickedBlock)) return;
 
+        // Spell effects are game cosmetics: keep the spell's existing mechanics and
+        // impact visuals, then add the caster's style as a distinct accent.
+        if (plugin.getArcadePortManager() != null) {
+            plugin.getArcadePortManager().showAbilityActivationCosmetic(
+                    player, au.com.testplex.arcadeports.ArcadePortGame.WIZARDS, spell.displayName());
+        }
+
         state.mana -= manaCost;
         int cooldown = spell.cooldownSeconds(level, state.cooldownModifier);
         state.cooldowns.put(spell, now + cooldown * 1000L);

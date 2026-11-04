@@ -541,8 +541,14 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         player.setGameMode(org.bukkit.GameMode.ADVENTURE);
         player.setInvulnerable(true);
         lobby.ensurePanelItem(player);
+        if (showcaseOptions(selectedGame).length == 0) {
+            player.sendMessage(ChatColor.YELLOW + selectedGame.displayName()
+                    + " has no game-specific cosmetic line to preview.");
+            lobby.sendToLobby(player);
+            return;
+        }
         player.sendMessage(ChatColor.AQUA + selectedGame.displayName()
-                + ChatColor.GRAY + " ability-effects sandbox. Right-click any style to preview it. "
+                + ChatColor.GRAY + " cosmetic preview sandbox. Right-click a style to preview it. "
                 + "Use /arcadeport preview exit to return.");
     }
 
@@ -551,27 +557,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
      */
     private String[] showcaseOptions(ArcadePortGame game) {
         String[] registered = registeredCosmeticOptions(game);
-        if (registered.length > 0) return registered;
-        return switch (game) {
-            case BOMB_LOBBERS -> BOMB_LOBBERS_THEMES;
-            case DEATH_TAG -> new String[] {"bark-footprints", "soul-ribbons", "lantern-motes"};
-            case DRAGON_ESCAPE -> new String[] {"dragon-eye", "sky-compass", "wing-flare",
-                    "skylands-gate", "dragon-roar", "cloud-surf"};
-            case DRAGONS -> new String[] {"ember-wing", "phoenix-arc", "molten-orbit"};
-            case EVOLUTION -> new String[] {"shell-fragments", "nature-bloom", "void-unfold"};
-            case GLADIATORS -> new String[] {"arena-challenger", "red-sand", "oath-mark"};
-            case MICRO_BATTLES -> new String[] {"cracked-ice", "prism-grid", "molten-seam",
-                    "sweeping-tape", "warning-pips", "shatter-line"};
-            case ONE_IN_THE_QUIVER -> new String[] {"bullseye-dash", "fletching-sparks", "ricochet-rune"};
-            case PAINTBALL -> new String[] {"chrome-marker", "splatter-cannon", "neon-suppressor",
-                    "colourburst", "paint-drip", "stencil-stamp"};
-            case RUNNER -> new String[] {"red-walk", "chalk-dashes", "ribbon-replay"};
-            case SHEEP_QUEST -> new String[] {"sheep-bell", "wool-confetti", "shepherd-flare"};
-            case SPLEEF -> new String[] {"snowburst", "ice-shards", "chalk-grid"};
-            case TURF_WARS -> new String[] {"team-sigil", "turf-crack", "painted-chevron"};
-            case CAMERA_SHY -> new String[] {"smoke-artist", "decoy", "runner", "spotter", "understudy"};
-            default -> new String[] {"classic", "inferno", "frost"};
-        };
+        return registered;
     }
 
     @SuppressWarnings("unchecked")
@@ -586,7 +572,6 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             List<Object> lines = (List<Object>) definition.getClass().getMethod("getCosmeticLines").invoke(definition);
             List<String> options = new ArrayList<>();
             for (Object line : lines) {
-                if (!"ability-effects".equals(line.getClass().getMethod("getId").invoke(line))) continue;
                 List<Object> choices = (List<Object>) line.getClass().getMethod("getOptions").invoke(line);
                 for (Object choice : choices) {
                     String id = (String) choice.getClass().getMethod("getId").invoke(choice);
@@ -968,23 +953,29 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     }
 
     private void openDebugMenu(Player player) {
-        Inventory inventory = Bukkit.createInventory(null, 27, DEBUG_TITLE);
+        Inventory inventory = Bukkit.createInventory(null, 54, DEBUG_TITLE);
         inventory.setItem(4, item(Material.COMPARATOR, ChatColor.RED + selectedGame.displayName() + " Debug"));
-        boolean allKits = manager.isDebugOverrideEnabled(player.getUniqueId(), selectedGame, "all-kits");
-        inventory.setItem(11, testBotButton(allKits ? Material.LIME_DYE : Material.GRAY_DYE,
-                "Achievement Kits: " + (allKits ? "Unlocked" : "Normal Unlocks"),
-                "For test coverage, bypass this game's achievement-kit lock.", "debug-toggle:all-kits"));
+        inventory.setItem(10, debugToggleButton(player, "all-kits", Material.NETHER_STAR,
+                "Unlock all kits", "Bypass achievement-kit locks for this game."));
+        inventory.setItem(12, debugToggleButton(player, "invulnerable", Material.SHIELD,
+                "Invulnerability", "Prevent damage to you in this game's active round."));
+        inventory.setItem(14, debugToggleButton(player, "no-fall-damage", Material.FEATHER,
+                "Disable fall damage", "Ignore fall damage in this game's active round."));
+        inventory.setItem(16, debugToggleButton(player, "no-hunger-loss", Material.COOKED_BEEF,
+                "Lock hunger", "Keep hunger full while testing this game."));
         if (selectedGame == ArcadePortGame.BACON_BRAWL) {
-            boolean unlimited = manager.isDebugOverrideEnabled(player.getUniqueId(), selectedGame,
-                    "unlimited-abilities");
-            inventory.setItem(15, testBotButton(unlimited ? Material.FIREWORK_ROCKET : Material.FIREWORK_STAR,
-                    "Unlimited Abilities: " + (unlimited ? "On" : "Off"),
-                    "Abilities use full strength and do not consume meter.", "debug-toggle:unlimited-abilities"));
-        } else {
-            inventory.setItem(15, item(Material.BARRIER, ChatColor.GRAY + "No ability-meter override for this game"));
+            inventory.setItem(28, debugToggleButton(player, "unlimited-abilities", Material.FIREWORK_ROCKET,
+                    "Unlimited Abilities", "Abilities use full strength and do not consume meter."));
         }
-        inventory.setItem(22, testBotButton(Material.BARRIER, "Close", "debug-close"));
+        inventory.setItem(49, testBotButton(Material.BARRIER, "Close", "debug-close"));
         player.openInventory(inventory);
+    }
+
+    private ItemStack debugToggleButton(Player player, String flag, Material icon, String label, String description) {
+        boolean enabled = manager.isDebugOverrideEnabled(player.getUniqueId(), selectedGame, flag);
+        return testBotButton(enabled ? Material.LIME_DYE : icon,
+                label + ": " + (enabled ? ChatColor.GREEN + "On" : ChatColor.RED + "Off"),
+                description, "debug-toggle:" + flag);
     }
 
     private void handleDebugMenuClick(Player player, String action) {
@@ -1180,7 +1171,6 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             List<TestBotCosmetic> choices = new ArrayList<>();
             for (Object line : lines) {
                 String lineId = (String) line.getClass().getMethod("getId").invoke(line);
-                if (!"ability-effects".equals(lineId)) continue;
                 String lineTitle = (String) line.getClass().getMethod("getTitle").invoke(line);
                 String icon = (String) line.getClass().getMethod("getIcon").invoke(line);
                 @SuppressWarnings("unchecked")

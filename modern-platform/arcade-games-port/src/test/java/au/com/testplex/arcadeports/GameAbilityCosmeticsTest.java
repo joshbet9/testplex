@@ -8,44 +8,47 @@ import org.junit.jupiter.api.Test;
 import java.util.HashSet;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class GameAbilityCosmeticsTest {
     @Test
-    void everyArcadeGameHasOneCohesiveAbilityLineWithDistinctRenderableStyles() {
-        ArcadeCatalog catalog = new ArcadeCatalog();
-        for (ArcadePortGame game : ArcadePortGame.values()) {
-            String catalogId = game.isMonsterMaze() ? "monster-maze" : game.id();
-            var definition = catalog.getGame(catalogId);
-            assertNotNull(definition, "Missing cosmetic game registration for " + game.id());
-            assertEquals(1, definition.getCosmeticLines().size(),
-                    "Each game must expose one ability style line; win effects stay separate: " + game.id());
-            CosmeticLineDefinition line = definition.getCosmeticLines().get(0);
-            assertEquals("ability-effects", line.getId(), "Unexpected ability style line for " + game.id());
-            assertEquals(CosmeticLineDefinition.SelectionMode.SINGLE, line.getSelectionMode());
-
-            Set<GameAbilityCosmetics.Motif> motifs = new HashSet<>();
-            Set<Object> colours = new HashSet<>();
-            for (CosmeticOption option : line.getOptions()) {
-                GameAbilityCosmetics.Palette palette = GameAbilityCosmetics.palette(option.getId());
-                assertNotNull(palette, "Missing render palette for " + game.id() + "/" + option.getId());
-                assertNotNull(palette.motif(), "Missing effect geometry for " + game.id() + "/" + option.getId());
-                motifs.add(palette.motif());
-                colours.add(palette.colour());
-            }
-            assertTrue(line.getOptions().size() >= 2, "Game has no style choices: " + game.id());
-            assertTrue(motifs.size() >= 2, "Styles have identical particle geometry for " + game.id()
-                    + ": " + motifs);
-            assertTrue(colours.size() >= 2, "Styles have identical palette colours for " + game.id()
-                    + ": " + colours);
-
-            String fallback = GameAbilityCosmetics.defaultOption(catalogId);
-            assertNotEquals("arcade-pulse", fallback,
-                    "Missing ability-effect default for " + game.id());
+    void abilityNamesUseStableDistinctMotifsWithinAStyle() {
+        GameAbilityCosmetics.Palette style = GameAbilityCosmetics.palette("arcane-script");
+        Set<GameAbilityCosmetics.Motif> motifs = new HashSet<>();
+        for (String spell : Set.of("Anvil Drop", "Fireball", "Blink", "Ice Shards",
+                "Lightning Strike", "Rumble", "Spectral Arrow", "Frost Barrier")) {
+            GameAbilityCosmetics.Palette result = GameAbilityCosmetics.abilityPalette(style, spell);
+            assertEquals(style.colour(), result.colour(), "Spell identity must keep the equipped palette");
+            assertEquals(result.motif(), GameAbilityCosmetics.abilityPalette(style, spell).motif(),
+                    "The same spell must keep its visual signature");
+            motifs.add(result.motif());
         }
+        assertTrue(motifs.size() >= 8, "Wizard spells should have recognizable silhouettes under one style");
+    }
+
+    @Test
+    void onlyAbilityEffectLinesUseTheSharedParticleRenderer() {
+        ArcadeCatalog catalog = new ArcadeCatalog();
+        int effectLines = 0;
+        for (var game : catalog.getGames()) {
+            for (CosmeticLineDefinition line : game.getCosmeticLines()) {
+                if (!"ability-effects".equals(line.getId())) continue;
+                effectLines++;
+                Set<GameAbilityCosmetics.Motif> motifs = new HashSet<>();
+                Set<Object> colours = new HashSet<>();
+                for (CosmeticOption option : line.getOptions()) {
+                    GameAbilityCosmetics.Palette palette = GameAbilityCosmetics.palette(option.getId());
+                    assertNotNull(palette, "Missing palette for " + game.getId() + "/" + option.getId());
+                    assertNotNull(palette.motif(), "Missing geometry for " + game.getId() + "/" + option.getId());
+                    motifs.add(palette.motif());
+                    colours.add(palette.colour());
+                }
+                assertTrue(line.getOptions().size() >= 2, game.getId() + " needs test styles");
+                assertTrue(motifs.size() >= 2, game.getId() + " styles need distinct effect shapes");
+                assertTrue(colours.size() >= 2, game.getId() + " styles need distinct colours");
+            }
+        }
+        assertEquals(3, effectLines, "Only Bacon Brawl, Snake and Super Sploor use the shared ability renderer.");
     }
 
     @Test

@@ -7,20 +7,98 @@ import org.bukkit.Particle;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 
-/** Shared, game-scoped renderer for each game's single ability-effects cosmetic line. */
+/** Shared renderer for approved game-specific cosmetic previews and ability lines. */
 final class GameAbilityCosmetics {
     private GameAbilityCosmetics() { }
 
     static void preview(Player viewer, Location center, String optionId) {
-        emit(viewer, center, optionId, 1.0D);
+        if (optionId == null || optionId.isBlank()) return;
+        emit(viewer, center, optionId, "", 1.0D);
     }
 
     static void hit(Player viewer, Location center, String optionId) {
-        emit(viewer, center, optionId, 0.38D);
+        hit(viewer, center, optionId, "");
+    }
+
+    static void hit(Player viewer, Location center, String optionId, String abilityName) {
+        if (optionId == null || optionId.isBlank()) return;
+        emit(viewer, center, optionId, abilityName, 0.38D);
     }
 
     static Palette palette(String optionId) {
         String id = normalize(optionId);
+        if (id.equals("classic-pellet") || id.equals("ember-ring") || id.equals("golden-burst")
+                || id.equals("golden-thread") || id.equals("royal-gold")) {
+            return new Palette(Color.fromRGB(255, 190, 79), Particle.END_ROD, Particle.ELECTRIC_SPARK,
+                    Motif.BURST);
+        }
+        if (id.equals("arcane-burst") || id.equals("void-siege") || id.equals("void-motes")
+                || id.equals("void-unfold") || id.equals("arcane-script")) {
+            return new Palette(Color.fromRGB(178, 106, 255), Particle.SOUL, Particle.PORTAL,
+                    Motif.SPIRAL);
+        }
+        if (id.equals("frost-shards") || id.equals("glacier-dust") || id.equals("frost-runes")
+                || id.equals("crystal-pellet")) {
+            return new Palette(Color.fromRGB(132, 220, 255), Particle.SNOWFLAKE, Particle.END_ROD,
+                    Motif.GRID);
+        }
+        if (id.equals("starburst") || id.equals("starflare") || id.equals("starlight")
+                || id.equals("comet-pellet")) {
+            return new Palette(Color.fromRGB(255, 215, 78), Particle.FIREWORK, Particle.ELECTRIC_SPARK,
+                    Motif.BURST);
+        }
+        if (id.equals("verdant-siege") || id.equals("pasture-bloom")) {
+            return new Palette(Color.fromRGB(91, 209, 113), Particle.HAPPY_VILLAGER, Particle.COMPOSTER,
+                    Motif.ORBIT);
+        }
+        if (id.equals("prism-pellet") || id.equals("prism")) {
+            return new Palette(Color.fromRGB(99, 221, 220), Particle.ELECTRIC_SPARK, Particle.END_ROD,
+                    Motif.GRID);
+        }
+        if (id.equals("deep-current")) {
+            return new Palette(Color.fromRGB(64, 210, 195), Particle.BUBBLE, Particle.SPLASH,
+                    Motif.SPIRAL);
+        }
+        if (id.equals("reef-burst")) {
+            return new Palette(Color.fromRGB(255, 109, 155), Particle.SPLASH, Particle.FIREWORK,
+                    Motif.SPLASH);
+        }
+        if (id.equals("ink-pearl")) {
+            return new Palette(Color.fromRGB(205, 221, 238), Particle.SQUID_INK, Particle.END_ROD,
+                    Motif.ORBIT);
+        }
+        if (id.equals("vintage-flash")) {
+            return new Palette(Color.fromRGB(255, 232, 177), Particle.FLASH, Particle.END_ROD,
+                    Motif.EYE);
+        }
+        if (id.equals("neon-shutter")) {
+            return new Palette(Color.fromRGB(65, 245, 236), Particle.FLASH, Particle.ELECTRIC_SPARK,
+                    Motif.GRID);
+        }
+        if (id.equals("polaroid-frame")) {
+            return new Palette(Color.fromRGB(255, 255, 255), Particle.FLASH, Particle.FIREWORK,
+                    Motif.RING);
+        }
+        if (id.equals("smokehouse")) {
+            return new Palette(Color.fromRGB(170, 180, 190), Particle.CAMPFIRE_COSY_SMOKE,
+                    Particle.FLAME, Motif.SPIRAL);
+        }
+        if (id.equals("cinder-drift")) {
+            return new Palette(Color.fromRGB(255, 112, 42), Particle.FLAME, Particle.SMALL_FLAME,
+                    Motif.ORBIT);
+        }
+        if (id.equals("golden-bell") || id.equals("court-confetti")) {
+            return new Palette(Color.fromRGB(255, 205, 75), Particle.FIREWORK, Particle.NOTE,
+                    Motif.SPLASH);
+        }
+        if (id.equals("prismatic")) {
+            return new Palette(Color.fromRGB(116, 240, 228), Particle.ENCHANT, Particle.ELECTRIC_SPARK,
+                    Motif.ORBIT);
+        }
+        if (id.equals("frosted-bacon")) {
+            return new Palette(Color.fromRGB(160, 225, 255), Particle.SNOWFLAKE, Particle.END_ROD,
+                    Motif.ARC);
+        }
         if (id.contains("dragon-eye")) {
             return new Palette(Color.fromRGB(255, 226, 119), Particle.ENCHANT, Particle.END_ROD,
                     Motif.EYE);
@@ -126,44 +204,18 @@ final class GameAbilityCosmetics {
     static String defaultOption(String gameId) {
         return switch (gameId == null ? "" : gameId) {
             case "bacon-brawl" -> "crispy-comet";
-            case "bomb-lobbers" -> "turtle-shell";
-            case "death-tag" -> "soul-ribbons";
-            case "dragon-escape" -> "dragon-eye";
-            case "dragons" -> "phoenix-arc";
-            case "evolution" -> "charged-shell";
-            case "gladiators" -> "oath-mark";
-            case "micro-battles" -> "cracked-ice";
-            case "one-in-the-quiver" -> "bullseye-dash";
-            case "paintball" -> "chrome-marker";
-            case "runner" -> "trail-red";
-            case "sheep-quest" -> "sheep-bell";
             case "snake" -> "anaconda";
-            case "spleef" -> "snowburst";
-            case "draw-my-thing" -> "ink-splash";
-            case "master-builders" -> "blueprint-pulse";
-            case "castle-assault" -> "crystal-fracture";
-            case "heroes-of-gwen" -> "beacon-pulse";
-            case "hoops-remastered" -> "court-trail";
-            case "wizards" -> "arcane-glyph";
-            case "milk-the-cow" -> "dairy-splash";
-            case "wither-assault" -> "soul-rift";
-            case "skywars" -> "tnt-burst";
-            case "turf-wars" -> "team-sigil";
-            case "sneaky-assassins" -> "smoke-artist";
-            case "camera-shy" -> "flash-frame";
-            case "plexball" -> "pitch-flare";
-            case "super-sploor" -> "ink-current";
-            case "speed-builders", "speed-builders-arcade" -> "blueprint-pulse";
-            case "monster-maze" -> "maze-pulse";
-            default -> "arcade-pulse";
+            case "super-sploor" -> "ink-pearl";
+            case "wizards" -> "arcane-script";
+            default -> null;
         };
     }
 
-    private static void emit(Player viewer, Location center, String optionId, double scale) {
+    private static void emit(Player viewer, Location center, String optionId, String abilityName, double scale) {
         if (viewer == null || !viewer.isOnline() || center == null || center.getWorld() == null
                 || viewer.getWorld() != center.getWorld()) return;
         World world = center.getWorld();
-        Palette palette = palette(optionId);
+        Palette palette = abilityPalette(palette(optionId), abilityName);
         Location origin = center.clone().add(0.0D, 0.8D, 0.0D);
         int points = Math.max(10, (int) Math.round(32.0D * scale));
         double radius = 0.72D * scale;
@@ -180,6 +232,27 @@ final class GameAbilityCosmetics {
             case SPLASH -> emitSplash(world, origin, palette, dust, points, radius, scale);
             case EYE -> emitEye(world, origin, palette, dust, points, radius, scale);
         }
+    }
+
+    /** Ability names select distinct silhouettes while the equipped style keeps its colour and particle theme. */
+    static Palette abilityPalette(Palette style, String abilityName) {
+        if (style == null || abilityName == null || abilityName.isBlank()) return style;
+        String ability = abilityName.toLowerCase(Locale.ROOT);
+        Motif motif = ability.contains("leap") || ability.contains("jump") || ability.contains("glide")
+                ? Motif.ARC
+                : ability.contains("dash") || ability.contains("slide") || ability.contains("strike")
+                        ? Motif.SLASH
+                        : ability.contains("bomb") || ability.contains("blast") || ability.contains("shot")
+                                || ability.contains("throw") || ability.contains("sparkler")
+                                        ? Motif.BURST
+                                        : ability.contains("guard") || ability.contains("shield")
+                                                || ability.contains("block") || ability.contains("catch")
+                                                        ? Motif.RING
+                                                        : ability.contains("dodge") || ability.contains("smoke")
+                                                                || ability.contains("distraction")
+                                                                        ? Motif.ORBIT
+                                                                        : Motif.values()[Math.floorMod(ability.hashCode(), Motif.values().length)];
+        return new Palette(style.colour(), style.primary(), style.accent(), motif);
     }
 
     private static void emitRing(World world, Location origin, Palette palette, Particle.DustOptions dust,

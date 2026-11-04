@@ -340,6 +340,7 @@ public final class SuperSploorRuntime implements Listener {
 
     public void tick(long now) {
         if (!running || engine == null) return;
+        for (Player player : players.values()) ArcadeCollisionRules.disable(player);
         updateChargerPaintLines();
         rechargeDodgeRolls(now);
         updateTemporaryDevices(now);

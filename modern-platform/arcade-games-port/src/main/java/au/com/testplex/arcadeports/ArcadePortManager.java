@@ -433,10 +433,16 @@ public final class ArcadePortManager implements Listener {
         this.testPlayers = new ArcadeTestPlayerManager(plugin);
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=test-player-manager-ready");
         this.sneakyAssassins = new SneakyAssassinsMechanics(plugin, testPlayers::isTestPlayer);
-        this.hoops = new HoopsRemasteredRuntime(plugin, (winner, announceWinner) -> {
-            Session hoopsSession = active;
-            if (hoopsSession != null && hoopsSession.type == ArcadePortGame.HOOPS_REMASTERED) {
-                ArcadePortManager.this.finish(hoopsSession, winner, announceWinner);
+        this.hoops = new HoopsRemasteredRuntime(plugin, new HoopsRemasteredRuntime.Hooks() {
+            @Override public void finish(Player winner, boolean announceWinner) {
+                Session hoopsSession = active;
+                if (hoopsSession != null && hoopsSession.type == ArcadePortGame.HOOPS_REMASTERED) {
+                    ArcadePortManager.this.finish(hoopsSession, winner, announceWinner);
+                }
+            }
+
+            @Override public String cosmeticOption(Player player, String lineId, String fallback) {
+                return selectedGameCosmeticOption(player, "hoops-remastered", lineId, fallback);
             }
         });
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=sneaky-assassins-mechanics-ready");
@@ -797,7 +803,6 @@ public final class ArcadePortManager implements Listener {
             var choose = cosmetics.getClass().getMethod("chooseCosmeticOption",
                     UUID.class, String.class, String.class, String.class);
             for (String lineId : section.getKeys(false)) {
-                if (!"ability-effects".equals(lineId)) continue;
                 String optionId = section.getString(lineId, "");
                 if (optionId.isBlank()) continue;
                 boolean valid = false;
@@ -821,7 +826,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     void setConfiguredTestBotCosmetic(ArcadePortGame type, int botIndex, String lineId, String optionId) {
-        if (type == null || botIndex < 0 || !"ability-effects".equals(lineId)
+        if (type == null || botIndex < 0 || lineId == null || lineId.isBlank()
                 || optionId == null || optionId.isBlank()) return;
         plugin.getConfig().set("test-bot-loadouts." + type.id() + ".players." + botIndex
                 + ".cosmetics." + lineId, optionId);
@@ -4064,8 +4069,6 @@ public final class ArcadePortManager implements Listener {
         session.baconKnockback = ArcadePortRules.initialBaconKnockback(participants.size());
         session.baconEscalationIntervalMillis = ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS;
         session.microBarrierActive = type == ArcadePortGame.MICRO_BATTLES;
-        YamlConfiguration microCosmeticPreferences = type == ArcadePortGame.MICRO_BATTLES
-                ? loadMicroBattlesCosmeticPreferences() : null;
         SourceMapCatalog.MapData microSourceMap = sourceMapData.get(type.id());
         if (type == ArcadePortGame.MICRO_BATTLES) {
             session.microCrumbleMinX = microSourceMap == null ? -HALF_SIZE : microSourceMap.minX();
@@ -4313,10 +4316,10 @@ public final class ArcadePortManager implements Listener {
                 session.microKits.put(microId, microKitPreferences.getOrDefault(microId, "archer"));
                 session.microNextArrowAt.put(microId,
                         now + ArcadePortRules.MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS);
-                session.microGlassColours.put(microId, microBattlesColourSelection(
-                        microCosmeticPreferences, microId, "middle-glass-colour"));
-                session.microBorderColours.put(microId, microBattlesColourSelection(
-                        microCosmeticPreferences, microId, "border-particle-colour"));
+                String startGlassColour = selectedGameCosmeticOption(player, "micro-battles",
+                        "start-glass-colour", "white");
+                session.microGlassColours.put(microId, startGlassColour);
+                session.microBorderColours.put(microId, startGlassColour);
             }
             if (type == ArcadePortGame.ONE_IN_THE_QUIVER) {
                 session.quiverKits.put(player.getUniqueId(), quiverKitPreferences.getOrDefault(player.getUniqueId(), "leaper"));
@@ -4605,6 +4608,11 @@ public final class ArcadePortManager implements Listener {
                         @Override
                         public void heroSelected(Player player, String hero) {
                             heroesOfGwenHeroPreferences.put(player.getUniqueId(), hero);
+                        }
+
+                        @Override
+                        public String cosmeticOption(Player player, String lineId, String fallback) {
+                            return selectedGameCosmeticOption(player, "castle-assault", lineId, fallback);
                         }
                     });
             if (!session.variantRuntime.isReady()) {
@@ -5509,28 +5517,16 @@ public final class ArcadePortManager implements Listener {
     }
 
     private String gladiatorKillMessageStyle(Player killer) {
-        Plugin cosmeticsPlugin = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
-        if (cosmeticsPlugin != null) {
-            try {
-                Object selected = cosmeticsPlugin.getClass()
-                        .getMethod("getSelectedCosmeticOption", UUID.class, String.class, String.class)
-                        .invoke(cosmeticsPlugin, killer.getUniqueId(), "gladiators", "kill-message");
-                if (selected instanceof String value && !value.isBlank()) return value;
-            } catch (ReflectiveOperationException | LinkageError exception) {
-                plugin.getLogger().fine("Gladiators cosmetic preference bridge unavailable: " + exception.getMessage());
-            }
-        }
-        String fallback = plugin.getConfig().getString(
-                "players." + killer.getUniqueId() + ".games.gladiators.kill-message", "classic");
-        return fallback == null ? "classic" : fallback;
+        return selectedGameCosmeticOption(killer, "gladiators", "kill-messages", "defeated-by");
     }
 
     private void announceGladiatorKill(Session session, Player killer, Player victim) {
         String style = gladiatorKillMessageStyle(killer);
         String message = switch (style) {
-            case "sent-to-sand" -> ChatColor.GRAY + victim.getName() + " was sent to the sand by " + ChatColor.GOLD + killer.getName();
-            case "broken-oath" -> ChatColor.GRAY + victim.getName() + "'s challenge was ended by " + ChatColor.GOLD + killer.getName();
-            case "outclassed" -> ChatColor.GRAY + victim.getName() + " was no match for " + ChatColor.GOLD + killer.getName();
+            case "eliminated" -> ChatColor.GOLD + killer.getName() + ChatColor.GRAY + " eliminated "
+                    + ChatColor.WHITE + victim.getName();
+            case "fell-to" -> ChatColor.WHITE + victim.getName() + ChatColor.GRAY + " fell to "
+                    + ChatColor.GOLD + killer.getName();
             default -> ChatColor.GRAY + victim.getName() + " was defeated by " + ChatColor.GOLD + killer.getName();
         };
         announce(session, ChatColor.DARK_GRAY + "[Gladiators] " + message + ChatColor.GRAY + ".");
@@ -6666,6 +6662,9 @@ public final class ArcadePortManager implements Listener {
                 || disguise.getLocation().getYaw() != player.getLocation().getYaw()) {
             disguise.teleport(player.getLocation());
         }
+        // Reassert after player respawns or client entity resynchronization. These
+        // visibility hides can be cleared by a fresh client-side spawn packet.
+        player.hideEntity(plugin, disguise);
         disguise.setCustomName(ChatColor.RED + player.getName());
         // Hide the real Player entity from each viewer once, including held equipment,
         // while leaving the server-side Player available for combat and stat attribution.
@@ -6680,8 +6679,12 @@ public final class ArcadePortManager implements Listener {
                 playerId, ignored -> new HashSet<>());
         for (Player viewer : Bukkit.getOnlinePlayers()) {
             UUID viewerId = viewer.getUniqueId();
-            if (!viewerId.equals(playerId) && hiddenViewers.add(viewerId)) {
-                viewer.hideEntity(plugin, realPlayer);
+            if (!viewerId.equals(playerId)) {
+                // Use the player-specific API so Paper removes the real player
+                // entity before the skeleton proxy is rendered. Reapply if a client
+                // respawn caused Paper to send the real player spawn again.
+                if (viewer.canSee(realPlayer)) viewer.hidePlayer(plugin, realPlayer);
+                hiddenViewers.add(viewerId);
             }
         }
     }
@@ -6691,7 +6694,7 @@ public final class ArcadePortManager implements Listener {
         Set<UUID> hiddenViewers = session.deathTagHiddenViewers.remove(realPlayer.getUniqueId());
         if (hiddenViewers == null || hiddenViewers.isEmpty()) return;
         for (Player viewer : Bukkit.getOnlinePlayers()) {
-            if (hiddenViewers.contains(viewer.getUniqueId())) viewer.showEntity(plugin, realPlayer);
+            if (hiddenViewers.contains(viewer.getUniqueId())) viewer.showPlayer(plugin, realPlayer);
         }
     }
 
@@ -10593,35 +10596,52 @@ public final class ArcadePortManager implements Listener {
      * catalogue choice when the UI plugin is absent.
      */
     private String paintballCosmeticOption(UUID playerId, String group) {
-        String style = "chrome-marker";
+        String style = "classic-pellet";
         org.bukkit.plugin.Plugin cosmeticsPlugin = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
         if (cosmeticsPlugin != null && cosmeticsPlugin.isEnabled()) {
             try {
                 Object selected = cosmeticsPlugin.getClass()
                         .getMethod("getSelectedCosmeticOption", UUID.class, String.class, String.class)
-                        .invoke(cosmeticsPlugin, playerId, "paintball", "ability-effects");
+                        .invoke(cosmeticsPlugin, playerId, "paintball", "pellet-styles");
                 if (selected instanceof String value && !value.isBlank()) style = value;
             } catch (ReflectiveOperationException | LinkageError exception) {
                 plugin.getLogger().fine("Paintball cosmetic preference bridge unavailable: " + exception.getMessage());
             }
         }
-        if ("weapon".equals(group)) return switch (style) {
-            case "colourburst" -> "neon-suppressor";
-            case "stencil-stamp" -> "splatter-cannon";
-            default -> "chrome-marker";
-        };
-        return switch (style) {
-            case "stencil-stamp" -> "stencil-stamp";
-            case "colourburst" -> "colourburst";
-            default -> "paint-drip";
-        };
+        if ("weapon".equals(group)) return "chrome-marker";
+        return style;
+    }
+
+    private boolean hasCosmeticLine(String gameId, String lineId) {
+        Plugin cosmetics = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
+        if (cosmetics == null || !cosmetics.isEnabled() || gameId == null || lineId == null) return false;
+        try {
+            Object catalog = cosmetics.getClass().getMethod("getCatalog").invoke(cosmetics);
+            Object game = catalog.getClass().getMethod("getGame", String.class).invoke(catalog, gameId);
+            if (game == null) return false;
+            @SuppressWarnings("unchecked")
+            List<Object> lines = (List<Object>) game.getClass().getMethod("getCosmeticLines").invoke(game);
+            for (Object line : lines) {
+                if (lineId.equals(line.getClass().getMethod("getId").invoke(line))) return true;
+            }
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            plugin.getLogger().fine("Could not check cosmetic line " + gameId + "/" + lineId + ": "
+                    + exception.getMessage());
+        }
+        return false;
     }
 
     private String abilityEffectCosmeticOption(Player player, ArcadePortGame game) {
-        String gameId = game != null && game.isMonsterMaze() ? "monster-maze"
-                : game == null ? "" : game.id();
+        if (game == null) return null;
+        String gameId = game.isMonsterMaze() ? "monster-maze" : game.id();
+        String lineId = switch (game) {
+            case BACON_BRAWL, SNAKE, SUPER_SPLOOR -> "ability-effects";
+            case WIZARDS -> "spell-effects";
+            default -> "";
+        };
+        if (lineId.isBlank()) return null;
+        if (player == null || gameId.isBlank() || !hasCosmeticLine(gameId, lineId)) return null;
         String fallback = GameAbilityCosmetics.defaultOption(gameId);
-        if (player == null || gameId.isBlank()) return fallback;
         org.bukkit.plugin.Plugin cosmetics = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
         if (cosmetics == null || !cosmetics.isEnabled()) return fallback;
         try {
@@ -10636,28 +10656,59 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private String selectedGameCosmeticOption(Player player, String gameId, String lineId, String fallback) {
+        return player == null ? null
+                : selectedGameCosmeticOption(player.getUniqueId(), gameId, lineId, fallback);
+    }
+
+    private String selectedGameCosmeticOption(UUID playerId, String gameId, String lineId, String fallback) {
+        if (playerId == null || gameId == null || lineId == null || !hasCosmeticLine(gameId, lineId)) return null;
+        org.bukkit.plugin.Plugin cosmetics = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
+        if (cosmetics == null || !cosmetics.isEnabled()) return fallback;
+        try {
+            Object selected = cosmetics.getClass().getMethod("getSelectedCosmeticOption",
+                    UUID.class, String.class, String.class)
+                    .invoke(cosmetics, playerId, gameId, lineId);
+            return selected instanceof String option && !option.isBlank() ? option : fallback;
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            plugin.getLogger().fine("Could not read " + gameId + "/" + lineId + " cosmetic selection: "
+                    + exception.getMessage());
+            return fallback;
+        }
+    }
+
     void showAbilityActivationCosmetic(Player player) {
+        showAbilityActivationCosmetic(player, "");
+    }
+
+    void showAbilityActivationCosmetic(Player player, String abilityName) {
         Session session = active;
         if (session == null || player == null || !player.isOnline() || !session.liveStarted
                 || !session.alive.contains(player.getUniqueId())
                 || !isSessionWorld(session, player.getWorld())) return;
-        renderAbilityActivationCosmetic(player, session.type);
+        renderAbilityActivationCosmetic(player, session.type, abilityName);
     }
 
     void showAbilityActivationCosmetic(Player player, ArcadePortGame game) {
-        if (game == ArcadePortGame.CAMERA_SHY) {
-            if (cameraShyModule == null || !cameraShyModule.isLiveParticipant(player)) return;
-            renderAbilityActivationCosmetic(player, game);
-            return;
-        }
-        showAbilityActivationCosmetic(player);
+        showAbilityActivationCosmetic(player, game, "");
     }
 
-    private void renderAbilityActivationCosmetic(Player player, ArcadePortGame game) {
+    void showAbilityActivationCosmetic(Player player, ArcadePortGame game, String abilityName) {
+        if (game == ArcadePortGame.CAMERA_SHY) {
+            if (cameraShyModule == null || !cameraShyModule.isLiveParticipant(player)) return;
+            renderAbilityActivationCosmetic(player, game, abilityName);
+            return;
+        }
+        showAbilityActivationCosmetic(player, abilityName);
+    }
+
+    private void renderAbilityActivationCosmetic(Player player, ArcadePortGame game, String abilityName) {
         if (player == null || !player.isOnline() || game == null) return;
         Location effectAt = player.getLocation().clone().add(0.0D, 0.8D, 0.0D);
-        GameAbilityCosmetics.hit(player, effectAt,
-                abilityEffectCosmeticOption(player, game));
+        String style = game == ArcadePortGame.CAMERA_SHY
+                ? selectedGameCosmeticOption(player, "camera-shy", "camera-flash", "vintage-flash")
+                : abilityEffectCosmeticOption(player, game);
+        GameAbilityCosmetics.hit(player, effectAt, style, abilityName);
     }
 
     private void updatePaintballWeaponSkin(Session session, Player player) {
@@ -10678,6 +10729,15 @@ public final class ArcadePortManager implements Listener {
         Color colour = ArcadePortRules.paintballTeamColor(team);
         session.paintProjectileTeams.put(projectile.getUniqueId(), team);
         String style = paintballCosmeticOption(shooter.getUniqueId(), "pellet");
+        if (projectile instanceof Snowball snowball) {
+            Material pellet = switch (style) {
+                case "prism-pellet" -> Material.AMETHYST_SHARD;
+                case "comet-pellet" -> Material.FIRE_CHARGE;
+                case "crystal-pellet" -> Material.PRISMARINE_CRYSTALS;
+                default -> Material.SNOWBALL;
+            };
+            snowball.setItem(new ItemStack(pellet));
+        }
         session.paintballProjectileCosmetics.put(projectile.getUniqueId(),
                 new PaintballProjectileVisual(projectile, style, colour));
     }
@@ -10739,13 +10799,26 @@ public final class ArcadePortManager implements Listener {
             Location point = projectile.getLocation();
             Particle.DustOptions dust = new Particle.DustOptions(visual.teamColor(), 1.35F);
             switch (visual.style()) {
-                case "paint-drip" -> spawnPaintballCosmeticDust(session,
-                        point.clone().add(0.0D, -0.10D, 0.0D),
-                        2, 0.012D, 0.075D, 0.012D, dust);
-                case "stencil-stamp" -> spawnPaintballCosmeticDust(session, point,
-                        4, 0.035D, 0.0D, 0.035D, dust);
-                default -> spawnPaintballCosmeticDust(session, point, 4,
-                        0.045D, 0.045D, 0.045D, dust);
+                case "prism-pellet" -> {
+                    spawnPaintballCosmeticDust(session, point, 3, 0.025D, 0.025D, 0.025D, dust);
+                    session.world.spawnParticle(Particle.ELECTRIC_SPARK, point, 2,
+                            0.025D, 0.025D, 0.025D, 0.01D);
+                }
+                case "comet-pellet" -> {
+                    Vector velocity = projectile.getVelocity().clone();
+                    if (velocity.lengthSquared() > 0.0001D) velocity.normalize().multiply(-0.22D);
+                    spawnPaintballCosmeticDust(session, point.clone().add(velocity), 3,
+                            0.018D, 0.018D, 0.018D, dust);
+                    session.world.spawnParticle(Particle.FLAME, point.clone().add(velocity), 1,
+                            0.015D, 0.015D, 0.015D, 0.0D);
+                }
+                case "crystal-pellet" -> {
+                    spawnPaintballCosmeticDust(session, point, 2, 0.02D, 0.02D, 0.02D, dust);
+                    session.world.spawnParticle(Particle.SNOWFLAKE, point, 2,
+                            0.025D, 0.025D, 0.025D, 0.0D);
+                }
+                default -> spawnPaintballCosmeticDust(session, point, 3,
+                        0.025D, 0.025D, 0.025D, dust);
             }
         }
     }
@@ -11975,14 +12048,7 @@ public final class ArcadePortManager implements Listener {
     /** Preserve Mineplex 1.8's run-through behavior for every active game and participant. */
     private void disableParticipantCollisions(Session session) {
         for (Player player : session.players.values()) {
-            if (player == null || !player.isOnline()) continue;
-            player.setCollidable(false);
-            // Paper's player-team collision rule can override setCollidable(false).
-            // Scoreboards are replaced by several game runtimes, so normalize every
-            // team on the participant's current board instead of only their own tab team.
-            for (Team team : player.getScoreboard().getTeams()) {
-                team.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
-            }
+            ArcadeCollisionRules.disable(player);
         }
     }
 
@@ -13760,8 +13826,13 @@ public final class ArcadePortManager implements Listener {
             if (flight != null) {
                 Location next = dragon.getLocation().clone().add(flight);
                 next.setDirection(flight);
-                dragon.teleport(next);
-                dragon.setVelocity(new Vector());
+                if (dragon.teleport(next)) {
+                    dragon.setVelocity(new Vector());
+                } else {
+                    // A failed teleport must not leave a no-AI dragon stranded at spawn.
+                    dragon.setAI(true);
+                    dragon.setVelocity(flight);
+                }
             }
             if (targetUpdate) {
                 for (Player player : alive) {
@@ -13782,13 +13853,14 @@ public final class ArcadePortManager implements Listener {
                 session.dragonSparklerItems.remove(sparklerId);
                 session.dragonSparklerStyles.remove(sparklerId);
                 session.dragonSparklerOwners.remove(sparklerId);
+                session.dragonSparklerLanded.remove(sparklerId);
                 it.remove();
                 item.remove();
                 continue;
             }
-            if (perkUpdate) {
-                Location itemLocation = item.getLocation();
-                renderDragonSparklerBurst(itemLocation, session.dragonSparklerStyles.getOrDefault(sparklerId, "golden-thread"));
+            if (item.isOnGround() && session.dragonSparklerLanded.add(sparklerId)) {
+                renderDragonSparklerBurst(session, item.getLocation(),
+                        session.dragonSparklerStyles.getOrDefault(sparklerId, "golden-thread"));
             }
             if (!targetUpdate) continue;
             Location itemLocation = item.getLocation();
@@ -14012,26 +14084,23 @@ public final class ArcadePortManager implements Listener {
     }
 
     private String selectedDragonCosmetic(UUID playerId, String lineId, String defaultOption) {
-        Plugin cosmeticsPlugin = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
-        if (cosmeticsPlugin == null || !cosmeticsPlugin.isEnabled()) return defaultOption;
-        File preferencesFile = new File(cosmeticsPlugin.getDataFolder(), "player-preferences.yml");
-        YamlConfiguration preferences = YamlConfiguration.loadConfiguration(preferencesFile);
-        String selected = preferences.getString("players." + playerId
-                + ".games.dragons.cosmetics." + lineId + ".selected", defaultOption);
+        String selected = selectedGameCosmeticOption(playerId, "dragons", lineId, defaultOption);
         return selected == null || selected.isBlank() ? defaultOption : selected.toLowerCase(java.util.Locale.ROOT);
     }
 
-    private void renderDragonSparklerBurst(Location location, String style) {
+    private void renderDragonSparklerBurst(Session session, Location location, String style) {
         if (location == null || location.getWorld() == null) return;
         var world = location.getWorld();
+        List<Player> receivers = session == null ? List.of() : new ArrayList<>(session.players.values());
+        if (receivers.isEmpty()) return;
         FireworkEffect.Builder effect = FireworkEffect.builder().with(FireworkEffect.Type.BURST);
         switch (style == null ? "golden-thread" : style) {
-            case "cinder-drift" -> { effect.withColor(Color.ORANGE, Color.RED); world.spawnParticle(Particle.FLAME, location, 5, 0.10D, 0.10D, 0.10D, 0.01D); }
-            case "glacier-dust" -> { effect.withColor(Color.AQUA, Color.WHITE); world.spawnParticle(Particle.SNOWFLAKE, location, 5, 0.10D, 0.10D, 0.10D, 0.01D); }
-            case "void-motes" -> { effect.withColor(Color.PURPLE, Color.FUCHSIA); world.spawnParticle(Particle.PORTAL, location, 6, 0.10D, 0.10D, 0.10D, 0.02D); }
-            case "starlight" -> { effect.withColor(Color.YELLOW, Color.WHITE); world.spawnParticle(Particle.ELECTRIC_SPARK, location, 7, 0.12D, 0.12D, 0.12D, 0.02D); }
-            case "prismatic" -> { effect.withColor(Color.AQUA, Color.LIME, Color.FUCHSIA); world.spawnParticle(Particle.ENCHANT, location, 5, 0.12D, 0.12D, 0.12D, 0.02D); }
-            default -> { effect.withColor(Color.YELLOW, Color.WHITE); world.spawnParticle(Particle.END_ROD, location, 4, 0.09D, 0.09D, 0.09D, 0.01D); }
+            case "cinder-drift" -> { effect.withColor(Color.ORANGE, Color.RED); world.spawnParticle(Particle.FLAME, receivers, null, location.getX(), location.getY(), location.getZ(), 5, 0.10D, 0.10D, 0.10D, 0.01D, null, true); }
+            case "glacier-dust" -> { effect.withColor(Color.AQUA, Color.WHITE); world.spawnParticle(Particle.SNOWFLAKE, receivers, null, location.getX(), location.getY(), location.getZ(), 5, 0.10D, 0.10D, 0.10D, 0.01D, null, true); }
+            case "void-motes" -> { effect.withColor(Color.PURPLE, Color.FUCHSIA); world.spawnParticle(Particle.PORTAL, receivers, null, location.getX(), location.getY(), location.getZ(), 6, 0.10D, 0.10D, 0.10D, 0.02D, null, true); }
+            case "starlight" -> { effect.withColor(Color.YELLOW, Color.WHITE); world.spawnParticle(Particle.ELECTRIC_SPARK, receivers, null, location.getX(), location.getY(), location.getZ(), 7, 0.12D, 0.12D, 0.12D, 0.02D, null, true); }
+            case "prismatic" -> { effect.withColor(Color.AQUA, Color.LIME, Color.FUCHSIA); world.spawnParticle(Particle.ENCHANT, receivers, null, location.getX(), location.getY(), location.getZ(), 5, 0.12D, 0.12D, 0.12D, 0.02D, null, true); }
+            default -> { effect.withColor(Color.YELLOW, Color.WHITE); world.spawnParticle(Particle.END_ROD, receivers, null, location.getX(), location.getY(), location.getZ(), 4, 0.09D, 0.09D, 0.09D, 0.01D, null, true); }
         }
         Firework firework = world.spawn(location, Firework.class);
         FireworkMeta meta = firework.getFireworkMeta();
@@ -14648,8 +14717,13 @@ public final class ArcadePortManager implements Listener {
         // The 1.8 source uses UtilEnt.setPosition each tick. Velocity-only movement
         // leaves Paper's entity position behind the route simulation and Douglas
         // visibly lags while the destruction/rank calculations move ahead.
-        dragon.teleport(location);
-        dragon.setVelocity(new Vector());
+        if (dragon.teleport(location)) {
+            dragon.setVelocity(new Vector());
+        } else {
+            dragon.setAI(true);
+            dragon.setVelocity(velocity.clone().multiply(ArcadePortRules.DRAGON_ESCAPE_CHASE_SPEED
+                    * session.dragonEscapeSpeedMultiplier));
+        }
         return location;
     }
 
@@ -14732,12 +14806,12 @@ public final class ArcadePortManager implements Listener {
         }
 
         // Generated fallback course for maps with no authored waypoint markers.
+        // Douglas has AI disabled and is normally advanced with direct position
+        // updates, so velocity alone cannot move him on Paper.
         if (location.getZ() < 80.0D) {
-            Vector desired = new Vector((0.5D - location.getX()) * 0.025D,
-                    (65.5D - location.getY()) * 0.02D, 1.0D).normalize()
-                    .multiply(ArcadePortRules.DRAGON_ESCAPE_CHASE_SPEED);
-            dragon.setVelocity(desired);
-        } else dragon.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+            location = moveDragonEscapeDragon(session,
+                    new Location(session.world, 0.5D, 65.5D, 80.0D));
+        } else dragon.setVelocity(new Vector());
         int minZ = Math.max(-24, (int) Math.floor(location.getZ() - ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS));
         int maxZ = Math.min(80, (int) Math.floor(location.getZ() + ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS));
         double radius = ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS;
@@ -14786,7 +14860,9 @@ public final class ArcadePortManager implements Listener {
     private void recordDragonEscapeFinish(Session session, Player player, long now) {
         if (session == null || player == null || testPlayers.isTestPlayer(player)) return;
         UUID id = player.getUniqueId();
+        boolean firstFinisher = session.dragonEscapeCompleted.isEmpty();
         if (session.dragonEscapeCompleted.add(id)) {
+            if (firstFinisher) session.dragonEscapeWinner = id;
             String statsPath = localStatsPath(id, ArcadePortGame.DRAGON_ESCAPE.id());
             plugin.getConfig().set(statsPath + "course-completes",
                     plugin.getConfig().getInt(statsPath + "course-completes", 0) + 1);
@@ -15476,12 +15552,19 @@ public final class ArcadePortManager implements Listener {
         if (order.isEmpty()) return;
         Player leader = order.get(0);
         UUID leaderId = leader.getUniqueId();
-        String leaderColor = dragonEscapeBeaconColor(leaderId);
-        if (!leaderId.equals(session.dragonEscapeBeaconLeader)) {
-            session.dragonEscapeBeaconLeader = leaderId;
+        UUID beaconOwnerId = session.dragonEscapeWinner == null ? leaderId : session.dragonEscapeWinner;
+        Player beaconOwner = session.players.getOrDefault(beaconOwnerId, leader);
+        String leaderColor = dragonEscapeBeaconColor(beaconOwnerId);
+        if (!beaconOwnerId.equals(session.dragonEscapeBeaconLeader)) {
+            session.dragonEscapeBeaconLeader = beaconOwnerId;
             session.dragonEscapeBeaconColor = leaderColor;
-            announce(session, ChatColor.GOLD + leader.getName() + ChatColor.YELLOW
-                    + " is now leading! Beacon colour: " + leaderColor + ".");
+            if (session.dragonEscapeWinner == null) {
+                announce(session, ChatColor.GOLD + leader.getName() + ChatColor.YELLOW
+                        + " is now leading! Beacon colour: " + leaderColor + ".");
+            } else {
+                announce(session, ChatColor.GOLD + beaconOwner.getName() + ChatColor.YELLOW
+                        + " won the race! Their beacon colour is " + leaderColor + ".");
+            }
         } else {
             session.dragonEscapeBeaconColor = leaderColor;
         }
@@ -15505,7 +15588,7 @@ public final class ArcadePortManager implements Listener {
         // Keep these particles exclusively for the race-leader beacon.
         Color beaconRgb = dragonEscapeBeaconRgb(session.dragonEscapeBeaconColor);
         Particle.DustOptions beaconDust = new Particle.DustOptions(beaconRgb, 1.7F);
-        Location beacon = leader.getLocation().clone().add(0.0D, 1.4D, 0.0D);
+        Location beacon = beaconOwner.getLocation().clone().add(0.0D, 1.4D, 0.0D);
         for (Player viewer : session.players.values()) {
             if (viewer == null || !viewer.isOnline() || viewer.getWorld() != session.world) continue;
             for (double y : new double[] {0.0D, 1.8D, 3.6D, 5.4D}) {
@@ -15795,6 +15878,8 @@ public final class ArcadePortManager implements Listener {
                 && session.teams.getOrDefault(holderId, -1) == team) {
             recordSheepQuestCapture(session, holderId);
             session.scores.merge(holderId, 1, Integer::sum);
+            GameAbilityCosmetics.hit(holder, sheep.getLocation(),
+                    selectedGameCosmeticOption(holder, "sheep-quest", "capture-effects", "wool-burst"));
             holder.playSound(holder.getLocation(), Sound.ENTITY_SHEEP_AMBIENT, 1.0F, 1.5F);
             holder.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, holder.getLocation().add(0, 1, 0),
                     12, 0.35D, 0.4D, 0.35D, 0.04D);
@@ -17774,16 +17859,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private String evolutionEggVariant(UUID playerId) {
-        var cosmeticsPlugin = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
-        java.io.File cosmeticsFolder = cosmeticsPlugin == null
-                ? new java.io.File(plugin.getDataFolder().getParentFile(), "TestplexModernArcade")
-                : cosmeticsPlugin.getDataFolder();
-        java.io.File preferencesFile = new java.io.File(cosmeticsFolder, "player-preferences.yml");
-        if (!preferencesFile.isFile()) return "charged";
-        org.bukkit.configuration.file.YamlConfiguration preferences =
-                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(preferencesFile);
-        String selected = preferences.getString("players." + playerId
-                + ".games.evolution.cosmetics.metamorphosis.selected", "charged");
+        String selected = selectedGameCosmeticOption(playerId, "evolution", "metamorphosis", "shell-fragments");
         return switch (selected == null ? "charged" : selected.toLowerCase(java.util.Locale.ROOT)) {
             case "void", "void-unfold" -> "void";
             case "nature", "nature-bloom" -> "nature";
@@ -18939,6 +19015,7 @@ public final class ArcadePortManager implements Listener {
             for (UUID playerId : new ArrayList<>(session.dragonGliderUntil.keySet())) endDragonGlider(session, playerId);
             restoreDragonFrostBlocks(session);
             session.dragonSparklerStyles.clear();
+            session.dragonSparklerLanded.clear();
         }
         active = null;
         if (session.tickTask != null) session.tickTask.cancel();
@@ -20199,13 +20276,16 @@ public final class ArcadePortManager implements Listener {
         if (playerId == null) return "white";
         org.bukkit.plugin.Plugin cosmetics = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
         if (cosmetics != null && cosmetics.isEnabled()) {
+            String selected = selectedGameCosmeticOption(playerId, "dragon-escape",
+                    "winner-beacon-colour", "white");
+            if (selected != null && DRAGON_ESCAPE_BEACON_COLOR_NAMES.contains(selected)) return selected;
             File preferencesFile = new File(cosmetics.getDataFolder(), "player-preferences.yml");
             YamlConfiguration preferences = YamlConfiguration.loadConfiguration(preferencesFile);
-            String selected = preferences.getString("players." + playerId
+            String legacySelected = preferences.getString("players." + playerId
                     + ".games.dragon-escape.cosmetics.leader-beacon.selected", null);
-            if (selected != null) {
-                selected = selected.toLowerCase(java.util.Locale.ROOT).replace('_', '-');
-                if (DRAGON_ESCAPE_BEACON_COLOR_NAMES.contains(selected)) return selected;
+            if (legacySelected != null) {
+                legacySelected = legacySelected.toLowerCase(java.util.Locale.ROOT).replace('_', '-');
+                if (DRAGON_ESCAPE_BEACON_COLOR_NAMES.contains(legacySelected)) return legacySelected;
             }
         }
         String value = plugin.getConfig().getString("dragon-escape-beacon-color." + playerId, "white");
@@ -20220,6 +20300,22 @@ public final class ArcadePortManager implements Listener {
         if (!DRAGON_ESCAPE_BEACON_COLOR_NAMES.contains(value)) {
             player.sendMessage(ChatColor.YELLOW + "Beacon colours: " + String.join(", ", DRAGON_ESCAPE_BEACON_COLOR_NAMES));
             return false;
+        }
+        Plugin cosmeticsPlugin = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
+        if (cosmeticsPlugin != null && cosmeticsPlugin.isEnabled()) {
+            try {
+                Object selected = cosmeticsPlugin.getClass()
+                        .getMethod("chooseCosmeticOption", UUID.class, String.class, String.class, String.class)
+                        .invoke(cosmeticsPlugin, player.getUniqueId(), "dragon-escape",
+                                "winner-beacon-colour", value);
+                if (Boolean.TRUE.equals(selected)) {
+                    player.sendMessage(ChatColor.GREEN + "Your Dragon Escape winner beacon colour is now "
+                            + value.replace('-', ' ') + ".");
+                    return true;
+                }
+            } catch (ReflectiveOperationException | LinkageError exception) {
+                plugin.getLogger().fine("Dragon Escape beacon cosmetic bridge unavailable: " + exception.getMessage());
+            }
         }
         plugin.getConfig().set("dragon-escape-beacon-color." + player.getUniqueId(), value);
         plugin.saveConfig();
@@ -21944,14 +22040,12 @@ public final class ArcadePortManager implements Listener {
         try {
             Object selected = cosmeticsPlugin.getClass()
                     .getMethod("getSelectedCosmeticOption", UUID.class, String.class, String.class)
-                    .invoke(cosmeticsPlugin, playerId, "runner", "ability-effects");
+                    .invoke(cosmeticsPlugin, playerId, "runner", "trail-colour");
             if (selected instanceof String value) {
-                return switch (value) {
-                    case "trail-cyan" -> "trail-cyan";
-                    case "trail-chalk" -> "trail-white";
-                    case "trail-red" -> "trail-red";
-                    default -> fallback;
-                };
+                String colour = value.toLowerCase(java.util.Locale.ROOT).replace('_', '-');
+                if ("red".equals(colour)) return "trail-red";
+                return ArcadePortRules.runnerTrailColours().contains(colour)
+                        ? "trail-" + colour : fallback;
             }
             return fallback;
         } catch (ReflectiveOperationException | LinkageError exception) {
@@ -22389,30 +22483,7 @@ public final class ArcadePortManager implements Listener {
         return ArcadePortRules.nextSpleefSlowDamageMaterial(material);
     }
 
-    private String spleefBreakSignatureOption(UUID playerId) {
-        String fallback = "snowburst";
-        if (playerId == null) return fallback;
-        org.bukkit.plugin.Plugin cosmeticsPlugin = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
-        if (cosmeticsPlugin == null || !cosmeticsPlugin.isEnabled()) return fallback;
-        try {
-            Object selected = cosmeticsPlugin.getClass()
-                    .getMethod("getSelectedCosmeticOption", UUID.class, String.class, String.class)
-                    .invoke(cosmeticsPlugin, playerId, "spleef", "ability-effects");
-            return selected instanceof String value
-                    && java.util.Set.of("snowburst", "ice-shards", "chalk-grid").contains(value)
-                    ? value : fallback;
-        } catch (ReflectiveOperationException | LinkageError exception) {
-            plugin.getLogger().fine("Spleef block-break cosmetic preference bridge unavailable: "
-                    + exception.getMessage());
-            return fallback;
-        }
-    }
-
-    /**
-     * Render the block break selected by the player who caused it. Explicitly
-     * target every player in this isolated match world and force delivery, so
-     * distant players and spectators see the same effect as the breaker.
-     */
+    /** Keep normal snow-block break feedback; Spleef has no separate cosmetic line. */
     private void breakSpleefBlock(Session session, Player breaker, Block block) {
         if (isSpleefProtectedBlock(block.getType())) return;
         if (breaker != null) {
@@ -22430,36 +22501,9 @@ public final class ArcadePortManager implements Listener {
 
         List<Player> receivers = new ArrayList<>(session.world.getPlayers());
         if (!receivers.isEmpty()) {
-            String signature = spleefBreakSignatureOption(breaker == null ? null : breaker.getUniqueId());
-            switch (signature) {
-                case "ice-shards" -> {
-                    session.world.spawnParticle(Particle.BLOCK, receivers, null,
-                            center.getX(), center.getY(), center.getZ(), 14,
-                            0.24D, 0.22D, 0.24D, 0.11D, brokenData, true);
-                    session.world.spawnParticle(Particle.SNOWFLAKE, receivers, null,
-                            center.getX(), center.getY(), center.getZ(), 8,
-                            0.20D, 0.20D, 0.20D, 0.035D, null, true);
-                }
-                case "chalk-grid" -> {
-                    Particle.DustOptions chalk = new Particle.DustOptions(Color.fromRGB(235, 239, 245), 0.9F);
-                    for (double offset : new double[] {-0.28D, 0.0D, 0.28D}) {
-                        session.world.spawnParticle(Particle.DUST, receivers, null,
-                                center.getX(), center.getY(), center.getZ() + offset, 3,
-                                0.26D, 0.0D, 0.0D, 0.0D, chalk, true);
-                        session.world.spawnParticle(Particle.DUST, receivers, null,
-                                center.getX() + offset, center.getY(), center.getZ(), 3,
-                                0.0D, 0.0D, 0.26D, 0.0D, chalk, true);
-                    }
-                }
-                default -> {
-                    session.world.spawnParticle(Particle.SNOWFLAKE, receivers, null,
-                            center.getX(), center.getY(), center.getZ(), 12,
-                            0.20D, 0.18D, 0.20D, 0.06D, null, true);
-                    session.world.spawnParticle(Particle.CLOUD, receivers, null,
-                            center.getX(), center.getY(), center.getZ(), 4,
-                            0.14D, 0.12D, 0.14D, 0.02D, null, true);
-                }
-            }
+            session.world.spawnParticle(Particle.BLOCK, receivers, null,
+                    center.getX(), center.getY(), center.getZ(), 8,
+                    0.22D, 0.20D, 0.22D, 0.08D, brokenData, true);
         }
         session.world.playSound(center, Sound.BLOCK_STONE_BREAK, 0.5F, 1.15F);
     }
@@ -22836,6 +22880,20 @@ public final class ArcadePortManager implements Listener {
         if (event.isCancelled() && !(session.type == ArcadePortGame.BACON_BRAWL
                 && event.getCause() == EntityDamageEvent.DamageCause.VOID
                 && event.getEntity() instanceof Player)) return;
+        if (event.getEntity() instanceof Player debugTarget
+                && session.players.containsKey(debugTarget.getUniqueId())) {
+            UUID debugId = debugTarget.getUniqueId();
+            if (isDebugOverrideEnabled(debugId, session.type, "invulnerable")) {
+                event.setCancelled(true);
+                return;
+            }
+            if (event.getCause() == EntityDamageEvent.DamageCause.FALL
+                    && isDebugOverrideEnabled(debugId, session.type, "no-fall-damage")) {
+                event.setCancelled(true);
+                debugTarget.setFallDistance(0.0F);
+                return;
+            }
+        }
         if (event instanceof EntityDamageByEntityEvent byEntity
                 && event.getEntity() instanceof Player victim
                 && session.players.containsKey(victim.getUniqueId())) {
@@ -24188,6 +24246,18 @@ public final class ArcadePortManager implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onGameDebugFoodLevelChange(FoodLevelChangeEvent event) {
+        if (!(event.getEntity() instanceof Player player)) return;
+        Session session = active;
+        if (session == null || !session.players.containsKey(player.getUniqueId())) return;
+        if (isDebugOverrideEnabled(player.getUniqueId(), session.type, "no-hunger-loss")) {
+            event.setCancelled(true);
+            player.setFoodLevel(20);
+            player.setSaturation(20.0F);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onBaconFoodLevelChange(FoodLevelChangeEvent event) {
         if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
@@ -24729,8 +24799,6 @@ public final class ArcadePortManager implements Listener {
                 session.dragonAbilitiesUsed.add(id);
                 session.dragonSparklerStyles.put(sparkler.getUniqueId(),
                         selectedDragonCosmetic(id, "sparkler-effects", "golden-thread"));
-                renderDragonPyroSignature(sparkler.getLocation(),
-                        selectedDragonCosmetic(id, "pyro-signature", "ember-wing"));
                 if (!testPlayers.isTestPlayer(id)) {
                     String sparklezPath = localStatsPath(id, "dragons") + "sparklez";
                     plugin.getConfig().set(sparklezPath, plugin.getConfig().getInt(sparklezPath, 0) + 1);
@@ -27657,61 +27725,9 @@ public final class ArcadePortManager implements Listener {
                     "fiery-tnt".equals(powerupType) ? 0.72F : 0.88F);
         }
 
-        String cosmetic = "turtle-shell";
-        org.bukkit.plugin.Plugin cosmeticsPlugin = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
-        if (owner != null && cosmeticsPlugin != null && cosmeticsPlugin.isEnabled()) {
-            java.io.File preferencesFile = new java.io.File(
-                    cosmeticsPlugin.getDataFolder(), "player-preferences.yml");
-            if (preferencesFile.isFile()) {
-                org.bukkit.configuration.file.YamlConfiguration preferences =
-                        org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(preferencesFile);
-                String path = "players." + owner.getUniqueId()
-                        + ".games.bomb-lobbers.cosmetics.tnt-impact.selected";
-                cosmetic = preferences.getString(path, "turtle-shell");
-            }
-        }
-        if (cosmetic == null || !List.of("turtle-shell", "starburst-tnt", "pixel-crater").contains(cosmetic)) {
-            cosmetic = "turtle-shell";
-        }
-
-        if ("turtle-shell".equals(cosmetic)) {
-            Particle.DustOptions shellDust = new Particle.DustOptions(Color.fromRGB(75, 190, 135), 1.8F);
-            Particle.DustOptions rimDust = new Particle.DustOptions(Color.fromRGB(210, 245, 190), 1.1F);
-            for (int i = 0; i < 28; i++) {
-                double angle = (Math.PI * 2.0D * i) / 28.0D;
-                Location point = blast.clone().add(Math.cos(angle) * 1.55D,
-                        0.18D + Math.sin(angle * 3.0D) * 0.12D,
-                        Math.sin(angle) * 1.55D);
-                world.spawnParticle(Particle.DUST, point, 3, 0.04D, 0.08D, 0.04D, 0.01D, shellDust);
-                world.spawnParticle(Particle.DUST, point.clone().add(0.0D, 0.22D, 0.0D),
-                        1, 0.02D, 0.02D, 0.02D, 0.01D, rimDust);
-                world.spawnParticle(Particle.ELECTRIC_SPARK, point, 1, 0.02D, 0.04D, 0.02D, 0.01D);
-            }
-        } else if ("starburst-tnt".equals(cosmetic)) {
-            Particle.DustOptions starDust = new Particle.DustOptions(Color.fromRGB(255, 205, 65), 1.8F);
-            for (int ray = 0; ray < 12; ray++) {
-                double angle = (Math.PI * 2.0D * ray) / 12.0D;
-                for (int step = 1; step <= 4; step++) {
-                    Location point = blast.clone().add(Math.cos(angle) * step * 0.48D,
-                            0.15D + step * 0.1D, Math.sin(angle) * step * 0.48D);
-                    world.spawnParticle(Particle.FIREWORK, point, 3, 0.07D, 0.07D, 0.07D, 0.02D);
-                    world.spawnParticle(Particle.DUST, point, 2, 0.05D, 0.05D, 0.05D, 0.01D, starDust);
-                }
-            }
-        } else {
-            Particle.DustOptions craterDust = new Particle.DustOptions(Color.fromRGB(255, 95, 35), 1.7F);
-            Particle.DustOptions emberDust = new Particle.DustOptions(Color.fromRGB(255, 185, 65), 1.1F);
-            for (int x = -3; x <= 3; x++) {
-                for (int z = -3; z <= 3; z++) {
-                    if (Math.max(Math.abs(x), Math.abs(z)) != 3) continue;
-                    Location point = blast.clone().add(x * 0.52D, 0.12D, z * 0.52D);
-                    world.spawnParticle(Particle.DUST, point, 4, 0.03D, 0.04D, 0.03D, 0.01D, craterDust);
-                    world.spawnParticle(Particle.FLAME, point, 2, 0.02D, 0.05D, 0.02D, 0.01D);
-                }
-            }
-            world.spawnParticle(Particle.LAVA, blast, 12, 0.65D, 0.1D, 0.65D, 0.0D);
-            world.spawnParticle(Particle.DUST, blast, 18, 0.6D, 0.08D, 0.6D, 0.01D, emberDust);
-        }
+        String cosmetic = owner == null ? "ember-ring"
+                : selectedGameCosmeticOption(owner, "bomb-lobbers", "tnt-explosions", "ember-ring");
+        GameAbilityCosmetics.hit(owner, blast, cosmetic);
     }
 
     private void removeBombTracking(Session session, UUID bombId) {
@@ -29466,6 +29482,7 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> dragonMarksmanFiring = new HashSet<>();
         final Set<UUID> dragonTrackedArrows = new HashSet<>();
         final Set<UUID> dragonSparklerItems = new HashSet<>();
+        final Set<UUID> dragonSparklerLanded = new HashSet<>();
         final Map<UUID, Long> dragonCompassNextUseAt = new HashMap<>();
         final Map<UUID, Location> dragonTargetLocations = new HashMap<>();
         final Map<UUID, UUID> dragonTargetPlayers = new HashMap<>();
@@ -29502,6 +29519,7 @@ public final class ArcadePortManager implements Listener {
         String dragonEscapeMapResource;
         Location dragonEscapeStartLocation;
         UUID dragonEscapeBeaconLeader;
+        UUID dragonEscapeWinner;
         String dragonEscapeBeaconColor = "white";
         int dragonEscapeDragonProgress;
         long dragonEscapeNextScoreUpdateAt;

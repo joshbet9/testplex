@@ -1027,6 +1027,7 @@ public final class CameraShyGame implements Listener {
         if (player.getInventory().getItemInMainHand().getType() != Material.SPYGLASS) return;
         event.setCancelled(true);
         emitCameraFlash(player.getLocation());
+        manager.showAbilityActivationCosmetic(player, ArcadePortGame.CAMERA_SHY);
         if (!isUsingSpyglass(player)) {
             player.sendActionBar(Component.text("Right-click and hold the spyglass before pressing F to take a photo."));
             return;

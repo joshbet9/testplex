@@ -29,7 +29,11 @@ public final class MobThemeManager implements Listener {
     private static final List<String> THEMES = Collections.unmodifiableList(Arrays.asList(
         "map_default","creeper","skeleton","spider","zombie","slime","zombie_pigman","enderman","cave_spider",
         "silverfish","blaze","magma_cube","bat","witch","endermite","guardian","pig","sheep","cow",
-        "chicken","squid","wolf","mooshroom","snowman","ocelot","horse","rabbit","villager","random"));
+        "chicken","squid","wolf","mooshroom","snowman","ocelot","horse","rabbit","villager",
+        // Current-era mob forms are kept to silhouettes within the cosmetic slot's
+        // two-block height and length limit. Oversized forms such as camel are omitted.
+        "axolotl","allay","frog","goat","fox","panda","parrot","turtle","bee","sniffer","armadillo",
+        "random"));
     private final MonsterMazePlugin plugin;
 
     private final File file;
@@ -226,7 +230,10 @@ public final class MobThemeManager implements Listener {
             case "zombie_pigman":case "magma_cube":case "mooshroom":return "RED";case "enderman":case "witch":return "PURPLE";
             case "cave_spider":return "LIGHT_BLUE";case "blaze":case "villager":return "ORANGE";case "endermite":return "MAGENTA";
             case "guardian":return "CYAN";case "pig":case "rabbit":return "PINK";case "sheep":case "chicken":case "snowman":return "WHITE";
-            case "cow":case "horse":return "BROWN";case "squid":return "BLUE";case "ocelot":return "YELLOW";default:return "LIME";
+            case "cow":case "horse":case "armadillo":return "BROWN";case "squid":case "allay":return "BLUE";
+            case "ocelot":case "bee":return "YELLOW";case "axolotl":case "parrot":return "PINK";
+            case "fox":return "ORANGE";case "goat":case "panda":return "LIGHT_GRAY";
+            case "frog":case "turtle":case "sniffer":return "GREEN";default:return "LIME";
         }
     }
     static String displayName(String s){if("map_default".equals(s))return "Map Default";if("random".equals(s))return "Random Mob";StringBuilder b=new StringBuilder();for(String part:normalize(s).split("_")){if(b.length()>0)b.append(' ');b.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));}return b.toString();}

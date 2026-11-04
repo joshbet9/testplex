@@ -104,6 +104,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         void eliminate(Player victim, Player killer, String reason);
         void finish(Player winner, int winningTeam, String reason);
         void heroSelected(Player player, String hero);
+        String cosmeticOption(Player player, String lineId, String fallback);
     }
 
     private static final int CASTLE_KING_HEALTH = 600;
@@ -1727,6 +1728,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     void tick(long now) {
         if (stopped || !ready) return;
+        for (Player player : players.values()) ArcadeCollisionRules.disable(player);
         if (game == ArcadePortGame.CASTLE_ASSAULT) tickCastleAssault(now);
         else if (game == ArcadePortGame.HEROES_OF_GWEN) tickHeroesOfGwen(now);
     }
@@ -1836,8 +1838,24 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             world.spawnParticle(Particle.FIREWORK, carrier.getEyeLocation(), 4, 0.12D, 0.12D, 0.12D, 0.01D);
             world.spawnParticle(Particle.DUST, carrier.getEyeLocation(), 4, 0.15D, 0.15D, 0.15D,
                     new Particle.DustOptions(burst, 1.0F));
+            renderCastleSiegeCosmetic(carrier.getLocation().add(0.0D, 1.1D, 0.0D),
+                    hooks.cosmeticOption(carrier, "siege-effects", "royal-gold"));
             objectiveCarrierLastEffectAt = now + 250L;
         }
+    }
+
+    private void renderCastleSiegeCosmetic(Location at, String style) {
+        if (at == null || at.getWorld() == null) return;
+        Color colour;
+        Particle accent;
+        switch (style == null ? "royal-gold" : style) {
+            case "void-siege" -> { colour = Color.PURPLE; accent = Particle.PORTAL; }
+            case "verdant-siege" -> { colour = Color.LIME; accent = Particle.HAPPY_VILLAGER; }
+            default -> { colour = Color.fromRGB(255, 190, 79); accent = Particle.ELECTRIC_SPARK; }
+        }
+        world.spawnParticle(Particle.DUST, at, 5, 0.18D, 0.18D, 0.18D,
+                new Particle.DustOptions(colour, 1.1F));
+        world.spawnParticle(accent, at, 3, 0.12D, 0.14D, 0.12D, 0.02D);
     }
 
     private void spawnObjectiveItem(Location spawn) {
@@ -2997,6 +3015,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         Location crystalLocation = crystal.getLocation().clone();
         world.spawnParticle(Particle.EXPLOSION_EMITTER, crystalLocation, 1);
         world.spawnParticle(Particle.CLOUD, crystalLocation, 30, 0.65D, 0.65D, 0.65D, 0.08D);
+        renderCastleSiegeCosmetic(crystalLocation,
+                hooks.cosmeticOption(attacker, "siege-effects", "royal-gold"));
         world.playSound(crystalLocation, Sound.ENTITY_GENERIC_EXPLODE, 1.3F, 0.9F);
         entities.remove(crystal);
         crystal.remove();

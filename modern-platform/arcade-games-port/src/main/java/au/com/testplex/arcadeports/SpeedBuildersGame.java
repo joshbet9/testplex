@@ -839,12 +839,6 @@ public final class SpeedBuildersGame implements Listener {
                 state.roundBuildTimeTicks = 0L;
                 state.totalBuildTimeTicks = 0L;
             }
-            if (perfectBuild) {
-                String style = plugin.selectedCosmeticOption(
-                        state.player, "speed-builders", "ability-effects");
-                if (style == null) style = GameAbilityCosmetics.defaultOption("speed-builders");
-                GameAbilityCosmetics.hit(state.player, state.player.getLocation(), style);
-            }
             state.roundPoints = SpeedBuildersRules.roundPoints(
                     state.score, currentTemplate.expectedScore());
             state.totalPoints += state.roundPoints;

@@ -44,8 +44,8 @@ public final class AbilityCooldownProgress implements Listener {
         if (plugin instanceof ArcadeMechanicsModernPlugin arcadePlugin) {
             ArcadePortManager manager = arcadePlugin.getArcadePortManager();
             if (manager != null) {
-                if (cosmeticGame == null) manager.showAbilityActivationCosmetic(player);
-                else manager.showAbilityActivationCosmetic(player, cosmeticGame);
+                if (cosmeticGame == null) manager.showAbilityActivationCosmetic(player, name);
+                else manager.showAbilityActivationCosmetic(player, cosmeticGame, name);
             }
         }
     }
