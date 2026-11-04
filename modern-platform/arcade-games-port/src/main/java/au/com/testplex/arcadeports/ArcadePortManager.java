@@ -7463,7 +7463,7 @@ public final class ArcadePortManager implements Listener {
                 player.getInventory().setArmorContents(new ItemStack[4]);
                 player.getInventory().setItemInOffHand(null);
                 player.getInventory().setItem(0, namedItem(Material.IRON_AXE, "Kit Ability",
-                        "Right-click to spend your damage meter."));
+                        baconAbilityMeterLore(kit, session.baconMeters.getOrDefault(player.getUniqueId(), 0))));
                 if ("mama-piggles".equals(kit)) {
                     player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 60, 1, false, false, false));
                 }
@@ -11703,9 +11703,48 @@ public final class ArcadePortManager implements Listener {
         if (Math.abs(player.getExp() - progress) > 0.001F) player.setExp(progress);
         if (player.getLevel() != percent) player.setLevel(percent);
 
+        ItemStack ability = player.getInventory().getItem(0);
+        if (ability != null && ability.getType() == Material.IRON_AXE
+                && ability.hasItemMeta() && ability.getItemMeta().hasDisplayName()
+                && "Kit Ability".equals(ChatColor.stripColor(ability.getItemMeta().getDisplayName()))) {
+            ItemMeta meta = ability.getItemMeta();
+            if (meta != null) {
+                List<String> lore = List.of(ChatColor.GRAY + baconAbilityMeterLore(
+                        session.baconKits.getOrDefault(player.getUniqueId(), "el-muchacho-pigo"), percent));
+                if (!lore.equals(meta.getLore())) {
+                    meta.setLore(lore);
+                    ability.setItemMeta(meta);
+                }
+            }
+        }
+
         // Remove the old slot-9 star if a tester is upgrading from an earlier plugin build.
         ItemStack oldMeter = player.getInventory().getItem(8);
         if (isBaconMeterItem(oldMeter)) player.getInventory().setItem(8, null);
+    }
+
+    private String baconAbilityMeterLore(String kit, int charge) {
+        int safeCharge = Math.max(0, Math.min(ArcadePortRules.BACON_METER_MAX, charge));
+        if (safeCharge < ArcadePortRules.BACON_METER_MIN_ABILITY) {
+            return "Right-click at 50%+; spends all charge. " + safeCharge + "% charged.";
+        }
+        return switch (kit) {
+            case "mama-piggles" -> String.format(java.util.Locale.ROOT,
+                    "Blast force %.2fx at %d%% charge; right-click spends all charge.",
+                    ArcadePortRules.baconBlastPowerMultiplier(safeCharge), safeCharge);
+            case "chris-p-bacon" -> String.format(java.util.Locale.ROOT,
+                    "Crispy shot speed scales with charge (%d%%); crouch-dash strength is fixed. Spends all charge.",
+                    safeCharge);
+            case "pig" -> String.format(java.util.Locale.ROOT,
+                    "Pig Cloak lasts %.1fs at %d%% charge; right-click spends all charge.",
+                    ArcadePortRules.baconAbilityDurationMillis(safeCharge) / 1_000.0D, safeCharge);
+            case "brutus-bacon" -> String.format(java.util.Locale.ROOT,
+                    "Brutus guard lasts %.1fs at %d%% charge; right-click spends all charge.",
+                    ArcadePortRules.baconAbilityDurationMillis(safeCharge) / 1_000.0D, safeCharge);
+            default -> String.format(java.util.Locale.ROOT,
+                    "Body Slam launch and hit force %.2fx at %d%% charge; right-click spends all charge.",
+                    ArcadePortRules.baconBodySlamMeterMultiplier(safeCharge), safeCharge);
+        };
     }
 
     private boolean isBaconMeterItem(ItemStack item) {
@@ -12214,10 +12253,11 @@ public final class ArcadePortManager implements Listener {
                     if (crispy) {
                         igniteCrispyBaconTarget(session, target, now);
                     } else {
-                        handleBaconBrawlHit(session, owner, target, "bacon-blast", 6.0D, null, blastPower);
-                        if (active == session && session.alive.contains(target.getUniqueId())) {
-                            target.playSound(target.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.2F, 1.65F);
+                        if ("mama-piggles".equals(
+                                session.baconKits.getOrDefault(ownerId, "el-muchacho-pigo"))) {
+                            playMamaPigglesBaconBlastHitSound(owner, target);
                         }
+                        handleBaconBrawlHit(session, owner, target, "bacon-blast", 6.0D, null, blastPower);
                     }
                 }
                 removeBaconBlastItem(session, blastId);
@@ -12281,6 +12321,17 @@ public final class ArcadePortManager implements Listener {
                     0.25D, 0.45D, 0.25D, 0.02D);
         }
         session.baconCrispyFlamedUntil.put(target.getUniqueId(), now + 5_000L);
+    }
+
+    private void playMamaPigglesBaconBlastHitSound(Player owner, Player target) {
+        // Send the cue directly to both players so the struck player hears it even when the
+        // impact location is outside their client sound radius or the hit ends the round.
+        if (owner != null && owner.isOnline()) {
+            owner.playSound(owner.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.25F);
+        }
+        if (target != null && target.isOnline()) {
+            target.playSound(target.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.25F);
+        }
     }
 
     private void removeBaconBlastItem(Session session, UUID blastId) {
@@ -12605,10 +12656,13 @@ public final class ArcadePortManager implements Listener {
 
         double timingMultiplier = normalTimedHit
                 ? session.baconSwingTimingMultiplierById.getOrDefault(attackerId, 1.0D) : 1.0D;
-        boolean vanillaCritical = !attacker.isOnGround() && attacker.getFallDistance() > 0.0F
+        boolean vanillaCritical = normalTimedHit && !attacker.isOnGround() && attacker.getFallDistance() > 0.0F
                 && attacker.getVelocity().getY() < -0.08D;
         boolean crispyFlamed = session.baconCrispyFlamedUntil.getOrDefault(targetId, 0L) > now;
-        boolean critical = vanillaCritical || crispyFlamed || session.baconSwingCritical.contains(attackerId);
+        // Only ordinary timed attacks can be critical. Ability hits use their own knockback
+        // inputs below; burning grants its separate knockback bonus without becoming a critical.
+        boolean critical = normalTimedHit
+                && (vanillaCritical || session.baconSwingCritical.contains(attackerId));
         if (critical) timingMultiplier = Math.max(1.6D, timingMultiplier);
 
         String kit = session.baconKits.getOrDefault(attackerId, "el-muchacho-pigo");
@@ -15572,8 +15626,6 @@ public final class ArcadePortManager implements Listener {
             }
             if (session.type == ArcadePortGame.BACON_BRAWL) {
                 updateBaconMeterItem(session, p);
-                if (now < session.baconHitFeedbackUntil.getOrDefault(id, 0L)) continue;
-
                 // Keep only the requested combat timing bar; the meter remains on the XP bar.
                 p.sendActionBar(baconTimingStatusText(session, id, now));
                 continue;
@@ -21797,7 +21849,15 @@ public final class ArcadePortManager implements Listener {
         event.setDeathMessage(null);
         if (session.type == ArcadePortGame.BACON_BRAWL
                 && session.alive.contains(player.getUniqueId())) {
-            eliminate(session, player, null, "fell into the void");
+            UUID victimId = player.getUniqueId();
+            UUID lastAttackerId = session.baconLastDamager.get(victimId);
+            long lastHitAt = session.baconLastDamagedAt.getOrDefault(victimId, 0L);
+            boolean recentArenaHit = ArcadePortRules.shouldCreditBaconFallKill(
+                    System.currentTimeMillis(), lastHitAt, true);
+            Player killer = recentArenaHit && lastAttackerId != null
+                    && !lastAttackerId.equals(victimId) && session.scores.containsKey(lastAttackerId)
+                    ? session.players.get(lastAttackerId) : null;
+            eliminate(session, player, killer, "fell into the void");
         }
     }
 
