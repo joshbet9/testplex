@@ -475,7 +475,9 @@ public final class ArcadePortRules {
     /** Bacon Blast is a thrown pork item that ends on impact or after five seconds in flight. */
     public static final long BACON_BLAST_MAX_FLIGHT_MILLIS = 5_000L;
     /** Reborn's ProjectileManager AddThrow uses a 0.5-block collision radius. */
-    public static final double BACON_BLAST_PLAYER_COLLISION_RADIUS_SQUARED = 0.25D;
+    // The moving pork item has its own small hitbox. Expand the swept test enough to cover a
+    // player's full standing hitbox, rather than requiring the projectile path through its centre.
+    public static final double BACON_BLAST_PLAYER_COLLISION_RADIUS_SQUARED = 0.64D;
 
     public static boolean isBaconBlastBlockImpact(boolean onGround, boolean inLiquid,
             boolean insideSolidBlock, boolean stationaryAgainstSolidBlock) {
@@ -1431,7 +1433,8 @@ public final class ArcadePortRules {
     }
 
     public static double initialBaconKnockback(int playerCount) {
-        return playerCount == 2 ? 1.8D : 1.5D;
+        // BaconBrawl sets _knockbackMagnitude to 1.5 for every match size.
+        return 1.5D;
     }
 
     public static double nextBaconKnockback(double current) {

@@ -390,7 +390,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         // Keep every source kit available for these games even if an older
         // server config still lists one of them as hidden.
         if (game == ArcadePortGame.DRAGONS || game == ArcadePortGame.BOMB_LOBBERS
-                || game == ArcadePortGame.CAMERA_SHY) {
+                || game == ArcadePortGame.CAMERA_SHY || game.isMonsterMaze()) {
             return ArcadeLobbyKitCatalogue.forGame(game, List.of(), order);
         }
         return ArcadeLobbyKitCatalogue.forGame(
