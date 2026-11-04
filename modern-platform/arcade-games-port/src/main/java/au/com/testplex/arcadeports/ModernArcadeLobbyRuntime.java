@@ -586,6 +586,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             List<Object> lines = (List<Object>) definition.getClass().getMethod("getCosmeticLines").invoke(definition);
             List<String> options = new ArrayList<>();
             for (Object line : lines) {
+                if (!"ability-effects".equals(line.getClass().getMethod("getId").invoke(line))) continue;
                 List<Object> choices = (List<Object>) line.getClass().getMethod("getOptions").invoke(line);
                 for (Object choice : choices) {
                     String id = (String) choice.getClass().getMethod("getId").invoke(choice);
@@ -1179,6 +1180,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             List<TestBotCosmetic> choices = new ArrayList<>();
             for (Object line : lines) {
                 String lineId = (String) line.getClass().getMethod("getId").invoke(line);
+                if (!"ability-effects".equals(lineId)) continue;
                 String lineTitle = (String) line.getClass().getMethod("getTitle").invoke(line);
                 String icon = (String) line.getClass().getMethod("getIcon").invoke(line);
                 @SuppressWarnings("unchecked")

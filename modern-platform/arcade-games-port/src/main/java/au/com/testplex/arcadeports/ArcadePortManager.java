@@ -797,6 +797,7 @@ public final class ArcadePortManager implements Listener {
             var choose = cosmetics.getClass().getMethod("chooseCosmeticOption",
                     UUID.class, String.class, String.class, String.class);
             for (String lineId : section.getKeys(false)) {
+                if (!"ability-effects".equals(lineId)) continue;
                 String optionId = section.getString(lineId, "");
                 if (optionId.isBlank()) continue;
                 boolean valid = false;
@@ -820,7 +821,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     void setConfiguredTestBotCosmetic(ArcadePortGame type, int botIndex, String lineId, String optionId) {
-        if (type == null || botIndex < 0 || lineId == null || lineId.isBlank()
+        if (type == null || botIndex < 0 || !"ability-effects".equals(lineId)
                 || optionId == null || optionId.isBlank()) return;
         plugin.getConfig().set("test-bot-loadouts." + type.id() + ".players." + botIndex
                 + ".cosmetics." + lineId, optionId);
@@ -1418,6 +1419,10 @@ public final class ArcadePortManager implements Listener {
                 au.com.testplex.wizards.WizardsGameManager wizards = plugin.getWizardsGameManager();
                 au.com.testplex.wizards.WizardsKit kit = au.com.testplex.wizards.WizardsKit.parse(value);
                 if (wizards != null && kit != null) wizards.setKit(player, kit);
+                return;
+            }
+            if (lobbyGame == ArcadePortGame.SNAKE) {
+                if (snakeModule != null) snakeModule.setKit(player, value);
                 return;
             }
             if (lobbyGame == ArcadePortGame.PLEXBALL) {
@@ -6637,6 +6642,9 @@ public final class ArcadePortManager implements Listener {
             disguise.setCanPickupItems(false);
             disguise.setCustomName(ChatColor.RED + player.getName());
             disguise.setCustomNameVisible(true);
+            // The proxy represents this player to everyone else. Hide that proxy from
+            // its owner too, so third-person camera does not show both bodies.
+            player.hideEntity(plugin, disguise);
             var equipment = disguise.getEquipment();
             if (equipment != null) {
                 equipment.setHelmet(null);
@@ -11360,11 +11368,23 @@ public final class ArcadePortManager implements Listener {
                 || !(event.getWhoClicked() instanceof Player player)
                 || session.drawCurrentDrawer == null
                 || !player.getUniqueId().equals(session.drawCurrentDrawer)
-                || event.getClickedInventory() != player.getInventory()) return;
+                || event.getClickedInventory() == null) return;
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || clicked.getType().isAir() || !DRAW_MY_THING_COLOURS.contains(clicked.getType())) return;
         event.setCancelled(true);
         selectDrawColour(session, player, clicked.getType(), drawColourName(clicked.getType()));
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onDrawMyThingPaletteHotbarChange(PlayerItemHeldEvent event) {
+        Session session = active;
+        Player player = event.getPlayer();
+        if (session == null || session.type != ArcadePortGame.DRAW_MY_THING
+                || session.drawCurrentDrawer == null
+                || !player.getUniqueId().equals(session.drawCurrentDrawer)) return;
+        ItemStack selected = player.getInventory().getItem(event.getNewSlot());
+        if (selected == null || !DRAW_MY_THING_COLOURS.contains(selected.getType())) return;
+        selectDrawColour(session, player, selected.getType(), drawColourName(selected.getType()));
     }
 
     private void handleDrawMyThingInteract(Session session, PlayerInteractEvent event) {
@@ -11955,8 +11975,12 @@ public final class ArcadePortManager implements Listener {
     /** Preserve Mineplex 1.8's run-through behavior for every active game and participant. */
     private void disableParticipantCollisions(Session session) {
         for (Player player : session.players.values()) {
-            if (player != null && player.isOnline() && player.isCollidable()) {
-                player.setCollidable(false);
+            if (player == null || !player.isOnline()) continue;
+            player.setCollidable(false);
+            for (Team team : player.getScoreboard().getTeams()) {
+                if (team.hasEntry(player.getName())) {
+                    team.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
+                }
             }
         }
     }
@@ -21669,6 +21693,14 @@ public final class ArcadePortManager implements Listener {
             locked.setPitch(event.getTo().getPitch());
             event.setTo(locked);
             player.sendActionBar(Component.text("Start drawing to move freely."));
+            long now = System.currentTimeMillis();
+            long lastPrompt = session.drawMovementPromptSoundAt.getOrDefault(playerId, 0L);
+            if (now - lastPrompt >= 1_000L) {
+                // The 1.8 movement instruction used NOTE_PLING; limit it to one
+                // reminder per second while the drawer is still locked in place.
+                player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0F, 0.5F);
+                session.drawMovementPromptSoundAt.put(playerId, now);
+            }
             return;
         }
         if (session.type == ArcadePortGame.DEATH_TAG && session.alive.contains(playerId)
@@ -25124,6 +25156,7 @@ public final class ArcadePortManager implements Listener {
             disguise.setRemoveWhenFarAway(false);
             disguise.setCustomName(ChatColor.RED + player.getName());
             disguise.setCustomNameVisible(true);
+            player.hideEntity(plugin, disguise);
             session.milkCowDisguises.put(id, disguise);
             session.entities.add(disguise);
         }
@@ -25142,6 +25175,7 @@ public final class ArcadePortManager implements Listener {
             disguise.setRemoveWhenFarAway(false);
             disguise.setCustomName(ChatColor.RED + player.getName());
             disguise.setCustomNameVisible(true);
+            player.hideEntity(plugin, disguise);
             session.witherDisguises.put(id, disguise);
             session.entities.add(disguise);
         }
@@ -28810,6 +28844,7 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> drawLinguistFailed = new HashSet<>();
         final Map<UUID, Integer> drawLinguistPerfectRounds = new HashMap<>();
         final Map<UUID, Integer> drawFirstGuessStreaks = new HashMap<>();
+        final Map<UUID, Long> drawMovementPromptSoundAt = new HashMap<>();
         final Set<UUID> drawComebackCandidates = new HashSet<>();
         int drawFastGuessRounds;
         final Set<String> drawUsedWords = new HashSet<>();

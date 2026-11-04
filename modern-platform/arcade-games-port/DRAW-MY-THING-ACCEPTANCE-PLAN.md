@@ -14,8 +14,8 @@ Draw My Thing is promoted to the shared controlled queue with the original Draw 
 ## Drawing and guessing
 
 - [ ] Verify the drawing tool paints the expected wool colours and cannot modify blocks outside the drawing area.
-- [ ] As the drawer, select several palette colours from the inventory; each click must select a colour without moving or consuming the swatch and without painting a pixel.
-- [ ] Verify brush strokes, bucket fill and clear-canvas actions play their drawing feedback sounds, and colour selection and correct/wrong guesses provide audible feedback.
+- [ ] As the drawer, select several palette colours from the inventory or hotbar; each selection changes subsequent paint without moving or consuming the swatch or painting a pixel.
+- [ ] Verify the 1.8 sound feedback: note pling for the movement reminder, orb pickup for colour selection, fizz for painting, splash for fill and explosion for clear; guesses also give audible feedback.
 - [ ] Verify each player has at most ten guesses per turn and the action-bar counter updates after each accepted guess.
 - [ ] Confirm correct guesses are credited once, with the expected scoring/order and no duplicate off-hand interaction.
 - [ ] Verify wrong guesses, blank guesses, repeated guesses and late guesses are handled consistently.
