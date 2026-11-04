@@ -1,4 +1,4 @@
-# Gladiators â€” shared Paper 26.3 acceptance plan
+# Gladiators — shared Paper 26.3 acceptance plan
 
 ## Test objective
 
@@ -17,7 +17,7 @@ For a tournament with multiple players:
 /arcadeport start gladiators
 ```
 
-## Ruleset vote â€” all five must be visible
+## Ruleset vote — all five must be visible
 
 - [ ] The lobby vote menu shows **Normal**, **Rodless**, **Bowless**, **Modern** and **Pot** as five distinct choices.
 - [ ] Normal is the default when the queue has no saved votes, when no one votes in the live vote, and for solo practice.
