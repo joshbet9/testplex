@@ -36,14 +36,15 @@ public final class ArcadePortRules {
 
     public static final long DRAW_MY_THING_GAME_MILLIS = 320_000L;
     public static final long DRAW_MY_THING_BASE_ROUND_MILLIS = 40_000L;
-    public static final long DRAW_MY_THING_INTERMISSION_MILLIS = 3_000L;
+    /** Turns start back-to-back so the drawing budget stays within the match timer. */
+    public static final long DRAW_MY_THING_INTERMISSION_MILLIS = 0L;
     public static final int DRAW_MY_THING_FULL_ROUND_PLAYER_LIMIT = 8;
     public static final int MASTER_BUILDERS_MAX_BUILDERS = 16;
 
     /**
-     * Divides the five-minute-twenty-second drawing budget across each participant's
-     * turn, capped at forty seconds for lobbies of eight or fewer. Intermission time
-     * is separate from the drawing timer.
+     * Divides the five-minute-twenty-second match timer across each participant's
+     * turn, capped at forty seconds. DMT has no intermission, so all full turns fit
+     * within the same 320-second match budget.
      */
     public static long drawMyThingRoundMillis(int playerCount) {
         long turns = Math.max(1L, playerCount);

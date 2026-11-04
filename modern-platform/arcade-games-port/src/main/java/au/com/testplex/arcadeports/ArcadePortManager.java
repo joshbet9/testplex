@@ -10513,18 +10513,28 @@ public final class ArcadePortManager implements Listener {
      * catalogue choice when the UI plugin is absent.
      */
     private String paintballCosmeticOption(UUID playerId, String group) {
-        String fallback = "weapon".equals(group) ? "chrome-marker" : "colourburst";
+        String style = "chrome-marker";
         org.bukkit.plugin.Plugin cosmeticsPlugin = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
-        if (cosmeticsPlugin == null || !cosmeticsPlugin.isEnabled()) return fallback;
-        try {
-            Object selected = cosmeticsPlugin.getClass()
-                    .getMethod("getSelectedCosmeticOption", UUID.class, String.class, String.class)
-                    .invoke(cosmeticsPlugin, playerId, "paintball", group);
-            return selected instanceof String value && !value.isBlank() ? value : fallback;
-        } catch (ReflectiveOperationException | LinkageError exception) {
-            plugin.getLogger().fine("Paintball cosmetic preference bridge unavailable: " + exception.getMessage());
-            return fallback;
+        if (cosmeticsPlugin != null && cosmeticsPlugin.isEnabled()) {
+            try {
+                Object selected = cosmeticsPlugin.getClass()
+                        .getMethod("getSelectedCosmeticOption", UUID.class, String.class, String.class)
+                        .invoke(cosmeticsPlugin, playerId, "paintball", "ability-effects");
+                if (selected instanceof String value && !value.isBlank()) style = value;
+            } catch (ReflectiveOperationException | LinkageError exception) {
+                plugin.getLogger().fine("Paintball cosmetic preference bridge unavailable: " + exception.getMessage());
+            }
         }
+        if ("weapon".equals(group)) return switch (style) {
+            case "colourburst" -> "neon-suppressor";
+            case "stencil-stamp" -> "splatter-cannon";
+            default -> "chrome-marker";
+        };
+        return switch (style) {
+            case "stencil-stamp" -> "stencil-stamp";
+            case "colourburst" -> "colourburst";
+            default -> "paint-drip";
+        };
     }
 
     private void updatePaintballWeaponSkin(Session session, Player player) {
@@ -11030,7 +11040,7 @@ public final class ArcadePortManager implements Listener {
         announce(session,ChatColor.GOLD+drawer.getName()+" is drawing! Guess the word.");
         for (Player participant : session.players.values()) {
             if (participant != null && participant.isOnline()) {
-                participant.playSound(participant.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.8F, 1.35F);
+                participant.playSound(participant.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0F, 0.5F);
             }
         }
         for(Player p:session.players.values()) if(p!=null&&p.isOnline()&&!p.equals(drawer)){
@@ -11085,8 +11095,10 @@ public final class ArcadePortManager implements Listener {
         session.drawRoundEndsAt=0L;
         boolean hasRemainingDrawer = session.drawTurnOrder.subList(session.drawTurnIndex, session.drawTurnOrder.size())
                 .stream().map(session.players::get).anyMatch(p -> p != null && p.isOnline());
-        session.drawNextRoundAt = hasRemainingDrawer
-                ? now + ArcadePortRules.DRAW_MY_THING_INTERMISSION_MILLIS : now;
+        session.drawNextRoundAt = now;
+        if (hasRemainingDrawer) {
+            startNextDrawMyThingRound(session, now);
+        }
     }
 
     private void updateDrawMyThing(Session session,long now) {
@@ -11153,6 +11165,13 @@ public final class ArcadePortManager implements Listener {
         if(guess.equals(answer)){
             boolean first=session.drawCorrectGuessers.isEmpty();
             session.drawCorrectGuessers.add(playerId);session.scores.merge(playerId,first?3:1,Integer::sum);
+            player.playSound(player.getLocation(), first ? Sound.ENTITY_PLAYER_LEVELUP
+                    : Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8F, first ? 1.15F : 1.35F);
+            Player drawer = session.players.get(session.drawCurrentDrawer);
+            if (drawer != null && drawer.isOnline()) {
+                drawer.playSound(drawer.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.8F,
+                        first ? 1.5F : 1.9F);
+            }
             if (!testPlayers.isTestPlayer(playerId)) {
                 plugin.getConfig().set(statPath + "correct-guesses",
                         plugin.getConfig().getInt(statPath + "correct-guesses", 0) + 1);
@@ -11214,7 +11233,7 @@ public final class ArcadePortManager implements Listener {
                 session.drawComebackCandidates.add(playerId);
             }
             session.drawFirstGuessStreaks.put(playerId, 0);
-            player.playSound(player.getLocation(), Sound.BLOCK_FIRE_EXTINGUISH, 0.2F, 2.0F);
+            player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 0.7F, 0.75F);
             player.sendMessage(ChatColor.GRAY+"Not quite. "+(DRAW_MY_THING_MAX_GUESSES-used-1)+" guesses remain.");
         }
     }
@@ -11232,10 +11251,8 @@ public final class ArcadePortManager implements Listener {
                 || !clicked.hasItemMeta() || !clicked.getItemMeta().hasDisplayName()
                 || !ChatColor.stripColor(clicked.getItemMeta().getDisplayName()).endsWith(" Paint")) return;
         event.setCancelled(true);
-        session.drawBrushColours.put(player.getUniqueId(), clicked.getType());
         String colourName = ChatColor.stripColor(clicked.getItemMeta().getDisplayName()).replace(" Paint", "");
-        player.sendMessage(ChatColor.GREEN + colourName + " selected.");
-        player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 2.0F, 1.0F);
+        selectDrawColour(session, player, clicked.getType(), colourName);
     }
 
     private void handleDrawMyThingInteract(Session session, PlayerInteractEvent event) {
@@ -11249,14 +11266,25 @@ public final class ArcadePortManager implements Listener {
         String name = ChatColor.stripColor(held.getItemMeta().getDisplayName());
         if (name == null) return;
         if (name.endsWith(" Paint") && DRAW_MY_THING_COLOURS.contains(held.getType())) {
-            session.drawBrushColours.put(id, held.getType());
-            Block target = drawCanvasTarget(session, player, event.getClickedBlock());
-            if (target == null) player.sendMessage(ChatColor.GREEN + name.replace(" Paint", "") + " selected.");
-            else paintDrawBlock(session, player, target, false);
+            // Selecting a swatch must never also stamp a pixel. Previously, looking
+            // at the canvas while switching colours caused the selection click to
+            // paint immediately and made colour changes feel unreliable.
+            selectDrawColour(session, player, held.getType(), name.replace(" Paint", ""));
             return;
         }
         Block target = drawCanvasTarget(session, player, event.getClickedBlock());
         if (target != null) performDrawToolAction(session, player, target, name);
+    }
+
+    private void selectDrawColour(Session session, Player player, Material colour, String colourName) {
+        UUID id = player.getUniqueId();
+        session.drawBrushColours.put(id, colour);
+        session.drawPreviousPaintPoints.remove(id);
+        session.drawShapeStarts.remove(id);
+        session.drawShapeTools.remove(id);
+        player.sendMessage(ChatColor.GREEN + colourName + " paint selected.");
+        player.sendActionBar(Component.text("Paint colour: " + colourName));
+        player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 2.0F, 1.0F);
     }
 
     private Block drawCanvasTarget(Session session, Player player, Block clicked) {
@@ -21678,8 +21706,16 @@ public final class ArcadePortManager implements Listener {
         try {
             Object selected = cosmeticsPlugin.getClass()
                     .getMethod("getSelectedCosmeticOption", UUID.class, String.class, String.class)
-                    .invoke(cosmeticsPlugin, playerId, "runner", "trail");
-            return selected instanceof String value && value.startsWith("trail-") ? value : fallback;
+                    .invoke(cosmeticsPlugin, playerId, "runner", "ability-effects");
+            if (selected instanceof String value) {
+                return switch (value) {
+                    case "trail-cyan" -> "trail-cyan";
+                    case "trail-chalk" -> "trail-white";
+                    case "trail-red" -> "trail-red";
+                    default -> fallback;
+                };
+            }
+            return fallback;
         } catch (ReflectiveOperationException | LinkageError exception) {
             plugin.getLogger().fine("Runner trail preference bridge unavailable: " + exception.getMessage());
             return fallback;
@@ -22123,7 +22159,7 @@ public final class ArcadePortManager implements Listener {
         try {
             Object selected = cosmeticsPlugin.getClass()
                     .getMethod("getSelectedCosmeticOption", UUID.class, String.class, String.class)
-                    .invoke(cosmeticsPlugin, playerId, "spleef", "signature");
+                    .invoke(cosmeticsPlugin, playerId, "spleef", "ability-effects");
             return selected instanceof String value
                     && java.util.Set.of("snowburst", "ice-shards", "chalk-grid").contains(value)
                     ? value : fallback;

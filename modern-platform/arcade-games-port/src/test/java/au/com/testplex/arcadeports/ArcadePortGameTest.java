@@ -2758,11 +2758,14 @@ class ArcadePortGameTest {
         assertEquals(35_555L, ArcadePortRules.drawMyThingRoundMillis(9));
         assertEquals(32_000L, ArcadePortRules.drawMyThingRoundMillis(10));
         assertEquals(20_000L, ArcadePortRules.drawMyThingRoundMillis(16));
+        assertEquals(0L, ArcadePortRules.DRAW_MY_THING_INTERMISSION_MILLIS,
+                "Intermissions must not push the complete drawing schedule past 320 seconds");
 
         for (int players = 1; players <= 64; players++) {
-            long drawingMillis = players * ArcadePortRules.drawMyThingRoundMillis(players);
-            assertTrue(drawingMillis <= ArcadePortRules.DRAW_MY_THING_GAME_MILLIS,
-                    "DMT drawing exceeds 320 seconds for " + players + " players");
+            long fullMatchMillis = players * ArcadePortRules.drawMyThingRoundMillis(players)
+                    + Math.max(0, players - 1) * ArcadePortRules.DRAW_MY_THING_INTERMISSION_MILLIS;
+            assertTrue(fullMatchMillis <= ArcadePortRules.DRAW_MY_THING_GAME_MILLIS,
+                    "DMT schedule exceeds 320 seconds for " + players + " players");
         }
     }
 

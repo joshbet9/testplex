@@ -164,6 +164,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=selected-game-displays-complete");
         refreshKitAndTeamNpcs();
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=selected-game-kit-team-npcs-complete");
+        if (cosmeticPreviewWorld != null) refreshShowcase();
     }
 
     public void refreshDisplays() {
@@ -432,26 +433,6 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             String tag = e.getPersistentDataContainer().get(themeKey, PersistentDataType.STRING);
             if (tag != null && (tag.startsWith("showcase:") || "showcase-label".equals(tag))) e.remove();
         }
-        if (selectedGame == ArcadePortGame.BACON_BRAWL) {
-            int[] xs = {-9,-6,-3,0,3,6}, zs = {18,26};
-            String[] names = {"Porky","Inferno","Frost","Slime","Royal","Confetti"};
-            for (int row=0; row<2; row++) for (int col=0; col<THEMES.length; col++) {
-                Location at = new Location(world, xs[col]+0.5D, ModernArcadeLobby.FLOOR_Y+1.0D, zs[row]+0.5D);
-                LivingEntity demo;
-                if (row == 0) demo = world.spawn(at, Pig.class);
-                else {
-                    Sheep sheep = world.spawn(at, Sheep.class); sheep.setColor(DyeColor.PINK); demo = sheep;
-                }
-                demo.setCustomName((row==0 ? ChatColor.GOLD+"Pig - " : ChatColor.LIGHT_PURPLE+"Pink Sheep - ")+names[col]+" Set");
-                demo.setCustomNameVisible(true); demo.setInvulnerable(true); demo.setRemoveWhenFarAway(false);
-                demo.setPersistent(false); demo.setSilent(true); demo.setCollidable(false);
-                if(demo instanceof Mob mob) mob.setAI(false);
-                demo.getPersistentDataContainer().set(themeKey, PersistentDataType.STRING, "showcase:"+THEMES[col]);
-                showcase.add(demo);
-            }
-            return;
-        }
-
         String[] themes = showcaseOptions(selectedGame);
         int columns = Math.min(7, Math.max(3, themes.length));
         int left = columns == 7 ? -9 : -(columns - 1) * 2;
@@ -489,7 +470,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             label.setMarker(true);
             label.setInvulnerable(true);
             label.setCanPickupItems(false);
-            label.setCustomName(ChatColor.GOLD + titlePrefix + pretty(theme));
+            label.setCustomName(ChatColor.GOLD + titlePrefix + pretty(theme)
+                    + ChatColor.GRAY + " | Right-click to preview");
             label.setCustomNameVisible(true);
             label.getPersistentDataContainer().set(themeKey, PersistentDataType.STRING, "showcase-label");
             showcase.add(label);
@@ -560,7 +542,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         player.setInvulnerable(true);
         lobby.ensurePanelItem(player);
         player.sendMessage(ChatColor.AQUA + selectedGame.displayName()
-                + ChatColor.GRAY + " cosmetic sandbox. Use /arcadeport preview exit to return.");
+                + ChatColor.GRAY + " ability-effects sandbox. Right-click any style to preview it. "
+                + "Use /arcadeport preview exit to return.");
     }
 
     /**
@@ -669,6 +652,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
 
     @EventHandler
     public void onLobbyNpcUse(PlayerInteractEntityEvent e) {
+        if (handleCosmeticPreviewUse(e)) return;
         Entity entity = e.getRightClicked();
         String kit = entity.getPersistentDataContainer().get(kitNpcKey, PersistentDataType.STRING);
         String queue = entity.getPersistentDataContainer().get(teamNpcKey, PersistentDataType.STRING);
@@ -699,6 +683,38 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             Bot b = bots.get(bot);
             if (b != null) openBotCosmetics(e.getPlayer(), b);
         }
+    }
+
+    private boolean handleCosmeticPreviewUse(PlayerInteractEntityEvent event) {
+        if (event.getHand() != EquipmentSlot.HAND || cosmeticPreviewWorld == null
+                || event.getPlayer().getWorld() != cosmeticPreviewWorld) return false;
+        Entity display = event.getRightClicked();
+        String tag = display.getPersistentDataContainer().get(themeKey, PersistentDataType.STRING);
+        if (tag == null || !tag.startsWith("showcase:") || "showcase-label".equals(tag)) return false;
+        event.setCancelled(true);
+        String style = tag.substring("showcase:".length());
+        playCosmeticPreview(event.getPlayer(), display.getLocation(), style);
+        return true;
+    }
+
+    private void playCosmeticPreview(Player player, Location source, String style) {
+        World world = source.getWorld();
+        if (world == null || player.getWorld() != world) return;
+        Location center = source.clone().add(0.0D, 1.1D, 0.0D);
+        Particle effect = particle(style);
+        for (int ring = 0; ring < 3; ring++) {
+            double radius = 0.35D + ring * 0.2D;
+            double y = ring * 0.35D;
+            for (int point = 0; point < 20; point++) {
+                double angle = Math.PI * 2.0D * point / 20.0D + ring * 0.18D;
+                Location at = center.clone().add(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
+                world.spawnParticle(effect, at, 1, 0.0D, 0.0D, 0.0D, 0.0D);
+            }
+        }
+        world.spawnParticle(Particle.END_ROD, center, 8, 0.25D, 0.4D, 0.25D, 0.02D);
+        player.playSound(center, Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8F, 1.2F);
+        player.sendMessage(ChatColor.AQUA + selectedGame.displayName() + ChatColor.GRAY
+                + " preview: " + ChatColor.GOLD + pretty(style));
     }
 
     private static String teamName(int team) {
@@ -1396,7 +1412,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         if (value.contains("cloud")) return Particle.CLOUD;
         if (value.contains("prism") || value.contains("shatter") || value.contains("pixel-crater")) return Particle.CRIT;
         if (value.contains("warning") || value.contains("turtle") || value.contains("pips")) return Particle.ELECTRIC_SPARK;
-        if (value.contains("sheep") || value.contains("shepherd")) return Particle.ITEM;
+        if (value.contains("sheep") || value.contains("shepherd")) return Particle.HAPPY_VILLAGER;
         if (value.contains("arena") || value.contains("red-sand")) return Particle.CRIT;
         return Particle.CRIT;
     }

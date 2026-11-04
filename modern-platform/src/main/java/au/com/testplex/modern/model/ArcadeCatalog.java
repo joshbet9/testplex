@@ -7,9 +7,9 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Modern catalogue for all 30 Arcade games. Each game owns its own cosmetic
- * lines and win-scene choices; actual render/gameplay handlers are added with
- * each port rather than pretending global cosmetics are game-specific.
+ * Modern catalogue for all Arcade games. Each game has one ability-effects
+ * style line and a separate win-scene choice list. Ability style lines do not
+ * replace global cosmetics such as trails or death effects.
  */
 public final class ArcadeCatalog {
     private final Map<String, GameDefinition> games = new LinkedHashMap<>();
@@ -404,9 +404,154 @@ public final class ArcadeCatalog {
     }
 
     private void register(GameDefinition definition) {
-        if (games.putIfAbsent(definition.getId(), definition) != null) {
+        List<CosmeticLineDefinition> lines = List.of(abilityEffectsLine(definition));
+        GameDefinition normalized = new GameDefinition(definition.getId(), definition.getName(),
+                definition.getDescription(), definition.getIcon(), definition.getPortStatus(), lines,
+                definition.getWinEffects(), definition.getDefaultWinEffectId());
+        if (games.putIfAbsent(normalized.getId(), normalized) != null) {
             throw new IllegalArgumentException("Duplicate Arcade game id: " + definition.getId());
         }
+    }
+
+    /** One cohesive, game-scoped style choice changes ability/action feedback as a set. */
+    private static CosmeticLineDefinition abilityEffectsLine(GameDefinition game) {
+        return line("ability-effects", game.getName() + " Ability Effects",
+                "Choose one visual style for this game's abilities and action feedback. "
+                        + "It does not change global cosmetics or victory celebrations.",
+                game.getIcon(), abilityEffectStyles(game.getId()));
+    }
+
+    private static CosmeticOption[] abilityEffectStyles(String gameId) {
+        return switch (gameId) {
+            case "bacon-brawl" -> new CosmeticOption[] {
+                    style("crispy-comet", "Crispy Comet", "Warm bacon sparks, smoky trails and a bright impact ring."),
+                    style("blue-flame", "Blue Flame", "Cool blue fire traces every kit ability and hit."),
+                    style("smokehouse", "Smokehouse", "Smoked ember curls and dark, quick impact bursts.")};
+            case "bomb-lobbers" -> new CosmeticOption[] {
+                    style("turtle-shell", "Turtle Shell", "Shell-shaped rings mark throws, impacts and blocks."),
+                    style("starburst-tnt", "Starburst TNT", "A bright radial flash carries through every blast."),
+                    style("pixel-crater", "Pixel Crater", "Square shockwaves and ember sparks mark the action.")};
+            case "death-tag" -> new CosmeticOption[] {
+                    style("soul-ribbons", "Soul Ribbons", "Soul wisps and curved ribbons mark chases and hits."),
+                    style("lantern-motes", "Lantern Motes", "Warm motes trace movement, tags and escapes."),
+                    style("bone-dust", "Bone Dust", "Pale fragments and sharp white impact flashes.")};
+            case "dragon-escape" -> new CosmeticOption[] {
+                    style("dragon-eye", "Dragon Eye", "An iris pulse marks boosts, checkpoints and the finish."),
+                    style("wing-flare", "Wing Flare", "Wing-shaped bursts follow movement abilities."),
+                    style("cloud-surf", "Cloud Surf", "Cloud rings and sky-blue trails mark course actions.")};
+            case "dragons" -> new CosmeticOption[] {
+                    style("phoenix-arc", "Phoenix Arc", "A phoenix outline traces Pyro launches and impacts."),
+                    style("molten-orbit", "Molten Orbit", "Molten sparks spiral around ability effects."),
+                    style("glacier-dust", "Glacier Dust", "Cool frost motes and crystal flashes follow abilities.")};
+            case "evolution" -> new CosmeticOption[] {
+                    style("charged-shell", "Charged Shell", "Electric sparks spiral through each evolution effect."),
+                    style("void-unfold", "Void Unfold", "Portal fragments open and fold around ability effects."),
+                    style("nature-bloom", "Nature Bloom", "Green motes and petals bloom at each action.")};
+            case "gladiators" -> new CosmeticOption[] {
+                    style("oath-mark", "Oath Mark", "A restrained arena sigil marks combat abilities."),
+                    style("red-sand", "Red Sand", "Red sand bursts and crossed-sword impact flashes."),
+                    style("arena-challenger", "Arena Challenger", "A bright duel bell and steel glint mark each move.")};
+            case "micro-battles" -> new CosmeticOption[] {
+                    style("cracked-ice", "Cracked Ice", "Ice fractures mark hits, kit abilities and border pressure."),
+                    style("prism-grid", "Prism Grid", "Prismatic lines frame combat and island effects."),
+                    style("molten-seam", "Molten Seam", "Hot cracks and ember pips mark each action.")};
+            case "one-in-the-quiver" -> new CosmeticOption[] {
+                    style("bullseye-dash", "Bullseye Dash", "Target lines trace shots and impact confirms."),
+                    style("fletching-sparks", "Fletching Sparks", "Feather-like sparks follow shots and kit actions."),
+                    style("ricochet-rune", "Ricochet Rune", "A compact rune marks every ability and hit.")};
+            case "paintball" -> new CosmeticOption[] {
+                    style("chrome-marker", "Chrome Marker", "A polished marker with bright, clean paint impacts."),
+                    style("colourburst", "Colourburst", "A shared radial paint bloom styles weapons and pellets."),
+                    style("stencil-stamp", "Stencil Stamp", "A bold stencil pattern carries across every kit action.")};
+            case "runner" -> new CosmeticOption[] {
+                    style("trail-red", "Classic Red", "The source red trail styles every Runner ability."),
+                    style("trail-cyan", "Cyan Dash", "Cyan ribbons trace jumps, swaps and movement abilities."),
+                    style("trail-chalk", "Chalk Dashes", "Chalk strokes and route marks style every ability.")};
+            case "sheep-quest" -> new CosmeticOption[] {
+                    style("sheep-bell", "Sheep Bell", "A clear bell and wool puff mark abilities and captures."),
+                    style("wool-confetti", "Wool Confetti", "Team-coloured wool flecks follow every action."),
+                    style("shepherd-flare", "Shepherd Flare", "A crook-shaped flare ties movement and capture effects together.")};
+            case "snake" -> new CosmeticOption[] {
+                    style("anaconda", "Anaconda", "Segmented scale pulses mark movement and item abilities."),
+                    style("cobra", "Cobra", "A raised hood flash and alternating scales mark actions."),
+                    style("neon-viper", "Neon Viper", "A two-tone luminous stripe follows each ability.")};
+            case "spleef" -> new CosmeticOption[] {
+                    style("snowburst", "Snowburst", "A compact snow burst marks shovel hits and abilities."),
+                    style("ice-shards", "Ice Shards", "Crystalline fragments carry through the game's actions."),
+                    style("chalk-grid", "Chalk Grid", "A sharp grid outline marks breaks and kit abilities.")};
+            case "draw-my-thing" -> new CosmeticOption[] {
+                    style("ink-splash", "Ink Splash", "Colourful ink marks drawing tools and correct guesses."),
+                    style("chalk-stroke", "Chalk Stroke", "Soft chalk strokes style drawing and hint feedback."),
+                    style("prism-ink", "Prism Ink", "Prismatic strokes connect drawing and round feedback.")};
+            case "master-builders" -> new CosmeticOption[] {
+                    style("blueprint-pulse", "Blueprint Pulse", "Blueprint lines mark block placement and scoring."),
+                    style("builder-spark", "Builder Spark", "A brief spark follows successful build actions."),
+                    style("palette-flare", "Palette Flare", "Colour swatches pulse on block placement and review.")};
+            case "castle-assault" -> new CosmeticOption[] {
+                    style("crystal-fracture", "Crystal Fracture", "Crystal shards mark objective damage and abilities."),
+                    style("siege-spark", "Siege Spark", "A compact blast signature follows siege actions."),
+                    style("gate-rune", "Gate Rune", "Runic pulses tie combat abilities to castle objectives.")};
+            case "heroes-of-gwen" -> new CosmeticOption[] {
+                    style("beacon-pulse", "Beacon Pulse", "A beacon ring follows hero abilities and captures."),
+                    style("tower-impact", "Tower Impact", "Stone and crystal bursts mark hero attacks."),
+                    style("arcane-banner", "Arcane Banner", "A coloured hero sigil trails abilities and movement.")};
+            case "hoops-remastered" -> new CosmeticOption[] {
+                    style("court-trail", "Court Trail", "A court-line trail styles passes, steals and shots."),
+                    style("rim-spark", "Rim Spark", "A bright rim burst marks blocks, dunks and makes."),
+                    style("orange-comet", "Orange Comet", "A basketball-coloured comet follows every court action.")};
+            case "wizards" -> new CosmeticOption[] {
+                    style("arcane-glyph", "Arcane Glyph", "A rune signature follows spells and kit abilities."),
+                    style("elemental-burst", "Elemental Burst", "An elemental flare styles every spell impact."),
+                    style("void-script", "Void Script", "Violet glyphs trail casts and spellbook actions.")};
+            case "milk-the-cow" -> new CosmeticOption[] {
+                    style("dairy-splash", "Dairy Splash", "A clean splash marks Cow charges and body slams."),
+                    style("hoof-quake", "Hoof Quake", "Hoof-shaped shockwaves mark movement and hits."),
+                    style("hay-bloom", "Hay Bloom", "Warm hay motes follow abilities and team actions.")};
+            case "wither-assault" -> new CosmeticOption[] {
+                    style("soul-rift", "Soul Rift", "A dark rift marks objective and combat abilities."),
+                    style("wither-pulse", "Wither Pulse", "A smoky pulse follows every team ability."),
+                    style("siege-ember", "Siege Ember", "Soul embers trace attacks and objective damage.")};
+            case "skywars" -> new CosmeticOption[] {
+                    style("tnt-burst", "TNT Burst", "A bright blast signature follows TNT and combat actions."),
+                    style("skyfall", "Skyfall", "A wind ring traces throws and movement abilities."),
+                    style("island-collapse", "Island Collapse", "Block-shatter lines style hits and island events.")};
+            case "turf-wars" -> new CosmeticOption[] {
+                    style("team-sigil", "Team Sigil", "A team-coloured sigil marks shots and abilities."),
+                    style("turf-crack", "Turf Crack", "A short crack traces hits, shots and movement."),
+                    style("painted-chevron", "Painted Chevron", "A bold chevron carries the team palette through actions.")};
+            case "sneaky-assassins" -> new CosmeticOption[] {
+                    style("smoke-artist", "Smoke Artist", "A compact smoke flourish styles disguise abilities."),
+                    style("decoy", "Decoy", "A brief silhouette echo marks movement and tricks."),
+                    style("understudy", "Understudy", "A villager-like shimmer follows disguise actions.")};
+            case "camera-shy" -> new CosmeticOption[] {
+                    style("flash-frame", "Flash Frame", "A camera-frame flash styles photos and exposure effects."),
+                    style("smoke-artist", "Smoke Artist", "Soft smoke traces escapes and camera tricks."),
+                    style("spotter", "Spotter", "A focused lens ring marks photos and detection abilities.")};
+            case "plexball" -> new CosmeticOption[] {
+                    style("pitch-flare", "Pitch Flare", "A short trail styles throws, hits, catches and blocks."),
+                    style("curve-trail", "Curve Trail", "A curved stadium ribbon follows ball actions."),
+                    style("home-run-impact", "Home Run Impact", "A clean impact burst marks every batting ability.")};
+            case "super-sploor" -> new CosmeticOption[] {
+                    style("ink-current", "Ink Current", "A flowing ink signature styles Squid and kit abilities."),
+                    style("prism-splat", "Prism Splat", "A bright team-coloured splat follows every action."),
+                    style("neon-squid", "Neon Squid", "A luminous squid-shaped current traces abilities.")};
+            case "speed-builders" -> new CosmeticOption[] {
+                    style("blueprint-pulse", "Blueprint Pulse", "Blueprint lines mark block placement and accuracy."),
+                    style("perfect-match", "Perfect Match", "A bright match spark confirms accurate build actions."),
+                    style("speed-trace", "Speed Trace", "Fast construction leaves a short quartz-like trail.")};
+            case "monster-maze", "monster-maze-speed", "monster-maze-modern" -> new CosmeticOption[] {
+                    style("maze-pulse", "Maze Pulse", "A shared maze glyph styles boosts, hazards and stage events."),
+                    style("soul-grid", "Soul Grid", "A soul-lit grid marks the same abilities in every mode."),
+                    style("glow-path", "Glow Path", "A luminous path traces movement and objective actions.")};
+            default -> new CosmeticOption[] {
+                    style("classic-action", "Classic Action", "A compact visual signature for this game's actions."),
+                    style("arcade-pulse", "Arcade Pulse", "A bright pulse styles abilities and hit feedback."),
+                    style("prism-action", "Prism Action", "A prismatic flourish carries across game actions.")};
+        };
+    }
+
+    private static CosmeticOption style(String id, String name, String description) {
+        return single(id, name, description);
     }
 
     private static GameDefinition game(String id, String name, String icon, String description,
