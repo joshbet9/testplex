@@ -19,6 +19,7 @@ public final class AbilityCooldownProgress implements Listener {
     private static final Map<JavaPlugin, AbilityCooldownProgress> INSTANCES = new WeakHashMap<>();
     private static final int BAR_SEGMENTS = 24;
 
+    private final JavaPlugin plugin;
     private final Map<UUID, Cooldown> active = new HashMap<>();
     @SuppressWarnings("unused")
     private final BukkitTask task;
@@ -28,6 +29,7 @@ public final class AbilityCooldownProgress implements Listener {
     }
 
     private AbilityCooldownProgress(JavaPlugin plugin) {
+        this.plugin = plugin;
         task = Bukkit.getScheduler().runTaskTimer(plugin, this::update, 1L, 1L);
         Bukkit.getPluginManager().registerEvents(this, plugin);
     }
@@ -35,6 +37,10 @@ public final class AbilityCooldownProgress implements Listener {
     public void start(Player player, String name, long durationMillis) {
         if (player == null || !player.isOnline() || durationMillis <= 0L) return;
         active.put(player.getUniqueId(), new Cooldown(name, System.currentTimeMillis(), durationMillis));
+        if (plugin instanceof ArcadeMechanicsModernPlugin arcadePlugin) {
+            ArcadePortManager manager = arcadePlugin.getArcadePortManager();
+            if (manager != null) manager.showAbilityActivationCosmetic(player);
+        }
     }
 
     public void stop(Player player) {

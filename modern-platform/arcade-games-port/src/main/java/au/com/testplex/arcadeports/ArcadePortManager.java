@@ -10556,6 +10556,16 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    void showAbilityActivationCosmetic(Player player) {
+        Session session = active;
+        if (session == null || player == null || !player.isOnline() || !session.liveStarted
+                || !session.alive.contains(player.getUniqueId())
+                || !isSessionWorld(session, player.getWorld())) return;
+        Location effectAt = player.getLocation().clone().add(0.0D, 0.8D, 0.0D);
+        GameAbilityCosmetics.hit(player, effectAt,
+                abilityEffectCosmeticOption(player, session.type));
+    }
+
     private void updatePaintballWeaponSkin(Session session, Player player) {
         ItemStack held = player.getInventory().getItem(0);
         String kit = paintballKitForItem(held);
@@ -12861,6 +12871,7 @@ public final class ArcadePortManager implements Listener {
                 ? ArcadePortRules.BACON_METER_MIN_ABILITY : charge;
         // Other abilities spend their full current charge; none use a wall-clock cooldown.
         session.baconAbilitiesUsed.add(id);
+        showAbilityActivationCosmetic(player);
         session.baconMeters.put(id, unlimitedAbilityDebug ? ArcadePortRules.BACON_METER_MAX
                 : Math.max(0, charge - chargeCost));
         updateBaconMeterItem(session, player);
