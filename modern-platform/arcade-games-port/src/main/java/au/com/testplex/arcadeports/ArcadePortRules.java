@@ -115,7 +115,6 @@ public final class ArcadePortRules {
         return (deltaMillis > 0L ? "+" : "-") + formatDragonEscapeTime(Math.abs(deltaMillis));
     }
     public static final long RUNNER_BLOCK_DECAY_MILLIS = 600L;
-    public static final long RUNNER_BLOCK_LIFETIME_MILLIS = 1_200L;
     public static final long RUNNER_LEAP_COOLDOWN_MILLIS = 8_000L;
     public static final long RUNNER_QUICKSHOT_COOLDOWN_MILLIS = 6_000L;
     public static final long RUNNER_FROSTBALL_INTERVAL_MILLIS = 500L;
@@ -151,31 +150,16 @@ public final class ArcadePortRules {
         return won && elapsedMillis >= 0L && elapsedMillis <= RUNNER_FLASH_ACHIEVEMENT_MAX_WIN_MILLIS;
     }
 
-    /**
-     * Avoid a trail colour already present on the selected map's exposed palette.
-     * Prefer the first unused alternative; if all choices occur, use the least
-     * represented alternative (excluding the requested colour).
-     */
+    /** Use red as the source-compatible default and as the fallback for map clashes. */
     public static String resolveRunnerTrailColour(
             String requestedColour, java.util.Map<String, Integer> mapPaletteCounts) {
         String requested = requestedColour == null ? "" : requestedColour.toLowerCase(java.util.Locale.ROOT)
                 .replace('_', '-').replace("trail-", "");
-        if (!RUNNER_TRAIL_COLOURS.contains(requested)) requested = "cyan";
+        if (!RUNNER_TRAIL_COLOURS.contains(requested)) requested = "red";
         if (mapPaletteCounts == null || Math.max(0, mapPaletteCounts.getOrDefault(requested, 0)) == 0) {
             return requested;
         }
-
-        String fallback = null;
-        int lowestUse = Integer.MAX_VALUE;
-        for (String candidate : RUNNER_TRAIL_COLOURS) {
-            if (candidate.equals(requested)) continue;
-            int use = Math.max(0, mapPaletteCounts.getOrDefault(candidate, 0));
-            if (use < lowestUse) {
-                fallback = candidate;
-                lowestUse = use;
-            }
-        }
-        return fallback == null ? "cyan" : fallback;
+        return "red";
     }
 
     /** Meter charge comes from the source damage value recorded for each successful hit. */
@@ -224,10 +208,11 @@ public final class ArcadePortRules {
         return game != null && game != ArcadePortGame.PAINTBALL && !game.isMonsterMaze();
     }
 
-    /** Legacy Gladiators and Paintball cancel fall damage; Monster Maze owns its damage rules. */
+    /** Legacy Gladiators, Paintball, and Turf Wars cancel fall damage; Monster Maze owns its damage rules. */
     public static boolean shouldApplyLegacyFallDamage(ArcadePortGame game) {
         return game != null && game != ArcadePortGame.GLADIATORS
-                && game != ArcadePortGame.PAINTBALL && !game.isMonsterMaze();
+                && game != ArcadePortGame.PAINTBALL && game != ArcadePortGame.TURF_WARS
+                && !game.isMonsterMaze();
     }
 
     public static final int BACON_METER_MAX = 100;
@@ -569,6 +554,7 @@ public final class ArcadePortRules {
     public static final int SPLEEF_SNOWBALLER_MAX_SNOWBALLS = 16;
     public static final long SPLEEF_BRAWLER_LEAP_COOLDOWN_MILLIS = 30_000L;
     public static final long SPLEEF_KNOCKBACK_COOLDOWN_MILLIS = 400L;
+    public static final long SPLEEF_GUST_COOLDOWN_MILLIS = 20_000L;
     public static final double SPLEEF_DEFAULT_KNOCKBACK = 0.3D;
     public static final double SPLEEF_BRAWLER_KNOCKBACK = 0.6D;
     public static final long SPLEEF_SMASHER_COOLDOWN_MILLIS = 250L;
@@ -598,6 +584,7 @@ public final class ArcadePortRules {
     public static final int TURF_WARS_MARKSMAN_MAX_WOOL = 8;
     public static final int TURF_WARS_INFILTRATOR_MAX_WOOL = 4;
     public static final int TURF_WARS_SHREDDER_MAX_WOOL = 6;
+    public static final int TURF_WARS_FORTIFIER_MAX_WOOL = 12;
     public static final int TURF_WARS_MARKSMAN_MAX_ARROWS = 2;
     public static final int TURF_WARS_INFILTRATOR_MAX_ARROWS = 1;
     public static final int TURF_WARS_SHREDDER_MAX_ARROWS = 2;
@@ -963,6 +950,7 @@ public final class ArcadePortRules {
             case "snowballer" -> "snowballer";
             case "brawler" -> "brawler";
             case "archer" -> "archer";
+            case "gust" -> "gust";
             default -> null;
         };
     }
@@ -1474,6 +1462,7 @@ public final class ArcadePortRules {
             case "leaper" -> "leaper";
             case "archer" -> "archer";
             case "frosty" -> "frosty";
+            case "switcher" -> "switcher";
             default -> null;
         };
     }
@@ -1482,11 +1471,6 @@ public final class ArcadePortRules {
     public static boolean shouldMarkRunnerBlock(boolean solid, boolean bedrock, boolean liquid,
             boolean aboveIsAir, boolean alreadyMarked) {
         return solid && !bedrock && !liquid && aboveIsAir && !alreadyMarked;
-    }
-
-    /** Falling blocks only hurt a player when the player is not above the block. */
-    public static boolean shouldRunnerFallingBlockHit(double playerY, double fallingBlockY) {
-        return playerY <= fallingBlockY + 0.5D;
     }
 
     public static int spleefProjectileClearRadius(boolean arrow, double velocity) {
@@ -2437,6 +2421,7 @@ public final class ArcadePortRules {
             case "marksman", "turfwars-marksman", "turf-wars-marksman" -> "marksman";
             case "infiltrator", "turfwars-infiltrator", "turf-wars-infiltrator" -> "infiltrator";
             case "shredder", "turfwars-shredder", "turf-wars-shredder" -> "shredder";
+            case "fortifier", "turfwars-fortifier", "turf-wars-fortifier" -> "fortifier";
             default -> null;
         };
     }
@@ -2445,6 +2430,7 @@ public final class ArcadePortRules {
         return switch (normalizeTurfWarsKit(kit) == null ? "marksman" : normalizeTurfWarsKit(kit)) {
             case "infiltrator" -> TURF_WARS_INFILTRATOR_MAX_WOOL;
             case "shredder" -> TURF_WARS_SHREDDER_MAX_WOOL;
+            case "fortifier" -> TURF_WARS_FORTIFIER_MAX_WOOL;
             default -> TURF_WARS_MARKSMAN_MAX_WOOL;
         };
     }

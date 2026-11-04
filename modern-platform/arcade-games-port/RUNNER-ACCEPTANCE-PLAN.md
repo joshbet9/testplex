@@ -50,27 +50,27 @@ The two Clay Plaza filenames are distinct source archives and must not be collap
 - [ ] **Leaper:** iron axe loadout; Leap has the source 1.2 strength parameters and an 8-second cooldown. Reusing it early is rejected; the cooldown cannot be reset by changing kit or reconnecting.
 - [ ] **Archer:** bow loadout; Quickshot retains the source 1.2 parameter and six-second cooldown. Confirm shots do not create unintended player damage because Runner PvP is disabled.
 - [ ] **Frosty:** starts with the source 16 Frost Balls; replenishes on the 500 ms source interval up to the cap. A hit applies Slowness III for two seconds, disables knockback, and does not bypass spectator or session-state checks.
-- [ ] Kit selection through the lobby pedestal and `/arcadeport kit runner-<kit>` resolves Leaper, Archer and Frosty consistently.
+- [ ] **Switcher:** requires all current Runner achievements, randomly selects from every other living Runner who is grounded or airborne above an eligible unrun block, and succeeds once per round. Both landing footprints remain intact for 750 ms after the swap.
+- [ ] Lobby kit selection resolves Leaper, Archer, Frosty and Switcher consistently. During a round, only operators can change kits for debugging; switching does not reset ability cooldowns.
 
 ### Course block loop
 
 - [ ] Each live player's full side-standing footprint is sampled; every eligible exposed course block is marked, not just the block at the player's feet.
 - [ ] Air, bedrock, liquid, blocks with a non-air block above, and already-marked blocks are never marked.
 - [ ] Eligible blocks use the source red stained-clay warning appearance and remain for 600 ms before being removed.
-- [ ] Removed blocks spawn falling-block hazards with the source 1.2-second lifetime. They are removed on expiry, chunk unload or collision and never become permanent world blocks.
-- [ ] Falling blocks deal six damage only when the target is not above the falling block (the source vertical collision check); spectators are immune.
-- [ ] A falling block landing does not replace the map's original block. Its impact feedback remains visible without placing a permanent redstone block.
+- [ ] After the 600 ms warning, run blocks disappear without spawning falling-block hazards, matching the newer Mineplex behavior.
 - [ ] An arrow hitting the course marks eligible blocks in the source 2.5-block radius and the arrow is removed after the trail is created.
 - [ ] Confirm the loop remains bounded under simultaneous players and repeated arrow hits; no duplicate scheduling or runaway falling-block entities.
 
 ### Stats, progression and cosmetics
 
 - [ ] The source `MarathonRunner` distance stat samples 3D travel at its original one-second cadence, persists to the local Testplex stats view and is not confused with horizontal achievement distance.
+- [ ] The source `Hot Feet` (50 wins) and `Marathon Runner` (20,000 blocks) achievements remain represented by the Wins and Blocks Run milestones.
 - [ ] Teleports, respawns and map transitions do not create artificial distance jumps.
 - [ ] `Gettin’ those steps in!` is awarded only when horizontal walking distance is strictly over 400 blocks in one match.
 - [ ] `Hop to it` is awarded at 100 jumps in one match.
 - [ ] `Flash` is awarded only for a win at or below 90 seconds; a non-win or a 90,001 ms result does not qualify.
-- [ ] The 15 non-red trail colours remain visible to both players and spectators. On a map whose exposed palette already uses the selected colour, the resolver selects an unused alternative; if all are present, it chooses the least represented alternative.
+- [ ] The 15 non-red trail cosmetics remain visible to both players and spectators. The source red trail is the fallback when no usable colour is selected or a selected colour conflicts with the map.
 - [ ] The cosmetic is applied as shared world-block changes, not only as a private particle effect, and all changed trail blocks are restored at round end.
 - [ ] Fake test-player fixtures exercise the course mechanics but never earn personal stats, achievements or distance records.
 

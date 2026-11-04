@@ -1,19 +1,16 @@
 package au.com.testplex.arcadeports;
 
 /**
- * Fast, free-for-all rules for the dedicated Mixed Arcade SkyWars variant.
- * These values intentionally do not affect the legacy Solo or Team modes.
+ * Mixed Arcade adapts the 1.8 free-for-all SkyWars rules to the 8–16 player queue.
  */
 public final class SkyWarsMixedArcadeRules {
     private SkyWarsMixedArcadeRules() {}
 
     public static final int MAX_PLAYERS = 16;
-    public static final long PREPARE_MILLIS = 5_000L;
-    public static final long ROUND_MILLIS = 8 * 60_000L;
-    public static final long CRUMBLE_DELAY_MILLIS = 60_000L;
-    public static final long BORDER_SHRINK_MILLIS = 45_000L;
-    public static final double FINAL_BORDER_SIZE = 32.0D;
-    public static final long TNT_GENERATOR_INTERVAL_MILLIS = 15_000L;
+    public static final long PREPARE_MILLIS = 10_000L;
+    public static final long ROUND_MILLIS = 20 * 60_000L;
+    public static final long CRUMBLE_DELAY_MILLIS = 100_000L;
+    public static final long TNT_GENERATOR_INTERVAL_MILLIS = 30_000L;
     public static final int TNT_PER_DROP = 2;
     public static final long TNT_THROW_FUSE_TICKS = 60L;
     public static final long TNT_THROW_COOLDOWN_MILLIS = 500L;

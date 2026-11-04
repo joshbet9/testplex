@@ -54,6 +54,7 @@ import org.bukkit.scoreboard.Team;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayDeque;
+import java.util.Collection;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
@@ -66,13 +67,18 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import au.com.testplex.arcadeports.ArcadeGameModule;
+import au.com.testplex.arcadeports.ArcadeMechanicsModernPlugin;
+import au.com.testplex.arcadeports.ArcadePortGame;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.CommandSender;
 
 /**
- * Standalone Snake mechanics port for Paper 26.3. This deliberately keeps the
- * first pass mechanics-focused; cosmetics and the win scene remain game-specific
- * follow-up work after this loop has been exercised in-game.
+ * Snake mechanics controller hosted as an in-process module by Testplex Arcade.
+ * The shared Arcade plugin owns command routing, queues and module lifecycle.
  */
-public final class SnakeGameManager implements Listener {
+public final class SnakeGameManager implements Listener, ArcadeGameModule, CommandExecutor {
     private static final String WORLD_NAME = SnakeMapCatalog.WORLD_NAME;
     private static final String SPECTATE_MENU_TITLE = "Spectator Menu";
     private static final String KIT_MENU_TITLE = "Snake Kits";
@@ -85,7 +91,7 @@ public final class SnakeGameManager implements Listener {
     private static final double SEGMENT_SPACING = SnakeRules.SEGMENT_SPACING;
     private static final double SOURCE_BODY_FOLLOW_SPACING = 1.4D;
 
-    private final SnakeModernPlugin plugin;
+    private final ArcadeMechanicsModernPlugin plugin;
     private final Map<UUID, Player> queue = new LinkedHashMap<>();
     private final Map<UUID, SnakeState> snakes = new LinkedHashMap<>();
     private final Map<UUID, PlayerSnapshot> pendingRestore = new HashMap<>();
@@ -115,8 +121,9 @@ public final class SnakeGameManager implements Listener {
     private long nextHazardAt;
     private long lastSpectatorUpdate;
 
-    public SnakeGameManager(SnakeModernPlugin plugin) {
+    public SnakeGameManager(ArcadeMechanicsModernPlugin plugin) {
         this.plugin = plugin;
+        migrateLegacyPreferences(plugin);
         this.stats = new SnakeStatsStore(plugin);
         this.spectatorTargetKey = new NamespacedKey(plugin, "snake-spectator-target");
         this.kitMenuKey = new NamespacedKey(plugin, "snake-kit-choice");
@@ -127,9 +134,59 @@ public final class SnakeGameManager implements Listener {
         this.tickTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 1L, 1L);
     }
 
+    private static void migrateLegacyPreferences(ArcadeMechanicsModernPlugin plugin) {
+        java.io.File legacyConfig = new java.io.File(plugin.getDataFolder().getParentFile(),
+                "SnakeModern/config.yml");
+        if (!legacyConfig.isFile()) return;
+        org.bukkit.configuration.file.YamlConfiguration legacy =
+                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(legacyConfig);
+        boolean changed = false;
+        if (!plugin.getConfig().contains("selected-maps.snake")) {
+            String selectedMap = legacy.getString("selected-map");
+            if (selectedMap != null && !selectedMap.isBlank()) {
+                plugin.getConfig().set("selected-maps.snake", selectedMap);
+                changed = true;
+            }
+        }
+        org.bukkit.configuration.ConfigurationSection kits = legacy.getConfigurationSection("kits");
+        if (kits != null) {
+            for (String playerId : kits.getKeys(false)) {
+                String kit = kits.getString(playerId);
+                String path = "snake-kits." + playerId;
+                if (kit != null && !plugin.getConfig().contains(path)) {
+                    plugin.getConfig().set(path, kit);
+                    changed = true;
+                }
+            }
+        }
+        if (changed) plugin.saveConfig();
+    }
+
+    @Override
+    public ArcadePortGame game() { return ArcadePortGame.SNAKE; }
+
+    @Override
+    public void initialize() {
+        if (!isAvailable()) throw new IllegalStateException("Snake map preflight failed: " + availabilityDiagnostic());
+        plugin.getLogger().info("Snake registered as an in-process Testplex Arcade game module.");
+    }
+
+    @Override
+    public boolean isGameRunning() { return running; }
+
+    public boolean startFromArcade(Collection<Player> participants, CommandSender sender) {
+        if (participants != null) {
+            for (Player player : participants) {
+                if (player != null && player.isOnline()) queue.put(player.getUniqueId(), player);
+            }
+        }
+        start(null, sender);
+        return running;
+    }
+
     private World createArena() {
         if (mapResource == null) {
-            plugin.getLogger().severe("No original Snake map archives were packaged in SnakeModern.jar.");
+            plugin.getLogger().severe("No original Snake map archives were packaged in ArcadeMechanicsModern.jar.");
             return null;
         }
         if (!SnakeMapCatalog.install(plugin, mapResource)) return null;
@@ -189,6 +246,9 @@ public final class SnakeGameManager implements Listener {
             return;
         }
 
+        plugin.getLogger().info("Starting Snake match: map=" + SnakeMapCatalog.displayName(mapResource)
+                + ", players=" + players.size() + ", TEAM_SPAWNS candidates=" + sourceSpawns.size());
+
         queue.clear();
         running = true;
         live = false;
@@ -205,15 +265,19 @@ public final class SnakeGameManager implements Listener {
         hazards.clear();
         snakes.clear();
 
+        int spawnOffset = ThreadLocalRandom.current().nextInt(sourceSpawns.size());
         for (int i = 0; i < players.size(); i++) {
             Player player = players.get(i);
             PlayerSnapshot snapshot = new PlayerSnapshot(player);
-            Location spawn = sourceSpawns.get(i % sourceSpawns.size()).clone();
+            int spawnIndex = (spawnOffset + (int) ((long) i * sourceSpawns.size() / players.size()))
+                    % sourceSpawns.size();
+            Location spawn = sourceSpawns.get(spawnIndex).clone();
             if (i >= sourceSpawns.size()) {
                 double angle = (Math.PI * 2.0D * i) / Math.max(1, players.size());
                 spawn.add(Math.cos(angle) * 1.5D, 0.0D, Math.sin(angle) * 1.5D);
             }
-            String kit = plugin.getConfig().getString("kits." + player.getUniqueId(), "speed");
+            String kit = plugin.getConfig().getString("snake-kits." + player.getUniqueId(),
+                    plugin.getConfig().getString("kits." + player.getUniqueId(), "speed"));
             if (!isKnownKit(kit)) kit = "speed";
 
             player.closeInventory();
@@ -292,13 +356,20 @@ public final class SnakeGameManager implements Listener {
             player.sendMessage(ChatColor.RED + "Unknown kit. Choose speed, reverse, or invulnerable.");
             return;
         }
-        plugin.getConfig().set("kits." + player.getUniqueId(), kit);
+        plugin.getConfig().set("snake-kits." + player.getUniqueId(), kit);
         plugin.saveConfig();
         player.sendMessage(ChatColor.GREEN + "Snake kit saved: " + ChatColor.WHITE + kit + ChatColor.GREEN + ".");
     }
 
     public boolean isAvailable() {
         return arena != null && mapData != null && mapData.hasSpawnLocations();
+    }
+
+    public String availabilityDiagnostic() {
+        int spawnCount = mapData == null ? 0 : mapData.spawnLocations().size();
+        return "map=" + (mapResource == null ? "unavailable" : SnakeMapCatalog.displayName(mapResource))
+                + ", worldLoaded=" + (arena != null)
+                + ", parsedTEAM_SPAWNS=" + spawnCount;
     }
 
     public String status() {
@@ -348,7 +419,7 @@ public final class SnakeGameManager implements Listener {
             return;
         }
         mapResource = resource;
-        plugin.getConfig().set("selected-map", resource.substring(resource.lastIndexOf('/') + 1));
+        plugin.getConfig().set("selected-maps.snake", resource);
         plugin.saveConfig();
         arena = createArena();
         mapData = SnakeMapCatalog.readMapData(plugin, arena, mapResource);
@@ -393,6 +464,55 @@ public final class SnakeGameManager implements Listener {
         }
         pendingRestore.clear();
         if (stats != null) stats.flush();
+    }
+
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        String sub = args.length == 0 ? "help" : args[0].toLowerCase(java.util.Locale.ROOT);
+        switch (sub) {
+            case "join" -> {
+                if (!(sender instanceof Player player)) sender.sendMessage("Players only.");
+                else plugin.getArcadePortManager().queue(ArcadePortGame.SNAKE, player, false);
+            }
+            case "start" -> plugin.getArcadePortManager().startFromLobby(ArcadePortGame.SNAKE, sender, false, true);
+            case "leave" -> {
+                if (!(sender instanceof Player player)) sender.sendMessage("Players only.");
+                else plugin.getArcadePortManager().leaveQueue(ArcadePortGame.SNAKE, player);
+            }
+            case "kit" -> {
+                if (!(sender instanceof Player player)) sender.sendMessage("Players only.");
+                else if (args.length < 2) openKitMenu(player);
+                else setKit(player, args[1]);
+            }
+            case "status" -> sender.sendMessage(ChatColor.GOLD + "Snake: " + ChatColor.WHITE + status());
+            case "maps" -> showMaps(sender);
+            case "map" -> {
+                if (!(sender instanceof Player player)) sender.sendMessage("Players only.");
+                else if (args.length < 2) showMaps(sender);
+                else selectMap(player, String.join(" ", java.util.Arrays.copyOfRange(args, 1, args.length)));
+            }
+            case "stats" -> {
+                if (!(sender instanceof Player player)) sender.sendMessage("Players only.");
+                else showStats(player);
+            }
+            case "stop" -> {
+                if (!plugin.hasAdminAccess(sender)) sender.sendMessage(ChatColor.RED + "Operator permission required.");
+                else stop("Snake test stopped by an operator.");
+            }
+            default -> {
+                sender.sendMessage(ChatColor.GOLD + "=== Snake ===");
+                sender.sendMessage(ChatColor.YELLOW + "/snake join" + ChatColor.GRAY + " — join the next Arcade round");
+                sender.sendMessage(ChatColor.YELLOW + "/snake start" + ChatColor.GRAY + " — start Snake from the Arcade lobby");
+                sender.sendMessage(ChatColor.YELLOW + "/snake kit [speed|reverse|invulnerable]" + ChatColor.GRAY + " — choose a kit");
+                sender.sendMessage(ChatColor.YELLOW + "/snake status" + ChatColor.GRAY + " — inspect the round");
+                sender.sendMessage(ChatColor.YELLOW + "/snake maps" + ChatColor.GRAY + " — list original Snake maps");
+                sender.sendMessage(ChatColor.YELLOW + "/snake map <name>" + ChatColor.GRAY + " — select a map while idle");
+                sender.sendMessage(ChatColor.YELLOW + "/snake stats" + ChatColor.GRAY + " — inspect Snake stats");
+                sender.sendMessage(ChatColor.YELLOW + "/snake leave" + ChatColor.GRAY + " — leave and restore your lobby state");
+                sender.sendMessage(ChatColor.YELLOW + "/snake stop" + ChatColor.GRAY + " — operator reset");
+            }
+        }
+        return true;
     }
 
     private void setupMatchScoreboard() {

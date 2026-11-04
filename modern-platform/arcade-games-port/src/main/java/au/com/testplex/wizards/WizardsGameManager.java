@@ -1213,7 +1213,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         player.openInventory(inventory);
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onInteract(PlayerInteractEvent event) {
         if (event.getHand() != null && event.getHand() != org.bukkit.inventory.EquipmentSlot.HAND) return;
         Player player = event.getPlayer();
@@ -1245,7 +1245,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
         WizardState state = states.get(player.getUniqueId());
@@ -1285,6 +1285,10 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
                 consumeLootItem(player, state, clicked);
                 event.getClickedInventory().setItem(event.getSlot(), null);
                 player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.7F, 1.0F);
+            } else {
+                // Wizards owns the live chest interaction. Let ordinary source
+                // loot transfer even when a shared-game listener marked it first.
+                event.setCancelled(false);
             }
         }
     }

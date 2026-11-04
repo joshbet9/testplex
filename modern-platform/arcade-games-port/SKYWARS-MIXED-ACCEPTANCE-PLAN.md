@@ -1,6 +1,6 @@
 # SkyWars Mixed Arcade acceptance plan
 
-SkyWars Mixed is **READY_FOR_TEST** for the shared controlled queue. It is a separate 16-player free-for-all and does not replace or modify legacy Solo SkyWars or Team SkyWars. The current port contains the fast-round runtime, five source kits, original island/connector/middle loot families, throwable TNT, Zombie Guardians, island crumble, closing border and the merged source ore/block parity corrections. CI validates all 50 original map archives and their required authored markers. This promotion makes it available for controlled sessions; it does not claim live gameplay acceptance or complete 1.8 parity.
+SkyWars Mixed is **READY_FOR_TEST** for the shared controlled queue. It is an 8–16 player free-for-all using original Solo SkyWars gameplay adapted for the mixed player count; it does not add the legacy Team SkyWars variant. Runtime features include the five source kits, island/connector/middle chests and loot, throwable TNT, Zombie Guardians, island crumble and source ore/block behavior. CI validates all 50 original map archives and their required authored markers. Live gameplay acceptance remains pending.
 
 ## Automated archive gate
 
@@ -17,9 +17,9 @@ SkyWars Mixed is **READY_FOR_TEST** for the shared controlled queue. It is a sep
 4. Verify RED Zombie Guardians spawn with 15 health, gold armour, fire resistance, no natural despawn and no drops except one random Middle-loot reward on death. RED is optional per source map; maps without RED points spawn no Guardians. Confirm tethering and the eight-block chase boundary.
 5. Verify custom marker 19 sponge blocks are removed before Prepare. Marker 56 ore slots must convert to stone, be assigned to their nearest island spawn within eight horizontal blocks, then generate three two-block diamond veins, seven random 3–5 block iron veins and four random 3–5 block gravel veins per island. Hidden ores must reveal after adjacent block breaks and TNT explosions; exposed cobweb, gravel and iron ore use source string/flint/iron-ingot bonus drops with no XP.
 6. Verify placement is blocked at WorldConfig MaxY minus three and above, and for chests, pistons, sticky pistons and hoppers, while ordinary blocks remain placeable. Confirm block burn, leaf decay, block fade/spread and Fire Aspect enchanting are cancelled only in the SkyWars world.
-7. Verify the LIME generator creates the two-item Throwable TNT drop on the fast-mode 15-second cadence; test pickup, recharge, left-click throw, right-click drop, 1.6 throw strength, 60-tick fuse and 500 ms click gate.
+7. Verify the LIME generator creates two Throwable TNT every 30 seconds; test pickup, recharge, left-click throw, right-click drop, 1.6 throw strength, 60-tick fuse and 500 ms click gate.
 8. Exercise each lobby kit (Ice, Fire, Air, Metal and Earth), including bridge/area burst/void save/double jump/armour magnetism/Throwable Dirt and their cooldown or upgrade levels. Confirm no kit state leaks between players or rounds.
-9. Verify the fast-round clock, 5-second Prepare, eight-minute round ceiling, crumble starting 60 seconds after Live, block-by-block island/connector/middle crumble priority and 45-second border close to 32 blocks.
+9. Verify the source 10-second Prepare and 20-minute timeout. Crumble starts 100 seconds after Live and removes the farthest supported blocks at the source rate; SkyWars does not close a world border.
 10. Confirm PvP, fall/void deaths, TNT deaths, disconnect recovery, spectator compass, winner/placement handling, scoreboard and cleanup across three consecutive matches.
 
 The tests protect archive parity and deterministic timer limits. They do not prove loot randomness, NPC pathing, live combat balance or repeated-round behavior. Keep SkyWars Mixed gated until the live checks are recorded.

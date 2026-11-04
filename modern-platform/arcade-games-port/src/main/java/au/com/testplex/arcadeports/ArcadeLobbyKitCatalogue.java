@@ -3,6 +3,7 @@ package au.com.testplex.arcadeports;
 import org.bukkit.ChatColor;
 import org.bukkit.DyeColor;
 import org.bukkit.Material;
+import org.bukkit.entity.IronGolem;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Pig;
 import org.bukkit.entity.Sheep;
@@ -40,6 +41,29 @@ final class ArcadeLobbyKitCatalogue {
             ArcadePortGame game, List<String> hiddenKitIds, List<String> configuredOrder) {
         if (game == null) return List.of();
         List<KitChoice> choices = switch (game) {
+            case CASTLE_ASSAULT -> List.of(
+                    choice("alchemist", "Alchemist", Material.POTION, Unlock.FREE, Villager.class, Material.SPLASH_POTION),
+                    choice("archer", "Archer", Material.BOW, Unlock.FREE, Skeleton.class, Material.BOW),
+                    choice("demolitionist", "Demolitionist", Material.TNT, Unlock.FREE, Zombie.class, Material.TNT),
+                    choice("fighter", "Fighter", Material.IRON_SWORD, Unlock.FREE, Zombie.class, Material.IRON_SWORD),
+                    choice("tank", "Tank", Material.IRON_CHESTPLATE, Unlock.FREE, IronGolem.class, Material.IRON_CHESTPLATE));
+            case HEROES_OF_GWEN -> List.of(
+                    choice("hattori", "Hattori", Material.IRON_SWORD, Unlock.FREE, Villager.class, Material.IRON_SWORD),
+                    choice("devon", "Devon", Material.BOW, Unlock.FREE, Villager.class, Material.BOW),
+                    choice("anath", "Anath", Material.BLAZE_ROD, Unlock.FREE, Villager.class, Material.BLAZE_ROD),
+                    choice("dana", "Dana", Material.GOLDEN_SWORD, Unlock.FREE, Villager.class, Material.GOLDEN_SWORD),
+                    choice("biff", "Biff", Material.IRON_AXE, Unlock.FREE, Villager.class, Material.IRON_AXE),
+                    choice("larissa", "Larissa", Material.WATER_BUCKET, Unlock.FREE, Villager.class, Material.WATER_BUCKET),
+                    choice("bardolf", "Bardolf", Material.STONE_SWORD, Unlock.FREE, Villager.class, Material.STONE_SWORD),
+                    choice("rowena", "Rowena", Material.CROSSBOW, Unlock.FREE, Villager.class, Material.CROSSBOW),
+                    choice("ivy", "Ivy", Material.SHIELD, Unlock.FREE, Villager.class, Material.SHIELD),
+                    choice("bob-ross", "Bob Ross", Material.PAINTING, Unlock.FREE, Villager.class, Material.PAINTING));
+            case SKY_WARS -> List.of(
+                    choice("ice", "Ice", Material.ICE, Unlock.FREE, Skeleton.class, Material.ICE),
+                    choice("fire", "Fire", Material.BLAZE_POWDER, Unlock.FREE, Skeleton.class, Material.BLAZE_POWDER),
+                    choice("air", "Air", Material.FEATHER, Unlock.FREE, Skeleton.class, Material.FEATHER),
+                    choice("metal", "Metal", Material.IRON_INGOT, Unlock.FREE, IronGolem.class, Material.IRON_INGOT),
+                    choice("earth", "Earth", Material.DIRT, Unlock.FREE, Zombie.class, Material.DIRT));
             case BACON_BRAWL -> List.of(
                     choice("el-muchacho-pigo", "El Muchacho Pigo", Material.PORKCHOP,
                             Unlock.FREE, Pig.class, null),
@@ -155,7 +179,9 @@ final class ArcadeLobbyKitCatalogue {
                     choice("runnerkit-archer", "Archer", Material.BOW,
                             Unlock.GEM, Skeleton.class, Material.BOW),
                     choice("runnerkit-frosty", "Frosty", Material.SNOWBALL,
-                            Unlock.GEM, Skeleton.class, Material.SNOWBALL));
+                            Unlock.GEM, Skeleton.class, Material.SNOWBALL),
+                    choice("runnerkit-switcher", "Switcher", Material.ENDER_EYE,
+                            Unlock.ACHIEVEMENT, Skeleton.class, Material.ENDER_EYE));
             case WITHER_ASSAULT -> List.of(
                     choice("archer", "Archer", Material.BOW,
                             Unlock.FREE, Skeleton.class, Material.BOW),
@@ -178,14 +204,18 @@ final class ArcadeLobbyKitCatalogue {
                     choice("spleef-brawler", "Brawler", Material.IRON_SWORD,
                             Unlock.GEM, Skeleton.class, Material.IRON_AXE),
                     choice("spleef-archer", "Archer", Material.BOW,
-                            Unlock.FREE, Skeleton.class, Material.BOW));
+                            Unlock.FREE, Skeleton.class, Material.BOW),
+                    choice("spleef-gust", "Gust", Material.WIND_CHARGE,
+                            Unlock.ACHIEVEMENT, Skeleton.class, Material.WIND_CHARGE));
             case TURF_WARS -> List.of(
                     choice("turf-wars-marksman", "Marksman", Material.BOW,
                             Unlock.FREE, Zombie.class, Material.BOW),
                     choice("turf-wars-infiltrator", "Infiltrator", Material.IRON_SWORD,
                             Unlock.GEM, Zombie.class, Material.IRON_SWORD),
                     choice("turf-wars-shredder", "Shredder", Material.ARROW,
-                            Unlock.GEM, Zombie.class, Material.BOW));
+                            Unlock.GEM, Zombie.class, Material.BOW),
+                    choice("turf-wars-fortifier", "Fortifier", Material.BRICKS,
+                            Unlock.ACHIEVEMENT, Zombie.class, Material.BRICKS));
             case SUPER_SPLOOR -> List.of(
                     choice("sprayer", "Sprayer", Material.BLAZE_ROD,
                             Unlock.FREE, Zombie.class, Material.BLAZE_ROD),
@@ -209,8 +239,8 @@ final class ArcadeLobbyKitCatalogue {
                     choice("skyguard", "Skyguard", Material.FEATHER,
                             Unlock.ACHIEVEMENT, Skeleton.class, Material.FEATHER));
             case CAMERA_SHY -> List.of(
-                    choice("snap-smoke-artist", "Smoke Artist", Material.POTION,
-                            Unlock.FREE, Villager.class, Material.POTION),
+                    choice("snap-smoke-artist", "Smoke Artist", Material.INK_SAC,
+                            Unlock.FREE, Villager.class, Material.INK_SAC),
                     choice("snap-decoy", "Decoy", Material.FIREWORK_ROCKET,
                             Unlock.GEM, Villager.class, Material.FIREWORK_ROCKET),
                     choice("snap-runner", "Runner", Material.SUGAR,

@@ -42,6 +42,10 @@ public final class ArcadeProgressCatalog {
                     a("mama-camera", "Mama Get the Camera", "As Mama Piggles, get 4 kills from Bacon Blast or its kill combo."),
                     a("got-em", "Got em’", "Kill a player during their Body Slam recovery before they land."),
                     a("hamished", "Hamished", "Win while taking starvation damage."))),
+            Map.entry("skywars", List.of(
+                    a("death-bomber", "Death Bomber", "Kill 3 players with Throwable TNT in one game."),
+                    a("no-chest", "No Chest", "Win without opening a chest."),
+                    a("no-armor", "No Armor", "Win without wearing armor."))),
             Map.entry("bomb-lobbers", List.of(
                     a("ultimate-killer", "Ultimate Killer", "Get 5 kills in one game."),
                     a("two-birds-one-stone", "Two birds, one stone", "Kill 2 players with one TNT."),
@@ -140,6 +144,10 @@ public final class ArcadeProgressCatalog {
                     a("made-it-work", "Made it work", "Win after assisting in 5 opponent deaths with Archer."),
                     a("sore-feet", "Sore Feet", "Take 20 hearts worth of fall damage in one game."))),
             Map.entry("sheep-quest", List.of(
+                    a("hungry-hungry-hippo", "Hungry Hungry Hippo", "Win 50 games of Sheep Quest."),
+                    a("thief", "Thief", "Steal 300 sheep from enemy pens."),
+                    a("animal-rescue", "Animal Rescue", "Make 300 enemies drop their sheep."),
+                    a("selfish", "Selfish", "Win with more than 12 sheep in your pen."),
                     a("whats-a-sheep", "What's a Sheep?", "Win with at least 10 kills and 0 sheep captures."),
                     a("cheeky", "Cheeky", "Win after capturing 5 sheep in the final 10 seconds."),
                     a("gladiator", "Gladiator", "As Brute, throw a teammate into a fight where they get a double kill."),
@@ -307,7 +315,9 @@ public final class ArcadeProgressCatalog {
             Map.entry("skywars", List.of(
                     m("wins", "Wins", "wins", 250, "wins"),
                     m("kills", "Kills", "kills", 2000, "kills"),
-                    m("tnt-kills", "TNT Kills", "tnt-kills", 100, "TNT kills"))),
+                    m("tnt-kills", "TNT Kills", "tnt-kills", 100, "TNT kills"),
+                    m("tnt-pickups", "Throwable TNT Pickups", "tnt-pickups", 250, "pickups"),
+                    m("zombie-kills", "Zombie Guardian Kills", "zombie-kills", 250, "kills"))),
             Map.entry("draw-my-thing", List.of(
                     m("wins", "Wins", "wins", 250, "wins"),
                     m("correct-guesses", "Correct Guesses", "correct-guesses", 2000, "guesses"),

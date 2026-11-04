@@ -47,13 +47,13 @@ final class RunnerParityRulesTest {
     }
 
     @Test
-    void unusedTrailColourIsPreferredWhenSelectedColourConflicts() {
-        assertEquals("white", ArcadePortRules.resolveRunnerTrailColour("cyan", Map.of("cyan", 12)));
+    void redIsUsedWhenSelectedTrailColourConflicts() {
+        assertEquals("red", ArcadePortRules.resolveRunnerTrailColour("cyan", Map.of("cyan", 12)));
     }
 
     @Test
-    void leastRepresentedAlternativeWinsWhenEveryColourAppearsOnTheMap() {
-        assertEquals("green", ArcadePortRules.resolveRunnerTrailColour("cyan",
+    void redRemainsFallbackWhenEveryCosmeticColourAppearsOnTheMap() {
+        assertEquals("red", ArcadePortRules.resolveRunnerTrailColour("cyan",
                 Map.ofEntries(
                         Map.entry("cyan", 10), Map.entry("white", 6), Map.entry("orange", 5),
                         Map.entry("magenta", 7), Map.entry("light-blue", 4), Map.entry("yellow", 8),
@@ -63,16 +63,15 @@ final class RunnerParityRulesTest {
     }
 
     @Test
-    void redAndUnknownColoursAreNeverSelected() {
+    void redIsTheFallbackForRedAndUnknownSelections() {
         assertFalse(ArcadePortRules.runnerTrailColours().contains("red"));
-        assertEquals("cyan", ArcadePortRules.resolveRunnerTrailColour("red", Map.of()));
-        assertEquals("cyan", ArcadePortRules.resolveRunnerTrailColour("unknown", Map.of()));
+        assertEquals("red", ArcadePortRules.resolveRunnerTrailColour("red", Map.of()));
+        assertEquals("red", ArcadePortRules.resolveRunnerTrailColour("unknown", Map.of()));
     }
 
     @Test
-    void sourceBlockDecayAndFallingBlockLifetimeMatchReborn() {
+    void runnerTrailBlocksDisappearAfterTheSourceDecayInterval() {
         assertEquals(600L, ArcadePortRules.RUNNER_BLOCK_DECAY_MILLIS);
-        assertEquals(1_200L, ArcadePortRules.RUNNER_BLOCK_LIFETIME_MILLIS);
         assertFalse(ArcadePortRules.shouldDropRunnerBlock(599L));
         assertTrue(ArcadePortRules.shouldDropRunnerBlock(600L));
     }
@@ -88,10 +87,11 @@ final class RunnerParityRulesTest {
     }
 
     @Test
-    void sourceKitAliasesNormalizeToTheThreeLegacyKits() {
+    void sourceKitAliasesAndAchievementKitNormalize() {
         assertEquals("leaper", ArcadePortRules.normalizeRunnerKit("runnerkit-leaper"));
         assertEquals("archer", ArcadePortRules.normalizeRunnerKit("Runner-Archer"));
         assertEquals("frosty", ArcadePortRules.normalizeRunnerKit("frosty"));
+        assertEquals("switcher", ArcadePortRules.normalizeRunnerKit("switcher"));
         assertEquals(null, ArcadePortRules.normalizeRunnerKit("tank"));
         assertEquals(null, ArcadePortRules.normalizeRunnerKit(null));
     }
@@ -106,10 +106,4 @@ final class RunnerParityRulesTest {
         assertFalse(ArcadePortRules.shouldMarkRunnerBlock(true, false, false, true, true));
     }
 
-    @Test
-    void fallingBlockCollisionOnlyHitsPlayersAtOrBelowTheBlock() {
-        assertTrue(ArcadePortRules.shouldRunnerFallingBlockHit(10.0D, 10.0D));
-        assertTrue(ArcadePortRules.shouldRunnerFallingBlockHit(9.0D, 10.0D));
-        assertFalse(ArcadePortRules.shouldRunnerFallingBlockHit(10.51D, 10.0D));
-    }
 }

@@ -1,10 +1,10 @@
 # Snake — Paper 26.3 controlled acceptance plan
 
-Snake is promoted to the shared controlled-testing queue. It remains a separate `SnakeModern.jar` module, launched from the Testplex Game Panel and bridged to the shared Arcade statistics/cosmetics. The one-time readiness migration enables the plugin on an existing isolated VM; the module still fails closed if the original map set or command is unavailable.
+Snake is promoted to the shared controlled-testing queue. It is compiled into `ArcadeMechanicsModern.jar` and launched from the Testplex Game Panel through the shared Arcade queue, statistics, cosmetics and lifecycle. The shared module fails startup readiness if the original map set or command is unavailable.
 
 ## Startup and maps
 
-- [ ] Confirm `SnakeModern` loads and installs the configured original map before advertising the game as available.
+- [ ] Confirm the shared Arcade Snake module registers and installs the configured original map before advertising the game as available.
 - [ ] Confirm the packaged resources include exactly the three source archives: Snake Pit, Snake Volcanic and Snake WinterBabylon.
 - [ ] Load each map and verify its `WorldConfig.dat` team spawns, bounds, spectator marker and world storage conversion.
 - [ ] Start a second match after a map change and verify no stale world, participant or item-box state survives.

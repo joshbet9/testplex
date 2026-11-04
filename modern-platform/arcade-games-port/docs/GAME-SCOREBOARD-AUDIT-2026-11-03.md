@@ -37,4 +37,4 @@ Every playable game needs an in-game sidebar. The shared Arcade session now has 
 | Snap (Camera Shy) | New game-specific scoreboard |
 | Snake | New Snake match scoreboard |
 
-The Snake scoreboard is scoped to the standalone Snake manager. It updates during preparation and live play, restores each player's prior scoreboard on leave/end, and reports map, countdown/elapsed time, survivors, food, and top Snake stats.
+The Snake scoreboard is scoped to its Arcade-owned game controller. It updates during preparation and live play, restores each player's prior scoreboard on leave/end, and reports map, countdown/elapsed time, survivors, food, and top Snake stats.
