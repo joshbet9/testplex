@@ -46,8 +46,7 @@ final class ArcadeLobbyKitCatalogue {
                     choice("archer", "Archer", Material.BOW, Unlock.FREE, Skeleton.class, Material.BOW),
                     choice("demolitionist", "Demolitionist", Material.TNT, Unlock.FREE, Zombie.class, Material.TNT),
                     choice("fighter", "Fighter", Material.IRON_SWORD, Unlock.FREE, Zombie.class, Material.IRON_SWORD),
-                    choice("tank", "Tank", Material.IRON_CHESTPLATE, Unlock.FREE, IronGolem.class, Material.IRON_CHESTPLATE),
-                    choice("breacher", "Breacher", Material.TNT, Unlock.ACHIEVEMENT, Zombie.class, Material.TNT));
+                    choice("tank", "Tank", Material.IRON_CHESTPLATE, Unlock.FREE, IronGolem.class, Material.IRON_CHESTPLATE));
             case HEROES_OF_GWEN -> List.of(
                     choice("hattori", "Hattori", Material.IRON_SWORD, Unlock.FREE, Villager.class, Material.IRON_SWORD),
                     choice("devon", "Devon", Material.BOW, Unlock.FREE, Villager.class, Material.BOW),
@@ -58,17 +57,13 @@ final class ArcadeLobbyKitCatalogue {
                     choice("bardolf", "Bardolf", Material.STONE_SWORD, Unlock.FREE, Villager.class, Material.STONE_SWORD),
                     choice("rowena", "Rowena", Material.CROSSBOW, Unlock.FREE, Villager.class, Material.CROSSBOW),
                     choice("ivy", "Ivy", Material.SHIELD, Unlock.FREE, Villager.class, Material.SHIELD),
-                    choice("bob-ross", "Bob Ross", Material.PAINTING, Unlock.FREE, Villager.class, Material.PAINTING),
-                    choice("tactician", "Tactician", Material.COMPASS,
-                            Unlock.ACHIEVEMENT, Villager.class, Material.COMPASS));
+                    choice("bob-ross", "Bob Ross", Material.PAINTING, Unlock.FREE, Villager.class, Material.PAINTING));
             case SKY_WARS -> List.of(
                     choice("ice", "Ice", Material.ICE, Unlock.FREE, Skeleton.class, Material.ICE),
                     choice("fire", "Fire", Material.BLAZE_POWDER, Unlock.FREE, Skeleton.class, Material.BLAZE_POWDER),
                     choice("air", "Air", Material.FEATHER, Unlock.FREE, Skeleton.class, Material.FEATHER),
                     choice("metal", "Metal", Material.IRON_INGOT, Unlock.FREE, IronGolem.class, Material.IRON_INGOT),
-                    choice("earth", "Earth", Material.DIRT, Unlock.FREE, Zombie.class, Material.DIRT),
-                    choice("tnt-specialist", "TNT Specialist", Material.TNT,
-                            Unlock.ACHIEVEMENT, Zombie.class, Material.TNT));
+                    choice("earth", "Earth", Material.DIRT, Unlock.FREE, Zombie.class, Material.DIRT));
             case BACON_BRAWL -> List.of(
                     choice("el-muchacho-pigo", "El Muchacho Pigo", Material.PORKCHOP,
                             Unlock.FREE, Pig.class, null),
@@ -130,16 +125,12 @@ final class ArcadeLobbyKitCatalogue {
                     choice("glider", "Glider", Material.ELYTRA,
                             Unlock.GEM, Zombie.class, Material.ELYTRA),
                     choice("tamer", "Tamer", Material.END_CRYSTAL,
-                            Unlock.GEM, Zombie.class, Material.END_CRYSTAL),
-                    choice("dragon-warden", "Dragon Warden", Material.SHIELD,
-                            Unlock.ACHIEVEMENT, IronGolem.class, Material.SHIELD));
+                            Unlock.GEM, Zombie.class, Material.END_CRYSTAL));
             case EVOLUTION -> List.of(
                     choice("standard-evolution", "Standard Evolution", Material.DRAGON_EGG,
                             Unlock.FREE, Zombie.class, Material.IRON_INGOT),
                     choice("quick-evolver", "Quick Evolver", Material.CLOCK,
-                            Unlock.FREE, Zombie.class, Material.GOLDEN_APPLE),
-                    choice("apex", "Apex", Material.NETHER_STAR,
-                            Unlock.ACHIEVEMENT, Zombie.class, Material.BLAZE_ROD));
+                            Unlock.FREE, Zombie.class, Material.GOLDEN_APPLE));
             case MICRO_BATTLES -> List.of(
                     choice("micro-archer", "Archer", Material.BOW,
                             Unlock.FREE, Zombie.class, Material.BOW),

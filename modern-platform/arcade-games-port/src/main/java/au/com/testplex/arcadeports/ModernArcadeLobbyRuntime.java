@@ -683,14 +683,9 @@ public final class ModernArcadeLobbyRuntime implements Listener {
 
     private String achievementKitSummary(String kitId) {
         return switch (kitId) {
-            case "breacher" -> "TNT-focused attacker; charges replenish over time.";
-            case "tactician" -> "Survey and mark enemies, or gain a short combat boost.";
-            case "tnt-specialist" -> "Starts with three throwable TNT charges.";
             case "runner-turtle" -> "Copper axe hits shell Chasers; every third hit earns a Wind Charge.";
             case "runner-trickster" -> "Swap once with a random Chaser and launch Runner distractions.";
-            case "dragon-warden" -> "Shield and Wind Charges help defend against dragon dives.";
-            case "apex" -> "Start every evolution stage with a Golden Apple.";
-            case "shepherd" -> "Carry one extra sheep, with extra movement penalty.";
+            case "shepherd" -> "Carry unlimited sheep; Slowness increases every two sheep.";
             case "warden" -> "Use an iron sword and shield to protect Humans.";
             default -> "Use the kit's specialised loadout.";
         };

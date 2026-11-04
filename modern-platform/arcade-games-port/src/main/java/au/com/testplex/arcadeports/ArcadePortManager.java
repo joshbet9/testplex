@@ -1209,8 +1209,7 @@ public final class ArcadePortManager implements Listener {
         }
         String value = requestedKit.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
         if (value.equals("quick-evolver") || value.equals("evolution-quick-evolver")
-                || value.equals("standard-evolution") || value.equals("evolution-standard")
-                || value.equals("apex")) {
+                || value.equals("standard-evolution") || value.equals("evolution-standard")) {
             selectEvolutionKit(player, value);
             return;
         }
@@ -1345,8 +1344,7 @@ public final class ArcadePortManager implements Listener {
         else if (ArcadePortRules.normalizeSpleefKit(value) != null) selectSpleefKit(player, value);
         else if (ArcadePortRules.normalizeMicroBattlesKit(value) != null) selectMicroBattlesKit(player, value);
         else if (value.equals("quick-evolver") || value.equals("evolution-quick-evolver")
-                || value.equals("standard-evolution") || value.equals("evolution-standard")
-                || value.equals("apex")) {
+                || value.equals("standard-evolution") || value.equals("evolution-standard")) {
             selectEvolutionKit(player, value);
         }
         else if (Set.of("rifle", "sniper", "shotgun", "machine-gun", "machinegun").contains(value)) selectPaintballKit(player, value);
@@ -1363,16 +1361,11 @@ public final class ArcadePortManager implements Listener {
     static String achievementKitUnlock(ArcadePortGame game, String kit) {
         if (game == null || kit == null) return null;
         return switch (game) {
-            case CASTLE_ASSAULT -> "breacher".equals(kit) ? "moral-exercise" : null;
-            case HEROES_OF_GWEN -> "tactician".equals(kit) ? "know-your-enemy" : null;
-            case SKY_WARS -> "tnt-specialist".equals(kit) ? "death-bomber" : null;
             case DEATH_TAG -> switch (kit) {
                 case "runner-turtle" -> "turtle-shell";
                 case "runner-trickster" -> "smoke-and-mirrors";
                 default -> null;
             };
-            case DRAGONS -> "dragon-warden".equals(kit) ? "sharpshooter" : null;
-            case EVOLUTION -> "apex".equals(kit) ? "ability-assassin" : null;
             case SHEEP_QUEST -> "shepherd".equals(kit) ? "cheeky" : null;
             case WITHER_ASSAULT -> "warden".equals(kit) ? "savior" : null;
             default -> null;
@@ -1450,8 +1443,8 @@ public final class ArcadePortManager implements Listener {
     public void selectSkyWarsKit(Player player, String requestedKit) {
         if (player == null || requestedKit == null) return;
         String kit = requestedKit.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
-        if (!Set.of("ice", "fire", "air", "metal", "earth", "tnt-specialist").contains(kit)) {
-            player.sendMessage(ChatColor.YELLOW + "SkyWars kits: ice, fire, air, metal, earth, TNT Specialist.");
+        if (!Set.of("ice", "fire", "air", "metal", "earth").contains(kit)) {
+            player.sendMessage(ChatColor.YELLOW + "SkyWars kits: ice, fire, air, metal or earth.");
             return;
         }
         skyWarsKitPreferences.put(player.getUniqueId(), kit);
@@ -1541,9 +1534,9 @@ public final class ArcadePortManager implements Listener {
                 .replace('_', '-').replace(' ', '-');
         if (kit.equals("evolution-quick-evolver")) kit = "quick-evolver";
         if (kit.equals("evolution-standard")) kit = "standard-evolution";
-        if (!kit.equals("quick-evolver") && !kit.equals("standard-evolution") && !kit.equals("apex")) {
+        if (!kit.equals("quick-evolver") && !kit.equals("standard-evolution")) {
             player.sendMessage(ChatColor.YELLOW
-                    + "Evolution kits: standard-evolution, quick-evolver, apex.");
+                    + "Evolution kits: standard-evolution or quick-evolver.");
             return;
         }
         UUID playerId = player.getUniqueId();
@@ -1564,8 +1557,7 @@ public final class ArcadePortManager implements Listener {
         }
             player.sendMessage(ChatColor.GREEN + (kit.equals("quick-evolver")
                     ? "Quick Evolver selected — evolution is 25% faster."
-                    : kit.equals("apex") ? "Apex selected — you start each evolution stage with a Golden Apple."
-                            : "Standard Evolution kit selected."));
+                    : "Standard Evolution kit selected."));
     }
 
     public void selectMicroBattlesKit(Player player, String requestedKit) {
@@ -7564,13 +7556,6 @@ public final class ArcadePortManager implements Listener {
                     player.getInventory().setArmorContents(new ItemStack[] {
                             new ItemStack(Material.IRON_BOOTS), new ItemStack(Material.IRON_LEGGINGS),
                             new ItemStack(Material.IRON_CHESTPLATE), new ItemStack(Material.IRON_HELMET) });
-                } else if ("dragon-warden".equals(kit)) {
-                    player.getInventory().addItem(new ItemStack(Material.SHIELD),
-                            namedItem(Material.WIND_CHARGE, "Dragon Guard",
-                                    "Deflect a dragon's dive or recover from a dangerous launch.", 2));
-                    player.getInventory().setArmorContents(new ItemStack[] {
-                            new ItemStack(Material.IRON_BOOTS), new ItemStack(Material.CHAINMAIL_LEGGINGS),
-                            new ItemStack(Material.CHAINMAIL_CHESTPLATE), new ItemStack(Material.IRON_HELMET) });
                 } else {
                     player.getInventory().addItem(namedItem(Material.IRON_AXE, "Leap",
                             "Right-click to leap forward (8-second cooldown)."));
@@ -7764,7 +7749,7 @@ public final class ArcadePortManager implements Listener {
             case "shepherd" -> {
                 player.getInventory().setItem(0, new ItemStack(Material.WOODEN_SWORD));
                 player.getInventory().setItem(1, namedItem(Material.SADDLE, "Herding Saddle",
-                        "Carry up to four sheep at once; carrying slows you more."));
+                        "Carry unlimited sheep. Slowness increases every two sheep."));
                 player.getInventory().setItem(2, new ItemStack(Material.SHEARS));
             }
             default -> {
@@ -8110,8 +8095,6 @@ public final class ArcadePortManager implements Listener {
                         "Throwable Dirt", "Right-click to throw dirt (maximum 4).", true));
                 session.skyWarsNextDirtAt.put(id, System.currentTimeMillis());
             }
-            case "tnt-specialist" -> player.getInventory().addItem(
-                    namedItem(Material.TNT, "Throwable TNT", "Right-click to throw. 3 charges.", 3));
             default -> player.getInventory().addItem(skyWarsKitItem(Material.ICE,
                     "Ice Bridge", "Launch forward and lay a temporary ice bridge (30-second cooldown).", false));
         }
@@ -14825,8 +14808,9 @@ public final class ArcadePortManager implements Listener {
             vehicle = passenger;
         }
         carrier.setExp(0.0F);
+        carrier.setLevel(0);
         carrier.removePotionEffect(PotionEffectType.SLOWNESS);
-        for (int slot = 4; slot <= 6; slot++) {
+        for (int slot = 4; slot <= 7; slot++) {
             ItemStack item = carrier.getInventory().getItem(slot);
             if (item != null && item.getType().name().endsWith("_WOOL")) carrier.getInventory().setItem(slot, null);
         }
@@ -14863,16 +14847,24 @@ public final class ArcadePortManager implements Listener {
         List<Sheep> carried = session.sheepCarriers.entrySet().stream()
                 .filter(entry -> player.getUniqueId().equals(entry.getValue()))
                 .map(Map.Entry::getKey).collect(java.util.stream.Collectors.toList());
-        int carryLimit = "shepherd".equals(session.sheepQuestKits.get(player.getUniqueId()))
-                ? ArcadePortRules.SHEEP_QUEST_MAX_CARRY + 1 : ArcadePortRules.SHEEP_QUEST_MAX_CARRY;
-        int count = Math.min(carryLimit, carried.size());
-        player.setExp(count / (float) carryLimit);
-        for (int index = 0; index < carryLimit; index++) {
-            player.getInventory().setItem(4 + index, index < count ? sheepQuestWoolIcon(carried.get(index)) : null);
+        boolean shepherd = "shepherd".equals(session.sheepQuestKits.get(player.getUniqueId()));
+        int count = shepherd ? carried.size()
+                : Math.min(ArcadePortRules.SHEEP_QUEST_MAX_CARRY, carried.size());
+        if (shepherd) {
+            player.setLevel(count);
+            player.setExp(0.0F);
+        } else {
+            player.setLevel(0);
+            player.setExp(count / (float) ArcadePortRules.SHEEP_QUEST_MAX_CARRY);
+        }
+        int visibleCount = Math.min(count, 4);
+        for (int index = 0; index < 4; index++) {
+            player.getInventory().setItem(4 + index,
+                    index < visibleCount ? sheepQuestWoolIcon(carried.get(index)) : null);
         }
         if (count > 0) {
-            int amplifier = "shepherd".equals(session.sheepQuestKits.get(player.getUniqueId()))
-                    ? Math.min(ArcadePortRules.SHEEP_QUEST_MAX_CARRY, count - 1)
+            int amplifier = shepherd
+                    ? Math.min(127, (count - 1) / 2)
                     : ArcadePortRules.sheepQuestCarrySlownessAmplifier(count);
             player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60,
                     Math.max(0, amplifier), false, false, true));
@@ -14892,9 +14884,8 @@ public final class ArcadePortManager implements Listener {
             return false;
         }
         int carriedCount = sheepCarriedBy(session, playerId);
-        int carryLimit = "shepherd".equals(session.sheepQuestKits.get(playerId))
-                ? ArcadePortRules.SHEEP_QUEST_MAX_CARRY + 1 : ArcadePortRules.SHEEP_QUEST_MAX_CARRY;
-        if (carriedCount >= carryLimit) return false;
+        boolean shepherd = "shepherd".equals(session.sheepQuestKits.get(playerId));
+        if (!shepherd && !ArcadePortRules.canCarryAnotherSheep(carriedCount)) return false;
         int team = session.teams.getOrDefault(playerId, -1);
         if (team < 0 || team > 3) return false;
         int owner = session.sheepOwners.getOrDefault(sheep, -1);
@@ -16547,9 +16538,6 @@ public final class ArcadePortManager implements Listener {
                 player.getInventory().setItem(1, new ItemStack(Material.EGG, 3));
                 player.setAllowFlight(false);
                 break;
-        }
-        if ("apex".equals(session.evolutionKits.getOrDefault(id, "standard-evolution"))) {
-            player.getInventory().addItem(new ItemStack(Material.GOLDEN_APPLE));
         }
         player.sendMessage(ChatColor.GREEN + "Evolution stage restored: " + (level + 1) + "/5.");
         player.updateInventory();

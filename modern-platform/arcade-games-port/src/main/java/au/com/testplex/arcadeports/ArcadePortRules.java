@@ -781,7 +781,6 @@ public final class ArcadePortRules {
             case "frost", "ice", "ice-bridge" -> "frost";
             case "glider", "glide" -> "glider";
             case "tamer", "dragon-tamer" -> "tamer";
-            case "dragon-warden", "warden" -> "dragon-warden";
             default -> null;
         };
     }
@@ -3078,7 +3077,7 @@ public final class ArcadePortRules {
                 .replace('_', '-').replace(' ', '-');
         if ("demo".equals(value) || "demolition".equals(value)) value = "demolitionist";
         return switch (value) {
-            case "alchemist", "archer", "demolitionist", "fighter", "tank", "breacher" -> value;
+            case "alchemist", "archer", "demolitionist", "fighter", "tank" -> value;
             default -> null;
         };
     }
@@ -3091,7 +3090,7 @@ public final class ArcadePortRules {
         if ("bob".equals(value) || "ross".equals(value) || "bobross".equals(value)) value = "bob-ross";
         return switch (value) {
             case "hattori", "devon", "anath", "dana", "biff", "larissa",
-                    "bardolf", "rowena", "ivy", "bob-ross", "tactician" -> value;
+                    "bardolf", "rowena", "ivy", "bob-ross" -> value;
             default -> null;
         };
     }
@@ -3103,7 +3102,7 @@ public final class ArcadePortRules {
         return switch (canonical) {
             case "hattori", "bardolf" -> "Assassin";
             case "devon", "rowena" -> "Hunter";
-            case "anath", "larissa", "bob-ross", "tactician" -> "Mage";
+            case "anath", "larissa", "bob-ross" -> "Mage";
             case "dana", "biff", "ivy" -> "Warrior";
             default -> null;
         };
