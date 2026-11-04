@@ -12423,11 +12423,11 @@ public final class ArcadePortManager implements Listener {
         for (Player target : alivePlayers(session)) {
             if (target.equals(player) || target.getLocation().distanceSquared(flame) > 2.25D) continue;
             target.setFireTicks(Math.max(target.getFireTicks(), 60));
-            LivingEntity avatar = baconPlayerAvatar(session, target.getUniqueId());
-            if (avatar != null) {
-                avatar.setFireTicks(Math.max(avatar.getFireTicks(), 60));
-                avatar.getWorld().spawnParticle(Particle.FLAME,
-                        avatar.getLocation().add(0.0D, 0.8D, 0.0D), 18,
+            LivingEntity targetAvatar = baconPlayerAvatar(session, target.getUniqueId());
+            if (targetAvatar != null) {
+                targetAvatar.setFireTicks(Math.max(targetAvatar.getFireTicks(), 60));
+                targetAvatar.getWorld().spawnParticle(Particle.FLAME,
+                        targetAvatar.getLocation().add(0.0D, 0.8D, 0.0D), 18,
                         0.25D, 0.45D, 0.25D, 0.02D);
             }
             session.baconCrispyFlamedUntil.put(target.getUniqueId(), now + 3_000L);
