@@ -11361,7 +11361,7 @@ public final class ArcadePortManager implements Listener {
             case "Paint Bucket" -> {
                 DrawMyThingCanvas.fill(session.drawCanvasBlocks, target, colour);
                 markDrawPainted(session);
-                playDrawMyThingSound(session, Sound.ENTITY_SPLASH_POTION_BREAK, 0.4F, 1.5F);
+                playDrawMyThingSound(session, Sound.BLOCK_WOOL_PLACE, 0.8F, 1.15F);
             }
             case "Clear Canvas" -> {
                 resetDrawCanvas(session);
@@ -11369,12 +11369,12 @@ public final class ArcadePortManager implements Listener {
                 session.drawShapeStarts.remove(id);
                 session.drawShapeTools.remove(id);
                 markDrawPainted(session);
-                playDrawMyThingSound(session, Sound.ENTITY_GENERIC_EXPLODE, 0.5F, 1.5F);
+                playDrawMyThingSound(session, Sound.BLOCK_WOOL_BREAK, 0.8F, 0.8F);
             }
             default -> { return; }
         }
         if (!"Clear Canvas".equals(tool) && !"Paint Bucket".equals(tool)) {
-            playDrawMyThingSound(session, Sound.BLOCK_FIRE_EXTINGUISH, 0.2F, 2.0F);
+            playDrawMyThingSound(session, Sound.BLOCK_WOOL_PLACE, 0.8F, 1.15F);
         }
     }
 
@@ -11388,7 +11388,7 @@ public final class ArcadePortManager implements Listener {
             DrawMyThingCanvas.point(session.drawCanvasBlocks, target, colour, thick);
         }
         markDrawPainted(session);
-        playDrawMyThingSound(session, Sound.BLOCK_FIRE_EXTINGUISH, 0.2F, 2.0F);
+        playDrawMyThingSound(session, Sound.BLOCK_WOOL_PLACE, 0.8F, 1.15F);
     }
 
     private void playDrawMyThingSound(Session session, Sound sound, float volume, float pitch) {

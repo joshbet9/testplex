@@ -7,13 +7,15 @@ Draw My Thing is promoted to the shared controlled queue with the original Draw 
 - [ ] Start from the shared Game Panel and verify the queue, minimum/maximum participation and return to lobby.
 - [ ] Confirm each queued player receives exactly one shuffled drawing turn.
 - [ ] Verify the original Stadium archive loads with the intended drawer position, guesser positions and play bounds.
-- [ ] For lobbies of 10 or fewer, verify the 30-second drawing window and three-second inter-turn gap.
-- [ ] For lobbies above 10, verify turn durations scale against the five-minute game budget after reserving the inter-turn gaps; test 11, 12 and 16 players.
+- [ ] Verify the total drawing budget is 320 seconds, with consecutive turns and no inter-turn delay.
+- [ ] Verify each turn is `min(40 seconds, 320 seconds / queued players)`: eight players or fewer get 40 seconds, while larger lobbies divide the 320-second budget across everyone. Test 8, 9, 12 and 16 players.
 - [ ] Confirm hint reveal timing scales with the active drawing window and does not reveal the answer prematurely.
 
 ## Drawing and guessing
 
 - [ ] Verify the drawing tool paints the expected wool colours and cannot modify blocks outside the drawing area.
+- [ ] As the drawer, select several palette colours from the inventory; each click must select a colour without moving or consuming the swatch and without painting a pixel.
+- [ ] Verify brush strokes, bucket fill and clear-canvas actions play their drawing feedback sounds, and colour selection and correct/wrong guesses provide audible feedback.
 - [ ] Verify each player has at most ten guesses per turn and the action-bar counter updates after each accepted guess.
 - [ ] Confirm correct guesses are credited once, with the expected scoring/order and no duplicate off-hand interaction.
 - [ ] Verify wrong guesses, blank guesses, repeated guesses and late guesses are handled consistently.
