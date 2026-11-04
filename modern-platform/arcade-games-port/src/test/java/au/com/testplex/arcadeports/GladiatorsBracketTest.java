@@ -96,15 +96,46 @@ class GladiatorsBracketTest {
     }
 
     @Test
+    void grandFinalResetCanAlsoBeWonByTheLosersChampion() {
+        GladiatorsBracket bracket = new GladiatorsBracket(players(8));
+        playUntilGrandFinal(bracket, new Random(551L));
+        GladiatorsBracket.MatchView grandFinal = bracket.matches().stream()
+                .filter(match -> match.bracket() == GladiatorsBracket.Bracket.GRAND_FINAL).findFirst().orElseThrow();
+        UUID winnersChampion = grandFinal.first();
+        UUID losersChampion = grandFinal.second();
+
+        assertTrue(bracket.begin(grandFinal.id()));
+        bracket.complete(grandFinal.id(), losersChampion);
+        assertEquals(1, bracket.losses(winnersChampion));
+        assertEquals(1, bracket.losses(losersChampion));
+
+        GladiatorsBracket.MatchView reset = bracket.readyMatches().stream()
+                .filter(match -> match.bracket() == GladiatorsBracket.Bracket.GRAND_FINAL_RESET)
+                .findFirst().orElseThrow();
+        assertEquals(losersChampion, reset.first());
+        assertEquals(winnersChampion, reset.second());
+        assertTrue(bracket.begin(reset.id()));
+        bracket.complete(reset.id(), losersChampion);
+
+        assertEquals(losersChampion, bracket.champion());
+        assertEquals(2, bracket.losses(winnersChampion));
+        assertEquals(1, bracket.losses(losersChampion));
+    }
+
+    @Test
     void matchSlotDependenciesAreInvariantToCompletionOrder() {
-        GladiatorsBracket first = new GladiatorsBracket(players(8));
-        GladiatorsBracket second = new GladiatorsBracket(players(8));
-        List<String> structure = structure(first);
-        assertEquals(structure, structure(second));
-        play(first, new Random(1L), false);
-        play(second, new Random(2L), true);
-        assertEquals(structure, structure(first));
-        assertEquals(structure, structure(second));
+        for (int count = 2; count <= 16; count++) {
+            GladiatorsBracket template = new GladiatorsBracket(players(count));
+            List<String> fixedStructure = structure(template);
+            for (int order = 0; order < 12; order++) {
+                GladiatorsBracket bracket = new GladiatorsBracket(players(count));
+                assertEquals(fixedStructure, structure(bracket), "initial slots differ for " + count + " players");
+                play(bracket, new Random(10_000L + count * 31L + order), (order & 1) != 0);
+                assertTrue(bracket.complete(), "tournament stalled for " + count + " players, order " + order);
+                assertEquals(fixedStructure, structure(bracket),
+                        "completion order changed feeder slots for " + count + " players, order " + order);
+            }
+        }
     }
 
     @Test
@@ -161,6 +192,11 @@ class GladiatorsBracketTest {
         for (int guard = 0; guard < 1000 && !bracket.complete(); guard++) {
             List<GladiatorsBracket.MatchView> ready = new ArrayList<>(bracket.readyMatches());
             if (completeReverse) java.util.Collections.reverse(ready);
+            List<UUID> readyFighters = ready.stream()
+                    .flatMap(match -> java.util.stream.Stream.of(match.first(), match.second()))
+                    .filter(java.util.Objects::nonNull).toList();
+            assertEquals(readyFighters.size(), readyFighters.stream().distinct().count(),
+                    "a participant was assigned to two ready matches");
             for (var match : ready) bracket.begin(match.id());
             if (completeReverse) java.util.Collections.reverse(ready);
             for (var match : ready) {

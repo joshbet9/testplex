@@ -34,7 +34,7 @@ For a tournament with multiple players:
 
 - [ ] Original Gladiators source map loads in its own isolated world and uses the source arena markers/bounds.
 - [ ] A single random seed fixes every winners', losers', and conditional grand-final-reset slot when the tournament starts.
-- [ ] Verify bracket simulations for every player count from 2 through 16, especially 3, 5, 8, and 16.
+- [x] Automated bracket simulations cover every player count from 2 through 16, including 3, 5, 8, and 16; 12 different duel completion orders per count preserve the same fixed slot dependencies.
 - [ ] The 16-player bracket has winners' rounds of 8/4/2/1 and losers' rounds of 4/4/3/2/1 matches; the lower semifinal has four entrants after the winners' finalist drops in.
 - [ ] Reordering independent match completions never changes feeder relationships or designated opponents.
 - [ ] Each participant enters at most one duel at a time; independent ready matches start concurrently when distinct arenas are available.
@@ -42,7 +42,7 @@ For a tournament with multiple players:
 - [ ] Each duel has the full five-second start lock; players cannot damage, shoot or interfere with another pair.
 - [ ] First defeat advances through the predetermined lower-bracket feeder; second defeat eliminates the player.
 - [ ] A lower-bracket duel starts as soon as its feeder results are known and an arena is free, without waiting on unrelated duels.
-- [ ] The winners' champion wins immediately by taking the grand final; a lower-bracket champion win starts the predeclared one-loss reset final.
+- [x] Automated tests cover the winners' champion ending the tournament immediately and both finalists entering the reset final after a lower-bracket grand-final win; either player can win the reset without giving the winner a third loss.
 - [ ] Unresolved duels receive the intended poison escalation after 60 seconds, without poisoning completed duels.
 - [ ] Environmental damage remains active inside a duel; eliminated and out-of-pair players cannot be damaged.
 - [ ] A disconnect, quit, death or server-side stop resolves the affected pair and does not strand either bracket.
