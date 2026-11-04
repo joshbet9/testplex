@@ -11782,9 +11782,16 @@ public final class ArcadePortManager implements Listener {
         long until = System.currentTimeMillis() + ArcadePortRules.BACON_HIT_FEEDBACK_MILLIS;
         session.baconHitFeedbackUntil.put(attacker.getUniqueId(), until);
         session.baconHitFeedbackUntil.put(target.getUniqueId(), until);
-        String label = backstab ? "Backstab!" : critical ? "Critical!" : "Hit!";
-        ChatColor colour = backstab ? ChatColor.RED : critical ? ChatColor.GOLD : ChatColor.WHITE;
-        showFloatingCombatLabel(session, target.getLocation(), label, colour);
+        if (backstab && critical) {
+            Location targetLocation = target.getLocation();
+            showFloatingCombatLabel(session, targetLocation, "Backstab!", ChatColor.RED);
+            showFloatingCombatLabel(session, targetLocation.clone().add(0.0D, 0.45D, 0.0D),
+                    "Critical!", ChatColor.GOLD);
+        } else {
+            String label = backstab ? "Backstab!" : critical ? "Critical!" : "Hit!";
+            ChatColor colour = backstab ? ChatColor.RED : critical ? ChatColor.GOLD : ChatColor.WHITE;
+            showFloatingCombatLabel(session, target.getLocation(), label, colour);
+        }
         Location impact = target.getLocation().clone().add(0.0D, 1.0D, 0.0D);
         if (critical) {
             target.getWorld().spawnParticle(Particle.CRIT, impact, 10, 0.3D, 0.35D, 0.3D, 0.08D);
