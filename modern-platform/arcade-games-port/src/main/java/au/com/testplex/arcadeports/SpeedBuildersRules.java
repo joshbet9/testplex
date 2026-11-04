@@ -27,6 +27,14 @@ public final class SpeedBuildersRules {
 
     private SpeedBuildersRules() { }
 
+    /** Fills only unused player slots, respecting both the bot setting and the map's roster limit. */
+    public static int testPlayersNeeded(int humanPlayers, int configuredTestPlayers) {
+        if (humanPlayers < 0 || configuredTestPlayers < 0) {
+            throw new IllegalArgumentException("Player counts cannot be negative.");
+        }
+        return Math.min(configuredTestPlayers, Math.max(0, MAX_PLAYERS - humanPlayers));
+    }
+
     /** Maps queue order to one of two authentic eight-plot arena copies. */
     public static int arenaIndexForPlayer(int playerIndex) {
         if (playerIndex < 0 || playerIndex >= MAX_PLAYERS) {

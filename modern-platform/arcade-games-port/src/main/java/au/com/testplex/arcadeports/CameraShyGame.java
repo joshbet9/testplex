@@ -438,6 +438,11 @@ public final class CameraShyGame implements Listener {
 
     public boolean isActive() { return phase == Phase.STARTING || phase == Phase.LIVE || phase == Phase.ENDING; }
 
+    boolean isLiveParticipant(Player player) {
+        return phase == Phase.LIVE && player != null && players.containsKey(player.getUniqueId())
+                && alive.contains(player.getUniqueId()) && player.getWorld() == arena;
+    }
+
     public String status() {
         if (phase == Phase.IDLE) return "idle";
         if (phase == Phase.STARTING) return "starting; queued=" + pendingHumans.size() + " humans";
@@ -1145,7 +1150,7 @@ public final class CameraShyGame implements Listener {
                 && shooter.hasLineOfSight(stand)
                 && !isBlockedBySmoke(shooter.getEyeLocation(), stand.getLocation())) {
             cameraReadyAt.put(shooterId, now + cooldown);
-            cooldownProgress.start(shooter, "Camera", cooldown);
+            cooldownProgress.start(shooter, "Camera", cooldown, ArcadePortGame.CAMERA_SHY);
             takeUnderstudyPhoto(shooter, stand);
             return;
         }
@@ -1157,7 +1162,7 @@ public final class CameraShyGame implements Listener {
             return;
         }
         cameraReadyAt.put(shooterId, now + cooldown);
-        cooldownProgress.start(shooter, "Camera", cooldown);
+        cooldownProgress.start(shooter, "Camera", cooldown, ArcadePortGame.CAMERA_SHY);
         for (Player photographed : targets) registerPhoto(shooter, photographed, now);
         if (targets.size() >= 2 && humans.contains(shooterId)) award(shooterId, "group-portrait");
         shooter.playSound(shooter.getLocation(), Sound.ITEM_SPYGLASS_USE, 1.0F, 1.35F);
@@ -1343,7 +1348,7 @@ public final class CameraShyGame implements Listener {
             return;
         }
         abilityReadyAt.put(id, now + cooldown);
-        cooldownProgress.start(player, kit.name().replace('_', ' '), cooldown);
+        cooldownProgress.start(player, kit.name().replace('_', ' '), cooldown, ArcadePortGame.CAMERA_SHY);
         switch (kit) {
             case SMOKE_ARTIST -> {
                 Location center = player.getLocation().clone().add(0.0D, 1.0D, 0.0D);

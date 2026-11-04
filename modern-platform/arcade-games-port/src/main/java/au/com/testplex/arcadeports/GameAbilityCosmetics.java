@@ -153,7 +153,7 @@ final class GameAbilityCosmetics {
             case "camera-shy" -> "flash-frame";
             case "plexball" -> "pitch-flare";
             case "super-sploor" -> "ink-current";
-            case "speed-builders" -> "blueprint-pulse";
+            case "speed-builders", "speed-builders-arcade" -> "blueprint-pulse";
             case "monster-maze" -> "maze-pulse";
             default -> "arcade-pulse";
         };

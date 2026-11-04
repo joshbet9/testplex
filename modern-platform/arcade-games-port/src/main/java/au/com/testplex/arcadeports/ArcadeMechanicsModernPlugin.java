@@ -128,16 +128,20 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     }
     public ArcadePortManager getArcadePortManager() { return manager; }
     public String selectedCosmeticOption(Player player, String group) {
-        if (player == null || group == null) return null;
+        return selectedCosmeticOption(player, "snake", group);
+    }
+
+    public String selectedCosmeticOption(Player player, String gameId, String group) {
+        if (player == null || gameId == null || gameId.isBlank() || group == null) return null;
         org.bukkit.plugin.Plugin platform = getServer().getPluginManager().getPlugin("TestplexModernArcade");
         if (platform == null || !platform.isEnabled()) return null;
         try {
             java.lang.reflect.Method method = platform.getClass().getMethod(
                     "getSelectedCosmeticOption", java.util.UUID.class, String.class, String.class);
-            Object value = method.invoke(platform, player.getUniqueId(), "snake", group);
+            Object value = method.invoke(platform, player.getUniqueId(), gameId, group);
             return value instanceof String text && !text.isBlank() ? text : null;
         } catch (ReflectiveOperationException exception) {
-            getLogger().warning("Could not read Snake cosmetic selection from TestplexModernArcade: "
+            getLogger().warning("Could not read " + gameId + " cosmetic selection from TestplexModernArcade: "
                     + exception.getMessage());
             return null;
         }

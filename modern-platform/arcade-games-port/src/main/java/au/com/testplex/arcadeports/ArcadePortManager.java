@@ -589,6 +589,10 @@ public final class ArcadePortManager implements Listener {
 
     ArcadeTestPlayerManager testPlayerManager() { return testPlayers; }
 
+    Location testPlayerLobbySpawn() {
+        return lobby.spawnLocation().clone();
+    }
+
     void setCameraShyModule(CameraShyGame game) { this.cameraShyModule = game; }
 
     CameraShyGame cameraShyModule() { return cameraShyModule; }
@@ -695,6 +699,9 @@ public final class ArcadePortManager implements Listener {
 
     public int queuedCount(ArcadePortGame type) {
         if (type == null) return 0;
+        if (type == ArcadePortGame.SPEED_BUILDERS) {
+            return plugin.getSpeedBuildersGame() == null ? 0 : plugin.getSpeedBuildersGame().queuedCount();
+        }
         if (type == ArcadePortGame.CAMERA_SHY) {
             return cameraShyModule == null ? 0 : cameraShyModule.queuedCount();
         }
@@ -950,6 +957,12 @@ public final class ArcadePortManager implements Listener {
     /** Leave a global queue or an active eliminated/spectator role. */
     public boolean leaveQueue(ArcadePortGame type, Player player) {
         if (type == null || player == null) return false;
+        if (type == ArcadePortGame.SPEED_BUILDERS && plugin.getSpeedBuildersGame() != null) {
+            int before = plugin.getSpeedBuildersGame().queuedCount();
+            plugin.getSpeedBuildersGame().leaveQueue(player);
+            lobbyRuntime.refreshDisplays();
+            return plugin.getSpeedBuildersGame().queuedCount() < before;
+        }
         UUID id = player.getUniqueId();
         boolean removed = false;
         Map<UUID, Player> queue = queues.get(queueKey(type, false));
@@ -2293,6 +2306,17 @@ public final class ArcadePortManager implements Listener {
                     + " is not cleared for in-game parity testing yet. Cleared game IDs: " + enabledGamesLabel() + ".");
             return;
         }
+        if (type == ArcadePortGame.SPEED_BUILDERS) {
+            if (automaticRotationTask != null || automaticRotationOnReturn) {
+                cancelAutomaticRotationVote();
+                player.sendMessage(ChatColor.YELLOW + "The automatic preference vote was cancelled by a manual queue selection.");
+            }
+            SpeedBuildersGame module = plugin.getSpeedBuildersGame();
+            if (module == null) player.sendMessage(ChatColor.RED + "Speed Builders is not loaded.");
+            else module.queue(player, quickStart);
+            lobbyRuntime.refreshDisplays();
+            return;
+        }
         if (type == ArcadePortGame.SNEAKY_ASSASSINS
                 && (sneakyAssassinsDisguiseBridge == null || !sneakyAssassinsDisguiseBridge.isAvailable())) {
             player.sendMessage(ChatColor.RED
@@ -2735,6 +2759,27 @@ public final class ArcadePortManager implements Listener {
                 gladiatorLobbyVotes.remove(player.getUniqueId());
             }
             cameraShyModule.startFromLobby(sender, lobbyPlayers);
+            return;
+        }
+
+        if (type == ArcadePortGame.SPEED_BUILDERS) {
+            SpeedBuildersGame module = plugin.getSpeedBuildersGame();
+            if (module == null) {
+                sender.sendMessage(ChatColor.RED + "Speed Builders is not loaded.");
+                return;
+            }
+            if (sender instanceof Player requestingPlayer && requestingPlayer.isOnline()) {
+                lobby.ensurePlayerInLobby(requestingPlayer);
+            }
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                if (player.isOnline() && lobby.isLobbyWorld(player.getWorld()) && !testPlayers.isTestPlayer(player)) {
+                    for (LinkedHashMap<UUID, Player> existingQueue : queues.values()) {
+                        existingQueue.remove(player.getUniqueId());
+                    }
+                    module.queue(player, false);
+                }
+            }
+            module.startQueued(sender);
             return;
         }
 
@@ -3327,6 +3372,12 @@ public final class ArcadePortManager implements Listener {
             } else {
                 cameraShyModule.startQueued(sender);
             }
+            return;
+        }
+        if (type == ArcadePortGame.SPEED_BUILDERS) {
+            SpeedBuildersGame module = plugin.getSpeedBuildersGame();
+            if (module == null) sender.sendMessage(ChatColor.RED + "Speed Builders is not loaded.");
+            else module.startQueued(sender);
             return;
         }
         if (type == ArcadePortGame.PLEXBALL) {
@@ -5616,6 +5667,7 @@ public final class ArcadePortManager implements Listener {
                     DRAGON_ESCAPE, DRAGONS, GLADIATORS, HEROES_OF_GWEN,
                     HOOPS_REMASTERED, ONE_IN_THE_QUIVER, PAINTBALL,
                     SUPER_SPLOOR, PLEXBALL, MASTER_BUILDERS, SNEAKY_ASSASSINS,
+                    SPEED_BUILDERS,
                     MONSTER_MAZE, MONSTER_MAZE_SPEED, MONSTER_MAZE_MODERN, SNAKE,
                     WIZARDS, CAMERA_SHY -> false;
             case EVOLUTION, MICRO_BATTLES, RUNNER, SHEEP_QUEST, SPLEEF,
@@ -10561,9 +10613,23 @@ public final class ArcadePortManager implements Listener {
         if (session == null || player == null || !player.isOnline() || !session.liveStarted
                 || !session.alive.contains(player.getUniqueId())
                 || !isSessionWorld(session, player.getWorld())) return;
+        renderAbilityActivationCosmetic(player, session.type);
+    }
+
+    void showAbilityActivationCosmetic(Player player, ArcadePortGame game) {
+        if (game == ArcadePortGame.CAMERA_SHY) {
+            if (cameraShyModule == null || !cameraShyModule.isLiveParticipant(player)) return;
+            renderAbilityActivationCosmetic(player, game);
+            return;
+        }
+        showAbilityActivationCosmetic(player);
+    }
+
+    private void renderAbilityActivationCosmetic(Player player, ArcadePortGame game) {
+        if (player == null || !player.isOnline() || game == null) return;
         Location effectAt = player.getLocation().clone().add(0.0D, 0.8D, 0.0D);
         GameAbilityCosmetics.hit(player, effectAt,
-                abilityEffectCosmeticOption(player, session.type));
+                abilityEffectCosmeticOption(player, game));
     }
 
     private void updatePaintballWeaponSkin(Session session, Player player) {
@@ -11288,21 +11354,55 @@ public final class ArcadePortManager implements Listener {
         event.setCancelled(true);
         Player player = event.getPlayer();
         UUID id = player.getUniqueId();
-        if (!event.getAction().isRightClick() || session.drawCurrentDrawer == null
+        if (session.drawCurrentDrawer == null
                 || !id.equals(session.drawCurrentDrawer) || !session.alive.contains(id)) return;
+
+        // Reborn's palette is the wool swatch area marked GREEN in the source map.
+        // Keep that interaction as well as the inventory palette. Selecting a swatch
+        // with either mouse button must not paint it as a side effect.
+        Block clicked = event.getClickedBlock();
+        if (clicked == null) {
+            Block target = player.getTargetBlockExact(64);
+            if (target != null && isDrawPaletteSwatch(session, target)) clicked = target;
+        }
+        if (clicked != null && isDrawPaletteSwatch(session, clicked)) {
+            selectDrawColour(session, player, clicked.getType(), drawColourName(clicked.getType()));
+            return;
+        }
+
         ItemStack held = event.getItem();
-        if (held == null || !held.hasItemMeta() || !held.getItemMeta().hasDisplayName()) return;
-        String name = ChatColor.stripColor(held.getItemMeta().getDisplayName());
-        if (name == null) return;
-        if (name.endsWith(" Paint") && DRAW_MY_THING_COLOURS.contains(held.getType())) {
-            // Selecting a swatch must never also stamp a pixel. Previously, looking
-            // at the canvas while switching colours caused the selection click to
-            // paint immediately and made colour changes feel unreliable.
+        String name = held == null || !held.hasItemMeta() || !held.getItemMeta().hasDisplayName()
+                ? null : ChatColor.stripColor(held.getItemMeta().getDisplayName());
+        if (held != null && name != null && name.endsWith(" Paint")
+                && DRAW_MY_THING_COLOURS.contains(held.getType())) {
             selectDrawColour(session, player, held.getType(), name.replace(" Paint", ""));
             return;
         }
+        if (!event.getAction().isRightClick() || name == null) return;
         Block target = drawCanvasTarget(session, player, event.getClickedBlock());
         if (target != null) performDrawToolAction(session, player, target, name);
+    }
+
+    private boolean isDrawPaletteSwatch(Session session, Block block) {
+        if (block == null || block.getWorld() != session.world || !DRAW_MY_THING_COLOURS.contains(block.getType())) {
+            return false;
+        }
+        SourceMapCatalog.MapData map = sourceMapData.get(ArcadePortGame.DRAW_MY_THING.id());
+        if (map == null) return false;
+        List<Location> bounds = map.dataLocations("GREEN");
+        if (bounds.size() < 2) return false;
+        Location first = bounds.get(0);
+        Location second = bounds.get(1);
+        return block.getX() >= Math.min(first.getBlockX(), second.getBlockX())
+                && block.getX() <= Math.max(first.getBlockX(), second.getBlockX())
+                && block.getY() >= Math.min(first.getBlockY(), second.getBlockY())
+                && block.getY() <= Math.max(first.getBlockY(), second.getBlockY())
+                && block.getZ() >= Math.min(first.getBlockZ(), second.getBlockZ())
+                && block.getZ() <= Math.max(first.getBlockZ(), second.getBlockZ());
+    }
+
+    private String drawColourName(Material colour) {
+        return colour.name().replace("_WOOL", "").replace('_', ' ').toLowerCase(java.util.Locale.ROOT);
     }
 
     private void selectDrawColour(Session session, Player player, Material colour, String colourName) {
@@ -11361,7 +11461,7 @@ public final class ArcadePortManager implements Listener {
             case "Paint Bucket" -> {
                 DrawMyThingCanvas.fill(session.drawCanvasBlocks, target, colour);
                 markDrawPainted(session);
-                playDrawMyThingSound(session, Sound.BLOCK_WOOL_PLACE, 0.8F, 1.15F);
+                playDrawMyThingSound(session, Sound.ITEM_BUCKET_FILL, 0.4F, 1.5F);
             }
             case "Clear Canvas" -> {
                 resetDrawCanvas(session);
@@ -11369,12 +11469,12 @@ public final class ArcadePortManager implements Listener {
                 session.drawShapeStarts.remove(id);
                 session.drawShapeTools.remove(id);
                 markDrawPainted(session);
-                playDrawMyThingSound(session, Sound.BLOCK_WOOL_BREAK, 0.8F, 0.8F);
+                playDrawMyThingSound(session, Sound.ENTITY_GENERIC_EXPLODE, 0.5F, 1.5F);
             }
             default -> { return; }
         }
         if (!"Clear Canvas".equals(tool) && !"Paint Bucket".equals(tool)) {
-            playDrawMyThingSound(session, Sound.BLOCK_WOOL_PLACE, 0.8F, 1.15F);
+            playDrawMyThingSound(session, Sound.BLOCK_FIRE_EXTINGUISH, 0.2F, 2.0F);
         }
     }
 
@@ -11388,7 +11488,7 @@ public final class ArcadePortManager implements Listener {
             DrawMyThingCanvas.point(session.drawCanvasBlocks, target, colour, thick);
         }
         markDrawPainted(session);
-        playDrawMyThingSound(session, Sound.BLOCK_WOOL_PLACE, 0.8F, 1.15F);
+        playDrawMyThingSound(session, Sound.BLOCK_FIRE_EXTINGUISH, 0.2F, 2.0F);
     }
 
     private void playDrawMyThingSound(Session session, Sound sound, float volume, float pitch) {
@@ -21253,7 +21353,12 @@ public final class ArcadePortManager implements Listener {
 
     public void stop(String reason) {
         boolean cameraShyWasActive = cameraShyModule != null && cameraShyModule.isActive();
+        boolean speedBuildersWasActive = plugin.getSpeedBuildersGame() != null
+                && plugin.getSpeedBuildersGame().isActive();
         if (cameraShyModule != null) cameraShyModule.stop(reason);
+        if (plugin.getSpeedBuildersGame() != null) {
+            plugin.getSpeedBuildersGame().stop(reason);
+        }
         automaticRotationOnReturn = false;
         cancelAutomaticRotationVote();
         if (postGameReturnTask != null) postGameReturnTask.cancel();
@@ -21304,8 +21409,8 @@ public final class ArcadePortManager implements Listener {
             monsterMazeModule.getGameManager().forceStop();
         }
         if (monsterMazeModule != null) monsterMazeModule.clearActiveArcadeGame();
-        if (!cameraShyWasActive) testPlayers.despawnSessionPlayers();
-        // Camera Shy owns and has already released its own AFK roster when it was active.
+        if (!cameraShyWasActive && !speedBuildersWasActive) testPlayers.despawnSessionPlayers();
+        // Camera Shy and Speed Builders own their AFK-roster restoration lifecycles.
         // Spleef's panel stop has left participants in the stale round state until
         // they reconnect. Reapply its saved state and lobby return synchronously.
         if (stopping != null && stopping.type == ArcadePortGame.SPLEEF) {
@@ -21334,6 +21439,8 @@ public final class ArcadePortManager implements Listener {
         String variant = active != null && active.mixedArcadeVariant ? " (Mixed Arcade)" : "";
         String game = active == null
                 ? (wizardsRunning() ? "Wizards (" + plugin.getWizardsGameManager().status() + ")"
+                        : plugin.getSpeedBuildersGame() != null && plugin.getSpeedBuildersGame().isActive()
+                                ? "Speed Builders (" + plugin.getSpeedBuildersGame().status() + ")"
                         : monsterMazeRunning() ? monsterMazeModule.getActiveArcadeGame().displayName()
                         + " (" + monsterMazeModule.getGameManager().getStage() + " stages reached)" : "idle")
                 : active.type.displayName() + variant

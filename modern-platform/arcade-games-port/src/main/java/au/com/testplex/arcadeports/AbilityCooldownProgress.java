@@ -35,11 +35,18 @@ public final class AbilityCooldownProgress implements Listener {
     }
 
     public void start(Player player, String name, long durationMillis) {
+        start(player, name, durationMillis, null);
+    }
+
+    public void start(Player player, String name, long durationMillis, ArcadePortGame cosmeticGame) {
         if (player == null || !player.isOnline() || durationMillis <= 0L) return;
         active.put(player.getUniqueId(), new Cooldown(name, System.currentTimeMillis(), durationMillis));
         if (plugin instanceof ArcadeMechanicsModernPlugin arcadePlugin) {
             ArcadePortManager manager = arcadePlugin.getArcadePortManager();
-            if (manager != null) manager.showAbilityActivationCosmetic(player);
+            if (manager != null) {
+                if (cosmeticGame == null) manager.showAbilityActivationCosmetic(player);
+                else manager.showAbilityActivationCosmetic(player, cosmeticGame);
+            }
         }
     }
 

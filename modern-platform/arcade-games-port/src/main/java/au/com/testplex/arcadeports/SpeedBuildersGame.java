@@ -114,6 +114,9 @@ public final class SpeedBuildersGame implements Listener {
     private String stopReason = "";
     private boolean shuttingDown;
     private boolean standaloneSessionLockAcquired;
+    private boolean testRosterStarting;
+    private boolean cancelPendingTestRoster;
+    private String pendingTestRosterStopReason = "Speed Builders start was cancelled.";
 
     SpeedBuildersGame(ArcadeMechanicsModernPlugin plugin) {
         this.plugin = plugin;
@@ -121,7 +124,7 @@ public final class SpeedBuildersGame implements Listener {
     }
 
     public boolean isActive() {
-        return phase != Phase.IDLE;
+        return phase != Phase.IDLE || testRosterStarting;
     }
 
     public String status() {
@@ -129,6 +132,13 @@ public final class SpeedBuildersGame implements Listener {
         return phase.name() + " round=" + round + "/" + matchRoundLimit + " builders=" + activePlayers().size()
                 + " templates=" + templates.size()
                 + " build=" + (currentTemplate == null ? "none" : currentTemplate.name());
+    }
+
+    public int queuedCount() {
+        return (int) queue.stream().filter(id -> {
+            Player player = Bukkit.getPlayer(id);
+            return player != null && player.isOnline();
+        }).count();
     }
 
     public static boolean isStatsRequest(String[] args) {
@@ -230,18 +240,10 @@ public final class SpeedBuildersGame implements Listener {
         List<Player> participants = new ArrayList<>();
         for (UUID id : queue) {
             Player player = Bukkit.getPlayer(id);
-            if (player != null && player.isOnline()) participants.add(player);
+            if (player != null && player.isOnline() && !plugin.isTestPlayer(player)) participants.add(player);
             if (participants.size() == SpeedBuildersRules.MAX_PLAYERS) break;
         }
         queue.removeIf(id -> Bukkit.getPlayer(id) == null || !Bukkit.getPlayer(id).isOnline());
-        if (participants.size() < SpeedBuildersRules.MIN_PLAYERS) {
-            if (sender != null) sender.sendMessage(ChatColor.YELLOW + "Join the Speed Builders queue with /arcadeport play speed-builders, then start again.");
-            for (Player player : participants) {
-                player.sendMessage(ChatColor.YELLOW + "Speed Builders is waiting for another player; your queue place is retained.");
-            }
-            queueDeadlineTick = queue.isEmpty() ? -1L : tick + NORMAL_QUEUE_TICKS;
-            return;
-        }
         if (!plugin.canStartSpeedBuilders()) {
             if (sender != null) sender.sendMessage(ChatColor.RED + "Another Arcade game is currently active. Speed Builders will wait until it ends.");
             for (Player player : participants) {
@@ -250,12 +252,126 @@ public final class SpeedBuildersGame implements Listener {
             queueDeadlineTick = -1L;
             return;
         }
-        queue.clear();
-        queueDeadlineTick = -1L;
-        startMatch(participants);
+        ArcadePortManager manager = plugin.getArcadePortManager();
+        if (manager == null) {
+            if (sender != null) sender.sendMessage(ChatColor.RED + "Speed Builders cannot access the shared test-player manager.");
+            return;
+        }
+        int configuredBots = manager.configuredTestBotCount(ArcadePortGame.SPEED_BUILDERS);
+        int botsNeeded = SpeedBuildersRules.testPlayersNeeded(participants.size(), configuredBots);
+        if (participants.size() + botsNeeded < SpeedBuildersRules.MIN_PLAYERS) {
+            if (sender != null) sender.sendMessage(ChatColor.YELLOW
+                    + "Join Speed Builders or increase its configured bot count in Bot Configuration.");
+            for (Player player : participants) {
+                player.sendMessage(ChatColor.YELLOW + "Speed Builders is waiting for another player; your queue place is retained.");
+            }
+            queueDeadlineTick = queue.isEmpty() ? -1L : tick + NORMAL_QUEUE_TICKS;
+            return;
+        }
+        if (botsNeeded == 0) {
+            queue.clear();
+            queueDeadlineTick = -1L;
+            startMatch(participants);
+            return;
+        }
+
+        ArcadeTestPlayerManager testPlayers = manager.testPlayerManager();
+        if (!testPlayers.isStartupCleanupComplete() || testPlayers.isCleanupInProgress()) {
+            if (sender != null) sender.sendMessage(ChatColor.YELLOW
+                    + "Speed Builders is waiting for the previous test-player cleanup to finish.");
+            queueDeadlineTick = -1L;
+            return;
+        }
+        if (!testPlayers.isStartupCleanupSuccessful() || !testPlayers.isAvailableForDamageablePlayers()) {
+            if (sender != null) sender.sendMessage(ChatColor.RED
+                    + "Speed Builders cannot fill its configured test roster. Check FakePlayerPlugin startup and damageable-player settings.");
+            return;
+        }
+        try {
+            plugin.prepareForSpeedBuilders();
+            standaloneSessionLockAcquired = true;
+        } catch (RuntimeException failure) {
+            if (sender != null) sender.sendMessage(ChatColor.RED
+                    + "Speed Builders could not reserve the shared Arcade lane: " + failure.getMessage());
+            return;
+        }
+
+        testRosterStarting = true;
+        cancelPendingTestRoster = false;
+        Location botSpawn = participants.isEmpty()
+                ? manager.testPlayerLobbySpawn() : participants.get(0).getLocation();
+        Player owner = participants.isEmpty() ? null : participants.get(0);
+        try {
+            testPlayers.spawnForMatch(botsNeeded, botSpawn, owner, result -> {
+            testRosterStarting = false;
+            if (cancelPendingTestRoster) {
+                testPlayers.despawnSessionPlayers();
+                queue.clear();
+                queueDeadlineTick = -1L;
+                releaseSessionLockAfterRestoration();
+                Bukkit.broadcastMessage(ChatColor.YELLOW + pendingTestRosterStopReason);
+                return;
+            }
+            if (!result.succeeded()) {
+                if (sender != null) sender.sendMessage(ChatColor.RED
+                        + "Speed Builders could not create its configured AFK player roster: " + result.error());
+                testPlayers.despawnSessionPlayers();
+                releaseSessionLockAfterRestoration();
+                return;
+            }
+            try {
+                List<Player> roster = new ArrayList<>();
+                participants.stream().filter(player -> player != null && player.isOnline()).forEach(roster::add);
+                List<Player> bots = result.players();
+                for (int index = 0; index < bots.size(); index++) {
+                    Player bot = bots.get(index);
+                    if (bot == null || !bot.isOnline()) continue;
+                    manager.applyConfiguredTestBotLoadout(ArcadePortGame.SPEED_BUILDERS, index, bot);
+                    roster.add(bot);
+                }
+                if (roster.size() < SpeedBuildersRules.MIN_PLAYERS) {
+                    testPlayers.despawnSessionPlayers();
+                    releaseSessionLockAfterRestoration();
+                    if (sender != null) sender.sendMessage(ChatColor.RED
+                            + "Speed Builders lost all queued players before its test roster joined.");
+                    return;
+                }
+                queue.clear();
+                queueDeadlineTick = -1L;
+                startMatch(roster);
+                for (Player bot : bots) {
+                    if (bot != null && bot.isOnline()) {
+                        testPlayers.syncMatchRespawnLocation(bot);
+                        bot.sendMessage(ChatColor.GRAY + "AFK Test Player — controlled by Testplex game testing.");
+                    }
+                }
+            } catch (RuntimeException failure) {
+                plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                        "Speed Builders failed while applying its configured test-player loadouts.", failure);
+                testPlayers.despawnSessionPlayers();
+                releaseSessionLockAfterRestoration();
+                if (sender != null) sender.sendMessage(ChatColor.RED
+                        + "Speed Builders could not finish preparing the configured bot loadouts.");
+            }
+            });
+        } catch (RuntimeException failure) {
+            testRosterStarting = false;
+            testPlayers.despawnSessionPlayers();
+            releaseSessionLockAfterRestoration();
+            plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                    "Speed Builders could not start its configured test-player roster.", failure);
+            if (sender != null) sender.sendMessage(ChatColor.RED
+                    + "Speed Builders could not start its configured AFK player roster.");
+        }
     }
 
     public void stop(String reason) {
+        if (testRosterStarting) {
+            cancelPendingTestRoster = true;
+            pendingTestRosterStopReason = reason == null || reason.isBlank()
+                    ? "Speed Builders was stopped." : reason;
+            return;
+        }
         if (!isActive()) {
             queue.clear();
             queueDeadlineTick = -1L;
@@ -365,8 +481,10 @@ public final class SpeedBuildersGame implements Listener {
 
     private void startMatch(List<Player> participants) {
         try {
-            plugin.prepareForSpeedBuilders();
-            standaloneSessionLockAcquired = true;
+            if (!standaloneSessionLockAcquired) {
+                plugin.prepareForSpeedBuilders();
+                standaloneSessionLockAcquired = true;
+            }
             loadSourceTemplates(participants.size());
             arena = ensureArena();
             buildArenaFloor();
@@ -707,6 +825,12 @@ public final class SpeedBuildersGame implements Listener {
                 state.perfectedEveryBuild = false;
                 state.roundBuildTimeTicks = 0L;
                 state.totalBuildTimeTicks = 0L;
+            }
+            if (perfectBuild) {
+                String style = plugin.selectedCosmeticOption(
+                        state.player, "speed-builders", "ability-effects");
+                if (style == null) style = GameAbilityCosmetics.defaultOption("speed-builders");
+                GameAbilityCosmetics.hit(state.player, state.player.getLocation(), style);
             }
             state.roundPoints = SpeedBuildersRules.roundPoints(
                     state.score, currentTemplate.expectedScore());

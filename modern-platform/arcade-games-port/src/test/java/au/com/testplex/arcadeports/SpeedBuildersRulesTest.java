@@ -10,6 +10,17 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class SpeedBuildersRulesTest {
     @Test
+    void configuredBotsFillOnlyAvailableSpeedBuildersSlots() {
+        assertEquals(16, SpeedBuildersRules.testPlayersNeeded(0, 16));
+        assertEquals(15, SpeedBuildersRules.testPlayersNeeded(1, 16));
+        assertEquals(4, SpeedBuildersRules.testPlayersNeeded(4, 4));
+        assertEquals(0, SpeedBuildersRules.testPlayersNeeded(16, 16));
+        assertEquals(0, SpeedBuildersRules.testPlayersNeeded(18, 16));
+        assertThrows(IllegalArgumentException.class, () -> SpeedBuildersRules.testPlayersNeeded(-1, 2));
+        assertThrows(IllegalArgumentException.class, () -> SpeedBuildersRules.testPlayersNeeded(1, -1));
+    }
+
+    @Test
     void sixteenPlayersAreAllocatedAcrossTwoEightPlotArenaCopies() {
         assertEquals(1, SpeedBuildersRules.arenaCountForPlayers(1));
         assertEquals(1, SpeedBuildersRules.arenaCountForPlayers(8));
