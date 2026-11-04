@@ -108,7 +108,11 @@ public final class GladiatorsBracket {
         List<Slot> output = new ArrayList<>((survivors.size() + drops.size() + 1) / 2);
         int crossPairs = Math.min(survivors.size(), drops.size());
         for (int index = 0; index < crossPairs; index++) {
-            output.add(winnerSlot(create(bracket, round, survivors.get(index), drops.get(index), false)));
+            // Cross the incoming winners-bracket drops through the lower-bracket
+            // survivor order. Pairing equal indexes can immediately replay a
+            // first-round duel when the same upper-bracket winner loses next.
+            int dropIndex = drops.size() - 1 - index;
+            output.add(winnerSlot(create(bracket, round, survivors.get(index), drops.get(dropIndex), false)));
         }
         List<Slot> remaining = new ArrayList<>();
         remaining.addAll(survivors.subList(crossPairs, survivors.size()));

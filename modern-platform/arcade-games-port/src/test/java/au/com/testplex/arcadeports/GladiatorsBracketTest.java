@@ -29,6 +29,29 @@ class GladiatorsBracketTest {
     }
 
     @Test
+    void everyEntrantGetsOneFixedOpeningSlotAndSecondRoundDropsAvoidFirstRoundRematches() {
+        for (int count = 2; count <= 16; count++) {
+            GladiatorsBracket initial = new GladiatorsBracket(players(count));
+            List<UUID> openingEntrants = initial.matches().stream()
+                    .filter(match -> match.bracket() == GladiatorsBracket.Bracket.WINNERS && match.round() == 1)
+                    .flatMap(match -> java.util.stream.Stream.of(match.first(), match.second()))
+                    .filter(java.util.Objects::nonNull).toList();
+            assertEquals(count, openingEntrants.size());
+            assertEquals(count, openingEntrants.stream().distinct().count());
+            assertEquals(initial.seededPlayers().stream().collect(java.util.stream.Collectors.toSet()),
+                    openingEntrants.stream().collect(java.util.stream.Collectors.toSet()));
+        }
+
+        for (int count : List.of(8, 16)) {
+            for (int seed = 0; seed < 100; seed++) {
+                GladiatorsBracket bracket = new GladiatorsBracket(players(count));
+                playAvoidingEarlyRematches(bracket, new Random(seed * 17L + count));
+                assertTrue(bracket.complete(), "tournament stalled with " + count + " players, seed " + seed);
+            }
+        }
+    }
+
+    @Test
     void sixteenPlayerBracketHasRequiredRoundCountsAndResettableFinal() {
         GladiatorsBracket bracket = new GladiatorsBracket(players(16));
         var initial = bracket.matches();
@@ -202,6 +225,24 @@ class GladiatorsBracketTest {
             for (var match : ready) {
                 UUID winner = random.nextBoolean() ? match.first() : match.second();
                 bracket.complete(match.id(), winner);
+            }
+        }
+    }
+
+    private static void playAvoidingEarlyRematches(GladiatorsBracket bracket, Random random) {
+        java.util.Set<java.util.Set<UUID>> playedPairs = new java.util.HashSet<>();
+        for (int guard = 0; guard < 1000 && !bracket.complete(); guard++) {
+            List<GladiatorsBracket.MatchView> ready = bracket.readyMatches();
+            for (var match : ready) {
+                java.util.Set<UUID> pair = java.util.Set.of(match.first(), match.second());
+                if (match.bracket() == GladiatorsBracket.Bracket.LOSERS && match.round() == 2) {
+                    assertFalse(playedPairs.contains(pair), "lower bracket round two rematched an earlier duel: " + pair);
+                }
+                assertTrue(bracket.begin(match.id()));
+            }
+            for (var match : ready) {
+                playedPairs.add(java.util.Set.of(match.first(), match.second()));
+                bracket.complete(match.id(), random.nextBoolean() ? match.first() : match.second());
             }
         }
     }

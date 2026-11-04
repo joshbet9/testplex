@@ -34,7 +34,7 @@ For a tournament with multiple players:
 
 - [ ] Original Gladiators source map loads in its own isolated world and uses the source arena markers/bounds.
 - [ ] A single random seed fixes every winners', losers', and conditional grand-final-reset slot when the tournament starts.
-- [x] Automated bracket simulations cover every player count from 2 through 16, including 3, 5, 8, and 16; 12 different duel completion orders per count preserve the same fixed slot dependencies.
+- [x] Automated bracket simulations cover every player count from 2 through 16, including 3, 5, 8, and 16; 12 different duel completion orders per count preserve the same fixed slot dependencies, and 100 seeded simulations for 8 and 16 players avoid an avoidable round-two rematch.
 - [ ] The 16-player bracket has winners' rounds of 8/4/2/1 and losers' rounds of 4/4/3/2/1 matches; the lower semifinal has four entrants after the winners' finalist drops in.
 - [ ] Reordering independent match completions never changes feeder relationships or designated opponents.
 - [ ] Each participant enters at most one duel at a time; independent ready matches start concurrently when distinct arenas are available.
@@ -72,8 +72,8 @@ For a tournament with multiple players:
 
 - [ ] The game has a 320-second total timer; round time divides the available drawing time among queued players and never exceeds 40 seconds.
 - [ ] With 8 or fewer players, each drawing turn is 40 seconds; above 8 players, the 320-second drawing budget is divided across all turns with no intermission.
-- [ ] The drawer can select any palette colour while drawing without moving or losing palette items.
-- [ ] Hint, correct-guess, painting, and clear-board sounds play for the intended audience and do not spam unrelated players.
+- [ ] The drawer can select every palette colour from the inventory and the source map's GREEN swatch area without moving or losing palette items; swatches preserve their actual map material and colour.
+- [ ] Hint, correct-guess, painting, fill, colour-selection, and clear-board sounds play for the intended audience, including the 1.8 splash sound for bucket fill, and do not spam unrelated players.
 
 ## Exit criteria
 

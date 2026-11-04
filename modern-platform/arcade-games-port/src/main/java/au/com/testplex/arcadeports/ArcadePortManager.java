@@ -775,7 +775,7 @@ public final class ArcadePortManager implements Listener {
     void applyConfiguredTestBotLoadout(ArcadePortGame type, int botIndex, Player bot) {
         if (type == null || bot == null) return;
         String kit = configuredTestBotKit(type, botIndex);
-        if (!kit.isBlank()) selectKit(bot, kit);
+        if (!kit.isBlank()) selectKit(bot, kit, type);
         int team = configuredTestBotTeam(type, botIndex);
         if (team >= 0) selectLobbyTeam(bot, type, team);
         applyConfiguredTestBotCosmetics(type, botIndex, bot);
@@ -1340,6 +1340,10 @@ public final class ArcadePortManager implements Listener {
 
 
     public void selectKit(Player player, String requestedKit) {
+        selectKit(player, requestedKit, null);
+    }
+
+    private void selectKit(Player player, String requestedKit, ArcadePortGame gameOverride) {
         if (player == null || requestedKit == null) return;
         if (isPreparingParticipant(player)) {
             player.sendMessage(ChatColor.YELLOW + "Kit changes are locked until the round begins.");
@@ -1352,7 +1356,8 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         boolean explicitSnapKit = value.startsWith("snap-") || value.startsWith("camera-shy-");
-        String selectedLobbyGame = plugin.getConfig().getString("lobby-selected-game", "bacon-brawl");
+        String selectedLobbyGame = gameOverride == null
+                ? plugin.getConfig().getString("lobby-selected-game", "bacon-brawl") : gameOverride.id();
         boolean snapLobby = "snap".equalsIgnoreCase(selectedLobbyGame)
                 || "camera-shy".equalsIgnoreCase(selectedLobbyGame);
         if (explicitSnapKit || snapLobby) {
@@ -1368,7 +1373,8 @@ public final class ArcadePortManager implements Listener {
         String catalogueKitId = value.startsWith("monster-maze-")
                 ? value.substring("monster-maze-".length()) : value;
         if (lobby.isLobbyWorld(player.getWorld())) {
-            ArcadePortGame lobbyGame = ArcadePortGame.fromId(plugin.getConfig().getString("lobby-selected-game", "death-tag"));
+            ArcadePortGame lobbyGame = gameOverride == null
+                    ? ArcadePortGame.fromId(selectedLobbyGame) : gameOverride;
             if (lobbyGame != null && !lobbyRuntime.hasKit(lobbyGame, catalogueKitId)) {
                 player.sendMessage(ChatColor.RED + "That kit is not available for " + lobbyGame.displayName() + ".");
                 return;
@@ -1406,6 +1412,19 @@ public final class ArcadePortManager implements Listener {
                 selectSkyWarsKit(player, value);
                 plugin.getConfig().set("lobby-kit-preferences." + player.getUniqueId() + ".skywars", skyWarsKitPreferences.get(player.getUniqueId()));
                 plugin.saveConfig();
+                return;
+            }
+            if (lobbyGame == ArcadePortGame.WIZARDS) {
+                au.com.testplex.wizards.WizardsGameManager wizards = plugin.getWizardsGameManager();
+                au.com.testplex.wizards.WizardsKit kit = au.com.testplex.wizards.WizardsKit.parse(value);
+                if (wizards != null && kit != null) wizards.setKit(player, kit);
+                return;
+            }
+            if (lobbyGame == ArcadePortGame.PLEXBALL) {
+                PlexballGame game = plugin.getPlexballGame();
+                if (game != null && !game.selectKit(player, value)) {
+                    player.sendMessage(ChatColor.RED + "Unknown Plexball kit. Choose Slugger, Technician, Curve Artist, Sprinter or Skyguard.");
+                }
                 return;
             }
         }
@@ -1465,8 +1484,7 @@ public final class ArcadePortManager implements Listener {
                 default -> { }
             }
         }
-        if (ArcadePortGame.PLEXBALL.id().equalsIgnoreCase(
-                plugin.getConfig().getString("lobby-selected-game", ""))) {
+        if (ArcadePortGame.PLEXBALL.id().equalsIgnoreCase(selectedLobbyGame)) {
             PlexballGame game = plugin.getPlexballGame();
             if (game != null && !game.selectKit(player, value)) {
                 player.sendMessage(ChatColor.RED + "Unknown Plexball kit. Choose Slugger, Technician, Curve Artist, Sprinter or Skyguard.");
@@ -1646,7 +1664,8 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "Spleef kits: snowballer, brawler, archer, gust (achievement kit).");
             return;
         }
-        if ("gust".equals(kit) && !hasSpleefGustAchievement(player.getUniqueId())) {
+        if ("gust".equals(kit) && !testPlayers.isTestPlayer(player.getUniqueId())
+                && !hasSpleefGustAchievement(player.getUniqueId())) {
             player.sendMessage(ChatColor.RED
                     + "Gust is locked. Unlock it by earning Praying to the Gods: win while falling into the void.");
             return;
@@ -1708,7 +1727,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         UUID playerId = player.getUniqueId();
-        if ("dasher".equals(kit)
+        if ("dasher".equals(kit) && !testPlayers.isTestPlayer(playerId)
                 && !plugin.getConfig().getBoolean(MicroBattlesAchievement.SPEEDSTER.configKey(playerId), false)) {
             player.sendMessage(ChatColor.RED + "Dasher is locked. Win a Micro Battles game in under 1:30 to unlock it.");
             return;
@@ -1791,7 +1810,8 @@ public final class ArcadePortManager implements Listener {
         }
         UUID id = player.getUniqueId();
         Session session = active;
-        if ("switcher".equals(kit) && !player.isOp() && !hasAllRunnerAchievements(id)) {
+        if ("switcher".equals(kit) && !testPlayers.isTestPlayer(id)
+                && !player.isOp() && !hasAllRunnerAchievements(id)) {
             player.sendMessage(ChatColor.RED + "Switcher requires every Runner achievement.");
             return;
         }
@@ -2182,7 +2202,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         UUID id = player.getUniqueId();
-        if ("fortifier".equals(kit) && !plugin.getConfig().getBoolean(
+        if ("fortifier".equals(kit) && !testPlayers.isTestPlayer(id) && !plugin.getConfig().getBoolean(
                 "local-achievements." + id + ".turf-wars.genius-mathematician", false)) {
             player.sendMessage(ChatColor.RED + "Fortifier unlocks with Genius Mathematician: win without leaving your base or being killed.");
             return;
@@ -11342,12 +11362,9 @@ public final class ArcadePortManager implements Listener {
                 || !player.getUniqueId().equals(session.drawCurrentDrawer)
                 || event.getClickedInventory() != player.getInventory()) return;
         ItemStack clicked = event.getCurrentItem();
-        if (clicked == null || clicked.getType().isAir() || !DRAW_MY_THING_COLOURS.contains(clicked.getType())
-                || !clicked.hasItemMeta() || !clicked.getItemMeta().hasDisplayName()
-                || !ChatColor.stripColor(clicked.getItemMeta().getDisplayName()).endsWith(" Paint")) return;
+        if (clicked == null || clicked.getType().isAir() || !DRAW_MY_THING_COLOURS.contains(clicked.getType())) return;
         event.setCancelled(true);
-        String colourName = ChatColor.stripColor(clicked.getItemMeta().getDisplayName()).replace(" Paint", "");
-        selectDrawColour(session, player, clicked.getType(), colourName);
+        selectDrawColour(session, player, clicked.getType(), drawColourName(clicked.getType()));
     }
 
     private void handleDrawMyThingInteract(Session session, PlayerInteractEvent event) {
@@ -11373,9 +11390,8 @@ public final class ArcadePortManager implements Listener {
         ItemStack held = event.getItem();
         String name = held == null || !held.hasItemMeta() || !held.getItemMeta().hasDisplayName()
                 ? null : ChatColor.stripColor(held.getItemMeta().getDisplayName());
-        if (held != null && name != null && name.endsWith(" Paint")
-                && DRAW_MY_THING_COLOURS.contains(held.getType())) {
-            selectDrawColour(session, player, held.getType(), name.replace(" Paint", ""));
+        if (held != null && DRAW_MY_THING_COLOURS.contains(held.getType())) {
+            selectDrawColour(session, player, held.getType(), drawColourName(held.getType()));
             return;
         }
         if (!event.getAction().isRightClick() || name == null) return;
@@ -11384,7 +11400,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private boolean isDrawPaletteSwatch(Session session, Block block) {
-        if (block == null || block.getWorld() != session.world || !DRAW_MY_THING_COLOURS.contains(block.getType())) {
+        if (block == null || block.getWorld() != session.world || block.getType().isAir()) {
             return false;
         }
         SourceMapCatalog.MapData map = sourceMapData.get(ArcadePortGame.DRAW_MY_THING.id());
@@ -11402,7 +11418,15 @@ public final class ArcadePortManager implements Listener {
     }
 
     private String drawColourName(Material colour) {
-        return colour.name().replace("_WOOL", "").replace('_', ' ').toLowerCase(java.util.Locale.ROOT);
+        String name = colour.name();
+        for (String suffix : List.of("_WOOL", "_STAINED_CLAY", "_TERRACOTTA", "_CONCRETE_POWDER",
+                "_CONCRETE", "_STAINED_GLASS_PANE", "_STAINED_GLASS")) {
+            if (name.endsWith(suffix)) {
+                name = name.substring(0, name.length() - suffix.length());
+                break;
+            }
+        }
+        return name.replace('_', ' ').toLowerCase(java.util.Locale.ROOT);
     }
 
     private void selectDrawColour(Session session, Player player, Material colour, String colourName) {
@@ -11461,7 +11485,8 @@ public final class ArcadePortManager implements Listener {
             case "Paint Bucket" -> {
                 DrawMyThingCanvas.fill(session.drawCanvasBlocks, target, colour);
                 markDrawPainted(session);
-                playDrawMyThingSound(session, Sound.ITEM_BUCKET_FILL, 0.4F, 1.5F);
+                // 1.8 Draw uses Sound.SPLASH for the paint bucket fill.
+                playDrawMyThingSound(session, Sound.ENTITY_GENERIC_SPLASH, 0.4F, 1.5F);
             }
             case "Clear Canvas" -> {
                 resetDrawCanvas(session);
