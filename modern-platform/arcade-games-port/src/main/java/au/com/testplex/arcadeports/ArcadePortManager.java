@@ -11726,15 +11726,16 @@ public final class ArcadePortManager implements Listener {
     private String baconAbilityMeterLore(String kit, int charge) {
         int safeCharge = Math.max(0, Math.min(ArcadePortRules.BACON_METER_MAX, charge));
         if (safeCharge < ArcadePortRules.BACON_METER_MIN_ABILITY) {
-            return "Right-click at 50%+; spends all charge. " + safeCharge + "% charged.";
+            return "Right-click at 50%+. " + safeCharge + "% charged.";
+        }
+        if ("chris-p-bacon".equals(kit)) {
+            return "Crispy shots and crouch-dash use fixed strength; each ability costs 50%. "
+                    + safeCharge + "% charged.";
         }
         return switch (kit) {
             case "mama-piggles" -> String.format(java.util.Locale.ROOT,
                     "Blast force %.2fx at %d%% charge; right-click spends all charge.",
                     ArcadePortRules.baconBlastPowerMultiplier(safeCharge), safeCharge);
-            case "chris-p-bacon" -> String.format(java.util.Locale.ROOT,
-                    "Crispy shot speed scales with charge (%d%%); crouch-dash strength is fixed. Spends all charge.",
-                    safeCharge);
             case "pig" -> String.format(java.util.Locale.ROOT,
                     "Pig Cloak lasts %.1fs at %d%% charge; right-click spends all charge.",
                     ArcadePortRules.baconAbilityDurationMillis(safeCharge) / 1_000.0D, safeCharge);
@@ -12255,7 +12256,7 @@ public final class ArcadePortManager implements Listener {
                     } else {
                         if ("mama-piggles".equals(
                                 session.baconKits.getOrDefault(ownerId, "el-muchacho-pigo"))) {
-                            playMamaPigglesBaconBlastHitSound(owner, target);
+                            playMamaPigglesBaconBlastHitSound(owner);
                         }
                         handleBaconBrawlHit(session, owner, target, "bacon-blast", 6.0D, null, blastPower);
                     }
@@ -12323,14 +12324,11 @@ public final class ArcadePortManager implements Listener {
         session.baconCrispyFlamedUntil.put(target.getUniqueId(), now + 5_000L);
     }
 
-    private void playMamaPigglesBaconBlastHitSound(Player owner, Player target) {
-        // Send the cue directly to both players so the struck player hears it even when the
-        // impact location is outside their client sound radius or the hit ends the round.
+    private void playMamaPigglesBaconBlastHitSound(Player owner) {
+        // Send the cue directly to its owner even when impact is outside sound radius
+        // or the hit ends the round.
         if (owner != null && owner.isOnline()) {
             owner.playSound(owner.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.25F);
-        }
-        if (target != null && target.isOnline()) {
-            target.playSound(target.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.25F);
         }
     }
 
@@ -12356,9 +12354,12 @@ public final class ArcadePortManager implements Listener {
         String kit = session.baconKits.getOrDefault(id, "el-muchacho-pigo");
         int charge = session.baconMeters.getOrDefault(id, 0);
         if (!ArcadePortRules.canUseBaconMeterAbility(charge)) return;
-        // Abilities are gated only by earned damage meter, never by a wall-clock cooldown.
+        // Chris P Bacon has fixed-strength actions that each cost exactly half the meter.
+        int chargeCost = "chris-p-bacon".equals(kit)
+                ? ArcadePortRules.BACON_METER_MIN_ABILITY : charge;
+        // Other abilities spend their full current charge; none use a wall-clock cooldown.
         session.baconAbilitiesUsed.add(id);
-        session.baconMeters.put(id, 0);
+        session.baconMeters.put(id, Math.max(0, charge - chargeCost));
         updateBaconMeterItem(session, player);
         player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.9F,
                 0.7F + charge / 100.0F);
@@ -12386,12 +12387,12 @@ public final class ArcadePortManager implements Listener {
             }
             case "chris-p-bacon": {
                 if (crouchDash) {
-                    useCrispyBaconDash(session, player, charge);
+                    useCrispyBaconDash(session, player);
                     break;
                 }
                 Vector direction = player.getEyeLocation().getDirection().normalize();
                 Location launch = player.getEyeLocation().add(direction.clone().multiply(1.4D));
-                double power = ArcadePortRules.baconBlastPowerMultiplier(charge);
+                double power = 1.0D;
                 for (int shot = -1; shot <= 1; shot++) {
                     Vector shotDirection = direction.clone().rotateAroundY(shot * 0.13D);
                     Item bacon = player.getWorld().dropItem(launch, new ItemStack(Material.COOKED_PORKCHOP));
@@ -12459,7 +12460,7 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    private void useCrispyBaconDash(Session session, Player player, int charge) {
+    private void useCrispyBaconDash(Session session, Player player) {
         Vector direction = player.getLocation().getDirection().setY(0.0D);
         if (direction.lengthSquared() < 1.0E-5D) direction = new Vector(0.0D, 0.0D, 1.0D);
         direction.normalize();
