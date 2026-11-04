@@ -12259,7 +12259,7 @@ public final class ArcadePortManager implements Listener {
                 if (owner != null && owner.isOnline() && session.alive.contains(ownerId)
                         && active == session && session.alive.contains(target.getUniqueId())) {
                     if (crispy) {
-                        igniteCrispyBaconTarget(session, target, now);
+                        igniteCrispyBaconTarget(session, owner, target, now);
                     } else {
                         if ("mama-piggles".equals(
                                 session.baconKits.getOrDefault(ownerId, "el-muchacho-pigo"))) {
@@ -12315,8 +12315,10 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    private void igniteCrispyBaconTarget(Session session, Player target, long now) {
+    private void igniteCrispyBaconTarget(Session session, Player owner, Player target, long now) {
         if (target == null || !target.isOnline()) return;
+        UUID targetId = target.getUniqueId();
+        UUID ownerId = owner.getUniqueId();
         target.setFireTicks(Math.max(target.getFireTicks(), 100));
         target.getWorld().spawnParticle(Particle.FLAME,
                 target.getLocation().add(0.0D, 0.9D, 0.0D), 18,
@@ -12328,7 +12330,12 @@ public final class ArcadePortManager implements Listener {
                     avatar.getLocation().add(0.0D, 0.8D, 0.0D), 18,
                     0.25D, 0.45D, 0.25D, 0.02D);
         }
-        session.baconCrispyFlamedUntil.put(target.getUniqueId(), now + 5_000L);
+        session.baconCrispyFlamedUntil.put(targetId, now + 5_000L);
+        session.baconLastDamager.put(targetId, ownerId);
+        session.baconLastDamagedAt.put(targetId, now);
+        session.baconLastHitSource.put(targetId, "crispy-bacon");
+        session.baconLastHitBackstab.put(targetId, false);
+        session.baconLastHitCloaked.put(targetId, false);
     }
 
     private void playMamaPigglesBaconBlastHitSound(Player owner) {
@@ -12667,10 +12674,10 @@ public final class ArcadePortManager implements Listener {
         boolean vanillaCritical = normalTimedHit && !attacker.isOnGround() && attacker.getFallDistance() > 0.0F
                 && attacker.getVelocity().getY() < -0.08D;
         boolean crispyFlamed = session.baconCrispyFlamedUntil.getOrDefault(targetId, 0L) > now;
-        // Only ordinary timed attacks can be critical. Ability hits use their own knockback
-        // inputs below; burning grants its separate knockback bonus without becoming a critical.
+        // Ability hits use their own knockback inputs below. Ordinary timed hits become
+        // critical while Crispy Bacon's fire is active, matching the kit's source behavior.
         boolean critical = normalTimedHit
-                && (vanillaCritical || session.baconSwingCritical.contains(attackerId));
+                && (crispyFlamed || vanillaCritical || session.baconSwingCritical.contains(attackerId));
         if (critical) timingMultiplier = Math.max(1.6D, timingMultiplier);
 
         String kit = session.baconKits.getOrDefault(attackerId, "el-muchacho-pigo");
@@ -20802,6 +20809,17 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.RUNNER) session.runnerJumpCounts.merge(playerId, 1, Integer::sum);
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onBaconBrutusJump(PlayerJumpEvent event) {
+        Player player = event.getPlayer();
+        Session session = active;
+        UUID playerId = player.getUniqueId();
+        if (session == null || session.type != ArcadePortGame.BACON_BRAWL
+                || player.getWorld() != session.world || !session.alive.contains(playerId)
+                || session.baconBrutusUntil.getOrDefault(playerId, 0L) <= System.currentTimeMillis()) return;
+        event.setCancelled(true);
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onSneakyAssassinsEntityDeath(EntityDeathEvent event) {
         Session session = active;
@@ -21877,13 +21895,34 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onDamage(EntityDamageEvent event) {
         if (event.getEntity() instanceof Player prepareVictim && cancelPrepareAction(prepareVictim, event)) return;
         if (event instanceof EntityDamageByEntityEvent byEntity && cancelPrepareAction(playerShooter(byEntity.getDamager()), event)) return;
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+        // Keep the shared damage pipeline's previous ignore-cancelled behavior, while
+        // allowing Bacon Brawl to take ownership of void knockouts already intercepted elsewhere.
+        if (event.isCancelled() && !(session.type == ArcadePortGame.BACON_BRAWL
+                && event.getCause() == EntityDamageEvent.DamageCause.VOID
+                && event.getEntity() instanceof Player)) return;
         if (session.type.isMonsterMaze()) return;
+        if (session.type == ArcadePortGame.BACON_BRAWL
+                && event.getCause() == EntityDamageEvent.DamageCause.VOID
+                && event.getEntity() instanceof Player baconVictim
+                && session.alive.contains(baconVictim.getUniqueId())) {
+            event.setCancelled(true);
+            UUID victimId = baconVictim.getUniqueId();
+            UUID lastAttackerId = session.baconLastDamager.get(victimId);
+            long lastHitAt = session.baconLastDamagedAt.getOrDefault(victimId, 0L);
+            boolean recentKnockoutHit = ArcadePortRules.shouldCreditBaconFallKill(
+                    System.currentTimeMillis(), lastHitAt, true);
+            Player killer = recentKnockoutHit && lastAttackerId != null
+                    && !lastAttackerId.equals(victimId) && session.scores.containsKey(lastAttackerId)
+                    ? session.players.get(lastAttackerId) : null;
+            eliminate(session, baconVictim, killer, "fell into the void");
+            return;
+        }
         if (event.getEntity() instanceof Player fallTarget
                 && event.getCause() == EntityDamageEvent.DamageCause.FALL
                 && !ArcadePortRules.shouldApplyLegacyFallDamage(session.type)) {
@@ -23207,7 +23246,7 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onBaconFoodLevelChange(FoodLevelChangeEvent event) {
         if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
