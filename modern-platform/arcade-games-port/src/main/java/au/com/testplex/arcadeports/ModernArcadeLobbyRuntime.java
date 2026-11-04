@@ -387,16 +387,9 @@ public final class ModernArcadeLobbyRuntime implements Listener {
 
     private List<ArcadeLobbyKitCatalogue.KitChoice> kitChoicesFor(ArcadePortGame game) {
         List<String> order = plugin.getConfig().getStringList("lobby-kits.order." + game.id());
-        // Keep every source kit available for these games even if an older
-        // server config still lists one of them as hidden.
-        if (game == ArcadePortGame.DRAGONS || game == ArcadePortGame.BOMB_LOBBERS
-                || game == ArcadePortGame.CAMERA_SHY || game.isMonsterMaze()) {
-            return ArcadeLobbyKitCatalogue.forGame(game, List.of(), order);
-        }
-        return ArcadeLobbyKitCatalogue.forGame(
-                game,
-                plugin.getConfig().getStringList("lobby-kits.hidden"),
-                order);
+        // Old server configs hid source kits here. Current kit availability is defined by the
+        // shared catalogue and achievement unlocks, so stale hide lists must not remove the menu.
+        return ArcadeLobbyKitCatalogue.forGame(game, List.of(), order);
     }
 
     private static final class Pedestal {

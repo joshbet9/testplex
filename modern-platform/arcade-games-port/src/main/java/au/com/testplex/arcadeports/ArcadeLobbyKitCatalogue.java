@@ -258,12 +258,6 @@ final class ArcadeLobbyKitCatalogue {
                             Unlock.GEM, Villager.class, Material.COMPASS),
                     choice("snap-understudy", "Understudy", Material.ARMOR_STAND,
                             Unlock.ACHIEVEMENT, Villager.class, Material.ARMOR_STAND));
-            case MONSTER_MAZE, MONSTER_MAZE_SPEED, MONSTER_MAZE_MODERN -> List.of(
-                    choice("jumper", "Jumper", Material.FEATHER, Unlock.FREE, Zombie.class, Material.FEATHER),
-                    choice("slowball", "Slowballer", Material.SNOWBALL, Unlock.FREE, Skeleton.class, Material.SNOWBALL),
-                    choice("body-builder", "Body Builder", Material.APPLE, Unlock.FREE, Zombie.class, Material.APPLE),
-                    choice("repulsor", "Repulsor", Material.COAL, Unlock.FREE, IronGolem.class, Material.COAL),
-                    choice("maverick", "Maverick", Material.ARROW, Unlock.FREE, Skeleton.class, Material.ARROW));
             default -> List.of();
         };
         Set<String> hidden = new HashSet<>();
