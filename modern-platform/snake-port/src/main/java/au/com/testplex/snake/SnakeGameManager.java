@@ -1624,30 +1624,35 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
 
     private void updateSnakeAppearance(SnakeState state, long now) {
         if (state == null || !state.alive || state.segments.isEmpty()) return;
-        String snakeType = plugin.selectedCosmeticOption(state.player, "snake-type");
-        String colourTheme = plugin.selectedCosmeticOption(state.player, "colour-theme");
-        String visual = plugin.selectedCosmeticOption(state.player, "ability-visuals");
+        String visual = plugin.selectedCosmeticOption(state.player, "ability-effects");
         String ability = state.invulnerableUntil > now ? "super"
                 : state.speedUntil > now ? "speed"
                 : state.reverseUntil > now ? "reverse" : null;
-        DyeColor abilityColour = ability == null ? null : abilityColour(colourTheme, ability);
-        if ("super".equals(ability) && abilityColour == null) abilityColour = randomSnakeColour();
         for (int i = 0; i < state.segments.size(); i++) {
             Sheep segment = state.segments.get(i);
             if (!segment.isValid()) continue;
-            DyeColor colour = abilityColour == null ? snakeTypeColour(snakeType, i, state.color) : abilityColour;
-            segment.setColor(colour);
+            segment.setColor(ability == null ? state.color : snakeAbilityColour(visual, ability, i));
         }
-        if (ability == null || visual == null || "classic".equalsIgnoreCase(visual) || tick % 4 != 0) return;
-        Particle particle;
-        if ("subtle".equalsIgnoreCase(visual)) particle = Particle.CLOUD;
-        else if ("neon".equalsIgnoreCase(visual)) particle = "reverse".equals(ability) ? Particle.WITCH : Particle.FIREWORK;
-        else if ("colour-coded".equalsIgnoreCase(visual)) {
-            particle = "super".equals(ability) ? Particle.FIREWORK
-                    : "speed".equals(ability) ? Particle.HAPPY_VILLAGER : Particle.PORTAL;
-        } else return;
+        if (ability == null || tick % 4 != 0) return;
+        Particle particle = snakeAbilityParticle(visual, ability);
         Location effect = state.player.getLocation().clone().add(0.0D, 0.25D, 0.0D);
         arena.spawnParticle(particle, effect, 3, 0.12D, 0.16D, 0.12D, 0.01D);
+    }
+
+    private DyeColor snakeAbilityColour(String style, String ability, int segment) {
+        String normalized = style == null ? "anaconda" : style.toLowerCase(java.util.Locale.ROOT);
+        int phase = Math.floorMod(segment + ("speed".equals(ability) ? 1 : "reverse".equals(ability) ? 2 : 0), 3);
+        return switch (normalized) {
+            case "cobra" -> phase == 0 ? DyeColor.ORANGE : phase == 1 ? DyeColor.YELLOW : DyeColor.RED;
+            case "neon-viper" -> phase == 0 ? DyeColor.CYAN : phase == 1 ? DyeColor.PURPLE : DyeColor.LIGHT_BLUE;
+            default -> phase == 0 ? DyeColor.GREEN : phase == 1 ? DyeColor.LIME : DyeColor.DARK_GREEN;
+        };
+    }
+
+    private Particle snakeAbilityParticle(String style, String ability) {
+        if ("super".equals(ability)) return "cobra".equals(style) ? Particle.FLAME : Particle.FIREWORK;
+        if ("speed".equals(ability)) return "neon-viper".equals(style) ? Particle.ELECTRIC_SPARK : Particle.HAPPY_VILLAGER;
+        return "anaconda".equals(style) ? Particle.SLIME : Particle.PORTAL;
     }
 
     private DyeColor abilityColour(String theme, String ability) {
