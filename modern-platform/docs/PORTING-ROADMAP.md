@@ -12,8 +12,8 @@
 ## Current implementation
 
 - `TestplexModernArcade.jar`: Game Panel, cosmetic catalogue and per-player preferences.
-- `MonsterMazeModern.jar`: mechanics-first import of the 1.21 standalone implementation, with production backend writes/heartbeats blocked by default.
-- `SnakeModern.jar`: independent mechanics-first port with its own test arena, sheep tails, slime food, kits, magma-cube item boxes and steering roulette.
+- Monster Maze: mechanics import of the 1.21 implementation, compiled into the shared Arcade plugin with production backend writes/heartbeats blocked by default.
+- Snake: shared Arcade module with sheep tails, slime food, kits, magma-cube item boxes and steering roulette; it is packaged in `ArcadeMechanicsModern.jar`.
 - `ArcadeMechanicsModern.jar`: first-pass, distinct mechanical loops for the other 14 games; separate generated arena per game. These are prototypes for rapid compatibility testing, not source-parity sign-off.
 - Gladiators is receiving a dedicated parity pass on `feat/gladiators-parity`: lobby PvP vote, in-duel hotbar editor, concurrent double-elimination brackets, per-duel timers, challenge achievements, lower-bracket win milestone and kill-message cosmetics. It remains disabled for live play until the branch builds and passes multiplayer acceptance.
 - Gladiators now has the lobby rules vote, in-duel hotbar editing, parallel double-elimination brackets, per-duel combat timers, two requested achievements, Silky Seconds tracking and player-selectable kill messages. It is an isolated 26.3 acceptance candidate; keep its catalogue status in progress until multiplayer sign-off.

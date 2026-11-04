@@ -66,7 +66,8 @@ public final class SnakeMapCatalog {
     public static String selectedResource(JavaPlugin plugin) {
         List<String> resources = maps(plugin);
         if (resources.isEmpty()) return null;
-        String configured = plugin.getConfig().getString("selected-map", "Snake_Pit.zip");
+        String configured = plugin.getConfig().getString("selected-maps.snake",
+                plugin.getConfig().getString("selected-map", "Snake_Pit.zip"));
         if (configured != null && !configured.isBlank()) {
             for (String resource : resources) {
                 String file = resource.substring(resource.lastIndexOf('/') + 1);

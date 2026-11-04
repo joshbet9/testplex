@@ -222,7 +222,7 @@ jobs:
           source_dir="$RUNNER_TEMP/testplex-modern-artifact"
           stage_dir="$RUNNER_TEMP/testplex-modern-verified"
           mkdir -p "$stage_dir"
-          for jar in TestplexModernArcade.jar SnakeModern.jar ArcadeMechanicsModern.jar WizardsModern.jar; do
+          for jar in TestplexModernArcade.jar ArcadeMechanicsModern.jar; do
             matches="$(find "$source_dir" -type f -name "$jar" | wc -l | tr -d ' ')"
             [[ "$matches" == "1" ]] || { echo "Expected exactly one $jar in the selected artifact; got $matches." >&2; exit 1; }
             source_jar="$(find "$source_dir" -type f -name "$jar" -print -quit)"
@@ -351,7 +351,7 @@ jobs:
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
           changed=()
-          for jar in TestplexModernArcade.jar SnakeModern.jar ArcadeMechanicsModern.jar WizardsModern.jar; do
+          for jar in TestplexModernArcade.jar ArcadeMechanicsModern.jar; do
             local_sha="$(sha256sum "$STAGE_DIR/$jar" | awk '{print $1}')"
             installed_sha="$(timeout --foreground --signal=TERM --kill-after=10s 90s ssh "${ssh_opts[@]}" "$remote" \
               sudo -n sha256sum "/home/monstermaze/servers/testplex-modern/plugins/$jar" 2>/dev/null | awk '{print $1}' || true)"
@@ -614,7 +614,7 @@ jobs:
           IFS=, read -r -a changed_jars <<< "$changed_jars_csv"
           for jar in "${changed_jars[@]}"; do
             [[ -n "$jar" ]] || continue
-            case "$jar" in TestplexModernArcade.jar|SnakeModern.jar|ArcadeMechanicsModern.jar|WizardsModern.jar) ;; *) echo "Invalid changed JAR name in upload request: $jar" >&2; exit 2 ;; esac
+            case "$jar" in TestplexModernArcade.jar|ArcadeMechanicsModern.jar) ;; *) echo "Invalid changed JAR name in upload request: $jar" >&2; exit 2 ;; esac
             installed="$server_dir/plugins/$jar"
             if sudo -n test -s "$installed"; then
               jar_kb="$(sudo -n du -sk -- "$installed" | awk '{print $1}')"
@@ -676,7 +676,7 @@ jobs:
             while IFS= read -r jar; do
               [[ -n "$jar" ]] || continue
               case "$jar" in
-                TestplexModernArcade.jar|SnakeModern.jar|ArcadeMechanicsModern.jar|WizardsModern.jar) ;;
+                TestplexModernArcade.jar|ArcadeMechanicsModern.jar) ;;
                 *) echo "Invalid changed JAR in manifest: $jar" >&2; exit 1 ;;
               esac
             done < "$STAGE_DIR/ChangedModernJars.txt"
@@ -803,7 +803,7 @@ jobs:
           for jar in "${changed_jars[@]}"; do
             [[ -n "$jar" ]] || continue
             case "$jar" in
-              TestplexModernArcade.jar|SnakeModern.jar|ArcadeMechanicsModern.jar|WizardsModern.jar) ;;
+              TestplexModernArcade.jar|ArcadeMechanicsModern.jar) ;;
               *) echo "Invalid changed plugin JAR in verified manifest: $jar" >&2; exit 1 ;;
             esac
             sudo -n test -s "$UPLOAD_DIR/$jar"
@@ -1086,6 +1086,12 @@ jobs:
             [[ -n "$descriptor" ]] || continue
             plugin_name="$(yaml_descriptor_value name "$descriptor")"
             plugin_main="$(yaml_descriptor_value main "$descriptor")"
+            if [[ "$plugin_name" == "SnakeModern" || "$plugin_main" == "au.com.testplex.snake.SnakeModernPlugin" \
+               || "$plugin_name" == "WizardsModern" || "$plugin_main" == "au.com.testplex.wizards.WizardsModernPlugin" ]]; then
+              sudo -n rm -f -- "$plugin_jar"
+              echo "Retired separate game plugin $plugin_name; its controller now runs inside ArcadeMechanicsModern."
+              continue
+            fi
             if [[ "$plugin_name" == "FakePlayerPlugin" || "$plugin_main" == "me.bill.fakePlayerPlugin.FakePlayerPlugin" ]]; then
               if [[ "$plugin_jar" != "$FPP_INSTALLED" || "$FPP_REPLACE" == true ]]; then
                 sudo -n rm -f -- "$plugin_jar"
@@ -1392,7 +1398,7 @@ jobs:
             rollback
             exit 1
           fi
-          for plugin in TestplexModernArcade SnakeModern ArcadeMechanicsModern WizardsModern FakePlayerPlugin; do
+          for plugin in TestplexModernArcade ArcadeMechanicsModern FakePlayerPlugin; do
             if ! sudo -n grep -Fq "$plugin" "$SERVER_DIR/logs/latest.log"; then
               echo "Expected plugin name $plugin not found in the modern server log." >&2
               rollback
@@ -1411,6 +1417,7 @@ jobs:
                sudo -n grep -Fxq 'module=arcade-runtime' "$readiness_file" &&
                sudo -n grep -Fxq 'monster_maze=READY' "$readiness_file" &&
                sudo -n grep -Fxq 'wizards=READY' "$readiness_file" &&
+               sudo -n grep -Fxq 'snake=READY' "$readiness_file" &&
                sudo -n grep -Fxq 'manager=testplex-arcade' "$readiness_file" &&
                sudo -n grep -Fxq 'world=testplex_arcade_lobby_v1' "$readiness_file" &&
                sudo -n grep -Fxq 'plane=100x100' "$readiness_file" &&
@@ -1461,22 +1468,24 @@ jobs:
             exit 1
           fi
 
-          if ! sudo -n grep -Fq 'SnakeModern loaded in isolated test mode; /snake help for commands.' "$SERVER_DIR/logs/latest.log"; then
-            echo "SnakeModern is in the 25-game acceptance queue but did not load successfully; rolling back." >&2
+          if ! sudo -n grep -Fq 'TESTPLEX_ARCADE_BOOTSTRAP phase=snake-module-registered' "$SERVER_DIR/logs/latest.log"; then
+            echo "Snake was not registered inside the shared Arcade plugin; rolling back." >&2
             timeout --foreground --signal=TERM 10s sudo -n grep -i -E -C 3 'Snake|ERROR|SEVERE|Exception|Caused by:|Failed|Could not|Unable to' "$SERVER_DIR/logs/latest.log" | tail -n 160 >&2 || true
             rollback
             exit 1
           fi
           if ! sudo -n grep -Fq 'Installed original Snake map Snake Pit for Paper 26.3.' "$SERVER_DIR/logs/latest.log"; then
-            echo "SnakeModern started without confirming its selected original source map; rolling back." >&2
+            echo "The shared Arcade plugin started without confirming its selected original Snake source map; rolling back." >&2
             rollback
             exit 1
           fi
-          if ! sudo -n grep -Fq 'WizardsModern is installed but disabled; it is not cleared for in-game testing yet.' "$SERVER_DIR/logs/latest.log"; then
-            echo "WizardsModern did not remain gated while being installed; rolling back the modern-only deployment." >&2
-            rollback
-            exit 1
-          fi
+          for plugin_jar in "$SERVER_DIR"/plugins/SnakeModern.jar "$SERVER_DIR"/plugins/WizardsModern.jar; do
+            if sudo -n test -e "$plugin_jar"; then
+              echo "Separate game plugin remains installed after migration: $plugin_jar" >&2
+              rollback
+              exit 1
+            fi
+          done
           # All new artifacts are assigned monstermaze ownership at installation time;
           # source-map trees are chowned individually when copied. Do not recursively
           # traverse the entire server directory here: it includes large survival/map
@@ -1484,11 +1493,11 @@ jobs:
           sudo -n chown monstermaze:monstermaze "$SERVER_DIR" "$SERVER_DIR/plugins"
 
           echo "[deploy] Verified Testplex Arcade runtime readiness identity:"
-          sudo -n awk -F= '$1 ~ /^(status|module|manager|world|plane|floor_y|monster_maze|wizards|source_sha|invocation_id|process_id)$/ { print }' "$readiness_file"
+          sudo -n awk -F= '$1 ~ /^(status|module|manager|world|plane|floor_y|monster_maze|wizards|snake|source_sha|invocation_id|process_id)$/ { print }' "$readiness_file"
           sudo -n grep -F 'TESTPLEX_ARCADE_RUNTIME_READY' "$SERVER_DIR/logs/latest.log" | tail -n 1 || true
 
           sudo -n /usr/local/sbin/testplex-modern-recovery --locked set-phase DEPLOYMENT_VERIFIED
-          echo "Modern Paper 26.3 is ready with the Testplex Arcade 100x100 lobby and 31 enabled Arcade selections representing 29 distinct titles (the three Monster Maze modes count as one title); Evolution remains catalogued but disabled pending separate source-map clearance. Heroes of Gwen, Hoops Remastered and Wizards each have one Arcade entry; Wizards/Nano Wizards original maps are installed from the verified 20-archive deployment payload and readiness requires wizards=READY. The separate WizardsModern plugin remains installed but disabled. CI verifies all original source-map archives and Paper acceptance for the newly promoted games; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
+          echo "Modern Paper 26.3 is ready with the Testplex Arcade 100x100 lobby and 31 enabled Arcade selections representing 29 distinct titles (the three Monster Maze modes count as one title); Evolution remains catalogued but disabled pending separate source-map clearance. All game controllers, including Snake, Wizards and Monster Maze, run inside ArcadeMechanicsModern; legacy SnakeModern and WizardsModern plugin jars are retired. Wizards/Nano Wizards source maps are installed from the verified 20-archive deployment payload and readiness requires wizards=READY. CI verifies all original source-map archives and Paper acceptance for the newly promoted games; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
           echo "On successful deployment, testplex-reborn.service remains stopped if it was active during preflight; a failed deployment restores services that were active before preflight. Separate Monster Maze project services/data were not modified."
           REMOTE_DEPLOY
 

@@ -33,7 +33,6 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
-import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -88,14 +87,12 @@ public final class CameraShyGame implements Listener {
     private static final int FLOOR_Y = 64;
     private static final int QUEUE_WINDOW_TICKS = 100;
     private static final long SPOTLIGHT_INTERVAL_MILLIS = 55_000L;
-    private static final long GROUP_PICKUP_INTERVAL_MILLIS = 42_000L;
-    private static final long GROUP_PICKUP_LIFETIME_MILLIS = 22_000L;
     private static final long DECOY_FLASH_LIFETIME_MILLIS = 6_000L;
     private static final long SMOKE_LIFETIME_MILLIS = 4_500L;
     private static final long PURSUIT_ESCAPE_MILLIS = 2_000L;
     private static final double PURSUIT_ESCAPE_DISTANCE = 8.0D;
     private static final double SPOTTER_RANGE = 18.0D;
-    private static final double GROUP_PHOTO_MIN_DOT = 0.985D;
+    private static final double PHOTO_LENS_MIN_DOT = 0.94D;
     private static final long ABILITY_SMOKE_COOLDOWN = 25_000L;
     private static final long ABILITY_DECOY_COOLDOWN = 25_000L;
     private static final long ABILITY_RUNNER_COOLDOWN = 20_000L;
@@ -104,7 +101,7 @@ public final class CameraShyGame implements Listener {
 
     private enum Phase { IDLE, STARTING, LIVE, ENDING }
     public enum Kit {
-        SMOKE_ARTIST("smoke-artist", "Smoke Artist", Material.POTION, "Smoke Bomb"),
+        SMOKE_ARTIST("smoke-artist", "Smoke Artist", Material.INK_SAC, "Smoke Bomb"),
         DECOY("decoy", "Decoy", Material.FIREWORK_ROCKET, "Fake Snapshot"),
         RUNNER("runner", "Runner", Material.SUGAR, "Adrenaline Rush"),
         SPOTTER("spotter", "Spotter", Material.COMPASS, "Flash Finder"),
@@ -339,7 +336,7 @@ public final class CameraShyGame implements Listener {
     private final NamespacedKey abilityKey;
     private final NamespacedKey decoyStandKey;
     private final NamespacedKey decoyOwnerKey;
-    private final NamespacedKey groupPickupKey;
+    private final NamespacedKey legacyGroupPickupKey;
     private final LinkedHashMap<UUID, Player> queue = new LinkedHashMap<>();
     private final Map<UUID, Player> players = new LinkedHashMap<>();
     private final Set<UUID> humans = new LinkedHashSet<>();
@@ -386,8 +383,10 @@ public final class CameraShyGame implements Listener {
     private long nextScoreboardUpdateAt;
     private final Map<UUID, Long> spotlightGlowUntil = new HashMap<>();
     private final Map<UUID, Boolean> spotlightOriginalGlow = new HashMap<>();
+    private UUID lastSpotlightTarget;
     private final Map<UUID, Location> spawnLocations = new HashMap<>();
-    private final Set<UUID> groupPhotoCharges = new HashSet<>();
+    private final Set<UUID> photoOutlinedTargets = new HashSet<>();
+    private final Map<UUID, Boolean> photoOutlineOriginalGlow = new HashMap<>();
     private final Random random = new Random();
 
     private Phase phase = Phase.IDLE;
@@ -399,10 +398,8 @@ public final class CameraShyGame implements Listener {
     private long startedAt;
     private long endsAt;
     private long nextSpotlightAt;
-    private long nextGroupPickupAt;
     private long decoySerial;
     private boolean finalSnapshot;
-    private Item currentGroupPickup;
     private List<Player> pendingHumans = List.of();
     private int startWaitTicks;
 
@@ -414,7 +411,7 @@ public final class CameraShyGame implements Listener {
         this.abilityKey = new NamespacedKey(plugin, "camera-shy-ability");
         this.decoyStandKey = new NamespacedKey(plugin, "camera-shy-understudy");
         this.decoyOwnerKey = new NamespacedKey(plugin, "camera-shy-decoy-owner");
-        this.groupPickupKey = new NamespacedKey(plugin, "camera-shy-group-photo");
+        this.legacyGroupPickupKey = new NamespacedKey(plugin, "camera-shy-group-photo");
         this.ticker = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 1L, 1L);
     }
 
@@ -640,9 +637,9 @@ public final class CameraShyGame implements Listener {
                 }
                 return;
             }
-            Location botSpawn = mazeSpawnLocations().get(0);
+            List<Location> botSpawns = mazeSpawnLocations();
             Player owner = pendingHumans.get(0);
-            testPlayers.spawnForMatch(missing, botSpawn, owner, result -> {
+            testPlayers.spawnForMatch(missing, botSpawns, owner, result -> {
                 if (phase != Phase.STARTING) {
                     testPlayers.despawnSessionPlayers();
                     return;
@@ -689,11 +686,12 @@ public final class CameraShyGame implements Listener {
         runnerUntil.clear(); runnerUsedUntil.clear(); smokeUsedUntil.clear(); fourExposureSince.clear(); lastPhotoAt.clear();
         lastPhotoTarget.clear(); lastEliminationAt.clear(); eliminationStreaks.clear(); revengeMatchCounts.clear();
         focusAttempts.clear(); focusSeenThisTick.clear(); smokeClouds.clear(); fakeFlashes.clear();
-        groupPhotoCharges.clear(); spawnLocations.clear(); aimingSince.clear();
+        spawnLocations.clear(); aimingSince.clear();
         spotlightGlowUntil.clear(); spotlightOriginalGlow.clear();
+        lastSpotlightTarget = null;
         for (ArmorStand stand : understudyStands.values()) if (stand != null && stand.isValid()) stand.remove();
         understudyStands.clear();
-        clearGroupPickup();
+        clearPhotoOutlines();
 
         List<Player> all = new ArrayList<>(humansInMatch);
         all.addAll(testBots);
@@ -706,7 +704,6 @@ public final class CameraShyGame implements Listener {
         startedAt = System.currentTimeMillis();
         endsAt = startedAt + CameraShyRules.MATCH_SECONDS * 1_000L;
         nextSpotlightAt = startedAt + SPOTLIGHT_INTERVAL_MILLIS;
-        nextGroupPickupAt = startedAt + GROUP_PICKUP_INTERVAL_MILLIS;
         finalSnapshot = false;
 
         try {
@@ -938,9 +935,9 @@ public final class CameraShyGame implements Listener {
         updatePursuits(now);
         updateFakeFlashes(now);
         updateSpotlight(now);
-        updateGroupPickup(now);
         updateStageFright(now);
         cleanupTemporaryEffects(now);
+        if (serverTick % 5L == 0L) updateSpotlightMarkers(now);
         if (serverTick % 5L == 0L) refreshHud(now);
 
         long livingHumans = alive.stream().filter(humans::contains).count();
@@ -988,12 +985,6 @@ public final class CameraShyGame implements Listener {
                 bar.setProgress(Math.max(0.0D, Math.min(1.0D, (double) (endsAt - now)
                         / (CameraShyRules.MATCH_SECONDS * 1_000.0D))));
             }
-            String cameraState = now < cameraReadyAt.getOrDefault(id, 0L)
-                    ? "RECHARGING" : "READY";
-            player.sendActionBar(Component.text("Photos " + photos.getOrDefault(id, 0)
-                    + "  |  Exposure " + exposures.getOrDefault(id, 0) + "/5"
-                    + "  |  Camera " + cameraState
-                    + "  |  Alive " + alive.stream().filter(humans::contains).count()));
         }
     }
 
@@ -1016,6 +1007,7 @@ public final class CameraShyGame implements Listener {
         if (phase != Phase.LIVE || !isAliveParticipant(player)) return;
         if (player.getInventory().getItemInMainHand().getType() != Material.SPYGLASS) return;
         event.setCancelled(true);
+        emitCameraFlash(player.getLocation());
         if (!isUsingSpyglass(player)) {
             player.sendActionBar(Component.text("Right-click and hold the spyglass before pressing F to take a photo."));
             return;
@@ -1033,21 +1025,6 @@ public final class CameraShyGame implements Listener {
     @EventHandler
     public void onDrop(PlayerDropItemEvent event) {
         if (phase == Phase.LIVE && players.containsKey(event.getPlayer().getUniqueId())) event.setCancelled(true);
-    }
-
-    @EventHandler
-    public void onPickup(EntityPickupItemEvent event) {
-        if (phase != Phase.LIVE || !(event.getEntity() instanceof Player player) || !isAliveParticipant(player)) return;
-        ItemStack stack = event.getItem().getItemStack();
-        if (stack.hasItemMeta() && stack.getItemMeta().getPersistentDataContainer()
-                .has(groupPickupKey, PersistentDataType.BYTE)) {
-            event.setCancelled(true);
-            event.getItem().remove();
-            groupPhotoCharges.add(player.getUniqueId());
-            player.sendMessage(ChatColor.LIGHT_PURPLE + "Group Photo acquired! Your next photograph can capture two players.");
-            player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.8F, 1.5F);
-            clearGroupPickup();
-        }
     }
 
     @EventHandler
@@ -1156,86 +1133,74 @@ public final class CameraShyGame implements Listener {
             shooter.sendActionBar(Component.text("Camera recharging..."));
             return;
         }
-        RayTraceResult trace = arena.rayTraceEntities(shooter.getEyeLocation(),
-                shooter.getEyeLocation().getDirection(), CameraShyRules.CAMERA_RANGE_BLOCKS, 0.35D,
-                entity -> isPhotoTarget(shooter, entity));
-        if (trace == null || trace.getHitEntity() == null) {
-            shooter.sendActionBar(Component.text("No opponent in focus."));
-            return;
-        }
-        Entity hit = trace.getHitEntity();
-        Location camera = shooter.getEyeLocation();
-        Location targetLocation = hit.getLocation().clone().add(0.0D, 0.9D, 0.0D);
-        if (!shooter.hasLineOfSight(hit) || isBlockedBySmoke(camera, targetLocation)) {
-            shooter.sendActionBar(Component.text("The shot is blocked."));
-            return;
-        }
-        if (hit instanceof ArmorStand stand && stand.getPersistentDataContainer()
-                .has(decoyStandKey, PersistentDataType.BYTE)) {
+        RayTraceResult decoyTrace = arena.rayTraceEntities(shooter.getEyeLocation(),
+                shooter.getEyeLocation().getDirection(), CameraShyRules.CAMERA_RANGE_BLOCKS, 0.25D,
+                entity -> entity instanceof ArmorStand stand
+                        && stand.getPersistentDataContainer().has(decoyStandKey, PersistentDataType.BYTE));
+        if (decoyTrace != null && decoyTrace.getHitEntity() instanceof ArmorStand stand
+                && shooter.hasLineOfSight(stand)
+                && !isBlockedBySmoke(shooter.getEyeLocation(), stand.getLocation())) {
             cameraReadyAt.put(shooterId, now + cooldown);
             cooldownProgress.start(shooter, "Camera", cooldown);
             takeUnderstudyPhoto(shooter, stand);
-            emitCameraFlash(shooter.getLocation());
             return;
         }
-        if (!(hit instanceof Player target)) return;
-        UUID targetId = target.getUniqueId();
-        if (!CameraShyRules.mayPhotograph(now, cameraReadyAt.getOrDefault(shooterId, 0L),
-                protectedUntil.getOrDefault(targetId, 0L))) {
-            shooter.sendActionBar(Component.text("That player is recovering from a recent photograph."));
+        List<Player> targets = playersInPhotoLens(shooter, now);
+        if (targets.isEmpty()) {
+            shooter.sendActionBar(hasPhotoTargetInLens(shooter)
+                    ? Component.text("That player is recovering from a recent photograph.")
+                    : Component.text("No eligible player in the lens."));
             return;
-        }
-
-        List<Player> targets = new ArrayList<>();
-        targets.add(target);
-        boolean group = groupPhotoCharges.contains(shooterId);
-        if (group) {
-            Player second = findGroupPhotoTarget(shooter, target);
-            if (second != null) targets.add(second);
         }
         cameraReadyAt.put(shooterId, now + cooldown);
         cooldownProgress.start(shooter, "Camera", cooldown);
-        if (group && targets.size() >= 2) groupPhotoCharges.remove(shooterId);
-        emitCameraFlash(shooter.getLocation());
         for (Player photographed : targets) registerPhoto(shooter, photographed, now);
         if (targets.size() >= 2 && humans.contains(shooterId)) award(shooterId, "group-portrait");
         shooter.playSound(shooter.getLocation(), Sound.ITEM_SPYGLASS_USE, 1.0F, 1.35F);
-        shooter.sendActionBar(Component.text("SNAP! " + targets.size() + " target(s) photographed."));
+        shooter.sendActionBar(Component.text("SNAP! " + targets.size() + " player(s) photographed."));
     }
 
-    private boolean isPhotoTarget(Player shooter, Entity entity) {
-        if (entity instanceof Player target) {
-            return !target.getUniqueId().equals(shooter.getUniqueId())
-                    && players.containsKey(target.getUniqueId()) && alive.contains(target.getUniqueId());
-        }
-        return entity instanceof ArmorStand stand
-                && stand.getPersistentDataContainer().has(decoyStandKey, PersistentDataType.BYTE)
-                && stand.getWorld() == arena;
+    private boolean isEligiblePlayerTarget(Player shooter, Player target) {
+        return target != null && !target.getUniqueId().equals(shooter.getUniqueId())
+                && players.containsKey(target.getUniqueId()) && alive.contains(target.getUniqueId())
+                && target.getWorld() == arena;
     }
 
-    private Player findGroupPhotoTarget(Player shooter, Player primary) {
+    private List<Player> playersInPhotoLens(Player shooter, long now) {
+        UUID shooterId = shooter.getUniqueId();
         Vector direction = shooter.getEyeLocation().getDirection();
-        Collection<Entity> nearby = arena.getNearbyEntities(primary.getLocation(), 4.0D, 3.0D, 4.0D);
-        Player best = null;
-        double bestDistance = Double.MAX_VALUE;
-        long now = System.currentTimeMillis();
-        for (Entity entity : nearby) {
-            if (!(entity instanceof Player candidate) || candidate.equals(primary)
-                    || candidate.equals(shooter) || !isAliveParticipant(candidate)) continue;
-            double distance = shooter.getEyeLocation().distance(candidate.getEyeLocation());
-            if (distance > CameraShyRules.CAMERA_RANGE_BLOCKS
-                    || !CameraShyRules.mayPhotograph(now, cameraReadyAt.getOrDefault(shooter.getUniqueId(), 0L),
-                            protectedUntil.getOrDefault(candidate.getUniqueId(), 0L))) continue;
-            Vector toTarget = candidate.getEyeLocation().toVector().subtract(shooter.getEyeLocation().toVector());
-            if (!CameraShyRules.insidePhotoCone(direction, toTarget, GROUP_PHOTO_MIN_DOT)) continue;
-            if (!shooter.hasLineOfSight(candidate)
-                    || isBlockedBySmoke(shooter.getEyeLocation(), candidate.getEyeLocation())) continue;
-            if (distance < bestDistance) {
-                best = candidate;
-                bestDistance = distance;
-            }
+        Location eye = shooter.getEyeLocation();
+        List<Player> targets = new ArrayList<>();
+        for (Entity entity : arena.getNearbyEntities(eye, CameraShyRules.CAMERA_RANGE_BLOCKS,
+                CameraShyRules.CAMERA_RANGE_BLOCKS, CameraShyRules.CAMERA_RANGE_BLOCKS)) {
+            if (!(entity instanceof Player candidate) || !isEligiblePlayerTarget(shooter, candidate)) continue;
+            Location targetEye = candidate.getEyeLocation();
+            Vector toTarget = targetEye.toVector().subtract(eye.toVector());
+            if (toTarget.length() > CameraShyRules.CAMERA_RANGE_BLOCKS
+                    || !CameraShyRules.insidePhotoCone(direction, toTarget, PHOTO_LENS_MIN_DOT)
+                    || !CameraShyRules.mayPhotograph(now, cameraReadyAt.getOrDefault(shooterId, 0L),
+                            protectedUntil.getOrDefault(candidate.getUniqueId(), 0L))
+                    || !shooter.hasLineOfSight(candidate)
+                    || isBlockedBySmoke(eye, targetEye)) continue;
+            targets.add(candidate);
         }
-        return best;
+        targets.sort(java.util.Comparator.comparingDouble(candidate -> eye.distanceSquared(candidate.getEyeLocation())));
+        return targets;
+    }
+
+    private boolean hasPhotoTargetInLens(Player shooter) {
+        Vector direction = shooter.getEyeLocation().getDirection();
+        Location eye = shooter.getEyeLocation();
+        for (Entity entity : arena.getNearbyEntities(eye, CameraShyRules.CAMERA_RANGE_BLOCKS,
+                CameraShyRules.CAMERA_RANGE_BLOCKS, CameraShyRules.CAMERA_RANGE_BLOCKS)) {
+            if (!(entity instanceof Player candidate) || !isEligiblePlayerTarget(shooter, candidate)) continue;
+            Vector toTarget = candidate.getEyeLocation().toVector().subtract(eye.toVector());
+            if (toTarget.length() <= CameraShyRules.CAMERA_RANGE_BLOCKS
+                    && CameraShyRules.insidePhotoCone(direction, toTarget, PHOTO_LENS_MIN_DOT)
+                    && shooter.hasLineOfSight(candidate)
+                    && !isBlockedBySmoke(eye, candidate.getEyeLocation())) return true;
+        }
+        return false;
     }
 
     private void registerPhoto(Player shooter, Player target, long now) {
@@ -1353,7 +1318,6 @@ public final class CameraShyGame implements Listener {
             if (player != null && player.isOnline() && player.getWorld() == world
                     && player.getLocation().distanceSquared(location) <= 24.0D * 24.0D) {
                 player.playSound(location, Sound.ITEM_SPYGLASS_USE, 0.5F, 0.75F);
-                player.sendActionBar(Component.text("A camera flash just exposed someone's position!"));
             }
         }
     }
@@ -1503,23 +1467,20 @@ public final class CameraShyGame implements Listener {
 
     private void updateFocusTracking(long now) {
         focusSeenThisTick.clear();
+        Set<UUID> desiredOutlines = new HashSet<>();
         for (UUID id : alive) {
             Player shooter = players.get(id);
             if (shooter == null || !shooter.isOnline() || !isUsingSpyglass(shooter)) continue;
             aimingSince.putIfAbsent(id, now);
-            RayTraceResult trace = arena.rayTraceEntities(shooter.getEyeLocation(),
-                    shooter.getEyeLocation().getDirection(), CameraShyRules.CAMERA_RANGE_BLOCKS, 0.35D,
-                    entity -> entity instanceof Player target && !target.getUniqueId().equals(id)
-                            && players.containsKey(target.getUniqueId()) && alive.contains(target.getUniqueId()));
-            if (trace == null || !(trace.getHitEntity() instanceof Player target)) continue;
-            Location focusedLocation = target.getLocation().clone().add(0.0D, 0.9D, 0.0D);
-            if (!shooter.hasLineOfSight(target) || isBlockedBySmoke(shooter.getEyeLocation(), focusedLocation)) continue;
-            FocusKey key = new FocusKey(id, target.getUniqueId());
-            focusSeenThisTick.add(key);
-            focusAttempts.computeIfAbsent(key, ignored -> new FocusAttempt(serverTick, target.getLocation()));
-            shooter.sendActionBar(Component.text(ChatColor.GREEN + "FOCUS LOCKED — " + target.getName()
-                    + ChatColor.GRAY + " | press F to photograph"));
+            for (Player target : playersInPhotoLens(shooter, now)) {
+                UUID targetId = target.getUniqueId();
+                FocusKey key = new FocusKey(id, targetId);
+                focusSeenThisTick.add(key);
+                desiredOutlines.add(targetId);
+                focusAttempts.computeIfAbsent(key, ignored -> new FocusAttempt(serverTick, target.getLocation()));
+            }
         }
+        refreshPhotoOutlines(desiredOutlines);
         for (Map.Entry<FocusKey, FocusAttempt> entry : new ArrayList<>(focusAttempts.entrySet())) {
             FocusKey key = entry.getKey();
             if (focusSeenThisTick.contains(key)) continue;
@@ -1539,6 +1500,39 @@ public final class CameraShyGame implements Listener {
             }
             focusAttempts.remove(key);
         }
+    }
+
+    private void refreshPhotoOutlines(Set<UUID> desired) {
+        for (UUID targetId : new HashSet<>(photoOutlinedTargets)) {
+            if (desired.contains(targetId)) continue;
+            photoOutlinedTargets.remove(targetId);
+            Player target = players.get(targetId);
+            Boolean original = photoOutlineOriginalGlow.remove(targetId);
+            if (target != null && target.isOnline() && original != null) {
+                target.setGlowing(original || spotlightGlowUntil.getOrDefault(targetId, 0L) > System.currentTimeMillis());
+            }
+        }
+        for (UUID targetId : desired) {
+            Player target = players.get(targetId);
+            if (target == null || !target.isOnline() || !alive.contains(targetId)) continue;
+            if (photoOutlinedTargets.add(targetId)) {
+                boolean original = spotlightOriginalGlow.getOrDefault(targetId, target.isGlowing());
+                photoOutlineOriginalGlow.put(targetId, original);
+            }
+            target.setGlowing(true);
+        }
+    }
+
+    private void clearPhotoOutlines() {
+        for (UUID targetId : new HashSet<>(photoOutlinedTargets)) {
+            Player target = players.get(targetId);
+            Boolean original = photoOutlineOriginalGlow.remove(targetId);
+            if (target != null && target.isOnline() && original != null) {
+                target.setGlowing(original || spotlightGlowUntil.getOrDefault(targetId, 0L) > System.currentTimeMillis());
+            }
+        }
+        photoOutlinedTargets.clear();
+        photoOutlineOriginalGlow.clear();
     }
 
     private void updatePursuits(long now) {
@@ -1641,37 +1635,41 @@ public final class CameraShyGame implements Listener {
     private void updateSpotlight(long now) {
         if (now < nextSpotlightAt) return;
         nextSpotlightAt = now + SPOTLIGHT_INTERVAL_MILLIS;
-        List<UUID> candidates = alive.stream().filter(humans::contains).toList();
+        List<UUID> candidates = alive.stream()
+                .filter(id -> {
+                    Player candidate = players.get(id);
+                    return candidate != null && candidate.isOnline() && candidate.getWorld() == arena;
+                })
+                .toList();
         if (candidates.isEmpty()) return;
-        UUID selected = candidates.get(random.nextInt(candidates.size()));
+        List<UUID> choices = candidates.size() > 1 && lastSpotlightTarget != null
+                ? candidates.stream().filter(id -> !id.equals(lastSpotlightTarget)).toList() : candidates;
+        UUID selected = choices.get(random.nextInt(choices.size()));
         Player target = players.get(selected);
         if (target == null || !target.isOnline()) return;
+        lastSpotlightTarget = selected;
         broadcastMatch(ChatColor.GOLD + "DIRECTOR'S SPOTLIGHT: " + ChatColor.YELLOW + target.getName()
                 + ChatColor.GRAY + " has been caught in the light!");
-        spotlightOriginalGlow.put(selected, target.isGlowing());
+        spotlightOriginalGlow.put(selected, photoOutlineOriginalGlow.getOrDefault(selected, target.isGlowing()));
         spotlightGlowUntil.put(selected, now + 3_000L);
         target.setGlowing(true);
         arena.spawnParticle(Particle.FLASH, target.getLocation().add(0.0D, 1.0D, 0.0D), 1);
+        for (UUID humanId : humans) {
+            Player viewer = players.get(humanId);
+            if (viewer != null && viewer.isOnline()) {
+                viewer.playSound(target.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8F, 1.8F);
+            }
+        }
     }
 
-    private void updateGroupPickup(long now) {
-        if (now < nextGroupPickupAt || (currentGroupPickup != null && currentGroupPickup.isValid())) return;
-        nextGroupPickupAt = now + GROUP_PICKUP_INTERVAL_MILLIS;
-        List<Location> locations = mazeSpawnLocations();
-        Location location = locations.get(random.nextInt(locations.size())).clone().add(0.0D, 0.25D, 0.0D);
-        ItemStack pickup = namedItem(Material.FIREWORK_STAR, ChatColor.LIGHT_PURPLE + "GROUP PHOTO",
-                List.of(ChatColor.GRAY + "Collect this for one double-target photograph."));
-        ItemMeta meta = pickup.getItemMeta();
-        meta.getPersistentDataContainer().set(groupPickupKey, PersistentDataType.BYTE, (byte) 1);
-        pickup.setItemMeta(meta);
-        Item spawnedPickup = arena.dropItem(location, pickup);
-        currentGroupPickup = spawnedPickup;
-        spawnedPickup.setPickupDelay(0);
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (currentGroupPickup == spawnedPickup) clearGroupPickup();
-        }, GROUP_PICKUP_LIFETIME_MILLIS / 50L);
-        arena.spawnParticle(Particle.HAPPY_VILLAGER, location, 16, 0.4D, 0.5D, 0.4D, 0.02D);
-        broadcastMatch(ChatColor.LIGHT_PURPLE + "A Group Photo pickup has appeared somewhere in the maze!");
+    private void updateSpotlightMarkers(long now) {
+        for (Map.Entry<UUID, Long> entry : spotlightGlowUntil.entrySet()) {
+            if (entry.getValue() <= now) continue;
+            Player target = players.get(entry.getKey());
+            if (target == null || !target.isOnline() || target.getWorld() != arena) continue;
+            Location marker = target.getLocation().add(0.0D, 2.2D, 0.0D);
+            arena.spawnParticle(Particle.END_ROD, marker, 3, 0.18D, 0.55D, 0.18D, 0.005D);
+        }
     }
 
     private void updateStageFright(long now) {
@@ -1699,12 +1697,9 @@ public final class CameraShyGame implements Listener {
         spotlightGlowUntil.remove(playerId);
         Boolean originalGlow = spotlightOriginalGlow.remove(playerId);
         Player target = players.get(playerId);
-        if (originalGlow != null && target != null && target.isOnline()) target.setGlowing(originalGlow);
-    }
-
-    private void clearGroupPickup() {
-        if (currentGroupPickup != null && currentGroupPickup.isValid()) currentGroupPickup.remove();
-        currentGroupPickup = null;
+        if (originalGlow != null && target != null && target.isOnline()) {
+            target.setGlowing(originalGlow || photoOutlinedTargets.contains(playerId));
+        }
     }
 
     private void broadcastQueue(String message) {
@@ -1738,7 +1733,8 @@ public final class CameraShyGame implements Listener {
         if (phase == Phase.IDLE || phase == Phase.ENDING) return;
         phase = Phase.ENDING;
         if (recordProgress) recordMatchProgress(winnerId);
-        clearGroupPickup();
+        clearPhotoOutlines();
+        for (UUID id : new HashSet<>(spotlightGlowUntil.keySet())) clearSpotlight(id);
         for (ArmorStand stand : understudyStands.values()) if (stand != null && stand.isValid()) stand.remove();
         understudyStands.clear();
         for (UUID id : new ArrayList<>(bossBars.keySet())) removePlayerPresentation(id);
@@ -1778,8 +1774,9 @@ public final class CameraShyGame implements Listener {
         runnerUntil.clear(); runnerUsedUntil.clear(); smokeUsedUntil.clear(); fourExposureSince.clear(); lastPhotoAt.clear();
         lastPhotoTarget.clear(); lastEliminationAt.clear(); eliminationStreaks.clear(); revengeMatchCounts.clear();
         focusAttempts.clear(); focusSeenThisTick.clear(); smokeClouds.clear(); fakeFlashes.clear();
-        groupPhotoCharges.clear(); spawnLocations.clear(); aimingSince.clear();
+        spawnLocations.clear(); aimingSince.clear();
         spotlightGlowUntil.clear(); spotlightOriginalGlow.clear();
+        lastSpotlightTarget = null;
         selectedKits.keySet().removeIf(id -> !Bukkit.getOfflinePlayer(id).hasPlayedBefore());
         pendingHumans = List.of();
         finalSnapshot = false;
@@ -1947,6 +1944,13 @@ public final class CameraShyGame implements Listener {
             buildMaze(arena);
             plugin.getConfig().set("camera-shy.arena-built", true);
             plugin.saveConfig();
+        }
+        for (Entity entity : arena.getEntities()) {
+            if (entity instanceof Item item && item.getItemStack().hasItemMeta()
+                    && item.getItemStack().getItemMeta().getPersistentDataContainer()
+                            .has(legacyGroupPickupKey, PersistentDataType.BYTE)) {
+                item.remove();
+            }
         }
     }
 

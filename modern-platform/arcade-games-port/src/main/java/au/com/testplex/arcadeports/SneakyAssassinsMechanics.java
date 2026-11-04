@@ -55,8 +55,9 @@ import java.util.function.Predicate;
 /**
  * Mineplex Reborn Sneaky Assassins mechanics adapted for the isolated Paper 26.3 harness.
  *
- * The upstream repository does not include a Sneaky Assassins map archive, so this port
- * builds a clearly isolated town test arena and uses authored test spawn/power-up points.
+ * Source terrain is loaded through the shared Arcade map lifecycle. Original archives
+ * currently lack WorldConfig.dat, so their player starts and power-up locations are
+ * inferred from the selected map terrain and logged as such.
  */
 final class SneakyAssassinsMechanics {
     static final int SOURCE_NPC_COUNT = 200;
@@ -83,12 +84,12 @@ final class SneakyAssassinsMechanics {
     private final Map<UUID, String> kitPreferences = new HashMap<>();
 
     private World world;
+    private List<Location> powerUpLocations = List.of();
     private final Map<UUID, Player> players = new LinkedHashMap<>();
     private Predicate<UUID> isAlive = ignored -> false;
     private Eliminator eliminator = (victim, killer, reason) -> { };
     private final Set<UUID> npcIds = new HashSet<>();
-    private final Map<UUID, Villager> disguises = new HashMap<>();
-    private final Map<UUID, Set<UUID>> hiddenViewers = new HashMap<>();
+    private SneakyAssassinsDisguiseBridge disguiseBridge;
     private final Map<UUID, Long> revealUntil = new HashMap<>();
     private final Map<UUID, Long> cloakUntil = new HashMap<>();
     private final Map<UUID, Long> bribeReadyAt = new HashMap<>();
@@ -129,6 +130,10 @@ final class SneakyAssassinsMechanics {
         this.cooldownProgress = AbilityCooldownProgress.forPlugin(plugin);
         this.isTestPlayer = isTestPlayer == null ? ignored -> false : isTestPlayer;
         this.itemKey = new NamespacedKey(plugin, "sneaky-assassins-item");
+    }
+
+    void setDisguiseBridge(SneakyAssassinsDisguiseBridge bridge) {
+        this.disguiseBridge = bridge;
     }
 
     static String normalizeKit(String requested) {
@@ -299,9 +304,11 @@ final class SneakyAssassinsMechanics {
         return item;
     }
 
-    void start(World world, List<Player> participants, Predicate<UUID> alive, Eliminator eliminator) {
+    void start(World world, SourceMapCatalog.MapData mapData, List<Player> participants,
+            Predicate<UUID> alive, Eliminator eliminator) {
         stop();
         this.world = world;
+        this.powerUpLocations = resolvePowerUpLocations(world, mapData);
         this.isAlive = alive;
         this.eliminator = eliminator;
         for (Player player : participants) {
@@ -444,16 +451,6 @@ final class SneakyAssassinsMechanics {
                 removeDisguise(id);
                 continue;
             }
-            Villager proxy = disguises.get(id);
-            if (proxy != null && proxy.isValid()) {
-                Location target = player.getLocation().clone();
-                if (proxy.getWorld() != target.getWorld()
-                        || proxy.getLocation().distanceSquared(target) > 0.04D
-                        || Math.abs(proxy.getLocation().getYaw() - target.getYaw()) > 3.0F) {
-                    proxy.teleport(target);
-                }
-                proxy.setInvisible(cloakUntil.getOrDefault(id, 0L) > now);
-            }
             Long expiry = revealUntil.get(id);
             if (expiry != null && expiry <= now && globalRevealEndsAt <= now) {
                 revealUntil.remove(id);
@@ -479,25 +476,7 @@ final class SneakyAssassinsMechanics {
                 || globalRevealEndsAt > System.currentTimeMillis()) return;
         UUID id = player.getUniqueId();
         removeDisguise(id);
-        Villager proxy = world.spawn(player.getLocation(), Villager.class);
-        proxy.setAI(false);
-        proxy.setSilent(true);
-        proxy.setPersistent(true);
-        proxy.setRemoveWhenFarAway(false);
-        proxy.setCollidable(false);
-        proxy.setInvulnerable(false);
-        proxy.setCanPickupItems(false);
-        proxy.setGravity(false);
-        proxy.setCustomNameVisible(false);
-        disguises.put(id, proxy);
-        Set<UUID> viewers = hiddenViewers.computeIfAbsent(id, ignored -> new HashSet<>());
-        for (Player viewer : players.values()) {
-            if (viewer == null || !viewer.isOnline() || viewer.equals(player)) continue;
-            if (viewer.canSee(player)) {
-                viewer.hidePlayer(plugin, player);
-                viewers.add(viewer.getUniqueId());
-            }
-        }
+        if (disguiseBridge != null) disguiseBridge.setDisguised(id, true);
     }
 
     private void restoreDisguise(UUID id) {
@@ -510,29 +489,7 @@ final class SneakyAssassinsMechanics {
     }
 
     private void removeDisguise(UUID id) {
-        Villager proxy = disguises.remove(id);
-        if (proxy != null && proxy.isValid()) proxy.remove();
-        Set<UUID> viewers = hiddenViewers.remove(id);
-        if (viewers == null) return;
-        Player owner = players.get(id);
-        if (owner == null) return;
-        for (UUID viewerId : viewers) {
-            Player viewer = Bukkit.getPlayer(viewerId);
-            if (viewer != null && viewer.isOnline()) viewer.showPlayer(plugin, owner);
-        }
-    }
-
-    Player disguiseOwner(Entity entity) {
-        if (entity == null) return null;
-        UUID id = entity.getUniqueId();
-        for (Map.Entry<UUID, Villager> entry : disguises.entrySet()) {
-            Villager disguise = entry.getValue();
-            if (disguise != null && disguise.getUniqueId().equals(id)) {
-                Player owner = players.get(entry.getKey());
-                return owner != null && owner.isOnline() && isAlive.test(entry.getKey()) ? owner : null;
-            }
-        }
-        return null;
+        if (disguiseBridge != null) disguiseBridge.setDisguised(id, false);
     }
 
     private void spawnNpc() {
@@ -803,8 +760,6 @@ final class SneakyAssassinsMechanics {
         }
         long now = System.currentTimeMillis();
         cloakUntil.put(player.getUniqueId(), now + SMOKE_CLOAK_DURATION_MILLIS);
-        Villager proxy = disguises.get(player.getUniqueId());
-        if (proxy != null && proxy.isValid()) proxy.setInvisible(true);
         player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 24, 0, false, false, false));
         for (Entity nearby : player.getNearbyEntities(SMOKE_RADIUS, SMOKE_RADIUS, SMOKE_RADIUS)) {
             if (!(nearby instanceof LivingEntity living) || nearby.equals(player)) continue;
@@ -911,14 +866,8 @@ final class SneakyAssassinsMechanics {
     }
 
     private boolean spawnPowerUp(long now) {
-        Location[] points = {
-                new Location(world, -17.5D, 64.0D, -17.5D),
-                new Location(world, 17.5D, 64.0D, -17.5D),
-                new Location(world, -17.5D, 64.0D, 17.5D),
-                new Location(world, 17.5D, 64.0D, 17.5D)
-        };
         List<Location> available = new ArrayList<>();
-        for (Location point : points) {
+        for (Location point : powerUpLocations) {
             boolean used = powerUps.stream().anyMatch(p -> p.location.distanceSquared(point) < 1.0D);
             if (!used) available.add(point);
         }
@@ -929,10 +878,11 @@ final class SneakyAssassinsMechanics {
         Location location = available.get(ThreadLocalRandom.current().nextInt(available.size()));
         lastPowerUpLocation = location.clone();
         PowerUp powerUp = new PowerUp(location, now);
+        int baseY = location.getBlockY() - 2;
         for (int dx = -1; dx <= 1; dx++) {
             for (int dz = -1; dz <= 1; dz++) {
                 for (int dy = 0; dy <= 1; dy++) {
-                    Block block = world.getBlockAt(location.getBlockX() + dx, 62 + dy,
+                    Block block = world.getBlockAt(location.getBlockX() + dx, baseY + dy,
                             location.getBlockZ() + dz);
                     powerUp.originalBlocks.put(block, block.getBlockData().clone());
                     Material material = dy == 0 ? Material.IRON_BLOCK
@@ -944,6 +894,64 @@ final class SneakyAssassinsMechanics {
         powerUps.add(powerUp);
         announce(ChatColor.YELLOW + "Power-up spawning...");
         return true;
+    }
+
+    private List<Location> resolvePowerUpLocations(World world, SourceMapCatalog.MapData mapData) {
+        if (world == null || mapData == null) return List.of();
+        List<Location> authored = mapData.dataLocations("RED").stream()
+                .filter(location -> location.getWorld() == world)
+                .map(Location::clone)
+                .toList();
+        if (!authored.isEmpty()) return authored;
+
+        if (!mapData.hasBounds()) {
+            plugin.getLogger().warning("Sneaky Assassins map " + mapData.mapName()
+                    + " has no RED power-up datapoints or inferable map bounds; power-ups are disabled.");
+            return List.of();
+        }
+        double offsetX = Math.max(8.0D, mapData.width() * 0.22D);
+        double offsetZ = Math.max(8.0D, mapData.depth() * 0.22D);
+        double centerX = mapData.centerX();
+        double centerZ = mapData.centerZ();
+        double[][] candidates = {{-offsetX, -offsetZ}, {offsetX, -offsetZ},
+                {-offsetX, offsetZ}, {offsetX, offsetZ}};
+        List<Location> inferred = new ArrayList<>();
+        for (double[] candidate : candidates) {
+            Location safe = findSafePowerUpSurface(world,
+                    (int) Math.round(centerX + candidate[0]),
+                    (int) Math.round(centerZ + candidate[1]));
+            if (safe != null && inferred.stream().noneMatch(existing ->
+                    existing.distanceSquared(safe) < 16.0D)) inferred.add(safe);
+        }
+        plugin.getLogger().warning("Sneaky Assassins map " + mapData.mapName()
+                + " has no original WorldConfig RED datapoints; using " + inferred.size()
+                + " terrain-checked inferred power-up locations from its inferred test bounds.");
+        return List.copyOf(inferred);
+    }
+
+    private Location findSafePowerUpSurface(World world, int centerX, int centerZ) {
+        for (int radius = 0; radius <= 8; radius++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) != radius) continue;
+                    int x = centerX + dx;
+                    int z = centerZ + dz;
+                    world.getChunkAt(x >> 4, z >> 4).load();
+                    int y = world.getHighestBlockYAt(x, z);
+                    if (y <= world.getMinHeight() || y + 3 >= world.getMaxHeight()) continue;
+                    Block floor = world.getBlockAt(x, y, z);
+                    Block feet = world.getBlockAt(x, y + 1, z);
+                    Block head = world.getBlockAt(x, y + 2, z);
+                    Material floorType = floor.getType();
+                    if (floor.isPassable() || floorType == Material.MAGMA_BLOCK
+                            || floorType == Material.CAMPFIRE || floorType == Material.SOUL_CAMPFIRE
+                            || floorType == Material.CACTUS || floorType == Material.POWDER_SNOW
+                            || !feet.isPassable() || !head.isPassable()) continue;
+                    return new Location(world, x + 0.5D, y + 1.0D, z + 0.5D);
+                }
+            }
+        }
+        return null;
     }
 
     private void collectPowerUp(Player player) {
@@ -1100,7 +1108,7 @@ final class SneakyAssassinsMechanics {
             event.setCancelled(true);
             return;
         }
-        Player target = entity instanceof Player player ? player : disguiseOwner(entity);
+        Player target = entity instanceof Player player ? player : null;
         if (target == null || !players.containsKey(target.getUniqueId())) return;
         event.setCancelled(true);
         if (!isAlive.test(target.getUniqueId()) || event.getCause() == EntityDamageEvent.DamageCause.WITHER) return;
@@ -1150,8 +1158,6 @@ final class SneakyAssassinsMechanics {
         if (lethalMasterCompassHit) pendingCompassKills.put(target.getUniqueId(), attacker.getUniqueId());
         if (attacker != null) {
             cloakUntil.remove(attacker.getUniqueId());
-            Villager proxy = disguises.get(attacker.getUniqueId());
-            if (proxy != null && proxy.isValid()) proxy.setInvisible(false);
             attacker.removePotionEffect(PotionEffectType.INVISIBILITY);
         }
         if (damage <= 0.0D) return;
@@ -1194,8 +1200,6 @@ final class SneakyAssassinsMechanics {
                 ? Math.max(2.0D, projectile.getVelocity().length() * 2.0D)
                 : recordedDamage;
         cloakUntil.remove(shooter.getUniqueId());
-        Villager proxy = disguises.get(shooter.getUniqueId());
-        if (proxy != null && proxy.isValid()) proxy.setInvisible(false);
         shooter.removePotionEffect(PotionEffectType.INVISIBILITY);
         applyDamage(target, damage, shooter, "was defeated by " + shooter.getName());
         projectile.remove();
@@ -1346,7 +1350,7 @@ final class SneakyAssassinsMechanics {
     }
 
     void stop() {
-        for (UUID id : new ArrayList<>(disguises.keySet())) removeDisguise(id);
+        for (UUID id : new ArrayList<>(players.keySet())) removeDisguise(id);
         for (UUID id : new ArrayList<>(players.keySet())) {
             Player player = players.get(id);
             if (player != null) {
@@ -1376,7 +1380,6 @@ final class SneakyAssassinsMechanics {
         npcLastMovementAt.clear();
         nextTownNpcCullAt = 0L;
         players.clear();
-        hiddenViewers.clear();
         revealUntil.clear();
         cloakUntil.clear();
         bribeReadyAt.clear();
@@ -1389,6 +1392,7 @@ final class SneakyAssassinsMechanics {
         previousScoreboards.clear();
         lastPowerUpLocation = null;
         world = null;
+        powerUpLocations = List.of();
         isAlive = ignored -> false;
         eliminator = (victim, killer, reason) -> { };
         nextPowerUpAt = nextGlobalRevealAt = globalRevealEndsAt = 0L;

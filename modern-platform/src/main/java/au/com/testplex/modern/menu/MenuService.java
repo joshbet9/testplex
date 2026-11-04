@@ -938,13 +938,8 @@ public final class MenuService implements Listener {
         } else if ("launch-game".equals(action) && game != null) {
             String enginePlugin = null;
             String startCommand = null;
-            if ("snake".equals(game.getId())) {
-                enginePlugin = "SnakeModern";
-                startCommand = "snake start";
-            } else {
-                enginePlugin = "ArcadeMechanicsModern";
-                startCommand = "arcadeport play " + game.getId();
-            }
+            enginePlugin = "ArcadeMechanicsModern";
+            startCommand = "arcadeport play " + game.getId();
             if (enginePlugin == null) return;
             if (!Bukkit.getPluginManager().isPluginEnabled(enginePlugin)) {
                 player.sendMessage(ChatColor.RED + enginePlugin + ".jar is not installed on this server yet.");

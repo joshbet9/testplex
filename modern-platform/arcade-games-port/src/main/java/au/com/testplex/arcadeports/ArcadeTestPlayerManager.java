@@ -290,13 +290,32 @@ final class ArcadeTestPlayerManager {
             completion.accept(new SpawnResult(List.of(), null));
             return;
         }
+        if (spawn == null || spawn.getWorld() == null) {
+            completion.accept(new SpawnResult(List.of(), "The Arcade lobby spawn is unavailable."));
+            return;
+        }
+        List<Location> stagingSpawns = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            stagingSpawns.add(spawn.clone().add(
+                    ((i % 5) - 2) * 1.25D, 0.0D, ((i / 5) - 1) * 1.25D));
+        }
+        spawnForMatch(count, stagingSpawns, owner, completion);
+    }
+
+    void spawnForMatch(int count, List<Location> spawns, Player owner, Consumer<SpawnResult> completion) {
+        if (completion == null) return;
+        if (count <= 0) {
+            completion.accept(new SpawnResult(List.of(), null));
+            return;
+        }
         if (shuttingDown || pendingSpawnTask != null || !activeHandles.isEmpty()
                 || !retiringHandles.isEmpty() || cleanupTask != null) {
             completion.accept(new SpawnResult(List.of(), "A previous test-player batch is still being cleaned up."));
             return;
         }
-        if (spawn == null || spawn.getWorld() == null) {
-            completion.accept(new SpawnResult(List.of(), "The Arcade lobby spawn is unavailable."));
+        if (spawns == null || spawns.size() < count
+                || spawns.subList(0, count).stream().anyMatch(spawn -> spawn == null || spawn.getWorld() == null)) {
+            completion.accept(new SpawnResult(List.of(), "One or more Arcade test-player spawns are unavailable."));
             return;
         }
 
@@ -324,8 +343,7 @@ final class ArcadeTestPlayerManager {
                 if (Bukkit.getPlayerExact(name) != null) {
                     throw new IllegalStateException("Reserved test-player name is already online: " + name);
                 }
-                Location stagingLocation = spawn.clone().add(
-                        ((i % 5) - 2) * 1.25D, 0.0D, ((i / 5) - 1) * 1.25D);
+                Location stagingLocation = spawns.get(i).clone();
                 Object optional = invoke(api, "spawnBot",
                         new Class<?>[] {Location.class, Player.class, String.class},
                         stagingLocation, owner, name);

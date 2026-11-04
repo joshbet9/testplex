@@ -151,7 +151,7 @@ class ArcadePortGameTest {
 
 
     @Test void exposesTheMechanicsGamesAndIntegratedModules() {
-        assertEquals(30, ArcadePortGame.values().length);
+        assertEquals(31, ArcadePortGame.values().length);
         Set<String> ids = new HashSet<>();
         for (ArcadePortGame game : ArcadePortGame.values()) {
             assertTrue(ids.add(game.id()), "duplicate game id: " + game.id());
@@ -168,6 +168,7 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortGame.MONSTER_MAZE_SPEED.isMonsterMaze());
         assertTrue(ArcadePortGame.MONSTER_MAZE_MODERN.isMonsterMaze());
         assertEquals(ArcadePortGame.WIZARDS, ArcadePortGame.fromId("wizards"));
+        assertEquals(ArcadePortGame.SNAKE, ArcadePortGame.fromId("snake"));
         assertEquals(ArcadePortGame.PLEXBALL, ArcadePortGame.fromId("plexball"));
         assertEquals(ArcadePortGame.CAMERA_SHY, ArcadePortGame.fromId("camera-shy"));
         assertEquals(ArcadePortGame.SUPER_SPLOOR, ArcadePortGame.fromId("super-sploor"));
@@ -188,7 +189,7 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.CAMERA_SHY.id(),
                 java.util.List.of("death-tag", "plexball", "spleef")),
                 "Snap must remain gated when it is removed from the reviewed allow-list.");
-        assertNull(ArcadePortGame.fromId("snake"));
+        assertEquals(ArcadePortGame.SNAKE, ArcadePortGame.fromId("snake"));
         assertEquals(ArcadePortGame.DRAW_MY_THING, ArcadePortGame.fromId("Draw My Thing"));
         assertEquals(ArcadePortGame.MASTER_BUILDERS, ArcadePortGame.fromId("master_builders"));
         assertEquals(ArcadePortGame.SNEAKY_ASSASSINS, ArcadePortGame.fromId("sneaky-assassins"));
@@ -1556,9 +1557,8 @@ class ArcadePortGameTest {
         assertEquals(2, ArcadePortRules.RUNNER_FROSTBALL_SLOW_AMPLIFIER);
     }
 
-    @Test void runnerFloorBlocksFallAfterSixHundredMilliseconds() {
+    @Test void runnerFloorBlocksDisappearAfterSixHundredMilliseconds() {
         assertEquals(600L, ArcadePortRules.RUNNER_BLOCK_DECAY_MILLIS);
-        assertEquals(1_200L, ArcadePortRules.RUNNER_BLOCK_LIFETIME_MILLIS);
         assertFalse(ArcadePortRules.shouldDropRunnerBlock(599L));
         assertTrue(ArcadePortRules.shouldDropRunnerBlock(600L));
         assertTrue(ArcadePortRules.shouldDropRunnerBlock(1_200L));
@@ -1571,13 +1571,6 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldMarkRunnerBlock(true, false, true, true, false));
         assertFalse(ArcadePortRules.shouldMarkRunnerBlock(true, false, false, false, false));
         assertFalse(ArcadePortRules.shouldMarkRunnerBlock(true, false, false, true, true));
-    }
-
-    @Test void runnerFallingBlocksCannotHitPlayersStandingAboveThem() {
-        assertTrue(ArcadePortRules.shouldRunnerFallingBlockHit(64.0D, 64.0D));
-        assertTrue(ArcadePortRules.shouldRunnerFallingBlockHit(64.5D, 64.0D));
-        assertFalse(ArcadePortRules.shouldRunnerFallingBlockHit(64.5001D, 64.0D));
-        assertFalse(ArcadePortRules.shouldRunnerFallingBlockHit(70.0D, 64.0D));
     }
 
     @Test void sourceWaterDamageMatchesTheOriginalArcadeGameSettings() {

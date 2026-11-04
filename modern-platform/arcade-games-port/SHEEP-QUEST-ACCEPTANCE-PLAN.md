@@ -22,6 +22,7 @@ The four pen markers and the sheep-spawn marker are read from this map's `WorldC
 - [ ] Start from the shared Game Panel and `/arcadeport play sheep-quest`; confirm it enters the normal Arcade queue/session and loads the dedicated source world.
 - [ ] Resolve exactly four source pens: RED, BLUE, GREEN and YELLOW. Resolve WHITE markers as the sheep-spawn locations. Fail map setup clearly if any required marker group is missing or empty.
 - [ ] Verify the team-to-marker mapping is stable: RED, BLUE, GREEN, YELLOW. Check all four team spawns, pen floor blocks and bounds on the source map.
+- [ ] Use the authored map pens only; confirm no extra wool pen structures are built at fixed world coordinates.
 - [ ] Confirm Adventure mode, source day time 2000, hunger fixed at 20, team armour, and spectator-only compass distribution. Dead players remain in the team game and respawn after the source six-second spectator interval.
 - [ ] Confirm the shared session restores the full player snapshot and all temporary entities/tasks/world changes after natural end, operator stop, disconnect and immediate rematch.
 
@@ -29,6 +30,7 @@ The four pen markers and the sheep-spawn marker are read from this map's `WorldC
 
 - [ ] Spawn four adult sheep when Live begins, then spawn one additional sheep every 20 seconds from a random WHITE marker. Sheep use the source high-health survivability rather than dying to ordinary incidental damage.
 - [ ] A free/unowned sheep returns toward a valid WHITE spawn when it strays more than 14 blocks; a stuck sheep receives the source recovery impulse after one second without meaningful movement.
+- [ ] Sheep pathfind toward their spawn or owning pen and roam between authored pen markers; capture leaves a sheep where it reaches the pen instead of teleporting it elsewhere.
 - [ ] When a sheep is delivered into a pen, assign that pen's team as its owner, colour it with that team's wool colour, clear its holder/target state and play the source capture feedback.
 - [ ] Owned sheep move toward their owner's pen centre when outside it and roam between pen blocks while safely inside. A sheep already owned by a team and inside that team's pen cannot be farmed by picking it up again.
 - [ ] When another team carries an owned sheep, it must not be recoloured or re-owned by the enemy until the carrying chain is released and the sheep is actually deposited in their pen.
@@ -40,7 +42,8 @@ The four pen markers and the sheep-spawn marker are read from this map's `WorldC
 - [ ] Each carried sheep is represented by the correct wool item in the legacy hotbar slots and by the carry-count experience/progress indicator. Stale wool icons and carry slowdown must clear when sheep are dropped or captured.
 - [ ] Carry slowdown scales by sheep count (one, two, then three); verify the fourth-count boundary cannot apply a stronger effect.
 - [ ] Carrying a sheep into the team's exact pen block deposits it, increments the team's live pen count and clears the passenger chain. Check enemy sheep steals count toward the receiving team's score.
-- [ ] Pickup and capture effects/messages and the local `Thief` / `AnimalRescue` counters are credited to the correct player. Verify the legacy `Selfish` win stat threshold is strictly more than 12 sheep.
+- [ ] Keep the eight modern Sheep Quest achievements, and restore the four source achievements: Hungry Hungry Hippo (50 wins), Thief (300 source Thief stat increments on eligible pickups), Animal Rescue (300 enemy-carrier sheep drops) and Selfish (win with more than 12 sheep).
+- [ ] Pickup and capture effects/messages and the local `Thief` / `AnimalRescue` counters are credited to the correct player. Verify `Selfish` requires strictly more than 12 sheep.
 
 ### Dropping, combat and Brute interactions
 

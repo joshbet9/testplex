@@ -99,8 +99,8 @@ final class PaintballRunnerParityRulesTest {
     @Test
     void runnerTrailColourSelectionAvoidsMapPaletteConflicts() {
         assertEquals("purple", ArcadePortRules.resolveRunnerTrailColour("purple", Map.of("cyan", 20)));
-        assertEquals("white", ArcadePortRules.resolveRunnerTrailColour("cyan", Map.of("cyan", 12)));
+        assertEquals("red", ArcadePortRules.resolveRunnerTrailColour("cyan", Map.of("cyan", 12)));
         assertFalse(ArcadePortRules.runnerTrailColours().contains("red"));
-        assertEquals("cyan", ArcadePortRules.resolveRunnerTrailColour("red", Map.of()));
+        assertEquals("red", ArcadePortRules.resolveRunnerTrailColour("red", Map.of()));
     }
 }

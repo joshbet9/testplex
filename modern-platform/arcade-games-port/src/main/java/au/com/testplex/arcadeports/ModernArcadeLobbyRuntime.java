@@ -60,7 +60,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private static final String[] BOMB_LOBBERS_THEMES = {
             "classic", "ember", "shockwave", "spark", "confetti", "frost", "slime"
     };
-    private static final int[] KIT_MENU_SLOTS = {10, 11, 12, 13, 14, 15, 16, 17, 18};
+    private static final int[] KIT_MENU_SLOTS = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25};
     private static final int KIT_PEDESTAL_X = -17;
     private static final int QUEUE_PEDESTAL_X = 18;
 
@@ -389,7 +389,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         List<String> order = plugin.getConfig().getStringList("lobby-kits.order." + game.id());
         // Keep every source kit available for these games even if an older
         // server config still lists one of them as hidden.
-        if (game == ArcadePortGame.DRAGONS || game == ArcadePortGame.BOMB_LOBBERS) {
+        if (game == ArcadePortGame.DRAGONS || game == ArcadePortGame.BOMB_LOBBERS
+                || game == ArcadePortGame.CAMERA_SHY) {
             return ArcadeLobbyKitCatalogue.forGame(game, List.of(), order);
         }
         return ArcadeLobbyKitCatalogue.forGame(
@@ -511,7 +512,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         String value = option == null ? "" : option.toLowerCase(Locale.ROOT);
         if (game == ArcadePortGame.CAMERA_SHY) {
             return switch (value) {
-                case "smoke-artist" -> Material.POTION;
+                case "smoke-artist" -> Material.INK_SAC;
                 case "decoy" -> Material.FIREWORK_ROCKET;
                 case "runner" -> Material.SUGAR;
                 case "spotter" -> Material.COMPASS;
@@ -602,7 +603,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     }
 
     private void openKitMenu(Player p) {
-        Inventory inv = Bukkit.createInventory(null, 27, KIT_TITLE);
+        Inventory inv = Bukkit.createInventory(null, 54, KIT_TITLE);
         List<ArcadeLobbyKitCatalogue.KitChoice> choices = kitChoicesFor(selectedGame);
         if (choices.isEmpty()) {
             inv.setItem(13, item(Material.BARRIER, ChatColor.RED + "No Kit Selection",
@@ -611,15 +612,88 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         } else {
             for (int i = 0; i < choices.size() && i < KIT_MENU_SLOTS.length; i++) {
                 ArcadeLobbyKitCatalogue.KitChoice choice = choices.get(i);
-                ItemStack it = item(choice.icon, ChatColor.YELLOW + choice.name,
-                        ChatColor.GRAY + "Choose this kit for your next " + selectedGame.displayName() + ".",
-                        ChatColor.GREEN + "Click to select");
+                ItemStack it;
+                if (selectedGame == ArcadePortGame.RUNNER && "runnerkit-switcher".equals(choice.id)) {
+                    it = item(choice.icon, ChatColor.YELLOW + choice.name,
+                            ChatColor.GRAY + "Requires every Runner achievement.",
+                            ChatColor.GRAY + "Randomly swaps with one eligible Runner, once per round.",
+                            ChatColor.GREEN + "Click to select");
+                } else if (selectedGame == ArcadePortGame.SPLEEF && "spleef-gust".equals(choice.id)) {
+                    it = item(choice.icon, ChatColor.YELLOW + choice.name,
+                            ChatColor.GRAY + "Unlock with Praying to the Gods: win while falling into the void.",
+                            ChatColor.GRAY + "A Wind Charge can launch you or knock opponents back.",
+                            ChatColor.GRAY + "Recharges every 20 seconds.",
+                            ChatColor.GREEN + "Click to select");
+                } else if (selectedGame == ArcadePortGame.TURF_WARS
+                        && "turf-wars-fortifier".equals(choice.id)) {
+                    boolean unlocked = plugin.getConfig().getBoolean("local-achievements."
+                            + p.getUniqueId() + ".turf-wars.genius-mathematician", false);
+                    it = item(choice.icon, ChatColor.YELLOW + choice.name,
+                            ChatColor.GRAY + "Unlock with Genius Mathematician:",
+                            ChatColor.GRAY + "win without leaving your base or being killed.",
+                            ChatColor.GRAY + "Carries 12 team-coloured wool.",
+                            unlocked ? ChatColor.GREEN + "Click to select" : ChatColor.RED + "Locked");
+                } else if (selectedGame == ArcadePortGame.SUPER_SPLOOR) {
+                    String selectedKit = plugin.getConfig().getString(
+                            "lobby-kit-preferences." + p.getUniqueId() + ".super-sploor", "sprayer");
+                    String[] details = switch (choice.id) {
+                        case "roller" -> new String[] {"Fast close-range paint path.",
+                                "Secondary: place an Ink Mine.", "Special: Stampede through enemy lines."};
+                        case "charger" -> new String[] {"Hold right-click, release left-click for a precise ink line.",
+                                "Secondary: reveal nearby enemies.", "Special: fire a long Prism Beam."};
+                        case "lobber" -> new String[] {"Lob arcing shots with a wide paint splash.",
+                                "Secondary: launch a Sprinkler.", "Special: call a pulsing Paintstorm."};
+                        case "dualies" -> new String[] {"Rapid paired shots and a two-charge dodge roll.",
+                                "Secondary: throw a Suction Bomb.", "Special: dash through a painted afterimage."};
+                        default -> new String[] {"Balanced mid-range paint weapon.",
+                                "Secondary: throw a Burst Bomb.", "Special: release a close-range Colourburst."};
+                    };
+                    it = item(choice.icon, ChatColor.YELLOW + choice.name,
+                            ChatColor.GRAY + details[0], ChatColor.GRAY + details[1], ChatColor.GRAY + details[2],
+                            choice.id.equalsIgnoreCase(selectedKit)
+                                    ? ChatColor.GOLD + "Currently selected" : ChatColor.GREEN + "Click to select");
+                } else if (selectedGame == ArcadePortGame.CAMERA_SHY) {
+                    String selectedSnapKit = plugin.getConfig().getString(
+                            "camera-shy-kit-preferences." + p.getUniqueId(), "smoke-artist");
+                    boolean selected = choice.id.equals("snap-" + selectedSnapKit);
+                    it = item(choice.icon, ChatColor.YELLOW + choice.name,
+                            ChatColor.GRAY + "Choose this kit for your next Snap round.",
+                            selected ? ChatColor.GOLD + "Currently selected" : ChatColor.GREEN + "Click to select");
+                } else if (choice.unlock == ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT
+                        && ArcadePortManager.achievementKitUnlock(selectedGame, choice.id) != null) {
+                    String achievement = ArcadePortManager.achievementKitUnlock(selectedGame, choice.id);
+                    boolean unlocked = plugin.getConfig().getBoolean("local-achievements."
+                            + p.getUniqueId() + "." + selectedGame.id() + "." + achievement, false);
+                    it = item(choice.icon, ChatColor.YELLOW + choice.name,
+                            ChatColor.GRAY + "Unlock with " + ArcadePortManager.titleCaseAchievement(achievement) + ".",
+                            ChatColor.GRAY + achievementKitSummary(choice.id),
+                            unlocked ? ChatColor.GREEN + "Click to select" : ChatColor.RED + "Locked");
+                } else {
+                    it = item(choice.icon, ChatColor.YELLOW + choice.name,
+                            ChatColor.GRAY + "Choose this kit for your next " + selectedGame.displayName() + ".",
+                            ChatColor.GREEN + "Click to select");
+                }
                 mark(it, "kit:" + choice.id, null);
                 inv.setItem(KIT_MENU_SLOTS[i], it);
             }
         }
-        inv.setItem(22, item(Material.RED_BED, ChatColor.GRAY + "Back / Close"));
+        inv.setItem(49, item(Material.RED_BED, ChatColor.GRAY + "Back / Close"));
         p.openInventory(inv);
+    }
+
+    private String achievementKitSummary(String kitId) {
+        return switch (kitId) {
+            case "breacher" -> "TNT-focused attacker; charges replenish over time.";
+            case "tactician" -> "Survey and mark enemies, or gain a short combat boost.";
+            case "tnt-specialist" -> "Starts with three throwable TNT charges.";
+            case "runner-turtle" -> "Copper axe hits shell Chasers; every third hit earns a Wind Charge.";
+            case "runner-trickster" -> "Swap once with a random Chaser and launch Runner distractions.";
+            case "dragon-warden" -> "Shield and Wind Charges help defend against dragon dives.";
+            case "apex" -> "Start every evolution stage with a Golden Apple.";
+            case "shepherd" -> "Carry one extra sheep, with extra movement penalty.";
+            case "warden" -> "Use an iron sword and shield to protect Humans.";
+            default -> "Use the kit's specialised loadout.";
+        };
     }
     private void openQueueMenu(Player p) {
         Inventory inv = Bukkit.createInventory(null, 27, QUEUE_TITLE);
@@ -667,6 +741,12 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         if(KIT_TITLE.equals(title)){
             if(action!=null&&action.startsWith("kit:")){
                 String kit=action.substring(4);manager.selectKit(p,kit);
+                if (selectedGame == ArcadePortGame.TURF_WARS && "turf-wars-fortifier".equals(kit)
+                        && !plugin.getConfig().getBoolean("local-achievements." + p.getUniqueId()
+                                + ".turf-wars.genius-mathematician", false)) {
+                    p.closeInventory();
+                    return;
+                }
                 plugin.getConfig().set("lobby-kit-preferences."+p.getUniqueId()+"."+selectedGame.id(),kit);
                 plugin.saveConfig();
                 lobby.refreshPlayerScoreboard(p);
@@ -674,7 +754,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 p.sendMessage(ChatColor.GREEN + "Selected " + kit.replace('-', ' ')
                         + " for " + selectedGame.displayName() + ".");
                 p.closeInventory();
-            }else if(e.getSlot()==22)p.closeInventory();
+            }else if(e.getSlot()==31)p.closeInventory();
         } else if (QUEUE_TITLE.equals(title)) {
             if (action != null && action.startsWith("team:")) {
                 int team = Integer.parseInt(action.substring("team:".length()));

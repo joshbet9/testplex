@@ -102,6 +102,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         // ArcadePortManager registers and initializes manager-owned game modules through
         // one lifecycle entry point. It owns startup failure cleanup and eventual shutdown.
         manager.initializeGameModules();
+        getCommand("snake").setExecutor(manager.getSnakeModule());
 
         // Publish one process-correlated readiness record only after the shared
         // lobby and every game required by the controlled acceptance queue exist.
@@ -126,6 +127,21 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         return manager == null ? null : manager.getMonsterMazeModule();
     }
     public ArcadePortManager getArcadePortManager() { return manager; }
+    public String selectedCosmeticOption(Player player, String group) {
+        if (player == null || group == null) return null;
+        org.bukkit.plugin.Plugin platform = getServer().getPluginManager().getPlugin("TestplexModernArcade");
+        if (platform == null || !platform.isEnabled()) return null;
+        try {
+            java.lang.reflect.Method method = platform.getClass().getMethod(
+                    "getSelectedCosmeticOption", java.util.UUID.class, String.class, String.class);
+            Object value = method.invoke(platform, player.getUniqueId(), "snake", group);
+            return value instanceof String text && !text.isBlank() ? text : null;
+        } catch (ReflectiveOperationException exception) {
+            getLogger().warning("Could not read Snake cosmetic selection from TestplexModernArcade: "
+                    + exception.getMessage());
+            return null;
+        }
+    }
     public PlexballGame getPlexballGame() { return plexball; }
     public SpeedBuildersGame getSpeedBuildersGame() { return speedBuilders; }
 
@@ -243,9 +259,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
 
     private void publishArcadeRuntimeReadiness() {
         if (manager == null || !manager.isMonsterMazeModuleRegistered() || !manager.isWizardsModuleRegistered()
+                || !manager.isSnakeModuleRegistered()
                 || !manager.isRotationCandidateAvailable(ArcadePortGame.WIZARDS)) {
             throw new IllegalStateException(
-                    "The shared Arcade runtime cannot be marked ready without its integrated Monster Maze and Wizards Arcade modules and installed Wizards source maps.");
+                    "The shared Arcade runtime cannot be marked ready without its integrated Snake, Monster Maze and Wizards modules and installed Wizards source maps.");
         }
         try {
             java.nio.file.Path identityPath = getDataFolder().toPath()
@@ -256,10 +273,11 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     + " invocation-id-present=" + (System.getenv("INVOCATION_ID") != null));
             boolean deploymentSignal = ArcadeRuntimeReadinessSignal.publish(
                     getDataFolder().toPath(), System.getenv("INVOCATION_ID"), ProcessHandle.current().pid(),
-                    manager.isMonsterMazeModuleRegistered(), manager.isWizardsModuleRegistered());
+                    manager.isMonsterMazeModuleRegistered(), manager.isWizardsModuleRegistered(),
+                    manager.isSnakeModuleRegistered());
             getLogger().info("TESTPLEX_ARCADE_RUNTIME_READY world=" + ModernArcadeLobby.WORLD_NAME
                     + " plane=100x100 floor-y=" + ModernArcadeLobby.FLOOR_Y
-                    + " monster-maze=READY wizards=READY deployment-signal=" + deploymentSignal);
+                    + " snake=READY monster-maze=READY wizards=READY deployment-signal=" + deploymentSignal);
             if (!deploymentSignal && System.getenv("TESTPLEX_DEPLOYED_BUILD_SHA") != null) {
                 throw new IllegalStateException("Systemd deployment identity is missing from "
                         + getDataFolder() + "; refusing to report the complete Arcade runtime as deployment-ready.");
@@ -602,7 +620,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                         sender.sendMessage(ChatColor.RED + "Operator permission required to force-start Speed Builders.");
                         return true;
                     }
-                    if (speedBuilders != null) speedBuilders.startQueued();
+                    if (speedBuilders != null) speedBuilders.startQueued(sender);
                     return true;
                 }
                 if ("plexball".equalsIgnoreCase(args[1])) {
@@ -694,6 +712,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 }
                 if (speedBuilders != null) speedBuilders.stop("Stopped by an operator.");
                 manager.stop("Stopped by an operator.");
+                sender.sendMessage(ChatColor.GREEN + "Stopped the active game and returned participants to the Arcade lobby.");
                 return true;
             default:
                 sender.sendMessage(ChatColor.GOLD + "=== Modern Arcade Mechanics Prototypes ===");

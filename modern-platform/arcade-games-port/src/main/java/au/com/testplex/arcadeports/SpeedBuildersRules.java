@@ -12,7 +12,8 @@ import java.util.Set;
 public final class SpeedBuildersRules {
     public static final int BUILD_WIDTH = 7;
     public static final int BUILD_HEIGHT = 7;
-    public static final int MIN_PLAYERS = 2;
+    /** The controlled Arcade harness allows one builder for solo mechanics testing. */
+    public static final int MIN_PLAYERS = 1;
     public static final int PLOTS_PER_ARENA = 8;
     public static final int MAX_ARENAS = 2;
     public static final int MAX_PLAYERS = PLOTS_PER_ARENA * MAX_ARENAS;

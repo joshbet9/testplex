@@ -68,7 +68,7 @@ public final class AbilityCooldownProgress implements Listener {
             StringBuilder display = new StringBuilder(ChatColor.GOLD + ChatColor.BOLD.toString()
                     + cooldown.name + ChatColor.RESET + " ");
             for (int segment = 0; segment < BAR_SEGMENTS; segment++) {
-                display.append(segment < filled ? ChatColor.GREEN : ChatColor.RED).append('█');
+                display.append(segment < filled ? ChatColor.GREEN : ChatColor.RED).append('\u258c');
             }
             display.append(ChatColor.RESET).append(' ').append(remaining).append('s');
             player.sendActionBar(display.toString());

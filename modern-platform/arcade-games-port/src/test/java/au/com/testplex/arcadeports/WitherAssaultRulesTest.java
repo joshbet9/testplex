@@ -8,10 +8,11 @@ import static org.junit.jupiter.api.Assertions.*;
 
 final class WitherAssaultRulesTest {
     @Test
-    void onlyTheThreeSourceHumanKitsAreSelectable() {
+    void sourceHumanKitsAndTheAchievementKitAreSelectable() {
         assertEquals("archer", WitherAssaultRules.normalizeHumanKit("Archer"));
         assertEquals("medic", WitherAssaultRules.normalizeHumanKit("human-medic"));
         assertEquals("editor", WitherAssaultRules.normalizeHumanKit("Human Editor"));
+        assertEquals("warden", WitherAssaultRules.normalizeHumanKit("Human Warden"));
         assertNull(WitherAssaultRules.normalizeHumanKit(null));
         assertNull(WitherAssaultRules.normalizeHumanKit(""));
         assertNull(WitherAssaultRules.normalizeHumanKit("miner"));
@@ -19,8 +20,8 @@ final class WitherAssaultRulesTest {
     }
 
     @Test
-    void lobbyCatalogueExposesTheSameSourceHumanKitSet() {
-        assertEquals(List.of("archer", "medic", "editor"),
+    void lobbyCatalogueExposesTheSourceHumanKitsAndAchievementKit() {
+        assertEquals(List.of("archer", "medic", "editor", "warden"),
                 ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.WITHER_ASSAULT, List.of())
                         .stream().map(choice -> choice.id).toList());
     }

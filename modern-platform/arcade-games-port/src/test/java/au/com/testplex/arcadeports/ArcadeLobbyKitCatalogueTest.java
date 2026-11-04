@@ -51,11 +51,12 @@ class ArcadeLobbyKitCatalogueTest {
     void dragonsCommunityKitsAreAvailableFromTheSharedKitCatalogue() {
         List<ArcadeLobbyKitCatalogue.KitChoice> choices =
                 ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.DRAGONS, List.of());
-        assertEquals(List.of("coward", "marksman", "pyrotechnic", "frost", "glider", "tamer"),
+        assertEquals(List.of("coward", "marksman", "pyrotechnic", "frost", "glider", "tamer", "dragon-warden"),
                 choices.stream().map(choice -> choice.id).toList());
         assertEquals(ArcadeLobbyKitCatalogue.Unlock.FREE, choices.get(0).unlock);
-        assertTrue(choices.subList(1, choices.size()).stream()
+        assertTrue(choices.subList(1, 6).stream()
                 .allMatch(choice -> choice.unlock == ArcadeLobbyKitCatalogue.Unlock.GEM));
+        assertEquals(ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT, choices.get(6).unlock);
     }
 
     @Test
@@ -67,14 +68,15 @@ class ArcadeLobbyKitCatalogueTest {
     }
 
     @Test
-    void sheepQuestLobbyCatalogueMatchesItsThreeLegacyKitsAndUnlockTiers() {
+    void sheepQuestLobbyCatalogueIncludesItsLegacyKitsAndAchievementKit() {
         List<ArcadeLobbyKitCatalogue.KitChoice> choices =
                 ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.SHEEP_QUEST, List.of());
-        assertEquals(List.of("beserker", "archer", "brute"),
+        assertEquals(List.of("beserker", "archer", "brute", "shepherd"),
                 choices.stream().map(choice -> choice.id).toList());
         assertEquals(ArcadeLobbyKitCatalogue.Unlock.FREE, choices.get(0).unlock);
         assertEquals(ArcadeLobbyKitCatalogue.Unlock.GEM, choices.get(1).unlock);
         assertEquals(ArcadeLobbyKitCatalogue.Unlock.GEM, choices.get(2).unlock);
+        assertEquals(ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT, choices.get(3).unlock);
     }
 
     @Test
@@ -84,8 +86,8 @@ class ArcadeLobbyKitCatalogueTest {
     }
 
     @Test
-    void witherAssaultExposesItsThreeSourceHumanKits() {
-        assertEquals(List.of("archer", "medic", "editor"),
+    void witherAssaultExposesItsHumanKitsAndAchievementKit() {
+        assertEquals(List.of("archer", "medic", "editor", "warden"),
                 ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.WITHER_ASSAULT, List.of())
                         .stream().map(choice -> choice.id).toList());
     }

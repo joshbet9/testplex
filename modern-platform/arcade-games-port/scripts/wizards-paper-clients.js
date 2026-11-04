@@ -159,6 +159,12 @@ function connect(username) {
       if (meta && meta.state === 'play' && meta.name === 'respawn') {
         setImmediate(() => sendPlayerLoaded('respawn-packet'));
       }
+      // The packet event is the protocol-level source of truth. Keep this
+      // fallback alongside the convenience event below: minecraft-protocol
+      // versions have varied in whether update_health is re-emitted by name.
+      if (meta && meta.state === 'play' && meta.name === 'update_health') {
+        handleHealthUpdate(data);
+      }
     });
 
     // The packet event above is the single source of respawn load acknowledgements.
@@ -166,7 +172,7 @@ function connect(username) {
     // emit both for the same Play packet.
 
     let respawnPending = false;
-    client.on('update_health', (packet) => {
+    function handleHealthUpdate(packet) {
       const health = Number(packet && packet.health);
       if (Number.isFinite(health) && health <= 0 && !respawnPending) {
         respawnPending = true;
@@ -183,7 +189,8 @@ function connect(username) {
       } else if (Number.isFinite(health) && health > 0) {
         respawnPending = false;
       }
-    });
+    }
+    client.on('update_health', handleHealthUpdate);
 
     client.on('error', (error) => {
       log('BOT_ERROR|' + username + '|' + (error && error.stack ? error.stack : String(error)));

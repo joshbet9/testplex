@@ -1,5 +1,6 @@
 package me.monstermaze.world;
 
+import au.com.testplex.arcadeports.SourceMapCatalog;
 import me.monstermaze.MonsterMazePlugin;
 import me.monstermaze.maze.MazeBlockData;
 import org.bukkit.Bukkit;
@@ -119,6 +120,8 @@ public final class MapManager {
             plugin.getLogger().warning("Map world folder is missing: " + worldFolder.getAbsolutePath());
             return null;
         }
+
+        if (!SourceMapCatalog.prepareMonsterMazeWorld(plugin.getHostPlugin(), folder)) return null;
 
         World world = new WorldCreator(folder).generateStructures(false).createWorld();
         if (world != null) {

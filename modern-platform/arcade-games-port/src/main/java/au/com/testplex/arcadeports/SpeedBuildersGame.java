@@ -202,7 +202,7 @@ public final class SpeedBuildersGame implements Listener {
         player.sendMessage(ChatColor.GREEN + "Queued for Speed Builders "
                 + ChatColor.GRAY + "(" + queue.size() + "/" + SpeedBuildersRules.MAX_PLAYERS + ").");
         if (queue.size() < SpeedBuildersRules.MIN_PLAYERS) {
-            player.sendMessage(ChatColor.GRAY + "Waiting for at least one more player.");
+            player.sendMessage(ChatColor.GRAY + "Waiting for the minimum player count.");
         }
         announceQueue();
     }
@@ -219,8 +219,12 @@ public final class SpeedBuildersGame implements Listener {
     }
 
     public void startQueued() {
+        startQueued(Bukkit.getConsoleSender());
+    }
+
+    public void startQueued(org.bukkit.command.CommandSender sender) {
         if (isActive()) {
-            plugin.getLogger().warning("Rejected Speed Builders start because another Speed Builders match is active.");
+            if (sender != null) sender.sendMessage(ChatColor.RED + "Speed Builders is already in progress.");
             return;
         }
         List<Player> participants = new ArrayList<>();
@@ -231,6 +235,7 @@ public final class SpeedBuildersGame implements Listener {
         }
         queue.removeIf(id -> Bukkit.getPlayer(id) == null || !Bukkit.getPlayer(id).isOnline());
         if (participants.size() < SpeedBuildersRules.MIN_PLAYERS) {
+            if (sender != null) sender.sendMessage(ChatColor.YELLOW + "Join the Speed Builders queue with /arcadeport play speed-builders, then start again.");
             for (Player player : participants) {
                 player.sendMessage(ChatColor.YELLOW + "Speed Builders is waiting for another player; your queue place is retained.");
             }
@@ -238,6 +243,7 @@ public final class SpeedBuildersGame implements Listener {
             return;
         }
         if (!plugin.canStartSpeedBuilders()) {
+            if (sender != null) sender.sendMessage(ChatColor.RED + "Another Arcade game is currently active. Speed Builders will wait until it ends.");
             for (Player player : participants) {
                 player.sendMessage(ChatColor.RED + "Another Arcade game is currently active. Your Speed Builders queue is retained; an operator can start it after that match ends.");
             }

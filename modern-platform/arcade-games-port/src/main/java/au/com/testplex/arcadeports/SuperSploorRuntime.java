@@ -25,6 +25,7 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
 import org.bukkit.entity.Snowball;
+import org.bukkit.entity.Squid;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -38,6 +39,7 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.EquipmentSlot;
@@ -133,7 +135,6 @@ public final class SuperSploorRuntime implements Listener {
     private static final int RED = 0;
     private static final int BLUE = 1;
     private static final int PRIMARY_SLOT = 0;
-    private static final int SQUID_SLOT = 7;
 
     private final JavaPlugin plugin;
     private final AbilityCooldownProgress cooldownProgress;
@@ -180,6 +181,7 @@ public final class SuperSploorRuntime implements Listener {
     private final Map<UUID, Set<UUID>> contributors = new HashMap<>();
     private final Map<UUID, Map<UUID, Long>> contributorTimes = new HashMap<>();
     private final Set<UUID> squidMode = new HashSet<>();
+    private final Map<UUID, Squid> squidEntities = new HashMap<>();
     private final Set<UUID> activeProjectiles = new HashSet<>();
     private final Map<UUID, UUID> projectileOwners = new HashMap<>();
     private final Map<UUID, Snowball> projectileEntities = new HashMap<>();
@@ -290,7 +292,8 @@ public final class SuperSploorRuntime implements Listener {
                 + "Super Sploor! " + ChatColor.RED + "Red" + ChatColor.GRAY + " vs "
                 + ChatColor.AQUA + "Blue" + ChatColor.GRAY + " — paint the most territory.");
         for (Player player : players.values()) {
-            player.sendMessage(ChatColor.YELLOW + "Right-click your selected primary weapon to paint. Select the Ink Sac on slot 8 while standing on friendly paint to enter Squid Mode.");
+            player.sendMessage(ChatColor.YELLOW + "Right-click your primary weapon to paint; slot 2 is your secondary, slot 3 your Special, and Dualies also has Dodge Roll in slot 4.");
+            player.sendMessage(ChatColor.AQUA + "Switch away from your paint gun while on your team's paint to become a squid. Select your paint gun to exit.");
         }
         updateScoreboard(now);
     }
@@ -365,10 +368,11 @@ public final class SuperSploorRuntime implements Listener {
             int currentInk = ink.getOrDefault(id, SuperSploorRules.MAX_INK);
             boolean inFriendlyPaint = engine.isFriendlySurface(player.getLocation(), teams.getOrDefault(id, -1));
             boolean squid = squidMode.contains(id);
-            if (squid && !inFriendlyPaint) {
+            if (squid && player.isOnGround() && !inFriendlyPaint) {
                 exitSquidMode(player, id);
                 squid = false;
             }
+            if (squid) syncSquidEntity(player, id);
             long lastRegen = lastInkRegenAt.getOrDefault(id, now);
             if (now - lastRegen >= 1_000L) {
                 int seconds = (int) Math.min(10L, (now - lastRegen) / 1_000L);
@@ -462,11 +466,11 @@ public final class SuperSploorRuntime implements Listener {
 
     private String secondaryDescription(String kit) {
         return switch (kit) {
-            case "roller" -> "Right-click to place a proximity mine. 30 ink.";
-            case "charger" -> "Right-click to reveal nearby enemies to your team. 25 ink.";
-            case "lobber" -> "Right-click to launch a temporary area sprinkler. 35 ink.";
-            case "dualies" -> "Right-click to launch a delayed suction blast. 30 ink.";
-            default -> "Right-click to throw an area paint bomb. 25 ink.";
+            case "roller" -> "Right-click to place a proximity mine. Costs 30 ink; 4-second cooldown.";
+            case "charger" -> "Right-click to reveal nearby enemies to your team. Costs 25 ink; 4-second cooldown.";
+            case "lobber" -> "Right-click to launch a temporary area sprinkler. Costs 35 ink; 4-second cooldown.";
+            case "dualies" -> "Right-click to launch a delayed suction blast. Costs 30 ink; 4-second cooldown.";
+            default -> "Right-click to throw an area paint bomb. Costs 25 ink; 4-second cooldown.";
         };
     }
 
@@ -477,6 +481,16 @@ public final class SuperSploorRuntime implements Listener {
             case "lobber" -> "Paintstorm";
             case "dualies" -> "Afterimage Dash";
             default -> "Colourburst";
+        };
+    }
+
+    private String specialDescription(String kit) {
+        return switch (kit) {
+            case "roller" -> "Paint through enemies and leave a damaging trail. Charges by painting; use at 100%.";
+            case "charger" -> "Fire a long beam that paints a straight path and marks enemies. Charges by painting; use at 100%.";
+            case "lobber" -> "Create a pulsing storm that paints a wide area and marks enemies. Charges by painting; use at 100%.";
+            case "dualies" -> "Dash through an afterimage, painting the route and disrupting enemies. Charges by painting; use at 100%.";
+            default -> "Blast nearby ground with team-coloured ink and mark close enemies. Charges by painting; use at 100%.";
         };
     }
 
@@ -902,13 +916,12 @@ public final class SuperSploorRuntime implements Listener {
         player.getInventory().setItem(1, namedItem(secondaryIcon(kit),
                 ChatColor.GREEN + secondaryName(kit), secondaryDescription(kit)));
         player.getInventory().setItem(2, namedItem(Material.BLAZE_POWDER,
-                ChatColor.LIGHT_PURPLE + specialName(kit), "Right-click when the Special gauge reaches 100%."));
+                ChatColor.LIGHT_PURPLE + specialName(kit),
+                "Right-click to use when SPECIAL is READY. " + specialDescription(kit)));
         if ("dualies".equals(kit)) {
             player.getInventory().setItem(3, namedItem(Material.ENDER_PEARL,
                     ChatColor.AQUA + "Dodge Roll", "Right-click to dodge. Two charges; one recharges every 5 seconds."));
         }
-        player.getInventory().setItem(7, namedItem(Material.INK_SAC, ChatColor.AQUA + "Squid Mode",
-                "Select this slot on your team's paint to swim, climb and refill ink"));
         player.getInventory().setHeldItemSlot(PRIMARY_SLOT);
         player.getInventory().setArmorContents(teamArmour(team, 0));
         player.setExp(1.0F);
@@ -957,9 +970,13 @@ public final class SuperSploorRuntime implements Listener {
         player.setExp(value / 100.0F);
         player.setLevel(value);
         int special = (int) Math.floor(specialCharge.getOrDefault(id, 0.0D));
+        String kit = kits.getOrDefault(id, "sprayer");
+        String specialStatus = special >= 100
+                ? ChatColor.GREEN + specialName(kit).toUpperCase(java.util.Locale.ROOT) + " READY"
+                : ChatColor.LIGHT_PURPLE + "SPECIAL " + special + "%";
         player.sendActionBar(ChatColor.AQUA + "INK " + value + "%"
                 + (squidMode.contains(id) ? ChatColor.GREEN + "  SQUID" : "")
-                + ChatColor.GRAY + "  | " + ChatColor.LIGHT_PURPLE + " SPECIAL " + special + "%"
+                + ChatColor.GRAY + "  | " + specialStatus
                 + ChatColor.GRAY + "  |  " + ChatColor.RED + engine.redUnits() + ChatColor.GRAY
                 + " : " + ChatColor.AQUA + engine.blueUnits());
     }
@@ -1536,27 +1553,88 @@ public final class SuperSploorRuntime implements Listener {
         Player player = event.getPlayer();
         UUID id = player.getUniqueId();
         if (!players.containsKey(id) || respawnAt.containsKey(id)) return;
-        if (event.getNewSlot() == SQUID_SLOT) {
+        if (event.getNewSlot() == PRIMARY_SLOT) {
+            if (squidMode.contains(id)) exitSquidMode(player, id);
+            return;
+        }
+        // 1.8 entered Squid Mode by switching away from the paint gun. Any other
+        // selected slot activates it while standing on friendly paint.
+        if (event.getNewSlot() != PRIMARY_SLOT) {
             if (!engine.isFriendlySurface(player.getLocation(), teams.getOrDefault(id, -1))) {
                 event.setCancelled(true);
                 player.sendActionBar(ChatColor.RED + "You can only enter Squid Mode on your team's paint.");
                 return;
             }
-            squidMode.add(id);
-            player.setWalkSpeed((float) SuperSploorRules.SQUID_WALK_SPEED);
-            player.setSneaking(true);
-            player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_SPLASH, 0.7F, 1.4F);
-            player.sendActionBar(ChatColor.GREEN + "SQUID MODE — swim, climb and refill!");
+            enterSquidMode(player, id);
         } else if (squidMode.contains(id)) {
             exitSquidMode(player, id);
         }
     }
 
+    private void enterSquidMode(Player player, UUID id) {
+        if (!squidMode.add(id)) return;
+        int team = teams.getOrDefault(id, RED);
+        Squid squid = spawnSquid(player, team);
+        squidEntities.put(id, squid);
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            if (!viewer.getUniqueId().equals(id)) viewer.hidePlayer(plugin, player);
+        }
+        player.hideEntity(plugin, squid);
+        player.setWalkSpeed((float) SuperSploorRules.SQUID_WALK_SPEED);
+        player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_SPLASH, 0.7F, 1.4F);
+        player.sendActionBar(ChatColor.GREEN + "SQUID MODE — climb friendly-painted walls and refill ink faster.");
+    }
+
+    private Squid spawnSquid(Player player, int team) {
+        return world.spawn(player.getLocation(), Squid.class, squid -> {
+            squid.setAI(false);
+            squid.setAware(false);
+            squid.setGravity(false);
+            squid.setCollidable(false);
+            squid.setInvulnerable(true);
+            squid.setSilent(true);
+            squid.setPersistent(false);
+            squid.setCustomName((team == RED ? ChatColor.RED : ChatColor.AQUA)
+                    + player.getName() + ChatColor.DARK_GRAY + " • Squid");
+            squid.setCustomNameVisible(true);
+        });
+    }
+
+    private void syncSquidEntity(Player player, UUID id) {
+        Squid squid = squidEntities.get(id);
+        if (squid == null || !squid.isValid()) {
+            squid = spawnSquid(player, teams.getOrDefault(id, RED));
+            squidEntities.put(id, squid);
+            player.hideEntity(plugin, squid);
+        }
+        Location target = player.getLocation();
+        if (squid.getLocation().distanceSquared(target) > 0.0025D
+                || Math.abs(squid.getLocation().getYaw() - target.getYaw()) > 1.0F) {
+            squid.teleport(target);
+        }
+    }
+
     private void exitSquidMode(Player player, UUID id) {
-        squidMode.remove(id);
+        if (!squidMode.remove(id)) return;
+        Squid squid = squidEntities.remove(id);
+        if (squid != null && squid.isValid()) squid.remove();
         if (player != null && player.isOnline()) {
+            if (squid != null) player.showEntity(plugin, squid);
+            for (Player viewer : Bukkit.getOnlinePlayers()) viewer.showPlayer(plugin, player);
             player.setWalkSpeed(0.2F);
-            player.setSneaking(false);
+            player.sendActionBar(ChatColor.YELLOW + "Squid Mode ended.");
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onJoin(PlayerJoinEvent event) {
+        if (!running) return;
+        Player viewer = event.getPlayer();
+        for (UUID squidId : squidMode) {
+            Player disguised = players.get(squidId);
+            if (disguised != null && disguised.isOnline() && !squidId.equals(viewer.getUniqueId())) {
+                viewer.hidePlayer(plugin, disguised);
+            }
         }
     }
 

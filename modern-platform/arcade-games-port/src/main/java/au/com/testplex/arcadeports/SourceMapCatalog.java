@@ -25,6 +25,10 @@ import java.util.jar.JarFile;
 
 /** Loads archived Reborn world maps into isolated modern Arcade test worlds. */
 public final class SourceMapCatalog {
+    private static final java.util.Set<String> MONSTER_MAZE_WORLD_NAMES = java.util.Set.of(
+            "mm_void", "mm_volcano", "mm_colombia", "mm_sandycoast", "mm_siberian",
+            "mm_swampland", "mm_tesorohundido");
+
     private SourceMapCatalog() {}
 
     public static String resourceFor(ArcadePortGame game) {
@@ -479,6 +483,117 @@ public final class SourceMapCatalog {
             plugin.getLogger().log(java.util.logging.Level.WARNING,
                     "Could not fully reset source test world " + worldName + ": " + ex.getMessage(), ex);
             return false;
+        }
+    }
+
+    /**
+     * Prepare one of the deployed Monster Maze source worlds for Paper 26.3.
+     * A deployment can restore the original {@code mm_*} folder while Paper's
+     * previous import still exists under {@code world/dimensions/minecraft}.
+     * When the restored source contains complete terrain, discard only that
+     * exact imported copy and let Paper import the authoritative source again.
+     */
+    public static boolean prepareMonsterMazeWorld(JavaPlugin plugin, String worldName) {
+        if (plugin == null || !MONSTER_MAZE_WORLD_NAMES.contains(worldName)) return false;
+
+        Path container = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
+        Path source = container.resolve(worldName).normalize();
+        if (!source.startsWith(container) || source.equals(container) || Files.isSymbolicLink(source)
+                || !Files.isDirectory(source) || !Files.isRegularFile(source.resolve("level.dat"))) {
+            plugin.getLogger().warning("Monster Maze source world is missing or unsafe: " + source);
+            return false;
+        }
+
+        boolean hasLegacyTerrain = hasWorldDownloaderTerrainMetadata(source);
+        boolean hasModernTerrain = hasPaper26TerrainMetadata(source);
+        List<Path> importedFolders;
+        try {
+            importedFolders = findMonsterMazeMigratedFolders(container, worldName);
+        } catch (IOException exception) {
+            plugin.getLogger().log(java.util.logging.Level.WARNING,
+                    "Could not inspect Paper imports for Monster Maze map " + worldName + ".", exception);
+            return false;
+        }
+        if (!hasLegacyTerrain && !hasModernTerrain) {
+            if (!importedFolders.isEmpty()) {
+                plugin.getLogger().info("Loading existing Paper import for Monster Maze map " + worldName
+                        + " because its source folder has already been migrated.");
+                return true;
+            }
+            plugin.getLogger().warning("Monster Maze source world has no complete terrain data: " + source);
+            return false;
+        }
+
+        try {
+            // Only replace Paper's imported copy when the deployment-provided
+            // source is complete. With no source terrain, leave the live world
+            // data untouched and allow Bukkit to load its existing import.
+            if (hasLegacyTerrain || hasModernTerrain) {
+                for (Path imported : importedFolders) {
+                    deleteMonsterMazeImportedFolder(imported, container, worldName);
+                    plugin.getLogger().info("Cleared stale Paper import for Monster Maze map "
+                            + worldName + " at " + imported);
+                }
+            }
+            preparePaper26WorldStorage(source);
+            return true;
+        } catch (IOException exception) {
+            plugin.getLogger().log(java.util.logging.Level.WARNING,
+                    "Could not prepare Monster Maze source world " + worldName + " for Paper 26.3: "
+                            + exception.getMessage(), exception);
+            return false;
+        }
+    }
+
+    private static List<Path> findMonsterMazeMigratedFolders(Path container, String worldName) throws IOException {
+        java.util.Set<Path> primaryWorlds = new java.util.LinkedHashSet<>();
+        primaryWorlds.add(container.resolve("world").normalize());
+        for (World world : Bukkit.getWorlds()) {
+            if (world == null || MONSTER_MAZE_WORLD_NAMES.contains(world.getName())) continue;
+            Path candidate = world.getWorldFolder().toPath().toAbsolutePath().normalize();
+            if (candidate.startsWith(container) && !candidate.equals(container)
+                    && !Files.isSymbolicLink(candidate)) primaryWorlds.add(candidate);
+        }
+        if (Files.isDirectory(container)) {
+            try (Stream<Path> children = Files.list(container)) {
+                children.filter(Files::isDirectory).filter(path -> !Files.isSymbolicLink(path))
+                        .map(path -> path.toAbsolutePath().normalize())
+                        .filter(path -> path.startsWith(container) && !path.equals(container))
+                        .filter(path -> !MONSTER_MAZE_WORLD_NAMES.contains(path.getFileName().toString()))
+                        .filter(path -> !isReservedSourceWorldName(path.getFileName().toString()))
+                        .forEach(primaryWorlds::add);
+            }
+        }
+
+        List<Path> result = new ArrayList<>();
+        for (Path primary : primaryWorlds) {
+            Path imported = primary.resolve("dimensions/minecraft").resolve(worldName).normalize();
+            if (primary.startsWith(container) && !primary.equals(container)
+                    && imported.startsWith(primary) && !Files.isSymbolicLink(imported)
+                    && Files.exists(imported)) result.add(imported);
+        }
+        return result.stream().distinct().toList();
+    }
+
+    private static void deleteMonsterMazeImportedFolder(Path imported, Path container, String worldName)
+            throws IOException {
+        Path safe = imported.toAbsolutePath().normalize();
+        Path root = container.toAbsolutePath().normalize();
+        Path minecraft = safe.getParent();
+        Path dimensions = minecraft == null ? null : minecraft.getParent();
+        Path primary = dimensions == null ? null : dimensions.getParent();
+        if (!MONSTER_MAZE_WORLD_NAMES.contains(worldName) || !safe.startsWith(root)
+                || safe.equals(root) || safe.getFileName() == null
+                || !worldName.equals(safe.getFileName().toString())
+                || minecraft == null || !"minecraft".equals(minecraft.getFileName().toString())
+                || dimensions == null || !"dimensions".equals(dimensions.getFileName().toString())
+                || primary == null || !primary.startsWith(root) || primary.equals(root)
+                || Files.isSymbolicLink(safe)) {
+            throw new IOException("Refusing to remove unvalidated Monster Maze Paper import: " + safe);
+        }
+        if (!Files.exists(safe)) return;
+        try (Stream<Path> paths = Files.walk(safe)) {
+            for (Path item : paths.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(item);
         }
     }
 

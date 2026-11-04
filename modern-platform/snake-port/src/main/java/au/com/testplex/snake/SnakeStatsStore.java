@@ -24,10 +24,16 @@ public final class SnakeStatsStore {
     public SnakeStatsStore(JavaPlugin plugin) {
         this.plugin = plugin;
         if (!plugin.getDataFolder().exists() && !plugin.getDataFolder().mkdirs()) {
-            throw new IllegalStateException("Could not create SnakeModern data folder.");
+            throw new IllegalStateException("Could not create the shared Arcade data folder for Snake stats.");
         }
-        file = new File(plugin.getDataFolder(), "stats.yml");
-        data = YamlConfiguration.loadConfiguration(file);
+        file = new File(plugin.getDataFolder(), "snake-stats.yml");
+        File legacyFile = new File(plugin.getDataFolder().getParentFile(), "SnakeModern/stats.yml");
+        if (!file.isFile() && legacyFile.isFile()) {
+            data = YamlConfiguration.loadConfiguration(legacyFile);
+            save();
+        } else {
+            data = YamlConfiguration.loadConfiguration(file);
+        }
     }
 
     public void recordKill(Player player, int killsThisRound) {

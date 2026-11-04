@@ -35,6 +35,7 @@ public enum ArcadePortGame {
     MONSTER_MAZE_MODERN("monster-maze-modern", "Monster Maze (Modern)", Material.ROTTEN_FLESH, 0),
     SNEAKY_ASSASSINS("sneaky-assassins", "Sneaky Assassins", Material.EMERALD_BLOCK, 0),
     SKY_WARS("skywars", "SkyWars", Material.END_STONE_BRICKS, 0),
+    SNAKE("snake", "Snake", Material.WHITE_WOOL, 0),
     MILK_THE_COW("milk-the-cow", "Milk the Cow", Material.GRASS_BLOCK, 0, true),
     WITHER_ASSAULT("wither-assault", "Wither Assault", Material.STONE_BRICKS, 0, true),
     WIZARDS("wizards", "Wizards", Material.ENCHANTING_TABLE, 0),
