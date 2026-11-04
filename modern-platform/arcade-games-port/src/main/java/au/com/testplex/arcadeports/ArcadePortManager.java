@@ -14871,7 +14871,9 @@ public final class ArcadePortManager implements Listener {
             player.getInventory().setItem(4 + index, index < count ? sheepQuestWoolIcon(carried.get(index)) : null);
         }
         if (count > 0) {
-            int amplifier = ArcadePortRules.sheepQuestCarrySlownessAmplifier(count);
+            int amplifier = "shepherd".equals(session.sheepQuestKits.get(player.getUniqueId()))
+                    ? Math.min(ArcadePortRules.SHEEP_QUEST_MAX_CARRY, count - 1)
+                    : ArcadePortRules.sheepQuestCarrySlownessAmplifier(count);
             player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60,
                     Math.max(0, amplifier), false, false, true));
         } else {
