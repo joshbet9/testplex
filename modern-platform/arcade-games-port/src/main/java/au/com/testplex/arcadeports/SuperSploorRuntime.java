@@ -916,7 +916,8 @@ public final class SuperSploorRuntime implements Listener {
         player.getInventory().setItem(1, namedItem(secondaryIcon(kit),
                 ChatColor.GREEN + secondaryName(kit), secondaryDescription(kit)));
         player.getInventory().setItem(2, namedItem(Material.BLAZE_POWDER,
-                ChatColor.LIGHT_PURPLE + specialName(kit), "Right-click to use when SPECIAL is READY.", specialDescription(kit)));
+                ChatColor.LIGHT_PURPLE + specialName(kit),
+                "Right-click to use when SPECIAL is READY. " + specialDescription(kit)));
         if ("dualies".equals(kit)) {
             player.getInventory().setItem(3, namedItem(Material.ENDER_PEARL,
                     ChatColor.AQUA + "Dodge Roll", "Right-click to dodge. Two charges; one recharges every 5 seconds."));

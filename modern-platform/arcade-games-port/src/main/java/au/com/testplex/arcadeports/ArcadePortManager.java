@@ -5342,10 +5342,10 @@ public final class ArcadePortManager implements Listener {
             long timeLeft = session.endsAt > 0L ? session.endsAt - now
                     : TimeUnit.MINUTES.toMillis(5) - (now - session.startedAt);
             lines.add(ChatColor.GREEN + "Humans");
-            lines.add(ChatColor.GREEN + humansAlive + " Players");
+            lines.add(ChatColor.GREEN.toString() + humansAlive + " Players");
             lines.add(" ");
             lines.add(ChatColor.RED + "Withers");
-            lines.add(ChatColor.RED + withersAlive + " Players");
+            lines.add(ChatColor.RED.toString() + withersAlive + " Players");
             lines.add("  ");
             lines.add(ChatColor.YELLOW + "Time Left");
             lines.add(ChatColor.WHITE + formatMatchScoreboardTime(timeLeft));
@@ -7918,14 +7918,14 @@ public final class ArcadePortManager implements Listener {
                         Integer.MAX_VALUE, 0, false, false, false), true);
             }
             case "air" -> {
-                player.getInventory().addItem(skyWarsKitItem(Material.EYE_OF_ENDER,
+                player.getInventory().addItem(skyWarsKitItem(Material.ENDER_EYE,
                         "Eye of Ender", "Double jump; right-click to return to your last safe ground.", false));
                 player.setAllowFlight(true);
                 session.skyWarsSafeLocations.put(id, player.getLocation().clone());
             }
             case "metal" -> {
                 player.getInventory().addItem(new ItemStack(Material.STONE_PICKAXE));
-                player.getInventory().addItem(skyWarsKitItem(Material.REDSTONE_COMPARATOR,
+                player.getInventory().addItem(skyWarsKitItem(Material.COMPARATOR,
                         "Magnet", "Pull and damage a nearby armored opponent (15-second cooldown).", false));
             }
             case "earth" -> {

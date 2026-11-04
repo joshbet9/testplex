@@ -121,7 +121,7 @@ public final class MapManager {
             return null;
         }
 
-        if (!SourceMapCatalog.prepareMonsterMazeWorld(plugin, folder)) return null;
+        if (!SourceMapCatalog.prepareMonsterMazeWorld(plugin.getHostPlugin(), folder)) return null;
 
         World world = new WorldCreator(folder).generateStructures(false).createWorld();
         if (world != null) {
