@@ -701,17 +701,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         World world = source.getWorld();
         if (world == null || player.getWorld() != world) return;
         Location center = source.clone().add(0.0D, 1.1D, 0.0D);
-        Particle effect = particle(style);
-        for (int ring = 0; ring < 3; ring++) {
-            double radius = 0.35D + ring * 0.2D;
-            double y = ring * 0.35D;
-            for (int point = 0; point < 20; point++) {
-                double angle = Math.PI * 2.0D * point / 20.0D + ring * 0.18D;
-                Location at = center.clone().add(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
-                world.spawnParticle(effect, at, 1, 0.0D, 0.0D, 0.0D, 0.0D);
-            }
-        }
-        world.spawnParticle(Particle.END_ROD, center, 8, 0.25D, 0.4D, 0.25D, 0.02D);
+        GameAbilityCosmetics.preview(player, center, style);
         player.playSound(center, Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8F, 1.2F);
         player.sendMessage(ChatColor.AQUA + selectedGame.displayName() + ChatColor.GRAY
                 + " preview: " + ChatColor.GOLD + pretty(style));

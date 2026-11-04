@@ -10537,6 +10537,25 @@ public final class ArcadePortManager implements Listener {
         };
     }
 
+    private String abilityEffectCosmeticOption(Player player, ArcadePortGame game) {
+        String gameId = game != null && game.isMonsterMaze() ? "monster-maze"
+                : game == null ? "" : game.id();
+        String fallback = GameAbilityCosmetics.defaultOption(gameId);
+        if (player == null || gameId.isBlank()) return fallback;
+        org.bukkit.plugin.Plugin cosmetics = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
+        if (cosmetics == null || !cosmetics.isEnabled()) return fallback;
+        try {
+            Object selected = cosmetics.getClass().getMethod("getSelectedCosmeticOption",
+                    UUID.class, String.class, String.class)
+                    .invoke(cosmetics, player.getUniqueId(), gameId, "ability-effects");
+            return selected instanceof String option && !option.isBlank() ? option : fallback;
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            plugin.getLogger().fine("Could not read " + gameId + " ability effect selection: "
+                    + exception.getMessage());
+            return fallback;
+        }
+    }
+
     private void updatePaintballWeaponSkin(Session session, Player player) {
         ItemStack held = player.getInventory().getItem(0);
         String kit = paintballKitForItem(held);
@@ -22500,6 +22519,49 @@ public final class ArcadePortManager implements Listener {
                             >= snapshot.healthAndAbsorption() - 0.001D) return;
             playLegacyDamageFeedback(player, forcedSpleefFallFeedback);
         });
+    }
+
+    /** Apply the selected game-only ability style to successful player-caused hits. */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void showGameAbilityHitCosmetic(EntityDamageEvent event) {
+        if (!(event instanceof EntityDamageByEntityEvent byEntity)
+                || !(event.getEntity() instanceof LivingEntity target)
+                || event.getFinalDamage() <= 0.0D) return;
+        Session session = active;
+        Player attacker = playerShooter(byEntity.getDamager());
+        if (session == null || attacker == null || !attacker.isOnline()
+                || !isSessionWorld(session, attacker.getWorld())
+                || !isSessionWorld(session, target.getWorld())
+                || !session.alive.contains(attacker.getUniqueId())) return;
+        String style = abilityEffectCosmeticOption(attacker, session.type);
+        GameAbilityCosmetics.hit(attacker, target.getLocation(), style);
+    }
+
+    /** Preview the equipped game's style whenever a named ability item is activated. */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void showGameAbilityUseCosmetic(PlayerInteractEvent event) {
+        Player player = event.getPlayer();
+        Session session = active;
+        if (event.getHand() != EquipmentSlot.HAND || !event.getAction().isRightClick()
+                || session == null || !session.liveStarted
+                || !session.alive.contains(player.getUniqueId())
+                || !isSessionWorld(session, player.getWorld())) return;
+        ItemStack item = event.getItem();
+        if (item == null || !item.hasItemMeta() || !item.getItemMeta().hasDisplayName()) return;
+        String name = ChatColor.stripColor(item.getItemMeta().getDisplayName());
+        if (name == null || !isAbilityStyleItemName(name)) return;
+        Location effectAt = player.getLocation().add(player.getLocation().getDirection().multiply(0.8D));
+        GameAbilityCosmetics.hit(player, effectAt,
+                abilityEffectCosmeticOption(player, session.type));
+    }
+
+    private boolean isAbilityStyleItemName(String name) {
+        String value = name.toLowerCase(java.util.Locale.ROOT);
+        return List.of("ability", "jump", "leap", "dash", "blast", "bomb", "fireball", "smoke",
+                "teleport", "switch", "disguise", "spell", "shot", "arrow", "tnt", "wall", "throw",
+                "snowball", "potion", "shield", "laser", "magic", "dragon", "sphere", "frost", "web",
+                "ink", "splat", "photo", "camera", "paint", "ball", "charge", "strike", "swing")
+                .stream().anyMatch(value::contains);
     }
 
     /** Recreate the visible 1.8 red hurt flash and body flinch for every real hit. */
