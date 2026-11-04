@@ -71,7 +71,7 @@ For a tournament with multiple players:
 ## Draw My Thing regression checks
 
 - [ ] The game has a 320-second total timer; round time divides the available drawing time among queued players and never exceeds 40 seconds.
-- [ ] With 8 or fewer players, each drawing turn is 40 seconds; above 8 players, the 320-second drawing budget is divided across all turns. Intermissions run outside each drawing timer.
+- [ ] With 8 or fewer players, each drawing turn is 40 seconds; above 8 players, the 320-second drawing budget is divided across all turns with no intermission.
 - [ ] The drawer can select any palette colour while drawing without moving or losing palette items.
 - [ ] Hint, correct-guess, painting, and clear-board sounds play for the intended audience and do not spam unrelated players.
 
