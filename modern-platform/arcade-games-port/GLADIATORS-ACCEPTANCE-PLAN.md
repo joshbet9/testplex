@@ -33,16 +33,30 @@ For a tournament with multiple players:
 ## Tournament and combat lifecycle
 
 - [ ] Original Gladiators source map loads in its own isolated world and uses the source arena markers/bounds.
-- [ ] The first tournament stage scales correctly to the player count; concurrent duels start in separate arenas.
+- [ ] A single random seed fixes every winners', losers', and conditional grand-final-reset slot when the tournament starts.
+- [ ] Verify bracket simulations for every player count from 2 through 16, especially 3, 5, 8, and 16.
+- [ ] The 16-player bracket has winners' rounds of 8/4/2/1 and losers' rounds of 4/4/3/2/1 matches; the lower semifinal has four entrants after the winners' finalist drops in.
+- [ ] Reordering independent match completions never changes feeder relationships or designated opponents.
+- [ ] Each participant enters at most one duel at a time; independent ready matches start concurrently when distinct arenas are available.
+- [ ] Byes and unavailable participants resolve without a duel or tournament deadlock.
 - [ ] Each duel has the full five-second start lock; players cannot damage, shoot or interfere with another pair.
-- [ ] The winners' bracket advances only after every duel in its stage resolves.
-- [ ] First loss moves a player into the lower bracket; second loss eliminates them.
-- [ ] Lower-bracket pairings start at stage boundaries and can run alongside the next winners' stage.
-- [ ] The grand final resets correctly when the lower-bracket finalist takes the first final.
+- [ ] First defeat advances through the predetermined lower-bracket feeder; second defeat eliminates the player.
+- [ ] A lower-bracket duel starts as soon as its feeder results are known and an arena is free, without waiting on unrelated duels.
+- [ ] The winners' champion wins immediately by taking the grand final; a lower-bracket champion win starts the predeclared one-loss reset final.
 - [ ] Unresolved duels receive the intended poison escalation after 60 seconds, without poisoning completed duels.
 - [ ] Environmental damage remains active inside a duel; eliminated and out-of-pair players cannot be damaged.
 - [ ] A disconnect, quit, death or server-side stop resolves the affected pair and does not strand either bracket.
 - [ ] Solo practice does not create a tournament win or advance a bracket.
+
+## Mirrored world and spectator checks
+
+- [ ] The losers' bracket receives a separate world extracted from the same selected source-map archive, preserving terrain, arena markers and configuration.
+- [ ] Winners' fighters remain in the original map and losers' fighters remain in the mirror; arena assignments do not overlap within either world.
+- [ ] A spectator can switch between winners' and losers' matches, return to the match list, and cannot attack or interact with fighters.
+- [ ] The spectator match list shows bracket, round, both fighters, current state, and completed results.
+- [ ] Waiting fighters can spectate and are returned to their assigned arena when their next duel begins.
+- [ ] The lower-bracket champion is moved to the original map for the grand final.
+- [ ] Ending, stopping, or restarting removes only the temporary mirror instance; interrupted-session mirror worlds are cleaned at startup.
 
 ## Hotbar, stats and presentation
 
@@ -54,6 +68,13 @@ For a tournament with multiple players:
 - [ ] Tournament status, bracket queues, duel result messages, spectator state and post-round lobby scoreboard remain readable.
 - [ ] Ending or restarting the tournament restores inventories, effects, locations and arena/world state.
 
+## Draw My Thing regression checks
+
+- [ ] The game has a 320-second total timer; round time divides the available drawing time among queued players and never exceeds 40 seconds.
+- [ ] With 8 or fewer players, each drawing turn is 40 seconds; above 8 players, the 320-second drawing budget is divided across all turns. Intermissions run outside each drawing timer.
+- [ ] The drawer can select any palette colour while drawing without moving or losing palette items.
+- [ ] Hint, correct-guess, painting, and clear-board sounds play for the intended audience and do not spam unrelated players.
+
 ## Exit criteria
 
-Keep Gladiators enabled in the shared queue while fixing any defects found. Do not mark it gameplay-accepted until the five rulesets, full tournament progression, disconnect cases, environmental damage and saved hotbar behaviour have been exercised on Paper 26.3.
+Keep Gladiators enabled in the shared queue while fixing any defects found. Do not mark it gameplay-accepted until the five rulesets, bracket simulations, both world instances, spectator switching, disconnect cases, environmental damage and saved hotbar behaviour have been exercised on Paper 26.3. Automated bracket checks are not live gameplay acceptance.

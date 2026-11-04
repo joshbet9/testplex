@@ -565,8 +565,12 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     sender.sendMessage("Players only.");
                     return true;
                 }
+                if (args.length >= 2 && "gladiators".equalsIgnoreCase(args[1])) {
+                    manager.openGladiatorSpectatorMenu(spectator);
+                    return true;
+                }
                 if (args.length < 2 || !"plexball".equalsIgnoreCase(args[1])) {
-                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport spectate plexball");
+                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport spectate <plexball|gladiators>");
                     return true;
                 }
                 if (plexball != null) plexball.spectate(spectator);
@@ -594,6 +598,12 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             case "bot":
             case "bots":
                 manager.handleBotCommand(sender, java.util.Arrays.copyOfRange(args, 1, args.length));
+                return true;
+            case "debug":
+                manager.handleDebugCommand(sender, java.util.Arrays.copyOfRange(args, 1, args.length));
+                return true;
+            case "preview":
+                manager.handlePreviewCommand(sender, java.util.Arrays.copyOfRange(args, 1, args.length));
                 return true;
             case "maps":
             case "map":

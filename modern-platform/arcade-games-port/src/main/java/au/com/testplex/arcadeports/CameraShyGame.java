@@ -623,7 +623,8 @@ public final class CameraShyGame implements Listener {
                 abortStart("The Snap maze world could not be loaded.");
                 return;
             }
-            int missing = CameraShyRules.MAX_PLAYERS - pendingHumans.size();
+            int missing = Math.min(manager.configuredTestBotCount(ArcadePortGame.CAMERA_SHY),
+                    CameraShyRules.MAX_PLAYERS - pendingHumans.size());
             if (missing <= 0) {
                 startMatch(pendingHumans, List.of());
                 return;
@@ -646,6 +647,9 @@ public final class CameraShyGame implements Listener {
                 }
                 if (result.succeeded()) {
                     List<Player> botsReady = new ArrayList<>(result.players());
+                    for (int index = 0; index < botsReady.size(); index++) {
+                        manager.applyConfiguredTestBotLoadout(ArcadePortGame.CAMERA_SHY, index, botsReady.get(index));
+                    }
                     startMatch(pendingHumans, botsReady);
                 } else if (pendingHumans.size() >= CameraShyRules.MIN_PLAYERS) {
                     plugin.getLogger().warning("Snap test-player fill failed; starting with humans only: " + result.error());

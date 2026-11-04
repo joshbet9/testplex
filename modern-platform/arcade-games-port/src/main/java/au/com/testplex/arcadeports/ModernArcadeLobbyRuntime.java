@@ -56,6 +56,11 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private static final String KIT_TITLE = "Kit Select";
     private static final String QUEUE_TITLE = "Team Select | Queue";
     private static final String BOT_MENU_PREFIX = "Bot Cosmetics | ";
+    private static final String TEST_BOTS_TITLE = "Test Bots: Setup";
+    private static final String TEST_BOT_LOADOUT_TITLE = "Test Bots: Loadout";
+    private static final String TEST_BOT_KITS_TITLE = "Test Bots: Kits";
+    private static final String TEST_BOT_COSMETICS_TITLE = "Test Bots: Cosmetics";
+    private static final String DEBUG_TITLE = "Game Debug Controls";
     private static final String[] THEMES = {"porky", "inferno", "frost", "slime", "royal", "confetti"};
     private static final String[] BOMB_LOBBERS_THEMES = {
             "classic", "ember", "shockwave", "spark", "confetti", "frost", "slime"
@@ -69,12 +74,18 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private final ModernArcadeLobby lobby;
     private final NamespacedKey actionKey, themeKey, botKey, formKey, displayKey, kitNpcKey, teamNpcKey;
     private final Map<String, Bot> bots = new LinkedHashMap<>();
+    private final Map<java.util.UUID, TestBotMenuState> testBotMenus = new LinkedHashMap<>();
     private final Map<java.util.UUID, Long> lastBotHitAtByAttacker = new LinkedHashMap<>();
     private final Map<java.util.UUID, Long> lastBotSwingAtByAttacker = new LinkedHashMap<>();
     private final List<Entity> showcase = new ArrayList<>();
     private final List<Entity> kitNpcs = new ArrayList<>();
     private final List<Entity> teamNpcs = new ArrayList<>();
     private ArcadePortGame selectedGame = ArcadePortGame.BACON_BRAWL;
+    private World cosmeticPreviewWorld;
+    private record TestBotMenuState(TestBotMenuPage page, ArcadePortGame game, int botIndex) {}
+    private enum TestBotMenuPage { SETUP, LOADOUT, KITS, COSMETICS }
+    private record TestBotCosmetic(String lineId, String lineTitle, String optionId,
+            String optionName, String icon) {}
     private BukkitTask task;
 
     ModernArcadeLobbyRuntime(JavaPlugin plugin, ArcadePortManager manager, ModernArcadeLobby lobby) {
@@ -87,6 +98,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         displayKey = new NamespacedKey(plugin, "legacy-lobby-datapoint");
         kitNpcKey = new NamespacedKey(plugin, "lobby-kit-npc");
         teamNpcKey = new NamespacedKey(plugin, "lobby-team-npc");
+        clearLobbyShowcase();
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=lobby-runtime-legacy-bot-cleanup-start");
         clearLegacyBots();
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=lobby-runtime-legacy-bot-cleanup-complete");
@@ -119,6 +131,17 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         }
     }
 
+    private void clearLobbyShowcase() {
+        World world = lobby.ensureWorld();
+        if (world == null) return;
+        for (Entity entity : new ArrayList<>(world.getEntities())) {
+            String tag = entity.getPersistentDataContainer().get(themeKey, PersistentDataType.STRING);
+            if (tag != null && (tag.startsWith("showcase:") || "showcase-label".equals(tag))) {
+                entity.remove();
+            }
+        }
+    }
+
     /** Also purge legacy NPC bots from arena chunks that were not loaded at plugin startup. */
     @EventHandler
     public void onLegacyBotChunkLoad(ChunkLoadEvent event) {
@@ -141,8 +164,6 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=selected-game-displays-complete");
         refreshKitAndTeamNpcs();
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=selected-game-kit-team-npcs-complete");
-        refreshShowcase();
-        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=selected-game-showcase-complete");
     }
 
     public void refreshDisplays() {
@@ -403,7 +424,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     }
 
     private void refreshShowcase() {
-        World world = lobby.ensureWorld();
+        World world = ensureCosmeticPreviewWorld();
         if (world == null) return;
         for (Entity e : new ArrayList<>(showcase)) if (e != null && e.isValid()) e.remove();
         showcase.clear();
@@ -475,10 +496,79 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         }
     }
 
+    private World ensureCosmeticPreviewWorld() {
+        if (cosmeticPreviewWorld != null) return cosmeticPreviewWorld;
+        World world = Bukkit.getWorld("testplex_cosmetic_preview_v1");
+        if (world == null) {
+            org.bukkit.WorldCreator creator = new org.bukkit.WorldCreator("testplex_cosmetic_preview_v1");
+            creator.type(org.bukkit.WorldType.FLAT);
+            creator.generateStructures(false);
+            world = creator.createWorld();
+        }
+        if (world == null) {
+            plugin.getLogger().severe("Could not create the dedicated game-cosmetic preview world.");
+            return null;
+        }
+        cosmeticPreviewWorld = world;
+        world.setTime(6000L);
+        world.setStorm(false);
+        world.setThundering(false);
+        world.setGameRule(org.bukkit.GameRule.DO_DAYLIGHT_CYCLE, false);
+        world.setGameRule(org.bukkit.GameRule.DO_WEATHER_CYCLE, false);
+        world.setGameRule(org.bukkit.GameRule.DO_MOB_SPAWNING, false);
+        world.getWorldBorder().setCenter(0.0D, 0.0D);
+        world.getWorldBorder().setSize(96.0D);
+        world.getWorldBorder().setDamageAmount(0.0D);
+        for (int x = -20; x <= 20; x++) {
+            for (int z = -4; z <= 36; z++) {
+                world.getBlockAt(x, ModernArcadeLobby.FLOOR_Y, z).setType(Material.SMOOTH_STONE, false);
+            }
+        }
+        world.setSpawnLocation(0, ModernArcadeLobby.FLOOR_Y + 1, 0);
+        return world;
+    }
+
+    public void handlePreviewCommand(org.bukkit.command.CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(ChatColor.YELLOW + "Cosmetic preview mode is available in-game from the Arcade lobby.");
+            return;
+        }
+        if (args.length > 0 && "exit".equalsIgnoreCase(args[0])) {
+            if (cosmeticPreviewWorld != null && player.getWorld() == cosmeticPreviewWorld) {
+                lobby.sendToLobby(player);
+                player.sendMessage(ChatColor.GREEN + "Returned to the Arcade lobby.");
+            }
+            return;
+        }
+        if (cosmeticPreviewWorld != null && player.getWorld() == cosmeticPreviewWorld) {
+            lobby.sendToLobby(player);
+            player.sendMessage(ChatColor.GREEN + "Returned to the Arcade lobby.");
+            return;
+        }
+        if (!lobby.isLobbyWorld(player.getWorld())) {
+            player.sendMessage(ChatColor.YELLOW + "Return to the Arcade lobby before entering cosmetic preview mode.");
+            return;
+        }
+        World world = ensureCosmeticPreviewWorld();
+        if (world == null) {
+            player.sendMessage(ChatColor.RED + "The cosmetic preview sandbox could not be loaded.");
+            return;
+        }
+        refreshShowcase();
+        player.teleport(new Location(world, 0.5D, ModernArcadeLobby.FLOOR_Y + 1.0D, 0.5D));
+        player.setGameMode(org.bukkit.GameMode.ADVENTURE);
+        player.setInvulnerable(true);
+        lobby.ensurePanelItem(player);
+        player.sendMessage(ChatColor.AQUA + selectedGame.displayName()
+                + ChatColor.GRAY + " cosmetic sandbox. Use /arcadeport preview exit to return.");
+    }
+
     /**
-     * Keep the lobby preview specific to the selected game's own cosmetic prototype options.
+     * Keep the sandbox preview specific to the selected game's cosmetic options.
      */
     private String[] showcaseOptions(ArcadePortGame game) {
+        String[] registered = registeredCosmeticOptions(game);
+        if (registered.length > 0) return registered;
         return switch (game) {
             case BOMB_LOBBERS -> BOMB_LOBBERS_THEMES;
             case DEATH_TAG -> new String[] {"bark-footprints", "soul-ribbons", "lantern-motes"};
@@ -499,6 +589,31 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             case CAMERA_SHY -> new String[] {"smoke-artist", "decoy", "runner", "spotter", "understudy"};
             default -> new String[] {"classic", "inferno", "frost"};
         };
+    }
+
+    @SuppressWarnings("unchecked")
+    private String[] registeredCosmeticOptions(ArcadePortGame game) {
+        org.bukkit.plugin.Plugin cosmetics = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
+        if (cosmetics == null || game == null) return new String[0];
+        try {
+            Object catalog = cosmetics.getClass().getMethod("getCatalog").invoke(cosmetics);
+            String gameId = game.isMonsterMaze() ? "monster-maze" : game.id();
+            Object definition = catalog.getClass().getMethod("getGame", String.class).invoke(catalog, gameId);
+            if (definition == null) return new String[0];
+            List<Object> lines = (List<Object>) definition.getClass().getMethod("getCosmeticLines").invoke(definition);
+            List<String> options = new ArrayList<>();
+            for (Object line : lines) {
+                List<Object> choices = (List<Object>) line.getClass().getMethod("getOptions").invoke(line);
+                for (Object choice : choices) {
+                    String id = (String) choice.getClass().getMethod("getId").invoke(choice);
+                    if (!options.contains(id)) options.add(id);
+                }
+            }
+            return options.toArray(String[]::new);
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            plugin.getLogger().fine("Could not read cosmetic preview options: " + exception.getMessage());
+            return new String[0];
+        }
     }
 
     private Material showcaseIcon(ArcadePortGame game, String option) {
@@ -721,15 +836,28 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     @EventHandler
     public void onMenuClick(InventoryClickEvent e){
         String title=ChatColor.stripColor(e.getView().getTitle());
-        if(title==null || !(title.equals(KIT_TITLE)||title.equals(QUEUE_TITLE)||title.startsWith(BOT_MENU_PREFIX)))return;
+        if(title==null || !(title.equals(KIT_TITLE)||title.equals(QUEUE_TITLE)||title.startsWith(BOT_MENU_PREFIX)
+                || title.equals(TEST_BOTS_TITLE) || title.equals(TEST_BOT_LOADOUT_TITLE)
+                || title.equals(TEST_BOT_KITS_TITLE) || title.equals(TEST_BOT_COSMETICS_TITLE)
+                || title.equals(DEBUG_TITLE)))return;
         e.setCancelled(true);
         if(!(e.getWhoClicked() instanceof Player p)||e.getClickedInventory()==null||e.getClickedInventory()!=e.getView().getTopInventory())return;
         ItemStack it=e.getCurrentItem();if(it==null||it.getType().isAir()||!it.hasItemMeta())return;
         String action=it.getItemMeta().getPersistentDataContainer().get(actionKey,PersistentDataType.STRING);
+        if (DEBUG_TITLE.equals(title)) {
+            handleDebugMenuClick(p, action);
+            return;
+        }
+        if (title.equals(TEST_BOTS_TITLE) || title.equals(TEST_BOT_LOADOUT_TITLE)
+                || title.equals(TEST_BOT_KITS_TITLE) || title.equals(TEST_BOT_COSMETICS_TITLE)) {
+            handleTestBotMenuClick(p, title, action);
+            return;
+        }
         if(KIT_TITLE.equals(title)){
             if(action!=null&&action.startsWith("kit:")){
                 String kit=action.substring(4);manager.selectKit(p,kit);
                 if (selectedGame == ArcadePortGame.TURF_WARS && "turf-wars-fortifier".equals(kit)
+                        && !manager.isDebugOverrideEnabled(p.getUniqueId(), selectedGame, "all-kits")
                         && !plugin.getConfig().getBoolean("local-achievements." + p.getUniqueId()
                                 + ".turf-wars.genius-mathematician", false)) {
                     p.closeInventory();
@@ -809,10 +937,262 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     }
 
     public void handleBotCommand(org.bukkit.command.CommandSender sender, String[] args) {
-        sender.sendMessage(ChatColor.YELLOW + "Global lobby bots are disabled.");
-        sender.sendMessage(ChatColor.GRAY + "Testplex creates " + ArcadeTestPlayerManager.TARGET_ROSTER_SIZE
-                + " total server-side Player participants for each game start (human players included).");
-        sender.sendMessage(ChatColor.GRAY + "The AFK test players are removed automatically when that match ends.");
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(ChatColor.YELLOW + "Open Bot Configuration from the Arcade lobby hotbar.");
+            return;
+        }
+        if (!lobby.isLobbyWorld(player.getWorld())) {
+            player.sendMessage(ChatColor.YELLOW + "Bot loadouts can be configured from the Arcade lobby before a game starts.");
+            return;
+        }
+        openTestBotSetup(player, selectedGame);
+    }
+
+    public void handleDebugCommand(org.bukkit.command.CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(ChatColor.YELLOW + "Open Game Debug Controls from the Arcade lobby hotbar.");
+            return;
+        }
+        if (!lobby.isLobbyWorld(player.getWorld())) {
+            player.sendMessage(ChatColor.YELLOW + "Debug options are selected in the Arcade lobby before a game starts.");
+            return;
+        }
+        openDebugMenu(player);
+    }
+
+    private void openDebugMenu(Player player) {
+        Inventory inventory = Bukkit.createInventory(null, 27, DEBUG_TITLE);
+        inventory.setItem(4, item(Material.COMPARATOR, ChatColor.RED + selectedGame.displayName() + " Debug"));
+        boolean allKits = manager.isDebugOverrideEnabled(player.getUniqueId(), selectedGame, "all-kits");
+        inventory.setItem(11, testBotButton(allKits ? Material.LIME_DYE : Material.GRAY_DYE,
+                "Achievement Kits: " + (allKits ? "Unlocked" : "Normal Unlocks"),
+                "For test coverage, bypass this game's achievement-kit lock.", "debug-toggle:all-kits"));
+        if (selectedGame == ArcadePortGame.BACON_BRAWL) {
+            boolean unlimited = manager.isDebugOverrideEnabled(player.getUniqueId(), selectedGame,
+                    "unlimited-abilities");
+            inventory.setItem(15, testBotButton(unlimited ? Material.FIREWORK_ROCKET : Material.FIREWORK_STAR,
+                    "Unlimited Abilities: " + (unlimited ? "On" : "Off"),
+                    "Abilities use full strength and do not consume meter.", "debug-toggle:unlimited-abilities"));
+        } else {
+            inventory.setItem(15, item(Material.BARRIER, ChatColor.GRAY + "No ability-meter override for this game"));
+        }
+        inventory.setItem(22, testBotButton(Material.BARRIER, "Close", "debug-close"));
+        player.openInventory(inventory);
+    }
+
+    private void handleDebugMenuClick(Player player, String action) {
+        if ("debug-close".equals(action)) {
+            player.closeInventory();
+        } else if (action != null && action.startsWith("debug-toggle:")) {
+            String flag = action.substring("debug-toggle:".length());
+            boolean enabled = manager.toggleDebugOverride(player, selectedGame, flag);
+            player.sendMessage(ChatColor.YELLOW + selectedGame.displayName() + " debug override "
+                    + (enabled ? ChatColor.GREEN + "enabled" : ChatColor.RED + "disabled") + ChatColor.YELLOW + ".");
+            openDebugMenu(player);
+        }
+    }
+
+    private void openTestBotSetup(Player player, ArcadePortGame game) {
+        testBotMenus.put(player.getUniqueId(), new TestBotMenuState(TestBotMenuPage.SETUP, game, -1));
+        Inventory inventory = Bukkit.createInventory(null, 54, TEST_BOTS_TITLE);
+        int count = manager.configuredTestBotCount(game);
+        inventory.setItem(4, item(Material.PLAYER_HEAD, ChatColor.AQUA + game.displayName() + " bots",
+                ChatColor.GRAY + "The count is capped by the game's 16-player limit."));
+        inventory.setItem(11, testBotButton(Material.RED_CONCRETE, "Fewer bots", "bot-count:-1"));
+        inventory.setItem(13, item(Material.IRON_GOLEM_SPAWN_EGG, ChatColor.YELLOW + "Bots to load: " + count,
+                ChatColor.GRAY + "Configured for " + game.displayName() + ".",
+                ChatColor.DARK_GRAY + "Human players reduce the available slots."));
+        inventory.setItem(15, testBotButton(Material.LIME_CONCRETE, "More bots", "bot-count:+1"));
+        for (int index = 0; index < ArcadeTestPlayerManager.TARGET_ROSTER_SIZE; index++) {
+            String kit = manager.configuredTestBotKit(game, index);
+            int team = manager.configuredTestBotTeam(game, index);
+            String kitName = kit.isBlank() ? "Default kit" : kit.replace('-', ' ');
+            Material icon = configuredKitIcon(game, kit);
+            ItemStack bot = item(icon, ChatColor.YELLOW + "Bot " + (index + 1),
+                    ChatColor.GRAY + "Kit: " + kitName,
+                    ChatColor.GRAY + "Team: " + botTeamName(game, team),
+                    ChatColor.GREEN + "Click to configure kit, team and game cosmetics.");
+            mark(bot, "bot-slot:" + index, null);
+            inventory.setItem(botGridSlot(index), bot);
+        }
+        inventory.setItem(49, testBotButton(Material.BARRIER, "Close", "bot-close"));
+        player.openInventory(inventory);
+    }
+
+    private void openTestBotLoadout(Player player, ArcadePortGame game, int botIndex) {
+        testBotMenus.put(player.getUniqueId(), new TestBotMenuState(TestBotMenuPage.LOADOUT, game, botIndex));
+        Inventory inventory = Bukkit.createInventory(null, 27, TEST_BOT_LOADOUT_TITLE);
+        String kit = manager.configuredTestBotKit(game, botIndex);
+        inventory.setItem(11, testBotButton(configuredKitIcon(game, kit), "Choose Kit",
+                kit.isBlank() ? "Current: game default" : "Current: " + kit.replace('-', ' '), "bot-kits"));
+        int team = manager.configuredTestBotTeam(game, botIndex);
+        inventory.setItem(15, testBotButton(Material.WHITE_BANNER, "Team: " + botTeamName(game, team),
+                "Click to cycle through teams; Auto balances the bot.", "bot-team"));
+        inventory.setItem(13, testBotButton(Material.FIREWORK_STAR, "Game Cosmetic Style",
+                "Choose this bot's game-specific cosmetic options.", "bot-cosmetics"));
+        inventory.setItem(22, testBotButton(Material.ARROW, "Back to Bots", "bot-back"));
+        player.openInventory(inventory);
+    }
+
+    private void openTestBotKits(Player player, ArcadePortGame game, int botIndex) {
+        testBotMenus.put(player.getUniqueId(), new TestBotMenuState(TestBotMenuPage.KITS, game, botIndex));
+        Inventory inventory = Bukkit.createInventory(null, 54, TEST_BOT_KITS_TITLE);
+        List<ArcadeLobbyKitCatalogue.KitChoice> choices = ArcadeLobbyKitCatalogue.forGame(game, List.of());
+        int[] slots = menuSlots();
+        for (int index = 0; index < choices.size() && index < slots.length; index++) {
+            ArcadeLobbyKitCatalogue.KitChoice choice = choices.get(index);
+            ItemStack item = item(choice.icon, ChatColor.YELLOW + choice.name,
+                    ChatColor.GRAY + "Assign to Bot " + (botIndex + 1) + " for " + game.displayName() + ".",
+                    ChatColor.GREEN + "Click to select.");
+            mark(item, "bot-kit:" + choice.id, null);
+            inventory.setItem(slots[index], item);
+        }
+        if (choices.isEmpty()) {
+            inventory.setItem(22, item(Material.BARRIER, ChatColor.RED + "No kit station for this game"));
+        }
+        inventory.setItem(49, testBotButton(Material.ARROW, "Back", "bot-loadout"));
+        player.openInventory(inventory);
+    }
+
+    private void openTestBotCosmetics(Player player, ArcadePortGame game, int botIndex) {
+        testBotMenus.put(player.getUniqueId(), new TestBotMenuState(TestBotMenuPage.COSMETICS, game, botIndex));
+        Inventory inventory = Bukkit.createInventory(null, 54, TEST_BOT_COSMETICS_TITLE);
+        List<TestBotCosmetic> choices = testBotCosmetics(game);
+        int[] slots = menuSlots();
+        for (int index = 0; index < choices.size() && index < slots.length; index++) {
+            TestBotCosmetic choice = choices.get(index);
+            String selected = manager.configuredTestBotCosmetic(game, botIndex, choice.lineId());
+            ItemStack item = item(material(choice.icon()),
+                    (choice.optionId().equals(selected) ? ChatColor.GREEN : ChatColor.YELLOW) + choice.optionName(),
+                    ChatColor.GRAY + choice.lineTitle(),
+                    ChatColor.DARK_GRAY + "Game ability effects only; global cosmetics are unaffected.",
+                    choice.optionId().equals(selected) ? ChatColor.GREEN + "Selected" : ChatColor.GREEN + "Click to select.");
+            mark(item, "bot-cosmetic:" + choice.lineId() + ":" + choice.optionId(), null);
+            inventory.setItem(slots[index], item);
+        }
+        if (choices.isEmpty()) {
+            inventory.setItem(22, item(Material.BARRIER, ChatColor.RED + "No game cosmetic options are registered"));
+        }
+        inventory.setItem(49, testBotButton(Material.ARROW, "Back", "bot-loadout"));
+        player.openInventory(inventory);
+    }
+
+    private void handleTestBotMenuClick(Player player, String title, String action) {
+        TestBotMenuState state = testBotMenus.get(player.getUniqueId());
+        if (state == null) return;
+        ArcadePortGame game = state.game();
+        if (game == null) return;
+        if ("bot-close".equals(action)) {
+            testBotMenus.remove(player.getUniqueId());
+            player.closeInventory();
+            return;
+        }
+        if (state.page() == TestBotMenuPage.SETUP) {
+            if ("bot-count:-1".equals(action) || "bot-count:+1".equals(action)) {
+                int delta = "bot-count:+1".equals(action) ? 1 : -1;
+                manager.setConfiguredTestBotCount(game, manager.configuredTestBotCount(game) + delta);
+                openTestBotSetup(player, game);
+            } else if (action != null && action.startsWith("bot-slot:")) {
+                int index = Integer.parseInt(action.substring("bot-slot:".length()));
+                openTestBotLoadout(player, game, index);
+            }
+            return;
+        }
+        int botIndex = state.botIndex();
+        if (state.page() == TestBotMenuPage.LOADOUT) {
+            if ("bot-kits".equals(action)) openTestBotKits(player, game, botIndex);
+            else if ("bot-cosmetics".equals(action)) openTestBotCosmetics(player, game, botIndex);
+            else if ("bot-team".equals(action)) {
+                int teamCount = ArcadePortManager.teamCountForGame(game);
+                if (teamCount < 2) {
+                    player.sendMessage(ChatColor.YELLOW + game.displayName() + " does not use team assignments.");
+                } else {
+                    int current = manager.configuredTestBotTeam(game, botIndex);
+                    manager.setConfiguredTestBotTeam(game, botIndex, current >= teamCount - 1 ? -1 : current + 1);
+                }
+                openTestBotLoadout(player, game, botIndex);
+            } else if ("bot-back".equals(action)) openTestBotSetup(player, game);
+            return;
+        }
+        if (state.page() == TestBotMenuPage.KITS && action != null && action.startsWith("bot-kit:")) {
+            manager.setConfiguredTestBotKit(game, botIndex, action.substring("bot-kit:".length()));
+            openTestBotLoadout(player, game, botIndex);
+        } else if (state.page() == TestBotMenuPage.COSMETICS && action != null
+                && action.startsWith("bot-cosmetic:")) {
+            String[] selected = action.substring("bot-cosmetic:".length()).split(":", 2);
+            if (selected.length == 2) manager.setConfiguredTestBotCosmetic(game, botIndex, selected[0], selected[1]);
+            openTestBotCosmetics(player, game, botIndex);
+        } else if ("bot-loadout".equals(action)) {
+            openTestBotLoadout(player, game, botIndex);
+        }
+    }
+
+    private ItemStack testBotButton(Material material, String name, String action) {
+        return testBotButton(material, name, "", action);
+    }
+
+    private ItemStack testBotButton(Material material, String name, String detail, String action) {
+        ItemStack item = detail == null || detail.isBlank()
+                ? item(material, ChatColor.YELLOW + name)
+                : item(material, ChatColor.YELLOW + name, ChatColor.GRAY + detail);
+        mark(item, action, null);
+        return item;
+    }
+
+    private static int botGridSlot(int index) {
+        int[] slots = {19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34, 37, 38};
+        return slots[index];
+    }
+
+    private static int[] menuSlots() {
+        return new int[] {10,11,12,13,14,15,16,19,20,21,22,23,24,25,28,29,30,31,32,33,34,37,38,39,40,41,42,43};
+    }
+
+    private Material configuredKitIcon(ArcadePortGame game, String kitId) {
+        for (ArcadeLobbyKitCatalogue.KitChoice choice : ArcadeLobbyKitCatalogue.forGame(game, List.of())) {
+            if (choice.id.equalsIgnoreCase(kitId)) return choice.icon;
+        }
+        return Material.PLAYER_HEAD;
+    }
+
+    private String botTeamName(ArcadePortGame game, int selected) {
+        int teams = ArcadePortManager.teamCountForGame(game);
+        return teams < 2 || selected < 0 || selected >= teams ? "Auto balance" : "Team " + (selected + 1);
+    }
+
+    private List<TestBotCosmetic> testBotCosmetics(ArcadePortGame game) {
+        org.bukkit.plugin.Plugin cosmetics = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
+        if (cosmetics == null || game == null) return List.of();
+        try {
+            Object catalog = cosmetics.getClass().getMethod("getCatalog").invoke(cosmetics);
+            String gameId = game.isMonsterMaze() ? "monster-maze" : game.id();
+            Object definition = catalog.getClass().getMethod("getGame", String.class).invoke(catalog, gameId);
+            if (definition == null) return List.of();
+            @SuppressWarnings("unchecked")
+            List<Object> lines = (List<Object>) definition.getClass().getMethod("getCosmeticLines").invoke(definition);
+            List<TestBotCosmetic> choices = new ArrayList<>();
+            for (Object line : lines) {
+                String lineId = (String) line.getClass().getMethod("getId").invoke(line);
+                String lineTitle = (String) line.getClass().getMethod("getTitle").invoke(line);
+                String icon = (String) line.getClass().getMethod("getIcon").invoke(line);
+                @SuppressWarnings("unchecked")
+                List<Object> options = (List<Object>) line.getClass().getMethod("getOptions").invoke(line);
+                for (Object option : options) {
+                    String optionId = (String) option.getClass().getMethod("getId").invoke(option);
+                    String optionName = (String) option.getClass().getMethod("getName").invoke(option);
+                    choices.add(new TestBotCosmetic(lineId, lineTitle, optionId, optionName, icon));
+                }
+            }
+            return choices;
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            plugin.getLogger().fine("Could not read game cosmetic options for bot setup: " + exception.getMessage());
+            return List.of();
+        }
+    }
+
+    private Material material(String name) {
+        Material material = name == null ? null : Material.matchMaterial(name);
+        return material == null ? Material.FIREWORK_STAR : material;
     }
 
     private Bot createBot(String name){String k=key(name);if(k.isBlank()||bots.containsKey(k))return null;Bot b=new Bot(k,name,"porky","pig","el-muchacho-pigo");bots.put(k,b);saveBot(b);spawnBotEntity(b,lobby.spawnLocation().add(bots.size()*1.6D-3.0D,-3.0D,8.0D),false);refreshDisplays();return b;}
@@ -901,8 +1281,10 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private String pretty(String value){StringBuilder out=new StringBuilder();for(String part:value.split("-")){if(part.isEmpty())continue;if(out.length()>0)out.append(' ');out.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));}return out.toString();}
 
     private void tick(){
-        refreshDisplays();World world=lobby.ensureWorld();
+        refreshDisplays();
         clearLobbyNpcFire();
+        World world = cosmeticPreviewWorld;
+        if (world == null || world.getPlayers().isEmpty()) return;
         for (Entity e : new ArrayList<>(showcase)) {
             if (e == null || !e.isValid() || e.getWorld() != world) continue;
             String value = e.getPersistentDataContainer().get(themeKey, PersistentDataType.STRING);

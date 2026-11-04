@@ -2752,18 +2752,17 @@ class ArcadePortGameTest {
         assertEquals("RED", ArcadePortRules.gladiatorsArenaMarkerGroup(4));
     }
 
-    @Test void drawMyThingRoundDurationScalesToTheFiveMinuteBudgetAboveTenPlayers() {
-        assertEquals(30_000L, ArcadePortRules.drawMyThingRoundMillis(1));
-        assertEquals(30_000L, ArcadePortRules.drawMyThingRoundMillis(10));
-        assertEquals(24_545L, ArcadePortRules.drawMyThingRoundMillis(11));
-        assertEquals(22_250L, ArcadePortRules.drawMyThingRoundMillis(12));
-        assertEquals(15_937L, ArcadePortRules.drawMyThingRoundMillis(16));
+    @Test void drawMyThingRoundDurationFitsTheThreeHundredTwentySecondGameLimit() {
+        assertEquals(40_000L, ArcadePortRules.drawMyThingRoundMillis(1));
+        assertEquals(40_000L, ArcadePortRules.drawMyThingRoundMillis(8));
+        assertEquals(35_555L, ArcadePortRules.drawMyThingRoundMillis(9));
+        assertEquals(32_000L, ArcadePortRules.drawMyThingRoundMillis(10));
+        assertEquals(20_000L, ArcadePortRules.drawMyThingRoundMillis(16));
 
-        for (int players = 11; players <= 64; players++) {
+        for (int players = 1; players <= 64; players++) {
             long drawingMillis = players * ArcadePortRules.drawMyThingRoundMillis(players);
-            long intermissionMillis = (players - 1L) * ArcadePortRules.DRAW_MY_THING_INTERMISSION_MILLIS;
-            assertTrue(drawingMillis + intermissionMillis <= ArcadePortRules.DRAW_MY_THING_GAME_MILLIS,
-                    "DMT schedule exceeds five minutes for " + players + " players");
+            assertTrue(drawingMillis <= ArcadePortRules.DRAW_MY_THING_GAME_MILLIS,
+                    "DMT drawing exceeds 320 seconds for " + players + " players");
         }
     }
 

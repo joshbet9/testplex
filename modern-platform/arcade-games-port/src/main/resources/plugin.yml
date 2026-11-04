@@ -20,7 +20,7 @@ commands:
     aliases: [gameprefs]
   arcadeport:
     description: Start and test a modern Arcade game
-    usage: /arcadeport <play|join|leave|spectate|start|kit|stats|ghost|maps|lobby|bot|status|stop>
+    usage: /arcadeport <play|join|leave|spectate|start|kit|stats|ghost|maps|lobby|bot|debug|preview|status|stop>
   snake:
     description: Snake commands managed by Testplex Arcade
     usage: /snake <join|start|leave|kit|status|maps|map|stats|stop>
