@@ -781,6 +781,7 @@ public final class ArcadePortRules {
             case "frost", "ice", "ice-bridge" -> "frost";
             case "glider", "glide" -> "glider";
             case "tamer", "dragon-tamer" -> "tamer";
+            case "dragon-warden", "warden" -> "dragon-warden";
             default -> null;
         };
     }
@@ -1448,7 +1449,7 @@ public final class ArcadePortRules {
                 .replace('_', '-').replace(' ', '-');
         if (kit.startsWith("runner-")) kit = kit.substring("runner-".length());
         return switch (kit) {
-            case "basher", "archer", "traitor", "null" -> kit;
+            case "basher", "archer", "traitor", "null", "turtle", "trickster" -> kit;
             default -> null;
         };
     }
@@ -1679,6 +1680,7 @@ public final class ArcadePortRules {
             case "beserker", "berserker", "double-jump" -> "beserker";
             case "archer" -> "archer";
             case "brute", "thrower" -> "brute";
+            case "shepherd" -> "shepherd";
             default -> null;
         };
     }
@@ -1706,10 +1708,10 @@ public final class ArcadePortRules {
         return carriedCount >= 0 && carriedCount < SHEEP_QUEST_MAX_CARRY;
     }
 
-    /** Source Sheep Quest slows carriers progressively, up to the three-sheep limit. */
+    /** Source Sheep Quest slows carriers progressively; Shepherd's fourth sheep adds one further step. */
     public static int sheepQuestCarrySlownessAmplifier(int carriedCount) {
         if (carriedCount <= 0) return -1;
-        return Math.min(SHEEP_QUEST_MAX_CARRY - 1, carriedCount - 1);
+        return Math.min(SHEEP_QUEST_MAX_CARRY, carriedCount - 1);
     }
 
 
@@ -3076,7 +3078,7 @@ public final class ArcadePortRules {
                 .replace('_', '-').replace(' ', '-');
         if ("demo".equals(value) || "demolition".equals(value)) value = "demolitionist";
         return switch (value) {
-            case "alchemist", "archer", "demolitionist", "fighter", "tank" -> value;
+            case "alchemist", "archer", "demolitionist", "fighter", "tank", "breacher" -> value;
             default -> null;
         };
     }
@@ -3089,7 +3091,7 @@ public final class ArcadePortRules {
         if ("bob".equals(value) || "ross".equals(value) || "bobross".equals(value)) value = "bob-ross";
         return switch (value) {
             case "hattori", "devon", "anath", "dana", "biff", "larissa",
-                    "bardolf", "rowena", "ivy", "bob-ross" -> value;
+                    "bardolf", "rowena", "ivy", "bob-ross", "tactician" -> value;
             default -> null;
         };
     }
@@ -3101,7 +3103,7 @@ public final class ArcadePortRules {
         return switch (canonical) {
             case "hattori", "bardolf" -> "Assassin";
             case "devon", "rowena" -> "Hunter";
-            case "anath", "larissa", "bob-ross" -> "Mage";
+            case "anath", "larissa", "bob-ross", "tactician" -> "Mage";
             case "dana", "biff", "ivy" -> "Warrior";
             default -> null;
         };

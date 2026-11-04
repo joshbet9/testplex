@@ -5,7 +5,7 @@ import java.util.Set;
 
 /** Pure source-contract rules for Wither Assault's Human kit selection and Editor limits. */
 public final class WitherAssaultRules {
-    private static final Set<String> HUMAN_KITS = Set.of("archer", "medic", "editor");
+    private static final Set<String> HUMAN_KITS = Set.of("archer", "medic", "editor", "warden");
 
     private WitherAssaultRules() { }
 

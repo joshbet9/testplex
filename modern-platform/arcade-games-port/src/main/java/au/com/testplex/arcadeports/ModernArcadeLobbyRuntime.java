@@ -60,7 +60,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private static final String[] BOMB_LOBBERS_THEMES = {
             "classic", "ember", "shockwave", "spark", "confetti", "frost", "slime"
     };
-    private static final int[] KIT_MENU_SLOTS = {10, 11, 12, 13, 14, 15, 16, 17, 18, 19};
+    private static final int[] KIT_MENU_SLOTS = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25};
     private static final int KIT_PEDESTAL_X = -17;
     private static final int QUEUE_PEDESTAL_X = 18;
 
@@ -603,7 +603,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     }
 
     private void openKitMenu(Player p) {
-        Inventory inv = Bukkit.createInventory(null, 36, KIT_TITLE);
+        Inventory inv = Bukkit.createInventory(null, 54, KIT_TITLE);
         List<ArcadeLobbyKitCatalogue.KitChoice> choices = kitChoicesFor(selectedGame);
         if (choices.isEmpty()) {
             inv.setItem(13, item(Material.BARRIER, ChatColor.RED + "No Kit Selection",
@@ -659,6 +659,15 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     it = item(choice.icon, ChatColor.YELLOW + choice.name,
                             ChatColor.GRAY + "Choose this kit for your next Snap round.",
                             selected ? ChatColor.GOLD + "Currently selected" : ChatColor.GREEN + "Click to select");
+                } else if (choice.unlock == ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT
+                        && ArcadePortManager.achievementKitUnlock(selectedGame, choice.id) != null) {
+                    String achievement = ArcadePortManager.achievementKitUnlock(selectedGame, choice.id);
+                    boolean unlocked = plugin.getConfig().getBoolean("local-achievements."
+                            + p.getUniqueId() + "." + selectedGame.id() + "." + achievement, false);
+                    it = item(choice.icon, ChatColor.YELLOW + choice.name,
+                            ChatColor.GRAY + "Unlock with " + ArcadePortManager.titleCaseAchievement(achievement) + ".",
+                            ChatColor.GRAY + achievementKitSummary(choice.id),
+                            unlocked ? ChatColor.GREEN + "Click to select" : ChatColor.RED + "Locked");
                 } else {
                     it = item(choice.icon, ChatColor.YELLOW + choice.name,
                             ChatColor.GRAY + "Choose this kit for your next " + selectedGame.displayName() + ".",
@@ -668,8 +677,23 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 inv.setItem(KIT_MENU_SLOTS[i], it);
             }
         }
-        inv.setItem(31, item(Material.RED_BED, ChatColor.GRAY + "Back / Close"));
+        inv.setItem(49, item(Material.RED_BED, ChatColor.GRAY + "Back / Close"));
         p.openInventory(inv);
+    }
+
+    private String achievementKitSummary(String kitId) {
+        return switch (kitId) {
+            case "breacher" -> "TNT-focused attacker; charges replenish over time.";
+            case "tactician" -> "Survey and mark enemies, or gain a short combat boost.";
+            case "tnt-specialist" -> "Starts with three throwable TNT charges.";
+            case "runner-turtle" -> "Copper axe hits shell Chasers; every third hit earns a Wind Charge.";
+            case "runner-trickster" -> "Swap once with a random Chaser and launch Runner distractions.";
+            case "dragon-warden" -> "Shield and Wind Charges help defend against dragon dives.";
+            case "apex" -> "Start every evolution stage with a Golden Apple.";
+            case "shepherd" -> "Carry one extra sheep, with extra movement penalty.";
+            case "warden" -> "Use an iron sword and shield to protect Humans.";
+            default -> "Use the kit's specialised loadout.";
+        };
     }
     private void openQueueMenu(Player p) {
         Inventory inv = Bukkit.createInventory(null, 27, QUEUE_TITLE);

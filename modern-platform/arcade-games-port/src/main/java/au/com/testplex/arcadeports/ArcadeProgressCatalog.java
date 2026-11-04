@@ -68,7 +68,9 @@ public final class ArcadeProgressCatalog {
                     a("ultimate-chaser", "The Ultimate Chaser", "Kill 8 Runners in a single game."),
                     a("hasty-hunter", "Hasty Hunter", "Kill 3 Runners within one minute."),
                     a("resilient-runner", "Resilient Runner", "Regenerate 250 hearts total while using Runner Basher."),
-                    a("catch-me-if-you-can", "Catch Me If You Can", "Run 10,000 blocks in Death Tag."))),
+                    a("catch-me-if-you-can", "Catch Me If You Can", "Run 10,000 blocks in Death Tag."),
+                    a("turtle-shell", "Turtle Shell", "As a Runner, land three melee hits on Chasers in one game."),
+                    a("smoke-and-mirrors", "Smoke and Mirrors", "Win Death Tag as a Runner without being tagged."))),
             Map.entry("dragon-escape", List.of(
                     a("douglas-defeater", "Douglas Defeater", "Win 50 games of Dragon Escape."),
                     a("paralympics", "Paralympics", "Win a game without using Leap."),

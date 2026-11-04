@@ -131,7 +131,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private static final double MOBA_MINION_SOURCE_TARGET_RANGE_SQUARED = 100.0D;
     private static final long MOBA_MINION_COMBAT_INTERVAL = 500L;
     private static final List<String> HEROES_OF_GWEN_HERO_ORDER = List.of(
-            "hattori", "bardolf", "devon", "rowena", "anath", "larissa", "dana", "biff", "ivy");
+            "hattori", "bardolf", "devon", "rowena", "anath", "larissa", "dana", "biff", "ivy", "tactician");
+
+    private static boolean isCastleTntKit(String kit) {
+        return "demolitionist".equals(kit) || "breacher".equals(kit);
+    }
 
     private final JavaPlugin plugin;
     private final ArcadePortGame game;
@@ -2109,7 +2113,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         Player player = event.getPlayer();
         String kit = castleAssaultPlayerKits.get(player.getUniqueId());
         ItemStack dropped = event.getItemDrop().getItemStack();
-        boolean lockedTnt = "demolitionist".equals(kit) && dropped.getType() == Material.TNT;
+        boolean lockedTnt = isCastleTntKit(kit) && dropped.getType() == Material.TNT;
         boolean lockedArrow = "archer".equals(kit) && isCastleFletchedArrow(dropped);
         boolean lockedKitItem = kit != null && isCastleKitItem(dropped);
         if (!lockedTnt && !lockedArrow && !lockedKitItem) return;
@@ -2123,7 +2127,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (stopped || game != ArcadePortGame.CASTLE_ASSAULT
                 || !(event.getWhoClicked() instanceof Player player)) return;
         String kit = castleAssaultPlayerKits.get(player.getUniqueId());
-        boolean demolitionist = "demolitionist".equals(kit);
+        boolean demolitionist = isCastleTntKit(kit);
         boolean archer = "archer".equals(kit);
         ItemStack current = event.getCurrentItem();
         ItemStack cursor = event.getCursor();
@@ -2168,7 +2172,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         Player killer = player.getKiller();
         if (killer != null) recordCastleKill(killer, player, false);
         String kit = castleAssaultPlayerKits.get(player.getUniqueId());
-        if ("demolitionist".equals(kit)) {
+        if (isCastleTntKit(kit)) {
             event.getDrops().removeIf(item -> item != null && item.getType() == Material.TNT);
         } else if ("archer".equals(kit)) {
             event.getDrops().removeIf(this::isCastleFletchedArrow);
@@ -2889,7 +2893,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private double castleTntRadius(Player owner) {
-        return 4.0D + ("demolitionist".equals(castleAssaultPlayerKits.get(owner.getUniqueId())) ? 3.0D : 0.0D);
+        String kit = castleAssaultPlayerKits.get(owner.getUniqueId());
+        return 4.0D + ("demolitionist".equals(kit) ? 3.0D : "breacher".equals(kit) ? 1.5D : 0.0D);
     }
 
     private void refillCastleArcherArrows(long now) {
@@ -2915,7 +2920,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private void refillCastleDemolitionistTnt(long now) {
         for (UUID id : new ArrayList<>(activePlayers)) {
-            if (!"demolitionist".equals(castleAssaultPlayerKits.get(id))) continue;
+            if (!isCastleTntKit(castleAssaultPlayerKits.get(id))) continue;
             Player player = players.get(id);
             if (player == null || !player.isOnline()) continue;
             long next = castleDemolitionistNextTntAt.getOrDefault(id, now);
@@ -3384,9 +3389,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private void openHeroSelection(Player player) {
         HeroSelectionHolder holder = new HeroSelectionHolder(player.getUniqueId());
-        Inventory inventory = Bukkit.createInventory(holder, 27, ChatColor.DARK_PURPLE + "Choose Your Hero");
+        Inventory inventory = Bukkit.createInventory(holder, 36, ChatColor.DARK_PURPLE + "Choose Your Hero");
         holder.inventory = inventory;
-        int[] slots = {10, 11, 12, 13, 14, 15, 16, 17, 18};
+        int[] slots = {10, 11, 12, 13, 14, 15, 16, 17, 18, 22};
         for (int index = 0; index < HEROES_OF_GWEN_HERO_ORDER.size(); index++) {
             String hero = HEROES_OF_GWEN_HERO_ORDER.get(index);
             String role = ArcadePortRules.heroesOfGwenHeroRole(hero);
@@ -4086,7 +4091,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         } else {
             castleArcherNextArrowAt.remove(player.getUniqueId());
         }
-        if ("demolitionist".equals(kit)) {
+        if (isCastleTntKit(kit)) {
             castleDemolitionistNextTntAt.put(player.getUniqueId(), kitAppliedAt + ArcadePortRules.CASTLE_ASSAULT_DEMOLITIONIST_TNT_REFILL_MILLIS);
         } else {
             castleDemolitionistNextTntAt.remove(player.getUniqueId());
@@ -4106,7 +4111,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         sword.setItemMeta(swordMeta);
         player.getInventory().setItem(0, sword);
 
-        boolean demolitionist = "demolitionist".equals(kit);
+        boolean demolitionist = isCastleTntKit(kit);
         player.getInventory().setHelmet(castleArmour(Material.DIAMOND_HELMET,
                 demolitionist ? Enchantment.BLAST_PROTECTION : null, demolitionist ? 4 : 0));
         player.getInventory().setChestplate(castleArmour(Material.IRON_CHESTPLATE,
@@ -4141,6 +4146,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 player.getInventory().setItem(1, castleFlintAndSteel(4, true));
                 player.getInventory().setItem(2, namedItem(Material.TNT, "Throwing TNT",
                         "Left-click to throw.", 2));
+            }
+            case "breacher" -> {
+                player.getInventory().setItem(1, castleFlintAndSteel(2, true));
+                player.getInventory().setItem(2, namedItem(Material.TNT, "Breacher TNT",
+                        "Left-click to throw at enemy objectives. Replenishes over time.", 1));
             }
             case "fighter" -> player.getInventory().setItem(1, namedItem(Material.GOLDEN_APPLE,
                     ChatColor.LIGHT_PURPLE + "Golden Applegate", "Fighter kit item."));
@@ -4279,6 +4289,16 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         "Floral Leap", "Leap and create a 5-second flower bed; enemies within 5 blocks take 2 damage each second and are slowed. Click or sneak. 11-second cooldown.");
                 giveHeroesOfGwenSkillItem(player, 3, "ivy.thorn_wall", Material.NETHER_STAR,
                         "Thorn Wall", "Create a 5-second square thorn ring. Allies regenerate; enemies are rooted or damaged. Drop to activate; 45-second cooldown.");
+            }
+            case "tactician" -> {
+                player.getInventory().setItem(0, namedItem(Material.BLAZE_ROD,
+                        ChatColor.GREEN + "Tactician's Wand", "A light mage weapon for keeping pressure on the enemy team."));
+                giveHeroesOfGwenSkillItem(player, 1, "tactician.survey", Material.COMPASS,
+                        "Battlefield Survey", "Reveal living enemies with Glowing for 4 seconds. 20-second cooldown.");
+                giveHeroesOfGwenSkillItem(player, 2, "tactician.signal", Material.GLOWSTONE_DUST,
+                        "Signal Flare", "Mark your nearest enemy for your team. 12-second cooldown.");
+                giveHeroesOfGwenSkillItem(player, 3, "tactician.focus", Material.NETHER_STAR,
+                        "Tactical Focus", "Gain Speed I and Resistance I for 5 seconds. 35-second cooldown.");
             }
             case "biff" -> {
                 player.getInventory().setItem(0, namedItem(Material.WOODEN_SWORD,
@@ -4526,6 +4546,45 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             case "ivy.vine_pull" -> activateIvyVinePull(player);
             case "ivy.floral_leap" -> activateIvyFloralLeap(player);
             case "ivy.thorn_wall" -> activateIvyThornWall(player);
+            case "tactician.survey" -> {
+                setHeroSkillCooldown(player, skill, 20_000L);
+                for (Player enemy : players.values()) {
+                    if (enemy.isOnline() && activePlayers.contains(enemy.getUniqueId())
+                            && teams.getOrDefault(enemy.getUniqueId(), -1)
+                                    != teams.getOrDefault(id, -2)) {
+                        enemy.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, 80, 0,
+                                false, true, true), true);
+                    }
+                }
+                player.sendMessage(ChatColor.GOLD + "Battlefield Survey: enemy heroes are marked for 4 seconds.");
+                player.playSound(player.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 0.7F, 1.5F);
+            }
+            case "tactician.signal" -> {
+                Player nearest = players.values().stream()
+                        .filter(enemy -> enemy.isOnline() && activePlayers.contains(enemy.getUniqueId())
+                                && teams.getOrDefault(enemy.getUniqueId(), -1)
+                                        != teams.getOrDefault(id, -2))
+                        .min(java.util.Comparator.comparingDouble(enemy -> enemy.getLocation()
+                                .distanceSquared(player.getLocation())))
+                        .orElse(null);
+                if (nearest == null) {
+                    player.sendMessage(ChatColor.YELLOW + "No living enemies to mark.");
+                    break;
+                }
+                setHeroSkillCooldown(player, skill, 12_000L);
+                nearest.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, 160, 0,
+                        false, true, true), true);
+                player.sendMessage(ChatColor.GOLD + "Signalled " + nearest.getName() + " to your team.");
+                player.playSound(nearest.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 0.8F, 1.8F);
+            }
+            case "tactician.focus" -> {
+                setHeroSkillCooldown(player, skill, 35_000L);
+                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 100, 0,
+                        false, true, true), true);
+                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 100, 0,
+                        false, true, true), true);
+                player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.8F, 1.35F);
+            }
             default -> player.sendMessage(ChatColor.YELLOW + "That hero ability is not yet available.");
         }
     }

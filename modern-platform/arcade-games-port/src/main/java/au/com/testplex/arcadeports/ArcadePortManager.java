@@ -1209,7 +1209,8 @@ public final class ArcadePortManager implements Listener {
         }
         String value = requestedKit.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
         if (value.equals("quick-evolver") || value.equals("evolution-quick-evolver")
-                || value.equals("standard-evolution") || value.equals("evolution-standard")) {
+                || value.equals("standard-evolution") || value.equals("evolution-standard")
+                || value.equals("apex")) {
             selectEvolutionKit(player, value);
             return;
         }
@@ -1235,6 +1236,14 @@ public final class ArcadePortManager implements Listener {
                 player.sendMessage(ChatColor.RED + "That kit is not available for " + lobbyGame.displayName() + ".");
                 return;
             }
+            String requiredAchievement = achievementKitUnlock(lobbyGame, catalogueKitId);
+            if (requiredAchievement != null && !plugin.getConfig().getBoolean("local-achievements."
+                    + player.getUniqueId() + "." + lobbyGame.id() + "." + requiredAchievement, false)) {
+                player.sendMessage(ChatColor.RED + "That achievement kit is still locked. Earn "
+                        + titleCaseAchievement(requiredAchievement)
+                        + " with the available kits first.");
+                return;
+            }
             if (lobbyGame == ArcadePortGame.SHEEP_QUEST && !value.startsWith("monster-maze-")) {
                 String sheepKit = ArcadePortRules.normalizeSheepQuestKit(value);
                 if (sheepKit == null) {
@@ -1252,6 +1261,12 @@ public final class ArcadePortManager implements Listener {
             }
             if (lobbyGame == ArcadePortGame.WITHER_ASSAULT) {
                 selectWitherAssaultKit(player, value);
+                return;
+            }
+            if (lobbyGame == ArcadePortGame.SKY_WARS) {
+                selectSkyWarsKit(player, value);
+                plugin.getConfig().set("lobby-kit-preferences." + player.getUniqueId() + ".skywars", skyWarsKitPreferences.get(player.getUniqueId()));
+                plugin.saveConfig();
                 return;
             }
         }
@@ -1301,6 +1316,7 @@ public final class ArcadePortManager implements Listener {
                 }
                 case SNEAKY_ASSASSINS -> { sneakyAssassins.selectKit(player, value); return; }
                 case WITHER_ASSAULT -> { selectWitherAssaultKit(player, value); return; }
+                case SKY_WARS -> { selectSkyWarsKit(player, value); return; }
                 case TURF_WARS -> { selectTurfWarsKit(player, value); return; }
                 case PLEXBALL -> {
                     PlexballGame game = plugin.getPlexballGame();
@@ -1329,7 +1345,8 @@ public final class ArcadePortManager implements Listener {
         else if (ArcadePortRules.normalizeSpleefKit(value) != null) selectSpleefKit(player, value);
         else if (ArcadePortRules.normalizeMicroBattlesKit(value) != null) selectMicroBattlesKit(player, value);
         else if (value.equals("quick-evolver") || value.equals("evolution-quick-evolver")
-                || value.equals("standard-evolution") || value.equals("evolution-standard")) {
+                || value.equals("standard-evolution") || value.equals("evolution-standard")
+                || value.equals("apex")) {
             selectEvolutionKit(player, value);
         }
         else if (Set.of("rifle", "sniper", "shotgun", "machine-gun", "machinegun").contains(value)) selectPaintballKit(player, value);
@@ -1343,11 +1360,41 @@ public final class ArcadePortManager implements Listener {
         else selectDeathTagRunnerKit(player, value);
     }
 
+    static String achievementKitUnlock(ArcadePortGame game, String kit) {
+        if (game == null || kit == null) return null;
+        return switch (game) {
+            case CASTLE_ASSAULT -> "breacher".equals(kit) ? "moral-exercise" : null;
+            case HEROES_OF_GWEN -> "tactician".equals(kit) ? "know-your-enemy" : null;
+            case SKY_WARS -> "tnt-specialist".equals(kit) ? "death-bomber" : null;
+            case DEATH_TAG -> switch (kit) {
+                case "runner-turtle" -> "turtle-shell";
+                case "runner-trickster" -> "smoke-and-mirrors";
+                default -> null;
+            };
+            case DRAGONS -> "dragon-warden".equals(kit) ? "sharpshooter" : null;
+            case EVOLUTION -> "apex".equals(kit) ? "ability-assassin" : null;
+            case SHEEP_QUEST -> "shepherd".equals(kit) ? "cheeky" : null;
+            case WITHER_ASSAULT -> "warden".equals(kit) ? "savior" : null;
+            default -> null;
+        };
+    }
+
+    static String titleCaseAchievement(String id) {
+        String[] parts = id.replace('-', ' ').split("\\s+");
+        StringBuilder title = new StringBuilder();
+        for (String part : parts) {
+            if (part.isBlank()) continue;
+            if (title.length() > 0) title.append(' ');
+            title.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));
+        }
+        return title.toString();
+    }
+
     private void selectWitherAssaultKit(Player player, String requestedKit) {
         if (player == null) return;
         String kit = WitherAssaultRules.normalizeHumanKit(requestedKit);
         if (kit == null) {
-            player.sendMessage(ChatColor.YELLOW + "Wither Assault Human kits: Archer, Medic or Editor.");
+            player.sendMessage(ChatColor.YELLOW + "Wither Assault Human kits: Archer, Medic, Editor or Warden.");
             return;
         }
         UUID id = player.getUniqueId();
@@ -1403,8 +1450,8 @@ public final class ArcadePortManager implements Listener {
     public void selectSkyWarsKit(Player player, String requestedKit) {
         if (player == null || requestedKit == null) return;
         String kit = requestedKit.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
-        if (!Set.of("ice", "fire", "air", "metal", "earth").contains(kit)) {
-            player.sendMessage(ChatColor.YELLOW + "SkyWars kits: ice, fire, air, metal, earth.");
+        if (!Set.of("ice", "fire", "air", "metal", "earth", "tnt-specialist").contains(kit)) {
+            player.sendMessage(ChatColor.YELLOW + "SkyWars kits: ice, fire, air, metal, earth, TNT Specialist.");
             return;
         }
         skyWarsKitPreferences.put(player.getUniqueId(), kit);
@@ -1494,9 +1541,9 @@ public final class ArcadePortManager implements Listener {
                 .replace('_', '-').replace(' ', '-');
         if (kit.equals("evolution-quick-evolver")) kit = "quick-evolver";
         if (kit.equals("evolution-standard")) kit = "standard-evolution";
-        if (!kit.equals("quick-evolver") && !kit.equals("standard-evolution")) {
+        if (!kit.equals("quick-evolver") && !kit.equals("standard-evolution") && !kit.equals("apex")) {
             player.sendMessage(ChatColor.YELLOW
-                    + "Evolution kits: standard-evolution, quick-evolver.");
+                    + "Evolution kits: standard-evolution, quick-evolver, apex.");
             return;
         }
         UUID playerId = player.getUniqueId();
@@ -1515,9 +1562,10 @@ public final class ArcadePortManager implements Listener {
                 && session.players.containsKey(playerId) && session.alive.contains(playerId)) {
             session.evolutionKits.put(playerId, kit);
         }
-        player.sendMessage(ChatColor.GREEN + (kit.equals("quick-evolver")
-                ? "Quick Evolver selected — evolution is 25% faster."
-                : "Standard Evolution kit selected."));
+            player.sendMessage(ChatColor.GREEN + (kit.equals("quick-evolver")
+                    ? "Quick Evolver selected — evolution is 25% faster."
+                    : kit.equals("apex") ? "Apex selected — you start each evolution stage with a Golden Apple."
+                            : "Standard Evolution kit selected."));
     }
 
     public void selectMicroBattlesKit(Player player, String requestedKit) {
@@ -6111,6 +6159,14 @@ public final class ArcadePortManager implements Listener {
                 }
                 case "traitor" -> player.getInventory().addItem(namedItem(Material.IRON_AXE,
                         "Runner Traitor", "Heavy knockback on melee hits."));
+                case "turtle" -> player.getInventory().addItem(namedItem(Material.COPPER_AXE,
+                        "Runner Turtle", "Melee hits shell Chasers and stack Slowness and Weakness. Earn Wind Charges every 3 hits."));
+                case "trickster" -> {
+                    player.getInventory().addItem(namedItem(Material.ENDER_EYE,
+                            "Chaser Swap", "Right-click to swap with a random living Chaser. One use."));
+                    player.getInventory().addItem(namedItem(Material.FIREWORK_ROCKET,
+                            "Runner Distraction", "Right-click to launch fireworks from every other living Runner. 30-second cooldown."));
+                }
                 case "null" -> { /* Reborn's NullKit has no kit items. */ }
                 default -> player.getInventory().addItem(namedItem(Material.IRON_SWORD,
                         "Runner Basher", "Melee hits cripple chasers with Slowness III."));
@@ -6837,6 +6893,108 @@ public final class ArcadePortManager implements Listener {
         if (recentKills.size() >= 3) awardCatalogAchievement(killer, "death-tag", "hasty-hunter");
     }
 
+    private void recordDeathTagTurtleHit(Session session, Player runner, Player chaser) {
+        UUID runnerId = runner.getUniqueId();
+        UUID chaserId = chaser.getUniqueId();
+        int hits = session.deathTagTurtleHitsByRunner.merge(runnerId, 1, Integer::sum);
+        if (hits >= 3) awardCatalogAchievement(runner, "death-tag", "turtle-shell");
+
+        long now = System.currentTimeMillis();
+        long lastHit = session.deathTagTurtleLastHitAt.getOrDefault(chaserId, 0L);
+        int stack = now - lastHit > 5_000L ? 1
+                : Math.min(3, session.deathTagTurtleStacksByChaser.getOrDefault(chaserId, 0) + 1);
+        session.deathTagTurtleStacksByChaser.put(chaserId, stack);
+        session.deathTagTurtleLastHitAt.put(chaserId, now);
+        chaser.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60, stack - 1, false, true, true), true);
+        chaser.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, 60, stack - 1, false, true, true), true);
+        Mob disguise = session.deathTagDisguises.get(chaserId);
+        if (disguise != null && disguise.isValid() && disguise.getEquipment() != null) {
+            disguise.getEquipment().setHelmet(new ItemStack(Material.TURTLE_HELMET));
+            disguise.getEquipment().setHelmetDropChance(0.0F);
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (active != session || !disguise.isValid()
+                        || session.deathTagTurtleLastHitAt.getOrDefault(chaserId, 0L) != now) return;
+                var equipment = disguise.getEquipment();
+                if (equipment != null) equipment.setHelmet(null);
+            }, 60L);
+        }
+        runner.playSound(runner.getLocation(), Sound.ITEM_ARMOR_EQUIP_TURTLE, 0.8F, 1.2F);
+        int charges = session.deathTagTurtleWindCharges.merge(runnerId, 1, Integer::sum);
+        if (charges >= 3) {
+            session.deathTagTurtleWindCharges.put(runnerId, charges - 3);
+            ItemStack windCharge = namedItem(Material.WIND_CHARGE, "Turtle Wind Charge",
+                    "Hit Chasers to earn more charges.");
+            Map<Integer, ItemStack> overflow = runner.getInventory().addItem(windCharge);
+            overflow.values().forEach(stackItem -> runner.getWorld().dropItemNaturally(runner.getLocation(), stackItem));
+            runner.sendMessage(ChatColor.AQUA + "Turtle shell formed a Wind Charge!");
+        }
+    }
+
+    private void useDeathTagTricksterSwap(Session session, Player runner) {
+        UUID id = runner.getUniqueId();
+        if (session.deathTagTricksterSwapUsed.contains(id)) {
+            runner.sendMessage(ChatColor.RED + "Your Chaser Swap has already been used this round.");
+            return;
+        }
+        if (!runner.isOnGround()) {
+            runner.sendMessage(ChatColor.YELLOW + "Chaser Swap needs you to be grounded.");
+            return;
+        }
+        List<Player> eligible = session.tagged.stream().filter(session.alive::contains)
+                .map(session.players::get).filter(java.util.Objects::nonNull).filter(Player::isOnline)
+                .filter(Player::isOnGround).filter(target -> isSafeDeathTagRespawnSpawn(target.getLocation()))
+                .toList();
+        if (eligible.isEmpty()) {
+            runner.sendMessage(ChatColor.YELLOW + "No grounded Chaser is safe to swap with right now.");
+            return;
+        }
+        Player target = eligible.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(eligible.size()));
+        Location runnerLocation = runner.getLocation().clone();
+        Location chaserLocation = target.getLocation().clone();
+        if (!isSafeDeathTagRespawnSpawn(runnerLocation)) {
+            runner.sendMessage(ChatColor.YELLOW + "Your position is not safe to swap from.");
+            return;
+        }
+        runner.teleport(chaserLocation);
+        target.teleport(runnerLocation);
+        long graceUntil = System.currentTimeMillis() + 1_000L;
+        session.deathTagRespawnGraceUntil.put(id, graceUntil);
+        session.deathTagRespawnGraceUntil.put(target.getUniqueId(), graceUntil);
+        session.deathTagTricksterSwapUsed.add(id);
+        runner.getInventory().remove(Material.ENDER_EYE);
+        runner.playSound(runner.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 1.15F);
+        target.playSound(target.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 0.85F);
+        runner.sendMessage(ChatColor.LIGHT_PURPLE + "You swapped places with " + target.getName() + "!");
+    }
+
+    private void useDeathTagTricksterFireworks(Session session, Player runner) {
+        UUID id = runner.getUniqueId();
+        long now = System.currentTimeMillis();
+        long readyAt = session.deathTagTricksterFireworksReadyAt.getOrDefault(id, 0L);
+        if (now < readyAt) {
+            runner.sendMessage(ChatColor.RED + "Runner Distraction recharges in "
+                    + Math.max(1L, (readyAt - now + 999L) / 1_000L) + "s.");
+            return;
+        }
+        int launched = 0;
+        for (UUID runnerId : session.alive) {
+            if (runnerId.equals(id) || session.tagged.contains(runnerId)) continue;
+            Player other = session.players.get(runnerId);
+            if (other == null || !other.isOnline()) continue;
+            Firework firework = other.getWorld().spawn(other.getLocation().add(0.0D, 0.5D, 0.0D), Firework.class);
+            FireworkMeta meta = firework.getFireworkMeta();
+            meta.setPower(0);
+            meta.addEffect(FireworkEffect.builder().with(FireworkEffect.Type.BURST)
+                    .withColor(Color.RED, Color.AQUA, Color.YELLOW).build());
+            firework.setFireworkMeta(meta);
+            launched++;
+        }
+        session.deathTagTricksterFireworksReadyAt.put(id, now + 30_000L);
+        cooldownProgress.start(runner, "Runner Distraction", 30_000L);
+        runner.sendMessage(ChatColor.LIGHT_PURPLE + "Runner Distraction set off " + launched + " fireworks.");
+        runner.getWorld().playSound(runner.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 0.9F, 1.25F);
+    }
+
     private boolean isDeathTagRespawnHazard(Material material) {
         return material == Material.LAVA || material == Material.FIRE || material == Material.SOUL_FIRE
                 || material == Material.MAGMA_BLOCK || material == Material.CAMPFIRE
@@ -7256,6 +7414,11 @@ public final class ArcadePortManager implements Listener {
                         revival[0], revival[1], stew);
                 player.sendMessage(ChatColor.GREEN + "Editor: place and break blocks above the four-block floor limit.");
             }
+            case "warden" -> {
+                player.getInventory().addItem(new ItemStack(Material.IRON_SWORD),
+                        new ItemStack(Material.SHIELD), revival[0], stew);
+                player.sendMessage(ChatColor.GREEN + "Warden: use your shield to guard allies and keep a Revival Potion ready.");
+            }
             default -> {
                 player.getInventory().addItem(new ItemStack(Material.IRON_SWORD),
                         new ItemStack(Material.BOW), new ItemStack(Material.ARROW, 2),
@@ -7401,6 +7564,13 @@ public final class ArcadePortManager implements Listener {
                     player.getInventory().setArmorContents(new ItemStack[] {
                             new ItemStack(Material.IRON_BOOTS), new ItemStack(Material.IRON_LEGGINGS),
                             new ItemStack(Material.IRON_CHESTPLATE), new ItemStack(Material.IRON_HELMET) });
+                } else if ("dragon-warden".equals(kit)) {
+                    player.getInventory().addItem(new ItemStack(Material.SHIELD),
+                            namedItem(Material.WIND_CHARGE, "Dragon Guard",
+                                    "Deflect a dragon's dive or recover from a dangerous launch.", 2));
+                    player.getInventory().setArmorContents(new ItemStack[] {
+                            new ItemStack(Material.IRON_BOOTS), new ItemStack(Material.CHAINMAIL_LEGGINGS),
+                            new ItemStack(Material.CHAINMAIL_CHESTPLATE), new ItemStack(Material.IRON_HELMET) });
                 } else {
                     player.getInventory().addItem(namedItem(Material.IRON_AXE, "Leap",
                             "Right-click to leap forward (8-second cooldown)."));
@@ -7590,6 +7760,12 @@ public final class ArcadePortManager implements Listener {
                 player.getInventory().setItem(0, new ItemStack(Material.IRON_SWORD));
                 player.getInventory().setItem(1, namedItem(Material.SADDLE, "Hold This",
                         "Hold to pick up sheep and teammates. Drop an item to throw your passenger."));
+            }
+            case "shepherd" -> {
+                player.getInventory().setItem(0, new ItemStack(Material.WOODEN_SWORD));
+                player.getInventory().setItem(1, namedItem(Material.SADDLE, "Herding Saddle",
+                        "Carry up to four sheep at once; carrying slows you more."));
+                player.getInventory().setItem(2, new ItemStack(Material.SHEARS));
             }
             default -> {
                 player.getInventory().setItem(0, namedItem(Material.IRON_AXE, "Beserker Jump",
@@ -7934,6 +8110,8 @@ public final class ArcadePortManager implements Listener {
                         "Throwable Dirt", "Right-click to throw dirt (maximum 4).", true));
                 session.skyWarsNextDirtAt.put(id, System.currentTimeMillis());
             }
+            case "tnt-specialist" -> player.getInventory().addItem(
+                    namedItem(Material.TNT, "Throwable TNT", "Right-click to throw. 3 charges.", 3));
             default -> player.getInventory().addItem(skyWarsKitItem(Material.ICE,
                     "Ice Bridge", "Launch forward and lay a temporary ice bridge (30-second cooldown).", false));
         }
@@ -14685,9 +14863,11 @@ public final class ArcadePortManager implements Listener {
         List<Sheep> carried = session.sheepCarriers.entrySet().stream()
                 .filter(entry -> player.getUniqueId().equals(entry.getValue()))
                 .map(Map.Entry::getKey).collect(java.util.stream.Collectors.toList());
-        int count = Math.min(ArcadePortRules.SHEEP_QUEST_MAX_CARRY, carried.size());
-        player.setExp(count / (float) ArcadePortRules.SHEEP_QUEST_MAX_CARRY);
-        for (int index = 0; index < ArcadePortRules.SHEEP_QUEST_MAX_CARRY; index++) {
+        int carryLimit = "shepherd".equals(session.sheepQuestKits.get(player.getUniqueId()))
+                ? ArcadePortRules.SHEEP_QUEST_MAX_CARRY + 1 : ArcadePortRules.SHEEP_QUEST_MAX_CARRY;
+        int count = Math.min(carryLimit, carried.size());
+        player.setExp(count / (float) carryLimit);
+        for (int index = 0; index < carryLimit; index++) {
             player.getInventory().setItem(4 + index, index < count ? sheepQuestWoolIcon(carried.get(index)) : null);
         }
         if (count > 0) {
@@ -14710,7 +14890,9 @@ public final class ArcadePortManager implements Listener {
             return false;
         }
         int carriedCount = sheepCarriedBy(session, playerId);
-        if (!ArcadePortRules.canCarryAnotherSheep(carriedCount)) return false;
+        int carryLimit = "shepherd".equals(session.sheepQuestKits.get(playerId))
+                ? ArcadePortRules.SHEEP_QUEST_MAX_CARRY + 1 : ArcadePortRules.SHEEP_QUEST_MAX_CARRY;
+        if (carriedCount >= carryLimit) return false;
         int team = session.teams.getOrDefault(playerId, -1);
         if (team < 0 || team > 3) return false;
         int owner = session.sheepOwners.getOrDefault(sheep, -1);
@@ -16364,6 +16546,9 @@ public final class ArcadePortManager implements Listener {
                 player.setAllowFlight(false);
                 break;
         }
+        if ("apex".equals(session.evolutionKits.getOrDefault(id, "standard-evolution"))) {
+            player.getInventory().addItem(new ItemStack(Material.GOLDEN_APPLE));
+        }
         player.sendMessage(ChatColor.GREEN + "Evolution stage restored: " + (level + 1) + "/5.");
         player.updateInventory();
     }
@@ -17030,6 +17215,9 @@ public final class ArcadePortManager implements Listener {
                             session.alphaChasers.contains(target.getUniqueId()));
                     boolean lethalHit = ArcadePortRules.deathTagHitIsLethal(target.getHealth(), damage);
                     if (damage > 0.0D) {
+                        if ("turtle".equals(kit) && !"projectile hit".equals(source)) {
+                            recordDeathTagTurtleHit(session, attacker, target);
+                        }
                         if (lethalHit) {
                             respawnDeathTagChaser(session, target);
                             awardDeathTagKill(session, attacker);
@@ -18769,6 +18957,10 @@ public final class ArcadePortManager implements Listener {
                             || session.type == ArcadePortGame.MICRO_BATTLES)
                         && session.alive.contains(id)
                         && session.teams.getOrDefault(id, -2) == winningTeam));
+            if (session.type == ArcadePortGame.DEATH_TAG && won && session.alive.contains(id)
+                    && !session.tagged.contains(id)) {
+                awardCatalogAchievement(entry.getValue(), "death-tag", "smoke-and-mirrors");
+            }
             if (session.type == ArcadePortGame.DRAGONS) {
                 int previousStreak = plugin.getConfig().getInt(path + "win-streak", 0);
                 int streak = ArcadePortRules.nextDragonsWinStreak(previousStreak, won);
@@ -23015,6 +23207,23 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         Material item = heldItem == null ? Material.AIR : heldItem.getType();
+        if (session.type == ArcadePortGame.DEATH_TAG && session.alive.contains(player.getUniqueId())
+                && !session.tagged.contains(player.getUniqueId())
+                && "trickster".equals(session.deathTagRunnerKits.get(player.getUniqueId()))
+                && event.getAction().isRightClick()) {
+            String ability = heldItem != null && heldItem.hasItemMeta() && heldItem.getItemMeta().hasDisplayName()
+                    ? ChatColor.stripColor(heldItem.getItemMeta().getDisplayName()) : "";
+            if ("Chaser Swap".equals(ability)) {
+                event.setCancelled(true);
+                useDeathTagTricksterSwap(session, player);
+                return;
+            }
+            if ("Runner Distraction".equals(ability)) {
+                event.setCancelled(true);
+                useDeathTagTricksterFireworks(session, player);
+                return;
+            }
+        }
         if (session.type == ArcadePortGame.SHEEP_QUEST && heldItem != null
                 && heldItem.getType() == Material.LEATHER_CHESTPLATE && heldItem.hasItemMeta()
                 && heldItem.getItemMeta().hasDisplayName()
@@ -27698,6 +27907,12 @@ public final class ArcadePortManager implements Listener {
         Team deathTagChaserScoreboardLine;
         String deathTagChaserScoreboardEntry;
         final Map<UUID, String> deathTagRunnerKits = new HashMap<>();
+        final Map<UUID, Integer> deathTagTurtleHitsByRunner = new HashMap<>();
+        final Map<UUID, Integer> deathTagTurtleStacksByChaser = new HashMap<>();
+        final Map<UUID, Long> deathTagTurtleLastHitAt = new HashMap<>();
+        final Map<UUID, Integer> deathTagTurtleWindCharges = new HashMap<>();
+        final Set<UUID> deathTagTricksterSwapUsed = new HashSet<>();
+        final Map<UUID, Long> deathTagTricksterFireworksReadyAt = new HashMap<>();
         final Map<UUID, String> deathTagRunnerTrailColours = new HashMap<>();
         final Map<UUID, String> deathTagRunnerTrailStyles = new HashMap<>();
         final Map<UUID, Integer> deathTagChaserKillsByPlayer = new HashMap<>();
