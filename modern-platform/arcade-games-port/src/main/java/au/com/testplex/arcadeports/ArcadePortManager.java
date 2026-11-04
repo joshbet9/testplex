@@ -22779,7 +22779,8 @@ public final class ArcadePortManager implements Listener {
         return List.of("ability", "jump", "leap", "dash", "blast", "bomb", "fireball", "smoke",
                 "teleport", "switch", "disguise", "spell", "shot", "arrow", "tnt", "wall", "throw",
                 "snowball", "potion", "shield", "laser", "magic", "dragon", "sphere", "frost", "web",
-                "ink", "splat", "photo", "camera", "paint", "ball", "charge", "strike", "swing")
+                "ink", "splat", "photo", "camera", "paint", "ball", "charge", "strike", "swing",
+                "power dive", "sure hands", "read flight", "burst")
                 .stream().anyMatch(value::contains);
     }
 
