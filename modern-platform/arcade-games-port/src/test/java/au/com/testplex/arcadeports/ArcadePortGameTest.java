@@ -1483,7 +1483,8 @@ class ArcadePortGameTest {
     @Test void baconBrawlCreditsRecentKnockbackForFallAndWaterKillsOnly() {
         assertTrue(ArcadePortRules.shouldCreditBaconFallKill(10_000L, 5_001L, true));
         assertTrue(ArcadePortRules.shouldCreditBaconFallKill(10_000L, 10_000L, true));
-        assertFalse(ArcadePortRules.shouldCreditBaconFallKill(10_001L, 5_000L, true));
+        assertTrue(ArcadePortRules.shouldCreditBaconFallKill(10_001L, 5_000L, true));
+        assertFalse(ArcadePortRules.shouldCreditBaconFallKill(40_001L, 10_000L, true));
         assertFalse(ArcadePortRules.shouldCreditBaconFallKill(10_000L, 9_000L, false),
                 "starvation and Body Slam recoil do not receive opponent kill credit");
         assertFalse(ArcadePortRules.shouldCreditBaconFallKill(9_000L, 10_000L, true));

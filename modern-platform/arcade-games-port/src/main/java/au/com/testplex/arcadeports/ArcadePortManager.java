@@ -12246,6 +12246,7 @@ public final class ArcadePortManager implements Listener {
                 Location blockImpact = previous.clone().add(
                         current.toVector().subtract(previous.toVector()).multiply(blockFraction));
                 spawnBaconBlastImpact(session, blockImpact, blastId, !crispy, true);
+                if (crispy && ownerId != null) placeCrispyBaconImpactFirePatch(session, blockImpact, ownerId);
                 removeBaconBlastItem(session, blastId);
                 continue;
             }
@@ -12260,6 +12261,7 @@ public final class ArcadePortManager implements Listener {
                         && active == session && session.alive.contains(target.getUniqueId())) {
                     if (crispy) {
                         igniteCrispyBaconTarget(session, owner, target, now);
+                        placeCrispyBaconImpactFirePatch(session, playerImpact, ownerId);
                     } else {
                         if ("mama-piggles".equals(
                                 session.baconKits.getOrDefault(ownerId, "el-muchacho-pigo"))) {
@@ -12283,6 +12285,7 @@ public final class ArcadePortManager implements Listener {
             long createdAt = session.baconBlastCreatedAt.getOrDefault(blastId, 0L);
             if (ArcadePortRules.shouldExpireBaconBlast(now, createdAt, touchingBlock)) {
                 spawnBaconBlastImpact(session, current, blastId, !crispy, true);
+                if (crispy && ownerId != null) placeCrispyBaconImpactFirePatch(session, current, ownerId);
                 removeBaconBlastItem(session, blastId);
                 continue;
             }
@@ -12316,7 +12319,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void igniteCrispyBaconTarget(Session session, Player owner, Player target, long now) {
-        if (target == null || !target.isOnline()) return;
+        if (owner == null || !owner.isOnline() || target == null || !target.isOnline()) return;
         UUID targetId = target.getUniqueId();
         UUID ownerId = owner.getUniqueId();
         target.setFireTicks(Math.max(target.getFireTicks(), 100));
@@ -12336,6 +12339,12 @@ public final class ArcadePortManager implements Listener {
         session.baconLastHitSource.put(targetId, "crispy-bacon");
         session.baconLastHitBackstab.put(targetId, false);
         session.baconLastHitCloaked.put(targetId, false);
+    }
+
+    private boolean isBaconPlayerBurning(Session session, Player player) {
+        if (player.getFireTicks() > 0) return true;
+        LivingEntity avatar = baconPlayerAvatar(session, player.getUniqueId());
+        return avatar != null && avatar.getFireTicks() > 0;
     }
 
     private void playMamaPigglesBaconBlastHitSound(Player owner) {
@@ -12505,34 +12514,62 @@ public final class ArcadePortManager implements Listener {
         if (avatar != null) avatar.setVelocity(velocity.clone());
         Location flame = player.getLocation();
         flame.getWorld().spawnParticle(Particle.FLAME, flame, 5, 0.16D, 0.08D, 0.16D, 0.005D);
-        placeBaconDashFireBlock(session, flame);
+        placeBaconDashFireBlock(session, flame, id);
         for (Player target : alivePlayers(session)) {
             if (target.equals(player) || target.getLocation().distanceSquared(flame) > 2.25D) continue;
-            target.setFireTicks(Math.max(target.getFireTicks(), 60));
-            LivingEntity targetAvatar = baconPlayerAvatar(session, target.getUniqueId());
-            if (targetAvatar != null) {
-                targetAvatar.setFireTicks(Math.max(targetAvatar.getFireTicks(), 60));
-                targetAvatar.getWorld().spawnParticle(Particle.FLAME,
-                        targetAvatar.getLocation().add(0.0D, 0.8D, 0.0D), 18,
-                        0.25D, 0.45D, 0.25D, 0.02D);
-            }
-            session.baconCrispyFlamedUntil.put(target.getUniqueId(), now + 3_000L);
+            igniteCrispyBaconTarget(session, player, target, now);
         }
     }
 
     /** Place real server-side fire briefly so every player receives the same trail state. */
-    private void placeBaconDashFireBlock(Session session, Location at) {
+    private boolean placeBaconDashFireBlock(Session session, Location at, UUID ownerId) {
         Block fireBlock = at.getBlock();
-        if (!fireBlock.getType().isAir() || !fireBlock.getRelative(BlockFace.DOWN).getType().isSolid()) return;
+        if ((!fireBlock.getType().isAir() && !session.baconDashFireBlocks.containsKey(fireBlock))
+                || !fireBlock.getRelative(BlockFace.DOWN).getType().isSolid()) return false;
         BaconDashFireState fire = session.baconDashFireBlocks.get(fireBlock);
         if (fire == null) {
             fire = new BaconDashFireState(fireBlock.getBlockData(),
-                    System.currentTimeMillis() + ArcadePortRules.BACON_CRISPY_DASH_FIRE_MILLIS);
+                    System.currentTimeMillis() + ArcadePortRules.BACON_CRISPY_DASH_FIRE_MILLIS, ownerId);
             session.baconDashFireBlocks.put(fireBlock, fire);
             fireBlock.setType(Material.FIRE, false);
         } else {
             fire.expiresAt = Math.max(fire.expiresAt,
                     System.currentTimeMillis() + ArcadePortRules.BACON_CRISPY_DASH_FIRE_MILLIS);
+            fire.ownerId = ownerId;
+        }
+        return true;
+    }
+
+    private void placeCrispyBaconImpactFirePatch(Session session, Location impact, UUID ownerId) {
+        if (impact == null || impact.getWorld() != session.world || ownerId == null) return;
+        Block hitBlock = impact.getBlock();
+        Block center = hitBlock.getType().isSolid() ? hitBlock.getRelative(BlockFace.UP) : hitBlock;
+        if ((!center.getType().isAir() && !session.baconDashFireBlocks.containsKey(center))
+                || !center.getRelative(BlockFace.DOWN).getType().isSolid()) {
+            center = null;
+            int startY = Math.min(hitBlock.getY(), session.world.getMaxHeight() - 2);
+            for (int y = startY; y >= session.world.getMinHeight(); y--) {
+                Block floor = session.world.getBlockAt(hitBlock.getX(), y, hitBlock.getZ());
+                Block fireSpace = floor.getRelative(BlockFace.UP);
+                if (floor.getType().isSolid() && fireSpace.getType().isAir()) {
+                    center = fireSpace;
+                    break;
+                }
+            }
+        }
+        if (center == null) return;
+
+        List<Block> candidates = new ArrayList<>();
+        candidates.add(center);
+        for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST,
+                BlockFace.NORTH_EAST, BlockFace.NORTH_WEST, BlockFace.SOUTH_EAST, BlockFace.SOUTH_WEST)) {
+            candidates.add(center.getRelative(face));
+        }
+        candidates.sort(java.util.Comparator.comparingDouble(block ->
+                block.getLocation().add(0.5D, 0.5D, 0.5D).distanceSquared(impact)));
+        int placed = 0;
+        for (Block candidate : candidates) {
+            if (placeBaconDashFireBlock(session, candidate.getLocation(), ownerId) && ++placed >= 3) break;
         }
     }
 
@@ -12541,7 +12578,19 @@ public final class ArcadePortManager implements Listener {
                 : new ArrayList<>(session.baconDashFireBlocks.entrySet())) {
             Block block = entry.getKey();
             BaconDashFireState state = entry.getValue();
-            if (now < state.expiresAt) continue;
+            if (now < state.expiresAt) {
+                Player owner = state.ownerId == null ? null : session.players.get(state.ownerId);
+                if (owner != null && owner.isOnline() && session.alive.contains(state.ownerId)) {
+                    Location fireCenter = block.getLocation().add(0.5D, 0.5D, 0.5D);
+                    for (Player target : alivePlayers(session)) {
+                        if (target.getUniqueId().equals(state.ownerId)
+                                || isBaconPlayerBurning(session, target)
+                                || target.getLocation().distanceSquared(fireCenter) > 2.25D) continue;
+                        igniteCrispyBaconTarget(session, owner, target, now);
+                    }
+                }
+                continue;
+            }
             if (block.getWorld() == session.world && block.getType() == Material.FIRE) {
                 block.setBlockData(state.originalData, false);
             }
@@ -12673,7 +12722,7 @@ public final class ArcadePortManager implements Listener {
                 ? session.baconSwingTimingMultiplierById.getOrDefault(attackerId, 1.0D) : 1.0D;
         boolean vanillaCritical = normalTimedHit && !attacker.isOnGround() && attacker.getFallDistance() > 0.0F
                 && attacker.getVelocity().getY() < -0.08D;
-        boolean crispyFlamed = session.baconCrispyFlamedUntil.getOrDefault(targetId, 0L) > now;
+        boolean crispyFlamed = isBaconPlayerBurning(session, target);
         // Ability hits use their own knockback inputs below. Ordinary timed hits become
         // critical while Crispy Bacon's fire is active, matching the kit's source behavior.
         boolean critical = normalTimedHit
@@ -27882,9 +27931,11 @@ public final class ArcadePortManager implements Listener {
     private static final class BaconDashFireState {
         final BlockData originalData;
         long expiresAt;
-        BaconDashFireState(BlockData originalData, long expiresAt) {
+        UUID ownerId;
+        BaconDashFireState(BlockData originalData, long expiresAt, UUID ownerId) {
             this.originalData = originalData.clone();
             this.expiresAt = expiresAt;
+            this.ownerId = ownerId;
         }
     }
 

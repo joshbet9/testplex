@@ -433,7 +433,7 @@ public final class ArcadePortRules {
     }
 
     /** Recent hit credit keeps knock-off kills attached to the attacker who caused the fall. */
-    public static final long BACON_FALL_KILL_CREDIT_WINDOW_MILLIS = 5_000L;
+    public static final long BACON_FALL_KILL_CREDIT_WINDOW_MILLIS = 30_000L;
 
     /** Hazards that end a Bacon Brawl knock-off on the embedded arena, including its lava floor. */
     public static boolean isBaconArenaKnockoutReason(String reason) {
@@ -1562,7 +1562,7 @@ public final class ArcadePortRules {
         return Math.min(0.022D, 0.012D + 0.003D * extraKills);
     }
 
-    public static final long BACON_BLAST_KILL_COMBO_WINDOW_MILLIS = BACON_FALL_KILL_CREDIT_WINDOW_MILLIS;
+    public static final long BACON_BLAST_KILL_COMBO_WINDOW_MILLIS = 5_000L;
 
     public static boolean shouldCountMamaCameraBlastKill(boolean mamaPiggles,
             boolean directBlastKill, java.util.UUID killerId, java.util.UUID comboOwnerId,
