@@ -467,6 +467,10 @@ public final class SpeedBuildersGame implements Listener {
             return;
         }
 
+        for (PlayerState state : players.values()) {
+            if (state != null) disablePlayerCollision(state.player);
+        }
+
         if (tick >= phaseDeadlineTick) {
             switch (phase) {
                 case VIEWING -> beginBuildingPhase();
@@ -477,6 +481,15 @@ public final class SpeedBuildersGame implements Listener {
             }
         }
         if (tick % 20L == 0L) refreshHud();
+    }
+
+    private static void disablePlayerCollision(Player player) {
+        if (player == null || !player.isOnline()) return;
+        player.setCollidable(false);
+        for (org.bukkit.scoreboard.Team team : player.getScoreboard().getTeams()) {
+            team.setOption(org.bukkit.scoreboard.Team.Option.COLLISION_RULE,
+                    org.bukkit.scoreboard.Team.OptionStatus.NEVER);
+        }
     }
 
     private void startMatch(List<Player> participants) {

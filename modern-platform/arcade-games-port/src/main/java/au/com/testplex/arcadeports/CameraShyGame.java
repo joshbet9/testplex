@@ -918,6 +918,7 @@ public final class CameraShyGame implements Listener {
     private void tick() {
         serverTick++;
         if (phase == Phase.IDLE) return;
+        for (Player player : players.values()) disablePlayerCollision(player);
         if (phase == Phase.STARTING) return;
         if (phase != Phase.LIVE) return;
 
@@ -955,6 +956,15 @@ public final class CameraShyGame implements Listener {
             String endReason = winner == null ? "All human players were eliminated."
                     : alive.size() <= 1 ? "Last player standing!" : "Last human player standing!";
             finish(winner, endReason, true);
+        }
+    }
+
+    private static void disablePlayerCollision(Player player) {
+        if (player == null || !player.isOnline()) return;
+        player.setCollidable(false);
+        for (org.bukkit.scoreboard.Team team : player.getScoreboard().getTeams()) {
+            team.setOption(org.bukkit.scoreboard.Team.Option.COLLISION_RULE,
+                    org.bukkit.scoreboard.Team.OptionStatus.NEVER);
         }
     }
 

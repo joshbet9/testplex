@@ -11977,12 +11977,36 @@ public final class ArcadePortManager implements Listener {
         for (Player player : session.players.values()) {
             if (player == null || !player.isOnline()) continue;
             player.setCollidable(false);
+            // Paper's player-team collision rule can override setCollidable(false).
+            // Scoreboards are replaced by several game runtimes, so normalize every
+            // team on the participant's current board instead of only their own tab team.
             for (Team team : player.getScoreboard().getTeams()) {
-                if (team.hasEntry(player.getName())) {
-                    team.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
-                }
+                team.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
             }
         }
+    }
+
+    private void hideProxyDisguisePlayer(Session session, Player player) {
+        if (session == null || player == null) return;
+        Set<UUID> hiddenViewers = session.proxyDisguiseHiddenViewers.computeIfAbsent(
+                player.getUniqueId(), ignored -> new HashSet<>());
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            if (viewer == null || !viewer.isOnline() || viewer.getUniqueId().equals(player.getUniqueId())) continue;
+            if (hiddenViewers.add(viewer.getUniqueId())) viewer.hidePlayer(plugin, player);
+        }
+    }
+
+    private void restoreProxyDisguisePlayers(Session session) {
+        if (session == null) return;
+        for (Map.Entry<UUID, Set<UUID>> entry : session.proxyDisguiseHiddenViewers.entrySet()) {
+            Player disguised = session.players.get(entry.getKey());
+            if (disguised == null) continue;
+            for (UUID viewerId : entry.getValue()) {
+                Player viewer = Bukkit.getPlayer(viewerId);
+                if (viewer != null && viewer.isOnline()) viewer.showPlayer(plugin, disguised);
+            }
+        }
+        session.proxyDisguiseHiddenViewers.clear();
     }
 
     private void updateSourceWaterDamage(Session session, long now) {
@@ -13562,6 +13586,7 @@ public final class ArcadePortManager implements Listener {
                         "Your controlled dragon is no longer available.", true);
                 session.dragonTargetLocations.remove(id);
                 session.dragonTargetPlayers.remove(id);
+                session.dragonFlightVectors.remove(id);
                 session.dragonSparklerDragonOwners.remove(id);
                 it.remove();
             }
@@ -13592,6 +13617,9 @@ public final class ArcadePortManager implements Listener {
                 dragon.setRemoveWhenFarAway(false);
                 session.entities.add(dragon);
                 session.dragonTargetLocations.put(dragon.getUniqueId(), randomDragonSkyTarget(session));
+                Vector initialHeading = dragon.getLocation().getDirection().normalize();
+                if (initialHeading.lengthSquared() < 1.0E-6D) initialHeading = new Vector(0.0D, 0.0D, 1.0D);
+                session.dragonFlightVectors.put(dragon.getUniqueId(), initialHeading);
                 spawn.getWorld().playSound(spawn, Sound.ENTITY_ENDER_DRAGON_GROWL, 20.0F, 1.0F);
             }
             }
@@ -13709,13 +13737,25 @@ public final class ArcadePortManager implements Listener {
                 }
             } else {
                 Location target = session.dragonTargetLocations.get(dragonId);
-                if (target != null) {
-                    Vector direction = target.toVector().subtract(dragon.getLocation().toVector());
-                    if (direction.lengthSquared() > 1.0D) {
-                        flight = direction.normalize().multiply(0.32D);
-                        flight.setY(Math.max(-0.08D, Math.min(0.16D, flight.getY() + 0.04D)));
+                Vector heading = session.dragonFlightVectors.get(dragonId);
+                if (heading == null || heading.lengthSquared() < 1.0E-6D) {
+                    heading = dragon.getLocation().getDirection().normalize();
+                }
+                if (target != null && target.getWorld() == dragon.getWorld()) {
+                    Vector desired = target.toVector().subtract(dragon.getLocation().toVector());
+                    if (desired.lengthSquared() > 1.0E-6D) {
+                        desired.normalize();
+                        // Reborn delegates steering to the native dragon controller.
+                        // Gradually turn this Paper-controlled dragon toward its target
+                        // so it follows a flight path instead of snapping every tick.
+                        heading.add(desired.subtract(heading.clone()).multiply(0.12D));
                     }
                 }
+                if (heading.lengthSquared() < 1.0E-6D) heading = new Vector(0.0D, 0.0D, 1.0D);
+                heading.normalize();
+                session.dragonFlightVectors.put(dragonId, heading.clone());
+                flight = heading.clone().multiply(0.32D);
+                flight.setY(Math.max(-0.08D, Math.min(0.16D, flight.getY() + 0.04D)));
             }
             if (flight != null) {
                 Location next = dragon.getLocation().clone().add(flight);
@@ -14598,7 +14638,10 @@ public final class ArcadePortManager implements Listener {
         location.add(velocity.clone().multiply(speed));
         location.add(0.0D, -pitch, 0.0D);
         location.setPitch(-pitch);
-        location.setYaw(dragonEscapeYaw(velocity));
+        // The 1.8 DragonEscapeData explicitly adds 180 degrees because Douglas's
+        // model faces opposite the Bukkit vector yaw. Without this, the dragon's
+        // body points backward along its otherwise-correct route movement.
+        location.setYaw(180.0F + dragonEscapeYaw(velocity));
         session.dragonEscapeDragonVelocity = velocity;
         session.dragonEscapeDragonPitch = pitch;
         session.dragonEscapeDragonLocation = location.clone();
@@ -18952,6 +18995,7 @@ public final class ArcadePortManager implements Listener {
         for (UUID playerId : new ArrayList<>(session.deathTagDisguises.keySet())) {
             removeDeathTagDisguise(session, playerId);
         }
+        restoreProxyDisguisePlayers(session);
         session.deathTagFletchedArrows.clear();
         session.deathTagProjectileDamage.clear();
         session.deathTagTraitorKnockbackAt.clear();
@@ -25147,6 +25191,7 @@ public final class ArcadePortManager implements Listener {
 
     private void disguiseMilkCowPlayer(Session session, Player player) {
         UUID id = player.getUniqueId();
+        hideProxyDisguisePlayer(session, player);
         Cow disguise = session.milkCowDisguises.get(id);
         if (disguise == null || !disguise.isValid()) {
             disguise = session.world.spawn(player.getLocation(), Cow.class);
@@ -25166,6 +25211,7 @@ public final class ArcadePortManager implements Listener {
 
     private void disguiseWitherPlayer(Session session, Player player) {
         UUID id = player.getUniqueId();
+        hideProxyDisguisePlayer(session, player);
         Wither disguise = session.witherDisguises.get(id);
         if (disguise == null || !disguise.isValid()) {
             disguise = session.world.spawn(player.getLocation(), Wither.class);
@@ -28546,7 +28592,18 @@ public final class ArcadePortManager implements Listener {
             if (!lobby.isLobbyWorld(player.getWorld())) lobby.sendToLobby(player);
             else lobby.ensurePanelItem(player);
             Session currentSession = active;
-            if (currentSession != null) applySessionTeamTabTeams(currentSession);
+            if (currentSession != null) {
+                applySessionTeamTabTeams(currentSession);
+                if (currentSession.type == ArcadePortGame.MILK_THE_COW
+                        || currentSession.type == ArcadePortGame.WITHER_ASSAULT) {
+                    currentSession.proxyDisguiseHiddenViewers.values()
+                            .forEach(viewers -> viewers.remove(player.getUniqueId()));
+                    for (UUID disguisedId : new ArrayList<>(currentSession.proxyDisguiseHiddenViewers.keySet())) {
+                        Player disguised = currentSession.players.get(disguisedId);
+                        if (disguised != null && disguised.isOnline()) hideProxyDisguisePlayer(currentSession, disguised);
+                    }
+                }
+            }
             lobby.refreshLobbyScoreboards();
         });
     }
@@ -29063,6 +29120,7 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> alphaChasers = new HashSet<>();
         final Map<UUID, Mob> deathTagDisguises = new HashMap<>();
         final Map<UUID, Set<UUID>> deathTagHiddenViewers = new HashMap<>();
+        final Map<UUID, Set<UUID>> proxyDisguiseHiddenViewers = new HashMap<>();
         boolean deathTagRunnerSpeedUnlocked;
         Scoreboard deathTagScoreboard;
         Objective deathTagScoreboardObjective;
@@ -29410,6 +29468,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> dragonCompassNextUseAt = new HashMap<>();
         final Map<UUID, Location> dragonTargetLocations = new HashMap<>();
         final Map<UUID, UUID> dragonTargetPlayers = new HashMap<>();
+        final Map<UUID, Vector> dragonFlightVectors = new HashMap<>();
         Location dragonSpectatorLocation;
         long dragonNextSpawnAt;
         final Map<UUID, Long> dragonLeapReadyAt = new HashMap<>();
