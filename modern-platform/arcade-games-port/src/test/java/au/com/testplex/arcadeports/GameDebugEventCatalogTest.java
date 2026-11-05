@@ -136,6 +136,25 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void castleAssaultObjectiveEventRequiresVacantObjectiveAndUsesNormalSpawner() throws IOException {
+        Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "CastleAssaultHeroesOfGwenRuntime.java");
+        if (!Files.isRegularFile(runtimePath)) {
+            runtimePath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "CastleAssaultHeroesOfGwenRuntime.java");
+        }
+        String source = Files.readString(runtimePath);
+        int method = source.indexOf("boolean debugSpawnObjectiveTnt(Player tester)");
+        int nextMethod = source.indexOf("private void tickCastleAssault", method);
+        assertTrue(method >= 0 && nextMethod > method);
+        String debug = source.substring(method, nextMethod);
+        assertTrue(debug.contains("objectiveItem != null && objectiveItem.isValid()"));
+        assertTrue(debug.contains("objectiveCarrier != null"));
+        assertTrue(debug.contains("spawnObjectiveTnt()"));
+        assertTrue(debug.contains("activePlayers.contains(tester.getUniqueId())"));
+    }
+
+    @Test
     void kitRefreshIsOnlyOfferedForGamesWithSharedKitSetup() {
         for (ArcadePortGame game : ArcadePortGame.values()) {
             boolean offered = GameDebugEventCatalog.events(game).stream()

@@ -901,6 +901,12 @@ public final class ArcadePortManager implements Listener {
             tester.sendMessage(ChatColor.GOLD + baconAbilityName(session, tester.getUniqueId()) + " is maxed (debug).");
             triggered = true;
         }
+        if (type == ArcadePortGame.CASTLE_ASSAULT && "spawn-objective".equals(eventId)
+                && session.variantRuntime != null
+                && session.variantRuntime.debugSpawnObjectiveTnt(tester)) {
+            GameDebugRuntimeOverrides.markDebugSession();
+            triggered = true;
+        }
         if (type == ArcadePortGame.WITHER_ASSAULT && "spawn-minions".equals(eventId)
                 && session.teams.getOrDefault(tester.getUniqueId(), 0) == 1) {
             GameDebugRuntimeOverrides.markDebugSession();

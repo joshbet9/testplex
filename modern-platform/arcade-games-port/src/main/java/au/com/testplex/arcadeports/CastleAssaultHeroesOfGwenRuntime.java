@@ -1743,6 +1743,15 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         else if (game == ArcadePortGame.HEROES_OF_GWEN) tickHeroesOfGwen(now);
     }
 
+    boolean debugSpawnObjectiveTnt(Player tester) {
+        if (stopped || !ready || game != ArcadePortGame.CASTLE_ASSAULT || tester == null
+                || !tester.isOnline() || !activePlayers.contains(tester.getUniqueId())
+                || objectiveItem != null && objectiveItem.isValid() || objectiveCarrier != null) return false;
+        objectiveRespawnAt = 0L;
+        spawnObjectiveTnt();
+        return objectiveItem != null && objectiveItem.isValid();
+    }
+
     private void tickCastleAssault(long now) {
         refillCastleArcherArrows(now);
         if (now >= nextCastleScoreboardAt) updateCastleScoreboard(now);
