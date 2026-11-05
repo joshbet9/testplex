@@ -10524,7 +10524,9 @@ public final class ArcadePortManager implements Listener {
             }
             Location location = player.getLocation();
             boolean nearBorder = ArcadePortRules.shouldShowMicroBattlesBorderParticles(
-                    location.getX(), location.getZ(), center.getX(), center.getZ(), border.getSize());
+                    location.getX(), location.getZ(), center.getX(), center.getZ(), border.getSize(),
+                    GameDebugRuntimeOverrides.doubleValue("MICRO_BATTLES_BORDER_PARTICLE_DISTANCE",
+                            ArcadePortRules.MICRO_BATTLES_BORDER_PARTICLE_DISTANCE));
             if (!nearBorder) continue;
 
             UUID playerId = player.getUniqueId();
@@ -10584,7 +10586,9 @@ public final class ArcadePortManager implements Listener {
             Location location = player.getLocation();
             double x = location.getX(), z = location.getZ();
             if (!ArcadePortRules.shouldShowMicroBattlesBorderParticles(
-                    x, z, center.getX(), center.getZ(), border.getSize())) continue;
+                    x, z, center.getX(), center.getZ(), border.getSize(),
+                    GameDebugRuntimeOverrides.doubleValue("MICRO_BATTLES_BORDER_PARTICLE_DISTANCE",
+                            ArcadePortRules.MICRO_BATTLES_BORDER_PARTICLE_DISTANCE))) continue;
             double xFaceDistance = half - Math.abs(x - center.getX());
             double zFaceDistance = half - Math.abs(z - center.getZ());
             boolean xFace = xFaceDistance <= zFaceDistance;
@@ -10598,7 +10602,10 @@ public final class ArcadePortManager implements Listener {
                             ArcadePortRules.MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR));
             Particle.DustOptions dust = new Particle.DustOptions(colour, 1.2F);
             // Three points make the border obvious across the player's full height, not just on the floor.
-            for (double height : new double[] {0.15D, 0.95D, 1.75D}) {
+            int verticalPoints = GameDebugRuntimeOverrides.intValue("MICRO_BATTLES_BORDER_PARTICLE_VERTICAL_POINTS",
+                    ArcadePortRules.MICRO_BATTLES_BORDER_PARTICLE_VERTICAL_POINTS);
+            for (int point = 0; point < verticalPoints; point++) {
+                double height = verticalPoints == 1 ? 0.95D : 0.15D + 1.6D * point / (verticalPoints - 1);
                 Location cue = xFace
                         ? new Location(session.world, edgeX, location.getY() + height, along)
                         : new Location(session.world, along, location.getY() + height, edgeZ);
@@ -10963,7 +10970,9 @@ public final class ArcadePortManager implements Listener {
                     target.getUniqueId(), ignored -> new LinkedHashMap<>());
             long now = System.currentTimeMillis();
             contributors.entrySet().removeIf(entry ->
-                    !ArcadePortRules.isMicroBattlesCombatContributionFresh(now, entry.getValue()));
+                    !ArcadePortRules.isMicroBattlesCombatContributionFresh(now, entry.getValue(),
+                            GameDebugRuntimeOverrides.longValue("MICRO_BATTLES_COMBAT_LOG_EXPIRE_MILLIS",
+                                    ArcadePortRules.MICRO_BATTLES_COMBAT_LOG_EXPIRE_MILLIS)));
             contributors.remove(attacker.getUniqueId());
             contributors.put(attacker.getUniqueId(), now);
         }
@@ -10986,7 +10995,9 @@ public final class ArcadePortManager implements Listener {
         if (contributors == null || contributors.isEmpty()) return null;
         long now = System.currentTimeMillis();
         contributors.entrySet().removeIf(entry ->
-                !ArcadePortRules.isMicroBattlesCombatContributionFresh(now, entry.getValue()));
+                !ArcadePortRules.isMicroBattlesCombatContributionFresh(now, entry.getValue(),
+                        GameDebugRuntimeOverrides.longValue("MICRO_BATTLES_COMBAT_LOG_EXPIRE_MILLIS",
+                                ArcadePortRules.MICRO_BATTLES_COMBAT_LOG_EXPIRE_MILLIS)));
         Player recent = null;
         for (UUID attackerId : contributors.keySet()) {
             Player candidate = session.players.get(attackerId);
@@ -11002,7 +11013,9 @@ public final class ArcadePortManager implements Listener {
         for (Map.Entry<UUID, Long> entry : contributors.entrySet()) {
             UUID contributorId = entry.getKey();
             if (contributorId.equals(killerId)
-                    || !ArcadePortRules.isMicroBattlesCombatContributionFresh(now, entry.getValue())
+                    || !ArcadePortRules.isMicroBattlesCombatContributionFresh(now, entry.getValue(),
+                            GameDebugRuntimeOverrides.longValue("MICRO_BATTLES_COMBAT_LOG_EXPIRE_MILLIS",
+                                    ArcadePortRules.MICRO_BATTLES_COMBAT_LOG_EXPIRE_MILLIS))
                     || !session.players.containsKey(contributorId)) continue;
             session.microAssists.merge(contributorId, 1, Integer::sum);
         }
@@ -18096,7 +18109,9 @@ public final class ArcadePortManager implements Listener {
             if (session.type == ArcadePortGame.MICRO_BATTLES
                     && !GameDebugRuntimeOverrides.isDebugSession()
                     && !testPlayers.isTestPlayer(killer)
-                    && ArcadePortRules.shouldAwardMicroBattlesAnnihilation(kills)) {
+                    && ArcadePortRules.shouldAwardMicroBattlesAnnihilation(kills,
+                            GameDebugRuntimeOverrides.intValue("MICRO_BATTLES_ANNIHILATION_KILLS",
+                                    ArcadePortRules.MICRO_BATTLES_ANNIHILATION_KILLS))) {
                 UUID killerId = killer.getUniqueId();
                 String statsPath = localStatsPath(killerId, ArcadePortGame.MICRO_BATTLES.id());
                 plugin.getConfig().set(statsPath + "annihilation-count",
@@ -22913,7 +22928,9 @@ public final class ArcadePortManager implements Listener {
                             horizontalDistanceSquared(to, microTeamCenter(session, other)));
                 }
                 if (ArcadePortRules.shouldPunishMicroIslandExit(System.currentTimeMillis() - session.startedAt,
-                        ownDistance, nearestOther)) {
+                        ownDistance, nearestOther, GameDebugRuntimeOverrides.longValue(
+                                "MICRO_BATTLES_CHEAT_WINDOW_MILLIS",
+                                ArcadePortRules.MICRO_BATTLES_CHEAT_WINDOW_MILLIS))) {
                     eliminate(session, player, null, "left the starting island before the opening restriction ended");
                     return;
                 }

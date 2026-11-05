@@ -191,6 +191,10 @@ final class GameDebugVariableCatalog {
 
     private static double minimum(String name, double defaultValue, Kind kind) {
         if (kind == Kind.BOOLEAN) return 0.0D;
+        if (name.equals("MICRO_BATTLES_CHEAT_WINDOW_MILLIS")
+                || name.equals("MICRO_BATTLES_COMBAT_LOG_EXPIRE_MILLIS")) return 0.0D;
+        if (name.equals("MICRO_BATTLES_BORDER_PARTICLE_DISTANCE")) return 0.5D;
+        if (name.equals("MICRO_BATTLES_BORDER_PARTICLE_VERTICAL_POINTS")) return 1.0D;
         if (name.equals("SAFE_PAD_CAPTURE_RADIUS_BLOCKS")) return 0.5D;
         if (name.equals("MOB_MOVE_SPEED")) return 0.05D;
         if (name.equals("BUMP_RADIUS_BLOCKS")) return 0.25D;
@@ -211,6 +215,10 @@ final class GameDebugVariableCatalog {
 
     private static double maximum(String name, Kind kind, double defaultValue) {
         if (kind == Kind.BOOLEAN) return 1.0D;
+        if (name.equals("MICRO_BATTLES_CHEAT_WINDOW_MILLIS")) return 30_000.0D;
+        if (name.equals("MICRO_BATTLES_COMBAT_LOG_EXPIRE_MILLIS")) return 120_000.0D;
+        if (name.equals("MICRO_BATTLES_BORDER_PARTICLE_DISTANCE")) return 16.0D;
+        if (name.equals("MICRO_BATTLES_BORDER_PARTICLE_VERTICAL_POINTS")) return 8.0D;
         if (name.equals("SAFE_PAD_CAPTURE_RADIUS_BLOCKS")) return 2.0D;
         if (name.equals("MOB_MOVE_SPEED")) return 2.0D;
         if (name.equals("BUMP_RADIUS_BLOCKS")) return 5.0D;

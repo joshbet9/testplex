@@ -2030,7 +2030,13 @@ public final class ArcadePortRules {
 
     public static boolean shouldPunishMicroIslandExit(long elapsedMillis, double ownDistanceSquared,
             double nearestOtherDistanceSquared) {
-        return elapsedMillis >= 0L && elapsedMillis < MICRO_BATTLES_CHEAT_WINDOW_MILLIS
+        return shouldPunishMicroIslandExit(elapsedMillis, ownDistanceSquared, nearestOtherDistanceSquared,
+                MICRO_BATTLES_CHEAT_WINDOW_MILLIS);
+    }
+
+    public static boolean shouldPunishMicroIslandExit(long elapsedMillis, double ownDistanceSquared,
+            double nearestOtherDistanceSquared, long cheatWindowMillis) {
+        return elapsedMillis >= 0L && elapsedMillis < Math.max(0L, cheatWindowMillis)
                 && nearestOtherDistanceSquared < ownDistanceSquared;
     }
 
@@ -3310,9 +3316,15 @@ public final class ArcadePortRules {
 
     public static boolean shouldShowMicroBattlesBorderParticles(double playerX, double playerZ,
             double centerX, double centerZ, double borderSize) {
+        return shouldShowMicroBattlesBorderParticles(playerX, playerZ, centerX, centerZ, borderSize,
+                MICRO_BATTLES_BORDER_PARTICLE_DISTANCE);
+    }
+
+    public static boolean shouldShowMicroBattlesBorderParticles(double playerX, double playerZ,
+            double centerX, double centerZ, double borderSize, double particleDistance) {
         double distance = microBattlesDistanceToBorder(playerX, playerZ, centerX, centerZ, borderSize);
         return Double.isFinite(distance) && distance >= 0.0D
-                && distance <= MICRO_BATTLES_BORDER_PARTICLE_DISTANCE;
+                && Double.isFinite(particleDistance) && distance <= Math.max(0.0D, particleDistance);
     }
 
     /** Normalise the 16 supported stained-glass and dust colour names. */
@@ -3690,7 +3702,11 @@ public final class ArcadePortRules {
 
     // Additional source-derived Micro Battles achievements and contribution rules.
     public static boolean shouldAwardMicroBattlesAnnihilation(int killsThisGame) {
-        return killsThisGame == MICRO_BATTLES_ANNIHILATION_KILLS;
+        return shouldAwardMicroBattlesAnnihilation(killsThisGame, MICRO_BATTLES_ANNIHILATION_KILLS);
+    }
+
+    public static boolean shouldAwardMicroBattlesAnnihilation(int killsThisGame, int requiredKills) {
+        return requiredKills > 0 && killsThisGame == requiredKills;
     }
 
     public static boolean shouldAwardMicroBattlesLastTwo(int aliveTeams) {
@@ -3699,8 +3715,14 @@ public final class ArcadePortRules {
 
 
     public static boolean isMicroBattlesCombatContributionFresh(long nowMillis, long lastDamageAtMillis) {
+        return isMicroBattlesCombatContributionFresh(nowMillis, lastDamageAtMillis,
+                MICRO_BATTLES_COMBAT_LOG_EXPIRE_MILLIS);
+    }
+
+    public static boolean isMicroBattlesCombatContributionFresh(long nowMillis, long lastDamageAtMillis,
+            long expiryMillis) {
         return nowMillis >= lastDamageAtMillis
-                && nowMillis - lastDamageAtMillis < MICRO_BATTLES_COMBAT_LOG_EXPIRE_MILLIS;
+                && nowMillis - lastDamageAtMillis < Math.max(0L, expiryMillis);
     }
 
 }
