@@ -18,6 +18,7 @@ This checklist tracks implemented controls, not menu/catalog presence alone. A g
 - [x] Reset to Defaults clears per-profile rule overrides and test-bot count/loadouts, preventing legacy bot settings from being silently re-enabled.
 - [x] Automated coverage walks every exposed game variable, sets it through the typed runtime override boundary, reads it back and verifies clearing restores its default; a source check keeps runtime override keys linked to the profile catalog.
 - [x] A source-backed test verifies every catalogued variable has a production gameplay consumer, including the mode-scoped Monster Maze and dynamic Sneaky Assassins rule accessors.
+- [x] A cross-module source check verifies each literal game feature switch shown in the debug menu is referenced by production code; dedicated behavior tests remain required for switches without direct runtime assertions.
 - [x] Variable consumer checks include the separate Snake module, all SkyWars profile variables have runtime rule accessors, and tester profile changes affect Hoops target score, Wizards wand capacity, and mixed Turf Wars frontline step.
 - [x] Automated coverage requires every individual game and Monster Maze mode to expose at least one game-specific runtime variable in addition to shared combat rules.
 - [x] Shared feature switches cover kit unlock, invulnerability, fall damage and hunger; Bacon Brawl also has its unlimited-ability switch.
