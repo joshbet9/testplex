@@ -1244,6 +1244,18 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             features.put("review-voting", new DebugFeature("review-voting", "Review voting", Material.LIME_CONCRETE,
                     "Allow this tester to submit ratings through the normal six-level review vote.", true));
         }
+        if (game == ArcadePortGame.MILK_THE_COW) {
+            features.put("cow-charge", new DebugFeature("cow-charge", "Cow charge", Material.LEATHER_BOOTS,
+                    "Allow this tester's sprinting Cow-role charge to damage and knock back Farmers.", true));
+            features.put("farmer-double-jump", new DebugFeature("farmer-double-jump", "Farmer double jump", Material.FEATHER,
+                    "Allow this tester's one-per-airtime Farmer double jump.", true));
+            features.put("herd-spawning", new DebugFeature("herd-spawning", "Cow herd", Material.COW_SPAWN_EGG,
+                    "Spawn and move the normal Cow-role herd around the selected Cow.", true));
+            features.put("milk-capture", new DebugFeature("milk-capture", "Bucket capture", Material.BUCKET,
+                    "Allow this tester to fill a bucket by interacting with a Cow player.", true));
+            features.put("milk-scoring", new DebugFeature("milk-scoring", "Milk score", Material.MILK_BUCKET,
+                    "Award this tester the normal points when they drink a captured milk bucket.", true));
+        }
         if (game == ArcadePortGame.WITHER_ASSAULT) {
             features.put("ability-human-leap", new DebugFeature("ability-human-leap", "Human double jump", Material.FEATHER,
                     "Allow this tester to use the Human team's grounded double jump.", true));
@@ -1452,6 +1464,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                                 || "sound-feedback".equals(key)))
                 || (game == ArcadePortGame.MASTER_BUILDERS
                         && ("plot-editing".equals(key) || "review-voting".equals(key)))
+                || (game == ArcadePortGame.MILK_THE_COW && Set.of("cow-charge", "farmer-double-jump",
+                        "herd-spawning", "milk-capture", "milk-scoring").contains(key))
                 || (game == ArcadePortGame.WITHER_ASSAULT
                         && ("ability-human-leap".equals(key) || "human-revival".equals(key) || key.startsWith("ability-")))
                 || (game == ArcadePortGame.HOOPS_REMASTERED

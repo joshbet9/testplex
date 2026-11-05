@@ -779,6 +779,11 @@ public final class ArcadePortManager implements Listener {
         return fallback;
     }
 
+    private boolean debugFeatureEnabledForActiveSession(ArcadePortGame type, String flag) {
+        return activeDebugProfileGame != type || activeDebugProfileOwner == null
+                || debugFeatureEnabled(activeDebugProfileOwner, type, flag, true);
+    }
+
     boolean toggleDebugOverride(Player player, ArcadePortGame type, String flag) {
         return toggleDebugOverride(player, type, flag, false);
     }
@@ -998,6 +1003,10 @@ public final class ArcadePortManager implements Listener {
         }
         if (type == ArcadePortGame.MILK_THE_COW && "spawn-herd".equals(eventId)
                 && session.teams.getOrDefault(tester.getUniqueId(), 0) == 1) {
+            if (!debugFeatureEnabled(tester.getUniqueId(), ArcadePortGame.MILK_THE_COW, "herd-spawning", true)) {
+                tester.sendMessage(ChatColor.RED + "Cow herd spawning is disabled in your debug profile.");
+                return false;
+            }
             GameDebugRuntimeOverrides.markDebugSession();
             session.milkNextHerdUpdateAt = 0L;
             updateMilkCowHerd(session, tester, System.currentTimeMillis());
@@ -25745,6 +25754,12 @@ public final class ArcadePortManager implements Listener {
 
         if (session.type == ArcadePortGame.MILK_THE_COW && item == Material.BUCKET
                 && session.teams.getOrDefault(player.getUniqueId(), 0) == 0) {
+            if (plugin.hasAdminAccess(player)
+                    && !debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.MILK_THE_COW, "milk-capture", true)) {
+                event.setCancelled(true);
+                player.sendActionBar(ChatColor.RED + "Bucket capture is disabled in your debug profile.");
+                return;
+            }
             Player cowPlayer = event.getRightClicked() instanceof Player targetPlayer ? targetPlayer : null;
             if (event.getRightClicked() instanceof Cow disguiseCow) {
                 cowPlayer = session.milkCowDisguises.entrySet().stream()
@@ -25951,8 +25966,11 @@ public final class ArcadePortManager implements Listener {
                 session.milkPingerCandidates.add(otherId);
             }
         }
-        incrementMilkCowScore(session, player, GameDebugRuntimeOverrides.intValue(
-                "MILK_THE_COW_SCORE_PER_MILK", MilkCowRules.SCORE_PER_MILK), "Milk drunk");
+        if (!plugin.hasAdminAccess(player)
+                || debugFeatureEnabled(drinkerId, ArcadePortGame.MILK_THE_COW, "milk-scoring", true)) {
+            incrementMilkCowScore(session, player, GameDebugRuntimeOverrides.intValue(
+                    "MILK_THE_COW_SCORE_PER_MILK", MilkCowRules.SCORE_PER_MILK), "Milk drunk");
+        }
         if (active != session) return;
         player.setHealth(Math.min(player.getMaxHealth(), player.getHealth() + 2.0D));
         player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_BURP, 1.0F, 1.0F);
@@ -26584,6 +26602,8 @@ public final class ArcadePortManager implements Listener {
         }
         for (Player cowPlayer : cows) {
             if (!cowPlayer.isSprinting()) continue;
+            if (plugin.hasAdminAccess(cowPlayer)
+                    && !debugFeatureEnabled(cowPlayer.getUniqueId(), ArcadePortGame.MILK_THE_COW, "cow-charge", true)) continue;
             Location forward = cowPlayer.getLocation().clone().add(cowPlayer.getLocation().getDirection().setY(0).normalize());
             for (Entity nearby : session.world.getNearbyEntities(forward, 2.0D, 1.6D, 2.0D)) {
                 if (!(nearby instanceof Player target) || session.teams.getOrDefault(target.getUniqueId(), 1) != 0
@@ -26658,6 +26678,14 @@ public final class ArcadePortManager implements Listener {
                 || !session.alive.contains(cowPlayer.getUniqueId())
                 || session.teams.getOrDefault(cowPlayer.getUniqueId(), 0) != 1
                 || now < session.milkNextHerdUpdateAt) return;
+        if (!debugFeatureEnabledForActiveSession(ArcadePortGame.MILK_THE_COW, "herd-spawning")) {
+            for (Cow cow : new ArrayList<>(session.milkCowHerd)) {
+                if (cow != null && cow.isValid()) cow.remove();
+                session.entities.remove(cow);
+            }
+            session.milkCowHerd.clear();
+            return;
+        }
         session.milkNextHerdUpdateAt = now + 1_000L;
         Location target = cowPlayer.getLocation();
         session.milkCowHerd.removeIf(cow -> cow == null || !cow.isValid());
@@ -28929,6 +28957,13 @@ public final class ArcadePortManager implements Listener {
                 || !session.alive.contains(player.getUniqueId())
                 || session.teams.getOrDefault(player.getUniqueId(), 0) != 0) return;
         event.setCancelled(true);
+        if (plugin.hasAdminAccess(player)
+                && !debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.MILK_THE_COW, "farmer-double-jump", true)) {
+            player.setFlying(false);
+            player.setAllowFlight(false);
+            player.sendActionBar(ChatColor.RED + "Farmer double jump is disabled in your debug profile.");
+            return;
+        }
         UUID id = player.getUniqueId();
         if (!session.milkDoubleJumpUsed.add(id)) {
             player.setFlying(false);

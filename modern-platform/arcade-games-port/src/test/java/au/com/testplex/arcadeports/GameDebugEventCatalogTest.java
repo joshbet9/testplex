@@ -252,6 +252,24 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void milkTheCowDebugSwitchesGateRoleAbilitiesAndScoring() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        for (String key : List.of("cow-charge", "farmer-double-jump", "herd-spawning", "milk-capture", "milk-scoring")) {
+            assertTrue(lobby.contains("\"" + key + "\""), key + " appears in Milk the Cow debug menu");
+            assertTrue(manager.contains("ArcadePortGame.MILK_THE_COW, \"" + key + "\", true"),
+                    key + " reaches its live gameplay check");
+        }
+        assertTrue(manager.contains("debugFeatureEnabledForActiveSession(ArcadePortGame.MILK_THE_COW, \"herd-spawning\")"));
+        assertTrue(manager.contains("session.milkCowHerd.clear()"));
+    }
+
+    @Test
     void baconBrawlDebugMeterFillsTheSelectedAbilityAndRefreshesItsHud() throws IOException {
         Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "ArcadePortManager.java");
