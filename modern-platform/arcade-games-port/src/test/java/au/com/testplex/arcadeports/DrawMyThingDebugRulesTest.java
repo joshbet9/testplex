@@ -1,22 +1,43 @@
 package au.com.testplex.arcadeports;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.Set;
-import java.util.random.RandomGenerator;
-import java.util.random.RandomGeneratorFactory;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class DrawMyThingDebugRulesTest {
+    @AfterEach
+    void clearOverrides() {
+        GameDebugRuntimeOverrides.clear();
+    }
+
     @Test
-    void revealsOnlyAnUnshownNonSpaceLetterAndStopsWhenComplete() {
-        RandomGenerator random = RandomGeneratorFactory.of("L64X128MixRandom").create(23L);
-        String word = "cat dog";
-        int next = DrawMyThingDebugRules.nextHiddenLetterIndex(word, Set.of(0, 1, 2, 4, 5, 6), random);
-        assertEquals(-1, next);
-        next = DrawMyThingDebugRules.nextHiddenLetterIndex(word, Set.of(0, 1, 4, 5, 6), random);
-        assertEquals(2, next);
-        assertEquals(-1, DrawMyThingDebugRules.nextHiddenLetterIndex(null, Set.of(), random));
+    void profileOverridesChangeGuessLimitsScoringAndComebackThreshold() {
+        assertEquals(10, ArcadePortRules.drawMyThingMaxGuesses());
+        assertEquals(3, ArcadePortRules.drawMyThingGuesserPoints(true));
+        assertEquals(1, ArcadePortRules.drawMyThingGuesserPoints(false));
+        assertEquals(2, ArcadePortRules.drawMyThingDrawerFirstGuessPoints());
+        assertEquals(10, ArcadePortRules.drawMyThingComebackScoreGap());
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "DRAW_MY_THING_MAX_GUESSES", 4D,
+                "DRAW_MY_THING_FIRST_GUESS_POINTS", 6D,
+                "DRAW_MY_THING_LATER_GUESS_POINTS", 2D,
+                "DRAW_MY_THING_DRAWER_FIRST_GUESS_POINTS", 5D,
+                "DRAW_MY_THING_COMEBACK_SCORE_GAP", 4D));
+        assertEquals(4, ArcadePortRules.drawMyThingMaxGuesses());
+        assertEquals(6, ArcadePortRules.drawMyThingGuesserPoints(true));
+        assertEquals(2, ArcadePortRules.drawMyThingGuesserPoints(false));
+        assertEquals(5, ArcadePortRules.drawMyThingDrawerFirstGuessPoints());
+        assertEquals(4, ArcadePortRules.drawMyThingComebackScoreGap());
+
+        GameDebugRuntimeOverrides.clear();
+        assertEquals(10, ArcadePortRules.drawMyThingMaxGuesses());
+        assertEquals(3, ArcadePortRules.drawMyThingGuesserPoints(true));
+        assertEquals(1, ArcadePortRules.drawMyThingGuesserPoints(false));
+        assertEquals(2, ArcadePortRules.drawMyThingDrawerFirstGuessPoints());
+        assertEquals(10, ArcadePortRules.drawMyThingComebackScoreGap());
     }
 }

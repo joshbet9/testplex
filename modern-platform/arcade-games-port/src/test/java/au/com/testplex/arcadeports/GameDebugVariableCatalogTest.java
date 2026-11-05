@@ -40,6 +40,9 @@ class GameDebugVariableCatalogTest {
     void gameSpecificCatalogsIncludeTheirOwnRulePrefixes() {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.BACON_BRAWL), "BACON_1_8_HIT_DELAY_MILLIS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAGON_ESCAPE), "DRAGON_ESCAPE_CHASE_SPEED");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAW_MY_THING), "DRAW_MY_THING_MAX_GUESSES");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAW_MY_THING), "DRAW_MY_THING_FIRST_GUESS_POINTS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAW_MY_THING), "DRAW_MY_THING_LATER_GUESS_POINTS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.HEROES_OF_GWEN), "HEROES_OF_GWEN_MINIONS_PER_WAVE");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SPLEEF), "SPLEEF_HUNGER_DRAIN_INTERVAL_MILLIS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DEATH_TAG), "DEATH_TAG_CHASER_DAMAGE");

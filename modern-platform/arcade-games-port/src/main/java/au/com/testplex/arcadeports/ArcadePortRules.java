@@ -40,6 +40,11 @@ public final class ArcadePortRules {
     /** Turns start back-to-back so the drawing budget stays within the match timer. */
     public static final long DRAW_MY_THING_INTERMISSION_MILLIS = 0L;
     public static final int DRAW_MY_THING_FULL_ROUND_PLAYER_LIMIT = 8;
+    public static final int DRAW_MY_THING_MAX_GUESSES = 10;
+    public static final int DRAW_MY_THING_FIRST_GUESS_POINTS = 3;
+    public static final int DRAW_MY_THING_LATER_GUESS_POINTS = 1;
+    public static final int DRAW_MY_THING_DRAWER_FIRST_GUESS_POINTS = 2;
+    public static final int DRAW_MY_THING_COMEBACK_SCORE_GAP = 10;
     public static final int MASTER_BUILDERS_MAX_BUILDERS = 16;
     public static final long MASTER_BUILDERS_TOTAL_MILLIS = 300_000L;
     public static final long MASTER_BUILDERS_VOTE_MILLIS = 8_000L;
@@ -58,6 +63,35 @@ public final class ArcadePortRules {
                 "DRAW_MY_THING_BASE_ROUND_MILLIS", DRAW_MY_THING_BASE_ROUND_MILLIS));
         long budgetPerTurn = totalMillis / turns;
         return Math.max(1L, Math.min(baseRoundMillis, budgetPerTurn));
+    }
+
+    public static int drawMyThingMaxGuesses() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue("DRAW_MY_THING_MAX_GUESSES",
+                DRAW_MY_THING_MAX_GUESSES));
+    }
+
+    public static int drawMyThingGuesserPoints(boolean firstGuesser) {
+        return firstGuesser ? drawMyThingFirstGuesserPoints() : drawMyThingLaterGuesserPoints();
+    }
+
+    private static int drawMyThingFirstGuesserPoints() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue("DRAW_MY_THING_FIRST_GUESS_POINTS",
+                DRAW_MY_THING_FIRST_GUESS_POINTS));
+    }
+
+    private static int drawMyThingLaterGuesserPoints() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue("DRAW_MY_THING_LATER_GUESS_POINTS",
+                DRAW_MY_THING_LATER_GUESS_POINTS));
+    }
+
+    public static int drawMyThingDrawerFirstGuessPoints() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue("DRAW_MY_THING_DRAWER_FIRST_GUESS_POINTS",
+                DRAW_MY_THING_DRAWER_FIRST_GUESS_POINTS));
+    }
+
+    public static int drawMyThingComebackScoreGap() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue("DRAW_MY_THING_COMEBACK_SCORE_GAP",
+                DRAW_MY_THING_COMEBACK_SCORE_GAP));
     }
 
     public static boolean supportsMasterBuildersPlayerCount(int playerCount) {

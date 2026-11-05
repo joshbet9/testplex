@@ -178,7 +178,6 @@ import org.bukkit.util.Vector;
 public final class ArcadePortManager implements Listener {
     private static final int HALF_SIZE = 20;
     private static final long ROUND_MS = 180_000L;
-    private static final int DRAW_MY_THING_MAX_GUESSES = 10;
     private static final List<Material> DRAW_MY_THING_COLOURS = List.of(
             Material.WHITE_WOOL, Material.ORANGE_WOOL, Material.MAGENTA_WOOL, Material.LIGHT_BLUE_WOOL,
             Material.YELLOW_WOOL, Material.LIME_WOOL, Material.PINK_WOOL, Material.GRAY_WOOL,
@@ -12179,7 +12178,8 @@ public final class ArcadePortManager implements Listener {
             if(p==null||!p.isOnline()||p.getUniqueId().equals(session.drawCurrentDrawer))continue;
             if(session.drawCorrectGuessers.contains(p.getUniqueId()))p.sendActionBar(Component.text("Correct! Waiting for next round"));
             else p.sendActionBar(Component.text(hint+" | "+seconds+"s | Guesses: "+
-                    Math.max(0,DRAW_MY_THING_MAX_GUESSES-session.drawGuessAttempts.getOrDefault(p.getUniqueId(),0))+"/10"));
+                    Math.max(0,ArcadePortRules.drawMyThingMaxGuesses()-session.drawGuessAttempts.getOrDefault(p.getUniqueId(),0))
+                            +"/"+ArcadePortRules.drawMyThingMaxGuesses()));
         }
     }
 
@@ -12193,7 +12193,8 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         int used=session.drawGuessAttempts.getOrDefault(playerId,0);
-        if(used>=DRAW_MY_THING_MAX_GUESSES){player.sendMessage(ChatColor.RED+"No guesses remaining.");return;}
+        int maxGuesses = ArcadePortRules.drawMyThingMaxGuesses();
+        if(used>=maxGuesses){player.sendMessage(ChatColor.RED+"No guesses remaining.");return;}
         session.drawGuessAttempts.put(playerId,used+1);
         String statPath = localStatsPath(playerId, "draw-my-thing");
         if (!testPlayers.isTestPlayer(playerId) && !GameDebugRuntimeOverrides.isDebugSession()) {
@@ -12205,7 +12206,8 @@ public final class ArcadePortManager implements Listener {
         String answer=session.drawWord.toLowerCase(java.util.Locale.ROOT);
         if(guess.equals(answer)){
             boolean first=session.drawCorrectGuessers.isEmpty();
-            session.drawCorrectGuessers.add(playerId);session.scores.merge(playerId,first?3:1,Integer::sum);
+            session.drawCorrectGuessers.add(playerId);
+            session.scores.merge(playerId, ArcadePortRules.drawMyThingGuesserPoints(first), Integer::sum);
             if (GameDebugRuntimeOverrides.booleanValue("sound-feedback", true)) {
                 player.playSound(player.getLocation(), first ? Sound.ENTITY_PLAYER_LEVELUP
                         : Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8F, first ? 1.15F : 1.35F);
@@ -12257,14 +12259,16 @@ public final class ArcadePortManager implements Listener {
                     session.drawFastGuessRounds++;
                 }
                 Player d=session.players.get(session.drawCurrentDrawer);
-                if(d!=null&&d.isOnline())session.scores.merge(d.getUniqueId(),2,Integer::sum);
+                if(d!=null&&d.isOnline())session.scores.merge(d.getUniqueId(),
+                        ArcadePortRules.drawMyThingDrawerFirstGuessPoints(),Integer::sum);
             } else {
                 session.drawFirstGuessStreaks.put(playerId, 0);
             }
             int bestOtherScore = session.scores.entrySet().stream()
                     .filter(entry -> !entry.getKey().equals(playerId))
                     .mapToInt(Map.Entry::getValue).max().orElse(0);
-            if (bestOtherScore - session.scores.getOrDefault(playerId, 0) >= 10) {
+            if (bestOtherScore - session.scores.getOrDefault(playerId, 0)
+                    >= ArcadePortRules.drawMyThingComebackScoreGap()) {
                 session.drawComebackCandidates.add(playerId);
             }
             if (GameDebugRuntimeOverrides.booleanValue("sound-feedback", true)) {
@@ -12275,14 +12279,15 @@ public final class ArcadePortManager implements Listener {
             int bestOtherScore = session.scores.entrySet().stream()
                     .filter(entry -> !entry.getKey().equals(playerId))
                     .mapToInt(Map.Entry::getValue).max().orElse(0);
-            if (bestOtherScore - session.scores.getOrDefault(playerId, 0) >= 10) {
+            if (bestOtherScore - session.scores.getOrDefault(playerId, 0)
+                    >= ArcadePortRules.drawMyThingComebackScoreGap()) {
                 session.drawComebackCandidates.add(playerId);
             }
             session.drawFirstGuessStreaks.put(playerId, 0);
             if (GameDebugRuntimeOverrides.booleanValue("sound-feedback", true)) {
                 player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 0.7F, 0.75F);
             }
-            player.sendMessage(ChatColor.GRAY+"Not quite. "+(DRAW_MY_THING_MAX_GUESSES-used-1)+" guesses remain.");
+            player.sendMessage(ChatColor.GRAY+"Not quite. "+(maxGuesses-used-1)+" guesses remain.");
         }
     }
 
