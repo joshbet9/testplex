@@ -1428,6 +1428,12 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             features.put("worker-tools", new DebugFeature("worker-tools", "Worker mining tools",
                     Material.STONE_PICKAXE,
                     "Allow an authorised tester using Worker to mine with its pickaxe, shovel and axe.", true));
+            features.put("border-warning", new DebugFeature("border-warning", "Border warning label",
+                    Material.GOLDEN_HELMET, "Show the normal warning label above this tester near the border.", true));
+            features.put("border-particles", new DebugFeature("border-particles", "Border particles",
+                    Material.GLOWSTONE_DUST, "Show the normal coloured border particles to this tester.", true));
+            features.put("border-elimination", new DebugFeature("border-elimination", "Border elimination",
+                    Material.BARRIER, "Eliminate this tester when they cross the closing world border.", true));
             features.put("blocks-place", new DebugFeature("blocks-place", "Block placing", Material.COBBLESTONE,
                     "Allow authorised testers to place Micro Battles blocks.", true));
             features.put("blocks-break", new DebugFeature("blocks-break", "Block breaking", Material.IRON_PICKAXE,
@@ -1536,7 +1542,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.TURF_WARS && Set.of("build-editing", "combat-damage").contains(key))
                 || (game == ArcadePortGame.MICRO_BATTLES
                         && (key.startsWith("ability-") || key.startsWith("blocks-")
-                                || "worker-tools".equals(key)))
+                                || Set.of("worker-tools", "border-warning", "border-particles",
+                                        "border-elimination").contains(key)))
                 || (game == ArcadePortGame.SKY_WARS && key.startsWith("ability-"))
                 || (game == ArcadePortGame.SKY_WARS && Set.of("chest-looting", "island-crumbling", "tnt-generator").contains(key))
                 || (game == ArcadePortGame.WIZARDS && Set.of("spell-casting", "chest-looting").contains(key))

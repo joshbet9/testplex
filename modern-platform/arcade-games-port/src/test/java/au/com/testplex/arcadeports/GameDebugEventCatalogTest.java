@@ -871,6 +871,9 @@ class GameDebugEventCatalogTest {
         String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
         assertTrue(lobby.contains("List.of(\"archer\", \"fighter\", \"dasher\")"));
         assertTrue(lobby.contains("features.put(\"worker-tools\""));
+        assertTrue(lobby.contains("features.put(\"border-warning\""));
+        assertTrue(lobby.contains("features.put(\"border-particles\""));
+        assertTrue(lobby.contains("features.put(\"border-elimination\""));
         assertTrue(lobby.contains("features.put(\"blocks-place\""));
         assertTrue(lobby.contains("features.put(\"blocks-break\""));
         assertTrue(manager.contains("debugKitFeatureEnabled(targetPlayer, ArcadePortGame.MICRO_BATTLES, \"fighter\")"));
@@ -880,9 +883,12 @@ class GameDebugEventCatalogTest {
         assertTrue(normalize(manager).contains("ArcadePortGame.MICRO_BATTLES, \"worker-tools\", true"));
         assertTrue(manager.contains("material == Material.STONE_PICKAXE || material == Material.STONE_SHOVEL"));
         assertTrue(manager.contains("|| material == Material.STONE_AXE"));
+        assertTrue(manager.contains("\"border-elimination\", true"));
+        assertTrue(manager.contains("\"border-warning\", true"));
+        assertTrue(manager.contains("\"border-particles\", true"));
         assertTrue(normalize(manager).contains("ArcadePortGame.MICRO_BATTLES, \"blocks-place\", true"));
         assertTrue(normalize(manager).contains("ArcadePortGame.MICRO_BATTLES, \"blocks-break\", true"));
-        assertTrue(lobby.contains("|| \"worker-tools\".equals(key)"));
+        assertTrue(normalize(lobby).contains("Set.of(\"worker-tools\", \"border-warning\", \"border-particles\", \"border-elimination\").contains(key)"));
     }
 
     @Test

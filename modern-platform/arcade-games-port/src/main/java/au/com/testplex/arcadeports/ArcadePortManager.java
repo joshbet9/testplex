@@ -10312,6 +10312,12 @@ public final class ArcadePortManager implements Listener {
         Location center = border.getCenter();
         Set<UUID> showing = new HashSet<>();
         for (Player player : alivePlayers(session)) {
+            if (plugin.hasAdminAccess(player)
+                    && !debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.MICRO_BATTLES,
+                            "border-warning", true)) {
+                removeMicroBorderWarning(session, player.getUniqueId());
+                continue;
+            }
             Location location = player.getLocation();
             boolean nearBorder = ArcadePortRules.shouldShowMicroBattlesBorderParticles(
                     location.getX(), location.getZ(), center.getX(), center.getZ(), border.getSize());
@@ -10368,6 +10374,9 @@ public final class ArcadePortManager implements Listener {
         Location center = border.getCenter();
         double half = border.getSize() / 2.0D;
         for (Player player : alivePlayers(session)) {
+            if (plugin.hasAdminAccess(player)
+                    && !debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.MICRO_BATTLES,
+                            "border-particles", true)) continue;
             Location location = player.getLocation();
             double x = location.getX(), z = location.getZ();
             if (!ArcadePortRules.shouldShowMicroBattlesBorderParticles(
@@ -22538,7 +22547,11 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
             WorldBorder border = session.world.getWorldBorder();
             Location center = border.getCenter();
-            if (ArcadePortRules.isOutsideWorldBorder(location.getX(), location.getZ(),
+            boolean testerDisabledBorderElimination = plugin.hasAdminAccess(player)
+                    && !debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.MICRO_BATTLES,
+                            "border-elimination", true);
+            if (!testerDisabledBorderElimination
+                    && ArcadePortRules.isOutsideWorldBorder(location.getX(), location.getZ(),
                     center.getX(), center.getZ(), border.getSize())) {
                 eliminate(session, player, null, "caught by the closing border");
             }
