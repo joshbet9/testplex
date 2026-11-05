@@ -42,6 +42,8 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAGON_ESCAPE), "DRAGON_ESCAPE_CHASE_SPEED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.HEROES_OF_GWEN), "HEROES_OF_GWEN_MINIONS_PER_WAVE");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SPLEEF), "SPLEEF_HUNGER_DRAIN_INTERVAL_MILLIS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DEATH_TAG), "DEATH_TAG_CHASER_DAMAGE");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DEATH_TAG), "DEATH_TAG_ALPHA_CHASER_DAMAGE");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.CAMERA_SHY), "CAMERA_SHY_MATCH_SECONDS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.HOOPS_REMASTERED), "HOOPS_TARGET_SCORE");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SUPER_SPLOOR), "SUPER_SPLOOR_MAX_INK");
@@ -73,6 +75,15 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.BACON_BRAWL), "BACON_BRAWL_HITS_DAMAGE_HEALTH");
         assertFalse(GameDebugVariableCatalog.variables(ArcadePortGame.SPEED_BUILDERS).stream()
                 .anyMatch(variable -> variable.key().equals("SPEED_BUILDERS_BUILD_WIDTH")));
+    }
+
+    @Test
+    void deathTagDamageSlidersChangeNormalChaserDamageCalculations() {
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "DEATH_TAG_CHASER_DAMAGE", 2.5D,
+                "DEATH_TAG_ALPHA_CHASER_DAMAGE", 7.5D));
+        assertEquals(2.5D, ArcadePortRules.deathTagChaserDamage(false));
+        assertEquals(7.5D, ArcadePortRules.deathTagChaserDamage(true));
     }
 
     @Test

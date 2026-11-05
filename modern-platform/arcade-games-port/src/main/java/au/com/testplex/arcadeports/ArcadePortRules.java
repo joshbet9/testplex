@@ -74,6 +74,8 @@ public final class ArcadePortRules {
         return -24.0D + (plot / 4) * 16.0D + 0.5D;
     }
     public static final long DEATH_TAG_CHASER_PROMOTION_INTERVAL_MILLIS = 30_000L;
+    public static final double DEATH_TAG_CHASER_DAMAGE = 4.0D;
+    public static final double DEATH_TAG_ALPHA_CHASER_DAMAGE = 6.0D;
     /** DeathTag inherits the 20-minute timeout from the legacy Arcade Game base class. */
     public static final long DEATH_TAG_GAME_TIMEOUT_MILLIS = 1_200_000L;
     public static final int DEATH_TAG_FORCED_CHASER_REWARD_GEMS = 10;
@@ -2386,7 +2388,9 @@ public final class ArcadePortRules {
     }
 
     public static double deathTagChaserDamage(boolean alphaChaser) {
-        return alphaChaser ? 6.0D : 4.0D;
+        return alphaChaser
+                ? GameDebugRuntimeOverrides.doubleValue("DEATH_TAG_ALPHA_CHASER_DAMAGE", DEATH_TAG_ALPHA_CHASER_DAMAGE)
+                : GameDebugRuntimeOverrides.doubleValue("DEATH_TAG_CHASER_DAMAGE", DEATH_TAG_CHASER_DAMAGE);
     }
 
     public static double deathTagRunnerDamage(String runnerKit, boolean projectile) {
