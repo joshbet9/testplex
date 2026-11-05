@@ -189,6 +189,25 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void speedBuildersPerfectBuildProgressDoesNotPersistInDebugRounds() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String source = Files.readString(sourceRoot.resolve("SpeedBuildersGame.java"));
+        int start = source.indexOf("private void markPerfectBuild(PlayerState state)");
+        int end = source.indexOf("private void checkPerfectBuild(", start);
+        assertTrue(start >= 0 && end > start);
+        String method = source.substring(start, end);
+        int guard = method.indexOf("if (!GameDebugRuntimeOverrides.isDebugSession())");
+        assertTrue(guard >= 0);
+        assertTrue(method.indexOf("SpeedBuildersProgressStore.increment") > guard);
+        assertTrue(method.indexOf("plugin.saveConfig()") > guard);
+        assertTrue(method.indexOf("Bukkit.broadcastMessage") > guard);
+    }
+
+    @Test
     void castleAssaultObjectiveEventRequiresVacantObjectiveAndUsesNormalSpawner() throws IOException {
         Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "CastleAssaultHeroesOfGwenRuntime.java");

@@ -1525,14 +1525,16 @@ public final class SpeedBuildersGame implements Listener {
         state.perfect = true;
         state.perfectBuilds++;
         long elapsedMillis = state.roundBuildTimeTicks * 50L;
-        if (!firstPerfectBuildAwarded) {
-            firstPerfectBuildAwarded = true;
-            SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(), "perfect-first", 1L);
+        if (!GameDebugRuntimeOverrides.isDebugSession()) {
+            if (!firstPerfectBuildAwarded) {
+                firstPerfectBuildAwarded = true;
+                SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(), "perfect-first", 1L);
+            }
+            if (elapsedMillis < 10_000L) {
+                SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(), "speediest-builderizer", 1L);
+            }
+            plugin.saveConfig();
         }
-        if (elapsedMillis < 10_000L) {
-            SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(), "speediest-builderizer", 1L);
-        }
-        plugin.saveConfig();
         Bukkit.broadcastMessage(ChatColor.GOLD + state.player.getName()
                 + ChatColor.YELLOW + " got a perfect build!");
         state.player.sendTitle(ChatColor.GREEN + "PERFECT BUILD!",
