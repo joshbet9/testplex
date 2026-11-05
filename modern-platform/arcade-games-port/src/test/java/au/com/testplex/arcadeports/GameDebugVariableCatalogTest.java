@@ -30,6 +30,9 @@ class GameDebugVariableCatalogTest {
                     game.id() + " variables are stable for menu paging");
             assertTrue(variables.stream().anyMatch(variable -> variable.key().equals("LEGACY_ATTACK_SPEED")),
                     game.id() + " includes the shared 1.8 combat rule");
+            String gamePrefix = GameDebugVariableCatalog.rulePrefix(game);
+            assertTrue(variables.stream().anyMatch(variable -> variable.key().startsWith(gamePrefix)),
+                    game.id() + " has at least one game-specific runtime variable");
         }
     }
 
