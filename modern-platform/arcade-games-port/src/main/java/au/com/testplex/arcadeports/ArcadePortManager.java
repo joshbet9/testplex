@@ -10711,11 +10711,7 @@ public final class ArcadePortManager implements Listener {
     private String abilityEffectCosmeticOption(Player player, ArcadePortGame game) {
         if (game == null) return null;
         String gameId = game.isMonsterMaze() ? "monster-maze" : game.id();
-        String lineId = switch (game) {
-            case BACON_BRAWL, SNAKE, SUPER_SPLOOR -> "ability-effects";
-            case WIZARDS -> "spell-effects";
-            default -> "";
-        };
+        String lineId = abilityEffectCosmeticLineId(game);
         if (lineId.isBlank()) return null;
         if (player == null || gameId.isBlank() || !hasCosmeticLine(gameId, lineId)) return null;
         String fallback = GameAbilityCosmetics.defaultOption(gameId);
@@ -10724,13 +10720,22 @@ public final class ArcadePortManager implements Listener {
         try {
             Object selected = cosmetics.getClass().getMethod("getSelectedCosmeticOption",
                     UUID.class, String.class, String.class)
-                    .invoke(cosmetics, player.getUniqueId(), gameId, "ability-effects");
+                    .invoke(cosmetics, player.getUniqueId(), gameId, lineId);
             return selected instanceof String option && !option.isBlank() ? option : fallback;
         } catch (ReflectiveOperationException | LinkageError exception) {
             plugin.getLogger().fine("Could not read " + gameId + " ability effect selection: "
                     + exception.getMessage());
             return fallback;
         }
+    }
+
+    static String abilityEffectCosmeticLineId(ArcadePortGame game) {
+        if (game == null) return "";
+        return switch (game) {
+            case BACON_BRAWL, SNAKE, SUPER_SPLOOR -> "ability-effects";
+            case WIZARDS -> "spell-effects";
+            default -> "";
+        };
     }
 
     private String selectedGameCosmeticOption(Player player, String gameId, String lineId, String fallback) {

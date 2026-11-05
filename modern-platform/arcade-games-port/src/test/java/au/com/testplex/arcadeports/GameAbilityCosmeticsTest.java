@@ -12,6 +12,15 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class GameAbilityCosmeticsTest {
     @Test
+    void abilityCosmeticSelectionUsesTheReviewedGameLineId() {
+        assertEquals("spell-effects", ArcadePortManager.abilityEffectCosmeticLineId(ArcadePortGame.WIZARDS));
+        assertEquals("ability-effects", ArcadePortManager.abilityEffectCosmeticLineId(ArcadePortGame.BACON_BRAWL));
+        assertEquals("ability-effects", ArcadePortManager.abilityEffectCosmeticLineId(ArcadePortGame.SNAKE));
+        assertEquals("ability-effects", ArcadePortManager.abilityEffectCosmeticLineId(ArcadePortGame.SUPER_SPLOOR));
+        assertEquals("", ArcadePortManager.abilityEffectCosmeticLineId(ArcadePortGame.ONE_IN_THE_QUIVER));
+    }
+
+    @Test
     void abilityNamesUseStableDistinctMotifsWithinAStyle() {
         GameAbilityCosmetics.Palette style = GameAbilityCosmetics.palette("arcane-script");
         Set<GameAbilityCosmetics.Motif> motifs = new HashSet<>();
