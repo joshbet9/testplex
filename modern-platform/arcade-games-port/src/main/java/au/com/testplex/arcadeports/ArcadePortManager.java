@@ -24417,6 +24417,7 @@ public final class ArcadePortManager implements Listener {
                 || !(event.getProjectile() instanceof Arrow arrow)) return;
         UUID id = player.getUniqueId();
         String kit = session.witherAssaultKits.getOrDefault(id, "archer");
+        if (!debugKitFeatureEnabled(player, ArcadePortGame.WITHER_ASSAULT, "archer")) return;
         if (!WitherAssaultRules.shouldTrackSmokeArrow(
                 session.teams.getOrDefault(id, 1), kit, session.alive.contains(id), true)) return;
         session.entities.add(arrow);
@@ -25170,6 +25171,7 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.WITHER_ASSAULT
                 && session.alive.contains(player.getUniqueId())
                 && event.getAction().isRightClick() && event.getClickedBlock() != null
+                && debugKitFeatureEnabled(player, ArcadePortGame.WITHER_ASSAULT, "editor")
                 && session.witherEditorBlocks.contains(event.getClickedBlock())) {
             event.setCancelled(true);
             temporarilyRemoveWitherEditorBlock(session, event.getClickedBlock());
@@ -25919,6 +25921,7 @@ public final class ArcadePortManager implements Listener {
                 || !(event.getPotion().getShooter() instanceof Player thrower)
                 || !session.alive.contains(thrower.getUniqueId())
                 || session.teams.getOrDefault(thrower.getUniqueId(), 1) != 0
+                || !debugFeatureEnabled(thrower.getUniqueId(), ArcadePortGame.WITHER_ASSAULT, "human-revival", true)
                 || !isWitherRevivalPotion(event.getPotion().getItem())) return;
 
         UUID nearestDowned = null;
@@ -26122,7 +26125,8 @@ public final class ArcadePortManager implements Listener {
 
     private void reviveWitherHuman(Session session, Player thrower, UUID revivedId) {
         if (active != session || thrower == null || !session.alive.contains(thrower.getUniqueId())
-                || session.teams.getOrDefault(thrower.getUniqueId(), 1) != 0) return;
+                || session.teams.getOrDefault(thrower.getUniqueId(), 1) != 0
+                || !debugFeatureEnabled(thrower.getUniqueId(), ArcadePortGame.WITHER_ASSAULT, "human-revival", true)) return;
         Player revived = session.players.get(revivedId);
         Skeleton copy = session.witherOutCopies.remove(revivedId);
         if (revived == null || copy == null || !revived.isOnline() || !copy.isValid()) return;
@@ -26192,6 +26196,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void launchWitherMinions(Session session, Player player, long now) {
+        if (!debugKitFeatureEnabled(player, ArcadePortGame.WITHER_ASSAULT, "wither")) return;
         UUID owner = player.getUniqueId();
         if (now < session.witherMinionReadyAt.getOrDefault(owner, 0L)) {
             player.sendMessage(ChatColor.YELLOW + "Wither Minions are recharging.");
@@ -26227,6 +26232,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void useWitherScent(Session session, Player player, long now) {
+        if (!debugKitFeatureEnabled(player, ArcadePortGame.WITHER_ASSAULT, "wither")) return;
         UUID id = player.getUniqueId();
         if (now < session.witherScentReadyAt.getOrDefault(id, 0L)) {
             player.sendMessage(ChatColor.YELLOW + "Smell Humans is recharging.");
@@ -26305,13 +26311,15 @@ public final class ArcadePortManager implements Listener {
                 if (now >= readyAt && !human.getAllowFlight()) human.setAllowFlight(true);
             }
             if ("medic".equals(kit) && now >= session.witherMedicNextRefillAt.getOrDefault(id, now + 45_000L)) {
-                if (!hasRevivalPotion(human)) {
+                if (debugKitFeatureEnabled(human, ArcadePortGame.WITHER_ASSAULT, "medic")
+                        && !hasRevivalPotion(human)) {
                     human.getInventory().addItem(revivalPotion());
                     human.playSound(human.getLocation(), Sound.ENTITY_ITEM_PICKUP, 1.0F, 1.0F);
                 }
                 session.witherMedicNextRefillAt.put(id, now + 45_000L);
             }
             if (WitherAssaultRules.hasFletcher(kit)
+                    && debugKitFeatureEnabled(human, ArcadePortGame.WITHER_ASSAULT, "archer")
                     && now >= session.witherFletcherNextAt.getOrDefault(id, now + 4_000L)) {
                 int arrows = human.getInventory().all(Material.ARROW).values().stream()
                         .mapToInt(ItemStack::getAmount).sum();
@@ -26384,6 +26392,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void startWitherFireStorm(Session session, Player player) {
+        if (!debugKitFeatureEnabled(player, ArcadePortGame.WITHER_ASSAULT, "wither")) return;
         UUID id = player.getUniqueId();
         if (player.getExp() <= 0.0F) {
             player.sendMessage(ChatColor.YELLOW + "Fire Storm is recharging.");
@@ -26858,6 +26867,7 @@ public final class ArcadePortManager implements Listener {
             Block block = event.getBlock();
             boolean canEdit = session.alive.contains(editor.getUniqueId())
                     && session.teams.getOrDefault(editor.getUniqueId(), 1) == 0
+                    && debugKitFeatureEnabled(editor, ArcadePortGame.WITHER_ASSAULT, "editor")
                     && "editor".equals(session.witherAssaultKits.getOrDefault(editor.getUniqueId(), "archer"))
                     && WitherAssaultRules.canEditorModifyBlock(block.getY(), session.witherAssaultSpawnY,
                             isWitherEditorBlockUnderAnotherPlayer(session, block, editor));
@@ -27006,6 +27016,7 @@ public final class ArcadePortManager implements Listener {
             Block placed = event.getBlockPlaced();
             boolean canEdit = session.alive.contains(editor.getUniqueId())
                     && session.teams.getOrDefault(editor.getUniqueId(), 1) == 0
+                    && debugKitFeatureEnabled(editor, ArcadePortGame.WITHER_ASSAULT, "editor")
                     && "editor".equals(session.witherAssaultKits.getOrDefault(editor.getUniqueId(), "archer"))
                     && WitherAssaultRules.canEditorModifyBlock(placed.getY(), session.witherAssaultSpawnY,
                             isWitherEditorBlockUnderAnotherPlayer(session, placed, editor));
@@ -27129,7 +27140,8 @@ public final class ArcadePortManager implements Listener {
                 || !session.players.containsKey(player.getUniqueId())
                 || !session.alive.contains(player.getUniqueId())) return;
         if (session.teams.getOrDefault(player.getUniqueId(), 1) != 0
-                || !"editor".equals(session.witherAssaultKits.getOrDefault(player.getUniqueId(), "archer"))) {
+                || !"editor".equals(session.witherAssaultKits.getOrDefault(player.getUniqueId(), "archer"))
+                || !debugKitFeatureEnabled(player, ArcadePortGame.WITHER_ASSAULT, "editor")) {
             event.setCancelled(true);
         }
     }
@@ -28810,6 +28822,13 @@ public final class ArcadePortManager implements Listener {
         if (session == null || session.type != ArcadePortGame.WITHER_ASSAULT
                 || !session.alive.contains(player.getUniqueId())
                 || session.teams.getOrDefault(player.getUniqueId(), 1) != 0) return;
+        if (!debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.WITHER_ASSAULT, "ability-human-leap", true)) {
+            event.setCancelled(true);
+            player.setFlying(false);
+            player.setAllowFlight(false);
+            player.sendActionBar(ChatColor.RED + "Human double jump is disabled in your debug profile.");
+            return;
+        }
         event.setCancelled(true);
         UUID id = player.getUniqueId();
         long now = System.currentTimeMillis();

@@ -1231,6 +1231,17 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             features.put("palette-selection", new DebugFeature("palette-selection", "Palette selection", Material.PAINTING,
                     "Allow this tester to change their drawing colour from the inventory or map palette.", true));
         }
+        if (game == ArcadePortGame.WITHER_ASSAULT) {
+            features.put("ability-human-leap", new DebugFeature("ability-human-leap", "Human double jump", Material.FEATHER,
+                    "Allow this tester to use the Human team's grounded double jump.", true));
+            features.put("human-revival", new DebugFeature("human-revival", "Human revival potions", Material.SPLASH_POTION,
+                    "Allow this tester to revive downed Human teammates with a Revival Potion.", true));
+            for (String feature : List.of("archer", "medic", "editor", "wither")) {
+                String key = "ability-" + feature;
+                features.put(key, new DebugFeature(key, "Kit feature: " + humanizeDebugKey(feature), Material.WITHER_SKELETON_SKULL,
+                        "Allow this tester's " + humanizeDebugKey(feature) + " kit features and abilities.", true));
+            }
+        }
         if (game == ArcadePortGame.HEROES_OF_GWEN) {
             for (String hero : List.of("hattori", "bardolf", "devon", "rowena", "anath", "larissa", "dana", "biff", "ivy")) {
                 String key = "hero-" + hero + "-abilities";
@@ -1375,6 +1386,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.HEROES_OF_GWEN && key.startsWith("hero-") && key.endsWith("-abilities"))
                 || (game == ArcadePortGame.DRAW_MY_THING
                         && ("canvas-tools".equals(key) || "palette-selection".equals(key)))
+                || (game == ArcadePortGame.WITHER_ASSAULT
+                        && ("ability-human-leap".equals(key) || "human-revival".equals(key) || key.startsWith("ability-")))
                 || (game == ArcadePortGame.DRAGON_ESCAPE && "finish-detection".equals(key))
                 || (game == ArcadePortGame.DRAGON_ESCAPE && key.startsWith("ability-"))
                 || (game == ArcadePortGame.RUNNER && "runner-trail".equals(key))

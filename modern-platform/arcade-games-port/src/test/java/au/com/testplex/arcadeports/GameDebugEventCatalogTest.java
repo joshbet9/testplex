@@ -797,6 +797,30 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void witherAssaultDebugSwitchesGateHumanAndWitherAbilities() throws IOException {
+        Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ArcadePortManager.java");
+        Path lobbyPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ModernArcadeLobbyRuntime.java");
+        if (!Files.isRegularFile(managerPath)) {
+            managerPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ArcadePortManager.java");
+            lobbyPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ModernArcadeLobbyRuntime.java");
+        }
+        String source = Files.readString(managerPath);
+        String lobby = Files.readString(lobbyPath);
+        assertTrue(lobby.contains("\"ability-human-leap\", \"Human double jump\""));
+        assertTrue(lobby.contains("\"human-revival\", \"Human revival potions\""));
+        assertTrue(lobby.contains("List.of(\"archer\", \"medic\", \"editor\", \"wither\")"));
+        assertTrue(source.contains("debugKitFeatureEnabled(player, ArcadePortGame.WITHER_ASSAULT, \"wither\")"));
+        assertTrue(source.contains("debugKitFeatureEnabled(human, ArcadePortGame.WITHER_ASSAULT, \"medic\")"));
+        assertTrue(source.contains("debugKitFeatureEnabled(editor, ArcadePortGame.WITHER_ASSAULT, \"editor\")"));
+        assertTrue(source.contains("\"ability-human-leap\", true"));
+        assertTrue(source.contains("\"human-revival\", true"));
+    }
+
+    @Test
     void heroesOfGwenDebugEventStartsTheNormalPairedMinionWave() throws IOException {
         Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "CastleAssaultHeroesOfGwenRuntime.java");
