@@ -996,6 +996,13 @@ public final class ArcadePortManager implements Listener {
             updateDragonEscapeChase(session);
             triggered = true;
         }
+        if (type == ArcadePortGame.EVOLUTION && "begin-evolution".equals(eventId)
+                && !session.evolving.contains(tester.getUniqueId())) {
+            GameDebugRuntimeOverrides.markDebugSession();
+            session.evolutionAvailable.add(tester.getUniqueId());
+            beginEvolution(session, tester);
+            triggered = session.evolving.contains(tester.getUniqueId());
+        }
         if (type == ArcadePortGame.ONE_IN_THE_QUIVER && "refill-arrow".equals(eventId)) {
             int arrowSlot = Math.max(0, Math.min(8, GameDebugRuntimeOverrides.intValue(
                     "QUIVER_ARROW_SLOT", ArcadePortRules.QUIVER_ARROW_SLOT)));
