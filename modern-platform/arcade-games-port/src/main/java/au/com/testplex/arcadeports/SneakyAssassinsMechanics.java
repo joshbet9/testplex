@@ -318,7 +318,9 @@ final class SneakyAssassinsMechanics {
             setDisguised(player);
         }
         prepareNpcPatrolAnchors();
-        for (int i = 0; i < SOURCE_NPC_COUNT; i++) spawnNpc();
+        if (GameDebugRuntimeOverrides.booleanValue("town-npcs", true)) {
+            for (int i = 0; i < SOURCE_NPC_COUNT; i++) spawnNpc();
+        }
         long now = System.currentTimeMillis();
         nextTownNpcCullAt = 0L; // The source starts its 4-second NPC cull clock at Live.
         nextPowerUpAt = now + FIRST_POWERUP_DELAY_MILLIS;
@@ -336,10 +338,10 @@ final class SneakyAssassinsMechanics {
         long now = System.currentTimeMillis();
         updateDisguises(now);
         updateRevealCycle(now);
-        updateNpcMovement(now);
+        if (GameDebugRuntimeOverrides.booleanValue("npc-patrol", true)) updateNpcMovement(now);
         updateTownNpcCull(now);
         updatePowerUps(now);
-        updateMasterCompasses(now);
+        if (GameDebugRuntimeOverrides.booleanValue("master-compass", true)) updateMasterCompasses(now);
         if (now >= lastHudUpdateAt) {
             lastHudUpdateAt = now + 1_000L;
             updateHud(now);
@@ -416,6 +418,8 @@ final class SneakyAssassinsMechanics {
     }
 
     private void updateRevealCycle(long now) {
+        if (!GameDebugRuntimeOverrides.booleanValue("global-reveal", true)
+                && globalRevealEndsAt <= 0L) return;
         if (globalRevealEndsAt > 0L) {
             if (now >= globalRevealEndsAt) {
                 globalRevealEndsAt = 0L;
@@ -448,6 +452,10 @@ final class SneakyAssassinsMechanics {
         for (UUID id : new ArrayList<>(players.keySet())) {
             Player player = players.get(id);
             if (player == null || !player.isOnline()) continue;
+            if (!GameDebugRuntimeOverrides.booleanValue("disguises", true)) {
+                removeDisguise(id);
+                continue;
+            }
             if (!isAlive.test(id)) {
                 removeDisguise(id);
                 continue;
@@ -477,6 +485,7 @@ final class SneakyAssassinsMechanics {
                 || globalRevealEndsAt > System.currentTimeMillis()) return;
         UUID id = player.getUniqueId();
         removeDisguise(id);
+        if (!GameDebugRuntimeOverrides.booleanValue("disguises", true)) return;
         if (disguiseBridge != null) disguiseBridge.setDisguised(id, true);
     }
 
@@ -713,10 +722,12 @@ final class SneakyAssassinsMechanics {
                 : held.getItemMeta().getPersistentDataContainer().get(itemKey, PersistentDataType.STRING);
         if ("smoke-bomb".equals(itemType)) {
             event.setCancelled(true);
+            if (!GameDebugRuntimeOverrides.booleanValue("ability-smoke-bomb", true)) return;
             consumeHeld(player);
             useSmokeBomb(player);
         } else if (held.getType() == Material.DIAMOND && "revealer".equals(selectedKit(player.getUniqueId()))) {
             event.setCancelled(true);
+            if (!GameDebugRuntimeOverrides.booleanValue("ability-revealer", true)) return;
             consumeHeld(player);
             throwRevealer(player);
         }
@@ -736,6 +747,7 @@ final class SneakyAssassinsMechanics {
         if (!isAlive.test(player.getUniqueId()) || !npcIds.contains(villager.getUniqueId())
                 || !"briber".equals(selectedKit(player.getUniqueId()))
                 || player.getInventory().getItemInMainHand().getType() != Material.EMERALD) return;
+        if (!GameDebugRuntimeOverrides.booleanValue("ability-briber", true)) return;
         long now = System.currentTimeMillis();
         long ready = bribeReadyAt.getOrDefault(player.getUniqueId(), 0L);
         if (now < ready) {
@@ -787,6 +799,10 @@ final class SneakyAssassinsMechanics {
     }
 
     private void updatePowerUps(long now) {
+        boolean powerUpsEnabled = GameDebugRuntimeOverrides.booleanValue("power-ups", true);
+        if (!powerUpsEnabled) {
+            for (PowerUp powerUp : new ArrayList<>(powerUps)) removePowerUp(powerUp);
+        } else {
         if (powerUps.size() < MAX_ACTIVE_POWERUPS && now >= nextPowerUpAt) {
             if (spawnPowerUp(now)) nextPowerUpAt = now + NEXT_POWERUP_DELAY_MILLIS;
         }
@@ -840,6 +856,7 @@ final class SneakyAssassinsMechanics {
                     break;
                 }
             }
+        }
         }
         for (Map.Entry<UUID, Item> entry : new ArrayList<>(revealerProjectiles.entrySet())) {
             Item item = entry.getValue();

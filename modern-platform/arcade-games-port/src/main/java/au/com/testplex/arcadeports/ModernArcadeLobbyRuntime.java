@@ -51,6 +51,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -1395,6 +1396,20 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             features.put("lava-elimination", new DebugFeature("lava-elimination", "Lava elimination", Material.LAVA_BUCKET,
                     "Eliminate this tester on lava contact using the normal Snake rule.", true));
         }
+        if (game == ArcadePortGame.SNEAKY_ASSASSINS) {
+            for (String feature : List.of("disguises", "power-ups", "global-reveal", "npc-patrol",
+                    "town-npcs", "smoke-bomb", "revealer", "briber", "master-compass")) {
+                String key = switch (feature) {
+                    case "smoke-bomb", "revealer", "briber" -> "ability-" + feature;
+                    default -> feature;
+                };
+                features.put(key, new DebugFeature(key, "Feature: " + humanizeDebugKey(feature),
+                        Material.SKELETON_SKULL,
+                        "town-npcs".equals(feature)
+                                ? "Spawn the source town NPCs when the next test round starts."
+                                : "Enable this Sneaky Assassins runtime feature in the active test session.", true));
+            }
+        }
         return List.copyOf(features.values());
     }
 
@@ -1444,6 +1459,9 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.SNAKE
                         && (key.startsWith("ability-") || "tail-collisions".equals(key)
                                 || "magma-hazards".equals(key) || "lava-elimination".equals(key)))
+                || (game == ArcadePortGame.SNEAKY_ASSASSINS
+                        && (Set.of("disguises", "power-ups", "global-reveal", "npc-patrol", "master-compass")
+                                .contains(key) || key.startsWith("ability-")))
                 || (game == ArcadePortGame.SUPER_SPLOOR && key.startsWith("special-"))
                 || "DRAGONS_SPAWNING_ENABLED".equals(key)
                 || "DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED".equals(key)

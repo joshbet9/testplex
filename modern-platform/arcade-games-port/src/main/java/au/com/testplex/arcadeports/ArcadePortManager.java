@@ -800,7 +800,7 @@ public final class ArcadePortManager implements Listener {
             debugProfiles.setFeature(player.getUniqueId(), type, flag, enabled);
             if (activeDebugGame() == type) {
                 GameDebugRuntimeOverrides.markDebugSession();
-                if (type == ArcadePortGame.SNAKE
+                if ((type == ArcadePortGame.SNAKE || type == ArcadePortGame.SNEAKY_ASSASSINS)
                         && player.getUniqueId().equals(activeDebugProfileOwner)) {
                     GameDebugRuntimeOverrides.setValue(flag, enabled);
                 }

@@ -185,6 +185,34 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void sneakyAssassinsDebugSwitchesReachItsLiveMechanics() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String mechanics = Files.readString(sourceRoot.resolve("SneakyAssassinsMechanics.java"));
+        for (String key : List.of("disguises", "power-ups", "global-reveal", "npc-patrol", "town-npcs",
+                "master-compass")) {
+            assertTrue(lobby.contains("\"" + key + "\""), key + " appears in Sneaky Assassins controls");
+        }
+        assertTrue(lobby.contains("\"ability-\" + feature"));
+        for (String kit : List.of("smoke-bomb", "revealer", "briber")) {
+            assertTrue(lobby.contains("\"" + kit + "\""));
+        }
+        for (String key : List.of("disguises", "power-ups", "global-reveal", "npc-patrol", "town-npcs",
+                "ability-smoke-bomb", "ability-revealer", "ability-briber", "master-compass")) {
+            assertTrue(mechanics.contains("booleanValue(\"" + key + "\""),
+                    key + " is read by the live mechanics");
+        }
+        assertTrue(manager.contains("type == ArcadePortGame.SNEAKY_ASSASSINS"));
+        assertTrue(mechanics.contains("removePowerUp(powerUp)"));
+        assertTrue(mechanics.contains("removeDisguise(id)"));
+    }
+
+    @Test
     void baconBrawlDebugMeterFillsTheSelectedAbilityAndRefreshesItsHud() throws IOException {
         Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "ArcadePortManager.java");
