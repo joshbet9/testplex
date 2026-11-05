@@ -52,8 +52,9 @@ class GameDebugEventCatalogTest {
         assertEquals(List.of("restore-armour", "fire-shot", "refresh-kit"),
                 GameDebugEventCatalog.events(ArcadePortGame.PAINTBALL).stream()
                         .map(GameDebugEventCatalog.Event::id).toList());
-        assertEquals("promote-self", GameDebugEventCatalog.events(ArcadePortGame.DEATH_TAG)
-                .getFirst().id());
+        assertEquals(List.of("promote-self", "use-kit-ability", "refresh-kit"),
+                GameDebugEventCatalog.events(ArcadePortGame.DEATH_TAG).stream()
+                        .map(GameDebugEventCatalog.Event::id).toList());
         assertTrue(GameDebugEventCatalog.events(ArcadePortGame.DEATH_TAG).stream()
                 .anyMatch(event -> event.id().equals("refresh-kit")));
         assertEquals("forfeit-duel", GameDebugEventCatalog.events(ArcadePortGame.GLADIATORS)
@@ -112,6 +113,23 @@ class GameDebugEventCatalogTest {
         assertTrue(manager.contains("firePaintballWeapon(session, tester, kit, System.currentTimeMillis())"),
                 "the event must share reload, heat, projectile, and cosmetic behavior with regular firing");
         assertTrue(manager.contains("session.paintballShotOwners.size() > projectilesBefore"));
+        assertTrue(manager.contains("if (triggered) GameDebugRuntimeOverrides.markDebugSession()"));
+    }
+
+    @Test
+    void deathTagTricksterDebugEventUsesNormalSwapAndFireworksCooldownPaths() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String eventCatalog = Files.readString(sourceRoot.resolve("GameDebugEventCatalog.java"));
+        assertTrue(eventCatalog.contains("new Event(\"use-kit-ability\", \"Test Trickster Ability\""));
+        assertTrue(manager.contains("\"trickster\".equals(session.deathTagRunnerKits.get(tester.getUniqueId()))"));
+        assertTrue(manager.contains("useDeathTagTricksterSwap(session, tester)"));
+        assertTrue(manager.contains("useDeathTagTricksterFireworks(session, tester)"));
+        assertTrue(manager.contains("session.deathTagTricksterFireworksReadyAt.getOrDefault("));
         assertTrue(manager.contains("if (triggered) GameDebugRuntimeOverrides.markDebugSession()"));
     }
 

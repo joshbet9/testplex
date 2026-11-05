@@ -1194,6 +1194,26 @@ public final class ArcadePortManager implements Listener {
             makeDeathTagChaser(session, tester, "promoted by an authorised debug event");
             triggered = session.tagged.contains(tester.getUniqueId());
         }
+        if (type == ArcadePortGame.DEATH_TAG && "use-kit-ability".equals(eventId)
+                && !session.tagged.contains(tester.getUniqueId())
+                && "trickster".equals(session.deathTagRunnerKits.get(tester.getUniqueId()))) {
+            ItemStack held = tester.getInventory().getItemInMainHand();
+            String ability = held != null && held.hasItemMeta() && held.getItemMeta().hasDisplayName()
+                    ? ChatColor.stripColor(held.getItemMeta().getDisplayName()) : "";
+            if ("Chaser Swap".equals(ability)) {
+                boolean usedBefore = session.deathTagTricksterSwapUsed.contains(tester.getUniqueId());
+                useDeathTagTricksterSwap(session, tester);
+                triggered = !usedBefore && session.deathTagTricksterSwapUsed.contains(tester.getUniqueId());
+            } else if ("Runner Distraction".equals(ability)) {
+                long now = System.currentTimeMillis();
+                long readyBefore = session.deathTagTricksterFireworksReadyAt.getOrDefault(
+                        tester.getUniqueId(), 0L);
+                useDeathTagTricksterFireworks(session, tester);
+                triggered = readyBefore <= now
+                        && session.deathTagTricksterFireworksReadyAt.getOrDefault(tester.getUniqueId(), 0L) > now;
+            }
+            if (triggered) GameDebugRuntimeOverrides.markDebugSession();
+        }
         if (GameDebugEventCatalog.supportsKitRefresh(type) && "refresh-kit".equals(eventId)) {
             GameDebugRuntimeOverrides.markDebugSession();
             giveKit(session, tester);

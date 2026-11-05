@@ -69,7 +69,9 @@ final class GameDebugEventCatalog {
                     "Fire your selected Paintball weapon through its ordinary ammo, cooldown, heat, and projectile path."));
     private static final List<Event> DEATH_TAG = List.of(
             new Event("promote-self", "Promote Self to Chaser", Material.SKELETON_SKULL,
-                    "Run the normal Runner-to-Chaser conversion on yourself."));
+                    "Run the normal Runner-to-Chaser conversion on yourself."),
+            new Event("use-kit-ability", "Test Trickster Ability", Material.ENDER_EYE,
+                    "Use the held Chaser Swap or Runner Distraction through its normal one-use/cooldown path."));
     private static final List<Event> REFRESH_KIT = List.of(
             new Event("refresh-kit", "Refresh Selected Kit", Material.NETHER_STAR,
                     "Reapply your selected kit through its normal in-game kit setup."));
