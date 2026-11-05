@@ -324,6 +324,28 @@ class GameDebugVariableCatalogTest {
     }
 
     @Test
+    void monsterMazeKitAbilitySwitchesAreLiveAndDefaultToTheSourceBehavior() {
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "kit-jumper", false,
+                "kit-slowball", false,
+                "kit-body-builder", false,
+                "kit-repulsor", false,
+                "kit-maverick", false));
+        assertFalse(me.monstermaze.game.MazeDebugRules.kitEnabled("jumper"));
+        assertFalse(me.monstermaze.game.MazeDebugRules.kitEnabled("slowball"));
+        assertFalse(me.monstermaze.game.MazeDebugRules.kitEnabled("body-builder"));
+        assertFalse(me.monstermaze.game.MazeDebugRules.kitEnabled("repulsor"));
+        assertFalse(me.monstermaze.game.MazeDebugRules.kitEnabled("maverick"));
+
+        GameDebugRuntimeOverrides.setValue("kit-jumper", true);
+        assertTrue(me.monstermaze.game.MazeDebugRules.kitEnabled("jumper"));
+
+        GameDebugRuntimeOverrides.clear();
+        assertTrue(me.monstermaze.game.MazeDebugRules.kitEnabled("jumper"));
+        assertTrue(me.monstermaze.game.MazeDebugRules.kitEnabled("maverick"));
+    }
+
+    @Test
     void timingCombatAndAbilityVariablesChangeTheirDeterministicGameRules() {
         GameDebugRuntimeOverrides.activate(Map.ofEntries(
                 Map.entry("CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS", 10_000L),
