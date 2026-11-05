@@ -39,7 +39,7 @@ The common tester switches (all kits, invulnerability, no fall damage, and no hu
 
 | Game | Status | Implemented coverage | Remaining work |
 |---|---|---|---|
-| Bacon Brawl | Partial | Shared rule overrides; common switches; achievement preview in its award helper; authorized testers can fill their selected kit's live ability meter, refresh its HUD, and enable or disable each kit ability in their own profile | Remaining game events and stats-isolated match simulation |
+| Bacon Brawl | Partial | Shared rule overrides; common switches; achievement preview in its award helper; authorized testers can fill their selected kit's live ability meter, refresh its HUD, enable or disable each kit ability, and immediately toggle optional health damage on normal hits in their own profile | Remaining game events and stats-isolated match simulation |
 | Bomb Lobbers | Partial | Shared rule overrides and common switches; authorised testers can pause future power-up waves, clear loose drops, or request the normal paired power-up wave through profile/live paths | TNT/round event controls and full feature regression tests |
 | Castle Assault | Partial | Shared rule overrides plus objective TNT respawn timing is runtime-backed; authorized testers can spawn objective TNT through the source runtime when it is neither active nor carried | Tower/crystal/TNT switches, Heroes of GWEN objective controls and regression tests |
 | Death Tag | Partial | Shared rule overrides plus chaser promotion, archer knockback and Traitor cooldown are runtime-backed; authorised testers can run the normal Runner-to-Chaser conversion on themselves | Runner/chaser feature controls, tag/respawn tools and achievement simulations |

@@ -17,6 +17,7 @@ final class GameDebugVariableCatalog {
 
     private static final Set<String> LIVE_BOOLEAN_RULES = Set.of(
             "BOMB_LOBBERS_POWERUP_SPAWNING_ENABLED",
+            "BACON_BRAWL_HITS_DAMAGE_HEALTH",
             "DRAGONS_SPAWNING_ENABLED",
             "DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED",
             "MICRO_BATTLES_CRUMBLE_ENABLED",

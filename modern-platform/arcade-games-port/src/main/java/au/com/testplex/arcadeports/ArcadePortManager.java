@@ -13915,6 +13915,19 @@ public final class ArcadePortManager implements Listener {
             session.baconSwingTimingMultiplierById.put(attackerId, 1.0D);
         }
 
+        if (normalTimedHit && GameDebugRuntimeOverrides.booleanValue("BACON_BRAWL_HITS_DAMAGE_HEALTH",
+                ArcadePortRules.BACON_BRAWL_HITS_DAMAGE_HEALTH)) {
+            double hitDamage = Math.max(0.0D, rawDamage);
+            if (hitDamage > 0.0D) {
+                if (target.getHealth() <= hitDamage) {
+                    eliminate(session, target, attacker, baconKillMode(source));
+                } else {
+                    target.setHealth(target.getHealth() - hitDamage);
+                    playLegacyDamageFeedback(target);
+                }
+            }
+        }
+
         if (active == session && "body-slam".equals(source)
                 && session.alive.contains(attackerId)) {
             // Reborn's Body Slam emits reciprocal 2-damage recoil, but only the target receives kill credit.

@@ -70,6 +70,7 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MONSTER_MAZE), "MONSTER_MAZE_CRYO_RADIUS_BLOCKS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MONSTER_MAZE_SPEED), "MONSTER_MAZE_SPEED_CRYO_RADIUS_BLOCKS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MONSTER_MAZE_MODERN), "MONSTER_MAZE_MODERN_CRYO_RADIUS_BLOCKS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.BACON_BRAWL), "BACON_BRAWL_HITS_DAMAGE_HEALTH");
         assertFalse(GameDebugVariableCatalog.variables(ArcadePortGame.SPEED_BUILDERS).stream()
                 .anyMatch(variable -> variable.key().equals("SPEED_BUILDERS_BUILD_WIDTH")));
     }
@@ -87,6 +88,8 @@ class GameDebugVariableCatalogTest {
         }
         assertFalse(GameDebugVariableCatalog.variables(ArcadePortGame.BACON_BRAWL).stream()
                 .anyMatch(variable -> variable.key().equals("BACON_FLASH_FRIED_MAX_WIN_MILLIS")));
+        assertTrue(GameDebugVariableCatalog.appliesImmediately(
+                GameDebugVariableCatalog.variable(ArcadePortGame.BACON_BRAWL, "BACON_BRAWL_HITS_DAMAGE_HEALTH")));
     }
 
     @Test
