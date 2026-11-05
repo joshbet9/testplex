@@ -17,27 +17,44 @@ public final class SkyWarsMixedArcadeRules {
     public static final double TNT_THROW_STRENGTH = 1.6D;
 
     public static boolean hasRoom(int queuedPlayers) {
-        return queuedPlayers < MAX_PLAYERS;
+        return queuedPlayers < intRule("SKY_WARS_MAX_PLAYERS", MAX_PLAYERS);
     }
 
     public static int acceptedPlayers(int requestedPlayers) {
-        return Math.max(0, Math.min(MAX_PLAYERS, requestedPlayers));
+        return Math.max(0, Math.min(intRule("SKY_WARS_MAX_PLAYERS", MAX_PLAYERS), requestedPlayers));
     }
 
     public static long roundEndsAt(long startMillis) {
-        return startMillis + PREPARE_MILLIS + ROUND_MILLIS;
+        return startMillis + prepareMillis() + roundMillis();
     }
 
     public static long liveStartsAt(long startMillis) {
-        return startMillis + PREPARE_MILLIS;
+        return startMillis + prepareMillis();
     }
 
     public static long crumbleStartsAt(long startMillis) {
-        return liveStartsAt(startMillis) + CRUMBLE_DELAY_MILLIS;
+        return liveStartsAt(startMillis) + crumbleDelayMillis();
     }
 
     public static long firstTntAt(long startMillis) {
-        return liveStartsAt(startMillis) + TNT_GENERATOR_INTERVAL_MILLIS;
+        return liveStartsAt(startMillis) + tntGeneratorIntervalMillis();
+    }
+
+    public static int maxPlayers() { return intRule("SKY_WARS_MAX_PLAYERS", MAX_PLAYERS); }
+    public static long prepareMillis() { return longRule("SKY_WARS_PREPARE_MILLIS", PREPARE_MILLIS); }
+    public static long roundMillis() { return longRule("SKY_WARS_ROUND_MILLIS", ROUND_MILLIS); }
+    public static long crumbleDelayMillis() { return longRule("SKY_WARS_CRUMBLE_DELAY_MILLIS", CRUMBLE_DELAY_MILLIS); }
+    public static long tntGeneratorIntervalMillis() {
+        return longRule("SKY_WARS_TNT_GENERATOR_INTERVAL_MILLIS", TNT_GENERATOR_INTERVAL_MILLIS);
+    }
+    public static int tntPerDrop() { return intRule("SKY_WARS_TNT_PER_DROP", TNT_PER_DROP); }
+
+    private static int intRule(String key, int fallback) {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(key, fallback));
+    }
+
+    private static long longRule(String key, long fallback) {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(key, fallback));
     }
 
     public static final double ORE_ISLAND_RADIUS_BLOCKS = 8.0D;

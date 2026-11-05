@@ -3,6 +3,7 @@ package au.com.testplex.arcadeports;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -41,6 +42,15 @@ class TurfWarsMixedVariantTest {
         assertEquals(1, ArcadePortRules.advanceTurfFrontline(-1, 0, true));
         assertEquals(-3, ArcadePortRules.advanceTurfFrontline(-1, 1, true));
         assertEquals(-1, ArcadePortRules.advanceTurfFrontline(-1, 7, true));
+    }
+
+    @Test
+    void debugProfileChangesMixedArcadeFrontlineStepAtRuntime() {
+        GameDebugRuntimeOverrides.activate(Map.of("TURF_WARS_MIXED_ARCADE_TURF_ADVANCE_BLOCKS", 4));
+        assertEquals(3, ArcadePortRules.advanceTurfFrontline(-1, 0, true));
+        assertEquals(-5, ArcadePortRules.advanceTurfFrontline(-1, 1, true));
+        GameDebugRuntimeOverrides.clear();
+        assertEquals(1, ArcadePortRules.advanceTurfFrontline(-1, 0, true));
     }
 
     @Test

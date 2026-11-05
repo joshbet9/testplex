@@ -2,6 +2,7 @@ package au.com.testplex.arcadeports;
 
 import org.bukkit.Material;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -113,35 +114,42 @@ final class GameDebugEventCatalog {
     private GameDebugEventCatalog() { }
 
     static List<Event> events(ArcadePortGame game) {
-        if (game == ArcadePortGame.BACON_BRAWL) return BACON_BRAWL;
-        if (game == ArcadePortGame.BOMB_LOBBERS) return BOMB_LOBBERS;
-        if (game == ArcadePortGame.CASTLE_ASSAULT) return CASTLE_ASSAULT;
-        if (game == ArcadePortGame.RUNNER) return RUNNER;
-        if (game == ArcadePortGame.HEROES_OF_GWEN) return HEROES_OF_GWEN;
-        if (game == ArcadePortGame.WITHER_ASSAULT) return WITHER_ASSAULT;
-        if (game == ArcadePortGame.DRAW_MY_THING) return DRAW_MY_THING;
-        if (game == ArcadePortGame.DRAGONS) return DRAGONS;
-        if (game == ArcadePortGame.DRAGON_ESCAPE) return DRAGON_ESCAPE;
-        if (game == ArcadePortGame.CAMERA_SHY) return CAMERA_SHY;
-        if (game == ArcadePortGame.EVOLUTION) return EVOLUTION;
-        if (game == ArcadePortGame.HOOPS_REMASTERED) return HOOPS_REMASTERED;
-        if (game == ArcadePortGame.MASTER_BUILDERS) return MASTER_BUILDERS;
-        if (game == ArcadePortGame.SNAKE) return SNAKE;
-        if (game == ArcadePortGame.SNEAKY_ASSASSINS) return SNEAKY_ASSASSINS;
-        if (game == ArcadePortGame.PLEXBALL) return PLEXBALL;
-        if (game == ArcadePortGame.ONE_IN_THE_QUIVER) return ONE_IN_THE_QUIVER;
-        if (game == ArcadePortGame.SPLEEF) return SPLEEF;
-        if (game == ArcadePortGame.SUPER_SPLOOR) return SUPER_SPLOOR;
-        if (game == ArcadePortGame.MILK_THE_COW) return MILK_THE_COW;
-        if (game == ArcadePortGame.SHEEP_QUEST) return SHEEP_QUEST;
-        if (game == ArcadePortGame.SKY_WARS) return SKY_WARS;
-        if (game == ArcadePortGame.PAINTBALL) return PAINTBALL;
-        if (game == ArcadePortGame.MICRO_BATTLES) return MICRO_BATTLES;
-        if (game == ArcadePortGame.DEATH_TAG) return DEATH_TAG;
-        if (game == ArcadePortGame.GLADIATORS) return GLADIATORS;
-        if (game == ArcadePortGame.WIZARDS) return WIZARDS;
-        if (supportsKitRefresh(game)) return REFRESH_KIT;
-        return List.of();
+        List<Event> configured = switch (game) {
+            case BACON_BRAWL -> BACON_BRAWL;
+            case BOMB_LOBBERS -> BOMB_LOBBERS;
+            case CASTLE_ASSAULT -> CASTLE_ASSAULT;
+            case RUNNER -> RUNNER;
+            case HEROES_OF_GWEN -> HEROES_OF_GWEN;
+            case WITHER_ASSAULT -> WITHER_ASSAULT;
+            case DRAW_MY_THING -> DRAW_MY_THING;
+            case DRAGONS -> DRAGONS;
+            case DRAGON_ESCAPE -> DRAGON_ESCAPE;
+            case CAMERA_SHY -> CAMERA_SHY;
+            case EVOLUTION -> EVOLUTION;
+            case HOOPS_REMASTERED -> HOOPS_REMASTERED;
+            case MASTER_BUILDERS -> MASTER_BUILDERS;
+            case SNAKE -> SNAKE;
+            case SNEAKY_ASSASSINS -> SNEAKY_ASSASSINS;
+            case PLEXBALL -> PLEXBALL;
+            case ONE_IN_THE_QUIVER -> ONE_IN_THE_QUIVER;
+            case SPLEEF -> SPLEEF;
+            case SUPER_SPLOOR -> SUPER_SPLOOR;
+            case MILK_THE_COW -> MILK_THE_COW;
+            case SHEEP_QUEST -> SHEEP_QUEST;
+            case SKY_WARS -> SKY_WARS;
+            case PAINTBALL -> PAINTBALL;
+            case MICRO_BATTLES -> MICRO_BATTLES;
+            case DEATH_TAG -> DEATH_TAG;
+            case GLADIATORS -> GLADIATORS;
+            case WIZARDS -> WIZARDS;
+            default -> List.of();
+        };
+        if (!supportsKitRefresh(game) || configured.stream().anyMatch(event -> event.id().equals("refresh-kit"))) {
+            return configured;
+        }
+        List<Event> combined = new ArrayList<>(configured);
+        combined.addAll(REFRESH_KIT);
+        return List.copyOf(combined);
     }
 
     static boolean supportsKitRefresh(ArcadePortGame game) {

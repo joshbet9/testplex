@@ -90,7 +90,6 @@ import java.util.UUID;
 
 public final class WizardsGameManager implements Listener, ArcadeGameModule {
     private static final String SPELL_MENU_TITLE = ChatColor.DARK_PURPLE + "Wizards Spell Selector";
-    private static final int MAX_WAND_SLOTS = GameDebugRuntimeOverrides.intValue("WIZARDS_WAND_SLOT_COUNT", WizardsRules.WAND_SLOT_COUNT);
     private static final int MENU_SLOT = 8;
     private static final int ARENA_FLOOR_Y = 63;
     private static final int CHEST_COUNT_FALLBACK = 32;
@@ -672,7 +671,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         });
         applyMatchScoreboard(player);
 
-        for (int slot = 0; slot < MAX_WAND_SLOTS; slot++) {
+        for (int slot = 0; slot < WizardsRules.maxWandSlots(); slot++) {
             if (slot < state.wandCount) {
                 player.getInventory().setItem(slot, makeWand(state, slot));
             } else {
@@ -1790,7 +1789,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
 
     private void dropDeathLoot(Player player, WizardState state) {
         PlayerInventory inventory = player.getInventory();
-        for (int slot = MAX_WAND_SLOTS; slot < inventory.getSize(); slot++) {
+        for (int slot = WizardsRules.maxWandSlots(); slot < inventory.getSize(); slot++) {
             ItemStack item = inventory.getItem(slot);
             if (item != null && !item.getType().isAir() && !isMenuBook(item)) drop(player, item.clone());
         }
@@ -1902,7 +1901,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
     public void onPlace(BlockPlaceEvent event) {
         WizardState state = states.get(event.getPlayer().getUniqueId());
         if (running && state != null && state.alive
-                && event.getPlayer().getInventory().getHeldItemSlot() < MAX_WAND_SLOTS
+                && event.getPlayer().getInventory().getHeldItemSlot() < WizardsRules.maxWandSlots()
                 && isWand(event.getItemInHand())) {
             event.setCancelled(true);
         }
@@ -3045,7 +3044,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         private final float maximumMana;
         private final EnumMap<WizardsSpell, Integer> known = new EnumMap<>(WizardsSpell.class);
         private final EnumMap<WizardsSpell, Long> cooldowns = new EnumMap<>(WizardsSpell.class);
-        private final WizardsSpell[] wands = new WizardsSpell[MAX_WAND_SLOTS];
+        private final WizardsSpell[] wands = new WizardsSpell[WizardsRules.maxWandSlots()];
         private float mana;
         private int wandCount;
         private int soulStars;

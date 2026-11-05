@@ -69,7 +69,8 @@ public final class HoopsRemasteredRules {
     }
 
     public static boolean hasReachedTargetScore(int red, int blue) {
-        return red >= TARGET_SCORE || blue >= TARGET_SCORE;
+        int targetScore = GameDebugRuntimeOverrides.intValue("HOOPS_TARGET_SCORE", TARGET_SCORE);
+        return red >= targetScore || blue >= targetScore;
     }
 
     /** Regulation is tied when the five-minute buzzer sounds. */

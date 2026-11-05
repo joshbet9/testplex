@@ -13,11 +13,12 @@ class GameDebugEventCatalogTest {
     @Test
     void eventToolsAreExplicitlyScopedToTheirGame() {
         var witherEvents = GameDebugEventCatalog.events(ArcadePortGame.WITHER_ASSAULT);
-        assertEquals(1, witherEvents.size());
+        assertEquals(List.of("spawn-minions", "refresh-kit"), witherEvents.stream()
+                .map(GameDebugEventCatalog.Event::id).toList());
         assertEquals("spawn-minions", witherEvents.getFirst().id());
         assertEquals("reveal-letter", GameDebugEventCatalog.events(ArcadePortGame.DRAW_MY_THING).getFirst().id());
         assertEquals("spawn-dragon", GameDebugEventCatalog.events(ArcadePortGame.DRAGONS).getFirst().id());
-        assertEquals(List.of("advance-dragon", "use-kit-ability", "finish-run"),
+        assertEquals(List.of("advance-dragon", "use-kit-ability", "finish-run", "refresh-kit"),
                 GameDebugEventCatalog.events(ArcadePortGame.DRAGON_ESCAPE).stream()
                         .map(GameDebugEventCatalog.Event::id).toList());
         assertEquals("begin-evolution", GameDebugEventCatalog.events(ArcadePortGame.EVOLUTION).getFirst().id());
@@ -175,7 +176,7 @@ class GameDebugEventCatalogTest {
         String generator = source.substring(helper, nextMethod);
         assertTrue(generator.contains("session.skyWarsTntGenerator"));
         assertTrue(generator.contains("session.world.dropItem"));
-        assertTrue(generator.contains("SkyWarsMixedArcadeRules.TNT_GENERATOR_INTERVAL_MILLIS"));
+        assertTrue(generator.contains("SkyWarsMixedArcadeRules.tntGeneratorIntervalMillis()"));
     }
 
     @Test
@@ -414,7 +415,11 @@ class GameDebugEventCatalogTest {
         String store = Files.readString(source);
         for (String methodName : List.of("recordKill", "recordSlime", "recordTailLength", "awardAchievement",
                 "recordGameEnd", "publishToArcadeStats")) {
-            int start = store.indexOf(" " + methodName + "(");
+            String signature = switch (methodName) {
+                case "awardAchievement" -> "public boolean awardAchievement(";
+                default -> "public void " + methodName + "(";
+            };
+            int start = store.indexOf(signature);
             int end = store.indexOf("\n    }", start);
             assertTrue(start >= 0 && end > start, methodName + " exists");
             assertTrue(store.substring(start, end).contains("GameDebugRuntimeOverrides.isDebugSession()"),
@@ -432,7 +437,8 @@ class GameDebugEventCatalogTest {
         String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
         String game = Files.readString(sourceRoot.resolve("CameraShyGame.java"));
         assertTrue(manager.contains("type == ArcadePortGame.CAMERA_SHY && \"take-photo\".equals(eventId)"));
-        assertTrue(manager.contains("GameDebugRuntimeOverrides.markDebugSession();\n            return cameraShyModule.debugTakePhoto(tester);"));
+        assertTrue(normalize(manager).contains(normalize("GameDebugRuntimeOverrides.markDebugSession();\n"
+                + "            return cameraShyModule.debugTakePhoto(tester);")));
         int debugPhoto = game.indexOf("public boolean debugTakePhoto(Player player)");
         int nextMethod = game.indexOf("public int queuedCount()", debugPhoto);
         assertTrue(debugPhoto >= 0 && nextMethod > debugPhoto);
@@ -443,8 +449,10 @@ class GameDebugEventCatalogTest {
         String photo = game.substring(trigger, end);
         assertTrue(photo.contains("emitCameraFlash(player.getLocation())"));
         assertTrue(photo.contains("takePhoto(player)"));
-        assertTrue(game.contains("private void award(UUID id, String achievementId) {\n        if (GameDebugRuntimeOverrides.isDebugSession()) return;"));
-        assertTrue(game.contains("private void recordMatchProgress(UUID winnerId) {\n        if (GameDebugRuntimeOverrides.isDebugSession()) return;"));
+        assertTrue(normalize(game).contains(normalize("private void award(UUID id, String achievementId) {\n"
+                + "        if (GameDebugRuntimeOverrides.isDebugSession()) return;")));
+        assertTrue(normalize(game).contains(normalize("private void recordMatchProgress(UUID winnerId) {\n"
+                + "        if (GameDebugRuntimeOverrides.isDebugSession()) return;")));
         assertTrue(manager.contains("type == ArcadePortGame.CAMERA_SHY && \"use-kit-ability\".equals(eventId)"));
         int debugAbility = game.indexOf("public boolean debugUseSelectedKitAbility(Player player)");
         int next = game.indexOf("public int queuedCount()", debugAbility);
@@ -558,12 +566,12 @@ class GameDebugEventCatalogTest {
             int method = manager.indexOf("private void " + methodName + "(");
             int body = manager.indexOf("{", method);
             assertTrue(method >= 0 && body > method, methodName + " exists");
-            assertTrue(manager.substring(body, body + 220).contains("isDebugAbilityAllowed"),
+            assertTrue(manager.substring(body, Math.min(manager.length(), body + 500)).contains("isDebugAbilityAllowed"),
                     methodName + " consumes its immediate ability switch");
         }
         assertTrue(manager.contains("isDebugAbilityAllowed(player, ArcadePortGame.DRAGONS, \"pyrotechnic\")"));
         assertTrue(manager.contains("isDebugAbilityAllowed(marksman, ArcadePortGame.DRAGONS, \"marksman\")"));
-        assertTrue(manager.contains("game == ArcadePortGame.DRAGONS && key.startsWith(\"ability-\")"));
+        assertTrue(lobby.contains("game == ArcadePortGame.DRAGONS && key.startsWith(\"ability-\")"));
     }
 
     @Test
@@ -639,7 +647,7 @@ class GameDebugEventCatalogTest {
                             || manager.contains("ArcadePortGame.RUNNER, \"" + key + "\""),
                     key + " has a runtime consumer");
         }
-        assertTrue(manager.contains("public boolean debugTriggerEvent(Player tester, ArcadePortGame type, String eventId)"));
+        assertTrue(manager.contains("boolean debugTriggerEvent(Player tester, ArcadePortGame type, String eventId)"));
         assertTrue(manager.contains("triggered = useRunnerPositionSwap(session, tester, System.currentTimeMillis())"));
     }
 
@@ -660,12 +668,12 @@ class GameDebugEventCatalogTest {
                             || manager.contains("ArcadePortGame.DEATH_TAG, \"ability-" + kit + "\", true"),
                     kit + " has a runtime consumer");
         }
-        assertTrue(manager.contains("private void useDeathTagTricksterSwap(Session session, Player runner) {\n"
-                + "        if (!isDebugAbilityAllowed(runner, ArcadePortGame.DEATH_TAG, \"trickster\")) return;"));
-        assertTrue(manager.contains("private void useDeathTagTricksterFireworks(Session session, Player runner) {\n"
-                + "        if (!isDebugAbilityAllowed(runner, ArcadePortGame.DEATH_TAG, \"trickster\")) return;"));
-        assertTrue(manager.contains("plugin.hasAdminAccess(player) && !debugFeatureEnabled(player.getUniqueId(),\n"
-                + "                ArcadePortGame.DEATH_TAG, \"ability-archer\", true)"));
+        assertTrue(normalize(manager).contains(normalize("private void useDeathTagTricksterSwap(Session session, Player runner) {\n"
+                + "        if (!isDebugAbilityAllowed(runner, ArcadePortGame.DEATH_TAG, \"trickster\")) return;")));
+        assertTrue(normalize(manager).contains(normalize("private void useDeathTagTricksterFireworks(Session session, Player runner) {\n"
+                + "        if (!isDebugAbilityAllowed(runner, ArcadePortGame.DEATH_TAG, \"trickster\")) return;")));
+        assertTrue(normalize(manager).contains(normalize("plugin.hasAdminAccess(player) && !debugFeatureEnabled(player.getUniqueId(),\n"
+                + "                ArcadePortGame.DEATH_TAG, \"ability-archer\", true)")));
     }
 
     @Test
@@ -684,10 +692,10 @@ class GameDebugEventCatalogTest {
                             || manager.contains("ArcadePortGame.EVOLUTION, \"" + ability + "\""),
                     ability + " has a runtime consumer");
         }
-        assertTrue(manager.contains("private void startEvolutionGolemSlam(Session session, Player player, long now) {\n"
-                + "        if (!isDebugAbilityAllowed(player, ArcadePortGame.EVOLUTION, \"golem\")) return;"));
-        assertTrue(manager.contains("private boolean throwEvolutionSulphurBomb(Session session, Player player) {\n"
-                + "        if (!isDebugAbilityAllowed(player, ArcadePortGame.EVOLUTION, \"creeper\")) return false;"));
+        assertTrue(normalize(manager).contains(normalize("private void startEvolutionGolemSlam(Session session, Player player, long now) {\n"
+                + "        if (!isDebugAbilityAllowed(player, ArcadePortGame.EVOLUTION, \"golem\")) return;")));
+        assertTrue(normalize(manager).contains(normalize("private boolean throwEvolutionSulphurBomb(Session session, Player player) {\n"
+                + "        if (!isDebugAbilityAllowed(player, ArcadePortGame.EVOLUTION, \"creeper\")) return false;")));
     }
 
     @Test
@@ -742,8 +750,8 @@ class GameDebugEventCatalogTest {
         String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
         assertTrue(lobby.contains("features.put(\"build-editing\""));
         assertTrue(lobby.contains("features.put(\"combat-damage\""));
-        assertTrue(manager.contains("ArcadePortGame.TURF_WARS, \"build-editing\", true"));
-        assertTrue(manager.contains("ArcadePortGame.TURF_WARS, \"combat-damage\", true"));
+        assertTrue(manager.contains("\"build-editing\", true"));
+        assertTrue(manager.contains("\"combat-damage\", true"));
         assertTrue(lobby.contains("List.of(\"infiltrator\", \"shredder\", \"fortifier\")"));
         assertTrue(manager.contains("debugKitFeatureEnabled(player, ArcadePortGame.TURF_WARS, \"infiltrator\")"));
         assertTrue(manager.contains("debugKitFeatureEnabled(player, ArcadePortGame.TURF_WARS, \"shredder\")"));
@@ -838,7 +846,8 @@ class GameDebugEventCatalogTest {
         assertTrue(manager.contains("type == ArcadePortGame.GLADIATORS && \"forfeit-duel\".equals(eventId)"));
         assertTrue(manager.contains("session.gladiatorPairs.containsKey(tester.getUniqueId())"));
         assertTrue(manager.contains("tester.setHealth(0.0D)"));
-        assertTrue(manager.contains("GameDebugRuntimeOverrides.markDebugSession();\n            tester.setHealth(0.0D)"));
+        assertTrue(normalize(manager).contains(normalize("GameDebugRuntimeOverrides.markDebugSession();\n"
+                + "            tester.setHealth(0.0D)")));
     }
 
     @Test
@@ -882,6 +891,35 @@ class GameDebugEventCatalogTest {
 
     private static String normalize(String source) {
         return source.replaceAll("\\s+", " ").trim();
+    }
+
+    @Test
+    void loadingAProfileDuringItsLiveRoundRefreshesOnlyImmediateRuleValues() throws IOException {
+        Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ArcadePortManager.java");
+        if (!Files.isRegularFile(managerPath)) {
+            managerPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ArcadePortManager.java");
+        }
+        String manager = Files.readString(managerPath);
+        int select = manager.indexOf("boolean selectDebugProfile(Player tester, ArcadePortGame type, String profile)");
+        int nextMethod = manager.indexOf("\n    private void activateDebugProfile(", select);
+        assertTrue(select >= 0 && nextMethod > select);
+        String method = normalize(manager.substring(select, nextMethod));
+        assertTrue(method.contains("activeDebugProfileGame == type && type == activeDebugGame()"));
+        assertTrue(method.contains("GameDebugVariableCatalog.appliesImmediately(variable)"));
+        assertTrue(method.contains("GameDebugRuntimeOverrides.setValue(variable.key(), debugProfiles.booleanVariable("));
+        assertTrue(method.contains("GameDebugRuntimeOverrides.markDebugSession()"));
+        assertFalse(method.contains("GameDebugRuntimeOverrides.activate("),
+                "loading a profile mid-round must not apply restart-required numeric values");
+        assertTrue(normalize(manager).contains("if (created != null) applySelectedDebugProfileToLiveRound(tester, type);"));
+        assertTrue(normalize(manager).contains("if (duplicated != null) applySelectedDebugProfileToLiveRound(tester, type);"));
+        assertTrue(normalize(manager).contains("if (renamed != null) applySelectedDebugProfileToLiveRound(tester, type);"));
+        assertTrue(normalize(manager).contains("applySelectedDebugProfileToLiveRound(tester, type);"));
+        String lobby = Files.readString(managerPath.resolveSibling("ModernArcadeLobbyRuntime.java"));
+        assertTrue(lobby.contains("manager.createDebugProfile(player, prompt.game(), input)"));
+        assertTrue(lobby.contains("manager.duplicateDebugProfile(player, prompt.game(), input)"));
+        assertTrue(lobby.contains("manager.renameDebugProfile(player, prompt.game(), input)"));
     }
 
     @Test

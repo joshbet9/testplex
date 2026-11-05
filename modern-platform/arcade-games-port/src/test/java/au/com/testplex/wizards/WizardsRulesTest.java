@@ -1,11 +1,27 @@
 package au.com.testplex.wizards;
 
 import org.junit.jupiter.api.Test;
+import au.com.testplex.arcadeports.GameDebugRuntimeOverrides;
+
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WizardsRulesTest {
+    @Test
+    void wandSlotDebugRuleChangesTheLiveWandCapacityAndClampsToHotbar() {
+        GameDebugRuntimeOverrides.activate(Map.of("WIZARDS_WAND_SLOT_COUNT", 3));
+        assertEquals(3, WizardsRules.maxWandSlots());
+        assertTrue(WizardsRules.canGainWand(2));
+        assertEquals(false, WizardsRules.canGainWand(3));
+
+        GameDebugRuntimeOverrides.activate(Map.of("WIZARDS_WAND_SLOT_COUNT", 40));
+        assertEquals(9, WizardsRules.maxWandSlots());
+        GameDebugRuntimeOverrides.clear();
+        assertEquals(WizardsRules.WAND_SLOT_COUNT, WizardsRules.maxWandSlots());
+    }
+
     @Test
     void capsEveryDirectMeleeHitAtTheOriginalHalfHeartValue() {
         assertEquals(0.5D, WizardsRules.capMeleeDamage(4.0D), 0.000001D);

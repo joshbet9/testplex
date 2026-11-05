@@ -90,6 +90,7 @@ final class GameDebugVariableCatalog {
             case MILK_THE_COW -> "MilkCowRules";
             case SPEED_BUILDERS -> "SpeedBuildersRules";
             case PLEXBALL -> "PlexballRules";
+            case SKY_WARS -> "SkyWarsMixedArcadeRules";
             case GLADIATORS -> null;
             case WIZARDS -> "au.com.testplex.wizards.WizardsRules";
             case WITHER_ASSAULT -> "WitherAssaultRules";
@@ -111,13 +112,14 @@ final class GameDebugVariableCatalog {
     private static boolean standaloneFieldIsWired(ArcadePortGame game, String name) {
         if (game == ArcadePortGame.SPEED_BUILDERS) {
             return Set.of("DEFAULT_VIEW_SECONDS", "DEFAULT_BUILD_SECONDS", "MIN_BUILD_SECONDS",
-                    "MAX_BUILD_SECONDS", "INTERMISSION_SECONDS", "DEFAULT_MATCH_ROUNDS")
+                    "MAX_BUILD_SECONDS", "INTERMISSION_SECONDS", "DEFAULT_MATCH_ROUNDS",
+                    "TEMPLATE_MOBS_ENABLED")
                     .contains(name);
         }
         if (game == ArcadePortGame.WIZARDS) {
             return Set.of("SOUL_STAR_MANA_PER_SECOND", "MAGE_RANDOM_STARTER_SPELL_COUNT",
                     "MAGE_STARTER_SPELL_SELECTION_ATTEMPTS", "FULL_WAND_CONVERSION",
-                    "MIN_PLAYERS", "MAX_PLAYERS", "ENDGAME_START_MINUTES", "ENDGAME_INITIAL_STRIKE_MILLIS",
+                    "MIN_PLAYERS", "MAX_PLAYERS", "WAND_SLOT_COUNT", "ENDGAME_START_MINUTES", "ENDGAME_INITIAL_STRIKE_MILLIS",
                     "ENDGAME_MIN_STRIKE_MILLIS", "ENDGAME_STRIKE_REDUCTION_PER_TICK_MILLIS").contains(name);
         }
         if (game == ArcadePortGame.WITHER_ASSAULT) return Set.of("MINIONS_PER_WAVE").contains(name);
@@ -145,6 +147,7 @@ final class GameDebugVariableCatalog {
             case WIZARDS -> "WIZARDS_";
             case WITHER_ASSAULT -> "WITHER_ASSAULT_";
             case SNEAKY_ASSASSINS -> "SNEAKY_ASSASSINS_";
+            case ONE_IN_THE_QUIVER -> "QUIVER_";
             case GLADIATORS -> "GLADIATOR_";
             case MONSTER_MAZE -> "MONSTER_MAZE_";
             case MONSTER_MAZE_SPEED -> "MONSTER_MAZE_SPEED_";

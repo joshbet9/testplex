@@ -1622,7 +1622,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         ArcadePortGame game = debugGame(player);
         if (action.startsWith("debug-profile-load:")) {
             String profile = action.substring("debug-profile-load:".length());
-            if (manager.debugProfiles().select(id, game, profile)) {
+            if (manager.selectDebugProfile(player, game, profile)) {
                 player.sendMessage(ChatColor.GREEN + "Loaded " + game.displayName() + " profile '" + profile + "'.");
                 openDebugMenu(player);
             }
@@ -1658,11 +1658,11 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 return;
             }
             String result = switch (prompt.operation()) {
-                case "create" -> manager.debugProfiles().create(id, prompt.game(), input);
-                case "duplicate" -> manager.debugProfiles().duplicate(id, prompt.game(), input);
-                case "rename" -> manager.debugProfiles().renameSelected(id, prompt.game(), input);
+                case "create" -> manager.createDebugProfile(player, prompt.game(), input);
+                case "duplicate" -> manager.duplicateDebugProfile(player, prompt.game(), input);
+                case "rename" -> manager.renameDebugProfile(player, prompt.game(), input);
                 case "delete" -> "DELETE".equalsIgnoreCase(input)
-                        && manager.debugProfiles().delete(id, prompt.game(), manager.debugProfiles().selected(id, prompt.game()))
+                        && manager.deleteDebugProfile(player, prompt.game(), manager.debugProfiles().selected(id, prompt.game()))
                         ? "deleted" : null;
                 default -> null;
             };
@@ -1690,11 +1690,11 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         UUID id = player.getUniqueId();
         String name = args.length > 2 ? String.join("-", java.util.Arrays.copyOfRange(args, 2, args.length)) : "";
         boolean ok = switch (operation) {
-            case "create" -> manager.debugProfiles().create(id, game, name) != null;
-            case "duplicate" -> manager.debugProfiles().duplicate(id, game, name) != null;
-            case "rename" -> manager.debugProfiles().renameSelected(id, game, name) != null;
-            case "delete" -> manager.debugProfiles().delete(id, game, manager.debugProfiles().selected(id, game));
-            case "load" -> manager.debugProfiles().select(id, game, GameDebugProfiles.normalizeProfile(name));
+            case "create" -> manager.createDebugProfile(player, game, name) != null;
+            case "duplicate" -> manager.duplicateDebugProfile(player, game, name) != null;
+            case "rename" -> manager.renameDebugProfile(player, game, name) != null;
+            case "delete" -> manager.deleteDebugProfile(player, game, manager.debugProfiles().selected(id, game));
+            case "load" -> manager.selectDebugProfile(player, game, GameDebugProfiles.normalizeProfile(name));
             case "save" -> { manager.saveDebugProfile(id, game); yield true; }
             case "reset" -> { manager.resetDebugProfile(id, game); yield true; }
             default -> false;

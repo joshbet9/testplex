@@ -151,7 +151,12 @@ public final class WizardsRules {
     }
 
     public static boolean canGainWand(int currentWands) {
-        return currentWands >= 0 && currentWands < WAND_SLOT_COUNT;
+        return currentWands >= 0 && currentWands < maxWandSlots();
+    }
+
+    public static int maxWandSlots() {
+        return Math.max(1, Math.min(9,
+                GameDebugRuntimeOverrides.intValue("WIZARDS_WAND_SLOT_COUNT", WAND_SLOT_COUNT)));
     }
 
     public static float addMana(float current, float amount, float maximum) {

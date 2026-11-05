@@ -1,9 +1,31 @@
 package au.com.testplex.arcadeports;
 
 import org.junit.jupiter.api.Test;
+import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SkyWarsMixedArcadeRulesTest {
+    @Test void debugProfileValuesChangeSkyWarsQueueAndRoundRulesAtRuntime() {
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "SKY_WARS_MAX_PLAYERS", 12,
+                "SKY_WARS_PREPARE_MILLIS", 5_000L,
+                "SKY_WARS_ROUND_MILLIS", 60_000L,
+                "SKY_WARS_CRUMBLE_DELAY_MILLIS", 30_000L,
+                "SKY_WARS_TNT_GENERATOR_INTERVAL_MILLIS", 10_000L,
+                "SKY_WARS_TNT_PER_DROP", 4));
+
+        assertEquals(12, SkyWarsMixedArcadeRules.acceptedPlayers(16));
+        assertFalse(SkyWarsMixedArcadeRules.hasRoom(12));
+        assertEquals(5_000L, SkyWarsMixedArcadeRules.prepareMillis());
+        assertEquals(60_000L, SkyWarsMixedArcadeRules.roundMillis());
+        assertEquals(30_000L, SkyWarsMixedArcadeRules.crumbleDelayMillis());
+        assertEquals(10_000L, SkyWarsMixedArcadeRules.tntGeneratorIntervalMillis());
+        assertEquals(4, SkyWarsMixedArcadeRules.tntPerDrop());
+
+        GameDebugRuntimeOverrides.clear();
+        assertEquals(16, SkyWarsMixedArcadeRules.maxPlayers());
+    }
+
     @Test void mixedSkyWarsCapsLobbiesAtSixteen() {
         assertEquals(16, SkyWarsMixedArcadeRules.acceptedPlayers(16));
         assertEquals(16, SkyWarsMixedArcadeRules.acceptedPlayers(20));

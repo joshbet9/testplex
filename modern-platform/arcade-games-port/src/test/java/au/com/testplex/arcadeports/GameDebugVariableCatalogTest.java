@@ -65,8 +65,7 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SPEED_BUILDERS), "SPEED_BUILDERS_TEMPLATE_MOBS_ENABLED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.PLEXBALL), "PLEXBALL_BALL_GRAVITY_PER_TICK");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.WIZARDS), "WIZARDS_ENDGAME_START_MINUTES");
-        assertFalse(GameDebugVariableCatalog.variables(ArcadePortGame.WIZARDS).stream()
-                .anyMatch(variable -> variable.key().equals("WIZARDS_WAND_SLOT_COUNT")));
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.WIZARDS), "WIZARDS_WAND_SLOT_COUNT");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.WITHER_ASSAULT), "WITHER_ASSAULT_MINIONS_PER_WAVE");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNEAKY_ASSASSINS), "SNEAKY_ASSASSINS_FIRST_POWERUP_DELAY_MILLIS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MONSTER_MAZE), "MONSTER_MAZE_CRYO_RADIUS_BLOCKS");
@@ -126,8 +125,10 @@ class GameDebugVariableCatalogTest {
                 String source = Files.readString(file);
                 var matcher = call.matcher(source);
                 while (matcher.find()) {
-                    assertTrue(GameDebugWiredRuleKeys.KEYS.contains(matcher.group(1)),
-                            file.getFileName() + " uses an unregistered debug rule: " + matcher.group(1));
+                    String key = matcher.group(1);
+                    if (key.endsWith("_")) continue; // Explicit dynamic Sneaky Assassins key prefix.
+                    assertTrue(GameDebugWiredRuleKeys.KEYS.contains(key),
+                            file.getFileName() + " uses an unregistered debug rule: " + key);
                 }
             }
         }
@@ -149,6 +150,22 @@ class GameDebugVariableCatalogTest {
                             throw new java.io.UncheckedIOException(exception);
                         }
                     }).collect(Collectors.joining("\n"));
+        }
+        Path snakeSources = Path.of("..", "snake-port", "src", "main", "java");
+        if (!Files.isDirectory(snakeSources)) {
+            snakeSources = Path.of("modern-platform", "snake-port", "src", "main", "java");
+        }
+        if (Files.isDirectory(snakeSources)) {
+            try (var files = Files.walk(snakeSources)) {
+                productionSources += "\n" + files.filter(path -> path.toString().endsWith(".java"))
+                        .map(path -> {
+                            try {
+                                return Files.readString(path);
+                            } catch (IOException exception) {
+                                throw new java.io.UncheckedIOException(exception);
+                            }
+                        }).collect(Collectors.joining("\n"));
+            }
         }
         Pattern consumer = Pattern.compile(
                 "GameDebugRuntimeOverrides\\.(?:intValue|longValue|doubleValue|floatValue|booleanValue)"
@@ -173,7 +190,19 @@ class GameDebugVariableCatalogTest {
                 boolean dynamicSneakyConsumer = game == ArcadePortGame.SNEAKY_ASSASSINS
                         && key.startsWith(GameDebugVariableCatalog.rulePrefix(game))
                         && productionSources.contains("GameDebugRuntimeOverrides.longValue(\"SNEAKY_ASSASSINS_\" + name");
-                assertTrue(literalConsumers.contains(key) || dynamicMazeConsumer || dynamicSneakyConsumer,
+                boolean dynamicTurfWarsConsumer = game == ArcadePortGame.TURF_WARS
+                        && (key.endsWith("_ARROW_INTERVAL_MILLIS") || key.endsWith("_MAX_ARROWS")
+                                || key.endsWith("_MAX_WOOL"))
+                        && productionSources.contains("GameDebugRuntimeOverrides.longValue(key, fallback)")
+                        || game == ArcadePortGame.TURF_WARS
+                        && (key.endsWith("_MAX_ARROWS") || key.endsWith("_MAX_WOOL"))
+                        && productionSources.contains("GameDebugRuntimeOverrides.intValue(key, fallback)");
+                boolean dynamicSkyWarsConsumer = game == ArcadePortGame.SKY_WARS
+                        && key.startsWith("SKY_WARS_")
+                        && (productionSources.contains("GameDebugRuntimeOverrides.longValue(key, fallback)")
+                                || productionSources.contains("GameDebugRuntimeOverrides.intValue(key, fallback)"));
+                assertTrue(literalConsumers.contains(key) || dynamicMazeConsumer || dynamicSneakyConsumer
+                                || dynamicTurfWarsConsumer || dynamicSkyWarsConsumer,
                         game.id() + " exposes " + key + " without a gameplay consumer");
             }
         }

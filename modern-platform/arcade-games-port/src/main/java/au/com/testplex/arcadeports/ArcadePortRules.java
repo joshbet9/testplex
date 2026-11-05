@@ -2663,7 +2663,8 @@ public final class ArcadePortRules {
 
     public static int advanceTurfFrontline(int currentFrontline, int teamId, boolean mixedArcadeVariant) {
         return advanceTurfFrontline(currentFrontline, teamId, mixedArcadeVariant
-                ? TURF_WARS_MIXED_ARCADE_TURF_ADVANCE_BLOCKS : 1);
+                ? GameDebugRuntimeOverrides.intValue("TURF_WARS_MIXED_ARCADE_TURF_ADVANCE_BLOCKS",
+                        TURF_WARS_MIXED_ARCADE_TURF_ADVANCE_BLOCKS) : 1);
     }
 
     public static int advanceTurfFrontline(int currentFrontline, int teamId, int blocks) {

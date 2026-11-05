@@ -1217,6 +1217,57 @@ public final class ArcadePortManager implements Listener {
         debugProfiles.setVariable(tester, type, key, value);
     }
 
+    boolean selectDebugProfile(Player tester, ArcadePortGame type, String profile) {
+        if (tester == null || !tester.isOnline() || !plugin.hasAdminAccess(tester)
+                || type == null || !debugProfiles.select(tester.getUniqueId(), type, profile)) return false;
+        applySelectedDebugProfileToLiveRound(tester, type);
+        return true;
+    }
+
+    String createDebugProfile(Player tester, ArcadePortGame type, String name) {
+        if (!authorizedDebugProfileOwner(tester, type)) return null;
+        String created = debugProfiles.create(tester.getUniqueId(), type, name);
+        if (created != null) applySelectedDebugProfileToLiveRound(tester, type);
+        return created;
+    }
+
+    String duplicateDebugProfile(Player tester, ArcadePortGame type, String name) {
+        if (!authorizedDebugProfileOwner(tester, type)) return null;
+        String duplicated = debugProfiles.duplicate(tester.getUniqueId(), type, name);
+        if (duplicated != null) applySelectedDebugProfileToLiveRound(tester, type);
+        return duplicated;
+    }
+
+    String renameDebugProfile(Player tester, ArcadePortGame type, String name) {
+        if (!authorizedDebugProfileOwner(tester, type)) return null;
+        String renamed = debugProfiles.renameSelected(tester.getUniqueId(), type, name);
+        if (renamed != null) applySelectedDebugProfileToLiveRound(tester, type);
+        return renamed;
+    }
+
+    boolean deleteDebugProfile(Player tester, ArcadePortGame type, String profile) {
+        if (!authorizedDebugProfileOwner(tester, type)
+                || !debugProfiles.delete(tester.getUniqueId(), type, profile)) return false;
+        applySelectedDebugProfileToLiveRound(tester, type);
+        return true;
+    }
+
+    private boolean authorizedDebugProfileOwner(Player tester, ArcadePortGame type) {
+        return tester != null && tester.isOnline() && plugin.hasAdminAccess(tester) && type != null;
+    }
+
+    private void applySelectedDebugProfileToLiveRound(Player tester, ArcadePortGame type) {
+        if (activeDebugProfileGame == type && type == activeDebugGame()
+                && tester.getUniqueId().equals(activeDebugProfileOwner)) {
+            for (GameDebugVariableCatalog.Variable variable : debugVariables(type)) {
+                if (!GameDebugVariableCatalog.appliesImmediately(variable)) continue;
+                GameDebugRuntimeOverrides.setValue(variable.key(), debugProfiles.booleanVariable(
+                        tester.getUniqueId(), type, variable.key(), variable.defaultValue() != 0.0D));
+            }
+            GameDebugRuntimeOverrides.markDebugSession();
+        }
+    }
+
     private void activateDebugProfile(Player starter, ArcadePortGame type) {
         activeDebugProfileOwner = starter == null ? null : starter.getUniqueId();
         activeDebugProfileGame = type;
@@ -3306,7 +3357,7 @@ public final class ArcadePortManager implements Listener {
                 LinkedHashMap<UUID, Player> targetQueue = queues.computeIfAbsent(
                         queueKey(type, mixedArcadeVariant), ignored -> new LinkedHashMap<>());
                 if (type == ArcadePortGame.SKY_WARS && mixedArcadeVariant
-                        && targetQueue.size() >= SkyWarsMixedArcadeRules.MAX_PLAYERS) {
+                        && targetQueue.size() >= SkyWarsMixedArcadeRules.maxPlayers()) {
                     player.sendMessage(ChatColor.YELLOW + "SkyWars Mixed Arcade is full (16 players); you were left in the lobby.");
                     continue;
                 }
@@ -4486,14 +4537,14 @@ public final class ArcadePortManager implements Listener {
         long now = System.currentTimeMillis();
         session.startedAt = now;
         session.prepareDurationMillis = type == ArcadePortGame.SKY_WARS
-                ? SkyWarsMixedArcadeRules.PREPARE_MILLIS
+                ? SkyWarsMixedArcadeRules.prepareMillis()
                 : ArcadeLobbyLifecycleRules.prepareSeconds(
                         plugin.getConfig().getInt("lifecycle.prepare-seconds", ArcadeLobbyLifecycleRules.DEFAULT_PREPARE_SECONDS)) * 1_000L;
         session.prepareEndsAt = now + session.prepareDurationMillis;
         if (type == ArcadePortGame.SKY_WARS) {
             session.skyWarsLiveAt = session.prepareEndsAt;
-            session.skyWarsCrumbleAt = session.prepareEndsAt + SkyWarsMixedArcadeRules.CRUMBLE_DELAY_MILLIS;
-            session.skyWarsNextTntAt = session.prepareEndsAt + SkyWarsMixedArcadeRules.TNT_GENERATOR_INTERVAL_MILLIS;
+            session.skyWarsCrumbleAt = session.prepareEndsAt + SkyWarsMixedArcadeRules.crumbleDelayMillis();
+            session.skyWarsNextTntAt = session.prepareEndsAt + SkyWarsMixedArcadeRules.tntGeneratorIntervalMillis();
             SourceMapCatalog.MapData map = sourceMapData.get(type.id());
             List<Location> generators = map == null ? List.of() : map.dataLocations("LIME");
             if (!generators.isEmpty()) session.skyWarsTntGenerator = generators.get(0).clone();
@@ -4545,7 +4596,7 @@ public final class ArcadePortManager implements Listener {
                 : type == ArcadePortGame.TURF_WARS ? GameDebugRuntimeOverrides.longValue("TURF_WARS_GAME_TIMEOUT_MILLIS", ArcadePortRules.TURF_WARS_GAME_TIMEOUT_MILLIS)
                 : type == ArcadePortGame.HEROES_OF_GWEN ? 1_200_000L
                 : type == ArcadePortGame.PAINTBALL ? GameDebugRuntimeOverrides.longValue("PAINTBALL_GAME_TIMEOUT_MILLIS", ArcadePortRules.PAINTBALL_GAME_TIMEOUT_MILLIS)
-                : type == ArcadePortGame.SKY_WARS ? SkyWarsMixedArcadeRules.ROUND_MILLIS
+                : type == ArcadePortGame.SKY_WARS ? SkyWarsMixedArcadeRules.roundMillis()
                 : ROUND_MS);
         session.lastBaconHungerAt = now;
         session.lastBaconSlowUpdateAt = now;
@@ -8911,10 +8962,10 @@ public final class ArcadePortManager implements Listener {
                 || now < session.skyWarsNextTntAt) return false;
         ItemStack tnt = skyWarsKitItem(Material.TNT, "Left Click - Throw / Right Click - Drop",
                 "Throwable TNT", false);
-        tnt.setAmount(2);
+        tnt.setAmount(SkyWarsMixedArcadeRules.tntPerDrop());
         Item dropped = session.world.dropItem(session.skyWarsTntGenerator.clone().add(0.5D, 0.2D, 0.5D), tnt);
         dropped.setPickupDelay(0);
-        session.skyWarsNextTntAt = now + SkyWarsMixedArcadeRules.TNT_GENERATOR_INTERVAL_MILLIS;
+        session.skyWarsNextTntAt = now + SkyWarsMixedArcadeRules.tntGeneratorIntervalMillis();
         return true;
     }
 
@@ -12465,8 +12516,8 @@ public final class ArcadePortManager implements Listener {
             session.ticks = 0;
             if (session.type == ArcadePortGame.SKY_WARS) {
                 session.skyWarsLiveAt = now;
-                session.skyWarsCrumbleAt = now + SkyWarsMixedArcadeRules.CRUMBLE_DELAY_MILLIS;
-                session.skyWarsNextTntAt = now + SkyWarsMixedArcadeRules.TNT_GENERATOR_INTERVAL_MILLIS;
+                session.skyWarsCrumbleAt = now + SkyWarsMixedArcadeRules.crumbleDelayMillis();
+                session.skyWarsNextTntAt = now + SkyWarsMixedArcadeRules.tntGeneratorIntervalMillis();
             }
             if (session.endsAt > 0L) {
                 session.endsAt = ArcadeLobbyLifecycleRules.shiftPausedTimestamp(session.endsAt, prepareElapsed);
