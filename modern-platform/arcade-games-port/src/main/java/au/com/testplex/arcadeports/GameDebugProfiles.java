@@ -180,6 +180,9 @@ final class GameDebugProfiles {
         String profile = profilePath(tester, game, selected(tester, game));
         config.set(profile + ".features", null);
         config.set(profile + ".variables", null);
+        config.set(profile + ".test-bots", null);
+        // An explicit zero prevents the default profile from reviving a legacy bot count.
+        config.set(profile + ".test-bots.count", 0);
         save();
     }
 

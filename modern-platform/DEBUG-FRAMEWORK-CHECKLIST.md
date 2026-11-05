@@ -14,6 +14,7 @@ This checklist tracks implemented controls, not menu/catalog presence alone. A g
 - [x] Numeric shared Arcade rules can be overridden for the active round; the menu marks these as restart-required.
 - [x] The variable menu exposes only rules with an explicit production runtime consumer; persisted values are clamped to the rule's safe range and malformed integer conversions cannot crash gameplay.
 - [x] Boolean gameplay switches are persisted as typed rule variables, reach the session override map, and have explicit immediate-versus-next-round metadata; live switches update the active rule value immediately.
+- [x] Reset to Defaults clears per-profile rule overrides and test-bot count/loadouts, preventing legacy bot settings from being silently re-enabled.
 - [x] Automated coverage walks every exposed game variable, sets it through the typed runtime override boundary, reads it back and verifies clearing restores its default; a source check keeps runtime override keys linked to the profile catalog.
 - [x] A source-backed test verifies every catalogued variable has a production gameplay consumer, including the mode-scoped Monster Maze and dynamic Sneaky Assassins rule accessors.
 - [x] Automated coverage requires every individual game and Monster Maze mode to expose at least one game-specific runtime variable in addition to shared combat rules.
@@ -25,7 +26,7 @@ This checklist tracks implemented controls, not menu/catalog presence alone. A g
 - [x] A source-backed access test protects the authorised-tester gates on debug menus, bot menus, event actions, phase changes and feature mutations.
 - [ ] Add explicit per-game control metadata for every meaningful mechanic, beyond primitive `ArcadePortRules` fields.
 - [ ] Add per-game event triggers beyond the read-only achievement preview and award-preview hooks; current tools cover Draw My Thing hint reveal, Dragons spawn, Death Tag chaser conversion, One in the Quiver arrow refill, Paintball armour restoration, Spleef hunger restore, Wizards spell access, a normal selected-kit refresh for 17 shared games, Wither Assault's minion-wave ability, Milk the Cow herd spawning, Sheep Quest sheep spawning, SkyWars generator TNT, Bacon Brawl meter fill, Castle Assault objective TNT, Heroes of GWEN minions, Runner position swap, and Bomb Lobbers power-up waves. Remaining games still need appropriate event tools.
-- [ ] Add automated persistence, permission, reset, live-effect and round-restart tests for profiles.
+- [ ] Add remaining automated persistence, permission, live-effect and round-restart tests for profiles; reset coverage now includes variables, features and bot loadouts.
 - [ ] Verify every setting listed below against its gameplay consumer; keep unchecked games out of the **complete** state until done.
 
 Legend: **Partial** means the common profile framework and any listed shared rule hooks exist, but game-specific controls or required tests are still missing. **Pending** means its separate runtime has not yet been connected to profile variables and controls. No game is marked complete yet.

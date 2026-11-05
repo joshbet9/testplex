@@ -206,4 +206,26 @@ class GameDebugProfilesTest {
         profiles.setBooleanVariable(tester, ArcadePortGame.BOMB_LOBBERS, powerups, true);
         assertEquals(Boolean.TRUE, profiles.values(tester, ArcadePortGame.BOMB_LOBBERS).get(powerups));
     }
+
+    @Test
+    void resetToDefaultsClearsProfileRulesAndBotLoadouts() {
+        GameDebugProfiles profiles = new GameDebugProfiles(directory.resolve("reset-defaults.yml").toFile(), ignored -> { });
+        UUID tester = UUID.randomUUID();
+        ArcadePortGame game = ArcadePortGame.BOMB_LOBBERS;
+        profiles.setFeature(tester, game, "unlimited-abilities", true);
+        profiles.setVariable(tester, game, "BOMB_LOBBERS_POWERUP_FIRST_SPAWN_DELAY_MILLIS", 5_000.0D);
+        profiles.setTestBotCount(tester, game, 3);
+        profiles.setTestBotKit(tester, game, 0, "turtle");
+        profiles.setTestBotTeam(tester, game, 0, 1);
+        profiles.setTestBotCosmetic(tester, game, 0, "tnt-explosions", "frost-shards");
+
+        profiles.resetSelected(tester, game);
+
+        assertFalse(profiles.feature(tester, game, "unlimited-abilities", false));
+        assertNull(profiles.variable(tester, game, "BOMB_LOBBERS_POWERUP_FIRST_SPAWN_DELAY_MILLIS"));
+        assertEquals(0, profiles.testBotCount(tester, game, 16));
+        assertEquals("", profiles.testBotKit(tester, game, 0, ""));
+        assertEquals(-1, profiles.testBotTeam(tester, game, 0, -1));
+        assertEquals("", profiles.testBotCosmetic(tester, game, 0, "tnt-explosions", ""));
+    }
 }
