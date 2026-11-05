@@ -556,7 +556,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
     /** Build next pad (preview). */
     public void spawnSafePad() {
         Location next = mazeGenerator.randomPadLocation(avoidPadLocations());
-        nextSafePad = new SafePad(next, qolEnabled());
+        nextSafePad = new SafePad(next, qolEnabled(), getMode());
         mazeGenerator.disablePadArea(next);
 
         // Remove mobs standing on the new pad

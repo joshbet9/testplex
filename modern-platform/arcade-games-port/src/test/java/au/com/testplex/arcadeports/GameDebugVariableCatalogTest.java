@@ -103,6 +103,28 @@ class GameDebugVariableCatalogTest {
     }
 
     @Test
+    void monsterMazeModesExposeTheirTunableCombatMovementSpawningAndSafePadRules() {
+        for (ArcadePortGame game : List.of(ArcadePortGame.MONSTER_MAZE,
+                ArcadePortGame.MONSTER_MAZE_SPEED, ArcadePortGame.MONSTER_MAZE_MODERN)) {
+            var variables = GameDebugVariableCatalog.variables(game);
+            for (String field : List.of("STAGE_TIMER_INITIAL_SECONDS", "INITIAL_MONSTER_COUNT",
+                    "ADDITIONAL_MONSTERS_PER_SAFE_PAD", "MONSTER_HEALTH", "BUMP_DAMAGE",
+                    "BUMP_RADIUS_BLOCKS", "PLAYER_BUMP_COOLDOWN_MILLIS", "BODY_RUSH_STRENGTH",
+                    "SAFE_PAD_DECAY_STAGES", "SAFE_PAD_CAPTURE_RADIUS_BLOCKS")) {
+                assertTrue(variables.stream().anyMatch(variable -> variable.key().equals(
+                        GameDebugVariableCatalog.rulePrefix(game) + field)),
+                        game.id() + " debug menu is missing " + field);
+            }
+            var radius = GameDebugVariableCatalog.variable(game,
+                    GameDebugVariableCatalog.rulePrefix(game) + "SAFE_PAD_CAPTURE_RADIUS_BLOCKS");
+            assertEquals(0.5D, radius.minimum());
+            assertEquals(2.0D, radius.maximum());
+            assertFalse(GameDebugVariableCatalog.appliesImmediately(radius),
+                    "safe pad shape/capture settings apply when the next round builds its pads");
+        }
+    }
+
+    @Test
     void everyLiteralRuntimeOverrideHasAProfileMenuEntry() {
         var catalogKeys = java.util.Arrays.stream(ArcadePortGame.values())
                 .flatMap(game -> GameDebugVariableCatalog.variables(game).stream())

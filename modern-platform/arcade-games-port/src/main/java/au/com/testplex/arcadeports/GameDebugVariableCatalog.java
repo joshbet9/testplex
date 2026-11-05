@@ -130,7 +130,13 @@ final class GameDebugVariableCatalog {
         if (game == ArcadePortGame.SNEAKY_ASSASSINS) return SneakyAssassinsRules.debuggableRule(name);
         if (game.isMonsterMaze()) {
             return Set.of("MOB_MOVE_SPEED", "BODY_RUSH_DURATION_MILLIS", "CRYO_COOLDOWN_MILLIS",
-                    "CRYO_FREEZE_MILLIS", "CRYO_RADIUS_BLOCKS", "JUMP_STRENGTH").contains(name);
+                    "CRYO_FREEZE_MILLIS", "CRYO_RADIUS_BLOCKS", "JUMP_STRENGTH",
+                    "STAGE_TIMER_INITIAL_SECONDS", "STAGE_TIMER_DECREASE_PER_STAGE_SECONDS", "STAGE_TIMER_MIN_SECONDS",
+                    "INITIAL_MONSTER_COUNT", "ADDITIONAL_MONSTERS_PER_SAFE_PAD", "MONSTER_HEALTH",
+                    "PLAYER_BUMP_COOLDOWN_MILLIS", "BUMP_RADIUS_BLOCKS", "BUMP_DAMAGE",
+                    "BUMP_KNOCKBACK_STRENGTH", "BUMP_KNOCKBACK_Y_ADD", "BUMP_KNOCKBACK_Y_MAX",
+                    "BODY_RUSH_STRENGTH", "BODY_RUSH_Y_ADD", "BODY_RUSH_Y_MAX",
+                    "SAFE_PAD_DECAY_STAGES", "SAFE_PAD_CAPTURE_RADIUS_BLOCKS").contains(name);
         }
         return true;
     }
@@ -180,6 +186,10 @@ final class GameDebugVariableCatalog {
 
     private static double minimum(String name, double defaultValue, Kind kind) {
         if (kind == Kind.BOOLEAN) return 0.0D;
+        if (name.equals("SAFE_PAD_CAPTURE_RADIUS_BLOCKS")) return 0.5D;
+        if (name.equals("MOB_MOVE_SPEED")) return 0.05D;
+        if (name.equals("BUMP_RADIUS_BLOCKS")) return 0.25D;
+        if (name.endsWith("_SECONDS")) return 1.0D;
         if (name.endsWith("_X") || name.endsWith("_Y") || name.endsWith("_Z")) return -512.0D;
         String upper = name.toUpperCase(Locale.ROOT);
         if (defaultValue > 0.0D && (upper.endsWith("_MILLIS") || upper.endsWith("_TICKS")
@@ -196,6 +206,17 @@ final class GameDebugVariableCatalog {
 
     private static double maximum(String name, Kind kind, double defaultValue) {
         if (kind == Kind.BOOLEAN) return 1.0D;
+        if (name.equals("SAFE_PAD_CAPTURE_RADIUS_BLOCKS")) return 2.0D;
+        if (name.equals("MOB_MOVE_SPEED")) return 2.0D;
+        if (name.equals("BUMP_RADIUS_BLOCKS")) return 5.0D;
+        if (name.equals("MONSTER_HEALTH")) return 40.0D;
+        if (name.equals("BUMP_DAMAGE")) return 20.0D;
+        if (name.equals("BUMP_KNOCKBACK_STRENGTH") || name.equals("BODY_RUSH_STRENGTH")) return 3.0D;
+        if (name.equals("BUMP_KNOCKBACK_Y_ADD") || name.equals("BODY_RUSH_Y_ADD")) return 3.0D;
+        if (name.equals("BUMP_KNOCKBACK_Y_MAX") || name.equals("BODY_RUSH_Y_MAX")) return 5.0D;
+        if (name.equals("INITIAL_MONSTER_COUNT")) return 1_000.0D;
+        if (name.equals("ADDITIONAL_MONSTERS_PER_SAFE_PAD")) return 500.0D;
+        if (name.endsWith("_SECONDS")) return 600.0D;
         if (name.endsWith("_X") || name.endsWith("_Y") || name.endsWith("_Z")) return 512.0D;
         String upper = name.toUpperCase(Locale.ROOT);
         if (upper.contains("COUNT") || upper.contains("MAX_") || upper.contains("PLAYERS")

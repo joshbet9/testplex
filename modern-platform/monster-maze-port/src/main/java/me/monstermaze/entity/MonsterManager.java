@@ -71,7 +71,7 @@ public class MonsterManager {
     public void start(MazeGenerator maze) {
         clear();
         this.maze = maze;
-        int starter = game.getMode().initialMonsterCount();
+        int starter = Math.max(1, game.getMode().initialMonsterCount());
 
         final int[] spawned = {0};
         spawnTask = Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
@@ -151,8 +151,9 @@ public class MonsterManager {
         if (ent == null) return false;
         ent.setRemoveWhenFarAway(false);
         ent.setCanPickupItems(false);
-        ent.setMaxHealth(4.0);
-        ent.setHealth(4.0);
+        double health = Math.max(1.0D, MazeDebugRules.doubleValue(game.getMode(), "MONSTER_HEALTH", MazeDebugRules.MONSTER_HEALTH));
+        ent.setMaxHealth(health);
+        ent.setHealth(health);
         ent.setCustomNameVisible(false);
         ents.put(ent, new MazeMobWaypoint(ent.getLocation()));
         return true;
@@ -170,8 +171,9 @@ public class MonsterManager {
             if (ent == null) continue;
             ent.setRemoveWhenFarAway(false);
             ent.setCanPickupItems(false);
-            ent.setMaxHealth(4.0);
-            ent.setHealth(4.0);
+            double health = Math.max(1.0D, MazeDebugRules.doubleValue(game.getMode(), "MONSTER_HEALTH", MazeDebugRules.MONSTER_HEALTH));
+            ent.setMaxHealth(health);
+            ent.setHealth(health);
             ent.setCustomNameVisible(false);
             ents.put(ent, new MazeMobWaypoint(ent.getLocation()));
         }
@@ -319,9 +321,9 @@ public class MonsterManager {
             for (int i = 0; i < count; i++) {
                 double dx = pl.getX() - mx[i];
                 double dz = pl.getZ() - mz[i];
-                if (dx * dx + dz * dz >= 1.0) continue;
                 double dy = pl.getY() - my[i];
-                if (dx * dx + dy * dy + dz * dz >= 1.0) continue;
+                if (!MazeDebugRules.isBumpHitWithinRange(game.getMode(), dx * dx + dz * dz,
+                        dx * dx + dy * dy + dz * dz)) continue;
 
                 LivingEntity ent = mobs[i];
 
@@ -329,7 +331,11 @@ public class MonsterManager {
                     Vector away = ent.getLocation().toVector().subtract(player.getLocation().toVector());
                     away.setY(0);
                     if (away.lengthSquared() <= 1e-6) away = new Vector(1, 0, 0);
-                    UtilAction.velocity(ent, away.normalize(), 1, true, 0, 0.8, 2, true);
+                    UtilAction.velocity(ent, away.normalize(),
+                            MazeDebugRules.doubleValue(game.getMode(), "BODY_RUSH_STRENGTH", MazeDebugRules.BODY_RUSH_STRENGTH),
+                            true, 0,
+                            MazeDebugRules.doubleValue(game.getMode(), "BODY_RUSH_Y_ADD", MazeDebugRules.BODY_RUSH_Y_ADD),
+                            MazeDebugRules.doubleValue(game.getMode(), "BODY_RUSH_Y_MAX", MazeDebugRules.BODY_RUSH_Y_MAX), true);
                     launch(ent, ent.getVelocity());
                     km.consumeBodyRushUse(player);
                     player.getWorld().playSound(ent.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_HURT, 1.2f, 0.8f);
@@ -351,10 +357,15 @@ public class MonsterManager {
                     Vector away = player.getLocation().toVector().subtract(ent.getLocation().toVector());
                     away.setY(0);
                     if (away.lengthSquared() <= 1e-6) away = new Vector(1, 0, 0);
-                    UtilAction.velocity(player, away.normalize(), 1.0, false, 0, 0.75, 1.2, true);
+                    UtilAction.velocity(player, away.normalize(),
+                            MazeDebugRules.doubleValue(game.getMode(), "BUMP_KNOCKBACK_STRENGTH", MazeDebugRules.BUMP_KNOCKBACK_STRENGTH),
+                            false, 0,
+                            MazeDebugRules.doubleValue(game.getMode(), "BUMP_KNOCKBACK_Y_ADD", MazeDebugRules.BUMP_KNOCKBACK_Y_ADD),
+                            MazeDebugRules.doubleValue(game.getMode(), "BUMP_KNOCKBACK_Y_MAX", MazeDebugRules.BUMP_KNOCKBACK_Y_MAX), true);
                 }
 
-                player.damage(4.0);
+                double bumpDamage = MazeDebugRules.bumpDamage(game.getMode());
+                if (bumpDamage > 0.0D) player.damage(bumpDamage);
                 Bukkit.getPluginManager().callEvent(new MonsterBumpPlayerEvent(player));
                 break;
             }
@@ -383,13 +394,18 @@ public class MonsterManager {
             }
         }
         Vector out = dir.normalize();
-        UtilAction.velocity(player, out, 1.0, false, 0, 0.75, 1.2, true);
+        UtilAction.velocity(player, out,
+                MazeDebugRules.doubleValue(game.getMode(), "BUMP_KNOCKBACK_STRENGTH", MazeDebugRules.BUMP_KNOCKBACK_STRENGTH),
+                false, 0,
+                MazeDebugRules.doubleValue(game.getMode(), "BUMP_KNOCKBACK_Y_ADD", MazeDebugRules.BUMP_KNOCKBACK_Y_ADD),
+                MazeDebugRules.doubleValue(game.getMode(), "BUMP_KNOCKBACK_Y_MAX", MazeDebugRules.BUMP_KNOCKBACK_Y_MAX), true);
         return out;
     }
 
     private boolean canBump(Player player) {
         Long last = bumpCooldown.get(player.getUniqueId());
-        return last == null || System.currentTimeMillis() - last >= 1000L;
+        return MazeDebugRules.isBumpCooldownReady(game.getMode(), System.currentTimeMillis(),
+                last == null ? -1L : last);
     }
 
     private void markBump(Player player) {
