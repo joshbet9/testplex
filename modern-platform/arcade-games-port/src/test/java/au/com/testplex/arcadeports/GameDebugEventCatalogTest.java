@@ -331,6 +331,30 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void dragonEscapeAbilitySwitchesArePerKitImmediateAndConsumedByEveryAbilityPath() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        assertTrue(lobby.contains("game == ArcadePortGame.DRAGON_ESCAPE"));
+        assertTrue(lobby.contains("List.of(\"jumper\", \"warper\", \"digger\", \"disruptor\")"));
+        assertTrue(lobby.contains("game == ArcadePortGame.DRAGON_ESCAPE && key.startsWith(\"ability-\")"));
+        for (String methodName : List.of("useDragonEscapeLeap", "useDragonEscapeWarper", "useDragonEscapeDigger")) {
+            int method = manager.indexOf("private void " + methodName + "(");
+            int body = manager.indexOf("{", method);
+            assertTrue(method >= 0 && body > method, methodName + " exists");
+            assertTrue(manager.substring(body, body + 260).contains("isDebugAbilityAllowed"),
+                    methodName + " consumes the tester's ability switch");
+        }
+        assertTrue(manager.contains("private boolean isDebugAbilityAllowed(Player player, ArcadePortGame game, String kit)"));
+        assertTrue(manager.contains("throwDragonEscapeMine(session, player)"));
+        assertTrue(manager.contains("isDebugAbilityAllowed(player, ArcadePortGame.DRAGON_ESCAPE, kit)"));
+    }
+
+    @Test
     void castleAssaultObjectiveEventRequiresVacantObjectiveAndUsesNormalSpawner() throws IOException {
         Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "CastleAssaultHeroesOfGwenRuntime.java");

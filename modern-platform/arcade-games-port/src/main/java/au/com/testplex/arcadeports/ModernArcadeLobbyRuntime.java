@@ -1232,6 +1232,13 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                         Material.FIREWORK_STAR, "Allow this kit's Special to activate for authorised testers.", true));
             }
         }
+        if (game == ArcadePortGame.DRAGON_ESCAPE) {
+            for (String kit : List.of("jumper", "warper", "digger", "disruptor")) {
+                String key = "ability-" + kit;
+                features.put(key, new DebugFeature(key, "Ability: " + humanizeDebugKey(kit),
+                        Material.ENDER_PEARL, "Allow this kit's ability for authorised testers.", true));
+            }
+        }
         return List.copyOf(features.values());
     }
 
@@ -1251,6 +1258,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || "no-hunger-loss".equals(key) || "unlimited-abilities".equals(key)
                 || "unlimited-specials".equals(key)
                 || (game == ArcadePortGame.BACON_BRAWL && key.startsWith("ability-"))
+                || (game == ArcadePortGame.DRAGON_ESCAPE && key.startsWith("ability-"))
                 || (game == ArcadePortGame.SUPER_SPLOOR && key.startsWith("special-"))
                 || "DRAGONS_SPAWNING_ENABLED".equals(key)
                 || "DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED".equals(key)

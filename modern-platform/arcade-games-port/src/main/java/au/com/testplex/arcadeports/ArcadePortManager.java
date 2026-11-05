@@ -1082,9 +1082,18 @@ public final class ArcadePortManager implements Listener {
         return triggered;
     }
 
+    private boolean isDebugAbilityAllowed(Player player, ArcadePortGame game, String kit) {
+        if (player == null || !plugin.hasAdminAccess(player)) return true;
+        String feature = "ability-" + kit;
+        if (debugFeatureEnabled(player.getUniqueId(), game, feature, true)) return true;
+        player.sendActionBar(ChatColor.RED + "That ability is disabled in your debug profile.");
+        return false;
+    }
+
     private boolean debugUseDragonEscapeKitAbility(Session session, Player tester) {
         UUID id = tester.getUniqueId();
         String kit = session.dragonEscapeKits.getOrDefault(id, "jumper");
+        if (!isDebugAbilityAllowed(tester, ArcadePortGame.DRAGON_ESCAPE, kit)) return false;
         if ("jumper".equals(kit)) {
             int before = session.dragonEscapeLeapUsesRemaining.getOrDefault(id, 0);
             useDragonEscapeLeap(session, tester);
@@ -14690,6 +14699,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void useDragonEscapeLeap(Session session, Player player) {
+        if (!isDebugAbilityAllowed(player, ArcadePortGame.DRAGON_ESCAPE,
+                session.dragonEscapeKits.getOrDefault(player.getUniqueId(), "jumper"))) return;
         UUID id = player.getUniqueId();
         long now = System.currentTimeMillis();
         long readyAt = session.dragonEscapeLeapReadyAt.getOrDefault(id, 0L);
@@ -14723,6 +14734,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void useDragonEscapeWarper(Session session, Player player) {
+        if (!isDebugAbilityAllowed(player, ArcadePortGame.DRAGON_ESCAPE, "warper")) return;
         UUID id = player.getUniqueId();
         if (session.dragonEscapeWarperUsed.contains(id)) {
             player.sendMessage(ChatColor.YELLOW + "Your Warper pearl has already been used.");
@@ -15004,6 +15016,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void useDragonEscapeDigger(Session session, Player player, Block block) {
+        if (!isDebugAbilityAllowed(player, ArcadePortGame.DRAGON_ESCAPE, "digger")) return;
         UUID id = player.getUniqueId();
         int remaining = session.dragonEscapeDiggerUsesRemaining.getOrDefault(
                 id, GameDebugRuntimeOverrides.intValue("DRAGON_ESCAPE_DIGGER_MAX_USES", ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES));
@@ -25269,6 +25282,7 @@ public final class ArcadePortManager implements Listener {
             if ((event.getAction().isRightClick() || event.getAction() == Action.LEFT_CLICK_AIR)
                     && item == Material.TNT && "disruptor".equals(kit)) {
                 event.setCancelled(true);
+                if (!isDebugAbilityAllowed(player, ArcadePortGame.DRAGON_ESCAPE, kit)) return;
                 throwDragonEscapeMine(session, player);
                 return;
             }
