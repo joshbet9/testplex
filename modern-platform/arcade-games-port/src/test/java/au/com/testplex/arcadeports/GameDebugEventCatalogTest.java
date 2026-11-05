@@ -67,6 +67,9 @@ class GameDebugEventCatalogTest {
                 .anyMatch(event -> event.id().equals("restore-hunger")));
         assertTrue(GameDebugEventCatalog.events(ArcadePortGame.SPLEEF).stream()
                 .anyMatch(event -> event.id().equals("use-kit-ability")));
+        assertEquals(List.of("charge-barrage", "refresh-kit"),
+                GameDebugEventCatalog.events(ArcadePortGame.TURF_WARS).stream()
+                        .map(GameDebugEventCatalog.Event::id).toList());
         assertEquals("use-special", GameDebugEventCatalog.events(ArcadePortGame.SUPER_SPLOOR)
                 .getFirst().id());
         assertTrue(GameDebugEventCatalog.events(ArcadePortGame.MICRO_BATTLES).stream()
@@ -187,6 +190,22 @@ class GameDebugEventCatalogTest {
         assertTrue(manager.contains("useSpleefLeap(session, tester, now)"));
         assertTrue(manager.contains("session.spleefLeapReadyAt.getOrDefault(tester.getUniqueId(), 0L) > now"));
         assertTrue(manager.contains("isDebugAbilityAllowed(tester, ArcadePortGame.SPLEEF, \"brawler\")"));
+    }
+
+    @Test
+    void turfWarsDebugEventStartsTheNormalShredderBarrageCharge() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String eventCatalog = Files.readString(sourceRoot.resolve("GameDebugEventCatalog.java"));
+        assertTrue(eventCatalog.contains("new Event(\"charge-barrage\", \"Charge Shredder Barrage\""));
+        assertTrue(manager.contains("startTurfWarsBarrage(session, tester)"));
+        assertTrue(manager.contains("session.turfBarrageCharges.containsKey(tester.getUniqueId())"));
+        assertTrue(manager.contains("startTurfWarsBarrage(Session session, Player player)"),
+                "the event must retain Shredder's ordinary bow, ammo, and charge checks");
     }
 
     @Test

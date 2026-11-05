@@ -105,6 +105,9 @@ final class GameDebugEventCatalog {
     private static final List<Event> SKY_WARS = List.of(
             new Event("spawn-tnt", "Spawn Generator TNT", Material.TNT,
                     "Run the selected map's normal TNT generator drop immediately."));
+    private static final List<Event> TURF_WARS = List.of(
+            new Event("charge-barrage", "Charge Shredder Barrage", Material.BOW,
+                    "Start Shredder's normal bow-charge ability; release the bow to fire the charged barrage."));
     private static final List<Event> BACON_BRAWL = List.of(
             new Event("fill-meter", "Fill Ability Meter", Material.IRON_AXE,
                     "Fill your selected kit's live ability meter so you can test its ability now."));
@@ -167,6 +170,7 @@ final class GameDebugEventCatalog {
             case MILK_THE_COW -> MILK_THE_COW;
             case SHEEP_QUEST -> SHEEP_QUEST;
             case SKY_WARS -> SKY_WARS;
+            case TURF_WARS -> TURF_WARS;
             case PAINTBALL -> PAINTBALL;
             case MICRO_BATTLES -> MICRO_BATTLES;
             case DEATH_TAG -> DEATH_TAG;

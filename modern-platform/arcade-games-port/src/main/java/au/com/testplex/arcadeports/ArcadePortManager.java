@@ -1075,6 +1075,12 @@ public final class ArcadePortManager implements Listener {
             GameDebugRuntimeOverrides.markDebugSession();
             triggered = spawnSkyWarsTnt(session, System.currentTimeMillis());
         }
+        if (type == ArcadePortGame.TURF_WARS && "charge-barrage".equals(eventId)
+                && "shredder".equals(session.turfWarsKits.getOrDefault(tester.getUniqueId(), "marksman"))) {
+            startTurfWarsBarrage(session, tester);
+            triggered = session.turfBarrageCharges.containsKey(tester.getUniqueId());
+            if (triggered) GameDebugRuntimeOverrides.markDebugSession();
+        }
         if (type == ArcadePortGame.DRAW_MY_THING && "reveal-letter".equals(eventId)
                 && session.drawCurrentDrawer != null && session.drawWord != null) {
             int revealedIndex = DrawMyThingDebugRules.nextHiddenLetterIndex(
