@@ -127,7 +127,15 @@ final class GameDebugVariableCatalog {
                 "LEAP_COOLDOWN_MILLIS", "MEDIC_REFILL_INTERVAL_MILLIS", "FLETCHER_ARROW_REFILL_MILLIS",
                 "SKULL_ATTACK_COOLDOWN_MILLIS", "SMOKE_ARROW_MAX_LIFETIME_TICKS",
                 "SMOKE_ARROW_BLINDNESS_TICKS", "SMOKE_ARROW_BLIND_RADIUS_BLOCKS",
-                "EDITOR_BUILD_DEPTH_BELOW_MARKER").contains(name);
+                "EDITOR_BUILD_DEPTH_BELOW_MARKER", "MINION_LAUNCH_SPEED", "MINION_TARGET_RANGE_BLOCKS",
+                "MINION_SPEED_AMPLIFIER", "MINION_SPEED_DURATION_TICKS", "FIRE_STORM_CHARGE_PER_TICK",
+                "FIRE_STORM_DRAIN_PER_TICK", "FIRE_STORM_ARROWS_PER_TICK", "FIRE_STORM_ARROW_SPEED",
+                "FIRE_STORM_SPREAD", "FLIGHT_MIN_SPEED", "FLIGHT_SPAWN_HOVER_SPEED", "FLIGHT_MAX_SPEED",
+                "FLIGHT_BASE_SPEED", "FLIGHT_SPEED_PER_Y_BLOCK", "FLIGHT_BLEND_START_BLOCKS",
+                "FLIGHT_BLEND_END_BLOCKS", "FLIGHT_MAX_SPEED_CHANGE_PER_TICK", "HUMAN_ARROW_DAMAGE_MULTIPLIER",
+                "SKULL_BLAST_RADIUS_BLOCKS", "SKULL_MIN_DAMAGE", "SKULL_MAX_DAMAGE",
+                "SKULL_KNOCKBACK_POWER", "SKULL_KNOCKBACK_Y_MULTIPLIER", "SKULL_TERRAIN_RADIUS_BLOCKS",
+                "SKULL_KNOCKBACK_Y_MINIMUM", "SKULL_BLOCK_RESTORE_TICKS").contains(name);
         if (game == ArcadePortGame.HOOPS_REMASTERED) return Set.of("TARGET_SCORE", "REGULATION_MILLIS",
                 "SHOT_CLOCK_MILLIS", "HOPS_COOLDOWN_MILLIS", "OFFENSIVE_REBOUND_SHOT_CLOCK_MILLIS",
                 "THREE_POINT_DISTANCE", "STEAL_RADIUS", "BLOCK_RADIUS", "BLOCK_COOLDOWN_MILLIS",
@@ -195,6 +203,16 @@ final class GameDebugVariableCatalog {
                 || name.equals("MICRO_BATTLES_COMBAT_LOG_EXPIRE_MILLIS")) return 0.0D;
         if (name.equals("MICRO_BATTLES_BORDER_PARTICLE_DISTANCE")) return 0.5D;
         if (name.equals("MICRO_BATTLES_BORDER_PARTICLE_VERTICAL_POINTS")) return 1.0D;
+        if (name.equals("MINION_TARGET_RANGE_BLOCKS")) return 0.0D;
+        if (name.equals("MINION_LAUNCH_SPEED") || name.equals("FIRE_STORM_SPREAD")
+                || name.equals("FIRE_STORM_CHARGE_PER_TICK") || name.equals("FIRE_STORM_DRAIN_PER_TICK")
+                || name.equals("FLIGHT_SPEED_PER_Y_BLOCK")) return 0.0D;
+        if (name.equals("FLIGHT_BLEND_START_BLOCKS")) return 0.0D;
+        if (name.equals("FLIGHT_BLEND_END_BLOCKS")) return 0.1D;
+        if (name.equals("HUMAN_ARROW_DAMAGE_MULTIPLIER") || name.equals("SKULL_MIN_DAMAGE")
+                || name.equals("SKULL_KNOCKBACK_POWER") || name.equals("SKULL_KNOCKBACK_Y_MULTIPLIER")
+                || name.equals("SKULL_KNOCKBACK_Y_MINIMUM")) return 0.0D;
+        if (name.equals("SKULL_BLAST_RADIUS_BLOCKS")) return 0.1D;
         if (name.equals("SAFE_PAD_CAPTURE_RADIUS_BLOCKS")) return 0.5D;
         if (name.equals("MOB_MOVE_SPEED")) return 0.05D;
         if (name.equals("BUMP_RADIUS_BLOCKS")) return 0.25D;
@@ -219,6 +237,28 @@ final class GameDebugVariableCatalog {
         if (name.equals("MICRO_BATTLES_COMBAT_LOG_EXPIRE_MILLIS")) return 120_000.0D;
         if (name.equals("MICRO_BATTLES_BORDER_PARTICLE_DISTANCE")) return 16.0D;
         if (name.equals("MICRO_BATTLES_BORDER_PARTICLE_VERTICAL_POINTS")) return 8.0D;
+        if (name.equals("MINION_TARGET_RANGE_BLOCKS")) return 128.0D;
+        if (name.equals("MINION_LAUNCH_SPEED")) return 4.0D;
+        if (name.equals("MINION_SPEED_AMPLIFIER")) return 4.0D;
+        if (name.equals("MINION_SPEED_DURATION_TICKS")) return 2_400.0D;
+        if (name.equals("FIRE_STORM_CHARGE_PER_TICK") || name.equals("FIRE_STORM_DRAIN_PER_TICK")) return 0.25D;
+        if (name.equals("FIRE_STORM_ARROWS_PER_TICK")) return 16.0D;
+        if (name.equals("FIRE_STORM_ARROW_SPEED")) return 5.0D;
+        if (name.equals("FIRE_STORM_SPREAD")) return 0.5D;
+        if (name.equals("FLIGHT_MIN_SPEED") || name.equals("FLIGHT_SPAWN_HOVER_SPEED")
+                || name.equals("FLIGHT_MAX_SPEED") || name.equals("FLIGHT_BASE_SPEED")) return 1.0D;
+        if (name.equals("FLIGHT_SPEED_PER_Y_BLOCK")) return 0.1D;
+        if (name.equals("FLIGHT_BLEND_START_BLOCKS")) return 32.0D;
+        if (name.equals("FLIGHT_BLEND_END_BLOCKS")) return 64.0D;
+        if (name.equals("FLIGHT_MAX_SPEED_CHANGE_PER_TICK")) return 0.25D;
+        if (name.equals("HUMAN_ARROW_DAMAGE_MULTIPLIER")) return 2.0D;
+        if (name.equals("SKULL_BLAST_RADIUS_BLOCKS")) return 32.0D;
+        if (name.equals("SKULL_MIN_DAMAGE") || name.equals("SKULL_MAX_DAMAGE")) return 40.0D;
+        if (name.equals("SKULL_KNOCKBACK_POWER")) return 5.0D;
+        if (name.equals("SKULL_KNOCKBACK_Y_MULTIPLIER")) return 2.0D;
+        if (name.equals("SKULL_KNOCKBACK_Y_MINIMUM")) return 3.0D;
+        if (name.equals("SKULL_TERRAIN_RADIUS_BLOCKS")) return 8.0D;
+        if (name.equals("SKULL_BLOCK_RESTORE_TICKS")) return 2_400.0D;
         if (name.equals("SAFE_PAD_CAPTURE_RADIUS_BLOCKS")) return 2.0D;
         if (name.equals("MOB_MOVE_SPEED")) return 2.0D;
         if (name.equals("BUMP_RADIUS_BLOCKS")) return 5.0D;

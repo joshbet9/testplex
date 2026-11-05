@@ -24184,7 +24184,9 @@ public final class ArcadePortManager implements Listener {
                         && session.witherMinionOwners.containsKey(minion.getUniqueId())) {
                     witherAttacker = session.players.get(session.witherMinionOwners.get(minion.getUniqueId()));
                 } else return;
-                if (projectile instanceof Arrow) event.setDamage(event.getDamage() * 0.75D);
+                if (projectile instanceof Arrow) {
+                    event.setDamage(event.getDamage() * WitherAssaultRules.humanArrowDamageMultiplier());
+                }
             } else if (damager instanceof Skeleton minion
                     && session.witherMinionOwners.containsKey(minion.getUniqueId())) {
                 witherAttacker = session.players.get(session.witherMinionOwners.get(minion.getUniqueId()));
@@ -26610,6 +26612,9 @@ public final class ArcadePortManager implements Listener {
             }
             Player target = alivePlayers(session).stream()
                     .filter(player -> session.teams.getOrDefault(player.getUniqueId(), 1) == 0)
+                    .filter(player -> WitherAssaultRules.shouldMinionTargetHuman(
+                            player.getLocation().distanceSquared(skeleton.getLocation()),
+                            WitherAssaultRules.minionTargetRangeBlocks()))
                     .min(java.util.Comparator.comparingDouble(p -> p.getLocation().distanceSquared(skeleton.getLocation())))
                     .orElse(null);
             if (target != null) skeleton.setTarget(target);
@@ -26640,12 +26645,14 @@ public final class ArcadePortManager implements Listener {
             }
             minion.getEquipment().setChestplate(minionChestplate);
             minion.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 300, 0, false, false, false));
-            minion.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 300, 0, false, false, false));
+            minion.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,
+                    WitherAssaultRules.minionSpeedDurationTicks(), WitherAssaultRules.minionSpeedAmplifier(),
+                    false, false, false));
             Vector direction = player.getLocation().getDirection().clone();
-            direction.add(new Vector(ThreadLocalRandom.current().nextDouble(-0.25D, 0.25D),
+            minion.setVelocity(WitherAssaultRules.minionLaunchVelocity(direction,
+                    ThreadLocalRandom.current().nextDouble(-0.25D, 0.25D),
                     ThreadLocalRandom.current().nextDouble(-0.15D, 0.15D),
-                    ThreadLocalRandom.current().nextDouble(-0.25D, 0.25D))).normalize().multiply(1.1D);
-            minion.setVelocity(direction);
+                    ThreadLocalRandom.current().nextDouble(-0.25D, 0.25D)));
             session.witherMinionOwners.put(minion.getUniqueId(), owner);
             session.witherMinionCreatedAt.put(minion.getUniqueId(), now);
             session.entities.add(minion);
@@ -26757,16 +26764,15 @@ public final class ArcadePortManager implements Listener {
         for (Player wither : withers) {
             UUID witherId = wither.getUniqueId();
             if (!session.witherFireStormActive.contains(witherId)) {
-                wither.setExp(Math.min(0.999F, wither.getExp() + 0.05F));
+                wither.setExp(WitherAssaultRules.fireStormExperienceAfterTick(wither.getExp(), false));
             } else if (wither.getExp() > 0.0F) {
-                wither.setExp(Math.max(0.0F, wither.getExp() - 0.05F));
-                for (int i = 0; i < 2; i++) {
+                wither.setExp(WitherAssaultRules.fireStormExperienceAfterTick(wither.getExp(), true));
+                double spread = WitherAssaultRules.fireStormSpread();
+                for (int i = 0; i < WitherAssaultRules.fireStormArrowsPerTick(); i++) {
                     Vector shot = wither.getLocation().getDirection().clone().normalize();
-                    shot.add(new Vector(ThreadLocalRandom.current().nextDouble(-0.04D, 0.04D),
-                            ThreadLocalRandom.current().nextDouble(-0.04D, 0.04D),
-                            ThreadLocalRandom.current().nextDouble(-0.04D, 0.04D))).normalize();
+                    shot.add(new Vector(randomSpread(spread), randomSpread(spread), randomSpread(spread))).normalize();
                     Arrow arrow = wither.launchProjectile(Arrow.class);
-                    arrow.setVelocity(shot.multiply(2.0D));
+                    arrow.setVelocity(shot.multiply(WitherAssaultRules.fireStormArrowSpeed()));
                     session.witherFireArrows.add(arrow.getUniqueId());
                     session.entities.add(arrow);
                 }
@@ -26808,6 +26814,10 @@ public final class ArcadePortManager implements Listener {
             }
         }
         updateWitherMinions(session, now);
+    }
+
+    private double randomSpread(double maximum) {
+        return maximum <= 0.0D ? 0.0D : ThreadLocalRandom.current().nextDouble(-maximum, maximum);
     }
 
     private boolean hasRevivalPotion(Player player) {
@@ -29523,13 +29533,15 @@ public final class ArcadePortManager implements Listener {
             for (Player target : alivePlayers(session)) {
                 if (session.teams.getOrDefault(target.getUniqueId(), 1) != 0) continue;
                 double distance = target.getLocation().distance(blast);
-                if (distance > 7.0D) continue;
-                double scale = Math.max(0.0D, 1.0D - distance / 7.0D);
-                double damage = 2.0D + 10.0D * scale * ageScale;
+                double damage = WitherAssaultRules.skullDamageAtDistance(distance, ageScale);
+                if (damage <= 0.0D) continue;
+                double scale = Math.max(0.0D, 1.0D - distance / WitherAssaultRules.skullBlastRadiusBlocks());
                 Vector away = target.getEyeLocation().toVector().subtract(blast.toVector());
                 if (away.lengthSquared() < 0.001D) away = new Vector(0.0D, 1.0D, 0.0D);
-                target.setVelocity(target.getVelocity().add(away.normalize().multiply(1.25D * scale)
-                        .setY(Math.max(0.3D, 0.65D * scale))));
+                target.setVelocity(target.getVelocity().add(away.normalize()
+                        .multiply(WitherAssaultRules.skullKnockbackPower() * scale)
+                        .setY(Math.max(WitherAssaultRules.skullKnockbackYMinimum(),
+                                WitherAssaultRules.skullKnockbackYMultiplier() * scale))));
                 target.getWorld().spawnParticle(Particle.CLOUD, target.getLocation().add(0.0D, 1.0D, 0.0D),
                         10, 0.35D, 0.4D, 0.35D, 0.04D);
                 session.witherHumanDamaged.add(target.getUniqueId());
@@ -29547,8 +29559,12 @@ public final class ArcadePortManager implements Listener {
                 if (active != session) return;
                 if (owner != null) owner.sendActionBar(ChatColor.RED + "Wither Skull hit " + target.getName());
             }
-            for (int x = -4; x <= 4; x++) for (int y = -4; y <= 4; y++) for (int z = -4; z <= 4; z++) {
-                if (x * x + y * y + z * z > 16) continue;
+            int terrainRadius = WitherAssaultRules.skullTerrainRadiusBlocks();
+            int terrainRadiusSquared = terrainRadius * terrainRadius;
+            for (int x = -terrainRadius; x <= terrainRadius; x++)
+                for (int y = -terrainRadius; y <= terrainRadius; y++)
+                    for (int z = -terrainRadius; z <= terrainRadius; z++) {
+                if (x * x + y * y + z * z > terrainRadiusSquared) continue;
                 Block block = blast.getWorld().getBlockAt(blast.getBlockX() + x, blast.getBlockY() + y, blast.getBlockZ() + z);
                 Material material = block.getType();
                 if (material.isAir() || material == Material.BEDROCK || material == Material.IRON_BLOCK
@@ -29569,7 +29585,7 @@ public final class ArcadePortManager implements Listener {
                     }
                     session.witherExplosionBlocks.remove(block);
                 }
-            }, 120L);
+            }, WitherAssaultRules.skullBlockRestoreTicks());
             session.entities.remove(skull);
             skull.remove();
             return;

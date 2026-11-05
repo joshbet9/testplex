@@ -77,6 +77,9 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.WIZARDS), "WIZARDS_ENDGAME_START_MINUTES");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.WIZARDS), "WIZARDS_WAND_SLOT_COUNT");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.WITHER_ASSAULT), "WITHER_ASSAULT_MINIONS_PER_WAVE");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.WITHER_ASSAULT), "WITHER_ASSAULT_SKULL_BLAST_RADIUS_BLOCKS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.WITHER_ASSAULT), "WITHER_ASSAULT_FIRE_STORM_ARROWS_PER_TICK");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.WITHER_ASSAULT), "WITHER_ASSAULT_FLIGHT_MAX_SPEED_CHANGE_PER_TICK");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNEAKY_ASSASSINS), "SNEAKY_ASSASSINS_FIRST_POWERUP_DELAY_MILLIS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MONSTER_MAZE), "MONSTER_MAZE_CRYO_RADIUS_BLOCKS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MONSTER_MAZE_SPEED), "MONSTER_MAZE_SPEED_CRYO_RADIUS_BLOCKS");
