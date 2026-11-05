@@ -32,6 +32,9 @@ class GameDebugEventCatalogTest {
         assertEquals(List.of("spawn-minions", "refresh-kit"), witherEvents.stream()
                 .map(GameDebugEventCatalog.Event::id).toList());
         assertEquals("spawn-minions", witherEvents.getFirst().id());
+        assertEquals(List.of("spawn-powerups", "throw-held-bomb", "refresh-kit"),
+                GameDebugEventCatalog.events(ArcadePortGame.BOMB_LOBBERS).stream()
+                        .map(GameDebugEventCatalog.Event::id).toList());
         assertEquals("reveal-letter", GameDebugEventCatalog.events(ArcadePortGame.DRAW_MY_THING).getFirst().id());
         assertEquals(List.of("spawn-dragon", "use-kit-ability", "refresh-kit"),
                 GameDebugEventCatalog.events(ArcadePortGame.DRAGONS).stream()
@@ -241,6 +244,21 @@ class GameDebugEventCatalogTest {
         assertTrue(manager.contains("ArcadePortRules.canUseBaconMeterAbility(charge)"));
         assertTrue(manager.contains("useBaconBrawlAbility(session, tester, System.currentTimeMillis())"),
                 "debug use must preserve each kit's standard ability and meter consumption");
+    }
+
+    @Test
+    void bombLobbersDebugThrowUsesNormalTntPathAndIsolatesMatchProgression() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String eventCatalog = Files.readString(sourceRoot.resolve("GameDebugEventCatalog.java"));
+        assertTrue(eventCatalog.contains("new Event(\"throw-held-bomb\", \"Throw Held TNT\""));
+        assertTrue(manager.contains("isBombLobbersThrownTnt(tester.getInventory().getItemInMainHand())"));
+        assertTrue(manager.contains("throwBombLobbersTnt(session, tester)"));
+        assertTrue(manager.contains("GameDebugRuntimeOverrides.markDebugSession();"));
     }
 
     @Test

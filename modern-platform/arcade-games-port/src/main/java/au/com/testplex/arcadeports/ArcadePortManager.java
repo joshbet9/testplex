@@ -1006,6 +1006,11 @@ public final class ArcadePortManager implements Listener {
             triggered = session.bombPowerupDrops.size() > dropsBefore;
             if (triggered) GameDebugRuntimeOverrides.markDebugSession();
         }
+        if (type == ArcadePortGame.BOMB_LOBBERS && "throw-held-bomb".equals(eventId)
+                && isBombLobbersThrownTnt(tester.getInventory().getItemInMainHand())) {
+            GameDebugRuntimeOverrides.markDebugSession();
+            triggered = throwBombLobbersTnt(session, tester);
+        }
         if (type == ArcadePortGame.CASTLE_ASSAULT && "spawn-objective".equals(eventId)
                 && session.variantRuntime != null
                 && session.variantRuntime.debugSpawnObjectiveTnt(tester)) {

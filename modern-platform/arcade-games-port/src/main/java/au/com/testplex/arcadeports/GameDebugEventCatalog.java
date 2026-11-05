@@ -117,7 +117,9 @@ final class GameDebugEventCatalog {
                     "Activate the selected kit's real ability using its current meter and enabled-feature settings."));
     private static final List<Event> BOMB_LOBBERS = List.of(
             new Event("spawn-powerups", "Spawn Power-up Wave", Material.FIREWORK_ROCKET,
-                    "Run the normal paired team power-up drop wave immediately."));
+                    "Run the normal paired team power-up drop wave immediately."),
+            new Event("throw-held-bomb", "Throw Held TNT", Material.TNT,
+                    "Throw your held normal or powered TNT through the ordinary fuse, throw and hit-credit path."));
     private static final List<Event> CASTLE_ASSAULT = List.of(
             new Event("spawn-objective", "Spawn Objective TNT", Material.TNT,
                     "Run Castle Assault's normal objective spawn when no objective is active or carried."),
