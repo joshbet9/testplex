@@ -719,6 +719,21 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         return alive + "/" + states.size() + " alive; " + queue.size() + " queued; " + seconds + "s elapsed";
     }
 
+    /** Debug control: start the endgame or trigger its next strike through the normal tick logic. */
+    public boolean debugAdvancePhase() {
+        if (!running || startedAt <= 0L) return false;
+        long now = System.currentTimeMillis();
+        if (!endgameStarted) {
+            startedAt = now - GameDebugRuntimeOverrides.intValue(
+                    "WIZARDS_ENDGAME_START_MINUTES", WizardsRules.ENDGAME_START_MINUTES) * 60_000L;
+        } else {
+            endgameMessageCounter = 7;
+            lastEndgameStrikeAt = 0L;
+        }
+        tickEndgame();
+        return true;
+    }
+
     public void stop(String reason) {
         if (!running && snapshots.isEmpty()) {
             arcadeManaged = false;

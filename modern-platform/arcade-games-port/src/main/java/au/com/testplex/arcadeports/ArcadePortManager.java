@@ -810,16 +810,29 @@ public final class ArcadePortManager implements Listener {
     boolean debugAdvanceStartPhase(Player tester, ArcadePortGame type) {
         if (tester == null || !tester.isOnline() || !plugin.hasAdminAccess(tester)) return false;
         if (type == ArcadePortGame.CAMERA_SHY && cameraShyModule != null) {
-            return cameraShyModule.debugAdvancePhase();
+            boolean advanced = cameraShyModule.debugAdvancePhase();
+            if (advanced) GameDebugRuntimeOverrides.markDebugSession();
+            return advanced;
         }
         if (type == ArcadePortGame.SNAKE && snakeModule != null) {
-            return snakeModule.debugAdvancePhase();
+            boolean advanced = snakeModule.debugAdvancePhase();
+            if (advanced) GameDebugRuntimeOverrides.markDebugSession();
+            return advanced;
         }
         if (type == ArcadePortGame.SPEED_BUILDERS && plugin.getSpeedBuildersGame() != null) {
-            return plugin.getSpeedBuildersGame().debugAdvancePhase();
+            boolean advanced = plugin.getSpeedBuildersGame().debugAdvancePhase();
+            if (advanced) GameDebugRuntimeOverrides.markDebugSession();
+            return advanced;
         }
         if (type == ArcadePortGame.PLEXBALL && plugin.getPlexballGame() != null) {
-            return plugin.getPlexballGame().debugAdvancePhase();
+            boolean advanced = plugin.getPlexballGame().debugAdvancePhase();
+            if (advanced) GameDebugRuntimeOverrides.markDebugSession();
+            return advanced;
+        }
+        if (type == ArcadePortGame.WIZARDS && plugin.getWizardsGameManager() != null) {
+            boolean advanced = plugin.getWizardsGameManager().debugAdvancePhase();
+            if (advanced) GameDebugRuntimeOverrides.markDebugSession();
+            return advanced;
         }
         Session session = active;
         if (session == null || session.type != type || !session.startupComplete) {
@@ -854,6 +867,7 @@ public final class ArcadePortManager implements Listener {
             }
             case NONE -> { return false; }
         }
+        GameDebugRuntimeOverrides.markDebugSession();
         return true;
     }
 
@@ -861,6 +875,7 @@ public final class ArcadePortManager implements Listener {
         if (tester == null || !tester.isOnline() || !plugin.hasAdminAccess(tester)) return false;
         Session session = active;
         if (session == null || session.type != type || !session.alive.contains(tester.getUniqueId())) return false;
+        GameDebugRuntimeOverrides.markDebugSession();
         AttributeInstance health = tester.getAttribute(Attribute.MAX_HEALTH);
         double maximumHealth = health == null ? 20.0D : health.getValue();
         tester.setHealth(maximumHealth);

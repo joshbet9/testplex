@@ -59,7 +59,7 @@ The common tester switches (all kits, invulnerability, no fall damage, and no hu
 | Super Sploor | Partial | Ink, shot, squid, territory and round constants are profile-backed and consumed by its runtime | Remaining kit/event controls and direct behavior tests |
 | Turf Wars | Partial | Shared rule overrides include build/combat phase duration and melee/sword/shredder damage | Build/combat/territory/respawn switches and phase/event tools |
 | Wither Assault | Partial | Minion count and common shared-session switches are profile-backed and consumed by the manager/rules | Tower/phase/event controls and direct gameplay behavior tests |
-| Wizards | Partial | Player limits, starter-spell rolls, mana conversion, Soul Star mana rate and endgame strike timing are profile-backed and consumed by `WizardsGameManager`/`WizardsRules` | Spell/chest event controls, phase tools and direct live-round tests |
+| Wizards | Partial | Player limits, starter-spell rolls, mana conversion, Soul Star mana rate and endgame strike timing are profile-backed and consumed by `WizardsGameManager`/`WizardsRules`; debug controls can start endgame or trigger its next strike through normal logic | Spell/chest event controls and direct live-round tests |
 
 ## Completion gate
 

@@ -140,6 +140,18 @@ class GameDebugVariableCatalogTest {
     }
 
     @Test
+    void liveDebugActionsMarkTheRoundForProgressionIsolation() {
+        GameDebugRuntimeOverrides.activate(Map.of());
+        assertFalse(GameDebugRuntimeOverrides.isDebugSession());
+
+        GameDebugRuntimeOverrides.markDebugSession();
+        GameDebugRuntimeOverrides.resetActiveValues();
+
+        assertTrue(GameDebugRuntimeOverrides.isDebugSession());
+        GameDebugRuntimeOverrides.clear();
+    }
+
+    @Test
     void timingCombatAndAbilityVariablesChangeTheirDeterministicGameRules() {
         GameDebugRuntimeOverrides.activate(Map.ofEntries(
                 Map.entry("CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS", 10_000L),

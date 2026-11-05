@@ -30,6 +30,11 @@ public final class GameDebugRuntimeOverrides {
         return debugSession;
     }
 
+    /** Mark an already-running round as a test after an authorized live debug action. */
+    public static void markDebugSession() {
+        debugSession = true;
+    }
+
     public static int intValue(String key, int fallback) {
         Number number = number(key);
         if (number == null) return fallback;
