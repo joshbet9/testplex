@@ -17,7 +17,7 @@ This checklist tracks implemented controls, not menu/catalog presence alone. A g
 - [x] Authorized testers can advance any shared Arcade start countdown, the live Draw My Thing turn, Master Builders build/review phase, Turf Wars phase, any supported shared round timeout, or the current Speed Builders, Plexball, Wizards, Snake, Snap, Monster Maze or Super Sploor phase; bot rosters are configured for the next round.
 - [x] Authorized testers can restore only their own active-round health/hunger and clear fire/potion effects without invoking damage, scoring, or achievement paths.
 - [ ] Add explicit per-game control metadata for every meaningful mechanic, beyond primitive `ArcadePortRules` fields.
-- [ ] Add per-game event triggers and non-persistent achievement simulation beyond the award-preview hooks; current tools cover Draw My Thing hint reveal, Dragons spawn, One in the Quiver arrow refill and Wither Assault's normal minion-wave ability, but remaining games still need tools.
+- [ ] Add per-game event triggers and non-persistent achievement simulation beyond the award-preview hooks; current tools cover Draw My Thing hint reveal, Dragons spawn, One in the Quiver arrow refill, Paintball armour restoration and Wither Assault's normal minion-wave ability, but remaining games still need tools.
 - [ ] Add automated persistence, permission, reset, live-effect and round-restart tests for profiles.
 - [ ] Verify every setting listed below against its gameplay consumer; keep unchecked games out of the **complete** state until done.
 
@@ -47,7 +47,7 @@ The common tester switches (all kits, invulnerability, no fall damage, and no hu
 | Milk the Cow | Partial | Score goal, milk/death scoring, cow-team ratio, herd size/speed, and common session switches are profile-backed and consumed by the manager | Cow phase/event triggers and direct gameplay behavior tests |
 | Monster Maze (all modes) | Partial | Per-mode mob speed, Body Rush duration, Cryo cooldown/freeze/radius and jump strength are profile-backed in the existing in-process engine; debug rounds suppress leaderboard personal-best writes; authorized phase control advances the current Safe Pad through normal stage resolution | Mob/theme/map controls, achievement/event preview paths and direct mode behavior tests |
 | One in the Quiver | Partial | Shared rule overrides and common switches; authorised testers can restore the normal one-shot arrow to its configured slot | Arrow/kit feature switches and kill/round event tools |
-| Paintball | Partial | Shared rule overrides include Machine Gun heat capacity, shots-per-cycle and cooling | Weapon, reload, map and team-event controls |
+| Paintball | Partial | Shared rule overrides include Machine Gun heat capacity, shots-per-cycle and cooling; authorised testers can restore their normal team-coloured armour through the runtime armour renderer | Weapon, reload, map and team-event controls |
 | Plexball | Partial | Player limits, match/batting timing, rewind, ball physics, home-run distance and catch windows are profile-backed and consumed by the rule/runtime code; debug controls advance intro, turn-break, and batting timeout phases through normal transitions | Remaining scoring/possession tunables, bot integration and direct match behavior tests |
 | Runner | Partial | Shared rule overrides and common switches | Switcher/blocks/kit feature controls and phase/event tools |
 | Sheep Quest | Partial | Shared rule overrides and common switches | Sheep/carry/kit/score controls and capture event simulation |

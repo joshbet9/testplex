@@ -20,6 +20,9 @@ final class GameDebugEventCatalog {
     private static final List<Event> ONE_IN_THE_QUIVER = List.of(
             new Event("refill-arrow", "Restore Super Arrow", Material.ARROW,
                     "Restore the normal one-shot arrow to its configured hotbar slot for testing."));
+    private static final List<Event> PAINTBALL = List.of(
+            new Event("restore-armour", "Restore Paintball Armour", Material.LEATHER_CHESTPLATE,
+                    "Restore your normal four armour pieces using the selected team's colours."));
 
     private GameDebugEventCatalog() { }
 
@@ -28,6 +31,7 @@ final class GameDebugEventCatalog {
         if (game == ArcadePortGame.DRAW_MY_THING) return DRAW_MY_THING;
         if (game == ArcadePortGame.DRAGONS) return DRAGONS;
         if (game == ArcadePortGame.ONE_IN_THE_QUIVER) return ONE_IN_THE_QUIVER;
+        if (game == ArcadePortGame.PAINTBALL) return PAINTBALL;
         return List.of();
     }
 }

@@ -929,6 +929,12 @@ public final class ArcadePortManager implements Listener {
             tester.getInventory().setItem(arrowSlot, allowQuiverGlassBreaks(arrow));
             triggered = true;
         }
+        if (type == ArcadePortGame.PAINTBALL && "restore-armour".equals(eventId)) {
+            GameDebugRuntimeOverrides.markDebugSession();
+            session.paintPiecesRemaining.put(tester.getUniqueId(), 4);
+            setPaintballArmor(session, tester);
+            triggered = true;
+        }
         return triggered;
     }
 
