@@ -11202,12 +11202,7 @@ public final class ArcadePortManager implements Listener {
         }
         boolean ignoreReload = plugin.hasAdminAccess(player)
                 && debugFeatureEnabled(playerId, ArcadePortGame.PAINTBALL, "ignore-reload", false);
-        long cooldown = switch (kit) {
-            case "sniper" -> 1_000L;
-            case "shotgun" -> 1_400L;
-            case "machine-gun" -> GameDebugRuntimeOverrides.longValue("PAINTBALL_MACHINE_GUN_FIRE_COOLDOWN_MILLIS", ArcadePortRules.PAINTBALL_MACHINE_GUN_FIRE_COOLDOWN_MILLIS);
-            default -> 500L;
-        };
+        long cooldown = Math.max(0L, ArcadePortRules.paintballReloadMillis(kit));
         Long lastShot = session.paintballLastShotAt.get(playerId);
         if (!ignoreReload && lastShot != null && now - lastShot < cooldown) return;
         if (!ignoreReload && "machine-gun".equals(kit)
@@ -11233,7 +11228,8 @@ public final class ArcadePortManager implements Listener {
         if ("sniper".equals(kit)) {
             int paintAmount = ArcadePortRules.paintballPaintAmount(kit, true, player.getExp());
             Arrow arrow = player.launchProjectile(Arrow.class);
-            arrow.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(15.0D));
+            arrow.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(
+                    Math.max(0.0D, ArcadePortRules.paintballSniperArrowSpeed())));
             session.entities.add(arrow);
             session.paintProjectileDamage.put(arrow.getUniqueId(), paintAmount);
             session.paintballProjectileShotIds.put(arrow.getUniqueId(), shotId);
@@ -11246,8 +11242,9 @@ public final class ArcadePortManager implements Listener {
             return;
         }
 
-        int shots = "shotgun".equals(kit) ? 8 : 1;
+        int shots = ArcadePortRules.paintballShotCount(kit);
         int paintAmount = ArcadePortRules.paintballPaintAmount(kit, false, 0.0D);
+        double spread = ArcadePortRules.paintballShotSpread(kit);
         for (int i = 0; i < shots; i++) {
             Projectile projectile;
             boolean redTeam = ArcadePortRules.isPaintballRedTeam(session.teams.getOrDefault(playerId, 0));
@@ -11255,17 +11252,10 @@ public final class ArcadePortManager implements Listener {
             else projectile = player.launchProjectile(Snowball.class);
 
             Vector velocity = projectile.getVelocity();
-            if ("rifle".equals(kit)) {
-                velocity.multiply(2.0D);
-            } else if ("shotgun".equals(kit)) {
-                velocity.add(new Vector(ThreadLocalRandom.current().nextDouble(-0.2D, 0.2D),
-                        ThreadLocalRandom.current().nextDouble(-0.2D, 0.2D),
-                        ThreadLocalRandom.current().nextDouble(-0.2D, 0.2D)));
-            } else {
-                velocity.multiply(1.6D).add(new Vector(ThreadLocalRandom.current().nextDouble(-0.125D, 0.125D),
-                        ThreadLocalRandom.current().nextDouble(-0.125D, 0.125D),
-                        ThreadLocalRandom.current().nextDouble(-0.125D, 0.125D)));
-            }
+            velocity.multiply(Math.max(0.0D, ArcadePortRules.paintballProjectileSpeedMultiplier(kit)));
+            if (spread > 0.0D) velocity.add(new Vector(ThreadLocalRandom.current().nextDouble(-spread, spread),
+                    ThreadLocalRandom.current().nextDouble(-spread, spread),
+                    ThreadLocalRandom.current().nextDouble(-spread, spread)));
             projectile.setVelocity(velocity);
             session.entities.add(projectile);
             session.paintProjectileDamage.put(projectile.getUniqueId(), paintAmount);
@@ -11352,8 +11342,11 @@ public final class ArcadePortManager implements Listener {
                 ItemStack held = player.getInventory().getItemInMainHand();
                 boolean scoped = player.isSneaking() && "sniper".equals(paintballKitForItem(held));
                 if (scoped) {
-                    player.setExp(Math.min(0.999F, player.getExp() + 0.03332F));
-                    player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 8, false, false, true), true);
+                    player.setExp((float) Math.min(0.999F, player.getExp() + ArcadePortRules.paintballSniperChargePerTick()));
+                    player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,
+                            ArcadePortRules.paintballSniperSlownessTicks(),
+                            ArcadePortRules.paintballSniperSlownessAmplifier(),
+                            false, false, true), true);
                 } else {
                     player.removePotionEffect(PotionEffectType.SLOWNESS);
                     if (player.getExp() > 0.0F) player.setExp(0.0F);
@@ -11367,10 +11360,12 @@ public final class ArcadePortManager implements Listener {
                 player.removePotionEffect(PotionEffectType.SLOWNESS);
                 if (player.getExp() != 0.0F) player.setExp(0.0F);
             }
-            if (session.ticks % 80 == 0) {
+            long speedRefreshTicks = ArcadePortRules.paintballKitSpeedRefreshTicks();
+            if (session.ticks % speedRefreshTicks == 0L) {
                 if ("rifle".equals(kit) || "shotgun".equals(kit)) {
-                    int speedLevel = "shotgun".equals(kit) ? 1 : 0;
-                    player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 160, speedLevel, false, false, true), true);
+                    player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,
+                            ArcadePortRules.paintballKitSpeedDurationTicks(),
+                            ArcadePortRules.paintballKitSpeedAmplifier(kit), false, false, true), true);
                 } else player.removePotionEffect(PotionEffectType.SPEED);
             }
             if (session.ticks % 10 == 0) updatePaintballWeaponSkin(session, player);
@@ -11781,7 +11776,7 @@ public final class ArcadePortManager implements Listener {
             }
             if (session.teams.getOrDefault(targetId, -2) != throwerTeam) continue;
             if (marker.getLocation().clone().add(0.0D, 1.0D, 0.0D).distanceSquared(impact)
-                    <= GameDebugRuntimeOverrides.doubleValue("PAINTBALL_SAVE_ME_RADIUS", ArcadePortRules.PAINTBALL_SAVE_ME_RADIUS) * GameDebugRuntimeOverrides.doubleValue("PAINTBALL_SAVE_ME_RADIUS", ArcadePortRules.PAINTBALL_SAVE_ME_RADIUS)) {
+                    <= ArcadePortRules.paintballSaveMeRadius() * ArcadePortRules.paintballSaveMeRadius()) {
                 revive.add(targetId);
             }
         }
@@ -11834,7 +11829,7 @@ public final class ArcadePortManager implements Listener {
     /** Match Reborn's CustomDamageEvent.AddKnockback("Paintball", 2) impulse. */
     private void applyPaintballKnockback(Projectile projectile, Player target) {
         if (projectile == null || target == null) return;
-        final double knockback = Math.log10(2.0D) * 2.0D;
+        final double knockback = ArcadePortRules.paintballKnockbackStrength();
         Vector trajectory = projectile.getVelocity().clone();
         trajectory.setY(0.0D);
         double length = trajectory.length();

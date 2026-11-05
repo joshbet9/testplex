@@ -1883,6 +1883,30 @@ public final class ArcadePortRules {
     public static final long PAINTBALL_GAME_TIMEOUT_MILLIS = 1_200_000L;
     public static final long PAINTBALL_WATER_BOMB_COOLDOWN_MILLIS = 250L;
     public static final double PAINTBALL_SAVE_ME_RADIUS = 3.0D;
+    public static final long PAINTBALL_RIFLE_RELOAD_MILLIS = 500L;
+    public static final long PAINTBALL_SNIPER_RELOAD_MILLIS = 1_000L;
+    public static final long PAINTBALL_SHOTGUN_RELOAD_MILLIS = 1_400L;
+    public static final int PAINTBALL_SHOTGUN_PELLETS = 8;
+    public static final double PAINTBALL_SHOTGUN_SPREAD = 0.2D;
+    public static final double PAINTBALL_MACHINE_GUN_SPREAD = 0.125D;
+    public static final double PAINTBALL_RIFLE_PROJECTILE_SPEED = 2.0D;
+    public static final double PAINTBALL_MACHINE_GUN_PROJECTILE_SPEED = 1.6D;
+    public static final double PAINTBALL_SHOTGUN_PROJECTILE_SPEED = 1.0D;
+    public static final double PAINTBALL_SNIPER_ARROW_SPEED = 15.0D;
+    public static final double PAINTBALL_SNIPER_SCOPE_CHARGE_PER_TICK = 0.03332D;
+    public static final int PAINTBALL_RIFLE_PAINT_PER_HIT = 3;
+    public static final int PAINTBALL_SHOTGUN_PAINT_PER_HIT = 1;
+    public static final int PAINTBALL_MACHINE_GUN_PAINT_PER_HIT = 1;
+    public static final int PAINTBALL_SNIPER_BASE_PAINT = 1;
+    public static final double PAINTBALL_SNIPER_SCOPE_CHARGE_PER_EXTRA_PAINT = 0.3D;
+    public static final int PAINTBALL_SNIPER_MAX_EXTRA_PAINT = 3;
+    public static final long PAINTBALL_KIT_SPEED_REFRESH_TICKS = 80L;
+    public static final int PAINTBALL_KIT_SPEED_DURATION_TICKS = 160;
+    public static final int PAINTBALL_RIFLE_SPEED_AMPLIFIER = 0;
+    public static final int PAINTBALL_SHOTGUN_SPEED_AMPLIFIER = 1;
+    public static final int PAINTBALL_SNIPER_SCOPE_SLOWNESS_AMPLIFIER = 8;
+    public static final int PAINTBALL_SNIPER_SCOPE_SLOWNESS_TICKS = 40;
+    public static final double PAINTBALL_KNOCKBACK_MULTIPLIER = 1.0D;
 
     /** Reborn orders its teams Frost/AQUA first, then Nether/RED. */
     public static boolean isPaintballRedTeam(int team) {
@@ -1981,8 +2005,14 @@ public final class ArcadePortRules {
     }
 
     public static boolean shouldPaintballWaterBombAffectPlayer(double distanceSquared, boolean sameTeam) {
+        double radius = paintballSaveMeRadius();
         return sameTeam && distanceSquared >= 0.0D
-                && distanceSquared <= PAINTBALL_SAVE_ME_RADIUS * PAINTBALL_SAVE_ME_RADIUS;
+                && distanceSquared <= radius * radius;
+    }
+
+    public static double paintballSaveMeRadius() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "PAINTBALL_SAVE_ME_RADIUS", PAINTBALL_SAVE_ME_RADIUS));
     }
 
     public static int paintballPiecesAfterHit(int remainingPieces, int paintAmount) {
@@ -2000,14 +2030,99 @@ public final class ArcadePortRules {
     /** Mirrors Reborn's per-kit armour-paint counts and the Sniper scope damage gauge. */
     public static int paintballPaintAmount(String kit, boolean arrow, double scopeCharge) {
         String safeKit = kit == null ? "rifle" : kit.toLowerCase(java.util.Locale.ROOT);
-        if ("rifle".equals(safeKit)) return 3;
+        if ("rifle".equals(safeKit)) return Math.max(0, Math.min(4, GameDebugRuntimeOverrides.intValue(
+                "PAINTBALL_RIFLE_PAINT_PER_HIT", PAINTBALL_RIFLE_PAINT_PER_HIT)));
+        if ("shotgun".equals(safeKit)) return Math.max(0, Math.min(4, GameDebugRuntimeOverrides.intValue(
+                "PAINTBALL_SHOTGUN_PAINT_PER_HIT", PAINTBALL_SHOTGUN_PAINT_PER_HIT)));
+        if ("machine-gun".equals(safeKit)) return Math.max(0, Math.min(4, GameDebugRuntimeOverrides.intValue(
+                "PAINTBALL_MACHINE_GUN_PAINT_PER_HIT", PAINTBALL_MACHINE_GUN_PAINT_PER_HIT)));
         if ("sniper".equals(safeKit) && arrow) return paintballSniperPaintDamage(scopeCharge);
         return 1;
     }
 
     public static int paintballSniperPaintDamage(double scopeCharge) {
         double charge = Math.max(0.0D, Math.min(0.999D, scopeCharge));
-        return 1 + (int) Math.floor(charge * 10.0D / 3.0D);
+        int base = Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "PAINTBALL_SNIPER_BASE_PAINT", PAINTBALL_SNIPER_BASE_PAINT));
+        double step = Math.max(0.001D, GameDebugRuntimeOverrides.doubleValue(
+                "PAINTBALL_SNIPER_SCOPE_CHARGE_PER_EXTRA_PAINT", PAINTBALL_SNIPER_SCOPE_CHARGE_PER_EXTRA_PAINT));
+        int maximumBonus = Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "PAINTBALL_SNIPER_MAX_EXTRA_PAINT", PAINTBALL_SNIPER_MAX_EXTRA_PAINT));
+        return Math.min(4, base + Math.min(maximumBonus, (int) Math.floor(charge / step)));
+    }
+
+    public static long paintballReloadMillis(String kit) {
+        return switch (kit == null ? "rifle" : kit.toLowerCase(java.util.Locale.ROOT)) {
+            case "sniper" -> GameDebugRuntimeOverrides.longValue("PAINTBALL_SNIPER_RELOAD_MILLIS", PAINTBALL_SNIPER_RELOAD_MILLIS);
+            case "shotgun" -> GameDebugRuntimeOverrides.longValue("PAINTBALL_SHOTGUN_RELOAD_MILLIS", PAINTBALL_SHOTGUN_RELOAD_MILLIS);
+            case "machine-gun" -> GameDebugRuntimeOverrides.longValue("PAINTBALL_MACHINE_GUN_FIRE_COOLDOWN_MILLIS", PAINTBALL_MACHINE_GUN_FIRE_COOLDOWN_MILLIS);
+            default -> GameDebugRuntimeOverrides.longValue("PAINTBALL_RIFLE_RELOAD_MILLIS", PAINTBALL_RIFLE_RELOAD_MILLIS);
+        };
+    }
+
+    public static int paintballShotCount(String kit) {
+        return "shotgun".equalsIgnoreCase(kit == null ? "" : kit)
+                ? Math.max(1, GameDebugRuntimeOverrides.intValue("PAINTBALL_SHOTGUN_PELLETS", PAINTBALL_SHOTGUN_PELLETS))
+                : 1;
+    }
+
+    public static double paintballShotSpread(String kit) {
+        return "shotgun".equalsIgnoreCase(kit == null ? "" : kit)
+                ? Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue("PAINTBALL_SHOTGUN_SPREAD", PAINTBALL_SHOTGUN_SPREAD))
+                : "machine-gun".equalsIgnoreCase(kit == null ? "" : kit)
+                    ? Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue("PAINTBALL_MACHINE_GUN_SPREAD", PAINTBALL_MACHINE_GUN_SPREAD))
+                    : 0.0D;
+    }
+
+    public static double paintballProjectileSpeedMultiplier(String kit) {
+        return "rifle".equalsIgnoreCase(kit == null ? "" : kit)
+                ? GameDebugRuntimeOverrides.doubleValue("PAINTBALL_RIFLE_PROJECTILE_SPEED", PAINTBALL_RIFLE_PROJECTILE_SPEED)
+                : "shotgun".equalsIgnoreCase(kit == null ? "" : kit)
+                    ? GameDebugRuntimeOverrides.doubleValue("PAINTBALL_SHOTGUN_PROJECTILE_SPEED", PAINTBALL_SHOTGUN_PROJECTILE_SPEED)
+                : "machine-gun".equalsIgnoreCase(kit == null ? "" : kit)
+                    ? GameDebugRuntimeOverrides.doubleValue("PAINTBALL_MACHINE_GUN_PROJECTILE_SPEED", PAINTBALL_MACHINE_GUN_PROJECTILE_SPEED)
+                    : 1.0D;
+    }
+
+    public static double paintballSniperArrowSpeed() {
+        return GameDebugRuntimeOverrides.doubleValue("PAINTBALL_SNIPER_ARROW_SPEED", PAINTBALL_SNIPER_ARROW_SPEED);
+    }
+
+    public static double paintballSniperChargePerTick() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "PAINTBALL_SNIPER_SCOPE_CHARGE_PER_TICK", PAINTBALL_SNIPER_SCOPE_CHARGE_PER_TICK));
+    }
+
+    public static double paintballKnockbackStrength() {
+        double multiplier = Math.max(0.0D, Math.min(3.0D, GameDebugRuntimeOverrides.doubleValue(
+                "PAINTBALL_KNOCKBACK_MULTIPLIER", PAINTBALL_KNOCKBACK_MULTIPLIER)));
+        return Math.log10(2.0D) * 2.0D * multiplier;
+    }
+
+    public static int paintballSniperSlownessTicks() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "PAINTBALL_SNIPER_SCOPE_SLOWNESS_TICKS", PAINTBALL_SNIPER_SCOPE_SLOWNESS_TICKS));
+    }
+
+    public static int paintballSniperSlownessAmplifier() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "PAINTBALL_SNIPER_SCOPE_SLOWNESS_AMPLIFIER", PAINTBALL_SNIPER_SCOPE_SLOWNESS_AMPLIFIER));
+    }
+
+    public static long paintballKitSpeedRefreshTicks() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "PAINTBALL_KIT_SPEED_REFRESH_TICKS", PAINTBALL_KIT_SPEED_REFRESH_TICKS));
+    }
+
+    public static int paintballKitSpeedDurationTicks() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "PAINTBALL_KIT_SPEED_DURATION_TICKS", PAINTBALL_KIT_SPEED_DURATION_TICKS));
+    }
+
+    public static int paintballKitSpeedAmplifier(String kit) {
+        return Math.max(0, "shotgun".equalsIgnoreCase(kit == null ? "" : kit)
+                ? GameDebugRuntimeOverrides.intValue("PAINTBALL_SHOTGUN_SPEED_AMPLIFIER", PAINTBALL_SHOTGUN_SPEED_AMPLIFIER)
+                : GameDebugRuntimeOverrides.intValue("PAINTBALL_RIFLE_SPEED_AMPLIFIER", PAINTBALL_RIFLE_SPEED_AMPLIFIER));
     }
 
 

@@ -199,6 +199,14 @@ final class GameDebugVariableCatalog {
 
     private static double minimum(String name, double defaultValue, Kind kind) {
         if (kind == Kind.BOOLEAN) return 0.0D;
+        if (name.equals("PAINTBALL_SHOTGUN_PELLETS")) return 1.0D;
+        if (name.startsWith("PAINTBALL_") && name.endsWith("_MILLIS")) return 1.0D;
+        if (name.startsWith("PAINTBALL_") && (name.endsWith("_SPREAD") || name.endsWith("_SPEED")
+                || name.endsWith("_SPEED_MULTIPLIER") || name.endsWith("_RADIUS")
+                || name.endsWith("_CHARGE_PER_TICK") || name.endsWith("_CHARGE_PER_EXTRA_PAINT")
+                || name.endsWith("_MULTIPLIER"))) return 0.0D;
+        if (name.startsWith("PAINTBALL_") && (name.endsWith("_PAINT") || name.endsWith("_PAINT_PER_HIT")
+                || name.endsWith("_PELLETS") || name.endsWith("_TICKS") || name.endsWith("_AMPLIFIER"))) return 0.0D;
         if (name.equals("MICRO_BATTLES_CHEAT_WINDOW_MILLIS")
                 || name.equals("MICRO_BATTLES_COMBAT_LOG_EXPIRE_MILLIS")) return 0.0D;
         if (name.equals("MICRO_BATTLES_BORDER_PARTICLE_DISTANCE")) return 0.5D;
@@ -237,6 +245,17 @@ final class GameDebugVariableCatalog {
 
     private static double maximum(String name, Kind kind, double defaultValue) {
         if (kind == Kind.BOOLEAN) return 1.0D;
+        if (name.startsWith("PAINTBALL_") && name.endsWith("_MILLIS")) return 10_000.0D;
+        if (name.equals("PAINTBALL_SHOTGUN_PELLETS")) return 32.0D;
+        if (name.endsWith("_PAINT_PER_HIT") || name.endsWith("_SNIPER_BASE_PAINT")
+                || name.endsWith("_SNIPER_MAX_EXTRA_PAINT")) return 4.0D;
+        if (name.endsWith("_SPREAD")) return 1.0D;
+        if (name.endsWith("_PROJECTILE_SPEED") || name.endsWith("_ARROW_SPEED")) return 30.0D;
+        if (name.equals("PAINTBALL_SNIPER_SCOPE_CHARGE_PER_TICK")
+                || name.equals("PAINTBALL_SNIPER_SCOPE_CHARGE_PER_EXTRA_PAINT")) return 1.0D;
+        if (name.endsWith("_KNOCKBACK_MULTIPLIER")) return 3.0D;
+        if (name.endsWith("_AMPLIFIER")) return 10.0D;
+        if (name.endsWith("_TICKS")) return 1_200.0D;
         if (name.equals("MICRO_BATTLES_CHEAT_WINDOW_MILLIS")) return 30_000.0D;
         if (name.equals("MICRO_BATTLES_COMBAT_LOG_EXPIRE_MILLIS")) return 120_000.0D;
         if (name.equals("MICRO_BATTLES_BORDER_PARTICLE_DISTANCE")) return 16.0D;
