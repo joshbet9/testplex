@@ -1280,6 +1280,14 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                         "Allow this kit's combat, movement or passive effect for authorised testers.", true));
             }
         }
+        if (game == ArcadePortGame.EVOLUTION) {
+            for (String form : List.of("golem", "blaze", "creeper", "slime", "chicken", "quick-evolver")) {
+                String key = "ability-" + form;
+                features.put(key, new DebugFeature(key, "Form feature: " + humanizeDebugKey(form),
+                        Material.DRAGON_EGG,
+                        "Allow this Evolution form's ability or progression perk for authorised testers.", true));
+            }
+        }
         return List.copyOf(features.values());
     }
 
@@ -1306,6 +1314,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.SPLEEF && key.startsWith("ability-"))
                 || (game == ArcadePortGame.RUNNER && key.startsWith("ability-"))
                 || (game == ArcadePortGame.DEATH_TAG && key.startsWith("ability-"))
+                || (game == ArcadePortGame.EVOLUTION && key.startsWith("ability-"))
                 || (game == ArcadePortGame.SUPER_SPLOOR && key.startsWith("special-"))
                 || "DRAGONS_SPAWNING_ENABLED".equals(key)
                 || "DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED".equals(key)

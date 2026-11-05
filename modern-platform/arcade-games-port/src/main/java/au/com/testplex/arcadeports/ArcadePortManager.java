@@ -18072,7 +18072,9 @@ public final class ArcadePortManager implements Listener {
             }
             float progress = session.evolutionCharge.getOrDefault(id, 0.0F);
             boolean quickEvolver = "quick-evolver".equals(
-                    session.evolutionKits.getOrDefault(id, "standard-evolution"));
+                    session.evolutionKits.getOrDefault(id, "standard-evolution"))
+                    && (!plugin.hasAdminAccess(player) || debugFeatureEnabled(id,
+                            ArcadePortGame.EVOLUTION, "ability-quick-evolver", true));
             progress = (float) Math.min(0.9999D, progress
                     + ArcadePortRules.evolutionChargePerTick(
                             session.evolutionLifeKills.getOrDefault(id, 0), quickEvolver));
@@ -18211,6 +18213,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void startEvolutionGolemSlam(Session session, Player player, long now) {
+        if (!isDebugAbilityAllowed(player, ArcadePortGame.EVOLUTION, "golem")) return;
         UUID id = player.getUniqueId();
         long readyAt = session.evolutionGolemSlamReadyAt.getOrDefault(id, 0L);
         if (now < readyAt) {
@@ -18231,6 +18234,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void startEvolutionFlamethrower(Session session, Player player, long now) {
+        if (!isDebugAbilityAllowed(player, ArcadePortGame.EVOLUTION, "blaze")) return;
         UUID id = player.getUniqueId();
         long readyAt = session.evolutionBlazeReadyAt.getOrDefault(id, 0L);
         if (now < readyAt) {
@@ -18248,6 +18252,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void startEvolutionSlimeSlam(Session session, Player player, long now) {
+        if (!isDebugAbilityAllowed(player, ArcadePortGame.EVOLUTION, "slime")) return;
         UUID id = player.getUniqueId();
         long readyAt = session.evolutionSlimeSlamReadyAt.getOrDefault(id, 0L);
         if (now < readyAt) {
@@ -18268,6 +18273,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void startEvolutionChickenEgg(Session session, Player player) {
+        if (!isDebugAbilityAllowed(player, ArcadePortGame.EVOLUTION, "chicken")) return;
         if (inventoryCount(player, Material.EGG) <= 0) {
             player.sendMessage(ChatColor.YELLOW + "You need an egg to use Egg Launch.");
             return;
@@ -18434,7 +18440,9 @@ public final class ArcadePortManager implements Listener {
         session.evolutionStartedAtMillis.put(id, System.currentTimeMillis());
         session.evolutionLevelAtAttempt.put(id, session.evolutionLevels.getOrDefault(id, 0));
         boolean quickEvolver = "quick-evolver".equals(
-                session.evolutionKits.getOrDefault(id, "standard-evolution"));
+                session.evolutionKits.getOrDefault(id, "standard-evolution"))
+                && (!plugin.hasAdminAccess(player) || debugFeatureEnabled(id,
+                        ArcadePortGame.EVOLUTION, "ability-quick-evolver", true));
         session.evolutionQuickEvolverAtAttempt.put(id, quickEvolver);
         long formChangeTicks = ArcadePortRules.evolutionFormChangeTicks(quickEvolver);
         long totalAnimationTicks = ArcadePortRules.evolutionTotalAnimationTicks(quickEvolver);
@@ -24199,6 +24207,13 @@ public final class ArcadePortManager implements Listener {
                 || !session.alive.contains(player.getUniqueId())
                 || session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) != 4
                 || session.evolving.contains(player.getUniqueId())) return;
+        if (plugin.hasAdminAccess(player) && !debugFeatureEnabled(player.getUniqueId(),
+                ArcadePortGame.EVOLUTION, "ability-chicken", true)) {
+            event.setCancelled(true);
+            player.setFlying(false);
+            player.sendActionBar(ChatColor.RED + "Chicken abilities are disabled in your debug profile.");
+            return;
+        }
         event.setCancelled(true);
         player.setFlying(false);
         UUID id = player.getUniqueId();
@@ -28396,6 +28411,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private boolean throwEvolutionSulphurBomb(Session session, Player player) {
+        if (!isDebugAbilityAllowed(player, ArcadePortGame.EVOLUTION, "creeper")) return false;
         if (session == null || active != session || session.type != ArcadePortGame.EVOLUTION
                 || player == null || !player.isOnline()
                 || !session.alive.contains(player.getUniqueId())
