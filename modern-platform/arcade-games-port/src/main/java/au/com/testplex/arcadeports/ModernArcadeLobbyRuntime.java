@@ -1164,8 +1164,13 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         for (DebugFeature feature : COMMON_DEBUG_FEATURES) features.put(feature.key(), feature);
         for (GameDebugVariableCatalog.Variable variable : manager.debugVariables(game)) {
             if (variable.kind() != GameDebugVariableCatalog.Kind.BOOLEAN) continue;
-            features.put(variable.key(), new DebugFeature(variable.key(), variable.label(), Material.REDSTONE_TORCH,
-                    "Game rule switch from " + variable.key() + ".", variable.defaultValue() != 0.0D));
+            String title = variable.key().equals("BOMB_LOBBERS_POWERUP_SPAWNING_ENABLED")
+                    ? "Power-up spawns" : variable.label();
+            String description = variable.key().equals("BOMB_LOBBERS_POWERUP_SPAWNING_ENABLED")
+                    ? "Pause power-up waves and clear loose drops; power-ups already carried can still be used."
+                    : "Game rule switch from " + variable.key() + ".";
+            features.put(variable.key(), new DebugFeature(variable.key(), title, Material.REDSTONE_TORCH,
+                    description, variable.defaultValue() != 0.0D));
         }
         features.put("achievement-preview-only", new DebugFeature("achievement-preview-only",
                 "Achievement preview only", Material.KNOWLEDGE_BOOK,
@@ -1186,6 +1191,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         return "all-kits".equals(key) || "invulnerable".equals(key) || "no-fall-damage".equals(key)
                 || "no-hunger-loss".equals(key) || "unlimited-abilities".equals(key)
                 || "unlimited-specials".equals(key)
+                || "BOMB_LOBBERS_POWERUP_SPAWNING_ENABLED".equals(key)
                 || "achievement-preview-only".equals(key);
     }
 

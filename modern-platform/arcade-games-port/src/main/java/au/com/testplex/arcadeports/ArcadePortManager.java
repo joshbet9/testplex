@@ -27498,6 +27498,17 @@ public final class ArcadePortManager implements Listener {
 
     private void updateBombLobbersPowerups(Session session, long now) {
         if (session == null || active != session) return;
+        if (!ArcadePortRules.bombLobbersPowerupsEnabled()) {
+            for (Item drop : session.bombPowerupDrops.values()) {
+                if (drop != null && drop.isValid()) drop.remove();
+                if (drop != null) session.entities.remove(drop);
+            }
+            session.bombPowerupDrops.clear();
+            session.bombPowerupTeamByDrop.clear();
+            session.bombPowerupStatusByTeam.clear();
+            session.bombNextPowerupSpawnAtByTeam.clear();
+            return;
+        }
         for (Map.Entry<UUID, Item> entry : new ArrayList<>(session.bombPowerupDrops.entrySet())) {
             Item drop = entry.getValue();
             if (drop == null || !drop.isValid()) {

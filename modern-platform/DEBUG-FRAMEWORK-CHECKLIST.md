@@ -32,7 +32,7 @@ The common tester switches (all kits, invulnerability, no fall damage, and no hu
 | Game | Status | Implemented coverage | Remaining work |
 |---|---|---|---|
 | Bacon Brawl | Partial | Shared rule overrides; common switches; achievement preview in its award helper | Per-kit ability switches/variables, event triggers and stats-isolated match simulation |
-| Bomb Lobbers | Partial | Shared rule overrides and common switches | Power-up/TNT feature controls, event triggers and phase controls |
+| Bomb Lobbers | Partial | Shared rule overrides and common switches; authorised testers can pause future power-up waves and clear loose drops through a profile-backed live switch | TNT/event controls, phase tools and full feature regression tests |
 | Castle Assault | Partial | Shared rule overrides plus objective TNT respawn timing is runtime-backed | Objective, tower/crystal/TNT switches, event triggers and regression tests |
 | Death Tag | Partial | Shared rule overrides plus chaser promotion, archer knockback and Traitor cooldown are runtime-backed | Runner/chaser feature controls, tag/respawn/event tools and achievements |
 | Dragon Escape | Partial | Shared rule overrides plus Digger protection radius and Warper grace period are runtime-backed | Dragon/ability/finish feature switches and event controls |

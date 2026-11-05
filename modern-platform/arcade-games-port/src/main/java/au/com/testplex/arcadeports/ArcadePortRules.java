@@ -240,10 +240,16 @@ public final class ArcadePortRules {
     }
     public static final long BACON_FLASH_FRIED_MAX_WIN_MILLIS = 60_000L;
     public static final long BOMB_LOBBERS_ASSIST_WINDOW_MILLIS = 10_000L;
+    public static final boolean BOMB_LOBBERS_POWERUP_SPAWNING_ENABLED = true;
     public static final long BOMB_LOBBERS_POWERUP_FIRST_SPAWN_DELAY_MILLIS = 10_000L;
     public static final double BOMB_LOBBERS_SUPER_TNT_EXPLOSION_RADIUS = 10.0D;
     public static final double BOMB_LOBBERS_SUPER_TNT_MAX_DAMAGE = 65.0D;
     public static final int BOMB_LOBBERS_POWERUP_SPEED_DURATION_TICKS = 240;
+
+    public static boolean bombLobbersPowerupsEnabled() {
+        return GameDebugRuntimeOverrides.booleanValue(
+                "BOMB_LOBBERS_POWERUP_SPAWNING_ENABLED", BOMB_LOBBERS_POWERUP_SPAWNING_ENABLED);
+    }
     public static final int BOMB_LOBBERS_ULTIMATE_KILLER_KILLS = 5;
     public static final int BOMB_LOBBERS_TWO_BIRDS_KILLS = 2;
     public static final int BOMB_LOBBERS_TEAM_PLAYER_ASSISTS = 5;
