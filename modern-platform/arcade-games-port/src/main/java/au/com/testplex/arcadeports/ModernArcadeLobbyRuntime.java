@@ -1522,10 +1522,12 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.EVOLUTION && key.startsWith("ability-"))
                 || (game == ArcadePortGame.SHEEP_QUEST && key.startsWith("ability-"))
                 || (game == ArcadePortGame.TURF_WARS && key.startsWith("ability-"))
+                || (game == ArcadePortGame.TURF_WARS && Set.of("build-editing", "combat-damage").contains(key))
                 || (game == ArcadePortGame.MICRO_BATTLES
                         && (key.startsWith("ability-") || key.startsWith("blocks-")))
                 || (game == ArcadePortGame.SKY_WARS && key.startsWith("ability-"))
                 || (game == ArcadePortGame.SKY_WARS && Set.of("chest-looting", "island-crumbling", "tnt-generator").contains(key))
+                || (game == ArcadePortGame.WIZARDS && Set.of("spell-casting", "chest-looting").contains(key))
                 || (game == ArcadePortGame.SNAKE
                         && (key.startsWith("ability-") || "tail-collisions".equals(key)
                                 || "self-collisions".equals(key) || "opponent-collisions".equals(key)

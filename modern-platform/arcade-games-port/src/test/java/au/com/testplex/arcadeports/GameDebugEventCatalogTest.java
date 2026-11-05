@@ -1246,4 +1246,16 @@ class GameDebugEventCatalogTest {
         assertTrue(manager.contains("ArcadePortGame.DRAGON_ESCAPE, \"dragon-movement\")"));
         assertTrue(manager.contains("if (dragonMovementEnabled) location = moveDragonEscapeDragon(session, target)"));
     }
+
+    @Test
+    void immediateRuntimeFeatureControlsAreMarkedImmediateInTheMenu() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        assertTrue(lobby.contains("Set.of(\"build-editing\", \"combat-damage\").contains(key)"));
+        assertTrue(lobby.contains("Set.of(\"spell-casting\", \"chest-looting\").contains(key)"));
+    }
 }
