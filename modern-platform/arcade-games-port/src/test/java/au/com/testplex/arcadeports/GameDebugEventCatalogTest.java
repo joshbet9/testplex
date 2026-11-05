@@ -1,0 +1,16 @@
+package au.com.testplex.arcadeports;
+
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class GameDebugEventCatalogTest {
+    @Test
+    void eventToolsAreExplicitlyScopedToTheirGame() {
+        var witherEvents = GameDebugEventCatalog.events(ArcadePortGame.WITHER_ASSAULT);
+        assertEquals(1, witherEvents.size());
+        assertEquals("spawn-minions", witherEvents.getFirst().id());
+        assertFalse(GameDebugEventCatalog.events(ArcadePortGame.BACON_BRAWL).stream()
+                .anyMatch(event -> event.id().equals("spawn-minions")));
+    }
+}

@@ -17,7 +17,7 @@ This checklist tracks implemented controls, not menu/catalog presence alone. A g
 - [x] Authorized testers can advance any shared Arcade start countdown, the live Draw My Thing turn, Master Builders build/review phase, Turf Wars phase, any supported shared round timeout, or the current Speed Builders, Plexball, Wizards, Snake, Snap, Monster Maze or Super Sploor phase; bot rosters are configured for the next round.
 - [x] Authorized testers can restore only their own active-round health/hunger and clear fire/potion effects without invoking damage, scoring, or achievement paths.
 - [ ] Add explicit per-game control metadata for every meaningful mechanic, beyond primitive `ArcadePortRules` fields.
-- [ ] Add per-game event triggers and non-persistent achievement simulation beyond the award-preview hooks; the current vitals action is a shared tester utility, not a substitute for game event triggers.
+- [ ] Add per-game event triggers and non-persistent achievement simulation beyond the award-preview hooks; Wither Assault can invoke its normal minion-wave ability, but the current vitals action is a shared tester utility, not a substitute for the remaining event tools.
 - [ ] Add automated persistence, permission, reset, live-effect and round-restart tests for profiles.
 - [ ] Verify every setting listed below against its gameplay consumer; keep unchecked games out of the **complete** state until done.
 
@@ -59,7 +59,7 @@ The common tester switches (all kits, invulnerability, no fall damage, and no hu
 | Spleef | Partial | Shared rule overrides and common switches | Kit, block-break, hunger and round-phase switches/event tools |
 | Super Sploor | Partial | Ink, shot, squid, territory and round constants are profile-backed and consumed by its runtime; debug advances round/overtime deadlines through normal score and finish logic; tester profile can keep the special full between activations | Remaining kit/event controls and direct behavior tests |
 | Turf Wars | Partial | Shared rule overrides include build/combat phase duration and melee/sword/shredder damage | Build/combat/territory/respawn switches and phase/event tools |
-| Wither Assault | Partial | Minion count and common shared-session switches are profile-backed and consumed by the manager/rules | Tower/phase/event controls and direct gameplay behavior tests |
+| Wither Assault | Partial | Minion count and common shared-session switches are profile-backed and consumed by the manager/rules; authorised testers can trigger the normal minion-wave ability while playing the Wither role | Tower/phase controls and direct gameplay behavior tests |
 | Wizards | Partial | Player limits, starter-spell rolls, mana conversion, Soul Star mana rate and endgame strike timing are profile-backed and consumed by `WizardsGameManager`/`WizardsRules`; debug controls can start endgame or trigger its next strike through normal logic | Spell/chest event controls and direct live-round tests |
 
 ## Completion gate

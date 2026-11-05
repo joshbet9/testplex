@@ -883,6 +883,24 @@ public final class ArcadePortManager implements Listener {
         return true;
     }
 
+    boolean debugTriggerEvent(Player tester, ArcadePortGame type, String eventId) {
+        if (tester == null || !tester.isOnline() || !plugin.hasAdminAccess(tester)
+                || type == null || eventId == null) return false;
+        Session session = active;
+        if (session == null || session.type != type || !session.liveStarted
+                || !session.alive.contains(tester.getUniqueId())) return false;
+        boolean triggered = false;
+        if (type == ArcadePortGame.WITHER_ASSAULT && "spawn-minions".equals(eventId)
+                && session.teams.getOrDefault(tester.getUniqueId(), 0) == 1) {
+            session.witherMinionReadyAt.put(tester.getUniqueId(), 0L);
+            int before = session.witherMinionOwners.size();
+            launchWitherMinions(session, tester, System.currentTimeMillis());
+            triggered = session.witherMinionOwners.size() > before;
+        }
+        if (triggered) GameDebugRuntimeOverrides.markDebugSession();
+        return triggered;
+    }
+
     boolean debugRestoreTesterVitals(Player tester, ArcadePortGame type) {
         if (tester == null || !tester.isOnline() || !plugin.hasAdminAccess(tester)) return false;
         Session session = active;
