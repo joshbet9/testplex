@@ -1258,6 +1258,13 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             features.put(key, new DebugFeature(key, "Ignore reload and heat", Material.SNOWBALL,
                     "Let your weapons fire continuously without reload waits or Machine Gun heat for testing.", false));
         }
+        if (game == ArcadePortGame.SPLEEF) {
+            for (String kit : List.of("snowballer", "archer", "brawler", "gust")) {
+                String key = "ability-" + kit;
+                features.put(key, new DebugFeature(key, "Kit feature: " + humanizeDebugKey(kit),
+                        Material.SNOWBALL, "Enable this kit's special supplies and abilities for authorised testers.", true));
+            }
+        }
         return List.copyOf(features.values());
     }
 
@@ -1281,6 +1288,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.DRAGONS && key.startsWith("ability-"))
                 || (game == ArcadePortGame.ONE_IN_THE_QUIVER && key.startsWith("ability-"))
                 || (game == ArcadePortGame.PAINTBALL && "ignore-reload".equals(key))
+                || (game == ArcadePortGame.SPLEEF && key.startsWith("ability-"))
                 || (game == ArcadePortGame.SUPER_SPLOOR && key.startsWith("special-"))
                 || "DRAGONS_SPAWNING_ENABLED".equals(key)
                 || "DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED".equals(key)

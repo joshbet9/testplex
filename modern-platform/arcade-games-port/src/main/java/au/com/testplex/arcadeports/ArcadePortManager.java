@@ -22745,7 +22745,9 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void giveSpleefSnowball(Session session, Player player) {
-        if (!"snowballer".equals(session.spleefKits.getOrDefault(player.getUniqueId(), "snowballer"))) return;
+        if (!"snowballer".equals(session.spleefKits.getOrDefault(player.getUniqueId(), "snowballer"))
+                || plugin.hasAdminAccess(player)
+                        && !debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.SPLEEF, "ability-snowballer", true)) return;
         if (inventoryCount(player, Material.SNOWBALL) < GameDebugRuntimeOverrides.intValue("SPLEEF_SNOWBALLER_MAX_SNOWBALLS", ArcadePortRules.SPLEEF_SNOWBALLER_MAX_SNOWBALLS)) {
             player.getInventory().addItem(new ItemStack(Material.SNOWBALL, 1));
         }
@@ -22757,7 +22759,8 @@ public final class ArcadePortManager implements Listener {
                 || isSpleefProtectedBlock(block.getType())) return;
         restoreSpleefHunger(session, player, now);
         String kit = session.spleefKits.getOrDefault(player.getUniqueId(), "snowballer");
-        if ("brawler".equals(kit)) {
+        if ("brawler".equals(kit) && (!plugin.hasAdminAccess(player)
+                || debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.SPLEEF, "ability-brawler", true))) {
             long readyAt = session.spleefSmasherReadyAt.getOrDefault(player.getUniqueId(), 0L);
             if (now >= readyAt) {
                 session.spleefSmasherReadyAt.put(player.getUniqueId(),
@@ -22801,6 +22804,8 @@ public final class ArcadePortManager implements Listener {
             String kit = session.spleefKits.getOrDefault(player.getUniqueId(), "snowballer");
             if ("gust".equals(kit)) {
                 UUID id = player.getUniqueId();
+                if (plugin.hasAdminAccess(player)
+                        && !debugFeatureEnabled(id, ArcadePortGame.SPLEEF, "ability-gust", true)) continue;
                 long readyAt = session.spleefGustReadyAt.getOrDefault(id, 0L);
                 if (readyAt > 0L && now >= readyAt
                         && inventoryCount(player, Material.WIND_CHARGE) == 0) {
@@ -22811,7 +22816,8 @@ public final class ArcadePortManager implements Listener {
                 }
                 continue;
             }
-            if (!"archer".equals(kit)) continue;
+            if (!"archer".equals(kit) || plugin.hasAdminAccess(player)
+                    && !debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.SPLEEF, "ability-archer", true)) continue;
             long nextAt = session.spleefNextArrowAt.getOrDefault(player.getUniqueId(),
                     now + GameDebugRuntimeOverrides.longValue("SPLEEF_ARCHER_ARROW_INTERVAL_MILLIS", ArcadePortRules.SPLEEF_ARCHER_ARROW_INTERVAL_MILLIS));
             if (now < nextAt) continue;
@@ -22829,7 +22835,10 @@ public final class ArcadePortManager implements Listener {
         if (active != session || session.type != ArcadePortGame.SPLEEF || attacker == null || target == null
                 || attacker.equals(target) || !session.alive.contains(attacker.getUniqueId())
                 || !session.alive.contains(target.getUniqueId())) return;
-        if ("brawler".equals(session.spleefKits.getOrDefault(attacker.getUniqueId(), "snowballer"))) {
+        boolean brawlerEnabled = "brawler".equals(session.spleefKits.getOrDefault(attacker.getUniqueId(), "snowballer"))
+                && (!plugin.hasAdminAccess(attacker)
+                        || debugFeatureEnabled(attacker.getUniqueId(), ArcadePortGame.SPLEEF, "ability-brawler", true));
+        if (brawlerEnabled) {
             session.spleefBrawlerHitPlayers.add(attacker.getUniqueId());
         }
         String key = attacker.getUniqueId() + ":" + target.getUniqueId();
@@ -22838,7 +22847,7 @@ public final class ArcadePortManager implements Listener {
         if (now - last < GameDebugRuntimeOverrides.longValue("SPLEEF_KNOCKBACK_COOLDOWN_MILLIS", ArcadePortRules.SPLEEF_KNOCKBACK_COOLDOWN_MILLIS)) return;
         session.spleefKnockbackAt.put(key, now);
         String kit = session.spleefKits.getOrDefault(attacker.getUniqueId(), "snowballer");
-        double power = "brawler".equals(kit) ? GameDebugRuntimeOverrides.doubleValue("SPLEEF_BRAWLER_KNOCKBACK", ArcadePortRules.SPLEEF_BRAWLER_KNOCKBACK)
+        double power = brawlerEnabled ? GameDebugRuntimeOverrides.doubleValue("SPLEEF_BRAWLER_KNOCKBACK", ArcadePortRules.SPLEEF_BRAWLER_KNOCKBACK)
                 : GameDebugRuntimeOverrides.doubleValue("SPLEEF_DEFAULT_KNOCKBACK", ArcadePortRules.SPLEEF_DEFAULT_KNOCKBACK);
         Vector direction = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
         if (direction.lengthSquared() <= 0.000001D) return;
@@ -22955,6 +22964,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void useSpleefLeap(Session session, Player player, long now) {
+        if (!isDebugAbilityAllowed(player, ArcadePortGame.SPLEEF, "brawler")) return;
         UUID id = player.getUniqueId();
         long readyAt = session.spleefLeapReadyAt.getOrDefault(id, 0L);
         if (now < readyAt) {
@@ -26771,14 +26781,21 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onSpleefGustLaunch(ProjectileLaunchEvent event) {
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onSpleefSpecialLaunch(ProjectileLaunchEvent event) {
         Session session = active;
         if (session == null || session.type != ArcadePortGame.SPLEEF
-                || event.getEntity().getType() != EntityType.WIND_CHARGE
                 || !(event.getEntity().getShooter() instanceof Player player)
-                || !session.alive.contains(player.getUniqueId())
-                || !"gust".equals(session.spleefKits.getOrDefault(player.getUniqueId(), "snowballer"))) return;
+                || !session.alive.contains(player.getUniqueId())) return;
+        String kit = session.spleefKits.getOrDefault(player.getUniqueId(), "snowballer");
+        String feature = event.getEntity().getType() == EntityType.WIND_CHARGE && "gust".equals(kit) ? "gust"
+                : event.getEntity().getType() == EntityType.SNOWBALL && "snowballer".equals(kit) ? "snowballer" : null;
+        if (feature == null) return;
+        if (!isDebugAbilityAllowed(player, ArcadePortGame.SPLEEF, feature)) {
+            event.setCancelled(true);
+            return;
+        }
+        if (!"gust".equals(feature)) return;
         long cooldown = GameDebugRuntimeOverrides.longValue("SPLEEF_GUST_COOLDOWN_MILLIS", ArcadePortRules.SPLEEF_GUST_COOLDOWN_MILLIS);
         session.spleefGustReadyAt.put(player.getUniqueId(), System.currentTimeMillis() + cooldown);
         cooldownProgress.start(player, "Gust", cooldown);
