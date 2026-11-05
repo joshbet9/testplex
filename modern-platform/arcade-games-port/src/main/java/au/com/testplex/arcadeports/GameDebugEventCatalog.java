@@ -24,6 +24,9 @@ final class GameDebugEventCatalog {
     private static final List<Event> EVOLUTION = List.of(
             new Event("begin-evolution", "Start Evolution", Material.DRAGON_EGG,
                     "Begin your normal evolution animation immediately to test form and cosmetic effects."));
+    private static final List<Event> HOOPS_REMASTERED = List.of(
+            new Event("shoot-ball", "Take a Shot", Material.MAGMA_CREAM,
+                    "If you currently have possession, release a normal shot using your current aim and position."));
     private static final List<Event> ONE_IN_THE_QUIVER = List.of(
             new Event("refill-arrow", "Restore Super Arrow", Material.ARROW,
                     "Restore the normal one-shot arrow to its configured hotbar slot for testing."));
@@ -92,6 +95,7 @@ final class GameDebugEventCatalog {
         if (game == ArcadePortGame.DRAGONS) return DRAGONS;
         if (game == ArcadePortGame.DRAGON_ESCAPE) return DRAGON_ESCAPE;
         if (game == ArcadePortGame.EVOLUTION) return EVOLUTION;
+        if (game == ArcadePortGame.HOOPS_REMASTERED) return HOOPS_REMASTERED;
         if (game == ArcadePortGame.ONE_IN_THE_QUIVER) return ONE_IN_THE_QUIVER;
         if (game == ArcadePortGame.SPLEEF) return SPLEEF;
         if (game == ArcadePortGame.MILK_THE_COW) return MILK_THE_COW;

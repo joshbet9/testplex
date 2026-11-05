@@ -19,6 +19,7 @@ class GameDebugEventCatalogTest {
         assertEquals("spawn-dragon", GameDebugEventCatalog.events(ArcadePortGame.DRAGONS).getFirst().id());
         assertEquals("advance-dragon", GameDebugEventCatalog.events(ArcadePortGame.DRAGON_ESCAPE).getFirst().id());
         assertEquals("begin-evolution", GameDebugEventCatalog.events(ArcadePortGame.EVOLUTION).getFirst().id());
+        assertEquals("shoot-ball", GameDebugEventCatalog.events(ArcadePortGame.HOOPS_REMASTERED).getFirst().id());
         assertEquals("refill-arrow", GameDebugEventCatalog.events(ArcadePortGame.ONE_IN_THE_QUIVER)
                 .getFirst().id());
         assertEquals("restore-armour", GameDebugEventCatalog.events(ArcadePortGame.PAINTBALL)
@@ -161,6 +162,30 @@ class GameDebugEventCatalogTest {
         assertTrue(ability.contains("plugin.hasAdminAccess(player)"));
         assertTrue(ability.contains("debugFeatureEnabled(id, ArcadePortGame.BACON_BRAWL, abilityFeature, true)"));
         assertTrue(ability.indexOf("debugFeatureEnabled") < ability.indexOf("session.baconAbilitiesUsed.add(id)"));
+    }
+
+    @Test
+    void hoopsShotEventUsesNormalPossessionPathAndDebugRoundsDoNotPersistCareerOrAchievements() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String runtime = Files.readString(sourceRoot.resolve("HoopsRemasteredRuntime.java"));
+        assertTrue(manager.contains("type == ArcadePortGame.HOOPS_REMASTERED && \"shoot-ball\".equals(eventId)"));
+        int debugShot = runtime.indexOf("public boolean debugShoot(Player shooter)");
+        int nextMethod = runtime.indexOf("@EventHandler", debugShot);
+        assertTrue(debugShot >= 0 && nextMethod > debugShot);
+        String shot = runtime.substring(debugShot, nextMethod);
+        assertTrue(shot.contains("shooter.getUniqueId().equals(current.holderId)"));
+        assertTrue(shot.contains("shoot(current, shooter)"));
+        int persist = runtime.indexOf("private void persistCareer(");
+        int award = runtime.indexOf("private void award(Match current, UUID id, Player player", persist);
+        assertTrue(persist >= 0 && award > persist);
+        assertTrue(runtime.substring(persist, award).contains("if (GameDebugRuntimeOverrides.isDebugSession()) return;"));
+        int awardGuard = runtime.indexOf("if (GameDebugRuntimeOverrides.isDebugSession()) return;", award);
+        assertTrue(awardGuard > award);
     }
 
     @Test

@@ -1065,6 +1065,7 @@ public final class HoopsRemasteredRuntime implements Listener {
     }
 
     private void persistCareer(Match current, int winningTeam) {
+        if (GameDebugRuntimeOverrides.isDebugSession()) return;
         for (Map.Entry<UUID, Player> entry : current.players.entrySet()) {
             UUID id = entry.getKey();
             Player player = entry.getValue();
@@ -1124,6 +1125,7 @@ public final class HoopsRemasteredRuntime implements Listener {
     }
 
     private void award(Match current, UUID id, Player player, String achievementId) {
+        if (GameDebugRuntimeOverrides.isDebugSession()) return;
         String key = "local-achievements." + id + "." + GAME_ID + "." + achievementId;
         if (plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
@@ -1213,6 +1215,18 @@ public final class HoopsRemasteredRuntime implements Listener {
             return;
         }
         if (action.isRightClick()) blockShot(current, player);
+    }
+
+    /** Release the held ball through the ordinary shot path for an authorised debug event. */
+    public boolean debugShoot(Player shooter) {
+        Match current = match;
+        if (current == null || current.ending || shooter == null
+                || !shooter.isOnline() || shooter.getWorld() != current.world
+                || !shooter.getUniqueId().equals(current.holderId)
+                || !current.players.containsKey(shooter.getUniqueId())) return false;
+        Ball previous = current.ball;
+        shoot(current, shooter);
+        return current.ball != previous;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)

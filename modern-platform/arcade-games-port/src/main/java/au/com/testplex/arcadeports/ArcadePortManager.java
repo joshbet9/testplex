@@ -1003,6 +1003,11 @@ public final class ArcadePortManager implements Listener {
             beginEvolution(session, tester);
             triggered = session.evolving.contains(tester.getUniqueId());
         }
+        if (type == ArcadePortGame.HOOPS_REMASTERED && "shoot-ball".equals(eventId)
+                && hoops.debugShoot(tester)) {
+            GameDebugRuntimeOverrides.markDebugSession();
+            triggered = true;
+        }
         if (type == ArcadePortGame.ONE_IN_THE_QUIVER && "refill-arrow".equals(eventId)) {
             int arrowSlot = Math.max(0, Math.min(8, GameDebugRuntimeOverrides.intValue(
                     "QUIVER_ARROW_SLOT", ArcadePortRules.QUIVER_ARROW_SLOT)));
