@@ -124,6 +124,9 @@ class GameDebugEventCatalogTest {
         assertTrue(manager.contains("debugProfiles.selectedFeatureValues("));
         assertTrue(manager.contains("GameDebugRuntimeOverrides.removeValue(key)"));
         assertTrue(lobby.contains("boolean debugFeatureAppliesImmediately(ArcadePortGame game, String key)"));
+        assertTrue(lobby.contains("boolean appliesImmediately)"));
+        assertTrue(lobby.contains("feature.appliesImmediately()"));
+        assertTrue(lobby.contains("debugFeatureAppliesImmediately(game, feature.key())"));
         assertTrue(profiles.contains("Map<String, Boolean> selectedFeatureValues("));
         assertTrue(profiles.contains("Set<String> featureKeys("));
         assertTrue(overrides.contains("public static void removeValue(String key)"));

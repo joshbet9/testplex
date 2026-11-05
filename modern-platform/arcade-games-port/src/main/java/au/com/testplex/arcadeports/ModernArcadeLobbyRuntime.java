@@ -107,7 +107,12 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private enum TestBotMenuPage { SETUP, LOADOUT, KITS, COSMETICS }
     private record TestBotCosmetic(String lineId, String lineTitle, String optionId,
             String optionName, String icon) {}
-    private record DebugFeature(String key, String title, Material icon, String description, boolean defaultValue) {}
+    private record DebugFeature(String key, String title, Material icon, String description, boolean defaultValue,
+            boolean appliesImmediately) {
+        private DebugFeature(String key, String title, Material icon, String description, boolean defaultValue) {
+            this(key, title, icon, description, defaultValue, false);
+        }
+    }
     private record DebugPrompt(ArcadePortGame game, String operation) {}
     private BukkitTask task;
 
@@ -1146,7 +1151,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     feature.key(), feature.defaultValue());
             inventory.setItem(slot++, testBotButton(enabled ? Material.LIME_DYE : feature.icon(),
                     feature.title() + ": " + (enabled ? ChatColor.GREEN + "On" : ChatColor.RED + "Off"),
-                    feature.description() + " " + (debugFeatureAppliesImmediately(game, feature.key())
+                    feature.description() + " " + (feature.appliesImmediately()
                             ? "Applies immediately." : "Applies when the next round starts."),
                     "debug-toggle:" + feature.key()));
         }
@@ -1498,7 +1503,11 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                         "Enable Maverick's mode-specific passive for authorised testers.", true));
             }
         }
-        return List.copyOf(features.values());
+        return features.values().stream()
+                .map(feature -> new DebugFeature(feature.key(), feature.title(), feature.icon(),
+                        feature.description(), feature.defaultValue(),
+                        debugFeatureAppliesImmediately(game, feature.key())))
+                .toList();
     }
 
     private String humanizeDebugKey(String key) {
