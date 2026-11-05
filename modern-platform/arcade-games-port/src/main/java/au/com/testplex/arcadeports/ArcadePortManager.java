@@ -183,9 +183,6 @@ public final class ArcadePortManager implements Listener {
             Material.YELLOW_WOOL, Material.LIME_WOOL, Material.PINK_WOOL, Material.GRAY_WOOL,
             Material.LIGHT_GRAY_WOOL, Material.CYAN_WOOL, Material.PURPLE_WOOL, Material.BLUE_WOOL,
             Material.BROWN_WOOL, Material.GREEN_WOOL, Material.RED_WOOL, Material.BLACK_WOOL);
-    private static final long MASTER_BUILDERS_TOTAL_MILLIS = 300_000L;
-    private static final long MASTER_BUILDERS_VOTE_MILLIS = 8_000L;
-    private static final long MASTER_BUILDERS_REVIEW_MILLIS = 8_000L;
     private static final List<String> DRAW_MY_THING_WORDS = List.of(
             "Bird", "Volcano", "Sloth", "Love", "Dance", "Hair",
             "Glasses", "Domino", "Dice", "Computer", "Top Hat", "Beard",
@@ -11875,8 +11872,11 @@ public final class ArcadePortManager implements Listener {
         session.masterBuilderTheme=themes.get(ThreadLocalRandom.current().nextInt(themes.size()));
         session.masterBuilderPhase=MasterBuildersPhase.BUILDING;
         long judgedBuildCount=session.masterBuilderReviewOrder.size();
-        long reviewBudget=judgedBuildCount<=1?0L:judgedBuildCount*MASTER_BUILDERS_REVIEW_MILLIS;
-        long buildMillis=Math.max(30_000L,MASTER_BUILDERS_TOTAL_MILLIS-reviewBudget);
+        long buildMillis = ArcadeProgressRules.masterBuildersBuildMillis(
+                GameDebugRuntimeOverrides.longValue("MASTER_BUILDERS_TOTAL_MILLIS",
+                        ArcadePortRules.MASTER_BUILDERS_TOTAL_MILLIS), judgedBuildCount,
+                GameDebugRuntimeOverrides.longValue("MASTER_BUILDERS_REVIEW_MILLIS",
+                        ArcadePortRules.MASTER_BUILDERS_REVIEW_MILLIS));
         session.masterBuilderBuildEndsAt=now+buildMillis;
         for(Player p:session.players.values())if(p!=null&&p.isOnline()){
             p.getInventory().clear();
@@ -11933,8 +11933,10 @@ public final class ArcadePortManager implements Listener {
             Player target=session.players.get(targetId);
             if(target==null||!target.isOnline()){session.masterBuilderReviewIndex++;continue;}
             session.masterBuilderCurrentTarget=targetId;
-            session.masterBuilderReviewEndsAt=now+MASTER_BUILDERS_REVIEW_MILLIS;
-            session.masterBuilderVoteEndsAt=now+MASTER_BUILDERS_VOTE_MILLIS;
+            session.masterBuilderReviewEndsAt = now + GameDebugRuntimeOverrides.longValue(
+                    "MASTER_BUILDERS_REVIEW_MILLIS", ArcadePortRules.MASTER_BUILDERS_REVIEW_MILLIS);
+            session.masterBuilderVoteEndsAt = now + GameDebugRuntimeOverrides.longValue(
+                    "MASTER_BUILDERS_VOTE_MILLIS", ArcadePortRules.MASTER_BUILDERS_VOTE_MILLIS);
             session.masterBuilderLastReviewSecond=-1;
             Location centre=masterBuilderPlotCenter(session.world,session.masterBuilderPlots.getOrDefault(targetId,0));
             Material[] ratings={Material.RED_CONCRETE,Material.ORANGE_CONCRETE,Material.YELLOW_CONCRETE,

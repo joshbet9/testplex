@@ -32,6 +32,11 @@ public final class ArcadeProgressRules {
         return (int) Math.round((voteSum - originalVote + 1.0D) / voteCount * 100.0D);
     }
 
+    public static long masterBuildersBuildMillis(long totalMillis, int judgedBuildCount, long reviewMillis) {
+        long reviewBudget = judgedBuildCount <= 1 ? 0L : judgedBuildCount * Math.max(0L, reviewMillis);
+        return Math.max(30_000L, Math.max(0L, totalMillis) - reviewBudget);
+    }
+
     public static boolean shouldAwardMasterBuildersGreaterGood(int ownScore, int hypotheticalWinnerScore,
             int highestOtherScore) {
         return ownScore > hypotheticalWinnerScore && ownScore > highestOtherScore;

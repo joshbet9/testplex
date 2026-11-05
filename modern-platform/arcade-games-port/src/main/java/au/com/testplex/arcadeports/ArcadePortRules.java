@@ -41,6 +41,9 @@ public final class ArcadePortRules {
     public static final long DRAW_MY_THING_INTERMISSION_MILLIS = 0L;
     public static final int DRAW_MY_THING_FULL_ROUND_PLAYER_LIMIT = 8;
     public static final int MASTER_BUILDERS_MAX_BUILDERS = 16;
+    public static final long MASTER_BUILDERS_TOTAL_MILLIS = 300_000L;
+    public static final long MASTER_BUILDERS_VOTE_MILLIS = 8_000L;
+    public static final long MASTER_BUILDERS_REVIEW_MILLIS = 8_000L;
 
     /**
      * Divides the five-minute-twenty-second match timer across each participant's

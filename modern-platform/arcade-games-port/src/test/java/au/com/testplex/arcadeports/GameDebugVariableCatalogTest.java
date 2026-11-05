@@ -52,6 +52,9 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAGONS), "DRAGONS_TURN_RATE");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNAKE), "SNAKE_HAZARD_STEERING_SPEED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.ONE_IN_THE_QUIVER), "QUIVER_LEAPER_DOUBLE_JUMP_ENABLED");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MASTER_BUILDERS), "MASTER_BUILDERS_TOTAL_MILLIS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MASTER_BUILDERS), "MASTER_BUILDERS_VOTE_MILLIS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MASTER_BUILDERS), "MASTER_BUILDERS_REVIEW_MILLIS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SPLEEF), "SPLEEF_HUNGER_DRAIN_ENABLED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MILK_THE_COW), "MILK_THE_COW_SCORE_TO_WIN");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SPEED_BUILDERS), "SPEED_BUILDERS_DEFAULT_VIEW_SECONDS");
@@ -345,6 +348,24 @@ class GameDebugVariableCatalogTest {
                 "SPEED_BUILDERS_MAX_BUILD_SECONDS", 12));
 
         assertEquals(12, SpeedBuildersRules.buildSeconds(40, 0, 0, 1.0D, null));
+    }
+
+    @Test
+    void masterBuildersDebugProfileChangesBuildAndVoteTimers() {
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "MASTER_BUILDERS_TOTAL_MILLIS", 180_000L,
+                "MASTER_BUILDERS_REVIEW_MILLIS", 2_000L,
+                "MASTER_BUILDERS_VOTE_MILLIS", 1_200L));
+
+        long buildMillis = ArcadeProgressRules.masterBuildersBuildMillis(
+                GameDebugRuntimeOverrides.longValue("MASTER_BUILDERS_TOTAL_MILLIS",
+                        ArcadePortRules.MASTER_BUILDERS_TOTAL_MILLIS), 6,
+                GameDebugRuntimeOverrides.longValue("MASTER_BUILDERS_REVIEW_MILLIS",
+                        ArcadePortRules.MASTER_BUILDERS_REVIEW_MILLIS));
+
+        assertEquals(170_000L, buildMillis);
+        assertEquals(1_200L, GameDebugRuntimeOverrides.longValue("MASTER_BUILDERS_VOTE_MILLIS",
+                ArcadePortRules.MASTER_BUILDERS_VOTE_MILLIS));
     }
 
     @Test
