@@ -689,6 +689,10 @@ class GameDebugEventCatalogTest {
         }
         String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
         String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        assertTrue(lobby.contains("features.put(\"build-editing\""));
+        assertTrue(lobby.contains("features.put(\"combat-damage\""));
+        assertTrue(manager.contains("ArcadePortGame.TURF_WARS, \"build-editing\", true"));
+        assertTrue(manager.contains("ArcadePortGame.TURF_WARS, \"combat-damage\", true"));
         assertTrue(lobby.contains("List.of(\"infiltrator\", \"shredder\", \"fortifier\")"));
         assertTrue(manager.contains("debugKitFeatureEnabled(player, ArcadePortGame.TURF_WARS, \"infiltrator\")"));
         assertTrue(manager.contains("debugKitFeatureEnabled(player, ArcadePortGame.TURF_WARS, \"shredder\")"));

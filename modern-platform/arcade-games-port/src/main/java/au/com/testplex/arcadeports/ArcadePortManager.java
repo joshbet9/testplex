@@ -18767,6 +18767,11 @@ public final class ArcadePortManager implements Listener {
                 || session.type == ArcadePortGame.MICRO_BATTLES || session.type == ArcadePortGame.SHEEP_QUEST)
                 && session.teams.getOrDefault(attacker.getUniqueId(), -1).equals(session.teams.getOrDefault(target.getUniqueId(), -2))) return;
         if (session.type == ArcadePortGame.PAINTBALL && "melee".equals(source)) return;
+        if (session.type == ArcadePortGame.TURF_WARS
+                && ((plugin.hasAdminAccess(attacker) && !debugFeatureEnabled(attacker.getUniqueId(),
+                        ArcadePortGame.TURF_WARS, "combat-damage", true))
+                    || (plugin.hasAdminAccess(target) && !debugFeatureEnabled(target.getUniqueId(),
+                        ArcadePortGame.TURF_WARS, "combat-damage", true)))) return;
         if (session.type == ArcadePortGame.TURF_WARS && !session.turfCombat) return;
         if (session.type == ArcadePortGame.DRAGONS) return; // PvP is disabled; use Pyro against dragons.
         if (session.type == ArcadePortGame.SPLEEF) {
@@ -26987,6 +26992,14 @@ public final class ArcadePortManager implements Listener {
             event.setCancelled(true);
             return;
         }
+        if (session.type == ArcadePortGame.TURF_WARS
+                && session.alive.contains(event.getPlayer().getUniqueId())
+                && plugin.hasAdminAccess(event.getPlayer())
+                && !debugFeatureEnabled(event.getPlayer().getUniqueId(), ArcadePortGame.TURF_WARS,
+                        "build-editing", true)) {
+            event.setCancelled(true);
+            return;
+        }
         if (session.type == ArcadePortGame.MICRO_BATTLES
                 && session.alive.contains(event.getPlayer().getUniqueId())) {
             if (session.microBarrierBlocks.contains(event.getBlock())) {
@@ -27180,6 +27193,12 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.TURF_WARS) {
             Player player = event.getPlayer();
+            if (session.alive.contains(player.getUniqueId()) && plugin.hasAdminAccess(player)
+                    && !debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.TURF_WARS,
+                            "build-editing", true)) {
+                event.setCancelled(true);
+                return;
+            }
             int team = session.teams.getOrDefault(player.getUniqueId(), -1);
             Material ownWool = team == 0 ? Material.RED_WOOL : Material.LIGHT_BLUE_WOOL;
             Material ownTurf = team == 0 ? Material.RED_TERRACOTTA : Material.LIGHT_BLUE_TERRACOTTA;

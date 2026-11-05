@@ -1379,6 +1379,10 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             }
         }
         if (game == ArcadePortGame.TURF_WARS) {
+            features.put("build-editing", new DebugFeature("build-editing", "Turf Wars building", Material.RED_WOOL,
+                    "Allow this tester to place and break Turf Wars blocks during the normal build phase.", true));
+            features.put("combat-damage", new DebugFeature("combat-damage", "Turf Wars combat damage", Material.BOW,
+                    "Allow this tester to deal and receive Turf Wars damage.", true));
             for (String kit : List.of("infiltrator", "shredder", "fortifier")) {
                 String key = "ability-" + kit;
                 features.put(key, new DebugFeature(key, "Kit feature: " + humanizeDebugKey(kit),
