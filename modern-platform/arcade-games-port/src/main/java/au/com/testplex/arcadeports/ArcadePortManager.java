@@ -933,6 +933,14 @@ public final class ArcadePortManager implements Listener {
             tester.getInventory().setItem(arrowSlot, allowQuiverGlassBreaks(arrow));
             triggered = true;
         }
+        if (type == ArcadePortGame.SPLEEF && "restore-hunger".equals(eventId)
+                && active != null && active.type == ArcadePortGame.SPLEEF
+                && active.alive.contains(tester.getUniqueId())) {
+            GameDebugRuntimeOverrides.markDebugSession();
+            tester.setFoodLevel(20);
+            tester.setSaturation(20.0F);
+            triggered = true;
+        }
         if (type == ArcadePortGame.PAINTBALL && "restore-armour".equals(eventId)) {
             GameDebugRuntimeOverrides.markDebugSession();
             session.paintPiecesRemaining.put(tester.getUniqueId(), 4);
@@ -22528,7 +22536,12 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void updateSpleef(Session session, long now) {
-        if (now - session.lastSpleefHungerAt >= GameDebugRuntimeOverrides.longValue("SPLEEF_HUNGER_DRAIN_INTERVAL_MILLIS", ArcadePortRules.SPLEEF_HUNGER_DRAIN_INTERVAL_MILLIS)) {
+        boolean hungerDrainEnabled = GameDebugRuntimeOverrides.booleanValue("SPLEEF_HUNGER_DRAIN_ENABLED",
+                ArcadePortRules.SPLEEF_HUNGER_DRAIN_ENABLED);
+        if (!hungerDrainEnabled) {
+            session.lastSpleefHungerAt = now;
+        } else if (now - session.lastSpleefHungerAt >= GameDebugRuntimeOverrides.longValue(
+                "SPLEEF_HUNGER_DRAIN_INTERVAL_MILLIS", ArcadePortRules.SPLEEF_HUNGER_DRAIN_INTERVAL_MILLIS)) {
             session.lastSpleefHungerAt = now;
             for (Player player : new ArrayList<>(alivePlayers(session))) {
                 if (player.getFoodLevel() > 0) {

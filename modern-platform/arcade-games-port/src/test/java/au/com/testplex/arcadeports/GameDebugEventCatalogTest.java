@@ -22,8 +22,10 @@ class GameDebugEventCatalogTest {
                 .getFirst().id());
         assertEquals("promote-self", GameDebugEventCatalog.events(ArcadePortGame.DEATH_TAG)
                 .getFirst().id());
-        assertEquals("refresh-kit", GameDebugEventCatalog.events(ArcadePortGame.SPLEEF)
-                .getFirst().id());
+        assertTrue(GameDebugEventCatalog.events(ArcadePortGame.SPLEEF).stream()
+                .anyMatch(event -> event.id().equals("refresh-kit")));
+        assertTrue(GameDebugEventCatalog.events(ArcadePortGame.SPLEEF).stream()
+                .anyMatch(event -> event.id().equals("restore-hunger")));
         assertEquals("grant-spells", GameDebugEventCatalog.events(ArcadePortGame.WIZARDS)
                 .getFirst().id());
         assertFalse(GameDebugEventCatalog.events(ArcadePortGame.BACON_BRAWL).stream()

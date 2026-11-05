@@ -1191,6 +1191,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         return "all-kits".equals(key) || "invulnerable".equals(key) || "no-fall-damage".equals(key)
                 || "no-hunger-loss".equals(key) || "unlimited-abilities".equals(key)
                 || "unlimited-specials".equals(key)
+                || "QUIVER_LEAPER_DOUBLE_JUMP_ENABLED".equals(key)
+                || "SPLEEF_HUNGER_DRAIN_ENABLED".equals(key)
                 || "BOMB_LOBBERS_POWERUP_SPAWNING_ENABLED".equals(key)
                 || "achievement-preview-only".equals(key);
     }

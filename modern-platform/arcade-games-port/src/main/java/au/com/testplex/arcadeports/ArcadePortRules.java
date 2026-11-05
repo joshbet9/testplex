@@ -557,6 +557,7 @@ public final class ArcadePortRules {
     public static final double BOMB_LOBBERS_EXPLOSION_RADIUS = BOMB_LOBBERS_EXPLOSION_SIZE * 2.0D;
     public static final double BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE = 50.0D;
     public static final long SPLEEF_HUNGER_DRAIN_INTERVAL_MILLIS = 4_000L;
+    public static final boolean SPLEEF_HUNGER_DRAIN_ENABLED = true;
     public static final int SPLEEF_HUNGER_DRAIN_PER_INTERVAL = 2;
     public static final long SPLEEF_HUNGER_RESTORE_COOLDOWN_MILLIS = 50L;
     public static final long SPLEEF_ARCHER_ARROW_INTERVAL_MILLIS = 2_000L;
