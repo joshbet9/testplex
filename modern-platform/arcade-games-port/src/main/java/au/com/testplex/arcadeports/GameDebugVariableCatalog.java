@@ -122,7 +122,12 @@ final class GameDebugVariableCatalog {
                     "MIN_PLAYERS", "MAX_PLAYERS", "WAND_SLOT_COUNT", "ENDGAME_START_MINUTES", "ENDGAME_INITIAL_STRIKE_MILLIS",
                     "ENDGAME_MIN_STRIKE_MILLIS", "ENDGAME_STRIKE_REDUCTION_PER_TICK_MILLIS").contains(name);
         }
-        if (game == ArcadePortGame.WITHER_ASSAULT) return Set.of("MINIONS_PER_WAVE").contains(name);
+        if (game == ArcadePortGame.WITHER_ASSAULT) return Set.of("MINIONS_PER_WAVE",
+                "MINION_COOLDOWN_MILLIS", "MINION_LIFETIME_MILLIS", "SCENT_COOLDOWN_MILLIS",
+                "LEAP_COOLDOWN_MILLIS", "MEDIC_REFILL_INTERVAL_MILLIS", "FLETCHER_ARROW_REFILL_MILLIS",
+                "SKULL_ATTACK_COOLDOWN_MILLIS", "SMOKE_ARROW_MAX_LIFETIME_TICKS",
+                "SMOKE_ARROW_BLINDNESS_TICKS", "SMOKE_ARROW_BLIND_RADIUS_BLOCKS",
+                "EDITOR_BUILD_DEPTH_BELOW_MARKER").contains(name);
         if (game == ArcadePortGame.HOOPS_REMASTERED) return Set.of("TARGET_SCORE", "REGULATION_MILLIS",
                 "SHOT_CLOCK_MILLIS", "HOPS_COOLDOWN_MILLIS", "OFFENSIVE_REBOUND_SHOT_CLOCK_MILLIS",
                 "THREE_POINT_DISTANCE", "STEAL_RADIUS", "BLOCK_RADIUS", "BLOCK_COOLDOWN_MILLIS",
@@ -209,6 +214,9 @@ final class GameDebugVariableCatalog {
         if (name.equals("SAFE_PAD_CAPTURE_RADIUS_BLOCKS")) return 2.0D;
         if (name.equals("MOB_MOVE_SPEED")) return 2.0D;
         if (name.equals("BUMP_RADIUS_BLOCKS")) return 5.0D;
+        if (name.equals("SMOKE_ARROW_BLIND_RADIUS_BLOCKS")) return 32.0D;
+        if (name.equals("SMOKE_ARROW_MAX_LIFETIME_TICKS")) return 2_400.0D;
+        if (name.equals("EDITOR_BUILD_DEPTH_BELOW_MARKER")) return 32.0D;
         if (name.equals("MONSTER_HEALTH")) return 40.0D;
         if (name.equals("BUMP_DAMAGE")) return 20.0D;
         if (name.equals("BUMP_KNOCKBACK_STRENGTH") || name.equals("BODY_RUSH_STRENGTH")) return 3.0D;

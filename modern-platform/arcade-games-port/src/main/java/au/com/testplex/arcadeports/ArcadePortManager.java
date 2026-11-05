@@ -26579,7 +26579,7 @@ public final class ArcadePortManager implements Listener {
             Entity entity = session.entities.stream().filter(candidate -> candidate.getUniqueId().equals(minionId))
                     .findFirst().orElse(null);
             if (!(entity instanceof Skeleton skeleton) || !skeleton.isValid()
-                    || now - entry.getValue() >= 15_000L || skeleton.getLocation().getY() < 0) {
+                    || now - entry.getValue() >= WitherAssaultRules.minionLifetimeMillis() || skeleton.getLocation().getY() < 0) {
                 session.entities.remove(entity);
                 if (entity != null && entity.isValid()) entity.remove();
                 session.witherMinionCreatedAt.remove(minionId);
@@ -26601,8 +26601,9 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "Wither Minions are recharging.");
             return;
         }
-        session.witherMinionReadyAt.put(owner, now + 10_000L);
-        cooldownProgress.start(player, "Wither Minions", 10_000L);
+        long cooldown = WitherAssaultRules.minionCooldownMillis();
+        session.witherMinionReadyAt.put(owner, now + cooldown);
+        cooldownProgress.start(player, "Wither Minions", cooldown);
         for (int i = 0; i < WitherAssaultRules.minionCount(); i++) {
             Skeleton minion = session.world.spawn(player.getEyeLocation(), Skeleton.class);
             minion.setRemoveWhenFarAway(false);
@@ -26637,8 +26638,9 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "Smell Humans is recharging.");
             return;
         }
-        session.witherScentReadyAt.put(id, now + 30_000L);
-        cooldownProgress.start(player, "Smell Humans", 30_000L);
+        long cooldown = WitherAssaultRules.scentCooldownMillis();
+        session.witherScentReadyAt.put(id, now + cooldown);
+        cooldownProgress.start(player, "Smell Humans", cooldown);
         int revealed = 0;
         for (Player human : alivePlayers(session)) {
             if (session.teams.getOrDefault(human.getUniqueId(), 1) != 0) continue;
@@ -26709,21 +26711,23 @@ public final class ArcadePortManager implements Listener {
                 long readyAt = session.witherLeapReadyAt.getOrDefault(id, 0L);
                 if (now >= readyAt && !human.getAllowFlight()) human.setAllowFlight(true);
             }
-            if ("medic".equals(kit) && now >= session.witherMedicNextRefillAt.getOrDefault(id, now + 45_000L)) {
+            long medicRefill = WitherAssaultRules.medicRefillIntervalMillis();
+            if ("medic".equals(kit) && now >= session.witherMedicNextRefillAt.getOrDefault(id, now + medicRefill)) {
                 if (debugKitFeatureEnabled(human, ArcadePortGame.WITHER_ASSAULT, "medic")
                         && !hasRevivalPotion(human)) {
                     human.getInventory().addItem(revivalPotion());
                     human.playSound(human.getLocation(), Sound.ENTITY_ITEM_PICKUP, 1.0F, 1.0F);
                 }
-                session.witherMedicNextRefillAt.put(id, now + 45_000L);
+                session.witherMedicNextRefillAt.put(id, now + medicRefill);
             }
+            long arrowRefill = WitherAssaultRules.fletcherArrowRefillMillis();
             if (WitherAssaultRules.hasFletcher(kit)
                     && debugKitFeatureEnabled(human, ArcadePortGame.WITHER_ASSAULT, "archer")
-                    && now >= session.witherFletcherNextAt.getOrDefault(id, now + 4_000L)) {
+                    && now >= session.witherFletcherNextAt.getOrDefault(id, now + arrowRefill)) {
                 int arrows = human.getInventory().all(Material.ARROW).values().stream()
                         .mapToInt(ItemStack::getAmount).sum();
                 if (arrows < 4) human.getInventory().addItem(new ItemStack(Material.ARROW, 1));
-                session.witherFletcherNextAt.put(id, now + 4_000L);
+                session.witherFletcherNextAt.put(id, now + arrowRefill);
             }
         }
 
@@ -26756,7 +26760,7 @@ public final class ArcadePortManager implements Listener {
             Entity entity = session.entities.stream().filter(candidate -> candidate.getUniqueId().equals(arrowId))
                     .findFirst().orElse(null);
             if (!(entity instanceof Arrow arrow) || !arrow.isValid() || arrow.isOnGround()
-                    || arrow.getTicksLived() > 120) {
+                    || arrow.getTicksLived() > WitherAssaultRules.smokeArrowMaxLifetimeTicks()) {
                 session.witherBlindArrows.remove(arrowId);
                 session.entities.remove(entity);
                 if (entity != null && entity.isValid()) entity.remove();
@@ -26764,13 +26768,14 @@ public final class ArcadePortManager implements Listener {
             }
             List<Player> closeWithers = withers.stream()
                     .filter(wither -> WitherAssaultRules.shouldSmokeArrowBlindAtDistanceSquared(
-                            wither.getLocation().add(0.0D, 3.0D, 0.0D).distanceSquared(arrow.getLocation()), 6.0D))
+                            wither.getLocation().add(0.0D, 3.0D, 0.0D).distanceSquared(arrow.getLocation()),
+                            WitherAssaultRules.smokeArrowBlindRadiusBlocks()))
                     .toList();
             if (!closeWithers.isEmpty()) {
                 // The source perk checks every living Wither, not just the nearest target.
                 for (Player closeWither : closeWithers) {
                     closeWither.addPotionEffect(new PotionEffect(
-                            PotionEffectType.BLINDNESS, 80, 0, false, false, false));
+                            PotionEffectType.BLINDNESS, WitherAssaultRules.smokeArrowBlindnessTicks(), 0, false, false, false));
                 }
                 arrow.getWorld().spawnParticle(Particle.EXPLOSION, arrow.getLocation(), 1);
                 arrow.remove();
@@ -26808,7 +26813,7 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "Wither Skull is recharging.");
             return;
         }
-        session.witherLastAttackAt.put(id, now + 2_000L);
+        session.witherLastAttackAt.put(id, now + WitherAssaultRules.skullAttackCooldownMillis());
         WitherSkull skull = player.launchProjectile(WitherSkull.class);
         skull.setIsIncendiary(false);
         skull.setYield(0.0F);
@@ -29291,8 +29296,9 @@ public final class ArcadePortManager implements Listener {
             player.sendActionBar(ChatColor.YELLOW + "Double Jump is recharging.");
             return;
         }
-        session.witherLeapReadyAt.put(id, now + 6_000L);
-        cooldownProgress.start(player, "Double Jump", 6_000L);
+        long cooldown = WitherAssaultRules.leapCooldownMillis();
+        session.witherLeapReadyAt.put(id, now + cooldown);
+        cooldownProgress.start(player, "Double Jump", cooldown);
         player.setFlying(false);
         player.setAllowFlight(false);
         String kit = session.witherAssaultKits.getOrDefault(id, "archer");

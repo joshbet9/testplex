@@ -1,12 +1,16 @@
 package au.com.testplex.arcadeports;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 final class WitherAssaultRulesTest {
+    @AfterEach void clearOverrides() { GameDebugRuntimeOverrides.clear(); }
+
     @Test
     void sourceHumanKitsAndTheAchievementKitAreSelectable() {
         assertEquals("archer", WitherAssaultRules.normalizeHumanKit("Archer"));
@@ -82,5 +86,47 @@ final class WitherAssaultRulesTest {
         assertFalse(WitherAssaultRules.shouldTrackSmokeArrow(1, "archer", true, true));
         assertFalse(WitherAssaultRules.shouldTrackSmokeArrow(0, "editor", false, true));
         assertFalse(WitherAssaultRules.shouldTrackSmokeArrow(0, "archer", true, false));
+    }
+
+    @Test
+    void perKitTimersAndSmokeArrowRulesAreProfileBackedAndRestoreDefaults() {
+        assertEquals(10_000L, WitherAssaultRules.minionCooldownMillis());
+        assertEquals(30_000L, WitherAssaultRules.scentCooldownMillis());
+        assertEquals(6_000L, WitherAssaultRules.leapCooldownMillis());
+        assertEquals(45_000L, WitherAssaultRules.medicRefillIntervalMillis());
+        assertEquals(4_000L, WitherAssaultRules.fletcherArrowRefillMillis());
+        assertEquals(2_000L, WitherAssaultRules.skullAttackCooldownMillis());
+        assertEquals(6.0D, WitherAssaultRules.smokeArrowBlindRadiusBlocks());
+        assertTrue(WitherAssaultRules.canEditorModifyBlock(72, 76.0D, false));
+
+        GameDebugRuntimeOverrides.activate(Map.ofEntries(
+                Map.entry("WITHER_ASSAULT_MINION_COOLDOWN_MILLIS", 2_000L),
+                Map.entry("WITHER_ASSAULT_SCENT_COOLDOWN_MILLIS", 5_000L),
+                Map.entry("WITHER_ASSAULT_LEAP_COOLDOWN_MILLIS", 1_000L),
+                Map.entry("WITHER_ASSAULT_MEDIC_REFILL_INTERVAL_MILLIS", 10_000L),
+                Map.entry("WITHER_ASSAULT_FLETCHER_ARROW_REFILL_MILLIS", 500L),
+                Map.entry("WITHER_ASSAULT_SKULL_ATTACK_COOLDOWN_MILLIS", 300L),
+                Map.entry("WITHER_ASSAULT_MINION_LIFETIME_MILLIS", 4_000L),
+                Map.entry("WITHER_ASSAULT_SMOKE_ARROW_MAX_LIFETIME_TICKS", 40),
+                Map.entry("WITHER_ASSAULT_SMOKE_ARROW_BLINDNESS_TICKS", 20),
+                Map.entry("WITHER_ASSAULT_SMOKE_ARROW_BLIND_RADIUS_BLOCKS", 10.0D),
+                Map.entry("WITHER_ASSAULT_EDITOR_BUILD_DEPTH_BELOW_MARKER", 8)));
+        assertEquals(2_000L, WitherAssaultRules.minionCooldownMillis());
+        assertEquals(5_000L, WitherAssaultRules.scentCooldownMillis());
+        assertEquals(1_000L, WitherAssaultRules.leapCooldownMillis());
+        assertEquals(10_000L, WitherAssaultRules.medicRefillIntervalMillis());
+        assertEquals(500L, WitherAssaultRules.fletcherArrowRefillMillis());
+        assertEquals(300L, WitherAssaultRules.skullAttackCooldownMillis());
+        assertEquals(4_000L, WitherAssaultRules.minionLifetimeMillis());
+        assertEquals(40, WitherAssaultRules.smokeArrowMaxLifetimeTicks());
+        assertEquals(20, WitherAssaultRules.smokeArrowBlindnessTicks());
+        assertTrue(WitherAssaultRules.shouldSmokeArrowBlindAtDistanceSquared(81.0D,
+                WitherAssaultRules.smokeArrowBlindRadiusBlocks()));
+        assertFalse(WitherAssaultRules.canEditorModifyBlock(67, 76.0D, false));
+
+        GameDebugRuntimeOverrides.clear();
+        assertEquals(10_000L, WitherAssaultRules.minionCooldownMillis());
+        assertEquals(6.0D, WitherAssaultRules.smokeArrowBlindRadiusBlocks());
+        assertTrue(WitherAssaultRules.canEditorModifyBlock(72, 76.0D, false));
     }
 }
