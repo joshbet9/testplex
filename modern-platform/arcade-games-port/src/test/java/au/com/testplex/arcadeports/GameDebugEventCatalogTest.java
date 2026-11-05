@@ -116,6 +116,26 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void plexballFeatureSwitchesGateLiveTesterActionsAndApplyImmediately() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        String game = Files.readString(sourceRoot.resolve("PlexballGame.java"));
+        for (String key : List.of("batting", "catching", "kit-abilities")) {
+            assertTrue(lobby.contains("features.put(\"" + key + "\""), key + " is configurable");
+            assertTrue(game.contains("debugFeatureEnabled(player, \"" + key + "\")"),
+                    key + " gates the active gameplay action");
+            assertTrue(lobby.contains("Set.of(\"batting\", \"catching\", \"kit-abilities\").contains(key)"),
+                    key + " is marked for immediate application");
+        }
+        assertTrue(game.contains("!plugin.hasAdminAccess(player)) return true"),
+                "non-authorised players retain normal Plexball rules");
+    }
+
+    @Test
     void sheepQuestSpawnEventUsesNormalConfiguredMapSpawnPath() throws IOException {
         Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "ArcadePortManager.java");

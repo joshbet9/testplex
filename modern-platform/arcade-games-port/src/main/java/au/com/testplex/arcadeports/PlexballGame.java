@@ -301,6 +301,13 @@ public final class PlexballGame implements Listener {
         return true;
     }
 
+    private boolean debugFeatureEnabled(Player player, String feature) {
+        if (player == null || !plugin.hasAdminAccess(player)) return true;
+        ArcadePortManager manager = plugin.getArcadePortManager();
+        return manager == null || manager.debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.PLEXBALL,
+                feature, true);
+    }
+
     /** Open the local Plexball career page used by /stats plexball. */
     public void openStats(Player player) {
         if (player == null || !player.isOnline()) return;
@@ -1429,6 +1436,10 @@ public final class PlexballGame implements Listener {
             player.sendMessage(ChatColor.RED + "You're not the batter.");
             return;
         }
+        if (!debugFeatureEnabled(player, "batting")) {
+            player.sendActionBar(Component.text("Batting is disabled in your debug profile."));
+            return;
+        }
         swing(player);
     }
 
@@ -1544,6 +1555,10 @@ public final class PlexballGame implements Listener {
 
     private void startCatch(Player player) {
         UUID id = player.getUniqueId();
+        if (!debugFeatureEnabled(player, "catching")) {
+            player.sendActionBar(Component.text("Catching is disabled in your debug profile."));
+            return;
+        }
         if (!catchUsedThisBall.add(id)) {
             player.sendActionBar(Component.text("You have already used your catch attempt on this ball."));
             return;
@@ -1561,6 +1576,10 @@ public final class PlexballGame implements Listener {
 
     private void useAbility(Player player) {
         UUID id = player.getUniqueId();
+        if (!debugFeatureEnabled(player, "kit-abilities")) {
+            player.sendActionBar(Component.text("Kit abilities are disabled in your debug profile."));
+            return;
+        }
         if (!abilityUsedThisBall.add(id)) {
             player.sendActionBar(Component.text("Your kit ability is already used for this ball."));
             return;

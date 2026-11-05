@@ -1410,6 +1410,14 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             features.put("chest-looting", new DebugFeature("chest-looting", "Chest looting", Material.CHEST,
                     "Allow this tester to collect spellbooks, wands and mana from arena chests.", true));
         }
+        if (game == ArcadePortGame.PLEXBALL) {
+            features.put("batting", new DebugFeature("batting", "Batter swings", Material.STICK,
+                    "Allow this tester to swing at the tee ball during their batting turn.", true));
+            features.put("catching", new DebugFeature("catching", "Fielder catches", Material.LEATHER_CHESTPLATE,
+                    "Allow this tester to start their normal catch window during ball flight.", true));
+            features.put("kit-abilities", new DebugFeature("kit-abilities", "Kit abilities", Material.FIREWORK_STAR,
+                    "Allow this tester to use their selected Plexball kit ability.", true));
+        }
         if (game == ArcadePortGame.MICRO_BATTLES) {
             for (String kit : List.of("archer", "fighter", "dasher")) {
                 String key = "ability-" + kit;
@@ -1528,6 +1536,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.SKY_WARS && key.startsWith("ability-"))
                 || (game == ArcadePortGame.SKY_WARS && Set.of("chest-looting", "island-crumbling", "tnt-generator").contains(key))
                 || (game == ArcadePortGame.WIZARDS && Set.of("spell-casting", "chest-looting").contains(key))
+                || (game == ArcadePortGame.PLEXBALL && Set.of("batting", "catching", "kit-abilities").contains(key))
                 || (game == ArcadePortGame.SNAKE
                         && (key.startsWith("ability-") || "tail-collisions".equals(key)
                                 || "self-collisions".equals(key) || "opponent-collisions".equals(key)
