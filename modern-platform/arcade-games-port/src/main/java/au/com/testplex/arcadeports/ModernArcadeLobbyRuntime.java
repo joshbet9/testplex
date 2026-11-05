@@ -1318,6 +1318,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         if (game == ArcadePortGame.DRAGON_ESCAPE) {
             features.put("finish-detection", new DebugFeature("finish-detection", "Course finish detection",
                     Material.DRAGON_EGG, "Allow this tester to finish by reaching the map's authored beacon.", true));
+            features.put("dragon-movement", new DebugFeature("dragon-movement", "Douglas movement", Material.DRAGON_HEAD,
+                    "Move Douglas and destroy course blocks using the normal chase rules; racer finish checks continue.", true));
             for (String kit : List.of("jumper", "warper", "digger", "disruptor")) {
                 String key = "ability-" + kit;
                 features.put(key, new DebugFeature(key, "Ability: " + humanizeDebugKey(kit),
@@ -1506,6 +1508,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                         && ("shooting".equals(key) || "scoring".equals(key) || "steals".equals(key)))
                 || (game == ArcadePortGame.GLADIATORS && "combat-damage".equals(key))
                 || (game == ArcadePortGame.DRAGON_ESCAPE && "finish-detection".equals(key))
+                || (game == ArcadePortGame.DRAGON_ESCAPE && "dragon-movement".equals(key))
                 || (game == ArcadePortGame.DRAGON_ESCAPE && key.startsWith("ability-"))
                 || (game == ArcadePortGame.RUNNER && "runner-trail".equals(key))
                 || (game == ArcadePortGame.DRAGONS && key.startsWith("ability-"))

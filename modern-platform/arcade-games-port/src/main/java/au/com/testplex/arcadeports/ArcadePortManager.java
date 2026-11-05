@@ -15340,21 +15340,24 @@ public final class ArcadePortManager implements Listener {
             if (active != session) return;
         }
         Location location = dragon.getLocation();
+        boolean dragonMovementEnabled = debugFeatureEnabledForActiveSession(
+                ArcadePortGame.DRAGON_ESCAPE, "dragon-movement");
         if (!session.dragonEscapeWaypoints.isEmpty()) {
-            int dragonCandidate = getDragonEscapeWaypointIndex(
-                    session, location, session.dragonEscapeDragonProgress);
+            int dragonCandidate = dragonMovementEnabled ? getDragonEscapeWaypointIndex(
+                    session, location, session.dragonEscapeDragonProgress) : session.dragonEscapeDragonProgress;
             int dragonIndex = ArcadePortRules.monotonicDragonEscapeProgress(
                     session.dragonEscapeDragonProgress, dragonCandidate, session.dragonEscapeWaypoints.size());
             session.dragonEscapeDragonProgress = dragonIndex;
             Location target = session.dragonEscapeWaypoints.get(
                     Math.min(session.dragonEscapeWaypoints.size() - 1, dragonIndex + 1));
-            location = moveDragonEscapeDragon(session, target);
+            if (dragonMovementEnabled) location = moveDragonEscapeDragon(session, target);
 
             // Reborn destroys a radius-10 sphere as the dragon moves. Do not scan the same area
             // every tick: update the sphere after the dragon has moved at least half a block.
             Location lastDestruction = session.dragonEscapeLastDestructionLocation;
             double movedSquared = lastDestruction == null ? 0.0D : location.distanceSquared(lastDestruction);
-            if (ArcadePortRules.shouldProcessDragonEscapeDestruction(movedSquared, lastDestruction != null)) {
+            if (dragonMovementEnabled
+                    && ArcadePortRules.shouldProcessDragonEscapeDestruction(movedSquared, lastDestruction != null)) {
                 // Reborn tests each block centre against the dragon's actual position.
                 // Search one extra block in each axis because the centre can still be
                 // inside the radius when its integer block offset is radius + 1.
@@ -15411,21 +15414,23 @@ public final class ArcadePortManager implements Listener {
         // Generated fallback course for maps with no authored waypoint markers.
         // Douglas has AI disabled and is normally advanced with direct position
         // updates, so velocity alone cannot move him on Paper.
-        if (location.getZ() < 80.0D) {
+        if (dragonMovementEnabled && location.getZ() < 80.0D) {
             location = moveDragonEscapeDragon(session,
                     new Location(session.world, 0.5D, 65.5D, 80.0D));
         } else dragon.setVelocity(new Vector());
-        int minZ = Math.max(-24, (int) Math.floor(location.getZ() - GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_BLOCK_RADIUS", ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS)));
-        int maxZ = Math.min(80, (int) Math.floor(location.getZ() + GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_BLOCK_RADIUS", ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS)));
-        double radius = GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_BLOCK_RADIUS", ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS);
-        for (int x = -3; x <= 3; x++) {
-            for (int z = minZ; z <= maxZ; z++) {
-                Block block = session.world.getBlockAt(x, 63, z);
-                if (block.getType().isAir()) continue;
-                double dx = x + 0.5D - location.getX();
-                double dy = 63.5D - location.getY();
-                double dz = z + 0.5D - location.getZ();
-                if (dx * dx + dy * dy + dz * dz <= radius * radius) block.setType(Material.AIR, false);
+        if (dragonMovementEnabled) {
+            int minZ = Math.max(-24, (int) Math.floor(location.getZ() - GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_BLOCK_RADIUS", ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS)));
+            int maxZ = Math.min(80, (int) Math.floor(location.getZ() + GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_BLOCK_RADIUS", ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS)));
+            double radius = GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_BLOCK_RADIUS", ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS);
+            for (int x = -3; x <= 3; x++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    Block block = session.world.getBlockAt(x, 63, z);
+                    if (block.getType().isAir()) continue;
+                    double dx = x + 0.5D - location.getX();
+                    double dy = 63.5D - location.getY();
+                    double dz = z + 0.5D - location.getZ();
+                    if (dx * dx + dy * dy + dz * dz <= radius * radius) block.setType(Material.AIR, false);
+                }
             }
         }
         long now = System.currentTimeMillis();
