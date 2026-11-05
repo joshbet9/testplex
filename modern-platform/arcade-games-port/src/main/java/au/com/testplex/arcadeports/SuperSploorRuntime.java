@@ -365,6 +365,14 @@ public final class SuperSploorRuntime implements Listener {
         for (UUID id : new ArrayList<>(players.keySet())) {
             Player player = players.get(id);
             if (player == null || !player.isOnline()) continue;
+            ArcadePortManager arcade = plugin instanceof ArcadeMechanicsModernPlugin host
+                    ? host.getArcadePortManager() : null;
+            if (arcade != null && arcade.isDebugOverrideEnabled(id, ArcadePortGame.SUPER_SPLOOR,
+                    "unlimited-specials") && !specialChargeSuppressed.contains(id)
+                    && specialCharge.getOrDefault(id, 0.0D) < 100.0D) {
+                specialCharge.put(id, 100.0D);
+                updateInkBar(player, id);
+            }
             if (!respawnAt.containsKey(id) && player.getLocation().getY() <= world.getMinHeight() + 4.0D) {
                 splat(id, player, null);
                 continue;

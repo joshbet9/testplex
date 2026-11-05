@@ -52,12 +52,12 @@ class GameDebugProfilesTest {
         ArcadePortGame game = ArcadePortGame.SUPER_SPLOOR;
         profiles.setVariable(tester, game, "SUPER_SPLOOR_MAX_INK", 250.0D);
         profiles.create(tester, game, "experimental");
-        profiles.setFeature(tester, game, "unlimited-abilities", true);
+        profiles.setFeature(tester, game, "unlimited-specials", true);
 
         profiles.resetSelected(tester, game);
 
         assertNull(profiles.variable(tester, game, "SUPER_SPLOOR_MAX_INK"));
-        assertFalse(profiles.hasFeature(tester, game, "unlimited-abilities"));
+        assertFalse(profiles.hasFeature(tester, game, "unlimited-specials"));
         assertTrue(profiles.profiles(tester, game).contains("experimental"));
         assertFalse(profiles.delete(tester, game, GameDebugProfiles.DEFAULT_PROFILE));
     }

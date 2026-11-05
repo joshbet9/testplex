@@ -774,9 +774,11 @@ public final class ArcadePortManager implements Listener {
     }
 
     boolean toggleDebugOverride(Player player, ArcadePortGame type, String flag, boolean fallback) {
-        if (player == null || type == null || flag == null || flag.isBlank()) return false;
+        if (player == null || !player.isOnline() || !plugin.hasAdminAccess(player)
+                || type == null || flag == null || flag.isBlank()) return false;
         boolean enabled = !debugFeatureEnabled(player.getUniqueId(), type, flag, fallback);
         debugProfiles.setFeature(player.getUniqueId(), type, flag, enabled);
+        if (activeDebugGame() == type) GameDebugRuntimeOverrides.markDebugSession();
         return enabled;
     }
 
@@ -907,6 +909,7 @@ public final class ArcadePortManager implements Listener {
     void resetDebugProfile(UUID tester, ArcadePortGame type) {
         debugProfiles.resetSelected(tester, type);
         if (tester != null && tester.equals(activeDebugProfileOwner) && type == activeDebugProfileGame) {
+            if (activeDebugGame() == type) GameDebugRuntimeOverrides.markDebugSession();
             GameDebugRuntimeOverrides.resetActiveValues();
         }
     }

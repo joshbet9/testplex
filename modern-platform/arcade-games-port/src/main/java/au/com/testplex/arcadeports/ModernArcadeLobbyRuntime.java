@@ -1140,12 +1140,18 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             features.put("unlimited-abilities", new DebugFeature("unlimited-abilities", "Unlimited abilities",
                     Material.FIREWORK_ROCKET, "Use full-charge Bacon Brawl abilities without consuming meter.", false));
         }
+        if (game == ArcadePortGame.SUPER_SPLOOR) {
+            features.put("unlimited-specials", new DebugFeature("unlimited-specials", "Unlimited Specials",
+                    Material.FIREWORK_ROCKET,
+                    "Keep the kit special fully charged, except while its active effect is running.", false));
+        }
         return List.copyOf(features.values());
     }
 
     private boolean debugFeatureAppliesImmediately(String key) {
         return "all-kits".equals(key) || "invulnerable".equals(key) || "no-fall-damage".equals(key)
                 || "no-hunger-loss".equals(key) || "unlimited-abilities".equals(key)
+                || "unlimited-specials".equals(key)
                 || "achievement-preview-only".equals(key);
     }
 
