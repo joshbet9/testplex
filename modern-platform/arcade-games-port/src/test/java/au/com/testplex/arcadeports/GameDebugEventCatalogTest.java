@@ -48,7 +48,7 @@ class GameDebugEventCatalogTest {
                 GameDebugEventCatalog.events(ArcadePortGame.CAMERA_SHY).stream()
                         .map(GameDebugEventCatalog.Event::id).toList());
         assertEquals("reset-own-plot", GameDebugEventCatalog.events(ArcadePortGame.MASTER_BUILDERS).getFirst().id());
-        assertEquals(List.of("refill-arrow", "use-kit-ability", "refresh-kit"),
+        assertEquals(List.of("refill-arrow", "use-kit-ability", "test-bot-kill", "refresh-kit"),
                 GameDebugEventCatalog.events(ArcadePortGame.ONE_IN_THE_QUIVER).stream()
                         .map(GameDebugEventCatalog.Event::id).toList());
         assertEquals(List.of("restore-armour", "fire-shot", "refresh-kit"),
@@ -99,6 +99,24 @@ class GameDebugEventCatalogTest {
                 "the event must execute the same cooldown and knockback path as the live ability");
         assertTrue(manager.contains("isDebugAbilityAllowed(tester, ArcadePortGame.ONE_IN_THE_QUIVER, \"slam-shot\")"));
         assertTrue(manager.contains("GameDebugRuntimeOverrides.markDebugSession()"));
+    }
+
+    @Test
+    void quiverKillEventOnlyTargetsBotsAndUsesNormalScoreAndRespawnPath() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String eventCatalog = Files.readString(sourceRoot.resolve("GameDebugEventCatalog.java"));
+        assertTrue(eventCatalog.contains("new Event(\"test-bot-kill\", \"Test Kill and Respawn\""));
+        assertTrue(manager.contains("testPlayers.isTestPlayer(candidate)"),
+                "the event must never target a human player");
+        assertTrue(manager.contains("scoreQuiverKill(session, tester, target)"),
+                "the event must use ordinary scoring, killstreak, and respawn behavior");
+        assertTrue(manager.contains("if (target != null)"));
+        assertTrue(manager.contains("scoreQuiverKill(session, tester, target)"));
     }
 
     @Test

@@ -1164,6 +1164,18 @@ public final class ArcadePortManager implements Listener {
                 if (triggered) GameDebugRuntimeOverrides.markDebugSession();
             }
         }
+        if (type == ArcadePortGame.ONE_IN_THE_QUIVER && "test-bot-kill".equals(eventId)) {
+            Player target = alivePlayers(session).stream()
+                    .filter(candidate -> !candidate.equals(tester) && testPlayers.isTestPlayer(candidate))
+                    .min(java.util.Comparator.comparingDouble(candidate ->
+                            candidate.getLocation().distanceSquared(tester.getLocation())))
+                    .orElse(null);
+            if (target != null) {
+                GameDebugRuntimeOverrides.markDebugSession();
+                scoreQuiverKill(session, tester, target);
+                triggered = true;
+            }
+        }
         if (type == ArcadePortGame.SPLEEF && "restore-hunger".equals(eventId)
                 && active != null && active.type == ArcadePortGame.SPLEEF
                 && active.alive.contains(tester.getUniqueId())) {
