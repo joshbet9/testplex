@@ -22,6 +22,11 @@ class SkyWarsMixedArcadeRulesTest {
         assertEquals(10_000L, SkyWarsMixedArcadeRules.tntGeneratorIntervalMillis());
         assertEquals(4, SkyWarsMixedArcadeRules.tntPerDrop());
 
+        GameDebugRuntimeOverrides.activate(Map.of("SKY_WARS_MAX_PLAYERS", 90,
+                "SKY_WARS_TNT_PER_DROP", 200));
+        assertEquals(16, SkyWarsMixedArcadeRules.maxPlayers());
+        assertEquals(64, SkyWarsMixedArcadeRules.tntPerDrop());
+
         GameDebugRuntimeOverrides.clear();
         assertEquals(16, SkyWarsMixedArcadeRules.maxPlayers());
     }

@@ -17,11 +17,11 @@ public final class SkyWarsMixedArcadeRules {
     public static final double TNT_THROW_STRENGTH = 1.6D;
 
     public static boolean hasRoom(int queuedPlayers) {
-        return queuedPlayers < intRule("SKY_WARS_MAX_PLAYERS", MAX_PLAYERS);
+        return queuedPlayers < maxPlayers();
     }
 
     public static int acceptedPlayers(int requestedPlayers) {
-        return Math.max(0, Math.min(intRule("SKY_WARS_MAX_PLAYERS", MAX_PLAYERS), requestedPlayers));
+        return Math.max(0, Math.min(maxPlayers(), requestedPlayers));
     }
 
     public static long roundEndsAt(long startMillis) {
@@ -40,14 +40,18 @@ public final class SkyWarsMixedArcadeRules {
         return liveStartsAt(startMillis) + tntGeneratorIntervalMillis();
     }
 
-    public static int maxPlayers() { return intRule("SKY_WARS_MAX_PLAYERS", MAX_PLAYERS); }
+    public static int maxPlayers() {
+        return Math.max(1, Math.min(16, intRule("SKY_WARS_MAX_PLAYERS", MAX_PLAYERS)));
+    }
     public static long prepareMillis() { return longRule("SKY_WARS_PREPARE_MILLIS", PREPARE_MILLIS); }
     public static long roundMillis() { return longRule("SKY_WARS_ROUND_MILLIS", ROUND_MILLIS); }
     public static long crumbleDelayMillis() { return longRule("SKY_WARS_CRUMBLE_DELAY_MILLIS", CRUMBLE_DELAY_MILLIS); }
     public static long tntGeneratorIntervalMillis() {
         return longRule("SKY_WARS_TNT_GENERATOR_INTERVAL_MILLIS", TNT_GENERATOR_INTERVAL_MILLIS);
     }
-    public static int tntPerDrop() { return intRule("SKY_WARS_TNT_PER_DROP", TNT_PER_DROP); }
+    public static int tntPerDrop() {
+        return Math.max(1, Math.min(64, intRule("SKY_WARS_TNT_PER_DROP", TNT_PER_DROP)));
+    }
 
     private static int intRule(String key, int fallback) {
         return Math.max(1, GameDebugRuntimeOverrides.intValue(key, fallback));
