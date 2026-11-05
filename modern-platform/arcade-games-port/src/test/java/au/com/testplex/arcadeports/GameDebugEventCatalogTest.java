@@ -208,6 +208,25 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void snakeSeparateStatsStoreRejectsEveryProgressWriteDuringDebugRounds() throws IOException {
+        Path source = Path.of("..", "snake-port", "src", "main", "java", "au", "com", "testplex",
+                "snake", "SnakeStatsStore.java");
+        if (!Files.isRegularFile(source)) {
+            source = Path.of("modern-platform", "snake-port", "src", "main", "java", "au", "com",
+                    "testplex", "snake", "SnakeStatsStore.java");
+        }
+        String store = Files.readString(source);
+        for (String methodName : List.of("recordKill", "recordSlime", "recordTailLength", "awardAchievement",
+                "recordGameEnd", "publishToArcadeStats")) {
+            int start = store.indexOf(" " + methodName + "(");
+            int end = store.indexOf("\n    }", start);
+            assertTrue(start >= 0 && end > start, methodName + " exists");
+            assertTrue(store.substring(start, end).contains("GameDebugRuntimeOverrides.isDebugSession()"),
+                    methodName + " is isolated during debug rounds");
+        }
+    }
+
+    @Test
     void castleAssaultObjectiveEventRequiresVacantObjectiveAndUsesNormalSpawner() throws IOException {
         Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "CastleAssaultHeroesOfGwenRuntime.java");
