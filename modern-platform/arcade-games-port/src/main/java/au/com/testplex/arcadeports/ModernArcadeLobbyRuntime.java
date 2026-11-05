@@ -1239,6 +1239,20 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                         Material.ENDER_PEARL, "Allow this kit's ability for authorised testers.", true));
             }
         }
+        if (game == ArcadePortGame.DRAGONS) {
+            for (String kit : List.of("coward", "frost", "glider", "tamer", "pyrotechnic", "marksman")) {
+                String key = "ability-" + kit;
+                features.put(key, new DebugFeature(key, "Ability: " + humanizeDebugKey(kit),
+                        Material.DRAGON_BREATH, "Allow this kit's ability for authorised testers.", true));
+            }
+        }
+        if (game == ArcadePortGame.ONE_IN_THE_QUIVER) {
+            for (String kit : List.of("brawler", "enchanter", "slam-shot", "ninja")) {
+                String key = "ability-" + kit;
+                features.put(key, new DebugFeature(key, "Ability: " + humanizeDebugKey(kit),
+                        Material.ARROW, "Allow this kit's ability or kill perk for authorised testers.", true));
+            }
+        }
         return List.copyOf(features.values());
     }
 
@@ -1259,6 +1273,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || "unlimited-specials".equals(key)
                 || (game == ArcadePortGame.BACON_BRAWL && key.startsWith("ability-"))
                 || (game == ArcadePortGame.DRAGON_ESCAPE && key.startsWith("ability-"))
+                || (game == ArcadePortGame.DRAGONS && key.startsWith("ability-"))
+                || (game == ArcadePortGame.ONE_IN_THE_QUIVER && key.startsWith("ability-"))
                 || (game == ArcadePortGame.SUPER_SPLOOR && key.startsWith("special-"))
                 || "DRAGONS_SPAWNING_ENABLED".equals(key)
                 || "DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED".equals(key)

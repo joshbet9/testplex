@@ -9485,6 +9485,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void activateQuiverNinjaVanish(Session session, Player player, long now) {
+        if (!isDebugAbilityAllowed(player, ArcadePortGame.ONE_IN_THE_QUIVER, "ninja")) return;
         UUID id = player.getUniqueId();
         if (!"ninja".equals(session.quiverKits.getOrDefault(id, "leaper"))) return;
         session.quiverCloakedUntil.put(id, now + GameDebugRuntimeOverrides.longValue("QUIVER_NINJA_VANISH_MILLIS", ArcadePortRules.QUIVER_NINJA_VANISH_MILLIS));
@@ -9499,6 +9500,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void useDragonsLeap(Session session, Player player, long now) {
+        if (!isDebugAbilityAllowed(player, ArcadePortGame.DRAGONS, "coward")) return;
         UUID id = player.getUniqueId();
         long readyAt = session.dragonLeapReadyAt.getOrDefault(id, 0L);
         if (now < readyAt) return;
@@ -9583,6 +9585,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void activateDragonFrostBridge(Session session, Player player, long now) {
+        if (!isDebugAbilityAllowed(player, ArcadePortGame.DRAGONS, "frost")) return;
         UUID id = player.getUniqueId();
         long readyAt = session.dragonFrostReadyAt.getOrDefault(id, 0L);
         if (now < readyAt) return;
@@ -9618,6 +9621,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void activateDragonGlider(Session session, Player player, long now) {
+        if (!isDebugAbilityAllowed(player, ArcadePortGame.DRAGONS, "glider")) return;
         UUID id = player.getUniqueId();
         long readyAt = session.dragonGliderReadyAt.getOrDefault(id, 0L);
         if (now < readyAt || session.dragonGliderUntil.containsKey(id)) return;
@@ -9649,6 +9653,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void activateDragonTamer(Session session, Player player, long now) {
+        if (!isDebugAbilityAllowed(player, ArcadePortGame.DRAGONS, "tamer")) return;
         UUID playerId = player.getUniqueId();
         if (session.dragonTamerControls.containsKey(playerId)) { player.sendMessage(ChatColor.YELLOW + "You are already controlling a dragon."); return; }
         long readyAt = session.dragonTamerReadyAt.getOrDefault(playerId, 0L);
@@ -9789,6 +9794,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void useQuiverGroundPound(Session session, Player player, long now) {
+        if (!isDebugAbilityAllowed(player, ArcadePortGame.ONE_IN_THE_QUIVER, "slam-shot")) return;
         UUID id = player.getUniqueId();
         long readyAt = session.quiverGroundPoundReadyAt.getOrDefault(id, 0L);
         if (now < readyAt) {
@@ -18853,10 +18859,12 @@ public final class ArcadePortManager implements Listener {
                     "The Perfect Game — achieved a Perfect Run killstreak in a game.");
         }
         if ("brawler".equals(session.quiverKits.getOrDefault(attackerId, "leaper"))) {
-            attacker.setHealth(ArcadePortRules.quiverBrawlerHealthAfterKill(
-                    attacker.getHealth(), attacker.getMaxHealth()));
-            attacker.getWorld().spawnParticle(Particle.HEART,
-                    attacker.getLocation().add(0.0D, 1.0D, 0.0D), 3, 0.25D, 0.25D, 0.25D, 0.0D);
+            if (isDebugAbilityAllowed(attacker, ArcadePortGame.ONE_IN_THE_QUIVER, "brawler")) {
+                attacker.setHealth(ArcadePortRules.quiverBrawlerHealthAfterKill(
+                        attacker.getHealth(), attacker.getMaxHealth()));
+                attacker.getWorld().spawnParticle(Particle.HEART,
+                        attacker.getLocation().add(0.0D, 1.0D, 0.0D), 3, 0.25D, 0.25D, 0.25D, 0.0D);
+            }
         }
 
         int kills = session.scores.merge(attackerId, 1, Integer::sum);
@@ -24024,10 +24032,17 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDragonsMarksmanShoot(EntityShootBowEvent event) {
         if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
+        if (session != null && session.type == ArcadePortGame.DRAGONS
+                && event.getEntity() instanceof Player marksman
+                && "marksman".equals(session.dragonKits.getOrDefault(marksman.getUniqueId(), "coward"))
+                && !isDebugAbilityAllowed(marksman, ArcadePortGame.DRAGONS, "marksman")) {
+            event.setCancelled(true);
+            return;
+        }
         if (session == null || session.type != ArcadePortGame.DRAGONS
                 || !(event.getEntity() instanceof Player player)
                 || !session.alive.contains(player.getUniqueId())
@@ -24207,7 +24222,8 @@ public final class ArcadePortManager implements Listener {
         session.entities.add(arrow);
         session.quiverArrowFlightStyles.put(arrow.getUniqueId(), quiverArrowFlightCosmetic(player.getUniqueId()));
         if (arrow.getVelocity().getY() >= 0.45D) session.quiverHighArcArrows.add(arrow.getUniqueId());
-        if (!"enchanter".equals(session.quiverKits.getOrDefault(player.getUniqueId(), "leaper"))) return;
+        if (!"enchanter".equals(session.quiverKits.getOrDefault(player.getUniqueId(), "leaper"))
+                || !isDebugAbilityAllowed(player, ArcadePortGame.ONE_IN_THE_QUIVER, "enchanter")) return;
         UUID arrowId = arrow.getUniqueId();
         session.quiverArrowBounces.put(arrowId, GameDebugRuntimeOverrides.intValue("QUIVER_MAX_ARROW_BOUNCES", ArcadePortRules.QUIVER_MAX_ARROW_BOUNCES));
         session.quiverArrowIgnoredPlayers.put(arrowId, new HashSet<>(Set.of(player.getUniqueId())));
@@ -25317,6 +25333,7 @@ public final class ArcadePortManager implements Listener {
                     && "Throwing Sparkler".equals(ChatColor.stripColor(heldItem.getItemMeta().getDisplayName()))
                     && (event.getAction().isRightClick() || event.getAction() == Action.LEFT_CLICK_AIR)) {
                 event.setCancelled(true);
+                if (!isDebugAbilityAllowed(player, ArcadePortGame.DRAGONS, "pyrotechnic")) return;
                 consumeHeld(player);
                 Vector direction = player.getLocation().getDirection().normalize();
                 Item sparkler = player.getWorld().dropItem(player.getEyeLocation().add(direction.clone()),

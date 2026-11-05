@@ -355,6 +355,49 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void dragonsAbilitySwitchesReachTheSixKitActivationPaths() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        assertTrue(lobby.contains("List.of(\"coward\", \"frost\", \"glider\", \"tamer\", \"pyrotechnic\", \"marksman\")"));
+        for (String methodName : List.of("useDragonsLeap", "activateDragonFrostBridge", "activateDragonGlider",
+                "activateDragonTamer")) {
+            int method = manager.indexOf("private void " + methodName + "(");
+            int body = manager.indexOf("{", method);
+            assertTrue(method >= 0 && body > method, methodName + " exists");
+            assertTrue(manager.substring(body, body + 220).contains("isDebugAbilityAllowed"),
+                    methodName + " consumes its immediate ability switch");
+        }
+        assertTrue(manager.contains("isDebugAbilityAllowed(player, ArcadePortGame.DRAGONS, \"pyrotechnic\")"));
+        assertTrue(manager.contains("isDebugAbilityAllowed(marksman, ArcadePortGame.DRAGONS, \"marksman\")"));
+        assertTrue(manager.contains("game == ArcadePortGame.DRAGONS && key.startsWith(\"ability-\")"));
+    }
+
+    @Test
+    void quiverKitPerksAreToggleableAndConsumedByTheirRuntimePaths() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        assertTrue(lobby.contains("List.of(\"brawler\", \"enchanter\", \"slam-shot\", \"ninja\")"));
+        assertTrue(lobby.contains("game == ArcadePortGame.ONE_IN_THE_QUIVER && key.startsWith(\"ability-\")"));
+        for (String hook : List.of("ArcadePortGame.ONE_IN_THE_QUIVER, \"slam-shot\"",
+                "ArcadePortGame.ONE_IN_THE_QUIVER, \"enchanter\"",
+                "ArcadePortGame.ONE_IN_THE_QUIVER, \"brawler\"",
+                "ArcadePortGame.ONE_IN_THE_QUIVER, \"ninja\"")) {
+            assertTrue(manager.contains("isDebugAbilityAllowed(") && manager.contains(hook),
+                    hook + " has a runtime consumer");
+        }
+    }
+
+    @Test
     void castleAssaultObjectiveEventRequiresVacantObjectiveAndUsesNormalSpawner() throws IOException {
         Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "CastleAssaultHeroesOfGwenRuntime.java");
