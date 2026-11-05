@@ -6,15 +6,28 @@ import java.util.Map;
 /** Session-scoped overrides for numeric and boolean game rules. */
 public final class GameDebugRuntimeOverrides {
     private static volatile Map<String, Object> values = Map.of();
+    private static volatile boolean debugSession;
 
     private GameDebugRuntimeOverrides() { }
 
     public static void activate(Map<String, Object> overrides) {
         values = overrides == null ? Map.of() : Map.copyOf(new LinkedHashMap<>(overrides));
+        debugSession = !values.isEmpty();
     }
 
     public static void clear() {
         values = Map.of();
+        debugSession = false;
+    }
+
+    /** Clear active rule changes without allowing this test round to persist progression. */
+    public static void resetActiveValues() {
+        values = Map.of();
+        debugSession = true;
+    }
+
+    public static boolean isDebugSession() {
+        return debugSession;
     }
 
     public static int intValue(String key, int fallback) {

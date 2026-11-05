@@ -127,6 +127,19 @@ class GameDebugVariableCatalogTest {
     }
 
     @Test
+    void configuredDebugRoundsSuppressProgressionEvenAfterResetToDefaults() {
+        GameDebugRuntimeOverrides.activate(Map.of("BACON_1_8_HIT_DELAY_MILLIS", 250L));
+        assertTrue(GameDebugRuntimeOverrides.isDebugSession());
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+
+        assertTrue(GameDebugRuntimeOverrides.isDebugSession());
+        assertEquals(400L, GameDebugRuntimeOverrides.longValue("BACON_1_8_HIT_DELAY_MILLIS", 400L));
+        GameDebugRuntimeOverrides.clear();
+        assertFalse(GameDebugRuntimeOverrides.isDebugSession());
+    }
+
+    @Test
     void timingCombatAndAbilityVariablesChangeTheirDeterministicGameRules() {
         GameDebugRuntimeOverrides.activate(Map.ofEntries(
                 Map.entry("CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS", 10_000L),

@@ -52,4 +52,22 @@ class WizardsProgressStoreTest {
         assertEquals(0L, config.getLong(root + "wins"));
         assertEquals(0L, config.getLong(root + "games-played"));
     }
+
+    @Test
+    void debugRoundDoesNotPersistStats() {
+        YamlConfiguration config = new YamlConfiguration();
+        UUID player = UUID.fromString("4c9fb0d2-b947-4fb7-a2fd-41d8c8bb6bc5");
+        try {
+            au.com.testplex.arcadeports.GameDebugRuntimeOverrides.activate(
+                    java.util.Map.of("WIZARDS_ENDGAME_START_MINUTES", 1L));
+            WizardsProgressStore.increment(config, player, "wins", 1L);
+            WizardsProgressStore.increment(config, player, "kills", 5L);
+
+            String root = "local-stats." + player + ".wizards.";
+            assertEquals(0L, config.getLong(root + "wins"));
+            assertEquals(0L, config.getLong(root + "kills"));
+        } finally {
+            au.com.testplex.arcadeports.GameDebugRuntimeOverrides.clear();
+        }
+    }
 }

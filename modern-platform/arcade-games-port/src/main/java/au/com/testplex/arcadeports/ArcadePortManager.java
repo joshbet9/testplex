@@ -847,7 +847,7 @@ public final class ArcadePortManager implements Listener {
     void resetDebugProfile(UUID tester, ArcadePortGame type) {
         debugProfiles.resetSelected(tester, type);
         if (tester != null && tester.equals(activeDebugProfileOwner) && type == activeDebugProfileGame) {
-            GameDebugRuntimeOverrides.activate(Map.of());
+            GameDebugRuntimeOverrides.resetActiveValues();
         }
     }
 
@@ -860,7 +860,10 @@ public final class ArcadePortManager implements Listener {
     private void activateDebugProfile(Player starter, ArcadePortGame type) {
         activeDebugProfileOwner = starter == null ? null : starter.getUniqueId();
         activeDebugProfileGame = type;
-        GameDebugRuntimeOverrides.activate(starter == null ? Map.of() : debugProfiles.values(starter.getUniqueId(), type));
+        Map<String, Object> values = new LinkedHashMap<>(
+                starter == null ? Map.of() : debugProfiles.values(starter.getUniqueId(), type));
+        if (debugProfiles.testBotCount(type, 0) > 0) values.put("__DEBUG_TEST_BOT_ROSTER", true);
+        GameDebugRuntimeOverrides.activate(values);
     }
 
     String configuredTestBotKit(ArcadePortGame type, int botIndex) {
@@ -2195,7 +2198,8 @@ public final class ArcadePortManager implements Listener {
                     while (now - state.lastSecondAt >= 1_000L) {
                         state.lastSecondAt += 1_000L;
                         state.seconds++;
-                        if (state.seconds > 15 && !testPlayers.isTestPlayer(id)) {
+                        if (state.seconds > 15 && !testPlayers.isTestPlayer(id)
+                                && !GameDebugRuntimeOverrides.isDebugSession()) {
                             String statPath = "local-stats." + id + ".turf-wars.behind-enemy-lines";
                             plugin.getConfig().set(statPath, plugin.getConfig().getInt(statPath, 0) + 1);
                         }
@@ -5609,7 +5613,7 @@ public final class ArcadePortManager implements Listener {
 
     private void awardGladiatorsAchievement(Player player, String achievementId, String displayName) {
         if (debugAchievementPreview(player, ArcadePortGame.GLADIATORS, displayName)) return;
-        if (player == null || testPlayers.isTestPlayer(player)) return;
+        if (GameDebugRuntimeOverrides.isDebugSession() || player == null || testPlayers.isTestPlayer(player)) return;
         String path = ArcadePortRules.gladiatorsAchievementConfigKey(player.getUniqueId(), achievementId);
         if (plugin.getConfig().getBoolean(path, false)) return;
         plugin.getConfig().set(path, true);
@@ -5619,7 +5623,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void recordGladiatorsLoserBracketWin(Player player) {
-        if (player == null || testPlayers.isTestPlayer(player)) return;
+        if (GameDebugRuntimeOverrides.isDebugSession() || player == null || testPlayers.isTestPlayer(player)) return;
         String path = ArcadePortRules.gladiatorsMilestoneConfigKey(player.getUniqueId());
         int wins = plugin.getConfig().getInt(path, 0) + 1;
         plugin.getConfig().set(path, wins);
@@ -5656,7 +5660,7 @@ public final class ArcadePortManager implements Listener {
 
     private void incrementGladiatorsLifetimeStat(Player player, String stat, int amount,
             int achievementThreshold, String achievementId) {
-        if (player == null || testPlayers.isTestPlayer(player)) return;
+        if (GameDebugRuntimeOverrides.isDebugSession() || player == null || testPlayers.isTestPlayer(player)) return;
         String path = localStatsPath(player.getUniqueId(), ArcadePortGame.GLADIATORS.id());
         int value = plugin.getConfig().getInt(path + stat, 0) + amount;
         plugin.getConfig().set(path + stat, value);
@@ -8871,7 +8875,7 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         Player player = event.getPlayer();
         UUID id = player.getUniqueId();
-        if (session == null || session.type != ArcadePortGame.SKY_WARS
+        if (GameDebugRuntimeOverrides.isDebugSession() || session == null || session.type != ArcadePortGame.SKY_WARS
                 || !session.alive.contains(id) || !"air".equals(session.skyWarsKits.get(id))) return;
         event.setCancelled(true);
         if (!session.liveStarted || System.currentTimeMillis() < session.skyWarsKitReadyAt.getOrDefault(id, 0L)) {
@@ -8940,6 +8944,7 @@ public final class ArcadePortManager implements Listener {
     public void onSkyWarsThrowableTntPickup(EntityPickupItemEvent event) {
         Session session = active;
         if (session == null || session.type != ArcadePortGame.SKY_WARS
+                || GameDebugRuntimeOverrides.isDebugSession()
                 || !(event.getEntity() instanceof Player player)
                 || !isSkyWarsSkill(event.getItem().getItemStack(), "Left Click - Throw / Right Click - Drop")) return;
         String path = localStatsPath(player.getUniqueId(), ArcadePortGame.SKY_WARS.id());
@@ -8985,7 +8990,7 @@ public final class ArcadePortManager implements Listener {
         ItemStack loot = SkyWarsChestLoot.randomMiddleItem();
         if (loot != null) event.getDrops().add(loot);
         Player killer = event.getEntity().getKiller();
-        if (killer != null) {
+        if (killer != null && !GameDebugRuntimeOverrides.isDebugSession()) {
             String path = localStatsPath(killer.getUniqueId(), ArcadePortGame.SKY_WARS.id());
             plugin.getConfig().set(path + "zombie-kills",
                     plugin.getConfig().getInt(path + "zombie-kills", 0) + 1);
@@ -9448,7 +9453,7 @@ public final class ArcadePortManager implements Listener {
 
     private void awardDragonAchievement(UUID id, Player player, String achievementId, String description) {
         if (debugAchievementPreview(player, ArcadePortGame.DRAGONS, description)) return;
-        if (id == null || testPlayers.isTestPlayer(id)) return;
+        if (GameDebugRuntimeOverrides.isDebugSession() || id == null || testPlayers.isTestPlayer(id)) return;
         String key = "local-achievements." + id + ".dragons." + achievementId;
         if (plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
@@ -11458,11 +11463,11 @@ public final class ArcadePortManager implements Listener {
                             plugin.getConfig().getInt(statPath + "first-guesses", 0) + 1);
                 }
                 long elapsed = System.currentTimeMillis() - session.drawRoundStartedAt;
-                if (elapsed < 8_000L) {
+                if (elapsed < 8_000L && !GameDebugRuntimeOverrides.isDebugSession()) {
                     plugin.getConfig().set(statPath + "pure-luck",
                             plugin.getConfig().getInt(statPath + "pure-luck", 0) + 1);
                 }
-                if (first && elapsed < 15_000L) {
+                if (first && elapsed < 15_000L && !GameDebugRuntimeOverrides.isDebugSession()) {
                     UUID drawerId = session.drawCurrentDrawer;
                     String drawerPath = localStatsPath(drawerId, "draw-my-thing");
                     int fastDraws = plugin.getConfig().getInt(drawerPath + "fast-draw-rounds", 0) + 1;
@@ -16157,7 +16162,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void recordSheepQuestStat(UUID playerId, String stat) {
-        if (playerId == null || testPlayers.isTestPlayer(playerId) || stat == null || stat.isBlank()) return;
+        if (GameDebugRuntimeOverrides.isDebugSession() || playerId == null || testPlayers.isTestPlayer(playerId)
+                || stat == null || stat.isBlank()) return;
         String key = localStatsPath(playerId, "sheep-quest") + stat;
         int value = plugin.getConfig().getInt(key, 0) + 1;
         plugin.getConfig().set(key, value);
@@ -16170,7 +16176,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void recordSheepQuestRewards(Session session, Player winner) {
-        if (session == null || winner == null) return;
+        if (GameDebugRuntimeOverrides.isDebugSession() || session == null || winner == null) return;
         int winnerTeam = session.teams.getOrDefault(winner.getUniqueId(), -1);
         if (winnerTeam < 0) return;
         for (Player player : session.players.values()) {
@@ -17255,6 +17261,7 @@ public final class ArcadePortManager implements Listener {
         if (killer != null && session.scores.containsKey(killer.getUniqueId())) {
             int kills = session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
             if (session.type == ArcadePortGame.MICRO_BATTLES
+                    && !GameDebugRuntimeOverrides.isDebugSession()
                     && "worker".equals(session.microKits.getOrDefault(killer.getUniqueId(), "archer"))
                     && killer.getInventory().getItemInMainHand().getType() == Material.STONE_SHOVEL) {
                 awardCatalogAchievement(killer, "micro-battles", "gravedigger");
@@ -19671,6 +19678,7 @@ public final class ArcadePortManager implements Listener {
                 .filter(achievement -> achievement.id().equals(achievementId))
                 .map(ArcadeProgressCatalog.Achievement::name).findFirst().orElse(achievementId);
         if (debugAchievementPreview(player, game, displayName)) return;
+        if (GameDebugRuntimeOverrides.isDebugSession()) return;
         String key = arcadeAchievementConfigKey(playerId, gameId, achievementId);
         if (key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
@@ -19692,7 +19700,7 @@ public final class ArcadePortManager implements Listener {
 
     private void awardBombLobbersAchievement(Player player, String key, String description) {
         if (debugAchievementPreview(player, ArcadePortGame.BOMB_LOBBERS, description)) return;
-        if (player == null || testPlayers.isTestPlayer(player)
+        if (GameDebugRuntimeOverrides.isDebugSession() || player == null || testPlayers.isTestPlayer(player)
                 || key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
         if (player != null && player.isOnline()) player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + description);
@@ -19701,7 +19709,7 @@ public final class ArcadePortManager implements Listener {
 
     private void awardMicroBattlesAchievement(Player player, String key, String description) {
         if (debugAchievementPreview(player, ArcadePortGame.MICRO_BATTLES, description)) return;
-        if (player == null || testPlayers.isTestPlayer(player)
+        if (GameDebugRuntimeOverrides.isDebugSession() || player == null || testPlayers.isTestPlayer(player)
                 || key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
         if (player != null && player.isOnline()) {
@@ -19716,7 +19724,8 @@ public final class ArcadePortManager implements Listener {
 
     private void awardBaconAchievement(Player player, String key, String description) {
         if (debugAchievementPreview(player, ArcadePortGame.BACON_BRAWL, description)) return;
-        if (player == null || testPlayers.isTestPlayer(player) || plugin.getConfig().getBoolean(key, false)) return;
+        if (GameDebugRuntimeOverrides.isDebugSession() || player == null || testPlayers.isTestPlayer(player)
+                || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
         player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + description);
         plugin.saveConfig();
@@ -19736,6 +19745,12 @@ public final class ArcadePortManager implements Listener {
     public void recordSnakeStats(UUID playerId, boolean won, int kills, boolean knockedOut,
                                  int lifetimeKills, int lifetimeSlimes, int bestTailLength,
                                  Set<String> achievements) {
+        if (GameDebugRuntimeOverrides.isDebugSession()) {
+            if (achievements != null) for (String achievement : achievements) {
+                previewDebugAchievement(playerId, ArcadePortGame.SNAKE, achievement);
+            }
+            return;
+        }
         if (playerId == null || testPlayers.isTestPlayer(playerId)) return;
         String path = localStatsPath(playerId, "snake");
         plugin.getConfig().set(path + "games-played",
@@ -19764,7 +19779,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     public void recordMonsterMazeFirstSafePad(UUID playerId) {
-        if (!ArcadeTestPlayerManager.shouldPersistProgression(playerId, testPlayers.isTestPlayer(playerId))) return;
+        if (GameDebugRuntimeOverrides.isDebugSession()
+                || !ArcadeTestPlayerManager.shouldPersistProgression(playerId, testPlayers.isTestPlayer(playerId))) return;
         String path = localStatsPath(playerId, "monster-maze");
         plugin.getConfig().set(path + "first-safe-pads",
                 plugin.getConfig().getInt(path + "first-safe-pads", 0) + 1);
@@ -19772,7 +19788,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     public void recordMonsterMazeHighestStage(UUID playerId, int stage) {
-        if (!ArcadeTestPlayerManager.shouldPersistProgression(playerId, testPlayers.isTestPlayer(playerId))
+        if (GameDebugRuntimeOverrides.isDebugSession()
+                || !ArcadeTestPlayerManager.shouldPersistProgression(playerId, testPlayers.isTestPlayer(playerId))
                 || stage < 0) return;
         String path = localStatsPath(playerId, "monster-maze");
         plugin.getConfig().set(path + "highest-stage",
@@ -19781,7 +19798,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     public void recordMonsterMazeWin(UUID playerId, int stage) {
-        if (!ArcadeTestPlayerManager.shouldPersistProgression(playerId, testPlayers.isTestPlayer(playerId))) return;
+        if (GameDebugRuntimeOverrides.isDebugSession()
+                || !ArcadeTestPlayerManager.shouldPersistProgression(playerId, testPlayers.isTestPlayer(playerId))) return;
         String path = localStatsPath(playerId, "monster-maze");
         plugin.getConfig().set(path + "wins", plugin.getConfig().getInt(path + "wins", 0) + 1);
         plugin.getConfig().set(path + "highest-stage",
@@ -19802,7 +19820,8 @@ public final class ArcadePortManager implements Listener {
      * Keep the source Death Tag payout schedule in a clearly labelled local test ledger.
      */
     private void awardDeathTagTestGems(Session session, UUID playerId, int amount, String reason) {
-        if (playerId == null || testPlayers.isTestPlayer(playerId) || amount <= 0) return;
+        if (GameDebugRuntimeOverrides.isDebugSession() || playerId == null
+                || testPlayers.isTestPlayer(playerId) || amount <= 0) return;
         String path = localStatsPath(playerId, session.type.id());
         int balance = plugin.getConfig().getInt(path + "test-gems-earned", 0) + amount;
         plugin.getConfig().set(path + "test-gems-earned", balance);
@@ -19817,6 +19836,7 @@ public final class ArcadePortManager implements Listener {
 
     /** Mirror GameTeam.GetPlacements(true): live Runners first, then OUT Runners newest-first. */
     private void recordDeathTagRewards(Session session) {
+        if (GameDebugRuntimeOverrides.isDebugSession()) return;
         if (session.deathTagRewardsAwarded) return;
         session.deathTagRewardsAwarded = true;
 
@@ -20009,7 +20029,7 @@ public final class ArcadePortManager implements Listener {
 
 
     private void recordLocalStats(Session session, Player winner, boolean completed) {
-        if (!completed || session.type == ArcadePortGame.HOOPS_REMASTERED) return;
+        if (GameDebugRuntimeOverrides.isDebugSession() || !completed || session.type == ArcadePortGame.HOOPS_REMASTERED) return;
         if (session.type == ArcadePortGame.DRAGONS && winner != null && !testPlayers.isTestPlayer(winner)) {
             awardDragonEndGems(session, winner);
         }
@@ -24033,7 +24053,7 @@ public final class ArcadePortManager implements Listener {
                 wool.setType(Material.AIR, false);
                 if (turfArrow.getShooter() instanceof Player shooter) {
                     shooter.playSound(shooter.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 0.7F, 1.5F);
-                    if (!testPlayers.isTestPlayer(shooter)) {
+                    if (!testPlayers.isTestPlayer(shooter) && !GameDebugRuntimeOverrides.isDebugSession()) {
                         String base = localStatsPath(shooter.getUniqueId(), "turf-wars");
                         if (woolType == Material.RED_WOOL || woolType == Material.LIGHT_BLUE_WOOL) {
                             plugin.getConfig().set(base + "blocks-broken",
@@ -24914,7 +24934,7 @@ public final class ArcadePortManager implements Listener {
                 session.dragonAbilitiesUsed.add(id);
                 session.dragonSparklerStyles.put(sparkler.getUniqueId(),
                         selectedDragonCosmetic(id, "sparkler-effects", "golden-thread"));
-                if (!testPlayers.isTestPlayer(id)) {
+                if (!testPlayers.isTestPlayer(id) && !GameDebugRuntimeOverrides.isDebugSession()) {
                     String sparklezPath = localStatsPath(id, "dragons") + "sparklez";
                     plugin.getConfig().set(sparklezPath, plugin.getConfig().getInt(sparklezPath, 0) + 1);
                     plugin.saveConfig(); // SparklezStatTracker records each ThrowSparklerEvent immediately.
@@ -26294,7 +26314,8 @@ public final class ArcadePortManager implements Listener {
                         || (team == 1 && broken == Material.LIGHT_BLUE_WOOL)) {
                     event.setDropItems(false);
                     event.setExpToDrop(0);
-                    if (!testPlayers.isTestPlayer(event.getPlayer())) {
+                    if (!testPlayers.isTestPlayer(event.getPlayer())
+                            && !GameDebugRuntimeOverrides.isDebugSession()) {
                         String base = "local-stats." + event.getPlayer().getUniqueId() + ".turf-wars.";
                         plugin.getConfig().set(base + "blocks-broken",
                                 plugin.getConfig().getInt(base + "blocks-broken", 0) + 1);
@@ -26475,7 +26496,7 @@ public final class ArcadePortManager implements Listener {
                 player.sendMessage(ChatColor.YELLOW + "You can only build on your own coloured turf, within five blocks of the clay.");
             } else {
                 event.setCancelled(false);
-                if (!testPlayers.isTestPlayer(player)) {
+                if (!testPlayers.isTestPlayer(player) && !GameDebugRuntimeOverrides.isDebugSession()) {
                     String base = "local-stats." + player.getUniqueId() + ".turf-wars.";
                     plugin.getConfig().set(base + "blocks-placed",
                             plugin.getConfig().getInt(base + "blocks-placed", 0) + 1);

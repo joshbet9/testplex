@@ -1861,6 +1861,7 @@ public final class CameraShyGame implements Listener {
     }
 
     private void recordMatchProgress(UUID winnerId) {
+        if (GameDebugRuntimeOverrides.isDebugSession()) return;
         for (UUID id : humans) {
             String path = "local-stats." + id + ".camera-shy.";
             int matchPhotos = photos.getOrDefault(id, 0);
@@ -1917,6 +1918,7 @@ public final class CameraShyGame implements Listener {
     }
 
     private void award(UUID id, String achievementId) {
+        if (GameDebugRuntimeOverrides.isDebugSession()) return;
         if (id == null || !humans.contains(id)) return;
         String name = CameraShyProgressCatalog.achievements().stream()
                 .filter(achievement -> achievement.id().equals(achievementId))
