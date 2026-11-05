@@ -2252,8 +2252,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             }
             if (event.getAction().isRightClick() && player.getUniqueId().equals(objectiveCarrier)) {
                 event.setCancelled(true);
-                if (debugFeatureEnabled(player, "objective-tnt")) detonateObjectiveTnt(player);
-                else player.sendActionBar(ChatColor.RED + "Objective TNT is disabled in your debug profile.");
+                detonateObjectiveTnt(player);
                 return;
             }
             if (event.getAction().isLeftClick() && event.getItem() != null
@@ -2916,7 +2915,6 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void detonateObjectiveTnt(Player carrier) {
-        if (!debugFeatureEnabled(carrier, "objective-tnt")) return;
         restoreCarrierHelmet(carrier);
         objectiveCarrier = null;
         objectiveCarryStartedAt = 0L;

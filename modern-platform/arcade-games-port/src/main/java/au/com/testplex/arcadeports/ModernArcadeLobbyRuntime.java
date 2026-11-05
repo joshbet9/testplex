@@ -626,14 +626,6 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             if ("frost".equals(value)) return Material.SNOWBALL;
             if ("slime".equals(value)) return Material.SLIME_BALL;
         }
-        if (game == ArcadePortGame.CASTLE_ASSAULT) {
-            features.put("objective-tnt", new DebugFeature("objective-tnt", "Objective TNT", Material.TNT,
-                    "Allow the tester to collect and detonate Objective TNT or spawn it for testing.", true));
-            features.put("crystal-damage", new DebugFeature("crystal-damage", "Sentry crystal damage", Material.END_CRYSTAL,
-                    "Allow the tester's kills and Objective TNT to damage sentry crystals.", true));
-            features.put("king-damage", new DebugFeature("king-damage", "King damage", Material.ZOMBIE_HEAD,
-                    "Allow the tester's attacks and Objective TNT to damage the enemy King.", true));
-        }
         if (value.contains("lantern") || value.contains("soul")) return Material.SOUL_LANTERN;
         if (value.contains("footprint") || value.contains("bark")) return Material.OAK_LEAVES;
         if (value.contains("dragon-eye")) return Material.ENDER_EYE;
@@ -1224,6 +1216,14 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     "Allow Pitcher testers to adjust TNT throw power.", true));
             features.put("block-wall", new DebugFeature("block-wall", "Waller block wall", Material.STONE_BRICKS,
                     "Allow Waller testers to place the normal cooldown wall.", true));
+        }
+        if (game == ArcadePortGame.CASTLE_ASSAULT) {
+            features.put("objective-tnt", new DebugFeature("objective-tnt", "Objective TNT", Material.TNT,
+                    "Allow the tester to collect new Objective TNT or spawn it for testing; carried TNT resolves normally.", true));
+            features.put("crystal-damage", new DebugFeature("crystal-damage", "Sentry crystal damage", Material.END_CRYSTAL,
+                    "Allow the tester's kills and Objective TNT to damage sentry crystals.", true));
+            features.put("king-damage", new DebugFeature("king-damage", "King damage", Material.ZOMBIE_HEAD,
+                    "Allow the tester's attacks and Objective TNT to damage the enemy King.", true));
         }
         features.put("achievement-preview-only", new DebugFeature("achievement-preview-only",
                 "Achievement preview only", Material.KNOWLEDGE_BOOK,
