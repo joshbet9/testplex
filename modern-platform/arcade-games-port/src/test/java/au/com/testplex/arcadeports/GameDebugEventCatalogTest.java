@@ -192,6 +192,25 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void heroesOfGwenDebugEventStartsTheNormalPairedMinionWave() throws IOException {
+        Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "CastleAssaultHeroesOfGwenRuntime.java");
+        if (!Files.isRegularFile(runtimePath)) {
+            runtimePath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "CastleAssaultHeroesOfGwenRuntime.java");
+        }
+        String source = Files.readString(runtimePath);
+        int method = source.indexOf("boolean debugStartHeroesOfGwenMinionWave(Player tester)");
+        int nextMethod = source.indexOf("private void tickCastleAssault", method);
+        assertTrue(method >= 0 && nextMethod > method);
+        String debug = source.substring(method, nextMethod);
+        assertTrue(debug.contains("activePlayers.contains(tester.getUniqueId())"));
+        assertTrue(debug.contains("minionWavePending = true"));
+        assertTrue(debug.contains("updateHeroesOfGwenMinions(now)"));
+        assertTrue(debug.contains("heroesOfGwenMinionTeams.size() > before"));
+    }
+
+    @Test
     void kitRefreshIsOnlyOfferedForGamesWithSharedKitSetup() {
         for (ArcadePortGame game : ArcadePortGame.values()) {
             boolean offered = GameDebugEventCatalog.events(game).stream()

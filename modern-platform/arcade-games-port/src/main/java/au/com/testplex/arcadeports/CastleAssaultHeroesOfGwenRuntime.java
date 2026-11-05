@@ -1752,6 +1752,20 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         return objectiveItem != null && objectiveItem.isValid();
     }
 
+    boolean debugStartHeroesOfGwenMinionWave(Player tester) {
+        if (stopped || !ready || game != ArcadePortGame.HEROES_OF_GWEN || tester == null
+                || !tester.isOnline() || !activePlayers.contains(tester.getUniqueId())) return false;
+        int before = heroesOfGwenMinionTeams.size();
+        long now = System.currentTimeMillis();
+        java.util.Arrays.fill(minionsSpawnedInWave, 0);
+        nextMinionSpawnAt[0] = now;
+        nextMinionSpawnAt[1] = now;
+        minionWavePending = true;
+        nextMinionWaveAt = now + mobaMinionWaveInterval();
+        updateHeroesOfGwenMinions(now);
+        return heroesOfGwenMinionTeams.size() > before;
+    }
+
     private void tickCastleAssault(long now) {
         refillCastleArcherArrows(now);
         if (now >= nextCastleScoreboardAt) updateCastleScoreboard(now);

@@ -58,6 +58,9 @@ final class GameDebugEventCatalog {
     private static final List<Event> RUNNER = List.of(
             new Event("use-position-swap", "Test Position Swap", Material.ENDER_EYE,
                     "Use the selected Switcher kit's normal random eligible-player swap and landing protection."));
+    private static final List<Event> HEROES_OF_GWEN = List.of(
+            new Event("spawn-minion-wave", "Start Minion Wave", Material.ZOMBIE_SPAWN_EGG,
+                    "Start both teams' normal minion wave and source-map route processing."));
     private static final Set<ArcadePortGame> KIT_REFRESH_GAMES = Set.of(
             ArcadePortGame.BACON_BRAWL, ArcadePortGame.BOMB_LOBBERS, ArcadePortGame.CASTLE_ASSAULT,
             ArcadePortGame.DRAGON_ESCAPE, ArcadePortGame.DRAGONS, ArcadePortGame.EVOLUTION,
@@ -73,6 +76,7 @@ final class GameDebugEventCatalog {
         if (game == ArcadePortGame.BOMB_LOBBERS) return BOMB_LOBBERS;
         if (game == ArcadePortGame.CASTLE_ASSAULT) return CASTLE_ASSAULT;
         if (game == ArcadePortGame.RUNNER) return RUNNER;
+        if (game == ArcadePortGame.HEROES_OF_GWEN) return HEROES_OF_GWEN;
         if (game == ArcadePortGame.WITHER_ASSAULT) return WITHER_ASSAULT;
         if (game == ArcadePortGame.DRAW_MY_THING) return DRAW_MY_THING;
         if (game == ArcadePortGame.DRAGONS) return DRAGONS;

@@ -914,6 +914,12 @@ public final class ArcadePortManager implements Listener {
             GameDebugRuntimeOverrides.markDebugSession();
             triggered = true;
         }
+        if (type == ArcadePortGame.HEROES_OF_GWEN && "spawn-minion-wave".equals(eventId)
+                && session.variantRuntime != null
+                && session.variantRuntime.debugStartHeroesOfGwenMinionWave(tester)) {
+            GameDebugRuntimeOverrides.markDebugSession();
+            triggered = true;
+        }
         if (type == ArcadePortGame.RUNNER && "use-position-swap".equals(eventId)
                 && "switcher".equals(session.runnerKits.getOrDefault(tester.getUniqueId(), "leaper"))) {
             triggered = useRunnerPositionSwap(session, tester, System.currentTimeMillis());
