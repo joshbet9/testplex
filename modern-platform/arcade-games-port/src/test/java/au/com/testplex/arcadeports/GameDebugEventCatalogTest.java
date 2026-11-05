@@ -29,7 +29,7 @@ class GameDebugEventCatalogTest {
     @Test
     void eventToolsAreExplicitlyScopedToTheirGame() {
         var witherEvents = GameDebugEventCatalog.events(ArcadePortGame.WITHER_ASSAULT);
-        assertEquals(List.of("spawn-minions", "refresh-kit"), witherEvents.stream()
+        assertEquals(List.of("spawn-minions", "fire-skull", "refresh-kit"), witherEvents.stream()
                 .map(GameDebugEventCatalog.Event::id).toList());
         assertEquals("spawn-minions", witherEvents.getFirst().id());
         assertEquals(List.of("spawn-powerups", "throw-held-bomb", "refresh-kit"),
@@ -259,6 +259,21 @@ class GameDebugEventCatalogTest {
         assertTrue(manager.contains("isBombLobbersThrownTnt(tester.getInventory().getItemInMainHand())"));
         assertTrue(manager.contains("throwBombLobbersTnt(session, tester)"));
         assertTrue(manager.contains("GameDebugRuntimeOverrides.markDebugSession();"));
+    }
+
+    @Test
+    void witherAssaultDebugSkullUsesNormalTeamAndCooldownChecks() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String eventCatalog = Files.readString(sourceRoot.resolve("GameDebugEventCatalog.java"));
+        assertTrue(eventCatalog.contains("new Event(\"fire-skull\", \"Fire Wither Skull\""));
+        assertTrue(manager.contains("launchWitherAssaultSkull(session, tester, now)"));
+        assertTrue(manager.contains("session.teams.getOrDefault(tester.getUniqueId(), 0) == 1"));
+        assertTrue(manager.contains("session.witherLastAttackAt.getOrDefault(tester.getUniqueId(), 0L) > now"));
     }
 
     @Test

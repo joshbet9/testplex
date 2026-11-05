@@ -12,7 +12,9 @@ final class GameDebugEventCatalog {
 
     private static final List<Event> WITHER_ASSAULT = List.of(
             new Event("spawn-minions", "Spawn Minion Wave", Material.WITHER_SKELETON_SKULL,
-                    "Run the active Wither's normal minion ability and cooldown."));
+                    "Run the active Wither's normal minion ability and cooldown."),
+            new Event("fire-skull", "Fire Wither Skull", Material.WITHER_SKELETON_SKULL,
+                    "Fire a normal aimed Wither skull through its ordinary two-second attack cooldown."));
     private static final List<Event> DRAW_MY_THING = List.of(
             new Event("reveal-letter", "Reveal Next Hint Letter", Material.WRITABLE_BOOK,
                     "Reveal one additional answer letter to the guessers through the normal hint display."),

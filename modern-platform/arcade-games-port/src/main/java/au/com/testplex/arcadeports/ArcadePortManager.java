@@ -1072,6 +1072,16 @@ public final class ArcadePortManager implements Listener {
             launchWitherMinions(session, tester, System.currentTimeMillis());
             triggered = session.witherMinionOwners.size() > before;
         }
+        if (type == ArcadePortGame.WITHER_ASSAULT && "fire-skull".equals(eventId)
+                && session.teams.getOrDefault(tester.getUniqueId(), 0) == 1) {
+            long now = System.currentTimeMillis();
+            long readyAt = session.witherLastAttackAt.getOrDefault(tester.getUniqueId(), 0L);
+            if (now >= readyAt) {
+                launchWitherAssaultSkull(session, tester, now);
+                triggered = session.witherLastAttackAt.getOrDefault(tester.getUniqueId(), 0L) > now;
+                if (triggered) GameDebugRuntimeOverrides.markDebugSession();
+            }
+        }
         if (type == ArcadePortGame.MILK_THE_COW && "spawn-herd".equals(eventId)
                 && session.teams.getOrDefault(tester.getUniqueId(), 0) == 1) {
             if (!debugFeatureEnabled(tester.getUniqueId(), ArcadePortGame.MILK_THE_COW, "herd-spawning", true)) {
