@@ -10044,7 +10044,8 @@ public final class ArcadePortManager implements Listener {
     private void updateMicroBattlesArrows(Session session, long now) {
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
-            if (!"archer".equals(session.microKits.getOrDefault(id, "archer"))) continue;
+            if (!"archer".equals(session.microKits.getOrDefault(id, "archer"))
+                    || !debugKitFeatureEnabled(player, ArcadePortGame.MICRO_BATTLES, "archer")) continue;
             long next = session.microNextArrowAt.getOrDefault(id,
                     now + GameDebugRuntimeOverrides.longValue("MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS", ArcadePortRules.MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS));
             int count = countNamedItems(player, Material.ARROW, "Fletched Arrow");
@@ -10063,6 +10064,10 @@ public final class ArcadePortManager implements Listener {
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
             if (!"dasher".equals(session.microKits.getOrDefault(id, "archer"))) continue;
+            if (!debugKitFeatureEnabled(player, ArcadePortGame.MICRO_BATTLES, "dasher")) {
+                if (player.getAllowFlight()) player.setAllowFlight(false);
+                continue;
+            }
             if (player.isOnGround()
                     && now >= session.microDasherJumpReadyAt.getOrDefault(id, 0L)
                     && !player.getAllowFlight()) {
@@ -10550,7 +10555,9 @@ public final class ArcadePortManager implements Listener {
         if (attacker != null && (!session.alive.contains(attacker.getUniqueId())
                 || attacker.getUniqueId().equals(target.getUniqueId()))) return;
 
-        boolean fighter = "fighter".equals(session.microKits.getOrDefault(target.getUniqueId(), "archer"));
+        Player targetPlayer = session.players.get(target.getUniqueId());
+        boolean fighter = "fighter".equals(session.microKits.getOrDefault(target.getUniqueId(), "archer"))
+                && debugKitFeatureEnabled(targetPlayer, ArcadePortGame.MICRO_BATTLES, "fighter");
         double postPerkDamage = ArcadePortRules.microBattlesDamageAfterIronSkin(
                 rawDamage, fighter && cause != EntityDamageEvent.DamageCause.FIRE_TICK);
         var armourAttribute = target.getAttribute(Attribute.ARMOR);
@@ -24327,7 +24334,7 @@ public final class ArcadePortManager implements Listener {
         session.quiverArrowIgnoredPlayers.put(arrowId, new HashSet<>(Set.of(player.getUniqueId())));
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onMicroBowShoot(EntityShootBowEvent event) {
         if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
@@ -24335,6 +24342,11 @@ public final class ArcadePortManager implements Listener {
                 || !(event.getEntity() instanceof Player player)
                 || !"archer".equals(session.microKits.getOrDefault(player.getUniqueId(), "archer"))
                 || !(event.getProjectile() instanceof Arrow arrow)) return;
+        if (!debugKitFeatureEnabled(player, ArcadePortGame.MICRO_BATTLES, "archer")) {
+            event.setCancelled(true);
+            player.sendActionBar(ChatColor.RED + "Archer abilities are disabled in your debug profile.");
+            return;
+        }
         // Archer's loadout only supplies fletched arrows, so each shot gets the source perk's
         // remove-on-impact behaviour even when the last arrow has just left the inventory.
         session.microFletchedArrows.add(arrow.getUniqueId());
@@ -26730,6 +26742,14 @@ public final class ArcadePortManager implements Listener {
         if (cancelPrepareAction(event.getPlayer(), event)) return;
         Session session = active;
         if (session == null || event.getBlock().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.MICRO_BATTLES
+                && session.alive.contains(event.getPlayer().getUniqueId())
+                && plugin.hasAdminAccess(event.getPlayer())
+                && !debugFeatureEnabled(event.getPlayer().getUniqueId(), ArcadePortGame.MICRO_BATTLES,
+                        "blocks-break", true)) {
+            event.setCancelled(true);
+            return;
+        }
         if (event.isCancelled() && session.type != ArcadePortGame.MICRO_BATTLES
                 && session.type != ArcadePortGame.MASTER_BUILDERS) return;
         if (session.type == ArcadePortGame.SKY_WARS
@@ -26891,6 +26911,14 @@ public final class ArcadePortManager implements Listener {
         if (cancelPrepareAction(event.getPlayer(), event)) return;
         Session session = active;
         if (session == null || event.getBlock().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.MICRO_BATTLES
+                && session.alive.contains(event.getPlayer().getUniqueId())
+                && plugin.hasAdminAccess(event.getPlayer())
+                && !debugFeatureEnabled(event.getPlayer().getUniqueId(), ArcadePortGame.MICRO_BATTLES,
+                        "blocks-place", true)) {
+            event.setCancelled(true);
+            return;
+        }
         if (event.isCancelled() && session.type != ArcadePortGame.MASTER_BUILDERS
                 && session.type != ArcadePortGame.TURF_WARS) return;
         if (session.type == ArcadePortGame.SKY_WARS) {
@@ -28771,6 +28799,12 @@ public final class ArcadePortManager implements Listener {
         if (session == null || session.type != ArcadePortGame.MICRO_BATTLES || !session.liveStarted
                 || !session.alive.contains(player.getUniqueId())
                 || !"dasher".equals(session.microKits.getOrDefault(player.getUniqueId(), "archer"))) return;
+        if (!debugKitFeatureEnabled(player, ArcadePortGame.MICRO_BATTLES, "dasher")) {
+            event.setCancelled(true);
+            player.setFlying(false);
+            player.setAllowFlight(false);
+            return;
+        }
         event.setCancelled(true);
         player.setFlying(false);
         player.setAllowFlight(false);

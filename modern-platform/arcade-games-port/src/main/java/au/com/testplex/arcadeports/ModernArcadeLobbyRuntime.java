@@ -1304,6 +1304,18 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                         "Allow this kit's territory, barrage or fortification feature for authorised testers.", true));
             }
         }
+        if (game == ArcadePortGame.MICRO_BATTLES) {
+            for (String kit : List.of("archer", "fighter", "dasher")) {
+                String key = "ability-" + kit;
+                features.put(key, new DebugFeature(key, "Kit feature: " + humanizeDebugKey(kit),
+                        Material.IRON_SWORD,
+                        "Allow this kit's arrows, damage resistance or double jump for authorised testers.", true));
+            }
+            features.put("blocks-place", new DebugFeature("blocks-place", "Block placing", Material.COBBLESTONE,
+                    "Allow authorised testers to place Micro Battles blocks.", true));
+            features.put("blocks-break", new DebugFeature("blocks-break", "Block breaking", Material.IRON_PICKAXE,
+                    "Allow authorised testers to break Micro Battles blocks.", true));
+        }
         return List.copyOf(features.values());
     }
 
@@ -1333,6 +1345,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.EVOLUTION && key.startsWith("ability-"))
                 || (game == ArcadePortGame.SHEEP_QUEST && key.startsWith("ability-"))
                 || (game == ArcadePortGame.TURF_WARS && key.startsWith("ability-"))
+                || (game == ArcadePortGame.MICRO_BATTLES
+                        && (key.startsWith("ability-") || key.startsWith("blocks-")))
                 || (game == ArcadePortGame.SUPER_SPLOOR && key.startsWith("special-"))
                 || "DRAGONS_SPAWNING_ENABLED".equals(key)
                 || "DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED".equals(key)
