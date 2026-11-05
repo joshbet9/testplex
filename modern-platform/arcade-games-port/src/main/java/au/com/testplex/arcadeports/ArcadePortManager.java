@@ -907,6 +907,9 @@ public final class ArcadePortManager implements Listener {
             return plugin.getWizardsGameManager() != null
                     && plugin.getWizardsGameManager().debugGrantSpellAccess(tester);
         }
+        if (type == ArcadePortGame.SNAKE && "roll-item".equals(eventId)) {
+            return snakeModule != null && snakeModule.debugRollItem(tester);
+        }
         Session session = active;
         if (session == null || session.type != type || !session.liveStarted
                 || !session.alive.contains(tester.getUniqueId())) return false;

@@ -395,6 +395,16 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
         return true;
     }
 
+    /** Start the normal item roulette for an active, living tester. */
+    public boolean debugRollItem(Player player) {
+        if (player == null || !running) return false;
+        SnakeState state = snakes.get(player.getUniqueId());
+        if (state == null || !state.alive || !player.isOnline() || state.rouletteActive) return false;
+        GameDebugRuntimeOverrides.markDebugSession();
+        beginRoulette(state);
+        return state.rouletteActive;
+    }
+
     public void showStats(Player player) {
         player.sendMessage(ChatColor.GOLD + stats.summary(player));
     }

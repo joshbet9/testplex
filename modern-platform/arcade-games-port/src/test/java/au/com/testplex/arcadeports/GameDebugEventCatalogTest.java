@@ -20,6 +20,7 @@ class GameDebugEventCatalogTest {
         assertEquals("advance-dragon", GameDebugEventCatalog.events(ArcadePortGame.DRAGON_ESCAPE).getFirst().id());
         assertEquals("begin-evolution", GameDebugEventCatalog.events(ArcadePortGame.EVOLUTION).getFirst().id());
         assertEquals("shoot-ball", GameDebugEventCatalog.events(ArcadePortGame.HOOPS_REMASTERED).getFirst().id());
+        assertEquals("roll-item", GameDebugEventCatalog.events(ArcadePortGame.SNAKE).getFirst().id());
         assertEquals("refill-arrow", GameDebugEventCatalog.events(ArcadePortGame.ONE_IN_THE_QUIVER)
                 .getFirst().id());
         assertEquals("restore-armour", GameDebugEventCatalog.events(ArcadePortGame.PAINTBALL)
@@ -243,6 +244,33 @@ class GameDebugEventCatalogTest {
         assertTrue(plugin.contains("hasAdminAccess(player)"));
         assertTrue(runtime.contains("debugSpecialEnabled(player, \"special-\" + kit)"));
         assertTrue(runtime.contains("isArcadeDebugFeatureEnabled"));
+    }
+
+    @Test
+    void snakeItemRollDebugEventRunsTheRealRouletteForAlivePlayers() throws IOException {
+        Path snakeSource = Path.of("..", "snake-port", "src", "main", "java", "au", "com", "testplex",
+                "snake", "SnakeGameManager.java");
+        if (!Files.isRegularFile(snakeSource)) {
+            snakeSource = Path.of("modern-platform", "snake-port", "src", "main", "java", "au", "com",
+                    "testplex", "snake", "SnakeGameManager.java");
+        }
+        Path managerSource = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ArcadePortManager.java");
+        if (!Files.isRegularFile(managerSource)) {
+            managerSource = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ArcadePortManager.java");
+        }
+        String snake = Files.readString(snakeSource);
+        String manager = Files.readString(managerSource);
+        int start = snake.indexOf("public boolean debugRollItem(Player player)");
+        int end = snake.indexOf("public void showStats", start);
+        assertTrue(start >= 0 && end > start);
+        String event = snake.substring(start, end);
+        assertTrue(event.contains("state.alive"));
+        assertTrue(event.contains("state.rouletteActive"));
+        assertTrue(event.contains("GameDebugRuntimeOverrides.markDebugSession()"));
+        assertTrue(event.contains("beginRoulette(state)"));
+        assertTrue(manager.contains("type == ArcadePortGame.SNAKE && \"roll-item\".equals(eventId)"));
     }
 
     @Test

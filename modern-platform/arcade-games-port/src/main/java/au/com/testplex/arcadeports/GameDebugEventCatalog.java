@@ -21,6 +21,9 @@ final class GameDebugEventCatalog {
     private static final List<Event> DRAGON_ESCAPE = List.of(
             new Event("advance-dragon", "Advance Douglas Once", Material.DRAGON_HEAD,
                     "Run Douglas's normal chase, block clearing and catch checks once now."));
+    private static final List<Event> SNAKE = List.of(
+            new Event("roll-item", "Test Item Roulette", Material.MAGMA_CREAM,
+                    "Start your normal random control-debuff roll now; only works for a living player."));
     private static final List<Event> EVOLUTION = List.of(
             new Event("begin-evolution", "Start Evolution", Material.DRAGON_EGG,
                     "Begin your normal evolution animation immediately to test form and cosmetic effects."));
@@ -96,6 +99,7 @@ final class GameDebugEventCatalog {
         if (game == ArcadePortGame.DRAGON_ESCAPE) return DRAGON_ESCAPE;
         if (game == ArcadePortGame.EVOLUTION) return EVOLUTION;
         if (game == ArcadePortGame.HOOPS_REMASTERED) return HOOPS_REMASTERED;
+        if (game == ArcadePortGame.SNAKE) return SNAKE;
         if (game == ArcadePortGame.ONE_IN_THE_QUIVER) return ONE_IN_THE_QUIVER;
         if (game == ArcadePortGame.SPLEEF) return SPLEEF;
         if (game == ArcadePortGame.MILK_THE_COW) return MILK_THE_COW;
