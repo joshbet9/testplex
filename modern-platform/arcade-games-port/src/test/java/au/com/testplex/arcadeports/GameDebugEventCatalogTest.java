@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -16,6 +17,7 @@ class GameDebugEventCatalogTest {
         assertEquals("spawn-minions", witherEvents.getFirst().id());
         assertEquals("reveal-letter", GameDebugEventCatalog.events(ArcadePortGame.DRAW_MY_THING).getFirst().id());
         assertEquals("spawn-dragon", GameDebugEventCatalog.events(ArcadePortGame.DRAGONS).getFirst().id());
+        assertEquals("advance-dragon", GameDebugEventCatalog.events(ArcadePortGame.DRAGON_ESCAPE).getFirst().id());
         assertEquals("refill-arrow", GameDebugEventCatalog.events(ArcadePortGame.ONE_IN_THE_QUIVER)
                 .getFirst().id());
         assertEquals("restore-armour", GameDebugEventCatalog.events(ArcadePortGame.PAINTBALL)
@@ -135,6 +137,29 @@ class GameDebugEventCatalogTest {
         assertTrue(fill.contains("updateBaconMeterItem(session, tester)"));
         assertTrue(fill.contains("updateBaconMeterScoreboard(session)"));
         assertTrue(fill.contains("markDebugSession()"));
+    }
+
+    @Test
+    void baconBrawlPerKitAbilitySwitchesAreTesterScopedAndReachActivation() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        for (String kit : List.of("mama-piggles", "chris-p-bacon", "pig", "brutus-bacon",
+                "el-muchacho-pigo")) {
+            assertTrue(lobby.contains("\"" + kit + "\""), kit + " is configurable in the game-specific menu");
+        }
+        int activation = manager.indexOf("private void useBaconBrawlAbility(Session session, Player player, long now, boolean crouchDash)");
+        int nextMethod = manager.indexOf("private void useCrispyBaconDash(", activation);
+        assertTrue(activation >= 0 && nextMethod > activation);
+        String ability = manager.substring(activation, nextMethod);
+        assertTrue(ability.contains("String abilityFeature = \"ability-\" + kit"));
+        assertTrue(ability.contains("plugin.hasAdminAccess(player)"));
+        assertTrue(ability.contains("debugFeatureEnabled(id, ArcadePortGame.BACON_BRAWL, abilityFeature, true)"));
+        assertTrue(ability.indexOf("debugFeatureEnabled") < ability.indexOf("session.baconAbilitiesUsed.add(id)"));
     }
 
     @Test

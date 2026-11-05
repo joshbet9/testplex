@@ -18,6 +18,9 @@ final class GameDebugEventCatalog {
     private static final List<Event> DRAGONS = List.of(
             new Event("spawn-dragon", "Spawn Next Dragon Now", Material.DRAGON_EGG,
                     "Run the normal map spawn and target initialization without waiting for the interval."));
+    private static final List<Event> DRAGON_ESCAPE = List.of(
+            new Event("advance-dragon", "Advance Douglas Once", Material.DRAGON_HEAD,
+                    "Run Douglas's normal chase, block clearing and catch checks once now."));
     private static final List<Event> ONE_IN_THE_QUIVER = List.of(
             new Event("refill-arrow", "Restore Super Arrow", Material.ARROW,
                     "Restore the normal one-shot arrow to its configured hotbar slot for testing."));
@@ -84,6 +87,7 @@ final class GameDebugEventCatalog {
         if (game == ArcadePortGame.WITHER_ASSAULT) return WITHER_ASSAULT;
         if (game == ArcadePortGame.DRAW_MY_THING) return DRAW_MY_THING;
         if (game == ArcadePortGame.DRAGONS) return DRAGONS;
+        if (game == ArcadePortGame.DRAGON_ESCAPE) return DRAGON_ESCAPE;
         if (game == ArcadePortGame.ONE_IN_THE_QUIVER) return ONE_IN_THE_QUIVER;
         if (game == ArcadePortGame.SPLEEF) return SPLEEF;
         if (game == ArcadePortGame.MILK_THE_COW) return MILK_THE_COW;

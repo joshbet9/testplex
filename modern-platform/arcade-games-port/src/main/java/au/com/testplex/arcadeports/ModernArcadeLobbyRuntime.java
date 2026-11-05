@@ -1215,6 +1215,12 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         if (game == ArcadePortGame.BACON_BRAWL) {
             features.put("unlimited-abilities", new DebugFeature("unlimited-abilities", "Unlimited abilities",
                     Material.FIREWORK_ROCKET, "Use full-charge Bacon Brawl abilities without consuming meter.", false));
+            for (String kit : List.of("mama-piggles", "chris-p-bacon", "pig", "brutus-bacon",
+                    "el-muchacho-pigo")) {
+                String key = "ability-" + kit;
+                features.put(key, new DebugFeature(key, "Ability: " + humanizeDebugKey(kit),
+                        Material.IRON_AXE, "Allow this kit's ability to activate for authorised testers.", true));
+            }
         }
         if (game == ArcadePortGame.SUPER_SPLOOR) {
             features.put("unlimited-specials", new DebugFeature("unlimited-specials", "Unlimited Specials",
@@ -1224,11 +1230,22 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         return List.copyOf(features.values());
     }
 
+    private String humanizeDebugKey(String key) {
+        String[] words = key.split("-");
+        StringBuilder result = new StringBuilder();
+        for (String word : words) {
+            if (result.length() > 0) result.append(' ');
+            if (!word.isEmpty()) result.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
+        }
+        return result.toString();
+    }
+
     private boolean debugFeatureAppliesImmediately(ArcadePortGame game, String key) {
         if (GameDebugVariableCatalog.appliesImmediately(GameDebugVariableCatalog.variable(game, key))) return true;
         return "all-kits".equals(key) || "invulnerable".equals(key) || "no-fall-damage".equals(key)
                 || "no-hunger-loss".equals(key) || "unlimited-abilities".equals(key)
                 || "unlimited-specials".equals(key)
+                || (game == ArcadePortGame.BACON_BRAWL && key.startsWith("ability-"))
                 || "DRAGONS_SPAWNING_ENABLED".equals(key)
                 || "DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED".equals(key)
                 || "QUIVER_LEAPER_DOUBLE_JUMP_ENABLED".equals(key)

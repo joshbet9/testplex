@@ -990,6 +990,12 @@ public final class ArcadePortManager implements Listener {
                     .filter(entity -> entity instanceof EnderDragon && entity.isValid()).count();
             triggered = dragonsAfter > dragonsBefore;
         }
+        if (type == ArcadePortGame.DRAGON_ESCAPE && "advance-dragon".equals(eventId)
+                && session.dragonEscapeDragon != null && session.dragonEscapeDragon.isValid()) {
+            GameDebugRuntimeOverrides.markDebugSession();
+            updateDragonEscapeChase(session);
+            triggered = true;
+        }
         if (type == ArcadePortGame.ONE_IN_THE_QUIVER && "refill-arrow".equals(eventId)) {
             int arrowSlot = Math.max(0, Math.min(8, GameDebugRuntimeOverrides.intValue(
                     "QUIVER_ARROW_SLOT", ArcadePortRules.QUIVER_ARROW_SLOT)));
@@ -13425,6 +13431,12 @@ public final class ArcadePortManager implements Listener {
     private void useBaconBrawlAbility(Session session, Player player, long now, boolean crouchDash) {
         UUID id = player.getUniqueId();
         String kit = session.baconKits.getOrDefault(id, "el-muchacho-pigo");
+        String abilityFeature = "ability-" + kit;
+        if (plugin.hasAdminAccess(player)
+                && !debugFeatureEnabled(id, ArcadePortGame.BACON_BRAWL, abilityFeature, true)) {
+            player.sendMessage(ChatColor.RED + "This ability is disabled in your Bacon Brawl debug profile.");
+            return;
+        }
         boolean unlimitedAbilityDebug = isDebugOverrideEnabled(id, ArcadePortGame.BACON_BRAWL,
                 "unlimited-abilities");
         int charge = unlimitedAbilityDebug ? GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", ArcadePortRules.BACON_METER_MAX)
