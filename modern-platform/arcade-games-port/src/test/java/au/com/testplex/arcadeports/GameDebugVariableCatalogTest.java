@@ -324,6 +324,17 @@ class GameDebugVariableCatalogTest {
     }
 
     @Test
+    void removingAnImmediateOverrideRestoresItsConsumerFallback() {
+        GameDebugRuntimeOverrides.activate(Map.of("ability-crispy", false));
+        assertFalse(GameDebugRuntimeOverrides.booleanValue("ability-crispy", true));
+
+        GameDebugRuntimeOverrides.removeValue("ability-crispy");
+
+        assertTrue(GameDebugRuntimeOverrides.booleanValue("ability-crispy", true));
+        assertFalse(GameDebugRuntimeOverrides.booleanValue("ability-crispy", false));
+    }
+
+    @Test
     void monsterMazeKitAbilitySwitchesAreLiveAndDefaultToTheSourceBehavior() {
         GameDebugRuntimeOverrides.activate(Map.of(
                 "kit-jumper", false,

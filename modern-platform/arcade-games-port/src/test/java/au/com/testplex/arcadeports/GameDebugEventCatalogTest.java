@@ -98,14 +98,35 @@ class GameDebugEventCatalogTest {
             assertTrue(lobby.contains("\"" + key + "\""), key + " is exposed in the mode debug menu");
         }
         assertTrue(lobby.contains("if (game.isMonsterMaze() && key.startsWith(\"kit-\")) return true"));
-        assertTrue(manager.contains("|| type.isMonsterMaze())"));
-        assertTrue(manager.contains("debugProfiles.feature(tester.getUniqueId(), type, key, true)"));
+        assertTrue(manager.contains("lobbyRuntime.debugFeatureAppliesImmediately(type, flag)"));
+        assertTrue(manager.contains("debugProfiles.featureKeys(tester.getUniqueId(), type)"));
         assertTrue(rules.contains("booleanValue(\"kit-\" + kit, true)"));
         assertTrue(kits.contains("kitEnabled(\"jumper\")"));
         assertTrue(kits.contains("kitEnabled(\"slowball\")"));
         assertTrue(kits.contains("kitEnabled(\"body-builder\")"));
         assertTrue(kits.contains("kitEnabled(\"repulsor\")"));
         assertTrue(monsters.contains("kitEnabled(\"maverick\")"));
+    }
+
+    @Test
+    void profileChangesApplyOnlyImmediateFeaturesAndClearStaleFeatureValuesAcrossGames() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        String profiles = Files.readString(sourceRoot.resolve("GameDebugProfiles.java"));
+        String overrides = Files.readString(sourceRoot.resolve("GameDebugRuntimeOverrides.java"));
+        assertTrue(manager.contains("lobbyRuntime.debugFeatureAppliesImmediately(type, flag)"));
+        assertTrue(manager.contains("debugProfiles.featureKeys(tester.getUniqueId(), type)"));
+        assertTrue(manager.contains("debugProfiles.selectedFeatureValues("));
+        assertTrue(manager.contains("GameDebugRuntimeOverrides.removeValue(key)"));
+        assertTrue(lobby.contains("boolean debugFeatureAppliesImmediately(ArcadePortGame game, String key)"));
+        assertTrue(profiles.contains("Map<String, Boolean> selectedFeatureValues("));
+        assertTrue(profiles.contains("Set<String> featureKeys("));
+        assertTrue(overrides.contains("public static void removeValue(String key)"));
     }
 
     @Test

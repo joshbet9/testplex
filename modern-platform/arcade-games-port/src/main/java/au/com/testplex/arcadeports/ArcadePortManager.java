@@ -804,11 +804,9 @@ public final class ArcadePortManager implements Listener {
             }
         } else {
             debugProfiles.setFeature(player.getUniqueId(), type, flag, enabled);
-            if (activeDebugGame() == type) {
+            if (activeDebugGame() == type && player.getUniqueId().equals(activeDebugProfileOwner)) {
                 GameDebugRuntimeOverrides.markDebugSession();
-                if ((type == ArcadePortGame.SNAKE || type == ArcadePortGame.SNEAKY_ASSASSINS
-                        || type == ArcadePortGame.DRAW_MY_THING || type.isMonsterMaze())
-                        && player.getUniqueId().equals(activeDebugProfileOwner)) {
+                if (lobbyRuntime.debugFeatureAppliesImmediately(type, flag)) {
                     GameDebugRuntimeOverrides.setValue(flag, enabled);
                 }
             }
@@ -1275,15 +1273,15 @@ public final class ArcadePortManager implements Listener {
                 GameDebugRuntimeOverrides.setValue(variable.key(), debugProfiles.booleanVariable(
                         tester.getUniqueId(), type, variable.key(), variable.defaultValue() != 0.0D));
             }
-            if (type.isMonsterMaze()) {
-                for (String kit : List.of("jumper", "slowball", "body-builder", "repulsor")) {
-                    String key = "kit-" + kit;
-                    GameDebugRuntimeOverrides.setValue(key,
-                            debugProfiles.feature(tester.getUniqueId(), type, key, true));
+            for (String key : debugProfiles.featureKeys(tester.getUniqueId(), type)) {
+                if (lobbyRuntime.debugFeatureAppliesImmediately(type, key)) {
+                    GameDebugRuntimeOverrides.removeValue(key);
                 }
-                if (type != ArcadePortGame.MONSTER_MAZE) {
-                    GameDebugRuntimeOverrides.setValue("kit-maverick",
-                            debugProfiles.feature(tester.getUniqueId(), type, "kit-maverick", true));
+            }
+            for (Map.Entry<String, Boolean> entry : debugProfiles.selectedFeatureValues(
+                    tester.getUniqueId(), type).entrySet()) {
+                if (lobbyRuntime.debugFeatureAppliesImmediately(type, entry.getKey())) {
+                    GameDebugRuntimeOverrides.setValue(entry.getKey(), entry.getValue());
                 }
             }
             GameDebugRuntimeOverrides.markDebugSession();

@@ -8,9 +8,11 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -137,6 +139,33 @@ final class GameDebugProfiles {
         if (!validKey(feature)) return;
         config.set(profilePath(tester, game, selected(tester, game)) + ".features." + feature, enabled);
         save();
+    }
+
+    Map<String, Boolean> selectedFeatureValues(UUID tester, ArcadePortGame game) {
+        ConfigurationSection section = config.getConfigurationSection(
+                profilePath(tester, game, selected(tester, game)) + ".features");
+        if (section == null) return Map.of();
+        Map<String, Boolean> result = new LinkedHashMap<>();
+        for (String key : section.getKeys(false)) {
+            Object value = section.get(key);
+            if (validKey(key) && value instanceof Boolean enabled) result.put(key, enabled);
+        }
+        return Map.copyOf(result);
+    }
+
+    Set<String> featureKeys(UUID tester, ArcadePortGame game) {
+        ConfigurationSection profiles = config.getConfigurationSection(root(tester, game) + ".profiles");
+        if (profiles == null) return Set.of();
+        Set<String> result = new LinkedHashSet<>();
+        for (String name : profiles.getKeys(false)) {
+            ConfigurationSection section = config.getConfigurationSection(
+                    profilePath(tester, game, name) + ".features");
+            if (section == null) continue;
+            for (String key : section.getKeys(false)) {
+                if (validKey(key)) result.add(key);
+            }
+        }
+        return Set.copyOf(result);
     }
 
     Double variable(UUID tester, ArcadePortGame game, String variable) {

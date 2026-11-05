@@ -1511,7 +1511,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         return result.toString();
     }
 
-    private boolean debugFeatureAppliesImmediately(ArcadePortGame game, String key) {
+    boolean debugFeatureAppliesImmediately(ArcadePortGame game, String key) {
         if (GameDebugVariableCatalog.appliesImmediately(GameDebugVariableCatalog.variable(game, key))) return true;
         if (game.isMonsterMaze() && key.startsWith("kit-")) return true;
         return "all-kits".equals(key) || "invulnerable".equals(key) || "no-fall-damage".equals(key)

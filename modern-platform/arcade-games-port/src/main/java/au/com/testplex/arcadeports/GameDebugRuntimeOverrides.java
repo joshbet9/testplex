@@ -23,6 +23,14 @@ public final class GameDebugRuntimeOverrides {
         values = Map.copyOf(updated);
     }
 
+    /** Remove an explicitly immediate value so the consumer returns to its intended default. */
+    public static void removeValue(String key) {
+        if (key == null || key.isBlank() || !values.containsKey(key)) return;
+        Map<String, Object> updated = new LinkedHashMap<>(values);
+        updated.remove(key);
+        values = Map.copyOf(updated);
+    }
+
     public static void clear() {
         values = Map.of();
         debugSession = false;

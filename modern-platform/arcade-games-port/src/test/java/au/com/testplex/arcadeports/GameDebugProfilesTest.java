@@ -5,6 +5,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -60,6 +62,22 @@ class GameDebugProfilesTest {
         assertFalse(profiles.hasFeature(tester, game, "unlimited-specials"));
         assertTrue(profiles.profiles(tester, game).contains("experimental"));
         assertFalse(profiles.delete(tester, game, GameDebugProfiles.DEFAULT_PROFILE));
+    }
+
+    @Test
+    void exposesSelectedFeatureValuesAndTheUnionNeededToClearStaleImmediateSwitches() {
+        GameDebugProfiles profiles = new GameDebugProfiles(directory.resolve("feature-overlays.yml").toFile(),
+                ignored -> { });
+        UUID tester = UUID.randomUUID();
+        ArcadePortGame game = ArcadePortGame.BACON_BRAWL;
+        profiles.setFeature(tester, game, "ability-crispy", false);
+        profiles.create(tester, game, "default-abilities");
+        profiles.setFeature(tester, game, "ability-brutus", false);
+
+        assertEquals(Set.of("ability-crispy", "ability-brutus"), profiles.featureKeys(tester, game));
+        assertEquals(Map.of("ability-brutus", false), profiles.selectedFeatureValues(tester, game));
+        assertTrue(profiles.select(tester, game, "default"));
+        assertEquals(Map.of("ability-crispy", false), profiles.selectedFeatureValues(tester, game));
     }
 
     @Test
