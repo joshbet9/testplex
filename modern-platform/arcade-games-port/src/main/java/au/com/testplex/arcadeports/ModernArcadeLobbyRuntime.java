@@ -1390,6 +1390,12 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                         "Allow this kit's territory, barrage or fortification feature for authorised testers.", true));
             }
         }
+        if (game == ArcadePortGame.WIZARDS) {
+            features.put("spell-casting", new DebugFeature("spell-casting", "Spell casting", Material.BLAZE_ROD,
+                    "Allow this tester to cast their selected Wizards spells.", true));
+            features.put("chest-looting", new DebugFeature("chest-looting", "Chest looting", Material.CHEST,
+                    "Allow this tester to collect spellbooks, wands and mana from arena chests.", true));
+        }
         if (game == ArcadePortGame.MICRO_BATTLES) {
             for (String kit : List.of("archer", "fighter", "dasher")) {
                 String key = "ability-" + kit;

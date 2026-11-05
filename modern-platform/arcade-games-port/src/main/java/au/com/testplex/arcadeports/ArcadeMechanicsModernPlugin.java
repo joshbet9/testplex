@@ -140,6 +140,11 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 ? manager.debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.SUPER_SPLOOR, feature, fallback)
                 : fallback;
     }
+    public boolean isArcadeDebugFeatureEnabled(Player player, ArcadePortGame game, String feature, boolean fallback) {
+        return player != null && hasAdminAccess(player) && manager != null && game != null
+                ? manager.debugFeatureEnabled(player.getUniqueId(), game, feature, fallback)
+                : fallback;
+    }
     public ArcadePortManager getArcadePortManager() { return manager; }
     public String selectedCosmeticOption(Player player, String group) {
         return selectedCosmeticOption(player, "snake", group);

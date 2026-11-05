@@ -1313,6 +1313,11 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         Inventory top = event.getView().getTopInventory();
         if (event.getClickedInventory() != null && event.getClickedInventory() == top
                 && top.getType() == InventoryType.CHEST) {
+            if (!plugin.isArcadeDebugFeatureEnabled(player,
+                    au.com.testplex.arcadeports.ArcadePortGame.WIZARDS, "chest-looting", true)) {
+                event.setCancelled(true);
+                return;
+            }
             ItemStack clicked = event.getCurrentItem();
             if (isSpellBook(clicked) || isLootWand(clicked) || isSoulStar(clicked)) {
                 event.setCancelled(true);
@@ -1909,6 +1914,11 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
     }
 
     private void castSpell(Player player, WizardState state, WizardsSpell spell, Entity target, Block clickedBlock) {
+        if (!plugin.isArcadeDebugFeatureEnabled(player,
+                au.com.testplex.arcadeports.ArcadePortGame.WIZARDS, "spell-casting", true)) {
+            player.sendMessage(ChatColor.YELLOW + "Spell casting is disabled for your debug profile.");
+            return;
+        }
         int level = state.known.getOrDefault(spell, 0);
         if (level <= 0) return;
         if (!spell.implemented()) {

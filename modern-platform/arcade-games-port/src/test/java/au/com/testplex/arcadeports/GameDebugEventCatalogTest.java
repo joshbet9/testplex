@@ -703,6 +703,29 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void wizardsDebugSwitchesGateLiveSpellCastingAndChestLooting() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        String api = Files.readString(sourceRoot.resolve("ArcadeMechanicsModernPlugin.java"));
+        Path wizardManager = Path.of("src", "main", "java", "au", "com", "testplex",
+                "wizards", "WizardsGameManager.java");
+        if (!Files.isRegularFile(wizardManager)) {
+            wizardManager = Path.of("modern-platform", "arcade-games-port", "src", "main", "java",
+                    "au", "com", "testplex", "wizards", "WizardsGameManager.java");
+        }
+        String wizards = Files.readString(wizardManager);
+        assertTrue(lobby.contains("features.put(\"spell-casting\""));
+        assertTrue(lobby.contains("features.put(\"chest-looting\""));
+        assertTrue(api.contains("isArcadeDebugFeatureEnabled(Player player, ArcadePortGame game"));
+        assertTrue(wizards.contains("ArcadePortGame.WIZARDS, \"spell-casting\", true"));
+        assertTrue(wizards.contains("ArcadePortGame.WIZARDS, \"chest-looting\", true"));
+    }
+
+    @Test
     void microBattlesDebugSwitchesGateBlocksAndKitAbilities() throws IOException {
         Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
         if (!Files.isDirectory(sourceRoot)) {
