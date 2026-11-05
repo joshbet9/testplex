@@ -101,7 +101,11 @@ final class GameDebugEventCatalog {
                     "Run the normal paired team power-up drop wave immediately."));
     private static final List<Event> CASTLE_ASSAULT = List.of(
             new Event("spawn-objective", "Spawn Objective TNT", Material.TNT,
-                    "Run Castle Assault's normal objective spawn when no objective is active or carried."));
+                    "Run Castle Assault's normal objective spawn when no objective is active or carried."),
+            new Event("destroy-crystal", "Destroy Enemy Crystal", Material.END_CRYSTAL,
+                    "Use the normal enemy crystal destruction path if your profile allows crystal damage."),
+            new Event("damage-king", "Damage Enemy King", Material.ZOMBIE_HEAD,
+                    "Apply normal King damage after both enemy crystals are destroyed if your profile allows it."));
     private static final List<Event> RUNNER = List.of(
             new Event("use-position-swap", "Test Position Swap", Material.ENDER_EYE,
                     "Use the selected Switcher kit's normal random eligible-player swap and landing protection."));

@@ -999,6 +999,16 @@ public final class ArcadePortManager implements Listener {
             GameDebugRuntimeOverrides.markDebugSession();
             triggered = true;
         }
+        if (type == ArcadePortGame.CASTLE_ASSAULT && "destroy-crystal".equals(eventId)
+                && session.variantRuntime != null) {
+            GameDebugRuntimeOverrides.markDebugSession();
+            triggered = session.variantRuntime.debugDestroyEnemyCrystal(tester);
+        }
+        if (type == ArcadePortGame.CASTLE_ASSAULT && "damage-king".equals(eventId)
+                && session.variantRuntime != null) {
+            GameDebugRuntimeOverrides.markDebugSession();
+            triggered = session.variantRuntime.debugDamageEnemyKing(tester);
+        }
         if (type == ArcadePortGame.HEROES_OF_GWEN && "spawn-minion-wave".equals(eventId)
                 && session.variantRuntime != null
                 && session.variantRuntime.debugStartHeroesOfGwenMinionWave(tester)) {

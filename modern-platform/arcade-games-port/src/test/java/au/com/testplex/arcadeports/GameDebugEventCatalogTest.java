@@ -1095,6 +1095,8 @@ class GameDebugEventCatalogTest {
         }
         String runtime = Files.readString(runtimePath);
         String lobby = Files.readString(lobbyPath);
+        Path managerPath = runtimePath.resolveSibling("ArcadePortManager.java");
+        String manager = Files.readString(managerPath);
         assertTrue(lobby.contains("\"objective-tnt\", \"Objective TNT\""));
         assertTrue(lobby.contains("\"crystal-damage\", \"Sentry crystal damage\""));
         assertTrue(lobby.contains("\"king-damage\", \"King damage\""));
@@ -1102,6 +1104,16 @@ class GameDebugEventCatalogTest {
         assertTrue(runtime.contains("!debugFeatureEnabled(attacker, \"crystal-damage\")"));
         assertTrue(runtime.contains("!debugFeatureEnabled(attacker, \"king-damage\")"));
         assertTrue(runtime.contains("!debugFeatureEnabled(player, \"objective-tnt\")"));
+        for (String event : List.of("spawn-objective", "destroy-crystal", "damage-king")) {
+            assertTrue(GameDebugEventCatalog.events(ArcadePortGame.CASTLE_ASSAULT).stream()
+                    .anyMatch(entry -> entry.id().equals(event)), event + " is available in Castle Assault tools");
+            assertTrue(manager.contains("\"" + event + "\".equals(eventId)"),
+                    event + " dispatches to the live objective runtime");
+        }
+        assertTrue(runtime.contains("boolean debugDestroyEnemyCrystal(Player tester)"));
+        assertTrue(runtime.contains("destroyCastleCrystal(enemyKing, crystal, tester)"));
+        assertTrue(runtime.contains("boolean debugDamageEnemyKing(Player tester)"));
+        assertTrue(runtime.contains("damageCastleKing(enemyKing, Math.min(50, before), tester)"));
     }
 
     @Test

@@ -1754,6 +1754,34 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         return objectiveItem != null && objectiveItem.isValid();
     }
 
+    boolean debugDestroyEnemyCrystal(Player tester) {
+        if (stopped || !ready || game != ArcadePortGame.CASTLE_ASSAULT || tester == null
+                || !tester.isOnline() || !activePlayers.contains(tester.getUniqueId())
+                || !debugFeatureEnabled(tester, "crystal-damage")) return false;
+        int team = teams.getOrDefault(tester.getUniqueId(), -1);
+        KingState enemyKing = kings.get(1 - team);
+        if (team < 0 || enemyKing == null) return false;
+        for (EnderCrystal crystal : new ArrayList<>(enemyKing.crystals)) {
+            if (crystal == null || !crystal.isValid()) continue;
+            int before = enemyKing.activeCrystals();
+            destroyCastleCrystal(enemyKing, crystal, tester);
+            return enemyKing.activeCrystals() < before;
+        }
+        return false;
+    }
+
+    boolean debugDamageEnemyKing(Player tester) {
+        if (stopped || !ready || game != ArcadePortGame.CASTLE_ASSAULT || tester == null
+                || !tester.isOnline() || !activePlayers.contains(tester.getUniqueId())
+                || !debugFeatureEnabled(tester, "king-damage")) return false;
+        int team = teams.getOrDefault(tester.getUniqueId(), -1);
+        KingState enemyKing = kings.get(1 - team);
+        if (team < 0 || enemyKing == null || enemyKing.activeCrystals() > 0 || enemyKing.health <= 0) return false;
+        int before = enemyKing.health;
+        damageCastleKing(enemyKing, Math.min(50, before), tester);
+        return enemyKing.health < before;
+    }
+
     boolean debugStartHeroesOfGwenMinionWave(Player tester) {
         if (stopped || !ready || game != ArcadePortGame.HEROES_OF_GWEN || tester == null
                 || !tester.isOnline() || !activePlayers.contains(tester.getUniqueId())) return false;
