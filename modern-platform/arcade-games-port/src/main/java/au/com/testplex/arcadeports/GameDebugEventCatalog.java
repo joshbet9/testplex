@@ -100,13 +100,16 @@ final class GameDebugEventCatalog {
     private static final List<Event> RUNNER = List.of(
             new Event("use-position-swap", "Test Position Swap", Material.ENDER_EYE,
                     "Use the selected Switcher kit's normal random eligible-player swap and landing protection."));
+    private static final List<Event> MONSTER_MAZE = List.of(
+            new Event("spawn-monster-wave", "Spawn Monster Wave", Material.ZOMBIE_SPAWN_EGG,
+                    "Spawn the selected mode's normal safe-pad monster wave around the active maze."));
     private static final List<Event> HEROES_OF_GWEN = List.of(
             new Event("spawn-minion-wave", "Start Minion Wave", Material.ZOMBIE_SPAWN_EGG,
                     "Start both teams' normal minion wave and source-map route processing."));
     private static final Set<ArcadePortGame> KIT_REFRESH_GAMES = Set.of(
             ArcadePortGame.BACON_BRAWL, ArcadePortGame.BOMB_LOBBERS, ArcadePortGame.CASTLE_ASSAULT,
             ArcadePortGame.DRAGON_ESCAPE, ArcadePortGame.DRAGONS, ArcadePortGame.EVOLUTION,
-            ArcadePortGame.GLADIATORS, ArcadePortGame.HEROES_OF_GWEN, ArcadePortGame.MICRO_BATTLES,
+            ArcadePortGame.DEATH_TAG, ArcadePortGame.GLADIATORS, ArcadePortGame.HEROES_OF_GWEN, ArcadePortGame.MICRO_BATTLES,
             ArcadePortGame.ONE_IN_THE_QUIVER, ArcadePortGame.PAINTBALL, ArcadePortGame.RUNNER,
             ArcadePortGame.SHEEP_QUEST, ArcadePortGame.SPLEEF, ArcadePortGame.SKY_WARS,
             ArcadePortGame.TURF_WARS, ArcadePortGame.WITHER_ASSAULT);
@@ -114,6 +117,7 @@ final class GameDebugEventCatalog {
     private GameDebugEventCatalog() { }
 
     static List<Event> events(ArcadePortGame game) {
+        if (game != null && game.isMonsterMaze()) return MONSTER_MAZE;
         List<Event> configured = switch (game) {
             case BACON_BRAWL -> BACON_BRAWL;
             case BOMB_LOBBERS -> BOMB_LOBBERS;

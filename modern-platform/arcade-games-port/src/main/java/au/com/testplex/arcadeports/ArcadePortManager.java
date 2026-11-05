@@ -1005,6 +1005,12 @@ public final class ArcadePortManager implements Listener {
             triggered = useRunnerPositionSwap(session, tester, System.currentTimeMillis());
             if (triggered) GameDebugRuntimeOverrides.markDebugSession();
         }
+        if (type.isMonsterMaze() && "spawn-monster-wave".equals(eventId)) {
+            me.monstermaze.MonsterMazePlugin maze = plugin.getMonsterMazeModule();
+            triggered = maze != null && maze.getGameManager() != null
+                    && maze.getGameManager().debugSpawnMonsterWave(tester);
+            if (triggered) GameDebugRuntimeOverrides.markDebugSession();
+        }
         if (type == ArcadePortGame.WITHER_ASSAULT && "spawn-minions".equals(eventId)
                 && session.teams.getOrDefault(tester.getUniqueId(), 0) == 1) {
             GameDebugRuntimeOverrides.markDebugSession();

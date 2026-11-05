@@ -11,6 +11,7 @@ import me.monstermaze.stats.StatTracker;
 import me.monstermaze.util.GameScoreboard;
 import me.monstermaze.util.PlayerFeedback;
 import me.monstermaze.util.TextUtil;
+import au.com.testplex.arcadeports.GameDebugRuntimeOverrides;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import org.bukkit.Particle;
@@ -138,6 +139,16 @@ public class GameManager implements Listener {
         }
         if (nextSafePad == null) spawnSafePad();
         phaseTimer = 1;
+        return true;
+    }
+    public static boolean canDebugSpawnMonsterWave(GameState state, boolean hasSafePad, boolean testerAlive) {
+        return state == GameState.LIVE && hasSafePad && testerAlive;
+    }
+    /** Tester-only event bridge; adds the selected mode's normal safe-pad monster wave. */
+    public boolean debugSpawnMonsterWave(Player tester) {
+        if (!canDebugSpawnMonsterWave(state, safePad != null,
+                tester != null && getAlivePlayers().contains(tester))) return false;
+        monsterManager.spawnMore(Math.max(1, getMode().additionalMonstersPerSafePad()));
         return true;
     }
     public void recordFirstSafePad(UUID playerId) { plugin.recordFirstSafePad(playerId); }

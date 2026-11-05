@@ -36,6 +36,8 @@ class GameDebugEventCatalogTest {
                 .getFirst().id());
         assertEquals("promote-self", GameDebugEventCatalog.events(ArcadePortGame.DEATH_TAG)
                 .getFirst().id());
+        assertTrue(GameDebugEventCatalog.events(ArcadePortGame.DEATH_TAG).stream()
+                .anyMatch(event -> event.id().equals("refresh-kit")));
         assertEquals("forfeit-duel", GameDebugEventCatalog.events(ArcadePortGame.GLADIATORS)
                 .getFirst().id());
         assertTrue(GameDebugEventCatalog.events(ArcadePortGame.SPLEEF).stream()
@@ -50,6 +52,15 @@ class GameDebugEventCatalogTest {
                 .getFirst().id());
         assertFalse(GameDebugEventCatalog.events(ArcadePortGame.BACON_BRAWL).stream()
                 .anyMatch(event -> event.id().equals("spawn-minions")));
+    }
+
+    @Test
+    void everyMonsterMazeModeUsesTheSharedMonsterWaveEventBridge() {
+        for (ArcadePortGame game : List.of(ArcadePortGame.MONSTER_MAZE,
+                ArcadePortGame.MONSTER_MAZE_SPEED, ArcadePortGame.MONSTER_MAZE_MODERN)) {
+            assertEquals(List.of("spawn-monster-wave"), GameDebugEventCatalog.events(game).stream()
+                    .map(GameDebugEventCatalog.Event::id).toList());
+        }
     }
 
     @Test
@@ -69,7 +80,9 @@ class GameDebugEventCatalogTest {
                         && GameDebugEventCatalog.supportsKitRefresh(game)
                         && source.contains("GameDebugEventCatalog.supportsKitRefresh(type)"
                                 + " && \"refresh-kit\".equals(eventId)");
-                assertTrue(directDispatcher || sharedKitDispatcher,
+                boolean sharedMazeDispatcher = game.isMonsterMaze() && "spawn-monster-wave".equals(event.id())
+                        && source.contains("type.isMonsterMaze() && \"spawn-monster-wave\".equals(eventId)");
+                assertTrue(directDispatcher || sharedKitDispatcher || sharedMazeDispatcher,
                         game.id() + " event " + event.id() + " has no gameplay dispatcher");
             }
         }
