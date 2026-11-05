@@ -24,6 +24,8 @@ class GameDebugEventCatalogTest {
                 .getFirst().id());
         assertEquals("refresh-kit", GameDebugEventCatalog.events(ArcadePortGame.SPLEEF)
                 .getFirst().id());
+        assertEquals("grant-spells", GameDebugEventCatalog.events(ArcadePortGame.WIZARDS)
+                .getFirst().id());
         assertFalse(GameDebugEventCatalog.events(ArcadePortGame.BACON_BRAWL).stream()
                 .anyMatch(event -> event.id().equals("spawn-minions")));
     }

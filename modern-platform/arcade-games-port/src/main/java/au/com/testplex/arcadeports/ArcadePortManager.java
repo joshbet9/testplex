@@ -886,10 +886,14 @@ public final class ArcadePortManager implements Listener {
     boolean debugTriggerEvent(Player tester, ArcadePortGame type, String eventId) {
         if (tester == null || !tester.isOnline() || !plugin.hasAdminAccess(tester)
                 || type == null || eventId == null) return false;
+        if (GameDebugEventCatalog.events(type).stream().noneMatch(event -> event.id().equals(eventId))) return false;
+        if (type == ArcadePortGame.WIZARDS && "grant-spells".equals(eventId)) {
+            return plugin.getWizardsGameManager() != null
+                    && plugin.getWizardsGameManager().debugGrantSpellAccess(tester);
+        }
         Session session = active;
         if (session == null || session.type != type || !session.liveStarted
                 || !session.alive.contains(tester.getUniqueId())) return false;
-        if (GameDebugEventCatalog.events(type).stream().noneMatch(event -> event.id().equals(eventId))) return false;
         boolean triggered = false;
         if (type == ArcadePortGame.WITHER_ASSAULT && "spawn-minions".equals(eventId)
                 && session.teams.getOrDefault(tester.getUniqueId(), 0) == 1) {

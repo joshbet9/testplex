@@ -734,6 +734,23 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         return true;
     }
 
+    /** Debug control: unlock the implemented spellbook, refill mana and clear spell cooldowns. */
+    public boolean debugGrantSpellAccess(Player player) {
+        if (!running || player == null || !player.isOnline()) return false;
+        WizardState state = states.get(player.getUniqueId());
+        if (state == null || !state.alive) return false;
+        GameDebugRuntimeOverrides.markDebugSession();
+        for (WizardsSpell spell : WizardsSpell.implementedSpells()) {
+            state.known.putIfAbsent(spell, 1);
+        }
+        state.mana = state.maximumMana;
+        state.cooldowns.clear();
+        updateWandLabels(player, state);
+        refreshManaBar(player, state);
+        player.sendMessage(ChatColor.AQUA + "Debug loadout: implemented spells known, mana restored and cooldowns cleared.");
+        return true;
+    }
+
     public void stop(String reason) {
         if (!running && snapshots.isEmpty()) {
             arcadeManaged = false;

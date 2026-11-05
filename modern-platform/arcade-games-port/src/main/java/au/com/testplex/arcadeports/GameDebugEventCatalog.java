@@ -21,6 +21,9 @@ final class GameDebugEventCatalog {
     private static final List<Event> ONE_IN_THE_QUIVER = List.of(
             new Event("refill-arrow", "Restore Super Arrow", Material.ARROW,
                     "Restore the normal one-shot arrow to its configured hotbar slot for testing."));
+    private static final List<Event> WIZARDS = List.of(
+            new Event("grant-spells", "Grant Spell Test Loadout", Material.BLAZE_ROD,
+                    "Unlock implemented spells, refill mana and clear spell cooldowns for your next casts."));
     private static final List<Event> PAINTBALL = List.of(
             new Event("restore-armour", "Restore Paintball Armour", Material.LEATHER_CHESTPLATE,
                     "Restore your normal four armour pieces using the selected team's colours."));
@@ -47,6 +50,7 @@ final class GameDebugEventCatalog {
         if (game == ArcadePortGame.ONE_IN_THE_QUIVER) return ONE_IN_THE_QUIVER;
         if (game == ArcadePortGame.PAINTBALL) return PAINTBALL;
         if (game == ArcadePortGame.DEATH_TAG) return DEATH_TAG;
+        if (game == ArcadePortGame.WIZARDS) return WIZARDS;
         if (supportsKitRefresh(game)) return REFRESH_KIT;
         return List.of();
     }
