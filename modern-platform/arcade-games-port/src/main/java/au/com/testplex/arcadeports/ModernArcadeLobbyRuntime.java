@@ -1373,6 +1373,14 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             features.put("blocks-break", new DebugFeature("blocks-break", "Block breaking", Material.IRON_PICKAXE,
                     "Allow authorised testers to break Micro Battles blocks.", true));
         }
+        if (game == ArcadePortGame.SKY_WARS) {
+            for (String kit : List.of("ice", "fire", "air", "metal", "earth")) {
+                String key = "ability-" + kit;
+                features.put(key, new DebugFeature(key, "Kit feature: " + humanizeDebugKey(kit),
+                        Material.ENDER_EYE,
+                        "Allow this tester's " + humanizeDebugKey(kit) + " kit ability and passive effects.", true));
+            }
+        }
         return List.copyOf(features.values());
     }
 
@@ -1418,6 +1426,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.TURF_WARS && key.startsWith("ability-"))
                 || (game == ArcadePortGame.MICRO_BATTLES
                         && (key.startsWith("ability-") || key.startsWith("blocks-")))
+                || (game == ArcadePortGame.SKY_WARS && key.startsWith("ability-"))
                 || (game == ArcadePortGame.SUPER_SPLOOR && key.startsWith("special-"))
                 || "DRAGONS_SPAWNING_ENABLED".equals(key)
                 || "DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED".equals(key)

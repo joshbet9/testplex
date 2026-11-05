@@ -134,6 +134,27 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void skyWarsKitSwitchesAreListedAndConsumedByTheirLiveKitPaths() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        for (String kit : List.of("ice", "fire", "air", "metal", "earth")) {
+            assertTrue(lobby.contains("\"" + kit + "\""), kit + " appears in the SkyWars debug menu");
+            assertTrue(manager.contains("debugKitFeatureEnabled(player, ArcadePortGame.SKY_WARS, kit)"),
+                    kit + " passive behavior reads its profile switch");
+            assertTrue(manager.contains("isDebugAbilityAllowed(player, ArcadePortGame.SKY_WARS, kit)"),
+                    kit + " active ability reads its profile switch");
+        }
+        assertTrue(lobby.contains("game == ArcadePortGame.SKY_WARS && key.startsWith(\"ability-\")"));
+        assertTrue(manager.contains("debugKitFeatureEnabled(player, ArcadePortGame.SKY_WARS, \"air\")"));
+        assertTrue(manager.contains("player.removePotionEffect(PotionEffectType.FIRE_RESISTANCE)"));
+    }
+
+    @Test
     void baconBrawlDebugMeterFillsTheSelectedAbilityAndRefreshesItsHud() throws IOException {
         Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "ArcadePortManager.java");

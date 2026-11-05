@@ -8786,11 +8786,16 @@ public final class ArcadePortManager implements Listener {
                     break;
                 }
             }
-            if ("air".equals(session.skyWarsKits.get(id)) && player.isOnGround()) {
+            String kit = session.skyWarsKits.get(id);
+            boolean kitEnabled = debugKitFeatureEnabled(player, ArcadePortGame.SKY_WARS, kit);
+            if ("air".equals(kit) && kitEnabled && player.isOnGround()) {
                 session.skyWarsSafeLocations.put(id, player.getLocation().clone());
                 if (now >= session.skyWarsKitReadyAt.getOrDefault(id, 0L)) player.setAllowFlight(true);
+            } else if ("air".equals(kit) && !kitEnabled && player.getAllowFlight()) {
+                player.setAllowFlight(false);
+                player.setFlying(false);
             }
-            if ("earth".equals(session.skyWarsKits.get(id))
+            if ("earth".equals(kit) && kitEnabled
                     && now >= session.skyWarsNextDirtAt.getOrDefault(id, 0L)) {
                 int dirtCount = 0;
                 for (ItemStack item : player.getInventory().getContents()) {
@@ -8802,14 +8807,22 @@ public final class ArcadePortManager implements Listener {
                 }
                 session.skyWarsNextDirtAt.put(id, now + 20_000L);
             }
-            if ("metal".equals(session.skyWarsKits.get(id)) && session.ticks % 20L == 0L) {
+            if ("fire".equals(kit) && kitEnabled && !player.hasPotionEffect(PotionEffectType.FIRE_RESISTANCE)) {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE,
+                        Integer.MAX_VALUE, 0, false, false, false), true);
+            } else if ("fire".equals(kit) && !kitEnabled && player.hasPotionEffect(PotionEffectType.FIRE_RESISTANCE)) {
+                player.removePotionEffect(PotionEffectType.FIRE_RESISTANCE);
+            }
+            if ("metal".equals(kit) && session.ticks % 20L == 0L) {
                 var maxHealth = player.getAttribute(Attribute.MAX_HEALTH);
                 if (maxHealth != null) {
                     double bonus = 0.0D;
-                    for (ItemStack armor : player.getInventory().getArmorContents()) {
-                        if (armor != null && (armor.getType().name().startsWith("IRON_")
-                                || armor.getType().name().startsWith("GOLDEN_")
-                                || armor.getType().name().startsWith("CHAINMAIL_"))) bonus += 1.0D;
+                    if (kitEnabled) {
+                        for (ItemStack armor : player.getInventory().getArmorContents()) {
+                            if (armor != null && (armor.getType().name().startsWith("IRON_")
+                                    || armor.getType().name().startsWith("GOLDEN_")
+                                    || armor.getType().name().startsWith("CHAINMAIL_"))) bonus += 1.0D;
+                        }
                     }
                     maxHealth.setBaseValue(20.0D + bonus);
                     if (player.getHealth() > 20.0D + bonus) player.setHealth(20.0D + bonus);
@@ -9052,6 +9065,7 @@ public final class ArcadePortManager implements Listener {
         String kit = session.skyWarsKits.getOrDefault(id, "ice");
         if ("ice".equals(kit) && isSkyWarsSkill(item, "Ice Bridge")) {
             event.setCancelled(true);
+            if (!isDebugAbilityAllowed(player, ArcadePortGame.SKY_WARS, kit)) return true;
             if (!session.liveStarted) return true;
             long now = System.currentTimeMillis();
             if (now < session.skyWarsKitReadyAt.getOrDefault(id, 0L)) return true;
@@ -9065,6 +9079,7 @@ public final class ArcadePortManager implements Listener {
         }
         if ("fire".equals(kit) && isSkyWarsSkill(item, "Fire Burst")) {
             event.setCancelled(true);
+            if (!isDebugAbilityAllowed(player, ArcadePortGame.SKY_WARS, kit)) return true;
             if (!session.liveStarted) return true;
             long now = System.currentTimeMillis();
             if (now < session.skyWarsKitReadyAt.getOrDefault(id, 0L)) return true;
@@ -9081,6 +9096,7 @@ public final class ArcadePortManager implements Listener {
         }
         if ("air".equals(kit) && isSkyWarsSkill(item, "Eye of Ender")) {
             event.setCancelled(true);
+            if (!isDebugAbilityAllowed(player, ArcadePortGame.SKY_WARS, kit)) return true;
             if (!session.liveStarted) return true;
             Location safe = session.skyWarsSafeLocations.get(id);
             if (safe != null) {
@@ -9097,6 +9113,7 @@ public final class ArcadePortManager implements Listener {
         }
         if ("metal".equals(kit) && isSkyWarsSkill(item, "Magnet")) {
             event.setCancelled(true);
+            if (!isDebugAbilityAllowed(player, ArcadePortGame.SKY_WARS, kit)) return true;
             if (!session.liveStarted) return true;
             Player target = skyWarsPlayerInSight(session, player, 12.0D);
             if (target == null) return true;
@@ -9119,6 +9136,7 @@ public final class ArcadePortManager implements Listener {
         }
         if ("earth".equals(kit) && isSkyWarsSkill(item, "Throwable Dirt")) {
             event.setCancelled(true);
+            if (!isDebugAbilityAllowed(player, ArcadePortGame.SKY_WARS, kit)) return true;
             if (!session.liveStarted) return true;
             long now = System.currentTimeMillis();
             if (now < session.skyWarsKitReadyAt.getOrDefault(id, 0L)) return true;
@@ -9248,6 +9266,12 @@ public final class ArcadePortManager implements Listener {
         UUID id = player.getUniqueId();
         if (GameDebugRuntimeOverrides.isDebugSession() || session == null || session.type != ArcadePortGame.SKY_WARS
                 || !session.alive.contains(id) || !"air".equals(session.skyWarsKits.get(id))) return;
+        if (!debugKitFeatureEnabled(player, ArcadePortGame.SKY_WARS, "air")) {
+            event.setCancelled(true);
+            player.setFlying(false);
+            player.setAllowFlight(false);
+            return;
+        }
         event.setCancelled(true);
         if (!session.liveStarted || System.currentTimeMillis() < session.skyWarsKitReadyAt.getOrDefault(id, 0L)) {
             player.setFlying(false);
@@ -9268,7 +9292,8 @@ public final class ArcadePortManager implements Listener {
                 || event.getCause() != EntityDamageEvent.DamageCause.FALL) return;
         Session session = active;
         if (session != null && session.type == ArcadePortGame.SKY_WARS
-                && "air".equals(session.skyWarsKits.get(player.getUniqueId()))) event.setCancelled(true);
+                && "air".equals(session.skyWarsKits.get(player.getUniqueId()))
+                && debugKitFeatureEnabled(player, ArcadePortGame.SKY_WARS, "air")) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
