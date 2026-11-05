@@ -23,6 +23,7 @@ class GameDebugEventCatalogTest {
         assertEquals("begin-evolution", GameDebugEventCatalog.events(ArcadePortGame.EVOLUTION).getFirst().id());
         assertEquals("shoot-ball", GameDebugEventCatalog.events(ArcadePortGame.HOOPS_REMASTERED).getFirst().id());
         assertEquals("roll-item", GameDebugEventCatalog.events(ArcadePortGame.SNAKE).getFirst().id());
+        assertEquals("take-photo", GameDebugEventCatalog.events(ArcadePortGame.CAMERA_SHY).getFirst().id());
         assertEquals("reset-own-plot", GameDebugEventCatalog.events(ArcadePortGame.MASTER_BUILDERS).getFirst().id());
         assertEquals("refill-arrow", GameDebugEventCatalog.events(ArcadePortGame.ONE_IN_THE_QUIVER)
                 .getFirst().id());
@@ -228,6 +229,31 @@ class GameDebugEventCatalogTest {
             assertTrue(store.substring(start, end).contains("GameDebugRuntimeOverrides.isDebugSession()"),
                     methodName + " is isolated during debug rounds");
         }
+    }
+
+    @Test
+    void cameraShyDebugPhotoUsesTheNormalFlashPathAndIsolatedProgressGuard() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String game = Files.readString(sourceRoot.resolve("CameraShyGame.java"));
+        assertTrue(manager.contains("type == ArcadePortGame.CAMERA_SHY && \"take-photo\".equals(eventId)"));
+        assertTrue(manager.contains("GameDebugRuntimeOverrides.markDebugSession();\n            return cameraShyModule.debugTakePhoto(tester);"));
+        int debugPhoto = game.indexOf("public boolean debugTakePhoto(Player player)");
+        int nextMethod = game.indexOf("public int queuedCount()", debugPhoto);
+        assertTrue(debugPhoto >= 0 && nextMethod > debugPhoto);
+        assertTrue(game.substring(debugPhoto, nextMethod).contains("triggerPhoto(player)"));
+        int trigger = game.indexOf("private void triggerPhoto(Player player)");
+        int end = game.indexOf("@EventHandler", trigger);
+        assertTrue(trigger >= 0 && end > trigger);
+        String photo = game.substring(trigger, end);
+        assertTrue(photo.contains("emitCameraFlash(player.getLocation())"));
+        assertTrue(photo.contains("takePhoto(player)"));
+        assertTrue(game.contains("private void award(UUID id, String achievementId) {\n        if (GameDebugRuntimeOverrides.isDebugSession()) return;"));
+        assertTrue(game.contains("private void recordMatchProgress(UUID winnerId) {\n        if (GameDebugRuntimeOverrides.isDebugSession()) return;"));
     }
 
     @Test

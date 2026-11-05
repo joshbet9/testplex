@@ -459,6 +459,13 @@ public final class CameraShyGame implements Listener {
         return true;
     }
 
+    /** Debug control: exercise the real camera flash/photo checks for an active participant. */
+    public boolean debugTakePhoto(Player player) {
+        if (!isAliveParticipant(player)) return false;
+        triggerPhoto(player);
+        return true;
+    }
+
     public int queuedCount() {
         return (int) queue.values().stream().filter(player -> player != null && player.isOnline()).count();
     }
@@ -1035,6 +1042,10 @@ public final class CameraShyGame implements Listener {
         if (phase != Phase.LIVE || !isAliveParticipant(player)) return;
         if (player.getInventory().getItemInMainHand().getType() != Material.SPYGLASS) return;
         event.setCancelled(true);
+        triggerPhoto(player);
+    }
+
+    private void triggerPhoto(Player player) {
         emitCameraFlash(player.getLocation());
         manager.showAbilityActivationCosmetic(player, ArcadePortGame.CAMERA_SHY);
         if (!isUsingSpyglass(player)) {

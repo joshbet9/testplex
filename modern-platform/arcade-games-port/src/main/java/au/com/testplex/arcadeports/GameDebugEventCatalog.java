@@ -26,6 +26,9 @@ final class GameDebugEventCatalog {
     private static final List<Event> SNAKE = List.of(
             new Event("roll-item", "Test Item Roulette", Material.MAGMA_CREAM,
                     "Start your normal random control-debuff roll now; only works for a living player."));
+    private static final List<Event> CAMERA_SHY = List.of(
+            new Event("take-photo", "Test Camera Flash", Material.SPYGLASS,
+                    "Run the normal F-key flash and photo checks now, including a visible flash on a missed photo."));
     private static final List<Event> EVOLUTION = List.of(
             new Event("begin-evolution", "Start Evolution", Material.DRAGON_EGG,
                     "Begin your normal evolution animation immediately to test form and cosmetic effects."));
@@ -102,6 +105,7 @@ final class GameDebugEventCatalog {
         if (game == ArcadePortGame.DRAW_MY_THING) return DRAW_MY_THING;
         if (game == ArcadePortGame.DRAGONS) return DRAGONS;
         if (game == ArcadePortGame.DRAGON_ESCAPE) return DRAGON_ESCAPE;
+        if (game == ArcadePortGame.CAMERA_SHY) return CAMERA_SHY;
         if (game == ArcadePortGame.EVOLUTION) return EVOLUTION;
         if (game == ArcadePortGame.HOOPS_REMASTERED) return HOOPS_REMASTERED;
         if (game == ArcadePortGame.MASTER_BUILDERS) return MASTER_BUILDERS;

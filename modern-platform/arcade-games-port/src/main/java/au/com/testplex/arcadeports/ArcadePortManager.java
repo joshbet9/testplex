@@ -910,6 +910,11 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.SNAKE && "roll-item".equals(eventId)) {
             return snakeModule != null && snakeModule.debugRollItem(tester);
         }
+        if (type == ArcadePortGame.CAMERA_SHY && "take-photo".equals(eventId)) {
+            if (cameraShyModule == null || !cameraShyModule.isLiveParticipant(tester)) return false;
+            GameDebugRuntimeOverrides.markDebugSession();
+            return cameraShyModule.debugTakePhoto(tester);
+        }
         Session session = active;
         if (session == null || session.type != type || !session.liveStarted
                 || !session.alive.contains(tester.getUniqueId())) return false;
