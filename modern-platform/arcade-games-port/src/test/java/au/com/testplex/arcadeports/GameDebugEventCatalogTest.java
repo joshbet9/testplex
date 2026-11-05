@@ -23,6 +23,8 @@ class GameDebugEventCatalogTest {
         assertEquals("begin-evolution", GameDebugEventCatalog.events(ArcadePortGame.EVOLUTION).getFirst().id());
         assertEquals("shoot-ball", GameDebugEventCatalog.events(ArcadePortGame.HOOPS_REMASTERED).getFirst().id());
         assertEquals("roll-item", GameDebugEventCatalog.events(ArcadePortGame.SNAKE).getFirst().id());
+        assertEquals("use-kit-ability", GameDebugEventCatalog.events(ArcadePortGame.SNEAKY_ASSASSINS)
+                .getFirst().id());
         assertEquals(List.of("take-photo", "use-kit-ability"),
                 GameDebugEventCatalog.events(ArcadePortGame.CAMERA_SHY).stream()
                         .map(GameDebugEventCatalog.Event::id).toList());
@@ -92,6 +94,25 @@ class GameDebugEventCatalogTest {
         assertTrue(herdUpdater.contains("MILK_THE_COW_HERD_SIZE"));
         assertTrue(herdUpdater.contains("MILK_THE_COW_HERD_MOVE_SPEED"));
         assertTrue(herdUpdater.contains("session.world.spawn(spawn, Cow.class)"));
+    }
+
+    @Test
+    void sneakyAssassinsDebugAbilityRunsTheSelectedKitEffectForAuthorisedLivingPlayers() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String mechanics = Files.readString(sourceRoot.resolve("SneakyAssassinsMechanics.java"));
+        assertTrue(manager.contains("type == ArcadePortGame.SNEAKY_ASSASSINS && \"use-kit-ability\".equals(eventId)"));
+        assertTrue(mechanics.contains("!plugin.hasAdminAccess(tester)"));
+        assertTrue(mechanics.contains("!isAlive.test(tester.getUniqueId())"));
+        assertTrue(mechanics.contains("escapeArtistSmokeUsed.add(id)"));
+        assertTrue(mechanics.contains("useSmokeBomb(tester)"));
+        assertTrue(mechanics.contains("throwRevealer(tester)"));
+        assertTrue(mechanics.contains("booleanValue(\"ability-smoke-bomb\", true)"));
+        assertTrue(mechanics.contains("booleanValue(\"ability-revealer\", true)"));
     }
 
     @Test

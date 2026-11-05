@@ -169,6 +169,27 @@ final class SneakyAssassinsMechanics {
         return kitPreferences.getOrDefault(playerId, "escape-artist");
     }
 
+    boolean debugUseSelectedKitAbility(Player tester) {
+        if (tester == null || !tester.isOnline() || !plugin.hasAdminAccess(tester) || world == null
+                || tester.getWorld() != world || !players.containsKey(tester.getUniqueId())
+                || !isAlive.test(tester.getUniqueId())) return false;
+        UUID id = tester.getUniqueId();
+        String kit = selectedKit(id);
+        if ("escape-artist".equals(kit)) {
+            if (!GameDebugRuntimeOverrides.booleanValue("ability-smoke-bomb", true)
+                    || escapeArtistSmokeUsed.contains(id)) return false;
+            escapeArtistSmokeUsed.add(id);
+            useSmokeBomb(tester);
+            return true;
+        }
+        if ("revealer".equals(kit)) {
+            if (!GameDebugRuntimeOverrides.booleanValue("ability-revealer", true)) return false;
+            throwRevealer(tester);
+            return true;
+        }
+        return false;
+    }
+
     String statusText(UUID playerId) {
         int count = powerUpCounts.getOrDefault(playerId, 0);
         long now = System.currentTimeMillis();
