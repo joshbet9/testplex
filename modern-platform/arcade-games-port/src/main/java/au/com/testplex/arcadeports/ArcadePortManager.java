@@ -7536,7 +7536,9 @@ public final class ArcadePortManager implements Listener {
         updateDeathTagRunnerTrails(session);
         for (Player player : alivePlayers(session)) {
             if (!session.tagged.contains(player.getUniqueId())
-                    && "archer".equals(session.deathTagRunnerKits.getOrDefault(player.getUniqueId(), "basher"))) {
+                    && "archer".equals(session.deathTagRunnerKits.getOrDefault(player.getUniqueId(), "basher"))
+                    && (!plugin.hasAdminAccess(player) || debugFeatureEnabled(player.getUniqueId(),
+                            ArcadePortGame.DEATH_TAG, "ability-archer", true))) {
                 Long lastArrow = session.deathTagLastArrowAt.get(player.getUniqueId());
                 if (lastArrow == null || now - lastArrow >= GameDebugRuntimeOverrides.longValue("DEATH_TAG_ARCHER_ARROW_INTERVAL_MILLIS", ArcadePortRules.DEATH_TAG_ARCHER_ARROW_INTERVAL_MILLIS)) {
                     session.deathTagLastArrowAt.put(player.getUniqueId(), now);
@@ -7754,6 +7756,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void useDeathTagTricksterSwap(Session session, Player runner) {
+        if (!isDebugAbilityAllowed(runner, ArcadePortGame.DEATH_TAG, "trickster")) return;
         UUID id = runner.getUniqueId();
         if (session.deathTagTricksterSwapUsed.contains(id)) {
             runner.sendMessage(ChatColor.RED + "Your Chaser Swap has already been used this round.");
@@ -7791,6 +7794,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void useDeathTagTricksterFireworks(Session session, Player runner) {
+        if (!isDebugAbilityAllowed(runner, ArcadePortGame.DEATH_TAG, "trickster")) return;
         UUID id = runner.getUniqueId();
         long now = System.currentTimeMillis();
         long readyAt = session.deathTagTricksterFireworksReadyAt.getOrDefault(id, 0L);
@@ -18638,7 +18642,16 @@ public final class ArcadePortManager implements Listener {
                     }
                 } else {
                     String kit = session.deathTagRunnerKits.getOrDefault(attacker.getUniqueId(), "basher");
-                    if (!"basher".equals(kit) && !"traitor".equals(kit)
+                    boolean basherAbility = "basher".equals(kit)
+                            && (!plugin.hasAdminAccess(attacker) || debugFeatureEnabled(attacker.getUniqueId(),
+                                    ArcadePortGame.DEATH_TAG, "ability-basher", true));
+                    boolean traitorAbility = "traitor".equals(kit)
+                            && (!plugin.hasAdminAccess(attacker) || debugFeatureEnabled(attacker.getUniqueId(),
+                                    ArcadePortGame.DEATH_TAG, "ability-traitor", true));
+                    boolean turtleAbility = "turtle".equals(kit)
+                            && (!plugin.hasAdminAccess(attacker) || debugFeatureEnabled(attacker.getUniqueId(),
+                                    ArcadePortGame.DEATH_TAG, "ability-turtle", true));
+                    if (!basherAbility && !traitorAbility
                             && !"projectile hit".equals(source)) {
                         applyDeathTagDefaultMeleeKnockback(attacker, target,
                                 session.alphaChasers.contains(target.getUniqueId()));
@@ -18648,7 +18661,7 @@ public final class ArcadePortManager implements Listener {
                             session.alphaChasers.contains(target.getUniqueId()));
                     boolean lethalHit = ArcadePortRules.deathTagHitIsLethal(target.getHealth(), damage);
                     if (damage > 0.0D) {
-                        if ("turtle".equals(kit) && !"projectile hit".equals(source)) {
+                        if (turtleAbility && !"projectile hit".equals(source)) {
                             recordDeathTagTurtleHit(session, attacker, target);
                         }
                         if (lethalHit) {
@@ -18661,9 +18674,9 @@ public final class ArcadePortManager implements Listener {
                             target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.05F);
                         }
                     }
-                    if (!lethalHit && "basher".equals(kit) && !"projectile hit".equals(source)) {
+                    if (!lethalHit && basherAbility && !"projectile hit".equals(source)) {
                         target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 2, false, false, true));
-                    } else if (!lethalHit && "traitor".equals(kit) && !"projectile hit".equals(source)) {
+                    } else if (!lethalHit && traitorAbility && !"projectile hit".equals(source)) {
                         String cooldownKey = attacker.getUniqueId() + ":" + target.getUniqueId();
                         long now = System.currentTimeMillis();
                         long lastUse = session.deathTagTraitorKnockbackAt.getOrDefault(cooldownKey, 0L);
@@ -24150,7 +24163,7 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onDeathTagBowShoot(EntityShootBowEvent event) {
         if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
@@ -24161,6 +24174,13 @@ public final class ArcadePortManager implements Listener {
                 || session.tagged.contains(player.getUniqueId())
                 || !"archer".equals(session.deathTagRunnerKits.getOrDefault(player.getUniqueId(), "basher"))
                 || !(event.getProjectile() instanceof Arrow arrow)) return;
+
+        if (plugin.hasAdminAccess(player) && !debugFeatureEnabled(player.getUniqueId(),
+                ArcadePortGame.DEATH_TAG, "ability-archer", true)) {
+            event.setCancelled(true);
+            player.sendActionBar(ChatColor.RED + "Your Archer kit feature is disabled in this debug profile.");
+            return;
+        }
 
         // Archer is the only Death Tag kit with a bow; track every shot for remove-on-impact.
         // Do not inspect the inventory here: the final arrow may already have been consumed.
@@ -24797,7 +24817,9 @@ public final class ArcadePortManager implements Listener {
                 || !(event.getEntity() instanceof Player player)) return;
         UUID playerId = player.getUniqueId();
         if (!session.alive.contains(playerId) || session.tagged.contains(playerId)
-                || !"basher".equals(session.deathTagRunnerKits.getOrDefault(playerId, "basher"))) return;
+                || !"basher".equals(session.deathTagRunnerKits.getOrDefault(playerId, "basher"))
+                || (plugin.hasAdminAccess(player) && !debugFeatureEnabled(playerId,
+                        ArcadePortGame.DEATH_TAG, "ability-basher", true))) return;
         EntityRegainHealthEvent.RegainReason reason = event.getRegainReason();
         if (reason != EntityRegainHealthEvent.RegainReason.SATIATED
                 && reason != EntityRegainHealthEvent.RegainReason.REGEN) return;

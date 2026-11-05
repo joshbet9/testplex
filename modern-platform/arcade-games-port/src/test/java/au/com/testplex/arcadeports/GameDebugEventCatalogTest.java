@@ -455,6 +455,29 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void deathTagKitSwitchesGateCombatArrowsAndTricksterAbilitiesForTesters() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        assertTrue(lobby.contains("List.of(\"basher\", \"archer\", \"traitor\", \"turtle\", \"trickster\")"));
+        assertTrue(lobby.contains("game == ArcadePortGame.DEATH_TAG && key.startsWith(\"ability-\")"));
+        for (String kit : List.of("basher", "archer", "traitor", "turtle", "trickster")) {
+            assertTrue(manager.contains("ArcadePortGame.DEATH_TAG, \"ability-" + kit + "\""),
+                    kit + " has a runtime consumer");
+        }
+        assertTrue(manager.contains("private void useDeathTagTricksterSwap(Session session, Player runner) {\n"
+                + "        if (!isDebugAbilityAllowed(runner, ArcadePortGame.DEATH_TAG, \"trickster\")) return;"));
+        assertTrue(manager.contains("private void useDeathTagTricksterFireworks(Session session, Player runner) {\n"
+                + "        if (!isDebugAbilityAllowed(runner, ArcadePortGame.DEATH_TAG, \"trickster\")) return;"));
+        assertTrue(manager.contains("plugin.hasAdminAccess(player) && !debugFeatureEnabled(player.getUniqueId(),\n"
+                + "                ArcadePortGame.DEATH_TAG, \"ability-archer\", true)"));
+    }
+
+    @Test
     void castleAssaultObjectiveEventRequiresVacantObjectiveAndUsesNormalSpawner() throws IOException {
         Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "CastleAssaultHeroesOfGwenRuntime.java");

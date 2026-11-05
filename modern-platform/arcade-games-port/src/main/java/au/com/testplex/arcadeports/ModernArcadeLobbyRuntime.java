@@ -1272,6 +1272,14 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                         Material.ENDER_EYE, "Allow this kit's movement, attack or swap ability for authorised testers.", true));
             }
         }
+        if (game == ArcadePortGame.DEATH_TAG) {
+            for (String kit : List.of("basher", "archer", "traitor", "turtle", "trickster")) {
+                String key = "ability-" + kit;
+                features.put(key, new DebugFeature(key, "Kit feature: " + humanizeDebugKey(kit),
+                        Material.IRON_AXE,
+                        "Allow this kit's combat, movement or passive effect for authorised testers.", true));
+            }
+        }
         return List.copyOf(features.values());
     }
 
@@ -1297,6 +1305,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.PAINTBALL && "ignore-reload".equals(key))
                 || (game == ArcadePortGame.SPLEEF && key.startsWith("ability-"))
                 || (game == ArcadePortGame.RUNNER && key.startsWith("ability-"))
+                || (game == ArcadePortGame.DEATH_TAG && key.startsWith("ability-"))
                 || (game == ArcadePortGame.SUPER_SPLOOR && key.startsWith("special-"))
                 || "DRAGONS_SPAWNING_ENABLED".equals(key)
                 || "DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED".equals(key)
