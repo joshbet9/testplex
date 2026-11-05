@@ -28456,6 +28456,11 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void adjustBombLobbersPitch(Session session, Player player, boolean increase) {
+        if (plugin.hasAdminAccess(player)
+                && !debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.BOMB_LOBBERS, "pitch-adjustment", true)) {
+            player.sendActionBar(ChatColor.RED + "TNT pitch adjustment is disabled in your debug profile.");
+            return;
+        }
         UUID id = player.getUniqueId();
         long now = System.currentTimeMillis();
         long lastAdjust = session.bombLastPitchAdjustAt.getOrDefault(id, 0L);
@@ -28605,6 +28610,11 @@ public final class ArcadePortManager implements Listener {
 
     private void useBombLobbersWaller(Session session, Player player, Block clicked) {
         if (session == null || player == null || clicked == null) return;
+        if (plugin.hasAdminAccess(player)
+                && !debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.BOMB_LOBBERS, "block-wall", true)) {
+            player.sendActionBar(ChatColor.RED + "Waller block walls are disabled in your debug profile.");
+            return;
+        }
         long clickAt = System.currentTimeMillis();
         session.bombLastWallerAt.put(player.getUniqueId(), clickAt);
         if (clicked.isLiquid()) {
@@ -28874,6 +28884,14 @@ public final class ArcadePortManager implements Listener {
         if (session == null || session.type != ArcadePortGame.BOMB_LOBBERS
                 || !session.alive.contains(player.getUniqueId())) return;
         UUID id = player.getUniqueId();
+        if (plugin.hasAdminAccess(player)
+                && !debugFeatureEnabled(id, ArcadePortGame.BOMB_LOBBERS, "double-jump", true)) {
+            event.setCancelled(true);
+            player.setFlying(false);
+            player.setAllowFlight(false);
+            player.sendActionBar(ChatColor.RED + "Double jump is disabled in your debug profile.");
+            return;
+        }
         // The source perk only permits the toggle when grounded readiness has recharged.
         if (!session.bombDoubleJumpAvailable.remove(id)) {
             event.setCancelled(true);

@@ -1209,6 +1209,14 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             features.put(variable.key(), new DebugFeature(variable.key(), title, Material.REDSTONE_TORCH,
                     description, variable.defaultValue() != 0.0D));
         }
+        if (game == ArcadePortGame.BOMB_LOBBERS) {
+            features.put("double-jump", new DebugFeature("double-jump", "Double jump", Material.FEATHER,
+                    "Allow authorised testers to use the normal grounded double jump.", true));
+            features.put("pitch-adjustment", new DebugFeature("pitch-adjustment", "TNT pitch control", Material.LEVER,
+                    "Allow Pitcher testers to adjust TNT throw power.", true));
+            features.put("block-wall", new DebugFeature("block-wall", "Waller block wall", Material.STONE_BRICKS,
+                    "Allow Waller testers to place the normal cooldown wall.", true));
+        }
         features.put("achievement-preview-only", new DebugFeature("achievement-preview-only",
                 "Achievement preview only", Material.KNOWLEDGE_BOOK,
                 "Show real achievement condition results without saving unlocks.", false));
@@ -1335,6 +1343,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || "no-hunger-loss".equals(key) || "unlimited-abilities".equals(key)
                 || "unlimited-specials".equals(key)
                 || (game == ArcadePortGame.BACON_BRAWL && key.startsWith("ability-"))
+                || (game == ArcadePortGame.BOMB_LOBBERS
+                        && ("double-jump".equals(key) || "pitch-adjustment".equals(key) || "block-wall".equals(key)))
                 || (game == ArcadePortGame.DRAGON_ESCAPE && key.startsWith("ability-"))
                 || (game == ArcadePortGame.DRAGONS && key.startsWith("ability-"))
                 || (game == ArcadePortGame.ONE_IN_THE_QUIVER && key.startsWith("ability-"))

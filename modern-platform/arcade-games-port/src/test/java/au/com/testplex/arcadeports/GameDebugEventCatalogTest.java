@@ -653,6 +653,28 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void bombLobbersMenuSwitchesGateTheRealKitMechanics() throws IOException {
+        Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ArcadePortManager.java");
+        Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ModernArcadeLobbyRuntime.java");
+        if (!Files.isRegularFile(managerPath)) {
+            managerPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ArcadePortManager.java");
+            runtimePath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ModernArcadeLobbyRuntime.java");
+        }
+        String manager = Files.readString(managerPath);
+        String runtime = Files.readString(runtimePath);
+        assertTrue(runtime.contains("\"double-jump\", \"Double jump\""));
+        assertTrue(runtime.contains("\"pitch-adjustment\", \"TNT pitch control\""));
+        assertTrue(runtime.contains("\"block-wall\", \"Waller block wall\""));
+        assertTrue(manager.contains("debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.BOMB_LOBBERS, \"pitch-adjustment\", true)"));
+        assertTrue(manager.contains("debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.BOMB_LOBBERS, \"block-wall\", true)"));
+        assertTrue(manager.contains("debugFeatureEnabled(id, ArcadePortGame.BOMB_LOBBERS, \"double-jump\", true)"));
+    }
+
+    @Test
     void heroesOfGwenDebugEventStartsTheNormalPairedMinionWave() throws IOException {
         Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "CastleAssaultHeroesOfGwenRuntime.java");
