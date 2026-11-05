@@ -35,4 +35,10 @@ class GameDebugPhaseActionsTest {
         assertFalse(GameManager.canDebugAdvancePhase(GameState.LIVE, false));
         assertTrue(GameManager.canDebugAdvancePhase(GameState.LIVE, true));
     }
+
+    @Test
+    void superSploorPhaseAdvanceRequiresARunningRuntime() {
+        assertFalse(GameDebugPhaseActions.canAdvanceSuperSploor(false));
+        assertTrue(GameDebugPhaseActions.canAdvanceSuperSploor(true));
+    }
 }

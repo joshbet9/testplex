@@ -843,6 +843,11 @@ public final class ArcadePortManager implements Listener {
         if (session == null || session.type != type || !session.startupComplete) {
             return false;
         }
+        if (type == ArcadePortGame.SUPER_SPLOOR) {
+            boolean advanced = superSploor.debugAdvancePhase();
+            if (advanced) GameDebugRuntimeOverrides.markDebugSession();
+            return advanced;
+        }
         long now = System.currentTimeMillis();
         boolean builderPhase = session.masterBuilderPhase == MasterBuildersPhase.BUILDING
                 || session.masterBuilderPhase == MasterBuildersPhase.REVIEW;

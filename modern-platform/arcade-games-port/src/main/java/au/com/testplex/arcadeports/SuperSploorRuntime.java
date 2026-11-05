@@ -210,6 +210,14 @@ public final class SuperSploorRuntime implements Listener {
     }
 
     public boolean isRunning() { return running; }
+    /** Debug control: run the regular round or overtime deadline handler immediately. */
+    public boolean debugAdvancePhase() {
+        if (!GameDebugPhaseActions.canAdvanceSuperSploor(running)) return false;
+        long now = System.currentTimeMillis();
+        if (overtime) overtimeEndsAt = now;
+        else matchEndsAt = now;
+        return true;
+    }
 
     public Map<UUID, PlayerMatchStats> snapshotStats() {
         Map<UUID, PlayerMatchStats> copy = new HashMap<>();

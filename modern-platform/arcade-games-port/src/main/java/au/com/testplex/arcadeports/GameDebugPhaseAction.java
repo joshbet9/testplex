@@ -25,4 +25,8 @@ final class GameDebugPhaseActions {
         return hasRoundTimeout ? GameDebugPhaseAction.ROUND_TIMEOUT : GameDebugPhaseAction.NONE;
     }
 
+    static boolean canAdvanceSuperSploor(boolean running) {
+        return running;
+    }
+
 }
