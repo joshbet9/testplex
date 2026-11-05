@@ -1231,6 +1231,12 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     "Allow this tester to paint and use the Pencil, Brush, Line, Square, Circle and Spray tools.", true));
             features.put("palette-selection", new DebugFeature("palette-selection", "Palette selection", Material.PAINTING,
                     "Allow this tester to change their drawing colour from the inventory or map palette.", true));
+            features.put("guess-submission", new DebugFeature("guess-submission", "Guess submissions", Material.WRITABLE_BOOK,
+                    "Allow this tester to submit guesses through the normal chat answer check.", true));
+            features.put("timed-hints", new DebugFeature("timed-hints", "Timed letter hints", Material.PAPER,
+                    "Reveal letters on the normal round schedule and play the hint sound.", true));
+            features.put("sound-feedback", new DebugFeature("sound-feedback", "Round sound effects", Material.NOTE_BLOCK,
+                    "Play the normal drawing, hint and guess feedback sounds.", true));
         }
         if (game == ArcadePortGame.WITHER_ASSAULT) {
             features.put("ability-human-leap", new DebugFeature("ability-human-leap", "Human double jump", Material.FEATHER,
@@ -1435,7 +1441,9 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                         && ("objective-tnt".equals(key) || "crystal-damage".equals(key) || "king-damage".equals(key)))
                 || (game == ArcadePortGame.HEROES_OF_GWEN && key.startsWith("hero-") && key.endsWith("-abilities"))
                 || (game == ArcadePortGame.DRAW_MY_THING
-                        && ("canvas-tools".equals(key) || "palette-selection".equals(key)))
+                        && ("canvas-tools".equals(key) || "palette-selection".equals(key)
+                                || "guess-submission".equals(key) || "timed-hints".equals(key)
+                                || "sound-feedback".equals(key)))
                 || (game == ArcadePortGame.WITHER_ASSAULT
                         && ("ability-human-leap".equals(key) || "human-revival".equals(key) || key.startsWith("ability-")))
                 || (game == ArcadePortGame.HOOPS_REMASTERED

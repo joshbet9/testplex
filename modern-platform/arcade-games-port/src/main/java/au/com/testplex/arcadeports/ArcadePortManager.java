@@ -800,7 +800,8 @@ public final class ArcadePortManager implements Listener {
             debugProfiles.setFeature(player.getUniqueId(), type, flag, enabled);
             if (activeDebugGame() == type) {
                 GameDebugRuntimeOverrides.markDebugSession();
-                if ((type == ArcadePortGame.SNAKE || type == ArcadePortGame.SNEAKY_ASSASSINS)
+                if ((type == ArcadePortGame.SNAKE || type == ArcadePortGame.SNEAKY_ASSASSINS
+                        || type == ArcadePortGame.DRAW_MY_THING)
                         && player.getUniqueId().equals(activeDebugProfileOwner)) {
                     GameDebugRuntimeOverrides.setValue(flag, enabled);
                 }
@@ -11752,7 +11753,8 @@ public final class ArcadePortManager implements Listener {
         drawer.sendMessage(ChatColor.GREEN+"Your word is: "+ChatColor.YELLOW+session.drawWord);
         announce(session,ChatColor.GOLD+drawer.getName()+" is drawing! Guess the word.");
         for (Player participant : session.players.values()) {
-            if (participant != null && participant.isOnline()) {
+            if (participant != null && participant.isOnline()
+                    && GameDebugRuntimeOverrides.booleanValue("sound-feedback", true)) {
                 participant.playSound(participant.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0F, 0.5F);
             }
         }
@@ -11767,7 +11769,8 @@ public final class ArcadePortManager implements Listener {
         Player drawer=session.players.get(drawerId);
         announce(session,ChatColor.GOLD+"Round ended. The word was "+ChatColor.YELLOW+session.drawWord+".");
         for (Player participant : session.players.values()) {
-            if (participant != null && participant.isOnline()) {
+            if (participant != null && participant.isOnline()
+                    && GameDebugRuntimeOverrides.booleanValue("sound-feedback", true)) {
                 participant.playSound(participant.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 0.7F, 0.85F);
             }
         }
@@ -11829,7 +11832,9 @@ public final class ArcadePortManager implements Listener {
         boolean allGuessed=!guessers.isEmpty()&&guessers.stream().allMatch(session.drawCorrectGuessers::contains);
         if(now>=session.drawRoundEndsAt||allGuessed){finishDrawMyThingRound(session,now);return;}
         int letters=(int)session.drawWord.chars().filter(ch->ch!=' ').count();
-        int reveal=letters==0?0:(int)Math.floor(Math.max(0,now-session.drawRoundStartedAt)*(double)letters/(session.drawRoundDurationMillis*1.75D));
+        boolean timedHints = GameDebugRuntimeOverrides.booleanValue("timed-hints", true);
+        if (!timedHints) session.drawRevealedLetters.clear();
+        int reveal=!timedHints||letters==0?0:(int)Math.floor(Math.max(0,now-session.drawRoundStartedAt)*(double)letters/(session.drawRoundDurationMillis*1.75D));
         int revealedBefore = session.drawRevealedLetters.size();
         while(session.drawRevealedLetters.size()<reveal){
             List<Integer> hidden=new ArrayList<>();
@@ -11840,7 +11845,8 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.drawRevealedLetters.size() > revealedBefore) {
             for (Player guesser : session.players.values()) {
-                if (guesser != null && guesser.isOnline() && !guesser.getUniqueId().equals(session.drawCurrentDrawer)) {
+                if (guesser != null && guesser.isOnline() && !guesser.getUniqueId().equals(session.drawCurrentDrawer)
+                        && GameDebugRuntimeOverrides.booleanValue("sound-feedback", true)) {
                     guesser.playSound(guesser.getLocation(), Sound.ENTITY_CHICKEN_EGG, 1.5F, 2.0F);
                 }
             }
@@ -11864,6 +11870,11 @@ public final class ArcadePortManager implements Listener {
         if(active!=session||session.drawCurrentDrawer==null||playerId.equals(session.drawCurrentDrawer))return;
         Player player=session.players.get(playerId);
         if(player==null||!player.isOnline()||session.drawCorrectGuessers.contains(playerId))return;
+        if (plugin.hasAdminAccess(player)
+                && !debugFeatureEnabled(playerId, ArcadePortGame.DRAW_MY_THING, "guess-submission", true)) {
+            player.sendActionBar(ChatColor.RED + "Guess submissions are disabled in your debug profile.");
+            return;
+        }
         int used=session.drawGuessAttempts.getOrDefault(playerId,0);
         if(used>=DRAW_MY_THING_MAX_GUESSES){player.sendMessage(ChatColor.RED+"No guesses remaining.");return;}
         session.drawGuessAttempts.put(playerId,used+1);
@@ -11878,10 +11889,13 @@ public final class ArcadePortManager implements Listener {
         if(guess.equals(answer)){
             boolean first=session.drawCorrectGuessers.isEmpty();
             session.drawCorrectGuessers.add(playerId);session.scores.merge(playerId,first?3:1,Integer::sum);
-            player.playSound(player.getLocation(), first ? Sound.ENTITY_PLAYER_LEVELUP
-                    : Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8F, first ? 1.15F : 1.35F);
+            if (GameDebugRuntimeOverrides.booleanValue("sound-feedback", true)) {
+                player.playSound(player.getLocation(), first ? Sound.ENTITY_PLAYER_LEVELUP
+                        : Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8F, first ? 1.15F : 1.35F);
+            }
             Player drawer = session.players.get(session.drawCurrentDrawer);
-            if (drawer != null && drawer.isOnline()) {
+            if (drawer != null && drawer.isOnline()
+                    && GameDebugRuntimeOverrides.booleanValue("sound-feedback", true)) {
                 drawer.playSound(drawer.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.8F,
                         first ? 1.5F : 1.9F);
             }
@@ -11936,7 +11950,9 @@ public final class ArcadePortManager implements Listener {
             if (bestOtherScore - session.scores.getOrDefault(playerId, 0) >= 10) {
                 session.drawComebackCandidates.add(playerId);
             }
-            player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 2.0F, 1.0F);
+            if (GameDebugRuntimeOverrides.booleanValue("sound-feedback", true)) {
+                player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 2.0F, 1.0F);
+            }
             announce(session,ChatColor.GREEN+player.getName()+" guessed the word"+(first?" first!":"!"));
         }else {
             int bestOtherScore = session.scores.entrySet().stream()
@@ -11946,7 +11962,9 @@ public final class ArcadePortManager implements Listener {
                 session.drawComebackCandidates.add(playerId);
             }
             session.drawFirstGuessStreaks.put(playerId, 0);
-            player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 0.7F, 0.75F);
+            if (GameDebugRuntimeOverrides.booleanValue("sound-feedback", true)) {
+                player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 0.7F, 0.75F);
+            }
             player.sendMessage(ChatColor.GRAY+"Not quite. "+(DRAW_MY_THING_MAX_GUESSES-used-1)+" guesses remain.");
         }
     }
@@ -22504,7 +22522,9 @@ public final class ArcadePortManager implements Listener {
             if (now - lastPrompt >= 1_000L) {
                 // The 1.8 movement instruction used NOTE_PLING; limit it to one
                 // reminder per second while the drawer is still locked in place.
-                player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0F, 0.5F);
+                if (GameDebugRuntimeOverrides.booleanValue("sound-feedback", true)) {
+                    player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0F, 0.5F);
+                }
                 session.drawMovementPromptSoundAt.put(playerId, now);
             }
             return;

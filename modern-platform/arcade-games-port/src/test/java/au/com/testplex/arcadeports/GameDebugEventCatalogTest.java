@@ -213,6 +213,27 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void drawMyThingDebugSwitchesControlGuessHintsAndRoundSounds() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        for (String key : List.of("guess-submission", "timed-hints", "sound-feedback")) {
+            assertTrue(lobby.contains("\"" + key + "\""), key + " appears in the Draw My Thing panel");
+        }
+        assertTrue(manager.contains("debugFeatureEnabled(playerId, ArcadePortGame.DRAW_MY_THING, \"guess-submission\", true)"));
+        for (String key : List.of("timed-hints", "sound-feedback")) {
+            assertTrue(manager.contains("booleanValue(\"" + key + "\""),
+                    key + " is consumed by the active round runtime");
+        }
+        assertTrue(manager.contains("session.drawRevealedLetters.clear()"));
+        assertTrue(manager.contains("type == ArcadePortGame.DRAW_MY_THING"));
+    }
+
+    @Test
     void baconBrawlDebugMeterFillsTheSelectedAbilityAndRefreshesItsHud() throws IOException {
         Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "ArcadePortManager.java");
