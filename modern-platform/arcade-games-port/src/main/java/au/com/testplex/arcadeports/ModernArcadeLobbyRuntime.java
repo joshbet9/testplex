@@ -1291,6 +1291,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             }
         }
         if (game == ArcadePortGame.RUNNER) {
+            features.put("runner-trail", new DebugFeature("runner-trail", "Runner block trail", Material.LIME_WOOL,
+                    "Let this runner paint visited blocks with their trail; trail blocks disappear after the normal delay.", true));
             for (String kit : List.of("leaper", "archer", "frosty", "switcher")) {
                 String key = "ability-" + kit;
                 features.put(key, new DebugFeature(key, "Ability: " + humanizeDebugKey(kit),
@@ -1367,6 +1369,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.HEROES_OF_GWEN && key.startsWith("hero-") && key.endsWith("-abilities"))
                 || (game == ArcadePortGame.DRAGON_ESCAPE && "finish-detection".equals(key))
                 || (game == ArcadePortGame.DRAGON_ESCAPE && key.startsWith("ability-"))
+                || (game == ArcadePortGame.RUNNER && "runner-trail".equals(key))
                 || (game == ArcadePortGame.DRAGONS && key.startsWith("ability-"))
                 || (game == ArcadePortGame.ONE_IN_THE_QUIVER && key.startsWith("ability-"))
                 || (game == ArcadePortGame.PAINTBALL && "ignore-reload".equals(key))

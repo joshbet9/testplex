@@ -22772,6 +22772,8 @@ public final class ArcadePortManager implements Listener {
         if (active != session || block == null || block.getY() < 0
                 || block.getY() >= session.world.getMaxHeight()
                 || !insideRunnerSourceBounds(session, block.getX(), block.getZ())) return;
+        if (owner != null && plugin.hasAdminAccess(owner)
+                && !debugFeatureEnabled(owner.getUniqueId(), ArcadePortGame.RUNNER, "runner-trail", true)) return;
         Long graceUntil = session.runnerBlockGraceUntil.get(block);
         if (graceUntil != null) {
             if (now < graceUntil) return;
@@ -22801,6 +22803,17 @@ public final class ArcadePortManager implements Listener {
                 session.runnerBlockMaterials.remove(block);
                 continue;
             }
+            UUID ownerId = session.runnerBlockOwners.get(block);
+            Player owner = ownerId == null ? null : session.players.get(ownerId);
+            if (owner != null && plugin.hasAdminAccess(owner)
+                    && !debugFeatureEnabled(ownerId, ArcadePortGame.RUNNER, "runner-trail", true)) {
+                org.bukkit.block.data.BlockData original = session.runnerOriginalBlockData.remove(block);
+                if (original != null) block.setBlockData(original, false);
+                iterator.remove();
+                session.runnerBlockMaterials.remove(block);
+                session.runnerBlockOwners.remove(block);
+                continue;
+            }
             Long graceUntil = session.runnerBlockGraceUntil.get(block);
             if (graceUntil != null) {
                 if (now < graceUntil) continue;
@@ -22810,6 +22823,8 @@ public final class ArcadePortManager implements Listener {
             block.setType(Material.AIR, false);
             iterator.remove();
             session.runnerBlockMaterials.remove(block);
+            session.runnerBlockOwners.remove(block);
+            session.runnerOriginalBlockData.remove(block);
         }
         session.runnerBlockGraceUntil.entrySet().removeIf(entry -> entry.getValue() <= now
                 && !session.runnerBlocks.containsKey(entry.getKey()));

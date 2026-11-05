@@ -757,6 +757,26 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void runnerTrailSwitchStopsNewMarksAndRestoresExistingTrail() throws IOException {
+        Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ArcadePortManager.java");
+        Path lobbyPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ModernArcadeLobbyRuntime.java");
+        if (!Files.isRegularFile(managerPath)) {
+            managerPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ArcadePortManager.java");
+            lobbyPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ModernArcadeLobbyRuntime.java");
+        }
+        String source = Files.readString(managerPath);
+        String lobby = Files.readString(lobbyPath);
+        assertTrue(lobby.contains("\"runner-trail\", \"Runner block trail\""));
+        assertTrue(source.contains("debugFeatureEnabled(owner.getUniqueId(), ArcadePortGame.RUNNER, \"runner-trail\", true)"));
+        assertTrue(source.contains("session.runnerOriginalBlockData.remove(block)"));
+        assertTrue(source.contains("session.runnerBlockOwners.remove(block)"));
+    }
+
+    @Test
     void heroesOfGwenDebugEventStartsTheNormalPairedMinionWave() throws IOException {
         Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "CastleAssaultHeroesOfGwenRuntime.java");
