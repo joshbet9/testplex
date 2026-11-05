@@ -17,7 +17,9 @@ class GameDebugEventCatalogTest {
         assertEquals("spawn-minions", witherEvents.getFirst().id());
         assertEquals("reveal-letter", GameDebugEventCatalog.events(ArcadePortGame.DRAW_MY_THING).getFirst().id());
         assertEquals("spawn-dragon", GameDebugEventCatalog.events(ArcadePortGame.DRAGONS).getFirst().id());
-        assertEquals("advance-dragon", GameDebugEventCatalog.events(ArcadePortGame.DRAGON_ESCAPE).getFirst().id());
+        assertEquals(List.of("advance-dragon", "use-kit-ability"),
+                GameDebugEventCatalog.events(ArcadePortGame.DRAGON_ESCAPE).stream()
+                        .map(GameDebugEventCatalog.Event::id).toList());
         assertEquals("begin-evolution", GameDebugEventCatalog.events(ArcadePortGame.EVOLUTION).getFirst().id());
         assertEquals("shoot-ball", GameDebugEventCatalog.events(ArcadePortGame.HOOPS_REMASTERED).getFirst().id());
         assertEquals("roll-item", GameDebugEventCatalog.events(ArcadePortGame.SNAKE).getFirst().id());
@@ -271,6 +273,27 @@ class GameDebugEventCatalogTest {
         assertTrue(event.contains("GameDebugRuntimeOverrides.markDebugSession()"));
         assertTrue(event.contains("beginRoulette(state)"));
         assertTrue(manager.contains("type == ArcadePortGame.SNAKE && \"roll-item\".equals(eventId)"));
+    }
+
+    @Test
+    void dragonEscapeKitDebugEventInvokesSelectedNormalAbilityWithValidTargets() throws IOException {
+        Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ArcadePortManager.java");
+        if (!Files.isRegularFile(managerPath)) {
+            managerPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ArcadePortManager.java");
+        }
+        String source = Files.readString(managerPath);
+        assertTrue(source.contains("type == ArcadePortGame.DRAGON_ESCAPE && \"use-kit-ability\".equals(eventId)"));
+        int start = source.indexOf("private boolean debugUseDragonEscapeKitAbility(");
+        int end = source.indexOf("boolean debugRestoreTesterVitals(", start);
+        assertTrue(start >= 0 && end > start);
+        String helper = source.substring(start, end);
+        assertTrue(helper.contains("useDragonEscapeLeap(session, tester)"));
+        assertTrue(helper.contains("useDragonEscapeWarper(session, tester)"));
+        assertTrue(helper.contains("Block target = tester.getTargetBlockExact(6)"));
+        assertTrue(helper.contains("if (target == null) return false"));
+        assertTrue(helper.contains("updateDragonEscapeResources(session"));
     }
 
     @Test

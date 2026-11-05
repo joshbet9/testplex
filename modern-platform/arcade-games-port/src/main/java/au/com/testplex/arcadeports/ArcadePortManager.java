@@ -999,6 +999,10 @@ public final class ArcadePortManager implements Listener {
             updateDragonEscapeChase(session);
             triggered = true;
         }
+        if (type == ArcadePortGame.DRAGON_ESCAPE && "use-kit-ability".equals(eventId)) {
+            triggered = debugUseDragonEscapeKitAbility(session, tester);
+            if (triggered) GameDebugRuntimeOverrides.markDebugSession();
+        }
         if (type == ArcadePortGame.EVOLUTION && "begin-evolution".equals(eventId)
                 && !session.evolving.contains(tester.getUniqueId())) {
             GameDebugRuntimeOverrides.markDebugSession();
@@ -1052,6 +1056,38 @@ public final class ArcadePortManager implements Listener {
             triggered = true;
         }
         return triggered;
+    }
+
+    private boolean debugUseDragonEscapeKitAbility(Session session, Player tester) {
+        UUID id = tester.getUniqueId();
+        String kit = session.dragonEscapeKits.getOrDefault(id, "jumper");
+        if ("jumper".equals(kit)) {
+            int before = session.dragonEscapeLeapUsesRemaining.getOrDefault(id, 0);
+            useDragonEscapeLeap(session, tester);
+            return session.dragonEscapeLeapUsesRemaining.getOrDefault(id, 0) < before;
+        }
+        if ("warper".equals(kit)) {
+            boolean usedBefore = session.dragonEscapeWarperUsed.contains(id);
+            Location before = tester.getLocation().clone();
+            useDragonEscapeWarper(session, tester);
+            return !usedBefore && session.dragonEscapeWarperUsed.contains(id)
+                    || tester.getLocation().distanceSquared(before) > 0.25D;
+        }
+        if ("digger".equals(kit)) {
+            int before = session.dragonEscapeDiggerUsesRemaining.getOrDefault(id,
+                    GameDebugRuntimeOverrides.intValue("DRAGON_ESCAPE_DIGGER_MAX_USES", ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES));
+            Block target = tester.getTargetBlockExact(6);
+            if (target == null) return false;
+            useDragonEscapeDigger(session, tester, target);
+            return session.dragonEscapeDiggerUsesRemaining.getOrDefault(id, before) < before;
+        }
+        if ("disruptor".equals(kit)) {
+            int before = inventoryCount(tester, Material.TNT);
+            session.dragonEscapeNextTntAt.put(id, 0L);
+            updateDragonEscapeResources(session, System.currentTimeMillis());
+            return inventoryCount(tester, Material.TNT) > before;
+        }
+        return false;
     }
 
     boolean debugRestoreTesterVitals(Player tester, ArcadePortGame type) {
