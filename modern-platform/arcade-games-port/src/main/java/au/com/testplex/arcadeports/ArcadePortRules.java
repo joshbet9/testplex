@@ -888,7 +888,8 @@ public final class ArcadePortRules {
     }
 
     public static boolean shouldAwardDragonsSurviveFiveMinutes(long liveElapsedMillis) {
-        return liveElapsedMillis >= DRAGONS_SURVIVE_FIVE_MINUTES_MILLIS;
+        return liveElapsedMillis >= GameDebugRuntimeOverrides.longValue(
+                "DRAGONS_SURVIVE_FIVE_MINUTES_MILLIS", DRAGONS_SURVIVE_FIVE_MINUTES_MILLIS);
     }
 
     public static int nextDragonsWinStreak(int previousStreak, boolean won) {
@@ -896,7 +897,8 @@ public final class ArcadePortRules {
     }
 
     public static boolean shouldAwardDragonsWinStreak(int streak) {
-        return streak >= DRAGONS_WIN_STREAK_ACHIEVEMENT;
+        return streak >= GameDebugRuntimeOverrides.intValue(
+                "DRAGONS_WIN_STREAK_ACHIEVEMENT", DRAGONS_WIN_STREAK_ACHIEVEMENT);
     }
 
     public static boolean shouldAwardDragonsNoDamageWin(boolean won, boolean tookDamage) {
