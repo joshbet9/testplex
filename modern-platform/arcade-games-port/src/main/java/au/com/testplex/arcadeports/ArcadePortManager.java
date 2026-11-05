@@ -1090,6 +1090,11 @@ public final class ArcadePortManager implements Listener {
         return false;
     }
 
+    private boolean debugKitFeatureEnabled(Player player, ArcadePortGame game, String kit) {
+        return player == null || !plugin.hasAdminAccess(player)
+                || debugFeatureEnabled(player.getUniqueId(), game, "ability-" + kit, true);
+    }
+
     private boolean debugUseDragonEscapeKitAbility(Session session, Player tester) {
         UUID id = tester.getUniqueId();
         String kit = session.dragonEscapeKits.getOrDefault(id, "jumper");
@@ -16260,7 +16265,8 @@ public final class ArcadePortManager implements Listener {
         List<Sheep> carried = session.sheepCarriers.entrySet().stream()
                 .filter(entry -> player.getUniqueId().equals(entry.getValue()))
                 .map(Map.Entry::getKey).collect(java.util.stream.Collectors.toList());
-        boolean shepherd = "shepherd".equals(session.sheepQuestKits.get(player.getUniqueId()));
+        boolean shepherd = "shepherd".equals(session.sheepQuestKits.get(player.getUniqueId()))
+                && debugKitFeatureEnabled(player, ArcadePortGame.SHEEP_QUEST, "shepherd");
         int count = shepherd ? carried.size()
                 : Math.min(GameDebugRuntimeOverrides.intValue("SHEEP_QUEST_MAX_CARRY", ArcadePortRules.SHEEP_QUEST_MAX_CARRY), carried.size());
         if (shepherd) {
@@ -16297,7 +16303,8 @@ public final class ArcadePortManager implements Listener {
             return false;
         }
         int carriedCount = sheepCarriedBy(session, playerId);
-        boolean shepherd = "shepherd".equals(session.sheepQuestKits.get(playerId));
+        boolean shepherd = "shepherd".equals(session.sheepQuestKits.get(playerId))
+                && debugKitFeatureEnabled(player, ArcadePortGame.SHEEP_QUEST, "shepherd");
         if (!shepherd && !ArcadePortRules.canCarryAnotherSheep(carriedCount)) return false;
         int team = session.teams.getOrDefault(playerId, -1);
         if (team < 0 || team > 3) return false;
@@ -16439,10 +16446,20 @@ public final class ArcadePortManager implements Listener {
             String kit = session.sheepQuestKits.getOrDefault(id, "beserker");
             if ("beserker".equals(kit)) {
                 long readyAt = session.sheepBerserkerReadyAt.getOrDefault(id, 0L);
-                if (player.isOnGround() && now >= readyAt && !player.getAllowFlight()) {
+                boolean enabled = debugKitFeatureEnabled(player, ArcadePortGame.SHEEP_QUEST, "beserker");
+                if (!enabled && player.getAllowFlight()) player.setAllowFlight(false);
+                if (enabled && player.isOnGround() && now >= readyAt && !player.getAllowFlight()) {
                     player.setAllowFlight(true);
                 }
             } else if ("archer".equals(kit)) {
+                if (!debugKitFeatureEnabled(player, ArcadePortGame.SHEEP_QUEST, "archer")) {
+                    session.sheepArcherCharge.remove(id);
+                    session.sheepArcherLastChargeAt.remove(id);
+                    session.sheepArcherVolleyRemaining.remove(id);
+                    session.sheepArcherNextVolleyAt.remove(id);
+                    player.setExp(0.0F);
+                    continue;
+                }
                 long nextArrowAt = session.sheepFletcherNextArrowAt.getOrDefault(id, now);
                 if (now >= nextArrowAt) {
                     if (sheepQuestFletchedArrowCount(player) < GameDebugRuntimeOverrides.intValue("SHEEP_QUEST_ARCHER_MAX_ARROWS", ArcadePortRules.SHEEP_QUEST_ARCHER_MAX_ARROWS)) {
@@ -16498,6 +16515,8 @@ public final class ArcadePortManager implements Listener {
                         player.playSound(player.getLocation(), Sound.ENTITY_ARROW_SHOOT, 0.8F, 1.0F);
                     }
                 }
+            } else if ("shepherd".equals(kit)) {
+                updateSheepQuestCarryUi(session, player);
             }
         }
     }
@@ -24242,7 +24261,7 @@ public final class ArcadePortManager implements Listener {
         event.setKnockback(event.getKnockback().multiply(0.5D));
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onSheepQuestArcherBowShoot(EntityShootBowEvent event) {
         if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
@@ -24251,6 +24270,11 @@ public final class ArcadePortManager implements Listener {
                 || !session.alive.contains(player.getUniqueId())
                 || !"archer".equals(session.sheepQuestKits.getOrDefault(player.getUniqueId(), "beserker"))
                 || !(event.getProjectile() instanceof Arrow arrow)) return;
+        if (!debugKitFeatureEnabled(player, ArcadePortGame.SHEEP_QUEST, "archer")) {
+            event.setCancelled(true);
+            player.sendActionBar(ChatColor.RED + "Archer abilities are disabled in your debug profile.");
+            return;
+        }
         UUID id = player.getUniqueId();
         session.entities.add(arrow);
         session.sheepArcherTrackedArrows.add(arrow.getUniqueId());
@@ -25095,6 +25119,7 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.SHEEP_QUEST && !event.isCancelled()
                 && session.alive.contains(player.getUniqueId())
                 && "archer".equals(session.sheepQuestKits.getOrDefault(player.getUniqueId(), "beserker"))
+                && debugKitFeatureEnabled(player, ArcadePortGame.SHEEP_QUEST, "archer")
                 && item == Material.BOW && event.getAction().isRightClick()
                 && player.getInventory().contains(Material.ARROW)) {
             UUID id = player.getUniqueId();
@@ -28641,6 +28666,12 @@ public final class ArcadePortManager implements Listener {
         if (session == null || session.type != ArcadePortGame.SHEEP_QUEST
                 || !session.alive.contains(id)
                 || !"beserker".equals(session.sheepQuestKits.getOrDefault(id, "beserker"))) return;
+        if (!debugKitFeatureEnabled(player, ArcadePortGame.SHEEP_QUEST, "beserker")) {
+            event.setCancelled(true);
+            player.setFlying(false);
+            player.setAllowFlight(false);
+            return;
+        }
         event.setCancelled(true);
         long now = System.currentTimeMillis();
         long readyAt = session.sheepBerserkerReadyAt.getOrDefault(id, 0L);
