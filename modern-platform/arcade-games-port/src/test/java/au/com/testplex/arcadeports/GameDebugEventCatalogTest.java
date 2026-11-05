@@ -870,13 +870,19 @@ class GameDebugEventCatalogTest {
         String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
         String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
         assertTrue(lobby.contains("List.of(\"archer\", \"fighter\", \"dasher\")"));
+        assertTrue(lobby.contains("features.put(\"worker-tools\""));
         assertTrue(lobby.contains("features.put(\"blocks-place\""));
         assertTrue(lobby.contains("features.put(\"blocks-break\""));
         assertTrue(manager.contains("debugKitFeatureEnabled(targetPlayer, ArcadePortGame.MICRO_BATTLES, \"fighter\")"));
         assertTrue(manager.contains("debugKitFeatureEnabled(player, ArcadePortGame.MICRO_BATTLES, \"archer\")"));
         assertTrue(manager.contains("debugKitFeatureEnabled(player, ArcadePortGame.MICRO_BATTLES, \"dasher\")"));
+        assertTrue(manager.contains("isMicroWorkerMiningTool(heldMaterial)"));
+        assertTrue(normalize(manager).contains("ArcadePortGame.MICRO_BATTLES, \"worker-tools\", true"));
+        assertTrue(manager.contains("material == Material.STONE_PICKAXE || material == Material.STONE_SHOVEL"));
+        assertTrue(manager.contains("|| material == Material.STONE_AXE"));
         assertTrue(normalize(manager).contains("ArcadePortGame.MICRO_BATTLES, \"blocks-place\", true"));
         assertTrue(normalize(manager).contains("ArcadePortGame.MICRO_BATTLES, \"blocks-break\", true"));
+        assertTrue(lobby.contains("|| \"worker-tools\".equals(key)"));
     }
 
     @Test

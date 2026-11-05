@@ -26996,6 +26996,18 @@ public final class ArcadePortManager implements Listener {
         if (cancelPrepareAction(event.getPlayer(), event)) return;
         Session session = active;
         if (session == null || event.getBlock().getWorld() != session.world) return;
+        ItemStack heldItem = event.getPlayer().getInventory().getItemInMainHand();
+        Material heldMaterial = heldItem == null ? Material.AIR : heldItem.getType();
+        if (session.type == ArcadePortGame.MICRO_BATTLES
+                && session.alive.contains(event.getPlayer().getUniqueId())
+                && "worker".equals(session.microKits.getOrDefault(event.getPlayer().getUniqueId(), "archer"))
+                && plugin.hasAdminAccess(event.getPlayer())
+                && isMicroWorkerMiningTool(heldMaterial)
+                && !debugFeatureEnabled(event.getPlayer().getUniqueId(), ArcadePortGame.MICRO_BATTLES,
+                        "worker-tools", true)) {
+            event.setCancelled(true);
+            return;
+        }
         if (session.type == ArcadePortGame.MICRO_BATTLES
                 && session.alive.contains(event.getPlayer().getUniqueId())
                 && plugin.hasAdminAccess(event.getPlayer())
@@ -27333,6 +27345,11 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         event.setCancelled(true);
+    }
+
+    private boolean isMicroWorkerMiningTool(Material material) {
+        return material == Material.STONE_PICKAXE || material == Material.STONE_SHOVEL
+                || material == Material.STONE_AXE;
     }
 
     /**
