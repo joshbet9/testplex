@@ -46,6 +46,9 @@ final class GameDebugEventCatalog {
     private static final List<Event> SKY_WARS = List.of(
             new Event("spawn-tnt", "Spawn Generator TNT", Material.TNT,
                     "Run the selected map's normal TNT generator drop immediately."));
+    private static final List<Event> BACON_BRAWL = List.of(
+            new Event("fill-meter", "Fill Ability Meter", Material.IRON_AXE,
+                    "Fill your selected kit's live ability meter so you can test its ability now."));
     private static final Set<ArcadePortGame> KIT_REFRESH_GAMES = Set.of(
             ArcadePortGame.BACON_BRAWL, ArcadePortGame.BOMB_LOBBERS, ArcadePortGame.CASTLE_ASSAULT,
             ArcadePortGame.DRAGON_ESCAPE, ArcadePortGame.DRAGONS, ArcadePortGame.EVOLUTION,
@@ -57,6 +60,7 @@ final class GameDebugEventCatalog {
     private GameDebugEventCatalog() { }
 
     static List<Event> events(ArcadePortGame game) {
+        if (game == ArcadePortGame.BACON_BRAWL) return BACON_BRAWL;
         if (game == ArcadePortGame.WITHER_ASSAULT) return WITHER_ASSAULT;
         if (game == ArcadePortGame.DRAW_MY_THING) return DRAW_MY_THING;
         if (game == ArcadePortGame.DRAGONS) return DRAGONS;

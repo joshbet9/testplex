@@ -892,6 +892,15 @@ public final class ArcadePortManager implements Listener {
         if (session == null || session.type != type || !session.liveStarted
                 || !session.alive.contains(tester.getUniqueId())) return false;
         boolean triggered = false;
+        if (type == ArcadePortGame.BACON_BRAWL && "fill-meter".equals(eventId)) {
+            int meter = GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", ArcadePortRules.BACON_METER_MAX);
+            session.baconMeters.put(tester.getUniqueId(), meter);
+            updateBaconMeterItem(session, tester);
+            updateBaconMeterScoreboard(session);
+            GameDebugRuntimeOverrides.markDebugSession();
+            tester.sendMessage(ChatColor.GOLD + baconAbilityName(session, tester.getUniqueId()) + " is maxed (debug).");
+            triggered = true;
+        }
         if (type == ArcadePortGame.WITHER_ASSAULT && "spawn-minions".equals(eventId)
                 && session.teams.getOrDefault(tester.getUniqueId(), 0) == 1) {
             GameDebugRuntimeOverrides.markDebugSession();

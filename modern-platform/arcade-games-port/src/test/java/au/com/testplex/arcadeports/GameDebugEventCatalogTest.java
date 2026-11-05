@@ -117,6 +117,25 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void baconBrawlDebugMeterFillsTheSelectedAbilityAndRefreshesItsHud() throws IOException {
+        Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ArcadePortManager.java");
+        if (!Files.isRegularFile(managerPath)) {
+            managerPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ArcadePortManager.java");
+        }
+        String source = Files.readString(managerPath);
+        int dispatch = source.indexOf("type == ArcadePortGame.BACON_BRAWL && \"fill-meter\".equals(eventId)");
+        assertTrue(dispatch >= 0);
+        int nextEvent = source.indexOf("if (type == ArcadePortGame.WITHER_ASSAULT", dispatch);
+        String fill = source.substring(dispatch, nextEvent);
+        assertTrue(fill.contains("session.baconMeters.put(tester.getUniqueId(), meter)"));
+        assertTrue(fill.contains("updateBaconMeterItem(session, tester)"));
+        assertTrue(fill.contains("updateBaconMeterScoreboard(session)"));
+        assertTrue(fill.contains("markDebugSession()"));
+    }
+
+    @Test
     void kitRefreshIsOnlyOfferedForGamesWithSharedKitSetup() {
         for (ArcadePortGame game : ArcadePortGame.values()) {
             boolean offered = GameDebugEventCatalog.events(game).stream()
