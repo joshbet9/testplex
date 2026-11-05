@@ -102,7 +102,7 @@ final class ArcadeTestPlayerManager {
 
     /** Exclude session test players and missing UUIDs from persistent progression and rewards. */
     static boolean shouldPersistProgression(UUID playerId, boolean testPlayer) {
-        return playerId != null && !testPlayer;
+        return playerId != null && !testPlayer && !GameDebugRuntimeOverrides.isDebugSession();
     }
 
     boolean isTestPlayer(UUID id) {

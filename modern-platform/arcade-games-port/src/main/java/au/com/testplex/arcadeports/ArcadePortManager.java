@@ -17259,7 +17259,7 @@ public final class ArcadePortManager implements Listener {
             player.removePotionEffect(PotionEffectType.JUMP_BOOST);
             if (killer != null && session.alive.contains(killer.getUniqueId())) {
                 UUID killerId = killer.getUniqueId();
-                if (victimWasCharging) {
+                if (victimWasCharging && !GameDebugRuntimeOverrides.isDebugSession()) {
                     String evolvingKillsPath = localStatsPath(killerId, ArcadePortGame.EVOLUTION.id())
                             + "kills-while-evolving";
                     int evolvingKills = plugin.getConfig().getInt(evolvingKillsPath, 0) + 1;
@@ -17366,6 +17366,7 @@ public final class ArcadePortManager implements Listener {
                 awardCatalogAchievement(killer, "micro-battles", "gravedigger");
             }
             if (session.type == ArcadePortGame.MICRO_BATTLES
+                    && !GameDebugRuntimeOverrides.isDebugSession()
                     && !testPlayers.isTestPlayer(killer)
                     && ArcadePortRules.shouldAwardMicroBattlesAnnihilation(kills)) {
                 UUID killerId = killer.getUniqueId();
@@ -28111,7 +28112,7 @@ public final class ArcadePortManager implements Listener {
             session.bombPowerupClutchEligible.remove(ownerId);
         }
         session.bombLastThrowAt.put(ownerId, now);
-        if (!testPlayers.isTestPlayer(ownerId)) {
+        if (ArcadeTestPlayerManager.shouldPersistProgression(ownerId, testPlayers.isTestPlayer(ownerId))) {
             String throwsPath = localStatsPath(ownerId, "bomb-lobbers") + "thrown";
             plugin.getConfig().set(throwsPath, plugin.getConfig().getInt(throwsPath, 0) + 1);
         }
