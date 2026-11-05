@@ -7853,7 +7853,8 @@ public final class ArcadePortManager implements Listener {
         long now = System.currentTimeMillis();
         long readyAt = session.deathTagSoloChaserHitReadyAt.getOrDefault(target.getUniqueId(), 0L);
         if (now < readyAt) return;
-        session.deathTagSoloChaserHitReadyAt.put(target.getUniqueId(), now + 1_500L);
+        session.deathTagSoloChaserHitReadyAt.put(target.getUniqueId(),
+                now + ArcadePortRules.deathTagSoloChaserHitCooldownMillis());
 
         double damage = ArcadePortRules.deathTagChaserDamage(false);
         if (target.getHealth() <= damage) target.setHealth(target.getMaxHealth());
@@ -7974,12 +7975,9 @@ public final class ArcadePortManager implements Listener {
     private void applyDeathTagDefaultMeleeKnockback(Player attacker, Player target, boolean alphaTarget) {
         Vector direction = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
         direction.setY(0.0D);
-        if (direction.lengthSquared() < 0.001D) return;
-        double multiplier = ArcadePortRules.deathTagKnockbackMultiplier(alphaTarget);
-        Vector velocity = target.getVelocity().multiply(0.5D)
-                .add(direction.normalize().multiply(0.4D * multiplier));
-        velocity.setY(Math.max(velocity.getY(), 0.36D * multiplier));
-        target.setVelocity(velocity);
+        Vector velocity = ArcadePortRules.deathTagDefaultMeleeKnockback(
+                target.getVelocity(), direction, alphaTarget);
+        if (velocity != null) target.setVelocity(velocity);
     }
 
     private void awardDeathTagKill(Session session, Player killer) {
@@ -19179,7 +19177,15 @@ public final class ArcadePortManager implements Listener {
                             double multiplier = ArcadePortRules.deathTagKnockbackMultiplier(
                                     session.alphaChasers.contains(target.getUniqueId()));
                             if (knockbackDirection.lengthSquared() > 0.001D) {
-                                target.setVelocity(knockbackDirection.normalize().multiply(0.8D * multiplier).setY(0.1D));
+                                double horizontal = GameDebugRuntimeOverrides.doubleValue(
+                                        "DEATH_TAG_TRAITOR_KNOCKBACK_HORIZONTAL",
+                                        ArcadePortRules.DEATH_TAG_TRAITOR_KNOCKBACK_HORIZONTAL);
+                                double vertical = GameDebugRuntimeOverrides.doubleValue(
+                                        "DEATH_TAG_TRAITOR_KNOCKBACK_VERTICAL",
+                                        ArcadePortRules.DEATH_TAG_TRAITOR_KNOCKBACK_VERTICAL);
+                                target.setVelocity(knockbackDirection.normalize()
+                                        .multiply(Math.max(0.0D, horizontal) * multiplier)
+                                        .setY(Math.max(0.0D, vertical)));
                             }
                         }
                     }

@@ -47,6 +47,9 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SPLEEF), "SPLEEF_HUNGER_DRAIN_INTERVAL_MILLIS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DEATH_TAG), "DEATH_TAG_CHASER_DAMAGE");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DEATH_TAG), "DEATH_TAG_ALPHA_CHASER_DAMAGE");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DEATH_TAG), "DEATH_TAG_RUNNER_BASHER_DAMAGE");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DEATH_TAG), "DEATH_TAG_IRON_SKIN_DAMAGE_REDUCTION");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DEATH_TAG), "DEATH_TAG_MELEE_KNOCKBACK_HORIZONTAL");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.CAMERA_SHY), "CAMERA_SHY_MATCH_SECONDS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.HOOPS_REMASTERED), "HOOPS_TARGET_SCORE");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SUPER_SPLOOR), "SUPER_SPLOOR_MAX_INK");

@@ -122,6 +122,18 @@ public final class ArcadePortRules {
     public static final int DEATH_TAG_ARCHER_MAX_ARROWS = 2;
     public static final double DEATH_TAG_ARCHER_ARROW_KNOCKBACK_POWER = 3.0D;
     public static final long DEATH_TAG_TRAITOR_KNOCKBACK_COOLDOWN_MILLIS = 400L;
+    public static final long DEATH_TAG_CHASER_HIT_COOLDOWN_MILLIS = 1_500L;
+    public static final double DEATH_TAG_RUNNER_BASHER_DAMAGE = 6.0D;
+    public static final double DEATH_TAG_RUNNER_TRAITOR_DAMAGE = 6.0D;
+    public static final double DEATH_TAG_RUNNER_DEFAULT_DAMAGE = 1.0D;
+    public static final double DEATH_TAG_RUNNER_ARCHER_PROJECTILE_DAMAGE = 4.0D;
+    public static final double DEATH_TAG_IRON_SKIN_DAMAGE_REDUCTION = 2.0D;
+    public static final double DEATH_TAG_ALPHA_IRON_SKIN_DAMAGE_REDUCTION = 4.0D;
+    public static final double DEATH_TAG_MELEE_KNOCKBACK_DAMPING = 0.5D;
+    public static final double DEATH_TAG_MELEE_KNOCKBACK_HORIZONTAL = 0.4D;
+    public static final double DEATH_TAG_MELEE_KNOCKBACK_VERTICAL = 0.36D;
+    public static final double DEATH_TAG_TRAITOR_KNOCKBACK_HORIZONTAL = 0.8D;
+    public static final double DEATH_TAG_TRAITOR_KNOCKBACK_VERTICAL = 0.1D;
     public static final int EVOLUTION_WIN_LEVEL = 5;
     public static final double DRAGON_ESCAPE_FINISH_X = 0.5D;
     public static final double DRAGON_ESCAPE_FINISH_Y = 64.0D;
@@ -2478,17 +2490,36 @@ public final class ArcadePortRules {
                 : GameDebugRuntimeOverrides.doubleValue("DEATH_TAG_CHASER_DAMAGE", DEATH_TAG_CHASER_DAMAGE);
     }
 
+    public static long deathTagSoloChaserHitCooldownMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "DEATH_TAG_CHASER_HIT_COOLDOWN_MILLIS", DEATH_TAG_CHASER_HIT_COOLDOWN_MILLIS));
+    }
+
     public static double deathTagRunnerDamage(String runnerKit, boolean projectile) {
         String kit = runnerKit == null ? "basher" : runnerKit.toLowerCase(java.util.Locale.ROOT);
-        if (projectile) return "archer".equals(kit) ? 4.0D : 0.0D;
+        if (projectile) return "archer".equals(kit)
+                ? GameDebugRuntimeOverrides.doubleValue("DEATH_TAG_RUNNER_ARCHER_PROJECTILE_DAMAGE",
+                        DEATH_TAG_RUNNER_ARCHER_PROJECTILE_DAMAGE) : 0.0D;
         // Only Basher and Traitor replace the default unarmed hit with weapon damage.
-        return "basher".equals(kit) || "traitor".equals(kit) ? 6.0D : 1.0D;
+        if ("basher".equals(kit)) return GameDebugRuntimeOverrides.doubleValue(
+                "DEATH_TAG_RUNNER_BASHER_DAMAGE", DEATH_TAG_RUNNER_BASHER_DAMAGE);
+        if ("traitor".equals(kit)) return GameDebugRuntimeOverrides.doubleValue(
+                "DEATH_TAG_RUNNER_TRAITOR_DAMAGE", DEATH_TAG_RUNNER_TRAITOR_DAMAGE);
+        if ("archer".equals(kit)) return GameDebugRuntimeOverrides.doubleValue(
+                "DEATH_TAG_RUNNER_DEFAULT_DAMAGE", DEATH_TAG_RUNNER_DEFAULT_DAMAGE);
+        return GameDebugRuntimeOverrides.doubleValue("DEATH_TAG_RUNNER_DEFAULT_DAMAGE",
+                DEATH_TAG_RUNNER_DEFAULT_DAMAGE);
     }
 
     /** Iron Skin in Reborn subtracts a flat 2 or 4 damage from attacks greater than 1. */
     public static double deathTagDamageAfterIronSkin(double damage, boolean alphaChaser) {
         if (damage <= 1.0D) return damage;
-        return Math.max(0.0D, damage - (alphaChaser ? 4.0D : 2.0D));
+        double reduction = alphaChaser
+                ? GameDebugRuntimeOverrides.doubleValue("DEATH_TAG_ALPHA_IRON_SKIN_DAMAGE_REDUCTION",
+                        DEATH_TAG_ALPHA_IRON_SKIN_DAMAGE_REDUCTION)
+                : GameDebugRuntimeOverrides.doubleValue("DEATH_TAG_IRON_SKIN_DAMAGE_REDUCTION",
+                        DEATH_TAG_IRON_SKIN_DAMAGE_REDUCTION);
+        return Math.max(0.0D, damage - Math.max(0.0D, reduction));
     }
 
     /** The legacy Iron Skin perk does not reduce fire-tick or one-point-and-lower damage. */
@@ -2499,6 +2530,24 @@ public final class ArcadePortRules {
 
     public static double deathTagKnockbackMultiplier(boolean alphaChaser) {
         return alphaChaser ? 0.5D : 1.0D;
+    }
+
+    public static org.bukkit.util.Vector deathTagDefaultMeleeKnockback(
+            org.bukkit.util.Vector currentVelocity, org.bukkit.util.Vector horizontalDirection, boolean alphaTarget) {
+        if (currentVelocity == null || horizontalDirection == null || !Double.isFinite(currentVelocity.lengthSquared())
+                || !Double.isFinite(horizontalDirection.lengthSquared()) || horizontalDirection.lengthSquared() < 0.001D) {
+            return null;
+        }
+        double multiplier = deathTagKnockbackMultiplier(alphaTarget);
+        double damping = GameDebugRuntimeOverrides.doubleValue("DEATH_TAG_MELEE_KNOCKBACK_DAMPING",
+                DEATH_TAG_MELEE_KNOCKBACK_DAMPING);
+        double horizontal = GameDebugRuntimeOverrides.doubleValue("DEATH_TAG_MELEE_KNOCKBACK_HORIZONTAL",
+                DEATH_TAG_MELEE_KNOCKBACK_HORIZONTAL);
+        double vertical = GameDebugRuntimeOverrides.doubleValue("DEATH_TAG_MELEE_KNOCKBACK_VERTICAL",
+                DEATH_TAG_MELEE_KNOCKBACK_VERTICAL);
+        return currentVelocity.clone().multiply(Math.max(0.0D, damping))
+                .add(horizontalDirection.clone().setY(0.0D).normalize().multiply(Math.max(0.0D, horizontal) * multiplier))
+                .setY(Math.max(currentVelocity.getY() * Math.max(0.0D, damping), Math.max(0.0D, vertical) * multiplier));
     }
 
     /** Original Death Tag lights switch between gold blocks and white wool each second. */
