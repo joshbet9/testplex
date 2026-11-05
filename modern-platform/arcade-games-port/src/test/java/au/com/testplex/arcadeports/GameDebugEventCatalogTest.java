@@ -79,6 +79,27 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void speedBuildersProgressWritersSkipDebugRounds() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String source = Files.readString(sourceRoot.resolve("SpeedBuildersGame.java"));
+        int matchStart = source.indexOf("private void persistMatchProgress(");
+        int playerStart = source.indexOf("private void persistPlayerProgress(", matchStart);
+        int scoreStart = source.indexOf("private int score(", playerStart);
+        assertTrue(matchStart >= 0 && playerStart > matchStart && scoreStart > playerStart);
+        String matchWriter = source.substring(matchStart, playerStart);
+        String playerWriter = source.substring(playerStart, scoreStart);
+
+        assertTrue(matchWriter.indexOf("GameDebugRuntimeOverrides.isDebugSession()")
+                < matchWriter.indexOf("SpeedBuildersProgressStore.increment"));
+        assertTrue(playerWriter.indexOf("GameDebugRuntimeOverrides.isDebugSession()")
+                < playerWriter.indexOf("SpeedBuildersProgressStore.increment"));
+    }
+
+    @Test
     void achievementPreviewIsAuthorisedGameScopedAndDoesNotWriteProgress() throws IOException {
         Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
         if (!Files.isDirectory(sourceRoot)) {

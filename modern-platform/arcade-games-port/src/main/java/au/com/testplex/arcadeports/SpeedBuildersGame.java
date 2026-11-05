@@ -981,6 +981,7 @@ public final class SpeedBuildersGame implements Listener {
     }
 
     private void persistMatchProgress(Set<UUID> winnerIds) {
+        if (GameDebugRuntimeOverrides.isDebugSession()) return;
         for (PlayerState state : players.values()) {
             UUID playerId = state.player.getUniqueId();
             SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "blocks-placed", state.blocksPlaced);
@@ -995,6 +996,7 @@ public final class SpeedBuildersGame implements Listener {
     }
 
     private void persistPlayerProgress(PlayerState state) {
+        if (GameDebugRuntimeOverrides.isDebugSession()) return;
         UUID playerId = state.player.getUniqueId();
         SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "blocks-placed", state.blocksPlaced);
         SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "blocks-broken", state.blocksBroken);
