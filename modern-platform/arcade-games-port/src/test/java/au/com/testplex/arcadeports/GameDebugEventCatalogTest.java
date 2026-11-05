@@ -65,6 +65,8 @@ class GameDebugEventCatalogTest {
                 .anyMatch(event -> event.id().equals("refresh-kit")));
         assertTrue(GameDebugEventCatalog.events(ArcadePortGame.SPLEEF).stream()
                 .anyMatch(event -> event.id().equals("restore-hunger")));
+        assertTrue(GameDebugEventCatalog.events(ArcadePortGame.SPLEEF).stream()
+                .anyMatch(event -> event.id().equals("use-kit-ability")));
         assertEquals("use-special", GameDebugEventCatalog.events(ArcadePortGame.SUPER_SPLOOR)
                 .getFirst().id());
         assertTrue(GameDebugEventCatalog.events(ArcadePortGame.MICRO_BATTLES).stream()
@@ -170,6 +172,21 @@ class GameDebugEventCatalogTest {
         assertTrue(manager.contains("case \"tamer\" -> activateDragonTamer(session, player, now)"));
         assertTrue(manager.contains("session.dragonGliderReadyAt.getOrDefault(id, 0L) > now"));
         assertTrue(manager.contains("!isDebugAbilityAllowed(player, ArcadePortGame.DRAGONS, kit)"));
+    }
+
+    @Test
+    void spleefBrawlerDebugEventUsesTheNormalLeapCooldownAndVelocityPath() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String eventCatalog = Files.readString(sourceRoot.resolve("GameDebugEventCatalog.java"));
+        assertTrue(eventCatalog.contains("new Event(\"use-kit-ability\", \"Test Brawler Leap\""));
+        assertTrue(manager.contains("useSpleefLeap(session, tester, now)"));
+        assertTrue(manager.contains("session.spleefLeapReadyAt.getOrDefault(tester.getUniqueId(), 0L) > now"));
+        assertTrue(manager.contains("isDebugAbilityAllowed(tester, ArcadePortGame.SPLEEF, \"brawler\")"));
     }
 
     @Test

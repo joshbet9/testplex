@@ -1184,6 +1184,16 @@ public final class ArcadePortManager implements Listener {
             tester.setSaturation(20.0F);
             triggered = true;
         }
+        if (type == ArcadePortGame.SPLEEF && "use-kit-ability".equals(eventId)
+                && "brawler".equals(session.spleefKits.getOrDefault(tester.getUniqueId(), "snowballer"))) {
+            long now = System.currentTimeMillis();
+            long readyAt = session.spleefLeapReadyAt.getOrDefault(tester.getUniqueId(), 0L);
+            if (now >= readyAt && isDebugAbilityAllowed(tester, ArcadePortGame.SPLEEF, "brawler")) {
+                useSpleefLeap(session, tester, now);
+                triggered = session.spleefLeapReadyAt.getOrDefault(tester.getUniqueId(), 0L) > now;
+                if (triggered) GameDebugRuntimeOverrides.markDebugSession();
+            }
+        }
         if (type == ArcadePortGame.PAINTBALL && "restore-armour".equals(eventId)) {
             GameDebugRuntimeOverrides.markDebugSession();
             session.paintPiecesRemaining.put(tester.getUniqueId(), 4);

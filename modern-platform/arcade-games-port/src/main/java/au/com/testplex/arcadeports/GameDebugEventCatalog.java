@@ -90,6 +90,8 @@ final class GameDebugEventCatalog {
     private static final List<Event> SPLEEF = List.of(
             new Event("restore-hunger", "Restore Hunger", Material.COOKED_BEEF,
                     "Restore your hunger and saturation to full during an active round."),
+            new Event("use-kit-ability", "Test Brawler Leap", Material.IRON_AXE,
+                    "Use Brawler's normal leap with its cooldown, velocity and effects."),
             REFRESH_KIT.getFirst());
     private static final List<Event> SUPER_SPLOOR = List.of(
             new Event("use-special", "Test Selected Special", Material.FIREWORK_STAR,
