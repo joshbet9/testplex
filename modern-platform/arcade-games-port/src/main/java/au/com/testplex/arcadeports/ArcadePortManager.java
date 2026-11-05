@@ -1174,6 +1174,14 @@ public final class ArcadePortManager implements Listener {
             setPaintballArmor(session, tester);
             triggered = true;
         }
+        if (type == ArcadePortGame.PAINTBALL && "fire-shot".equals(eventId)) {
+            UUID testerId = tester.getUniqueId();
+            String kit = session.paintballKits.getOrDefault(testerId, "rifle");
+            int projectilesBefore = session.paintballShotOwners.size();
+            firePaintballWeapon(session, tester, kit, System.currentTimeMillis());
+            triggered = session.paintballShotOwners.size() > projectilesBefore;
+            if (triggered) GameDebugRuntimeOverrides.markDebugSession();
+        }
         if (type == ArcadePortGame.MICRO_BATTLES && "drop-barriers".equals(eventId)
                 && session.microBarrierActive) {
             releaseMicroBattlesBarrier(session);

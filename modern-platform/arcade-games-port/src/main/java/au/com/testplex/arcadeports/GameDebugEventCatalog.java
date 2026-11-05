@@ -64,7 +64,9 @@ final class GameDebugEventCatalog {
                     "Unlock implemented spells, refill mana and clear spell cooldowns for your next casts."));
     private static final List<Event> PAINTBALL = List.of(
             new Event("restore-armour", "Restore Paintball Armour", Material.LEATHER_CHESTPLATE,
-                    "Restore your normal four armour pieces using the selected team's colours."));
+                    "Restore your normal four armour pieces using the selected team's colours."),
+            new Event("fire-shot", "Fire Selected Weapon", Material.SNOWBALL,
+                    "Fire your selected Paintball weapon through its ordinary ammo, cooldown, heat, and projectile path."));
     private static final List<Event> DEATH_TAG = List.of(
             new Event("promote-self", "Promote Self to Chaser", Material.SKELETON_SKULL,
                     "Run the normal Runner-to-Chaser conversion on yourself."));

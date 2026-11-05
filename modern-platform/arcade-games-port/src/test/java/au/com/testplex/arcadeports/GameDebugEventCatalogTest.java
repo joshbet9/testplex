@@ -49,8 +49,9 @@ class GameDebugEventCatalogTest {
         assertEquals(List.of("refill-arrow", "use-kit-ability", "refresh-kit"),
                 GameDebugEventCatalog.events(ArcadePortGame.ONE_IN_THE_QUIVER).stream()
                         .map(GameDebugEventCatalog.Event::id).toList());
-        assertEquals("restore-armour", GameDebugEventCatalog.events(ArcadePortGame.PAINTBALL)
-                .getFirst().id());
+        assertEquals(List.of("restore-armour", "fire-shot", "refresh-kit"),
+                GameDebugEventCatalog.events(ArcadePortGame.PAINTBALL).stream()
+                        .map(GameDebugEventCatalog.Event::id).toList());
         assertEquals("promote-self", GameDebugEventCatalog.events(ArcadePortGame.DEATH_TAG)
                 .getFirst().id());
         assertTrue(GameDebugEventCatalog.events(ArcadePortGame.DEATH_TAG).stream()
@@ -95,6 +96,23 @@ class GameDebugEventCatalogTest {
                 "the event must execute the same cooldown and knockback path as the live ability");
         assertTrue(manager.contains("isDebugAbilityAllowed(tester, ArcadePortGame.ONE_IN_THE_QUIVER, \"slam-shot\")"));
         assertTrue(manager.contains("GameDebugRuntimeOverrides.markDebugSession()"));
+    }
+
+    @Test
+    void paintballFireShotEventUsesTheSelectedWeaponsNormalRuntimePath() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String eventCatalog = Files.readString(sourceRoot.resolve("GameDebugEventCatalog.java"));
+        assertTrue(eventCatalog.contains("new Event(\"fire-shot\", \"Fire Selected Weapon\""));
+        assertTrue(manager.contains("session.paintballKits.getOrDefault(testerId, \"rifle\")"));
+        assertTrue(manager.contains("firePaintballWeapon(session, tester, kit, System.currentTimeMillis())"),
+                "the event must share reload, heat, projectile, and cosmetic behavior with regular firing");
+        assertTrue(manager.contains("session.paintballShotOwners.size() > projectilesBefore"));
+        assertTrue(manager.contains("if (triggered) GameDebugRuntimeOverrides.markDebugSession()"));
     }
 
     @Test
