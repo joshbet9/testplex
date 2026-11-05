@@ -760,6 +760,14 @@ public final class ArcadePortManager implements Listener {
 
     boolean debugFeatureEnabled(UUID playerId, ArcadePortGame type, String flag, boolean fallback) {
         if (playerId == null || type == null || flag == null || flag.isBlank()) return false;
+        GameDebugVariableCatalog.Variable variable = GameDebugVariableCatalog.variable(type, flag);
+        if (variable != null && variable.kind() == GameDebugVariableCatalog.Kind.BOOLEAN) {
+            if (debugProfiles.hasBooleanVariable(playerId, type, flag)) {
+                return debugProfiles.booleanVariable(playerId, type, flag, fallback);
+            }
+            return debugProfiles.hasFeature(playerId, type, flag)
+                    ? debugProfiles.feature(playerId, type, flag, fallback) : fallback;
+        }
         if (debugProfiles.hasFeature(playerId, type, flag)) {
             return debugProfiles.feature(playerId, type, flag, fallback);
         }
@@ -774,8 +782,19 @@ public final class ArcadePortManager implements Listener {
         if (player == null || !player.isOnline() || !plugin.hasAdminAccess(player)
                 || type == null || flag == null || flag.isBlank()) return false;
         boolean enabled = !debugFeatureEnabled(player.getUniqueId(), type, flag, fallback);
-        debugProfiles.setFeature(player.getUniqueId(), type, flag, enabled);
-        if (activeDebugGame() == type) GameDebugRuntimeOverrides.markDebugSession();
+        GameDebugVariableCatalog.Variable variable = GameDebugVariableCatalog.variable(type, flag);
+        if (variable != null && variable.kind() == GameDebugVariableCatalog.Kind.BOOLEAN) {
+            debugProfiles.setBooleanVariable(player.getUniqueId(), type, flag, enabled);
+            if (activeDebugGame() == type && player.getUniqueId().equals(activeDebugProfileOwner)) {
+                GameDebugRuntimeOverrides.markDebugSession();
+                if (GameDebugVariableCatalog.appliesImmediately(variable)) {
+                    GameDebugRuntimeOverrides.setValue(flag, enabled);
+                }
+            }
+        } else {
+            debugProfiles.setFeature(player.getUniqueId(), type, flag, enabled);
+            if (activeDebugGame() == type) GameDebugRuntimeOverrides.markDebugSession();
+        }
         return enabled;
     }
 

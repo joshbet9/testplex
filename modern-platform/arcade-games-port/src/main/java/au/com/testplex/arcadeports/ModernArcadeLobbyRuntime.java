@@ -1145,7 +1145,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     feature.key(), feature.defaultValue());
             inventory.setItem(slot++, testBotButton(enabled ? Material.LIME_DYE : feature.icon(),
                     feature.title() + ": " + (enabled ? ChatColor.GREEN + "On" : ChatColor.RED + "Off"),
-                    feature.description() + " " + (debugFeatureAppliesImmediately(feature.key())
+                    feature.description() + " " + (debugFeatureAppliesImmediately(game, feature.key())
                             ? "Applies immediately." : "Applies when the next round starts."),
                     "debug-toggle:" + feature.key()));
         }
@@ -1224,7 +1224,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         return List.copyOf(features.values());
     }
 
-    private boolean debugFeatureAppliesImmediately(String key) {
+    private boolean debugFeatureAppliesImmediately(ArcadePortGame game, String key) {
+        if (GameDebugVariableCatalog.appliesImmediately(GameDebugVariableCatalog.variable(game, key))) return true;
         return "all-kits".equals(key) || "invulnerable".equals(key) || "no-fall-damage".equals(key)
                 || "no-hunger-loss".equals(key) || "unlimited-abilities".equals(key)
                 || "unlimited-specials".equals(key)

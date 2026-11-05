@@ -15,6 +15,14 @@ public final class GameDebugRuntimeOverrides {
         debugSession = !values.isEmpty();
     }
 
+    /** Update one explicitly immediate profile switch in the active test round. */
+    public static void setValue(String key, Object value) {
+        if (key == null || key.isBlank() || value == null) return;
+        Map<String, Object> updated = new LinkedHashMap<>(values);
+        updated.put(key, value);
+        values = Map.copyOf(updated);
+    }
+
     public static void clear() {
         values = Map.of();
         debugSession = false;

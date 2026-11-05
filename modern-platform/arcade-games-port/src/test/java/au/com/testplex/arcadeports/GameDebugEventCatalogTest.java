@@ -297,4 +297,18 @@ class GameDebugEventCatalogTest {
         assertTrue(manager.contains("!plugin.hasAdminAccess(tester)"));
         assertTrue(manager.contains("debugAdvanceStartPhase(Player tester, ArcadePortGame type)"));
     }
+
+    @Test
+    void booleanRuleSwitchesReachTheRuntimeOverrideAndShowTheirApplyMode() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        assertTrue(manager.contains("debugProfiles.setBooleanVariable(player.getUniqueId(), type, flag, enabled)"));
+        assertTrue(manager.contains("GameDebugRuntimeOverrides.setValue(flag, enabled)"));
+        assertTrue(lobby.contains("GameDebugVariableCatalog.appliesImmediately(GameDebugVariableCatalog.variable(game, key))"));
+    }
 }

@@ -15,6 +15,14 @@ final class GameDebugVariableCatalog {
     record Variable(String key, String label, Kind kind, double defaultValue,
                     double minimum, double maximum, double step) { }
 
+    private static final Set<String> LIVE_BOOLEAN_RULES = Set.of(
+            "BOMB_LOBBERS_POWERUP_SPAWNING_ENABLED",
+            "DRAGONS_SPAWNING_ENABLED",
+            "DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED",
+            "MICRO_BATTLES_CRUMBLE_ENABLED",
+            "QUIVER_LEAPER_DOUBLE_JUMP_ENABLED",
+            "SPLEEF_HUNGER_DRAIN_ENABLED");
+
     private GameDebugVariableCatalog() { }
 
     static List<Variable> variables(ArcadePortGame game) {
@@ -53,6 +61,11 @@ final class GameDebugVariableCatalog {
     static Variable variable(ArcadePortGame game, String key) {
         if (game == null || key == null || key.isBlank()) return null;
         return variables(game).stream().filter(candidate -> candidate.key().equals(key)).findFirst().orElse(null);
+    }
+
+    static boolean appliesImmediately(Variable variable) {
+        return variable != null && variable.kind() == Kind.BOOLEAN
+                && LIVE_BOOLEAN_RULES.contains(variable.key());
     }
 
     static double clamp(Variable variable, double value) {

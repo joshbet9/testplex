@@ -269,6 +269,18 @@ class GameDebugVariableCatalogTest {
     }
 
     @Test
+    void documentedLiveSwitchesUpdateTheActiveBooleanRuleWithoutReactivation() {
+        GameDebugRuntimeOverrides.activate(Map.of("MICRO_BATTLES_CRUMBLE_ENABLED", true));
+        assertTrue(GameDebugRuntimeOverrides.booleanValue("MICRO_BATTLES_CRUMBLE_ENABLED", false));
+        GameDebugRuntimeOverrides.setValue("MICRO_BATTLES_CRUMBLE_ENABLED", false);
+        assertFalse(GameDebugRuntimeOverrides.booleanValue("MICRO_BATTLES_CRUMBLE_ENABLED", true));
+        assertTrue(GameDebugVariableCatalog.appliesImmediately(GameDebugVariableCatalog.variable(
+                ArcadePortGame.MICRO_BATTLES, "MICRO_BATTLES_CRUMBLE_ENABLED")));
+        assertFalse(GameDebugVariableCatalog.appliesImmediately(GameDebugVariableCatalog.variable(
+                ArcadePortGame.MICRO_BATTLES, "MICRO_BATTLES_BARRIER_DURATION_MILLIS")));
+    }
+
+    @Test
     void timingCombatAndAbilityVariablesChangeTheirDeterministicGameRules() {
         GameDebugRuntimeOverrides.activate(Map.ofEntries(
                 Map.entry("CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS", 10_000L),

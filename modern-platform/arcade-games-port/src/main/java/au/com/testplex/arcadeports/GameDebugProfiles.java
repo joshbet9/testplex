@@ -155,6 +155,27 @@ final class GameDebugProfiles {
         save();
     }
 
+    boolean booleanVariable(UUID tester, ArcadePortGame game, String variable, boolean fallback) {
+        GameDebugVariableCatalog.Variable definition = GameDebugVariableCatalog.variable(game, variable);
+        if (definition == null || definition.kind() != GameDebugVariableCatalog.Kind.BOOLEAN) return fallback;
+        String path = profilePath(tester, game, selected(tester, game)) + ".variables." + variable;
+        return config.getBoolean(path, fallback);
+    }
+
+    boolean hasBooleanVariable(UUID tester, ArcadePortGame game, String variable) {
+        GameDebugVariableCatalog.Variable definition = GameDebugVariableCatalog.variable(game, variable);
+        if (definition == null || definition.kind() != GameDebugVariableCatalog.Kind.BOOLEAN) return false;
+        return config.contains(profilePath(tester, game, selected(tester, game)) + ".variables." + variable);
+    }
+
+    void setBooleanVariable(UUID tester, ArcadePortGame game, String variable, boolean value) {
+        if (tester == null || game == null) return;
+        GameDebugVariableCatalog.Variable definition = GameDebugVariableCatalog.variable(game, variable);
+        if (definition == null || definition.kind() != GameDebugVariableCatalog.Kind.BOOLEAN) return;
+        config.set(profilePath(tester, game, selected(tester, game)) + ".variables." + variable, value);
+        save();
+    }
+
     void resetSelected(UUID tester, ArcadePortGame game) {
         String profile = profilePath(tester, game, selected(tester, game));
         config.set(profile + ".features", null);
@@ -175,8 +196,11 @@ final class GameDebugProfiles {
         }
         result.entrySet().removeIf(entry -> {
             GameDebugVariableCatalog.Variable definition = GameDebugVariableCatalog.variable(game, entry.getKey());
-            if (definition == null || definition.kind() == GameDebugVariableCatalog.Kind.BOOLEAN
-                    || !(entry.getValue() instanceof Number number)) return true;
+            if (definition == null) return true;
+            if (definition.kind() == GameDebugVariableCatalog.Kind.BOOLEAN) {
+                return !(entry.getValue() instanceof Boolean);
+            }
+            if (!(entry.getValue() instanceof Number number)) return true;
             double bounded = GameDebugVariableCatalog.clamp(definition, number.doubleValue());
             if (!Double.isFinite(bounded)) return true;
             entry.setValue(bounded);
@@ -185,7 +209,7 @@ final class GameDebugProfiles {
         ConfigurationSection features = config.getConfigurationSection(
                 profilePath(tester, game, selected(tester, game)) + ".features");
         if (features != null) {
-            for (String key : features.getKeys(false)) result.put(key, features.get(key));
+            for (String key : features.getKeys(false)) result.putIfAbsent(key, features.get(key));
         }
         return Map.copyOf(result);
     }

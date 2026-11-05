@@ -177,4 +177,33 @@ class GameDebugProfilesTest {
         profiles.setVariable(tester, ArcadePortGame.SNAKE, "SNAKE_MAX_HAZARDS", 1_000_000.0D);
         assertEquals(64.0D, profiles.variable(tester, ArcadePortGame.SNAKE, "SNAKE_MAX_HAZARDS"));
     }
+
+    @Test
+    void booleanRuleSwitchesPersistAsTypedVariablesAndStayProfileScoped() {
+        Path file = directory.resolve("boolean-variables.yml");
+        GameDebugProfiles profiles = new GameDebugProfiles(file.toFile(), ignored -> { });
+        UUID tester = UUID.randomUUID();
+        String key = "MICRO_BATTLES_CRUMBLE_ENABLED";
+
+        profiles.setBooleanVariable(tester, ArcadePortGame.MICRO_BATTLES, key, false);
+        assertFalse(profiles.booleanVariable(tester, ArcadePortGame.MICRO_BATTLES, key, true));
+        assertEquals(Boolean.FALSE, profiles.values(tester, ArcadePortGame.MICRO_BATTLES).get(key));
+        GameDebugRuntimeOverrides.activate(profiles.values(tester, ArcadePortGame.MICRO_BATTLES));
+        assertFalse(GameDebugRuntimeOverrides.booleanValue(key, true));
+        GameDebugRuntimeOverrides.clear();
+
+        assertEquals("alternate", profiles.create(tester, ArcadePortGame.MICRO_BATTLES, "alternate"));
+        assertTrue(profiles.booleanVariable(tester, ArcadePortGame.MICRO_BATTLES, key, true));
+        profiles.setBooleanVariable(tester, ArcadePortGame.MICRO_BATTLES, key, true);
+        assertTrue(profiles.select(tester, ArcadePortGame.MICRO_BATTLES, GameDebugProfiles.DEFAULT_PROFILE));
+        assertFalse(profiles.booleanVariable(tester, ArcadePortGame.MICRO_BATTLES, key, true));
+        assertTrue(profiles.select(tester, ArcadePortGame.MICRO_BATTLES, "alternate"));
+        assertTrue(profiles.booleanVariable(tester, ArcadePortGame.MICRO_BATTLES, key, false));
+
+        String powerups = "BOMB_LOBBERS_POWERUP_SPAWNING_ENABLED";
+        profiles.setFeature(tester, ArcadePortGame.BOMB_LOBBERS, powerups, false);
+        assertEquals(Boolean.FALSE, profiles.values(tester, ArcadePortGame.BOMB_LOBBERS).get(powerups));
+        profiles.setBooleanVariable(tester, ArcadePortGame.BOMB_LOBBERS, powerups, true);
+        assertEquals(Boolean.TRUE, profiles.values(tester, ArcadePortGame.BOMB_LOBBERS).get(powerups));
+    }
 }
