@@ -1127,9 +1127,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
 
     private List<DebugFeature> debugFeatures(ArcadePortGame game) {
         Map<String, DebugFeature> features = new LinkedHashMap<>();
-        if (usesSharedArcadeDebugRuntime(game)) {
-            for (DebugFeature feature : COMMON_DEBUG_FEATURES) features.put(feature.key(), feature);
-        }
+        for (DebugFeature feature : COMMON_DEBUG_FEATURES) features.put(feature.key(), feature);
         for (GameDebugVariableCatalog.Variable variable : manager.debugVariables(game)) {
             if (variable.kind() != GameDebugVariableCatalog.Kind.BOOLEAN) continue;
             features.put(variable.key(), new DebugFeature(variable.key(), variable.label(), Material.REDSTONE_TORCH,
@@ -1143,13 +1141,6 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     Material.FIREWORK_ROCKET, "Use full-charge Bacon Brawl abilities without consuming meter.", false));
         }
         return List.copyOf(features.values());
-    }
-
-    private boolean usesSharedArcadeDebugRuntime(ArcadePortGame game) {
-        return game != ArcadePortGame.CAMERA_SHY && game != ArcadePortGame.SPEED_BUILDERS
-                && game != ArcadePortGame.PLEXBALL && game != ArcadePortGame.SNAKE
-                && game != ArcadePortGame.MONSTER_MAZE && game != ArcadePortGame.MONSTER_MAZE_SPEED
-                && game != ArcadePortGame.MONSTER_MAZE_MODERN && game != ArcadePortGame.WIZARDS;
     }
 
     private boolean debugFeatureAppliesImmediately(String key) {

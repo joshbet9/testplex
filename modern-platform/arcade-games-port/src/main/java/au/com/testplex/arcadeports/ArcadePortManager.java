@@ -792,7 +792,19 @@ public final class ArcadePortManager implements Listener {
         if (plugin.getWizardsGameManager() != null && plugin.getWizardsGameManager().isGameRunning()) {
             return ArcadePortGame.WIZARDS;
         }
+        if (plugin.getPlexballGame() != null && plugin.getPlexballGame().isActive()) {
+            return ArcadePortGame.PLEXBALL;
+        }
+        if (monsterMazeRunning() && monsterMaze.getActiveArcadeGame() != null) {
+            return monsterMaze.getActiveArcadeGame();
+        }
         return null;
+    }
+
+    private ArcadePortGame standaloneDebugGame(Player player) {
+        if (player == null || !player.isOnline() || active != null || !plugin.hasAdminAccess(player)
+                || lobby.isLobbyWorld(player.getWorld())) return null;
+        return activeDebugGame();
     }
 
     boolean debugAdvanceStartPhase(Player tester, ArcadePortGame type) {
@@ -23033,7 +23045,19 @@ public final class ArcadePortManager implements Listener {
         if (event.getEntity() instanceof Player prepareVictim && cancelPrepareAction(prepareVictim, event)) return;
         if (event instanceof EntityDamageByEntityEvent byEntity && cancelPrepareAction(playerShooter(byEntity.getDamager()), event)) return;
         Session session = active;
-        if (session == null || !isSessionWorld(session, event.getEntity().getWorld())) return;
+        if (session == null || !isSessionWorld(session, event.getEntity().getWorld())) {
+            if (event.getEntity() instanceof Player tester) {
+                ArcadePortGame game = standaloneDebugGame(tester);
+                if (game != null && isDebugOverrideEnabled(tester.getUniqueId(), game, "invulnerable")) {
+                    event.setCancelled(true);
+                } else if (game != null && event.getCause() == EntityDamageEvent.DamageCause.FALL
+                        && isDebugOverrideEnabled(tester.getUniqueId(), game, "no-fall-damage")) {
+                    event.setCancelled(true);
+                    tester.setFallDistance(0.0F);
+                }
+            }
+            return;
+        }
         // Keep the shared damage pipeline's previous ignore-cancelled behavior, while
         // allowing Bacon Brawl to take ownership of void knockouts already intercepted elsewhere.
         if (event.isCancelled() && !(session.type == ArcadePortGame.BACON_BRAWL
@@ -24408,8 +24432,9 @@ public final class ArcadePortManager implements Listener {
     public void onGameDebugFoodLevelChange(FoodLevelChangeEvent event) {
         if (!(event.getEntity() instanceof Player player)) return;
         Session session = active;
-        if (session == null || !session.players.containsKey(player.getUniqueId())) return;
-        if (isDebugOverrideEnabled(player.getUniqueId(), session.type, "no-hunger-loss")) {
+        ArcadePortGame game = session != null && session.players.containsKey(player.getUniqueId())
+                ? session.type : standaloneDebugGame(player);
+        if (game != null && isDebugOverrideEnabled(player.getUniqueId(), game, "no-hunger-loss")) {
             event.setCancelled(true);
             player.setFoodLevel(20);
             player.setSaturation(20.0F);

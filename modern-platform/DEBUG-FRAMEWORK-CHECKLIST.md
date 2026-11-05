@@ -26,6 +26,8 @@ Debug-round persistence guard: configured debug rounds and rounds launched with 
 
 Bot counts and per-bot team, kit, and cosmetic loadouts are now stored inside each tester's selected game profile. Duplicating or renaming a profile carries its roster configuration with it. Existing `test-bot-loadouts` values remain a fallback for the default profile during migration.
 
+The common tester switches (all kits, invulnerability, no fall damage, and no hunger loss) are exposed in every game's debug menu. Invulnerability, fall, and hunger switches now also have runtime hooks for separately managed games when the authorized tester is in the active game world.
+
 | Game | Status | Implemented coverage | Remaining work |
 |---|---|---|---|
 | Bacon Brawl | Partial | Shared rule overrides; common switches; achievement preview in its award helper | Per-kit ability switches/variables, event triggers and stats-isolated match simulation |
