@@ -119,6 +119,59 @@ class GameDebugVariableCatalogTest {
     }
 
     @Test
+    void everyVisibleProfileVariableCanBeChangedAtItsGameplayOverrideBoundary() {
+        for (ArcadePortGame game : ArcadePortGame.values()) {
+            for (GameDebugVariableCatalog.Variable variable : GameDebugVariableCatalog.variables(game)) {
+                double configured = variable.defaultValue();
+                Object supplied;
+                Object fallback;
+                Object actual;
+                if (variable.kind() == GameDebugVariableCatalog.Kind.BOOLEAN) {
+                    supplied = configured == 0.0D;
+                    fallback = configured != 0.0D;
+                    GameDebugRuntimeOverrides.activate(Map.of(variable.key(), supplied));
+                    actual = GameDebugRuntimeOverrides.booleanValue(variable.key(), (Boolean) fallback);
+                } else {
+                    double changed = configured + variable.step();
+                    if (changed > variable.maximum()) changed = configured - variable.step();
+                    if (changed < variable.minimum()) changed = variable.minimum();
+                    if (changed == configured) continue;
+                    supplied = changed;
+                    fallback = configured;
+                    GameDebugRuntimeOverrides.activate(Map.of(variable.key(), supplied));
+                    actual = switch (variable.kind()) {
+                        case INTEGER -> GameDebugRuntimeOverrides.intValue(variable.key(), (int) configured);
+                        case LONG -> GameDebugRuntimeOverrides.longValue(variable.key(), (long) configured);
+                        case FLOAT -> GameDebugRuntimeOverrides.floatValue(variable.key(), (float) configured);
+                        case DOUBLE -> GameDebugRuntimeOverrides.doubleValue(variable.key(), configured);
+                        case BOOLEAN -> throw new AssertionError("boolean handled above");
+                    };
+                }
+                if (supplied instanceof Number suppliedNumber) {
+                    assertEquals(suppliedNumber.doubleValue(), ((Number) actual).doubleValue(), 1.0e-5D,
+                            game.id() + " / " + variable.key());
+                } else {
+                    assertEquals(supplied, actual, game.id() + " / " + variable.key());
+                }
+                GameDebugRuntimeOverrides.clear();
+                Object restored = switch (variable.kind()) {
+                    case INTEGER -> GameDebugRuntimeOverrides.intValue(variable.key(), (int) variable.defaultValue());
+                    case LONG -> GameDebugRuntimeOverrides.longValue(variable.key(), (long) variable.defaultValue());
+                    case FLOAT -> GameDebugRuntimeOverrides.floatValue(variable.key(), (float) variable.defaultValue());
+                    case DOUBLE -> GameDebugRuntimeOverrides.doubleValue(variable.key(), variable.defaultValue());
+                    case BOOLEAN -> GameDebugRuntimeOverrides.booleanValue(variable.key(), variable.defaultValue() != 0.0D);
+                };
+                if (fallback instanceof Number fallbackNumber) {
+                    assertEquals(fallbackNumber.doubleValue(), ((Number) restored).doubleValue(), 1.0e-5D,
+                            game.id() + " reset / " + variable.key());
+                } else {
+                    assertEquals(fallback, restored, game.id() + " reset / " + variable.key());
+                }
+            }
+        }
+    }
+
+    @Test
     void malformedOversizedIntegerOverrideCannotCrashGameplayConversion() {
         GameDebugRuntimeOverrides.activate(Map.of("UNTRUSTED_TEST_VALUE", Double.MAX_VALUE));
 

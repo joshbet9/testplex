@@ -1,6 +1,8 @@
 package au.com.testplex.arcadeports;
 
 import org.junit.jupiter.api.Test;
+import me.monstermaze.game.GameState;
+import me.monstermaze.game.GameManager;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -25,5 +27,12 @@ class GameDebugPhaseActionsTest {
                 GameDebugPhaseActions.resolve(ArcadePortGame.TURF_WARS, true, false, false, false, true));
         assertEquals(GameDebugPhaseAction.NONE,
                 GameDebugPhaseActions.resolve(ArcadePortGame.GLADIATORS, true, false, false, false, false));
+    }
+
+    @Test
+    void monsterMazePhaseAdvanceRequiresALiveRoundAndCurrentSafePad() {
+        assertFalse(GameManager.canDebugAdvancePhase(GameState.IDLE, true));
+        assertFalse(GameManager.canDebugAdvancePhase(GameState.LIVE, false));
+        assertTrue(GameManager.canDebugAdvancePhase(GameState.LIVE, true));
     }
 }

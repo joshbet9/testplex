@@ -240,6 +240,7 @@ public final class MonsterMazePlugin {
         if (gameManager == null || !gameManager.isRunning()) activeArcadeGame = ArcadePortGame.MONSTER_MAZE;
     }
     public boolean isGameRunning() { return gameManager != null && gameManager.isRunning(); }
+    public boolean debugAdvancePhase() { return gameManager != null && gameManager.debugAdvancePhase(); }
 
     public ArcadeMechanicsModernPlugin getHostPlugin() { return host; }
     public boolean isDebugRound() { return host.isArcadeDebugRound(); }

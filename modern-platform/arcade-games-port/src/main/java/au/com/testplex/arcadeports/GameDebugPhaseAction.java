@@ -24,4 +24,5 @@ final class GameDebugPhaseActions {
         if (game == ArcadePortGame.TURF_WARS && hasTurfWarsPhase) return GameDebugPhaseAction.TURF_WARS_PHASE;
         return hasRoundTimeout ? GameDebugPhaseAction.ROUND_TIMEOUT : GameDebugPhaseAction.NONE;
     }
+
 }

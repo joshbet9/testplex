@@ -834,6 +834,11 @@ public final class ArcadePortManager implements Listener {
             if (advanced) GameDebugRuntimeOverrides.markDebugSession();
             return advanced;
         }
+        if (type != null && type.isMonsterMaze() && monsterMaze != null) {
+            boolean advanced = monsterMaze.debugAdvancePhase();
+            if (advanced) GameDebugRuntimeOverrides.markDebugSession();
+            return advanced;
+        }
         Session session = active;
         if (session == null || session.type != type || !session.startupComplete) {
             return false;

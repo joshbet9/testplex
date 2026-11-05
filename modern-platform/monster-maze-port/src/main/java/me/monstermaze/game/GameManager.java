@@ -126,6 +126,20 @@ public class GameManager implements Listener {
     public boolean isRunning() { return state != GameState.IDLE && state != GameState.ENDING; }
     public boolean isLive() { return state == GameState.LIVE; }
     public int getStage() { return curSafe; }
+    public static boolean canDebugAdvancePhase(GameState state, boolean hasCurrentSafePad) {
+        return state == GameState.LIVE && hasCurrentSafePad;
+    }
+    /** Debug control: safely move participants through the current safe-pad transition. */
+    public boolean debugAdvancePhase() {
+        if (!canDebugAdvancePhase(state, safePad != null)) return false;
+        for (Player player : getAlivePlayers()) {
+            padLockIns.add(player.getUniqueId());
+            teleportToSafePadCenter(player);
+        }
+        if (nextSafePad == null) spawnSafePad();
+        phaseTimer = 1;
+        return true;
+    }
     public void recordFirstSafePad(UUID playerId) { plugin.recordFirstSafePad(playerId); }
     public void recordAchievement(UUID playerId, String achievementId) { plugin.recordAchievement(playerId, achievementId); }
     public void noteFirstPad(Player player) { if (player != null) firstPadPlayers.add(player.getUniqueId()); }

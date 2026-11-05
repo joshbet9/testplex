@@ -11,6 +11,7 @@ This checklist tracks implemented controls, not menu/catalog presence alone. A g
 - [x] Menus separate profiles, feature switches, variables and bot setup for the currently selected game.
 - [x] Numeric shared Arcade rules can be overridden for the active round; the menu marks these as restart-required.
 - [x] The variable menu exposes only rules with an explicit production runtime consumer; persisted values are clamped to the rule's safe range and malformed integer conversions cannot crash gameplay.
+- [x] Automated coverage walks every exposed game variable, sets it through the typed runtime override boundary, reads it back and verifies clearing restores its default; a source check keeps runtime override keys linked to the profile catalog.
 - [x] Shared feature switches cover kit unlock, invulnerability, fall damage and hunger; Bacon Brawl also has its unlimited-ability switch.
 - [x] Achievement preview mode runs real achievement conditions through shared Arcade award helpers and Snap; preview notices do not persist unlocks.
 - [x] Authorized testers can advance any shared Arcade start countdown, the live Draw My Thing turn, Master Builders build/review phase, Turf Wars phase, any supported shared round timeout, or the current Speed Builders phase; bot rosters are configured for the next round.
@@ -44,7 +45,7 @@ The common tester switches (all kits, invulnerability, no fall damage, and no hu
 | Master Builders | Partial | Shared builder limits and common switches | Plot/map/vote/build controls and achievement/event simulation |
 | Micro Battles | Partial | Shared rule overrides and common switches | Kit/bridge/border feature switches and phase/event controls |
 | Milk the Cow | Partial | Score goal, milk/death scoring, cow-team ratio, herd size/speed, and common session switches are profile-backed and consumed by the manager | Cow phase/event triggers and direct gameplay behavior tests |
-| Monster Maze (all modes) | Partial | Per-mode mob speed, Body Rush duration, Cryo cooldown/freeze/radius and jump strength are profile-backed in the existing in-process engine; debug rounds now suppress the separate leaderboard personal-best writes too | Mob/theme/stage/map controls, achievement/event preview paths, test event/phase actions and direct mode behavior tests |
+| Monster Maze (all modes) | Partial | Per-mode mob speed, Body Rush duration, Cryo cooldown/freeze/radius and jump strength are profile-backed in the existing in-process engine; debug rounds suppress leaderboard personal-best writes; authorized phase control advances the current Safe Pad through normal stage resolution | Mob/theme/map controls, achievement/event preview paths and direct mode behavior tests |
 | One in the Quiver | Partial | Shared rule overrides and common switches | Arrow/kit feature switches and kill/round event tools |
 | Paintball | Partial | Shared rule overrides include Machine Gun heat capacity, shots-per-cycle and cooling | Weapon, reload, map and team-event controls |
 | Plexball | Partial | Player limits, match/batting timing, rewind, ball physics, home-run distance and catch windows are profile-backed and consumed by the rule/runtime code; debug controls advance intro, turn-break, and batting timeout phases through normal transitions | Remaining scoring/possession tunables, bot integration and direct match behavior tests |
