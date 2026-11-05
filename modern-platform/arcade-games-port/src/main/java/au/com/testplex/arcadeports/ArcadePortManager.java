@@ -13969,7 +13969,9 @@ public final class ArcadePortManager implements Listener {
         if (!unlimitedAbilityDebug && !ArcadePortRules.canUseBaconMeterAbility(charge)) return;
         // Chris P Bacon has fixed-strength actions that each cost exactly half the meter.
         int chargeCost = "chris-p-bacon".equals(kit)
-                ? GameDebugRuntimeOverrides.intValue("BACON_METER_MIN_ABILITY", ArcadePortRules.BACON_METER_MIN_ABILITY) : charge;
+                ? GameDebugRuntimeOverrides.intValue("BACON_CHRIS_ABILITY_METER_COST",
+                        ArcadePortRules.BACON_CHRIS_ABILITY_METER_COST)
+                : charge;
         // Other abilities spend their full current charge; none use a wall-clock cooldown.
         session.baconAbilitiesUsed.add(id);
         showAbilityActivationCosmetic(player);
@@ -28429,7 +28431,12 @@ public final class ArcadePortManager implements Listener {
 
     private long nextBombLobbersPowerupDelayMillis() {
         // One paired Red/Blue drop wave at a uniformly random 20-100 second interval (60-second mean).
-        return ThreadLocalRandom.current().nextLong(20_000L, 100_001L);
+        long minimum = Math.max(1L, GameDebugRuntimeOverrides.longValue("BOMB_LOBBERS_POWERUP_SPAWN_MIN_DELAY_MILLIS",
+                ArcadePortRules.BOMB_LOBBERS_POWERUP_SPAWN_MIN_DELAY_MILLIS));
+        long maximum = Math.max(minimum, GameDebugRuntimeOverrides.longValue("BOMB_LOBBERS_POWERUP_SPAWN_MAX_DELAY_MILLIS",
+                ArcadePortRules.BOMB_LOBBERS_POWERUP_SPAWN_MAX_DELAY_MILLIS));
+        return maximum == Long.MAX_VALUE ? minimum + ThreadLocalRandom.current().nextLong(maximum - minimum)
+                : ThreadLocalRandom.current().nextLong(minimum, maximum + 1L);
     }
 
     private void updateBombLobbersPowerups(Session session, long now) {
@@ -28493,7 +28500,9 @@ public final class ArcadePortManager implements Listener {
             spawned++;
         }
         // Both sides share one unpredictable wave clock, not two frequent announcements.
-        long nextWave = now + (spawned == 0 ? 10_000L : nextBombLobbersPowerupDelayMillis());
+        long retryDelay = Math.max(1L, GameDebugRuntimeOverrides.longValue("BOMB_LOBBERS_POWERUP_RETRY_DELAY_MILLIS",
+                ArcadePortRules.BOMB_LOBBERS_POWERUP_RETRY_DELAY_MILLIS));
+        long nextWave = now + (spawned == 0 ? retryDelay : nextBombLobbersPowerupDelayMillis());
         for (int team = 0; team < 2; team++) {
             session.bombNextPowerupSpawnAtByTeam.put(team, nextWave);
         }

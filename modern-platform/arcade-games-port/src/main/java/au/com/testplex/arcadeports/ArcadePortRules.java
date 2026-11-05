@@ -224,6 +224,10 @@ public final class ArcadePortRules {
 
     public static final int BACON_METER_MAX = 100;
     public static final int BACON_METER_MIN_ABILITY = 50;
+    public static final int BACON_METER_GAIN_NORMAL_HIT = 5;
+    public static final int BACON_METER_GAIN_CRITICAL_HIT = 10;
+    public static final double BACON_METER_POPULATION_SCALE = 14.0D;
+    public static final int BACON_CHRIS_ABILITY_METER_COST = 50;
     /** Per attacker-victim throttle, allowing the classic ten hits per second. */
     public static final long BACON_HIT_COOLDOWN_MILLIS = 100L;
     public static final long BACON_CRISPY_DASH_DURATION_MILLIS = 250L;
@@ -239,6 +243,10 @@ public final class ArcadePortRules {
     /** The Pig kit's damage meter controls its invincibility window, capped at five seconds. */
     public static final long BACON_PIG_INVINCIBILITY_MIN_MILLIS = 500L;
     public static final long BACON_PIG_INVINCIBILITY_MAX_MILLIS = 5_000L;
+    public static final double BACON_BODY_SLAM_METER_BASE_MULTIPLIER = 0.5D;
+    public static final double BACON_BODY_SLAM_METER_CHARGE_SCALE = 200.0D;
+    public static final double BACON_BLAST_METER_BASE_MULTIPLIER = 0.5D;
+    public static final double BACON_BLAST_METER_CHARGE_SCALE = 1.5D;
 
     public static boolean isBaconInvincibilityActive(long nowMillis, long invincibleUntilMillis) {
         return invincibleUntilMillis > 0L && nowMillis < invincibleUntilMillis;
@@ -249,6 +257,11 @@ public final class ArcadePortRules {
     public static final long BOMB_LOBBERS_POWERUP_FIRST_SPAWN_DELAY_MILLIS = 10_000L;
     public static final double BOMB_LOBBERS_SUPER_TNT_EXPLOSION_RADIUS = 10.0D;
     public static final double BOMB_LOBBERS_SUPER_TNT_MAX_DAMAGE = 65.0D;
+    public static final double BOMB_LOBBERS_DIRECT_HIT_DAMAGE = 10.0D;
+    public static final double BOMB_LOBBERS_SUPER_TNT_DIRECT_HIT_DAMAGE = 15.0D;
+    public static final long BOMB_LOBBERS_POWERUP_SPAWN_MIN_DELAY_MILLIS = 20_000L;
+    public static final long BOMB_LOBBERS_POWERUP_SPAWN_MAX_DELAY_MILLIS = 100_000L;
+    public static final long BOMB_LOBBERS_POWERUP_RETRY_DELAY_MILLIS = 10_000L;
     public static final int BOMB_LOBBERS_POWERUP_SPEED_DURATION_TICKS = 240;
 
     public static boolean bombLobbersPowerupsEnabled() {
@@ -266,18 +279,22 @@ public final class ArcadePortRules {
     public static final int BACON_BRAWL_KING_OF_BACON_WINS = 15;
 
     public static boolean shouldAwardBaconKingOfBacon(int totalWins) {
-        return totalWins >= BACON_BRAWL_KING_OF_BACON_WINS;
+        return totalWins >= GameDebugRuntimeOverrides.intValue("BACON_BRAWL_KING_OF_BACON_WINS", BACON_BRAWL_KING_OF_BACON_WINS);
     }
     public static int baconMeterGainForHit(boolean critical, int alivePlayers) {
         int alive = Math.max(1, Math.min(16, alivePlayers));
-        double scale = 1.0D + (16 - alive) / 14.0D;
-        int base = critical ? 10 : 5;
+        double scale = 1.0D + (16 - alive) / Math.max(1.0D, GameDebugRuntimeOverrides.doubleValue(
+                "BACON_METER_POPULATION_SCALE", BACON_METER_POPULATION_SCALE));
+        int base = critical
+                ? GameDebugRuntimeOverrides.intValue("BACON_METER_GAIN_CRITICAL_HIT", BACON_METER_GAIN_CRITICAL_HIT)
+                : GameDebugRuntimeOverrides.intValue("BACON_METER_GAIN_NORMAL_HIT", BACON_METER_GAIN_NORMAL_HIT);
         return (int) Math.ceil(base * scale);
     }
 
     public static int nextBaconMeter(int current, boolean critical, int alivePlayers) {
-        int charge = Math.max(0, Math.min(BACON_METER_MAX, current));
-        return Math.min(BACON_METER_MAX, charge + baconMeterGainForHit(critical, alivePlayers));
+        int max = Math.max(1, GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", BACON_METER_MAX));
+        int charge = Math.max(0, Math.min(max, current));
+        return Math.min(max, charge + baconMeterGainForHit(critical, alivePlayers));
     }
 
     /** Keep the Bacon Brawl sidebar within Minecraft's 15-row limit without merging names. */
@@ -298,22 +315,25 @@ public final class ArcadePortRules {
     }
 
     public static boolean canUseBaconMeterAbility(int percent) {
-        return percent >= BACON_METER_MIN_ABILITY;
+        return percent >= GameDebugRuntimeOverrides.intValue("BACON_METER_MIN_ABILITY", BACON_METER_MIN_ABILITY);
     }
 
     /** Lower charge still permits the ability; higher charge increases its knockback. */
     public static double baconBodySlamMeterMultiplier(int percent) {
-        int charge = Math.max(0, Math.min(BACON_METER_MAX, percent));
-        return 0.5D + charge / 200.0D;
+        int max = Math.max(1, GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", BACON_METER_MAX));
+        int charge = Math.max(0, Math.min(max, percent));
+        return GameDebugRuntimeOverrides.doubleValue("BACON_BODY_SLAM_METER_BASE_MULTIPLIER", BACON_BODY_SLAM_METER_BASE_MULTIPLIER)
+                + charge / Math.max(1.0D, GameDebugRuntimeOverrides.doubleValue("BACON_BODY_SLAM_METER_CHARGE_SCALE", BACON_BODY_SLAM_METER_CHARGE_SCALE));
     }
 
     /** Meter-powered Pig Cloak and Brutus Bacon abilities share a charge-scaled duration. */
     public static long baconAbilityDurationMillis(int percent) {
-        int charge = Math.max(0, Math.min(BACON_METER_MAX, percent));
+        int max = Math.max(1, GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", BACON_METER_MAX));
+        int charge = Math.max(0, Math.min(max, percent));
         if (!canUseBaconMeterAbility(charge)) return 0L;
-        return BACON_PIG_INVINCIBILITY_MIN_MILLIS
-                + Math.round((BACON_PIG_INVINCIBILITY_MAX_MILLIS
-                        - BACON_PIG_INVINCIBILITY_MIN_MILLIS) * charge / (double) BACON_METER_MAX);
+        long min = GameDebugRuntimeOverrides.longValue("BACON_PIG_INVINCIBILITY_MIN_MILLIS", BACON_PIG_INVINCIBILITY_MIN_MILLIS);
+        long maxDuration = Math.max(min, GameDebugRuntimeOverrides.longValue("BACON_PIG_INVINCIBILITY_MAX_MILLIS", BACON_PIG_INVINCIBILITY_MAX_MILLIS));
+        return min + Math.round((maxDuration - min) * charge / (double) max);
     }
 
     /** Retained as a compatibility alias for earlier tests and callers. */
@@ -328,8 +348,8 @@ public final class ArcadePortRules {
     }
 
     public static boolean isBaconTimedCritical(long intervalMillis, double knockbackMultiplier) {
-        return intervalMillis >= baconTimingWindowMillis(BACON_TIMED_HIT_GOOD_MIN_MILLIS, knockbackMultiplier)
-                && intervalMillis <= baconTimingWindowMillis(BACON_TIMED_HIT_GOOD_MAX_MILLIS, knockbackMultiplier);
+        return intervalMillis >= baconTimingWindowMillis(GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_GOOD_MIN_MILLIS", BACON_TIMED_HIT_GOOD_MIN_MILLIS), knockbackMultiplier)
+                && intervalMillis <= baconTimingWindowMillis(GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_GOOD_MAX_MILLIS", BACON_TIMED_HIT_GOOD_MAX_MILLIS), knockbackMultiplier);
     }
 
     public static boolean isBaconTimedCritical(long intervalMillis) {
@@ -343,18 +363,20 @@ public final class ArcadePortRules {
 
     /** Mama Piggles spends meter to set Bacon Blast launch and impact power. */
     public static double baconBlastPowerMultiplier(int percent) {
-        int charge = Math.max(0, Math.min(BACON_METER_MAX, percent));
-        return 0.5D + 1.5D * charge / BACON_METER_MAX;
+        int max = Math.max(1, GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", BACON_METER_MAX));
+        int charge = Math.max(0, Math.min(max, percent));
+        return GameDebugRuntimeOverrides.doubleValue("BACON_BLAST_METER_BASE_MULTIPLIER", BACON_BLAST_METER_BASE_MULTIPLIER)
+                + GameDebugRuntimeOverrides.doubleValue("BACON_BLAST_METER_CHARGE_SCALE", BACON_BLAST_METER_CHARGE_SCALE) * charge / max;
     }
 
     /** Spamming within the same short click window weakens hits; well-timed hits are rewarded. */
     public static double baconTimedHitKnockbackMultiplier(long intervalMillis, double knockbackMultiplier) {
-        long spam = baconTimingWindowMillis(BACON_TIMED_HIT_SPAM_WINDOW_MILLIS, knockbackMultiplier);
-        long goodMin = baconTimingWindowMillis(BACON_TIMED_HIT_GOOD_MIN_MILLIS, knockbackMultiplier);
-        long goodMax = baconTimingWindowMillis(BACON_TIMED_HIT_GOOD_MAX_MILLIS, knockbackMultiplier);
-        long okMin = baconTimingWindowMillis(BACON_TIMED_HIT_OK_MIN_MILLIS, knockbackMultiplier);
-        long okMax = baconTimingWindowMillis(BACON_TIMED_HIT_OK_MAX_MILLIS, knockbackMultiplier);
-        long lateMax = baconTimingWindowMillis(BACON_TIMED_HIT_LATE_MAX_MILLIS, knockbackMultiplier);
+        long spam = baconTimingWindowMillis(GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_SPAM_WINDOW_MILLIS", BACON_TIMED_HIT_SPAM_WINDOW_MILLIS), knockbackMultiplier);
+        long goodMin = baconTimingWindowMillis(GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_GOOD_MIN_MILLIS", BACON_TIMED_HIT_GOOD_MIN_MILLIS), knockbackMultiplier);
+        long goodMax = baconTimingWindowMillis(GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_GOOD_MAX_MILLIS", BACON_TIMED_HIT_GOOD_MAX_MILLIS), knockbackMultiplier);
+        long okMin = baconTimingWindowMillis(GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_OK_MIN_MILLIS", BACON_TIMED_HIT_OK_MIN_MILLIS), knockbackMultiplier);
+        long okMax = baconTimingWindowMillis(GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_OK_MAX_MILLIS", BACON_TIMED_HIT_OK_MAX_MILLIS), knockbackMultiplier);
+        long lateMax = baconTimingWindowMillis(GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_LATE_MAX_MILLIS", BACON_TIMED_HIT_LATE_MAX_MILLIS), knockbackMultiplier);
         if (intervalMillis < 0L) return 1.0D;
         if (intervalMillis <= spam) return 0.65D;
         if (intervalMillis >= goodMin && intervalMillis <= goodMax) return 1.6D;
@@ -375,7 +397,7 @@ public final class ArcadePortRules {
             double distanceSquared, boolean hasLineOfSight) {
         return activeBaconRound && attackerAlive && targetAlive && !selfHit
                 && Double.isFinite(distanceSquared) && distanceSquared >= 0.0D
-                && distanceSquared <= BACON_AVATAR_MAX_ATTACK_DISTANCE_SQUARED
+                && distanceSquared <= GameDebugRuntimeOverrides.doubleValue("BACON_AVATAR_MAX_ATTACK_DISTANCE_SQUARED", BACON_AVATAR_MAX_ATTACK_DISTANCE_SQUARED)
                 && hasLineOfSight;
     }
 
@@ -392,11 +414,11 @@ public final class ArcadePortRules {
     }
 
     public static boolean shouldAwardBaconPigsInBlankets(int killsThisGame) {
-        return killsThisGame >= BACON_BRAWL_PIGS_IN_BLANKETS_KILLS;
+        return killsThisGame >= GameDebugRuntimeOverrides.intValue("BACON_BRAWL_PIGS_IN_BLANKETS_KILLS", BACON_BRAWL_PIGS_IN_BLANKETS_KILLS);
     }
 
     public static boolean shouldAwardBaconFlashFried(long roundMillis) {
-        return roundMillis >= 0L && roundMillis <= BACON_FLASH_FRIED_MAX_WIN_MILLIS;
+        return roundMillis >= 0L && roundMillis <= GameDebugRuntimeOverrides.longValue("BACON_FLASH_FRIED_MAX_WIN_MILLIS", BACON_FLASH_FRIED_MAX_WIN_MILLIS);
     }
 
     public static boolean shouldAwardBaconRawPork(boolean usedAbilityThisGame) {
@@ -404,27 +426,27 @@ public final class ArcadePortRules {
     }
 
     public static boolean shouldAwardBaconThreeForOne(int bodySlamKills) {
-        return bodySlamKills >= BACON_THREE_FOR_ONE_BODY_SLAM_KILLS;
+        return bodySlamKills >= GameDebugRuntimeOverrides.intValue("BACON_THREE_FOR_ONE_BODY_SLAM_KILLS", BACON_THREE_FOR_ONE_BODY_SLAM_KILLS);
     }
 
     public static boolean shouldAwardBombLobbersUltimateKiller(int killsThisGame) {
-        return killsThisGame >= BOMB_LOBBERS_ULTIMATE_KILLER_KILLS;
+        return killsThisGame >= GameDebugRuntimeOverrides.intValue("BOMB_LOBBERS_ULTIMATE_KILLER_KILLS", BOMB_LOBBERS_ULTIMATE_KILLER_KILLS);
     }
     public static boolean shouldAwardBombLobbersTwoBirdsOneStone(int killsFromOneTnt) {
-        return killsFromOneTnt >= BOMB_LOBBERS_TWO_BIRDS_KILLS;
+        return killsFromOneTnt >= GameDebugRuntimeOverrides.intValue("BOMB_LOBBERS_TWO_BIRDS_KILLS", BOMB_LOBBERS_TWO_BIRDS_KILLS);
     }
     public static int nextBombLobbersTntKillCount(int currentKills, boolean creditedKill) {
         int current = Math.max(0, currentKills);
         return creditedKill ? Math.min(64, current + 1) : current;
     }
     public static boolean shouldAwardBombLobbersTeamPlayer(int assistsThisGame) {
-        return assistsThisGame >= BOMB_LOBBERS_TEAM_PLAYER_ASSISTS;
+        return assistsThisGame >= GameDebugRuntimeOverrides.intValue("BOMB_LOBBERS_TEAM_PLAYER_ASSISTS", BOMB_LOBBERS_TEAM_PLAYER_ASSISTS);
     }
     public static boolean shouldAwardBombLobbersDoubleJump(boolean won, boolean aliveAtFinish, boolean usedDoubleJump) {
         return won && aliveAtFinish && !usedDoubleJump;
     }
     public static boolean shouldAwardBombLobbersMasterBomber(int winsAfterCurrentGame) {
-        return winsAfterCurrentGame >= BOMB_LOBBERS_MASTER_BOMBER_WINS;
+        return winsAfterCurrentGame >= GameDebugRuntimeOverrides.intValue("BOMB_LOBBERS_MASTER_BOMBER_WINS", BOMB_LOBBERS_MASTER_BOMBER_WINS);
     }
     public static String bombLobbersAchievementConfigKey(java.util.UUID playerId, String achievementSlug) {
         if (playerId == null || achievementSlug == null || !achievementSlug.matches("[a-z0-9-]+")) return "";
@@ -463,7 +485,7 @@ public final class ArcadePortRules {
             boolean isArenaFallOrWaterKnockout) {
         return isArenaFallOrWaterKnockout && lastHitAtMillis > 0L
                 && nowMillis >= lastHitAtMillis
-                && nowMillis - lastHitAtMillis <= BACON_FALL_KILL_CREDIT_WINDOW_MILLIS;
+                && nowMillis - lastHitAtMillis <= GameDebugRuntimeOverrides.longValue("BACON_FALL_KILL_CREDIT_WINDOW_MILLIS", BACON_FALL_KILL_CREDIT_WINDOW_MILLIS);
     }
 
     /** Reborn Bacon Brawl has no fixed timer; SoloGame ends when at most one player remains alive. */
@@ -499,7 +521,7 @@ public final class ArcadePortRules {
 
     public static boolean isBaconBlastNearPlayer(double distanceSquared) {
         return Double.isFinite(distanceSquared) && distanceSquared >= 0.0D
-                && distanceSquared <= BACON_BLAST_PLAYER_COLLISION_RADIUS_SQUARED;
+                && distanceSquared <= GameDebugRuntimeOverrides.doubleValue("BACON_BLAST_PLAYER_COLLISION_RADIUS_SQUARED", BACON_BLAST_PLAYER_COLLISION_RADIUS_SQUARED);
     }
 
     /**
@@ -513,14 +535,15 @@ public final class ArcadePortRules {
                 || !Double.isFinite(segmentLength) || segmentLength < 0.0D) return false;
         if (!Double.isFinite(blockFraction) || blockFraction < 0.0D) return true;
         if (blockFraction > 1.0D || segmentLength <= 1.0E-6D) return false;
-        double playerNearEdge = playerFraction
-                - Math.sqrt(BACON_BLAST_PLAYER_COLLISION_RADIUS_SQUARED) / segmentLength;
+        double collisionRadiusSquared = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "BACON_BLAST_PLAYER_COLLISION_RADIUS_SQUARED", BACON_BLAST_PLAYER_COLLISION_RADIUS_SQUARED));
+        double playerNearEdge = playerFraction - Math.sqrt(collisionRadiusSquared) / segmentLength;
         return playerNearEdge <= blockFraction;
     }
 
     public static boolean shouldExpireBaconBlast(long nowMillis, long createdAtMillis, boolean touchingBlock) {
         return touchingBlock || createdAtMillis <= 0L || nowMillis < createdAtMillis
-                || nowMillis - createdAtMillis >= BACON_BLAST_MAX_FLIGHT_MILLIS;
+                || nowMillis - createdAtMillis >= GameDebugRuntimeOverrides.longValue("BACON_BLAST_MAX_FLIGHT_MILLIS", BACON_BLAST_MAX_FLIGHT_MILLIS);
     }
     /** Reborn's inherited Game.GameTimeout is 20 minutes. */
     public static final long BOMB_LOBBERS_ROUND_MILLIS = 1_200_000L;
@@ -542,11 +565,13 @@ public final class ArcadePortRules {
     }
 
     public static long nextBombLobbersSpectatorTeleportAt(long nowMillis) {
-        if (nowMillis < 0L) return BOMB_LOBBERS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS;
-        if (nowMillis > Long.MAX_VALUE - BOMB_LOBBERS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS) {
+        long cooldown = Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "BOMB_LOBBERS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS", BOMB_LOBBERS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS));
+        if (nowMillis < 0L) return cooldown;
+        if (nowMillis > Long.MAX_VALUE - cooldown) {
             return Long.MAX_VALUE;
         }
-        return nowMillis + BOMB_LOBBERS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS;
+        return nowMillis + cooldown;
     }
 
     /** Reborn's Waller perk uses a 100 ms Recharge gate between wall placements. */
@@ -1128,18 +1153,30 @@ public final class ArcadePortRules {
         return 2;
     }
 
+    public static long bombLobbersPowerupSpawnDelayMillis(long randomValue) {
+        long min = Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "BOMB_LOBBERS_POWERUP_SPAWN_MIN_DELAY_MILLIS", BOMB_LOBBERS_POWERUP_SPAWN_MIN_DELAY_MILLIS));
+        long max = Math.max(min, GameDebugRuntimeOverrides.longValue(
+                "BOMB_LOBBERS_POWERUP_SPAWN_MAX_DELAY_MILLIS", BOMB_LOBBERS_POWERUP_SPAWN_MAX_DELAY_MILLIS));
+        return min + Math.floorMod(randomValue, max - min + 1L);
+    }
+
     public static double bombLobbersExplosionRadius(String powerupType) {
         return "super-tnt".equalsIgnoreCase(powerupType)
-                ? BOMB_LOBBERS_SUPER_TNT_EXPLOSION_RADIUS : BOMB_LOBBERS_EXPLOSION_RADIUS;
+                ? GameDebugRuntimeOverrides.doubleValue("BOMB_LOBBERS_SUPER_TNT_EXPLOSION_RADIUS", BOMB_LOBBERS_SUPER_TNT_EXPLOSION_RADIUS)
+                : GameDebugRuntimeOverrides.doubleValue("BOMB_LOBBERS_EXPLOSION_RADIUS", BOMB_LOBBERS_EXPLOSION_RADIUS);
     }
 
     public static double bombLobbersExplosionMaxDamage(String powerupType) {
         return "super-tnt".equalsIgnoreCase(powerupType)
-                ? BOMB_LOBBERS_SUPER_TNT_MAX_DAMAGE : BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE;
+                ? GameDebugRuntimeOverrides.doubleValue("BOMB_LOBBERS_SUPER_TNT_MAX_DAMAGE", BOMB_LOBBERS_SUPER_TNT_MAX_DAMAGE)
+                : GameDebugRuntimeOverrides.doubleValue("BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE", BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE);
     }
 
     public static double bombLobbersDirectHitDamage(String powerupType) {
-        return "super-tnt".equalsIgnoreCase(powerupType) ? 15.0D : 10.0D;
+        return "super-tnt".equalsIgnoreCase(powerupType)
+                ? GameDebugRuntimeOverrides.doubleValue("BOMB_LOBBERS_SUPER_TNT_DIRECT_HIT_DAMAGE", BOMB_LOBBERS_SUPER_TNT_DIRECT_HIT_DAMAGE)
+                : GameDebugRuntimeOverrides.doubleValue("BOMB_LOBBERS_DIRECT_HIT_DAMAGE", BOMB_LOBBERS_DIRECT_HIT_DAMAGE);
     }
 
     public static boolean bombLobbersTntIgnites(String powerupType) {
@@ -1187,9 +1224,10 @@ public final class ArcadePortRules {
     public static final long BOMB_LOBBERS_DOUBLE_JUMP_RECHARGE_MILLIS = 50L;
 
     public static long nextBombLobbersDoubleJumpReadyAt(long nowMillis) {
-        if (nowMillis < 0L) return BOMB_LOBBERS_DOUBLE_JUMP_RECHARGE_MILLIS;
-        if (nowMillis > Long.MAX_VALUE - BOMB_LOBBERS_DOUBLE_JUMP_RECHARGE_MILLIS) return Long.MAX_VALUE;
-        return nowMillis + BOMB_LOBBERS_DOUBLE_JUMP_RECHARGE_MILLIS;
+        long cooldown = Math.max(0L, GameDebugRuntimeOverrides.longValue("BOMB_LOBBERS_DOUBLE_JUMP_RECHARGE_MILLIS", BOMB_LOBBERS_DOUBLE_JUMP_RECHARGE_MILLIS));
+        if (nowMillis < 0L) return cooldown;
+        if (nowMillis > Long.MAX_VALUE - cooldown) return Long.MAX_VALUE;
+        return nowMillis + cooldown;
     }
 
     /** Mirrors UtilAction.velocity for PerkDoubleJump's view vector, Y cap, and optional ground boost. */
@@ -1262,8 +1300,8 @@ public final class ArcadePortRules {
     }
 
     public static boolean shouldPrimeBombLobbersBomb(long ageMillis, boolean touchingSolidBlock) {
-        return ageMillis >= BOMB_LOBBERS_MAX_FLIGHT_MILLIS
-                || (ageMillis >= BOMB_LOBBERS_WALL_CONTACT_DELAY_MILLIS && touchingSolidBlock);
+        return ageMillis >= GameDebugRuntimeOverrides.longValue("BOMB_LOBBERS_MAX_FLIGHT_MILLIS", BOMB_LOBBERS_MAX_FLIGHT_MILLIS)
+                || (ageMillis >= GameDebugRuntimeOverrides.longValue("BOMB_LOBBERS_WALL_CONTACT_DELAY_MILLIS", BOMB_LOBBERS_WALL_CONTACT_DELAY_MILLIS) && touchingSolidBlock);
     }
 
     /** Whether a Waller can place a wall at this time, including the source's short Recharge gate. */
@@ -1272,9 +1310,10 @@ public final class ArcadePortRules {
     }
 
     public static long nextBombLobbersWallerReadyAt(long nowMillis) {
-        if (nowMillis < 0L) return BOMB_LOBBERS_WALLER_COOLDOWN_MILLIS;
-        if (nowMillis > Long.MAX_VALUE - BOMB_LOBBERS_WALLER_COOLDOWN_MILLIS) return Long.MAX_VALUE;
-        return nowMillis + BOMB_LOBBERS_WALLER_COOLDOWN_MILLIS;
+        long cooldown = Math.max(0L, GameDebugRuntimeOverrides.longValue("BOMB_LOBBERS_WALLER_COOLDOWN_MILLIS", BOMB_LOBBERS_WALLER_COOLDOWN_MILLIS));
+        if (nowMillis < 0L) return cooldown;
+        if (nowMillis > Long.MAX_VALUE - cooldown) return Long.MAX_VALUE;
+        return nowMillis + cooldown;
     }
 
     /** Reborn's Waller faces the adjacent block using getFace(playerYaw + 180F). */
@@ -1291,7 +1330,7 @@ public final class ArcadePortRules {
      */
     public static double bombLobbersBlastDamage(double distanceToTarget, double exposure) {
         return bombLobbersBlastDamage(distanceToTarget, exposure,
-                BOMB_LOBBERS_EXPLOSION_RADIUS, BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE);
+                bombLobbersExplosionRadius(null), bombLobbersExplosionMaxDamage(null));
     }
 
     public static double bombLobbersBlastDamage(double distanceToTarget, double exposure,
@@ -1367,9 +1406,9 @@ public final class ArcadePortRules {
         }
         org.bukkit.util.Vector startVector = start.toVector();
         org.bukkit.util.BoundingBox hitBox = targetBox.clone().expand(
-                BOMB_LOBBERS_DIRECT_HIT_BOX_GROW,
-                BOMB_LOBBERS_DIRECT_HIT_BOX_GROW,
-                BOMB_LOBBERS_DIRECT_HIT_BOX_GROW);
+                Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue("BOMB_LOBBERS_DIRECT_HIT_BOX_GROW", BOMB_LOBBERS_DIRECT_HIT_BOX_GROW)),
+                Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue("BOMB_LOBBERS_DIRECT_HIT_BOX_GROW", BOMB_LOBBERS_DIRECT_HIT_BOX_GROW)),
+                Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue("BOMB_LOBBERS_DIRECT_HIT_BOX_GROW", BOMB_LOBBERS_DIRECT_HIT_BOX_GROW)));
         org.bukkit.util.Vector segment = end.toVector().subtract(startVector);
         double length = segment.length();
         if (!Double.isFinite(length)) return Double.POSITIVE_INFINITY;
@@ -1638,7 +1677,8 @@ public final class ArcadePortRules {
         if (directBlastKill) return true;
         return killerId != null && killerId.equals(comboOwnerId)
                 && lastComboHitAtMillis > 0L && nowMillis >= lastComboHitAtMillis
-                && nowMillis - lastComboHitAtMillis <= BACON_BLAST_KILL_COMBO_WINDOW_MILLIS;
+                && nowMillis - lastComboHitAtMillis <= GameDebugRuntimeOverrides.longValue(
+                        "BACON_BLAST_KILL_COMBO_WINDOW_MILLIS", BACON_BLAST_KILL_COMBO_WINDOW_MILLIS);
     }
 
     public static long evolutionPityRemainingMillis(long pityDeadline, long now) {
@@ -1959,14 +1999,17 @@ public final class ArcadePortRules {
     public static final long BACON_BRAWL_ENDGAME_ESCALATION_DELAY_MILLIS = 20_000L;
 
     public static long nextBaconKnockbackInterval(int completedEscalations, int alivePlayers) {
-        if (completedEscalations < 0 || completedEscalations >= BACON_BRAWL_MAX_KNOCKBACK_ESCALATIONS) {
+        long initial = GameDebugRuntimeOverrides.longValue("BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS", BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS);
+        long step = Math.max(1L, GameDebugRuntimeOverrides.longValue("BACON_KNOCKBACK_INTERVAL_STEP_MILLIS", BACON_KNOCKBACK_INTERVAL_STEP_MILLIS));
+        long minimum = Math.max(0L, GameDebugRuntimeOverrides.longValue("BACON_MIN_KNOCKBACK_INTERVAL_MILLIS", BACON_MIN_KNOCKBACK_INTERVAL_MILLIS));
+        int maxEscalations = (int) Math.max(1L, (initial + step - 1L) / step);
+        if (completedEscalations < 0 || completedEscalations >= maxEscalations) {
             return 0L;
         }
-        long sourceInterval = Math.max(BACON_MIN_KNOCKBACK_INTERVAL_MILLIS,
-                BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS
-                        - completedEscalations * BACON_KNOCKBACK_INTERVAL_STEP_MILLIS);
+        long sourceInterval = Math.max(minimum, initial - completedEscalations * step);
         if (alivePlayers <= 2) {
-            return Math.min(sourceInterval, BACON_BRAWL_ENDGAME_ESCALATION_DELAY_MILLIS);
+            return Math.min(sourceInterval, GameDebugRuntimeOverrides.longValue(
+                    "BACON_BRAWL_ENDGAME_ESCALATION_DELAY_MILLIS", BACON_BRAWL_ENDGAME_ESCALATION_DELAY_MILLIS));
         }
         return sourceInterval;
     }

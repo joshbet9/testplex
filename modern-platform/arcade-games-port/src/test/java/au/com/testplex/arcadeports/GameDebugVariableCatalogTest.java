@@ -96,7 +96,7 @@ class GameDebugVariableCatalogTest {
                         game.id() + " exposes a rule without a runtime consumer: " + variable.key());
             }
         }
-        assertFalse(GameDebugVariableCatalog.variables(ArcadePortGame.BACON_BRAWL).stream()
+        assertTrue(GameDebugVariableCatalog.variables(ArcadePortGame.BACON_BRAWL).stream()
                 .anyMatch(variable -> variable.key().equals("BACON_FLASH_FRIED_MAX_WIN_MILLIS")));
         assertTrue(GameDebugVariableCatalog.appliesImmediately(
                 GameDebugVariableCatalog.variable(ArcadePortGame.BACON_BRAWL, "BACON_BRAWL_HITS_DAMAGE_HEALTH")));
