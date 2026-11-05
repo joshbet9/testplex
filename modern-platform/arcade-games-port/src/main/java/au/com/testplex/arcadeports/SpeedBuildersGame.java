@@ -791,7 +791,10 @@ public final class SpeedBuildersGame implements Listener {
             removeMobs(state.mobs);
             restorePlot(state.plot);
             pasteTemplate(state.plot, currentTemplate);
-            spawnTemplateMobs(state, state.plot, currentTemplate);
+            if (GameDebugRuntimeOverrides.booleanValue("SPEED_BUILDERS_TEMPLATE_MOBS_ENABLED",
+                    SpeedBuildersRules.TEMPLATE_MOBS_ENABLED)) {
+                spawnTemplateMobs(state, state.plot, currentTemplate);
+            }
             teleportToPlot(state);
             state.player.sendTitle(ChatColor.GOLD + currentTemplate.name(),
                     ChatColor.YELLOW + "Memorise the model — " + GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_DEFAULT_VIEW_SECONDS", SpeedBuildersRules.DEFAULT_VIEW_SECONDS) + " seconds",

@@ -63,6 +63,20 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void standaloneSpeedBuildersMatchUsesConfiguredBotRosterAndLoadouts() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String source = Files.readString(sourceRoot.resolve("SpeedBuildersGame.java"));
+
+        assertTrue(source.contains("manager.configuredTestBotCount(ArcadePortGame.SPEED_BUILDERS)"));
+        assertTrue(source.contains("testPlayers.spawnForMatch(botsNeeded"));
+        assertTrue(source.contains("manager.applyConfiguredTestBotLoadout(ArcadePortGame.SPEED_BUILDERS, index, bot)"));
+    }
+
+    @Test
     void debugAndBotMenusAndRuntimeMutationsRemainTesterOnly() throws IOException {
         Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
         if (!Files.isDirectory(sourceRoot)) {

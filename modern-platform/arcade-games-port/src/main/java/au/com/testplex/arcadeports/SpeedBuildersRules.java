@@ -24,6 +24,7 @@ public final class SpeedBuildersRules {
     public static final int REVIEW_SECONDS = 10;
     public static final int INTERMISSION_SECONDS = 3;
     public static final int DEFAULT_MATCH_ROUNDS = 5;
+    public static final boolean TEMPLATE_MOBS_ENABLED = true;
 
     private SpeedBuildersRules() { }
 

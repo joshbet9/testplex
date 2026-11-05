@@ -48,6 +48,7 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNAKE), "SNAKE_HAZARD_STEERING_SPEED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MILK_THE_COW), "MILK_THE_COW_SCORE_TO_WIN");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SPEED_BUILDERS), "SPEED_BUILDERS_DEFAULT_VIEW_SECONDS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SPEED_BUILDERS), "SPEED_BUILDERS_TEMPLATE_MOBS_ENABLED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.PLEXBALL), "PLEXBALL_BALL_GRAVITY_PER_TICK");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.WIZARDS), "WIZARDS_ENDGAME_START_MINUTES");
         assertFalse(GameDebugVariableCatalog.variables(ArcadePortGame.WIZARDS).stream()
