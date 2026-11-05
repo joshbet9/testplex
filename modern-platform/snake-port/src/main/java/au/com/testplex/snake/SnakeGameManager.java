@@ -648,11 +648,18 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
             }
             nextGrowAt = now + 1_000L;
         }
-        if (now >= nextHazardAt && hazards.size() < GameDebugRuntimeOverrides.intValue("SNAKE_MAX_HAZARDS",
-                SnakeRules.MAX_HAZARDS)) {
-            boolean spawned = spawnHazard();
-            nextHazardAt = now + (spawned ? GameDebugRuntimeOverrides.longValue("SNAKE_HAZARD_INTERVAL_MILLIS",
-                    SnakeRules.HAZARD_INTERVAL_MILLIS) : 5_000L);
+        if (GameDebugRuntimeOverrides.booleanValue("magma-hazards", true)) {
+            if (now >= nextHazardAt && hazards.size() < GameDebugRuntimeOverrides.intValue("SNAKE_MAX_HAZARDS",
+                    SnakeRules.MAX_HAZARDS)) {
+                boolean spawned = spawnHazard();
+                nextHazardAt = now + (spawned ? GameDebugRuntimeOverrides.longValue("SNAKE_HAZARD_INTERVAL_MILLIS",
+                        SnakeRules.HAZARD_INTERVAL_MILLIS) : 5_000L);
+            }
+        } else if (!hazards.isEmpty()) {
+            for (MagmaCube hazard : new ArrayList<>(hazards)) {
+                if (hazard.isValid()) hazard.remove();
+            }
+            hazards.clear();
         }
 
         if (now - lastSpectatorUpdate >= 500L) {
@@ -688,7 +695,7 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
             moveSnake(state, now);
         }
         processFood();
-        moveAndProcessHazards();
+        if (GameDebugRuntimeOverrides.booleanValue("magma-hazards", true)) moveAndProcessHazards();
         processCollisions();
         checkEndCondition();
     }
@@ -1133,6 +1140,8 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
     private void processCollisions() {
         List<SnakeState> live = snakes.values().stream().filter(s -> s.alive && s.player.isOnline()).toList();
         for (SnakeState playerState : live) {
+            if (plugin.hasAdminAccess(playerState.player)
+                    && !GameDebugRuntimeOverrides.booleanValue("tail-collisions", true)) continue;
             if (playerState.invulnerableUntil > System.currentTimeMillis()
                     || playerState.reverseUntil > System.currentTimeMillis()
                     || playerState.segments.isEmpty()) continue;
@@ -1480,6 +1489,12 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
         // Kit items are game controls, not normal food/usable items. Cancel them even
         // while the one-second ability cooldown is active so cookies are not eaten.
         event.setCancelled(true);
+        String abilityFeature = "ability-" + state.kit;
+        if (plugin.hasAdminAccess(event.getPlayer())
+                && !GameDebugRuntimeOverrides.booleanValue(abilityFeature, true)) {
+            event.getPlayer().sendActionBar(ChatColor.RED + "That kit ability is disabled in your debug profile.");
+            return;
+        }
         long now = System.currentTimeMillis();
         if (now < state.abilityCooldownUntil) return;
         consumeMainHand(event.getPlayer());
@@ -1525,8 +1540,11 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
             if (state != null && state.alive
                     && SnakeRules.shouldEliminateFromDamageCause(event.getCause().name())) {
                 event.setCancelled(true);
-                eliminate(state, null, "fell into lava");
-                checkEndCondition();
+                if (!plugin.hasAdminAccess(player)
+                        || GameDebugRuntimeOverrides.booleanValue("lava-elimination", true)) {
+                    eliminate(state, null, "fell into lava");
+                    checkEndCondition();
+                }
                 return;
             }
             if (state != null) event.setCancelled(true);

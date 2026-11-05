@@ -155,6 +155,36 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void snakeDebugSwitchesReachItsInProcessGameModule() throws IOException {
+        Path arcadeSources = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(arcadeSources)) {
+            arcadeSources = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        Path snakeManagerPath = Path.of("..", "snake-port", "src", "main", "java", "au", "com",
+                "testplex", "snake", "SnakeGameManager.java");
+        if (!Files.isRegularFile(snakeManagerPath)) {
+            snakeManagerPath = Path.of("modern-platform", "snake-port", "src", "main", "java", "au",
+                    "com", "testplex", "snake", "SnakeGameManager.java");
+        }
+        String lobby = Files.readString(arcadeSources.resolve("ModernArcadeLobbyRuntime.java"));
+        String manager = Files.readString(arcadeSources.resolve("ArcadePortManager.java"));
+        String snake = Files.readString(snakeManagerPath);
+        for (String control : List.of("ability-speed", "ability-reverse", "ability-invulnerable",
+                "tail-collisions", "magma-hazards", "lava-elimination")) {
+            assertTrue(lobby.contains("\"" + control + "\""), control + " appears in Snake's debug menu");
+        }
+        assertTrue(snake.contains("booleanValue(abilityFeature, true)"));
+        for (String control : List.of("tail-collisions", "magma-hazards", "lava-elimination")) {
+            assertTrue(snake.contains("booleanValue(\"" + control + "\""),
+                    control + " is consumed by Snake gameplay");
+        }
+        assertTrue(manager.contains("GameDebugRuntimeOverrides.setValue(flag, enabled)"));
+        assertTrue(snake.contains("plugin.hasAdminAccess(event.getPlayer())"));
+        assertTrue(snake.contains("plugin.hasAdminAccess(playerState.player)"));
+    }
+
+    @Test
     void baconBrawlDebugMeterFillsTheSelectedAbilityAndRefreshesItsHud() throws IOException {
         Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "ArcadePortManager.java");

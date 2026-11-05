@@ -1381,6 +1381,20 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                         "Allow this tester's " + humanizeDebugKey(kit) + " kit ability and passive effects.", true));
             }
         }
+        if (game == ArcadePortGame.SNAKE) {
+            for (String kit : List.of("speed", "reverse", "invulnerable")) {
+                String key = "ability-" + kit;
+                features.put(key, new DebugFeature(key, "Kit ability: " + humanizeDebugKey(kit),
+                        Material.MAGMA_CREAM,
+                        "Allow this tester to use the selected Snake kit's normal ability.", true));
+            }
+            features.put("tail-collisions", new DebugFeature("tail-collisions", "Tail collisions", Material.SHEARS,
+                    "Enable normal Snake head-to-tail eliminations for this debug session.", true));
+            features.put("magma-hazards", new DebugFeature("magma-hazards", "Magma Cube hazards", Material.MAGMA_CREAM,
+                    "Spawn and steer the normal Magma Cube item hazards for this debug session.", true));
+            features.put("lava-elimination", new DebugFeature("lava-elimination", "Lava elimination", Material.LAVA_BUCKET,
+                    "Eliminate this tester on lava contact using the normal Snake rule.", true));
+        }
         return List.copyOf(features.values());
     }
 
@@ -1427,6 +1441,9 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.MICRO_BATTLES
                         && (key.startsWith("ability-") || key.startsWith("blocks-")))
                 || (game == ArcadePortGame.SKY_WARS && key.startsWith("ability-"))
+                || (game == ArcadePortGame.SNAKE
+                        && (key.startsWith("ability-") || "tail-collisions".equals(key)
+                                || "magma-hazards".equals(key) || "lava-elimination".equals(key)))
                 || (game == ArcadePortGame.SUPER_SPLOOR && key.startsWith("special-"))
                 || "DRAGONS_SPAWNING_ENABLED".equals(key)
                 || "DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED".equals(key)

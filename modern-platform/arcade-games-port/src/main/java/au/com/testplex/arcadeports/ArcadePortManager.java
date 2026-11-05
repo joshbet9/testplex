@@ -798,7 +798,13 @@ public final class ArcadePortManager implements Listener {
             }
         } else {
             debugProfiles.setFeature(player.getUniqueId(), type, flag, enabled);
-            if (activeDebugGame() == type) GameDebugRuntimeOverrides.markDebugSession();
+            if (activeDebugGame() == type) {
+                GameDebugRuntimeOverrides.markDebugSession();
+                if (type == ArcadePortGame.SNAKE
+                        && player.getUniqueId().equals(activeDebugProfileOwner)) {
+                    GameDebugRuntimeOverrides.setValue(flag, enabled);
+                }
+            }
         }
         return enabled;
     }
