@@ -743,6 +743,20 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void heroesOfGwenTowerSwitchGatesTesterDamageAtTheTowerRuntime() throws IOException {
+        Path arcadeSource = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(arcadeSource)) {
+            arcadeSource = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String lobby = Files.readString(arcadeSource.resolve("ModernArcadeLobbyRuntime.java"));
+        String runtime = Files.readString(arcadeSource.resolve("CastleAssaultHeroesOfGwenRuntime.java"));
+        assertTrue(lobby.contains("features.put(\"tower-damage\""));
+        assertTrue(lobby.contains("ArcadePortGame.HEROES_OF_GWEN && \"tower-damage\".equals(key)"));
+        assertTrue(runtime.contains("hooks.debugFeatureEnabled(attacker, \"tower-damage\")"));
+    }
+
+    @Test
     void microBattlesDebugSwitchesGateBlocksAndKitAbilities() throws IOException {
         Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
         if (!Files.isDirectory(sourceRoot)) {

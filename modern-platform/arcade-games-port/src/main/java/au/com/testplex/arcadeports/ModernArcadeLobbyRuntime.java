@@ -1276,6 +1276,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     "Allow this tester to steal possession from an opposing ball holder.", true));
         }
         if (game == ArcadePortGame.HEROES_OF_GWEN) {
+            features.put("tower-damage", new DebugFeature("tower-damage", "Tower damage", Material.IRON_PICKAXE,
+                    "Allow this tester's attacks to damage enemy Heroes towers.", true));
             for (String hero : List.of("hattori", "bardolf", "devon", "rowena", "anath", "larissa", "dana", "biff", "ivy")) {
                 String key = "hero-" + hero + "-abilities";
                 features.put(key, new DebugFeature(key, pretty(hero) + " abilities", Material.BLAZE_POWDER,
@@ -1474,6 +1476,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.CASTLE_ASSAULT
                         && ("objective-tnt".equals(key) || "crystal-damage".equals(key) || "king-damage".equals(key)))
                 || (game == ArcadePortGame.HEROES_OF_GWEN && key.startsWith("hero-") && key.endsWith("-abilities"))
+                || (game == ArcadePortGame.HEROES_OF_GWEN && "tower-damage".equals(key))
                 || (game == ArcadePortGame.DRAW_MY_THING
                         && ("canvas-tools".equals(key) || "palette-selection".equals(key)
                                 || "guess-submission".equals(key) || "timed-hints".equals(key)

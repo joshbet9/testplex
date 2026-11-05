@@ -3322,6 +3322,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             }
             Player attacker = resolveAttacker(byEntity);
             if (attacker == null || teams.getOrDefault(attacker.getUniqueId(), -1) == tower.owner) return;
+            if (!hooks.debugFeatureEnabled(attacker, "tower-damage")) return;
             if (attacker.getLocation().distanceSquared(tower.location) > MOBA_TOWER_RANGE_SQUARED) {
                 attacker.sendMessage(ChatColor.RED + "You must enter the tower's 10-block range to damage it.");
                 return;
