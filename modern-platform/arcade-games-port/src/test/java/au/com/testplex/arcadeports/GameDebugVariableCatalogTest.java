@@ -46,6 +46,8 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.HOOPS_REMASTERED), "HOOPS_TARGET_SCORE");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SUPER_SPLOOR), "SUPER_SPLOOR_MAX_INK");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAGONS), "DRAGONS_AUTONOMOUS_FLIGHT_SPEED");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAGONS), "DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAGONS), "DRAGONS_SPAWNING_ENABLED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAGONS), "DRAGONS_TAMER_FLIGHT_SPEED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAGONS), "DRAGONS_TURN_RATE");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNAKE), "SNAKE_HAZARD_STEERING_SPEED");

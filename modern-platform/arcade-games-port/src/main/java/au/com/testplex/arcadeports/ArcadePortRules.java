@@ -616,6 +616,8 @@ public final class ArcadePortRules {
     public static final int MICRO_BATTLES_CRUMBLE_BLOCKS_PER_TICK = 3;
     public static final int MICRO_BATTLES_CRUMBLE_SCAN_INTERVAL_TICKS = 2;
     public static final int DRAGONS_MAX_DRAGONS = 5;
+    public static final boolean DRAGONS_SPAWNING_ENABLED = true;
+    public static final boolean DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED = true;
     public static final double DRAGONS_AUTONOMOUS_FLIGHT_SPEED = 0.32D;
     public static final double DRAGONS_TAMER_FLIGHT_SPEED = 0.42D;
     public static final double DRAGONS_TURN_RATE = 0.12D;

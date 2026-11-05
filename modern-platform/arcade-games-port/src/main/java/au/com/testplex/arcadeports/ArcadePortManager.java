@@ -13892,7 +13892,8 @@ public final class ArcadePortManager implements Listener {
         }
 
         long dragonCount = session.entities.stream().filter(e -> e instanceof EnderDragon && e.isValid()).count();
-        if (now >= session.dragonNextSpawnAt) {
+        if (now >= session.dragonNextSpawnAt && GameDebugRuntimeOverrides.booleanValue(
+                "DRAGONS_SPAWNING_ENABLED", ArcadePortRules.DRAGONS_SPAWNING_ENABLED)) {
             session.dragonNextSpawnAt = now + GameDebugRuntimeOverrides.longValue("DRAGONS_SPAWN_INTERVAL_MILLIS", ArcadePortRules.DRAGONS_SPAWN_INTERVAL_MILLIS);
             if (dragonCount < GameDebugRuntimeOverrides.intValue("DRAGONS_MAX_DRAGONS", ArcadePortRules.DRAGONS_MAX_DRAGONS)) {
             SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
@@ -14035,7 +14036,8 @@ public final class ArcadePortManager implements Listener {
                     session.dragonTargetLocations.put(dragonId,
                             dragon.getLocation().clone().add(facing.clone().multiply(12.0D)));
                 }
-            } else {
+            } else if (GameDebugRuntimeOverrides.booleanValue("DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED",
+                    ArcadePortRules.DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED)) {
                 Location target = session.dragonTargetLocations.get(dragonId);
                 Vector heading = session.dragonFlightVectors.get(dragonId);
                 if (heading == null || heading.lengthSquared() < 1.0E-6D) {
