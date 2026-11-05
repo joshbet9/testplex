@@ -56,7 +56,9 @@ final class GameDebugEventCatalog {
                     "Restore your own plot to the current model and reapply the template-mob profile setting."));
     private static final List<Event> ONE_IN_THE_QUIVER = List.of(
             new Event("refill-arrow", "Restore Super Arrow", Material.ARROW,
-                    "Restore the normal one-shot arrow to its configured hotbar slot for testing."));
+                    "Restore the normal one-shot arrow to its configured hotbar slot for testing."),
+            new Event("use-kit-ability", "Test Ground Pound", Material.DIAMOND_SHOVEL,
+                    "Use Slam Shot's normal Ground Pound, cooldown, knockback, and feedback while selected."));
     private static final List<Event> WIZARDS = List.of(
             new Event("grant-spells", "Grant Spell Test Loadout", Material.BLAZE_ROD,
                     "Unlock implemented spells, refill mana and clear spell cooldowns for your next casts."));

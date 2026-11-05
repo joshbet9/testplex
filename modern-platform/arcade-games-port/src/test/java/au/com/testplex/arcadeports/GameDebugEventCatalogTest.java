@@ -46,8 +46,9 @@ class GameDebugEventCatalogTest {
                 GameDebugEventCatalog.events(ArcadePortGame.CAMERA_SHY).stream()
                         .map(GameDebugEventCatalog.Event::id).toList());
         assertEquals("reset-own-plot", GameDebugEventCatalog.events(ArcadePortGame.MASTER_BUILDERS).getFirst().id());
-        assertEquals("refill-arrow", GameDebugEventCatalog.events(ArcadePortGame.ONE_IN_THE_QUIVER)
-                .getFirst().id());
+        assertEquals(List.of("refill-arrow", "use-kit-ability", "refresh-kit"),
+                GameDebugEventCatalog.events(ArcadePortGame.ONE_IN_THE_QUIVER).stream()
+                        .map(GameDebugEventCatalog.Event::id).toList());
         assertEquals("restore-armour", GameDebugEventCatalog.events(ArcadePortGame.PAINTBALL)
                 .getFirst().id());
         assertEquals("promote-self", GameDebugEventCatalog.events(ArcadePortGame.DEATH_TAG)
@@ -77,6 +78,23 @@ class GameDebugEventCatalogTest {
             assertEquals(List.of("spawn-monster-wave"), GameDebugEventCatalog.events(game).stream()
                     .map(GameDebugEventCatalog.Event::id).toList());
         }
+    }
+
+    @Test
+    void quiverGroundPoundDebugEventUsesTheLiveAbilityAndPreservesItsGuards() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String eventCatalog = Files.readString(sourceRoot.resolve("GameDebugEventCatalog.java"));
+        assertTrue(eventCatalog.contains("new Event(\"use-kit-ability\", \"Test Ground Pound\""));
+        assertTrue(manager.contains("\"slam-shot\".equals(session.quiverKits"));
+        assertTrue(manager.contains("useQuiverGroundPound(session, tester, now)"),
+                "the event must execute the same cooldown and knockback path as the live ability");
+        assertTrue(manager.contains("isDebugAbilityAllowed(tester, ArcadePortGame.ONE_IN_THE_QUIVER, \"slam-shot\")"));
+        assertTrue(manager.contains("GameDebugRuntimeOverrides.markDebugSession()"));
     }
 
     @Test

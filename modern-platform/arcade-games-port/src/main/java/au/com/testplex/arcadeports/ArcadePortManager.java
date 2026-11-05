@@ -1150,6 +1150,16 @@ public final class ArcadePortManager implements Listener {
             tester.getInventory().setItem(arrowSlot, allowQuiverGlassBreaks(arrow));
             triggered = true;
         }
+        if (type == ArcadePortGame.ONE_IN_THE_QUIVER && "use-kit-ability".equals(eventId)
+                && "slam-shot".equals(session.quiverKits.getOrDefault(tester.getUniqueId(), "leaper"))) {
+            long now = System.currentTimeMillis();
+            long readyAt = session.quiverGroundPoundReadyAt.getOrDefault(tester.getUniqueId(), 0L);
+            if (now >= readyAt && isDebugAbilityAllowed(tester, ArcadePortGame.ONE_IN_THE_QUIVER, "slam-shot")) {
+                useQuiverGroundPound(session, tester, now);
+                triggered = session.quiverGroundPoundReadyAt.getOrDefault(tester.getUniqueId(), 0L) > now;
+                if (triggered) GameDebugRuntimeOverrides.markDebugSession();
+            }
+        }
         if (type == ArcadePortGame.SPLEEF && "restore-hunger".equals(eventId)
                 && active != null && active.type == ArcadePortGame.SPLEEF
                 && active.alive.contains(tester.getUniqueId())) {
