@@ -2298,30 +2298,56 @@ public final class ArcadePortRules {
     public static final double QUIVER_REBOUND_MAX_DISTANCE_SQUARED = 64.0D;
     /** Original Quiver labels 20 consecutive kills without dying as a Perfect Run. */
     public static final int QUIVER_PERFECT_RUN_KILL_STREAK = 20;
+    public static final long QUIVER_SPEEDRUNNER_MAX_WIN_MILLIS = 90_000L;
+    public static final int QUIVER_FIST_PUNCH_ACHIEVEMENT_KILLS = 3;
+    public static final double QUIVER_BRAWLER_WEAPON_DAMAGE = 7.0D;
+    public static final double QUIVER_SLAM_SHOT_WEAPON_DAMAGE = 5.5D;
+    public static final double QUIVER_NINJA_WEAPON_DAMAGE = 4.0D;
+    public static final double QUIVER_DEFAULT_WEAPON_DAMAGE = 5.0D;
+    public static final double QUIVER_BRAWLER_PUNCH_DAMAGE = 2.0D;
+    public static final double QUIVER_DEFAULT_PUNCH_DAMAGE = 1.0D;
+    public static final double QUIVER_BRAWLER_HEALTH_PER_KILL = 2.0D;
+    public static final double QUIVER_GROUND_POUND_RADIUS_BLOCKS = 8.0D;
+    public static final double QUIVER_GROUND_POUND_HORIZONTAL_STRENGTH = 0.8D;
+    public static final double QUIVER_GROUND_POUND_VERTICAL_BASE = 0.8D;
+    public static final double QUIVER_GROUND_POUND_VERTICAL_PROXIMITY = 1.0D;
+    public static final double QUIVER_REBOUND_BASE_POWER = 0.8D;
+    public static final double QUIVER_REBOUND_POWER_PER_BLOCK = 1.0D / 30.0D;
+    public static final double QUIVER_REBOUND_MAX_POWER = 1.2D;
+    public static final double QUIVER_REBOUND_VERTICAL_ARC_PER_BLOCK = 0.01D;
+    public static final double QUIVER_LEAPER_JUMP_HORIZONTAL = 0.9D;
+    public static final double QUIVER_LEAPER_JUMP_VERTICAL_ADD = 0.35D;
+    public static final double QUIVER_LEAPER_JUMP_VERTICAL_MIN = 0.55D;
+    public static final double QUIVER_LEAPER_JUMP_VERTICAL_MAX = 0.9D;
 
     public static boolean isQuiverPerfectRun(int killStreak) {
-        return killStreak >= QUIVER_PERFECT_RUN_KILL_STREAK;
+        return killStreak >= GameDebugRuntimeOverrides.intValue(
+                "QUIVER_PERFECT_RUN_KILL_STREAK", QUIVER_PERFECT_RUN_KILL_STREAK);
     }
 
     public static boolean isQuiverSpeedrunnerWin(long elapsedMillis) {
-        return elapsedMillis >= 0L && elapsedMillis < 90_000L;
+        return elapsedMillis >= 0L && elapsedMillis < GameDebugRuntimeOverrides.longValue(
+                "QUIVER_SPEEDRUNNER_MAX_WIN_MILLIS", QUIVER_SPEEDRUNNER_MAX_WIN_MILLIS);
     }
 
     public static boolean shouldAwardQuiverFistPunchKills(int kills) {
-        return kills >= 3;
+        return kills >= GameDebugRuntimeOverrides.intValue(
+                "QUIVER_FIST_PUNCH_ACHIEVEMENT_KILLS", QUIVER_FIST_PUNCH_ACHIEVEMENT_KILLS);
     }
 
     public static double quiverBrawlerHealthAfterKill(double health, double maxHealth) {
         if (!Double.isFinite(health) || !Double.isFinite(maxHealth) || maxHealth <= 0.0D) return 0.0D;
-        return Math.min(maxHealth, Math.max(0.0D, health) + 2.0D);
+        return Math.min(maxHealth, Math.max(0.0D, health) + GameDebugRuntimeOverrides.doubleValue(
+                "QUIVER_BRAWLER_HEALTH_PER_KILL", QUIVER_BRAWLER_HEALTH_PER_KILL));
     }
 
     public static boolean isQuiverKillstreakAnnouncement(int killStreak) {
         return killStreak == 3 || killStreak == 5 || killStreak == 7 || killStreak == 9
-                || killStreak == 11 || killStreak == 13 || killStreak == QUIVER_PERFECT_RUN_KILL_STREAK;
+                || killStreak == 11 || killStreak == 13 || isQuiverPerfectRun(killStreak);
     }
 
     public static String quiverKillstreakTitle(int killStreak) {
+        if (isQuiverPerfectRun(killStreak)) return "PERFECT RUN";
         return switch (killStreak) {
             case 3 -> "TRIPLE KILL";
             case 5 -> "MEGA KILL";
@@ -2329,16 +2355,17 @@ public final class ArcadePortRules {
             case 9 -> "ULTRA KILL";
             case 11 -> "UNSTOPPABLE";
             case 13 -> "GODLIKE";
-            case QUIVER_PERFECT_RUN_KILL_STREAK -> "PERFECT RUN";
             default -> null;
         };
     }
 
     public static boolean isQuiverReboundImpactInRange(double bodyDistanceSquared, double eyeDistanceSquared) {
+        double maxDistanceSquared = GameDebugRuntimeOverrides.doubleValue(
+                "QUIVER_REBOUND_MAX_IMPACT_DISTANCE_SQUARED", QUIVER_REBOUND_MAX_IMPACT_DISTANCE_SQUARED);
         boolean bodyNear = Double.isFinite(bodyDistanceSquared) && bodyDistanceSquared >= 0.0D
-                && bodyDistanceSquared <= QUIVER_REBOUND_MAX_IMPACT_DISTANCE_SQUARED;
+                && bodyDistanceSquared <= maxDistanceSquared;
         boolean eyesNear = Double.isFinite(eyeDistanceSquared) && eyeDistanceSquared >= 0.0D
-                && eyeDistanceSquared <= QUIVER_REBOUND_MAX_IMPACT_DISTANCE_SQUARED;
+                && eyeDistanceSquared <= maxDistanceSquared;
         return bodyNear || eyesNear;
     }
 
@@ -2385,7 +2412,8 @@ public final class ArcadePortRules {
     }
 
     public static long nextQuiverSpectatorTeleportAt(long now) {
-        return now + QUIVER_SPECTATOR_TELEPORT_COOLDOWN_MILLIS;
+        return now + GameDebugRuntimeOverrides.longValue("QUIVER_SPECTATOR_TELEPORT_COOLDOWN_MILLIS",
+                QUIVER_SPECTATOR_TELEPORT_COOLDOWN_MILLIS);
     }
 
     /** Only the old stained-glass materials are breakable in the source Quiver maps. */
@@ -2404,7 +2432,44 @@ public final class ArcadePortRules {
     /** Reborn's Ground Pound scales horizontal knockback from 0 at range to 0.8 at point-blank. */
     public static double quiverGroundPoundHorizontalMultiplier(double distance) {
         if (!Double.isFinite(distance)) return 0.0D;
-        return Math.max(0.0D, Math.min(1.0D, (8.0D - distance) / 8.0D));
+        double radius = Math.max(0.1D, GameDebugRuntimeOverrides.doubleValue(
+                "QUIVER_GROUND_POUND_RADIUS_BLOCKS", QUIVER_GROUND_POUND_RADIUS_BLOCKS));
+        return Math.max(0.0D, Math.min(1.0D, (radius - distance) / radius));
+    }
+
+    public static double quiverGroundPoundRadiusBlocks() {
+        return Math.max(0.1D, GameDebugRuntimeOverrides.doubleValue(
+                "QUIVER_GROUND_POUND_RADIUS_BLOCKS", QUIVER_GROUND_POUND_RADIUS_BLOCKS));
+    }
+
+    public static org.bukkit.util.Vector quiverLeaperJumpVelocity(org.bukkit.util.Vector lookDirection) {
+        if (lookDirection == null || lookDirection.lengthSquared() < 0.001D) return null;
+        double horizontal = GameDebugRuntimeOverrides.doubleValue(
+                "QUIVER_LEAPER_JUMP_HORIZONTAL", QUIVER_LEAPER_JUMP_HORIZONTAL);
+        double verticalAdd = GameDebugRuntimeOverrides.doubleValue(
+                "QUIVER_LEAPER_JUMP_VERTICAL_ADD", QUIVER_LEAPER_JUMP_VERTICAL_ADD);
+        double verticalMin = GameDebugRuntimeOverrides.doubleValue(
+                "QUIVER_LEAPER_JUMP_VERTICAL_MIN", QUIVER_LEAPER_JUMP_VERTICAL_MIN);
+        double verticalMax = GameDebugRuntimeOverrides.doubleValue(
+                "QUIVER_LEAPER_JUMP_VERTICAL_MAX", QUIVER_LEAPER_JUMP_VERTICAL_MAX);
+        org.bukkit.util.Vector velocity = lookDirection.clone().normalize().multiply(Math.max(0.0D, horizontal));
+        velocity.setY(Math.max(Math.max(0.0D, verticalMin), Math.min(Math.max(verticalMin, verticalMax),
+                velocity.getY() + verticalAdd)));
+        return velocity;
+    }
+
+    public static org.bukkit.util.Vector quiverGroundPoundVelocity(
+            org.bukkit.util.Vector direction, double distance) {
+        if (direction == null || !Double.isFinite(distance) || direction.lengthSquared() < 0.001D) return null;
+        double proximity = quiverGroundPoundHorizontalMultiplier(distance);
+        double horizontal = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "QUIVER_GROUND_POUND_HORIZONTAL_STRENGTH", QUIVER_GROUND_POUND_HORIZONTAL_STRENGTH));
+        double verticalBase = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "QUIVER_GROUND_POUND_VERTICAL_BASE", QUIVER_GROUND_POUND_VERTICAL_BASE));
+        double verticalProximity = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "QUIVER_GROUND_POUND_VERTICAL_PROXIMITY", QUIVER_GROUND_POUND_VERTICAL_PROXIMITY));
+        return direction.clone().setY(0.0D).normalize().multiply(horizontal * proximity)
+                .setY(verticalBase + verticalProximity * proximity);
     }
 
     public static double quiverMeleeDamage(String kit) {
@@ -2415,25 +2480,32 @@ public final class ArcadePortRules {
     public static double quiverMeleeDamage(String kit, boolean holdingKitWeapon) {
         String value = normalizeQuiverKit(kit);
         if (value == null) value = "leaper";
-        if (!holdingKitWeapon) return "brawler".equals(value) ? 2.0D : 1.0D;
+        if (!holdingKitWeapon) return "brawler".equals(value)
+                ? GameDebugRuntimeOverrides.doubleValue("QUIVER_BRAWLER_PUNCH_DAMAGE", QUIVER_BRAWLER_PUNCH_DAMAGE)
+                : GameDebugRuntimeOverrides.doubleValue("QUIVER_DEFAULT_PUNCH_DAMAGE", QUIVER_DEFAULT_PUNCH_DAMAGE);
         return switch (value) {
-            case "brawler" -> 7.0D;
-            case "slam-shot" -> 5.5D;
-            case "ninja" -> 4.0D;
-            default -> 5.0D;
+            case "brawler" -> GameDebugRuntimeOverrides.doubleValue("QUIVER_BRAWLER_WEAPON_DAMAGE", QUIVER_BRAWLER_WEAPON_DAMAGE);
+            case "slam-shot" -> GameDebugRuntimeOverrides.doubleValue("QUIVER_SLAM_SHOT_WEAPON_DAMAGE", QUIVER_SLAM_SHOT_WEAPON_DAMAGE);
+            case "ninja" -> GameDebugRuntimeOverrides.doubleValue("QUIVER_NINJA_WEAPON_DAMAGE", QUIVER_NINJA_WEAPON_DAMAGE);
+            default -> GameDebugRuntimeOverrides.doubleValue("QUIVER_DEFAULT_WEAPON_DAMAGE", QUIVER_DEFAULT_WEAPON_DAMAGE);
         };
     }
 
     /** Reborn's Chain Arrows gain speed with travel distance, capped at 1.2. */
     public static double quiverReboundPower(double targetDistance) {
-        if (!Double.isFinite(targetDistance)) return 0.8D;
-        return Math.min(1.2D, 0.8D + Math.max(0.0D, targetDistance) / 30.0D);
+        double base = GameDebugRuntimeOverrides.doubleValue("QUIVER_REBOUND_BASE_POWER", QUIVER_REBOUND_BASE_POWER);
+        double perBlock = GameDebugRuntimeOverrides.doubleValue("QUIVER_REBOUND_POWER_PER_BLOCK", QUIVER_REBOUND_POWER_PER_BLOCK);
+        double maximum = GameDebugRuntimeOverrides.doubleValue("QUIVER_REBOUND_MAX_POWER", QUIVER_REBOUND_MAX_POWER);
+        if (!Double.isFinite(targetDistance)) return Math.max(0.0D, base);
+        return Math.min(Math.max(0.0D, maximum), Math.max(0.0D, base)
+                + Math.max(0.0D, targetDistance) * Math.max(0.0D, perBlock));
     }
 
     /** Reborn adds a small upward arc proportional to the distance between rebound targets. */
     public static double quiverReboundVerticalArc(double targetDistance) {
         if (!Double.isFinite(targetDistance)) return 0.0D;
-        return Math.max(0.0D, targetDistance) / 100.0D;
+        return Math.max(0.0D, targetDistance) * GameDebugRuntimeOverrides.doubleValue(
+                "QUIVER_REBOUND_VERTICAL_ARC_PER_BLOCK", QUIVER_REBOUND_VERTICAL_ARC_PER_BLOCK);
     }
 
     /** Resolve a saved Quiver arrow-flight cosmetic, including the catalogue's default. */

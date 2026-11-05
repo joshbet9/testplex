@@ -62,6 +62,9 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAGONS), "DRAGONS_WIN_STREAK_ACHIEVEMENT");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNAKE), "SNAKE_HAZARD_STEERING_SPEED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.ONE_IN_THE_QUIVER), "QUIVER_LEAPER_DOUBLE_JUMP_ENABLED");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.ONE_IN_THE_QUIVER), "QUIVER_BRAWLER_WEAPON_DAMAGE");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.ONE_IN_THE_QUIVER), "QUIVER_GROUND_POUND_RADIUS_BLOCKS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.ONE_IN_THE_QUIVER), "QUIVER_REBOUND_MAX_POWER");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MASTER_BUILDERS), "MASTER_BUILDERS_TOTAL_MILLIS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MASTER_BUILDERS), "MASTER_BUILDERS_VOTE_MILLIS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MASTER_BUILDERS), "MASTER_BUILDERS_REVIEW_MILLIS");

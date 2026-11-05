@@ -10179,20 +10179,20 @@ public final class ArcadePortManager implements Listener {
         }
         session.quiverGroundPoundReadyAt.put(id, now + GameDebugRuntimeOverrides.longValue("QUIVER_GROUND_POUND_COOLDOWN_MILLIS", ArcadePortRules.QUIVER_GROUND_POUND_COOLDOWN_MILLIS));
         cooldownProgress.start(player, "Ground Pound", GameDebugRuntimeOverrides.longValue("QUIVER_GROUND_POUND_COOLDOWN_MILLIS", ArcadePortRules.QUIVER_GROUND_POUND_COOLDOWN_MILLIS));
+        double radius = ArcadePortRules.quiverGroundPoundRadiusBlocks();
         for (Player target : alivePlayers(session)) {
             if (target.equals(player)) continue;
             double distance = target.getLocation().distance(player.getLocation());
-            if (distance > 8.0D) continue;
+            if (distance > radius) continue;
             Vector direction = target.getLocation().toVector().subtract(player.getLocation().toVector());
             direction.setY(0.0D); // Reborn uses a 2D trajectory for horizontal knockback.
             if (direction.lengthSquared() < 0.001D) {
                 direction = player.getLocation().getDirection();
                 direction.setY(0.0D);
             }
-            double proximity = ArcadePortRules.quiverGroundPoundHorizontalMultiplier(distance);
             if (direction.lengthSquared() < 0.001D) direction = new Vector(0.0D, 0.0D, 1.0D);
-            target.setVelocity(direction.normalize().multiply(0.8D * proximity)
-                    .setY(0.8D + 1.0D * proximity));
+            Vector velocity = ArcadePortRules.quiverGroundPoundVelocity(direction, distance);
+            if (velocity != null) target.setVelocity(velocity);
             target.setFallDistance(0.0F);
             target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 0.8F);
         }
@@ -29440,9 +29440,8 @@ public final class ArcadePortManager implements Listener {
         session.quiverLeapAwaitingLanding.add(player.getUniqueId());
         player.setFlying(false);
         player.setAllowFlight(false);
-        Vector direction = player.getLocation().getDirection().normalize().multiply(0.9D);
-        direction.setY(Math.max(0.55D, Math.min(0.9D, direction.getY() + 0.35D)));
-        player.setVelocity(direction);
+        Vector direction = ArcadePortRules.quiverLeaperJumpVelocity(player.getLocation().getDirection());
+        if (direction != null) player.setVelocity(direction);
         player.setFallDistance(0.0F);
         player.getWorld().playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 0.8F, 1.2F);
     }

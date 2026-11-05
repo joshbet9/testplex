@@ -213,6 +213,10 @@ final class GameDebugVariableCatalog {
                 || name.equals("SKULL_KNOCKBACK_POWER") || name.equals("SKULL_KNOCKBACK_Y_MULTIPLIER")
                 || name.equals("SKULL_KNOCKBACK_Y_MINIMUM")) return 0.0D;
         if (name.equals("SKULL_BLAST_RADIUS_BLOCKS")) return 0.1D;
+        if (name.equals("REBOUND_POWER_PER_BLOCK") || name.equals("REBOUND_VERTICAL_ARC_PER_BLOCK")
+                || name.equals("LEAPER_JUMP_VERTICAL_ADD") || name.equals("GROUND_POUND_VERTICAL_BASE")
+                || name.equals("GROUND_POUND_VERTICAL_PROXIMITY")) return 0.0D;
+        if (name.equals("REBOUND_MAX_IMPACT_DISTANCE_SQUARED")) return 0.0D;
         if (name.equals("SAFE_PAD_CAPTURE_RADIUS_BLOCKS")) return 0.5D;
         if (name.equals("MOB_MOVE_SPEED")) return 0.05D;
         if (name.equals("BUMP_RADIUS_BLOCKS")) return 0.25D;
@@ -259,6 +263,16 @@ final class GameDebugVariableCatalog {
         if (name.equals("SKULL_KNOCKBACK_Y_MINIMUM")) return 3.0D;
         if (name.equals("SKULL_TERRAIN_RADIUS_BLOCKS")) return 8.0D;
         if (name.equals("SKULL_BLOCK_RESTORE_TICKS")) return 2_400.0D;
+        if (name.equals("REBOUND_POWER_PER_BLOCK")) return 1.0D;
+        if (name.equals("REBOUND_VERTICAL_ARC_PER_BLOCK")) return 0.5D;
+        if (name.equals("REBOUND_BASE_POWER") || name.equals("REBOUND_MAX_POWER")) return 5.0D;
+        if (name.equals("REBOUND_MAX_IMPACT_DISTANCE_SQUARED")) return 16.0D;
+        if (name.equals("GROUND_POUND_RADIUS_BLOCKS")) return 32.0D;
+        if (name.equals("GROUND_POUND_HORIZONTAL_STRENGTH")) return 4.0D;
+        if (name.equals("GROUND_POUND_VERTICAL_BASE") || name.equals("GROUND_POUND_VERTICAL_PROXIMITY")) return 4.0D;
+        if (name.equals("LEAPER_JUMP_HORIZONTAL") || name.equals("LEAPER_JUMP_VERTICAL_ADD")
+                || name.equals("LEAPER_JUMP_VERTICAL_MIN") || name.equals("LEAPER_JUMP_VERTICAL_MAX")) return 2.0D;
+        if (name.equals("BRAWLER_HEALTH_PER_KILL")) return 20.0D;
         if (name.equals("SAFE_PAD_CAPTURE_RADIUS_BLOCKS")) return 2.0D;
         if (name.equals("MOB_MOVE_SPEED")) return 2.0D;
         if (name.equals("BUMP_RADIUS_BLOCKS")) return 5.0D;
