@@ -1244,6 +1244,10 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             features.put("review-voting", new DebugFeature("review-voting", "Review voting", Material.LIME_CONCRETE,
                     "Allow this tester to submit ratings through the normal six-level review vote.", true));
         }
+        if (game == ArcadePortGame.CAMERA_SHY) {
+            features.put("photo-outlines", new DebugFeature("photo-outlines", "Spyglass target outlines", Material.SPYGLASS,
+                    "Show eligible players with the normal outline while this tester aims their spyglass.", true));
+        }
         if (game == ArcadePortGame.MILK_THE_COW) {
             features.put("cow-charge", new DebugFeature("cow-charge", "Cow charge", Material.LEATHER_BOOTS,
                     "Allow this tester's sprinting Cow-role charge to damage and knock back Farmers.", true));
@@ -1489,6 +1493,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                                 || "sound-feedback".equals(key)))
                 || (game == ArcadePortGame.MASTER_BUILDERS
                         && ("plot-editing".equals(key) || "review-voting".equals(key)))
+                || (game == ArcadePortGame.CAMERA_SHY && "photo-outlines".equals(key))
                 || (game == ArcadePortGame.MILK_THE_COW && Set.of("cow-charge", "farmer-double-jump",
                         "herd-spawning", "milk-capture", "milk-scoring").contains(key))
                 || (game == ArcadePortGame.WITHER_ASSAULT

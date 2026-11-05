@@ -1520,6 +1520,8 @@ public final class CameraShyGame implements Listener {
         for (UUID id : alive) {
             Player shooter = players.get(id);
             if (shooter == null || !shooter.isOnline() || !isUsingSpyglass(shooter)) continue;
+            if (plugin.hasAdminAccess(shooter) && !plugin.isArcadeDebugFeatureEnabled(shooter,
+                    ArcadePortGame.CAMERA_SHY, "photo-outlines", true)) continue;
             aimingSince.putIfAbsent(id, now);
             for (Player target : playersInPhotoLens(shooter, now)) {
                 UUID targetId = target.getUniqueId();
