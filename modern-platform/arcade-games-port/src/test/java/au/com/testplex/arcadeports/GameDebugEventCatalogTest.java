@@ -398,6 +398,26 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void paintballReloadDebugSwitchBypassesCooldownAndMachineGunHeatForTesters() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        assertTrue(lobby.contains("\"ignore-reload\""));
+        int fire = manager.indexOf("private void firePaintballWeapon(");
+        int next = manager.indexOf("private boolean isPaintballWaterBomb(", fire);
+        assertTrue(fire >= 0 && next > fire);
+        String method = manager.substring(fire, next);
+        assertTrue(method.contains("plugin.hasAdminAccess(player)"));
+        assertTrue(method.contains("debugFeatureEnabled(playerId, ArcadePortGame.PAINTBALL, \"ignore-reload\", false)"));
+        assertTrue(method.contains("if (!ignoreReload && lastShot != null && now - lastShot < cooldown) return;"));
+        assertTrue(method.contains("if (!ignoreReload && \"machine-gun\".equals(kit)"));
+    }
+
+    @Test
     void castleAssaultObjectiveEventRequiresVacantObjectiveAndUsesNormalSpawner() throws IOException {
         Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "CastleAssaultHeroesOfGwenRuntime.java");

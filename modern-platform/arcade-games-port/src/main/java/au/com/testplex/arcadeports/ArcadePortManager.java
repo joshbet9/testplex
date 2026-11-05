@@ -10791,6 +10791,8 @@ public final class ArcadePortManager implements Listener {
     private void firePaintballWeapon(Session session, Player player, String kit, long now) {
         UUID playerId = player.getUniqueId();
         if (!kit.equals(session.paintballKits.getOrDefault(playerId, "rifle"))) return;
+        boolean ignoreReload = plugin.hasAdminAccess(player)
+                && debugFeatureEnabled(playerId, ArcadePortGame.PAINTBALL, "ignore-reload", false);
         long cooldown = switch (kit) {
             case "sniper" -> 1_000L;
             case "shotgun" -> 1_400L;
@@ -10798,19 +10800,24 @@ public final class ArcadePortManager implements Listener {
             default -> 500L;
         };
         Long lastShot = session.paintballLastShotAt.get(playerId);
-        if (lastShot != null && now - lastShot < cooldown) return;
-        if ("machine-gun".equals(kit) && !ArcadePortRules.canFirePaintballMachineGun(player.getExp())) {
+        if (!ignoreReload && lastShot != null && now - lastShot < cooldown) return;
+        if (!ignoreReload && "machine-gun".equals(kit)
+                && !ArcadePortRules.canFirePaintballMachineGun(player.getExp())) {
             player.sendMessage(ChatColor.RED + "Machine gun overheated. Release fire and let the gauge cool.");
             return;
         }
-        session.paintballLastShotAt.put(playerId, now);
-        cooldownProgress.start(player, paintballCooldownName(kit), cooldown);
+        if (ignoreReload) {
+            if ("machine-gun".equals(kit)) player.setExp(0.0F);
+        } else {
+            session.paintballLastShotAt.put(playerId, now);
+            cooldownProgress.start(player, paintballCooldownName(kit), cooldown);
+        }
         UUID shotId = UUID.randomUUID();
         session.paintballShotOwners.put(shotId, playerId);
         session.paintballShotKits.put(shotId, kit);
         session.paintballShotHits.put(shotId, 0);
         if ("rifle".equals(kit)) session.paintballRifleShots.merge(playerId, 1, Integer::sum);
-        if ("machine-gun".equals(kit)) {
+        if ("machine-gun".equals(kit) && !ignoreReload) {
             player.setExp((float) ArcadePortRules.paintballMachineGunHeatAfterShot(player.getExp()));
         }
 

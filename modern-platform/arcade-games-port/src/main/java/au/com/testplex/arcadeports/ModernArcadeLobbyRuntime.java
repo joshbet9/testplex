@@ -1253,6 +1253,11 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                         Material.ARROW, "Allow this kit's ability or kill perk for authorised testers.", true));
             }
         }
+        if (game == ArcadePortGame.PAINTBALL) {
+            String key = "ignore-reload";
+            features.put(key, new DebugFeature(key, "Ignore reload and heat", Material.SNOWBALL,
+                    "Let your weapons fire continuously without reload waits or Machine Gun heat for testing.", false));
+        }
         return List.copyOf(features.values());
     }
 
@@ -1275,6 +1280,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.DRAGON_ESCAPE && key.startsWith("ability-"))
                 || (game == ArcadePortGame.DRAGONS && key.startsWith("ability-"))
                 || (game == ArcadePortGame.ONE_IN_THE_QUIVER && key.startsWith("ability-"))
+                || (game == ArcadePortGame.PAINTBALL && "ignore-reload".equals(key))
                 || (game == ArcadePortGame.SUPER_SPLOOR && key.startsWith("special-"))
                 || "DRAGONS_SPAWNING_ENABLED".equals(key)
                 || "DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED".equals(key)
