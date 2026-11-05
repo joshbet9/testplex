@@ -5,6 +5,7 @@ import java.util.Set;
 
 /** Pure source-contract rules for Wither Assault's Human kit selection and Editor limits. */
 public final class WitherAssaultRules {
+    public static final int MINIONS_PER_WAVE = 3;
     private static final Set<String> HUMAN_KITS = Set.of("archer", "medic", "editor", "warden");
 
     private WitherAssaultRules() { }
@@ -50,7 +51,9 @@ public final class WitherAssaultRules {
         return rightClick && ("golden_sword".equals(item) || "diamond_sword".equals(item));
     }
 
-    public static int minionCount() { return 3; }
+    public static int minionCount() {
+        return GameDebugRuntimeOverrides.intValue("WITHER_ASSAULT_MINIONS_PER_WAVE", MINIONS_PER_WAVE);
+    }
 
     private static String normalizeItem(String itemType) {
         return itemType == null ? "" : itemType.trim().toLowerCase(Locale.ROOT);

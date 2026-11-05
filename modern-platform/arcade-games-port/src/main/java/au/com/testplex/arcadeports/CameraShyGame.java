@@ -477,7 +477,7 @@ public final class CameraShyGame implements Listener {
             player.sendMessage(ChatColor.YELLOW + "You are already queued for Snap.");
             return;
         }
-        if (queue.size() >= CameraShyRules.MAX_PLAYERS) {
+        if (queue.size() >= GameDebugRuntimeOverrides.intValue("CAMERA_SHY_MAX_PLAYERS", CameraShyRules.MAX_PLAYERS)) {
             player.sendMessage(ChatColor.RED + "Snap is full (16/16).");
             return;
         }
@@ -532,7 +532,7 @@ public final class CameraShyGame implements Listener {
     public void startFromLobby(org.bukkit.command.CommandSender sender, Collection<Player> lobbyPlayers) {
         if (lobbyPlayers != null) {
             for (Player player : lobbyPlayers) {
-                if (player != null && player.isOnline() && queue.size() < CameraShyRules.MAX_PLAYERS) {
+                if (player != null && player.isOnline() && queue.size() < GameDebugRuntimeOverrides.intValue("CAMERA_SHY_MAX_PLAYERS", CameraShyRules.MAX_PLAYERS)) {
                     if (!queue.containsKey(player.getUniqueId())) {
                         queue.put(player.getUniqueId(), player);
                         String kit = plugin.getConfig().getString("camera-shy-kit-preferences." + player.getUniqueId(), "smoke-artist");
@@ -558,7 +558,7 @@ public final class CameraShyGame implements Listener {
             return;
         }
         List<Player> humansInQueue = queue.values().stream().filter(p -> p != null && p.isOnline())
-                .limit(CameraShyRules.MAX_PLAYERS).toList();
+                .limit(GameDebugRuntimeOverrides.intValue("CAMERA_SHY_MAX_PLAYERS", CameraShyRules.MAX_PLAYERS)).toList();
         if (humansInQueue.isEmpty()) {
             sender.sendMessage(ChatColor.YELLOW + "No players are queued for Snap. Use /arcadeport join snap.");
             return;
@@ -629,13 +629,13 @@ public final class CameraShyGame implements Listener {
                 return;
             }
             int missing = Math.min(manager.configuredTestBotCount(ArcadePortGame.CAMERA_SHY),
-                    CameraShyRules.MAX_PLAYERS - pendingHumans.size());
+                    GameDebugRuntimeOverrides.intValue("CAMERA_SHY_MAX_PLAYERS", CameraShyRules.MAX_PLAYERS) - pendingHumans.size());
             if (missing <= 0) {
                 startMatch(pendingHumans, List.of());
                 return;
             }
             if (!testPlayers.isAvailableForDamageablePlayers()) {
-                if (pendingHumans.size() >= CameraShyRules.MIN_PLAYERS) {
+                if (pendingHumans.size() >= GameDebugRuntimeOverrides.intValue("CAMERA_SHY_MIN_PLAYERS", CameraShyRules.MIN_PLAYERS)) {
                     plugin.getLogger().warning("Snap is starting without AFK test players: FakePlayerPlugin is unavailable.");
                     startMatch(pendingHumans, List.of());
                 } else {
@@ -656,7 +656,7 @@ public final class CameraShyGame implements Listener {
                         manager.applyConfiguredTestBotLoadout(ArcadePortGame.CAMERA_SHY, index, botsReady.get(index));
                     }
                     startMatch(pendingHumans, botsReady);
-                } else if (pendingHumans.size() >= CameraShyRules.MIN_PLAYERS) {
+                } else if (pendingHumans.size() >= GameDebugRuntimeOverrides.intValue("CAMERA_SHY_MIN_PLAYERS", CameraShyRules.MIN_PLAYERS)) {
                     plugin.getLogger().warning("Snap test-player fill failed; starting with humans only: " + result.error());
                     startMatch(pendingHumans, List.of());
                 } else {
@@ -704,14 +704,14 @@ public final class CameraShyGame implements Listener {
 
         List<Player> all = new ArrayList<>(humansInMatch);
         all.addAll(testBots);
-        if (all.size() < CameraShyRules.MIN_PLAYERS) {
+        if (all.size() < GameDebugRuntimeOverrides.intValue("CAMERA_SHY_MIN_PLAYERS", CameraShyRules.MIN_PLAYERS)) {
             abortStart("Snap needs at least four total players.");
             return;
         }
         Collections.shuffle(all, random);
         List<Location> spawns = mazeSpawnLocations();
         startedAt = System.currentTimeMillis();
-        endsAt = startedAt + CameraShyRules.MATCH_SECONDS * 1_000L;
+        endsAt = startedAt + GameDebugRuntimeOverrides.intValue("CAMERA_SHY_MATCH_SECONDS", CameraShyRules.MATCH_SECONDS) * 1_000L;
         nextSpotlightAt = startedAt + SPOTLIGHT_INTERVAL_MILLIS;
         finalSnapshot = false;
 
@@ -1002,7 +1002,7 @@ public final class CameraShyGame implements Listener {
                 bar.setTitle(ChatColor.GOLD + "SNAP " + ChatColor.WHITE + time
                         + ChatColor.GRAY + " | " + ChatColor.RED + exposures.getOrDefault(id, 0) + "/5");
                 bar.setProgress(Math.max(0.0D, Math.min(1.0D, (double) (endsAt - now)
-                        / (CameraShyRules.MATCH_SECONDS * 1_000.0D))));
+                        / (GameDebugRuntimeOverrides.intValue("CAMERA_SHY_MATCH_SECONDS", CameraShyRules.MATCH_SECONDS) * 1_000.0D))));
             }
         }
     }
@@ -1143,8 +1143,8 @@ public final class CameraShyGame implements Listener {
     private void takePhoto(Player shooter) {
         UUID shooterId = shooter.getUniqueId();
         long now = System.currentTimeMillis();
-        long cooldown = finalSnapshot ? CameraShyRules.FINAL_SNAPSHOT_COOLDOWN_MILLIS
-                : CameraShyRules.PHOTO_COOLDOWN_MILLIS;
+        long cooldown = finalSnapshot ? GameDebugRuntimeOverrides.longValue("CAMERA_SHY_FINAL_SNAPSHOT_COOLDOWN_MILLIS", CameraShyRules.FINAL_SNAPSHOT_COOLDOWN_MILLIS)
+                : GameDebugRuntimeOverrides.longValue("CAMERA_SHY_PHOTO_COOLDOWN_MILLIS", CameraShyRules.PHOTO_COOLDOWN_MILLIS);
         if (runnerUntil.getOrDefault(shooterId, 0L) > now) {
             shooter.sendActionBar(Component.text("You cannot take a photograph during Adrenaline Rush."));
             return;
@@ -1154,7 +1154,7 @@ public final class CameraShyGame implements Listener {
             return;
         }
         RayTraceResult decoyTrace = arena.rayTraceEntities(shooter.getEyeLocation(),
-                shooter.getEyeLocation().getDirection(), CameraShyRules.CAMERA_RANGE_BLOCKS, 0.25D,
+                shooter.getEyeLocation().getDirection(), GameDebugRuntimeOverrides.doubleValue("CAMERA_SHY_CAMERA_RANGE_BLOCKS", CameraShyRules.CAMERA_RANGE_BLOCKS), 0.25D,
                 entity -> entity instanceof ArmorStand stand
                         && stand.getPersistentDataContainer().has(decoyStandKey, PersistentDataType.BYTE));
         if (decoyTrace != null && decoyTrace.getHitEntity() instanceof ArmorStand stand
@@ -1191,12 +1191,12 @@ public final class CameraShyGame implements Listener {
         Vector direction = shooter.getEyeLocation().getDirection();
         Location eye = shooter.getEyeLocation();
         List<Player> targets = new ArrayList<>();
-        for (Entity entity : arena.getNearbyEntities(eye, CameraShyRules.CAMERA_RANGE_BLOCKS,
-                CameraShyRules.CAMERA_RANGE_BLOCKS, CameraShyRules.CAMERA_RANGE_BLOCKS)) {
+        for (Entity entity : arena.getNearbyEntities(eye, GameDebugRuntimeOverrides.doubleValue("CAMERA_SHY_CAMERA_RANGE_BLOCKS", CameraShyRules.CAMERA_RANGE_BLOCKS),
+                GameDebugRuntimeOverrides.doubleValue("CAMERA_SHY_CAMERA_RANGE_BLOCKS", CameraShyRules.CAMERA_RANGE_BLOCKS), GameDebugRuntimeOverrides.doubleValue("CAMERA_SHY_CAMERA_RANGE_BLOCKS", CameraShyRules.CAMERA_RANGE_BLOCKS))) {
             if (!(entity instanceof Player candidate) || !isEligiblePlayerTarget(shooter, candidate)) continue;
             Location targetEye = candidate.getEyeLocation();
             Vector toTarget = targetEye.toVector().subtract(eye.toVector());
-            if (toTarget.length() > CameraShyRules.CAMERA_RANGE_BLOCKS
+            if (toTarget.length() > GameDebugRuntimeOverrides.doubleValue("CAMERA_SHY_CAMERA_RANGE_BLOCKS", CameraShyRules.CAMERA_RANGE_BLOCKS)
                     || !CameraShyRules.insidePhotoCone(direction, toTarget, PHOTO_LENS_MIN_DOT)
                     || !CameraShyRules.mayPhotograph(now, cameraReadyAt.getOrDefault(shooterId, 0L),
                             protectedUntil.getOrDefault(candidate.getUniqueId(), 0L))
@@ -1211,11 +1211,11 @@ public final class CameraShyGame implements Listener {
     private boolean hasPhotoTargetInLens(Player shooter) {
         Vector direction = shooter.getEyeLocation().getDirection();
         Location eye = shooter.getEyeLocation();
-        for (Entity entity : arena.getNearbyEntities(eye, CameraShyRules.CAMERA_RANGE_BLOCKS,
-                CameraShyRules.CAMERA_RANGE_BLOCKS, CameraShyRules.CAMERA_RANGE_BLOCKS)) {
+        for (Entity entity : arena.getNearbyEntities(eye, GameDebugRuntimeOverrides.doubleValue("CAMERA_SHY_CAMERA_RANGE_BLOCKS", CameraShyRules.CAMERA_RANGE_BLOCKS),
+                GameDebugRuntimeOverrides.doubleValue("CAMERA_SHY_CAMERA_RANGE_BLOCKS", CameraShyRules.CAMERA_RANGE_BLOCKS), GameDebugRuntimeOverrides.doubleValue("CAMERA_SHY_CAMERA_RANGE_BLOCKS", CameraShyRules.CAMERA_RANGE_BLOCKS))) {
             if (!(entity instanceof Player candidate) || !isEligiblePlayerTarget(shooter, candidate)) continue;
             Vector toTarget = candidate.getEyeLocation().toVector().subtract(eye.toVector());
-            if (toTarget.length() <= CameraShyRules.CAMERA_RANGE_BLOCKS
+            if (toTarget.length() <= GameDebugRuntimeOverrides.doubleValue("CAMERA_SHY_CAMERA_RANGE_BLOCKS", CameraShyRules.CAMERA_RANGE_BLOCKS)
                     && CameraShyRules.insidePhotoCone(direction, toTarget, PHOTO_LENS_MIN_DOT)
                     && shooter.hasLineOfSight(candidate)
                     && !isBlockedBySmoke(eye, candidate.getEyeLocation())) return true;
@@ -1230,7 +1230,7 @@ public final class CameraShyGame implements Listener {
         int count = photos.merge(shooterId, 1, Integer::sum);
         uniquePhotos.computeIfAbsent(shooterId, ignored -> new LinkedHashSet<>()).add(targetId);
         photographedBy.computeIfAbsent(targetId, ignored -> new LinkedHashSet<>()).add(shooterId);
-        protectedUntil.put(targetId, now + CameraShyRules.EXPOSURE_PROTECTION_MILLIS);
+        protectedUntil.put(targetId, now + GameDebugRuntimeOverrides.longValue("CAMERA_SHY_EXPOSURE_PROTECTION_MILLIS", CameraShyRules.EXPOSURE_PROTECTION_MILLIS));
         pursuits.computeIfAbsent(targetId, ignored -> new HashMap<>()).put(shooterId, new Pursuit(shooterId));
 
         if (humans.contains(shooterId)) {
@@ -1241,7 +1241,7 @@ public final class CameraShyGame implements Listener {
             UUID previousTarget = lastPhotoTarget.get(shooterId);
             if (previousTarget != null && !previousTarget.equals(targetId)
                     && CameraShyRules.withinWindow(now, previous == null ? -1L : previous,
-                            CameraShyRules.DOUBLE_TAKE_WINDOW_MILLIS)) {
+                            GameDebugRuntimeOverrides.longValue("CAMERA_SHY_DOUBLE_TAKE_WINDOW_MILLIS", CameraShyRules.DOUBLE_TAKE_WINDOW_MILLIS))) {
                 award(shooterId, "double-take");
             }
             lastPhotoAt.put(shooterId, now);
@@ -1285,7 +1285,7 @@ public final class CameraShyGame implements Listener {
         eliminations.merge(killerId, 1, Integer::sum);
         Long previous = lastEliminationAt.get(killerId);
         int streak = previous != null && CameraShyRules.withinWindow(now, previous,
-                CameraShyRules.DOUBLE_ELIMINATION_WINDOW_MILLIS)
+                GameDebugRuntimeOverrides.longValue("CAMERA_SHY_DOUBLE_ELIMINATION_WINDOW_MILLIS", CameraShyRules.DOUBLE_ELIMINATION_WINDOW_MILLIS))
                 ? eliminationStreaks.getOrDefault(killerId, 1) + 1 : 1;
         eliminationStreaks.put(killerId, streak);
         lastEliminationAt.put(killerId, now);
@@ -1800,6 +1800,7 @@ public final class CameraShyGame implements Listener {
         selectedKits.keySet().removeIf(id -> !Bukkit.getOfflinePlayer(id).hasPlayedBefore());
         pendingHumans = List.of();
         finalSnapshot = false;
+        GameDebugRuntimeOverrides.clear();
         broadcastQueue(ChatColor.GRAY + "Snap is ready for another queue.");
     }
 
@@ -1917,12 +1918,13 @@ public final class CameraShyGame implements Listener {
 
     private void award(UUID id, String achievementId) {
         if (id == null || !humans.contains(id)) return;
-        String key = "local-achievements." + id + ".camera-shy." + achievementId;
-        if (plugin.getConfig().getBoolean(key, false)) return;
-        plugin.getConfig().set(key, true);
         String name = CameraShyProgressCatalog.achievements().stream()
                 .filter(achievement -> achievement.id().equals(achievementId))
                 .map(CameraShyProgressCatalog.Achievement::name).findFirst().orElse(achievementId);
+        if (manager.previewDebugAchievement(id, ArcadePortGame.CAMERA_SHY, name)) return;
+        String key = "local-achievements." + id + ".camera-shy." + achievementId;
+        if (plugin.getConfig().getBoolean(key, false)) return;
+        plugin.getConfig().set(key, true);
         Player player = Bukkit.getPlayer(id);
         if (player != null && player.isOnline()) {
             player.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "ACHIEVEMENT UNLOCKED: "
@@ -2087,10 +2089,10 @@ public final class CameraShyGame implements Listener {
         for (Location candidate : locations) {
             if (separated.stream().allMatch(existing -> existing.distanceSquared(candidate) >= 12.0D * 12.0D)) {
                 separated.add(candidate);
-                if (separated.size() >= CameraShyRules.MAX_PLAYERS) break;
+                if (separated.size() >= GameDebugRuntimeOverrides.intValue("CAMERA_SHY_MAX_PLAYERS", CameraShyRules.MAX_PLAYERS)) break;
             }
         }
-        if (separated.size() < CameraShyRules.MAX_PLAYERS) return locations.subList(0, CameraShyRules.MAX_PLAYERS);
+        if (separated.size() < GameDebugRuntimeOverrides.intValue("CAMERA_SHY_MAX_PLAYERS", CameraShyRules.MAX_PLAYERS)) return locations.subList(0, GameDebugRuntimeOverrides.intValue("CAMERA_SHY_MAX_PLAYERS", CameraShyRules.MAX_PLAYERS));
         return separated;
     }
 }

@@ -344,6 +344,7 @@ public final class ArcadePortManager implements Listener {
     private static final long JOIN_WINDOW_TICKS = 100L;
     static final int MANUAL_START_COUNTDOWN_SECONDS = 0;
     private final ArcadeMechanicsModernPlugin plugin;
+    private final GameDebugProfiles debugProfiles;
     private final SuperSploorRuntime superSploor;
     private final ArcadeTestPlayerManager testPlayers;
     private boolean testPlayerStartPending;
@@ -426,6 +427,7 @@ public final class ArcadePortManager implements Listener {
     ArcadePortManager(ArcadeMechanicsModernPlugin plugin) {
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=arcade-manager-constructor-start");
         this.plugin = plugin;
+        this.debugProfiles = new GameDebugProfiles(plugin);
         cleanupStaleGladiatorMirrorWorlds();
         this.cooldownProgress = AbilityCooldownProgress.forPlugin(plugin);
         this.superSploor = new SuperSploorRuntime(plugin);
@@ -729,53 +731,112 @@ public final class ArcadePortManager implements Listener {
     int configuredTestBotCount(ArcadePortGame type) {
         if (type == null) return ArcadeTestPlayerManager.TARGET_ROSTER_SIZE;
         return Math.max(0, Math.min(ArcadeTestPlayerManager.TARGET_ROSTER_SIZE,
-                plugin.getConfig().getInt("test-bot-loadouts." + type.id() + ".count",
-                        ArcadeTestPlayerManager.TARGET_ROSTER_SIZE)));
+                debugProfiles.testBotCount(type, plugin.getConfig().getInt(
+                        "test-bot-loadouts." + type.id() + ".count", ArcadeTestPlayerManager.TARGET_ROSTER_SIZE))));
     }
 
     void setConfiguredTestBotCount(ArcadePortGame type, int count) {
         if (type == null) return;
-        plugin.getConfig().set("test-bot-loadouts." + type.id() + ".count",
-                Math.max(0, Math.min(ArcadeTestPlayerManager.TARGET_ROSTER_SIZE, count)));
-        plugin.saveConfig();
+        debugProfiles.setTestBotCount(type, Math.max(0,
+                Math.min(ArcadeTestPlayerManager.TARGET_ROSTER_SIZE, count)));
     }
 
     boolean isDebugOverrideEnabled(UUID playerId, ArcadePortGame type, String flag) {
+        return debugFeatureEnabled(playerId, type, flag, false);
+    }
+
+    boolean debugFeatureEnabled(UUID playerId, ArcadePortGame type, String flag, boolean fallback) {
         if (playerId == null || type == null || flag == null || flag.isBlank()) return false;
-        return plugin.getConfig().getBoolean("test-debug." + playerId + "." + type.id() + "." + flag, false);
+        if (debugProfiles.hasFeature(playerId, type, flag)) {
+            return debugProfiles.feature(playerId, type, flag, fallback);
+        }
+        return fallback;
     }
 
     boolean toggleDebugOverride(Player player, ArcadePortGame type, String flag) {
+        return toggleDebugOverride(player, type, flag, false);
+    }
+
+    boolean toggleDebugOverride(Player player, ArcadePortGame type, String flag, boolean fallback) {
         if (player == null || type == null || flag == null || flag.isBlank()) return false;
-        String path = "test-debug." + player.getUniqueId() + "." + type.id() + "." + flag;
-        boolean enabled = !plugin.getConfig().getBoolean(path, false);
-        plugin.getConfig().set(path, enabled);
-        plugin.saveConfig();
+        boolean enabled = !debugFeatureEnabled(player.getUniqueId(), type, flag, fallback);
+        debugProfiles.setFeature(player.getUniqueId(), type, flag, enabled);
         return enabled;
+    }
+
+    GameDebugProfiles debugProfiles() { return debugProfiles; }
+
+    ArcadePortGame activeDebugGame() {
+        if (active != null) return active.type;
+        if (cameraShyModule != null && cameraShyModule.isActive()) return ArcadePortGame.CAMERA_SHY;
+        if (snakeModule != null && snakeModule.isGameRunning()) return ArcadePortGame.SNAKE;
+        if (plugin.getSpeedBuildersGame() != null && plugin.getSpeedBuildersGame().isActive()) {
+            return ArcadePortGame.SPEED_BUILDERS;
+        }
+        if (plugin.getWizardsGameManager() != null && plugin.getWizardsGameManager().isGameRunning()) {
+            return ArcadePortGame.WIZARDS;
+        }
+        return null;
+    }
+
+    boolean debugAdvanceStartPhase(Player tester, ArcadePortGame type) {
+        if (tester == null || !tester.isOnline() || !plugin.hasAdminAccess(tester)) return false;
+        if (type == ArcadePortGame.SPEED_BUILDERS && plugin.getSpeedBuildersGame() != null) {
+            return plugin.getSpeedBuildersGame().debugAdvancePhase();
+        }
+        Session session = active;
+        if (session == null || session.type != type || session.liveStarted || !session.startupComplete) {
+            return false;
+        }
+        session.prepareEndsAt = System.currentTimeMillis();
+        session.lastPrepareSecond = -1;
+        if (type == ArcadePortGame.SKY_WARS) session.skyWarsLiveAt = session.prepareEndsAt;
+        return true;
+    }
+
+    List<GameDebugVariableCatalog.Variable> debugVariables(ArcadePortGame type) {
+        return GameDebugVariableCatalog.variables(type);
+    }
+
+    Double debugVariable(UUID tester, ArcadePortGame type, String key) {
+        return debugProfiles.variable(tester, type, key);
+    }
+
+    void resetDebugProfile(UUID tester, ArcadePortGame type) { debugProfiles.resetSelected(tester, type); }
+
+    void saveDebugProfile(UUID tester, ArcadePortGame type) { debugProfiles.save(tester, type); }
+
+    void setDebugVariable(UUID tester, ArcadePortGame type, String key, double value) {
+        debugProfiles.setVariable(tester, type, key, value);
+    }
+
+    private void activateDebugProfile(Player starter, ArcadePortGame type) {
+        GameDebugRuntimeOverrides.activate(starter == null ? Map.of()
+                : debugProfiles.values(starter.getUniqueId(), type));
     }
 
     String configuredTestBotKit(ArcadePortGame type, int botIndex) {
         if (type == null || botIndex < 0) return "";
-        return plugin.getConfig().getString("test-bot-loadouts." + type.id() + ".players." + botIndex + ".kit", "");
+        return debugProfiles.testBotKit(type, botIndex, plugin.getConfig().getString(
+                "test-bot-loadouts." + type.id() + ".players." + botIndex + ".kit", ""));
     }
 
     void setConfiguredTestBotKit(ArcadePortGame type, int botIndex, String kit) {
         if (type == null || botIndex < 0 || kit == null || kit.isBlank()) return;
-        plugin.getConfig().set("test-bot-loadouts." + type.id() + ".players." + botIndex + ".kit", kit);
-        plugin.saveConfig();
+        debugProfiles.setTestBotKit(type, botIndex, kit);
     }
 
     int configuredTestBotTeam(ArcadePortGame type, int botIndex) {
         if (type == null || botIndex < 0) return -1;
-        return plugin.getConfig().getInt("test-bot-loadouts." + type.id() + ".players." + botIndex + ".team", -1);
+        return debugProfiles.testBotTeam(type, botIndex, plugin.getConfig().getInt(
+                "test-bot-loadouts." + type.id() + ".players." + botIndex + ".team", -1));
     }
 
     void setConfiguredTestBotTeam(ArcadePortGame type, int botIndex, int team) {
         if (type == null || botIndex < 0) return;
         int teamCount = teamCountForGame(type);
         int selected = teamCount < 2 || team < 0 || team >= teamCount ? -1 : team;
-        plugin.getConfig().set("test-bot-loadouts." + type.id() + ".players." + botIndex + ".team", selected);
-        plugin.saveConfig();
+        debugProfiles.setTestBotTeam(type, botIndex, selected);
     }
 
     void applyConfiguredTestBotLoadout(ArcadePortGame type, int botIndex, Player bot) {
@@ -791,9 +852,8 @@ public final class ArcadePortManager implements Listener {
     private void applyConfiguredTestBotCosmetics(ArcadePortGame type, int botIndex, Player bot) {
         Plugin cosmetics = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
         if (cosmetics == null || type == null || bot == null) return;
-        String root = "test-bot-loadouts." + type.id() + ".players." + botIndex + ".cosmetics";
-        var section = plugin.getConfig().getConfigurationSection(root);
-        if (section == null) return;
+        Map<String, String> cosmeticsByLine = debugProfiles.testBotCosmetics(type, botIndex);
+        if (cosmeticsByLine.isEmpty()) return;
         try {
             Object catalog = cosmetics.getClass().getMethod("getCatalog").invoke(cosmetics);
             String gameId = type.isMonsterMaze() ? "monster-maze" : type.id();
@@ -802,8 +862,9 @@ public final class ArcadePortManager implements Listener {
             List<Object> lines = (List<Object>) game.getClass().getMethod("getCosmeticLines").invoke(game);
             var choose = cosmetics.getClass().getMethod("chooseCosmeticOption",
                     UUID.class, String.class, String.class, String.class);
-            for (String lineId : section.getKeys(false)) {
-                String optionId = section.getString(lineId, "");
+            for (Map.Entry<String, String> cosmetic : cosmeticsByLine.entrySet()) {
+                String lineId = cosmetic.getKey();
+                String optionId = cosmetic.getValue();
                 if (optionId.isBlank()) continue;
                 boolean valid = false;
                 for (Object line : lines) {
@@ -828,15 +889,13 @@ public final class ArcadePortManager implements Listener {
     void setConfiguredTestBotCosmetic(ArcadePortGame type, int botIndex, String lineId, String optionId) {
         if (type == null || botIndex < 0 || lineId == null || lineId.isBlank()
                 || optionId == null || optionId.isBlank()) return;
-        plugin.getConfig().set("test-bot-loadouts." + type.id() + ".players." + botIndex
-                + ".cosmetics." + lineId, optionId);
-        plugin.saveConfig();
+        debugProfiles.setTestBotCosmetic(type, botIndex, lineId, optionId);
     }
 
     String configuredTestBotCosmetic(ArcadePortGame type, int botIndex, String lineId) {
         if (type == null || botIndex < 0 || lineId == null || lineId.isBlank()) return "";
-        return plugin.getConfig().getString("test-bot-loadouts." + type.id() + ".players." + botIndex
-                + ".cosmetics." + lineId, "");
+        return debugProfiles.testBotCosmetic(type, botIndex, lineId, plugin.getConfig().getString(
+                "test-bot-loadouts." + type.id() + ".players." + botIndex + ".cosmetics." + lineId, ""));
     }
 
     public int lobbyTeamPreference(Player player, ArcadePortGame type, int count) {
@@ -980,7 +1039,7 @@ public final class ArcadePortManager implements Listener {
         if (removed) {
             if (pendingStart != null && pendingType == type
                     && onlineQueuedPlayers(type, pendingMixedArcadeVariant).size()
-                    < (type == ArcadePortGame.PLEXBALL ? PlexballRules.MIN_PLAYERS : 1)) {
+                    < (type == ArcadePortGame.PLEXBALL ? GameDebugRuntimeOverrides.intValue("PLEXBALL_MIN_PLAYERS", PlexballRules.MIN_PLAYERS) : 1)) {
                 pendingStart.cancel();
                 pendingStart = null;
                 pendingType = null;
@@ -988,7 +1047,7 @@ public final class ArcadePortManager implements Listener {
             }
             if (manualStartCountdown != null && manualStartType == type
                     && onlineQueuedPlayers(type).size()
-                    < (type == ArcadePortGame.PLEXBALL ? PlexballRules.MIN_PLAYERS : 1)) {
+                    < (type == ArcadePortGame.PLEXBALL ? GameDebugRuntimeOverrides.intValue("PLEXBALL_MIN_PLAYERS", PlexballRules.MIN_PLAYERS) : 1)) {
                 cancelManualStartCountdown(type, ChatColor.YELLOW + "The queue no longer has enough players; the Arcade start countdown was cancelled.");
             }
             player.sendMessage(ChatColor.GREEN + "You left the " + type.displayName() + " queue.");
@@ -1146,7 +1205,7 @@ public final class ArcadePortManager implements Listener {
         long now = System.currentTimeMillis();
         double timingMultiplier = session.baconSwingTimingMultiplierById.getOrDefault(id, 1.0D);
         if (session.baconSwingCritical.contains(id)) {
-            session.baconHitFeedbackUntil.put(id, now + ArcadePortRules.BACON_HIT_FEEDBACK_MILLIS);
+            session.baconHitFeedbackUntil.put(id, now + GameDebugRuntimeOverrides.longValue("BACON_HIT_FEEDBACK_MILLIS", ArcadePortRules.BACON_HIT_FEEDBACK_MILLIS));
         }
         int meter = ArcadePortRules.nextBaconMeter(session.baconMeters.getOrDefault(id, 0),
                 session.baconSwingCritical.contains(id), session.alive.size());
@@ -1182,7 +1241,7 @@ public final class ArcadePortManager implements Listener {
         boolean backstab = ArcadePortRules.isBaconBrawlBackstab(targetLook.getX(), targetLook.getZ(),
                 fromTargetToAttacker.getX(), fromTargetToAttacker.getZ());
         if ("pig".equals(attackerKit) && backstab) {
-            multiplier *= ArcadePortRules.BACON_PIG_BACKSTAB_KNOCKBACK_MULTIPLIER;
+            multiplier *= GameDebugRuntimeOverrides.doubleValue("BACON_PIG_BACKSTAB_KNOCKBACK_MULTIPLIER", ArcadePortRules.BACON_PIG_BACKSTAB_KNOCKBACK_MULTIPLIER);
         }
         target.setNoDamageTicks(0);
         target.setVelocity(baconBrawlKnockbackVelocity(
@@ -1748,7 +1807,7 @@ public final class ArcadePortManager implements Listener {
                 && session.players.containsKey(playerId) && session.alive.contains(playerId)) {
             session.microKits.put(playerId, kit);
             session.microNextArrowAt.put(playerId,
-                    System.currentTimeMillis() + ArcadePortRules.MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS);
+                    System.currentTimeMillis() + GameDebugRuntimeOverrides.longValue("MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS", ArcadePortRules.MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS));
             giveKit(session, player);
             player.sendMessage(ChatColor.GREEN + "Micro Battles kit changed to " + microKitName(kit) + ".");
         } else {
@@ -2094,8 +2153,8 @@ public final class ArcadePortManager implements Listener {
                         }
                     }
                     long slowInterval = state.hasKilled
-                            ? ArcadePortRules.TURF_WARS_INFIlTRATOR_KILL_SLOW_INTERVAL_MILLIS
-                            : ArcadePortRules.TURF_WARS_INFIlTRATOR_SLOW_INTERVAL_MILLIS;
+                            ? GameDebugRuntimeOverrides.longValue("TURF_WARS_INFIlTRATOR_KILL_SLOW_INTERVAL_MILLIS", ArcadePortRules.TURF_WARS_INFIlTRATOR_KILL_SLOW_INTERVAL_MILLIS)
+                            : GameDebugRuntimeOverrides.longValue("TURF_WARS_INFIlTRATOR_SLOW_INTERVAL_MILLIS", ArcadePortRules.TURF_WARS_INFIlTRATOR_SLOW_INTERVAL_MILLIS);
                     if (now - state.lastSlowAt >= slowInterval) {
                         state.lastSlowAt = now;
                         state.slowLevel++;
@@ -2120,7 +2179,7 @@ public final class ArcadePortManager implements Listener {
                     player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 0.8F, 0.8F);
                     player.sendMessage(ChatColor.RED + "You cannot walk on the enemy's turf!");
                     session.turfKnockbackNextAt.put(id,
-                            now + ArcadePortRules.TURF_WARS_TERRITORY_KNOCKBACK_COOLDOWN_MILLIS);
+                            now + GameDebugRuntimeOverrides.longValue("TURF_WARS_TERRITORY_KNOCKBACK_COOLDOWN_MILLIS", ArcadePortRules.TURF_WARS_TERRITORY_KNOCKBACK_COOLDOWN_MILLIS));
                 }
                 continue;
             }
@@ -2132,7 +2191,7 @@ public final class ArcadePortManager implements Listener {
             long nextDamage = session.turfSpawnDamageNextAt.getOrDefault(id, 0L);
             if (now < nextDamage) continue;
             session.turfSpawnDamageNextAt.put(id,
-                    now + ArcadePortRules.TURF_WARS_SPAWN_DAMAGE_COOLDOWN_MILLIS);
+                    now + GameDebugRuntimeOverrides.longValue("TURF_WARS_SPAWN_DAMAGE_COOLDOWN_MILLIS", ArcadePortRules.TURF_WARS_SPAWN_DAMAGE_COOLDOWN_MILLIS));
             double damage = ArcadePortRules.turfWarsSpawnBoundaryDamage(session.turfCombat);
             if (player.getHealth() <= damage) {
                 respawnTurfWarsPlayer(session, player, null, "was lost outside their team's turf", false);
@@ -2195,13 +2254,13 @@ public final class ArcadePortManager implements Listener {
             session.alive.add(targetId);
             session.lastLocations.put(targetId, spawn.clone());
             session.turfKnockbackNextAt.put(targetId, System.currentTimeMillis()
-                    + ArcadePortRules.TURF_WARS_TERRITORY_KNOCKBACK_COOLDOWN_MILLIS);
+                    + GameDebugRuntimeOverrides.longValue("TURF_WARS_TERRITORY_KNOCKBACK_COOLDOWN_MILLIS", ArcadePortRules.TURF_WARS_TERRITORY_KNOCKBACK_COOLDOWN_MILLIS));
             session.turfSpawnDamageNextAt.put(targetId, System.currentTimeMillis()
-                    + ArcadePortRules.TURF_WARS_SPAWN_DAMAGE_COOLDOWN_MILLIS);
+                    + GameDebugRuntimeOverrides.longValue("TURF_WARS_SPAWN_DAMAGE_COOLDOWN_MILLIS", ArcadePortRules.TURF_WARS_SPAWN_DAMAGE_COOLDOWN_MILLIS));
             giveKit(session, target);
             target.sendMessage(ChatColor.GREEN + "Respawned in your team's fort.");
             checkTurfWarsObjectiveEnd(session);
-        }, ArcadePortRules.TURF_WARS_RESPAWN_DELAY_TICKS);
+        }, GameDebugRuntimeOverrides.longValue("TURF_WARS_RESPAWN_DELAY_TICKS", ArcadePortRules.TURF_WARS_RESPAWN_DELAY_TICKS));
     }
 
     public void selectTurfWarsKit(Player player, String requestedKit) {
@@ -2398,13 +2457,13 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.RED + "SkyWars Mixed Arcade is full (16/16 players).");
             return;
         }
-        if (type == ArcadePortGame.PLEXBALL && queuedPlayers >= PlexballRules.MAX_PLAYERS) {
+        if (type == ArcadePortGame.PLEXBALL && queuedPlayers >= GameDebugRuntimeOverrides.intValue("PLEXBALL_MAX_PLAYERS", PlexballRules.MAX_PLAYERS)) {
             player.sendMessage(ChatColor.RED + "Plexball's Arcade queue is full (16/16 players).");
             return;
         }
         if (type == ArcadePortGame.WIZARDS) {
-            int maximum = Math.max(WizardsRules.MIN_PLAYERS, Math.min(WizardsRules.MAX_PLAYERS,
-                    plugin.getConfig().getInt("wizards.maximum-players", WizardsRules.MAX_PLAYERS)));
+            int maximum = Math.max(2, Math.min(16, GameDebugRuntimeOverrides.intValue("WIZARDS_MAX_PLAYERS",
+                    plugin.getConfig().getInt("wizards.maximum-players", WizardsRules.MAX_PLAYERS))));
             if (queuedPlayers >= maximum) {
                 player.sendMessage(ChatColor.RED + "Wizards' Arcade queue is full (" + maximum + "/" + maximum + " players).");
                 return;
@@ -2778,6 +2837,7 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
             if (sender instanceof Player requesting && requesting.isOnline()) lobby.ensurePlayerInLobby(requesting);
+            activateDebugProfile(requester != null ? requester : sender instanceof Player player ? player : null, type);
             List<Player> lobbyPlayers = new ArrayList<>(Bukkit.getOnlinePlayers().stream()
                     .filter(player -> player.isOnline() && !testPlayers.isTestPlayer(player)
                             && lobby.isLobbyWorld(player.getWorld()))
@@ -2801,6 +2861,7 @@ public final class ArcadePortManager implements Listener {
             if (sender instanceof Player requestingPlayer && requestingPlayer.isOnline()) {
                 lobby.ensurePlayerInLobby(requestingPlayer);
             }
+            activateDebugProfile(requester != null ? requester : sender instanceof Player player ? player : null, type);
             for (Player player : Bukkit.getOnlinePlayers()) {
                 if (player.isOnline() && lobby.isLobbyWorld(player.getWorld()) && !testPlayers.isTestPlayer(player)) {
                     for (LinkedHashMap<UUID, Player> existingQueue : queues.values()) {
@@ -3066,6 +3127,7 @@ public final class ArcadePortManager implements Listener {
 
         Session session = new Session(type, center.getWorld(), participants, false);
         active = session;
+        activateDebugProfile(sender instanceof Player player ? player : null, type);
         try {
             for (Player player : participants) {
                 if (player == null || !player.isOnline()) continue;
@@ -3400,6 +3462,7 @@ public final class ArcadePortManager implements Listener {
             } else if (cameraShyModule == null) {
                 sender.sendMessage(ChatColor.RED + "Camera Shy is not loaded.");
             } else {
+                activateDebugProfile(sender instanceof Player player ? player : null, type);
                 cameraShyModule.startQueued(sender);
             }
             return;
@@ -3407,7 +3470,10 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.SPEED_BUILDERS) {
             SpeedBuildersGame module = plugin.getSpeedBuildersGame();
             if (module == null) sender.sendMessage(ChatColor.RED + "Speed Builders is not loaded.");
-            else module.startQueued(sender);
+            else {
+                activateDebugProfile(sender instanceof Player player ? player : null, type);
+                module.startQueued(sender);
+            }
             return;
         }
         if (type == ArcadePortGame.PLEXBALL) {
@@ -3531,10 +3597,10 @@ public final class ArcadePortManager implements Listener {
         if (requester != null && requester.isOnline() && !testPlayers.isTestPlayer(requester)) {
             humanIds.add(requester.getUniqueId());
         }
-        if (humanIds.size() > PlexballRules.MAX_PLAYERS) {
+        if (humanIds.size() > GameDebugRuntimeOverrides.intValue("PLEXBALL_MAX_PLAYERS", PlexballRules.MAX_PLAYERS)) {
             sender.sendMessage(ChatColor.RED + "Plexball supports at most "
-                    + PlexballRules.MAX_PLAYERS + " players. Remove "
-                    + (humanIds.size() - PlexballRules.MAX_PLAYERS) + " queued player(s) and retry.");
+                    + GameDebugRuntimeOverrides.intValue("PLEXBALL_MAX_PLAYERS", PlexballRules.MAX_PLAYERS) + " players. Remove "
+                    + (humanIds.size() - GameDebugRuntimeOverrides.intValue("PLEXBALL_MAX_PLAYERS", PlexballRules.MAX_PLAYERS)) + " queued player(s) and retry.");
             return;
         }
         if (!testPlayers.isStartupCleanupComplete()) {
@@ -3550,7 +3616,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
 
-        int targetRoster = PlexballRules.MAX_PLAYERS;
+        int targetRoster = GameDebugRuntimeOverrides.intValue("PLEXBALL_MAX_PLAYERS", PlexballRules.MAX_PLAYERS);
         int botsNeeded = Math.min(configuredTestBotCount(ArcadePortGame.PLEXBALL),
                 Math.max(0, targetRoster - humanIds.size()));
         if (botsNeeded == 0) {
@@ -3695,7 +3761,9 @@ public final class ArcadePortManager implements Listener {
                 pendingType = null;
                 pendingMixedArcadeVariant = false;
             }
+            activateDebugProfile(requester != null ? requester : sender instanceof Player player ? player : null, type);
             if (!snake.startFromArcade(participants, sender)) {
+                GameDebugRuntimeOverrides.clear();
                 sender.sendMessage(ChatColor.RED + "Snake did not start. Check the Arcade server log for its map preflight details.");
                 return;
             }
@@ -3713,7 +3781,7 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.PLEXBALL) {
             if (!PlexballRules.hasValidPlayerCount(participants.size())) {
                 sender.sendMessage(ChatColor.RED + "Plexball requires between "
-                        + PlexballRules.MIN_PLAYERS + " and " + PlexballRules.MAX_PLAYERS + " queued players.");
+                        + GameDebugRuntimeOverrides.intValue("PLEXBALL_MIN_PLAYERS", PlexballRules.MIN_PLAYERS) + " and " + GameDebugRuntimeOverrides.intValue("PLEXBALL_MAX_PLAYERS", PlexballRules.MAX_PLAYERS) + " queued players.");
                 return;
             }
             PlexballGame game = plugin.getPlexballGame();
@@ -3744,6 +3812,7 @@ public final class ArcadePortManager implements Listener {
             }
             Session session = new Session(type, plexballWorld, participants, false);
             active = session;
+            activateDebugProfile(requester != null ? requester : sender instanceof Player player ? player : null, type);
             try {
                 for (Player player : participants) {
                     if (player == null || !player.isOnline()) continue;
@@ -3845,6 +3914,7 @@ public final class ArcadePortManager implements Listener {
             }
 
             active = session;
+            activateDebugProfile(requester != null ? requester : sender instanceof Player player ? player : null, type);
             if (queue != null) queues.remove(selectedQueueKey);
             if (pendingStart != null && pendingType == type
                     && pendingMixedArcadeVariant == mixedArcadeVariant) {
@@ -3992,6 +4062,7 @@ public final class ArcadePortManager implements Listener {
             }
         }
         active = session;
+        activateDebugProfile(requester != null ? requester : sender instanceof Player player ? player : null, type);
         if (type == ArcadePortGame.SKY_WARS) {
             initializeSkyWarsMapResources(session, sourceMapData.get(type.id()));
         }
@@ -4041,8 +4112,8 @@ public final class ArcadePortManager implements Listener {
             }
         }
         session.endsAt = (type == ArcadePortGame.BACON_BRAWL
-                && !ArcadePortRules.BACON_BRAWL_HAS_ROUND_TIMER)
-                || (type == ArcadePortGame.DRAGON_ESCAPE && !ArcadePortRules.DRAGON_ESCAPE_HAS_ROUND_TIMER)
+                && !GameDebugRuntimeOverrides.booleanValue("BACON_BRAWL_HAS_ROUND_TIMER", ArcadePortRules.BACON_BRAWL_HAS_ROUND_TIMER))
+                || (type == ArcadePortGame.DRAGON_ESCAPE && !GameDebugRuntimeOverrides.booleanValue("DRAGON_ESCAPE_HAS_ROUND_TIMER", ArcadePortRules.DRAGON_ESCAPE_HAS_ROUND_TIMER))
                 || type == ArcadePortGame.DRAGONS
                 || type == ArcadePortGame.CASTLE_ASSAULT
                 || type == ArcadePortGame.SNEAKY_ASSASSINS
@@ -4050,13 +4121,13 @@ public final class ArcadePortManager implements Listener {
                 || type == ArcadePortGame.MASTER_BUILDERS
                 || type == ArcadePortGame.GLADIATORS || type == ArcadePortGame.SUPER_SPLOOR
                 || type == ArcadePortGame.HOOPS_REMASTERED
-                ? 0L : now + (type == ArcadePortGame.SHEEP_QUEST ? ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS
+                ? 0L : now + (type == ArcadePortGame.SHEEP_QUEST ? GameDebugRuntimeOverrides.longValue("SHEEP_QUEST_ROUND_MILLIS", ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS)
                 : type == ArcadePortGame.GLADIATORS ? 0L
-                : type == ArcadePortGame.BOMB_LOBBERS ? ArcadePortRules.BOMB_LOBBERS_ROUND_MILLIS
-                : type == ArcadePortGame.DEATH_TAG ? ArcadePortRules.DEATH_TAG_GAME_TIMEOUT_MILLIS
-                : type == ArcadePortGame.TURF_WARS ? ArcadePortRules.TURF_WARS_GAME_TIMEOUT_MILLIS
+                : type == ArcadePortGame.BOMB_LOBBERS ? GameDebugRuntimeOverrides.longValue("BOMB_LOBBERS_ROUND_MILLIS", ArcadePortRules.BOMB_LOBBERS_ROUND_MILLIS)
+                : type == ArcadePortGame.DEATH_TAG ? GameDebugRuntimeOverrides.longValue("DEATH_TAG_GAME_TIMEOUT_MILLIS", ArcadePortRules.DEATH_TAG_GAME_TIMEOUT_MILLIS)
+                : type == ArcadePortGame.TURF_WARS ? GameDebugRuntimeOverrides.longValue("TURF_WARS_GAME_TIMEOUT_MILLIS", ArcadePortRules.TURF_WARS_GAME_TIMEOUT_MILLIS)
                 : type == ArcadePortGame.HEROES_OF_GWEN ? 1_200_000L
-                : type == ArcadePortGame.PAINTBALL ? ArcadePortRules.PAINTBALL_GAME_TIMEOUT_MILLIS
+                : type == ArcadePortGame.PAINTBALL ? GameDebugRuntimeOverrides.longValue("PAINTBALL_GAME_TIMEOUT_MILLIS", ArcadePortRules.PAINTBALL_GAME_TIMEOUT_MILLIS)
                 : type == ArcadePortGame.SKY_WARS ? SkyWarsMixedArcadeRules.ROUND_MILLIS
                 : ROUND_MS);
         session.lastBaconHungerAt = now;
@@ -4067,7 +4138,7 @@ public final class ArcadePortManager implements Listener {
         session.dragonNextSpawnAt = now;
         session.dragonSpectatorLocation = dragonSpectatorLocation(session);
         session.baconKnockback = ArcadePortRules.initialBaconKnockback(participants.size());
-        session.baconEscalationIntervalMillis = ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS;
+        session.baconEscalationIntervalMillis = GameDebugRuntimeOverrides.longValue("BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS", ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS);
         session.microBarrierActive = type == ArcadePortGame.MICRO_BATTLES;
         SourceMapCatalog.MapData microSourceMap = sourceMapData.get(type.id());
         if (type == ArcadePortGame.MICRO_BATTLES) {
@@ -4174,7 +4245,7 @@ public final class ArcadePortManager implements Listener {
             }
         }
         lastDragonHazard = now + 8_000L;
-        session.sheepNextSpawnAt = now + ArcadePortRules.SHEEP_QUEST_SPAWN_INTERVAL_MILLIS;
+        session.sheepNextSpawnAt = now + GameDebugRuntimeOverrides.longValue("SHEEP_QUEST_SPAWN_INTERVAL_MILLIS", ArcadePortRules.SHEEP_QUEST_SPAWN_INTERVAL_MILLIS);
         if (type == ArcadePortGame.DRAGON_ESCAPE) spawnDragonEscapeDragon(session);
         SourceMapCatalog.MapData sourceMap = sourceMapData.get(type.id());
         String sourceMapName = sourceMap == null ? "" : sourceMap.mapName();
@@ -4261,7 +4332,7 @@ public final class ArcadePortManager implements Listener {
                 session.evolutionKillsSinceEvolution.put(evolutionId, 0);
                 session.evolutionSameMobOnly.add(evolutionId);
                 session.evolutionPityUntil.put(evolutionId,
-                        System.currentTimeMillis() + ArcadePortRules.EVOLUTION_PITY_CLOCK_MILLIS);
+                        System.currentTimeMillis() + GameDebugRuntimeOverrides.longValue("EVOLUTION_PITY_CLOCK_MILLIS", ArcadePortRules.EVOLUTION_PITY_CLOCK_MILLIS));
                 session.evolutionOverkillEligible.add(evolutionId);
             }
             if (type == ArcadePortGame.DRAGON_ESCAPE) {
@@ -4271,9 +4342,9 @@ public final class ArcadePortManager implements Listener {
                 String kit = dragonEscapeKitPreferences.getOrDefault(playerId, "jumper");
                 session.dragonEscapeKits.put(playerId, kit);
                 session.dragonEscapeLeapUsesRemaining.put(playerId, ArcadePortRules.dragonEscapeLeapUses(kit));
-                session.dragonEscapeDiggerUsesRemaining.put(playerId, ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES);
+                session.dragonEscapeDiggerUsesRemaining.put(playerId, GameDebugRuntimeOverrides.intValue("DRAGON_ESCAPE_DIGGER_MAX_USES", ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES));
                 session.dragonEscapeNextTntAt.put(playerId,
-                        now + ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS);
+                        now + GameDebugRuntimeOverrides.longValue("DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS", ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS));
             }
             int teamCount = teamCountForGame(type);
             boolean teamMode = teamCount > 0;
@@ -4315,7 +4386,7 @@ public final class ArcadePortManager implements Listener {
                 UUID microId = player.getUniqueId();
                 session.microKits.put(microId, microKitPreferences.getOrDefault(microId, "archer"));
                 session.microNextArrowAt.put(microId,
-                        now + ArcadePortRules.MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS);
+                        now + GameDebugRuntimeOverrides.longValue("MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS", ArcadePortRules.MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS));
                 String startGlassColour = selectedGameCosmeticOption(player, "micro-battles",
                         "start-glass-colour", "white");
                 session.microGlassColours.put(microId, startGlassColour);
@@ -4334,7 +4405,7 @@ public final class ArcadePortManager implements Listener {
                 UUID playerId = player.getUniqueId();
                 session.runnerStartY.put(playerId, player.getLocation().getY());
                 session.runnerKits.put(playerId, runnerKitPreferences.getOrDefault(playerId, "leaper"));
-                session.runnerNextFrostBallAt.put(playerId, now + ArcadePortRules.RUNNER_FROSTBALL_INTERVAL_MILLIS);
+                session.runnerNextFrostBallAt.put(playerId, now + GameDebugRuntimeOverrides.longValue("RUNNER_FROSTBALL_INTERVAL_MILLIS", ArcadePortRules.RUNNER_FROSTBALL_INTERVAL_MILLIS));
                 String selectedTrail = runnerTrailCosmeticOption(playerId);
                 String requestedTrail = selectedTrail.startsWith("trail-")
                         ? selectedTrail.substring("trail-".length()) : selectedTrail;
@@ -4350,8 +4421,8 @@ public final class ArcadePortManager implements Listener {
             if (type == ArcadePortGame.DRAGONS) {
                 UUID playerId = player.getUniqueId();
                 session.dragonKits.put(playerId, dragonsKitPreferences.getOrDefault(playerId, "coward"));
-                session.dragonNextSparklerAt.put(playerId, now + ArcadePortRules.DRAGONS_SPARKLER_INTERVAL_MILLIS);
-                session.dragonNextArrowAt.put(playerId, now + ArcadePortRules.DRAGONS_MARKSMAN_ARROW_INTERVAL_MILLIS);
+                session.dragonNextSparklerAt.put(playerId, now + GameDebugRuntimeOverrides.longValue("DRAGONS_SPARKLER_INTERVAL_MILLIS", ArcadePortRules.DRAGONS_SPARKLER_INTERVAL_MILLIS));
+                session.dragonNextArrowAt.put(playerId, now + GameDebugRuntimeOverrides.longValue("DRAGONS_MARKSMAN_ARROW_INTERVAL_MILLIS", ArcadePortRules.DRAGONS_MARKSMAN_ARROW_INTERVAL_MILLIS));
             }
             Location spawn = spawns.get(i % spawns.size()).clone();
             if (teamMode && preferredTeam >= 0 && selectedMap != null) {
@@ -4479,7 +4550,7 @@ public final class ArcadePortManager implements Listener {
                 // the initial Alpha is an OUT Runner placement and receives the forced bonus.
                 session.deathTagRunnerPlacementOrder.add(initialChaserId);
                 awardDeathTagTestGems(session, initialChaserId,
-                        ArcadePortRules.DEATH_TAG_FORCED_CHASER_REWARD_GEMS, "Forced Chaser");
+                        GameDebugRuntimeOverrides.intValue("DEATH_TAG_FORCED_CHASER_REWARD_GEMS", ArcadePortRules.DEATH_TAG_FORCED_CHASER_REWARD_GEMS), "Forced Chaser");
                 session.world.strikeLightningEffect(chaser.getLocation());
                 announce(session, ChatColor.GREEN + chaser.getName() + ChatColor.GRAY
                         + " has become an " + ChatColor.RED + "Alpha Chaser" + ChatColor.GRAY + ".");
@@ -4526,9 +4597,9 @@ public final class ArcadePortManager implements Listener {
             setupDeathTagScoreboard(session);
         }
         if (type == ArcadePortGame.SHEEP_QUEST) {
-            for (int i = 0; i < ArcadePortRules.SHEEP_QUEST_INITIAL_SHEEP; i++) spawnSheep(session);
+            for (int i = 0; i < GameDebugRuntimeOverrides.intValue("SHEEP_QUEST_INITIAL_SHEEP", ArcadePortRules.SHEEP_QUEST_INITIAL_SHEEP); i++) spawnSheep(session);
             session.sheepNextSpawnAt = System.currentTimeMillis()
-                    + ArcadePortRules.SHEEP_QUEST_SPAWN_INTERVAL_MILLIS;
+                    + GameDebugRuntimeOverrides.longValue("SHEEP_QUEST_SPAWN_INTERVAL_MILLIS", ArcadePortRules.SHEEP_QUEST_SPAWN_INTERVAL_MILLIS);
         }
         if (type == ArcadePortGame.MILK_THE_COW) spawnMilkCowMapAnimals(session);
         if (type == ArcadePortGame.WITHER_ASSAULT) {
@@ -4582,7 +4653,7 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.DRAW_MY_THING) {
             String drawRoundDuration = String.format(java.util.Locale.ROOT, "%.1f seconds",
                     session.drawRoundDurationMillis / 1_000.0D);
-            String drawScaling = session.players.size() > ArcadePortRules.DRAW_MY_THING_FULL_ROUND_PLAYER_LIMIT
+            String drawScaling = session.players.size() > GameDebugRuntimeOverrides.intValue("DRAW_MY_THING_FULL_ROUND_PLAYER_LIMIT", ArcadePortRules.DRAW_MY_THING_FULL_ROUND_PLAYER_LIMIT)
                     ? " (scaled to fit the 320-second game)" : "";
             announce(session, ChatColor.AQUA + "Draw My Thing: every player draws once. Each drawing round lasts "
                     + drawRoundDuration + drawScaling + " and allows 10 guesses; timed hints appear during the round.");
@@ -5533,6 +5604,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void awardGladiatorsAchievement(Player player, String achievementId, String displayName) {
+        if (debugAchievementPreview(player, ArcadePortGame.GLADIATORS, displayName)) return;
         if (player == null || testPlayers.isTestPlayer(player)) return;
         String path = ArcadePortRules.gladiatorsAchievementConfigKey(player.getUniqueId(), achievementId);
         if (plugin.getConfig().getBoolean(path, false)) return;
@@ -6312,11 +6384,11 @@ public final class ArcadePortManager implements Listener {
         }
         boolean walkToNextArena = advancingDoors.size() == 2;
         long transitionUntil = walkToNextArena ? now + 15_000L : now;
-        long fightStartsAt = transitionUntil + ArcadePortRules.GLADIATOR_ROUND_COUNTDOWN_MILLIS;
+        long fightStartsAt = transitionUntil + GameDebugRuntimeOverrides.longValue("GLADIATOR_ROUND_COUNTDOWN_MILLIS", ArcadePortRules.GLADIATOR_ROUND_COUNTDOWN_MILLIS);
         session.gladiatorRoundStartedAtByPair.put(pair, fightStartsAt);
         session.gladiatorFightStartsAtByPair.put(pair, fightStartsAt);
         session.gladiatorNextPoisonAtByPair.put(pair,
-                fightStartsAt + ArcadePortRules.GLADIATOR_POISON_DELAY_MILLIS);
+                fightStartsAt + GameDebugRuntimeOverrides.longValue("GLADIATOR_POISON_DELAY_MILLIS", ArcadePortRules.GLADIATOR_POISON_DELAY_MILLIS));
 
         Player[] fighters = {first, second};
         for (int i = 0; i < fighters.length; i++) {
@@ -6452,7 +6524,7 @@ public final class ArcadePortManager implements Listener {
             if (session.gladiatorResolvedPairs.contains(pair)) continue;
             long nextPoison = session.gladiatorNextPoisonAtByPair.getOrDefault(pair, Long.MAX_VALUE);
             if (now < nextPoison) continue;
-            session.gladiatorNextPoisonAtByPair.put(pair, now + ArcadePortRules.GLADIATOR_POISON_INTERVAL_MILLIS);
+            session.gladiatorNextPoisonAtByPair.put(pair, now + GameDebugRuntimeOverrides.longValue("GLADIATOR_POISON_INTERVAL_MILLIS", ArcadePortRules.GLADIATOR_POISON_INTERVAL_MILLIS));
             long roundStarted = session.gladiatorRoundStartedAtByPair.getOrDefault(pair, now);
             List<Player> fighters = session.gladiatorPairs.entrySet().stream()
                     .filter(entry -> entry.getValue().equals(pair) && session.alive.contains(entry.getKey()))
@@ -6460,11 +6532,11 @@ public final class ArcadePortManager implements Listener {
                     .filter(player -> player != null && player.isOnline()).toList();
             if (!ArcadePortRules.shouldGladiatorPoison(now, roundStarted, false, fighters.size())) continue;
             for (Player player : fighters) {
-                if (player.getHealth() <= ArcadePortRules.GLADIATOR_POISON_DAMAGE) {
+                if (player.getHealth() <= GameDebugRuntimeOverrides.doubleValue("GLADIATOR_POISON_DAMAGE", ArcadePortRules.GLADIATOR_POISON_DAMAGE)) {
                     eliminate(session, player, null, "was defeated by arena poison");
                     break;
                 }
-                player.setHealth(player.getHealth() - ArcadePortRules.GLADIATOR_POISON_DAMAGE);
+                player.setHealth(player.getHealth() - GameDebugRuntimeOverrides.doubleValue("GLADIATOR_POISON_DAMAGE", ArcadePortRules.GLADIATOR_POISON_DAMAGE));
                 playLegacyDamageFeedback(player);
                 player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.7F, 0.7F);
                 player.sendActionBar(ChatColor.RED + "POISON! Keep fighting!");
@@ -7151,10 +7223,10 @@ public final class ArcadePortManager implements Listener {
             if (!session.tagged.contains(player.getUniqueId())
                     && "archer".equals(session.deathTagRunnerKits.getOrDefault(player.getUniqueId(), "basher"))) {
                 Long lastArrow = session.deathTagLastArrowAt.get(player.getUniqueId());
-                if (lastArrow == null || now - lastArrow >= ArcadePortRules.DEATH_TAG_ARCHER_ARROW_INTERVAL_MILLIS) {
+                if (lastArrow == null || now - lastArrow >= GameDebugRuntimeOverrides.longValue("DEATH_TAG_ARCHER_ARROW_INTERVAL_MILLIS", ArcadePortRules.DEATH_TAG_ARCHER_ARROW_INTERVAL_MILLIS)) {
                     session.deathTagLastArrowAt.put(player.getUniqueId(), now);
                     int arrows = inventoryCount(player, Material.ARROW);
-                    if (arrows < ArcadePortRules.DEATH_TAG_ARCHER_MAX_ARROWS) {
+                    if (arrows < GameDebugRuntimeOverrides.intValue("DEATH_TAG_ARCHER_MAX_ARROWS", ArcadePortRules.DEATH_TAG_ARCHER_MAX_ARROWS)) {
                         player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrow", "Replenished by the Archer kit."));
                         player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.6F, 1.3F);
                     }
@@ -7245,7 +7317,7 @@ public final class ArcadePortManager implements Listener {
         session.tagged.add(convertedPlayerId);
         if (forcedAlpha) {
             awardDeathTagTestGems(session, convertedPlayerId,
-                    ArcadePortRules.DEATH_TAG_FORCED_CHASER_REWARD_GEMS, "Forced Chaser");
+                    GameDebugRuntimeOverrides.intValue("DEATH_TAG_FORCED_CHASER_REWARD_GEMS", ArcadePortRules.DEATH_TAG_FORCED_CHASER_REWARD_GEMS), "Forced Chaser");
         }
         if (forcedAlpha) session.alphaChasers.add(player.getUniqueId());
         else session.alphaChasers.remove(player.getUniqueId());
@@ -7704,7 +7776,7 @@ public final class ArcadePortManager implements Listener {
                     }
                 }
                 session.turfConstructorNextAt.put(id,
-                        now + ArcadePortRules.TURF_WARS_CONSTRUCTOR_INTERVAL_MILLIS);
+                        now + GameDebugRuntimeOverrides.longValue("TURF_WARS_CONSTRUCTOR_INTERVAL_MILLIS", ArcadePortRules.TURF_WARS_CONSTRUCTOR_INTERVAL_MILLIS));
             }
 
             long arrowAt = session.turfArrowNextAt.getOrDefault(id, now);
@@ -7742,16 +7814,16 @@ public final class ArcadePortManager implements Listener {
                     session.turfBarrageCharges.remove(id);
                     session.turfBarrageNextChargeAt.remove(id);
                 } else if (session.turfBarrageCharges.getOrDefault(id, 0)
-                        < ArcadePortRules.TURF_WARS_BARRAGE_MAX_CHARGE
+                        < GameDebugRuntimeOverrides.intValue("TURF_WARS_BARRAGE_MAX_CHARGE", ArcadePortRules.TURF_WARS_BARRAGE_MAX_CHARGE)
                         && now >= session.turfBarrageNextChargeAt.getOrDefault(id, Long.MAX_VALUE)) {
                     int charge = session.turfBarrageCharges.getOrDefault(id, 0) + 1;
                     session.turfBarrageCharges.put(id, charge);
                     session.turfBarrageNextChargeAt.put(id,
-                            now + ArcadePortRules.TURF_WARS_BARRAGE_CHARGE_INTERVAL_MILLIS);
+                            now + GameDebugRuntimeOverrides.longValue("TURF_WARS_BARRAGE_CHARGE_INTERVAL_MILLIS", ArcadePortRules.TURF_WARS_BARRAGE_CHARGE_INTERVAL_MILLIS));
                     player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT,
                             0.6F, 1.0F + charge * 0.1F);
                     player.sendActionBar(ChatColor.GOLD + "BARRAGE "
-                            + ChatColor.YELLOW + charge + "/" + ArcadePortRules.TURF_WARS_BARRAGE_MAX_CHARGE);
+                            + ChatColor.YELLOW + charge + "/" + GameDebugRuntimeOverrides.intValue("TURF_WARS_BARRAGE_MAX_CHARGE", ArcadePortRules.TURF_WARS_BARRAGE_MAX_CHARGE));
                 }
             }
 
@@ -7788,7 +7860,7 @@ public final class ArcadePortManager implements Listener {
         session.turfBarrageTargetsByOwner.put(id, new HashSet<>());
         session.turfBarrageCharges.put(id, 0);
         session.turfBarrageNextChargeAt.put(id,
-                System.currentTimeMillis() + ArcadePortRules.TURF_WARS_BARRAGE_FIRST_CHARGE_MILLIS);
+                System.currentTimeMillis() + GameDebugRuntimeOverrides.longValue("TURF_WARS_BARRAGE_FIRST_CHARGE_MILLIS", ArcadePortRules.TURF_WARS_BARRAGE_FIRST_CHARGE_MILLIS));
         player.sendMessage(ChatColor.YELLOW + "Charging Barrage. Release your bow to fire.");
     }
 
@@ -7796,7 +7868,7 @@ public final class ArcadePortManager implements Listener {
         int team = session.teams.getOrDefault(player.getUniqueId(), -1);
         if (team < 0) return;
         Material wool = team == 0 ? Material.RED_WOOL : Material.LIGHT_BLUE_WOOL;
-        player.getInventory().addItem(new ItemStack(wool, ArcadePortRules.TURF_WARS_BUILD_PHASE_WOOL));
+        player.getInventory().addItem(new ItemStack(wool, GameDebugRuntimeOverrides.intValue("TURF_WARS_BUILD_PHASE_WOOL", ArcadePortRules.TURF_WARS_BUILD_PHASE_WOOL)));
     }
 
     private ItemStack witherAssaultLeatherPiece(Material material, Color colour) {
@@ -7958,7 +8030,7 @@ public final class ArcadePortManager implements Listener {
                     player.getInventory().addItem(namedItem(Material.ENDER_PEARL, "Warp",
                             "Right-click to warp to the next-ranked racer ahead. One use."));
                 } else if ("digger".equals(kit)) {
-                    int digs = session.dragonEscapeDiggerUsesRemaining.getOrDefault(id, ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES);
+                    int digs = session.dragonEscapeDiggerUsesRemaining.getOrDefault(id, GameDebugRuntimeOverrides.intValue("DRAGON_ESCAPE_DIGGER_MAX_USES", ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES));
                     player.getInventory().addItem(namedItem(Material.DIAMOND_PICKAXE, "Digger Pickaxe",
                             "Left-click course blocks to recover and place as shortcuts (" + digs + " digs left).",
                             Math.max(1, digs)));
@@ -7973,7 +8045,7 @@ public final class ArcadePortManager implements Listener {
                     // Reborn's Fletcher is instant on kit application, then adds one arrow every four seconds.
                     player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrow",
                             "Replenishes up to four arrows every four seconds.",
-                            ArcadePortRules.DRAGONS_MARKSMAN_START_ARROWS));
+                            GameDebugRuntimeOverrides.intValue("DRAGONS_MARKSMAN_START_ARROWS", ArcadePortRules.DRAGONS_MARKSMAN_START_ARROWS)));
                     player.getInventory().setArmorContents(new ItemStack[] {
                             new ItemStack(Material.CHAINMAIL_BOOTS), new ItemStack(Material.CHAINMAIL_LEGGINGS),
                             new ItemStack(Material.CHAINMAIL_CHESTPLATE), new ItemStack(Material.CHAINMAIL_HELMET) });
@@ -8045,7 +8117,7 @@ public final class ArcadePortManager implements Listener {
                         player.getInventory().addItem(new ItemStack(Material.BOW));
                         player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrow",
                                 "Automatically replenishes up to 3 arrows every 20 seconds.",
-                                ArcadePortRules.MICRO_BATTLES_FLETCHER_MAX_ARROWS));
+                                GameDebugRuntimeOverrides.intValue("MICRO_BATTLES_FLETCHER_MAX_ARROWS", ArcadePortRules.MICRO_BATTLES_FLETCHER_MAX_ARROWS)));
                         player.getInventory().addItem(new ItemStack(Material.APPLE, 3));
                         break;
                 }
@@ -8080,10 +8152,10 @@ public final class ArcadePortManager implements Listener {
                 }
                 // Adventure mode mirrors the source Quiver rules. Each held kit item gets
                 // the same stained-glass break predicate; the BlockBreak listener enforces it again.
-                player.getInventory().setItem(ArcadePortRules.QUIVER_SWORD_SLOT, allowQuiverGlassBreaks(sword));
-                player.getInventory().setItem(ArcadePortRules.QUIVER_BOW_SLOT,
+                player.getInventory().setItem(GameDebugRuntimeOverrides.intValue("QUIVER_SWORD_SLOT", ArcadePortRules.QUIVER_SWORD_SLOT), allowQuiverGlassBreaks(sword));
+                player.getInventory().setItem(GameDebugRuntimeOverrides.intValue("QUIVER_BOW_SLOT", ArcadePortRules.QUIVER_BOW_SLOT),
                         allowQuiverGlassBreaks(new ItemStack(Material.BOW)));
-                player.getInventory().setItem(ArcadePortRules.QUIVER_ARROW_SLOT, allowQuiverGlassBreaks(
+                player.getInventory().setItem(GameDebugRuntimeOverrides.intValue("QUIVER_ARROW_SLOT", ArcadePortRules.QUIVER_ARROW_SLOT), allowQuiverGlassBreaks(
                         namedItem(Material.ARROW, "Super Arrow", "One arrow per shot; earn another with each kill.")));
                 break;
             }
@@ -9086,7 +9158,7 @@ public final class ArcadePortManager implements Listener {
     private void activateQuiverNinjaVanish(Session session, Player player, long now) {
         UUID id = player.getUniqueId();
         if (!"ninja".equals(session.quiverKits.getOrDefault(id, "leaper"))) return;
-        session.quiverCloakedUntil.put(id, now + ArcadePortRules.QUIVER_NINJA_VANISH_MILLIS);
+        session.quiverCloakedUntil.put(id, now + GameDebugRuntimeOverrides.longValue("QUIVER_NINJA_VANISH_MILLIS", ArcadePortRules.QUIVER_NINJA_VANISH_MILLIS));
         player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 24, 0, false, false, true));
         player.getWorld().spawnParticle(Particle.LARGE_SMOKE, player.getLocation().add(0.0D, 1.0D, 0.0D),
                 10, 0.25D, 0.4D, 0.25D, 0.02D);
@@ -9101,14 +9173,14 @@ public final class ArcadePortManager implements Listener {
         UUID id = player.getUniqueId();
         long readyAt = session.dragonLeapReadyAt.getOrDefault(id, 0L);
         if (now < readyAt) return;
-        session.dragonLeapReadyAt.put(id, now + ArcadePortRules.DRAGONS_COWARD_LEAP_COOLDOWN_MILLIS);
-        cooldownProgress.start(player, "Coward's Leap", ArcadePortRules.DRAGONS_COWARD_LEAP_COOLDOWN_MILLIS);
+        session.dragonLeapReadyAt.put(id, now + GameDebugRuntimeOverrides.longValue("DRAGONS_COWARD_LEAP_COOLDOWN_MILLIS", ArcadePortRules.DRAGONS_COWARD_LEAP_COOLDOWN_MILLIS));
+        cooldownProgress.start(player, "Coward's Leap", GameDebugRuntimeOverrides.longValue("DRAGONS_COWARD_LEAP_COOLDOWN_MILLIS", ArcadePortRules.DRAGONS_COWARD_LEAP_COOLDOWN_MILLIS));
         session.dragonAbilitiesUsed.add(id);
         if (!player.isOnGround() && player.getFallDistance() >= 6.0F) {
             session.dragonLeapSavedDangerousFall.add(id);
         }
         player.setCooldown(Material.IRON_AXE,
-                (int) Math.ceil(ArcadePortRules.DRAGONS_COWARD_LEAP_COOLDOWN_MILLIS / 50.0D));
+                (int) Math.ceil(GameDebugRuntimeOverrides.longValue("DRAGONS_COWARD_LEAP_COOLDOWN_MILLIS", ArcadePortRules.DRAGONS_COWARD_LEAP_COOLDOWN_MILLIS) / 50.0D));
         Entity leapEntity = player.getVehicle() instanceof Horse ? player.getVehicle() : player;
         leapEntity.setVelocity(ArcadePortRules.dragonsLeapVelocity(
                 leapEntity.getLocation().getDirection(), leapEntity.isOnGround()));
@@ -9168,7 +9240,7 @@ public final class ArcadePortManager implements Listener {
             cursor.subtract(direction.clone().multiply(2.0D));
 
             double distance = 0.0D;
-            while (distance < ArcadePortRules.DRAGONS_FROST_BRIDGE_LENGTH) {
+            while (distance < GameDebugRuntimeOverrides.intValue("DRAGONS_FROST_BRIDGE_LENGTH", ArcadePortRules.DRAGONS_FROST_BRIDGE_LENGTH)) {
                 distance += 0.2D;
                 cursor.add(direction.clone().multiply(0.2D));
                 Block candidate = cursor.getBlock();
@@ -9205,11 +9277,11 @@ public final class ArcadePortManager implements Listener {
         player.setVelocity(new Vector(0.0D, 0.5D, 0.0D));
         session.dragonFrostBridgePaths.put(id, path);
         session.dragonFrostBridgePathIndexes.put(id, 0);
-        session.dragonFrostReadyAt.put(id, now + ArcadePortRules.DRAGONS_FROST_COOLDOWN_MILLIS);
-        cooldownProgress.start(player, "Frost Breath", ArcadePortRules.DRAGONS_FROST_COOLDOWN_MILLIS);
+        session.dragonFrostReadyAt.put(id, now + GameDebugRuntimeOverrides.longValue("DRAGONS_FROST_COOLDOWN_MILLIS", ArcadePortRules.DRAGONS_FROST_COOLDOWN_MILLIS));
+        cooldownProgress.start(player, "Frost Breath", GameDebugRuntimeOverrides.longValue("DRAGONS_FROST_COOLDOWN_MILLIS", ArcadePortRules.DRAGONS_FROST_COOLDOWN_MILLIS));
         session.dragonAbilitiesUsed.add(id);
         player.setCooldown(Material.SNOWBALL,
-                (int) Math.ceil(ArcadePortRules.DRAGONS_FROST_COOLDOWN_MILLIS / 50.0D));
+                (int) Math.ceil(GameDebugRuntimeOverrides.longValue("DRAGONS_FROST_COOLDOWN_MILLIS", ArcadePortRules.DRAGONS_FROST_COOLDOWN_MILLIS) / 50.0D));
         player.getWorld().playSound(player.getLocation(), Sound.BLOCK_GLASS_PLACE, 0.9F, 1.5F);
         player.getWorld().spawnParticle(Particle.SNOWFLAKE,
                 player.getLocation().clone().add(0.0D, 0.3D, 0.0D), 14, 0.3D, 0.15D, 0.3D, 0.03D);
@@ -9227,12 +9299,12 @@ public final class ArcadePortManager implements Listener {
         Vector glide = player.getLocation().getDirection().normalize().multiply(0.72D);
         glide.setY(Math.max(0.08D, Math.min(0.42D, glide.getY() + 0.12D)));
         player.setVelocity(glide); player.setGliding(true);
-        session.dragonGliderUntil.put(id, now + ArcadePortRules.DRAGONS_GLIDER_DURATION_MILLIS);
-        session.dragonGliderReadyAt.put(id, now + ArcadePortRules.DRAGONS_GLIDER_COOLDOWN_MILLIS);
-        cooldownProgress.start(player, "Glider", ArcadePortRules.DRAGONS_GLIDER_COOLDOWN_MILLIS);
+        session.dragonGliderUntil.put(id, now + GameDebugRuntimeOverrides.longValue("DRAGONS_GLIDER_DURATION_MILLIS", ArcadePortRules.DRAGONS_GLIDER_DURATION_MILLIS));
+        session.dragonGliderReadyAt.put(id, now + GameDebugRuntimeOverrides.longValue("DRAGONS_GLIDER_COOLDOWN_MILLIS", ArcadePortRules.DRAGONS_GLIDER_COOLDOWN_MILLIS));
+        cooldownProgress.start(player, "Glider", GameDebugRuntimeOverrides.longValue("DRAGONS_GLIDER_COOLDOWN_MILLIS", ArcadePortRules.DRAGONS_GLIDER_COOLDOWN_MILLIS));
         session.dragonAbilitiesUsed.add(id);
         player.setCooldown(Material.FEATHER,
-                (int) Math.ceil(ArcadePortRules.DRAGONS_GLIDER_COOLDOWN_MILLIS / 50.0D));
+                (int) Math.ceil(GameDebugRuntimeOverrides.longValue("DRAGONS_GLIDER_COOLDOWN_MILLIS", ArcadePortRules.DRAGONS_GLIDER_COOLDOWN_MILLIS) / 50.0D));
         player.playSound(player.getLocation(), Sound.ITEM_ELYTRA_FLYING, 0.9F, 1.15F);
         // The Elytra animation and recharge overlay provide feedback.
     }
@@ -9257,14 +9329,14 @@ public final class ArcadePortManager implements Listener {
                 .min(java.util.Comparator.comparingDouble(e -> e.getLocation().distanceSquared(player.getLocation()))).orElse(null);
         if (dragon == null) { player.sendMessage(ChatColor.YELLOW + "There is no available dragon to control yet."); return; }
         DragonTamerControl control = new DragonTamerControl(dragon.getUniqueId(), player.getLocation().clone(),
-                player.getGameMode(), now + ArcadePortRules.DRAGONS_TAMER_DURATION_MILLIS);
+                player.getGameMode(), now + GameDebugRuntimeOverrides.longValue("DRAGONS_TAMER_DURATION_MILLIS", ArcadePortRules.DRAGONS_TAMER_DURATION_MILLIS));
         session.dragonTamerControls.put(playerId, control);
         session.dragonTamerByDragon.put(dragon.getUniqueId(), playerId);
-        session.dragonTamerReadyAt.put(playerId, now + ArcadePortRules.DRAGONS_TAMER_COOLDOWN_MILLIS);
-        cooldownProgress.start(player, "Dragon Tamer", ArcadePortRules.DRAGONS_TAMER_COOLDOWN_MILLIS);
+        session.dragonTamerReadyAt.put(playerId, now + GameDebugRuntimeOverrides.longValue("DRAGONS_TAMER_COOLDOWN_MILLIS", ArcadePortRules.DRAGONS_TAMER_COOLDOWN_MILLIS));
+        cooldownProgress.start(player, "Dragon Tamer", GameDebugRuntimeOverrides.longValue("DRAGONS_TAMER_COOLDOWN_MILLIS", ArcadePortRules.DRAGONS_TAMER_COOLDOWN_MILLIS));
         session.dragonAbilitiesUsed.add(playerId);
         player.setCooldown(Material.END_CRYSTAL,
-                (int) Math.ceil(ArcadePortRules.DRAGONS_TAMER_COOLDOWN_MILLIS / 50.0D));
+                (int) Math.ceil(GameDebugRuntimeOverrides.longValue("DRAGONS_TAMER_COOLDOWN_MILLIS", ArcadePortRules.DRAGONS_TAMER_COOLDOWN_MILLIS) / 50.0D));
         session.dragonTargetPlayers.remove(dragon.getUniqueId()); session.dragonTargetLocations.remove(dragon.getUniqueId());
         player.setGameMode(GameMode.SPECTATOR); player.setSpectatorTarget(dragon);
         player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 0.9F, 1.2F);
@@ -9350,7 +9422,7 @@ public final class ArcadePortManager implements Listener {
             if (isDragonFrostPlacementSafe(session, block, null)) {
                 session.dragonIceBridgeOriginals.putIfAbsent(block, block.getBlockData().clone());
                 session.dragonIceBridgeExpiresAt.put(block,
-                        now + ArcadePortRules.DRAGONS_FROST_BRIDGE_LIFETIME_MILLIS);
+                        now + GameDebugRuntimeOverrides.longValue("DRAGONS_FROST_BRIDGE_LIFETIME_MILLIS", ArcadePortRules.DRAGONS_FROST_BRIDGE_LIFETIME_MILLIS));
                 block.setType(Material.ICE, false);
                 block.getWorld().playEffect(block.getLocation(), Effect.STEP_SOUND, Material.ICE);
             }
@@ -9371,6 +9443,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void awardDragonAchievement(UUID id, Player player, String achievementId, String description) {
+        if (debugAchievementPreview(player, ArcadePortGame.DRAGONS, description)) return;
         if (id == null || testPlayers.isTestPlayer(id)) return;
         String key = "local-achievements." + id + ".dragons." + achievementId;
         if (plugin.getConfig().getBoolean(key, false)) return;
@@ -9394,8 +9467,8 @@ public final class ArcadePortManager implements Listener {
                     + Math.max(1L, (readyAt - now + 999L) / 1000L) + "s.");
             return;
         }
-        session.quiverGroundPoundReadyAt.put(id, now + ArcadePortRules.QUIVER_GROUND_POUND_COOLDOWN_MILLIS);
-        cooldownProgress.start(player, "Ground Pound", ArcadePortRules.QUIVER_GROUND_POUND_COOLDOWN_MILLIS);
+        session.quiverGroundPoundReadyAt.put(id, now + GameDebugRuntimeOverrides.longValue("QUIVER_GROUND_POUND_COOLDOWN_MILLIS", ArcadePortRules.QUIVER_GROUND_POUND_COOLDOWN_MILLIS));
+        cooldownProgress.start(player, "Ground Pound", GameDebugRuntimeOverrides.longValue("QUIVER_GROUND_POUND_COOLDOWN_MILLIS", ArcadePortRules.QUIVER_GROUND_POUND_COOLDOWN_MILLIS));
         for (Player target : alivePlayers(session)) {
             if (target.equals(player)) continue;
             double distance = target.getLocation().distance(player.getLocation());
@@ -9537,7 +9610,7 @@ public final class ArcadePortManager implements Listener {
 
         // Source MapCrumbleModule scans the arena vertically in two-tick slices.
         if (!session.microCrumbleScanComplete
-                && session.ticks % ArcadePortRules.MICRO_BATTLES_CRUMBLE_SCAN_INTERVAL_TICKS == 0) {
+                && session.ticks % GameDebugRuntimeOverrides.intValue("MICRO_BATTLES_CRUMBLE_SCAN_INTERVAL_TICKS", ArcadePortRules.MICRO_BATTLES_CRUMBLE_SCAN_INTERVAL_TICKS) == 0) {
             int y = session.microCrumbleScanY;
             for (int x = session.microCrumbleMinX; x < session.microCrumbleMaxX; x++) {
                 for (int z = session.microCrumbleMinZ; z < session.microCrumbleMaxZ; z++) {
@@ -9560,7 +9633,7 @@ public final class ArcadePortManager implements Listener {
         Location spectatorCenter = microCrumbleSpectatorLocation(session, mapData);
         double centerX = spectatorCenter.getX();
         double centerZ = spectatorCenter.getZ();
-        for (int i = 0; i < ArcadePortRules.MICRO_BATTLES_CRUMBLE_BLOCKS_PER_TICK; i++) {
+        for (int i = 0; i < GameDebugRuntimeOverrides.intValue("MICRO_BATTLES_CRUMBLE_BLOCKS_PER_TICK", ArcadePortRules.MICRO_BATTLES_CRUMBLE_BLOCKS_PER_TICK); i++) {
             Block best = null;
             double farthest = -1.0D;
             for (Block candidate : session.microCrumbleBlocks) {
@@ -9609,16 +9682,16 @@ public final class ArcadePortManager implements Listener {
             UUID id = player.getUniqueId();
             if (!"archer".equals(session.microKits.getOrDefault(id, "archer"))) continue;
             long next = session.microNextArrowAt.getOrDefault(id,
-                    now + ArcadePortRules.MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS);
+                    now + GameDebugRuntimeOverrides.longValue("MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS", ArcadePortRules.MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS));
             int count = countNamedItems(player, Material.ARROW, "Fletched Arrow");
             if (now < next) continue;
             if (ArcadePortRules.shouldReplenishMicroArrow(now, next, count,
-                    ArcadePortRules.MICRO_BATTLES_FLETCHER_MAX_ARROWS)) {
+                    GameDebugRuntimeOverrides.intValue("MICRO_BATTLES_FLETCHER_MAX_ARROWS", ArcadePortRules.MICRO_BATTLES_FLETCHER_MAX_ARROWS))) {
                 player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrow",
                         "Automatically replenishes up to 3 arrows every 20 seconds.", 1));
                 player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.8F, 1.0F);
             }
-            session.microNextArrowAt.put(id, now + ArcadePortRules.MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS);
+            session.microNextArrowAt.put(id, now + GameDebugRuntimeOverrides.longValue("MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS", ArcadePortRules.MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS));
         }
     }
 
@@ -9774,7 +9847,7 @@ public final class ArcadePortManager implements Listener {
     /** The source cue is a shared vertical wall marker, positioned at the nearest world-border face. */
     private void updateMicroBattlesBorderParticles(Session session) {
         if (active != session || session.type != ArcadePortGame.MICRO_BATTLES
-                || session.ticks % ArcadePortRules.MICRO_BATTLES_BORDER_PARTICLE_INTERVAL_TICKS != 0) return;
+                || session.ticks % GameDebugRuntimeOverrides.intValue("MICRO_BATTLES_BORDER_PARTICLE_INTERVAL_TICKS", ArcadePortRules.MICRO_BATTLES_BORDER_PARTICLE_INTERVAL_TICKS) != 0) return;
         WorldBorder border = session.world.getWorldBorder();
         Location center = border.getCenter();
         double half = border.getSize() / 2.0D;
@@ -10383,7 +10456,7 @@ public final class ArcadePortManager implements Listener {
         long cooldown = switch (kit) {
             case "sniper" -> 1_000L;
             case "shotgun" -> 1_400L;
-            case "machine-gun" -> ArcadePortRules.PAINTBALL_MACHINE_GUN_FIRE_COOLDOWN_MILLIS;
+            case "machine-gun" -> GameDebugRuntimeOverrides.longValue("PAINTBALL_MACHINE_GUN_FIRE_COOLDOWN_MILLIS", ArcadePortRules.PAINTBALL_MACHINE_GUN_FIRE_COOLDOWN_MILLIS);
             default -> 500L;
         };
         Long lastShot = session.paintballLastShotAt.get(playerId);
@@ -10533,7 +10606,7 @@ public final class ArcadePortManager implements Listener {
                 }
             } else if ("machine-gun".equals(kit)) {
                 Long lastShot = session.paintballLastShotAt.get(id);
-                if (lastShot == null || now - lastShot >= ArcadePortRules.PAINTBALL_MACHINE_GUN_COOL_RECHARGE_MILLIS) {
+                if (lastShot == null || now - lastShot >= GameDebugRuntimeOverrides.longValue("PAINTBALL_MACHINE_GUN_COOL_RECHARGE_MILLIS", ArcadePortRules.PAINTBALL_MACHINE_GUN_COOL_RECHARGE_MILLIS)) {
                     player.setExp((float) ArcadePortRules.coolPaintballMachineGunHeat(player.getExp()));
                 }
             } else {
@@ -10949,7 +11022,7 @@ public final class ArcadePortManager implements Listener {
             }
             if (session.teams.getOrDefault(targetId, -2) != throwerTeam) continue;
             if (marker.getLocation().clone().add(0.0D, 1.0D, 0.0D).distanceSquared(impact)
-                    <= ArcadePortRules.PAINTBALL_SAVE_ME_RADIUS * ArcadePortRules.PAINTBALL_SAVE_ME_RADIUS) {
+                    <= GameDebugRuntimeOverrides.doubleValue("PAINTBALL_SAVE_ME_RADIUS", ArcadePortRules.PAINTBALL_SAVE_ME_RADIUS) * GameDebugRuntimeOverrides.doubleValue("PAINTBALL_SAVE_ME_RADIUS", ArcadePortRules.PAINTBALL_SAVE_ME_RADIUS)) {
                 revive.add(targetId);
             }
         }
@@ -11103,7 +11176,7 @@ public final class ArcadePortManager implements Listener {
         for (int x = -36; x <= 36; x++) {
             for (int z = -36; z <= 36; z++) {
                 boolean plotFootprint = false;
-                for (int slot = 0; slot < ArcadePortRules.MASTER_BUILDERS_MAX_BUILDERS; slot++) {
+                for (int slot = 0; slot < GameDebugRuntimeOverrides.intValue("MASTER_BUILDERS_MAX_BUILDERS", ArcadePortRules.MASTER_BUILDERS_MAX_BUILDERS); slot++) {
                     Location centre = masterBuilderPlotCenter(world, slot);
                     if (Math.abs(x - centre.getBlockX()) <= 5 && Math.abs(z - centre.getBlockZ()) <= 5) {
                         plotFootprint = true;
@@ -11928,7 +12001,7 @@ public final class ArcadePortManager implements Listener {
                 session.sheepQuestOvertime = true;
                 session.endsAt = 0L;
                 session.sheepQuestNextOvertimeAnnouncementAt =
-                        now + ArcadePortRules.SHEEP_QUEST_OVERTIME_ANNOUNCE_INTERVAL_MILLIS;
+                        now + GameDebugRuntimeOverrides.longValue("SHEEP_QUEST_OVERTIME_ANNOUNCE_INTERVAL_MILLIS", ArcadePortRules.SHEEP_QUEST_OVERTIME_ANNOUNCE_INTERVAL_MILLIS);
                 announce(session, ChatColor.GOLD + "" + ChatColor.BOLD
                         + "First team to take the lead will win the game!");
             } else if (session.type == ArcadePortGame.DEATH_TAG && session.participantsAtStart > 1) {
@@ -12015,7 +12088,7 @@ public final class ArcadePortManager implements Listener {
             if (now >= session.sheepNextSpawnAt) {
                 // Reborn has no twelve-sheep cap; another neutral sheep appears every twenty seconds.
                 spawnSheep(session);
-                session.sheepNextSpawnAt = now + ArcadePortRules.SHEEP_QUEST_SPAWN_INTERVAL_MILLIS;
+                session.sheepNextSpawnAt = now + GameDebugRuntimeOverrides.longValue("SHEEP_QUEST_SPAWN_INTERVAL_MILLIS", ArcadePortRules.SHEEP_QUEST_SPAWN_INTERVAL_MILLIS);
             }
             if (session.sheepQuestOvertime) {
                 Player leader = sheepQuestLeader(session);
@@ -12027,7 +12100,7 @@ public final class ArcadePortManager implements Listener {
                     announce(session, ChatColor.GOLD + "" + ChatColor.BOLD
                             + "First team to take the lead will win the game!");
                     session.sheepQuestNextOvertimeAnnouncementAt =
-                            now + ArcadePortRules.SHEEP_QUEST_OVERTIME_ANNOUNCE_INTERVAL_MILLIS;
+                            now + GameDebugRuntimeOverrides.longValue("SHEEP_QUEST_OVERTIME_ANNOUNCE_INTERVAL_MILLIS", ArcadePortRules.SHEEP_QUEST_OVERTIME_ANNOUNCE_INTERVAL_MILLIS);
                 }
             }
         }
@@ -12089,7 +12162,7 @@ public final class ArcadePortManager implements Listener {
                 long nextDamageAt = session.dragonWaterDamageNextAt.getOrDefault(id, 0L);
                 if (now < nextDamageAt) continue;
                 session.dragonWaterDamageNextAt.put(id,
-                        now + ArcadePortRules.DRAGONS_WATER_DAMAGE_INTERVAL_MILLIS);
+                        now + GameDebugRuntimeOverrides.longValue("DRAGONS_WATER_DAMAGE_INTERVAL_MILLIS", ArcadePortRules.DRAGONS_WATER_DAMAGE_INTERVAL_MILLIS));
                 Block feet = player.getLocation().getBlock();
                 Material lower = feet.getType();
                 Material upper = feet.getRelative(BlockFace.UP).getType();
@@ -12116,7 +12189,7 @@ public final class ArcadePortManager implements Listener {
                 long nextCheckAt = session.dragonEscapeWaterDamageNextAt.getOrDefault(id, 0L);
                 if (now < nextCheckAt) continue;
                 session.dragonEscapeWaterDamageNextAt.put(id,
-                        now + ArcadePortRules.DRAGON_ESCAPE_WATER_DAMAGE_INTERVAL_MILLIS);
+                        now + GameDebugRuntimeOverrides.longValue("DRAGON_ESCAPE_WATER_DAMAGE_INTERVAL_MILLIS", ArcadePortRules.DRAGON_ESCAPE_WATER_DAMAGE_INTERVAL_MILLIS));
                 Block feet = player.getLocation().getBlock();
                 Material lower = feet.getType();
                 Material upper = feet.getRelative(BlockFace.UP).getType();
@@ -12160,21 +12233,21 @@ public final class ArcadePortManager implements Listener {
         // on every tick, but gate hunger and knockback escalation on that slower cadence.
         updateBaconBrawlAbilities(session, now);
         if (active != session
-                || now - session.lastBaconSlowUpdateAt < ArcadePortRules.BACON_SLOW_UPDATE_INTERVAL_MILLIS) return;
+                || now - session.lastBaconSlowUpdateAt < GameDebugRuntimeOverrides.longValue("BACON_SLOW_UPDATE_INTERVAL_MILLIS", ArcadePortRules.BACON_SLOW_UPDATE_INTERVAL_MILLIS)) return;
         session.lastBaconSlowUpdateAt = now;
-        if (now - session.lastBaconHungerAt >= ArcadePortRules.BACON_HUNGER_INTERVAL_MILLIS) {
+        if (now - session.lastBaconHungerAt >= GameDebugRuntimeOverrides.longValue("BACON_HUNGER_INTERVAL_MILLIS", ArcadePortRules.BACON_HUNGER_INTERVAL_MILLIS)) {
             session.lastBaconHungerAt = now;
             for (Player player : new ArrayList<>(alivePlayers(session))) {
                 if (player.getFoodLevel() > 0) {
-                    player.setFoodLevel(Math.max(0, player.getFoodLevel() - ArcadePortRules.BACON_HUNGER_DRAIN_PER_INTERVAL));
+                    player.setFoodLevel(Math.max(0, player.getFoodLevel() - GameDebugRuntimeOverrides.intValue("BACON_HUNGER_DRAIN_PER_INTERVAL", ArcadePortRules.BACON_HUNGER_DRAIN_PER_INTERVAL)));
                     player.setSaturation(0.0F);
-                } else if (player.getHealth() <= ArcadePortRules.BACON_STARVATION_DAMAGE) {
+                } else if (player.getHealth() <= GameDebugRuntimeOverrides.doubleValue("BACON_STARVATION_DAMAGE", ArcadePortRules.BACON_STARVATION_DAMAGE)) {
                     session.baconStarvationDamaged.add(player.getUniqueId());
                     eliminate(session, player, null, "starved");
                     if (active != session) return;
                 } else {
                     session.baconStarvationDamaged.add(player.getUniqueId());
-                    player.setHealth(player.getHealth() - ArcadePortRules.BACON_STARVATION_DAMAGE);
+                    player.setHealth(player.getHealth() - GameDebugRuntimeOverrides.doubleValue("BACON_STARVATION_DAMAGE", ArcadePortRules.BACON_STARVATION_DAMAGE));
                     playLegacyDamageFeedback(player);
                 }
             }
@@ -12369,7 +12442,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private String baconMeterBar(int percent) {
-        int charge = Math.max(0, Math.min(ArcadePortRules.BACON_METER_MAX, percent));
+        int charge = Math.max(0, Math.min(GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", ArcadePortRules.BACON_METER_MAX), percent));
         int filled = (charge + 9) / 10;
         return ChatColor.GREEN + "█".repeat(filled) + ChatColor.DARK_GRAY + "░".repeat(10 - filled);
     }
@@ -12379,11 +12452,11 @@ public final class ArcadePortManager implements Listener {
         int previous = session.baconMeters.getOrDefault(id, 0);
         int meter = ArcadePortRules.nextBaconMeter(previous, critical, session.alive.size());
         session.baconMeters.put(id, meter);
-        if (previous < ArcadePortRules.BACON_METER_MIN_ABILITY
-                && meter >= ArcadePortRules.BACON_METER_MIN_ABILITY) {
+        if (previous < GameDebugRuntimeOverrides.intValue("BACON_METER_MIN_ABILITY", ArcadePortRules.BACON_METER_MIN_ABILITY)
+                && meter >= GameDebugRuntimeOverrides.intValue("BACON_METER_MIN_ABILITY", ArcadePortRules.BACON_METER_MIN_ABILITY)) {
             player.sendMessage(ChatColor.GREEN + baconAbilityName(session, id) + " is ready!");
         }
-        if (previous < ArcadePortRules.BACON_METER_MAX && meter >= ArcadePortRules.BACON_METER_MAX) {
+        if (previous < GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", ArcadePortRules.BACON_METER_MAX) && meter >= GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", ArcadePortRules.BACON_METER_MAX)) {
             player.sendMessage(ChatColor.GOLD + baconAbilityName(session, id) + " is maxed!");
         }
         updateBaconMeterItem(session, player);
@@ -12404,9 +12477,9 @@ public final class ArcadePortManager implements Listener {
     private void updateBaconMeterItem(Session session, Player player) {
         if (session.type != ArcadePortGame.BACON_BRAWL || player == null || !player.isOnline()
                 || !session.alive.contains(player.getUniqueId())) return;
-        int percent = Math.max(0, Math.min(ArcadePortRules.BACON_METER_MAX,
+        int percent = Math.max(0, Math.min(GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", ArcadePortRules.BACON_METER_MAX),
                 session.baconMeters.getOrDefault(player.getUniqueId(), 0)));
-        float progress = Math.min(0.999F, percent / (float) ArcadePortRules.BACON_METER_MAX);
+        float progress = Math.min(0.999F, percent / (float) GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", ArcadePortRules.BACON_METER_MAX));
         if (Math.abs(player.getExp() - progress) > 0.001F) player.setExp(progress);
         if (player.getLevel() != percent) player.setLevel(percent);
 
@@ -12431,8 +12504,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private String baconAbilityMeterLore(String kit, int charge) {
-        int safeCharge = Math.max(0, Math.min(ArcadePortRules.BACON_METER_MAX, charge));
-        if (safeCharge < ArcadePortRules.BACON_METER_MIN_ABILITY) {
+        int safeCharge = Math.max(0, Math.min(GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", ArcadePortRules.BACON_METER_MAX), charge));
+        if (safeCharge < GameDebugRuntimeOverrides.intValue("BACON_METER_MIN_ABILITY", ArcadePortRules.BACON_METER_MIN_ABILITY)) {
             return "Right-click at 50%+. " + safeCharge + "% charged.";
         }
         if ("chris-p-bacon".equals(kit)) {
@@ -12486,7 +12559,7 @@ public final class ArcadePortManager implements Listener {
 
     private void showBaconHitFeedback(Session session, Player attacker, Player target, String source,
             boolean critical, boolean backstab) {
-        long until = System.currentTimeMillis() + ArcadePortRules.BACON_HIT_FEEDBACK_MILLIS;
+        long until = System.currentTimeMillis() + GameDebugRuntimeOverrides.longValue("BACON_HIT_FEEDBACK_MILLIS", ArcadePortRules.BACON_HIT_FEEDBACK_MILLIS);
         session.baconHitFeedbackUntil.put(attacker.getUniqueId(), until);
         session.baconHitFeedbackUntil.put(target.getUniqueId(), until);
         String abilityLabel = switch (source) {
@@ -12529,7 +12602,7 @@ public final class ArcadePortManager implements Listener {
         BaconHitPair pair = new BaconHitPair(attackerId, targetId);
         Long previousHitAt = session.baconLastHitAtByPair.get(pair);
         // Mineplex 1.8 ClientCombat.CanHurt requires more than 400 ms between hits.
-        if (previousHitAt != null && now - previousHitAt <= ArcadePortRules.BACON_1_8_HIT_DELAY_MILLIS) {
+        if (previousHitAt != null && now - previousHitAt <= GameDebugRuntimeOverrides.longValue("BACON_1_8_HIT_DELAY_MILLIS", ArcadePortRules.BACON_1_8_HIT_DELAY_MILLIS)) {
             return false;
         }
         session.baconLastHitAtByPair.put(pair, now);
@@ -13102,16 +13175,16 @@ public final class ArcadePortManager implements Listener {
         String kit = session.baconKits.getOrDefault(id, "el-muchacho-pigo");
         boolean unlimitedAbilityDebug = isDebugOverrideEnabled(id, ArcadePortGame.BACON_BRAWL,
                 "unlimited-abilities");
-        int charge = unlimitedAbilityDebug ? ArcadePortRules.BACON_METER_MAX
+        int charge = unlimitedAbilityDebug ? GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", ArcadePortRules.BACON_METER_MAX)
                 : session.baconMeters.getOrDefault(id, 0);
         if (!unlimitedAbilityDebug && !ArcadePortRules.canUseBaconMeterAbility(charge)) return;
         // Chris P Bacon has fixed-strength actions that each cost exactly half the meter.
         int chargeCost = "chris-p-bacon".equals(kit)
-                ? ArcadePortRules.BACON_METER_MIN_ABILITY : charge;
+                ? GameDebugRuntimeOverrides.intValue("BACON_METER_MIN_ABILITY", ArcadePortRules.BACON_METER_MIN_ABILITY) : charge;
         // Other abilities spend their full current charge; none use a wall-clock cooldown.
         session.baconAbilitiesUsed.add(id);
         showAbilityActivationCosmetic(player);
-        session.baconMeters.put(id, unlimitedAbilityDebug ? ArcadePortRules.BACON_METER_MAX
+        session.baconMeters.put(id, unlimitedAbilityDebug ? GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", ArcadePortRules.BACON_METER_MAX)
                 : Math.max(0, charge - chargeCost));
         updateBaconMeterItem(session, player);
         player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.9F,
@@ -13122,7 +13195,7 @@ public final class ArcadePortManager implements Listener {
                 double power = ArcadePortRules.baconBlastPowerMultiplier(charge);
                 Vector direction = player.getEyeLocation().getDirection().normalize();
                 Location launchLocation = player.getEyeLocation().add(direction.clone().multiply(1.5D));
-                Item bacon = player.getWorld().dropItem(launchLocation, new ItemStack(Material.PORKCHOP, ArcadePortRules.BACON_BLAST_PROJECTILE_STACK_SIZE));
+                Item bacon = player.getWorld().dropItem(launchLocation, new ItemStack(Material.PORKCHOP, GameDebugRuntimeOverrides.intValue("BACON_BLAST_PROJECTILE_STACK_SIZE", ArcadePortRules.BACON_BLAST_PROJECTILE_STACK_SIZE)));
                 bacon.setPickupDelay(Short.MAX_VALUE);
                 Vector velocity = direction.clone().multiply(0.6D + power * 0.4D);
                 bacon.setVelocity(velocity);
@@ -13219,8 +13292,8 @@ public final class ArcadePortManager implements Listener {
         direction.normalize();
         long now = System.currentTimeMillis();
         session.baconCrispyDashes.put(player.getUniqueId(),
-                new BaconCrispyDashState(direction, now + ArcadePortRules.BACON_CRISPY_DASH_DURATION_MILLIS));
-        Vector dashVelocity = direction.clone().multiply(ArcadePortRules.BACON_CRISPY_DASH_SPEED);
+                new BaconCrispyDashState(direction, now + GameDebugRuntimeOverrides.longValue("BACON_CRISPY_DASH_DURATION_MILLIS", ArcadePortRules.BACON_CRISPY_DASH_DURATION_MILLIS)));
+        Vector dashVelocity = direction.clone().multiply(GameDebugRuntimeOverrides.doubleValue("BACON_CRISPY_DASH_SPEED", ArcadePortRules.BACON_CRISPY_DASH_SPEED));
         player.setVelocity(dashVelocity.clone());
         LivingEntity avatar = baconPlayerAvatar(session, player.getUniqueId());
         if (avatar != null) avatar.setVelocity(dashVelocity.clone());
@@ -13237,7 +13310,7 @@ public final class ArcadePortManager implements Listener {
             session.baconCrispyDashes.remove(id);
             return;
         }
-        Vector velocity = dash.direction.clone().multiply(ArcadePortRules.BACON_CRISPY_DASH_SPEED);
+        Vector velocity = dash.direction.clone().multiply(GameDebugRuntimeOverrides.doubleValue("BACON_CRISPY_DASH_SPEED", ArcadePortRules.BACON_CRISPY_DASH_SPEED));
         velocity.setY(Math.max(-0.08D, Math.min(0.12D, player.getVelocity().getY())));
         player.setVelocity(velocity.clone());
         LivingEntity avatar = baconPlayerAvatar(session, id);
@@ -13259,12 +13332,12 @@ public final class ArcadePortManager implements Listener {
         BaconDashFireState fire = session.baconDashFireBlocks.get(fireBlock);
         if (fire == null) {
             fire = new BaconDashFireState(fireBlock.getBlockData(),
-                    System.currentTimeMillis() + ArcadePortRules.BACON_CRISPY_DASH_FIRE_MILLIS, ownerId);
+                    System.currentTimeMillis() + GameDebugRuntimeOverrides.longValue("BACON_CRISPY_DASH_FIRE_MILLIS", ArcadePortRules.BACON_CRISPY_DASH_FIRE_MILLIS), ownerId);
             session.baconDashFireBlocks.put(fireBlock, fire);
             fireBlock.setType(Material.FIRE, false);
         } else {
             fire.expiresAt = Math.max(fire.expiresAt,
-                    System.currentTimeMillis() + ArcadePortRules.BACON_CRISPY_DASH_FIRE_MILLIS);
+                    System.currentTimeMillis() + GameDebugRuntimeOverrides.longValue("BACON_CRISPY_DASH_FIRE_MILLIS", ArcadePortRules.BACON_CRISPY_DASH_FIRE_MILLIS));
             fire.ownerId = ownerId;
         }
         return true;
@@ -13420,7 +13493,7 @@ public final class ArcadePortManager implements Listener {
             Map<UUID, Long> attackerHits = session.baconRecentHitsByAttacker.computeIfAbsent(
                     attacker.getUniqueId(), ignored -> new HashMap<>());
             long previousHitAt = attackerHits.getOrDefault(target.getUniqueId(), 0L);
-            if (previousHitAt > 0L && now - previousHitAt < ArcadePortRules.BACON_HIT_COOLDOWN_MILLIS) return;
+            if (previousHitAt > 0L && now - previousHitAt < GameDebugRuntimeOverrides.longValue("BACON_HIT_COOLDOWN_MILLIS", ArcadePortRules.BACON_HIT_COOLDOWN_MILLIS)) return;
             attackerHits.put(target.getUniqueId(), now);
         }
         boolean attackerCloaked = session.baconCloakUntil.getOrDefault(attackerId, 0L) > now;
@@ -13465,7 +13538,7 @@ public final class ArcadePortManager implements Listener {
         double knockbackMultiplier = session.baconKnockback * timingMultiplier * Math.max(0.0D, abilityPowerMultiplier);
         if ("body-slam".equals(source)) {
             int charge = session.baconSlamPowerPercent.getOrDefault(attackerId, 0);
-            knockbackMultiplier *= ArcadePortRules.BACON_BODY_SLAM_KNOCKBACK_MULTIPLIER
+            knockbackMultiplier *= GameDebugRuntimeOverrides.doubleValue("BACON_BODY_SLAM_KNOCKBACK_MULTIPLIER", ArcadePortRules.BACON_BODY_SLAM_KNOCKBACK_MULTIPLIER)
                     * ArcadePortRules.baconBodySlamMeterMultiplier(charge);
         }
         if (crispyFlamed) {
@@ -13487,7 +13560,7 @@ public final class ArcadePortManager implements Listener {
         }
         // Reborn restores hunger to the attacker for each successful hit.
         attacker.setFoodLevel(Math.min(20,
-                attacker.getFoodLevel() + ArcadePortRules.BACON_HUNGER_RESTORE_PER_HIT));
+                attacker.getFoodLevel() + GameDebugRuntimeOverrides.intValue("BACON_HUNGER_RESTORE_PER_HIT", ArcadePortRules.BACON_HUNGER_RESTORE_PER_HIT)));
         attacker.setSaturation(0.0F);
         target.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
                 target.getLocation().add(0.0D, 1.0D, 0.0D), 6, 0.28D, 0.35D, 0.28D, 0.01D);
@@ -13511,7 +13584,7 @@ public final class ArcadePortManager implements Listener {
             session.baconLastHitSource.put(attackerId, "body-slam-recoil");
             // Body Slam recoil leaves the victim's hunger unchanged.
             attacker.setVelocity(baconBrawlKnockbackVelocity(target, attacker, 2.0D,
-                    session.baconKnockback * ArcadePortRules.BACON_BODY_SLAM_KNOCKBACK_MULTIPLIER, null));
+                    session.baconKnockback * GameDebugRuntimeOverrides.doubleValue("BACON_BODY_SLAM_KNOCKBACK_MULTIPLIER", ArcadePortRules.BACON_BODY_SLAM_KNOCKBACK_MULTIPLIER), null));
         }
     }
 
@@ -13614,7 +13687,7 @@ public final class ArcadePortManager implements Listener {
         session.dragonDamagedPlayers.clear();
         session.dragonLastContactAt.clear();
         session.dragonDodgemsAwarded.clear();
-        session.dragonNextSpawnAt = session.dragonRoundStartedAt + ArcadePortRules.DRAGONS_SPAWN_INTERVAL_MILLIS;
+        session.dragonNextSpawnAt = session.dragonRoundStartedAt + GameDebugRuntimeOverrides.longValue("DRAGONS_SPAWN_INTERVAL_MILLIS", ArcadePortRules.DRAGONS_SPAWN_INTERVAL_MILLIS);
         announce(session, ChatColor.DARK_PURPLE
                 + "The dragons are hunting! Use your kit ability, and keep moving.");
     }
@@ -13627,9 +13700,9 @@ public final class ArcadePortManager implements Listener {
         // The source uses FASTEST (125 ms) for dragon pursuit/contact and FAST (500 ms)
         // for Sparkler/Fletcher perk updates. Barrage itself remains a TICK ability.
         boolean targetUpdate = now >= session.dragonNextTargetUpdateAt;
-        if (targetUpdate) session.dragonNextTargetUpdateAt = now + ArcadePortRules.DRAGONS_TARGET_INTERVAL_MILLIS;
+        if (targetUpdate) session.dragonNextTargetUpdateAt = now + GameDebugRuntimeOverrides.longValue("DRAGONS_TARGET_INTERVAL_MILLIS", ArcadePortRules.DRAGONS_TARGET_INTERVAL_MILLIS);
         boolean perkUpdate = now >= session.dragonNextPerkUpdateAt;
-        if (perkUpdate) session.dragonNextPerkUpdateAt = now + ArcadePortRules.DRAGONS_PERK_UPDATE_INTERVAL_MILLIS;
+        if (perkUpdate) session.dragonNextPerkUpdateAt = now + GameDebugRuntimeOverrides.longValue("DRAGONS_PERK_UPDATE_INTERVAL_MILLIS", ArcadePortRules.DRAGONS_PERK_UPDATE_INTERVAL_MILLIS);
 
         List<Player> alive = alivePlayers(session);
         List<Player> possibleTargets = dragonTargetCandidates(session, alive, now);
@@ -13660,8 +13733,8 @@ public final class ArcadePortManager implements Listener {
 
         long dragonCount = session.entities.stream().filter(e -> e instanceof EnderDragon && e.isValid()).count();
         if (now >= session.dragonNextSpawnAt) {
-            session.dragonNextSpawnAt = now + ArcadePortRules.DRAGONS_SPAWN_INTERVAL_MILLIS;
-            if (dragonCount < ArcadePortRules.DRAGONS_MAX_DRAGONS) {
+            session.dragonNextSpawnAt = now + GameDebugRuntimeOverrides.longValue("DRAGONS_SPAWN_INTERVAL_MILLIS", ArcadePortRules.DRAGONS_SPAWN_INTERVAL_MILLIS);
+            if (dragonCount < GameDebugRuntimeOverrides.intValue("DRAGONS_MAX_DRAGONS", ArcadePortRules.DRAGONS_MAX_DRAGONS)) {
             SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
             // Reborn only reads WorldData.GetDataLocs("RED"). It does not invent spawn
             // positions when a map has no RED locations.
@@ -13701,7 +13774,7 @@ public final class ArcadePortManager implements Listener {
                 player.setSaturation(1.0F);
                 if ("pyrotechnic".equals(kit)) {
                     long next = session.dragonNextSparklerAt.getOrDefault(id,
-                            now + ArcadePortRules.DRAGONS_SPARKLER_INTERVAL_MILLIS);
+                            now + GameDebugRuntimeOverrides.longValue("DRAGONS_SPARKLER_INTERVAL_MILLIS", ArcadePortRules.DRAGONS_SPARKLER_INTERVAL_MILLIS));
                     if (now >= next) {
                         int held = countNamedItems(player, Material.EMERALD, "Throwing Sparkler");
                         if (ArcadePortRules.shouldReplenishDragonSparkler(now, next, held)) {
@@ -13709,19 +13782,19 @@ public final class ArcadePortManager implements Listener {
                                     "Right-click to throw a sparkler that attracts nearby dragons.", 1));
                             player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 2.0F, 1.0F);
                         }
-                        session.dragonNextSparklerAt.put(id, now + ArcadePortRules.DRAGONS_SPARKLER_INTERVAL_MILLIS);
+                        session.dragonNextSparklerAt.put(id, now + GameDebugRuntimeOverrides.longValue("DRAGONS_SPARKLER_INTERVAL_MILLIS", ArcadePortRules.DRAGONS_SPARKLER_INTERVAL_MILLIS));
                     }
                 } else if ("marksman".equals(kit)) {
                     long nextArrow = session.dragonNextArrowAt.getOrDefault(id,
-                            now + ArcadePortRules.DRAGONS_MARKSMAN_ARROW_INTERVAL_MILLIS);
+                            now + GameDebugRuntimeOverrides.longValue("DRAGONS_MARKSMAN_ARROW_INTERVAL_MILLIS", ArcadePortRules.DRAGONS_MARKSMAN_ARROW_INTERVAL_MILLIS));
                     if (now >= nextArrow) {
                         if (countNamedItems(player, Material.ARROW, "Fletched Arrow")
-                                < ArcadePortRules.DRAGONS_MARKSMAN_MAX_ARROWS) {
+                                < GameDebugRuntimeOverrides.intValue("DRAGONS_MARKSMAN_MAX_ARROWS", ArcadePortRules.DRAGONS_MARKSMAN_MAX_ARROWS)) {
                             player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrow",
                                     "A replenishing Marksman arrow.", 1));
                             player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 2.0F, 1.0F);
                         }
-                        session.dragonNextArrowAt.put(id, now + ArcadePortRules.DRAGONS_MARKSMAN_ARROW_INTERVAL_MILLIS);
+                        session.dragonNextArrowAt.put(id, now + GameDebugRuntimeOverrides.longValue("DRAGONS_MARKSMAN_ARROW_INTERVAL_MILLIS", ArcadePortRules.DRAGONS_MARKSMAN_ARROW_INTERVAL_MILLIS));
                     }
                 }
             }
@@ -13870,7 +13943,7 @@ public final class ArcadePortManager implements Listener {
                     itemLocation.getY(), itemLocation.getBlock().isLiquid())) continue;
             for (EnderDragon dragon : dragons) {
                 if (dragon.getLocation().distanceSquared(itemLocation)
-                        > ArcadePortRules.DRAGONS_SPARKLER_RANGE_SQUARED) continue;
+                        > GameDebugRuntimeOverrides.doubleValue("DRAGONS_SPARKLER_RANGE_SQUARED", ArcadePortRules.DRAGONS_SPARKLER_RANGE_SQUARED)) continue;
                 session.dragonTargetPlayers.remove(dragon.getUniqueId());
                 session.dragonTargetLocations.put(dragon.getUniqueId(), itemLocation.clone());
                 UUID sparklerOwner = session.dragonSparklerOwners.get(sparklerId);
@@ -14161,7 +14234,7 @@ public final class ArcadePortManager implements Listener {
             session.entities.add(arrow);
             session.dragonTrackedArrows.add(arrow.getUniqueId());
             session.dragonMarksmanCharge.put(id, remaining - 1);
-            session.dragonMarksmanNextChargeAt.put(id, now + ArcadePortRules.DRAGONS_BARRAGE_FIRE_INTERVAL_MILLIS);
+            session.dragonMarksmanNextChargeAt.put(id, now + GameDebugRuntimeOverrides.longValue("DRAGONS_BARRAGE_FIRE_INTERVAL_MILLIS", ArcadePortRules.DRAGONS_BARRAGE_FIRE_INTERVAL_MILLIS));
             player.playSound(player.getLocation(), Sound.ENTITY_ARROW_SHOOT, 1.0F,
                     1.0F + (0.1F * (remaining - 1)));
             return;
@@ -14173,12 +14246,12 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         long nextAt = session.dragonMarksmanNextChargeAt.getOrDefault(id,
-                now + ArcadePortRules.DRAGONS_BARRAGE_INITIAL_CHARGE_MILLIS);
+                now + GameDebugRuntimeOverrides.longValue("DRAGONS_BARRAGE_INITIAL_CHARGE_MILLIS", ArcadePortRules.DRAGONS_BARRAGE_INITIAL_CHARGE_MILLIS));
         int charge = session.dragonMarksmanCharge.getOrDefault(id, 0);
-        if (charge >= ArcadePortRules.DRAGONS_BARRAGE_MAX_ARROWS || now < nextAt) return;
+        if (charge >= GameDebugRuntimeOverrides.intValue("DRAGONS_BARRAGE_MAX_ARROWS", ArcadePortRules.DRAGONS_BARRAGE_MAX_ARROWS) || now < nextAt) return;
         charge++;
         session.dragonMarksmanCharge.put(id, charge);
-        session.dragonMarksmanNextChargeAt.put(id, now + ArcadePortRules.DRAGONS_BARRAGE_INTERVAL_MILLIS);
+        session.dragonMarksmanNextChargeAt.put(id, now + GameDebugRuntimeOverrides.longValue("DRAGONS_BARRAGE_INTERVAL_MILLIS", ArcadePortRules.DRAGONS_BARRAGE_INTERVAL_MILLIS));
         player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT, 1.0F, 1.0F + (0.1F * charge));
     }
 
@@ -14187,7 +14260,7 @@ public final class ArcadePortManager implements Listener {
         String key = dragon.getUniqueId() + ":" + target.getUniqueId();
         long nextAllowed = session.dragonContactCooldowns.getOrDefault(key, 0L);
         if (!ArcadePortRules.shouldApplyDragonContactHit(now, nextAllowed)) return;
-        session.dragonContactCooldowns.put(key, now + ArcadePortRules.DRAGONS_CONTACT_COOLDOWN_MILLIS);
+        session.dragonContactCooldowns.put(key, now + GameDebugRuntimeOverrides.longValue("DRAGONS_CONTACT_COOLDOWN_MILLIS", ArcadePortRules.DRAGONS_CONTACT_COOLDOWN_MILLIS));
         UUID targetId = target.getUniqueId();
         session.dragonLastContactAt.put(targetId, now);
         UUID sparklerOwner = session.dragonSparklerDragonOwners.get(dragon.getUniqueId());
@@ -14276,8 +14349,8 @@ public final class ArcadePortManager implements Listener {
         session.dragonEscapeLeaped.add(id);
         remaining--;
         session.dragonEscapeLeapUsesRemaining.put(id, remaining);
-        session.dragonEscapeLeapReadyAt.put(id, now + ArcadePortRules.DRAGON_ESCAPE_LEAP_RECHARGE_MILLIS);
-        cooldownProgress.start(player, "Leap", ArcadePortRules.DRAGON_ESCAPE_LEAP_RECHARGE_MILLIS);
+        session.dragonEscapeLeapReadyAt.put(id, now + GameDebugRuntimeOverrides.longValue("DRAGON_ESCAPE_LEAP_RECHARGE_MILLIS", ArcadePortRules.DRAGON_ESCAPE_LEAP_RECHARGE_MILLIS));
+        cooldownProgress.start(player, "Leap", GameDebugRuntimeOverrides.longValue("DRAGON_ESCAPE_LEAP_RECHARGE_MILLIS", ArcadePortRules.DRAGON_ESCAPE_LEAP_RECHARGE_MILLIS));
         player.setExp(Math.max(0.0F, Math.min(0.99F,
                 remaining / (float) Math.max(1, ArcadePortRules.dragonEscapeLeapUses(
                         session.dragonEscapeKits.getOrDefault(id, "jumper"))))));
@@ -14459,9 +14532,9 @@ public final class ArcadePortManager implements Listener {
             }
             if (!"disruptor".equals(session.dragonEscapeKits.getOrDefault(id, "jumper"))) continue;
             long nextAt = session.dragonEscapeNextTntAt.getOrDefault(id,
-                    now + ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS);
+                    now + GameDebugRuntimeOverrides.longValue("DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS", ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS));
             if (now < nextAt) continue;
-            if (inventoryCount(player, Material.TNT) < ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_MAX_TNT) {
+            if (inventoryCount(player, Material.TNT) < GameDebugRuntimeOverrides.intValue("DRAGON_ESCAPE_DISRUPTOR_MAX_TNT", ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_MAX_TNT)) {
                 player.getInventory().addItem(namedItem(Material.TNT, "Disruptor",
                         "Stationary trip mine; triggers nearby opponents after 2 seconds."));
                 player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.4F, 1.2F);
@@ -14469,7 +14542,7 @@ public final class ArcadePortManager implements Listener {
             session.dragonEscapeNextTntAt.put(id,
                     ArcadePortRules.dragonEscapeNextTntChargeAt(now));
             cooldownProgress.start(player, "Disruptor TNT",
-                    ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS);
+                    GameDebugRuntimeOverrides.longValue("DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS", ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS));
         }
         updateDragonEscapeSpectatorCompasses(session);
     }
@@ -14542,7 +14615,7 @@ public final class ArcadePortManager implements Listener {
         session.dragonEscapeMineOwners.remove(mine.getUniqueId());
         session.entities.remove(mine);
         mine.remove();
-        target.setVelocity(new Vector(0.0D, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y, 0.0D));
+        target.setVelocity(new Vector(0.0D, GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y", ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y), 0.0D));
         target.setFallDistance(0.0F);
         session.dragonEscapeMineLaunchedBy.put(target.getUniqueId(), ownerId);
         session.dragonEscapeMineLaunchedAt.put(target.getUniqueId(), System.currentTimeMillis());
@@ -14576,14 +14649,14 @@ public final class ArcadePortManager implements Listener {
     private void useDragonEscapeDigger(Session session, Player player, Block block) {
         UUID id = player.getUniqueId();
         int remaining = session.dragonEscapeDiggerUsesRemaining.getOrDefault(
-                id, ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES);
+                id, GameDebugRuntimeOverrides.intValue("DRAGON_ESCAPE_DIGGER_MAX_USES", ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES));
         if (remaining <= 0) {
             player.sendMessage(ChatColor.YELLOW + "Your Digger pickaxe has no uses remaining.");
             return;
         }
         long elapsed = Math.max(0L, System.currentTimeMillis() - session.startedAt);
         if (ArcadePortRules.isDragonEscapeDiggerOpeningLocked(elapsed)) {
-            long seconds = (ArcadePortRules.DRAGON_ESCAPE_DIGGER_OPENING_LOCKOUT_MILLIS - elapsed + 999L) / 1_000L;
+            long seconds = (GameDebugRuntimeOverrides.longValue("DRAGON_ESCAPE_DIGGER_OPENING_LOCKOUT_MILLIS", ArcadePortRules.DRAGON_ESCAPE_DIGGER_OPENING_LOCKOUT_MILLIS) - elapsed + 999L) / 1_000L;
             player.sendMessage(ChatColor.YELLOW + "You cannot dig for another " + seconds + " seconds.");
             return;
         }
@@ -14614,8 +14687,8 @@ public final class ArcadePortManager implements Listener {
         session.dragonEscapeTunnelBlocks.put(block, originalBlockData);
         session.dragonEscapeTunnelOwners.put(block, id);
         scheduleDragonEscapeBlockRestore(session, originalState, block.getBlockData().clone());
-        session.dragonEscapeDiggerNextUseAt.put(id, now + ArcadePortRules.DRAGON_ESCAPE_DIGGER_RECHARGE_MILLIS);
-        cooldownProgress.start(player, "Digger", ArcadePortRules.DRAGON_ESCAPE_DIGGER_RECHARGE_MILLIS);
+        session.dragonEscapeDiggerNextUseAt.put(id, now + GameDebugRuntimeOverrides.longValue("DRAGON_ESCAPE_DIGGER_RECHARGE_MILLIS", ArcadePortRules.DRAGON_ESCAPE_DIGGER_RECHARGE_MILLIS));
+        cooldownProgress.start(player, "Digger", GameDebugRuntimeOverrides.longValue("DRAGON_ESCAPE_DIGGER_RECHARGE_MILLIS", ArcadePortRules.DRAGON_ESCAPE_DIGGER_RECHARGE_MILLIS));
         Map<Integer, ItemStack> overflow = player.getInventory().addItem(new ItemStack(mined, 1));
         for (ItemStack leftover : overflow.values()) player.getWorld().dropItemNaturally(dropLocation, leftover);
         remaining--;
@@ -14654,7 +14727,7 @@ public final class ArcadePortManager implements Listener {
             Block current = world.getBlockAt(block.getX(), block.getY(), block.getZ());
             if (!current.getBlockData().matches(expectedCurrent)) return;
             previousState.update(true, false);
-        }, ArcadePortRules.DRAGON_ESCAPE_DIGGER_BLOCK_RESTORE_TICKS);
+        }, GameDebugRuntimeOverrides.intValue("DRAGON_ESCAPE_DIGGER_BLOCK_RESTORE_TICKS", ArcadePortRules.DRAGON_ESCAPE_DIGGER_BLOCK_RESTORE_TICKS));
     }
 
     private float dragonEscapePitch(Vector vector) {
@@ -14703,7 +14776,7 @@ public final class ArcadePortManager implements Listener {
         velocity.add(desired);
         if (velocity.lengthSquared() > 1.0E-12D) velocity.normalize();
 
-        double speed = ArcadePortRules.DRAGON_ESCAPE_CHASE_SPEED * session.dragonEscapeSpeedMultiplier;
+        double speed = GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_CHASE_SPEED", ArcadePortRules.DRAGON_ESCAPE_CHASE_SPEED) * session.dragonEscapeSpeedMultiplier;
         location.add(velocity.clone().multiply(speed));
         location.add(0.0D, -pitch, 0.0D);
         location.setPitch(-pitch);
@@ -14721,7 +14794,7 @@ public final class ArcadePortManager implements Listener {
             dragon.setVelocity(new Vector());
         } else {
             dragon.setAI(true);
-            dragon.setVelocity(velocity.clone().multiply(ArcadePortRules.DRAGON_ESCAPE_CHASE_SPEED
+            dragon.setVelocity(velocity.clone().multiply(GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_CHASE_SPEED", ArcadePortRules.DRAGON_ESCAPE_CHASE_SPEED)
                     * session.dragonEscapeSpeedMultiplier));
         }
         return location;
@@ -14755,7 +14828,7 @@ public final class ArcadePortManager implements Listener {
                 // Reborn tests each block centre against the dragon's actual position.
                 // Search one extra block in each axis because the centre can still be
                 // inside the radius when its integer block offset is radius + 1.
-                int radius = (int) Math.ceil(ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS) + 1;
+                int radius = (int) Math.ceil(GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_BLOCK_RADIUS", ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS)) + 1;
                 for (int dx = -radius; dx <= radius; dx++) {
                     for (int dy = -radius; dy <= radius; dy++) {
                         for (int dz = -radius; dz <= radius; dz++) {
@@ -14791,7 +14864,7 @@ public final class ArcadePortManager implements Listener {
                     session.dragonEscapePlayerRankScores.put(player.getUniqueId(), playerScore);
                     if (playerIndex == lastIndex && player.getLocation().distance(
                             session.dragonEscapeWaypoints.get(lastIndex))
-                            < ArcadePortRules.DRAGON_ESCAPE_FINISH_RADIUS) {
+                            < GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_FINISH_RADIUS", ArcadePortRules.DRAGON_ESCAPE_FINISH_RADIUS)) {
                         recordDragonEscapeFinish(session, player, now);
                         finish(session, player, true);
                         return;
@@ -14812,9 +14885,9 @@ public final class ArcadePortManager implements Listener {
             location = moveDragonEscapeDragon(session,
                     new Location(session.world, 0.5D, 65.5D, 80.0D));
         } else dragon.setVelocity(new Vector());
-        int minZ = Math.max(-24, (int) Math.floor(location.getZ() - ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS));
-        int maxZ = Math.min(80, (int) Math.floor(location.getZ() + ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS));
-        double radius = ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS;
+        int minZ = Math.max(-24, (int) Math.floor(location.getZ() - GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_BLOCK_RADIUS", ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS)));
+        int maxZ = Math.min(80, (int) Math.floor(location.getZ() + GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_BLOCK_RADIUS", ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS)));
+        double radius = GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_BLOCK_RADIUS", ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS);
         for (int x = -3; x <= 3; x++) {
             for (int z = minZ; z <= maxZ; z++) {
                 Block block = session.world.getBlockAt(x, 63, z);
@@ -14854,7 +14927,7 @@ public final class ArcadePortManager implements Listener {
                 || location.getWorld() != session.world) return false;
         Location finish = session.dragonEscapeWaypoints.get(session.dragonEscapeWaypoints.size() - 1);
         return location.distanceSquared(finish)
-                < ArcadePortRules.DRAGON_ESCAPE_FINISH_RADIUS * ArcadePortRules.DRAGON_ESCAPE_FINISH_RADIUS;
+                < GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_FINISH_RADIUS", ArcadePortRules.DRAGON_ESCAPE_FINISH_RADIUS) * GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_FINISH_RADIUS", ArcadePortRules.DRAGON_ESCAPE_FINISH_RADIUS);
     }
 
     private void recordDragonEscapeFinish(Session session, Player player, long now) {
@@ -15364,12 +15437,12 @@ public final class ArcadePortManager implements Listener {
         if (session.dragonEscapeWaypoints.isEmpty()) {
             double gap = Math.max(0.0D,
                     leader.getLocation().getZ() - racer.getLocation().getZ());
-            return Math.round(gap / ArcadePortRules.DRAGON_ESCAPE_RACE_GAP_ESTIMATED_SPEED * 1_000.0D);
+            return Math.round(gap / GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_RACE_GAP_ESTIMATED_SPEED", ArcadePortRules.DRAGON_ESCAPE_RACE_GAP_ESTIMATED_SPEED) * 1_000.0D);
         }
         double leaderDistance = dragonEscapeCourseDistance(session, leader);
         double racerDistance = dragonEscapeCourseDistance(session, racer);
         return ArcadePortRules.dragonEscapeCourseTimeGapMillis(
-                leaderDistance, racerDistance, ArcadePortRules.DRAGON_ESCAPE_RACE_GAP_ESTIMATED_SPEED);
+                leaderDistance, racerDistance, GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_RACE_GAP_ESTIMATED_SPEED", ArcadePortRules.DRAGON_ESCAPE_RACE_GAP_ESTIMATED_SPEED));
     }
 
     private void setupQuiverScoreboard(Session session) {
@@ -15767,7 +15840,7 @@ public final class ArcadePortManager implements Listener {
         String lowerReason = reason == null ? "" : reason.toLowerCase(java.util.Locale.ROOT);
         long cooldown = lowerReason.contains("hit") ? 1_000L
                 : lowerReason.contains("held item") ? 0L
-                : ArcadePortRules.SHEEP_QUEST_PICKUP_COOLDOWN_MILLIS;
+                : GameDebugRuntimeOverrides.longValue("SHEEP_QUEST_PICKUP_COOLDOWN_MILLIS", ArcadePortRules.SHEEP_QUEST_PICKUP_COOLDOWN_MILLIS);
         session.sheepNextPickupAt.put(carrierId, System.currentTimeMillis() + cooldown);
         carrier.sendMessage(ChatColor.RED + "You dropped your sheep!");
         carrier.playSound(carrier.getLocation(), Sound.ENTITY_SHEEP_AMBIENT, 1.0F, 1.0F);
@@ -15799,13 +15872,13 @@ public final class ArcadePortManager implements Listener {
                 .map(Map.Entry::getKey).collect(java.util.stream.Collectors.toList());
         boolean shepherd = "shepherd".equals(session.sheepQuestKits.get(player.getUniqueId()));
         int count = shepherd ? carried.size()
-                : Math.min(ArcadePortRules.SHEEP_QUEST_MAX_CARRY, carried.size());
+                : Math.min(GameDebugRuntimeOverrides.intValue("SHEEP_QUEST_MAX_CARRY", ArcadePortRules.SHEEP_QUEST_MAX_CARRY), carried.size());
         if (shepherd) {
             player.setLevel(count);
             player.setExp(0.0F);
         } else {
             player.setLevel(0);
-            player.setExp(count / (float) ArcadePortRules.SHEEP_QUEST_MAX_CARRY);
+            player.setExp(count / (float) GameDebugRuntimeOverrides.intValue("SHEEP_QUEST_MAX_CARRY", ArcadePortRules.SHEEP_QUEST_MAX_CARRY));
         }
         int visibleCount = Math.min(count, 4);
         for (int index = 0; index < 4; index++) {
@@ -15851,7 +15924,7 @@ public final class ArcadePortManager implements Listener {
         recordSheepQuestStat(playerId, "thief");
         sheep.setColor(owner >= 0 ? sheepTeamDyeColor(owner) : sheepTeamDyeColor(team));
         session.sheepNextPickupAt.put(playerId,
-                now + ArcadePortRules.SHEEP_QUEST_PICKUP_COOLDOWN_MILLIS);
+                now + GameDebugRuntimeOverrides.longValue("SHEEP_QUEST_PICKUP_COOLDOWN_MILLIS", ArcadePortRules.SHEEP_QUEST_PICKUP_COOLDOWN_MILLIS));
         player.playSound(player.getLocation(), Sound.ENTITY_SHEEP_AMBIENT, 1.0F, 2.0F);
         player.getWorld().playEffect(sheep.getLocation(), Effect.STEP_SOUND, Material.WHITE_WOOL);
         updateSheepQuestCarryUi(session, player);
@@ -15911,7 +15984,7 @@ public final class ArcadePortManager implements Listener {
                     if (thrower != null && thrower.isOnline()) recordSheepQuestStat(thrower.getUniqueId(), "animal-rescue");
                     dropSheepFromCarrier(session, target, "was hit by a thrown passenger");
                 }
-                double damage = ArcadePortRules.SHEEP_QUEST_THROWER_DAMAGE;
+                double damage = GameDebugRuntimeOverrides.doubleValue("SHEEP_QUEST_THROWER_DAMAGE", ArcadePortRules.SHEEP_QUEST_THROWER_DAMAGE);
                 if (target.getHealth() <= damage) {
                     if (thrown instanceof Player thrownPlayer
                             && "brute".equals(session.sheepQuestKits.getOrDefault(entry.getValue(), "beserker"))
@@ -15982,13 +16055,13 @@ public final class ArcadePortManager implements Listener {
             } else if ("archer".equals(kit)) {
                 long nextArrowAt = session.sheepFletcherNextArrowAt.getOrDefault(id, now);
                 if (now >= nextArrowAt) {
-                    if (sheepQuestFletchedArrowCount(player) < ArcadePortRules.SHEEP_QUEST_ARCHER_MAX_ARROWS) {
+                    if (sheepQuestFletchedArrowCount(player) < GameDebugRuntimeOverrides.intValue("SHEEP_QUEST_ARCHER_MAX_ARROWS", ArcadePortRules.SHEEP_QUEST_ARCHER_MAX_ARROWS)) {
                         player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrow",
                                 "Automatically replenishes to five arrows."));
                         player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.7F, 1.0F);
                     }
                     session.sheepFletcherNextArrowAt.put(id,
-                            now + ArcadePortRules.SHEEP_QUEST_ARCHER_FLETCHER_INTERVAL_MILLIS);
+                            now + GameDebugRuntimeOverrides.longValue("SHEEP_QUEST_ARCHER_FLETCHER_INTERVAL_MILLIS", ArcadePortRules.SHEEP_QUEST_ARCHER_FLETCHER_INTERVAL_MILLIS));
                 }
 
                 Integer charge = session.sheepArcherCharge.get(id);
@@ -16001,14 +16074,14 @@ public final class ArcadePortManager implements Listener {
                     } else {
                         long lastCharge = session.sheepArcherLastChargeAt.getOrDefault(id, now);
                         long interval = charge == 0
-                                ? ArcadePortRules.SHEEP_QUEST_ARCHER_BARRAGE_INITIAL_CHARGE_MILLIS
-                                : ArcadePortRules.SHEEP_QUEST_ARCHER_BARRAGE_CHARGE_INTERVAL_MILLIS;
-                        if (charge < ArcadePortRules.SHEEP_QUEST_ARCHER_BARRAGE_MAX_ARROWS
+                                ? GameDebugRuntimeOverrides.longValue("SHEEP_QUEST_ARCHER_BARRAGE_INITIAL_CHARGE_MILLIS", ArcadePortRules.SHEEP_QUEST_ARCHER_BARRAGE_INITIAL_CHARGE_MILLIS)
+                                : GameDebugRuntimeOverrides.longValue("SHEEP_QUEST_ARCHER_BARRAGE_CHARGE_INTERVAL_MILLIS", ArcadePortRules.SHEEP_QUEST_ARCHER_BARRAGE_CHARGE_INTERVAL_MILLIS);
+                        if (charge < GameDebugRuntimeOverrides.intValue("SHEEP_QUEST_ARCHER_BARRAGE_MAX_ARROWS", ArcadePortRules.SHEEP_QUEST_ARCHER_BARRAGE_MAX_ARROWS)
                                 && now - lastCharge >= interval) {
                             int nextCharge = charge + 1;
                             session.sheepArcherCharge.put(id, nextCharge);
                             session.sheepArcherLastChargeAt.put(id, now);
-                            player.setExp(nextCharge / (float) ArcadePortRules.SHEEP_QUEST_ARCHER_BARRAGE_MAX_ARROWS);
+                            player.setExp(nextCharge / (float) GameDebugRuntimeOverrides.intValue("SHEEP_QUEST_ARCHER_BARRAGE_MAX_ARROWS", ArcadePortRules.SHEEP_QUEST_ARCHER_BARRAGE_MAX_ARROWS));
                             player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT, 0.8F,
                                     1.0F + 0.1F * nextCharge);
                         }
@@ -16031,7 +16104,7 @@ public final class ArcadePortManager implements Listener {
                         session.sheepArcherTrackedArrows.add(arrow.getUniqueId());
                         session.sheepArcherVolleyRemaining.put(id, volley - 1);
                         session.sheepArcherNextVolleyAt.put(id,
-                                now + ArcadePortRules.SHEEP_QUEST_ARCHER_BARRAGE_VOLLEY_INTERVAL_MILLIS);
+                                now + GameDebugRuntimeOverrides.longValue("SHEEP_QUEST_ARCHER_BARRAGE_VOLLEY_INTERVAL_MILLIS", ArcadePortRules.SHEEP_QUEST_ARCHER_BARRAGE_VOLLEY_INTERVAL_MILLIS));
                         player.playSound(player.getLocation(), Sound.ENTITY_ARROW_SHOOT, 0.8F, 1.0F);
                     }
                 }
@@ -16257,8 +16330,8 @@ public final class ArcadePortManager implements Listener {
             for (Sheep sheep : new ArrayList<>(session.sheep)) {
                 if (!sheep.isValid() || sheep.isInsideVehicle()
                         || player.getLocation().distanceSquared(sheep.getLocation())
-                                > ArcadePortRules.SHEEP_QUEST_PICKUP_RADIUS
-                                        * ArcadePortRules.SHEEP_QUEST_PICKUP_RADIUS) continue;
+                                > GameDebugRuntimeOverrides.doubleValue("SHEEP_QUEST_PICKUP_RADIUS", ArcadePortRules.SHEEP_QUEST_PICKUP_RADIUS)
+                                        * GameDebugRuntimeOverrides.doubleValue("SHEEP_QUEST_PICKUP_RADIUS", ArcadePortRules.SHEEP_QUEST_PICKUP_RADIUS)) continue;
                 if (pickUpSheepQuest(session, player, sheep, now)) break;
             }
         }
@@ -16492,11 +16565,11 @@ public final class ArcadePortManager implements Listener {
 
         long elapsed = Math.max(0L, now - lastHit);
         long lateMax = ArcadePortRules.baconTimingWindowMillis(
-                ArcadePortRules.BACON_TIMED_HIT_LATE_MAX_MILLIS, session.baconKnockback);
+                GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_LATE_MAX_MILLIS", ArcadePortRules.BACON_TIMED_HIT_LATE_MAX_MILLIS), session.baconKnockback);
         long criticalMin = ArcadePortRules.baconTimingWindowMillis(
-                ArcadePortRules.BACON_TIMED_HIT_GOOD_MIN_MILLIS, session.baconKnockback);
+                GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_GOOD_MIN_MILLIS", ArcadePortRules.BACON_TIMED_HIT_GOOD_MIN_MILLIS), session.baconKnockback);
         long criticalMax = ArcadePortRules.baconTimingWindowMillis(
-                ArcadePortRules.BACON_TIMED_HIT_GOOD_MAX_MILLIS, session.baconKnockback);
+                GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_GOOD_MAX_MILLIS", ArcadePortRules.BACON_TIMED_HIT_GOOD_MAX_MILLIS), session.baconKnockback);
         int pointer = (int) Math.min(14L, elapsed * 15L / Math.max(1L, lateMax));
         boolean criticalWindow = ArcadePortRules.isBaconTimedCritical(elapsed, session.baconKnockback);
         int criticalStart = (int) (criticalMin * 15L / Math.max(1L, lateMax));
@@ -16585,7 +16658,8 @@ public final class ArcadePortManager implements Listener {
             if (farmers.isEmpty() && !cows.isEmpty()) {
                 // Source EndCheck awards each surviving Cow 15 points before placements are calculated.
                 for (UUID cowId : cows) session.scores.put(cowId,
-                        MilkCowRules.scoreAfterChange(session.scores.getOrDefault(cowId, 0), MilkCowRules.SCORE_TO_WIN));
+                        MilkCowRules.scoreAfterChange(session.scores.getOrDefault(cowId, 0),
+                                GameDebugRuntimeOverrides.intValue("MILK_THE_COW_SCORE_TO_WIN", MilkCowRules.SCORE_TO_WIN)));
                 finish(session, bestTimeoutPlayerOnTeam(session, 1), true);
             } else if (cows.isEmpty() && !farmers.isEmpty()) {
                 updateMilkCow(session, System.currentTimeMillis());
@@ -16906,7 +16980,7 @@ public final class ArcadePortManager implements Listener {
                 giveKit(session, player);
                 player.sendMessage(ChatColor.GREEN + "Respawned. First to 20 kills wins.");
                 checkRoundEnd(session);
-            }, ArcadePortRules.QUIVER_RESPAWN_DELAY_TICKS);
+            }, GameDebugRuntimeOverrides.longValue("QUIVER_RESPAWN_DELAY_TICKS", ArcadePortRules.QUIVER_RESPAWN_DELAY_TICKS));
             return;
         }
 
@@ -17097,7 +17171,7 @@ public final class ArcadePortManager implements Listener {
                 session.evolutionAvailable.add(killerId);
                 session.evolutionCharge.remove(killerId);
                 reduceEvolutionPity(session, killerId,
-                        ArcadePortRules.EVOLUTION_PITY_KILL_REDUCTION_MILLIS, eliminationTime);
+                        GameDebugRuntimeOverrides.longValue("EVOLUTION_PITY_KILL_REDUCTION_MILLIS", ArcadePortRules.EVOLUTION_PITY_KILL_REDUCTION_MILLIS), eliminationTime);
                 killer.setExp(0.0F);
                 killer.removePotionEffect(PotionEffectType.SLOWNESS);
                 killer.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 60, 0, false, false, true));
@@ -17122,7 +17196,7 @@ public final class ArcadePortManager implements Listener {
                 session.alive.add(victimId);
                 session.lastLocations.put(victimId, spawn.clone());
                 giveEvolutionKit(session, player);
-            }, ArcadePortRules.EVOLUTION_RESPAWN_TICKS);
+            }, GameDebugRuntimeOverrides.longValue("EVOLUTION_RESPAWN_TICKS", ArcadePortRules.EVOLUTION_RESPAWN_TICKS));
             return;
         }
         if (player.isOnline()) {
@@ -17561,7 +17635,7 @@ public final class ArcadePortManager implements Listener {
             }
             refreshEvolutionFormPerks(session, player);
             long pityDeadline = session.evolutionPityUntil.computeIfAbsent(id,
-                    ignored -> now + ArcadePortRules.EVOLUTION_PITY_CLOCK_MILLIS);
+                    ignored -> now + GameDebugRuntimeOverrides.longValue("EVOLUTION_PITY_CLOCK_MILLIS", ArcadePortRules.EVOLUTION_PITY_CLOCK_MILLIS));
             if (now >= pityDeadline && session.evolutionAvailable.add(id)) {
                 player.sendMessage(ChatColor.GOLD + "Pity evolution ready! Hold sneak while grounded to evolve.");
                 player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.9F, 1.25F);
@@ -17654,7 +17728,7 @@ public final class ArcadePortManager implements Listener {
                     session.evolutionBlazeNextShotAt.remove(id);
                 } else if (now >= session.evolutionBlazeNextShotAt.getOrDefault(id, 0L)) {
                     launchEvolutionFlame(session, player);
-                    session.evolutionBlazeNextShotAt.put(id, now + ArcadePortRules.EVOLUTION_BLAZE_FLAMETHROWER_TICK_MILLIS);
+                    session.evolutionBlazeNextShotAt.put(id, now + GameDebugRuntimeOverrides.longValue("EVOLUTION_BLAZE_FLAMETHROWER_TICK_MILLIS", ArcadePortRules.EVOLUTION_BLAZE_FLAMETHROWER_TICK_MILLIS));
                 }
             }
 
@@ -17675,12 +17749,12 @@ public final class ArcadePortManager implements Listener {
                 Player target = alivePlayers(session).stream()
                         .filter(other -> !other.getUniqueId().equals(id))
                         .filter(other -> other.getLocation().distanceSquared(player.getLocation())
-                                <= ArcadePortRules.EVOLUTION_SLIME_SLAM_RADIUS * ArcadePortRules.EVOLUTION_SLIME_SLAM_RADIUS)
+                                <= GameDebugRuntimeOverrides.doubleValue("EVOLUTION_SLIME_SLAM_RADIUS", ArcadePortRules.EVOLUTION_SLIME_SLAM_RADIUS) * GameDebugRuntimeOverrides.doubleValue("EVOLUTION_SLIME_SLAM_RADIUS", ArcadePortRules.EVOLUTION_SLIME_SLAM_RADIUS))
                         .findFirst().orElse(null);
                 if (target != null && session.evolutionSlimeSlamActive.remove(id)) {
                     session.evolutionSlimeSlamStartedAt.remove(id);
                     hitEvolutionAbilityTarget(session, player, target,
-                            ArcadePortRules.EVOLUTION_SLIME_SLAM_DAMAGE, 2.0D, "Slime Slam");
+                            GameDebugRuntimeOverrides.doubleValue("EVOLUTION_SLIME_SLAM_DAMAGE", ArcadePortRules.EVOLUTION_SLIME_SLAM_DAMAGE), 2.0D, "Slime Slam");
                     session.world.spawnParticle(Particle.ITEM_SLIME, player.getLocation(), 18, 0.5D, 0.5D, 0.5D, 0.1D);
                     session.world.playSound(player.getLocation(), Sound.ENTITY_SLIME_ATTACK, 1.0F, 1.0F);
                 }
@@ -17696,7 +17770,7 @@ public final class ArcadePortManager implements Listener {
                 ThreadLocalRandom.current().nextDouble(-0.07D, 0.07D))).normalize();
         Snowball flame = player.launchProjectile(Snowball.class);
         flame.setItem(new ItemStack(Material.BLAZE_POWDER));
-        flame.setVelocity(spread.multiply(ArcadePortRules.EVOLUTION_BLAZE_FLAME_SPEED));
+        flame.setVelocity(spread.multiply(GameDebugRuntimeOverrides.doubleValue("EVOLUTION_BLAZE_FLAME_SPEED", ArcadePortRules.EVOLUTION_BLAZE_FLAME_SPEED)));
         session.entities.add(flame);
         session.evolutionFlameProjectiles.add(flame.getUniqueId());
         session.world.spawnParticle(Particle.FLAME, player.getEyeLocation(), 3, 0.08D, 0.08D, 0.08D, 0.02D);
@@ -17712,9 +17786,9 @@ public final class ArcadePortManager implements Listener {
         for (Player target : alivePlayers(session)) {
             if (target.equals(player)) continue;
             double distance = target.getLocation().distance(centre);
-            if (distance > ArcadePortRules.EVOLUTION_GOLEM_SLAM_RADIUS) continue;
-            double damage = ArcadePortRules.EVOLUTION_GOLEM_SLAM_DAMAGE
-                    * (1.0D - distance / ArcadePortRules.EVOLUTION_GOLEM_SLAM_RADIUS) + 0.5D;
+            if (distance > GameDebugRuntimeOverrides.doubleValue("EVOLUTION_GOLEM_SLAM_RADIUS", ArcadePortRules.EVOLUTION_GOLEM_SLAM_RADIUS)) continue;
+            double damage = GameDebugRuntimeOverrides.doubleValue("EVOLUTION_GOLEM_SLAM_DAMAGE", ArcadePortRules.EVOLUTION_GOLEM_SLAM_DAMAGE)
+                    * (1.0D - distance / GameDebugRuntimeOverrides.doubleValue("EVOLUTION_GOLEM_SLAM_RADIUS", ArcadePortRules.EVOLUTION_GOLEM_SLAM_RADIUS)) + 0.5D;
             hitEvolutionAbilityTarget(session, player, target, damage, 2.4D, "Seismic Slam");
             if (active != session) return;
         }
@@ -17751,9 +17825,9 @@ public final class ArcadePortManager implements Listener {
                     + Math.max(1L, (readyAt - now + 999L) / 1_000L) + "s.");
             return;
         }
-        session.evolutionGolemSlamReadyAt.put(id, now + ArcadePortRules.EVOLUTION_GOLEM_SLAM_COOLDOWN_MILLIS);
+        session.evolutionGolemSlamReadyAt.put(id, now + GameDebugRuntimeOverrides.longValue("EVOLUTION_GOLEM_SLAM_COOLDOWN_MILLIS", ArcadePortRules.EVOLUTION_GOLEM_SLAM_COOLDOWN_MILLIS));
         session.evolutionAbilitiesUsed.add(id);
-        cooldownProgress.start(player, "Seismic Slam", ArcadePortRules.EVOLUTION_GOLEM_SLAM_COOLDOWN_MILLIS);
+        cooldownProgress.start(player, "Seismic Slam", GameDebugRuntimeOverrides.longValue("EVOLUTION_GOLEM_SLAM_COOLDOWN_MILLIS", ArcadePortRules.EVOLUTION_GOLEM_SLAM_COOLDOWN_MILLIS));
         Vector direction = player.getLocation().getDirection();
         if (direction.getY() < 0.0D) direction.setY(-direction.getY());
         if (direction.lengthSquared() < 0.001D) direction = new Vector(0.0D, 0.5D, 1.0D);
@@ -17771,10 +17845,10 @@ public final class ArcadePortManager implements Listener {
                     + Math.max(1L, (readyAt - now + 999L) / 1_000L) + "s.");
             return;
         }
-        session.evolutionBlazeReadyAt.put(id, now + ArcadePortRules.EVOLUTION_BLAZE_FLAMETHROWER_COOLDOWN_MILLIS);
+        session.evolutionBlazeReadyAt.put(id, now + GameDebugRuntimeOverrides.longValue("EVOLUTION_BLAZE_FLAMETHROWER_COOLDOWN_MILLIS", ArcadePortRules.EVOLUTION_BLAZE_FLAMETHROWER_COOLDOWN_MILLIS));
         session.evolutionAbilitiesUsed.add(id);
-        cooldownProgress.start(player, "Flamethrower", ArcadePortRules.EVOLUTION_BLAZE_FLAMETHROWER_COOLDOWN_MILLIS);
-        session.evolutionBlazeActiveUntil.put(id, now + ArcadePortRules.EVOLUTION_BLAZE_FLAMETHROWER_DURATION_MILLIS);
+        cooldownProgress.start(player, "Flamethrower", GameDebugRuntimeOverrides.longValue("EVOLUTION_BLAZE_FLAMETHROWER_COOLDOWN_MILLIS", ArcadePortRules.EVOLUTION_BLAZE_FLAMETHROWER_COOLDOWN_MILLIS));
+        session.evolutionBlazeActiveUntil.put(id, now + GameDebugRuntimeOverrides.longValue("EVOLUTION_BLAZE_FLAMETHROWER_DURATION_MILLIS", ArcadePortRules.EVOLUTION_BLAZE_FLAMETHROWER_DURATION_MILLIS));
         session.evolutionBlazeNextShotAt.put(id, now);
         player.playSound(player.getLocation(), Sound.ENTITY_GHAST_SHOOT, 0.8F, 1.25F);
         player.sendMessage(ChatColor.GREEN + "Flamethrower!");
@@ -17788,9 +17862,9 @@ public final class ArcadePortManager implements Listener {
                     + Math.max(1L, (readyAt - now + 999L) / 1_000L) + "s.");
             return;
         }
-        session.evolutionSlimeSlamReadyAt.put(id, now + ArcadePortRules.EVOLUTION_SLIME_SLAM_COOLDOWN_MILLIS);
+        session.evolutionSlimeSlamReadyAt.put(id, now + GameDebugRuntimeOverrides.longValue("EVOLUTION_SLIME_SLAM_COOLDOWN_MILLIS", ArcadePortRules.EVOLUTION_SLIME_SLAM_COOLDOWN_MILLIS));
         session.evolutionAbilitiesUsed.add(id);
-        cooldownProgress.start(player, "Slime Slam", ArcadePortRules.EVOLUTION_SLIME_SLAM_COOLDOWN_MILLIS);
+        cooldownProgress.start(player, "Slime Slam", GameDebugRuntimeOverrides.longValue("EVOLUTION_SLIME_SLAM_COOLDOWN_MILLIS", ArcadePortRules.EVOLUTION_SLIME_SLAM_COOLDOWN_MILLIS));
         session.evolutionSlimeSlamStartedAt.put(id, now);
         session.evolutionSlimeSlamActive.add(id);
         Vector velocity = player.getLocation().getDirection().multiply(1.6D);
@@ -17815,7 +17889,7 @@ public final class ArcadePortManager implements Listener {
 
     private void reduceEvolutionPity(Session session, UUID playerId, long reductionMillis, long now) {
         long deadline = session.evolutionPityUntil.getOrDefault(playerId,
-                now + ArcadePortRules.EVOLUTION_PITY_CLOCK_MILLIS);
+                now + GameDebugRuntimeOverrides.longValue("EVOLUTION_PITY_CLOCK_MILLIS", ArcadePortRules.EVOLUTION_PITY_CLOCK_MILLIS));
         long reduced = ArcadePortRules.reduceEvolutionPityDeadline(deadline, now, reductionMillis);
         session.evolutionPityUntil.put(playerId, reduced);
         Player player = session.players.get(playerId);
@@ -17846,10 +17920,10 @@ public final class ArcadePortManager implements Listener {
         for (Map.Entry<UUID, Long> contribution : contributors.entrySet()) {
             UUID contributorId = contribution.getKey();
             if (contributorId == null || contributorId.equals(victimId) || contributorId.equals(killerId)
-                    || now - contribution.getValue() > ArcadePortRules.EVOLUTION_ASSIST_WINDOW_MILLIS
+                    || now - contribution.getValue() > GameDebugRuntimeOverrides.longValue("EVOLUTION_ASSIST_WINDOW_MILLIS", ArcadePortRules.EVOLUTION_ASSIST_WINDOW_MILLIS)
                     || !session.players.containsKey(contributorId)) continue;
             reduceEvolutionPity(session, contributorId,
-                    ArcadePortRules.EVOLUTION_PITY_ASSIST_REDUCTION_MILLIS, now);
+                    GameDebugRuntimeOverrides.longValue("EVOLUTION_PITY_ASSIST_REDUCTION_MILLIS", ArcadePortRules.EVOLUTION_PITY_ASSIST_REDUCTION_MILLIS), now);
             session.evolutionAssistCreditsSinceEvolution.merge(contributorId, 1, Integer::sum);
             Player contributor = session.players.get(contributorId);
             if (contributor != null && contributor.isOnline()) {
@@ -18011,7 +18085,7 @@ public final class ArcadePortManager implements Listener {
                 session.evolutionOverkillEligible.remove(id);
             }
             session.evolutionPityUntil.put(id,
-                    System.currentTimeMillis() + ArcadePortRules.EVOLUTION_PITY_CLOCK_MILLIS);
+                    System.currentTimeMillis() + GameDebugRuntimeOverrides.longValue("EVOLUTION_PITY_CLOCK_MILLIS", ArcadePortRules.EVOLUTION_PITY_CLOCK_MILLIS));
             int nextLevel = ArcadePortRules.nextEvolutionLevel(
                     session.evolutionLevels.getOrDefault(id, 0), true);
             session.evolutionLevels.put(id, nextLevel);
@@ -18085,7 +18159,7 @@ public final class ArcadePortManager implements Listener {
     private void applyLegacyAttackSpeed(Player player) {
         if (player == null) return;
         var attackSpeed = player.getAttribute(Attribute.ATTACK_SPEED);
-        if (attackSpeed != null) attackSpeed.setBaseValue(ArcadePortRules.LEGACY_ATTACK_SPEED);
+        if (attackSpeed != null) attackSpeed.setBaseValue(GameDebugRuntimeOverrides.doubleValue("LEGACY_ATTACK_SPEED", ArcadePortRules.LEGACY_ATTACK_SPEED));
     }
 
     private void updateLegacyNaturalRegeneration(Session session) {
@@ -18100,11 +18174,11 @@ public final class ArcadePortManager implements Listener {
                 continue;
             }
             int timer = session.legacyNaturalRegenTicks.getOrDefault(id, 0) + 1;
-            if (timer >= ArcadePortRules.LEGACY_HEALTH_REGEN_TICKS) {
+            if (timer >= GameDebugRuntimeOverrides.intValue("LEGACY_HEALTH_REGEN_TICKS", ArcadePortRules.LEGACY_HEALTH_REGEN_TICKS)) {
                 player.setHealth(Math.min(maxHealth, player.getHealth() + 1.0D));
                 // FoodStats.addExhaustion(3.0F) is the 1.8 natural-regeneration cost.
                 player.setExhaustion(Math.min(40.0F,
-                        player.getExhaustion() + ArcadePortRules.LEGACY_REGEN_EXHAUSTION));
+                        player.getExhaustion() + GameDebugRuntimeOverrides.floatValue("LEGACY_REGEN_EXHAUSTION", ArcadePortRules.LEGACY_REGEN_EXHAUSTION)));
                 session.legacyNaturalRegenTicks.remove(id);
             } else {
                 session.legacyNaturalRegenTicks.put(id, timer);
@@ -18259,7 +18333,7 @@ public final class ArcadePortManager implements Listener {
                                 session.teams.getOrDefault(target.getUniqueId(), -1))
                         && System.currentTimeMillis() - session.sheepQuestLastMoveAt.getOrDefault(
                                 target.getUniqueId(), 0L) <= 5_000L
-                        && target.getHealth() <= ArcadePortRules.SHEEP_QUEST_PLAYER_HIT_DAMAGE) {
+                        && target.getHealth() <= GameDebugRuntimeOverrides.doubleValue("SHEEP_QUEST_PLAYER_HIT_DAMAGE", ArcadePortRules.SHEEP_QUEST_PLAYER_HIT_DAMAGE)) {
                     Map<UUID, Integer> targets = session.sheepQuestArcherKills.computeIfAbsent(
                             attacker.getUniqueId(), ignored -> new HashMap<>());
                     if (targets.merge(target.getUniqueId(), 1, Integer::sum) >= 5) {
@@ -18273,7 +18347,7 @@ public final class ArcadePortManager implements Listener {
                     recordSheepQuestStat(attacker.getUniqueId(), "animal-rescue");
                 }
                 dropSheepFromCarrier(session, target, "was hit");
-                double sheepQuestDamage = ArcadePortRules.SHEEP_QUEST_PLAYER_HIT_DAMAGE;
+                double sheepQuestDamage = GameDebugRuntimeOverrides.doubleValue("SHEEP_QUEST_PLAYER_HIT_DAMAGE", ArcadePortRules.SHEEP_QUEST_PLAYER_HIT_DAMAGE);
                 if (target.getHealth() <= sheepQuestDamage) {
                     eliminate(session, target, attacker, "was defeated while carrying sheep");
                 } else {
@@ -18448,7 +18522,7 @@ public final class ArcadePortManager implements Listener {
             giveKit(session, target);
             target.sendMessage(ChatColor.GREEN + "Respawned. First to 20 kills wins.");
             checkRoundEnd(session);
-        }, ArcadePortRules.QUIVER_RESPAWN_DELAY_TICKS);
+        }, GameDebugRuntimeOverrides.longValue("QUIVER_RESPAWN_DELAY_TICKS", ArcadePortRules.QUIVER_RESPAWN_DELAY_TICKS));
     }
 
     private String quiverCosmeticSelection(UUID playerId, String line, String defaultOption) {
@@ -18604,6 +18678,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void awardQuiverAchievement(Player player, QuiverAchievement achievement, String description) {
+        if (debugAchievementPreview(player, ArcadePortGame.ONE_IN_THE_QUIVER, description)) return;
         if (player == null || testPlayers.isTestPlayer(player) || achievement == null) return;
         String key = achievement.configKey(player.getUniqueId());
         if (key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
@@ -19018,6 +19093,7 @@ public final class ArcadePortManager implements Listener {
             session.dragonSparklerLanded.clear();
         }
         active = null;
+        GameDebugRuntimeOverrides.clear();
         if (session.tickTask != null) session.tickTask.cancel();
         if (announceWinner && session.type == ArcadePortGame.BACON_BRAWL && winner != null) {
             recordBaconBrawlAchievements(session, winner);
@@ -19324,6 +19400,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void awardRunnerAchievement(Player player, String key, String description) {
+        if (debugAchievementPreview(player, ArcadePortGame.RUNNER, description)) return;
         if (player == null || testPlayers.isTestPlayer(player)
                 || key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
@@ -19394,7 +19471,7 @@ public final class ArcadePortManager implements Listener {
         for (Map.Entry<UUID, Long> contribution : contributors.entrySet()) {
             UUID contributorId = contribution.getKey();
             if (contributorId == null || contributorId.equals(victimId) || contributorId.equals(killerId)
-                    || now - contribution.getValue() > ArcadePortRules.BOMB_LOBBERS_ASSIST_WINDOW_MILLIS
+                    || now - contribution.getValue() > GameDebugRuntimeOverrides.longValue("BOMB_LOBBERS_ASSIST_WINDOW_MILLIS", ArcadePortRules.BOMB_LOBBERS_ASSIST_WINDOW_MILLIS)
                     || !session.players.containsKey(contributorId)
                     || session.teams.getOrDefault(contributorId, -2) != killerTeam) continue;
             int assists = session.bombAssists.merge(contributorId, 1, Integer::sum);
@@ -19534,7 +19611,7 @@ public final class ArcadePortManager implements Listener {
         }
         if ("digger".equals(session.dragonEscapeKits.getOrDefault(id, "jumper"))
                 && session.dragonEscapeDiggerUsesRemaining.getOrDefault(id,
-                        ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES) == 0
+                        GameDebugRuntimeOverrides.intValue("DRAGON_ESCAPE_DIGGER_MAX_USES", ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES)) == 0
                 && !session.dragonEscapeDiggerRanThroughBrokenBlock.contains(id)) {
             awardCatalogAchievement(winner, "dragon-escape", "learn-to-code");
         }
@@ -19550,6 +19627,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void awardEvolutionAchievement(Player player, String key, String description) {
+        if (debugAchievementPreview(player, ArcadePortGame.EVOLUTION, description)) return;
         if (player == null || testPlayers.isTestPlayer(player)
                 || key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
@@ -19575,17 +19653,32 @@ public final class ArcadePortManager implements Listener {
 
     private void awardCatalogAchievement(UUID playerId, Player player, String gameId, String achievementId) {
         if (playerId == null) return;
+        ArcadePortGame game = ArcadePortGame.fromId(gameId);
+        String displayName = ArcadeProgressCatalog.achievements(gameId).stream()
+                .filter(achievement -> achievement.id().equals(achievementId))
+                .map(ArcadeProgressCatalog.Achievement::name).findFirst().orElse(achievementId);
+        if (debugAchievementPreview(player, game, displayName)) return;
         String key = arcadeAchievementConfigKey(playerId, gameId, achievementId);
         if (key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
-        if (player != null && player.isOnline()) player.sendMessage(ChatColor.GOLD + "Achievement unlocked: "
-                + ArcadeProgressCatalog.achievements(gameId).stream()
-                        .filter(achievement -> achievement.id().equals(achievementId))
-                        .map(ArcadeProgressCatalog.Achievement::name).findFirst().orElse(achievementId));
+        if (player != null && player.isOnline()) player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + displayName);
         plugin.saveConfig();
     }
 
+    private boolean debugAchievementPreview(Player player, ArcadePortGame game, String displayName) {
+        if (player == null || !player.isOnline() || game == null || !plugin.hasAdminAccess(player)
+                || !debugFeatureEnabled(player.getUniqueId(), game, "achievement-preview-only", false)) return false;
+        player.sendMessage(ChatColor.AQUA + "[Debug] Achievement condition met: "
+                + ChatColor.WHITE + displayName + ChatColor.GRAY + " (preview only; unlock not saved).");
+        return true;
+    }
+
+    boolean previewDebugAchievement(UUID playerId, ArcadePortGame game, String displayName) {
+        return debugAchievementPreview(playerId == null ? null : Bukkit.getPlayer(playerId), game, displayName);
+    }
+
     private void awardBombLobbersAchievement(Player player, String key, String description) {
+        if (debugAchievementPreview(player, ArcadePortGame.BOMB_LOBBERS, description)) return;
         if (player == null || testPlayers.isTestPlayer(player)
                 || key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
@@ -19594,6 +19687,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void awardMicroBattlesAchievement(Player player, String key, String description) {
+        if (debugAchievementPreview(player, ArcadePortGame.MICRO_BATTLES, description)) return;
         if (player == null || testPlayers.isTestPlayer(player)
                 || key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
@@ -19608,6 +19702,7 @@ public final class ArcadePortManager implements Listener {
 
 
     private void awardBaconAchievement(Player player, String key, String description) {
+        if (debugAchievementPreview(player, ArcadePortGame.BACON_BRAWL, description)) return;
         if (player == null || testPlayers.isTestPlayer(player) || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
         player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + description);
@@ -19648,8 +19743,9 @@ public final class ArcadePortManager implements Listener {
         for (String achievement : List.of("Cannibal", "ChooChoo", "SlimySheep",
                 "dont-want-none", "resilience-snakeified", "busted",
                 "one-of-the-ogs", "flawless", "bots-everywhere")) {
-            plugin.getConfig().set(path + "achievements." + achievement,
-                    achievements != null && achievements.contains(achievement));
+            boolean earned = achievements != null && achievements.contains(achievement);
+            if (earned && previewDebugAchievement(playerId, ArcadePortGame.SNAKE, achievement)) continue;
+            plugin.getConfig().set(path + "achievements." + achievement, earned);
         }
         plugin.saveConfig();
     }
@@ -19722,9 +19818,9 @@ public final class ArcadePortManager implements Listener {
         }
 
         int[] placementRewards = {
-                ArcadePortRules.DEATH_TAG_FIRST_PLACE_REWARD_GEMS,
-                ArcadePortRules.DEATH_TAG_SECOND_PLACE_REWARD_GEMS,
-                ArcadePortRules.DEATH_TAG_THIRD_PLACE_REWARD_GEMS
+                GameDebugRuntimeOverrides.intValue("DEATH_TAG_FIRST_PLACE_REWARD_GEMS", ArcadePortRules.DEATH_TAG_FIRST_PLACE_REWARD_GEMS),
+                GameDebugRuntimeOverrides.intValue("DEATH_TAG_SECOND_PLACE_REWARD_GEMS", ArcadePortRules.DEATH_TAG_SECOND_PLACE_REWARD_GEMS),
+                GameDebugRuntimeOverrides.intValue("DEATH_TAG_THIRD_PLACE_REWARD_GEMS", ArcadePortRules.DEATH_TAG_THIRD_PLACE_REWARD_GEMS)
         };
         String[] placementNames = {"1st Place", "2nd Place", "3rd Place"};
         for (int i = 0; i < Math.min(placements.size(), placementRewards.length); i++) {
@@ -19734,7 +19830,7 @@ public final class ArcadePortManager implements Listener {
             Player player = participant.getValue();
             if (player != null && player.isOnline()) {
                 awardDeathTagTestGems(session, participant.getKey(),
-                        ArcadePortRules.DEATH_TAG_PARTICIPATION_REWARD_GEMS, "Participation");
+                        GameDebugRuntimeOverrides.intValue("DEATH_TAG_PARTICIPATION_REWARD_GEMS", ArcadePortRules.DEATH_TAG_PARTICIPATION_REWARD_GEMS), "Participation");
             }
         }
         plugin.saveConfig();
@@ -19784,14 +19880,17 @@ public final class ArcadePortManager implements Listener {
         for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
             Player participant = entry.getValue();
             if (participant != null && participant.isOnline()) {
-                awardDragonTestGems(entry.getKey(), ArcadePortRules.DRAGONS_PARTICIPATION_GEMS);
+                awardDragonTestGems(entry.getKey(), GameDebugRuntimeOverrides.doubleValue("DRAGONS_PARTICIPATION_GEMS", ArcadePortRules.DRAGONS_PARTICIPATION_GEMS));
             }
         }
     }
 
     private void awardSuperSploorAchievement(UUID playerId, Player player, String gameId, String achievementId) {
+        SuperSploorProgressCatalog.Achievement preview = SuperSploorProgressCatalog.achievement(achievementId);
+        if (debugAchievementPreview(player, ArcadePortGame.SUPER_SPLOOR,
+                preview == null ? achievementId : preview.name())) return;
         if (playerId == null || !"super-sploor".equals(gameId) || testPlayers.isTestPlayer(playerId)) return;
-        SuperSploorProgressCatalog.Achievement achievement = SuperSploorProgressCatalog.achievement(achievementId);
+        SuperSploorProgressCatalog.Achievement achievement = preview;
         if (achievement == null) return;
         String key = SuperSploorProgressCatalog.achievementConfigKey(playerId, achievementId);
         if (plugin.getConfig().getBoolean(key, false)) return;
@@ -19983,7 +20082,7 @@ public final class ArcadePortManager implements Listener {
                 plugin.getConfig().set(path + "wins", lifetimeWins);
                 if (session.type == ArcadePortGame.MICRO_BATTLES
                         && System.currentTimeMillis() - session.startedAt
-                                < ArcadePortRules.MICRO_BATTLES_SPEEDSTER_MAX_GAME_MILLIS) {
+                                < GameDebugRuntimeOverrides.longValue("MICRO_BATTLES_SPEEDSTER_MAX_GAME_MILLIS", ArcadePortRules.MICRO_BATTLES_SPEEDSTER_MAX_GAME_MILLIS)) {
                     awardMicroBattlesAchievement(entry.getValue(),
                             MicroBattlesAchievement.SPEEDSTER.configKey(id),
                             "Speedster — win Micro Battles in under 1:30.");
@@ -21588,7 +21687,10 @@ public final class ArcadePortManager implements Listener {
                 plugin.getLogger().log(java.util.logging.Level.SEVERE,
                         "Spleef cleanup failed during Stop Game; forcing the session closed.", failure);
                 if (stopping.tickTask != null) stopping.tickTask.cancel();
-                if (active == stopping) active = null;
+                if (active == stopping) {
+                    active = null;
+                    GameDebugRuntimeOverrides.clear();
+                }
                 postGameEndsAtMillis = 0L;
                 endingSnapshots.clear();
             }
@@ -22202,7 +22304,7 @@ public final class ArcadePortManager implements Listener {
     private void restoreSpleefHunger(Session session, Player player, long now) {
         UUID id = player.getUniqueId();
         long last = session.spleefLastHungerGainAt.getOrDefault(id, 0L);
-        if (now - last >= ArcadePortRules.SPLEEF_HUNGER_RESTORE_COOLDOWN_MILLIS) {
+        if (now - last >= GameDebugRuntimeOverrides.longValue("SPLEEF_HUNGER_RESTORE_COOLDOWN_MILLIS", ArcadePortRules.SPLEEF_HUNGER_RESTORE_COOLDOWN_MILLIS)) {
             session.spleefLastHungerGainAt.put(id, now);
             player.setFoodLevel(Math.min(20, player.getFoodLevel() + 1));
         }
@@ -22221,7 +22323,7 @@ public final class ArcadePortManager implements Listener {
 
     private void giveSpleefSnowball(Session session, Player player) {
         if (!"snowballer".equals(session.spleefKits.getOrDefault(player.getUniqueId(), "snowballer"))) return;
-        if (inventoryCount(player, Material.SNOWBALL) < ArcadePortRules.SPLEEF_SNOWBALLER_MAX_SNOWBALLS) {
+        if (inventoryCount(player, Material.SNOWBALL) < GameDebugRuntimeOverrides.intValue("SPLEEF_SNOWBALLER_MAX_SNOWBALLS", ArcadePortRules.SPLEEF_SNOWBALLER_MAX_SNOWBALLS)) {
             player.getInventory().addItem(new ItemStack(Material.SNOWBALL, 1));
         }
     }
@@ -22236,8 +22338,8 @@ public final class ArcadePortManager implements Listener {
             long readyAt = session.spleefSmasherReadyAt.getOrDefault(player.getUniqueId(), 0L);
             if (now >= readyAt) {
                 session.spleefSmasherReadyAt.put(player.getUniqueId(),
-                        now + ArcadePortRules.SPLEEF_SMASHER_COOLDOWN_MILLIS);
-                cooldownProgress.start(player, "Smasher", ArcadePortRules.SPLEEF_SMASHER_COOLDOWN_MILLIS);
+                        now + GameDebugRuntimeOverrides.longValue("SPLEEF_SMASHER_COOLDOWN_MILLIS", ArcadePortRules.SPLEEF_SMASHER_COOLDOWN_MILLIS));
+                cooldownProgress.start(player, "Smasher", GameDebugRuntimeOverrides.longValue("SPLEEF_SMASHER_COOLDOWN_MILLIS", ArcadePortRules.SPLEEF_SMASHER_COOLDOWN_MILLIS));
                 for (BlockFace face : new BlockFace[] {BlockFace.UP, BlockFace.DOWN, BlockFace.NORTH,
                         BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST}) {
                     fadeSpleefBlock(session, player, block.getRelative(face), false);
@@ -22249,12 +22351,12 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void updateSpleef(Session session, long now) {
-        if (now - session.lastSpleefHungerAt >= ArcadePortRules.SPLEEF_HUNGER_DRAIN_INTERVAL_MILLIS) {
+        if (now - session.lastSpleefHungerAt >= GameDebugRuntimeOverrides.longValue("SPLEEF_HUNGER_DRAIN_INTERVAL_MILLIS", ArcadePortRules.SPLEEF_HUNGER_DRAIN_INTERVAL_MILLIS)) {
             session.lastSpleefHungerAt = now;
             for (Player player : new ArrayList<>(alivePlayers(session))) {
                 if (player.getFoodLevel() > 0) {
                     player.setFoodLevel(Math.max(0,
-                            player.getFoodLevel() - ArcadePortRules.SPLEEF_HUNGER_DRAIN_PER_INTERVAL));
+                            player.getFoodLevel() - GameDebugRuntimeOverrides.intValue("SPLEEF_HUNGER_DRAIN_PER_INTERVAL", ArcadePortRules.SPLEEF_HUNGER_DRAIN_PER_INTERVAL)));
                 } else if (player.getHealth() <= 1.0D) {
                     eliminate(session, player, null, "starved");
                     if (active != session) return;
@@ -22283,15 +22385,15 @@ public final class ArcadePortManager implements Listener {
             }
             if (!"archer".equals(kit)) continue;
             long nextAt = session.spleefNextArrowAt.getOrDefault(player.getUniqueId(),
-                    now + ArcadePortRules.SPLEEF_ARCHER_ARROW_INTERVAL_MILLIS);
+                    now + GameDebugRuntimeOverrides.longValue("SPLEEF_ARCHER_ARROW_INTERVAL_MILLIS", ArcadePortRules.SPLEEF_ARCHER_ARROW_INTERVAL_MILLIS));
             if (now < nextAt) continue;
-            if (inventoryCount(player, Material.ARROW) < ArcadePortRules.SPLEEF_ARCHER_MAX_ARROWS) {
+            if (inventoryCount(player, Material.ARROW) < GameDebugRuntimeOverrides.intValue("SPLEEF_ARCHER_MAX_ARROWS", ArcadePortRules.SPLEEF_ARCHER_MAX_ARROWS)) {
                 player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrow",
                         "A replenishing Spleef arrow.", 1));
                 player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.5F, 1.0F);
             }
             session.spleefNextArrowAt.put(player.getUniqueId(),
-                    now + ArcadePortRules.SPLEEF_ARCHER_ARROW_INTERVAL_MILLIS);
+                    now + GameDebugRuntimeOverrides.longValue("SPLEEF_ARCHER_ARROW_INTERVAL_MILLIS", ArcadePortRules.SPLEEF_ARCHER_ARROW_INTERVAL_MILLIS));
         }
     }
 
@@ -22305,11 +22407,11 @@ public final class ArcadePortManager implements Listener {
         String key = attacker.getUniqueId() + ":" + target.getUniqueId();
         long now = System.currentTimeMillis();
         long last = session.spleefKnockbackAt.getOrDefault(key, 0L);
-        if (now - last < ArcadePortRules.SPLEEF_KNOCKBACK_COOLDOWN_MILLIS) return;
+        if (now - last < GameDebugRuntimeOverrides.longValue("SPLEEF_KNOCKBACK_COOLDOWN_MILLIS", ArcadePortRules.SPLEEF_KNOCKBACK_COOLDOWN_MILLIS)) return;
         session.spleefKnockbackAt.put(key, now);
         String kit = session.spleefKits.getOrDefault(attacker.getUniqueId(), "snowballer");
-        double power = "brawler".equals(kit) ? ArcadePortRules.SPLEEF_BRAWLER_KNOCKBACK
-                : ArcadePortRules.SPLEEF_DEFAULT_KNOCKBACK;
+        double power = "brawler".equals(kit) ? GameDebugRuntimeOverrides.doubleValue("SPLEEF_BRAWLER_KNOCKBACK", ArcadePortRules.SPLEEF_BRAWLER_KNOCKBACK)
+                : GameDebugRuntimeOverrides.doubleValue("SPLEEF_DEFAULT_KNOCKBACK", ArcadePortRules.SPLEEF_DEFAULT_KNOCKBACK);
         Vector direction = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
         if (direction.lengthSquared() <= 0.000001D) return;
         Vector velocity = direction.normalize().multiply(power);
@@ -22431,8 +22533,8 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "Leap ready in " + Math.max(1L, (readyAt - now + 999L) / 1000L) + "s.");
             return;
         }
-        session.spleefLeapReadyAt.put(id, now + ArcadePortRules.SPLEEF_BRAWLER_LEAP_COOLDOWN_MILLIS);
-        cooldownProgress.start(player, "Leap", ArcadePortRules.SPLEEF_BRAWLER_LEAP_COOLDOWN_MILLIS);
+        session.spleefLeapReadyAt.put(id, now + GameDebugRuntimeOverrides.longValue("SPLEEF_BRAWLER_LEAP_COOLDOWN_MILLIS", ArcadePortRules.SPLEEF_BRAWLER_LEAP_COOLDOWN_MILLIS));
+        cooldownProgress.start(player, "Leap", GameDebugRuntimeOverrides.longValue("SPLEEF_BRAWLER_LEAP_COOLDOWN_MILLIS", ArcadePortRules.SPLEEF_BRAWLER_LEAP_COOLDOWN_MILLIS));
         if (session.spleefBrawlerSelfSpleefCandidates.contains(id)
                 && player.getFallDistance() >= 1.0F) {
             session.spleefBrawlerLeapAfterSelfSpleef.add(id);
@@ -22514,14 +22616,14 @@ public final class ArcadePortManager implements Listener {
             String kit = session.runnerKits.getOrDefault(id, "leaper");
             if (!"frosty".equals(kit)) continue;
             long next = session.runnerNextFrostBallAt.getOrDefault(id,
-                    now + ArcadePortRules.RUNNER_FROSTBALL_INTERVAL_MILLIS);
+                    now + GameDebugRuntimeOverrides.longValue("RUNNER_FROSTBALL_INTERVAL_MILLIS", ArcadePortRules.RUNNER_FROSTBALL_INTERVAL_MILLIS));
             if (now < next) continue;
-            if (inventoryCount(player, Material.SNOWBALL) < ArcadePortRules.RUNNER_MAX_FROSTBALLS) {
+            if (inventoryCount(player, Material.SNOWBALL) < GameDebugRuntimeOverrides.intValue("RUNNER_MAX_FROSTBALLS", ArcadePortRules.RUNNER_MAX_FROSTBALLS)) {
                 player.getInventory().addItem(namedItem(Material.SNOWBALL, "Snowball",
                         "Frost Balls slow opponents.", 1));
                 player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.7F, 1.0F);
             }
-            session.runnerNextFrostBallAt.put(id, now + ArcadePortRules.RUNNER_FROSTBALL_INTERVAL_MILLIS);
+            session.runnerNextFrostBallAt.put(id, now + GameDebugRuntimeOverrides.longValue("RUNNER_FROSTBALL_INTERVAL_MILLIS", ArcadePortRules.RUNNER_FROSTBALL_INTERVAL_MILLIS));
         }
 
     }
@@ -22538,8 +22640,8 @@ public final class ArcadePortManager implements Listener {
                         3.0D) != null) {
             session.runnerSpecialPlayCandidates.add(id);
         }
-        session.runnerLeapReadyAt.put(id, now + ArcadePortRules.RUNNER_LEAP_COOLDOWN_MILLIS);
-        cooldownProgress.start(player, "Leap", ArcadePortRules.RUNNER_LEAP_COOLDOWN_MILLIS);
+        session.runnerLeapReadyAt.put(id, now + GameDebugRuntimeOverrides.longValue("RUNNER_LEAP_COOLDOWN_MILLIS", ArcadePortRules.RUNNER_LEAP_COOLDOWN_MILLIS));
+        cooldownProgress.start(player, "Leap", GameDebugRuntimeOverrides.longValue("RUNNER_LEAP_COOLDOWN_MILLIS", ArcadePortRules.RUNNER_LEAP_COOLDOWN_MILLIS));
         Vector velocity = player.getLocation().getDirection().normalize().multiply(1.2D);
         velocity.setY(1.2D);
         player.setVelocity(velocity);
@@ -22555,8 +22657,8 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "Quickshot ready in " + Math.max(1L, (readyAt - now + 999L) / 1000L) + "s.");
             return;
         }
-        session.runnerQuickshotReadyAt.put(id, now + ArcadePortRules.RUNNER_QUICKSHOT_COOLDOWN_MILLIS);
-        cooldownProgress.start(player, "Quickshot", ArcadePortRules.RUNNER_QUICKSHOT_COOLDOWN_MILLIS);
+        session.runnerQuickshotReadyAt.put(id, now + GameDebugRuntimeOverrides.longValue("RUNNER_QUICKSHOT_COOLDOWN_MILLIS", ArcadePortRules.RUNNER_QUICKSHOT_COOLDOWN_MILLIS));
+        cooldownProgress.start(player, "Quickshot", GameDebugRuntimeOverrides.longValue("RUNNER_QUICKSHOT_COOLDOWN_MILLIS", ArcadePortRules.RUNNER_QUICKSHOT_COOLDOWN_MILLIS));
         Arrow arrow = player.launchProjectile(Arrow.class);
         arrow.setVelocity(player.getLocation().getDirection().multiply(1.2D));
         session.entities.add(arrow);
@@ -23625,8 +23727,8 @@ public final class ArcadePortManager implements Listener {
         session.evolutionAbilitiesUsed.add(id);
         player.setAllowFlight(false);
         Vector direction = player.getLocation().getDirection().normalize().multiply(
-                ArcadePortRules.EVOLUTION_CHICKEN_DOUBLE_JUMP_HORIZONTAL);
-        direction.setY(ArcadePortRules.EVOLUTION_CHICKEN_DOUBLE_JUMP_VERTICAL);
+                GameDebugRuntimeOverrides.doubleValue("EVOLUTION_CHICKEN_DOUBLE_JUMP_HORIZONTAL", ArcadePortRules.EVOLUTION_CHICKEN_DOUBLE_JUMP_HORIZONTAL));
+        direction.setY(GameDebugRuntimeOverrides.doubleValue("EVOLUTION_CHICKEN_DOUBLE_JUMP_VERTICAL", ArcadePortRules.EVOLUTION_CHICKEN_DOUBLE_JUMP_VERTICAL));
         player.setVelocity(direction);
         player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation(), 12,
                 0.25D, 0.2D, 0.25D, 0.05D);
@@ -23662,7 +23764,7 @@ public final class ArcadePortManager implements Listener {
         if (charged > 0) {
             session.sheepArcherVolleyRemaining.put(id, charged);
             session.sheepArcherNextVolleyAt.put(id,
-                    System.currentTimeMillis() + ArcadePortRules.SHEEP_QUEST_ARCHER_BARRAGE_VOLLEY_INTERVAL_MILLIS);
+                    System.currentTimeMillis() + GameDebugRuntimeOverrides.longValue("SHEEP_QUEST_ARCHER_BARRAGE_VOLLEY_INTERVAL_MILLIS", ArcadePortRules.SHEEP_QUEST_ARCHER_BARRAGE_VOLLEY_INTERVAL_MILLIS));
         }
     }
 
@@ -23681,7 +23783,7 @@ public final class ArcadePortManager implements Listener {
         if (arrow.getVelocity().getY() >= 0.45D) session.quiverHighArcArrows.add(arrow.getUniqueId());
         if (!"enchanter".equals(session.quiverKits.getOrDefault(player.getUniqueId(), "leaper"))) return;
         UUID arrowId = arrow.getUniqueId();
-        session.quiverArrowBounces.put(arrowId, ArcadePortRules.QUIVER_MAX_ARROW_BOUNCES);
+        session.quiverArrowBounces.put(arrowId, GameDebugRuntimeOverrides.intValue("QUIVER_MAX_ARROW_BOUNCES", ArcadePortRules.QUIVER_MAX_ARROW_BOUNCES));
         session.quiverArrowIgnoredPlayers.put(arrowId, new HashSet<>(Set.of(player.getUniqueId())));
     }
 
@@ -24063,8 +24165,8 @@ public final class ArcadePortManager implements Listener {
                 session.runnerFrostballLastHitBy.put(target.getUniqueId(), shooter.getUniqueId());
                 session.runnerFrostballLastHitAt.put(target.getUniqueId(), System.currentTimeMillis());
                 target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,
-                        ArcadePortRules.RUNNER_FROSTBALL_SLOW_TICKS,
-                        ArcadePortRules.RUNNER_FROSTBALL_SLOW_AMPLIFIER, false, false, true));
+                        GameDebugRuntimeOverrides.intValue("RUNNER_FROSTBALL_SLOW_TICKS", ArcadePortRules.RUNNER_FROSTBALL_SLOW_TICKS),
+                        GameDebugRuntimeOverrides.intValue("RUNNER_FROSTBALL_SLOW_AMPLIFIER", ArcadePortRules.RUNNER_FROSTBALL_SLOW_AMPLIFIER), false, false, true));
                 target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.7F, 0.8F);
                 target.sendMessage(ChatColor.AQUA + "Frost Ball slowed you!");
             }
@@ -24662,7 +24764,7 @@ public final class ArcadePortManager implements Listener {
                 long nextAllowed = session.dragonCompassNextUseAt.getOrDefault(player.getUniqueId(), 0L);
                 if (!ArcadePortRules.canUseDragonSpectatorTeleport(now, nextAllowed)) return;
                 session.dragonCompassNextUseAt.put(player.getUniqueId(),
-                        now + ArcadePortRules.DRAGONS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS);
+                        now + GameDebugRuntimeOverrides.longValue("DRAGONS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS", ArcadePortRules.DRAGONS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS));
                 Player target = nearestDragonsSpectatorTarget(session, player);
                 if (target != null) {
                     player.setSpectatorTarget(null);
@@ -24814,7 +24916,7 @@ public final class ArcadePortManager implements Listener {
                 session.dragonMarksmanCharge.put(id, 0);
                 session.dragonAbilitiesUsed.add(id);
                 session.dragonMarksmanNextChargeAt.put(id,
-                        System.currentTimeMillis() + ArcadePortRules.DRAGONS_BARRAGE_INITIAL_CHARGE_MILLIS);
+                        System.currentTimeMillis() + GameDebugRuntimeOverrides.longValue("DRAGONS_BARRAGE_INITIAL_CHARGE_MILLIS", ArcadePortRules.DRAGONS_BARRAGE_INITIAL_CHARGE_MILLIS));
                 return;
             }
         }
@@ -24857,7 +24959,7 @@ public final class ArcadePortManager implements Listener {
                 UUID id = player.getUniqueId();
                 long now = System.currentTimeMillis();
                 long last = session.paintballWaterBombLastThrowAt.getOrDefault(id, 0L);
-                if (now - last < ArcadePortRules.PAINTBALL_WATER_BOMB_COOLDOWN_MILLIS) return;
+                if (now - last < GameDebugRuntimeOverrides.longValue("PAINTBALL_WATER_BOMB_COOLDOWN_MILLIS", ArcadePortRules.PAINTBALL_WATER_BOMB_COOLDOWN_MILLIS)) return;
                 session.paintballWaterBombLastThrowAt.put(id, now);
                 consumeHeld(player);
                 ThrownPotion potion = player.launchProjectile(ThrownPotion.class);
@@ -25170,7 +25272,8 @@ public final class ArcadePortManager implements Listener {
                 session.milkPingerCandidates.add(otherId);
             }
         }
-        incrementMilkCowScore(session, player, MilkCowRules.SCORE_PER_MILK, "Milk drunk");
+        incrementMilkCowScore(session, player, GameDebugRuntimeOverrides.intValue(
+                "MILK_THE_COW_SCORE_PER_MILK", MilkCowRules.SCORE_PER_MILK), "Milk drunk");
         if (active != session) return;
         player.setHealth(Math.min(player.getMaxHealth(), player.getHealth() + 2.0D));
         player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_BURP, 1.0F, 1.0F);
@@ -25743,9 +25846,11 @@ public final class ArcadePortManager implements Listener {
         }
         session.milkCurrentLeader = nextLeader;
         player.sendMessage((change >= 0 ? ChatColor.GREEN : ChatColor.RED)
-                + reason + ": " + score + "/" + MilkCowRules.SCORE_TO_WIN);
+                + reason + ": " + score + "/" + GameDebugRuntimeOverrides.intValue(
+                        "MILK_THE_COW_SCORE_TO_WIN", MilkCowRules.SCORE_TO_WIN));
         if (MilkCowRules.hasWon(score)) {
-            announce(session, ChatColor.GOLD + player.getName() + " reached " + MilkCowRules.SCORE_TO_WIN + " points!");
+            announce(session, ChatColor.GOLD + player.getName() + " reached " + GameDebugRuntimeOverrides.intValue(
+                    "MILK_THE_COW_SCORE_TO_WIN", MilkCowRules.SCORE_TO_WIN) + " points!");
             finish(session, player, true);
         }
     }
@@ -25829,9 +25934,12 @@ public final class ArcadePortManager implements Listener {
                 for (Cow cow : session.milkCowHerd) {
                     Vector direction = target.toVector().subtract(cow.getLocation().toVector());
                     direction.setY(Math.max(-0.08D, Math.min(0.12D, direction.getY())));
-                    if (direction.lengthSquared() > 2.25D) cow.setVelocity(direction.normalize().multiply(0.28D));
+                    if (direction.lengthSquared() > 2.25D) cow.setVelocity(direction.normalize().multiply(
+                            GameDebugRuntimeOverrides.doubleValue("MILK_THE_COW_HERD_MOVE_SPEED",
+                                    MilkCowRules.HERD_MOVE_SPEED)));
                 }
-                while (session.milkCowHerd.size() < MilkCowRules.HERD_SIZE) {
+                while (session.milkCowHerd.size() < GameDebugRuntimeOverrides.intValue(
+                        "MILK_THE_COW_HERD_SIZE", MilkCowRules.HERD_SIZE)) {
                     Location spawn = target.clone().add(
                             ThreadLocalRandom.current().nextDouble(-2.5D, 2.5D), 0.0D,
                             ThreadLocalRandom.current().nextDouble(-2.5D, 2.5D));
@@ -25914,7 +26022,8 @@ public final class ArcadePortManager implements Listener {
                 }
             }
             session.milkDamageAtByTarget.remove(targetId);
-            incrementMilkCowScore(session, target, -MilkCowRules.SCORE_LOST_ON_DEATH, "Farmer defeated");
+            incrementMilkCowScore(session, target, -GameDebugRuntimeOverrides.intValue(
+                    "MILK_THE_COW_SCORE_LOST_ON_DEATH", MilkCowRules.SCORE_LOST_ON_DEATH), "Farmer defeated");
             if (active != session) return;
             if (attacker != null && session.teams.getOrDefault(attacker.getUniqueId(), -1) == 1) {
                 incrementMilkCowScore(session, attacker, 1, "Farmer defeated");
@@ -26213,7 +26322,7 @@ public final class ArcadePortManager implements Listener {
                 || !(event.getEntity().getShooter() instanceof Player player)
                 || !session.alive.contains(player.getUniqueId())
                 || !"gust".equals(session.spleefKits.getOrDefault(player.getUniqueId(), "snowballer"))) return;
-        long cooldown = ArcadePortRules.SPLEEF_GUST_COOLDOWN_MILLIS;
+        long cooldown = GameDebugRuntimeOverrides.longValue("SPLEEF_GUST_COOLDOWN_MILLIS", ArcadePortRules.SPLEEF_GUST_COOLDOWN_MILLIS);
         session.spleefGustReadyAt.put(player.getUniqueId(), System.currentTimeMillis() + cooldown);
         cooldownProgress.start(player, "Gust", cooldown);
     }
@@ -26602,7 +26711,7 @@ public final class ArcadePortManager implements Listener {
                 long nextAllowed = currentSession.dragonCompassNextUseAt.getOrDefault(spectator.getUniqueId(), 0L);
                 if (!ArcadePortRules.canUseDragonSpectatorTeleport(now, nextAllowed)) return;
                 currentSession.dragonCompassNextUseAt.put(spectator.getUniqueId(),
-                        now + ArcadePortRules.DRAGONS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS);
+                        now + GameDebugRuntimeOverrides.longValue("DRAGONS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS", ArcadePortRules.DRAGONS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS));
                 spectator.setSpectatorTarget(null);
                 spectator.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
                 spectator.setCompassTarget(target.getLocation());
@@ -27427,7 +27536,7 @@ public final class ArcadePortManager implements Listener {
         activateBombLobbersPowerup(session, bombLobbersPowerupTeam(held));
         consumeHeld(player);
         player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,
-                ArcadePortRules.BOMB_LOBBERS_POWERUP_SPEED_DURATION_TICKS, 1, false, true));
+                GameDebugRuntimeOverrides.intValue("BOMB_LOBBERS_POWERUP_SPEED_DURATION_TICKS", ArcadePortRules.BOMB_LOBBERS_POWERUP_SPEED_DURATION_TICKS), 1, false, true));
         player.getWorld().spawnParticle(Particle.CLOUD,
                 player.getLocation().add(0.0D, 1.0D, 0.0D), 16, 0.35D, 0.5D, 0.35D, 0.04D);
         player.sendMessage(ChatColor.GREEN + "Speed Boost! " + ChatColor.WHITE + "Speed II for 12 seconds.");
@@ -27466,7 +27575,7 @@ public final class ArcadePortManager implements Listener {
             long nextGrant = session.bombNextCraftAt.computeIfAbsent(id,
                     ignored -> ArcadePortRules.bombLobbersFirstCraftReadyAt(now));
             if (now >= nextGrant) {
-                if (inventoryCount(player, Material.TNT) < ArcadePortRules.BOMB_LOBBERS_MAX_CARRIED) {
+                if (inventoryCount(player, Material.TNT) < GameDebugRuntimeOverrides.intValue("BOMB_LOBBERS_MAX_CARRIED", ArcadePortRules.BOMB_LOBBERS_MAX_CARRIED)) {
                     player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT",
                             "Click to throw at enemy players.", 1));
                 }
@@ -27622,11 +27731,11 @@ public final class ArcadePortManager implements Listener {
             long age = Math.max(0L, now - createdAt);
             boolean touchingSolid = isBombTouchingAnyBlock(bomb);
             if (ArcadePortRules.shouldPrimeBombLobbersBomb(age, touchingSolid)) {
-                if (touchingSolid && age < ArcadePortRules.BOMB_LOBBERS_MAX_FLIGHT_MILLIS) {
+                if (touchingSolid && age < GameDebugRuntimeOverrides.longValue("BOMB_LOBBERS_MAX_FLIGHT_MILLIS", ArcadePortRules.BOMB_LOBBERS_MAX_FLIGHT_MILLIS)) {
                     UUID impactOwner = session.bombOwners.get(bombId);
                     if (impactOwner != null) session.bombImmediateImpactThrowers.add(impactOwner);
                 }
-                if (touchingSolid && age < ArcadePortRules.BOMB_LOBBERS_MAX_FLIGHT_MILLIS) {
+                if (touchingSolid && age < GameDebugRuntimeOverrides.longValue("BOMB_LOBBERS_MAX_FLIGHT_MILLIS", ArcadePortRules.BOMB_LOBBERS_MAX_FLIGHT_MILLIS)) {
                     UUID impactOwner = session.bombOwners.get(bombId);
                     if (impactOwner != null) session.bombImmediateImpactThrowers.add(impactOwner);
                 }
@@ -27643,7 +27752,7 @@ public final class ArcadePortManager implements Listener {
                 String powerupType = session.bombPowerTypes.getOrDefault(bombId, "normal");
                 Vector velocity = bomb.getVelocity().clone();
                 TNTPrimed replacement = session.world.spawn(current, TNTPrimed.class);
-                replacement.setFuseTicks(ArcadePortRules.BOMB_LOBBERS_FUSE_TICKS);
+                replacement.setFuseTicks(GameDebugRuntimeOverrides.intValue("BOMB_LOBBERS_FUSE_TICKS", ArcadePortRules.BOMB_LOBBERS_FUSE_TICKS));
                 replacement.setVelocity(velocity);
                 removeBombTracking(session, bombId);
                 session.entities.remove(bomb);
@@ -27682,7 +27791,7 @@ public final class ArcadePortManager implements Listener {
         Particle.DustOptions dust = new Particle.DustOptions(Color.RED, 1.0F);
         Vector direction = segment.multiply(1.0D / distance);
         for (int sample = 0; sample < samples; sample++) {
-            double offset = sample * ArcadePortRules.BOMB_LOBBERS_TRAIL_SAMPLE_SPACING;
+            double offset = sample * GameDebugRuntimeOverrides.doubleValue("BOMB_LOBBERS_TRAIL_SAMPLE_SPACING", ArcadePortRules.BOMB_LOBBERS_TRAIL_SAMPLE_SPACING);
             if (offset > distance) break;
             Location point = previous.clone().add(direction.clone().multiply(offset)).add(0.0D, 0.5D, 0.0D);
             session.world.spawnParticle(Particle.DUST, point, 2,
@@ -27812,7 +27921,7 @@ public final class ArcadePortManager implements Listener {
         Snowball projectile = player.launchProjectile(Snowball.class);
         projectile.setItem(new ItemStack(Material.COAL));
         Vector velocity = player.getEyeLocation().getDirection().normalize()
-                .multiply(ArcadePortRules.EVOLUTION_SULPHUR_BOMB_SPEED);
+                .multiply(GameDebugRuntimeOverrides.doubleValue("EVOLUTION_SULPHUR_BOMB_SPEED", ArcadePortRules.EVOLUTION_SULPHUR_BOMB_SPEED));
         projectile.setVelocity(velocity);
         session.entities.add(projectile);
         session.evolutionSulphurBombs.add(projectile.getUniqueId());
@@ -27836,7 +27945,7 @@ public final class ArcadePortManager implements Listener {
             if (!ArcadePortRules.isEvolutionSulphurBombInRange(distance)) continue;
             if (session.evolving.contains(target.getUniqueId())) interruptEvolutionForHit(session, target);
             recordEvolutionDamage(session, target, shooter, now);
-            double damage = ArcadePortRules.EVOLUTION_SULPHUR_BOMB_DAMAGE;
+            double damage = GameDebugRuntimeOverrides.doubleValue("EVOLUTION_SULPHUR_BOMB_DAMAGE", ArcadePortRules.EVOLUTION_SULPHUR_BOMB_DAMAGE);
             if (target.getHealth() <= damage) {
                 eliminate(session, target, shooter, "was hit by " + shooter.getName() + "'s Sulphur Bomb");
                 if (active != session) return;
@@ -27875,7 +27984,7 @@ public final class ArcadePortManager implements Listener {
 
         Location spawn = player.getEyeLocation().add(player.getLocation().getDirection().multiply(1.0D));
         TNTPrimed bomb = session.world.spawn(spawn, TNTPrimed.class);
-        bomb.setFuseTicks(ArcadePortRules.BOMB_LOBBERS_FUSE_TICKS);
+        bomb.setFuseTicks(GameDebugRuntimeOverrides.intValue("BOMB_LOBBERS_FUSE_TICKS", ArcadePortRules.BOMB_LOBBERS_FUSE_TICKS));
         bomb.setYield("super-tnt".equals(powerupType) ? 6.0F : 4.0F);
         double pitchVelocity = "pitcher".equals(session.bombLobbersKits.get(ownerId))
                 ? ArcadePortRules.bombLobbersPitchVelocity(session.bombPitchLevels.getOrDefault(ownerId, 2))
@@ -28108,7 +28217,7 @@ public final class ArcadePortManager implements Listener {
             player.sendActionBar(ChatColor.YELLOW + "Double Jump is recharging.");
             return;
         }
-        long cooldown = ArcadePortRules.MICRO_BATTLES_DASHER_JUMP_COOLDOWN_MILLIS;
+        long cooldown = GameDebugRuntimeOverrides.longValue("MICRO_BATTLES_DASHER_JUMP_COOLDOWN_MILLIS", ArcadePortRules.MICRO_BATTLES_DASHER_JUMP_COOLDOWN_MILLIS);
         session.microDasherJumpReadyAt.put(id, now + cooldown);
         cooldownProgress.start(player, "Double Jump", cooldown);
         Vector velocity = player.getLocation().getDirection().clone();
@@ -28451,7 +28560,7 @@ public final class ArcadePortManager implements Listener {
         if (wasQueued) {
             if (pendingStart != null && pendingType != null
                     && onlineQueuedPlayers(pendingType, pendingMixedArcadeVariant).size()
-                    < (pendingType == ArcadePortGame.PLEXBALL ? PlexballRules.MIN_PLAYERS : 1)) {
+                    < (pendingType == ArcadePortGame.PLEXBALL ? GameDebugRuntimeOverrides.intValue("PLEXBALL_MIN_PLAYERS", PlexballRules.MIN_PLAYERS) : 1)) {
                 pendingStart.cancel();
                 pendingStart = null;
                 pendingType = null;
@@ -28459,7 +28568,7 @@ public final class ArcadePortManager implements Listener {
             }
             if (manualStartCountdown != null && manualStartType != null
                     && onlineQueuedPlayers(manualStartType).size()
-                    < (manualStartType == ArcadePortGame.PLEXBALL ? PlexballRules.MIN_PLAYERS : 1)) {
+                    < (manualStartType == ArcadePortGame.PLEXBALL ? GameDebugRuntimeOverrides.intValue("PLEXBALL_MIN_PLAYERS", PlexballRules.MIN_PLAYERS) : 1)) {
                 cancelManualStartCountdown(manualStartType, ChatColor.YELLOW
                         + "The queue no longer has enough players; the Arcade start countdown was cancelled.");
             }
@@ -29604,7 +29713,7 @@ public final class ArcadePortManager implements Listener {
         long lastBaconSlowUpdateAt;
         long lastWorldWaterDamageAt;
         long lastBaconEscalationAt;
-        long baconEscalationIntervalMillis = ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS;
+        long baconEscalationIntervalMillis = GameDebugRuntimeOverrides.longValue("BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS", ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS);
         int baconKnockbackEscalations;
         long startedAt;
         String modulePhase;

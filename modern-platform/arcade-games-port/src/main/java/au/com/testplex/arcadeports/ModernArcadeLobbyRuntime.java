@@ -28,6 +28,7 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerAnimationEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -35,6 +36,7 @@ import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.ClickType;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.persistence.PersistentDataType;
@@ -50,6 +52,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /** Legacy-style kit/team lobby pads, cosmetics demo showcase and Bacon Brawl NPC test bots. */
 public final class ModernArcadeLobbyRuntime implements Listener {
@@ -61,6 +64,18 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private static final String TEST_BOT_KITS_TITLE = "Test Bots: Kits";
     private static final String TEST_BOT_COSMETICS_TITLE = "Test Bots: Cosmetics";
     private static final String DEBUG_TITLE = "Game Debug Controls";
+    private static final String DEBUG_PROFILES_TITLE = "Debug Profiles";
+    private static final String DEBUG_FEATURES_TITLE = "Debug Features";
+    private static final String DEBUG_VARIABLES_TITLE = "Debug Variables";
+    private static final List<DebugFeature> COMMON_DEBUG_FEATURES = List.of(
+            new DebugFeature("all-kits", "Unlock all kits", Material.NETHER_STAR,
+                    "Bypass achievement-kit locks for the selected game.", false),
+            new DebugFeature("invulnerable", "Invulnerability", Material.SHIELD,
+                    "Ignore damage to this tester in the selected game.", false),
+            new DebugFeature("no-fall-damage", "Disable fall damage", Material.FEATHER,
+                    "Ignore fall damage to this tester in the selected game.", false),
+            new DebugFeature("no-hunger-loss", "Lock hunger", Material.COOKED_BEEF,
+                    "Keep this tester's hunger full in the selected game.", false));
     private static final String[] THEMES = {"porky", "inferno", "frost", "slime", "royal", "confetti"};
     private static final String[] BOMB_LOBBERS_THEMES = {
             "classic", "ember", "shockwave", "spark", "confetti", "frost", "slime"
@@ -75,6 +90,9 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private final NamespacedKey actionKey, themeKey, botKey, formKey, displayKey, kitNpcKey, teamNpcKey;
     private final Map<String, Bot> bots = new LinkedHashMap<>();
     private final Map<java.util.UUID, TestBotMenuState> testBotMenus = new LinkedHashMap<>();
+    private final Map<UUID, DebugPrompt> debugPrompts = new ConcurrentHashMap<>();
+    private final Map<UUID, Integer> debugVariablePages = new LinkedHashMap<>();
+    private final Map<UUID, ArcadePortGame> debugContextGames = new ConcurrentHashMap<>();
     private final Map<java.util.UUID, Long> lastBotHitAtByAttacker = new LinkedHashMap<>();
     private final Map<java.util.UUID, Long> lastBotSwingAtByAttacker = new LinkedHashMap<>();
     private final List<Entity> showcase = new ArrayList<>();
@@ -86,6 +104,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private enum TestBotMenuPage { SETUP, LOADOUT, KITS, COSMETICS }
     private record TestBotCosmetic(String lineId, String lineTitle, String optionId,
             String optionName, String icon) {}
+    private record DebugFeature(String key, String title, Material icon, String description, boolean defaultValue) {}
+    private record DebugPrompt(ArcadePortGame game, String operation) {}
     private BukkitTask task;
 
     ModernArcadeLobbyRuntime(JavaPlugin plugin, ArcadePortManager manager, ModernArcadeLobby lobby) {
@@ -831,13 +851,26 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         if(title==null || !(title.equals(KIT_TITLE)||title.equals(QUEUE_TITLE)||title.startsWith(BOT_MENU_PREFIX)
                 || title.equals(TEST_BOTS_TITLE) || title.equals(TEST_BOT_LOADOUT_TITLE)
                 || title.equals(TEST_BOT_KITS_TITLE) || title.equals(TEST_BOT_COSMETICS_TITLE)
-                || title.equals(DEBUG_TITLE)))return;
+                || title.equals(DEBUG_TITLE) || title.equals(DEBUG_PROFILES_TITLE)
+                || title.equals(DEBUG_FEATURES_TITLE) || title.startsWith(DEBUG_VARIABLES_TITLE)))return;
         e.setCancelled(true);
         if(!(e.getWhoClicked() instanceof Player p)||e.getClickedInventory()==null||e.getClickedInventory()!=e.getView().getTopInventory())return;
+        if (isDebugMenuTitle(title) && !plugin.hasAdminAccess(p)) {
+            p.closeInventory();
+            p.sendMessage(ChatColor.RED + "Authorised tester access is required for game debug controls.");
+            return;
+        }
+        if ((title.equals(TEST_BOTS_TITLE) || title.equals(TEST_BOT_LOADOUT_TITLE)
+                || title.equals(TEST_BOT_KITS_TITLE) || title.equals(TEST_BOT_COSMETICS_TITLE))
+                && !plugin.hasAdminAccess(p)) {
+            p.closeInventory();
+            p.sendMessage(ChatColor.RED + "Authorised tester access is required for bot configuration.");
+            return;
+        }
         ItemStack it=e.getCurrentItem();if(it==null||it.getType().isAir()||!it.hasItemMeta())return;
         String action=it.getItemMeta().getPersistentDataContainer().get(actionKey,PersistentDataType.STRING);
-        if (DEBUG_TITLE.equals(title)) {
-            handleDebugMenuClick(p, action);
+        if (isDebugMenuTitle(title)) {
+            handleDebugMenuClick(p, title, action, e.getClick());
             return;
         }
         if (title.equals(TEST_BOTS_TITLE) || title.equals(TEST_BOT_LOADOUT_TITLE)
@@ -945,49 +978,323 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             sender.sendMessage(ChatColor.YELLOW + "Open Game Debug Controls from the Arcade lobby hotbar.");
             return;
         }
-        if (!lobby.isLobbyWorld(player.getWorld())) {
-            player.sendMessage(ChatColor.YELLOW + "Debug options are selected in the Arcade lobby before a game starts.");
+        if (!plugin.hasAdminAccess(player)) {
+            player.sendMessage(ChatColor.RED + "Authorised tester access is required for game debug controls.");
+            return;
+        }
+        ArcadePortGame game = lobby.isLobbyWorld(player.getWorld())
+                ? selectedGame : manager.activeDebugGame();
+        if (game == null) {
+            player.sendMessage(ChatColor.YELLOW + "Select a game in the Arcade lobby or join an active game before opening its debug controls.");
+            return;
+        }
+        debugContextGames.put(player.getUniqueId(), game);
+        if (args != null && args.length > 0 && "profile".equalsIgnoreCase(args[0])) {
+            handleDebugProfileCommand(player, args);
             return;
         }
         openDebugMenu(player);
     }
 
+    private ArcadePortGame debugGame(Player player) {
+        return debugContextGames.getOrDefault(player.getUniqueId(), selectedGame);
+    }
+
     private void openDebugMenu(Player player) {
+        ArcadePortGame game = debugGame(player);
         Inventory inventory = Bukkit.createInventory(null, 54, DEBUG_TITLE);
-        inventory.setItem(4, item(Material.COMPARATOR, ChatColor.RED + selectedGame.displayName() + " Debug"));
-        inventory.setItem(10, debugToggleButton(player, "all-kits", Material.NETHER_STAR,
-                "Unlock all kits", "Bypass achievement-kit locks for this game."));
-        inventory.setItem(12, debugToggleButton(player, "invulnerable", Material.SHIELD,
-                "Invulnerability", "Prevent damage to you in this game's active round."));
-        inventory.setItem(14, debugToggleButton(player, "no-fall-damage", Material.FEATHER,
-                "Disable fall damage", "Ignore fall damage in this game's active round."));
-        inventory.setItem(16, debugToggleButton(player, "no-hunger-loss", Material.COOKED_BEEF,
-                "Lock hunger", "Keep hunger full while testing this game."));
-        if (selectedGame == ArcadePortGame.BACON_BRAWL) {
-            inventory.setItem(28, debugToggleButton(player, "unlimited-abilities", Material.FIREWORK_ROCKET,
-                    "Unlimited Abilities", "Abilities use full strength and do not consume meter."));
-        }
+        String profile = manager.debugProfiles().selected(player.getUniqueId(), game);
+        inventory.setItem(4, item(Material.COMPARATOR, ChatColor.RED + game.displayName() + " Debug",
+                ChatColor.GRAY + "Active profile: " + ChatColor.WHITE + profile,
+                ChatColor.GRAY + "Controls below are specific to this game."));
+        inventory.setItem(19, testBotButton(Material.WRITABLE_BOOK, "Profiles: " + profile,
+                "Create, load, duplicate, rename, save or delete configurations.", "debug-open:profiles"));
+        inventory.setItem(21, testBotButton(Material.LEVER, "Feature switches",
+                "Per-game features and common test overrides.", "debug-open:features"));
+        inventory.setItem(23, testBotButton(Material.COMPARATOR, "Gameplay variables",
+                "Tune rule constants. Numeric values apply after restarting the round.", "debug-open:variables:0"));
+        inventory.setItem(25, testBotButton(Material.IRON_GOLEM_SPAWN_EGG, "Test bot setup",
+                "Set up the next round's bot count, team, kit and cosmetics.", "debug-open:bots"));
+        inventory.setItem(37, testBotButton(Material.CLOCK, "Profile application",
+                "Immediate switches take effect now. Rule switches and numeric values apply when the next round starts."));
+        inventory.setItem(39, testBotButton(Material.FEATHER, "Advance game phase",
+                "Skip the start countdown or current Speed Builders phase.", "debug-advance-phase"));
+        inventory.setItem(40, testBotButton(Material.BARRIER, "Reset to Defaults",
+                "Clear this profile's overrides and restore intended mechanics.", "debug-reset"));
         inventory.setItem(49, testBotButton(Material.BARRIER, "Close", "debug-close"));
         player.openInventory(inventory);
     }
 
-    private ItemStack debugToggleButton(Player player, String flag, Material icon, String label, String description) {
-        boolean enabled = manager.isDebugOverrideEnabled(player.getUniqueId(), selectedGame, flag);
-        return testBotButton(enabled ? Material.LIME_DYE : icon,
-                label + ": " + (enabled ? ChatColor.GREEN + "On" : ChatColor.RED + "Off"),
-                description, "debug-toggle:" + flag);
+    private boolean isDebugMenuTitle(String title) {
+        return DEBUG_TITLE.equals(title) || DEBUG_PROFILES_TITLE.equals(title)
+                || DEBUG_FEATURES_TITLE.equals(title) || title != null && title.startsWith(DEBUG_VARIABLES_TITLE);
     }
 
-    private void handleDebugMenuClick(Player player, String action) {
-        if ("debug-close".equals(action)) {
+    private void handleDebugMenuClick(Player player, String title, String action, ClickType click) {
+        if (action == null) return;
+        if ("debug-close".equals(action)) { player.closeInventory(); return; }
+        if ("debug-back".equals(action)) { openDebugMenu(player); return; }
+        if ("debug-open:profiles".equals(action)) { openDebugProfiles(player); return; }
+        if ("debug-open:features".equals(action)) { openDebugFeatures(player); return; }
+        if ("debug-open:variables:0".equals(action)) { openDebugVariables(player, 0); return; }
+        if ("debug-open:bots".equals(action)) { openTestBotSetup(player, debugGame(player)); return; }
+        ArcadePortGame game = debugGame(player);
+        if ("debug-advance-phase".equals(action)) {
+            boolean advanced = manager.debugAdvanceStartPhase(player, game);
+            player.sendMessage(advanced ? ChatColor.GREEN + "The current supported game phase was advanced."
+                    : ChatColor.YELLOW + "This game has no supported active phase to advance.");
+            openDebugMenu(player);
+            return;
+        }
+        if ("debug-reset".equals(action)) {
+            manager.resetDebugProfile(player.getUniqueId(), game);
+            player.sendMessage(ChatColor.GREEN + game.displayName()
+                    + " debug profile reset to intended game defaults.");
+            openDebugMenu(player);
+            return;
+        }
+        if (action.startsWith("debug-toggle:")) {
+            String key = action.substring("debug-toggle:".length());
+            boolean fallback = debugFeatures(game).stream().filter(feature -> feature.key().equals(key))
+                    .map(DebugFeature::defaultValue).findFirst().orElse(false);
+            manager.toggleDebugOverride(player, game, key, fallback);
+            openDebugFeatures(player);
+            return;
+        }
+        if (DEBUG_PROFILES_TITLE.equals(title)) { handleDebugProfileMenuClick(player, action); return; }
+        if (DEBUG_FEATURES_TITLE.equals(title)) return;
+        if (title != null && title.startsWith(DEBUG_VARIABLES_TITLE)) {
+            handleDebugVariableClick(player, action, click);
+        }
+    }
+
+    private void openDebugProfiles(Player player) {
+        ArcadePortGame game = debugGame(player);
+        Inventory inventory = Bukkit.createInventory(null, 54, DEBUG_PROFILES_TITLE);
+        String current = manager.debugProfiles().selected(player.getUniqueId(), game);
+        inventory.setItem(4, item(Material.WRITABLE_BOOK, ChatColor.AQUA + game.displayName() + " Profiles",
+                ChatColor.GRAY + "Selected: " + ChatColor.WHITE + current,
+                ChatColor.GRAY + "Profile changes are saved locally for this tester and game."));
+        int slot = 9;
+        for (String profile : manager.debugProfiles().profiles(player.getUniqueId(), game)) {
+            if (slot > 44) break;
+            boolean selected = profile.equals(current);
+            ItemStack choice = testBotButton(selected ? Material.ENCHANTED_BOOK : Material.BOOK,
+                    (selected ? ChatColor.GREEN : ChatColor.YELLOW) + profile,
+                    ChatColor.GRAY + "Left-click to load this profile.", "debug-profile-load:" + profile);
+            inventory.setItem(slot++, choice);
+        }
+        inventory.setItem(45, testBotButton(Material.WRITABLE_BOOK, "Create profile", "Start with default game mechanics and no overrides.", "debug-profile-prompt:create"));
+        inventory.setItem(46, testBotButton(Material.COPYING_TABLE, "Duplicate profile", "Copy the selected profile to a new name.", "debug-profile-prompt:duplicate"));
+        inventory.setItem(47, testBotButton(Material.NAME_TAG, "Rename profile", "Rename the selected non-default profile.", "debug-profile-prompt:rename"));
+        inventory.setItem(48, testBotButton(Material.LAVA_BUCKET, "Delete profile", "Delete the selected non-default profile.", "debug-profile-prompt:delete"));
+        inventory.setItem(49, testBotButton(Material.ARROW, "Back", "debug-back"));
+        inventory.setItem(51, testBotButton(Material.WRITABLE_BOOK, "Save profile", "Save the selected profile to disk.", "debug-profile-save"));
+        player.openInventory(inventory);
+    }
+
+    private void openDebugFeatures(Player player) {
+        ArcadePortGame game = debugGame(player);
+        Inventory inventory = Bukkit.createInventory(null, 54, DEBUG_FEATURES_TITLE);
+        inventory.setItem(4, item(Material.LEVER, ChatColor.AQUA + game.displayName() + " Features",
+                ChatColor.GRAY + "Settings are isolated to your profile. Each control shows when it applies."));
+        List<DebugFeature> features = debugFeatures(game);
+        int slot = 9;
+        for (DebugFeature feature : features) {
+            if (slot > 44) break;
+            boolean enabled = manager.debugFeatureEnabled(player.getUniqueId(), game,
+                    feature.key(), feature.defaultValue());
+            inventory.setItem(slot++, testBotButton(enabled ? Material.LIME_DYE : feature.icon(),
+                    feature.title() + ": " + (enabled ? ChatColor.GREEN + "On" : ChatColor.RED + "Off"),
+                    feature.description() + " " + (debugFeatureAppliesImmediately(feature.key())
+                            ? "Applies immediately." : "Applies when the next round starts."),
+                    "debug-toggle:" + feature.key()));
+        }
+        inventory.setItem(49, testBotButton(Material.ARROW, "Back", "debug-back"));
+        player.openInventory(inventory);
+    }
+
+    private List<DebugFeature> debugFeatures(ArcadePortGame game) {
+        Map<String, DebugFeature> features = new LinkedHashMap<>();
+        if (usesSharedArcadeDebugRuntime(game)) {
+            for (DebugFeature feature : COMMON_DEBUG_FEATURES) features.put(feature.key(), feature);
+        }
+        for (GameDebugVariableCatalog.Variable variable : manager.debugVariables(game)) {
+            if (variable.kind() != GameDebugVariableCatalog.Kind.BOOLEAN) continue;
+            features.put(variable.key(), new DebugFeature(variable.key(), variable.label(), Material.REDSTONE_TORCH,
+                    "Game rule switch from " + variable.key() + ".", variable.defaultValue() != 0.0D));
+        }
+        features.put("achievement-preview-only", new DebugFeature("achievement-preview-only",
+                "Achievement preview only", Material.KNOWLEDGE_BOOK,
+                "Show real achievement condition results without saving unlocks.", false));
+        if (game == ArcadePortGame.BACON_BRAWL) {
+            features.put("unlimited-abilities", new DebugFeature("unlimited-abilities", "Unlimited abilities",
+                    Material.FIREWORK_ROCKET, "Use full-charge Bacon Brawl abilities without consuming meter.", false));
+        }
+        return List.copyOf(features.values());
+    }
+
+    private boolean usesSharedArcadeDebugRuntime(ArcadePortGame game) {
+        return game != ArcadePortGame.CAMERA_SHY && game != ArcadePortGame.SPEED_BUILDERS
+                && game != ArcadePortGame.PLEXBALL && game != ArcadePortGame.SNAKE
+                && game != ArcadePortGame.MONSTER_MAZE && game != ArcadePortGame.MONSTER_MAZE_SPEED
+                && game != ArcadePortGame.MONSTER_MAZE_MODERN && game != ArcadePortGame.WIZARDS;
+    }
+
+    private boolean debugFeatureAppliesImmediately(String key) {
+        return "all-kits".equals(key) || "invulnerable".equals(key) || "no-fall-damage".equals(key)
+                || "no-hunger-loss".equals(key) || "unlimited-abilities".equals(key)
+                || "achievement-preview-only".equals(key);
+    }
+
+    private void openDebugVariables(Player player, int requestedPage) {
+        ArcadePortGame game = debugGame(player);
+        List<GameDebugVariableCatalog.Variable> variables = manager.debugVariables(game).stream()
+                .filter(variable -> variable.kind() != GameDebugVariableCatalog.Kind.BOOLEAN).toList();
+        int pageCount = Math.max(1, (variables.size() + 44) / 45);
+        int page = Math.max(0, Math.min(pageCount - 1, requestedPage));
+        debugVariablePages.put(player.getUniqueId(), page);
+        Inventory inventory = Bukkit.createInventory(null, 54, DEBUG_VARIABLES_TITLE + " " + (page + 1));
+        String profile = manager.debugProfiles().selected(player.getUniqueId(), game);
+        inventory.setItem(4, item(Material.COMPARATOR, ChatColor.AQUA + game.displayName() + " Variables",
+                ChatColor.GRAY + "Profile: " + ChatColor.WHITE + profile,
+                ChatColor.YELLOW + "Rule edits apply at the next round start."));
+        int start = page * 45;
+        for (int i = start; i < Math.min(variables.size(), start + 45); i++) {
+            GameDebugVariableCatalog.Variable variable = variables.get(i);
+            Double configured = manager.debugVariable(player.getUniqueId(), game, variable.key());
+            double current = configured == null ? variable.defaultValue() : configured;
+            inventory.setItem(i - start, debugActionButton(Material.COMPARATOR,
+                    ChatColor.YELLOW + variable.label(), "debug-variable:" + variable.key(),
+                    ChatColor.GRAY + "Current: " + ChatColor.WHITE + formatDebugValue(current)
+                            + ChatColor.GRAY + " | Default: " + ChatColor.WHITE + formatDebugValue(variable.defaultValue()),
+                    ChatColor.GRAY + "Left-click: +" + formatDebugValue(variable.step())
+                            + " | Right-click: -" + formatDebugValue(variable.step()),
+                    ChatColor.GRAY + "Shift-click: reset this variable"));
+        }
+        if (page > 0) inventory.setItem(45, testBotButton(Material.ARROW, "Previous page", "debug-variable-page:" + (page - 1)));
+        inventory.setItem(49, testBotButton(Material.ARROW, "Back", "debug-back"));
+        if (page + 1 < pageCount) inventory.setItem(53, testBotButton(Material.ARROW, "Next page", "debug-variable-page:" + (page + 1)));
+        player.openInventory(inventory);
+    }
+
+    private String formatDebugValue(double value) {
+        return value == Math.rint(value) ? Long.toString(Math.round(value)) : String.format(Locale.ROOT, "%.3f", value);
+    }
+
+    private ItemStack debugActionButton(Material material, String title, String action, String... lore) {
+        ItemStack button = item(material, title, lore);
+        mark(button, action, null);
+        return button;
+    }
+
+    private void handleDebugVariableClick(Player player, String action, ClickType click) {
+        ArcadePortGame game = debugGame(player);
+        if (action.startsWith("debug-variable-page:")) {
+            openDebugVariables(player, Integer.parseInt(action.substring("debug-variable-page:".length())));
+            return;
+        }
+        if (!action.startsWith("debug-variable:")) return;
+        String key = action.substring("debug-variable:".length());
+        GameDebugVariableCatalog.Variable variable = manager.debugVariables(game).stream()
+                .filter(candidate -> candidate.key().equals(key)).findFirst().orElse(null);
+        if (variable == null || variable.kind() == GameDebugVariableCatalog.Kind.BOOLEAN) return;
+        if (click.isShiftClick()) {
+            manager.debugProfiles().setVariable(player.getUniqueId(), game, key, variable.defaultValue());
+        } else {
+            Double configured = manager.debugVariable(player.getUniqueId(), game, key);
+            double current = configured == null ? variable.defaultValue() : configured;
+            double direction = click.isRightClick() ? -1.0D : 1.0D;
+            double next = Math.max(variable.minimum(), Math.min(variable.maximum(), current + direction * variable.step()));
+            manager.setDebugVariable(player.getUniqueId(), game, key, next);
+        }
+        openDebugVariables(player, debugVariablePages.getOrDefault(player.getUniqueId(), 0));
+    }
+
+    private void handleDebugProfileMenuClick(Player player, String action) {
+        UUID id = player.getUniqueId();
+        ArcadePortGame game = debugGame(player);
+        if (action.startsWith("debug-profile-load:")) {
+            String profile = action.substring("debug-profile-load:".length());
+            if (manager.debugProfiles().select(id, game, profile)) {
+                player.sendMessage(ChatColor.GREEN + "Loaded " + game.displayName() + " profile '" + profile + "'.");
+                openDebugMenu(player);
+            }
+        } else if (action.startsWith("debug-profile-prompt:")) {
+            String operation = action.substring("debug-profile-prompt:".length());
+            debugPrompts.put(id, new DebugPrompt(game, operation));
             player.closeInventory();
-        } else if (action != null && action.startsWith("debug-toggle:")) {
-            String flag = action.substring("debug-toggle:".length());
-            boolean enabled = manager.toggleDebugOverride(player, selectedGame, flag);
-            player.sendMessage(ChatColor.YELLOW + selectedGame.displayName() + " debug override "
-                    + (enabled ? ChatColor.GREEN + "enabled" : ChatColor.RED + "disabled") + ChatColor.YELLOW + ".");
+            player.sendMessage("delete".equals(operation)
+                    ? ChatColor.RED + "Type DELETE to confirm removal of the selected profile, or CANCEL."
+                    : ChatColor.YELLOW + "Enter the new profile name in chat. Type CANCEL to stop.");
+        } else if ("debug-profile-save".equals(action)) {
+            manager.saveDebugProfile(id, game);
+            player.sendMessage(ChatColor.GREEN + "Debug profile saved.");
+            openDebugProfiles(player);
+        } else if ("debug-back".equals(action)) {
             openDebugMenu(player);
         }
+    }
+
+    @EventHandler
+    public void onDebugProfileChat(AsyncPlayerChatEvent event) {
+        UUID id = event.getPlayer().getUniqueId();
+        DebugPrompt prompt = debugPrompts.get(id);
+        if (prompt == null) return;
+        event.setCancelled(true);
+        String input = event.getMessage();
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            debugPrompts.remove(id);
+            Player player = event.getPlayer();
+            if (!player.isOnline() || !plugin.hasAdminAccess(player)) return;
+            if ("CANCEL".equalsIgnoreCase(input)) {
+                player.sendMessage(ChatColor.GRAY + "Profile action cancelled.");
+                return;
+            }
+            String result = switch (prompt.operation()) {
+                case "create" -> manager.debugProfiles().create(id, prompt.game(), input);
+                case "duplicate" -> manager.debugProfiles().duplicate(id, prompt.game(), input);
+                case "rename" -> manager.debugProfiles().renameSelected(id, prompt.game(), input);
+                case "delete" -> "DELETE".equalsIgnoreCase(input)
+                        && manager.debugProfiles().delete(id, prompt.game(), manager.debugProfiles().selected(id, prompt.game()))
+                        ? "deleted" : null;
+                default -> null;
+            };
+            player.sendMessage(result == null ? ChatColor.RED + "Profile action failed; check the name, profile limit or default-profile restriction."
+                    : ChatColor.GREEN + "Profile action complete: " + result + ".");
+            if (lobby.isLobbyWorld(player.getWorld())) openDebugProfiles(player);
+        });
+    }
+
+    @EventHandler
+    public void onDebugTesterQuit(org.bukkit.event.player.PlayerQuitEvent event) {
+        UUID id = event.getPlayer().getUniqueId();
+        debugContextGames.remove(id);
+        debugPrompts.remove(id);
+        debugVariablePages.remove(id);
+    }
+
+    private void handleDebugProfileCommand(Player player, String[] args) {
+        ArcadePortGame game = debugGame(player);
+        if (args.length < 2) {
+            player.sendMessage(ChatColor.YELLOW + "/arcadeport debug profile <create|duplicate|rename|delete|load|save|reset> [name]");
+            return;
+        }
+        String operation = args[1].toLowerCase(Locale.ROOT);
+        UUID id = player.getUniqueId();
+        String name = args.length > 2 ? String.join("-", java.util.Arrays.copyOfRange(args, 2, args.length)) : "";
+        boolean ok = switch (operation) {
+            case "create" -> manager.debugProfiles().create(id, game, name) != null;
+            case "duplicate" -> manager.debugProfiles().duplicate(id, game, name) != null;
+            case "rename" -> manager.debugProfiles().renameSelected(id, game, name) != null;
+            case "delete" -> manager.debugProfiles().delete(id, game, manager.debugProfiles().selected(id, game));
+            case "load" -> manager.debugProfiles().select(id, game, GameDebugProfiles.normalizeProfile(name));
+            case "save" -> { manager.saveDebugProfile(id, game); yield true; }
+            case "reset" -> { manager.resetDebugProfile(id, game); yield true; }
+            default -> false;
+        };
+        player.sendMessage(ok ? ChatColor.GREEN + "Debug profile updated." : ChatColor.RED + "Profile action failed. Check the name and selected game.");
+        openDebugProfiles(player);
     }
 
     private void openTestBotSetup(Player player, ArcadePortGame game) {

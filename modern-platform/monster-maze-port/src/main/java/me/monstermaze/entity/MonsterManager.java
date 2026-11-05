@@ -4,6 +4,7 @@ import me.monstermaze.MonsterMazePlugin;
 import me.monstermaze.entity.MazeMobWaypoint.CardinalDirection;
 import me.monstermaze.event.MonsterBumpPlayerEvent;
 import me.monstermaze.game.GameManager;
+import me.monstermaze.game.MazeDebugRules;
 import me.monstermaze.game.GameState;
 import me.monstermaze.game.MazeMode;
 import me.monstermaze.game.SafePad;
@@ -37,7 +38,6 @@ import java.util.UUID;
  * receives the correct 1.21 renderer, while vanilla autonomous goals are removed by UtilEnt.</p>
  */
 public class MonsterManager {
-    private static final float MOB_MOVE_SPEED = 0.8f;
 
     private final MonsterMazePlugin plugin;
     private final GameManager game;
@@ -263,7 +263,8 @@ public class MonsterManager {
                 else if (west != null && nextLoc.equals(west.getLocation())) wp.Direction = CardinalDirection.WEST;
             }
 
-            UtilEnt.CreatureMoveFast(ent, wp.Target, MOB_MOVE_SPEED);
+            UtilEnt.CreatureMoveFast(ent, wp.Target, MazeDebugRules.floatValue(
+                    game.getMode(), "MOB_MOVE_SPEED", MazeDebugRules.MOB_MOVE_SPEED));
         }
     }
 

@@ -38,16 +38,17 @@ public final class PlexballRules {
     public static boolean canJoinAsSpectator(boolean matchActive, boolean alreadyPlaying,
                                              int currentSpectators) {
         return matchActive && !alreadyPlaying && currentSpectators >= 0
-                && currentSpectators < MAX_SPECTATORS;
+                && currentSpectators < GameDebugRuntimeOverrides.intValue("PLEXBALL_MAX_SPECTATORS", MAX_SPECTATORS);
     }
 
     public static boolean hasValidPlayerCount(int count) {
-        return count >= MIN_PLAYERS && count <= MAX_PLAYERS;
+        return count >= GameDebugRuntimeOverrides.intValue("PLEXBALL_MIN_PLAYERS", MIN_PLAYERS)
+                && count <= GameDebugRuntimeOverrides.intValue("PLEXBALL_MAX_PLAYERS", MAX_PLAYERS);
     }
 
     public static int latencyRewindTicks(int pingEstimateMillis) {
         if (pingEstimateMillis <= 0) return 0;
-        return Math.max(0, Math.min(MAX_REWIND_TICKS,
+        return Math.max(0, Math.min(GameDebugRuntimeOverrides.intValue("PLEXBALL_MAX_REWIND_TICKS", MAX_REWIND_TICKS),
                 (int) Math.round(pingEstimateMillis / 100.0D)));
     }
 
@@ -86,15 +87,16 @@ public final class PlexballRules {
         double delta = (yaw - 180.0D) % 360.0D;
         if (delta > 180.0D) delta -= 360.0D;
         if (delta < -180.0D) delta += 360.0D;
-        return Math.abs(delta) <= FAIR_ANGLE_DEGREES;
+        return Math.abs(delta) <= GameDebugRuntimeOverrides.doubleValue("PLEXBALL_FAIR_ANGLE_DEGREES", FAIR_ANGLE_DEGREES);
     }
 
     public static double fieldHalfWidthAtZ(double z) {
-        return Math.max(2.0D, -z * FIELD_HALF_WIDTH_PER_DEPTH + 2.0D);
+        return Math.max(2.0D, -z * GameDebugRuntimeOverrides.doubleValue(
+                "PLEXBALL_FIELD_HALF_WIDTH_PER_DEPTH", FIELD_HALF_WIDTH_PER_DEPTH) + 2.0D);
     }
 
     public static boolean isInsideField(double x, double z) {
-        return z <= 0.0D && z >= -HOME_RUN_METRES
+        return z <= 0.0D && z >= -GameDebugRuntimeOverrides.doubleValue("PLEXBALL_HOME_RUN_METRES", HOME_RUN_METRES)
                 && Math.abs(x) <= fieldHalfWidthAtZ(z);
     }
 

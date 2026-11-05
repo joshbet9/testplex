@@ -4,6 +4,22 @@ import org.bukkit.Material;
 
 /** Pure, regression-tested rules extracted from the Mineplex Reborn Sneaky Assassins source. */
 final class SneakyAssassinsRules {
+    public static final long POWERUP_KILL_WINDOW_MILLIS = 1_000L;
+    public static final long FIRST_POWERUP_DELAY_MILLIS = 12_000L;
+    public static final long NEXT_POWERUP_DELAY_MILLIS = 7_000L;
+    public static final int MAX_ACTIVE_POWERUPS = 2;
+    public static final int MASTER_ASSASSIN_POWERUPS_REQUIRED = 4;
+    public static final int REVEAL_RADIUS_BLOCKS = 12;
+    public static final int SMOKE_RADIUS_BLOCKS = 5;
+    public static final long GLOBAL_REVEAL_CYCLE_MILLIS = 60_000L;
+    public static final long REVEALER_DURATION_MILLIS = 5_000L;
+    public static final long SMOKE_CLOAK_DURATION_MILLIS = 1_200L;
+    public static final long BRIBE_COOLDOWN_MILLIS = 8_000L;
+    public static final int SOURCE_NPC_COUNT = 200;
+    public static final long NPC_CULL_INTERVAL_MILLIS = 4_000L;
+    public static final int NPC_PATROL_ANCHOR_DISTANCE_BLOCKS = 16;
+    public static final int NPC_PATROL_ORDER_CHANCE_DENOMINATOR = 40;
+    public static final long NPC_STUCK_RECOVERY_MILLIS = 800L;
     private SneakyAssassinsRules() { }
 
     static boolean shouldAwardYouNeedDirections(boolean masterAssassin, boolean directPlayerAttack,
@@ -29,12 +45,13 @@ final class SneakyAssassinsRules {
 
     static boolean isPowerUpKillWindow(long nowMillis, long collectedAtMillis) {
         return collectedAtMillis > 0L && nowMillis >= collectedAtMillis
-                && nowMillis - collectedAtMillis <= 1_000L;
+                && nowMillis - collectedAtMillis <= GameDebugRuntimeOverrides.longValue(
+                        "SNEAKY_ASSASSINS_POWERUP_KILL_WINDOW_MILLIS", POWERUP_KILL_WINDOW_MILLIS);
     }
 
-    static long firstPowerUpDelayMillis() { return 12_000L; }
-    static long nextPowerUpDelayMillis() { return 7_000L; }
-    static int maxActivePowerUps() { return 2; }
+    static long firstPowerUpDelayMillis() { return value("FIRST_POWERUP_DELAY_MILLIS", FIRST_POWERUP_DELAY_MILLIS); }
+    static long nextPowerUpDelayMillis() { return value("NEXT_POWERUP_DELAY_MILLIS", NEXT_POWERUP_DELAY_MILLIS); }
+    static int maxActivePowerUps() { return GameDebugRuntimeOverrides.intValue("SNEAKY_ASSASSINS_MAX_ACTIVE_POWERUPS", MAX_ACTIVE_POWERUPS); }
 
     static double swordDamage(Material weapon) {
         if (weapon == null) return 0.0D;
@@ -88,7 +105,8 @@ final class SneakyAssassinsRules {
     }
 
     static boolean becomesMasterAssassin(int currentPowerUps) {
-        return currentPowerUps == 4;
+        return currentPowerUps == GameDebugRuntimeOverrides.intValue(
+                "SNEAKY_ASSASSINS_MASTER_ASSASSIN_POWERUPS_REQUIRED", MASTER_ASSASSIN_POWERUPS_REQUIRED);
     }
 
     static boolean isSmokeBombKit(String kit) {
@@ -97,36 +115,38 @@ final class SneakyAssassinsRules {
     }
 
     static double revealRadiusSquared() {
-        return 12.0D * 12.0D;
+        double radius = GameDebugRuntimeOverrides.intValue("SNEAKY_ASSASSINS_REVEAL_RADIUS_BLOCKS", REVEAL_RADIUS_BLOCKS);
+        return radius * radius;
     }
 
     static double smokeRadiusSquared() {
-        return 5.0D * 5.0D;
+        double radius = GameDebugRuntimeOverrides.intValue("SNEAKY_ASSASSINS_SMOKE_RADIUS_BLOCKS", SMOKE_RADIUS_BLOCKS);
+        return radius * radius;
     }
 
     static long globalRevealCycleMillis() {
-        return 60_000L;
+        return value("GLOBAL_REVEAL_CYCLE_MILLIS", GLOBAL_REVEAL_CYCLE_MILLIS);
     }
 
     static long revealerDurationMillis() {
-        return 5_000L;
+        return value("REVEALER_DURATION_MILLIS", REVEALER_DURATION_MILLIS);
     }
 
     static long smokeCloakDurationMillis() {
-        return 1_200L;
+        return value("SMOKE_CLOAK_DURATION_MILLIS", SMOKE_CLOAK_DURATION_MILLIS);
     }
 
     static long bribeCooldownMillis() {
-        return 8_000L;
+        return value("BRIBE_COOLDOWN_MILLIS", BRIBE_COOLDOWN_MILLIS);
     }
 
     static int sourceNpcCount() {
-        return 200;
+        return GameDebugRuntimeOverrides.intValue("SNEAKY_ASSASSINS_SOURCE_NPC_COUNT", SOURCE_NPC_COUNT);
     }
 
     /** Source NpcManager removes one random town NPC every four seconds while Live. */
     static long npcCullIntervalMillis() {
-        return 4_000L;
+        return value("NPC_CULL_INTERVAL_MILLIS", NPC_CULL_INTERVAL_MILLIS);
     }
 
     static boolean shouldCullTownNpc(boolean live, long nowMillis, long nextCullAtMillis, int npcCount) {
@@ -141,13 +161,16 @@ final class SneakyAssassinsRules {
     static boolean isNpcPatrolAnchorNearby(double npcX, double npcZ, double anchorX, double anchorZ) {
         return Double.isFinite(npcX) && Double.isFinite(npcZ)
                 && Double.isFinite(anchorX) && Double.isFinite(anchorZ)
-                && Math.abs(npcX - anchorX) <= 16.0D
-                && Math.abs(npcZ - anchorZ) <= 16.0D;
+                && Math.abs(npcX - anchorX) <= GameDebugRuntimeOverrides.intValue(
+                        "SNEAKY_ASSASSINS_NPC_PATROL_ANCHOR_DISTANCE_BLOCKS", NPC_PATROL_ANCHOR_DISTANCE_BLOCKS)
+                && Math.abs(npcZ - anchorZ) <= GameDebugRuntimeOverrides.intValue(
+                        "SNEAKY_ASSASSINS_NPC_PATROL_ANCHOR_DISTANCE_BLOCKS", NPC_PATROL_ANCHOR_DISTANCE_BLOCKS);
     }
 
     /** Reborn picks one independent patrol waypoint attempt with probability 1/40 each tick. */
     static boolean shouldIssueNpcPatrolOrder(int randomRoll) {
-        return randomRoll >= 0 && randomRoll < 40;
+        return randomRoll >= 0 && randomRoll < GameDebugRuntimeOverrides.intValue(
+                "SNEAKY_ASSASSINS_NPC_PATROL_ORDER_CHANCE_DENOMINATOR", NPC_PATROL_ORDER_CHANCE_DENOMINATOR);
     }
 
     /** A generated-town patrol destination needs support, two clear blocks and no liquid floor. */
@@ -159,7 +182,23 @@ final class SneakyAssassinsRules {
     /** Reborn applies a recovery jump when a bribed villager cannot move for 800 ms. */
     static boolean shouldRecoverBribedNpc(long nowMillis, long lastMovementAtMillis) {
         return lastMovementAtMillis > 0L && nowMillis >= lastMovementAtMillis
-                && nowMillis - lastMovementAtMillis >= 800L;
+                && nowMillis - lastMovementAtMillis >= value("NPC_STUCK_RECOVERY_MILLIS", NPC_STUCK_RECOVERY_MILLIS);
+    }
+
+    static boolean debuggableRule(String name) {
+        return switch (name) {
+            case "POWERUP_KILL_WINDOW_MILLIS", "FIRST_POWERUP_DELAY_MILLIS", "NEXT_POWERUP_DELAY_MILLIS",
+                    "MAX_ACTIVE_POWERUPS", "MASTER_ASSASSIN_POWERUPS_REQUIRED", "REVEAL_RADIUS_BLOCKS",
+                    "SMOKE_RADIUS_BLOCKS", "GLOBAL_REVEAL_CYCLE_MILLIS", "REVEALER_DURATION_MILLIS",
+                    "SMOKE_CLOAK_DURATION_MILLIS", "BRIBE_COOLDOWN_MILLIS", "SOURCE_NPC_COUNT",
+                    "NPC_CULL_INTERVAL_MILLIS", "NPC_PATROL_ANCHOR_DISTANCE_BLOCKS",
+                    "NPC_PATROL_ORDER_CHANCE_DENOMINATOR", "NPC_STUCK_RECOVERY_MILLIS" -> true;
+            default -> false;
+        };
+    }
+
+    private static long value(String name, long fallback) {
+        return GameDebugRuntimeOverrides.longValue("SNEAKY_ASSASSINS_" + name, fallback);
     }
 
 }

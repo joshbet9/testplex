@@ -70,6 +70,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import au.com.testplex.arcadeports.ArcadeGameModule;
 import au.com.testplex.arcadeports.ArcadeMechanicsModernPlugin;
 import au.com.testplex.arcadeports.ArcadePortGame;
+import au.com.testplex.arcadeports.GameDebugRuntimeOverrides;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -82,13 +83,8 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
     private static final String WORLD_NAME = SnakeMapCatalog.WORLD_NAME;
     private static final String SPECTATE_MENU_TITLE = "Spectator Menu";
     private static final String KIT_MENU_TITLE = "Snake Kits";
-    private static final int MAX_HAZARDS = SnakeRules.MAX_HAZARDS;
     private static final int HOTBAR_ROULETTE_SLOT = 8;
     private static final int ROULETTE_STEPS = 12;
-    private static final long FIRST_HAZARD_DELAY_MS = SnakeRules.FIRST_HAZARD_DELAY_MILLIS;
-    private static final long HAZARD_INTERVAL_MS = SnakeRules.HAZARD_INTERVAL_MILLIS;
-    private static final long PREPARE_COUNTDOWN_MS = SnakeRules.PREPARE_COUNTDOWN_MILLIS;
-    private static final double SEGMENT_SPACING = SnakeRules.SEGMENT_SPACING;
     private static final double SOURCE_BODY_FOLLOW_SPACING = 1.4D;
 
     private final ArcadeMechanicsModernPlugin plugin;
@@ -256,7 +252,8 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
         startingPlayerCount = players.size();
         long now = System.currentTimeMillis();
         startedAt = now;
-        liveAt = now + PREPARE_COUNTDOWN_MS;
+        liveAt = now + GameDebugRuntimeOverrides.longValue("SNAKE_PREPARE_COUNTDOWN_MILLIS",
+                SnakeRules.PREPARE_COUNTDOWN_MILLIS);
         lastAnnouncedCountdownSecond = -1;
         nextFoodAt = Long.MAX_VALUE;
         nextGrowAt = Long.MAX_VALUE;
@@ -632,9 +629,11 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
             }
             nextGrowAt = now + 1_000L;
         }
-        if (now >= nextHazardAt && hazards.size() < MAX_HAZARDS) {
+        if (now >= nextHazardAt && hazards.size() < GameDebugRuntimeOverrides.intValue("SNAKE_MAX_HAZARDS",
+                SnakeRules.MAX_HAZARDS)) {
             boolean spawned = spawnHazard();
-            nextHazardAt = now + (spawned ? HAZARD_INTERVAL_MS : 5_000L);
+            nextHazardAt = now + (spawned ? GameDebugRuntimeOverrides.longValue("SNAKE_HAZARD_INTERVAL_MILLIS",
+                    SnakeRules.HAZARD_INTERVAL_MILLIS) : 5_000L);
         }
 
         if (now - lastSpectatorUpdate >= 500L) {
@@ -681,7 +680,8 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
         startedAt = now;
         nextFoodAt = now + 1_000L;
         nextGrowAt = now + 1_000L;
-        nextHazardAt = now + FIRST_HAZARD_DELAY_MS;
+        nextHazardAt = now + GameDebugRuntimeOverrides.longValue("SNAKE_FIRST_HAZARD_DELAY_MILLIS",
+                SnakeRules.FIRST_HAZARD_DELAY_MILLIS);
         // The 9-second PrepareFreeze period is not counted as player inactivity.
         for (SnakeState state : snakes.values()) {
             if (!state.alive || state.segments.isEmpty()) continue;
@@ -722,7 +722,8 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
         while (state.path.size() > maxPathPoints) state.path.removeLast();
         moveBodyAlongPath(state);
         player.setExp((float) Math.min(0.9999D,
-                (double) state.segments.size() / SnakeRules.SPEED_REFERENCE_LENGTH));
+                (double) state.segments.size() / GameDebugRuntimeOverrides.intValue(
+                        "SNAKE_SPEED_REFERENCE_LENGTH", SnakeRules.SPEED_REFERENCE_LENGTH)));
     }
 
     private void moveBodyAlongPath(SnakeState state) {
@@ -792,7 +793,8 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
         Location origin = mapData.foodSpawnOrigin();
         if (origin == null || origin.getWorld() != arena) return;
         double baseY = origin.getY();
-        for (int attempt = 0; attempt < SnakeRules.FOOD_SPAWN_ATTEMPTS; attempt++) {
+        for (int attempt = 0; attempt < GameDebugRuntimeOverrides.intValue("SNAKE_FOOD_SPAWN_ATTEMPTS",
+                SnakeRules.FOOD_SPAWN_ATTEMPTS); attempt++) {
             double angle = ThreadLocalRandom.current().nextDouble(0.0D, Math.PI * 2.0D);
             double distance = SnakeRules.foodSpawnDistance(ThreadLocalRandom.current().nextDouble());
             int blockX = origin.getBlockX() + (int) Math.round(Math.cos(angle) * distance);
@@ -863,7 +865,8 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
                     ? state.segments.get(state.segments.size() - 2).getLocation().toVector() : null;
             Vector extension = SnakeRules.tailExtensionDirection(
                     previous, last.getLocation().toVector(), state.player.getLocation().getDirection());
-            loc.add(extension.multiply(SEGMENT_SPACING));
+            loc.add(extension.multiply(GameDebugRuntimeOverrides.doubleValue("SNAKE_SEGMENT_SPACING",
+                    SnakeRules.SEGMENT_SPACING)));
             Sheep body = spawnSegment(loc, state.color);
             // Reborn calls UtilEnt.ghost(tail, true, false) for appended segments:
             // keep them visible, but remove their entity collision. The initial head remains collidable.
@@ -915,7 +918,8 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
         hazards.add(cube);
         announce(ChatColor.RED + "" + ChatColor.BOLD + "MAGMA CUBE! " + ChatColor.GRAY
                 + "A size " + cube.getSize() + " hazard has spawned in the arena ("
-                + hazards.size() + "/" + MAX_HAZARDS + ").");
+                + hazards.size() + "/" + GameDebugRuntimeOverrides.intValue("SNAKE_MAX_HAZARDS",
+                        SnakeRules.MAX_HAZARDS) + ").");
         for (SnakeState state : alive) {
             state.player.playSound(state.player.getLocation(), Sound.ENTITY_MAGMA_CUBE_JUMP, 0.8F, 0.8F);
         }
@@ -935,7 +939,8 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
         Location playerLocation = target.getLocation();
         double startAngle = ThreadLocalRandom.current().nextDouble(0.0D, Math.PI * 2.0D);
         int baseY = playerLocation.getBlockY();
-        for (int attempt = 0; attempt < SnakeRules.HAZARD_SPAWN_ATTEMPTS; attempt++) {
+        for (int attempt = 0; attempt < GameDebugRuntimeOverrides.intValue("SNAKE_HAZARD_SPAWN_ATTEMPTS",
+                SnakeRules.HAZARD_SPAWN_ATTEMPTS); attempt++) {
             double angle = startAngle + attempt * 2.399963229728653D;
             double distance = SnakeRules.hazardSpawnDistance(attempt);
             double x = playerLocation.getX() + Math.cos(angle) * distance;
@@ -981,7 +986,9 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
             for (SnakeState state : snakes.values()) {
                 if (!state.alive || !state.player.isOnline()) continue;
                 double distance = cube.getLocation().distanceSquared(state.player.getLocation());
-                if (distance < SnakeRules.HAZARD_CONTACT_RADIUS * SnakeRules.HAZARD_CONTACT_RADIUS) {
+                double contactRadius = GameDebugRuntimeOverrides.doubleValue("SNAKE_HAZARD_CONTACT_RADIUS",
+                        SnakeRules.HAZARD_CONTACT_RADIUS);
+                if (distance < contactRadius * contactRadius) {
                     if (!SnakeRules.shouldConsumeHazardOnContact(state.rouletteActive)) {
                         // Reborn leaves this cube in the arena while the current roll finishes.
                         nearest = null;
@@ -998,11 +1005,13 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
                     nearest = state;
                 }
             }
-            if (nearest != null && tick % SnakeRules.HAZARD_STEERING_INTERVAL_TICKS == 0) {
+            if (nearest != null && tick % GameDebugRuntimeOverrides.intValue(
+                    "SNAKE_HAZARD_STEERING_INTERVAL_TICKS", SnakeRules.HAZARD_STEERING_INTERVAL_TICKS) == 0) {
                 Vector direction = nearest.player.getLocation().toVector().subtract(cube.getLocation().toVector());
                 direction.setY(0.0D);
                 if (direction.lengthSquared() > 1.0E-6D) {
-                    Vector velocity = direction.normalize().multiply(SnakeRules.HAZARD_STEERING_SPEED);
+                    Vector velocity = direction.normalize().multiply(GameDebugRuntimeOverrides.doubleValue(
+                            "SNAKE_HAZARD_STEERING_SPEED", SnakeRules.HAZARD_STEERING_SPEED));
                     velocity.setY(cube.getVelocity().getY());
                     cube.setVelocity(velocity);
                 }
@@ -1192,6 +1201,7 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
         if (!running) return;
         running = false;
         live = false;
+        GameDebugRuntimeOverrides.clear();
         liveAt = 0L;
         lastAnnouncedCountdownSecond = -1;
         if (announceWinner && winner != null) announce(ChatColor.GOLD + "" + ChatColor.BOLD + winner.getName() + " won Snake!");

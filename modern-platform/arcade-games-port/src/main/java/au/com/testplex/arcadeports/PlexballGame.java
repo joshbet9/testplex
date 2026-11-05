@@ -81,20 +81,30 @@ public final class PlexballGame implements Listener {
     public static final String WORLD_NAME = "testplex_plexball_arena_v1";
     private static final int FLOOR_Y = 64;
     private static final int ARENA_MIN_Z = -100;
-    private static final int SNAPSHOT_RETENTION = PlexballRules.PLAYER_HISTORY_TICKS;
     private static final int QUEUE_COUNTDOWN_TICKS = 100;
     private static final int QUICK_COUNTDOWN_TICKS = 40;
     private static final int INTRO_TICKS = 40;
     private static final int TURN_BREAK_TICKS = 12;
     private static final int BALL_MAX_FLIGHT_TICKS = 85;
-    private static final long INPUT_GRACE_NANOS = PlexballRules.MAX_REWIND_TICKS * 50_000_000L;
     private static final double BALL_RADIUS = 0.24D;
-    private static final double CATCH_REACH = PlexballRules.BASE_CATCH_RADIUS;
     private static final double FIELD_PLAYER_EYE_OFFSET = 1.0D;
     private static final String STATS_MENU_TITLE = ChatColor.GOLD + "Plexball Progress";
     private static final String KIT_MENU_TITLE = ChatColor.AQUA + "Plexball Kits";
 
     private enum Phase { IDLE, INTRO, BATTING, BALL_FLIGHT, TURN_BREAK }
+
+    private static int snapshotRetention() {
+        return GameDebugRuntimeOverrides.intValue("PLEXBALL_PLAYER_HISTORY_TICKS", PlexballRules.PLAYER_HISTORY_TICKS);
+    }
+
+    private static long inputGraceNanos() {
+        return GameDebugRuntimeOverrides.intValue("PLEXBALL_MAX_REWIND_TICKS", PlexballRules.MAX_REWIND_TICKS)
+                * 50_000_000L;
+    }
+
+    private static double catchReach() {
+        return GameDebugRuntimeOverrides.doubleValue("PLEXBALL_BASE_CATCH_RADIUS", PlexballRules.BASE_CATCH_RADIUS);
+    }
 
     public enum Kit {
         SLUGGER("slugger", "Slugger", "Power Dive", Material.IRON_SWORD, 1.07D),
@@ -439,7 +449,7 @@ public final class PlexballGame implements Listener {
         if (phase != Phase.IDLE || world == null || requestedParticipants == null) return false;
         List<Player> participants = new ArrayList<>(requestedParticipants.stream()
                 .filter(player -> player != null && player.isOnline())
-                .limit(PlexballRules.MAX_PLAYERS)
+                .limit(GameDebugRuntimeOverrides.intValue("PLEXBALL_MAX_PLAYERS", PlexballRules.MAX_PLAYERS))
                 .toList());
         if (!PlexballRules.hasValidPlayerCount(participants.size())) return false;
         Collections.shuffle(participants, random);
@@ -462,7 +472,7 @@ public final class PlexballGame implements Listener {
         suddenDeathTurnIndex = 0;
         suddenDeath = false;
         batterId = participants.get(0).getUniqueId();
-        matchEndTick = serverTick + PlexballRules.MATCH_LIMIT_TICKS;
+        matchEndTick = serverTick + GameDebugRuntimeOverrides.intValue("PLEXBALL_MATCH_LIMIT_TICKS", PlexballRules.MATCH_LIMIT_TICKS);
         matchEndNanos = System.nanoTime() + 180_000_000_000L;
         phase = Phase.INTRO;
         phaseEndTick = serverTick + INTRO_TICKS;
@@ -585,7 +595,7 @@ public final class PlexballGame implements Listener {
             }
             case BATTING -> {
                 updateBattingHud();
-                if (System.nanoTime() >= battingDeadlineNanos + INPUT_GRACE_NANOS) {
+                if (System.nanoTime() >= battingDeadlineNanos + inputGraceNanos()) {
                     plugin.getLogger().fine("Plexball batting timeout for " + batterId);
                     resolveAttempt(0.0D, false, false, "Strike! No swing in time.");
                 }
@@ -646,8 +656,8 @@ public final class PlexballGame implements Listener {
         battingStartTick = serverTick;
         timingCycleTicks = 30 + random.nextInt(13);
         timingPhaseOffset = random.nextInt(timingCycleTicks);
-        int battingTicks = playoff ? PlexballRules.SUDDEN_DEATH_BATTING_TICKS
-                : PlexballRules.NORMAL_BATTING_TICKS;
+        int battingTicks = playoff ? GameDebugRuntimeOverrides.intValue("PLEXBALL_SUDDEN_DEATH_BATTING_TICKS", PlexballRules.SUDDEN_DEATH_BATTING_TICKS)
+                : GameDebugRuntimeOverrides.intValue("PLEXBALL_NORMAL_BATTING_TICKS", PlexballRules.NORMAL_BATTING_TICKS);
         battingDeadlineTick = serverTick + battingTicks;
         battingDeadlineNanos = System.nanoTime() + battingTicks * 50_000_000L;
         phase = Phase.BATTING;
@@ -767,7 +777,7 @@ public final class PlexballGame implements Listener {
         if (battingPlayer == null) return;
         PlayerResult result = results.computeIfAbsent(battingPlayer, ignored -> new PlayerResult());
         result.atBats++;
-        double recordedDistance = caught ? 0.0D : PlexballRules.clamp(distance, 0.0D, PlexballRules.HOME_RUN_METRES);
+        double recordedDistance = caught ? 0.0D : PlexballRules.clamp(distance, 0.0D, GameDebugRuntimeOverrides.doubleValue("PLEXBALL_HOME_RUN_METRES", PlexballRules.HOME_RUN_METRES));
         result.bestDistance = Math.max(result.bestDistance, recordedDistance);
         result.totalDistance += recordedDistance;
         if (homeRun && !caught) {
@@ -836,7 +846,7 @@ public final class PlexballGame implements Listener {
                 // the ball may be parked outside the fair triangle awaiting grace.
                 distance = terminalDistance;
             } else if (ballPosition != null && teeBallPosition != null) {
-                distance = Math.min(PlexballRules.HOME_RUN_METRES,
+                distance = Math.min(GameDebugRuntimeOverrides.doubleValue("PLEXBALL_HOME_RUN_METRES", PlexballRules.HOME_RUN_METRES),
                         PlexballRules.horizontalDistance(teeBallPosition, ballPosition));
             } else {
                 distance = 0.0D;
@@ -1019,7 +1029,7 @@ public final class PlexballGame implements Listener {
         Deque<PlayerFrame> frames = playerHistory.computeIfAbsent(player.getUniqueId(), ignored -> new ArrayDeque<>());
         frames.clear();
         Location location = player.getLocation().clone();
-        long first = serverTick - PlexballRules.MAX_REWIND_TICKS;
+        long first = serverTick - GameDebugRuntimeOverrides.intValue("PLEXBALL_MAX_REWIND_TICKS", PlexballRules.MAX_REWIND_TICKS);
         for (long tick = first; tick <= serverTick; tick++) frames.addLast(new PlayerFrame(tick, location));
     }
 
@@ -1030,7 +1040,7 @@ public final class PlexballGame implements Listener {
             if (player == null || !player.isOnline() || player.getWorld() != arena) continue;
             Deque<PlayerFrame> frames = playerHistory.computeIfAbsent(id, ignored -> new ArrayDeque<>());
             frames.addLast(new PlayerFrame(serverTick, player.getLocation()));
-            while (frames.size() > SNAPSHOT_RETENTION) frames.removeFirst();
+            while (frames.size() > snapshotRetention()) frames.removeFirst();
         }
     }
 
@@ -1271,7 +1281,7 @@ public final class PlexballGame implements Listener {
 
     private static String formatDistance(double distance) {
         return distance < 0.05D ? "—"
-                : String.format(java.util.Locale.ROOT, "%.1fm", Math.min(distance, PlexballRules.HOME_RUN_METRES));
+                : String.format(java.util.Locale.ROOT, "%.1fm", Math.min(distance, GameDebugRuntimeOverrides.doubleValue("PLEXBALL_HOME_RUN_METRES", PlexballRules.HOME_RUN_METRES)));
     }
 
     private void showMatchResultTitle(String title, String subtitle) {
@@ -1298,14 +1308,14 @@ public final class PlexballGame implements Listener {
             return;
         }
         Vector previous = ballPosition.clone();
-        ballVelocity.setY(ballVelocity.getY() - PlexballRules.BALL_GRAVITY_PER_TICK);
+        ballVelocity.setY(ballVelocity.getY() - GameDebugRuntimeOverrides.doubleValue("PLEXBALL_BALL_GRAVITY_PER_TICK", PlexballRules.BALL_GRAVITY_PER_TICK));
         if (curveAcceleration != 0.0D && curveDirection != null) {
             ballVelocity.add(curveDirection.clone().multiply(curveAcceleration));
         }
         ballPosition.add(ballVelocity);
         ballFlightTicks++;
         ballHistory.put(serverTick, ballPosition.clone());
-        while (ballHistory.size() > SNAPSHOT_RETENTION + 2) ballHistory.pollFirstEntry();
+        while (ballHistory.size() > snapshotRetention() + 2) ballHistory.pollFirstEntry();
         if (ballDisplay != null && ballDisplay.isValid()) {
             ballDisplay.teleport(new Location(arena, ballPosition.getX(), ballPosition.getY(), ballPosition.getZ()));
         }
@@ -1315,10 +1325,10 @@ public final class PlexballGame implements Listener {
 
         double distance = PlexballRules.horizontalDistance(teeBallPosition, ballPosition);
         boolean inFairTriangle = PlexballRules.isInsideField(ballPosition.getX(), ballPosition.getZ());
-        boolean fairFenceCrossing = ballPosition.getZ() <= -PlexballRules.HOME_RUN_METRES
-                && Math.abs(ballPosition.getX()) <= PlexballRules.fieldHalfWidthAtZ(-PlexballRules.HOME_RUN_METRES);
-        if (distance >= PlexballRules.HOME_RUN_METRES && (inFairTriangle || fairFenceCrossing)) {
-            scheduleTerminalResolution(PlexballRules.HOME_RUN_METRES, true, null);
+        boolean fairFenceCrossing = ballPosition.getZ() <= -GameDebugRuntimeOverrides.doubleValue("PLEXBALL_HOME_RUN_METRES", PlexballRules.HOME_RUN_METRES)
+                && Math.abs(ballPosition.getX()) <= PlexballRules.fieldHalfWidthAtZ(-GameDebugRuntimeOverrides.doubleValue("PLEXBALL_HOME_RUN_METRES", PlexballRules.HOME_RUN_METRES));
+        if (distance >= GameDebugRuntimeOverrides.doubleValue("PLEXBALL_HOME_RUN_METRES", PlexballRules.HOME_RUN_METRES) && (inFairTriangle || fairFenceCrossing)) {
+            scheduleTerminalResolution(GameDebugRuntimeOverrides.doubleValue("PLEXBALL_HOME_RUN_METRES", PlexballRules.HOME_RUN_METRES), true, null);
             return;
         }
         if (!inFairTriangle) {
@@ -1359,7 +1369,7 @@ public final class PlexballGame implements Listener {
         terminalMessage = message;
         // Wait only long enough for the maximum permitted network rewind.
         // A fielder's historical click can still claim a valid pre-terminal catch.
-        terminalResolutionTick = serverTick + PlexballRules.MAX_REWIND_TICKS + 1L;
+        terminalResolutionTick = serverTick + GameDebugRuntimeOverrides.intValue("PLEXBALL_MAX_REWIND_TICKS", PlexballRules.MAX_REWIND_TICKS) + 1L;
         ballVelocity = new Vector();
     }
 
@@ -1418,7 +1428,7 @@ public final class PlexballGame implements Listener {
         if (phase != Phase.BATTING || !player.getUniqueId().equals(batterId)) return;
         int pingEstimate = Math.max(0, player.getPing());
         int rewind = PlexballRules.latencyRewindTicks(pingEstimate);
-        long estimatedInputDelayNanos = Math.min(INPUT_GRACE_NANOS, pingEstimate * 500_000L);
+        long estimatedInputDelayNanos = Math.min(inputGraceNanos(), pingEstimate * 500_000L);
         long estimatedInputNanos = System.nanoTime() - estimatedInputDelayNanos;
         if (estimatedInputNanos > battingDeadlineNanos) {
             player.sendActionBar(Component.text("TIME — your swing arrived outside the batting window."));
@@ -1531,8 +1541,8 @@ public final class PlexballGame implements Listener {
         int rewind = PlexballRules.latencyRewindTicks(Math.max(0, player.getPing()));
         long startTick = Math.max(ballStartTick, serverTick - rewind);
         boolean sureHands = sureHandsArmed.remove(id);
-        int window = PlexballRules.BASE_CATCH_WINDOW_TICKS + (sureHands ? 4 : 0);
-        double radius = CATCH_REACH + (sureHands ? 0.25D : 0.0D);
+        int window = GameDebugRuntimeOverrides.intValue("PLEXBALL_BASE_CATCH_WINDOW_TICKS", PlexballRules.BASE_CATCH_WINDOW_TICKS) + (sureHands ? 4 : 0);
+        double radius = catchReach() + (sureHands ? 0.25D : 0.0D);
         CatchAttempt attempt = new CatchAttempt(startTick, window, radius);
         catchAttempts.put(id, attempt);
         player.sendActionBar(Component.text(sureHands ? "SURE HANDS — catch window extended" : "CATCH!"));
@@ -1579,7 +1589,7 @@ public final class PlexballGame implements Listener {
         Vector velocity = ballVelocity.clone();
         for (int step = 0; step < 24; step += 2) {
             for (int i = 0; i < 2; i++) {
-                velocity.setY(velocity.getY() - PlexballRules.BALL_GRAVITY_PER_TICK);
+                velocity.setY(velocity.getY() - GameDebugRuntimeOverrides.doubleValue("PLEXBALL_BALL_GRAVITY_PER_TICK", PlexballRules.BALL_GRAVITY_PER_TICK));
                 if (curveAcceleration != 0.0D && curveDirection != null) {
                     velocity.add(curveDirection.clone().multiply(curveAcceleration));
                 }
@@ -1692,7 +1702,7 @@ public final class PlexballGame implements Listener {
     }
 
     private void teleportToField(Player player, int playerIndex) {
-        int slot = Math.floorMod(playerIndex, PlexballRules.MAX_PLAYERS);
+        int slot = Math.floorMod(playerIndex, GameDebugRuntimeOverrides.intValue("PLEXBALL_MAX_PLAYERS", PlexballRules.MAX_PLAYERS));
         int row = slot / 4;
         int column = slot % 4;
         double z = -22.0D - row * 22.0D;

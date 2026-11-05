@@ -15,7 +15,8 @@ public final class MilkCowRules {
     public static int cowCountForPlayers(int playerCount) {
         if (playerCount <= 1) return 0;
         return Math.max(1, Math.min(playerCount - 1,
-                (int) Math.round(playerCount * COW_TEAM_RATIO)));
+                (int) Math.round(playerCount * GameDebugRuntimeOverrides.doubleValue(
+                        "MILK_THE_COW_COW_TEAM_RATIO", COW_TEAM_RATIO))));
     }
 
     public static int scoreAfterChange(int currentScore, int change) {
@@ -23,6 +24,6 @@ public final class MilkCowRules {
     }
 
     public static boolean hasWon(int score) {
-        return score >= SCORE_TO_WIN;
+        return score >= GameDebugRuntimeOverrides.intValue("MILK_THE_COW_SCORE_TO_WIN", SCORE_TO_WIN);
     }
 }

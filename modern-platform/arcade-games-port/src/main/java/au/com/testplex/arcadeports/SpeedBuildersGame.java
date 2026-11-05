@@ -81,7 +81,7 @@ public final class SpeedBuildersGame implements Listener {
     private static final String SOURCE_WORLD_NAME = "arcadeport_source_speedbuilders_v1";
     private static final String MIRROR_WORLD_NAME = "arcadeport_source_speedbuilders_v2";
     private static final String SOURCE_MAP_RESOURCE = "source-maps/Speed Builders/SpeedBuilders_Shroomland_Lake.zip";
-    private static final int DEFAULT_MATCH_ROUNDS = 5;
+    private static final int DEFAULT_MATCH_ROUNDS = SpeedBuildersRules.DEFAULT_MATCH_ROUNDS;
     private static final int FINAL_RESULTS_SECONDS = 5;
     private static final long NORMAL_QUEUE_TICKS = 100L;
     private static final long QUICK_QUEUE_TICKS = 40L;
@@ -106,10 +106,10 @@ public final class SpeedBuildersGame implements Listener {
     private long phaseDeadlineTick;
     private int round;
     private int matchRoundLimit = DEFAULT_MATCH_ROUNDS;
-    private int buildTimeTracker = SpeedBuildersRules.DEFAULT_BUILD_SECONDS;
+    private int buildTimeTracker = GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_DEFAULT_BUILD_SECONDS", SpeedBuildersRules.DEFAULT_BUILD_SECONDS);
     private long buildPhaseStartedTick;
     private boolean firstPerfectBuildAwarded;
-    private int buildSeconds = SpeedBuildersRules.DEFAULT_BUILD_SECONDS;
+    private int buildSeconds = GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_DEFAULT_BUILD_SECONDS", SpeedBuildersRules.DEFAULT_BUILD_SECONDS);
     private Template currentTemplate;
     private String stopReason = "";
     private boolean shuttingDown;
@@ -125,6 +125,13 @@ public final class SpeedBuildersGame implements Listener {
 
     public boolean isActive() {
         return phase != Phase.IDLE || testRosterStarting;
+    }
+
+    /** Shortens the current round phase to one tick for authorised test tooling. */
+    public boolean debugAdvancePhase() {
+        if (phase == Phase.IDLE) return false;
+        phaseDeadlineTick = tick;
+        return true;
     }
 
     public String status() {
@@ -501,13 +508,14 @@ public final class SpeedBuildersGame implements Listener {
             loadSourceTemplates(participants.size());
             arena = ensureArena();
             buildArenaFloor();
-            matchRoundLimit = Math.max(1, Math.min(templates.size(),
-                    plugin.getConfig().getInt("speed-builders.match-rounds", DEFAULT_MATCH_ROUNDS)));
+            int configuredRounds = GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_DEFAULT_MATCH_ROUNDS",
+                    plugin.getConfig().getInt("speed-builders.match-rounds", DEFAULT_MATCH_ROUNDS));
+            matchRoundLimit = Math.max(1, Math.min(templates.size(), configuredRounds));
             players.clear();
             matchHistory.clear();
             round = 0;
-            buildTimeTracker = SpeedBuildersRules.DEFAULT_BUILD_SECONDS;
-            buildSeconds = SpeedBuildersRules.DEFAULT_BUILD_SECONDS;
+            buildTimeTracker = GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_DEFAULT_BUILD_SECONDS", SpeedBuildersRules.DEFAULT_BUILD_SECONDS);
+            buildSeconds = GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_DEFAULT_BUILD_SECONDS", SpeedBuildersRules.DEFAULT_BUILD_SECONDS);
             firstPerfectBuildAwarded = false;
             unusedTemplates.clear();
             unusedTemplates.addAll(templates);
@@ -773,7 +781,7 @@ public final class SpeedBuildersGame implements Listener {
         // Reborn computes the next round's time before decrementing the tracker.
         if (round > 1) buildTimeTracker = Math.max(1, buildTimeTracker - 1);
         phase = Phase.VIEWING;
-        phaseDeadlineTick = tick + SpeedBuildersRules.DEFAULT_VIEW_SECONDS * 20L;
+        phaseDeadlineTick = tick + GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_DEFAULT_VIEW_SECONDS", SpeedBuildersRules.DEFAULT_VIEW_SECONDS) * 20L;
 
         for (PlayerState state : builders) {
             state.perfect = false;
@@ -786,7 +794,7 @@ public final class SpeedBuildersGame implements Listener {
             spawnTemplateMobs(state, state.plot, currentTemplate);
             teleportToPlot(state);
             state.player.sendTitle(ChatColor.GOLD + currentTemplate.name(),
-                    ChatColor.YELLOW + "Memorise the model — " + SpeedBuildersRules.DEFAULT_VIEW_SECONDS + " seconds",
+                    ChatColor.YELLOW + "Memorise the model — " + GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_DEFAULT_VIEW_SECONDS", SpeedBuildersRules.DEFAULT_VIEW_SECONDS) + " seconds",
                     5, 50, 10);
             state.player.playSound(state.player.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_PLING, 0.8F, 1.15F);
         }
@@ -856,7 +864,7 @@ public final class SpeedBuildersGame implements Listener {
         phase = round >= matchRoundLimit ? Phase.RESULTS : Phase.INTERMISSION;
         phaseDeadlineTick = tick + (phase == Phase.RESULTS
                 ? FINAL_RESULTS_SECONDS * 20L
-                : SpeedBuildersRules.INTERMISSION_SECONDS * 20L);
+                : GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_INTERMISSION_SECONDS", SpeedBuildersRules.INTERMISSION_SECONDS) * 20L);
         refreshHud();
     }
 
@@ -966,6 +974,7 @@ public final class SpeedBuildersGame implements Listener {
         matchHistory.clear();
         refreshHud();
         releaseSessionLockAfterRestoration();
+        GameDebugRuntimeOverrides.clear();
     }
 
     private void persistMatchProgress(Set<UUID> winnerIds) {

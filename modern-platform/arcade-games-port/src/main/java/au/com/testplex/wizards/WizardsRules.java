@@ -1,5 +1,6 @@
 package au.com.testplex.wizards;
 
+import au.com.testplex.arcadeports.GameDebugRuntimeOverrides;
 import org.bukkit.Material;
 
 import java.util.List;
@@ -24,7 +25,8 @@ public final class WizardsRules {
 
     public static float manaPerSecond(WizardsKit kit, int soulStars) {
         if (kit == null) throw new IllegalArgumentException("kit is required");
-        return kit.manaPerSecond() + Math.max(0, soulStars) * SOUL_STAR_MANA_PER_SECOND;
+        return kit.manaPerSecond() + Math.max(0, soulStars) * GameDebugRuntimeOverrides.floatValue(
+                "WIZARDS_SOUL_STAR_MANA_PER_SECOND", SOUL_STAR_MANA_PER_SECOND);
     }
 
     public static float initialMana() { return 0.0F; }
@@ -165,8 +167,11 @@ public final class WizardsRules {
     }
 
     public static int nextEndgameStrikeInterval(int currentMillis) {
-        return Math.max(ENDGAME_MIN_STRIKE_MILLIS,
-                currentMillis - ENDGAME_STRIKE_REDUCTION_PER_TICK_MILLIS);
+        int minimum = GameDebugRuntimeOverrides.intValue("WIZARDS_ENDGAME_MIN_STRIKE_MILLIS",
+                ENDGAME_MIN_STRIKE_MILLIS);
+        int reduction = GameDebugRuntimeOverrides.intValue("WIZARDS_ENDGAME_STRIKE_REDUCTION_PER_TICK_MILLIS",
+                ENDGAME_STRIKE_REDUCTION_PER_TICK_MILLIS);
+        return Math.max(minimum, currentMillis - reduction);
     }
 
     public static double endgameDamage(double size, double distance) {

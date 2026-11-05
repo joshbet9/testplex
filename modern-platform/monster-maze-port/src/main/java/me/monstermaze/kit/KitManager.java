@@ -6,6 +6,7 @@ import me.monstermaze.event.AbilityUseEvent;
 import me.monstermaze.event.EntityLaunchEvent;
 import me.monstermaze.event.MonsterBumpPlayerEvent;
 import me.monstermaze.game.GameManager;
+import me.monstermaze.game.MazeDebugRules;
 import me.monstermaze.game.GameState;
 import me.monstermaze.game.MazeMode;
 import me.monstermaze.util.TextUtil;
@@ -91,12 +92,22 @@ public class KitManager implements Listener {
     private final Map<UUID, Long> cryoCooldown = new HashMap<UUID, Long>();
 
     /** Body Builder secondary config. */
-    private static final long BODY_RUSH_DURATION_MS = 10000L;
-
-    /** Slowballer secondary config. */
-    private static final int CRYO_COOLDOWN_MS = 30000;
-    private static final long CRYO_FREEZE_MS = 3000;
-    private static final int CRYO_RADIUS = 6;
+    private long bodyRushDurationMillis() {
+        return MazeDebugRules.longValue(game.getMode(), "BODY_RUSH_DURATION_MILLIS",
+                MazeDebugRules.BODY_RUSH_DURATION_MILLIS);
+    }
+    private int cryoCooldownMillis() {
+        return MazeDebugRules.intValue(game.getMode(), "CRYO_COOLDOWN_MILLIS",
+                MazeDebugRules.CRYO_COOLDOWN_MILLIS);
+    }
+    private long cryoFreezeMillis() {
+        return MazeDebugRules.longValue(game.getMode(), "CRYO_FREEZE_MILLIS",
+                MazeDebugRules.CRYO_FREEZE_MILLIS);
+    }
+    private int cryoRadiusBlocks() {
+        return MazeDebugRules.intValue(game.getMode(), "CRYO_RADIUS_BLOCKS",
+                MazeDebugRules.CRYO_RADIUS_BLOCKS);
+    }
 
     /** Player -> how they view OTHER players (their dye state). Default VISIBLE. */
     private final Map<UUID, VisMode> visMode = new HashMap<UUID, VisMode>();
@@ -252,8 +263,8 @@ public class KitManager implements Listener {
         player.removePotionEffect(PotionEffectType.INVISIBILITY);
         player.removePotionEffect(PotionEffectType.SPEED);
         AttributeInstance a = player.getAttribute(Attribute.JUMP_STRENGTH);
-        if (a != null && Math.abs(a.getBaseValue() - JUMP_STRENGTH_DEFAULT) > 0.0001) {
-            a.setBaseValue(JUMP_STRENGTH_DEFAULT);
+        if (a != null && Math.abs(a.getBaseValue() - jumpStrengthDefault()) > 0.0001) {
+            a.setBaseValue(jumpStrengthDefault());
         }
         AttributeInstance m = player.getAttribute(Attribute.MOVEMENT_SPEED);
         if (m != null && Math.abs(m.getBaseValue() - 0.100D) > 0.0001) {
@@ -294,7 +305,9 @@ public class KitManager implements Listener {
      * single-block gaps, so it was removed as redundant.
      */
     /** Vanilla jump strength (attribute default) — restored for Jumpers / out of game. */
-    private static final double JUMP_STRENGTH_DEFAULT = 0.42D;
+    private double jumpStrengthDefault() {
+        return MazeDebugRules.doubleValue(game.getMode(), "JUMP_STRENGTH", MazeDebugRules.JUMP_STRENGTH);
+    }
 
     public void tickJumpLock() {
         if (game.getState() != GameState.LIVE && game.getState() != GameState.STARTING) return;
@@ -310,7 +323,7 @@ public class KitManager implements Listener {
             // The lock itself: jump_strength 0 pins locked players to the ground exactly like
             // the -10 amp did. Setting the base attribute patches the value only when it
             // actually changed (the client is fully in sync, so no snap, no fights).
-            double jumpTarget = allowJump ? JUMP_STRENGTH_DEFAULT : 0.0D;
+            double jumpTarget = allowJump ? jumpStrengthDefault() : 0.0D;
             AttributeInstance a = p.getAttribute(Attribute.JUMP_STRENGTH);
             if (a != null && Math.abs(a.getBaseValue() - jumpTarget) > 0.0001) {
                 a.setBaseValue(jumpTarget);
@@ -555,7 +568,7 @@ public class KitManager implements Listener {
         Long lastUse = cryoCooldown.get(id);
         if (lastUse == null) return "READY";
 
-        long remainingMs = lastUse.longValue() + CRYO_COOLDOWN_MS - System.currentTimeMillis();
+        long remainingMs = lastUse.longValue() + cryoCooldownMillis() - System.currentTimeMillis();
         if (remainingMs <= 0L) {
             cryoCooldown.remove(id);
             return "READY";
@@ -860,7 +873,7 @@ public class KitManager implements Listener {
         event.setCancelled(true);
         if (hand.getAmount() <= 1) player.getInventory().setItemInMainHand(null);
         else { hand.setAmount(hand.getAmount()-1); player.getInventory().setItemInMainHand(hand); }
-        bodyRushUntil.put(player.getUniqueId(), now + BODY_RUSH_DURATION_MS);
+        bodyRushUntil.put(player.getUniqueId(), now + bodyRushDurationMillis());
         bodyRushHitFeedback.remove(player.getUniqueId());
         bodyRushVisual(player);
         TextUtil.actionBar(player, ChatColor.RED + ChatColor.BOLD.toString() + "BODY RUSH 10.0s");
@@ -930,7 +943,7 @@ public class KitManager implements Listener {
             Long last=cryoCooldown.get(id);
             if(last==null) TextUtil.actionBar(p,ChatColor.AQUA+ChatColor.BOLD.toString()+"CRYO BLITZ READY");
             else {
-                long left=(last.longValue()+CRYO_COOLDOWN_MS)-now;
+                long left=(last.longValue()+cryoCooldownMillis())-now;
                 if(left<=0) { cryoCooldown.remove(id); TextUtil.actionBar(p,ChatColor.AQUA+ChatColor.BOLD.toString()+"CRYO BLITZ READY"); }
                 else TextUtil.actionBar(p,ChatColor.AQUA+ChatColor.BOLD.toString()+"CRYO BLITZ "+String.format(java.util.Locale.US,"%.1fs",left/1000.0));
             }
@@ -954,8 +967,8 @@ public class KitManager implements Listener {
 
         long now = System.currentTimeMillis();
         Long last = cryoCooldown.get(player.getUniqueId());
-        if (last != null && now - last < CRYO_COOLDOWN_MS) {
-            long left = (CRYO_COOLDOWN_MS - (now - last)) / 1000L;
+        if (last != null && now - last < cryoCooldownMillis()) {
+            long left = (cryoCooldownMillis() - (now - last)) / 1000L;
             player.sendMessage(ChatColor.AQUA + "Cryo Blitz on cooldown (" + left + "s).");
             return;
         }
@@ -968,8 +981,8 @@ public class KitManager implements Listener {
             for (LivingEntity ent : mm.getMonsters()) list.add(ent);
             for (LivingEntity ent : list) {
                 if (ent == null || !ent.isValid()) continue;
-                if (player.getLocation().distanceSquared(ent.getLocation()) > CRYO_RADIUS * CRYO_RADIUS) continue;
-                mm.freeze(ent, now + CRYO_FREEZE_MS);
+                if (player.getLocation().distanceSquared(ent.getLocation()) > cryoRadiusBlocks() * cryoRadiusBlocks()) continue;
+                mm.freeze(ent, now + cryoFreezeMillis());
                 ent.getWorld().spawnParticle(Particle.SNOWFLAKE, ent.getLocation(), 12, 0.3, 0.6, 0.3, 0.02);
                 frozenCount++;
             }
@@ -978,7 +991,7 @@ public class KitManager implements Listener {
         player.playSound(player.getLocation(), Sound.ENTITY_SNOWBALL_THROW, 1.0f, 0.5f);
         TextUtil.title(player, "", ChatColor.AQUA + "" + ChatColor.BOLD + "Cryo Blitz!"
                         + ChatColor.WHITE + " " + frozenCount + " mob(s) frozen", 5, 30, 5);
-        if (frozenCount > 0) cryoFrozenUntil.put(player.getUniqueId(), now + CRYO_FREEZE_MS);
+        if (frozenCount > 0) cryoFrozenUntil.put(player.getUniqueId(), now + cryoFreezeMillis());
         cryoVisual(player);
         // NOTE: do not rewrite slot 0 here. The dropped item is restored by the cancelled drop,
         // and swapping the slot's ItemStack before the restore could make 1.8 place the restored
@@ -1003,10 +1016,10 @@ public class KitManager implements Listener {
         long rem = -1;
         Long t = cryoCooldown.get(playerId);
         if (t != null) {
-            rem = (t.longValue() + CRYO_COOLDOWN_MS) - now;
+            rem = (t.longValue() + cryoCooldownMillis()) - now;
         }
         java.util.List<String> lore = new java.util.ArrayList<String>();
-        if (game.qolEnabled()) lore.add(ChatColor.GRAY + "Q-drop: Cryo Blitz (freeze " + CRYO_RADIUS + " blocks).");
+        if (game.qolEnabled()) lore.add(ChatColor.GRAY + "Q-drop: Cryo Blitz (freeze " + cryoRadiusBlocks() + " blocks).");
         if (rem >= 0) {
             if (game.qolEnabled()) lore.add(ChatColor.AQUA + "Cryo Blitz ready in " + (rem / 1000L) + "s");
         } else {

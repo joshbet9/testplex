@@ -143,7 +143,9 @@ public final class SpeedBuildersRules {
         }
         int adjusted = (int) (multiplier * (baseSeconds + addSeconds - subtractSeconds));
         if (exactSeconds != null) adjusted = exactSeconds;
-        return Math.max(MIN_BUILD_SECONDS, Math.min(MAX_BUILD_SECONDS, adjusted));
+        int min = GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_MIN_BUILD_SECONDS", MIN_BUILD_SECONDS);
+        int max = GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_MAX_BUILD_SECONDS", MAX_BUILD_SECONDS);
+        return Math.max(min, Math.min(max, adjusted));
     }
 
     /** Material-only compatibility scorer used by older simple fixtures. */
