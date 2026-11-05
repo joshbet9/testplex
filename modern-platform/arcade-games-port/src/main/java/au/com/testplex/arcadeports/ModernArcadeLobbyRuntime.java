@@ -1296,6 +1296,14 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                         "Allow this kit's leap, arrows or carry effects for authorised testers.", true));
             }
         }
+        if (game == ArcadePortGame.TURF_WARS) {
+            for (String kit : List.of("infiltrator", "shredder", "fortifier")) {
+                String key = "ability-" + kit;
+                features.put(key, new DebugFeature(key, "Kit feature: " + humanizeDebugKey(kit),
+                        Material.BOW,
+                        "Allow this kit's territory, barrage or fortification feature for authorised testers.", true));
+            }
+        }
         return List.copyOf(features.values());
     }
 
@@ -1324,6 +1332,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.DEATH_TAG && key.startsWith("ability-"))
                 || (game == ArcadePortGame.EVOLUTION && key.startsWith("ability-"))
                 || (game == ArcadePortGame.SHEEP_QUEST && key.startsWith("ability-"))
+                || (game == ArcadePortGame.TURF_WARS && key.startsWith("ability-"))
                 || (game == ArcadePortGame.SUPER_SPLOOR && key.startsWith("special-"))
                 || "DRAGONS_SPAWNING_ENABLED".equals(key)
                 || "DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED".equals(key)

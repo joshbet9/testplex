@@ -543,6 +543,24 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void turfWarsKitSwitchesGateInfiltratorShredderAndFortifierPerks() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        assertTrue(lobby.contains("List.of(\"infiltrator\", \"shredder\", \"fortifier\")"));
+        assertTrue(manager.contains("debugKitFeatureEnabled(player, ArcadePortGame.TURF_WARS, \"infiltrator\")"));
+        assertTrue(manager.contains("debugKitFeatureEnabled(player, ArcadePortGame.TURF_WARS, \"shredder\")"));
+        assertTrue(manager.contains("debugKitFeatureEnabled(player, ArcadePortGame.TURF_WARS, \"fortifier\")"));
+        assertTrue(manager.contains("session.turfBarrageFiring.remove(id)"));
+        assertTrue(manager.contains("private void startTurfWarsBarrage(Session session, Player player) {\n"
+                + "        if (!isDebugAbilityAllowed(player, ArcadePortGame.TURF_WARS, \"shredder\")) return;"));
+    }
+
+    @Test
     void castleAssaultObjectiveEventRequiresVacantObjectiveAndUsesNormalSpawner() throws IOException {
         Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "CastleAssaultHeroesOfGwenRuntime.java");

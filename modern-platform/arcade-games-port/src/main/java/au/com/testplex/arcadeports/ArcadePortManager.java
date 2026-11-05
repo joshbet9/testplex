@@ -2507,7 +2507,8 @@ public final class ArcadePortManager implements Listener {
                 continue;
             }
 
-            boolean infiltrator = "infiltrator".equals(session.turfWarsKits.getOrDefault(id, "marksman"));
+            boolean infiltrator = "infiltrator".equals(session.turfWarsKits.getOrDefault(id, "marksman"))
+                    && debugKitFeatureEnabled(player, ArcadePortGame.TURF_WARS, "infiltrator");
             if (groundTeam >= 0 && groundTeam != team) {
                 if (infiltrator && session.turfCombat) {
                     TurfWarsInfiltration state = session.turfInfiltration.computeIfAbsent(
@@ -8104,7 +8105,9 @@ public final class ArcadePortManager implements Listener {
             long constructorAt = session.turfConstructorNextAt.getOrDefault(id, now);
             if (now >= constructorAt) {
                 // PerkConstructor: one team-coloured wool every four seconds, up to the kit cap.
-                if (countTurfWarsWool(player, team) < ArcadePortRules.turfWarsConstructorMax(kit)) {
+                if ((!"fortifier".equals(kit)
+                        || debugKitFeatureEnabled(player, ArcadePortGame.TURF_WARS, "fortifier"))
+                        && countTurfWarsWool(player, team) < ArcadePortRules.turfWarsConstructorMax(kit)) {
                     Material wool = team == 0 ? Material.RED_WOOL : team == 1 ? Material.LIGHT_BLUE_WOOL : Material.AIR;
                     if (wool != Material.AIR) {
                         player.getInventory().addItem(new ItemStack(wool, 1));
@@ -8117,7 +8120,9 @@ public final class ArcadePortManager implements Listener {
 
             long arrowAt = session.turfArrowNextAt.getOrDefault(id, now);
             if (now >= arrowAt) {
-                if (countTurfWarsFletchedArrows(player)
+                if ((!"shredder".equals(kit)
+                        || debugKitFeatureEnabled(player, ArcadePortGame.TURF_WARS, "shredder"))
+                        && countTurfWarsFletchedArrows(player)
                         < ArcadePortRules.turfWarsArrowMax(kit)) {
                     player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrow",
                             "A replenishing Turf Wars arrow."));
@@ -8142,6 +8147,13 @@ public final class ArcadePortManager implements Listener {
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
             if (!"shredder".equals(session.turfWarsKits.getOrDefault(id, "marksman"))) continue;
+            if (!debugKitFeatureEnabled(player, ArcadePortGame.TURF_WARS, "shredder")) {
+                session.turfBarrageCharges.remove(id);
+                session.turfBarrageNextChargeAt.remove(id);
+                session.turfBarrageFiring.remove(id);
+                session.turfBarrageRemaining.remove(id);
+                continue;
+            }
             ItemStack held = player.getInventory().getItemInMainHand();
             boolean holdingBow = held != null && held.getType() == Material.BOW;
 
@@ -8188,6 +8200,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void startTurfWarsBarrage(Session session, Player player) {
+        if (!isDebugAbilityAllowed(player, ArcadePortGame.TURF_WARS, "shredder")) return;
         UUID id = player.getUniqueId();
         if (!"shredder".equals(session.turfWarsKits.getOrDefault(id, "marksman"))
                 || session.turfBarrageCharges.containsKey(id)
