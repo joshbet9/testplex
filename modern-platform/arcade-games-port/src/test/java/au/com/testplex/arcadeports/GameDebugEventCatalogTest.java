@@ -227,6 +227,25 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void superSploorSpecialSwitchesReachEachKitActivationAndRequireAuthorisedProfileBridge() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        String plugin = Files.readString(sourceRoot.resolve("ArcadeMechanicsModernPlugin.java"));
+        String runtime = Files.readString(sourceRoot.resolve("SuperSploorRuntime.java"));
+        for (String kit : List.of("sprayer", "roller", "charger", "lobber", "dualies")) {
+            assertTrue(lobby.contains("\"" + kit + "\""), kit + " Special switch is offered");
+        }
+        assertTrue(plugin.contains("isArcadeDebugFeatureEnabled(Player player, String feature, boolean fallback)"));
+        assertTrue(plugin.contains("hasAdminAccess(player)"));
+        assertTrue(runtime.contains("debugSpecialEnabled(player, \"special-\" + kit)"));
+        assertTrue(runtime.contains("isArcadeDebugFeatureEnabled"));
+    }
+
+    @Test
     void castleAssaultObjectiveEventRequiresVacantObjectiveAndUsesNormalSpawner() throws IOException {
         Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "CastleAssaultHeroesOfGwenRuntime.java");

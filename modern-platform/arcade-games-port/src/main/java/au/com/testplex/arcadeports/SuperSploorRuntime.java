@@ -573,12 +573,16 @@ public final class SuperSploorRuntime implements Listener {
     }
 
     private void useSpecial(Player player, UUID id) {
+        String kit = kits.getOrDefault(id, "sprayer");
+        if (!debugSpecialEnabled(player, "special-" + kit)) {
+            player.sendActionBar(ChatColor.RED + specialName(kit) + " is disabled in your debug profile.");
+            return;
+        }
         double charge = specialCharge.getOrDefault(id, 0.0D);
         if (!SuperSploorRules.canUseSpecial(charge)) {
             player.sendActionBar(ChatColor.LIGHT_PURPLE + "Special " + (int) Math.floor(charge) + "% — keep painting!");
             return;
         }
-        String kit = kits.getOrDefault(id, "sprayer");
         specialCharge.put(id, 0.0D);
         specialChargeSuppressed.add(id);
         specialTargetsThisActivation.computeIfAbsent(id, ignored -> new HashSet<>()).clear();
@@ -621,6 +625,19 @@ public final class SuperSploorRuntime implements Listener {
             }
         }
         updateInkBar(player, id);
+    }
+
+    private boolean debugSpecialEnabled(Player player, String feature) {
+        if (player == null || !player.isOnline() || !plugin.getName().equals("ArcadeMechanicsModern")) {
+            return true;
+        }
+        try {
+            Object enabled = plugin.getClass().getMethod("isArcadeDebugFeatureEnabled",
+                    Player.class, String.class, boolean.class).invoke(plugin, player, feature, true);
+            return !(enabled instanceof Boolean value) || value;
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+            return true;
+        }
     }
 
     private void announceTeam(UUID ownerId, String message) {

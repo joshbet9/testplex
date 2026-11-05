@@ -1226,6 +1226,11 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             features.put("unlimited-specials", new DebugFeature("unlimited-specials", "Unlimited Specials",
                     Material.FIREWORK_ROCKET,
                     "Keep the kit special fully charged, except while its active effect is running.", false));
+            for (String kit : List.of("sprayer", "roller", "charger", "lobber", "dualies")) {
+                String key = "special-" + kit;
+                features.put(key, new DebugFeature(key, "Special: " + humanizeDebugKey(kit),
+                        Material.FIREWORK_STAR, "Allow this kit's Special to activate for authorised testers.", true));
+            }
         }
         return List.copyOf(features.values());
     }
@@ -1246,6 +1251,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || "no-hunger-loss".equals(key) || "unlimited-abilities".equals(key)
                 || "unlimited-specials".equals(key)
                 || (game == ArcadePortGame.BACON_BRAWL && key.startsWith("ability-"))
+                || (game == ArcadePortGame.SUPER_SPLOOR && key.startsWith("special-"))
                 || "DRAGONS_SPAWNING_ENABLED".equals(key)
                 || "DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED".equals(key)
                 || "QUIVER_LEAPER_DOUBLE_JUMP_ENABLED".equals(key)

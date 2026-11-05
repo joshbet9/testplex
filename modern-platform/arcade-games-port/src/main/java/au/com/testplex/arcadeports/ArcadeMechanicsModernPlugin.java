@@ -135,6 +135,11 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     }
 
     public boolean isArcadeDebugRound() { return GameDebugRuntimeOverrides.isDebugSession(); }
+    public boolean isArcadeDebugFeatureEnabled(Player player, String feature, boolean fallback) {
+        return player != null && hasAdminAccess(player) && manager != null
+                ? manager.debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.SUPER_SPLOOR, feature, fallback)
+                : fallback;
+    }
     public ArcadePortManager getArcadePortManager() { return manager; }
     public String selectedCosmeticOption(Player player, String group) {
         return selectedCosmeticOption(player, "snake", group);
