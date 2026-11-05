@@ -155,6 +155,19 @@ public final class TestplexModernArcade extends JavaPlugin implements Listener {
         return null;
     }
 
+    /** Return all selected options from one game cosmetic line, including multi-select lines. */
+    public java.util.Set<String> getSelectedCosmeticOptions(UUID playerId, String gameId, String lineId) {
+        if (playerId == null || gameId == null || lineId == null || catalog == null || preferences == null) {
+            return java.util.Set.of();
+        }
+        GameDefinition game = catalog.getGame(cosmeticGameId(gameId));
+        if (game == null) return java.util.Set.of();
+        for (var line : game.getCosmeticLines()) {
+            if (lineId.equals(line.getId())) return java.util.Set.copyOf(preferences.getSelected(playerId, game, line));
+        }
+        return java.util.Set.of();
+    }
+
     /** Persist a game-port selection through the same in-memory store used by the cosmetics menu. */
     public boolean chooseCosmeticOption(UUID playerId, String gameId, String lineId, String optionId) {
         if (playerId == null || gameId == null || lineId == null || optionId == null

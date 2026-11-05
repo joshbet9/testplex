@@ -76,9 +76,11 @@ class ArcadeCatalogTest {
     @Test
     void monsterMazeModesShareOneMobSetLine() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        List<String> expected = List.of("map_default", "creeper", "skeleton", "spider", "zombie",
-                "witch", "slime", "enderman", "guardian", "axolotl", "allay", "frog", "goat",
-                "fox", "panda", "parrot", "turtle", "bee", "sniffer", "armadillo");
+        List<String> expected = List.of("map_default", "creeper", "skeleton", "spider", "zombie", "slime",
+                "witch", "enderman", "guardian", "cave_spider", "silverfish", "blaze", "magma_cube", "bat",
+                "endermite", "pig", "sheep", "cow", "chicken", "squid", "wolf", "mooshroom", "snowman",
+                "ocelot", "horse", "rabbit", "villager", "axolotl", "allay", "frog", "goat", "fox", "panda",
+                "parrot", "turtle", "bee", "sniffer", "armadillo", "random");
         for (String id : List.of("monster-maze", "monster-maze-speed", "monster-maze-modern")) {
             GameDefinition game = catalog.getGame(id);
             assertNotNull(game);

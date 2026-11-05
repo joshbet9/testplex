@@ -146,6 +146,26 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             return null;
         }
     }
+
+    public java.util.Set<String> selectedCosmeticOptions(Player player, String gameId, String lineId) {
+        if (player == null || gameId == null || gameId.isBlank() || lineId == null || lineId.isBlank()) {
+            return null;
+        }
+        org.bukkit.plugin.Plugin platform = getServer().getPluginManager().getPlugin("TestplexModernArcade");
+        if (platform == null || !platform.isEnabled()) return null;
+        try {
+            java.lang.reflect.Method method = platform.getClass().getMethod(
+                    "getSelectedCosmeticOptions", java.util.UUID.class, String.class, String.class);
+            Object value = method.invoke(platform, player.getUniqueId(), gameId, lineId);
+            if (value instanceof java.util.Collection<?> collection) {
+                return collection.stream().filter(String.class::isInstance).map(String.class::cast)
+                        .collect(java.util.stream.Collectors.toUnmodifiableSet());
+            }
+        } catch (ReflectiveOperationException exception) {
+            getLogger().warning("Could not read " + gameId + " enabled cosmetic options: " + exception.getMessage());
+        }
+        return null;
+    }
     public PlexballGame getPlexballGame() { return plexball; }
     public SpeedBuildersGame getSpeedBuildersGame() { return speedBuilders; }
 

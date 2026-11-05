@@ -46,7 +46,9 @@ public final class MobThemeManager implements Listener {
     }
     public String selected(Player player) {
         if(player==null)return defaultTheme();
-        String s=choices.get(player.getUniqueId()); return normalize(s==null?"map_default":s);
+        String choice = normalize(choices.getOrDefault(player.getUniqueId(), "map_default"));
+        List<String> enabled = enabledThemes(player);
+        return enabled.contains(choice) ? choice : enabled.get(0);
     }
     public String forViewer(Player viewer, UUID entityId) {
         String s=selected(viewer); if("map_default".equals(s))s=defaultTheme(); return "random".equals(s)?randomConcrete(viewer.getUniqueId(),entityId):s;
@@ -150,10 +152,33 @@ public final class MobThemeManager implements Listener {
         if(e.getHand()!=EquipmentSlot.HAND)return;
         Action a=e.getAction(); if(a!=Action.RIGHT_CLICK_AIR&&a!=Action.RIGHT_CLICK_BLOCK)return;
         Player p=e.getPlayer(); if(p.getInventory().getHeldItemSlot()!=SLOT||!isSelector(p.getInventory().getItemInMainHand()))return;
-        e.setCancelled(true); String c=selected(p); choices.put(p.getUniqueId(),THEMES.get((THEMES.indexOf(c)+1)%THEMES.size()));
+        e.setCancelled(true);
+        List<String> enabled = enabledThemes(p);
+        String c = nextTheme(selected(p), enabled);
+        choices.put(p.getUniqueId(), c);
         save();giveSelector(p);plugin.refreshPlayerMobThemes(p);refreshPlayerPads(p);
         if(!plugin.hasPerPlayerMobDisguises()&&!warnedMissingDisguise){p.sendMessage(ChatColor.RED+"Mob appearance changes require ProtocolLib; Safe Pad and beacon colours still update.");warnedMissingDisguise=true;}
         p.sendMessage(ChatColor.LIGHT_PURPLE+"Mob theme: "+ChatColor.YELLOW+displayName(selected(p))+ChatColor.GRAY+" (personal view).");
+    }
+
+    private List<String> enabledThemes(Player player) {
+        java.util.Set<String> configured = plugin.getHostPlugin()
+                .selectedCosmeticOptions(player, "monster-maze", "mob-sets");
+        return allowedThemes(configured);
+    }
+
+    static List<String> allowedThemes(java.util.Collection<String> configured) {
+        if (configured == null) return THEMES;
+        java.util.Set<String> selected = new java.util.LinkedHashSet<>();
+        for (String choice : configured) selected.add(normalize(choice));
+        List<String> enabled = THEMES.stream().filter(selected::contains).toList();
+        return enabled.isEmpty() ? List.of("map_default") : enabled;
+    }
+
+    static String nextTheme(String current, List<String> enabledThemes) {
+        if (enabledThemes == null || enabledThemes.isEmpty()) return "map_default";
+        int index = enabledThemes.indexOf(normalize(current));
+        return enabledThemes.get((index + 1) % enabledThemes.size());
     }
     @EventHandler(priority=org.bukkit.event.EventPriority.MONITOR)
     public void refreshTintAfterPadInteraction(final PlayerInteractEvent event) {
