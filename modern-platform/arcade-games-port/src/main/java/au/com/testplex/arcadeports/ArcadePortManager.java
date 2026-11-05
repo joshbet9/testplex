@@ -972,6 +972,19 @@ public final class ArcadePortManager implements Listener {
             tester.sendMessage(ChatColor.GOLD + baconAbilityName(session, tester.getUniqueId()) + " is maxed (debug).");
             triggered = true;
         }
+        if (type == ArcadePortGame.BACON_BRAWL && "use-ability".equals(eventId)) {
+            UUID testerId = tester.getUniqueId();
+            String kit = session.baconKits.getOrDefault(testerId, "el-muchacho-pigo");
+            String feature = "ability-" + kit;
+            boolean unlimited = debugFeatureEnabled(testerId, ArcadePortGame.BACON_BRAWL, "unlimited-abilities", false);
+            boolean enabled = debugFeatureEnabled(testerId, ArcadePortGame.BACON_BRAWL, feature, true);
+            int charge = session.baconMeters.getOrDefault(testerId, 0);
+            if (enabled && (unlimited || ArcadePortRules.canUseBaconMeterAbility(charge))) {
+                GameDebugRuntimeOverrides.markDebugSession();
+                useBaconBrawlAbility(session, tester, System.currentTimeMillis());
+                triggered = true;
+            }
+        }
         if (type == ArcadePortGame.GLADIATORS && "forfeit-duel".equals(eventId)
                 && session.gladiatorPairs.containsKey(tester.getUniqueId())) {
             GameDebugRuntimeOverrides.markDebugSession();

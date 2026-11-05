@@ -112,7 +112,9 @@ final class GameDebugEventCatalog {
                     "Start Shredder's normal bow-charge ability; release the bow to fire the charged barrage."));
     private static final List<Event> BACON_BRAWL = List.of(
             new Event("fill-meter", "Fill Ability Meter", Material.IRON_AXE,
-                    "Fill your selected kit's live ability meter so you can test its ability now."));
+                    "Fill your selected kit's live ability meter so you can test its ability now."),
+            new Event("use-ability", "Use Selected Ability", Material.PORKCHOP,
+                    "Activate the selected kit's real ability using its current meter and enabled-feature settings."));
     private static final List<Event> BOMB_LOBBERS = List.of(
             new Event("spawn-powerups", "Spawn Power-up Wave", Material.FIREWORK_ROCKET,
                     "Run the normal paired team power-up drop wave immediately."));

@@ -78,8 +78,9 @@ class GameDebugEventCatalogTest {
                 .anyMatch(event -> event.id().equals("drop-barriers")));
         assertEquals("grant-spells", GameDebugEventCatalog.events(ArcadePortGame.WIZARDS)
                 .getFirst().id());
-        assertFalse(GameDebugEventCatalog.events(ArcadePortGame.BACON_BRAWL).stream()
-                .anyMatch(event -> event.id().equals("spawn-minions")));
+        assertEquals(List.of("fill-meter", "use-ability", "refresh-kit"),
+                GameDebugEventCatalog.events(ArcadePortGame.BACON_BRAWL).stream()
+                        .map(GameDebugEventCatalog.Event::id).toList());
     }
 
     @Test
@@ -224,6 +225,22 @@ class GameDebugEventCatalogTest {
         assertTrue(manager.contains("hoops.debugAttemptSteal(tester)"));
         assertTrue(runtime.contains("trySteal(current, attacker, holder)"));
         assertTrue(runtime.contains("public boolean debugAttemptSteal(Player attacker)"));
+    }
+
+    @Test
+    void baconBrawlDebugAbilityEventUsesSelectedKitMeterAndLiveAbilityPath() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String eventCatalog = Files.readString(sourceRoot.resolve("GameDebugEventCatalog.java"));
+        assertTrue(eventCatalog.contains("new Event(\"use-ability\", \"Use Selected Ability\""));
+        assertTrue(manager.contains("session.baconKits.getOrDefault(testerId, \"el-muchacho-pigo\")"));
+        assertTrue(manager.contains("ArcadePortRules.canUseBaconMeterAbility(charge)"));
+        assertTrue(manager.contains("useBaconBrawlAbility(session, tester, System.currentTimeMillis())"),
+                "debug use must preserve each kit's standard ability and meter consumption");
     }
 
     @Test
