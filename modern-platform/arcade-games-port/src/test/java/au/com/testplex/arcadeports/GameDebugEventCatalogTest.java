@@ -33,6 +33,8 @@ class GameDebugEventCatalogTest {
                 .getFirst().id());
         assertEquals("promote-self", GameDebugEventCatalog.events(ArcadePortGame.DEATH_TAG)
                 .getFirst().id());
+        assertEquals("forfeit-duel", GameDebugEventCatalog.events(ArcadePortGame.GLADIATORS)
+                .getFirst().id());
         assertTrue(GameDebugEventCatalog.events(ArcadePortGame.SPLEEF).stream()
                 .anyMatch(event -> event.id().equals("refresh-kit")));
         assertTrue(GameDebugEventCatalog.events(ArcadePortGame.SPLEEF).stream()
@@ -577,6 +579,21 @@ class GameDebugEventCatalogTest {
         assertTrue(manager.contains("debugKitFeatureEnabled(player, ArcadePortGame.MICRO_BATTLES, \"dasher\")"));
         assertTrue(manager.contains("ArcadePortGame.MICRO_BATTLES,\n                        \"blocks-place\", true)"));
         assertTrue(manager.contains("ArcadePortGame.MICRO_BATTLES,\n                        \"blocks-break\", true)"));
+    }
+
+    @Test
+    void gladiatorsDebugForfeitUsesTheNormalDeathAndBracketResolutionPath() throws IOException {
+        Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ArcadePortManager.java");
+        if (!Files.isRegularFile(managerPath)) {
+            managerPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ArcadePortManager.java");
+        }
+        String manager = Files.readString(managerPath);
+        assertTrue(manager.contains("type == ArcadePortGame.GLADIATORS && \"forfeit-duel\".equals(eventId)"));
+        assertTrue(manager.contains("session.gladiatorPairs.containsKey(tester.getUniqueId())"));
+        assertTrue(manager.contains("tester.setHealth(0.0D)"));
+        assertTrue(manager.contains("GameDebugRuntimeOverrides.markDebugSession();\n            tester.setHealth(0.0D)"));
     }
 
     @Test

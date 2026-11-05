@@ -938,6 +938,12 @@ public final class ArcadePortManager implements Listener {
             tester.sendMessage(ChatColor.GOLD + baconAbilityName(session, tester.getUniqueId()) + " is maxed (debug).");
             triggered = true;
         }
+        if (type == ArcadePortGame.GLADIATORS && "forfeit-duel".equals(eventId)
+                && session.gladiatorPairs.containsKey(tester.getUniqueId())) {
+            GameDebugRuntimeOverrides.markDebugSession();
+            tester.setHealth(0.0D);
+            triggered = true;
+        }
         if (type == ArcadePortGame.BOMB_LOBBERS && "spawn-powerups".equals(eventId)) {
             int dropsBefore = session.bombPowerupDrops.size();
             session.bombNextPowerupSpawnAtByTeam.remove(0);

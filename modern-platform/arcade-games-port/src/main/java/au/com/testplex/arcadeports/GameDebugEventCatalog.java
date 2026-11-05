@@ -52,6 +52,10 @@ final class GameDebugEventCatalog {
     private static final List<Event> DEATH_TAG = List.of(
             new Event("promote-self", "Promote Self to Chaser", Material.SKELETON_SKULL,
                     "Run the normal Runner-to-Chaser conversion on yourself."));
+    private static final List<Event> GLADIATORS = List.of(
+            new Event("forfeit-duel", "Forfeit Current Duel", Material.WHITE_BANNER,
+                    "Resolve your current duel as a normal loss so you can test bracket advancement."),
+            REFRESH_KIT.getFirst());
     private static final List<Event> REFRESH_KIT = List.of(
             new Event("refresh-kit", "Refresh Selected Kit", Material.NETHER_STAR,
                     "Reapply your selected kit through its normal in-game kit setup."));
@@ -124,6 +128,7 @@ final class GameDebugEventCatalog {
         if (game == ArcadePortGame.PAINTBALL) return PAINTBALL;
         if (game == ArcadePortGame.MICRO_BATTLES) return MICRO_BATTLES;
         if (game == ArcadePortGame.DEATH_TAG) return DEATH_TAG;
+        if (game == ArcadePortGame.GLADIATORS) return GLADIATORS;
         if (game == ArcadePortGame.WIZARDS) return WIZARDS;
         if (supportsKitRefresh(game)) return REFRESH_KIT;
         return List.of();
