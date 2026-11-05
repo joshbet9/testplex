@@ -844,6 +844,25 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void paintballWeaponSwitchesGateActualFiring() throws IOException {
+        Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ArcadePortManager.java");
+        Path lobbyPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ModernArcadeLobbyRuntime.java");
+        if (!Files.isRegularFile(managerPath)) {
+            managerPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ArcadePortManager.java");
+            lobbyPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ModernArcadeLobbyRuntime.java");
+        }
+        String manager = Files.readString(managerPath);
+        String lobby = Files.readString(lobbyPath);
+        assertTrue(lobby.contains("List.of(\"rifle\", \"sniper\", \"shotgun\", \"machine-gun\")"));
+        assertTrue(manager.contains("ArcadePortGame.PAINTBALL, \"weapon-\" + kit, true"));
+        assertTrue(manager.contains("This Paintball weapon is disabled in your debug profile."));
+    }
+
+    @Test
     void heroesOfGwenDebugEventStartsTheNormalPairedMinionWave() throws IOException {
         Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "CastleAssaultHeroesOfGwenRuntime.java");

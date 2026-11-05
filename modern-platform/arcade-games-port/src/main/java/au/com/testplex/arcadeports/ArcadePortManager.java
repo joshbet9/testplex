@@ -10849,6 +10849,11 @@ public final class ArcadePortManager implements Listener {
     private void firePaintballWeapon(Session session, Player player, String kit, long now) {
         UUID playerId = player.getUniqueId();
         if (!kit.equals(session.paintballKits.getOrDefault(playerId, "rifle"))) return;
+        if (plugin.hasAdminAccess(player)
+                && !debugFeatureEnabled(playerId, ArcadePortGame.PAINTBALL, "weapon-" + kit, true)) {
+            player.sendActionBar(ChatColor.RED + "This Paintball weapon is disabled in your debug profile.");
+            return;
+        }
         boolean ignoreReload = plugin.hasAdminAccess(player)
                 && debugFeatureEnabled(playerId, ArcadePortGame.PAINTBALL, "ignore-reload", false);
         long cooldown = switch (kit) {

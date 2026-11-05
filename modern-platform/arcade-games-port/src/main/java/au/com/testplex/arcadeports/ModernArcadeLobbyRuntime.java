@@ -1307,6 +1307,11 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             String key = "ignore-reload";
             features.put(key, new DebugFeature(key, "Ignore reload and heat", Material.SNOWBALL,
                     "Let your weapons fire continuously without reload waits or Machine Gun heat for testing.", false));
+            for (String kit : List.of("rifle", "sniper", "shotgun", "machine-gun")) {
+                String weaponKey = "weapon-" + kit;
+                features.put(weaponKey, new DebugFeature(weaponKey, "Weapon: " + humanizeDebugKey(kit), Material.ENDER_PEARL,
+                        "Allow this tester to fire the selected " + humanizeDebugKey(kit) + " weapon.", true));
+            }
         }
         if (game == ArcadePortGame.SPLEEF) {
             for (String kit : List.of("snowballer", "archer", "brawler", "gust")) {
@@ -1403,7 +1408,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.RUNNER && "runner-trail".equals(key))
                 || (game == ArcadePortGame.DRAGONS && key.startsWith("ability-"))
                 || (game == ArcadePortGame.ONE_IN_THE_QUIVER && key.startsWith("ability-"))
-                || (game == ArcadePortGame.PAINTBALL && "ignore-reload".equals(key))
+                || (game == ArcadePortGame.PAINTBALL
+                        && ("ignore-reload".equals(key) || key.startsWith("weapon-")))
                 || (game == ArcadePortGame.SPLEEF && key.startsWith("ability-"))
                 || (game == ArcadePortGame.RUNNER && key.startsWith("ability-"))
                 || (game == ArcadePortGame.DEATH_TAG && key.startsWith("ability-"))
