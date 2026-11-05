@@ -234,6 +234,24 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void masterBuildersDebugSwitchesGatePlotEditingAndReviewVotes() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        for (String key : List.of("plot-editing", "review-voting")) {
+            assertTrue(lobby.contains("\"" + key + "\""), key + " appears in Master Builders debug menu");
+            assertTrue(manager.contains("ArcadePortGame.MASTER_BUILDERS, \"" + key + "\", true"),
+                    key + " reaches its gameplay check");
+        }
+        assertTrue(manager.contains("plugin.hasAdminAccess(builder)"));
+        assertTrue(manager.contains("plugin.hasAdminAccess(player)"));
+    }
+
+    @Test
     void baconBrawlDebugMeterFillsTheSelectedAbilityAndRefreshesItsHud() throws IOException {
         Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "ArcadePortManager.java");

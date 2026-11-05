@@ -1238,6 +1238,12 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             features.put("sound-feedback", new DebugFeature("sound-feedback", "Round sound effects", Material.NOTE_BLOCK,
                     "Play the normal drawing, hint and guess feedback sounds.", true));
         }
+        if (game == ArcadePortGame.MASTER_BUILDERS) {
+            features.put("plot-editing", new DebugFeature("plot-editing", "Plot block editing", Material.OAK_PLANKS,
+                    "Allow this tester to place and break blocks inside their assigned plot during Build.", true));
+            features.put("review-voting", new DebugFeature("review-voting", "Review voting", Material.LIME_CONCRETE,
+                    "Allow this tester to submit ratings through the normal six-level review vote.", true));
+        }
         if (game == ArcadePortGame.WITHER_ASSAULT) {
             features.put("ability-human-leap", new DebugFeature("ability-human-leap", "Human double jump", Material.FEATHER,
                     "Allow this tester to use the Human team's grounded double jump.", true));
@@ -1444,6 +1450,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                         && ("canvas-tools".equals(key) || "palette-selection".equals(key)
                                 || "guess-submission".equals(key) || "timed-hints".equals(key)
                                 || "sound-feedback".equals(key)))
+                || (game == ArcadePortGame.MASTER_BUILDERS
+                        && ("plot-editing".equals(key) || "review-voting".equals(key)))
                 || (game == ArcadePortGame.WITHER_ASSAULT
                         && ("ability-human-leap".equals(key) || "human-revival".equals(key) || key.startsWith("ability-")))
                 || (game == ArcadePortGame.HOOPS_REMASTERED

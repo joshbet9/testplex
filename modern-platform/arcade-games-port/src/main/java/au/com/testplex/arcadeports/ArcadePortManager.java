@@ -12283,6 +12283,8 @@ public final class ArcadePortManager implements Listener {
 
     private void handleMasterBuildersVote(Session session,Player player,PlayerInteractEvent event) {
         event.setCancelled(true);
+        if (plugin.hasAdminAccess(player)
+                && !debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.MASTER_BUILDERS, "review-voting", true)) return;
         if(event.getHand()!=EquipmentSlot.HAND
                 ||session.masterBuilderPhase!=MasterBuildersPhase.REVIEW
                 ||System.currentTimeMillis()>=session.masterBuilderVoteEndsAt
@@ -26911,10 +26913,13 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (session.type == ArcadePortGame.MASTER_BUILDERS) {
+            Player builder = event.getPlayer();
+            boolean debugEditingAllowed = !plugin.hasAdminAccess(builder)
+                    || debugFeatureEnabled(builder.getUniqueId(), ArcadePortGame.MASTER_BUILDERS, "plot-editing", true);
             if (session.masterBuilderPhase == MasterBuildersPhase.BUILDING
                     && System.currentTimeMillis() < session.masterBuilderBuildEndsAt
-                    && session.alive.contains(event.getPlayer().getUniqueId())
-                    && isInsideMasterBuilderPlot(session, event.getPlayer().getUniqueId(), event.getBlock())) {
+                    && session.alive.contains(builder.getUniqueId()) && debugEditingAllowed
+                    && isInsideMasterBuilderPlot(session, builder.getUniqueId(), event.getBlock())) {
                 event.setCancelled(false);
                 event.setDropItems(false);
                 event.setExpToDrop(0);
@@ -27092,10 +27097,12 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.MASTER_BUILDERS) {
             Player builder = event.getPlayer();
+            boolean debugEditingAllowed = !plugin.hasAdminAccess(builder)
+                    || debugFeatureEnabled(builder.getUniqueId(), ArcadePortGame.MASTER_BUILDERS, "plot-editing", true);
             boolean allowed = session.masterBuilderPhase == MasterBuildersPhase.BUILDING
                     && System.currentTimeMillis() < session.masterBuilderBuildEndsAt
-                    && session.alive.contains(event.getPlayer().getUniqueId())
-                    && isInsideMasterBuilderPlot(session, event.getPlayer().getUniqueId(), event.getBlockPlaced());
+                    && session.alive.contains(builder.getUniqueId()) && debugEditingAllowed
+                    && isInsideMasterBuilderPlot(session, builder.getUniqueId(), event.getBlockPlaced());
             if (!allowed) {
                 event.setCancelled(true);
             } else {
