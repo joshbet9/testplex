@@ -21,9 +21,12 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 /** Simple modern inventory UI. Game-specific renderers are registered alongside each port. */
 public final class MenuService implements Listener {
@@ -53,6 +56,7 @@ public final class MenuService implements Listener {
     private final NamespacedKey lineKey;
     private final NamespacedKey optionKey;
     private final NamespacedKey targetKey;
+    private final Map<UUID, Integer> cosmeticOptionPages = new HashMap<>();
 
     public MenuService(JavaPlugin plugin, ArcadeCatalog catalog, PlayerPreferenceStore preferences) {
         this.plugin = plugin;
@@ -553,11 +557,13 @@ public final class MenuService implements Listener {
         for (CosmeticLineDefinition line : game.getCosmeticLines()) {
             if (index >= slots.length) break;
             Set<String> selected = preferences.getSelected(player.getUniqueId(), game, line);
+            long enabled = selected.stream().filter(optionId -> line.getOptions().stream()
+                    .anyMatch(option -> option.getId().equals(optionId) && option.getSelectionGroup() == null)).count();
             String equipped = selected.isEmpty() ? "Default" : selected.iterator().next();
             ItemStack item = makeItem(icon(line.getIcon()), ChatColor.YELLOW + line.getTitle(), List.of(
                     ChatColor.GRAY + line.getDescription(),
                     ChatColor.GRAY + (line.getSelectionMode() == CosmeticLineDefinition.SelectionMode.MULTI
-                            ? "Enabled toggles: " + selected.size() : "Equipped: " + equipped),
+                            ? "Enabled toggles: " + enabled : "Equipped: " + equipped),
                     ChatColor.GREEN + "Click to view options",
                     ChatColor.DARK_GRAY + "Feature: " + line.getId()));
             mark(item, "cosmetic-line", game, line, null);
@@ -578,10 +584,19 @@ public final class MenuService implements Listener {
     }
 
     private void openOptions(Player player, GameDefinition game, CosmeticLineDefinition line) {
-        Inventory inventory = Bukkit.createInventory(null, 27, OPTIONS_TITLE + game.getId() + " | " + line.getId());
+        openOptions(player, game, line, 0);
+    }
+
+    private void openOptions(Player player, GameDefinition game, CosmeticLineDefinition line, int requestedPage) {
+        int pageCount = Math.max(1, (line.getOptions().size() + 44) / 45);
+        int page = Math.max(0, Math.min(pageCount - 1, requestedPage));
+        cosmeticOptionPages.put(player.getUniqueId(), page);
+        Inventory inventory = Bukkit.createInventory(null, 54,
+                OPTIONS_TITLE + game.getId() + " | " + line.getId() + " | " + (page + 1));
         Set<String> selected = preferences.getSelected(player.getUniqueId(), game, line);
-        int slot = 0;
-        for (CosmeticOption option : line.getOptions()) {
+        int start = page * 45;
+        for (int index = start; index < Math.min(line.getOptions().size(), start + 45); index++) {
+            CosmeticOption option = line.getOptions().get(index);
             String selectionHint = line.getSelectionMode() == CosmeticLineDefinition.SelectionMode.SINGLE
                     ? ChatColor.YELLOW + "Click to equip"
                     : option.getSelectionGroup() == null
@@ -593,9 +608,19 @@ public final class MenuService implements Listener {
                             selected.contains(option.getId()) ? ChatColor.GREEN + "Selected" : ChatColor.GRAY + "Not selected",
                             selectionHint));
             mark(item, "cosmetic-option", game, line, option.getId());
-            inventory.setItem(slot++, item);
+            inventory.setItem(index - start, item);
         }
-        inventory.setItem(22, backItem("Back to Cosmetic Lines", "back-lines", game));
+        if (page > 0) {
+            ItemStack previous = backItem("Previous page", "cosmetic-option-page", game);
+            mark(previous, "cosmetic-option-page", game, line, Integer.toString(page - 1));
+            inventory.setItem(45, previous);
+        }
+        inventory.setItem(49, backItem("Back to Cosmetic Lines", "back-lines", game));
+        if (page + 1 < pageCount) {
+            ItemStack next = backItem("Next page", "cosmetic-option-page", game);
+            mark(next, "cosmetic-option-page", game, line, Integer.toString(page + 1));
+            inventory.setItem(53, next);
+        }
         player.openInventory(inventory);
     }
 
@@ -642,6 +667,32 @@ public final class MenuService implements Listener {
         String lineId = meta.getPersistentDataContainer().get(lineKey, PersistentDataType.STRING);
         String optionId = meta.getPersistentDataContainer().get(optionKey, PersistentDataType.STRING);
         GameDefinition game = catalog.getGame(gameId);
+
+        if (title.startsWith(OPTIONS_TITLE)) {
+            if ("cosmetic-option-page".equals(action) && game != null && lineId != null && optionId != null) {
+                CosmeticLineDefinition line = findLine(game, lineId);
+                if (line != null) {
+                    try { openOptions(player, game, line, Integer.parseInt(optionId)); }
+                    catch (NumberFormatException ignored) { openOptions(player, game, line); }
+                }
+                return;
+            }
+            if ("cosmetic-option".equals(action) && game != null && lineId != null && optionId != null) {
+                CosmeticLineDefinition line = findLine(game, lineId);
+                if (line != null) {
+                    preferences.chooseOption(player.getUniqueId(), game, line, optionId);
+                    if ("monster-maze".equals(game.getId())) refreshMonsterMazeCosmetics(player);
+                    player.sendMessage(ChatColor.GREEN + "Saved " + game.getName() + " → " + line.getTitle() + ".");
+                    openOptions(player, game, line, cosmeticOptionPages.getOrDefault(player.getUniqueId(), 0));
+                }
+                return;
+            }
+            if ("back-lines".equals(action) && game != null) {
+                cosmeticOptionPages.remove(player.getUniqueId());
+                openGameDetails(player, game);
+                return;
+            }
+        }
 
         if (VOTING_TITLE.equals(title) && "panel-open-preferences".equals(action)) {
             player.closeInventory();
@@ -984,6 +1035,16 @@ public final class MenuService implements Listener {
             openGameDetails(player, game);
         } else if ("back-lines".equals(action) && game != null) {
             openGameDetails(player, game);
+        }
+    }
+
+    private void refreshMonsterMazeCosmetics(Player player) {
+        try {
+            plugin.getClass().getMethod("refreshMonsterMazeCosmetics", UUID.class)
+                    .invoke(plugin, player.getUniqueId());
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            plugin.getLogger().fine("Could not refresh Monster Maze mob and objective cosmetics: "
+                    + exception.getMessage());
         }
     }
 

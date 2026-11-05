@@ -178,12 +178,25 @@ public final class TestplexModernArcade extends JavaPlugin implements Listener {
             if (!lineId.equals(line.getId())) continue;
             try {
                 preferences.chooseOption(playerId, game, line, optionId);
+                if ("monster-maze".equals(game.getId())) refreshMonsterMazeCosmetics(playerId);
                 return true;
             } catch (IllegalArgumentException exception) {
                 return false;
             }
         }
         return false;
+    }
+
+    public void refreshMonsterMazeCosmetics(UUID playerId) {
+        Player player = Bukkit.getPlayer(playerId);
+        org.bukkit.plugin.Plugin mechanics = Bukkit.getPluginManager().getPlugin("ArcadeMechanicsModern");
+        if (player == null || mechanics == null || !mechanics.isEnabled()) return;
+        try {
+            mechanics.getClass().getMethod("refreshMonsterMazeCosmeticPreferences", Player.class)
+                    .invoke(mechanics, player);
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            getLogger().fine("Could not refresh Monster Maze mob and objective cosmetics: " + exception.getMessage());
+        }
     }
 
     private String cosmeticGameId(String gameId) {

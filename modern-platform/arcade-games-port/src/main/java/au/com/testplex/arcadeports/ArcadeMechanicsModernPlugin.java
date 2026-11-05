@@ -127,6 +127,13 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         return manager == null ? null : manager.getMonsterMazeModule();
     }
 
+    public void refreshMonsterMazeCosmeticPreferences(Player player) {
+        MonsterMazePlugin module = getMonsterMazeModule();
+        if (player == null || module == null) return;
+        module.refreshPlayerMobThemes(player);
+        if (module.getMobThemeManager() != null) module.getMobThemeManager().refreshPlayerPads(player);
+    }
+
     public boolean isArcadeDebugRound() { return GameDebugRuntimeOverrides.isDebugSession(); }
     public ArcadePortManager getArcadePortManager() { return manager; }
     public String selectedCosmeticOption(Player player, String group) {

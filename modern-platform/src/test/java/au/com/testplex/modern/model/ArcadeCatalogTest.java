@@ -90,7 +90,16 @@ class ArcadeCatalogTest {
             assertEquals(CosmeticLineDefinition.SelectionMode.MULTI,
                     game.getCosmeticLines().get(0).getSelectionMode(), id);
             assertEquals(expected, game.getCosmeticLines().get(0).getOptions().stream()
+                    .filter(option -> option.getSelectionGroup() == null)
                     .map(CosmeticOption::getId).toList(), id);
+            assertTrue(game.getCosmeticLines().get(0).getOptions().size() > 45,
+                    id + " needs the paginated options view");
+            assertTrue(game.getCosmeticLines().get(0).getOptions().stream()
+                    .anyMatch(option -> "beacon-creeper".equals(option.getSelectionGroup())
+                            && option.getId().equals("beacon-creeper-red")), id + " beacon palette");
+            assertTrue(game.getCosmeticLines().get(0).getOptions().stream()
+                    .anyMatch(option -> "pad-creeper".equals(option.getSelectionGroup())
+                            && option.getId().equals("pad-creeper-blue")), id + " Safe Pad palette");
         }
     }
 

@@ -473,48 +473,7 @@ public final class ArcadeCatalog {
                     color("cyan", "Cyan"), color("purple", "Purple"), color("blue", "Blue"),
                     color("brown", "Brown"), color("green", "Green"), color("red", "Red"),
                     color("black", "Black")));
-            case "monster-maze", "monster-maze-speed", "monster-maze-modern" -> List.of(
-                    lineMulti("mob-sets", "Monster Maze Mob Sets",
-                            "Choose which mob forms are available in your in-game cycle slot.", "CREEPER_HEAD",
-                            single("map_default", "Map Default", "Use the selected map's default mob."),
-                            single("creeper", "Creeper", "Creeper form."),
-                            single("skeleton", "Skeleton", "Skeleton form."),
-                            single("spider", "Spider", "Spider form."),
-                            single("zombie", "Zombie", "Zombie form."),
-                            single("slime", "Slime", "Slime form."),
-                            single("witch", "Witch", "Witch form."),
-                            single("enderman", "Enderman", "Enderman form."),
-                            single("guardian", "Guardian", "Guardian form."),
-                            single("cave_spider", "Cave Spider", "Cave Spider form."),
-                            single("silverfish", "Silverfish", "Silverfish form."),
-                            single("blaze", "Blaze", "Blaze form."),
-                            single("magma_cube", "Magma Cube", "Magma Cube form."),
-                            single("bat", "Bat", "Bat form."),
-                            single("endermite", "Endermite", "Endermite form."),
-                            single("pig", "Pig", "Pig form."),
-                            single("sheep", "Sheep", "Sheep form."),
-                            single("cow", "Cow", "Cow form."),
-                            single("chicken", "Chicken", "Chicken form."),
-                            single("squid", "Squid", "Squid form."),
-                            single("wolf", "Wolf", "Wolf form."),
-                            single("mooshroom", "Mooshroom", "Mooshroom form."),
-                            single("snowman", "Snow Golem", "Snow Golem form."),
-                            single("ocelot", "Ocelot", "Ocelot form."),
-                            single("horse", "Horse", "Horse form."),
-                            single("rabbit", "Rabbit", "Rabbit form."),
-                            single("villager", "Villager", "Villager form."),
-                            single("axolotl", "Axolotl", "Modern mob form under two blocks tall and long."),
-                            single("allay", "Allay", "Modern mob form under two blocks tall and long."),
-                            single("frog", "Frog", "Modern mob form under two blocks tall and long."),
-                            single("goat", "Goat", "Modern mob form under two blocks tall and long."),
-                            single("fox", "Fox", "Modern mob form under two blocks tall and long."),
-                            single("panda", "Panda", "Modern mob form under two blocks tall and long."),
-                            single("parrot", "Parrot", "Modern mob form under two blocks tall and long."),
-                            single("turtle", "Turtle", "Modern mob form under two blocks tall and long."),
-                            single("bee", "Bee", "Modern mob form under two blocks tall and long."),
-                            single("sniffer", "Sniffer", "Modern mob form under two blocks tall and long."),
-                            single("armadillo", "Armadillo", "Modern mob form under two blocks tall and long."),
-                            single("random", "Random Mob", "A stable random mob form for each player and maze entity.")));
+            case "monster-maze", "monster-maze-speed", "monster-maze-modern" -> List.of(monsterMazeMobSetLine());
             case "paintball" -> List.of(line("pellet-styles", "Paintball Pellet Styles",
                     "Choose the appearance of your paint pellets; team identity and hits remain unchanged.", "SNOWBALL",
                     style("classic-pellet", "Classic Pellet", "A clean, compact paint pellet."),
@@ -736,6 +695,51 @@ public final class ArcadeCatalog {
 
     private static CosmeticOption grouped(String id, String name, String description, String selectionGroup) {
         return new CosmeticOption(id, name, description, selectionGroup);
+    }
+
+    private static CosmeticLineDefinition monsterMazeMobSetLine() {
+        String[] mobSets = {"map_default", "creeper", "skeleton", "spider", "zombie", "slime", "witch",
+                "enderman", "guardian", "cave_spider", "silverfish", "blaze", "magma_cube", "bat",
+                "endermite", "pig", "sheep", "cow", "chicken", "squid", "wolf", "mooshroom", "snowman",
+                "ocelot", "horse", "rabbit", "villager", "axolotl", "allay", "frog", "goat", "fox", "panda",
+                "parrot", "turtle", "bee", "sniffer", "armadillo", "random"};
+        String[] dyeColours = {"white", "orange", "magenta", "light_blue", "yellow", "lime", "pink", "gray",
+                "light_gray", "cyan", "purple", "blue", "brown", "green", "red", "black"};
+        List<CosmeticOption> options = new ArrayList<>();
+        for (String mob : mobSets) {
+            String display = mobDisplayName(mob);
+            String description = switch (mob) {
+                case "map_default" -> "Use the selected map's default mob and objective colours.";
+                case "random" -> "Use a stable random mob form for each player and maze entity.";
+                case "axolotl", "allay", "frog", "goat", "fox", "panda", "parrot", "turtle", "bee",
+                        "sniffer", "armadillo" -> "Modern mob form under two blocks tall and long.";
+                default -> display + " form.";
+            };
+            options.add(single(mob, display, description));
+            for (String part : List.of("beacon", "pad")) {
+                String group = part + "-" + mob;
+                String label = "map_default".equals(mob) ? "Map Default" : display;
+                options.add(grouped(part + "-" + mob + "-inherit", label + " " + part + ": Mob colour",
+                        "Use the colour associated with this mob set.", group));
+                for (String colour : dyeColours) {
+                    options.add(grouped(part + "-" + mob + "-" + colour,
+                            label + " " + part + ": " + mobDisplayName(colour),
+                            "Use " + mobDisplayName(colour) + " for this mob set's " + part + " colour.", group));
+                }
+            }
+        }
+        return new CosmeticLineDefinition("mob-sets", "Monster Maze Mob Sets",
+                "Choose mob forms for your in-game cycle slot and set separate beacon-glass and Safe Pad colours for each form.",
+                "CREEPER_HEAD", CosmeticLineDefinition.SelectionMode.MULTI, options, "map_default");
+    }
+
+    private static String mobDisplayName(String id) {
+        StringBuilder result = new StringBuilder();
+        for (String part : id.split("_")) {
+            if (!result.isEmpty()) result.append(' ');
+            if (!part.isEmpty()) result.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));
+        }
+        return result.toString();
     }
 
     private static CosmeticOption win(String id, String name, String description) {

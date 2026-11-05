@@ -224,11 +224,13 @@ public final class MobThemeManager implements Listener {
     private void laterRefresh(final Player p){Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(),new Runnable(){public void run(){if(p.isOnline())refreshPlayerPads(p);}},2L);}
     private void paintPad(Player p,PadVisual pad) {
         World w=pad.center.getWorld();int cx=pad.center.getBlockX(),cz=pad.center.getBlockZ();
-        BlockData tint=padMaterial(p).createBlockData();boolean mapDefault="map_default".equals(selected(p));
+        BlockData tint=padMaterial(p).createBlockData();
+        boolean mapDefault="map_default".equals(selected(p));
+        boolean customPalette=customObjectiveColor(p,"pad")!=null||customObjectiveColor(p,"beacon")!=null;
         BlockData beamGlass=glassMaterial(p).createBlockData();
         for(int x=-2;x<=2;x++)for(int z=-2;z<=2;z++){
             Location at=new Location(w,cx+x,pad.surfaceY,cz+z);Block real=w.getBlockAt(at);BlockData visual=real.getBlockData().clone();
-            if(!mapDefault){
+            if(!mapDefault||customPalette){
                 if(x==0&&z==0&&real.getType()==Material.GLASS)visual=beamGlass.clone();
                 else if(real.getType()==Material.LIME_TERRACOTTA)visual=tint.clone();
             }
@@ -236,8 +238,18 @@ public final class MobThemeManager implements Listener {
         }
         Location above=new Location(w,cx,pad.surfaceY+3,cz);Block actual=w.getBlockAt(above);p.sendBlockChange(above,actual.getBlockData().clone());
     }
-    private Material padMaterial(Player p){Material m=Material.matchMaterial(color(palette(p))+"_TERRACOTTA");return m==null?Material.LIME_TERRACOTTA:m;}
-    private Material glassMaterial(Player p){Material m=Material.matchMaterial(color(palette(p))+"_STAINED_GLASS");return m==null?Material.LIME_STAINED_GLASS:m;}
+    private Material padMaterial(Player p){String color=customObjectiveColor(p,"pad");if(color==null)color=color(palette(p));Material m=Material.matchMaterial(color+"_TERRACOTTA");return m==null?Material.LIME_TERRACOTTA:m;}
+    private Material glassMaterial(Player p){String color=customObjectiveColor(p,"beacon");if(color==null)color=color(palette(p));Material m=Material.matchMaterial(color+"_STAINED_GLASS");return m==null?Material.LIME_STAINED_GLASS:m;}
+    private String customObjectiveColor(Player player,String part){
+        String mob=normalize(selected(player));
+        String group=part+"-"+mob;
+        String selected=plugin.getHostPlugin().selectedCosmeticOption(player,"monster-maze",group);
+        if(selected==null||selected.equals(group+"-inherit"))return null;
+        String prefix=group+"-";
+        if(!selected.startsWith(prefix))return null;
+        String color=selected.substring(prefix.length()).toUpperCase(Locale.ROOT);
+        return org.bukkit.Material.matchMaterial(color+"_TERRACOTTA")!=null?color:null;
+    }
 
     private boolean visibleTo(Player p,PadVisual d){if(p==null||!p.isOnline()||d.center.getWorld()==null||!p.getWorld().equals(d.center.getWorld()))return false;Location l=p.getLocation();return Math.abs(l.getX()-d.center.getX())<=192&&Math.abs(l.getZ()-d.center.getZ())<=192;}
     private String palette(Player p){String s=selected(p);if("map_default".equals(s))return s;return "random".equals(s)?randomConcrete(p.getUniqueId(),null):s;}
