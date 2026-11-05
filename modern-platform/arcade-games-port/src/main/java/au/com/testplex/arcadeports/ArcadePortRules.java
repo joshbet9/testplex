@@ -2153,6 +2153,7 @@ public final class ArcadePortRules {
     }
 
     public static final long QUIVER_RESPAWN_DELAY_TICKS = 20L;
+    public static final boolean QUIVER_LEAPER_DOUBLE_JUMP_ENABLED = true;
     public static final long QUIVER_GROUND_POUND_COOLDOWN_MILLIS = 10_000L;
     public static final long QUIVER_NINJA_VANISH_MILLIS = 1_200L;
     public static final long QUIVER_SPECTATOR_TELEPORT_COOLDOWN_MILLIS = 3_000L;

@@ -28437,6 +28437,8 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null || session.type != ArcadePortGame.ONE_IN_THE_QUIVER
                 || !session.alive.contains(player.getUniqueId())
+                || !GameDebugRuntimeOverrides.booleanValue("QUIVER_LEAPER_DOUBLE_JUMP_ENABLED",
+                        ArcadePortRules.QUIVER_LEAPER_DOUBLE_JUMP_ENABLED)
                 || !"leaper".equals(session.quiverKits.getOrDefault(player.getUniqueId(), "leaper"))) return;
         event.setCancelled(true);
         session.quiverLeapAwaitingLanding.add(player.getUniqueId());
