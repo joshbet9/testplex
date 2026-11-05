@@ -4514,6 +4514,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private void activateHeroesOfGwenSkill(Player player, String skill) {
         if (player == null || !player.isOnline() || !activePlayers.contains(player.getUniqueId())) return;
+        int separator = skill == null ? -1 : skill.indexOf('.');
+        if (separator > 0 && !debugFeatureEnabled(player, "hero-" + skill.substring(0, separator) + "-abilities")) {
+            player.sendActionBar(ChatColor.RED + "This hero's abilities are disabled in your debug profile.");
+            return;
+        }
         if (!isHeroSkillReady(player, skill)) {
             long remain = heroSkillReadyAt.getOrDefault(player.getUniqueId(), Map.of())
                     .getOrDefault(skill, 0L) - System.currentTimeMillis();

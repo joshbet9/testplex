@@ -1225,6 +1225,13 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             features.put("king-damage", new DebugFeature("king-damage", "King damage", Material.ZOMBIE_HEAD,
                     "Allow the tester's attacks and Objective TNT to damage the enemy King.", true));
         }
+        if (game == ArcadePortGame.HEROES_OF_GWEN) {
+            for (String hero : List.of("hattori", "bardolf", "devon", "rowena", "anath", "larissa", "dana", "biff", "ivy")) {
+                String key = "hero-" + hero + "-abilities";
+                features.put(key, new DebugFeature(key, pretty(hero) + " abilities", Material.BLAZE_POWDER,
+                        "Allow the tester to activate " + pretty(hero) + " skills; other players and passive effects are unchanged.", true));
+            }
+        }
         features.put("achievement-preview-only", new DebugFeature("achievement-preview-only",
                 "Achievement preview only", Material.KNOWLEDGE_BOOK,
                 "Show real achievement condition results without saving unlocks.", false));
@@ -1355,6 +1362,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                         && ("double-jump".equals(key) || "pitch-adjustment".equals(key) || "block-wall".equals(key)))
                 || (game == ArcadePortGame.CASTLE_ASSAULT
                         && ("objective-tnt".equals(key) || "crystal-damage".equals(key) || "king-damage".equals(key)))
+                || (game == ArcadePortGame.HEROES_OF_GWEN && key.startsWith("hero-") && key.endsWith("-abilities"))
                 || (game == ArcadePortGame.DRAGON_ESCAPE && key.startsWith("ability-"))
                 || (game == ArcadePortGame.DRAGONS && key.startsWith("ability-"))
                 || (game == ArcadePortGame.ONE_IN_THE_QUIVER && key.startsWith("ability-"))

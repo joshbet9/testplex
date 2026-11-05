@@ -698,6 +698,25 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void heroesOfGwenDebugSwitchesGateEveryHeroSkillSet() throws IOException {
+        Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "CastleAssaultHeroesOfGwenRuntime.java");
+        Path lobbyPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ModernArcadeLobbyRuntime.java");
+        if (!Files.isRegularFile(runtimePath)) {
+            runtimePath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "CastleAssaultHeroesOfGwenRuntime.java");
+            lobbyPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ModernArcadeLobbyRuntime.java");
+        }
+        String runtime = Files.readString(runtimePath);
+        String lobby = Files.readString(lobbyPath);
+        assertTrue(lobby.contains("List.of(\"hattori\", \"bardolf\", \"devon\", \"rowena\", \"anath\", \"larissa\", \"dana\", \"biff\", \"ivy\")"));
+        assertTrue(runtime.contains("\"hero-\" + skill.substring(0, separator) + \"-abilities\""));
+        assertTrue(runtime.contains("This hero's abilities are disabled in your debug profile."));
+    }
+
+    @Test
     void heroesOfGwenDebugEventStartsTheNormalPairedMinionWave() throws IOException {
         Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "CastleAssaultHeroesOfGwenRuntime.java");
