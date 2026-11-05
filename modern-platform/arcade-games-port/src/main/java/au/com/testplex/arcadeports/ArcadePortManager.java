@@ -946,6 +946,12 @@ public final class ArcadePortManager implements Listener {
         if (session == null || session.type != type || !session.liveStarted
                 || !session.alive.contains(tester.getUniqueId())) return false;
         boolean triggered = false;
+        if (type == ArcadePortGame.PLEXBALL && "use-kit-ability".equals(eventId)
+                && plugin.getPlexballGame() != null) {
+            triggered = plugin.getPlexballGame().debugUseSelectedKitAbility(tester);
+            if (triggered) GameDebugRuntimeOverrides.markDebugSession();
+            return triggered;
+        }
         if (type == ArcadePortGame.SNEAKY_ASSASSINS && "use-kit-ability".equals(eventId)) {
             triggered = sneakyAssassins.debugUseSelectedKitAbility(tester);
             if (triggered) GameDebugRuntimeOverrides.markDebugSession();

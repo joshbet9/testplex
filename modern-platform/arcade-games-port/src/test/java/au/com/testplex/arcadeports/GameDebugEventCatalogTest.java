@@ -133,6 +133,10 @@ class GameDebugEventCatalogTest {
         }
         assertTrue(game.contains("!plugin.hasAdminAccess(player)) return true"),
                 "non-authorised players retain normal Plexball rules");
+        assertTrue(GameDebugEventCatalog.events(ArcadePortGame.PLEXBALL).stream()
+                .anyMatch(event -> event.id().equals("use-kit-ability")));
+        assertTrue(game.contains("public boolean debugUseSelectedKitAbility(Player tester)"));
+        assertTrue(game.contains("phase != Phase.BALL_FLIGHT") && game.contains("useAbility(tester)"));
     }
 
     @Test

@@ -308,6 +308,16 @@ public final class PlexballGame implements Listener {
                 feature, true);
     }
 
+    /** Run the selected fielder ability through its normal per-ball use guard. */
+    public boolean debugUseSelectedKitAbility(Player tester) {
+        if (tester == null || !tester.isOnline() || !plugin.hasAdminAccess(tester)
+                || phase != Phase.BALL_FLIGHT || !matchPlayers.contains(tester.getUniqueId())
+                || tester.getUniqueId().equals(batterId)
+                || !debugFeatureEnabled(tester, "kit-abilities")) return false;
+        useAbility(tester);
+        return true;
+    }
+
     /** Open the local Plexball career page used by /stats plexball. */
     public void openStats(Player player) {
         if (player == null || !player.isOnline()) return;

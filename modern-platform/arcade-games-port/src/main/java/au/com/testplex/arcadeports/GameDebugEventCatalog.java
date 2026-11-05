@@ -31,6 +31,9 @@ final class GameDebugEventCatalog {
     private static final List<Event> SNEAKY_ASSASSINS = List.of(
             new Event("use-kit-ability", "Test Selected Kit Ability", Material.SMOKE_BOMB,
                     "Run Escape Artist's smoke cloak or Revealer's normal diamond projectile effect."));
+    private static final List<Event> PLEXBALL = List.of(
+            new Event("use-kit-ability", "Test Selected Kit Ability", Material.FIREWORK_STAR,
+                    "Run the normal one-use fielder ability during ball flight."));
     private static final List<Event> CAMERA_SHY = List.of(
             new Event("take-photo", "Test Camera Flash", Material.SPYGLASS,
                     "Run the normal F-key flash and photo checks now, including a visible flash on a missed photo."),
@@ -125,6 +128,7 @@ final class GameDebugEventCatalog {
         if (game == ArcadePortGame.MASTER_BUILDERS) return MASTER_BUILDERS;
         if (game == ArcadePortGame.SNAKE) return SNAKE;
         if (game == ArcadePortGame.SNEAKY_ASSASSINS) return SNEAKY_ASSASSINS;
+        if (game == ArcadePortGame.PLEXBALL) return PLEXBALL;
         if (game == ArcadePortGame.ONE_IN_THE_QUIVER) return ONE_IN_THE_QUIVER;
         if (game == ArcadePortGame.SPLEEF) return SPLEEF;
         if (game == ArcadePortGame.SUPER_SPLOOR) return SUPER_SPLOOR;
