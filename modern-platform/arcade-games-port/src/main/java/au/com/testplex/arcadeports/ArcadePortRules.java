@@ -616,6 +616,9 @@ public final class ArcadePortRules {
     public static final int MICRO_BATTLES_CRUMBLE_BLOCKS_PER_TICK = 3;
     public static final int MICRO_BATTLES_CRUMBLE_SCAN_INTERVAL_TICKS = 2;
     public static final int DRAGONS_MAX_DRAGONS = 5;
+    public static final double DRAGONS_AUTONOMOUS_FLIGHT_SPEED = 0.32D;
+    public static final double DRAGONS_TAMER_FLIGHT_SPEED = 0.42D;
+    public static final double DRAGONS_TURN_RATE = 0.12D;
     /** UpdateType.SEC_05: Reborn adds one dragon every five seconds. */
     public static final long DRAGONS_SPAWN_INTERVAL_MILLIS = 5_000L;
     /** UpdateType.FASTEST is the source dragon-target/contact update cadence. */
@@ -887,6 +890,24 @@ public final class ArcadePortRules {
         if (velocity.getY() > 2.0D) velocity.setY(2.0D);
         if (grounded) velocity.setY(velocity.getY() + 0.2D);
         return velocity;
+    }
+
+    public static Vector turnDragonHeading(Vector heading, Vector targetDirection, double turnRate) {
+        Vector result = heading == null ? new Vector() : heading.clone();
+        if (targetDirection != null && targetDirection.lengthSquared() > 1.0E-6D) {
+            Vector desired = targetDirection.clone().normalize();
+            double boundedTurnRate = Math.max(0.0D, Math.min(1.0D, turnRate));
+            result.add(desired.subtract(result.clone()).multiply(boundedTurnRate));
+        }
+        if (result.lengthSquared() < 1.0E-6D) return new Vector(0.0D, 0.0D, 1.0D);
+        return result.normalize();
+    }
+
+    public static Vector autonomousDragonFlight(Vector heading, double speed) {
+        if (heading == null || heading.lengthSquared() < 1.0E-6D) heading = new Vector(0.0D, 0.0D, 1.0D);
+        Vector flight = heading.clone().normalize().multiply(Math.max(0.0D, speed));
+        flight.setY(Math.max(-0.08D, Math.min(0.16D, flight.getY() + 0.04D)));
+        return flight;
     }
 
     public static boolean shouldDragonSparklerAttract(double y, boolean inLiquid) {

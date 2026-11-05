@@ -14028,7 +14028,8 @@ public final class ArcadePortManager implements Listener {
                     Vector facing = controller.getLocation().getDirection();
                     if (facing.lengthSquared() < 0.001D) facing = new Vector(0.0D, 0.0D, 1.0D);
                     facing.normalize();
-                    flight = facing.clone().multiply(0.42D);
+                    flight = facing.clone().multiply(GameDebugRuntimeOverrides.doubleValue(
+                            "DRAGONS_TAMER_FLIGHT_SPEED", ArcadePortRules.DRAGONS_TAMER_FLIGHT_SPEED));
                     flight.setY(Math.max(-0.14D, Math.min(0.14D, facing.getY() * 0.30D)));
                     session.dragonTargetPlayers.remove(dragonId);
                     session.dragonTargetLocations.put(dragonId,
@@ -14043,18 +14044,20 @@ public final class ArcadePortManager implements Listener {
                 if (target != null && target.getWorld() == dragon.getWorld()) {
                     Vector desired = target.toVector().subtract(dragon.getLocation().toVector());
                     if (desired.lengthSquared() > 1.0E-6D) {
-                        desired.normalize();
                         // Reborn delegates steering to the native dragon controller.
                         // Gradually turn this Paper-controlled dragon toward its target
                         // so it follows a flight path instead of snapping every tick.
-                        heading.add(desired.subtract(heading.clone()).multiply(0.12D));
+                        heading = ArcadePortRules.turnDragonHeading(heading, desired,
+                                GameDebugRuntimeOverrides.doubleValue("DRAGONS_TURN_RATE",
+                                        ArcadePortRules.DRAGONS_TURN_RATE));
                     }
                 }
                 if (heading.lengthSquared() < 1.0E-6D) heading = new Vector(0.0D, 0.0D, 1.0D);
                 heading.normalize();
                 session.dragonFlightVectors.put(dragonId, heading.clone());
-                flight = heading.clone().multiply(0.32D);
-                flight.setY(Math.max(-0.08D, Math.min(0.16D, flight.getY() + 0.04D)));
+                flight = ArcadePortRules.autonomousDragonFlight(heading,
+                        GameDebugRuntimeOverrides.doubleValue("DRAGONS_AUTONOMOUS_FLIGHT_SPEED",
+                                ArcadePortRules.DRAGONS_AUTONOMOUS_FLIGHT_SPEED));
             }
             if (flight != null) {
                 Location next = dragon.getLocation().clone().add(flight);
