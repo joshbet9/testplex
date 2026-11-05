@@ -246,4 +246,38 @@ class GameDebugProfilesTest {
         assertEquals(-1, profiles.testBotTeam(tester, game, 0, -1));
         assertEquals("", profiles.testBotCosmetic(tester, game, 0, "tnt-explosions", ""));
     }
+
+    @Test
+    void selectedProfilesReloadAcrossRuntimeRestartForEveryGame() {
+        Path file = directory.resolve("restart-profiles.yml");
+        UUID tester = UUID.randomUUID();
+        GameDebugProfiles beforeRestart = new GameDebugProfiles(file.toFile(), ignored -> { });
+
+        for (ArcadePortGame game : ArcadePortGame.values()) {
+            beforeRestart.create(tester, game, "Restart Check");
+            beforeRestart.setVariable(tester, game, "LEGACY_ATTACK_SPEED", 0.25D);
+            beforeRestart.setFeature(tester, game, "no-fall-damage", true);
+            beforeRestart.setTestBotCount(tester, game, 3);
+            beforeRestart.setTestBotKit(tester, game, 1, "restart-kit");
+        }
+        GameDebugRuntimeOverrides.clear();
+
+        GameDebugProfiles afterRestart = new GameDebugProfiles(file.toFile(), ignored -> { });
+        for (ArcadePortGame game : ArcadePortGame.values()) {
+            assertEquals("restart-check", afterRestart.selected(tester, game), game.id() + " selected profile");
+            assertEquals(0.25D, afterRestart.variable(tester, game, "LEGACY_ATTACK_SPEED"),
+                    game.id() + " persisted variable");
+            assertTrue(afterRestart.feature(tester, game, "no-fall-damage", false),
+                    game.id() + " persisted feature");
+            assertEquals(3, afterRestart.testBotCount(tester, game, 0), game.id() + " persisted roster size");
+            assertEquals("restart-kit", afterRestart.testBotKit(tester, game, 1, ""),
+                    game.id() + " persisted bot kit");
+
+            GameDebugRuntimeOverrides.activate(afterRestart.values(tester, game));
+            assertEquals(0.25D, GameDebugRuntimeOverrides.doubleValue("LEGACY_ATTACK_SPEED", 0.4D),
+                    game.id() + " reloaded runtime override");
+            assertTrue(GameDebugRuntimeOverrides.booleanValue("no-fall-damage", false),
+                    game.id() + " reloaded feature override");
+        }
+    }
 }
