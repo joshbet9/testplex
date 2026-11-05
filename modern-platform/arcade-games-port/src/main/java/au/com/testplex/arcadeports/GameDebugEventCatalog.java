@@ -26,6 +26,9 @@ final class GameDebugEventCatalog {
     private static final List<Event> DEATH_TAG = List.of(
             new Event("promote-self", "Promote Self to Chaser", Material.SKELETON_SKULL,
                     "Run the normal Runner-to-Chaser conversion on yourself."));
+    private static final List<Event> SPLEEF = List.of(
+            new Event("refresh-kit", "Refresh Kit Items", Material.IRON_AXE,
+                    "Reapply your selected Spleef kit through its normal kit setup."));
 
     private GameDebugEventCatalog() { }
 
@@ -36,6 +39,7 @@ final class GameDebugEventCatalog {
         if (game == ArcadePortGame.ONE_IN_THE_QUIVER) return ONE_IN_THE_QUIVER;
         if (game == ArcadePortGame.PAINTBALL) return PAINTBALL;
         if (game == ArcadePortGame.DEATH_TAG) return DEATH_TAG;
+        if (game == ArcadePortGame.SPLEEF) return SPLEEF;
         return List.of();
     }
 }

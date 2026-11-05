@@ -941,6 +941,11 @@ public final class ArcadePortManager implements Listener {
             makeDeathTagChaser(session, tester, "promoted by an authorised debug event");
             triggered = session.tagged.contains(tester.getUniqueId());
         }
+        if (type == ArcadePortGame.SPLEEF && "refresh-kit".equals(eventId)) {
+            GameDebugRuntimeOverrides.markDebugSession();
+            giveKit(session, tester);
+            triggered = true;
+        }
         return triggered;
     }
 
