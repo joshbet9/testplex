@@ -26,6 +26,8 @@ class GameDebugEventCatalogTest {
                 .anyMatch(event -> event.id().equals("refresh-kit")));
         assertTrue(GameDebugEventCatalog.events(ArcadePortGame.SPLEEF).stream()
                 .anyMatch(event -> event.id().equals("restore-hunger")));
+        assertTrue(GameDebugEventCatalog.events(ArcadePortGame.MICRO_BATTLES).stream()
+                .anyMatch(event -> event.id().equals("drop-barriers")));
         assertEquals("grant-spells", GameDebugEventCatalog.events(ArcadePortGame.WIZARDS)
                 .getFirst().id());
         assertFalse(GameDebugEventCatalog.events(ArcadePortGame.BACON_BRAWL).stream()
@@ -310,5 +312,19 @@ class GameDebugEventCatalogTest {
         assertTrue(manager.contains("debugProfiles.setBooleanVariable(player.getUniqueId(), type, flag, enabled)"));
         assertTrue(manager.contains("GameDebugRuntimeOverrides.setValue(flag, enabled)"));
         assertTrue(lobby.contains("GameDebugVariableCatalog.appliesImmediately(GameDebugVariableCatalog.variable(game, key))"));
+    }
+
+    @Test
+    void microBattlesBarrierEventUsesTheNormalBarrierReleasePath() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        assertTrue(manager.contains("\"drop-barriers\".equals(eventId)"));
+        assertTrue(manager.contains("releaseMicroBattlesBarrier(session);"));
+        assertTrue(manager.contains("private void updateMicroBarrier(Session session, long now)"));
+        assertTrue(manager.contains("private void releaseMicroBattlesBarrier(Session session)"));
     }
 }

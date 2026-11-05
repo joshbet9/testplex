@@ -33,6 +33,10 @@ final class GameDebugEventCatalog {
     private static final List<Event> REFRESH_KIT = List.of(
             new Event("refresh-kit", "Refresh Selected Kit", Material.NETHER_STAR,
                     "Reapply your selected kit through its normal in-game kit setup."));
+    private static final List<Event> MICRO_BATTLES = List.of(
+            new Event("drop-barriers", "Drop Start Barriers", Material.GLASS,
+                    "Run the normal start-glass removal now so you can test combat through the opening."),
+            REFRESH_KIT.getFirst());
     private static final List<Event> SPLEEF = List.of(
             new Event("restore-hunger", "Restore Hunger", Material.COOKED_BEEF,
                     "Restore your hunger and saturation to full during an active round."),
@@ -86,6 +90,7 @@ final class GameDebugEventCatalog {
         if (game == ArcadePortGame.SHEEP_QUEST) return SHEEP_QUEST;
         if (game == ArcadePortGame.SKY_WARS) return SKY_WARS;
         if (game == ArcadePortGame.PAINTBALL) return PAINTBALL;
+        if (game == ArcadePortGame.MICRO_BATTLES) return MICRO_BATTLES;
         if (game == ArcadePortGame.DEATH_TAG) return DEATH_TAG;
         if (game == ArcadePortGame.WIZARDS) return WIZARDS;
         if (supportsKitRefresh(game)) return REFRESH_KIT;

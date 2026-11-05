@@ -1013,6 +1013,12 @@ public final class ArcadePortManager implements Listener {
             setPaintballArmor(session, tester);
             triggered = true;
         }
+        if (type == ArcadePortGame.MICRO_BATTLES && "drop-barriers".equals(eventId)
+                && session.microBarrierActive) {
+            releaseMicroBattlesBarrier(session);
+            GameDebugRuntimeOverrides.markDebugSession();
+            triggered = true;
+        }
         if (type == ArcadePortGame.DEATH_TAG && "promote-self".equals(eventId)
                 && !session.tagged.contains(tester.getUniqueId())) {
             GameDebugRuntimeOverrides.markDebugSession();
@@ -7905,6 +7911,11 @@ public final class ArcadePortManager implements Listener {
         if (!session.microBarrierActive || !ArcadePortRules.shouldRemoveMicroBarrier(now - session.startedAt,
                 GameDebugRuntimeOverrides.longValue("MICRO_BATTLES_BARRIER_DURATION_MILLIS",
                         ArcadePortRules.MICRO_BATTLES_BARRIER_DURATION_MILLIS))) return;
+        releaseMicroBattlesBarrier(session);
+    }
+
+    private void releaseMicroBattlesBarrier(Session session) {
+        if (session == null || !session.microBarrierActive) return;
         for (Block block : session.microBarrierBlocks) {
             if (block.getType() == Material.GLASS) block.setType(Material.AIR, false);
         }
