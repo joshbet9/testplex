@@ -17242,6 +17242,11 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
+        if (session.type == ArcadePortGame.GLADIATORS
+                && ((plugin.hasAdminAccess(attacker) && !debugFeatureEnabled(attacker.getUniqueId(),
+                        ArcadePortGame.GLADIATORS, "combat-damage", true))
+                    || (plugin.hasAdminAccess(target) && !debugFeatureEnabled(target.getUniqueId(),
+                        ArcadePortGame.GLADIATORS, "combat-damage", true)))) return;
         if (session.type == ArcadePortGame.GLADIATORS) {
             if (session.participantsAtStart > 1) progressGladiators(session);
             // Solo practice remains live until the operator stops it; it is not a tournament win.

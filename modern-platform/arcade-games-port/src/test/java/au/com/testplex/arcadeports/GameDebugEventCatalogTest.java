@@ -1219,4 +1219,17 @@ class GameDebugEventCatalogTest {
         assertTrue(snap.contains("ArcadePortGame.CAMERA_SHY, \"photo-outlines\", true"));
         assertTrue(snap.contains("refreshPhotoOutlines(desiredOutlines)"));
     }
+
+    @Test
+    void gladiatorsCombatSwitchGatesDuelDamageForAuthorizedTesters() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        assertTrue(lobby.contains("features.put(\"combat-damage\""));
+        assertTrue(manager.contains("ArcadePortGame.GLADIATORS, \"combat-damage\", true"));
+    }
 }

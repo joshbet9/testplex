@@ -1279,6 +1279,10 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             features.put("steals", new DebugFeature("steals", "Ball steals", Material.LEATHER_BOOTS,
                     "Allow this tester to steal possession from an opposing ball holder.", true));
         }
+        if (game == ArcadePortGame.GLADIATORS) {
+            features.put("combat-damage", new DebugFeature("combat-damage", "Duel combat damage", Material.IRON_SWORD,
+                    "Allow this tester to deal and receive Gladiators duel damage.", true));
+        }
         if (game == ArcadePortGame.HEROES_OF_GWEN) {
             features.put("tower-damage", new DebugFeature("tower-damage", "Tower damage", Material.IRON_PICKAXE,
                     "Allow this tester's attacks to damage enemy Heroes towers.", true));
@@ -1500,6 +1504,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                         && ("ability-human-leap".equals(key) || "human-revival".equals(key) || key.startsWith("ability-")))
                 || (game == ArcadePortGame.HOOPS_REMASTERED
                         && ("shooting".equals(key) || "scoring".equals(key) || "steals".equals(key)))
+                || (game == ArcadePortGame.GLADIATORS && "combat-damage".equals(key))
                 || (game == ArcadePortGame.DRAGON_ESCAPE && "finish-detection".equals(key))
                 || (game == ArcadePortGame.DRAGON_ESCAPE && key.startsWith("ability-"))
                 || (game == ArcadePortGame.RUNNER && "runner-trail".equals(key))
