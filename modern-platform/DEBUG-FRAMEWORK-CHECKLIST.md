@@ -22,7 +22,7 @@ This checklist tracks implemented controls, not menu/catalog presence alone. A g
 
 Legend: **Partial** means the common profile framework and any listed shared rule hooks exist, but game-specific controls or required tests are still missing. **Pending** means its separate runtime has not yet been connected to profile variables and controls. No game is marked complete yet.
 
-Debug-round persistence guard: configured debug rounds and rounds launched with a debug bot roster do not persist match stats or achievements. Reset to Defaults clears active rule changes but keeps this guard enabled until the round ends. This is covered for shared Arcade stats plus the standalone Snap and Speed Builders progress stores; newly added direct progression paths must use the same guard.
+Debug-round persistence guard: configured debug rounds and rounds launched with a debug bot roster do not persist match stats or achievements. Authorized live phase/vitals debug actions also mark the round for isolation. Reset to Defaults clears active rule changes but keeps this guard enabled until the round ends. It covers shared Arcade stats, Snap, Speed Builders, Wizards, Plexball, and Monster Maze; newly added direct progression paths must use the same guard.
 
 Bot counts and per-bot team, kit, and cosmetic loadouts are now stored inside each tester's selected game profile. Duplicating or renaming a profile carries its roster configuration with it. Existing `test-bot-loadouts` values remain a fallback for the default profile during migration.
 

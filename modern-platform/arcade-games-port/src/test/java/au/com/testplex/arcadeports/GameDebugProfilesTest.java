@@ -98,11 +98,18 @@ class GameDebugProfilesTest {
         reloaded.create(tester, ArcadePortGame.MICRO_BATTLES, "balanced");
         assertEquals(0, reloaded.testBotCount(tester, ArcadePortGame.MICRO_BATTLES, 0));
         reloaded.setTestBotCount(tester, ArcadePortGame.MICRO_BATTLES, 4);
+        reloaded.setTestBotKit(tester, ArcadePortGame.MICRO_BATTLES, 3, "dasher");
+        reloaded.setTestBotTeam(tester, ArcadePortGame.MICRO_BATTLES, 3, 1);
+        reloaded.setTestBotCosmetic(tester, ArcadePortGame.MICRO_BATTLES, 3, "start-glass", "violet");
         assertTrue(reloaded.select(tester, ArcadePortGame.MICRO_BATTLES, "default"));
         assertEquals(8, reloaded.testBotCount(tester, ArcadePortGame.MICRO_BATTLES, 0));
         assertTrue(reloaded.select(tester, ArcadePortGame.MICRO_BATTLES, "balanced"));
         assertEquals("balanced-copy", reloaded.duplicate(tester, ArcadePortGame.MICRO_BATTLES, "Balanced Copy"));
         assertEquals(4, reloaded.testBotCount(tester, ArcadePortGame.MICRO_BATTLES, 0));
+        assertEquals("dasher", reloaded.testBotKit(tester, ArcadePortGame.MICRO_BATTLES, 3, ""));
+        assertEquals(1, reloaded.testBotTeam(tester, ArcadePortGame.MICRO_BATTLES, 3, -1));
+        assertEquals("violet", reloaded.testBotCosmetic(
+                tester, ArcadePortGame.MICRO_BATTLES, 3, "start-glass", ""));
         assertTrue(reloaded.select(tester, ArcadePortGame.MICRO_BATTLES, "default"));
         assertEquals(8, reloaded.testBotCount(tester, ArcadePortGame.MICRO_BATTLES, 0));
         assertTrue(reloaded.select(tester, ArcadePortGame.MICRO_BATTLES, "balanced"));

@@ -1920,6 +1920,7 @@ public final class PlexballGame implements Listener {
     }
 
     private void updateCareerProgress(List<UUID> participants, List<UUID> winners) {
+        if (GameDebugRuntimeOverrides.isDebugSession()) return;
         Set<UUID> winnerIds = winners == null ? Set.of() : new HashSet<>(winners);
         for (UUID id : participants) {
             PlayerResult match = results.getOrDefault(id, new PlayerResult());

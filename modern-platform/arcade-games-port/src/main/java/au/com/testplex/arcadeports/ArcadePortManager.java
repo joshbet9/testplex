@@ -9994,7 +9994,8 @@ public final class ArcadePortManager implements Listener {
         session.microLastTwoAwarded = true;
         for (UUID id : session.alive) {
             Player player = session.players.get(id);
-            if (player == null || !player.isOnline() || testPlayers.isTestPlayer(player)) continue;
+            if (GameDebugRuntimeOverrides.isDebugSession() || player == null || !player.isOnline()
+                    || testPlayers.isTestPlayer(player)) continue;
             String statsPath = localStatsPath(id, ArcadePortGame.MICRO_BATTLES.id());
             plugin.getConfig().set(statsPath + "last-two-mission-progress",
                     plugin.getConfig().getInt(statsPath + "last-two-mission-progress", 0) + 1);
@@ -11492,7 +11493,7 @@ public final class ArcadePortManager implements Listener {
         if(used>=DRAW_MY_THING_MAX_GUESSES){player.sendMessage(ChatColor.RED+"No guesses remaining.");return;}
         session.drawGuessAttempts.put(playerId,used+1);
         String statPath = localStatsPath(playerId, "draw-my-thing");
-        if (!testPlayers.isTestPlayer(playerId)) {
+        if (!testPlayers.isTestPlayer(playerId) && !GameDebugRuntimeOverrides.isDebugSession()) {
             plugin.getConfig().set(statPath + "total-guesses",
                     plugin.getConfig().getInt(statPath + "total-guesses", 0) + 1);
         }
@@ -11509,7 +11510,7 @@ public final class ArcadePortManager implements Listener {
                 drawer.playSound(drawer.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.8F,
                         first ? 1.5F : 1.9F);
             }
-            if (!testPlayers.isTestPlayer(playerId)) {
+            if (!testPlayers.isTestPlayer(playerId) && !GameDebugRuntimeOverrides.isDebugSession()) {
                 plugin.getConfig().set(statPath + "correct-guesses",
                         plugin.getConfig().getInt(statPath + "correct-guesses", 0) + 1);
                 if (first) {
@@ -15004,16 +15005,19 @@ public final class ArcadePortManager implements Listener {
         boolean firstFinisher = session.dragonEscapeCompleted.isEmpty();
         if (session.dragonEscapeCompleted.add(id)) {
             if (firstFinisher) session.dragonEscapeWinner = id;
-            String statsPath = localStatsPath(id, ArcadePortGame.DRAGON_ESCAPE.id());
-            plugin.getConfig().set(statsPath + "course-completes",
-                    plugin.getConfig().getInt(statsPath + "course-completes", 0) + 1);
-            String mapWinKey = dragonEscapeMapWinKey(session.dragonEscapeMapName);
-            if (!mapWinKey.isEmpty()) {
-                String mapWinsPath = statsPath + "map-wins." + mapWinKey;
-                plugin.getConfig().set(mapWinsPath, plugin.getConfig().getInt(mapWinsPath, 0) + 1);
+            if (!GameDebugRuntimeOverrides.isDebugSession()) {
+                String statsPath = localStatsPath(id, ArcadePortGame.DRAGON_ESCAPE.id());
+                plugin.getConfig().set(statsPath + "course-completes",
+                        plugin.getConfig().getInt(statsPath + "course-completes", 0) + 1);
+                String mapWinKey = dragonEscapeMapWinKey(session.dragonEscapeMapName);
+                if (!mapWinKey.isEmpty()) {
+                    String mapWinsPath = statsPath + "map-wins." + mapWinKey;
+                    plugin.getConfig().set(mapWinsPath, plugin.getConfig().getInt(mapWinsPath, 0) + 1);
+                }
+                plugin.saveConfig();
             }
-            plugin.saveConfig();
         }
+        if (GameDebugRuntimeOverrides.isDebugSession()) return;
         if (session.dragonEscapeMapResource == null) return;
         long elapsed = Math.max(1L, now - session.startedAt);
         Map<Integer, Long> splits = session.dragonEscapeRunSplitMillis.computeIfAbsent(id, ignored -> new HashMap<>());
@@ -18749,7 +18753,8 @@ public final class ArcadePortManager implements Listener {
 
     private void awardQuiverAchievement(Player player, QuiverAchievement achievement, String description) {
         if (debugAchievementPreview(player, ArcadePortGame.ONE_IN_THE_QUIVER, description)) return;
-        if (player == null || testPlayers.isTestPlayer(player) || achievement == null) return;
+        if (GameDebugRuntimeOverrides.isDebugSession() || player == null
+                || testPlayers.isTestPlayer(player) || achievement == null) return;
         String key = achievement.configKey(player.getUniqueId());
         if (key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
@@ -19475,7 +19480,7 @@ public final class ArcadePortManager implements Listener {
 
     private void awardRunnerAchievement(Player player, String key, String description) {
         if (debugAchievementPreview(player, ArcadePortGame.RUNNER, description)) return;
-        if (player == null || testPlayers.isTestPlayer(player)
+        if (GameDebugRuntimeOverrides.isDebugSession() || player == null || testPlayers.isTestPlayer(player)
                 || key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
         if (player != null && player.isOnline()) {
@@ -19702,7 +19707,7 @@ public final class ArcadePortManager implements Listener {
 
     private void awardEvolutionAchievement(Player player, String key, String description) {
         if (debugAchievementPreview(player, ArcadePortGame.EVOLUTION, description)) return;
-        if (player == null || testPlayers.isTestPlayer(player)
+        if (GameDebugRuntimeOverrides.isDebugSession() || player == null || testPlayers.isTestPlayer(player)
                 || key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
         if (player != null && player.isOnline()) {
@@ -19976,7 +19981,8 @@ public final class ArcadePortManager implements Listener {
         SuperSploorProgressCatalog.Achievement preview = SuperSploorProgressCatalog.achievement(achievementId);
         if (debugAchievementPreview(player, ArcadePortGame.SUPER_SPLOOR,
                 preview == null ? achievementId : preview.name())) return;
-        if (playerId == null || !"super-sploor".equals(gameId) || testPlayers.isTestPlayer(playerId)) return;
+        if (GameDebugRuntimeOverrides.isDebugSession() || playerId == null
+                || !"super-sploor".equals(gameId) || testPlayers.isTestPlayer(playerId)) return;
         SuperSploorProgressCatalog.Achievement achievement = preview;
         if (achievement == null) return;
         String key = SuperSploorProgressCatalog.achievementConfigKey(playerId, achievementId);
@@ -27791,7 +27797,7 @@ public final class ArcadePortManager implements Listener {
                 if (directHitDamage > 0.0D) {
                     session.bombPlayersDamaged.add(target.getUniqueId());
                     recordBombLobbersDamage(session, target, ownerId, now, bombId);
-                    if (!testPlayers.isTestPlayer(ownerId)) {
+                    if (!testPlayers.isTestPlayer(ownerId) && !GameDebugRuntimeOverrides.isDebugSession()) {
                         String directHitsPath = localStatsPath(ownerId, "bomb-lobbers") + "direct-hits";
                         plugin.getConfig().set(directHitsPath, plugin.getConfig().getInt(directHitsPath, 0) + 1);
                     }
