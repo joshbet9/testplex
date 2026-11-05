@@ -20,7 +20,9 @@ final class GameDebugEventCatalog {
                     "Clear the active drawing to white and reset its hint letters so the drawer can test again."));
     private static final List<Event> DRAGONS = List.of(
             new Event("spawn-dragon", "Spawn Next Dragon Now", Material.DRAGON_EGG,
-                    "Run the normal map spawn and target initialization without waiting for the interval."));
+                    "Run the normal map spawn and target initialization without waiting for the interval."),
+            new Event("use-kit-ability", "Test Selected Kit Ability", Material.NETHER_STAR,
+                    "Run your selected Leap, Frost Bridge, Glider, or Tamer ability through its normal cooldown and effect path."));
     private static final List<Event> DRAGON_ESCAPE = List.of(
             new Event("advance-dragon", "Advance Douglas Once", Material.DRAGON_HEAD,
                     "Run Douglas's normal chase, block clearing and catch checks once now."),

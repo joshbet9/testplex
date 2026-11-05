@@ -33,7 +33,9 @@ class GameDebugEventCatalogTest {
                 .map(GameDebugEventCatalog.Event::id).toList());
         assertEquals("spawn-minions", witherEvents.getFirst().id());
         assertEquals("reveal-letter", GameDebugEventCatalog.events(ArcadePortGame.DRAW_MY_THING).getFirst().id());
-        assertEquals("spawn-dragon", GameDebugEventCatalog.events(ArcadePortGame.DRAGONS).getFirst().id());
+        assertEquals(List.of("spawn-dragon", "use-kit-ability", "refresh-kit"),
+                GameDebugEventCatalog.events(ArcadePortGame.DRAGONS).stream()
+                        .map(GameDebugEventCatalog.Event::id).toList());
         assertEquals(List.of("advance-dragon", "use-kit-ability", "finish-run", "refresh-kit"),
                 GameDebugEventCatalog.events(ArcadePortGame.DRAGON_ESCAPE).stream()
                         .map(GameDebugEventCatalog.Event::id).toList());
@@ -131,6 +133,25 @@ class GameDebugEventCatalogTest {
         assertTrue(manager.contains("useDeathTagTricksterFireworks(session, tester)"));
         assertTrue(manager.contains("session.deathTagTricksterFireworksReadyAt.getOrDefault("));
         assertTrue(manager.contains("if (triggered) GameDebugRuntimeOverrides.markDebugSession()"));
+    }
+
+    @Test
+    void dragonsDebugEventRunsSelectedKitThroughItsNormalAbilityAndCooldownMethods() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String eventCatalog = Files.readString(sourceRoot.resolve("GameDebugEventCatalog.java"));
+        assertTrue(eventCatalog.contains("new Event(\"use-kit-ability\", \"Test Selected Kit Ability\""));
+        assertTrue(manager.contains("debugUseDragonsKitAbility(session, tester)"));
+        assertTrue(manager.contains("case \"coward\" -> useDragonsLeap(session, player, now)"));
+        assertTrue(manager.contains("case \"frost\" -> activateDragonFrostBridge(session, player, now)"));
+        assertTrue(manager.contains("case \"glider\" -> activateDragonGlider(session, player, now)"));
+        assertTrue(manager.contains("case \"tamer\" -> activateDragonTamer(session, player, now)"));
+        assertTrue(manager.contains("session.dragonGliderReadyAt.getOrDefault(id, 0L) > now"));
+        assertTrue(manager.contains("!isDebugAbilityAllowed(player, ArcadePortGame.DRAGONS, kit)"));
     }
 
     @Test

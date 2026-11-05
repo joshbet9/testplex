@@ -1105,6 +1105,10 @@ public final class ArcadePortManager implements Listener {
                     .filter(entity -> entity instanceof EnderDragon && entity.isValid()).count();
             triggered = dragonsAfter > dragonsBefore;
         }
+        if (type == ArcadePortGame.DRAGONS && "use-kit-ability".equals(eventId)) {
+            triggered = debugUseDragonsKitAbility(session, tester);
+            if (triggered) GameDebugRuntimeOverrides.markDebugSession();
+        }
         if (type == ArcadePortGame.DRAGON_ESCAPE && "advance-dragon".equals(eventId)
                 && session.dragonEscapeDragon != null && session.dragonEscapeDragon.isValid()) {
             GameDebugRuntimeOverrides.markDebugSession();
@@ -9786,6 +9790,39 @@ public final class ArcadePortManager implements Listener {
         leapEntity.setFallDistance(0.0F);
         player.setFallDistance(0.0F);
         player.playEffect(player.getLocation(), Effect.BLAZE_SHOOT, 8);
+    }
+
+    private boolean debugUseDragonsKitAbility(Session session, Player player) {
+        UUID id = player.getUniqueId();
+        String kit = session.dragonKits.getOrDefault(id, "coward");
+        if ("marksman".equals(kit) || !isDebugAbilityAllowed(player, ArcadePortGame.DRAGONS, kit)) return false;
+        long now = System.currentTimeMillis();
+        boolean before = switch (kit) {
+            case "coward" -> session.dragonLeapReadyAt.getOrDefault(id, 0L) > now;
+            case "frost" -> session.dragonFrostReadyAt.getOrDefault(id, 0L) > now;
+            case "glider" -> session.dragonGliderReadyAt.getOrDefault(id, 0L) > now
+                    || session.dragonGliderUntil.containsKey(id);
+            case "tamer" -> session.dragonTamerReadyAt.getOrDefault(id, 0L) > now
+                    || session.dragonTamerControls.containsKey(id);
+            default -> true;
+        };
+        switch (kit) {
+            case "coward" -> useDragonsLeap(session, player, now);
+            case "frost" -> activateDragonFrostBridge(session, player, now);
+            case "glider" -> activateDragonGlider(session, player, now);
+            case "tamer" -> activateDragonTamer(session, player, now);
+            default -> { return false; }
+        }
+        boolean after = switch (kit) {
+            case "coward" -> session.dragonLeapReadyAt.getOrDefault(id, 0L) > now;
+            case "frost" -> session.dragonFrostReadyAt.getOrDefault(id, 0L) > now;
+            case "glider" -> session.dragonGliderReadyAt.getOrDefault(id, 0L) > now
+                    || session.dragonGliderUntil.containsKey(id);
+            case "tamer" -> session.dragonTamerReadyAt.getOrDefault(id, 0L) > now
+                    || session.dragonTamerControls.containsKey(id);
+            default -> false;
+        };
+        return !before && after;
     }
 
     private boolean isDragonFrostPlacementSafe(Session session, Block block, UUID exemptPlayerId) {
