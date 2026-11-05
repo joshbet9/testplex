@@ -743,6 +743,20 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void dragonsKitSwitchesGatePerksAsWellAsActivation() throws IOException {
+        Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ArcadePortManager.java");
+        if (!Files.isRegularFile(managerPath)) {
+            managerPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ArcadePortManager.java");
+        }
+        String source = Files.readString(managerPath);
+        assertTrue(source.contains("isDebugAbilityAllowed(player, ArcadePortGame.DRAGONS, \"pyrotechnic\")"));
+        assertTrue(source.contains("isDebugAbilityAllowed(player, ArcadePortGame.DRAGONS, \"marksman\")"));
+        assertTrue(source.contains("isDebugAbilityAllowed(controller, ArcadePortGame.DRAGONS, \"tamer\")"));
+    }
+
+    @Test
     void heroesOfGwenDebugEventStartsTheNormalPairedMinionWave() throws IOException {
         Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "CastleAssaultHeroesOfGwenRuntime.java");

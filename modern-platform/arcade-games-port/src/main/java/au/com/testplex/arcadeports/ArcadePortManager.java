@@ -14200,7 +14200,8 @@ public final class ArcadePortManager implements Listener {
                 // and saturation=1 on UpdateType.FAST for each living player.
                 player.setFoodLevel(20);
                 player.setSaturation(1.0F);
-                if ("pyrotechnic".equals(kit)) {
+                if ("pyrotechnic".equals(kit)
+                        && isDebugAbilityAllowed(player, ArcadePortGame.DRAGONS, "pyrotechnic")) {
                     long next = session.dragonNextSparklerAt.getOrDefault(id,
                             now + GameDebugRuntimeOverrides.longValue("DRAGONS_SPARKLER_INTERVAL_MILLIS", ArcadePortRules.DRAGONS_SPARKLER_INTERVAL_MILLIS));
                     if (now >= next) {
@@ -14212,7 +14213,8 @@ public final class ArcadePortManager implements Listener {
                         }
                         session.dragonNextSparklerAt.put(id, now + GameDebugRuntimeOverrides.longValue("DRAGONS_SPARKLER_INTERVAL_MILLIS", ArcadePortRules.DRAGONS_SPARKLER_INTERVAL_MILLIS));
                     }
-                } else if ("marksman".equals(kit)) {
+                } else if ("marksman".equals(kit)
+                        && isDebugAbilityAllowed(player, ArcadePortGame.DRAGONS, "marksman")) {
                     long nextArrow = session.dragonNextArrowAt.getOrDefault(id,
                             now + GameDebugRuntimeOverrides.longValue("DRAGONS_MARKSMAN_ARROW_INTERVAL_MILLIS", ArcadePortRules.DRAGONS_MARKSMAN_ARROW_INTERVAL_MILLIS));
                     if (now >= nextArrow) {
@@ -14227,7 +14229,10 @@ public final class ArcadePortManager implements Listener {
                 }
             }
             // Reborn's PerkBarrage charges and emits queued arrows every server TICK.
-            if ("marksman".equals(kit)) updateDragonBarrageCharge(session, player, now);
+            if ("marksman".equals(kit)
+                    && isDebugAbilityAllowed(player, ArcadePortGame.DRAGONS, "marksman")) {
+                updateDragonBarrageCharge(session, player, now);
+            }
         }
 
         List<EnderDragon> dragons = session.entities.stream()
@@ -14242,6 +14247,7 @@ public final class ArcadePortManager implements Listener {
                     Player controller = session.players.get(controllerId);
                     DragonTamerControl control = session.dragonTamerControls.get(controllerId);
                     if (controller == null || !controller.isOnline() || control == null
+                            || !isDebugAbilityAllowed(controller, ArcadePortGame.DRAGONS, "tamer")
                             || !session.alive.contains(controllerId) || now >= control.endsAtMillis()) {
                         endDragonTamer(session, controllerId, "Your 15-second dragon control has ended.", true);
                     }
