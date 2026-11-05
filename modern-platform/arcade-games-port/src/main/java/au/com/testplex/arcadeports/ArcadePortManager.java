@@ -915,6 +915,11 @@ public final class ArcadePortManager implements Listener {
             GameDebugRuntimeOverrides.markDebugSession();
             return cameraShyModule.debugTakePhoto(tester);
         }
+        if (type == ArcadePortGame.CAMERA_SHY && "use-kit-ability".equals(eventId)) {
+            if (cameraShyModule == null || !cameraShyModule.isLiveParticipant(tester)) return false;
+            GameDebugRuntimeOverrides.markDebugSession();
+            return cameraShyModule.debugUseSelectedKitAbility(tester);
+        }
         Session session = active;
         if (session == null || session.type != type || !session.liveStarted
                 || !session.alive.contains(tester.getUniqueId())) return false;

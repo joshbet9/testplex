@@ -23,7 +23,9 @@ class GameDebugEventCatalogTest {
         assertEquals("begin-evolution", GameDebugEventCatalog.events(ArcadePortGame.EVOLUTION).getFirst().id());
         assertEquals("shoot-ball", GameDebugEventCatalog.events(ArcadePortGame.HOOPS_REMASTERED).getFirst().id());
         assertEquals("roll-item", GameDebugEventCatalog.events(ArcadePortGame.SNAKE).getFirst().id());
-        assertEquals("take-photo", GameDebugEventCatalog.events(ArcadePortGame.CAMERA_SHY).getFirst().id());
+        assertEquals(List.of("take-photo", "use-kit-ability"),
+                GameDebugEventCatalog.events(ArcadePortGame.CAMERA_SHY).stream()
+                        .map(GameDebugEventCatalog.Event::id).toList());
         assertEquals("reset-own-plot", GameDebugEventCatalog.events(ArcadePortGame.MASTER_BUILDERS).getFirst().id());
         assertEquals("refill-arrow", GameDebugEventCatalog.events(ArcadePortGame.ONE_IN_THE_QUIVER)
                 .getFirst().id());
@@ -254,6 +256,11 @@ class GameDebugEventCatalogTest {
         assertTrue(photo.contains("takePhoto(player)"));
         assertTrue(game.contains("private void award(UUID id, String achievementId) {\n        if (GameDebugRuntimeOverrides.isDebugSession()) return;"));
         assertTrue(game.contains("private void recordMatchProgress(UUID winnerId) {\n        if (GameDebugRuntimeOverrides.isDebugSession()) return;"));
+        assertTrue(manager.contains("type == ArcadePortGame.CAMERA_SHY && \"use-kit-ability\".equals(eventId)"));
+        int debugAbility = game.indexOf("public boolean debugUseSelectedKitAbility(Player player)");
+        int next = game.indexOf("public int queuedCount()", debugAbility);
+        assertTrue(debugAbility >= 0 && next > debugAbility);
+        assertTrue(game.substring(debugAbility, next).contains("activateAbility(player, kit)"));
     }
 
     @Test

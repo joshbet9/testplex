@@ -28,7 +28,9 @@ final class GameDebugEventCatalog {
                     "Start your normal random control-debuff roll now; only works for a living player."));
     private static final List<Event> CAMERA_SHY = List.of(
             new Event("take-photo", "Test Camera Flash", Material.SPYGLASS,
-                    "Run the normal F-key flash and photo checks now, including a visible flash on a missed photo."));
+                    "Run the normal F-key flash and photo checks now, including a visible flash on a missed photo."),
+            new Event("use-kit-ability", "Test Selected Kit Ability", Material.NETHER_STAR,
+                    "Run your selected kit's normal ability and cooldown checks immediately."));
     private static final List<Event> EVOLUTION = List.of(
             new Event("begin-evolution", "Start Evolution", Material.DRAGON_EGG,
                     "Begin your normal evolution animation immediately to test form and cosmetic effects."));

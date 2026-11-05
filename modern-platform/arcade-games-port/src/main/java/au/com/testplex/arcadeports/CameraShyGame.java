@@ -466,6 +466,15 @@ public final class CameraShyGame implements Listener {
         return true;
     }
 
+    /** Debug control: invoke the selected kit's ordinary ability and cooldown path. */
+    public boolean debugUseSelectedKitAbility(Player player) {
+        if (!isAliveParticipant(player)) return false;
+        Kit kit = Kit.fromId(selectedKits.get(player.getUniqueId()));
+        if (kit == null) return false;
+        activateAbility(player, kit);
+        return true;
+    }
+
     public int queuedCount() {
         return (int) queue.values().stream().filter(player -> player != null && player.isOnline()).count();
     }
