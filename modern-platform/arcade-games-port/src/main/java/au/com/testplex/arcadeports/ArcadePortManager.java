@@ -11999,6 +11999,11 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void selectDrawColour(Session session, Player player, Material colour, String colourName) {
+        if (plugin.hasAdminAccess(player)
+                && !debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.DRAW_MY_THING, "palette-selection", true)) {
+            player.sendActionBar(ChatColor.RED + "Palette selection is disabled in your debug profile.");
+            return;
+        }
         UUID id = player.getUniqueId();
         session.drawBrushColours.put(id, colour);
         session.drawPreviousPaintPoints.remove(id);
@@ -12016,6 +12021,11 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void performDrawToolAction(Session session, Player player, Block target, String tool) {
+        if (plugin.hasAdminAccess(player)
+                && !debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.DRAW_MY_THING, "canvas-tools", true)) {
+            player.sendActionBar(ChatColor.RED + "Canvas drawing tools are disabled in your debug profile.");
+            return;
+        }
         UUID id = player.getUniqueId();
         Material colour = session.drawBrushColours.getOrDefault(id, Material.BLACK_WOOL);
         switch (tool) {

@@ -777,6 +777,26 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void drawMyThingDebugSwitchesGatePaintingAndPaletteSelection() throws IOException {
+        Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ArcadePortManager.java");
+        Path lobbyPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ModernArcadeLobbyRuntime.java");
+        if (!Files.isRegularFile(managerPath)) {
+            managerPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ArcadePortManager.java");
+            lobbyPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ModernArcadeLobbyRuntime.java");
+        }
+        String source = Files.readString(managerPath);
+        String lobby = Files.readString(lobbyPath);
+        assertTrue(lobby.contains("\"canvas-tools\", \"Canvas drawing tools\""));
+        assertTrue(lobby.contains("\"palette-selection\", \"Palette selection\""));
+        assertTrue(source.contains("ArcadePortGame.DRAW_MY_THING, \"canvas-tools\", true"));
+        assertTrue(source.contains("ArcadePortGame.DRAW_MY_THING, \"palette-selection\", true"));
+    }
+
+    @Test
     void heroesOfGwenDebugEventStartsTheNormalPairedMinionWave() throws IOException {
         Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "CastleAssaultHeroesOfGwenRuntime.java");

@@ -1225,6 +1225,12 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             features.put("king-damage", new DebugFeature("king-damage", "King damage", Material.ZOMBIE_HEAD,
                     "Allow the tester's attacks and Objective TNT to damage the enemy King.", true));
         }
+        if (game == ArcadePortGame.DRAW_MY_THING) {
+            features.put("canvas-tools", new DebugFeature("canvas-tools", "Canvas drawing tools", Material.BRUSH,
+                    "Allow this tester to paint and use the Pencil, Brush, Line, Square, Circle and Spray tools.", true));
+            features.put("palette-selection", new DebugFeature("palette-selection", "Palette selection", Material.PAINTING,
+                    "Allow this tester to change their drawing colour from the inventory or map palette.", true));
+        }
         if (game == ArcadePortGame.HEROES_OF_GWEN) {
             for (String hero : List.of("hattori", "bardolf", "devon", "rowena", "anath", "larissa", "dana", "biff", "ivy")) {
                 String key = "hero-" + hero + "-abilities";
@@ -1367,6 +1373,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.CASTLE_ASSAULT
                         && ("objective-tnt".equals(key) || "crystal-damage".equals(key) || "king-damage".equals(key)))
                 || (game == ArcadePortGame.HEROES_OF_GWEN && key.startsWith("hero-") && key.endsWith("-abilities"))
+                || (game == ArcadePortGame.DRAW_MY_THING
+                        && ("canvas-tools".equals(key) || "palette-selection".equals(key)))
                 || (game == ArcadePortGame.DRAGON_ESCAPE && "finish-detection".equals(key))
                 || (game == ArcadePortGame.DRAGON_ESCAPE && key.startsWith("ability-"))
                 || (game == ArcadePortGame.RUNNER && "runner-trail".equals(key))
