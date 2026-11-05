@@ -23,6 +23,7 @@ This checklist tracks implemented controls, not menu/catalog presence alone. A g
 - [x] Shared feature switches cover kit unlock, invulnerability, fall damage and hunger; Bacon Brawl also has its unlimited-ability switch.
 - [x] Achievement previews provide a game-scoped read-only menu entry for each achievement message/sound, while achievement preview mode also runs real conditions through wired Arcade award helpers and Snap; neither path persists unlocks.
 - [x] Authorized testers can advance any shared Arcade start countdown, the live Draw My Thing turn, Master Builders build/review phase, Turf Wars phase, any supported shared round timeout, or the current Speed Builders, Plexball, Wizards, Snake, Snap, Monster Maze or Super Sploor phase; bot rosters are configured for the next round.
+- [x] Every shared phase advance, including skipping the pre-round countdown, marks the active match as debug-only before returning to gameplay.
 - [x] Authorized testers can restore only their own active-round health/hunger and clear fire/potion effects without invoking damage, scoring, or achievement paths.
 - [x] Automated coverage verifies every event shown in a game menu has a matching production dispatcher, preventing catalog-only debug buttons.
 - [x] A source-backed access test protects the authorised-tester gates on debug menus, bot menus, event actions, phase changes and feature mutations.

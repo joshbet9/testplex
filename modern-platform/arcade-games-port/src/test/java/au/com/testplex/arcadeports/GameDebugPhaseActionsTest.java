@@ -1,5 +1,9 @@
 package au.com.testplex.arcadeports;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 import org.junit.jupiter.api.Test;
 import me.monstermaze.game.GameState;
 import me.monstermaze.game.GameManager;
@@ -15,6 +19,19 @@ class GameDebugPhaseActionsTest {
             assertEquals(GameDebugPhaseAction.START_COUNTDOWN,
                     GameDebugPhaseActions.resolve(game, false, false, false, false, false), game.id());
         }
+    }
+
+    @Test
+    void skippingTheStartCountdownMarksTheRoundAsDebugOnly() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java")).replace("\r", "");
+        assertTrue(manager.contains("if (type == ArcadePortGame.SKY_WARS) session.skyWarsLiveAt = session.prepareEndsAt;\n"
+                + "                GameDebugRuntimeOverrides.markDebugSession();\n"
+                + "                return true;"));
     }
 
     @Test

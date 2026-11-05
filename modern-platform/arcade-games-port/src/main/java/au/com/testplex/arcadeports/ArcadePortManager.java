@@ -895,6 +895,7 @@ public final class ArcadePortManager implements Listener {
                 session.prepareEndsAt = now;
                 session.lastPrepareSecond = -1;
                 if (type == ArcadePortGame.SKY_WARS) session.skyWarsLiveAt = session.prepareEndsAt;
+                GameDebugRuntimeOverrides.markDebugSession();
                 return true;
             }
             case DRAW_TURN -> session.drawRoundEndsAt = now;
