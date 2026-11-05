@@ -15,7 +15,9 @@ final class GameDebugEventCatalog {
                     "Run the active Wither's normal minion ability and cooldown."));
     private static final List<Event> DRAW_MY_THING = List.of(
             new Event("reveal-letter", "Reveal Next Hint Letter", Material.WRITABLE_BOOK,
-                    "Reveal one additional answer letter to the guessers through the normal hint display."));
+                    "Reveal one additional answer letter to the guessers through the normal hint display."),
+            new Event("clear-canvas", "Clear Active Canvas", Material.WHITE_WOOL,
+                    "Clear the active drawing to white and reset its hint letters so the drawer can test again."));
     private static final List<Event> DRAGONS = List.of(
             new Event("spawn-dragon", "Spawn Next Dragon Now", Material.DRAGON_EGG,
                     "Run the normal map spawn and target initialization without waiting for the interval."));

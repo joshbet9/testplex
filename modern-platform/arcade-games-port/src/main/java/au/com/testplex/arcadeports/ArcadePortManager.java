@@ -1056,6 +1056,15 @@ public final class ArcadePortManager implements Listener {
                 triggered = true;
             }
         }
+        if (type == ArcadePortGame.DRAW_MY_THING && "clear-canvas".equals(eventId)
+                && tester.getUniqueId().equals(session.drawCurrentDrawer)) {
+            resetDrawCanvas(session);
+            session.drawRevealedLetters.clear();
+            session.drawPreviousPaintPoints.clear();
+            GameDebugRuntimeOverrides.markDebugSession();
+            updateDrawMyThing(session, System.currentTimeMillis());
+            triggered = true;
+        }
         if (type == ArcadePortGame.DRAGONS && "spawn-dragon".equals(eventId)) {
             long dragonsBefore = session.entities.stream()
                     .filter(entity -> entity instanceof EnderDragon && entity.isValid()).count();

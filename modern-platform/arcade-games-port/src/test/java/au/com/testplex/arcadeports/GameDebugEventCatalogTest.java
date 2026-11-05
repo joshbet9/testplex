@@ -383,6 +383,12 @@ class GameDebugEventCatalogTest {
         }
         assertTrue(manager.contains("session.drawRevealedLetters.clear()"));
         assertTrue(manager.contains("type == ArcadePortGame.DRAW_MY_THING"));
+        assertTrue(GameDebugEventCatalog.events(ArcadePortGame.DRAW_MY_THING).stream()
+                .anyMatch(event -> event.id().equals("clear-canvas")));
+        assertTrue(manager.contains("\"clear-canvas\".equals(eventId)"));
+        assertTrue(manager.contains("tester.getUniqueId().equals(session.drawCurrentDrawer)"));
+        assertTrue(manager.contains("resetDrawCanvas(session)"));
+        assertTrue(manager.contains("session.drawPreviousPaintPoints.clear()"));
     }
 
     @Test
