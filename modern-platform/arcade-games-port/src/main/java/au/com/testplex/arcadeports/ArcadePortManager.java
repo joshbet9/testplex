@@ -985,6 +985,19 @@ public final class ArcadePortManager implements Listener {
                 triggered = true;
             }
         }
+        if (type == ArcadePortGame.BACON_BRAWL && "use-crouch-dash".equals(eventId)
+                && "chris-p-bacon".equals(session.baconKits.getOrDefault(
+                        tester.getUniqueId(), "el-muchacho-pigo"))) {
+            UUID testerId = tester.getUniqueId();
+            boolean enabled = debugFeatureEnabled(testerId, ArcadePortGame.BACON_BRAWL, "ability-chris-p-bacon", true);
+            boolean unlimited = debugFeatureEnabled(testerId, ArcadePortGame.BACON_BRAWL, "unlimited-abilities", false);
+            int charge = session.baconMeters.getOrDefault(testerId, 0);
+            if (enabled && (unlimited || ArcadePortRules.canUseBaconMeterAbility(charge))) {
+                GameDebugRuntimeOverrides.markDebugSession();
+                useBaconBrawlAbility(session, tester, System.currentTimeMillis(), true);
+                triggered = true;
+            }
+        }
         if (type == ArcadePortGame.GLADIATORS && "forfeit-duel".equals(eventId)
                 && session.gladiatorPairs.containsKey(tester.getUniqueId())) {
             GameDebugRuntimeOverrides.markDebugSession();

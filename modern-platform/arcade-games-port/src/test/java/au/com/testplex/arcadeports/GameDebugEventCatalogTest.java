@@ -81,7 +81,7 @@ class GameDebugEventCatalogTest {
                 .anyMatch(event -> event.id().equals("drop-barriers")));
         assertEquals("grant-spells", GameDebugEventCatalog.events(ArcadePortGame.WIZARDS)
                 .getFirst().id());
-        assertEquals(List.of("fill-meter", "use-ability", "refresh-kit"),
+        assertEquals(List.of("fill-meter", "use-ability", "use-crouch-dash", "refresh-kit"),
                 GameDebugEventCatalog.events(ArcadePortGame.BACON_BRAWL).stream()
                         .map(GameDebugEventCatalog.Event::id).toList());
     }
@@ -259,6 +259,21 @@ class GameDebugEventCatalogTest {
         assertTrue(manager.contains("isBombLobbersThrownTnt(tester.getInventory().getItemInMainHand())"));
         assertTrue(manager.contains("throwBombLobbersTnt(session, tester)"));
         assertTrue(manager.contains("GameDebugRuntimeOverrides.markDebugSession();"));
+    }
+
+    @Test
+    void baconCrispyDashDebugActionRunsItsDistinctCrouchAbilityPath() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String eventCatalog = Files.readString(sourceRoot.resolve("GameDebugEventCatalog.java"));
+        assertTrue(eventCatalog.contains("new Event(\"use-crouch-dash\", \"Test Crispy Bacon Dash\""));
+        assertTrue(manager.contains("useBaconBrawlAbility(session, tester, System.currentTimeMillis(), true)"));
+        assertTrue(manager.contains("\"chris-p-bacon\".equals(session.baconKits.getOrDefault("));
+        assertTrue(manager.contains("ArcadePortRules.canUseBaconMeterAbility(charge)"));
     }
 
     @Test

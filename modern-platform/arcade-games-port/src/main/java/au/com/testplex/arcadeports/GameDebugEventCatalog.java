@@ -116,7 +116,9 @@ final class GameDebugEventCatalog {
             new Event("fill-meter", "Fill Ability Meter", Material.IRON_AXE,
                     "Fill your selected kit's live ability meter so you can test its ability now."),
             new Event("use-ability", "Use Selected Ability", Material.PORKCHOP,
-                    "Activate the selected kit's real ability using its current meter and enabled-feature settings."));
+                    "Activate the selected kit's real ability using its current meter and enabled-feature settings."),
+            new Event("use-crouch-dash", "Test Crispy Bacon Dash", Material.FEATHER,
+                    "Activate Chris P Bacon's crouch dash through its normal half-meter cost and fire effects."));
     private static final List<Event> BOMB_LOBBERS = List.of(
             new Event("spawn-powerups", "Spawn Power-up Wave", Material.FIREWORK_ROCKET,
                     "Run the normal paired team power-up drop wave immediately."),
