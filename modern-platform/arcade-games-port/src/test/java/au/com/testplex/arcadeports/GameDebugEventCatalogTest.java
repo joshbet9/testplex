@@ -101,6 +101,9 @@ class GameDebugEventCatalogTest {
         assertTrue(manager.contains("lobbyRuntime.debugFeatureAppliesImmediately(type, flag)"));
         assertTrue(manager.contains("debugProfiles.featureKeys(tester.getUniqueId(), type)"));
         assertTrue(manager.contains("GameDebugRuntimeOverrides.activate(values, activeDebugProfileOwner)"));
+        assertTrue(manager.contains("new HashSet<>(activeDebugFeatureKeys)"),
+                "features deleted with an old profile remain known long enough to clear from the live round");
+        assertTrue(manager.contains("GameDebugRuntimeOverrides.removeValue(key)"));
         assertTrue(rules.contains("booleanValueFor(player, \"kit-\" + kit, true)"));
         assertTrue(kits.contains("kitEnabled(p.getUniqueId(), \"jumper\")"));
         assertTrue(kits.contains("kitEnabled(p.getUniqueId(), \"slowball\")"));

@@ -345,6 +345,7 @@ public final class ArcadePortManager implements Listener {
     private final GameDebugProfiles debugProfiles;
     private UUID activeDebugProfileOwner;
     private ArcadePortGame activeDebugProfileGame;
+    private final Set<String> activeDebugFeatureKeys = new HashSet<>();
     private UUID debugContextOwner;
     private ArcadePortGame debugContextGame;
     private final SuperSploorRuntime superSploor;
@@ -806,6 +807,7 @@ public final class ArcadePortManager implements Listener {
             debugProfiles.setFeature(player.getUniqueId(), type, flag, enabled);
             if (activeDebugGame() == type && player.getUniqueId().equals(activeDebugProfileOwner)) {
                 GameDebugRuntimeOverrides.markDebugSession();
+                activeDebugFeatureKeys.add(flag);
                 if (lobbyRuntime.debugFeatureAppliesImmediately(type, flag)) {
                     GameDebugRuntimeOverrides.setValue(flag, enabled);
                 }
@@ -1273,7 +1275,10 @@ public final class ArcadePortManager implements Listener {
                 GameDebugRuntimeOverrides.setValue(variable.key(), debugProfiles.booleanVariable(
                         tester.getUniqueId(), type, variable.key(), variable.defaultValue() != 0.0D));
             }
-            for (String key : debugProfiles.featureKeys(tester.getUniqueId(), type)) {
+            Set<String> profileFeatureKeys = debugProfiles.featureKeys(tester.getUniqueId(), type);
+            Set<String> previouslyAppliedFeatureKeys = new HashSet<>(activeDebugFeatureKeys);
+            previouslyAppliedFeatureKeys.addAll(profileFeatureKeys);
+            for (String key : previouslyAppliedFeatureKeys) {
                 if (lobbyRuntime.debugFeatureAppliesImmediately(type, key)) {
                     GameDebugRuntimeOverrides.removeValue(key);
                 }
@@ -1284,6 +1289,7 @@ public final class ArcadePortManager implements Listener {
                     GameDebugRuntimeOverrides.setValue(entry.getKey(), entry.getValue());
                 }
             }
+            activeDebugFeatureKeys.addAll(profileFeatureKeys);
             GameDebugRuntimeOverrides.markDebugSession();
         }
     }
@@ -1299,6 +1305,8 @@ public final class ArcadePortManager implements Listener {
             values.put("__DEBUG_TEST_BOT_ROSTER", true);
         }
         GameDebugRuntimeOverrides.activate(values, activeDebugProfileOwner);
+        activeDebugFeatureKeys.clear();
+        if (starter != null) activeDebugFeatureKeys.addAll(debugProfiles.featureKeys(starter.getUniqueId(), type));
     }
 
     String configuredTestBotKit(ArcadePortGame type, int botIndex) {
