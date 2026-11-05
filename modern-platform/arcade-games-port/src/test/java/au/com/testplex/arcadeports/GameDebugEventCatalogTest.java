@@ -23,6 +23,7 @@ class GameDebugEventCatalogTest {
         assertEquals("begin-evolution", GameDebugEventCatalog.events(ArcadePortGame.EVOLUTION).getFirst().id());
         assertEquals("shoot-ball", GameDebugEventCatalog.events(ArcadePortGame.HOOPS_REMASTERED).getFirst().id());
         assertEquals("roll-item", GameDebugEventCatalog.events(ArcadePortGame.SNAKE).getFirst().id());
+        assertEquals("reset-own-plot", GameDebugEventCatalog.events(ArcadePortGame.MASTER_BUILDERS).getFirst().id());
         assertEquals("refill-arrow", GameDebugEventCatalog.events(ArcadePortGame.ONE_IN_THE_QUIVER)
                 .getFirst().id());
         assertEquals("restore-armour", GameDebugEventCatalog.events(ArcadePortGame.PAINTBALL)

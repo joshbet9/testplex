@@ -32,6 +32,9 @@ final class GameDebugEventCatalog {
     private static final List<Event> HOOPS_REMASTERED = List.of(
             new Event("shoot-ball", "Take a Shot", Material.MAGMA_CREAM,
                     "If you currently have possession, release a normal shot using your current aim and position."));
+    private static final List<Event> MASTER_BUILDERS = List.of(
+            new Event("reset-own-plot", "Clear Own Plot", Material.TNT,
+                    "Clear your active plot interior so you can test another build without ending the round."));
     private static final List<Event> ONE_IN_THE_QUIVER = List.of(
             new Event("refill-arrow", "Restore Super Arrow", Material.ARROW,
                     "Restore the normal one-shot arrow to its configured hotbar slot for testing."));
@@ -101,6 +104,7 @@ final class GameDebugEventCatalog {
         if (game == ArcadePortGame.DRAGON_ESCAPE) return DRAGON_ESCAPE;
         if (game == ArcadePortGame.EVOLUTION) return EVOLUTION;
         if (game == ArcadePortGame.HOOPS_REMASTERED) return HOOPS_REMASTERED;
+        if (game == ArcadePortGame.MASTER_BUILDERS) return MASTER_BUILDERS;
         if (game == ArcadePortGame.SNAKE) return SNAKE;
         if (game == ArcadePortGame.ONE_IN_THE_QUIVER) return ONE_IN_THE_QUIVER;
         if (game == ArcadePortGame.SPLEEF) return SPLEEF;

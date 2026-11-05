@@ -1015,6 +1015,20 @@ public final class ArcadePortManager implements Listener {
             GameDebugRuntimeOverrides.markDebugSession();
             triggered = true;
         }
+        if (type == ArcadePortGame.MASTER_BUILDERS && "reset-own-plot".equals(eventId)
+                && session.masterBuilderPhase == MasterBuildersPhase.BUILDING) {
+            Integer plot = session.masterBuilderPlots.get(tester.getUniqueId());
+            if (plot != null) {
+                Location centre = masterBuilderPlotCenter(session.world, plot);
+                for (int x = centre.getBlockX() - 4; x <= centre.getBlockX() + 4; x++) {
+                    for (int z = centre.getBlockZ() - 4; z <= centre.getBlockZ() + 4; z++) {
+                        for (int y = 64; y < 120; y++) session.world.getBlockAt(x, y, z).setType(Material.AIR, false);
+                    }
+                }
+                GameDebugRuntimeOverrides.markDebugSession();
+                triggered = true;
+            }
+        }
         if (type == ArcadePortGame.ONE_IN_THE_QUIVER && "refill-arrow".equals(eventId)) {
             int arrowSlot = Math.max(0, Math.min(8, GameDebugRuntimeOverrides.intValue(
                     "QUIVER_ARROW_SLOT", ArcadePortRules.QUIVER_ARROW_SLOT)));
