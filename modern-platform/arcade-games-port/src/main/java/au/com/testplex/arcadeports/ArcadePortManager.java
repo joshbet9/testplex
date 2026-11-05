@@ -900,6 +900,13 @@ public final class ArcadePortManager implements Listener {
             launchWitherMinions(session, tester, System.currentTimeMillis());
             triggered = session.witherMinionOwners.size() > before;
         }
+        if (type == ArcadePortGame.MILK_THE_COW && "spawn-herd".equals(eventId)
+                && session.teams.getOrDefault(tester.getUniqueId(), 0) == 1) {
+            GameDebugRuntimeOverrides.markDebugSession();
+            session.milkNextHerdUpdateAt = 0L;
+            updateMilkCowHerd(session, tester, System.currentTimeMillis());
+            triggered = session.milkCowHerd.stream().anyMatch(cow -> cow != null && cow.isValid());
+        }
         if (type == ArcadePortGame.DRAW_MY_THING && "reveal-letter".equals(eventId)
                 && session.drawCurrentDrawer != null && session.drawWord != null) {
             int revealedIndex = DrawMyThingDebugRules.nextHiddenLetterIndex(
@@ -7833,7 +7840,9 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void updateMicroBarrier(Session session, long now) {
-        if (!session.microBarrierActive || !ArcadePortRules.shouldRemoveMicroBarrier(now - session.startedAt)) return;
+        if (!session.microBarrierActive || !ArcadePortRules.shouldRemoveMicroBarrier(now - session.startedAt,
+                GameDebugRuntimeOverrides.longValue("MICRO_BATTLES_BARRIER_DURATION_MILLIS",
+                        ArcadePortRules.MICRO_BATTLES_BARRIER_DURATION_MILLIS))) return;
         for (Block block : session.microBarrierBlocks) {
             if (block.getType() == Material.GLASS) block.setType(Material.AIR, false);
         }
@@ -9758,6 +9767,8 @@ public final class ArcadePortManager implements Listener {
 
     private void updateMicroCrumble(Session session, long now) {
         if (active != session || session.type != ArcadePortGame.MICRO_BATTLES) return;
+        if (!GameDebugRuntimeOverrides.booleanValue("MICRO_BATTLES_CRUMBLE_ENABLED",
+                ArcadePortRules.MICRO_BATTLES_CRUMBLE_ENABLED)) return;
 
         // Source MapCrumbleModule scans the arena vertically in two-tick slices.
         if (!session.microCrumbleScanComplete
@@ -26149,30 +26160,7 @@ public final class ArcadePortManager implements Listener {
             }
         }
 
-        if (now >= session.milkNextHerdUpdateAt) {
-            session.milkNextHerdUpdateAt = now + 1_000L;
-            if (!cows.isEmpty()) {
-                Location target = cows.get(0).getLocation();
-                session.milkCowHerd.removeIf(cow -> cow == null || !cow.isValid());
-                for (Cow cow : session.milkCowHerd) {
-                    Vector direction = target.toVector().subtract(cow.getLocation().toVector());
-                    direction.setY(Math.max(-0.08D, Math.min(0.12D, direction.getY())));
-                    if (direction.lengthSquared() > 2.25D) cow.setVelocity(direction.normalize().multiply(
-                            GameDebugRuntimeOverrides.doubleValue("MILK_THE_COW_HERD_MOVE_SPEED",
-                                    MilkCowRules.HERD_MOVE_SPEED)));
-                }
-                while (session.milkCowHerd.size() < GameDebugRuntimeOverrides.intValue(
-                        "MILK_THE_COW_HERD_SIZE", MilkCowRules.HERD_SIZE)) {
-                    Location spawn = target.clone().add(
-                            ThreadLocalRandom.current().nextDouble(-2.5D, 2.5D), 0.0D,
-                            ThreadLocalRandom.current().nextDouble(-2.5D, 2.5D));
-                    Cow cow = session.world.spawn(spawn, Cow.class);
-                    cow.setRemoveWhenFarAway(false);
-                    session.milkCowHerd.add(cow);
-                    session.entities.add(cow);
-                }
-            }
-        }
+        if (!cows.isEmpty()) updateMilkCowHerd(session, cows.get(0), now);
 
         for (Map.Entry<UUID, Cow> entry : new ArrayList<>(session.milkCowBombs.entrySet())) {
             Cow bomb = entry.getValue();
@@ -26210,6 +26198,33 @@ public final class ArcadePortManager implements Listener {
             if (farmer.isOnGround() && session.milkDoubleJumpUsed.remove(id)) {
                 farmer.setAllowFlight(true);
             }
+        }
+    }
+
+    private void updateMilkCowHerd(Session session, Player cowPlayer, long now) {
+        if (active != session || cowPlayer == null || !cowPlayer.isOnline()
+                || !session.alive.contains(cowPlayer.getUniqueId())
+                || session.teams.getOrDefault(cowPlayer.getUniqueId(), 0) != 1
+                || now < session.milkNextHerdUpdateAt) return;
+        session.milkNextHerdUpdateAt = now + 1_000L;
+        Location target = cowPlayer.getLocation();
+        session.milkCowHerd.removeIf(cow -> cow == null || !cow.isValid());
+        for (Cow cow : session.milkCowHerd) {
+            Vector direction = target.toVector().subtract(cow.getLocation().toVector());
+            direction.setY(Math.max(-0.08D, Math.min(0.12D, direction.getY())));
+            if (direction.lengthSquared() > 2.25D) cow.setVelocity(direction.normalize().multiply(
+                    GameDebugRuntimeOverrides.doubleValue("MILK_THE_COW_HERD_MOVE_SPEED",
+                            MilkCowRules.HERD_MOVE_SPEED)));
+        }
+        while (session.milkCowHerd.size() < GameDebugRuntimeOverrides.intValue(
+                "MILK_THE_COW_HERD_SIZE", MilkCowRules.HERD_SIZE)) {
+            Location spawn = target.clone().add(
+                    ThreadLocalRandom.current().nextDouble(-2.5D, 2.5D), 0.0D,
+                    ThreadLocalRandom.current().nextDouble(-2.5D, 2.5D));
+            Cow cow = session.world.spawn(spawn, Cow.class);
+            cow.setRemoveWhenFarAway(false);
+            session.milkCowHerd.add(cow);
+            session.entities.add(cow);
         }
     }
 

@@ -248,6 +248,9 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldRemoveMicroBarrier(9_999L));
         assertTrue(ArcadePortRules.shouldRemoveMicroBarrier(10_000L));
         assertTrue(ArcadePortRules.shouldRemoveMicroBarrier(12_000L));
+        assertFalse(ArcadePortRules.shouldRemoveMicroBarrier(499L, 500L));
+        assertTrue(ArcadePortRules.shouldRemoveMicroBarrier(500L, 500L));
+        assertTrue(ArcadePortRules.shouldRemoveMicroBarrier(0L, 0L));
     }
 
     @Test void microBattlesBarrierHeightTracksSourceIslandY() {

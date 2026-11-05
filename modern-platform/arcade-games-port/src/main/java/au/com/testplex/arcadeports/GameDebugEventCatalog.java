@@ -37,6 +37,9 @@ final class GameDebugEventCatalog {
             new Event("restore-hunger", "Restore Hunger", Material.COOKED_BEEF,
                     "Restore your hunger and saturation to full during an active round."),
             REFRESH_KIT.getFirst());
+    private static final List<Event> MILK_THE_COW = List.of(
+            new Event("spawn-herd", "Spawn Cow Herd Now", Material.COW_SPAWN_EGG,
+                    "Run the normal herd follow and spawn update beside the active Cow-role tester."));
     private static final Set<ArcadePortGame> KIT_REFRESH_GAMES = Set.of(
             ArcadePortGame.BACON_BRAWL, ArcadePortGame.BOMB_LOBBERS, ArcadePortGame.CASTLE_ASSAULT,
             ArcadePortGame.DRAGON_ESCAPE, ArcadePortGame.DRAGONS, ArcadePortGame.EVOLUTION,
@@ -53,6 +56,7 @@ final class GameDebugEventCatalog {
         if (game == ArcadePortGame.DRAGONS) return DRAGONS;
         if (game == ArcadePortGame.ONE_IN_THE_QUIVER) return ONE_IN_THE_QUIVER;
         if (game == ArcadePortGame.SPLEEF) return SPLEEF;
+        if (game == ArcadePortGame.MILK_THE_COW) return MILK_THE_COW;
         if (game == ArcadePortGame.PAINTBALL) return PAINTBALL;
         if (game == ArcadePortGame.DEATH_TAG) return DEATH_TAG;
         if (game == ArcadePortGame.WIZARDS) return WIZARDS;

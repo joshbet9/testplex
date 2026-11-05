@@ -55,6 +55,8 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MASTER_BUILDERS), "MASTER_BUILDERS_TOTAL_MILLIS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MASTER_BUILDERS), "MASTER_BUILDERS_VOTE_MILLIS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MASTER_BUILDERS), "MASTER_BUILDERS_REVIEW_MILLIS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MICRO_BATTLES), "MICRO_BATTLES_BARRIER_DURATION_MILLIS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MICRO_BATTLES), "MICRO_BATTLES_CRUMBLE_ENABLED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SPLEEF), "SPLEEF_HUNGER_DRAIN_ENABLED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MILK_THE_COW), "MILK_THE_COW_SCORE_TO_WIN");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SPEED_BUILDERS), "SPEED_BUILDERS_DEFAULT_VIEW_SECONDS");

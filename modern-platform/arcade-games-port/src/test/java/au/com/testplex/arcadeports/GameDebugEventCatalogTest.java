@@ -56,6 +56,28 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void milkTheCowHerdEventUsesTheLiveCowRoleAndConfiguredHerdRules() throws IOException {
+        Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ArcadePortManager.java");
+        if (!Files.isRegularFile(managerPath)) {
+            managerPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ArcadePortManager.java");
+        }
+        String source = Files.readString(managerPath);
+        int dispatcher = source.indexOf("type == ArcadePortGame.MILK_THE_COW && \"spawn-herd\".equals(eventId)");
+        int update = source.indexOf("private void updateMilkCowHerd(");
+        int nextMethod = source.indexOf("private void ", update + 1);
+        assertTrue(dispatcher >= 0);
+        assertTrue(update > dispatcher);
+        assertTrue(nextMethod > update);
+        String herdUpdater = source.substring(update, nextMethod);
+        assertTrue(herdUpdater.contains("session.teams.getOrDefault(cowPlayer.getUniqueId(), 0) != 1"));
+        assertTrue(herdUpdater.contains("MILK_THE_COW_HERD_SIZE"));
+        assertTrue(herdUpdater.contains("MILK_THE_COW_HERD_MOVE_SPEED"));
+        assertTrue(herdUpdater.contains("session.world.spawn(spawn, Cow.class)"));
+    }
+
+    @Test
     void kitRefreshIsOnlyOfferedForGamesWithSharedKitSetup() {
         for (ArcadePortGame game : ArcadePortGame.values()) {
             boolean offered = GameDebugEventCatalog.events(game).stream()

@@ -616,6 +616,7 @@ public final class ArcadePortRules {
     public static final int TURF_WARS_MIXED_ARCADE_TURF_ADVANCE_BLOCKS = 2;
     public static final long MICRO_BATTLES_CHEAT_WINDOW_MILLIS = 4_000L;
     public static final long MICRO_BATTLES_BARRIER_DURATION_MILLIS = 10_000L;
+    public static final boolean MICRO_BATTLES_CRUMBLE_ENABLED = true;
     public static final int MICRO_BATTLES_CRUMBLE_BLOCKS_PER_TICK = 3;
     public static final int MICRO_BATTLES_CRUMBLE_SCAN_INTERVAL_TICKS = 2;
     public static final int DRAGONS_MAX_DRAGONS = 5;
@@ -987,7 +988,11 @@ public final class ArcadePortRules {
     }
 
     public static boolean shouldRemoveMicroBarrier(long elapsedMillis) {
-        return elapsedMillis >= MICRO_BATTLES_BARRIER_DURATION_MILLIS;
+        return shouldRemoveMicroBarrier(elapsedMillis, MICRO_BATTLES_BARRIER_DURATION_MILLIS);
+    }
+
+    public static boolean shouldRemoveMicroBarrier(long elapsedMillis, long durationMillis) {
+        return elapsedMillis >= Math.max(0L, durationMillis);
     }
 
     /** Only the kits retained from the selected source ruleset are exposed. */
