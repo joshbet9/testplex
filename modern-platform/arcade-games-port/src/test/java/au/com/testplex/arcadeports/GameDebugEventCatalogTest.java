@@ -19,6 +19,14 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void everyGameAchievementFitsInThePreviewMenu() {
+        for (ArcadePortGame game : ArcadePortGame.values()) {
+            assertTrue(ArcadeProgressCatalog.achievements(game.id()).size() <= 36,
+                    game.id() + " achievement previews must not be hidden past the menu's last slot");
+        }
+    }
+
+    @Test
     void eventToolsAreExplicitlyScopedToTheirGame() {
         var witherEvents = GameDebugEventCatalog.events(ArcadePortGame.WITHER_ASSAULT);
         assertEquals(List.of("spawn-minions", "refresh-kit"), witherEvents.stream()
