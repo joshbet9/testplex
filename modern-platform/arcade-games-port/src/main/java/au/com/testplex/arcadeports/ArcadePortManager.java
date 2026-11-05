@@ -1137,6 +1137,10 @@ public final class ArcadePortManager implements Listener {
             GameDebugRuntimeOverrides.markDebugSession();
             triggered = true;
         }
+        if (type == ArcadePortGame.HOOPS_REMASTERED && "try-steal".equals(eventId) && hoops != null) {
+            triggered = hoops.debugAttemptSteal(tester);
+            if (triggered) GameDebugRuntimeOverrides.markDebugSession();
+        }
         if (type == ArcadePortGame.MASTER_BUILDERS && "reset-own-plot".equals(eventId)
                 && session.masterBuilderPhase == MasterBuildersPhase.BUILDING) {
             Integer plot = session.masterBuilderPlots.get(tester.getUniqueId());

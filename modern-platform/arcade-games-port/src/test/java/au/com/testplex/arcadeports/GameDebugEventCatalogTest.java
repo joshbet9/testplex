@@ -40,7 +40,9 @@ class GameDebugEventCatalogTest {
                 GameDebugEventCatalog.events(ArcadePortGame.DRAGON_ESCAPE).stream()
                         .map(GameDebugEventCatalog.Event::id).toList());
         assertEquals("begin-evolution", GameDebugEventCatalog.events(ArcadePortGame.EVOLUTION).getFirst().id());
-        assertEquals("shoot-ball", GameDebugEventCatalog.events(ArcadePortGame.HOOPS_REMASTERED).getFirst().id());
+        assertEquals(List.of("shoot-ball", "try-steal"),
+                GameDebugEventCatalog.events(ArcadePortGame.HOOPS_REMASTERED).stream()
+                        .map(GameDebugEventCatalog.Event::id).toList());
         assertEquals("roll-item", GameDebugEventCatalog.events(ArcadePortGame.SNAKE).getFirst().id());
         assertEquals("use-kit-ability", GameDebugEventCatalog.events(ArcadePortGame.SNEAKY_ASSASSINS)
                 .getFirst().id());
@@ -206,6 +208,22 @@ class GameDebugEventCatalogTest {
         assertTrue(manager.contains("session.turfBarrageCharges.containsKey(tester.getUniqueId())"));
         assertTrue(manager.contains("startTurfWarsBarrage(Session session, Player player)"),
                 "the event must retain Shredder's ordinary bow, ammo, and charge checks");
+    }
+
+    @Test
+    void hoopsStealDebugEventUsesNormalPossessionAndStealValidation() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String runtime = Files.readString(sourceRoot.resolve("HoopsRemasteredRuntime.java"));
+        String eventCatalog = Files.readString(sourceRoot.resolve("GameDebugEventCatalog.java"));
+        assertTrue(eventCatalog.contains("new Event(\"try-steal\", \"Try to Steal Ball\""));
+        assertTrue(manager.contains("hoops.debugAttemptSteal(tester)"));
+        assertTrue(runtime.contains("trySteal(current, attacker, holder)"));
+        assertTrue(runtime.contains("public boolean debugAttemptSteal(Player attacker)"));
     }
 
     @Test

@@ -49,7 +49,9 @@ final class GameDebugEventCatalog {
                     "Begin your normal evolution animation immediately to test form and cosmetic effects."));
     private static final List<Event> HOOPS_REMASTERED = List.of(
             new Event("shoot-ball", "Take a Shot", Material.MAGMA_CREAM,
-                    "If you currently have possession, release a normal shot using your current aim and position."));
+                    "If you currently have possession, release a normal shot using your current aim and position."),
+            new Event("try-steal", "Try to Steal Ball", Material.IRON_SWORD,
+                    "Attempt a steal from the current ball holder using normal range, facing, cooldown, and team checks."));
     private static final List<Event> MASTER_BUILDERS = List.of(
             new Event("reset-own-plot", "Clear Own Plot", Material.TNT,
                     "Clear your active plot interior so you can test another build without ending the round."));

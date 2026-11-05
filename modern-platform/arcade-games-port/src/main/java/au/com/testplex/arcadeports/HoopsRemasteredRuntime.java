@@ -1249,6 +1249,18 @@ public final class HoopsRemasteredRuntime implements Listener {
         return current.ball != previous;
     }
 
+    /** Attempt a normal steal against the current holder for an authorised debug event. */
+    public boolean debugAttemptSteal(Player attacker) {
+        Match current = match;
+        if (current == null || current.ending || attacker == null || !attacker.isOnline()
+                || attacker.getWorld() != current.world || !current.players.containsKey(attacker.getUniqueId())
+                || current.holderId == null || current.holderId.equals(attacker.getUniqueId())) return false;
+        Player holder = current.players.get(current.holderId);
+        if (holder == null || !holder.isOnline()) return false;
+        trySteal(current, attacker, holder);
+        return attacker.getUniqueId().equals(current.holderId);
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onToggleFlight(PlayerToggleFlightEvent event) {
         Match current = match;
