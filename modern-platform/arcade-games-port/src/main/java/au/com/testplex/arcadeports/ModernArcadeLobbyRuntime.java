@@ -1002,6 +1002,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
 
     private void openDebugMenu(Player player) {
         ArcadePortGame game = debugGame(player);
+        manager.beginDebugContext(player, game);
         Inventory inventory = Bukkit.createInventory(null, 54, DEBUG_TITLE);
         String profile = manager.debugProfiles().selected(player.getUniqueId(), game);
         inventory.setItem(4, item(Material.COMPARATOR, ChatColor.RED + game.displayName() + " Debug",

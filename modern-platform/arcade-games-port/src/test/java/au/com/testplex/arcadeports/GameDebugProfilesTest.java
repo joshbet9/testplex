@@ -79,20 +79,29 @@ class GameDebugProfilesTest {
     @Test
     void testBotRosterSettingsPersistSeparatelyFromNormalGameConfiguration() {
         Path file = directory.resolve("debug-profiles.yml");
+        UUID tester = UUID.randomUUID();
         GameDebugProfiles profiles = new GameDebugProfiles(file.toFile(), ignored -> { });
 
-        profiles.setTestBotCount(ArcadePortGame.MICRO_BATTLES, 8);
-        profiles.setTestBotKit(ArcadePortGame.MICRO_BATTLES, 2, "dasher");
-        profiles.setTestBotTeam(ArcadePortGame.MICRO_BATTLES, 2, 1);
-        profiles.setTestBotCosmetic(ArcadePortGame.MICRO_BATTLES, 2, "start-glass", "violet");
+        profiles.setTestBotCount(tester, ArcadePortGame.MICRO_BATTLES, 8);
+        profiles.setTestBotKit(tester, ArcadePortGame.MICRO_BATTLES, 2, "dasher");
+        profiles.setTestBotTeam(tester, ArcadePortGame.MICRO_BATTLES, 2, 1);
+        profiles.setTestBotCosmetic(tester, ArcadePortGame.MICRO_BATTLES, 2, "start-glass", "violet");
 
         GameDebugProfiles reloaded = new GameDebugProfiles(file.toFile(), ignored -> { });
-        assertEquals(8, reloaded.testBotCount(ArcadePortGame.MICRO_BATTLES, 0));
-        assertEquals("dasher", reloaded.testBotKit(ArcadePortGame.MICRO_BATTLES, 2, ""));
-        assertEquals(1, reloaded.testBotTeam(ArcadePortGame.MICRO_BATTLES, 2, -1));
+        assertEquals(8, reloaded.testBotCount(tester, ArcadePortGame.MICRO_BATTLES, 0));
+        assertEquals("dasher", reloaded.testBotKit(tester, ArcadePortGame.MICRO_BATTLES, 2, ""));
+        assertEquals(1, reloaded.testBotTeam(tester, ArcadePortGame.MICRO_BATTLES, 2, -1));
         assertEquals("violet", reloaded.testBotCosmetic(
-                ArcadePortGame.MICRO_BATTLES, 2, "start-glass", ""));
-        assertEquals("", reloaded.testBotKit(ArcadePortGame.BACON_BRAWL, 2, ""));
+                tester, ArcadePortGame.MICRO_BATTLES, 2, "start-glass", ""));
+        assertEquals("", reloaded.testBotKit(tester, ArcadePortGame.BACON_BRAWL, 2, ""));
+
+        reloaded.create(tester, ArcadePortGame.MICRO_BATTLES, "balanced");
+        assertEquals(0, reloaded.testBotCount(tester, ArcadePortGame.MICRO_BATTLES, 0));
+        reloaded.setTestBotCount(tester, ArcadePortGame.MICRO_BATTLES, 4);
+        assertTrue(reloaded.select(tester, ArcadePortGame.MICRO_BATTLES, "default"));
+        assertEquals(8, reloaded.testBotCount(tester, ArcadePortGame.MICRO_BATTLES, 0));
+        assertTrue(reloaded.select(tester, ArcadePortGame.MICRO_BATTLES, "balanced"));
+        assertEquals(4, reloaded.testBotCount(tester, ArcadePortGame.MICRO_BATTLES, 0));
     }
 
     @Test

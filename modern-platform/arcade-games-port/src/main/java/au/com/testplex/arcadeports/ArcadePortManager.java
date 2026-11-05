@@ -347,6 +347,8 @@ public final class ArcadePortManager implements Listener {
     private final GameDebugProfiles debugProfiles;
     private UUID activeDebugProfileOwner;
     private ArcadePortGame activeDebugProfileGame;
+    private UUID debugContextOwner;
+    private ArcadePortGame debugContextGame;
     private final SuperSploorRuntime superSploor;
     private final ArcadeTestPlayerManager testPlayers;
     private boolean testPlayerStartPending;
@@ -733,14 +735,26 @@ public final class ArcadePortManager implements Listener {
     int configuredTestBotCount(ArcadePortGame type) {
         if (type == null) return ArcadeTestPlayerManager.TARGET_ROSTER_SIZE;
         return Math.max(0, Math.min(ArcadeTestPlayerManager.TARGET_ROSTER_SIZE,
-                debugProfiles.testBotCount(type, plugin.getConfig().getInt(
+                debugProfiles.testBotCount(debugOwnerFor(type), type, plugin.getConfig().getInt(
                         "test-bot-loadouts." + type.id() + ".count", ArcadeTestPlayerManager.TARGET_ROSTER_SIZE))));
     }
 
     void setConfiguredTestBotCount(ArcadePortGame type, int count) {
         if (type == null) return;
-        debugProfiles.setTestBotCount(type, Math.max(0,
+        debugProfiles.setTestBotCount(debugOwnerFor(type), type, Math.max(0,
                 Math.min(ArcadeTestPlayerManager.TARGET_ROSTER_SIZE, count)));
+    }
+
+    void beginDebugContext(Player tester, ArcadePortGame type) {
+        if (tester == null || type == null || !plugin.hasAdminAccess(tester)) return;
+        debugContextOwner = tester.getUniqueId();
+        debugContextGame = type;
+    }
+
+    private UUID debugOwnerFor(ArcadePortGame type) {
+        if (type != null && type == debugContextGame && debugContextOwner != null) return debugContextOwner;
+        if (type != null && type == activeDebugProfileGame) return activeDebugProfileOwner;
+        return null;
     }
 
     boolean isDebugOverrideEnabled(UUID playerId, ArcadePortGame type, String flag) {
@@ -860,26 +874,30 @@ public final class ArcadePortManager implements Listener {
     private void activateDebugProfile(Player starter, ArcadePortGame type) {
         activeDebugProfileOwner = starter == null ? null : starter.getUniqueId();
         activeDebugProfileGame = type;
+        debugContextOwner = activeDebugProfileOwner;
+        debugContextGame = type;
         Map<String, Object> values = new LinkedHashMap<>(
                 starter == null ? Map.of() : debugProfiles.values(starter.getUniqueId(), type));
-        if (debugProfiles.testBotCount(type, 0) > 0) values.put("__DEBUG_TEST_BOT_ROSTER", true);
+        if (debugProfiles.testBotCount(starter == null ? null : starter.getUniqueId(), type, 0) > 0) {
+            values.put("__DEBUG_TEST_BOT_ROSTER", true);
+        }
         GameDebugRuntimeOverrides.activate(values);
     }
 
     String configuredTestBotKit(ArcadePortGame type, int botIndex) {
         if (type == null || botIndex < 0) return "";
-        return debugProfiles.testBotKit(type, botIndex, plugin.getConfig().getString(
+        return debugProfiles.testBotKit(debugOwnerFor(type), type, botIndex, plugin.getConfig().getString(
                 "test-bot-loadouts." + type.id() + ".players." + botIndex + ".kit", ""));
     }
 
     void setConfiguredTestBotKit(ArcadePortGame type, int botIndex, String kit) {
         if (type == null || botIndex < 0 || kit == null || kit.isBlank()) return;
-        debugProfiles.setTestBotKit(type, botIndex, kit);
+        debugProfiles.setTestBotKit(debugOwnerFor(type), type, botIndex, kit);
     }
 
     int configuredTestBotTeam(ArcadePortGame type, int botIndex) {
         if (type == null || botIndex < 0) return -1;
-        return debugProfiles.testBotTeam(type, botIndex, plugin.getConfig().getInt(
+        return debugProfiles.testBotTeam(debugOwnerFor(type), type, botIndex, plugin.getConfig().getInt(
                 "test-bot-loadouts." + type.id() + ".players." + botIndex + ".team", -1));
     }
 
@@ -887,7 +905,7 @@ public final class ArcadePortManager implements Listener {
         if (type == null || botIndex < 0) return;
         int teamCount = teamCountForGame(type);
         int selected = teamCount < 2 || team < 0 || team >= teamCount ? -1 : team;
-        debugProfiles.setTestBotTeam(type, botIndex, selected);
+        debugProfiles.setTestBotTeam(debugOwnerFor(type), type, botIndex, selected);
     }
 
     void applyConfiguredTestBotLoadout(ArcadePortGame type, int botIndex, Player bot) {
@@ -903,7 +921,7 @@ public final class ArcadePortManager implements Listener {
     private void applyConfiguredTestBotCosmetics(ArcadePortGame type, int botIndex, Player bot) {
         Plugin cosmetics = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
         if (cosmetics == null || type == null || bot == null) return;
-        Map<String, String> cosmeticsByLine = debugProfiles.testBotCosmetics(type, botIndex);
+        Map<String, String> cosmeticsByLine = debugProfiles.testBotCosmetics(debugOwnerFor(type), type, botIndex);
         if (cosmeticsByLine.isEmpty()) return;
         try {
             Object catalog = cosmetics.getClass().getMethod("getCatalog").invoke(cosmetics);
@@ -940,12 +958,12 @@ public final class ArcadePortManager implements Listener {
     void setConfiguredTestBotCosmetic(ArcadePortGame type, int botIndex, String lineId, String optionId) {
         if (type == null || botIndex < 0 || lineId == null || lineId.isBlank()
                 || optionId == null || optionId.isBlank()) return;
-        debugProfiles.setTestBotCosmetic(type, botIndex, lineId, optionId);
+        debugProfiles.setTestBotCosmetic(debugOwnerFor(type), type, botIndex, lineId, optionId);
     }
 
     String configuredTestBotCosmetic(ArcadePortGame type, int botIndex, String lineId) {
         if (type == null || botIndex < 0 || lineId == null || lineId.isBlank()) return "";
-        return debugProfiles.testBotCosmetic(type, botIndex, lineId, plugin.getConfig().getString(
+        return debugProfiles.testBotCosmetic(debugOwnerFor(type), type, botIndex, lineId, plugin.getConfig().getString(
                 "test-bot-loadouts." + type.id() + ".players." + botIndex + ".cosmetics." + lineId, ""));
     }
 

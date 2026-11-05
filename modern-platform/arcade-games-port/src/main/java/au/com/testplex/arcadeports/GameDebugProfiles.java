@@ -190,47 +190,66 @@ final class GameDebugProfiles {
         return Map.copyOf(result);
     }
 
-    int testBotCount(ArcadePortGame game, int fallback) {
-        return game == null ? fallback : config.getInt(testBotRoot(game) + ".count", fallback);
+    int testBotCount(UUID tester, ArcadePortGame game, int fallback) {
+        if (game == null) return fallback;
+        String path = testBotRoot(tester, game) + ".count";
+        if (config.contains(path)) return config.getInt(path, fallback);
+        if ("default".equals(selected(tester, game))) {
+            return config.getInt(legacyTestBotRoot(game) + ".count", fallback);
+        }
+        return fallback;
     }
 
-    void setTestBotCount(ArcadePortGame game, int count) {
+    void setTestBotCount(UUID tester, ArcadePortGame game, int count) {
         if (game == null) return;
-        config.set(testBotRoot(game) + ".count", Math.max(0, Math.min(16, count)));
+        config.set(testBotRoot(tester, game) + ".count", Math.max(0, Math.min(16, count)));
         save();
     }
 
-    String testBotKit(ArcadePortGame game, int index, String fallback) {
-        return game == null || index < 0 ? fallback
-                : config.getString(testBotRoot(game) + ".players." + index + ".kit", fallback);
+    String testBotKit(UUID tester, ArcadePortGame game, int index, String fallback) {
+        if (game == null || index < 0) return fallback;
+        String path = testBotRoot(tester, game) + ".players." + index + ".kit";
+        if (config.contains(path)) return config.getString(path, fallback);
+        return "default".equals(selected(tester, game))
+                ? config.getString(legacyTestBotRoot(game) + ".players." + index + ".kit", fallback) : fallback;
     }
 
-    void setTestBotKit(ArcadePortGame game, int index, String kit) {
+    void setTestBotKit(UUID tester, ArcadePortGame game, int index, String kit) {
         if (game == null || index < 0 || kit == null || kit.isBlank()) return;
-        config.set(testBotRoot(game) + ".players." + index + ".kit", kit);
+        config.set(testBotRoot(tester, game) + ".players." + index + ".kit", kit);
         save();
     }
 
-    int testBotTeam(ArcadePortGame game, int index, int fallback) {
-        return game == null || index < 0 ? fallback
-                : config.getInt(testBotRoot(game) + ".players." + index + ".team", fallback);
+    int testBotTeam(UUID tester, ArcadePortGame game, int index, int fallback) {
+        if (game == null || index < 0) return fallback;
+        String path = testBotRoot(tester, game) + ".players." + index + ".team";
+        if (config.contains(path)) return config.getInt(path, fallback);
+        return "default".equals(selected(tester, game))
+                ? config.getInt(legacyTestBotRoot(game) + ".players." + index + ".team", fallback) : fallback;
     }
 
-    void setTestBotTeam(ArcadePortGame game, int index, int team) {
+    void setTestBotTeam(UUID tester, ArcadePortGame game, int index, int team) {
         if (game == null || index < 0) return;
-        config.set(testBotRoot(game) + ".players." + index + ".team", team);
+        config.set(testBotRoot(tester, game) + ".players." + index + ".team", team);
         save();
     }
 
-    String testBotCosmetic(ArcadePortGame game, int index, String lineId, String fallback) {
+    String testBotCosmetic(UUID tester, ArcadePortGame game, int index, String lineId, String fallback) {
         if (game == null || index < 0 || !validKey(lineId)) return fallback;
-        return config.getString(testBotRoot(game) + ".players." + index + ".cosmetics." + lineId, fallback);
+        String path = testBotRoot(tester, game) + ".players." + index + ".cosmetics." + lineId;
+        if (config.contains(path)) return config.getString(path, fallback);
+        return "default".equals(selected(tester, game))
+                ? config.getString(legacyTestBotRoot(game) + ".players." + index + ".cosmetics." + lineId, fallback)
+                : fallback;
     }
 
-    Map<String, String> testBotCosmetics(ArcadePortGame game, int index) {
+    Map<String, String> testBotCosmetics(UUID tester, ArcadePortGame game, int index) {
         if (game == null || index < 0) return Map.of();
-        ConfigurationSection section = config.getConfigurationSection(
-                testBotRoot(game) + ".players." + index + ".cosmetics");
+        String path = testBotRoot(tester, game) + ".players." + index + ".cosmetics";
+        ConfigurationSection section = config.getConfigurationSection(path);
+        if (section == null && "default".equals(selected(tester, game))) {
+            section = config.getConfigurationSection(legacyTestBotRoot(game) + ".players." + index + ".cosmetics");
+        }
         if (section == null) return Map.of();
         Map<String, String> result = new LinkedHashMap<>();
         for (String key : section.getKeys(false)) {
@@ -240,9 +259,9 @@ final class GameDebugProfiles {
         return Map.copyOf(result);
     }
 
-    void setTestBotCosmetic(ArcadePortGame game, int index, String lineId, String optionId) {
+    void setTestBotCosmetic(UUID tester, ArcadePortGame game, int index, String lineId, String optionId) {
         if (game == null || index < 0 || !validKey(lineId) || optionId == null || optionId.isBlank()) return;
-        config.set(testBotRoot(game) + ".players." + index + ".cosmetics." + lineId, optionId);
+        config.set(testBotRoot(tester, game) + ".players." + index + ".cosmetics." + lineId, optionId);
         save();
     }
 
@@ -267,7 +286,11 @@ final class GameDebugProfiles {
         return root(tester, game) + ".profiles." + profile;
     }
 
-    private static String testBotRoot(ArcadePortGame game) {
+    private String testBotRoot(UUID tester, ArcadePortGame game) {
+        return profilePath(tester, game, selected(tester, game)) + ".test-bots";
+    }
+
+    private static String legacyTestBotRoot(ArcadePortGame game) {
         return "test-bot-loadouts." + game.id();
     }
 

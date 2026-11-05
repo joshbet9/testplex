@@ -24,6 +24,8 @@ Legend: **Partial** means the common profile framework and any listed shared rul
 
 Debug-round persistence guard: configured debug rounds and rounds launched with a debug bot roster do not persist match stats or achievements. Reset to Defaults clears active rule changes but keeps this guard enabled until the round ends. This is covered for shared Arcade stats plus the standalone Snap and Speed Builders progress stores; newly added direct progression paths must use the same guard.
 
+Bot counts and per-bot team, kit, and cosmetic loadouts are now stored inside each tester's selected game profile. Duplicating or renaming a profile carries its roster configuration with it. Existing `test-bot-loadouts` values remain a fallback for the default profile during migration.
+
 | Game | Status | Implemented coverage | Remaining work |
 |---|---|---|---|
 | Bacon Brawl | Partial | Shared rule overrides; common switches; achievement preview in its award helper | Per-kit ability switches/variables, event triggers and stats-isolated match simulation |
