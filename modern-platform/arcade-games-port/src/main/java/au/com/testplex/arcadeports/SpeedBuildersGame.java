@@ -134,6 +134,37 @@ public final class SpeedBuildersGame implements Listener {
         return true;
     }
 
+    /** Restore only this authorised tester's active build from the current source template. */
+    public boolean debugResetOwnBuild(Player tester) {
+        if (tester == null || !tester.isOnline()) return false;
+        UUID id = tester.getUniqueId();
+        PlayerState state = players.get(id);
+        if (!SpeedBuildersRules.canDebugResetOwnBuild(plugin.hasAdminAccess(tester), phase == Phase.BUILDING,
+                state != null && state.player.equals(tester), state != null && state.perfect, currentTemplate != null)) {
+            return false;
+        }
+        GameDebugRuntimeOverrides.markDebugSession();
+        state.blocksPlaced = 0;
+        state.blocksBroken = 0;
+        state.mobsBuilt = 0;
+        state.score = 0;
+        state.roundPoints = 0;
+        state.roundBuildTimeTicks = 0L;
+        state.buildTimeRecorded = false;
+        removeMobs(state.mobs);
+        restorePlot(state.plot);
+        pasteTemplate(state.plot, currentTemplate);
+        if (GameDebugRuntimeOverrides.booleanValue("SPEED_BUILDERS_TEMPLATE_MOBS_ENABLED",
+                SpeedBuildersRules.TEMPLATE_MOBS_ENABLED)) {
+            spawnTemplateMobs(state, state.plot, currentTemplate);
+        }
+        state.perfect = false;
+        teleportToPlot(state);
+        tester.sendMessage(ChatColor.YELLOW + "Your build was reset to the current template for testing.");
+        refreshHud();
+        return true;
+    }
+
     public String status() {
         if (phase == Phase.IDLE) return "queue=" + queue.size();
         return phase.name() + " round=" + round + "/" + matchRoundLimit + " builders=" + activePlayers().size()

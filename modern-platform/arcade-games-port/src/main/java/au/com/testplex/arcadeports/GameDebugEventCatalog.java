@@ -49,6 +49,9 @@ final class GameDebugEventCatalog {
     private static final List<Event> MASTER_BUILDERS = List.of(
             new Event("reset-own-plot", "Clear Own Plot", Material.TNT,
                     "Clear your active plot interior so you can test another build without ending the round."));
+    private static final List<Event> SPEED_BUILDERS = List.of(
+            new Event("reset-own-build", "Reset Own Build", Material.BRICKS,
+                    "Restore your own plot to the current model and reapply the template-mob profile setting."));
     private static final List<Event> ONE_IN_THE_QUIVER = List.of(
             new Event("refill-arrow", "Restore Super Arrow", Material.ARROW,
                     "Restore the normal one-shot arrow to its configured hotbar slot for testing."));
@@ -132,6 +135,7 @@ final class GameDebugEventCatalog {
             case EVOLUTION -> EVOLUTION;
             case HOOPS_REMASTERED -> HOOPS_REMASTERED;
             case MASTER_BUILDERS -> MASTER_BUILDERS;
+            case SPEED_BUILDERS -> SPEED_BUILDERS;
             case SNAKE -> SNAKE;
             case SNEAKY_ASSASSINS -> SNEAKY_ASSASSINS;
             case PLEXBALL -> PLEXBALL;

@@ -10,6 +10,16 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class SpeedBuildersRulesTest {
     @Test
+    void ownBuildResetRequiresAnAuthorisedActiveUnfinishedBuilderAndModel() {
+        assertTrue(SpeedBuildersRules.canDebugResetOwnBuild(true, true, true, false, true));
+        assertFalse(SpeedBuildersRules.canDebugResetOwnBuild(false, true, true, false, true));
+        assertFalse(SpeedBuildersRules.canDebugResetOwnBuild(true, false, true, false, true));
+        assertFalse(SpeedBuildersRules.canDebugResetOwnBuild(true, true, false, false, true));
+        assertFalse(SpeedBuildersRules.canDebugResetOwnBuild(true, true, true, true, true));
+        assertFalse(SpeedBuildersRules.canDebugResetOwnBuild(true, true, true, false, false));
+    }
+
+    @Test
     void configuredBotsFillOnlyAvailableSpeedBuildersSlots() {
         assertEquals(16, SpeedBuildersRules.testPlayersNeeded(0, 16));
         assertEquals(15, SpeedBuildersRules.testPlayersNeeded(1, 16));

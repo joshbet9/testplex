@@ -28,6 +28,11 @@ public final class SpeedBuildersRules {
 
     private SpeedBuildersRules() { }
 
+    public static boolean canDebugResetOwnBuild(boolean authorised, boolean building,
+            boolean participant, boolean alreadyPerfect, boolean hasTemplate) {
+        return authorised && building && participant && !alreadyPerfect && hasTemplate;
+    }
+
     /** Fills only unused player slots, respecting both the bot setting and the map's roster limit. */
     public static int testPlayersNeeded(int humanPlayers, int configuredTestPlayers) {
         if (humanPlayers < 0 || configuredTestPlayers < 0) {

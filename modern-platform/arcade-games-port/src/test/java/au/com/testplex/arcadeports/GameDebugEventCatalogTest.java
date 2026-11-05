@@ -64,6 +64,22 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void speedBuildersOwnBuildResetHasAnAuthorizedRuntimeDispatcher() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String runtime = Files.readString(sourceRoot.resolve("SpeedBuildersGame.java"));
+        assertTrue(manager.contains("type == ArcadePortGame.SPEED_BUILDERS && \"reset-own-build\".equals(eventId)"));
+        assertTrue(runtime.contains("plugin.hasAdminAccess(tester)"));
+        assertTrue(runtime.contains("restorePlot(state.plot)"));
+        assertTrue(runtime.contains("pasteTemplate(state.plot, currentTemplate)"));
+        assertTrue(runtime.contains("GameDebugRuntimeOverrides.markDebugSession()"));
+    }
+
+    @Test
     void everyListedEventHasAProductionDispatcher() throws IOException {
         Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "ArcadePortManager.java");

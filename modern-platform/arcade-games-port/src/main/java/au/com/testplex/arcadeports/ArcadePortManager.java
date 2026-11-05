@@ -943,6 +943,10 @@ public final class ArcadePortManager implements Listener {
             GameDebugRuntimeOverrides.markDebugSession();
             return superSploor.debugUseSelectedSpecial(tester);
         }
+        if (type == ArcadePortGame.SPEED_BUILDERS && "reset-own-build".equals(eventId)) {
+            return plugin.getSpeedBuildersGame() != null
+                    && plugin.getSpeedBuildersGame().debugResetOwnBuild(tester);
+        }
         Session session = active;
         if (session == null || session.type != type || !session.liveStarted
                 || !session.alive.contains(tester.getUniqueId())) return false;
