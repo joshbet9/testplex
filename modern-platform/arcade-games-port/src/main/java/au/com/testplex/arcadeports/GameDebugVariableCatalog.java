@@ -30,13 +30,15 @@ final class GameDebugVariableCatalog {
             if (sharedRules && prefixes.stream().noneMatch(name::startsWith)) continue;
             if (!sharedRules && !Modifier.isPublic(field.getModifiers())) continue;
             if (!sharedRules && !standaloneFieldIsWired(game, name)) continue;
+            String key = sharedRules ? name : rulePrefix(game) + name;
+            boolean dynamicConsumer = game.isMonsterMaze() || game == ArcadePortGame.SNEAKY_ASSASSINS;
+            if (!GameDebugWiredRuleKeys.KEYS.contains(key) && !dynamicConsumer) continue;
             Kind kind = kind(field.getType());
             if (kind == null) continue;
             try {
                 Object raw = field.get(null);
                 double value = raw instanceof Boolean enabled ? (enabled ? 1.0D : 0.0D)
                         : ((Number) raw).doubleValue();
-                String key = sharedRules ? name : rulePrefix(game) + name;
                 result.add(new Variable(key, humanize(name), kind, value,
                         minimum(name, value, kind), maximum(name, kind), step(name, value, kind)));
             } catch (IllegalAccessException ignored) {
@@ -46,6 +48,22 @@ final class GameDebugVariableCatalog {
         }
         result.sort(Comparator.comparing(Variable::key));
         return List.copyOf(result);
+    }
+
+    static Variable variable(ArcadePortGame game, String key) {
+        if (game == null || key == null || key.isBlank()) return null;
+        return variables(game).stream().filter(candidate -> candidate.key().equals(key)).findFirst().orElse(null);
+    }
+
+    static double clamp(Variable variable, double value) {
+        if (variable == null || !Double.isFinite(value)) return Double.NaN;
+        double bounded = Math.max(variable.minimum(), Math.min(variable.maximum(), value));
+        return switch (variable.kind()) {
+            case INTEGER, LONG -> Math.rint(bounded);
+            case FLOAT -> (double) (float) bounded;
+            case DOUBLE -> bounded;
+            case BOOLEAN -> Double.NaN;
+        };
     }
 
     private static List<Class<?>> ruleSources(ArcadePortGame game) {

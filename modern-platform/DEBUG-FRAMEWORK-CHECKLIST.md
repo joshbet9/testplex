@@ -10,6 +10,7 @@ This checklist tracks implemented controls, not menu/catalog presence alone. A g
 - [x] Reset to Defaults removes only the selected profile's overrides.
 - [x] Menus separate profiles, feature switches, variables and bot setup for the currently selected game.
 - [x] Numeric shared Arcade rules can be overridden for the active round; the menu marks these as restart-required.
+- [x] The variable menu exposes only rules with an explicit production runtime consumer; persisted values are clamped to the rule's safe range and malformed integer conversions cannot crash gameplay.
 - [x] Shared feature switches cover kit unlock, invulnerability, fall damage and hunger; Bacon Brawl also has its unlimited-ability switch.
 - [x] Achievement preview mode runs real achievement conditions through shared Arcade award helpers and Snap; preview notices do not persist unlocks.
 - [x] Authorized testers can advance the initial countdown in a live shared Arcade session and the current Speed Builders phase; bot rosters are configured for the next round.
@@ -24,12 +25,12 @@ Legend: **Partial** means the common profile framework and any listed shared rul
 |---|---|---|---|
 | Bacon Brawl | Partial | Shared rule overrides; common switches; achievement preview in its award helper | Per-kit ability switches/variables, event triggers and stats-isolated match simulation |
 | Bomb Lobbers | Partial | Shared rule overrides and common switches | Power-up/TNT feature controls, event triggers and phase controls |
-| Castle Assault | Partial | Shared rule overrides plus Castle runtime constants | Objective, tower/crystal/TNT switches, event triggers and regression tests |
-| Death Tag | Partial | Shared rule overrides and common switches | Runner/chaser feature controls, tag/respawn/event tools and achievements |
-| Dragon Escape | Partial | Shared rule overrides and common switches | Dragon/ability/finish feature switches and event controls |
-| Dragons | Partial | Shared rule overrides and common switches | Tamer/dragon/perk controls and phase/event tools |
-| Draw My Thing | Partial | Shared timing rules are adjustable | Drawing/guess/map/round controls, event tools and direct tests |
-| Evolution | Partial | Shared rule overrides and common switches | Per-form abilities, pity/evolution controls and event tools |
+| Castle Assault | Partial | Shared rule overrides plus objective TNT respawn timing is runtime-backed | Objective, tower/crystal/TNT switches, event triggers and regression tests |
+| Death Tag | Partial | Shared rule overrides plus chaser promotion, archer knockback and Traitor cooldown are runtime-backed | Runner/chaser feature controls, tag/respawn/event tools and achievements |
+| Dragon Escape | Partial | Shared rule overrides plus Digger protection radius and Warper grace period are runtime-backed | Dragon/ability/finish feature switches and event controls |
+| Dragons | Partial | Shared rule overrides plus sparkler count and lifetime are runtime-backed | Tamer/dragon/perk controls and phase/event tools |
+| Draw My Thing | Partial | 320-second match budget and per-turn cap can be tuned through runtime-backed rules | Drawing/guess/map/round controls, event tools and direct tests |
+| Evolution | Partial | Shared rules include transformation timing, Quick Evolver multiplier, win level, overkill threshold and Sulphur Bomb range/cooldown | Per-form abilities, pity/evolution controls and event tools |
 | Gladiators | Partial | Shared rule overrides and common switches | Bracket/duel controls, forfeit/disconnect simulation and profile acceptance tests |
 | Heroes of GWEN | Partial | Shared rule overrides plus Heroes runtime constants | Per-hero/minion/objective switches and phase/event tools |
 | Hoops Remastered | Partial | Hoops timing, score and gameplay constants are profile-backed and consumed by the active runtime | Remaining constants, score/possession/shot event controls and direct behavior tests |
@@ -38,7 +39,7 @@ Legend: **Partial** means the common profile framework and any listed shared rul
 | Milk the Cow | Partial | Score goal, milk/death scoring, cow-team ratio, herd size/speed, and common session switches are profile-backed and consumed by the manager | Cow phase/event triggers and direct gameplay behavior tests |
 | Monster Maze (all modes) | Partial | Per-mode mob speed, Body Rush duration, Cryo cooldown/freeze/radius and jump strength are profile-backed in the existing in-process engine | Mob/theme/stage/map controls, achievement/event preview paths, test event/phase actions and direct mode behavior tests |
 | One in the Quiver | Partial | Shared rule overrides and common switches | Arrow/kit feature switches and kill/round event tools |
-| Paintball | Partial | Shared rule overrides and common switches | Weapon, reload, map and team-event controls |
+| Paintball | Partial | Shared rule overrides include Machine Gun heat capacity, shots-per-cycle and cooling | Weapon, reload, map and team-event controls |
 | Plexball | Partial | Player limits, match/batting timing, rewind, ball physics, home-run distance and catch windows are profile-backed and consumed by the rule/runtime code | Remaining scoring/possession tunables, bot integration and direct match behavior tests |
 | Runner | Partial | Shared rule overrides and common switches | Switcher/blocks/kit feature controls and phase/event tools |
 | Sheep Quest | Partial | Shared rule overrides and common switches | Sheep/carry/kit/score controls and capture event simulation |
@@ -49,7 +50,7 @@ Legend: **Partial** means the common profile framework and any listed shared rul
 | Speed Builders | Partial | View/build/intermission timing, match rounds, and build-time bounds are profile-backed and consumed by the round loop; authorized phase advance is available | Bot/profile selection integration, event triggers and direct round-loop tests |
 | Spleef | Partial | Shared rule overrides and common switches | Kit, block-break, hunger and round-phase switches/event tools |
 | Super Sploor | Partial | Ink, shot, squid, territory and round constants are profile-backed and consumed by its runtime | Remaining kit/event controls and direct behavior tests |
-| Turf Wars | Partial | Shared rule overrides and common switches | Build/combat/territory/respawn switches and phase/event tools |
+| Turf Wars | Partial | Shared rule overrides include build/combat phase duration and melee/sword/shredder damage | Build/combat/territory/respawn switches and phase/event tools |
 | Wither Assault | Partial | Minion count and common shared-session switches are profile-backed and consumed by the manager/rules | Tower/phase/event controls and direct gameplay behavior tests |
 | Wizards | Partial | Player limits, starter-spell rolls, mana conversion, Soul Star mana rate and endgame strike timing are profile-backed and consumed by `WizardsGameManager`/`WizardsRules` | Spell/chest event controls, phase tools and direct live-round tests |
 

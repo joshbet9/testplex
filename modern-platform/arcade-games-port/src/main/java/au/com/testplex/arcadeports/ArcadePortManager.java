@@ -5253,7 +5253,7 @@ public final class ArcadePortManager implements Listener {
         };
     }
 
-    private enum GladiatorMenuType { VOTE, HOTBAR, KILL_MESSAGES, SPECTATE }
+    private enum GladiatorMenuType { VOTE, HOTBAR, SPECTATE }
 
     private static final class GladiatorMenuHolder implements InventoryHolder {
         private final GladiatorMenuType type;
@@ -5376,25 +5376,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void openGladiatorKillMessageMenu(Player player) {
-        GladiatorMenuHolder holder = new GladiatorMenuHolder(GladiatorMenuType.KILL_MESSAGES);
-        Inventory inventory = Bukkit.createInventory(holder, 27, "Gladiators — Kill Messages");
-        holder.inventory = inventory;
-        String current = gladiatorKillMessageStyle(player);
-        String[][] options = {
-                {"classic", "Classic", "was defeated by"},
-                {"sent-to-sand", "Sent to the Sand", "was sent to the sand by"},
-                {"broken-oath", "Broken Oath", "'s challenge was ended by"},
-                {"outclassed", "Outclassed", "was no match for"}
-        };
-        Material[] icons = {Material.IRON_SWORD, Material.SAND, Material.SHIELD, Material.CROSSBOW};
-        for (int i = 0; i < options.length; i++) {
-            String id = options[i][0];
-            String selected = current.equals(id) ? "Selected" : "Click to equip";
-            inventory.setItem(10 + i * 2, gladiatorMenuItem(icons[i], options[i][1],
-                    selected + " — " + options[i][2], "kill-message", id));
-        }
-        inventory.setItem(22, gladiatorMenuItem(Material.BARRIER, "Close", "Return to the game.", "close", null));
-        player.openInventory(inventory);
+        if (player == null || !player.isOnline()) return;
+        player.sendMessage(ChatColor.YELLOW + "Gladiators uses its source kill messages. Choose your score flare in /cosmetics → Gladiators.");
     }
 
     public void openGladiatorSpectatorMenu(Player player) {
@@ -5566,40 +5549,13 @@ public final class ArcadePortManager implements Listener {
         for (int i = 0; i < 9; i++) player.getInventory().setItem(i, ordered[i]);
     }
 
-    private void saveGladiatorKillMessageStyle(Player player, String value) {
-        if (player == null || value == null) return;
-        plugin.getConfig().set("players." + player.getUniqueId()
-                + ".games.gladiators.kill-message", value);
-        plugin.saveConfig();
-        Plugin cosmeticsPlugin = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
-        if (cosmeticsPlugin == null) return;
-        try {
-            Object result = cosmeticsPlugin.getClass()
-                    .getMethod("chooseCosmeticOption", UUID.class, String.class, String.class, String.class)
-                    .invoke(cosmeticsPlugin, player.getUniqueId(), "gladiators", "kill-message", value);
-            if (!Boolean.TRUE.equals(result)) {
-                plugin.getLogger().warning("TestplexModernArcade rejected the Gladiators kill-message preference for "
-                        + player.getUniqueId() + ".");
-            }
-        } catch (ReflectiveOperationException | LinkageError exception) {
-            plugin.getLogger().warning("Could not save Gladiators kill-message preference through the live preference store: "
-                    + exception.getMessage());
-        }
-    }
-
-    private String gladiatorKillMessageStyle(Player killer) {
-        return selectedGameCosmeticOption(killer, "gladiators", "kill-messages", "defeated-by");
-    }
-
     private void announceGladiatorKill(Session session, Player killer, Player victim) {
-        String style = gladiatorKillMessageStyle(killer);
-        String message = switch (style) {
-            case "eliminated" -> ChatColor.GOLD + killer.getName() + ChatColor.GRAY + " eliminated "
-                    + ChatColor.WHITE + victim.getName();
-            case "fell-to" -> ChatColor.WHITE + victim.getName() + ChatColor.GRAY + " fell to "
-                    + ChatColor.GOLD + killer.getName();
-            default -> ChatColor.GRAY + victim.getName() + " was defeated by " + ChatColor.GOLD + killer.getName();
-        };
+        if (killer != null && victim != null) {
+            GameAbilityCosmetics.celebrate(killer, victim.getLocation(),
+                    selectedGameCosmeticOption(killer, "gladiators", "score-flares", "golden-burst"));
+        }
+        String message = killer == null || victim == null ? ChatColor.GRAY + "A Gladiators duel ended."
+                : ChatColor.GRAY + victim.getName() + " was defeated by " + ChatColor.GOLD + killer.getName();
         announce(session, ChatColor.DARK_GRAY + "[Gladiators] " + message + ChatColor.GRAY + ".");
     }
 
@@ -26826,19 +26782,6 @@ public final class ArcadePortManager implements Listener {
                 player.updateInventory();
                 openGladiatorHotbarMenu(player);
                 player.sendActionBar(ChatColor.GREEN + "Hotbar order saved.");
-                return;
-            }
-            if (holder.type == GladiatorMenuType.KILL_MESSAGES) {
-                if (slot == 22) { player.closeInventory(); return; }
-                ItemStack clicked = event.getCurrentItem();
-                if (clicked == null || !clicked.hasItemMeta()) return;
-                String action = clicked.getItemMeta().getPersistentDataContainer().get(gladiatorMenuActionKey, PersistentDataType.STRING);
-                String value = clicked.getItemMeta().getPersistentDataContainer().get(gladiatorMenuValueKey, PersistentDataType.STRING);
-                if ("kill-message".equals(action) && value != null) {
-                    saveGladiatorKillMessageStyle(player, value);
-                    player.sendMessage(ChatColor.GREEN + "Gladiators kill message equipped.");
-                    openGladiatorKillMessageMenu(player);
-                }
                 return;
             }
         }

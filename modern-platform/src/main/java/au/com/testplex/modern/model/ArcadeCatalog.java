@@ -454,11 +454,11 @@ public final class ArcadeCatalog {
                     style("shell-fragments", "Charged Dragon Egg", "Electric sparks spiral around the player and egg."),
                     style("void-unfold", "Void Dragon Egg", "Portal particles spiral around the player and egg."),
                     style("nature-bloom", "Nature Dragon Egg", "Green motes bloom around the player and egg.")));
-            case "gladiators" -> List.of(line("kill-messages", "Gladiators Kill Messages",
-                    "Choose the wording used when you kill an opponent in Gladiators only.", "IRON_SWORD",
-                    style("defeated-by", "Defeated By", "{victim} was defeated by {killer}."),
-                    style("eliminated", "Eliminated", "{killer} eliminated {victim}."),
-                    style("fell-to", "Fell To", "{victim} fell to {killer}.")));
+            case "gladiators" -> List.of(line("score-flares", "Gladiators Score Flares",
+                    "The scorer's selected flare triggers at their kill and is visible to everyone.", "FIREWORK_ROCKET",
+                    style("golden-burst", "Golden Burst", "A compact golden flare at the duel's scoring moment."),
+                    style("court-confetti", "Arena Confetti", "A short coloured confetti flourish after a point."),
+                    style("starflare", "Starflare", "A sharp star-shaped light burst when you score.")));
             case "hoops-remastered" -> List.of(line("score-flares", "Score Celebration Flares",
                     "The scorer's selected flare triggers at the hoop and is visible to everyone.", "FIREWORK_ROCKET",
                     style("golden-burst", "Golden Burst", "A compact golden flare at the scoring hoop."),

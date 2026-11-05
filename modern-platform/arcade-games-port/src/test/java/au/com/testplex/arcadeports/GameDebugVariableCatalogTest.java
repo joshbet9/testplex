@@ -53,6 +53,32 @@ class GameDebugVariableCatalogTest {
     }
 
     @Test
+    void variableMenusOnlyExposeRulesWithRuntimeConsumers() {
+        for (ArcadePortGame game : ArcadePortGame.values()) {
+            for (GameDebugVariableCatalog.Variable variable : GameDebugVariableCatalog.variables(game)) {
+                assertTrue(GameDebugWiredRuleKeys.KEYS.contains(variable.key())
+                                || game.isMonsterMaze() && variable.key().startsWith(GameDebugVariableCatalog.rulePrefix(game))
+                                || game == ArcadePortGame.SNEAKY_ASSASSINS
+                                        && variable.key().startsWith(GameDebugVariableCatalog.rulePrefix(game)),
+                        game.id() + " exposes a rule without a runtime consumer: " + variable.key());
+            }
+        }
+        assertFalse(GameDebugVariableCatalog.variables(ArcadePortGame.BACON_BRAWL).stream()
+                .anyMatch(variable -> variable.key().equals("BACON_FLASH_FRIED_MAX_WIN_MILLIS")));
+    }
+
+    @Test
+    void everyLiteralRuntimeOverrideHasAProfileMenuEntry() {
+        var catalogKeys = java.util.Arrays.stream(ArcadePortGame.values())
+                .flatMap(game -> GameDebugVariableCatalog.variables(game).stream())
+                .map(GameDebugVariableCatalog.Variable::key)
+                .collect(java.util.stream.Collectors.toSet());
+        for (String key : GameDebugWiredRuleKeys.KEYS) {
+            assertTrue(catalogKeys.contains(key), "Runtime override is unavailable in every game's profile menu: " + key);
+        }
+    }
+
+    @Test
     void numericAndBooleanRuleOverridesUseProfileValuesAndPreserveDefaults() {
         GameDebugRuntimeOverrides.activate(Map.of(
                 "BACON_1_8_HIT_DELAY_MILLIS", 250.0D,
@@ -67,6 +93,56 @@ class GameDebugVariableCatalogTest {
         GameDebugRuntimeOverrides.clear();
         assertEquals(400L, GameDebugRuntimeOverrides.longValue("BACON_1_8_HIT_DELAY_MILLIS", 400L));
         assertFalse(GameDebugRuntimeOverrides.booleanValue("BACON_BRAWL_HAS_ROUND_TIMER", false));
+    }
+
+    @Test
+    void malformedOversizedIntegerOverrideCannotCrashGameplayConversion() {
+        GameDebugRuntimeOverrides.activate(Map.of("UNTRUSTED_TEST_VALUE", Double.MAX_VALUE));
+
+        assertEquals(Integer.MAX_VALUE,
+                GameDebugRuntimeOverrides.intValue("UNTRUSTED_TEST_VALUE", 7));
+    }
+
+    @Test
+    void timingCombatAndAbilityVariablesChangeTheirDeterministicGameRules() {
+        GameDebugRuntimeOverrides.activate(Map.ofEntries(
+                Map.entry("CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS", 10_000L),
+                Map.entry("DRAW_MY_THING_GAME_MILLIS", 80_000L),
+                Map.entry("DRAW_MY_THING_BASE_ROUND_MILLIS", 20_000L),
+                Map.entry("DEATH_TAG_CHASER_PROMOTION_INTERVAL_MILLIS", 10_000L),
+                Map.entry("DEATH_TAG_ARCHER_ARROW_KNOCKBACK_POWER", 5.0D),
+                Map.entry("DEATH_TAG_TRAITOR_KNOCKBACK_COOLDOWN_MILLIS", 1_000L),
+                Map.entry("DRAGON_ESCAPE_DIGGER_NEARBY_PLAYER_RADIUS", 2.5D),
+                Map.entry("DRAGON_ESCAPE_WARPER_GRACE_MILLIS", 2_000L),
+                Map.entry("DRAGONS_MAX_SPARKLERS", 1),
+                Map.entry("DRAGONS_SPARKLER_LIFETIME_TICKS", 5),
+                Map.entry("EVOLUTION_WIN_LEVEL", 4),
+                Map.entry("EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION", 3),
+                Map.entry("EVOLUTION_SULPHUR_BOMB_RADIUS", 4.0D),
+                Map.entry("EVOLUTION_SULPHUR_BOMB_COOLDOWN_MILLIS", 1_000L),
+                Map.entry("PAINTBALL_MACHINE_GUN_MAX_HEAT", 0.8D),
+                Map.entry("PAINTBALL_MACHINE_GUN_SHOTS_PER_HEAT_CYCLE", 2),
+                Map.entry("PAINTBALL_MACHINE_GUN_COOL_PER_TICK", 0.1D),
+                Map.entry("TURF_WARS_INITIAL_BUILD_PHASE_MILLIS", 5_000L),
+                Map.entry("TURF_WARS_MELEE_DAMAGE", 3.0D)));
+
+        assertEquals(10_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(false));
+        assertEquals(20_000L, ArcadePortRules.drawMyThingRoundMillis(2));
+        assertEquals(3, ArcadePortRules.requiredDeathTagChasers(20_000L));
+        assertEquals(5.0D, ArcadePortRules.deathTagArcherArrowKnockbackMultiplier(false));
+        assertFalse(ArcadePortRules.deathTagTraitorKnockbackReady(999L, 1L));
+        assertTrue(ArcadePortRules.shouldPreventDragonEscapeDigger(2.4D, 20.0D));
+        assertFalse(ArcadePortRules.isDragonEscapeWarpGraceActive(3_000L, 1_000L));
+        assertFalse(ArcadePortRules.shouldReplenishDragonSparkler(10L, 10L, 1));
+        assertTrue(ArcadePortRules.shouldExpireDragonSparkler(6, 64.0D, false));
+        assertTrue(ArcadePortRules.isEvolutionWinnerLevel(4));
+        assertFalse(ArcadePortRules.evolutionOverkillRequirementMet(2));
+        assertTrue(ArcadePortRules.isEvolutionSulphurBombInRange(4.0D));
+        assertEquals(1_500L, ArcadePortRules.nextEvolutionSulphurBombReadyAt(500L));
+        assertEquals(0.4D, ArcadePortRules.paintballMachineGunHeatPerShot(), 1.0e-9);
+        assertEquals(0.7D, ArcadePortRules.coolPaintballMachineGunHeat(0.8D), 1.0e-9);
+        assertEquals(5_000L, ArcadePortRules.turfWarsInitialBuildPhaseMillis(false));
+        assertEquals(3.0D, ArcadePortRules.turfWarsHitDamage("marksman", false, false));
     }
 
     @Test

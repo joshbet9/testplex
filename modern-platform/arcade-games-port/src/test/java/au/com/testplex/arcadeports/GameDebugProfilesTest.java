@@ -76,4 +76,20 @@ class GameDebugProfilesTest {
                 ArcadePortGame.MICRO_BATTLES, 2, "start-glass", ""));
         assertEquals("", reloaded.testBotKit(ArcadePortGame.BACON_BRAWL, 2, ""));
     }
+
+    @Test
+    void numericValuesAreRestrictedToKnownGameRulesAndSafeRanges() {
+        GameDebugProfiles profiles = new GameDebugProfiles(directory.resolve("bounded.yml").toFile(), ignored -> { });
+        UUID tester = UUID.randomUUID();
+
+        profiles.setVariable(tester, ArcadePortGame.BACON_BRAWL, "BACON_1_8_HIT_DELAY_MILLIS", -500.0D);
+        profiles.setVariable(tester, ArcadePortGame.BACON_BRAWL, "UNRELATED_SERVER_SETTING", 5.0D);
+        profiles.setVariable(tester, ArcadePortGame.BACON_BRAWL, "BACON_BRAWL_HAS_ROUND_TIMER", 1.0D);
+
+        assertEquals(0.0D, profiles.variable(tester, ArcadePortGame.BACON_BRAWL,
+                "BACON_1_8_HIT_DELAY_MILLIS"));
+        assertNull(profiles.variable(tester, ArcadePortGame.BACON_BRAWL, "UNRELATED_SERVER_SETTING"));
+        assertNull(profiles.variable(tester, ArcadePortGame.BACON_BRAWL, "BACON_BRAWL_HAS_ROUND_TIMER"));
+        assertFalse(profiles.values(tester, ArcadePortGame.BACON_BRAWL).containsKey("UNRELATED_SERVER_SETTING"));
+    }
 }

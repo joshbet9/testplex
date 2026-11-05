@@ -137,14 +137,21 @@ final class GameDebugProfiles {
     }
 
     Double variable(UUID tester, ArcadePortGame game, String variable) {
-        if (!validKey(variable)) return null;
+        GameDebugVariableCatalog.Variable definition = GameDebugVariableCatalog.variable(game, variable);
+        if (definition == null || definition.kind() == GameDebugVariableCatalog.Kind.BOOLEAN) return null;
         String path = profilePath(tester, game, selected(tester, game)) + ".variables." + variable;
-        return config.contains(path) ? config.getDouble(path) : null;
+        if (!config.contains(path)) return null;
+        double value = GameDebugVariableCatalog.clamp(definition, config.getDouble(path, Double.NaN));
+        return Double.isFinite(value) ? value : null;
     }
 
     void setVariable(UUID tester, ArcadePortGame game, String variable, double value) {
-        if (!validKey(variable) || !Double.isFinite(value)) return;
-        config.set(profilePath(tester, game, selected(tester, game)) + ".variables." + variable, value);
+        if (tester == null || game == null) return;
+        GameDebugVariableCatalog.Variable definition = GameDebugVariableCatalog.variable(game, variable);
+        if (definition == null || definition.kind() == GameDebugVariableCatalog.Kind.BOOLEAN) return;
+        double bounded = GameDebugVariableCatalog.clamp(definition, value);
+        if (!Double.isFinite(bounded)) return;
+        config.set(profilePath(tester, game, selected(tester, game)) + ".variables." + variable, bounded);
         save();
     }
 
@@ -166,6 +173,15 @@ final class GameDebugProfiles {
         if (section != null) {
             for (String key : section.getKeys(false)) result.put(key, section.get(key));
         }
+        result.entrySet().removeIf(entry -> {
+            GameDebugVariableCatalog.Variable definition = GameDebugVariableCatalog.variable(game, entry.getKey());
+            if (definition == null || definition.kind() == GameDebugVariableCatalog.Kind.BOOLEAN
+                    || !(entry.getValue() instanceof Number number)) return true;
+            double bounded = GameDebugVariableCatalog.clamp(definition, number.doubleValue());
+            if (!Double.isFinite(bounded)) return true;
+            entry.setValue(bounded);
+            return false;
+        });
         ConfigurationSection features = config.getConfigurationSection(
                 profilePath(tester, game, selected(tester, game)) + ".features");
         if (features != null) {

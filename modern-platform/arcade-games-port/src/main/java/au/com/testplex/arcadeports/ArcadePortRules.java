@@ -19,8 +19,9 @@ public final class ArcadePortRules {
 
     /** Mixed Arcade halves the wait between objective TNT spawns. */
     public static long castleAssaultObjectiveTntRespawnMillis(boolean mixedArcadeVariant) {
-        return mixedArcadeVariant ? CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS / 2L
-                : CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS;
+        long delay = Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS", CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS));
+        return mixedArcadeVariant ? delay / 2L : delay;
     }
 
     /** Heroes of Gwen's Mixed Arcade store prices are half their standard cost. */
@@ -48,8 +49,12 @@ public final class ArcadePortRules {
      */
     public static long drawMyThingRoundMillis(int playerCount) {
         long turns = Math.max(1L, playerCount);
-        long budgetPerTurn = DRAW_MY_THING_GAME_MILLIS / turns;
-        return Math.max(1L, Math.min(DRAW_MY_THING_BASE_ROUND_MILLIS, budgetPerTurn));
+        long totalMillis = Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "DRAW_MY_THING_GAME_MILLIS", DRAW_MY_THING_GAME_MILLIS));
+        long baseRoundMillis = Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "DRAW_MY_THING_BASE_ROUND_MILLIS", DRAW_MY_THING_BASE_ROUND_MILLIS));
+        long budgetPerTurn = totalMillis / turns;
+        return Math.max(1L, Math.min(baseRoundMillis, budgetPerTurn));
     }
 
     public static boolean supportsMasterBuildersPlayerCount(int playerCount) {
@@ -678,17 +683,21 @@ public final class ArcadePortRules {
     }
 
     public static boolean shouldPreventDragonEscapeDigger(double distanceToBlockCenter, double distanceAboveBlock) {
+        double radius = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "DRAGON_ESCAPE_DIGGER_NEARBY_PLAYER_RADIUS", DRAGON_ESCAPE_DIGGER_NEARBY_PLAYER_RADIUS));
         return (Double.isFinite(distanceToBlockCenter)
                 && distanceToBlockCenter >= 0.0D
-                && distanceToBlockCenter < DRAGON_ESCAPE_DIGGER_NEARBY_PLAYER_RADIUS)
+                && distanceToBlockCenter < radius)
                 || (Double.isFinite(distanceAboveBlock)
                 && distanceAboveBlock >= 0.0D
-                && distanceAboveBlock < DRAGON_ESCAPE_DIGGER_NEARBY_PLAYER_RADIUS);
+                && distanceAboveBlock < radius);
     }
 
     public static boolean isDragonEscapeWarpGraceActive(long nowMillis, long warpedAtMillis) {
+        long graceMillis = Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "DRAGON_ESCAPE_WARPER_GRACE_MILLIS", DRAGON_ESCAPE_WARPER_GRACE_MILLIS));
         return warpedAtMillis >= 0L && nowMillis >= warpedAtMillis
-                && nowMillis - warpedAtMillis < DRAGON_ESCAPE_WARPER_GRACE_MILLIS;
+                && nowMillis - warpedAtMillis < graceMillis;
     }
 
     /**
@@ -883,13 +892,17 @@ public final class ArcadePortRules {
     }
 
     public static boolean shouldReplenishDragonSparkler(long now, long nextSpawnAt, int currentCount) {
-        return now >= nextSpawnAt && currentCount < DRAGONS_MAX_SPARKLERS;
+        int maxSparklers = Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "DRAGONS_MAX_SPARKLERS", DRAGONS_MAX_SPARKLERS));
+        return now >= nextSpawnAt && currentCount < maxSparklers;
     }
 
     public static boolean shouldExpireDragonSparkler(int livedTicks, double y, boolean inLiquid) {
         // PerkSparkler removes at >100 ticks. Dragons skips a low/submerged lure for targeting
         // but it remains alive until the perk's lifetime cleanup.
-        return livedTicks > DRAGONS_SPARKLER_LIFETIME_TICKS;
+        int lifetime = Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "DRAGONS_SPARKLER_LIFETIME_TICKS", DRAGONS_SPARKLER_LIFETIME_TICKS));
+        return livedTicks > lifetime;
     }
 
     public static double dragonFallDamageAfterReduction(double damage) {
@@ -1485,20 +1498,30 @@ public final class ArcadePortRules {
     public static final double EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER = 0.75D;
     public static double evolutionChargePerTick(int killsThisLife, boolean quickEvolver) {
         double normal = evolutionChargePerTick(killsThisLife);
-        return quickEvolver ? normal / EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER : normal;
+        double multiplier = Math.max(0.05D, GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER", EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER));
+        return quickEvolver ? normal / multiplier : normal;
     }
     public static long evolutionFormChangeTicks(boolean quickEvolver) {
-        return quickEvolver ? (long) Math.ceil(EVOLUTION_FORM_CHANGE_TICKS * EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER)
-                : EVOLUTION_FORM_CHANGE_TICKS;
+        long base = Math.max(1L, GameDebugRuntimeOverrides.longValue("EVOLUTION_FORM_CHANGE_TICKS", EVOLUTION_FORM_CHANGE_TICKS));
+        double multiplier = Math.max(0.05D, GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER", EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER));
+        return quickEvolver ? (long) Math.ceil(base * multiplier) : base;
     }
     public static long evolutionTotalAnimationTicks(boolean quickEvolver) {
-        return quickEvolver ? (long) Math.ceil(EVOLUTION_TOTAL_ANIMATION_TICKS * EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER)
-                : EVOLUTION_TOTAL_ANIMATION_TICKS;
+        long base = Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "EVOLUTION_TOTAL_ANIMATION_TICKS", EVOLUTION_TOTAL_ANIMATION_TICKS));
+        double multiplier = Math.max(0.05D, GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER", EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER));
+        return quickEvolver ? (long) Math.ceil(base * multiplier) : base;
     }
     public static boolean shouldAwardEvolutionWrongKitChamp(int attemptedLevel, boolean quickEvolverSelected,
             boolean currentlyEvolving, long elapsedTicks) {
-        return !quickEvolverSelected && currentlyEvolving && attemptedLevel == EVOLUTION_WIN_LEVEL - 1
-                && elapsedTicks >= evolutionFormChangeTicks(true) && elapsedTicks < EVOLUTION_FORM_CHANGE_TICKS;
+        long baseFormTicks = Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "EVOLUTION_FORM_CHANGE_TICKS", EVOLUTION_FORM_CHANGE_TICKS));
+        int winningLevel = Math.max(1, GameDebugRuntimeOverrides.intValue("EVOLUTION_WIN_LEVEL", EVOLUTION_WIN_LEVEL));
+        return !quickEvolverSelected && currentlyEvolving && attemptedLevel == winningLevel - 1
+                && elapsedTicks >= evolutionFormChangeTicks(true) && elapsedTicks < baseFormTicks;
     }
     public static final int EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION = 2;
     public static final long EVOLUTION_PITY_CLOCK_MILLIS = 90_000L;
@@ -1598,19 +1621,26 @@ public final class ArcadePortRules {
     }
 
     public static long nextEvolutionSulphurBombReadyAt(long now) {
-        return now + EVOLUTION_SULPHUR_BOMB_COOLDOWN_MILLIS;
+        long cooldown = Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "EVOLUTION_SULPHUR_BOMB_COOLDOWN_MILLIS", EVOLUTION_SULPHUR_BOMB_COOLDOWN_MILLIS));
+        return now + cooldown;
     }
 
     public static boolean isEvolutionSulphurBombInRange(double distance) {
-        return Double.isFinite(distance) && distance >= 0.0D && distance <= EVOLUTION_SULPHUR_BOMB_RADIUS;
+        double radius = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_SULPHUR_BOMB_RADIUS", EVOLUTION_SULPHUR_BOMB_RADIUS));
+        return Double.isFinite(distance) && distance >= 0.0D && distance <= radius;
     }
 
     public static boolean evolutionOverkillRequirementMet(int killsBeforeEvolution) {
-        return killsBeforeEvolution >= EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION;
+        int required = Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION", EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION));
+        return killsBeforeEvolution >= required;
     }
 
     public static boolean isEvolutionWinnerLevel(int level) {
-        return level >= EVOLUTION_WIN_LEVEL;
+        int target = Math.max(1, GameDebugRuntimeOverrides.intValue("EVOLUTION_WIN_LEVEL", EVOLUTION_WIN_LEVEL));
+        return level >= target;
     }
 
     public static int sheepQuestLeadingTeam(int redSheep, int blueSheep) {
@@ -1771,24 +1801,34 @@ public final class ArcadePortRules {
     public static final double PAINTBALL_MACHINE_GUN_COOL_PER_TICK = 0.020D;
 
     public static double paintballMachineGunHeatPerShot() {
-        return PAINTBALL_MACHINE_GUN_MAX_HEAT / PAINTBALL_MACHINE_GUN_SHOTS_PER_HEAT_CYCLE;
+        double maxHeat = Math.max(0.001D, GameDebugRuntimeOverrides.doubleValue(
+                "PAINTBALL_MACHINE_GUN_MAX_HEAT", PAINTBALL_MACHINE_GUN_MAX_HEAT));
+        int shots = Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "PAINTBALL_MACHINE_GUN_SHOTS_PER_HEAT_CYCLE", PAINTBALL_MACHINE_GUN_SHOTS_PER_HEAT_CYCLE));
+        return maxHeat / shots;
     }
 
     public static boolean canFirePaintballMachineGun(double currentHeat) {
         if (!Double.isFinite(currentHeat)) return false;
-        double heat = Math.max(0.0D, Math.min(PAINTBALL_MACHINE_GUN_MAX_HEAT, currentHeat));
-        return heat < PAINTBALL_MACHINE_GUN_MAX_HEAT - paintballMachineGunHeatPerShot() * 0.5D;
+        double maxHeat = Math.max(0.001D, GameDebugRuntimeOverrides.doubleValue(
+                "PAINTBALL_MACHINE_GUN_MAX_HEAT", PAINTBALL_MACHINE_GUN_MAX_HEAT));
+        double heat = Math.max(0.0D, Math.min(maxHeat, currentHeat));
+        return heat < maxHeat - paintballMachineGunHeatPerShot() * 0.5D;
     }
 
     public static double paintballMachineGunHeatAfterShot(double currentHeat) {
         double heat = Double.isFinite(currentHeat)
                 ? Math.max(0.0D, currentHeat) : PAINTBALL_MACHINE_GUN_MAX_HEAT;
-        return Math.min(PAINTBALL_MACHINE_GUN_MAX_HEAT, heat + paintballMachineGunHeatPerShot());
+        double maxHeat = Math.max(0.001D, GameDebugRuntimeOverrides.doubleValue(
+                "PAINTBALL_MACHINE_GUN_MAX_HEAT", PAINTBALL_MACHINE_GUN_MAX_HEAT));
+        return Math.min(maxHeat, heat + paintballMachineGunHeatPerShot());
     }
 
     public static double coolPaintballMachineGunHeat(double currentHeat) {
         double heat = Double.isFinite(currentHeat) ? Math.max(0.0D, currentHeat) : 0.0D;
-        return Math.max(0.0D, heat - PAINTBALL_MACHINE_GUN_COOL_PER_TICK);
+        double coolPerTick = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "PAINTBALL_MACHINE_GUN_COOL_PER_TICK", PAINTBALL_MACHINE_GUN_COOL_PER_TICK));
+        return Math.max(0.0D, heat - coolPerTick);
     }
 
     /** The selected held-item model changes for everyone; projectile physics are not affected. */
@@ -2277,8 +2317,9 @@ public final class ArcadePortRules {
     }
 
     public static int requiredDeathTagChasers(long elapsedMillis) {
-        return elapsedMillis < 0L ? 1
-                : 1 + (int) (elapsedMillis / DEATH_TAG_CHASER_PROMOTION_INTERVAL_MILLIS);
+        long interval = Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "DEATH_TAG_CHASER_PROMOTION_INTERVAL_MILLIS", DEATH_TAG_CHASER_PROMOTION_INTERVAL_MILLIS));
+        return elapsedMillis < 0L ? 1 : 1 + (int) (elapsedMillis / interval);
     }
 
     public static boolean shouldSpreadDeathTag(boolean attackerTagged, boolean targetTagged) {
@@ -2351,12 +2392,16 @@ public final class ArcadePortRules {
 
     /** Archer arrows have 300% of normal knockback; Alpha Chasers take half knockback. */
     public static double deathTagArcherArrowKnockbackMultiplier(boolean alphaChaser) {
-        return DEATH_TAG_ARCHER_ARROW_KNOCKBACK_POWER * deathTagKnockbackMultiplier(alphaChaser);
+        double power = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "DEATH_TAG_ARCHER_ARROW_KNOCKBACK_POWER", DEATH_TAG_ARCHER_ARROW_KNOCKBACK_POWER));
+        return power * deathTagKnockbackMultiplier(alphaChaser);
     }
 
     /** Reborn's Traitor knockback perk has a per-target 400 ms recharge. */
     public static boolean deathTagTraitorKnockbackReady(long nowMillis, long lastUseMillis) {
-        return lastUseMillis <= 0L || nowMillis - lastUseMillis >= DEATH_TAG_TRAITOR_KNOCKBACK_COOLDOWN_MILLIS;
+        long cooldown = Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "DEATH_TAG_TRAITOR_KNOCKBACK_COOLDOWN_MILLIS", DEATH_TAG_TRAITOR_KNOCKBACK_COOLDOWN_MILLIS));
+        return lastUseMillis <= 0L || nowMillis - lastUseMillis >= cooldown;
     }
 
     /**
@@ -2502,24 +2547,33 @@ public final class ArcadePortRules {
     public static double turfWarsHitDamage(String kit, boolean projectile, boolean ironSword) {
         if (projectile) {
             return "shredder".equals(normalizeTurfWarsKit(kit))
-                    ? TURF_WARS_SHREDDER_ARROW_DAMAGE : 500.0D;
+                    ? GameDebugRuntimeOverrides.doubleValue(
+                            "TURF_WARS_SHREDDER_ARROW_DAMAGE", TURF_WARS_SHREDDER_ARROW_DAMAGE) : 500.0D;
         }
-        return ironSword ? TURF_WARS_IRON_SWORD_DAMAGE : TURF_WARS_MELEE_DAMAGE;
+        return ironSword
+                ? GameDebugRuntimeOverrides.doubleValue("TURF_WARS_IRON_SWORD_DAMAGE", TURF_WARS_IRON_SWORD_DAMAGE)
+                : GameDebugRuntimeOverrides.doubleValue("TURF_WARS_MELEE_DAMAGE", TURF_WARS_MELEE_DAMAGE);
     }
 
     public static long turfWarsInitialBuildPhaseMillis(boolean mixedArcadeVariant) {
-        return mixedArcadeVariant ? TURF_WARS_MIXED_ARCADE_INITIAL_BUILD_PHASE_MILLIS
-                : TURF_WARS_INITIAL_BUILD_PHASE_MILLIS;
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(mixedArcadeVariant
+                        ? "TURF_WARS_MIXED_ARCADE_INITIAL_BUILD_PHASE_MILLIS" : "TURF_WARS_INITIAL_BUILD_PHASE_MILLIS",
+                mixedArcadeVariant ? TURF_WARS_MIXED_ARCADE_INITIAL_BUILD_PHASE_MILLIS
+                        : TURF_WARS_INITIAL_BUILD_PHASE_MILLIS));
     }
 
     public static long turfWarsBuildPhaseMillis(boolean mixedArcadeVariant) {
-        return mixedArcadeVariant ? TURF_WARS_MIXED_ARCADE_BUILD_PHASE_MILLIS
-                : TURF_WARS_BUILD_PHASE_MILLIS;
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(mixedArcadeVariant
+                        ? "TURF_WARS_MIXED_ARCADE_BUILD_PHASE_MILLIS" : "TURF_WARS_BUILD_PHASE_MILLIS",
+                mixedArcadeVariant ? TURF_WARS_MIXED_ARCADE_BUILD_PHASE_MILLIS
+                        : TURF_WARS_BUILD_PHASE_MILLIS));
     }
 
     public static long turfWarsCombatPhaseMillis(boolean mixedArcadeVariant) {
-        return mixedArcadeVariant ? TURF_WARS_MIXED_ARCADE_COMBAT_PHASE_MILLIS
-                : TURF_WARS_COMBAT_PHASE_MILLIS;
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(mixedArcadeVariant
+                        ? "TURF_WARS_MIXED_ARCADE_COMBAT_PHASE_MILLIS" : "TURF_WARS_COMBAT_PHASE_MILLIS",
+                mixedArcadeVariant ? TURF_WARS_MIXED_ARCADE_COMBAT_PHASE_MILLIS
+                        : TURF_WARS_COMBAT_PHASE_MILLIS));
     }
 
     public static int advanceTurfFrontline(int currentFrontline, int teamId) {

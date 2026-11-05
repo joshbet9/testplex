@@ -32,7 +32,7 @@ class ArcadeCatalogTest {
                 Map.entry("dragon-escape", "winner-beacon-colour"),
                 Map.entry("dragons", "sparkler-effects"),
                 Map.entry("evolution", "metamorphosis"),
-                Map.entry("gladiators", "kill-messages"),
+                Map.entry("gladiators", "score-flares"),
                 Map.entry("hoops-remastered", "score-flares"),
                 Map.entry("micro-battles", "start-glass-colour"),
                 Map.entry("monster-maze", "mob-sets"),

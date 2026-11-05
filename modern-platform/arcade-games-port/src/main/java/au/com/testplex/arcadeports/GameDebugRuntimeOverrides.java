@@ -19,7 +19,11 @@ public final class GameDebugRuntimeOverrides {
 
     public static int intValue(String key, int fallback) {
         Number number = number(key);
-        return number == null ? fallback : Math.toIntExact(Math.round(number.doubleValue()));
+        if (number == null) return fallback;
+        double value = number.doubleValue();
+        if (value <= Integer.MIN_VALUE) return Integer.MIN_VALUE;
+        if (value >= Integer.MAX_VALUE) return Integer.MAX_VALUE;
+        return (int) Math.round(value);
     }
 
     public static long longValue(String key, long fallback) {

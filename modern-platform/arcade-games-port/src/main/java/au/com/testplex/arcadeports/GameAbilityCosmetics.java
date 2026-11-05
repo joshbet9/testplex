@@ -25,6 +25,11 @@ final class GameAbilityCosmetics {
         emit(viewer, center, optionId, abilityName, 0.38D);
     }
 
+    static void celebrate(Player scorer, Location center, String optionId) {
+        if (optionId == null || optionId.isBlank()) return;
+        emit(scorer, center, optionId, "", 1.15D);
+    }
+
     static Palette palette(String optionId) {
         String id = normalize(optionId);
         if (id.equals("classic-pellet") || id.equals("ember-ring") || id.equals("golden-burst")
