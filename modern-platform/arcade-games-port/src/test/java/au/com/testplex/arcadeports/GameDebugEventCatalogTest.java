@@ -80,6 +80,35 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void monsterMazeKitDebugSwitchesGateLiveKitAbilitiesAndApplyImmediately() throws IOException {
+        Path arcadeRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        Path mazeRoot = Path.of("..", "monster-maze-port", "src", "main", "java", "me", "monstermaze");
+        if (!Files.isDirectory(arcadeRoot)) {
+            arcadeRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+            mazeRoot = Path.of("modern-platform", "monster-maze-port", "src", "main", "java", "me",
+                    "monstermaze");
+        }
+        String lobby = Files.readString(arcadeRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        String manager = Files.readString(arcadeRoot.resolve("ArcadePortManager.java"));
+        String rules = Files.readString(mazeRoot.resolve("game").resolve("MazeDebugRules.java"));
+        String kits = Files.readString(mazeRoot.resolve("kit").resolve("KitManager.java"));
+        String monsters = Files.readString(mazeRoot.resolve("entity").resolve("MonsterManager.java"));
+        for (String key : List.of("jumper", "slowball", "body-builder", "repulsor")) {
+            assertTrue(lobby.contains("\"" + key + "\""), key + " is exposed in the mode debug menu");
+        }
+        assertTrue(lobby.contains("if (game.isMonsterMaze() && key.startsWith(\"kit-\")) return true"));
+        assertTrue(manager.contains("|| type.isMonsterMaze())"));
+        assertTrue(manager.contains("debugProfiles.feature(tester.getUniqueId(), type, key, true)"));
+        assertTrue(rules.contains("booleanValue(\"kit-\" + kit, true)"));
+        assertTrue(kits.contains("kitEnabled(\"jumper\")"));
+        assertTrue(kits.contains("kitEnabled(\"slowball\")"));
+        assertTrue(kits.contains("kitEnabled(\"body-builder\")"));
+        assertTrue(kits.contains("kitEnabled(\"repulsor\")"));
+        assertTrue(monsters.contains("kitEnabled(\"maverick\")"));
+    }
+
+    @Test
     void speedBuildersOwnBuildResetHasAnAuthorizedRuntimeDispatcher() throws IOException {
         Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
         if (!Files.isDirectory(sourceRoot)) {

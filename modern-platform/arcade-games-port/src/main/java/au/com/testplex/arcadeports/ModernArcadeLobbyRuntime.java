@@ -1485,6 +1485,19 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                                 : "Enable this Sneaky Assassins runtime feature in the active test session.", true));
             }
         }
+        if (game.isMonsterMaze()) {
+            for (String kit : List.of("jumper", "slowball", "body-builder", "repulsor")) {
+                String key = "kit-" + kit;
+                features.put(key, new DebugFeature(key, "Kit: " + humanizeDebugKey(kit),
+                        Material.FEATHER,
+                        "Enable this kit's source ability and passive effects for authorised testers.", true));
+            }
+            if (game != ArcadePortGame.MONSTER_MAZE) {
+                features.put("kit-maverick", new DebugFeature("kit-maverick", "Kit: Maverick",
+                        Material.IRON_SWORD,
+                        "Enable Maverick's mode-specific passive for authorised testers.", true));
+            }
+        }
         return List.copyOf(features.values());
     }
 
@@ -1500,6 +1513,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
 
     private boolean debugFeatureAppliesImmediately(ArcadePortGame game, String key) {
         if (GameDebugVariableCatalog.appliesImmediately(GameDebugVariableCatalog.variable(game, key))) return true;
+        if (game.isMonsterMaze() && key.startsWith("kit-")) return true;
         return "all-kits".equals(key) || "invulnerable".equals(key) || "no-fall-damage".equals(key)
                 || "no-hunger-loss".equals(key) || "unlimited-abilities".equals(key)
                 || "unlimited-specials".equals(key)

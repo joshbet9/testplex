@@ -807,7 +807,7 @@ public final class ArcadePortManager implements Listener {
             if (activeDebugGame() == type) {
                 GameDebugRuntimeOverrides.markDebugSession();
                 if ((type == ArcadePortGame.SNAKE || type == ArcadePortGame.SNEAKY_ASSASSINS
-                        || type == ArcadePortGame.DRAW_MY_THING)
+                        || type == ArcadePortGame.DRAW_MY_THING || type.isMonsterMaze())
                         && player.getUniqueId().equals(activeDebugProfileOwner)) {
                     GameDebugRuntimeOverrides.setValue(flag, enabled);
                 }
@@ -1274,6 +1274,17 @@ public final class ArcadePortManager implements Listener {
                 if (!GameDebugVariableCatalog.appliesImmediately(variable)) continue;
                 GameDebugRuntimeOverrides.setValue(variable.key(), debugProfiles.booleanVariable(
                         tester.getUniqueId(), type, variable.key(), variable.defaultValue() != 0.0D));
+            }
+            if (type.isMonsterMaze()) {
+                for (String kit : List.of("jumper", "slowball", "body-builder", "repulsor")) {
+                    String key = "kit-" + kit;
+                    GameDebugRuntimeOverrides.setValue(key,
+                            debugProfiles.feature(tester.getUniqueId(), type, key, true));
+                }
+                if (type != ArcadePortGame.MONSTER_MAZE) {
+                    GameDebugRuntimeOverrides.setValue("kit-maverick",
+                            debugProfiles.feature(tester.getUniqueId(), type, "kit-maverick", true));
+                }
             }
             GameDebugRuntimeOverrides.markDebugSession();
         }

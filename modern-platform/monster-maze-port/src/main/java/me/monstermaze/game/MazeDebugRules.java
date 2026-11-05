@@ -35,6 +35,10 @@ public final class MazeDebugRules {
         return GameDebugRuntimeOverrides.intValue(key(mode, field), fallback);
     }
 
+    public static boolean kitEnabled(String kit) {
+        return GameDebugRuntimeOverrides.booleanValue("kit-" + kit, true);
+    }
+
     public static double doubleValue(MazeMode mode, String field, double fallback) {
         return GameDebugRuntimeOverrides.doubleValue(key(mode, field), fallback);
     }

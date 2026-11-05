@@ -313,7 +313,8 @@ public class KitManager implements Listener {
         if (game.getState() != GameState.LIVE && game.getState() != GameState.STARTING) return;
 
         for (Player p : game.getAlivePlayers()) {
-            boolean allowJump = getKit(p) == KitType.JUMPER && hasJumpsLeft(p);
+            boolean allowJump = getKit(p) == KitType.JUMPER && MazeDebugRules.kitEnabled("jumper")
+                    && hasJumpsLeft(p);
 
             // A stale JUMP_BOOST must never stay on anyone (clamped amp would boost jumps).
             if (p.hasPotionEffect(PotionEffectType.JUMP_BOOST)) {
@@ -361,7 +362,7 @@ public class KitManager implements Listener {
         if (center == null) return;
 
         for (Player p : game.getAlivePlayers()) {
-            if (getKit(p) != KitType.JUMPER) continue;
+            if (getKit(p) != KitType.JUMPER || !MazeDebugRules.kitEnabled("jumper")) continue;
 
             // Must have "Jumps Remaining" feather
             ItemStack feather = p.getInventory().getItem(8);
@@ -616,7 +617,7 @@ public class KitManager implements Listener {
     /** PerkConstructor("Slowballer", 2, 16, SNOW_BALL, "Slowball", true) — every 2s up to 16. */
     private void constructorSlowball() {
         for (Player p : game.getAlivePlayers()) {
-            if (getKit(p) != KitType.SLOWBALL) continue;
+            if (getKit(p) != KitType.SLOWBALL || !MazeDebugRules.kitEnabled("slowball")) continue;
 
             ItemStack slot = p.getInventory().getItem(0);
             if (slot != null && slot.getType() == Material.SNOWBALL && slot.getAmount() >= 16) continue;
@@ -639,7 +640,7 @@ public class KitManager implements Listener {
         Snowball ball = (Snowball) event.getDamager();
         if (!(ball.getShooter() instanceof Player)) return;
         Player shooter = (Player) ball.getShooter();
-        if (getKit(shooter) != KitType.SLOWBALL) return;
+        if (getKit(shooter) != KitType.SLOWBALL || !MazeDebugRules.kitEnabled("slowball")) return;
         // The kit slows OTHER PLAYERS, not monsters.
         if (!(event.getEntity() instanceof Player)) return;
         Player target = (Player) event.getEntity();
@@ -685,7 +686,7 @@ public class KitManager implements Listener {
             player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
             TextUtil.title(player, "", ChatColor.YELLOW + "" + ChatColor.BOLD + "You got to the Safe Pad first!", 5, 40, 5);
 
-            if (getKit(player) == KitType.BODY_BUILDER) {
+            if (getKit(player) == KitType.BODY_BUILDER && MazeDebugRules.kitEnabled("body-builder")) {
                 double max = player.getMaxHealth();
                 if (max < 30.0) {
                     player.setMaxHealth(Math.min(30.0, max + 2.0));
@@ -733,7 +734,7 @@ public class KitManager implements Listener {
         if (event.getHand() == EquipmentSlot.OFF_HAND) return;
 
         Player player = event.getPlayer();
-        if (getKit(player) != KitType.REPULSOR) return;
+        if (getKit(player) != KitType.REPULSOR || !MazeDebugRules.kitEnabled("repulsor")) return;
         if (!game.getAlivePlayers().contains(player)) return;
 
         ItemStack hand = player.getInventory().getItemInMainHand();
@@ -859,7 +860,7 @@ public class KitManager implements Listener {
         if (a != Action.RIGHT_CLICK_AIR && a != Action.RIGHT_CLICK_BLOCK) return;
 
         Player player = event.getPlayer();
-        if (getKit(player) != KitType.BODY_BUILDER) return;
+        if (getKit(player) != KitType.BODY_BUILDER || !MazeDebugRules.kitEnabled("body-builder")) return;
         if (!game.getAlivePlayers().contains(player)) return;
 
         ItemStack hand = player.getInventory().getItemInMainHand();
@@ -881,7 +882,7 @@ public class KitManager implements Listener {
     }
 
     public boolean isBodyRushActive(Player player) {
-        if (!game.qolEnabled()) return false;
+        if (!game.qolEnabled() || !MazeDebugRules.kitEnabled("body-builder")) return false;
         Long until=bodyRushUntil.get(player.getUniqueId());
         if (until==null) return false;
         if (until.longValue()<=System.currentTimeMillis()) { bodyRushUntil.remove(player.getUniqueId()); return false; }
@@ -960,7 +961,7 @@ public class KitManager implements Listener {
         if (game.getState() != GameState.LIVE) return;
         if (!game.qolEnabled()) return;
         Player player = event.getPlayer();
-        if (getKit(player) != KitType.SLOWBALL) return;
+        if (getKit(player) != KitType.SLOWBALL || !MazeDebugRules.kitEnabled("slowball")) return;
         if (!game.getAlivePlayers().contains(player)) return;
 
         event.setCancelled(true);

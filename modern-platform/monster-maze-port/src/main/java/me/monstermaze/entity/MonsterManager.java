@@ -363,7 +363,7 @@ public class MonsterManager {
 
     private Vector applyQolKnockback(Player player, LivingEntity ent) {
         Vector dir = null;
-        if (game.getKitManager().getKit(player) == KitType.MAVERICK) {
+        if (game.getKitManager().getKit(player) == KitType.MAVERICK && MazeDebugRules.kitEnabled("maverick")) {
             Location target = game.getMobKnockTarget();
             if (target != null) {
                 dir = target.toVector().subtract(player.getLocation().toVector());
