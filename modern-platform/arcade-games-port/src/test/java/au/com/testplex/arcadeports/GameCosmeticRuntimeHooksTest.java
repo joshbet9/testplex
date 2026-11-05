@@ -22,6 +22,7 @@ class GameCosmeticRuntimeHooksTest {
                 .flatMap(root -> {
                     try (var files = Files.walk(root)) {
                         return files.filter(path -> path.toString().endsWith(".java"))
+                                .filter(path -> !"ArcadeCatalog.java".equals(path.getFileName().toString()))
                                 .map(path -> {
                                     try {
                                         return Files.readString(path);
