@@ -1256,6 +1256,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             }
         }
         if (game == ArcadePortGame.DRAGON_ESCAPE) {
+            features.put("finish-detection", new DebugFeature("finish-detection", "Course finish detection",
+                    Material.DRAGON_EGG, "Allow this tester to finish by reaching the map's authored beacon.", true));
             for (String kit : List.of("jumper", "warper", "digger", "disruptor")) {
                 String key = "ability-" + kit;
                 features.put(key, new DebugFeature(key, "Ability: " + humanizeDebugKey(kit),
@@ -1363,6 +1365,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.CASTLE_ASSAULT
                         && ("objective-tnt".equals(key) || "crystal-damage".equals(key) || "king-damage".equals(key)))
                 || (game == ArcadePortGame.HEROES_OF_GWEN && key.startsWith("hero-") && key.endsWith("-abilities"))
+                || (game == ArcadePortGame.DRAGON_ESCAPE && "finish-detection".equals(key))
                 || (game == ArcadePortGame.DRAGON_ESCAPE && key.startsWith("ability-"))
                 || (game == ArcadePortGame.DRAGONS && key.startsWith("ability-"))
                 || (game == ArcadePortGame.ONE_IN_THE_QUIVER && key.startsWith("ability-"))

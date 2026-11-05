@@ -717,6 +717,32 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void dragonEscapeDebugControlsFinishDetectionAndNormalCompletion() throws IOException {
+        Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ArcadePortManager.java");
+        Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ModernArcadeLobbyRuntime.java");
+        Path catalogPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "GameDebugEventCatalog.java");
+        if (!Files.isRegularFile(managerPath)) {
+            managerPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ArcadePortManager.java");
+            runtimePath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ModernArcadeLobbyRuntime.java");
+            catalogPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "GameDebugEventCatalog.java");
+        }
+        String manager = Files.readString(managerPath);
+        String runtime = Files.readString(runtimePath);
+        String catalog = Files.readString(catalogPath);
+        assertTrue(catalog.contains("new Event(\"finish-run\", \"Complete the Course\""));
+        assertTrue(runtime.contains("\"finish-detection\", \"Course finish detection\""));
+        assertTrue(manager.contains("\"finish-run\".equals(eventId)"));
+        assertTrue(manager.contains("\"finish-detection\", true"));
+        assertTrue(manager.contains("recordDragonEscapeFinish(session, tester"));
+    }
+
+    @Test
     void heroesOfGwenDebugEventStartsTheNormalPairedMinionWave() throws IOException {
         Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "CastleAssaultHeroesOfGwenRuntime.java");

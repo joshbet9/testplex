@@ -22,7 +22,9 @@ final class GameDebugEventCatalog {
             new Event("advance-dragon", "Advance Douglas Once", Material.DRAGON_HEAD,
                     "Run Douglas's normal chase, block clearing and catch checks once now."),
             new Event("use-kit-ability", "Test Selected Kit Ability", Material.NETHER_STAR,
-                    "Run your selected kit's normal ability and cooldown checks immediately."));
+                    "Run your selected kit's normal ability and cooldown checks immediately."),
+            new Event("finish-run", "Complete the Course", Material.DRAGON_EGG,
+                    "Complete your run through the normal finish and round lifecycle without recording stats."));
     private static final List<Event> SNAKE = List.of(
             new Event("roll-item", "Test Item Roulette", Material.MAGMA_CREAM,
                     "Start your normal random control-debuff roll now; only works for a living player."));

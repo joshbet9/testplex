@@ -944,6 +944,14 @@ public final class ArcadePortManager implements Listener {
             tester.setHealth(0.0D);
             triggered = true;
         }
+        if (type == ArcadePortGame.DRAGON_ESCAPE && "finish-run".equals(eventId)
+                && session.alive.contains(tester.getUniqueId())) {
+            GameDebugRuntimeOverrides.markDebugSession();
+            session.dragonEscapePlayerProgress.put(tester.getUniqueId(), session.dragonEscapeWaypoints.size());
+            recordDragonEscapeFinish(session, tester, System.currentTimeMillis());
+            finish(session, tester, true);
+            triggered = true;
+        }
         if (type == ArcadePortGame.BOMB_LOBBERS && "spawn-powerups".equals(eventId)) {
             int dropsBefore = session.bombPowerupDrops.size();
             session.bombNextPowerupSpawnAtByTeam.remove(0);
@@ -22520,7 +22528,10 @@ public final class ArcadePortManager implements Listener {
                 }
             }
         }
-        if (session.type == ArcadePortGame.DRAGON_ESCAPE && session.dragonEscapeWaypoints.isEmpty()
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE
+                && (!plugin.hasAdminAccess(player) || debugFeatureEnabled(playerId, ArcadePortGame.DRAGON_ESCAPE,
+                        "finish-detection", true))
+                && session.dragonEscapeWaypoints.isEmpty()
                 && ArcadePortRules.isDragonEscapeFinishReached(
                         event.getTo().getX(), event.getTo().getY(), event.getTo().getZ())) {
             // Fixed finish coordinates are only for the generated fallback course.
@@ -22529,6 +22540,8 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE
+                && (!plugin.hasAdminAccess(player) || debugFeatureEnabled(playerId, ArcadePortGame.DRAGON_ESCAPE,
+                        "finish-detection", true))
                 && dragonEscapeReachedAuthoredFinish(session, event.getTo())) {
             long now = System.currentTimeMillis();
             int lastIndex = session.dragonEscapeWaypoints.size() - 1;
