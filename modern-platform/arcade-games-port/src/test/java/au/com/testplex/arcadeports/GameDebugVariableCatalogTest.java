@@ -8,6 +8,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -97,6 +99,52 @@ class GameDebugVariableCatalogTest {
                     assertTrue(GameDebugWiredRuleKeys.KEYS.contains(matcher.group(1)),
                             file.getFileName() + " uses an unregistered debug rule: " + matcher.group(1));
                 }
+            }
+        }
+    }
+
+    @Test
+    void everyCataloguedVariableHasALiteralOrExplicitDynamicGameplayConsumer() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java");
+        }
+        String productionSources;
+        try (var files = Files.walk(sourceRoot)) {
+            productionSources = files.filter(path -> path.toString().endsWith(".java"))
+                    .map(path -> {
+                        try {
+                            return Files.readString(path);
+                        } catch (IOException exception) {
+                            throw new java.io.UncheckedIOException(exception);
+                        }
+                    }).collect(Collectors.joining("\n"));
+        }
+        Pattern consumer = Pattern.compile(
+                "GameDebugRuntimeOverrides\\.(?:intValue|longValue|doubleValue|floatValue|booleanValue)"
+                        + "\\(\\s*\"([A-Z0-9_]+)\"");
+        Set<String> literalConsumers = consumer.matcher(productionSources).results()
+                .map(match -> match.group(1)).collect(Collectors.toSet());
+
+        for (ArcadePortGame game : ArcadePortGame.values()) {
+            for (GameDebugVariableCatalog.Variable variable : GameDebugVariableCatalog.variables(game)) {
+                String key = variable.key();
+                boolean dynamicMazeConsumer = game.isMonsterMaze()
+                        && key.startsWith(GameDebugVariableCatalog.rulePrefix(game))
+                        && (me.monstermaze.game.MazeDebugRules.key(me.monstermaze.game.MazeMode.ORIGINAL,
+                                    key.substring(GameDebugVariableCatalog.rulePrefix(game).length()))
+                                .equals(key)
+                            || me.monstermaze.game.MazeDebugRules.key(me.monstermaze.game.MazeMode.SPEED,
+                                    key.substring(GameDebugVariableCatalog.rulePrefix(game).length()))
+                                .equals(key)
+                            || me.monstermaze.game.MazeDebugRules.key(me.monstermaze.game.MazeMode.MODERN,
+                                    key.substring(GameDebugVariableCatalog.rulePrefix(game).length()))
+                                .equals(key));
+                boolean dynamicSneakyConsumer = game == ArcadePortGame.SNEAKY_ASSASSINS
+                        && key.startsWith(GameDebugVariableCatalog.rulePrefix(game))
+                        && productionSources.contains("GameDebugRuntimeOverrides.longValue(\"SNEAKY_ASSASSINS_\" + name");
+                assertTrue(literalConsumers.contains(key) || dynamicMazeConsumer || dynamicSneakyConsumer,
+                        game.id() + " exposes " + key + " without a gameplay consumer");
             }
         }
     }

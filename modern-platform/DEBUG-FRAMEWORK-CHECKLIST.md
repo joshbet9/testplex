@@ -12,6 +12,7 @@ This checklist tracks implemented controls, not menu/catalog presence alone. A g
 - [x] Numeric shared Arcade rules can be overridden for the active round; the menu marks these as restart-required.
 - [x] The variable menu exposes only rules with an explicit production runtime consumer; persisted values are clamped to the rule's safe range and malformed integer conversions cannot crash gameplay.
 - [x] Automated coverage walks every exposed game variable, sets it through the typed runtime override boundary, reads it back and verifies clearing restores its default; a source check keeps runtime override keys linked to the profile catalog.
+- [x] A source-backed test verifies every catalogued variable has a production gameplay consumer, including the mode-scoped Monster Maze and dynamic Sneaky Assassins rule accessors.
 - [x] Shared feature switches cover kit unlock, invulnerability, fall damage and hunger; Bacon Brawl also has its unlimited-ability switch.
 - [x] Achievement preview mode runs real achievement conditions through shared Arcade award helpers and Snap; preview notices do not persist unlocks.
 - [x] Authorized testers can advance any shared Arcade start countdown, the live Draw My Thing turn, Master Builders build/review phase, Turf Wars phase, any supported shared round timeout, or the current Speed Builders, Plexball, Wizards, Snake, Snap, Monster Maze or Super Sploor phase; bot rosters are configured for the next round.
