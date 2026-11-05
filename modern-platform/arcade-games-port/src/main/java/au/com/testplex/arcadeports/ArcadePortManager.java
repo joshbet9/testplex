@@ -1015,6 +1015,26 @@ public final class ArcadePortManager implements Listener {
             GameDebugRuntimeOverrides.markDebugSession();
             triggered = true;
         }
+        if (type == ArcadePortGame.HEROES_OF_GWEN && "damage-tower".equals(eventId)
+                && session.variantRuntime != null) {
+            GameDebugRuntimeOverrides.markDebugSession();
+            triggered = session.variantRuntime.debugDamageNextHeroesOfGwenTower(tester);
+        }
+        if (type == ArcadePortGame.HEROES_OF_GWEN && "capture-point".equals(eventId)
+                && session.variantRuntime != null) {
+            GameDebugRuntimeOverrides.markDebugSession();
+            triggered = session.variantRuntime.debugCaptureNextHeroesOfGwenPoint(tester);
+        }
+        if (type == ArcadePortGame.HEROES_OF_GWEN && "damage-tower".equals(eventId)
+                && session.variantRuntime != null) {
+            GameDebugRuntimeOverrides.markDebugSession();
+            triggered = session.variantRuntime.debugDamageNextHeroesOfGwenTower(tester);
+        }
+        if (type == ArcadePortGame.HEROES_OF_GWEN && "capture-point".equals(eventId)
+                && session.variantRuntime != null) {
+            GameDebugRuntimeOverrides.markDebugSession();
+            triggered = session.variantRuntime.debugCaptureNextHeroesOfGwenPoint(tester);
+        }
         if (type == ArcadePortGame.RUNNER && "use-position-swap".equals(eventId)
                 && "switcher".equals(session.runnerKits.getOrDefault(tester.getUniqueId(), "leaper"))) {
             triggered = useRunnerPositionSwap(session, tester, System.currentTimeMillis());

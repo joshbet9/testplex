@@ -1796,6 +1796,34 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         return heroesOfGwenMinionTeams.size() > before;
     }
 
+    boolean debugDamageNextHeroesOfGwenTower(Player tester) {
+        if (stopped || !ready || game != ArcadePortGame.HEROES_OF_GWEN || tester == null
+                || !tester.isOnline() || !activePlayers.contains(tester.getUniqueId())
+                || !hooks.debugFeatureEnabled(tester, "tower-damage")) return false;
+        int team = teams.getOrDefault(tester.getUniqueId(), -1);
+        if (team < 0) return false;
+        for (TowerState tower : towers.getOrDefault(1 - team, List.of())) {
+            if (tower.dead || !canDamageMobaTower(tower, team)) continue;
+            double before = tower.health;
+            damageMobaTower(tower, Math.min(50.0D, before), tester);
+            return tower.dead || tower.health < before;
+        }
+        return false;
+    }
+
+    boolean debugCaptureNextHeroesOfGwenPoint(Player tester) {
+        if (stopped || !ready || game != ArcadePortGame.HEROES_OF_GWEN || tester == null
+                || !tester.isOnline() || !activePlayers.contains(tester.getUniqueId())) return false;
+        int team = teams.getOrDefault(tester.getUniqueId(), -1);
+        if (team < 0) return false;
+        for (CapturePointState point : capturePoints) {
+            if (point.owner == team) continue;
+            setCapturePointOwner(point, team);
+            return point.owner == team;
+        }
+        return false;
+    }
+
     private boolean debugFeatureEnabled(Player player, String feature) {
         return player == null || !plugin.hasAdminAccess(player) || hooks.debugFeatureEnabled(player, feature);
     }

@@ -114,7 +114,11 @@ final class GameDebugEventCatalog {
                     "Spawn the selected mode's normal safe-pad monster wave around the active maze."));
     private static final List<Event> HEROES_OF_GWEN = List.of(
             new Event("spawn-minion-wave", "Start Minion Wave", Material.ZOMBIE_SPAWN_EGG,
-                    "Start both teams' normal minion wave and source-map route processing."));
+                    "Start both teams' normal minion wave and source-map route processing."),
+            new Event("damage-tower", "Damage Next Tower", Material.IRON_PICKAXE,
+                    "Apply up to 50 damage through the normal tower tier and health path."),
+            new Event("capture-point", "Capture Next Beacon", Material.BEACON,
+                    "Capture the next beacon through the normal ownership, gold reward, and display path."));
     private static final Set<ArcadePortGame> KIT_REFRESH_GAMES = Set.of(
             ArcadePortGame.BACON_BRAWL, ArcadePortGame.BOMB_LOBBERS, ArcadePortGame.CASTLE_ASSAULT,
             ArcadePortGame.DRAGON_ESCAPE, ArcadePortGame.DRAGONS, ArcadePortGame.EVOLUTION,

@@ -1130,9 +1130,21 @@ class GameDebugEventCatalogTest {
         }
         String runtime = Files.readString(runtimePath);
         String lobby = Files.readString(lobbyPath);
+        String manager = Files.readString(runtimePath.resolveSibling("ArcadePortManager.java"));
         assertTrue(lobby.contains("List.of(\"hattori\", \"bardolf\", \"devon\", \"rowena\", \"anath\", \"larissa\", \"dana\", \"biff\", \"ivy\")"));
         assertTrue(runtime.contains("\"hero-\" + skill.substring(0, separator) + \"-abilities\""));
         assertTrue(runtime.contains("This hero's abilities are disabled in your debug profile."));
+        for (String event : List.of("spawn-minion-wave", "damage-tower", "capture-point")) {
+            assertTrue(GameDebugEventCatalog.events(ArcadePortGame.HEROES_OF_GWEN).stream()
+                    .anyMatch(entry -> entry.id().equals(event)), event + " is listed in Heroes debug events");
+            assertTrue(manager.contains("\"" + event + "\".equals(eventId)"),
+                    event + " dispatches to the active Heroes runtime");
+        }
+        assertTrue(runtime.contains("boolean debugDamageNextHeroesOfGwenTower(Player tester)"));
+        assertTrue(runtime.contains("canDamageMobaTower(tower, team)"));
+        assertTrue(runtime.contains("damageMobaTower(tower, Math.min(50.0D, before), tester)"));
+        assertTrue(runtime.contains("boolean debugCaptureNextHeroesOfGwenPoint(Player tester)"));
+        assertTrue(runtime.contains("setCapturePointOwner(point, team)"));
     }
 
     @Test
