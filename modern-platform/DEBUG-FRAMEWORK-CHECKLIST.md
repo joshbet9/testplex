@@ -20,7 +20,7 @@ This checklist tracks implemented controls, not menu/catalog presence alone. A g
 - [x] Authorized testers can restore only their own active-round health/hunger and clear fire/potion effects without invoking damage, scoring, or achievement paths.
 - [x] Automated coverage verifies every event shown in a game menu has a matching production dispatcher, preventing catalog-only debug buttons.
 - [ ] Add explicit per-game control metadata for every meaningful mechanic, beyond primitive `ArcadePortRules` fields.
-- [ ] Add per-game event triggers and non-persistent achievement simulation beyond the award-preview hooks; current tools cover Draw My Thing hint reveal, Dragons spawn, Death Tag chaser conversion, One in the Quiver arrow refill, Paintball armour restoration, Spleef kit refresh and Wither Assault's normal minion-wave ability, but remaining games still need tools.
+- [ ] Add per-game event triggers and non-persistent achievement simulation beyond the award-preview hooks; current tools cover Draw My Thing hint reveal, Dragons spawn, Death Tag chaser conversion, One in the Quiver arrow refill, Paintball armour restoration, a normal selected-kit refresh for 17 shared games, and Wither Assault's minion-wave ability. Remaining games still need appropriate event tools.
 - [ ] Add automated persistence, permission, reset, live-effect and round-restart tests for profiles.
 - [ ] Verify every setting listed below against its gameplay consumer; keep unchecked games out of the **complete** state until done.
 

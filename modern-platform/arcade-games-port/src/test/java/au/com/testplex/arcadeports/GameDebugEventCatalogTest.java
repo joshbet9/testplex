@@ -39,10 +39,24 @@ class GameDebugEventCatalogTest {
         String source = Files.readString(managerPath);
         for (ArcadePortGame game : ArcadePortGame.values()) {
             for (GameDebugEventCatalog.Event event : GameDebugEventCatalog.events(game)) {
-                assertTrue(source.contains("type == ArcadePortGame." + game.name() + " && \""
-                                + event.id() + "\".equals(eventId)"),
+                boolean directDispatcher = source.contains("type == ArcadePortGame." + game.name()
+                        + " && \"" + event.id() + "\".equals(eventId)");
+                boolean sharedKitDispatcher = "refresh-kit".equals(event.id())
+                        && GameDebugEventCatalog.supportsKitRefresh(game)
+                        && source.contains("GameDebugEventCatalog.supportsKitRefresh(type)"
+                                + " && \"refresh-kit\".equals(eventId)");
+                assertTrue(directDispatcher || sharedKitDispatcher,
                         game.id() + " event " + event.id() + " has no gameplay dispatcher");
             }
+        }
+    }
+
+    @Test
+    void kitRefreshIsOnlyOfferedForGamesWithSharedKitSetup() {
+        for (ArcadePortGame game : ArcadePortGame.values()) {
+            boolean offered = GameDebugEventCatalog.events(game).stream()
+                    .anyMatch(event -> event.id().equals("refresh-kit"));
+            assertEquals(GameDebugEventCatalog.supportsKitRefresh(game), offered, game.id());
         }
     }
 }
