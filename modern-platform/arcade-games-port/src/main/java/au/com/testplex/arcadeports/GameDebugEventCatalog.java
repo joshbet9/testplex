@@ -29,7 +29,7 @@ final class GameDebugEventCatalog {
             new Event("roll-item", "Test Item Roulette", Material.MAGMA_CREAM,
                     "Start your normal random control-debuff roll now; only works for a living player."));
     private static final List<Event> SNEAKY_ASSASSINS = List.of(
-            new Event("use-kit-ability", "Test Selected Kit Ability", Material.SMOKE_BOMB,
+            new Event("use-kit-ability", "Test Selected Kit Ability", Material.INK_SAC,
                     "Run Escape Artist's smoke cloak or Revealer's normal diamond projectile effect."));
     private static final List<Event> PLEXBALL = List.of(
             new Event("use-kit-ability", "Test Selected Kit Ability", Material.FIREWORK_STAR,
@@ -60,13 +60,13 @@ final class GameDebugEventCatalog {
     private static final List<Event> DEATH_TAG = List.of(
             new Event("promote-self", "Promote Self to Chaser", Material.SKELETON_SKULL,
                     "Run the normal Runner-to-Chaser conversion on yourself."));
+    private static final List<Event> REFRESH_KIT = List.of(
+            new Event("refresh-kit", "Refresh Selected Kit", Material.NETHER_STAR,
+                    "Reapply your selected kit through its normal in-game kit setup."));
     private static final List<Event> GLADIATORS = List.of(
             new Event("forfeit-duel", "Forfeit Current Duel", Material.WHITE_BANNER,
                     "Resolve your current duel as a normal loss so you can test bracket advancement."),
             REFRESH_KIT.getFirst());
-    private static final List<Event> REFRESH_KIT = List.of(
-            new Event("refresh-kit", "Refresh Selected Kit", Material.NETHER_STAR,
-                    "Reapply your selected kit through its normal in-game kit setup."));
     private static final List<Event> MICRO_BATTLES = List.of(
             new Event("drop-barriers", "Drop Start Barriers", Material.GLASS,
                     "Run the normal start-glass removal now so you can test combat through the opening."),

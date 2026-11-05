@@ -82,6 +82,9 @@ final class GameDebugProfiles {
             for (Map.Entry<String, Object> entry : copied.entrySet()) {
                 config.set(to + "." + entry.getKey(), entry.getValue());
             }
+        } else {
+            // Materialize empty profiles so profile enumeration and selection see them.
+            config.set(to + ".created", true);
         }
         config.set(root(tester, game) + ".selected", name);
         save();

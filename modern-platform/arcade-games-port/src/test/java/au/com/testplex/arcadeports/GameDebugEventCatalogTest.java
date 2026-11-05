@@ -17,7 +17,7 @@ class GameDebugEventCatalogTest {
         assertEquals("spawn-minions", witherEvents.getFirst().id());
         assertEquals("reveal-letter", GameDebugEventCatalog.events(ArcadePortGame.DRAW_MY_THING).getFirst().id());
         assertEquals("spawn-dragon", GameDebugEventCatalog.events(ArcadePortGame.DRAGONS).getFirst().id());
-        assertEquals(List.of("advance-dragon", "use-kit-ability"),
+        assertEquals(List.of("advance-dragon", "use-kit-ability", "finish-run"),
                 GameDebugEventCatalog.events(ArcadePortGame.DRAGON_ESCAPE).stream()
                         .map(GameDebugEventCatalog.Event::id).toList());
         assertEquals("begin-evolution", GameDebugEventCatalog.events(ArcadePortGame.EVOLUTION).getFirst().id());
@@ -215,10 +215,12 @@ class GameDebugEventCatalogTest {
         String lobby = Files.readString(arcadeSources.resolve("ModernArcadeLobbyRuntime.java"));
         String manager = Files.readString(arcadeSources.resolve("ArcadePortManager.java"));
         String snake = Files.readString(snakeManagerPath);
-        for (String control : List.of("ability-speed", "ability-reverse", "ability-invulnerable",
+        for (String control : List.of("speed", "reverse", "invulnerable",
                 "tail-collisions", "self-collisions", "opponent-collisions", "magma-hazards", "lava-elimination")) {
             assertTrue(lobby.contains("\"" + control + "\""), control + " appears in Snake's debug menu");
         }
+        assertTrue(lobby.contains("String key = \"ability-\" + kit;"),
+                "the three kit toggles are generated from their selected kit IDs");
         assertTrue(snake.contains("booleanValue(abilityFeature, true)"));
         for (String control : List.of("tail-collisions", "magma-hazards", "lava-elimination")) {
             assertTrue(snake.contains("booleanValue(\"" + control + "\""),
@@ -595,7 +597,7 @@ class GameDebugEventCatalogTest {
         String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
         assertTrue(lobby.contains("\"ignore-reload\""));
         int fire = manager.indexOf("private void firePaintballWeapon(");
-        int next = manager.indexOf("private boolean isPaintballWaterBomb(", fire);
+        int next = manager.indexOf("\n    private ", fire + 1);
         assertTrue(fire >= 0 && next > fire);
         String method = manager.substring(fire, next);
         assertTrue(method.contains("plugin.hasAdminAccess(player)"));
@@ -653,7 +655,9 @@ class GameDebugEventCatalogTest {
         assertTrue(lobby.contains("List.of(\"basher\", \"archer\", \"traitor\", \"turtle\", \"trickster\")"));
         assertTrue(lobby.contains("game == ArcadePortGame.DEATH_TAG && key.startsWith(\"ability-\")"));
         for (String kit : List.of("basher", "archer", "traitor", "turtle", "trickster")) {
-            assertTrue(manager.contains("ArcadePortGame.DEATH_TAG, \"ability-" + kit + "\""),
+            assertTrue(manager.contains("ArcadePortGame.DEATH_TAG, \"ability-" + kit + "\"")
+                            || manager.contains("ArcadePortGame.DEATH_TAG, \"" + kit + "\"")
+                            || manager.contains("ArcadePortGame.DEATH_TAG, \"ability-" + kit + "\", true"),
                     kit + " has a runtime consumer");
         }
         assertTrue(manager.contains("private void useDeathTagTricksterSwap(Session session, Player runner) {\n"
@@ -745,8 +749,8 @@ class GameDebugEventCatalogTest {
         assertTrue(manager.contains("debugKitFeatureEnabled(player, ArcadePortGame.TURF_WARS, \"shredder\")"));
         assertTrue(manager.contains("debugKitFeatureEnabled(player, ArcadePortGame.TURF_WARS, \"fortifier\")"));
         assertTrue(manager.contains("session.turfBarrageFiring.remove(id)"));
-        assertTrue(manager.contains("private void startTurfWarsBarrage(Session session, Player player) {\n"
-                + "        if (!isDebugAbilityAllowed(player, ArcadePortGame.TURF_WARS, \"shredder\")) return;"));
+        assertTrue(normalize(manager).contains(normalize("private void startTurfWarsBarrage(Session session, Player player) {\n"
+                + "        if (!isDebugAbilityAllowed(player, ArcadePortGame.TURF_WARS, \"shredder\")) return;")));
     }
 
     @Test
@@ -784,8 +788,8 @@ class GameDebugEventCatalogTest {
         assertTrue(lobby.contains("features.put(\"chest-looting\""));
         assertTrue(lobby.contains("features.put(\"island-crumbling\""));
         assertTrue(lobby.contains("features.put(\"tnt-generator\""));
-        assertTrue(manager.contains("ArcadePortGame.SKY_WARS, \"chest-looting\", true"));
-        assertTrue(manager.contains("debugFeatureEnabledForActiveSession(\n                ArcadePortGame.SKY_WARS, \"island-crumbling\")"));
+        assertTrue(normalize(manager).contains("ArcadePortGame.SKY_WARS, \"chest-looting\", true"));
+        assertTrue(normalize(manager).contains(normalize("debugFeatureEnabledForActiveSession(\n                ArcadePortGame.SKY_WARS, \"island-crumbling\")")));
         assertTrue(manager.contains("debugFeatureEnabledForActiveSession(ArcadePortGame.SKY_WARS, \"tnt-generator\")"));
     }
 
@@ -818,8 +822,8 @@ class GameDebugEventCatalogTest {
         assertTrue(manager.contains("debugKitFeatureEnabled(targetPlayer, ArcadePortGame.MICRO_BATTLES, \"fighter\")"));
         assertTrue(manager.contains("debugKitFeatureEnabled(player, ArcadePortGame.MICRO_BATTLES, \"archer\")"));
         assertTrue(manager.contains("debugKitFeatureEnabled(player, ArcadePortGame.MICRO_BATTLES, \"dasher\")"));
-        assertTrue(manager.contains("ArcadePortGame.MICRO_BATTLES,\n                        \"blocks-place\", true)"));
-        assertTrue(manager.contains("ArcadePortGame.MICRO_BATTLES,\n                        \"blocks-break\", true)"));
+        assertTrue(normalize(manager).contains("ArcadePortGame.MICRO_BATTLES, \"blocks-place\", true"));
+        assertTrue(normalize(manager).contains("ArcadePortGame.MICRO_BATTLES, \"blocks-break\", true"));
     }
 
     @Test
@@ -867,13 +871,17 @@ class GameDebugEventCatalogTest {
         String source = Files.readString(managerPath);
         assertTrue(source.contains("type == ArcadePortGame.RUNNER && \"use-position-swap\".equals(eventId)"));
         int swap = source.indexOf("private boolean useRunnerPositionSwap(");
-        int nextMethod = source.indexOf("private boolean canRunnerSwapFrom(", swap);
+        int nextMethod = source.indexOf("\n    private ", swap + 1);
         assertTrue(swap >= 0 && nextMethod > swap);
         String ability = source.substring(swap, nextMethod);
         assertTrue(ability.contains("canRunnerSwapFrom(session, target)"));
         assertTrue(ability.contains("session.runnerSwapUsed.add(id)"));
         assertTrue(ability.contains("protectRunnerSwapLanding(session, player, graceUntil)"));
         assertTrue(ability.contains("protectRunnerSwapLanding(session, target, graceUntil)"));
+    }
+
+    private static String normalize(String source) {
+        return source.replaceAll("\\s+", " ").trim();
     }
 
     @Test

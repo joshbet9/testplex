@@ -18,6 +18,7 @@ public final class MazeDebugRules {
             case ORIGINAL -> "MONSTER_MAZE_";
             case SPEED -> "MONSTER_MAZE_SPEED_";
             case MODERN -> "MONSTER_MAZE_MODERN_";
+            case CLASSIC -> "MONSTER_MAZE_MODERN_";
         };
         return prefix + field;
     }

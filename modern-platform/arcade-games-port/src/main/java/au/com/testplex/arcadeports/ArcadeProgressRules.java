@@ -33,7 +33,7 @@ public final class ArcadeProgressRules {
     }
 
     public static long masterBuildersBuildMillis(long totalMillis, int judgedBuildCount, long reviewMillis) {
-        long reviewBudget = judgedBuildCount <= 1 ? 0L : judgedBuildCount * Math.max(0L, reviewMillis);
+        long reviewBudget = judgedBuildCount <= 1 ? 0L : (judgedBuildCount - 1L) * Math.max(0L, reviewMillis);
         return Math.max(30_000L, Math.max(0L, totalMillis) - reviewBudget);
     }
 

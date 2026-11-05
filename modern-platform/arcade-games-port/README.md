@@ -1,5 +1,7 @@
 # Modern Arcade mechanics prototypes (Paper 26.3)
 
+The authorised all-game debug framework is tracked in [the per-game debug checklist](../DEBUG-FRAMEWORK-CHECKLIST.md). It is still in progress; the checklist distinguishes implemented controls from per-game gameplay and test coverage that remains to be completed.
+
 This is the shared Testplex Arcade game plugin. Its game-specific controllers, including Monster Maze, Snake and Wizards, are in-process modules registered under the one Arcade Bukkit lifecycle; no game has a separate modern plugin. It is a compatibility/work-in-progress layer intended to expose API and game-loop problems early; it is **not** a claim that all original Mineplex mechanics or maps have been faithfully ported yet.
 
 ## Current controlled acceptance queue

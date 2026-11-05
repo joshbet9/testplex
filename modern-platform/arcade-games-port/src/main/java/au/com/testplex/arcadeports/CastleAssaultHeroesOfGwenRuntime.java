@@ -149,7 +149,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         return "demolitionist".equals(kit);
     }
 
-    private final JavaPlugin plugin;
+    private final ArcadeMechanicsModernPlugin plugin;
     private final ArcadePortGame game;
     private final World world;
     private final SourceMapCatalog.MapData map;
@@ -304,7 +304,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private Objective castleScoreboardObjective;
 
     CastleAssaultHeroesOfGwenRuntime(
-            JavaPlugin plugin,
+            ArcadeMechanicsModernPlugin plugin,
             ArcadePortGame game,
             World world,
             SourceMapCatalog.MapData map,

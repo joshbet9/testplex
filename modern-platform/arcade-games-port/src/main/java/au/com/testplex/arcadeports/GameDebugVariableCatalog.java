@@ -90,6 +90,7 @@ final class GameDebugVariableCatalog {
             case MILK_THE_COW -> "MilkCowRules";
             case SPEED_BUILDERS -> "SpeedBuildersRules";
             case PLEXBALL -> "PlexballRules";
+            case GLADIATORS -> null;
             case WIZARDS -> "au.com.testplex.wizards.WizardsRules";
             case WITHER_ASSAULT -> "WitherAssaultRules";
             case SNEAKY_ASSASSINS -> "SneakyAssassinsRules";
@@ -120,6 +121,10 @@ final class GameDebugVariableCatalog {
                     "ENDGAME_MIN_STRIKE_MILLIS", "ENDGAME_STRIKE_REDUCTION_PER_TICK_MILLIS").contains(name);
         }
         if (game == ArcadePortGame.WITHER_ASSAULT) return Set.of("MINIONS_PER_WAVE").contains(name);
+        if (game == ArcadePortGame.HOOPS_REMASTERED) return Set.of("TARGET_SCORE", "REGULATION_MILLIS",
+                "SHOT_CLOCK_MILLIS", "HOPS_COOLDOWN_MILLIS", "OFFENSIVE_REBOUND_SHOT_CLOCK_MILLIS",
+                "THREE_POINT_DISTANCE", "STEAL_RADIUS", "BLOCK_RADIUS", "BLOCK_COOLDOWN_MILLIS",
+                "RIM_SCORING_RADIUS", "CLUTCH_WINDOW_MILLIS").contains(name);
         if (game == ArcadePortGame.SNEAKY_ASSASSINS) return SneakyAssassinsRules.debuggableRule(name);
         if (game.isMonsterMaze()) {
             return Set.of("MOB_MOVE_SPEED", "BODY_RUSH_DURATION_MILLIS", "CRYO_COOLDOWN_MILLIS",
@@ -140,6 +145,7 @@ final class GameDebugVariableCatalog {
             case WIZARDS -> "WIZARDS_";
             case WITHER_ASSAULT -> "WITHER_ASSAULT_";
             case SNEAKY_ASSASSINS -> "SNEAKY_ASSASSINS_";
+            case GLADIATORS -> "GLADIATOR_";
             case MONSTER_MAZE -> "MONSTER_MAZE_";
             case MONSTER_MAZE_SPEED -> "MONSTER_MAZE_SPEED_";
             case MONSTER_MAZE_MODERN -> "MONSTER_MAZE_MODERN_";
@@ -160,6 +166,7 @@ final class GameDebugVariableCatalog {
         List<String> result = new ArrayList<>(List.of("LEGACY_"));
         result.addAll(switch (game) {
             case BACON_BRAWL -> List.of("BACON_", "BACON_BRAWL_");
+            case GLADIATORS -> List.of("GLADIATOR_");
             case ONE_IN_THE_QUIVER -> List.of("QUIVER_", "ONE_IN_THE_QUIVER_");
             case CASTLE_ASSAULT -> List.of("CASTLE_ASSAULT_");
             case HEROES_OF_GWEN -> List.of("HEROES_OF_GWEN_");

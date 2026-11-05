@@ -221,9 +221,11 @@ public final class SuperSploorRuntime implements Listener {
 
     /** Test the selected kit's real Special effect without waiting for ink charge. */
     public boolean debugUseSelectedSpecial(Player tester) {
-        if (!running || tester == null || !tester.isOnline()) return false;
+        if (!running || tester == null || !tester.isOnline()
+                || !(plugin instanceof ArcadeMechanicsModernPlugin arcadePlugin)
+                || !arcadePlugin.hasAdminAccess(tester)) return false;
         UUID id = tester.getUniqueId();
-        if (!players.containsKey(id) || !alive.contains(id)
+        if (!players.containsKey(id)
                 || !debugSpecialEnabled(tester, "special-" + kits.getOrDefault(id, "sprayer"))) return false;
         specialCharge.put(id, 100.0D);
         specialChargeSuppressed.remove(id);

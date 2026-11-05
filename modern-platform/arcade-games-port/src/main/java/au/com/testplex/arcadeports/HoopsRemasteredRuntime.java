@@ -79,13 +79,13 @@ public final class HoopsRemasteredRuntime implements Listener {
     private static final String GAME_ID = "hoops-remastered";
     private static final String[] STAT_KEYS = {"points", "assists", "rebounds", "blocks", "steals"};
 
-    private final JavaPlugin plugin;
+    private final ArcadeMechanicsModernPlugin plugin;
     private final Hooks hooks;
     private final AbilityCooldownProgress cooldownProgress;
     private final NamespacedKey ballItemKey;
     private Match match;
 
-    public HoopsRemasteredRuntime(JavaPlugin plugin, Hooks hooks) {
+    public HoopsRemasteredRuntime(ArcadeMechanicsModernPlugin plugin, Hooks hooks) {
         this.plugin = plugin;
         this.hooks = hooks;
         this.cooldownProgress = AbilityCooldownProgress.forPlugin(plugin);

@@ -36,7 +36,7 @@ import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.ClickType;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.persistence.PersistentDataType;
@@ -87,7 +87,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private static final int KIT_PEDESTAL_X = -17;
     private static final int QUEUE_PEDESTAL_X = 18;
 
-    private final JavaPlugin plugin;
+    private final ArcadeMechanicsModernPlugin plugin;
     private final ArcadePortManager manager;
     private final ModernArcadeLobby lobby;
     private final NamespacedKey actionKey, themeKey, botKey, formKey, displayKey, kitNpcKey, teamNpcKey;
@@ -111,7 +111,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private record DebugPrompt(ArcadePortGame game, String operation) {}
     private BukkitTask task;
 
-    ModernArcadeLobbyRuntime(JavaPlugin plugin, ArcadePortManager manager, ModernArcadeLobby lobby) {
+    ModernArcadeLobbyRuntime(ArcadeMechanicsModernPlugin plugin, ArcadePortManager manager, ModernArcadeLobby lobby) {
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=lobby-runtime-constructor-start");
         this.plugin = plugin; this.manager = manager; this.lobby = lobby;
         actionKey = new NamespacedKey(plugin, "lobby-runtime-action");
@@ -1125,7 +1125,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             inventory.setItem(slot++, choice);
         }
         inventory.setItem(45, testBotButton(Material.WRITABLE_BOOK, "Create profile", "Start with default game mechanics and no overrides.", "debug-profile-prompt:create"));
-        inventory.setItem(46, testBotButton(Material.COPYING_TABLE, "Duplicate profile", "Copy the selected profile to a new name.", "debug-profile-prompt:duplicate"));
+        inventory.setItem(46, testBotButton(Material.CARTOGRAPHY_TABLE, "Duplicate profile", "Copy the selected profile to a new name.", "debug-profile-prompt:duplicate"));
         inventory.setItem(47, testBotButton(Material.NAME_TAG, "Rename profile", "Rename the selected non-default profile.", "debug-profile-prompt:rename"));
         inventory.setItem(48, testBotButton(Material.LAVA_BUCKET, "Delete profile", "Delete the selected non-default profile.", "debug-profile-prompt:delete"));
         inventory.setItem(49, testBotButton(Material.ARROW, "Back", "debug-back"));

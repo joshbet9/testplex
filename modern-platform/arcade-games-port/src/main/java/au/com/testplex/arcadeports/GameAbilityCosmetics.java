@@ -243,7 +243,19 @@ final class GameAbilityCosmetics {
     static Palette abilityPalette(Palette style, String abilityName) {
         if (style == null || abilityName == null || abilityName.isBlank()) return style;
         String ability = abilityName.toLowerCase(Locale.ROOT);
-        Motif motif = ability.contains("leap") || ability.contains("jump") || ability.contains("glide")
+        Motif wizardMotif = switch (ability) {
+            case "anvil drop" -> Motif.EYE;
+            case "fireball" -> Motif.BURST;
+            case "blink" -> Motif.RING;
+            case "ice shards" -> Motif.SPLASH;
+            case "lightning strike" -> Motif.SLASH;
+            case "rumble" -> Motif.SPIRAL;
+            case "spectral arrow" -> Motif.ORBIT;
+            case "frost barrier" -> Motif.ARC;
+            default -> null;
+        };
+        Motif motif = wizardMotif != null ? wizardMotif
+                : ability.contains("leap") || ability.contains("jump") || ability.contains("glide")
                 ? Motif.ARC
                 : ability.contains("dash") || ability.contains("slide") || ability.contains("strike")
                         ? Motif.SLASH

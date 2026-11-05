@@ -2629,24 +2629,32 @@ public final class ArcadePortRules {
     }
 
     public static long turfWarsInitialBuildPhaseMillis(boolean mixedArcadeVariant) {
-        return Math.max(1L, GameDebugRuntimeOverrides.longValue(mixedArcadeVariant
-                        ? "TURF_WARS_MIXED_ARCADE_INITIAL_BUILD_PHASE_MILLIS" : "TURF_WARS_INITIAL_BUILD_PHASE_MILLIS",
-                mixedArcadeVariant ? TURF_WARS_MIXED_ARCADE_INITIAL_BUILD_PHASE_MILLIS
-                        : TURF_WARS_INITIAL_BUILD_PHASE_MILLIS));
+        if (mixedArcadeVariant) {
+            return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                    "TURF_WARS_MIXED_ARCADE_INITIAL_BUILD_PHASE_MILLIS",
+                    TURF_WARS_MIXED_ARCADE_INITIAL_BUILD_PHASE_MILLIS));
+        }
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue("TURF_WARS_INITIAL_BUILD_PHASE_MILLIS",
+                TURF_WARS_INITIAL_BUILD_PHASE_MILLIS));
     }
 
     public static long turfWarsBuildPhaseMillis(boolean mixedArcadeVariant) {
-        return Math.max(1L, GameDebugRuntimeOverrides.longValue(mixedArcadeVariant
-                        ? "TURF_WARS_MIXED_ARCADE_BUILD_PHASE_MILLIS" : "TURF_WARS_BUILD_PHASE_MILLIS",
-                mixedArcadeVariant ? TURF_WARS_MIXED_ARCADE_BUILD_PHASE_MILLIS
-                        : TURF_WARS_BUILD_PHASE_MILLIS));
+        if (mixedArcadeVariant) {
+            return Math.max(1L, GameDebugRuntimeOverrides.longValue("TURF_WARS_MIXED_ARCADE_BUILD_PHASE_MILLIS",
+                    TURF_WARS_MIXED_ARCADE_BUILD_PHASE_MILLIS));
+        }
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue("TURF_WARS_BUILD_PHASE_MILLIS",
+                TURF_WARS_BUILD_PHASE_MILLIS));
     }
 
     public static long turfWarsCombatPhaseMillis(boolean mixedArcadeVariant) {
-        return Math.max(1L, GameDebugRuntimeOverrides.longValue(mixedArcadeVariant
-                        ? "TURF_WARS_MIXED_ARCADE_COMBAT_PHASE_MILLIS" : "TURF_WARS_COMBAT_PHASE_MILLIS",
-                mixedArcadeVariant ? TURF_WARS_MIXED_ARCADE_COMBAT_PHASE_MILLIS
-                        : TURF_WARS_COMBAT_PHASE_MILLIS));
+        if (mixedArcadeVariant) {
+            return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                    "TURF_WARS_MIXED_ARCADE_COMBAT_PHASE_MILLIS",
+                    TURF_WARS_MIXED_ARCADE_COMBAT_PHASE_MILLIS));
+        }
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue("TURF_WARS_COMBAT_PHASE_MILLIS",
+                TURF_WARS_COMBAT_PHASE_MILLIS));
     }
 
     public static int advanceTurfFrontline(int currentFrontline, int teamId) {

@@ -329,7 +329,7 @@ public final class CameraShyGame implements Listener {
         }
     }
 
-    private final JavaPlugin plugin;
+    private final ArcadeMechanicsModernPlugin plugin;
     private final ArcadePortManager manager;
     private final AbilityCooldownProgress cooldownProgress;
     private final ArcadeTestPlayerManager testPlayers;
@@ -403,7 +403,7 @@ public final class CameraShyGame implements Listener {
     private List<Player> pendingHumans = List.of();
     private int startWaitTicks;
 
-    public CameraShyGame(JavaPlugin plugin, ArcadePortManager manager) {
+    public CameraShyGame(ArcadeMechanicsModernPlugin plugin, ArcadePortManager manager) {
         this.plugin = plugin;
         this.manager = manager;
         this.cooldownProgress = AbilityCooldownProgress.forPlugin(plugin);

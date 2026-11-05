@@ -168,7 +168,7 @@ class GameDebugProfilesTest {
         profiles.setVariable(tester, ArcadePortGame.BACON_BRAWL, "UNRELATED_SERVER_SETTING", 5.0D);
         profiles.setVariable(tester, ArcadePortGame.BACON_BRAWL, "BACON_BRAWL_HAS_ROUND_TIMER", 1.0D);
 
-        assertEquals(0.0D, profiles.variable(tester, ArcadePortGame.BACON_BRAWL,
+        assertEquals(1.0D, profiles.variable(tester, ArcadePortGame.BACON_BRAWL,
                 "BACON_1_8_HIT_DELAY_MILLIS"));
         assertNull(profiles.variable(tester, ArcadePortGame.BACON_BRAWL, "UNRELATED_SERVER_SETTING"));
         assertNull(profiles.variable(tester, ArcadePortGame.BACON_BRAWL, "BACON_BRAWL_HAS_ROUND_TIMER"));

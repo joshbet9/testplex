@@ -57,6 +57,7 @@ import org.bukkit.WorldBorder;
 import org.bukkit.WorldCreator;
 import org.bukkit.WorldType;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
@@ -830,8 +831,8 @@ public final class ArcadePortManager implements Listener {
         if (plugin.getPlexballGame() != null && plugin.getPlexballGame().isActive()) {
             return ArcadePortGame.PLEXBALL;
         }
-        if (monsterMazeRunning() && monsterMaze.getActiveArcadeGame() != null) {
-            return monsterMaze.getActiveArcadeGame();
+        if (monsterMazeRunning() && monsterMazeModule.getActiveArcadeGame() != null) {
+            return monsterMazeModule.getActiveArcadeGame();
         }
         return null;
     }
@@ -869,8 +870,8 @@ public final class ArcadePortManager implements Listener {
             if (advanced) GameDebugRuntimeOverrides.markDebugSession();
             return advanced;
         }
-        if (type != null && type.isMonsterMaze() && monsterMaze != null) {
-            boolean advanced = monsterMaze.debugAdvancePhase();
+        if (type != null && type.isMonsterMaze() && monsterMazeModule != null) {
+            boolean advanced = monsterMazeModule.debugAdvancePhase();
             if (advanced) GameDebugRuntimeOverrides.markDebugSession();
             return advanced;
         }
@@ -3253,7 +3254,7 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
             if (sender instanceof Player requesting && requesting.isOnline()) lobby.ensurePlayerInLobby(requesting);
-            activateDebugProfile(requester != null ? requester : sender instanceof Player player ? player : null, type);
+            activateDebugProfile(sender instanceof Player player ? player : null, type);
             List<Player> lobbyPlayers = new ArrayList<>(Bukkit.getOnlinePlayers().stream()
                     .filter(player -> player.isOnline() && !testPlayers.isTestPlayer(player)
                             && lobby.isLobbyWorld(player.getWorld()))
@@ -3277,7 +3278,7 @@ public final class ArcadePortManager implements Listener {
             if (sender instanceof Player requestingPlayer && requestingPlayer.isOnline()) {
                 lobby.ensurePlayerInLobby(requestingPlayer);
             }
-            activateDebugProfile(requester != null ? requester : sender instanceof Player player ? player : null, type);
+            activateDebugProfile(sender instanceof Player player ? player : null, type);
             for (Player player : Bukkit.getOnlinePlayers()) {
                 if (player.isOnline() && lobby.isLobbyWorld(player.getWorld()) && !testPlayers.isTestPlayer(player)) {
                     for (LinkedHashMap<UUID, Player> existingQueue : queues.values()) {
@@ -11239,7 +11240,7 @@ public final class ArcadePortManager implements Listener {
         showAbilityActivationCosmetic(player, game, "");
     }
 
-    void showAbilityActivationCosmetic(Player player, ArcadePortGame game, String abilityName) {
+    public void showAbilityActivationCosmetic(Player player, ArcadePortGame game, String abilityName) {
         if (game == ArcadePortGame.CAMERA_SHY) {
             if (cameraShyModule == null || !cameraShyModule.isLiveParticipant(player)) return;
             renderAbilityActivationCosmetic(player, game, abilityName);
@@ -12214,7 +12215,7 @@ public final class ArcadePortManager implements Listener {
                 "Lighthouse","Wizard Tower","Football Stadium");
         session.masterBuilderTheme=themes.get(ThreadLocalRandom.current().nextInt(themes.size()));
         session.masterBuilderPhase=MasterBuildersPhase.BUILDING;
-        long judgedBuildCount=session.masterBuilderReviewOrder.size();
+        int judgedBuildCount=session.masterBuilderReviewOrder.size();
         long buildMillis = ArcadeProgressRules.masterBuildersBuildMillis(
                 GameDebugRuntimeOverrides.longValue("MASTER_BUILDERS_TOTAL_MILLIS",
                         ArcadePortRules.MASTER_BUILDERS_TOTAL_MILLIS), judgedBuildCount,
@@ -17258,11 +17259,6 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
-        if (session.type == ArcadePortGame.GLADIATORS
-                && ((plugin.hasAdminAccess(attacker) && !debugFeatureEnabled(attacker.getUniqueId(),
-                        ArcadePortGame.GLADIATORS, "combat-damage", true))
-                    || (plugin.hasAdminAccess(target) && !debugFeatureEnabled(target.getUniqueId(),
-                        ArcadePortGame.GLADIATORS, "combat-damage", true)))) return;
         if (session.type == ArcadePortGame.GLADIATORS) {
             if (session.participantsAtStart > 1) progressGladiators(session);
             // Solo practice remains live until the operator stops it; it is not a tournament win.
@@ -18772,6 +18768,11 @@ public final class ArcadePortManager implements Listener {
     private void handlePlayerHit(Session session, Player attacker, Player target, String source, int paintballAmount) {
         if (active != session || attacker.equals(target) || !session.alive.contains(attacker.getUniqueId())
                 || !session.alive.contains(target.getUniqueId())) return;
+        if (session.type == ArcadePortGame.GLADIATORS
+                && ((plugin.hasAdminAccess(attacker) && !debugFeatureEnabled(attacker.getUniqueId(),
+                        ArcadePortGame.GLADIATORS, "combat-damage", true))
+                    || (plugin.hasAdminAccess(target) && !debugFeatureEnabled(target.getUniqueId(),
+                        ArcadePortGame.GLADIATORS, "combat-damage", true)))) return;
         if (session.type == ArcadePortGame.DEATH_TAG
                 && session.deathTagRespawnGraceUntil.getOrDefault(target.getUniqueId(), 0L)
                     > System.currentTimeMillis()) return;

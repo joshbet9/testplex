@@ -1698,14 +1698,14 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
         return switch (normalized) {
             case "cobra" -> phase == 0 ? DyeColor.ORANGE : phase == 1 ? DyeColor.YELLOW : DyeColor.RED;
             case "neon-viper" -> phase == 0 ? DyeColor.CYAN : phase == 1 ? DyeColor.PURPLE : DyeColor.LIGHT_BLUE;
-            default -> phase == 0 ? DyeColor.GREEN : phase == 1 ? DyeColor.LIME : DyeColor.DARK_GREEN;
+            default -> phase == 0 ? DyeColor.GREEN : phase == 1 ? DyeColor.LIME : DyeColor.GREEN;
         };
     }
 
     private Particle snakeAbilityParticle(String style, String ability) {
         if ("super".equals(ability)) return "cobra".equals(style) ? Particle.FLAME : Particle.FIREWORK;
         if ("speed".equals(ability)) return "neon-viper".equals(style) ? Particle.ELECTRIC_SPARK : Particle.HAPPY_VILLAGER;
-        return "anaconda".equals(style) ? Particle.SLIME : Particle.PORTAL;
+        return "anaconda".equals(style) ? Particle.ITEM_SLIME : Particle.PORTAL;
     }
 
     private DyeColor abilityColour(String theme, String ability) {

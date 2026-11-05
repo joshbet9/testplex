@@ -5,6 +5,8 @@ import me.monstermaze.game.GameState;
 import me.monstermaze.game.GameManager;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GameDebugPhaseActionsTest {
     @Test
