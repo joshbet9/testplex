@@ -889,9 +889,11 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null || session.type != type || !session.liveStarted
                 || !session.alive.contains(tester.getUniqueId())) return false;
+        if (GameDebugEventCatalog.events(type).stream().noneMatch(event -> event.id().equals(eventId))) return false;
         boolean triggered = false;
         if (type == ArcadePortGame.WITHER_ASSAULT && "spawn-minions".equals(eventId)
                 && session.teams.getOrDefault(tester.getUniqueId(), 0) == 1) {
+            GameDebugRuntimeOverrides.markDebugSession();
             session.witherMinionReadyAt.put(tester.getUniqueId(), 0L);
             int before = session.witherMinionOwners.size();
             launchWitherMinions(session, tester, System.currentTimeMillis());
@@ -902,12 +904,22 @@ public final class ArcadePortManager implements Listener {
             int revealedIndex = DrawMyThingDebugRules.nextHiddenLetterIndex(
                     session.drawWord, session.drawRevealedLetters, ThreadLocalRandom.current());
             if (revealedIndex >= 0) {
+                GameDebugRuntimeOverrides.markDebugSession();
                 session.drawRevealedLetters.add(revealedIndex);
                 updateDrawMyThing(session, System.currentTimeMillis());
                 triggered = true;
             }
         }
-        if (triggered) GameDebugRuntimeOverrides.markDebugSession();
+        if (type == ArcadePortGame.DRAGONS && "spawn-dragon".equals(eventId)) {
+            long dragonsBefore = session.entities.stream()
+                    .filter(entity -> entity instanceof EnderDragon && entity.isValid()).count();
+            GameDebugRuntimeOverrides.markDebugSession();
+            session.dragonNextSpawnAt = System.currentTimeMillis();
+            updateTestDragons(session, session.dragonNextSpawnAt);
+            long dragonsAfter = session.entities.stream()
+                    .filter(entity -> entity instanceof EnderDragon && entity.isValid()).count();
+            triggered = dragonsAfter > dragonsBefore;
+        }
         return triggered;
     }
 

@@ -14,12 +14,16 @@ final class GameDebugEventCatalog {
     private static final List<Event> DRAW_MY_THING = List.of(
             new Event("reveal-letter", "Reveal Next Hint Letter", Material.WRITABLE_BOOK,
                     "Reveal one additional answer letter to the guessers through the normal hint display."));
+    private static final List<Event> DRAGONS = List.of(
+            new Event("spawn-dragon", "Spawn Next Dragon Now", Material.DRAGON_EGG,
+                    "Run the normal map spawn and target initialization without waiting for the interval."));
 
     private GameDebugEventCatalog() { }
 
     static List<Event> events(ArcadePortGame game) {
         if (game == ArcadePortGame.WITHER_ASSAULT) return WITHER_ASSAULT;
         if (game == ArcadePortGame.DRAW_MY_THING) return DRAW_MY_THING;
+        if (game == ArcadePortGame.DRAGONS) return DRAGONS;
         return List.of();
     }
 }

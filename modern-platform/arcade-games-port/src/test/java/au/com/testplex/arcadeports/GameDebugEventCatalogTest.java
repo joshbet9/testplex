@@ -11,6 +11,7 @@ class GameDebugEventCatalogTest {
         assertEquals(1, witherEvents.size());
         assertEquals("spawn-minions", witherEvents.getFirst().id());
         assertEquals("reveal-letter", GameDebugEventCatalog.events(ArcadePortGame.DRAW_MY_THING).getFirst().id());
+        assertEquals("spawn-dragon", GameDebugEventCatalog.events(ArcadePortGame.DRAGONS).getFirst().id());
         assertFalse(GameDebugEventCatalog.events(ArcadePortGame.BACON_BRAWL).stream()
                 .anyMatch(event -> event.id().equals("spawn-minions")));
     }
