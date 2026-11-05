@@ -1,6 +1,7 @@
 package me.monstermaze.game;
 
 import au.com.testplex.arcadeports.GameDebugRuntimeOverrides;
+import java.util.UUID;
 
 /** Profile-backed values for the existing in-process Monster Maze game engine. */
 public final class MazeDebugRules {
@@ -35,8 +36,8 @@ public final class MazeDebugRules {
         return GameDebugRuntimeOverrides.intValue(key(mode, field), fallback);
     }
 
-    public static boolean kitEnabled(String kit) {
-        return GameDebugRuntimeOverrides.booleanValue("kit-" + kit, true);
+    public static boolean kitEnabled(UUID player, String kit) {
+        return GameDebugRuntimeOverrides.booleanValueFor(player, "kit-" + kit, true);
     }
 
     public static double doubleValue(MazeMode mode, String field, double fallback) {

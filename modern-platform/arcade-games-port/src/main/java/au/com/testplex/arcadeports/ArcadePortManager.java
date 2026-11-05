@@ -1298,7 +1298,7 @@ public final class ArcadePortManager implements Listener {
         if (debugProfiles.testBotCount(starter == null ? null : starter.getUniqueId(), type, 0) > 0) {
             values.put("__DEBUG_TEST_BOT_ROSTER", true);
         }
-        GameDebugRuntimeOverrides.activate(values);
+        GameDebugRuntimeOverrides.activate(values, activeDebugProfileOwner);
     }
 
     String configuredTestBotKit(ArcadePortGame type, int botIndex) {

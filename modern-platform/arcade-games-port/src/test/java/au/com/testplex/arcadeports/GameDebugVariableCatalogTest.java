@@ -336,24 +336,28 @@ class GameDebugVariableCatalogTest {
 
     @Test
     void monsterMazeKitAbilitySwitchesAreLiveAndDefaultToTheSourceBehavior() {
+        java.util.UUID owner = java.util.UUID.randomUUID();
+        java.util.UUID otherPlayer = java.util.UUID.randomUUID();
         GameDebugRuntimeOverrides.activate(Map.of(
                 "kit-jumper", false,
                 "kit-slowball", false,
                 "kit-body-builder", false,
                 "kit-repulsor", false,
-                "kit-maverick", false));
-        assertFalse(me.monstermaze.game.MazeDebugRules.kitEnabled("jumper"));
-        assertFalse(me.monstermaze.game.MazeDebugRules.kitEnabled("slowball"));
-        assertFalse(me.monstermaze.game.MazeDebugRules.kitEnabled("body-builder"));
-        assertFalse(me.monstermaze.game.MazeDebugRules.kitEnabled("repulsor"));
-        assertFalse(me.monstermaze.game.MazeDebugRules.kitEnabled("maverick"));
+                "kit-maverick", false), owner);
+        assertFalse(me.monstermaze.game.MazeDebugRules.kitEnabled(owner, "jumper"));
+        assertFalse(me.monstermaze.game.MazeDebugRules.kitEnabled(owner, "slowball"));
+        assertFalse(me.monstermaze.game.MazeDebugRules.kitEnabled(owner, "body-builder"));
+        assertFalse(me.monstermaze.game.MazeDebugRules.kitEnabled(owner, "repulsor"));
+        assertFalse(me.monstermaze.game.MazeDebugRules.kitEnabled(owner, "maverick"));
+        assertTrue(me.monstermaze.game.MazeDebugRules.kitEnabled(otherPlayer, "jumper"),
+                "a tester profile must not alter another participant's kit");
 
         GameDebugRuntimeOverrides.setValue("kit-jumper", true);
-        assertTrue(me.monstermaze.game.MazeDebugRules.kitEnabled("jumper"));
+        assertTrue(me.monstermaze.game.MazeDebugRules.kitEnabled(owner, "jumper"));
 
         GameDebugRuntimeOverrides.clear();
-        assertTrue(me.monstermaze.game.MazeDebugRules.kitEnabled("jumper"));
-        assertTrue(me.monstermaze.game.MazeDebugRules.kitEnabled("maverick"));
+        assertTrue(me.monstermaze.game.MazeDebugRules.kitEnabled(owner, "jumper"));
+        assertTrue(me.monstermaze.game.MazeDebugRules.kitEnabled(owner, "maverick"));
     }
 
     @Test

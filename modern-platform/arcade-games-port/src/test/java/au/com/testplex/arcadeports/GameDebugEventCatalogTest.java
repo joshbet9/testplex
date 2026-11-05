@@ -100,12 +100,13 @@ class GameDebugEventCatalogTest {
         assertTrue(lobby.contains("if (game.isMonsterMaze() && key.startsWith(\"kit-\")) return true"));
         assertTrue(manager.contains("lobbyRuntime.debugFeatureAppliesImmediately(type, flag)"));
         assertTrue(manager.contains("debugProfiles.featureKeys(tester.getUniqueId(), type)"));
-        assertTrue(rules.contains("booleanValue(\"kit-\" + kit, true)"));
-        assertTrue(kits.contains("kitEnabled(\"jumper\")"));
-        assertTrue(kits.contains("kitEnabled(\"slowball\")"));
-        assertTrue(kits.contains("kitEnabled(\"body-builder\")"));
-        assertTrue(kits.contains("kitEnabled(\"repulsor\")"));
-        assertTrue(monsters.contains("kitEnabled(\"maverick\")"));
+        assertTrue(manager.contains("GameDebugRuntimeOverrides.activate(values, activeDebugProfileOwner)"));
+        assertTrue(rules.contains("booleanValueFor(player, \"kit-\" + kit, true)"));
+        assertTrue(kits.contains("kitEnabled(p.getUniqueId(), \"jumper\")"));
+        assertTrue(kits.contains("kitEnabled(p.getUniqueId(), \"slowball\")"));
+        assertTrue(kits.contains("kitEnabled(player.getUniqueId(), \"body-builder\")"));
+        assertTrue(kits.contains("kitEnabled(player.getUniqueId(), \"repulsor\")"));
+        assertTrue(monsters.contains("kitEnabled(player.getUniqueId(), \"maverick\")"));
     }
 
     @Test

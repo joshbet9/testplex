@@ -2,17 +2,25 @@ package au.com.testplex.arcadeports;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 
 /** Session-scoped overrides for numeric and boolean game rules. */
 public final class GameDebugRuntimeOverrides {
     private static volatile Map<String, Object> values = Map.of();
     private static volatile boolean debugSession;
+    private static volatile UUID debugOwner;
 
     private GameDebugRuntimeOverrides() { }
 
     public static void activate(Map<String, Object> overrides) {
+        activate(overrides, null);
+    }
+
+    /** Activate profile values for one authorised tester while other players keep defaults. */
+    public static void activate(Map<String, Object> overrides, UUID owner) {
         values = overrides == null ? Map.of() : Map.copyOf(new LinkedHashMap<>(overrides));
         debugSession = !values.isEmpty();
+        debugOwner = owner;
     }
 
     /** Update one explicitly immediate profile switch in the active test round. */
@@ -34,6 +42,7 @@ public final class GameDebugRuntimeOverrides {
     public static void clear() {
         values = Map.of();
         debugSession = false;
+        debugOwner = null;
     }
 
     /** Clear active rule changes without allowing this test round to persist progression. */
@@ -78,6 +87,10 @@ public final class GameDebugRuntimeOverrides {
     public static boolean booleanValue(String key, boolean fallback) {
         Object value = values.get(key);
         return value instanceof Boolean enabled ? enabled : fallback;
+    }
+
+    public static boolean booleanValueFor(UUID player, String key, boolean fallback) {
+        return player != null && player.equals(debugOwner) ? booleanValue(key, fallback) : fallback;
     }
 
     private static Number number(String key) {
