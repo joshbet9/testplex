@@ -9,6 +9,9 @@ import java.util.List;
 
 /** Small deterministic rules shared by the Snake loop and its contract tests. */
 public final class SnakeRules {
+    public static long debugLiveAt(boolean running, boolean live, long nowMillis, long currentLiveAtMillis) {
+        return running && !live ? Math.min(currentLiveAtMillis, nowMillis) : currentLiveAtMillis;
+    }
     private static final int[] ROULETTE_SECONDS = {1, 3, 5, 10, 15, 20, 30};
     private static final DyeColor[] LEGACY_DYE_DATA_ORDER = {
             DyeColor.BLACK, DyeColor.RED, DyeColor.GREEN, DyeColor.BROWN,

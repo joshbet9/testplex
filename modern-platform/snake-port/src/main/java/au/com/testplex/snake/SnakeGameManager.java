@@ -386,6 +386,15 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
                 + (startingPlayerCount == 1 ? "; solo test" : "");
     }
 
+    /** Debug control: skip the source preparation countdown and enter live play. */
+    public boolean debugAdvancePhase() {
+        long advanced = SnakeRules.debugLiveAt(running, live, System.currentTimeMillis(), liveAt);
+        if (advanced == liveAt) return false;
+        liveAt = advanced;
+        lastAnnouncedCountdownSecond = -1;
+        return true;
+    }
+
     public void showStats(Player player) {
         player.sendMessage(ChatColor.GOLD + stats.summary(player));
     }

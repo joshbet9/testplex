@@ -4,6 +4,12 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SnakeRulesTest {
+    @Test void debugPhaseAdvanceOnlySkipsAnActivePreparationCountdown() {
+        assertEquals(9_000L, SnakeRules.debugLiveAt(false, false, 1_000L, 9_000L));
+        assertEquals(9_000L, SnakeRules.debugLiveAt(true, true, 1_000L, 9_000L));
+        assertEquals(1_000L, SnakeRules.debugLiveAt(true, false, 1_000L, 9_000L));
+    }
+
     @Test void rouletteDurationsEscalateAndCap() {
         assertEquals(1, SnakeRules.rouletteDurationSecondsForHit(1));
         assertEquals(3, SnakeRules.rouletteDurationSecondsForHit(2));

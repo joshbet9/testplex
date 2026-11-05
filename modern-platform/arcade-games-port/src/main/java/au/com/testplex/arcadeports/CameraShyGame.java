@@ -450,6 +450,15 @@ public final class CameraShyGame implements Listener {
         return "live; alive=" + alive.size() + "/" + players.size() + "; time=" + remaining + "s";
     }
 
+    /** Debug control: finish the active timed round through the normal timeout path. */
+    public boolean debugAdvancePhase() {
+        long advanced = CameraShyRules.debugRoundDeadline(phase == Phase.LIVE,
+                System.currentTimeMillis(), endsAt);
+        if (advanced == endsAt) return false;
+        endsAt = advanced;
+        return true;
+    }
+
     public int queuedCount() {
         return (int) queue.values().stream().filter(player -> player != null && player.isOnline()).count();
     }

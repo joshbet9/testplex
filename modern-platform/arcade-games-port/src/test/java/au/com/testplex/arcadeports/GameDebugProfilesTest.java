@@ -101,6 +101,11 @@ class GameDebugProfilesTest {
         assertTrue(reloaded.select(tester, ArcadePortGame.MICRO_BATTLES, "default"));
         assertEquals(8, reloaded.testBotCount(tester, ArcadePortGame.MICRO_BATTLES, 0));
         assertTrue(reloaded.select(tester, ArcadePortGame.MICRO_BATTLES, "balanced"));
+        assertEquals("balanced-copy", reloaded.duplicate(tester, ArcadePortGame.MICRO_BATTLES, "Balanced Copy"));
+        assertEquals(4, reloaded.testBotCount(tester, ArcadePortGame.MICRO_BATTLES, 0));
+        assertTrue(reloaded.select(tester, ArcadePortGame.MICRO_BATTLES, "default"));
+        assertEquals(8, reloaded.testBotCount(tester, ArcadePortGame.MICRO_BATTLES, 0));
+        assertTrue(reloaded.select(tester, ArcadePortGame.MICRO_BATTLES, "balanced"));
         assertEquals(4, reloaded.testBotCount(tester, ArcadePortGame.MICRO_BATTLES, 0));
     }
 

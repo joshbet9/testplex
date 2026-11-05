@@ -797,6 +797,12 @@ public final class ArcadePortManager implements Listener {
 
     boolean debugAdvanceStartPhase(Player tester, ArcadePortGame type) {
         if (tester == null || !tester.isOnline() || !plugin.hasAdminAccess(tester)) return false;
+        if (type == ArcadePortGame.CAMERA_SHY && cameraShyModule != null) {
+            return cameraShyModule.debugAdvancePhase();
+        }
+        if (type == ArcadePortGame.SNAKE && snakeModule != null) {
+            return snakeModule.debugAdvancePhase();
+        }
         if (type == ArcadePortGame.SPEED_BUILDERS && plugin.getSpeedBuildersGame() != null) {
             return plugin.getSpeedBuildersGame().debugAdvancePhase();
         }

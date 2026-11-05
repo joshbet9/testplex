@@ -10,6 +10,13 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class CameraShyRulesTest {
     @Test
+    void debugRoundAdvanceUsesTheNormalTimeoutDeadlineOnlyDuringLivePlay() {
+        assertEquals(9_000L, CameraShyRules.debugRoundDeadline(false, 1_000L, 9_000L));
+        assertEquals(1_000L, CameraShyRules.debugRoundDeadline(true, 1_000L, 9_000L));
+        assertEquals(500L, CameraShyRules.debugRoundDeadline(true, 1_000L, 500L));
+    }
+
+    @Test
     void aMissingOrCorruptArenaMarkerForcesTheMazeToBeRebuilt() {
         assertTrue(CameraShyRules.arenaBuildRequired(false, Material.DEEPSLATE_TILES, Material.COARSE_DIRT));
         assertTrue(CameraShyRules.arenaBuildRequired(true, Material.AIR, Material.AIR));

@@ -20,6 +20,10 @@ public final class CameraShyRules {
     public static final long DOUBLE_TAKE_WINDOW_MILLIS = 5_000L;
     public static final long DOUBLE_ELIMINATION_WINDOW_MILLIS = 15_000L;
 
+    public static long debugRoundDeadline(boolean live, long nowMillis, long currentDeadlineMillis) {
+        return live ? Math.min(currentDeadlineMillis, nowMillis) : currentDeadlineMillis;
+    }
+
     private CameraShyRules() { }
 
     /** Rebuild a dedicated arena if its persisted build flag or in-world floor marker is missing. */
