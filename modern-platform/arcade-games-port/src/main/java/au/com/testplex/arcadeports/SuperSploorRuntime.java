@@ -219,6 +219,18 @@ public final class SuperSploorRuntime implements Listener {
         return true;
     }
 
+    /** Test the selected kit's real Special effect without waiting for ink charge. */
+    public boolean debugUseSelectedSpecial(Player tester) {
+        if (!running || tester == null || !tester.isOnline()) return false;
+        UUID id = tester.getUniqueId();
+        if (!players.containsKey(id) || !alive.contains(id)
+                || !debugSpecialEnabled(tester, "special-" + kits.getOrDefault(id, "sprayer"))) return false;
+        specialCharge.put(id, 100.0D);
+        specialChargeSuppressed.remove(id);
+        useSpecial(tester, id);
+        return specialChargeSuppressed.contains(id) && specialCharge.getOrDefault(id, 0.0D) == 0.0D;
+    }
+
     public Map<UUID, PlayerMatchStats> snapshotStats() {
         Map<UUID, PlayerMatchStats> copy = new HashMap<>();
         for (Map.Entry<UUID, MutableStats> entry : playerStats.entrySet()) {

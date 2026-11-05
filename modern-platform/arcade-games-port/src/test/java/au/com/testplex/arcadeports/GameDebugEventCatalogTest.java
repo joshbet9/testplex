@@ -37,6 +37,8 @@ class GameDebugEventCatalogTest {
                 .anyMatch(event -> event.id().equals("refresh-kit")));
         assertTrue(GameDebugEventCatalog.events(ArcadePortGame.SPLEEF).stream()
                 .anyMatch(event -> event.id().equals("restore-hunger")));
+        assertEquals("use-special", GameDebugEventCatalog.events(ArcadePortGame.SUPER_SPLOOR)
+                .getFirst().id());
         assertTrue(GameDebugEventCatalog.events(ArcadePortGame.MICRO_BATTLES).stream()
                 .anyMatch(event -> event.id().equals("drop-barriers")));
         assertEquals("grant-spells", GameDebugEventCatalog.events(ArcadePortGame.WIZARDS)
@@ -517,6 +519,27 @@ class GameDebugEventCatalogTest {
         assertTrue(manager.contains("public void onSheepQuestArcherBowShoot(EntityShootBowEvent event)"));
         assertTrue(manager.contains("Archer abilities are disabled in your debug profile."));
         assertTrue(manager.contains("public void onSheepQuestBerserkerJump(PlayerToggleFlightEvent event)"));
+    }
+
+    @Test
+    void superSploorSpecialDebugEventFillsAndUsesTheNormalSelectedSpecial() throws IOException {
+        Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ArcadePortManager.java");
+        Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "SuperSploorRuntime.java");
+        if (!Files.isRegularFile(managerPath)) {
+            managerPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ArcadePortManager.java");
+            runtimePath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "SuperSploorRuntime.java");
+        }
+        String manager = Files.readString(managerPath);
+        String runtime = Files.readString(runtimePath);
+        assertTrue(manager.contains("type == ArcadePortGame.SUPER_SPLOOR && \"use-special\".equals(eventId)"));
+        assertTrue(manager.contains("superSploor.debugUseSelectedSpecial(tester)"));
+        assertTrue(runtime.contains("public boolean debugUseSelectedSpecial(Player tester)"));
+        assertTrue(runtime.contains("specialCharge.put(id, 100.0D)"));
+        assertTrue(runtime.contains("useSpecial(tester, id)"));
     }
 
     @Test

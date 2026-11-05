@@ -63,6 +63,9 @@ final class GameDebugEventCatalog {
             new Event("restore-hunger", "Restore Hunger", Material.COOKED_BEEF,
                     "Restore your hunger and saturation to full during an active round."),
             REFRESH_KIT.getFirst());
+    private static final List<Event> SUPER_SPLOOR = List.of(
+            new Event("use-special", "Test Selected Special", Material.FIREWORK_STAR,
+                    "Fill and activate your selected kit's normal Special so you can test its full effect."));
     private static final List<Event> MILK_THE_COW = List.of(
             new Event("spawn-herd", "Spawn Cow Herd Now", Material.COW_SPAWN_EGG,
                     "Run the normal herd follow and spawn update beside the active Cow-role tester."));
@@ -114,6 +117,7 @@ final class GameDebugEventCatalog {
         if (game == ArcadePortGame.SNAKE) return SNAKE;
         if (game == ArcadePortGame.ONE_IN_THE_QUIVER) return ONE_IN_THE_QUIVER;
         if (game == ArcadePortGame.SPLEEF) return SPLEEF;
+        if (game == ArcadePortGame.SUPER_SPLOOR) return SUPER_SPLOOR;
         if (game == ArcadePortGame.MILK_THE_COW) return MILK_THE_COW;
         if (game == ArcadePortGame.SHEEP_QUEST) return SHEEP_QUEST;
         if (game == ArcadePortGame.SKY_WARS) return SKY_WARS;

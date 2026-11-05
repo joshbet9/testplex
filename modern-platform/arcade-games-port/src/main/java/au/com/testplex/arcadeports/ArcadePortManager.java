@@ -920,6 +920,11 @@ public final class ArcadePortManager implements Listener {
             GameDebugRuntimeOverrides.markDebugSession();
             return cameraShyModule.debugUseSelectedKitAbility(tester);
         }
+        if (type == ArcadePortGame.SUPER_SPLOOR && "use-special".equals(eventId)) {
+            if (superSploor == null) return false;
+            GameDebugRuntimeOverrides.markDebugSession();
+            return superSploor.debugUseSelectedSpecial(tester);
+        }
         Session session = active;
         if (session == null || session.type != type || !session.liveStarted
                 || !session.alive.contains(tester.getUniqueId())) return false;
