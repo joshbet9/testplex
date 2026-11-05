@@ -1242,6 +1242,14 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                         "Allow this tester's " + humanizeDebugKey(feature) + " kit features and abilities.", true));
             }
         }
+        if (game == ArcadePortGame.HOOPS_REMASTERED) {
+            features.put("shooting", new DebugFeature("shooting", "Shooting", Material.SNOWBALL,
+                    "Allow this tester to release shots, layups and dunks.", true));
+            features.put("scoring", new DebugFeature("scoring", "Basket scoring", Material.GOLD_INGOT,
+                    "Allow this tester's shots to change the team score when they pass through the hoop.", true));
+            features.put("steals", new DebugFeature("steals", "Ball steals", Material.LEATHER_BOOTS,
+                    "Allow this tester to steal possession from an opposing ball holder.", true));
+        }
         if (game == ArcadePortGame.HEROES_OF_GWEN) {
             for (String hero : List.of("hattori", "bardolf", "devon", "rowena", "anath", "larissa", "dana", "biff", "ivy")) {
                 String key = "hero-" + hero + "-abilities";
@@ -1388,6 +1396,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                         && ("canvas-tools".equals(key) || "palette-selection".equals(key)))
                 || (game == ArcadePortGame.WITHER_ASSAULT
                         && ("ability-human-leap".equals(key) || "human-revival".equals(key) || key.startsWith("ability-")))
+                || (game == ArcadePortGame.HOOPS_REMASTERED
+                        && ("shooting".equals(key) || "scoring".equals(key) || "steals".equals(key)))
                 || (game == ArcadePortGame.DRAGON_ESCAPE && "finish-detection".equals(key))
                 || (game == ArcadePortGame.DRAGON_ESCAPE && key.startsWith("ability-"))
                 || (game == ArcadePortGame.RUNNER && "runner-trail".equals(key))

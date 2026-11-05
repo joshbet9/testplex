@@ -821,6 +821,29 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void hoopsDebugSwitchesGateShootingScoringAndSteals() throws IOException {
+        Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "HoopsRemasteredRuntime.java");
+        Path lobbyPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ModernArcadeLobbyRuntime.java");
+        if (!Files.isRegularFile(runtimePath)) {
+            runtimePath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "HoopsRemasteredRuntime.java");
+            lobbyPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ModernArcadeLobbyRuntime.java");
+        }
+        String runtime = Files.readString(runtimePath);
+        String lobby = Files.readString(lobbyPath);
+        assertTrue(lobby.contains("\"shooting\", \"Shooting\""));
+        assertTrue(lobby.contains("\"scoring\", \"Basket scoring\""));
+        assertTrue(lobby.contains("\"steals\", \"Ball steals\""));
+        assertTrue(runtime.contains("debugFeatureEnabled(shooter, \"shooting\")"));
+        assertTrue(runtime.contains("debugFeatureEnabled(shooter, \"scoring\")"));
+        assertTrue(runtime.contains("debugFeatureEnabled(attacker, \"steals\")"));
+        assertTrue(runtime.contains("default boolean debugFeatureEnabled(Player player, String feature)"));
+    }
+
+    @Test
     void heroesOfGwenDebugEventStartsTheNormalPairedMinionWave() throws IOException {
         Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "CastleAssaultHeroesOfGwenRuntime.java");

@@ -447,6 +447,11 @@ public final class ArcadePortManager implements Listener {
             @Override public String cosmeticOption(Player player, String lineId, String fallback) {
                 return selectedGameCosmeticOption(player, "hoops-remastered", lineId, fallback);
             }
+
+            @Override public boolean debugFeatureEnabled(Player player, String feature) {
+                return ArcadePortManager.this.debugFeatureEnabled(player.getUniqueId(),
+                        ArcadePortGame.HOOPS_REMASTERED, feature, true);
+            }
         });
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=sneaky-assassins-mechanics-ready");
         this.statsActionKey = new NamespacedKey(plugin, "stats-action");

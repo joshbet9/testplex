@@ -68,6 +68,7 @@ public final class HoopsRemasteredRuntime implements Listener {
     public interface Hooks {
         void finish(Player representativeWinner, boolean announceWinner);
         default String cosmeticOption(Player player, String lineId, String fallback) { return fallback; }
+        default boolean debugFeatureEnabled(Player player, String feature) { return true; }
     }
 
     private static final int FLOOR_Y = 63;
@@ -662,6 +663,13 @@ public final class HoopsRemasteredRuntime implements Listener {
             removeBall(current);
             return;
         }
+        if (!debugFeatureEnabled(shooter, "scoring")) {
+            Location rim = new Location(current.world, scoringTeam == 0 ? LEFT_HOOP_X : RIGHT_HOOP_X,
+                    HOOP_Y, 0.0D);
+            announce(current, ChatColor.GRAY + "Basket scoring is disabled in " + shooter.getName() + "'s debug profile.");
+            givePossessionToTeam(current, 1 - scoringTeam, rim);
+            return;
+        }
         int points = ball.points;
         current.teamScore[scoringTeam] += points;
         Location hoop = new Location(current.world, scoringTeam == 0 ? LEFT_HOOP_X : RIGHT_HOOP_X,
@@ -782,6 +790,10 @@ public final class HoopsRemasteredRuntime implements Listener {
     }
 
     private void shoot(Match current, Player shooter) {
+        if (!debugFeatureEnabled(shooter, "shooting")) {
+            shooter.sendActionBar(ChatColor.RED + "Shooting is disabled in your debug profile.");
+            return;
+        }
         Location eye = shooter.getEyeLocation();
         int team = current.teams.getOrDefault(shooter.getUniqueId(), 0);
         int defendingTeam = 1 - team;
@@ -865,6 +877,10 @@ public final class HoopsRemasteredRuntime implements Listener {
         if (target == null || current.holderId == null || !current.holderId.equals(target.getUniqueId())
                 || current.teams.getOrDefault(attacker.getUniqueId(), -1)
                         == current.teams.getOrDefault(target.getUniqueId(), -2)) return;
+        if (!debugFeatureEnabled(attacker, "steals")) {
+            attacker.sendActionBar(ChatColor.RED + "Steals are disabled in your debug profile.");
+            return;
+        }
         long now = System.currentTimeMillis();
         long readyAt = current.stealReadyAt.getOrDefault(attacker.getUniqueId(), 0L);
         Vector toHolder = target.getLocation().clone().add(0.0D, 1.0D, 0.0D)
@@ -882,6 +898,10 @@ public final class HoopsRemasteredRuntime implements Listener {
         attacker.sendActionBar(ChatColor.GREEN + "" + ChatColor.BOLD + "STEAL!");
         target.sendActionBar(ChatColor.RED + "Ball stolen by " + attacker.getName());
         announce(current, ChatColor.YELLOW + attacker.getName() + " stole the ball from " + target.getName() + "!");
+    }
+
+    private boolean debugFeatureEnabled(Player player, String feature) {
+        return player == null || !plugin.hasAdminAccess(player) || hooks.debugFeatureEnabled(player, feature);
     }
 
     private void spawnLooseBall(Match current, Location location, Vector velocity,
