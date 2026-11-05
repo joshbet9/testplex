@@ -1341,6 +1341,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             }
         }
         if (game == ArcadePortGame.SPLEEF) {
+            features.put("block-breaking", new DebugFeature("block-breaking", "Block breaking", Material.IRON_SHOVEL,
+                    "Allow this tester to damage and clear Spleef floor blocks.", true));
             for (String kit : List.of("snowballer", "archer", "brawler", "gust")) {
                 String key = "ability-" + kit;
                 features.put(key, new DebugFeature(key, "Kit feature: " + humanizeDebugKey(kit),
@@ -1501,6 +1503,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.PAINTBALL
                         && ("ignore-reload".equals(key) || key.startsWith("weapon-")))
                 || (game == ArcadePortGame.SPLEEF && key.startsWith("ability-"))
+                || (game == ArcadePortGame.SPLEEF && "block-breaking".equals(key))
                 || (game == ArcadePortGame.RUNNER && key.startsWith("ability-"))
                 || (game == ArcadePortGame.DEATH_TAG && key.startsWith("ability-"))
                 || (game == ArcadePortGame.EVOLUTION && key.startsWith("ability-"))

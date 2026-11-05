@@ -1192,4 +1192,17 @@ class GameDebugEventCatalogTest {
         assertTrue(manager.contains("private void updateMicroBarrier(Session session, long now)"));
         assertTrue(manager.contains("private void releaseMicroBattlesBarrier(Session session)"));
     }
+
+    @Test
+    void spleefDebugSwitchCanSuppressFloorBlockDamageForTheTester() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        assertTrue(lobby.contains("features.put(\"block-breaking\""));
+        assertTrue(manager.contains("ArcadePortGame.SPLEEF, \"block-breaking\", true"));
+    }
 }

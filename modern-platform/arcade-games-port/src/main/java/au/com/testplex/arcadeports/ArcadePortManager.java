@@ -22962,6 +22962,8 @@ public final class ArcadePortManager implements Listener {
         if (active != session || session.type != ArcadePortGame.SPLEEF || block == null
                 || block.getWorld() != session.world || !session.alive.contains(player.getUniqueId())
                 || isSpleefProtectedBlock(block.getType())) return;
+        if (plugin.hasAdminAccess(player) && !debugFeatureEnabled(player.getUniqueId(),
+                ArcadePortGame.SPLEEF, "block-breaking", true)) return;
         restoreSpleefHunger(session, player, now);
         String kit = session.spleefKits.getOrDefault(player.getUniqueId(), "snowballer");
         if ("brawler".equals(kit) && (!plugin.hasAdminAccess(player)
