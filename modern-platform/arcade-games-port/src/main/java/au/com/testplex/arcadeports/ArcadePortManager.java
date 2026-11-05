@@ -901,11 +901,23 @@ public final class ArcadePortManager implements Listener {
             tester.sendMessage(ChatColor.GOLD + baconAbilityName(session, tester.getUniqueId()) + " is maxed (debug).");
             triggered = true;
         }
+        if (type == ArcadePortGame.BOMB_LOBBERS && "spawn-powerups".equals(eventId)) {
+            int dropsBefore = session.bombPowerupDrops.size();
+            session.bombNextPowerupSpawnAtByTeam.remove(0);
+            updateBombLobbersPowerups(session, System.currentTimeMillis());
+            triggered = session.bombPowerupDrops.size() > dropsBefore;
+            if (triggered) GameDebugRuntimeOverrides.markDebugSession();
+        }
         if (type == ArcadePortGame.CASTLE_ASSAULT && "spawn-objective".equals(eventId)
                 && session.variantRuntime != null
                 && session.variantRuntime.debugSpawnObjectiveTnt(tester)) {
             GameDebugRuntimeOverrides.markDebugSession();
             triggered = true;
+        }
+        if (type == ArcadePortGame.RUNNER && "use-position-swap".equals(eventId)
+                && "switcher".equals(session.runnerKits.getOrDefault(tester.getUniqueId(), "leaper"))) {
+            triggered = useRunnerPositionSwap(session, tester, System.currentTimeMillis());
+            if (triggered) GameDebugRuntimeOverrides.markDebugSession();
         }
         if (type == ArcadePortGame.WITHER_ASSAULT && "spawn-minions".equals(eventId)
                 && session.teams.getOrDefault(tester.getUniqueId(), 0) == 1) {
@@ -22944,31 +22956,31 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    private void useRunnerPositionSwap(Session session, Player player, long now) {
+    private boolean useRunnerPositionSwap(Session session, Player player, long now) {
         UUID id = player.getUniqueId();
         if (session.runnerSwapUsed.contains(id)) {
             player.sendMessage(ChatColor.YELLOW + "Position Swap has already been used this round.");
-            return;
+            return false;
         }
         if (!canRunnerSwapFrom(session, player)) {
             player.sendMessage(ChatColor.RED + "You must be grounded or above an unrun block to swap.");
-            return;
+            return false;
         }
         List<Player> eligibleTargets = alivePlayers(session).stream()
                 .filter(target -> target != player && canRunnerSwapFrom(session, target))
                 .toList();
         if (eligibleTargets.isEmpty()) {
             player.sendMessage(ChatColor.YELLOW + "There are no eligible Runners to swap with.");
-            return;
+            return false;
         }
         Player target = eligibleTargets.get(ThreadLocalRandom.current().nextInt(eligibleTargets.size()));
 
         Location playerLocation = player.getLocation().clone();
         Location targetLocation = target.getLocation().clone();
-        if (!player.teleport(targetLocation)) return;
+        if (!player.teleport(targetLocation)) return false;
         if (!target.teleport(playerLocation)) {
             player.teleport(playerLocation);
-            return;
+            return false;
         }
         session.runnerSwapUsed.add(id);
         long graceUntil = now + 750L;
@@ -22982,6 +22994,7 @@ public final class ArcadePortManager implements Listener {
         target.playSound(target.getLocation(), Sound.ITEM_CHORUS_FRUIT_TELEPORT, 0.8F, 1.2F);
         player.sendMessage(ChatColor.LIGHT_PURPLE + "You swapped positions with " + target.getName() + ".");
         target.sendMessage(ChatColor.LIGHT_PURPLE + player.getName() + " swapped positions with you.");
+        return true;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)

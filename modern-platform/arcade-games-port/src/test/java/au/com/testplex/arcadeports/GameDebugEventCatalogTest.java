@@ -155,6 +155,43 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void runnerSwapDebugEventUsesTheNormalEligibleTargetAndGracePath() throws IOException {
+        Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ArcadePortManager.java");
+        if (!Files.isRegularFile(managerPath)) {
+            managerPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ArcadePortManager.java");
+        }
+        String source = Files.readString(managerPath);
+        assertTrue(source.contains("type == ArcadePortGame.RUNNER && \"use-position-swap\".equals(eventId)"));
+        int swap = source.indexOf("private boolean useRunnerPositionSwap(");
+        int nextMethod = source.indexOf("private boolean canRunnerSwapFrom(", swap);
+        assertTrue(swap >= 0 && nextMethod > swap);
+        String ability = source.substring(swap, nextMethod);
+        assertTrue(ability.contains("canRunnerSwapFrom(session, target)"));
+        assertTrue(ability.contains("session.runnerSwapUsed.add(id)"));
+        assertTrue(ability.contains("protectRunnerSwapLanding(session, player, graceUntil)"));
+        assertTrue(ability.contains("protectRunnerSwapLanding(session, target, graceUntil)"));
+    }
+
+    @Test
+    void bombLobbersPowerupEventUsesNormalSpawnerAndHonoursDisabledFeature() throws IOException {
+        Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ArcadePortManager.java");
+        if (!Files.isRegularFile(managerPath)) {
+            managerPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ArcadePortManager.java");
+        }
+        String source = Files.readString(managerPath);
+        assertTrue(source.contains("type == ArcadePortGame.BOMB_LOBBERS && \"spawn-powerups\".equals(eventId)"));
+        int updater = source.indexOf("private void updateBombLobbersPowerups(Session session, long now)");
+        int featureGate = source.indexOf("if (!ArcadePortRules.bombLobbersPowerupsEnabled())", updater);
+        int wave = source.indexOf("String[] choices = {\"wind-charge\"", featureGate);
+        assertTrue(updater >= 0 && featureGate > updater && wave > featureGate);
+        assertTrue(source.substring(updater, wave).contains("session.bombPowerupDrops.clear()"));
+    }
+
+    @Test
     void kitRefreshIsOnlyOfferedForGamesWithSharedKitSetup() {
         for (ArcadePortGame game : ArcadePortGame.values()) {
             boolean offered = GameDebugEventCatalog.events(game).stream()
