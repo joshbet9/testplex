@@ -17,13 +17,13 @@ This checklist tracks implemented controls, not menu/catalog presence alone. A g
 - [x] A source-backed test verifies every catalogued variable has a production gameplay consumer, including the mode-scoped Monster Maze and dynamic Sneaky Assassins rule accessors.
 - [x] Automated coverage requires every individual game and Monster Maze mode to expose at least one game-specific runtime variable in addition to shared combat rules.
 - [x] Shared feature switches cover kit unlock, invulnerability, fall damage and hunger; Bacon Brawl also has its unlimited-ability switch.
-- [x] Achievement preview mode runs real achievement conditions through shared Arcade award helpers and Snap; preview notices do not persist unlocks.
+- [x] Achievement previews provide a game-scoped read-only menu entry for each achievement message/sound, while achievement preview mode also runs real conditions through wired Arcade award helpers and Snap; neither path persists unlocks.
 - [x] Authorized testers can advance any shared Arcade start countdown, the live Draw My Thing turn, Master Builders build/review phase, Turf Wars phase, any supported shared round timeout, or the current Speed Builders, Plexball, Wizards, Snake, Snap, Monster Maze or Super Sploor phase; bot rosters are configured for the next round.
 - [x] Authorized testers can restore only their own active-round health/hunger and clear fire/potion effects without invoking damage, scoring, or achievement paths.
 - [x] Automated coverage verifies every event shown in a game menu has a matching production dispatcher, preventing catalog-only debug buttons.
 - [x] A source-backed access test protects the authorised-tester gates on debug menus, bot menus, event actions, phase changes and feature mutations.
 - [ ] Add explicit per-game control metadata for every meaningful mechanic, beyond primitive `ArcadePortRules` fields.
-- [ ] Add per-game event triggers and non-persistent achievement simulation beyond the award-preview hooks; current tools cover Draw My Thing hint reveal, Dragons spawn, Death Tag chaser conversion, One in the Quiver arrow refill, Paintball armour restoration, Wizards spell access, a normal selected-kit refresh for 17 shared games, and Wither Assault's minion-wave ability. Remaining games still need appropriate event tools.
+- [ ] Add per-game event triggers beyond the read-only achievement preview and award-preview hooks; current tools cover Draw My Thing hint reveal, Dragons spawn, Death Tag chaser conversion, One in the Quiver arrow refill, Paintball armour restoration, Spleef hunger restore, Wizards spell access, a normal selected-kit refresh for 17 shared games, and Wither Assault's minion-wave ability. Remaining games still need appropriate event tools.
 - [ ] Add automated persistence, permission, reset, live-effect and round-restart tests for profiles.
 - [ ] Verify every setting listed below against its gameplay consumer; keep unchecked games out of the **complete** state until done.
 

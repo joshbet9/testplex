@@ -68,6 +68,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private static final String DEBUG_FEATURES_TITLE = "Debug Features";
     private static final String DEBUG_VARIABLES_TITLE = "Debug Variables";
     private static final String DEBUG_EVENTS_TITLE = "Debug Events";
+    private static final String DEBUG_ACHIEVEMENTS_TITLE = "Debug Achievement Preview";
     private static final List<DebugFeature> COMMON_DEBUG_FEATURES = List.of(
             new DebugFeature("all-kits", "Unlock all kits", Material.NETHER_STAR,
                     "Bypass achievement-kit locks for the selected game.", false),
@@ -854,6 +855,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || title.equals(TEST_BOT_KITS_TITLE) || title.equals(TEST_BOT_COSMETICS_TITLE)
                 || title.equals(DEBUG_TITLE) || title.equals(DEBUG_PROFILES_TITLE)
                 || title.equals(DEBUG_FEATURES_TITLE) || title.equals(DEBUG_EVENTS_TITLE)
+                || title.equals(DEBUG_ACHIEVEMENTS_TITLE)
                 || title.startsWith(DEBUG_VARIABLES_TITLE)))return;
         e.setCancelled(true);
         if(!(e.getWhoClicked() instanceof Player p)||e.getClickedInventory()==null||e.getClickedInventory()!=e.getView().getTopInventory())return;
@@ -1020,6 +1022,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 "Set up the next round's bot count, team, kit and cosmetics.", "debug-open:bots"));
         inventory.setItem(27, testBotButton(Material.TARGET, "Game event tools",
                 "Trigger supported events in the active game through normal runtime handlers.", "debug-open:events"));
+        inventory.setItem(29, testBotButton(Material.KNOWLEDGE_BOOK, "Achievement previews",
+                "Preview each achievement message; previews never unlock or save progress.", "debug-open:achievements"));
         inventory.setItem(37, testBotButton(Material.CLOCK, "Profile application",
                 "Immediate switches take effect now. Rule switches and numeric values apply when the next round starts."));
         inventory.setItem(39, testBotButton(Material.FEATHER, "Advance game phase or timer",
@@ -1036,6 +1040,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private boolean isDebugMenuTitle(String title) {
         return DEBUG_TITLE.equals(title) || DEBUG_PROFILES_TITLE.equals(title)
                 || DEBUG_FEATURES_TITLE.equals(title) || DEBUG_EVENTS_TITLE.equals(title)
+                || DEBUG_ACHIEVEMENTS_TITLE.equals(title)
                 || title != null && title.startsWith(DEBUG_VARIABLES_TITLE);
     }
 
@@ -1046,6 +1051,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         if ("debug-open:profiles".equals(action)) { openDebugProfiles(player); return; }
         if ("debug-open:features".equals(action)) { openDebugFeatures(player); return; }
         if ("debug-open:events".equals(action)) { openDebugEvents(player); return; }
+        if ("debug-open:achievements".equals(action)) { openDebugAchievements(player); return; }
         if ("debug-open:variables:0".equals(action)) { openDebugVariables(player, 0); return; }
         if ("debug-open:bots".equals(action)) { openTestBotSetup(player, debugGame(player)); return; }
         ArcadePortGame game = debugGame(player);
@@ -1055,6 +1061,14 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             player.sendMessage(triggered ? ChatColor.GREEN + "The game event was triggered."
                     : ChatColor.YELLOW + "That event is unavailable for your current game role or phase.");
             openDebugEvents(player);
+            return;
+        }
+        if (action.startsWith("debug-achievement:")) {
+            boolean previewed = manager.previewAchievementForTester(player, game,
+                    action.substring("debug-achievement:".length()));
+            player.sendMessage(previewed ? ChatColor.AQUA + "Achievement preview shown; progress was not changed."
+                    : ChatColor.YELLOW + "That achievement is unavailable for this game.");
+            openDebugAchievements(player);
             return;
         }
         if ("debug-advance-phase".equals(action)) {
@@ -1154,6 +1168,29 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         }
         if (events.isEmpty()) {
             inventory.setItem(22, item(Material.BARRIER, ChatColor.GRAY + "No event tools registered for this game yet"));
+        }
+        inventory.setItem(49, testBotButton(Material.ARROW, "Back", "debug-back"));
+        player.openInventory(inventory);
+    }
+
+    private void openDebugAchievements(Player player) {
+        ArcadePortGame game = debugGame(player);
+        Inventory inventory = Bukkit.createInventory(null, 54, DEBUG_ACHIEVEMENTS_TITLE);
+        inventory.setItem(4, item(Material.KNOWLEDGE_BOOK,
+                ChatColor.AQUA + game.displayName() + " Achievement Previews",
+                ChatColor.GRAY + "Click one to display its message and sound.",
+                ChatColor.YELLOW + "No achievement or statistic will be saved."));
+        List<ArcadeProgressCatalog.Achievement> achievements = ArcadeProgressCatalog.achievements(game.id());
+        int slot = 9;
+        for (ArcadeProgressCatalog.Achievement achievement : achievements) {
+            if (slot > 44) break;
+            inventory.setItem(slot++, testBotButton(Material.PAPER,
+                    ChatColor.GOLD + achievement.name(),
+                    achievement.requirement(),
+                    "debug-achievement:" + achievement.id()));
+        }
+        if (achievements.isEmpty()) {
+            inventory.setItem(22, item(Material.BARRIER, ChatColor.GRAY + "No achievement entries registered"));
         }
         inventory.setItem(49, testBotButton(Material.ARROW, "Back", "debug-back"));
         player.openInventory(inventory);

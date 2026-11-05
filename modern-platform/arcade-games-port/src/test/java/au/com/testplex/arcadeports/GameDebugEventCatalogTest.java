@@ -79,6 +79,30 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void achievementPreviewIsAuthorisedGameScopedAndDoesNotWriteProgress() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        int start = manager.indexOf("boolean previewAchievementForTester(");
+        int end = manager.indexOf("private void awardBombLobbersAchievement(", start);
+        assertTrue(start >= 0 && end > start);
+        String preview = manager.substring(start, end);
+
+        assertTrue(lobby.contains("debug-open:achievements"));
+        assertTrue(lobby.contains("ArcadeProgressCatalog.achievements(game.id())"));
+        assertTrue(preview.contains("!plugin.hasAdminAccess(tester)"));
+        assertTrue(preview.contains("!tester.getUniqueId().equals(debugContextOwner)"));
+        assertTrue(preview.contains("game != debugContextGame"));
+        assertTrue(preview.contains("ArcadeProgressCatalog.achievements(game.id())"));
+        assertFalse(preview.contains("plugin.getConfig().set"));
+        assertFalse(preview.contains("plugin.saveConfig"));
+    }
+
+    @Test
     void debugAndBotMenusAndRuntimeMutationsRemainTesterOnly() throws IOException {
         Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
         if (!Files.isDirectory(sourceRoot)) {

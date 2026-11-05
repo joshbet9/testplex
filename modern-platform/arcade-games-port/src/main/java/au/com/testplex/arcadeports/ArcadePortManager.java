@@ -19852,6 +19852,19 @@ public final class ArcadePortManager implements Listener {
         return debugAchievementPreview(playerId == null ? null : Bukkit.getPlayer(playerId), game, displayName);
     }
 
+    boolean previewAchievementForTester(Player tester, ArcadePortGame game, String achievementId) {
+        if (tester == null || !tester.isOnline() || !plugin.hasAdminAccess(tester) || game == null
+                || !tester.getUniqueId().equals(debugContextOwner) || game != debugContextGame
+                || achievementId == null || achievementId.isBlank()) return false;
+        ArcadeProgressCatalog.Achievement achievement = ArcadeProgressCatalog.achievements(game.id()).stream()
+                .filter(candidate -> candidate.id().equals(achievementId)).findFirst().orElse(null);
+        if (achievement == null) return false;
+        tester.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + ChatColor.YELLOW + achievement.name()
+                + ChatColor.GRAY + " (debug preview only; progress not saved)");
+        tester.playSound(tester.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.8F, 1.15F);
+        return true;
+    }
+
     private void awardBombLobbersAchievement(Player player, String key, String description) {
         if (debugAchievementPreview(player, ArcadePortGame.BOMB_LOBBERS, description)) return;
         if (GameDebugRuntimeOverrides.isDebugSession() || player == null || testPlayers.isTestPlayer(player)
