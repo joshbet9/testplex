@@ -726,6 +726,23 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void skyWarsDebugSwitchesGateChestLootIslandCrumblingAndTntGenerator() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        assertTrue(lobby.contains("features.put(\"chest-looting\""));
+        assertTrue(lobby.contains("features.put(\"island-crumbling\""));
+        assertTrue(lobby.contains("features.put(\"tnt-generator\""));
+        assertTrue(manager.contains("ArcadePortGame.SKY_WARS, \"chest-looting\", true"));
+        assertTrue(manager.contains("debugFeatureEnabledForActiveSession(\n                ArcadePortGame.SKY_WARS, \"island-crumbling\")"));
+        assertTrue(manager.contains("debugFeatureEnabledForActiveSession(ArcadePortGame.SKY_WARS, \"tnt-generator\")"));
+    }
+
+    @Test
     void microBattlesDebugSwitchesGateBlocksAndKitAbilities() throws IOException {
         Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
         if (!Files.isDirectory(sourceRoot)) {

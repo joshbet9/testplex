@@ -8850,7 +8850,9 @@ public final class ArcadePortManager implements Listener {
         updateSkyWarsDirtProjectiles(session);
         updateSkyWarsGuardians(session);
 
-        if (!session.skyWarsCrumbleStarted && now >= session.skyWarsCrumbleAt) {
+        boolean islandCrumblingEnabled = debugFeatureEnabledForActiveSession(
+                ArcadePortGame.SKY_WARS, "island-crumbling");
+        if (islandCrumblingEnabled && !session.skyWarsCrumbleStarted && now >= session.skyWarsCrumbleAt) {
             session.skyWarsCrumbleStarted = true;
             announce(session, ChatColor.GREEN + "The world begins to crumble...");
             for (Player player : session.players.values()) {
@@ -8859,10 +8861,10 @@ public final class ArcadePortManager implements Listener {
                 }
             }
         }
-        if (session.skyWarsCrumbleBoundsValid && !session.skyWarsCrumbleScanComplete) {
+        if (islandCrumblingEnabled && session.skyWarsCrumbleBoundsValid && !session.skyWarsCrumbleScanComplete) {
             scanSkyWarsCrumbleLayer(session);
         }
-        if (session.skyWarsCrumbleStarted && session.skyWarsCrumbleScanComplete) {
+        if (islandCrumblingEnabled && session.skyWarsCrumbleStarted && session.skyWarsCrumbleScanComplete) {
             for (int count = 0; count < 4 && !session.skyWarsCrumbleQueue.isEmpty(); count++) {
                 SkyWarsCrumbleCandidate candidate = session.skyWarsCrumbleQueue.poll();
                 Block block = candidate.block();
@@ -8892,6 +8894,7 @@ public final class ArcadePortManager implements Listener {
 
     private boolean spawnSkyWarsTnt(Session session, long now) {
         if (session == null || active != session || session.type != ArcadePortGame.SKY_WARS
+                || !debugFeatureEnabledForActiveSession(ArcadePortGame.SKY_WARS, "tnt-generator")
                 || !session.liveStarted || session.skyWarsTntGenerator == null
                 || now < session.skyWarsNextTntAt) return false;
         ItemStack tnt = skyWarsKitItem(Material.TNT, "Left Click - Throw / Right Click - Drop",
@@ -9365,13 +9368,18 @@ public final class ArcadePortManager implements Listener {
         plugin.saveConfig();
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onSkyWarsChestOpen(InventoryOpenEvent event) {
         Session session = active;
         if (session == null || session.type != ArcadePortGame.SKY_WARS
                 || !(event.getPlayer() instanceof Player player)
                 || !session.alive.contains(player.getUniqueId())) return;
-        if (event.getInventory().getHolder() instanceof org.bukkit.block.Chest) {
+        if (!event.isCancelled() && event.getInventory().getHolder() instanceof org.bukkit.block.Chest) {
+            if (plugin.hasAdminAccess(player) && !debugFeatureEnabled(player.getUniqueId(),
+                    ArcadePortGame.SKY_WARS, "chest-looting", true)) {
+                event.setCancelled(true);
+                return;
+            }
             session.skyWarsOpenedChestPlayers.add(player.getUniqueId());
         }
     }

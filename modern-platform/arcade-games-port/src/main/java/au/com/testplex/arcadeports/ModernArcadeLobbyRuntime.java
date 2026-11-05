@@ -1409,6 +1409,12 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     "Allow authorised testers to break Micro Battles blocks.", true));
         }
         if (game == ArcadePortGame.SKY_WARS) {
+            features.put("chest-looting", new DebugFeature("chest-looting", "Chest looting", Material.CHEST,
+                    "Allow players to open SkyWars chests and take their contents.", true));
+            features.put("island-crumbling", new DebugFeature("island-crumbling", "Island crumbling", Material.GRAVEL,
+                    "Start and process the normal SkyWars island crumble event.", true));
+            features.put("tnt-generator", new DebugFeature("tnt-generator", "TNT generator", Material.TNT,
+                    "Generate throwable TNT at the map's normal generator on its regular timer.", true));
             for (String kit : List.of("ice", "fire", "air", "metal", "earth")) {
                 String key = "ability-" + kit;
                 features.put(key, new DebugFeature(key, "Kit feature: " + humanizeDebugKey(kit),
@@ -1496,6 +1502,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.MICRO_BATTLES
                         && (key.startsWith("ability-") || key.startsWith("blocks-")))
                 || (game == ArcadePortGame.SKY_WARS && key.startsWith("ability-"))
+                || (game == ArcadePortGame.SKY_WARS && Set.of("chest-looting", "island-crumbling", "tnt-generator").contains(key))
                 || (game == ArcadePortGame.SNAKE
                         && (key.startsWith("ability-") || "tail-collisions".equals(key)
                                 || "magma-hazards".equals(key) || "lava-elimination".equals(key)))
