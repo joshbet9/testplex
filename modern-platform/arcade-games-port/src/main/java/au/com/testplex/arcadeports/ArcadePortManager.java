@@ -897,6 +897,16 @@ public final class ArcadePortManager implements Listener {
             launchWitherMinions(session, tester, System.currentTimeMillis());
             triggered = session.witherMinionOwners.size() > before;
         }
+        if (type == ArcadePortGame.DRAW_MY_THING && "reveal-letter".equals(eventId)
+                && session.drawCurrentDrawer != null && session.drawWord != null) {
+            int revealedIndex = DrawMyThingDebugRules.nextHiddenLetterIndex(
+                    session.drawWord, session.drawRevealedLetters, ThreadLocalRandom.current());
+            if (revealedIndex >= 0) {
+                session.drawRevealedLetters.add(revealedIndex);
+                updateDrawMyThing(session, System.currentTimeMillis());
+                triggered = true;
+            }
+        }
         if (triggered) GameDebugRuntimeOverrides.markDebugSession();
         return triggered;
     }

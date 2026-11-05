@@ -17,7 +17,7 @@ This checklist tracks implemented controls, not menu/catalog presence alone. A g
 - [x] Authorized testers can advance any shared Arcade start countdown, the live Draw My Thing turn, Master Builders build/review phase, Turf Wars phase, any supported shared round timeout, or the current Speed Builders, Plexball, Wizards, Snake, Snap, Monster Maze or Super Sploor phase; bot rosters are configured for the next round.
 - [x] Authorized testers can restore only their own active-round health/hunger and clear fire/potion effects without invoking damage, scoring, or achievement paths.
 - [ ] Add explicit per-game control metadata for every meaningful mechanic, beyond primitive `ArcadePortRules` fields.
-- [ ] Add per-game event triggers and non-persistent achievement simulation beyond the award-preview hooks; Wither Assault can invoke its normal minion-wave ability, but the current vitals action is a shared tester utility, not a substitute for the remaining event tools.
+- [ ] Add per-game event triggers and non-persistent achievement simulation beyond the award-preview hooks; Draw My Thing can reveal the next hint letter and Wither Assault can invoke its normal minion-wave ability, but remaining game event tools are still needed.
 - [ ] Add automated persistence, permission, reset, live-effect and round-restart tests for profiles.
 - [ ] Verify every setting listed below against its gameplay consumer; keep unchecked games out of the **complete** state until done.
 
@@ -37,7 +37,7 @@ The common tester switches (all kits, invulnerability, no fall damage, and no hu
 | Death Tag | Partial | Shared rule overrides plus chaser promotion, archer knockback and Traitor cooldown are runtime-backed | Runner/chaser feature controls, tag/respawn/event tools and achievements |
 | Dragon Escape | Partial | Shared rule overrides plus Digger protection radius and Warper grace period are runtime-backed | Dragon/ability/finish feature switches and event controls |
 | Dragons | Partial | Shared rule overrides plus sparkler count and lifetime are runtime-backed | Tamer/dragon/perk controls and phase/event tools |
-| Draw My Thing | Partial | 320-second match budget and per-turn cap can be tuned through runtime-backed rules | Drawing/guess/map/round controls, event tools and direct tests |
+| Draw My Thing | Partial | 320-second match budget and per-turn cap can be tuned through runtime-backed rules; authorised testers can reveal the next hint letter during a live round | Drawing/guess/map/round controls and direct tests |
 | Evolution | Partial | Shared rules include transformation timing, Quick Evolver multiplier, win level, overkill threshold and Sulphur Bomb range/cooldown | Per-form abilities, pity/evolution controls and event tools |
 | Gladiators | Partial | Shared rule overrides and common switches | Bracket/duel controls, forfeit/disconnect simulation and profile acceptance tests |
 | Heroes of GWEN | Partial | Shared rule overrides plus Heroes runtime constants | Per-hero/minion/objective switches and phase/event tools |
