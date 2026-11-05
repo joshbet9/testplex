@@ -17,6 +17,9 @@ final class GameDebugEventCatalog {
     private static final List<Event> DRAGONS = List.of(
             new Event("spawn-dragon", "Spawn Next Dragon Now", Material.DRAGON_EGG,
                     "Run the normal map spawn and target initialization without waiting for the interval."));
+    private static final List<Event> ONE_IN_THE_QUIVER = List.of(
+            new Event("refill-arrow", "Restore Super Arrow", Material.ARROW,
+                    "Restore the normal one-shot arrow to its configured hotbar slot for testing."));
 
     private GameDebugEventCatalog() { }
 
@@ -24,6 +27,7 @@ final class GameDebugEventCatalog {
         if (game == ArcadePortGame.WITHER_ASSAULT) return WITHER_ASSAULT;
         if (game == ArcadePortGame.DRAW_MY_THING) return DRAW_MY_THING;
         if (game == ArcadePortGame.DRAGONS) return DRAGONS;
+        if (game == ArcadePortGame.ONE_IN_THE_QUIVER) return ONE_IN_THE_QUIVER;
         return List.of();
     }
 }

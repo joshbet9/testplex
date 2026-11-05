@@ -920,6 +920,15 @@ public final class ArcadePortManager implements Listener {
                     .filter(entity -> entity instanceof EnderDragon && entity.isValid()).count();
             triggered = dragonsAfter > dragonsBefore;
         }
+        if (type == ArcadePortGame.ONE_IN_THE_QUIVER && "refill-arrow".equals(eventId)) {
+            int arrowSlot = Math.max(0, Math.min(8, GameDebugRuntimeOverrides.intValue(
+                    "QUIVER_ARROW_SLOT", ArcadePortRules.QUIVER_ARROW_SLOT)));
+            ItemStack arrow = namedItem(Material.ARROW, "Super Arrow",
+                    "One arrow per shot; earn another with each kill.");
+            GameDebugRuntimeOverrides.markDebugSession();
+            tester.getInventory().setItem(arrowSlot, allowQuiverGlassBreaks(arrow));
+            triggered = true;
+        }
         return triggered;
     }
 
