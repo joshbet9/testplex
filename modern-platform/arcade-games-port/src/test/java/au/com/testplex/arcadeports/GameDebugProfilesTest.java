@@ -142,6 +142,24 @@ class GameDebugProfilesTest {
     }
 
     @Test
+    void commonFeatureSwitchesPersistAndResetIndependentlyForEveryGame() {
+        GameDebugProfiles profiles = new GameDebugProfiles(directory.resolve("all-game-features.yml").toFile(),
+                ignored -> { });
+        UUID tester = UUID.randomUUID();
+
+        for (ArcadePortGame game : ArcadePortGame.values()) {
+            profiles.setFeature(tester, game, "no-fall-damage", true);
+            assertTrue(profiles.feature(tester, game, "no-fall-damage", false), game.id());
+            profiles.create(tester, game, "fresh");
+            assertFalse(profiles.feature(tester, game, "no-fall-damage", false), game.id() + " profile isolation");
+            profiles.resetSelected(tester, game);
+            assertFalse(profiles.hasFeature(tester, game, "no-fall-damage"), game.id() + " reset");
+            assertTrue(profiles.select(tester, game, GameDebugProfiles.DEFAULT_PROFILE));
+            assertTrue(profiles.feature(tester, game, "no-fall-damage", false), game.id() + " default retained");
+        }
+    }
+
+    @Test
     void numericValuesAreRestrictedToKnownGameRulesAndSafeRanges() {
         GameDebugProfiles profiles = new GameDebugProfiles(directory.resolve("bounded.yml").toFile(), ignored -> { });
         UUID tester = UUID.randomUUID();

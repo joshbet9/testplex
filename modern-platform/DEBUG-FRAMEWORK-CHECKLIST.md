@@ -8,6 +8,7 @@ This checklist tracks implemented controls, not menu/catalog presence alone. A g
 - [x] Profiles and test-bot loadouts are stored separately in `debug-profiles.yml`, outside normal game settings and player stats.
 - [x] Named profiles support create, duplicate, rename, load, save and delete; the default profile cannot be deleted.
 - [x] Automated coverage saves an isolated bot count, team, kit and cosmetic selection for every game and verifies new named profiles do not inherit another profile's roster.
+- [x] Automated coverage verifies common feature switches persist, reset and remain isolated across profiles for every game.
 - [x] Reset to Defaults removes only the selected profile's overrides.
 - [x] Menus separate profiles, feature switches, variables and bot setup for the currently selected game.
 - [x] Numeric shared Arcade rules can be overridden for the active round; the menu marks these as restart-required.
