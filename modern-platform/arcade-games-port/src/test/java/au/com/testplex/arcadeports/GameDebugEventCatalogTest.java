@@ -675,6 +675,29 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void castleAssaultDebugSwitchesGateObjectiveDamageAndTnt() throws IOException {
+        Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "CastleAssaultHeroesOfGwenRuntime.java");
+        Path lobbyPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ModernArcadeLobbyRuntime.java");
+        if (!Files.isRegularFile(runtimePath)) {
+            runtimePath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "CastleAssaultHeroesOfGwenRuntime.java");
+            lobbyPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ModernArcadeLobbyRuntime.java");
+        }
+        String runtime = Files.readString(runtimePath);
+        String lobby = Files.readString(lobbyPath);
+        assertTrue(lobby.contains("\"objective-tnt\", \"Objective TNT\""));
+        assertTrue(lobby.contains("\"crystal-damage\", \"Sentry crystal damage\""));
+        assertTrue(lobby.contains("\"king-damage\", \"King damage\""));
+        assertTrue(runtime.contains("!debugFeatureEnabled(tester, \"objective-tnt\")"));
+        assertTrue(runtime.contains("!debugFeatureEnabled(attacker, \"crystal-damage\")"));
+        assertTrue(runtime.contains("!debugFeatureEnabled(attacker, \"king-damage\")"));
+        assertTrue(runtime.contains("!debugFeatureEnabled(player, \"objective-tnt\")"));
+    }
+
+    @Test
     void heroesOfGwenDebugEventStartsTheNormalPairedMinionWave() throws IOException {
         Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "CastleAssaultHeroesOfGwenRuntime.java");

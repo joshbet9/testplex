@@ -105,6 +105,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         void finish(Player winner, int winningTeam, String reason);
         void heroSelected(Player player, String hero);
         String cosmeticOption(Player player, String lineId, String fallback);
+        boolean debugFeatureEnabled(Player player, String feature);
     }
 
     private static final int CASTLE_KING_HEALTH = 600;
@@ -1746,6 +1747,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     boolean debugSpawnObjectiveTnt(Player tester) {
         if (stopped || !ready || game != ArcadePortGame.CASTLE_ASSAULT || tester == null
                 || !tester.isOnline() || !activePlayers.contains(tester.getUniqueId())
+                || !debugFeatureEnabled(tester, "objective-tnt")
                 || objectiveItem != null && objectiveItem.isValid() || objectiveCarrier != null) return false;
         objectiveRespawnAt = 0L;
         spawnObjectiveTnt();
@@ -1764,6 +1766,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         nextMinionWaveAt = now + mobaMinionWaveInterval();
         updateHeroesOfGwenMinions(now);
         return heroesOfGwenMinionTeams.size() > before;
+    }
+
+    private boolean debugFeatureEnabled(Player player, String feature) {
+        return player == null || !plugin.hasAdminAccess(player) || hooks.debugFeatureEnabled(player, feature);
     }
 
     private void tickCastleAssault(long now) {
@@ -2134,6 +2140,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             event.setCancelled(true);
             return;
         }
+        if (!debugFeatureEnabled(player, "objective-tnt")) {
+            event.setCancelled(true);
+            player.sendActionBar(ChatColor.RED + "Objective TNT is disabled in your debug profile.");
+            return;
+        }
         event.setCancelled(true);
         objectiveCarrier = player.getUniqueId();
         objectiveCarryStartedAt = System.currentTimeMillis();
@@ -2241,7 +2252,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             }
             if (event.getAction().isRightClick() && player.getUniqueId().equals(objectiveCarrier)) {
                 event.setCancelled(true);
-                detonateObjectiveTnt(player);
+                if (debugFeatureEnabled(player, "objective-tnt")) detonateObjectiveTnt(player);
+                else player.sendActionBar(ChatColor.RED + "Objective TNT is disabled in your debug profile.");
                 return;
             }
             if (event.getAction().isLeftClick() && event.getItem() != null
@@ -2904,6 +2916,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void detonateObjectiveTnt(Player carrier) {
+        if (!debugFeatureEnabled(carrier, "objective-tnt")) return;
         restoreCarrierHelmet(carrier);
         objectiveCarrier = null;
         objectiveCarryStartedAt = 0L;
@@ -3044,6 +3057,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void destroyCastleCrystal(KingState king, EnderCrystal crystal, Player attacker) {
+        if (!debugFeatureEnabled(attacker, "crystal-damage")) return;
         if (!king.crystals.remove(crystal)) return;
         Location crystalLocation = crystal.getLocation().clone();
         world.spawnParticle(Particle.EXPLOSION_EMITTER, crystalLocation, 1);
@@ -3064,6 +3078,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void damageCastleKing(KingState king, double damage, Player attacker) {
+        if (!debugFeatureEnabled(attacker, "king-damage")) return;
         if (king.activeCrystals() > 0 || king.health <= 0) return;
         king.health = Math.max(0, king.health - (int) Math.ceil(damage));
         if (king.entity != null && king.entity.isValid()) {

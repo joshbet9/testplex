@@ -626,6 +626,14 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             if ("frost".equals(value)) return Material.SNOWBALL;
             if ("slime".equals(value)) return Material.SLIME_BALL;
         }
+        if (game == ArcadePortGame.CASTLE_ASSAULT) {
+            features.put("objective-tnt", new DebugFeature("objective-tnt", "Objective TNT", Material.TNT,
+                    "Allow the tester to collect and detonate Objective TNT or spawn it for testing.", true));
+            features.put("crystal-damage", new DebugFeature("crystal-damage", "Sentry crystal damage", Material.END_CRYSTAL,
+                    "Allow the tester's kills and Objective TNT to damage sentry crystals.", true));
+            features.put("king-damage", new DebugFeature("king-damage", "King damage", Material.ZOMBIE_HEAD,
+                    "Allow the tester's attacks and Objective TNT to damage the enemy King.", true));
+        }
         if (value.contains("lantern") || value.contains("soul")) return Material.SOUL_LANTERN;
         if (value.contains("footprint") || value.contains("bark")) return Material.OAK_LEAVES;
         if (value.contains("dragon-eye")) return Material.ENDER_EYE;
@@ -1345,6 +1353,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.BACON_BRAWL && key.startsWith("ability-"))
                 || (game == ArcadePortGame.BOMB_LOBBERS
                         && ("double-jump".equals(key) || "pitch-adjustment".equals(key) || "block-wall".equals(key)))
+                || (game == ArcadePortGame.CASTLE_ASSAULT
+                        && ("objective-tnt".equals(key) || "crystal-damage".equals(key) || "king-damage".equals(key)))
                 || (game == ArcadePortGame.DRAGON_ESCAPE && key.startsWith("ability-"))
                 || (game == ArcadePortGame.DRAGONS && key.startsWith("ability-"))
                 || (game == ArcadePortGame.ONE_IN_THE_QUIVER && key.startsWith("ability-"))

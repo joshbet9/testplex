@@ -5061,6 +5061,11 @@ public final class ArcadePortManager implements Listener {
                         public String cosmeticOption(Player player, String lineId, String fallback) {
                             return selectedGameCosmeticOption(player, "castle-assault", lineId, fallback);
                         }
+
+                        @Override
+                        public boolean debugFeatureEnabled(Player player, String feature) {
+                            return ArcadePortManager.this.debugFeatureEnabled(player.getUniqueId(), type, feature, true);
+                        }
                     });
             if (!session.variantRuntime.isReady()) {
                 sender.sendMessage(ChatColor.RED + "The authentic " + type.displayName()
