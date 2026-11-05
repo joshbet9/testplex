@@ -171,7 +171,7 @@ class GameDebugEventCatalogTest {
         String manager = Files.readString(arcadeSources.resolve("ArcadePortManager.java"));
         String snake = Files.readString(snakeManagerPath);
         for (String control : List.of("ability-speed", "ability-reverse", "ability-invulnerable",
-                "tail-collisions", "magma-hazards", "lava-elimination")) {
+                "tail-collisions", "self-collisions", "opponent-collisions", "magma-hazards", "lava-elimination")) {
             assertTrue(lobby.contains("\"" + control + "\""), control + " appears in Snake's debug menu");
         }
         assertTrue(snake.contains("booleanValue(abilityFeature, true)"));
@@ -179,6 +179,8 @@ class GameDebugEventCatalogTest {
             assertTrue(snake.contains("booleanValue(\"" + control + "\""),
                     control + " is consumed by Snake gameplay");
         }
+        assertTrue(snake.contains("booleanValue(\"self-collisions\", true)"));
+        assertTrue(snake.contains("booleanValue(\"opponent-collisions\", true)"));
         assertTrue(manager.contains("GameDebugRuntimeOverrides.setValue(flag, enabled)"));
         assertTrue(snake.contains("plugin.hasAdminAccess(event.getPlayer())"));
         assertTrue(snake.contains("plugin.hasAdminAccess(playerState.player)"));

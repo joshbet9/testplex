@@ -1433,6 +1433,10 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             }
             features.put("tail-collisions", new DebugFeature("tail-collisions", "Tail collisions", Material.SHEARS,
                     "Enable normal Snake head-to-tail eliminations for this debug session.", true));
+            features.put("self-collisions", new DebugFeature("self-collisions", "Self-tail collisions", Material.LEAD,
+                    "Eliminate this tester when their own head hits their tail.", true));
+            features.put("opponent-collisions", new DebugFeature("opponent-collisions", "Opponent-tail collisions", Material.IRON_SWORD,
+                    "Eliminate this tester when their head hits another Snake's tail.", true));
             features.put("magma-hazards", new DebugFeature("magma-hazards", "Magma Cube hazards", Material.MAGMA_CREAM,
                     "Spawn and steer the normal Magma Cube item hazards for this debug session.", true));
             features.put("lava-elimination", new DebugFeature("lava-elimination", "Lava elimination", Material.LAVA_BUCKET,
@@ -1508,6 +1512,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.SKY_WARS && Set.of("chest-looting", "island-crumbling", "tnt-generator").contains(key))
                 || (game == ArcadePortGame.SNAKE
                         && (key.startsWith("ability-") || "tail-collisions".equals(key)
+                                || "self-collisions".equals(key) || "opponent-collisions".equals(key)
                                 || "magma-hazards".equals(key) || "lava-elimination".equals(key)))
                 || (game == ArcadePortGame.SNEAKY_ASSASSINS
                         && (Set.of("disguises", "power-ups", "global-reveal", "npc-patrol", "master-compass")

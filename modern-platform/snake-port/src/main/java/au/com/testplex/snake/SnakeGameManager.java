@@ -1148,6 +1148,12 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
             Location head = playerState.segments.get(0).getLocation();
             boolean hit = false;
             for (SnakeState otherState : live) {
+                if (plugin.hasAdminAccess(playerState.player)
+                        && otherState == playerState
+                        && !GameDebugRuntimeOverrides.booleanValue("self-collisions", true)) continue;
+                if (plugin.hasAdminAccess(playerState.player)
+                        && otherState != playerState
+                        && !GameDebugRuntimeOverrides.booleanValue("opponent-collisions", true)) continue;
                 for (int i = 0; i < otherState.segments.size(); i++) {
                     if (otherState == playerState && i < 3) continue;
                     Sheep segment = otherState.segments.get(i);
