@@ -935,6 +935,12 @@ public final class ArcadePortManager implements Listener {
             setPaintballArmor(session, tester);
             triggered = true;
         }
+        if (type == ArcadePortGame.DEATH_TAG && "promote-self".equals(eventId)
+                && !session.tagged.contains(tester.getUniqueId())) {
+            GameDebugRuntimeOverrides.markDebugSession();
+            makeDeathTagChaser(session, tester, "promoted by an authorised debug event");
+            triggered = session.tagged.contains(tester.getUniqueId());
+        }
         return triggered;
     }
 

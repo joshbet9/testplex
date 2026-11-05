@@ -23,6 +23,9 @@ final class GameDebugEventCatalog {
     private static final List<Event> PAINTBALL = List.of(
             new Event("restore-armour", "Restore Paintball Armour", Material.LEATHER_CHESTPLATE,
                     "Restore your normal four armour pieces using the selected team's colours."));
+    private static final List<Event> DEATH_TAG = List.of(
+            new Event("promote-self", "Promote Self to Chaser", Material.SKELETON_SKULL,
+                    "Run the normal Runner-to-Chaser conversion on yourself."));
 
     private GameDebugEventCatalog() { }
 
@@ -32,6 +35,7 @@ final class GameDebugEventCatalog {
         if (game == ArcadePortGame.DRAGONS) return DRAGONS;
         if (game == ArcadePortGame.ONE_IN_THE_QUIVER) return ONE_IN_THE_QUIVER;
         if (game == ArcadePortGame.PAINTBALL) return PAINTBALL;
+        if (game == ArcadePortGame.DEATH_TAG) return DEATH_TAG;
         return List.of();
     }
 }

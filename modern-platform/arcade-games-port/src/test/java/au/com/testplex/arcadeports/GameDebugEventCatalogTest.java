@@ -16,6 +16,8 @@ class GameDebugEventCatalogTest {
                 .getFirst().id());
         assertEquals("restore-armour", GameDebugEventCatalog.events(ArcadePortGame.PAINTBALL)
                 .getFirst().id());
+        assertEquals("promote-self", GameDebugEventCatalog.events(ArcadePortGame.DEATH_TAG)
+                .getFirst().id());
         assertFalse(GameDebugEventCatalog.events(ArcadePortGame.BACON_BRAWL).stream()
                 .anyMatch(event -> event.id().equals("spawn-minions")));
     }

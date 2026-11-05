@@ -17,7 +17,7 @@ This checklist tracks implemented controls, not menu/catalog presence alone. A g
 - [x] Authorized testers can advance any shared Arcade start countdown, the live Draw My Thing turn, Master Builders build/review phase, Turf Wars phase, any supported shared round timeout, or the current Speed Builders, Plexball, Wizards, Snake, Snap, Monster Maze or Super Sploor phase; bot rosters are configured for the next round.
 - [x] Authorized testers can restore only their own active-round health/hunger and clear fire/potion effects without invoking damage, scoring, or achievement paths.
 - [ ] Add explicit per-game control metadata for every meaningful mechanic, beyond primitive `ArcadePortRules` fields.
-- [ ] Add per-game event triggers and non-persistent achievement simulation beyond the award-preview hooks; current tools cover Draw My Thing hint reveal, Dragons spawn, One in the Quiver arrow refill, Paintball armour restoration and Wither Assault's normal minion-wave ability, but remaining games still need tools.
+- [ ] Add per-game event triggers and non-persistent achievement simulation beyond the award-preview hooks; current tools cover Draw My Thing hint reveal, Dragons spawn, Death Tag chaser conversion, One in the Quiver arrow refill, Paintball armour restoration and Wither Assault's normal minion-wave ability, but remaining games still need tools.
 - [ ] Add automated persistence, permission, reset, live-effect and round-restart tests for profiles.
 - [ ] Verify every setting listed below against its gameplay consumer; keep unchecked games out of the **complete** state until done.
 
@@ -34,7 +34,7 @@ The common tester switches (all kits, invulnerability, no fall damage, and no hu
 | Bacon Brawl | Partial | Shared rule overrides; common switches; achievement preview in its award helper | Per-kit ability switches/variables, event triggers and stats-isolated match simulation |
 | Bomb Lobbers | Partial | Shared rule overrides and common switches; authorised testers can pause future power-up waves and clear loose drops through a profile-backed live switch | TNT/event controls, phase tools and full feature regression tests |
 | Castle Assault | Partial | Shared rule overrides plus objective TNT respawn timing is runtime-backed | Objective, tower/crystal/TNT switches, event triggers and regression tests |
-| Death Tag | Partial | Shared rule overrides plus chaser promotion, archer knockback and Traitor cooldown are runtime-backed | Runner/chaser feature controls, tag/respawn/event tools and achievements |
+| Death Tag | Partial | Shared rule overrides plus chaser promotion, archer knockback and Traitor cooldown are runtime-backed; authorised testers can run the normal Runner-to-Chaser conversion on themselves | Runner/chaser feature controls, tag/respawn tools and achievement simulations |
 | Dragon Escape | Partial | Shared rule overrides plus Digger protection radius and Warper grace period are runtime-backed | Dragon/ability/finish feature switches and event controls |
 | Dragons | Partial | Shared rule overrides plus sparkler count and lifetime are runtime-backed; authorised testers can request the next dragon spawn through the normal map spawn and targeting path | Tamer/perk controls and direct movement behavior tests |
 | Draw My Thing | Partial | 320-second match budget and per-turn cap can be tuned through runtime-backed rules; authorised testers can reveal the next hint letter during a live round | Drawing/guess/map/round controls and direct tests |
