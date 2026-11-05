@@ -117,6 +117,31 @@ class GameDebugProfilesTest {
     }
 
     @Test
+    void testBotRosterProfilesAreIsolatedForEveryGame() {
+        GameDebugProfiles profiles = new GameDebugProfiles(directory.resolve("every-game-rosters.yml").toFile(),
+                ignored -> { });
+        UUID tester = UUID.randomUUID();
+
+        for (ArcadePortGame game : ArcadePortGame.values()) {
+            profiles.setTestBotCount(tester, game, 2);
+            profiles.setTestBotKit(tester, game, 1, game.id() + "-kit");
+            profiles.setTestBotTeam(tester, game, 1, 1);
+            profiles.setTestBotCosmetic(tester, game, 1, "game-line", "game-style");
+
+            assertEquals(2, profiles.testBotCount(tester, game, 0), game.id() + " bot count");
+            assertEquals(game.id() + "-kit", profiles.testBotKit(tester, game, 1, ""), game.id() + " bot kit");
+            assertEquals(1, profiles.testBotTeam(tester, game, 1, -1), game.id() + " bot team");
+            assertEquals("game-style", profiles.testBotCosmetic(tester, game, 1, "game-line", ""),
+                    game.id() + " bot cosmetic");
+
+            assertEquals("alternate", profiles.create(tester, game, "alternate"));
+            assertEquals(0, profiles.testBotCount(tester, game, 0), game.id() + " profile isolation");
+            assertTrue(profiles.select(tester, game, GameDebugProfiles.DEFAULT_PROFILE));
+            assertEquals(2, profiles.testBotCount(tester, game, 0), game.id() + " default roster");
+        }
+    }
+
+    @Test
     void numericValuesAreRestrictedToKnownGameRulesAndSafeRanges() {
         GameDebugProfiles profiles = new GameDebugProfiles(directory.resolve("bounded.yml").toFile(), ignored -> { });
         UUID tester = UUID.randomUUID();
