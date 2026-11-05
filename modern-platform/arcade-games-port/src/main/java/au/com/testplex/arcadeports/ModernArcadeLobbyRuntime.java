@@ -1265,6 +1265,13 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                         Material.SNOWBALL, "Enable this kit's special supplies and abilities for authorised testers.", true));
             }
         }
+        if (game == ArcadePortGame.RUNNER) {
+            for (String kit : List.of("leaper", "archer", "frosty", "switcher")) {
+                String key = "ability-" + kit;
+                features.put(key, new DebugFeature(key, "Ability: " + humanizeDebugKey(kit),
+                        Material.ENDER_EYE, "Allow this kit's movement, attack or swap ability for authorised testers.", true));
+            }
+        }
         return List.copyOf(features.values());
     }
 
@@ -1289,6 +1296,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.ONE_IN_THE_QUIVER && key.startsWith("ability-"))
                 || (game == ArcadePortGame.PAINTBALL && "ignore-reload".equals(key))
                 || (game == ArcadePortGame.SPLEEF && key.startsWith("ability-"))
+                || (game == ArcadePortGame.RUNNER && key.startsWith("ability-"))
                 || (game == ArcadePortGame.SUPER_SPLOOR && key.startsWith("special-"))
                 || "DRAGONS_SPAWNING_ENABLED".equals(key)
                 || "DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED".equals(key)

@@ -436,6 +436,25 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void runnerKitSwitchesGateLeapQuickshotFrostBallsAndPositionSwap() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        assertTrue(lobby.contains("List.of(\"leaper\", \"archer\", \"frosty\", \"switcher\")"));
+        for (String key : List.of("leaper", "archer", "frosty", "switcher")) {
+            assertTrue(manager.contains("ArcadePortGame.RUNNER, \"ability-" + key + "\"")
+                            || manager.contains("ArcadePortGame.RUNNER, \"" + key + "\""),
+                    key + " has a runtime consumer");
+        }
+        assertTrue(manager.contains("public boolean debugTriggerEvent(Player tester, ArcadePortGame type, String eventId)"));
+        assertTrue(manager.contains("triggered = useRunnerPositionSwap(session, tester, System.currentTimeMillis())"));
+    }
+
+    @Test
     void castleAssaultObjectiveEventRequiresVacantObjectiveAndUsesNormalSpawner() throws IOException {
         Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "CastleAssaultHeroesOfGwenRuntime.java");

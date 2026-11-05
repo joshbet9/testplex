@@ -23052,7 +23052,8 @@ public final class ArcadePortManager implements Listener {
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
             String kit = session.runnerKits.getOrDefault(id, "leaper");
-            if (!"frosty".equals(kit)) continue;
+            if (!"frosty".equals(kit) || plugin.hasAdminAccess(player)
+                    && !debugFeatureEnabled(id, ArcadePortGame.RUNNER, "ability-frosty", true)) continue;
             long next = session.runnerNextFrostBallAt.getOrDefault(id,
                     now + GameDebugRuntimeOverrides.longValue("RUNNER_FROSTBALL_INTERVAL_MILLIS", ArcadePortRules.RUNNER_FROSTBALL_INTERVAL_MILLIS));
             if (now < next) continue;
@@ -23067,6 +23068,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void useRunnerLeap(Session session, Player player, long now) {
+        if (!isDebugAbilityAllowed(player, ArcadePortGame.RUNNER, "leaper")) return;
         UUID id = player.getUniqueId();
         long readyAt = session.runnerLeapReadyAt.getOrDefault(id, 0L);
         if (now < readyAt) {
@@ -23089,6 +23091,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void useRunnerQuickshot(Session session, Player player, long now) {
+        if (!isDebugAbilityAllowed(player, ArcadePortGame.RUNNER, "archer")) return;
         UUID id = player.getUniqueId();
         long readyAt = session.runnerQuickshotReadyAt.getOrDefault(id, 0L);
         if (now < readyAt) {
@@ -23131,6 +23134,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private boolean useRunnerPositionSwap(Session session, Player player, long now) {
+        if (!isDebugAbilityAllowed(player, ArcadePortGame.RUNNER, "switcher")) return false;
         UUID id = player.getUniqueId();
         if (session.runnerSwapUsed.contains(id)) {
             player.sendMessage(ChatColor.YELLOW + "Position Swap has already been used this round.");
@@ -24619,7 +24623,8 @@ public final class ArcadePortManager implements Listener {
                 && session.alive.contains(shooter.getUniqueId())
                 && session.players.containsKey(shooter.getUniqueId())
                 && "frosty".equals(session.runnerKits.getOrDefault(shooter.getUniqueId(), "leaper"))) {
-            if (event.getHitEntity() instanceof Player target && session.alive.contains(target.getUniqueId())
+            if (isDebugAbilityAllowed(shooter, ArcadePortGame.RUNNER, "frosty")
+                    && event.getHitEntity() instanceof Player target && session.alive.contains(target.getUniqueId())
                     && session.players.containsKey(target.getUniqueId())) {
                 session.runnerFrostballLastHitBy.put(target.getUniqueId(), shooter.getUniqueId());
                 session.runnerFrostballLastHitAt.put(target.getUniqueId(), System.currentTimeMillis());
