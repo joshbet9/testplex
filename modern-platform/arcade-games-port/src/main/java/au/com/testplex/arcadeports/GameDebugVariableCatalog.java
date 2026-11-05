@@ -40,7 +40,7 @@ final class GameDebugVariableCatalog {
                 double value = raw instanceof Boolean enabled ? (enabled ? 1.0D : 0.0D)
                         : ((Number) raw).doubleValue();
                 result.add(new Variable(key, humanize(name), kind, value,
-                        minimum(name, value, kind), maximum(name, kind), step(name, value, kind)));
+                        minimum(name, value, kind), maximum(name, kind, value), step(name, value, kind)));
             } catch (IllegalAccessException ignored) {
                 // Public constants should be readable; ignore a field if a JVM denies access.
             }
@@ -158,6 +158,8 @@ final class GameDebugVariableCatalog {
         if (kind == Kind.BOOLEAN) return 0.0D;
         if (name.endsWith("_X") || name.endsWith("_Y") || name.endsWith("_Z")) return -512.0D;
         String upper = name.toUpperCase(Locale.ROOT);
+        if (defaultValue > 0.0D && (upper.endsWith("_MILLIS") || upper.endsWith("_TICKS")
+                || upper.contains("_INTERVAL_") || upper.contains("_COOLDOWN_"))) return 1.0D;
         if (defaultValue > 0.0D && (upper.contains("MAX_") || upper.contains("COUNT")
                 || upper.contains("LENGTH") || upper.contains("INTERVAL") || upper.contains("SPEED")
                 || upper.contains("RADIUS") || upper.contains("DISTANCE") || upper.contains("WIDTH")
@@ -168,12 +170,19 @@ final class GameDebugVariableCatalog {
         return 0.0D;
     }
 
-    private static double maximum(String name, Kind kind) {
+    private static double maximum(String name, Kind kind, double defaultValue) {
         if (kind == Kind.BOOLEAN) return 1.0D;
         if (name.endsWith("_X") || name.endsWith("_Y") || name.endsWith("_Z")) return 512.0D;
-        if (kind == Kind.INTEGER) return 1_000_000.0D;
+        String upper = name.toUpperCase(Locale.ROOT);
+        if (upper.contains("COUNT") || upper.contains("MAX_") || upper.contains("PLAYERS")
+                || upper.contains("SLOTS") || upper.contains("ATTEMPTS") || upper.contains("AMMO")
+                || upper.contains("ARROWS") || upper.contains("WOOL") || upper.contains("WAVES")
+                || upper.contains("STAGES") || upper.contains("LEVEL") || upper.contains("KILLS")
+                || upper.contains("CHARGES") || upper.contains("USES")) return 64.0D;
+        if (kind == Kind.INTEGER) return 1_000.0D;
         if (kind == Kind.LONG) return 86_400_000.0D;
-        return 1_000_000.0D;
+        if (Math.abs(defaultValue) <= 1.0D) return 32.0D;
+        return Math.max(100.0D, Math.min(100_000.0D, Math.abs(defaultValue) * 100.0D));
     }
 
     private static double step(String name, double defaultValue, Kind kind) {

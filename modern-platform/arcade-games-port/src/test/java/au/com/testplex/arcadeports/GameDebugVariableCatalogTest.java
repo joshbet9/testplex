@@ -3,8 +3,12 @@ package au.com.testplex.arcadeports;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -79,6 +83,25 @@ class GameDebugVariableCatalogTest {
     }
 
     @Test
+    void wiredKeyRegistryStaysInSyncWithProductionGameplayConsumers() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java");
+        }
+        Pattern call = Pattern.compile("GameDebugRuntimeOverrides\\.(?:intValue|longValue|doubleValue|floatValue|booleanValue)\\(\\s*\"([A-Z0-9_]+)\"");
+        try (var files = Files.walk(sourceRoot)) {
+            for (Path file : files.filter(path -> path.toString().endsWith(".java")).toList()) {
+                String source = Files.readString(file);
+                var matcher = call.matcher(source);
+                while (matcher.find()) {
+                    assertTrue(GameDebugWiredRuleKeys.KEYS.contains(matcher.group(1)),
+                            file.getFileName() + " uses an unregistered debug rule: " + matcher.group(1));
+                }
+            }
+        }
+    }
+
+    @Test
     void numericAndBooleanRuleOverridesUseProfileValuesAndPreserveDefaults() {
         GameDebugRuntimeOverrides.activate(Map.of(
                 "BACON_1_8_HIT_DELAY_MILLIS", 250.0D,
@@ -124,7 +147,17 @@ class GameDebugVariableCatalogTest {
                 Map.entry("PAINTBALL_MACHINE_GUN_SHOTS_PER_HEAT_CYCLE", 2),
                 Map.entry("PAINTBALL_MACHINE_GUN_COOL_PER_TICK", 0.1D),
                 Map.entry("TURF_WARS_INITIAL_BUILD_PHASE_MILLIS", 5_000L),
-                Map.entry("TURF_WARS_MELEE_DAMAGE", 3.0D)));
+                Map.entry("TURF_WARS_MELEE_DAMAGE", 3.0D),
+                Map.entry("RUNNER_BLOCK_DECAY_MILLIS", 100L),
+                Map.entry("DRAGON_ESCAPE_FINISH_X", 10.0D),
+                Map.entry("DRAGON_ESCAPE_FINISH_Y", 20.0D),
+                Map.entry("DRAGON_ESCAPE_FINISH_Z", 30.0D),
+                Map.entry("DRAGON_ESCAPE_FINISH_RADIUS", 2.0D),
+                Map.entry("DRAGON_ESCAPE_DISRUPTOR_ARM_TICKS", 5),
+                Map.entry("DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS", 4.0D),
+                Map.entry("TURF_WARS_MARKSMAN_ARROW_INTERVAL_MILLIS", 500L),
+                Map.entry("TURF_WARS_MARKSMAN_MAX_WOOL", 12),
+                Map.entry("TURF_WARS_MARKSMAN_MAX_ARROWS", 4)));
 
         assertEquals(10_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(false));
         assertEquals(20_000L, ArcadePortRules.drawMyThingRoundMillis(2));
@@ -143,6 +176,13 @@ class GameDebugVariableCatalogTest {
         assertEquals(0.7D, ArcadePortRules.coolPaintballMachineGunHeat(0.8D), 1.0e-9);
         assertEquals(5_000L, ArcadePortRules.turfWarsInitialBuildPhaseMillis(false));
         assertEquals(3.0D, ArcadePortRules.turfWarsHitDamage("marksman", false, false));
+        assertTrue(ArcadePortRules.shouldDropRunnerBlock(100L));
+        assertTrue(ArcadePortRules.isDragonEscapeFinishReached(10.0D, 20.0D, 30.0D));
+        assertFalse(ArcadePortRules.isDragonEscapeFinishReached(12.1D, 20.0D, 30.0D));
+        assertTrue(ArcadePortRules.shouldTriggerDragonEscapeDisruptor(5, 4.0D, false));
+        assertEquals(500L, ArcadePortRules.turfWarsArrowIntervalMillis("marksman"));
+        assertEquals(12, ArcadePortRules.turfWarsConstructorMax("marksman"));
+        assertEquals(4, ArcadePortRules.turfWarsArrowMax("marksman"));
     }
 
     @Test

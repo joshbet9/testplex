@@ -1005,7 +1005,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         Inventory inventory = Bukkit.createInventory(null, 54, DEBUG_TITLE);
         String profile = manager.debugProfiles().selected(player.getUniqueId(), game);
         inventory.setItem(4, item(Material.COMPARATOR, ChatColor.RED + game.displayName() + " Debug",
-                ChatColor.GRAY + "Active profile: " + ChatColor.WHITE + profile,
+                ChatColor.GRAY + "Selected profile: " + ChatColor.WHITE + profile,
                 ChatColor.GRAY + "Controls below are specific to this game."));
         inventory.setItem(19, testBotButton(Material.WRITABLE_BOOK, "Profiles: " + profile,
                 "Create, load, duplicate, rename, save or delete configurations.", "debug-open:profiles"));
@@ -1017,8 +1017,11 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 "Set up the next round's bot count, team, kit and cosmetics.", "debug-open:bots"));
         inventory.setItem(37, testBotButton(Material.CLOCK, "Profile application",
                 "Immediate switches take effect now. Rule switches and numeric values apply when the next round starts."));
-        inventory.setItem(39, testBotButton(Material.FEATHER, "Advance game phase",
-                "Skip the start countdown or current Speed Builders phase.", "debug-advance-phase"));
+        inventory.setItem(39, testBotButton(Material.FEATHER, "Advance game phase or timer",
+                "Skip this game's start countdown, live phase, turn, or round timer when supported.", "debug-advance-phase"));
+        inventory.setItem(41, testBotButton(Material.GOLDEN_APPLE, "Restore tester vitals",
+                "In your active round: restore health and hunger, clear fire and potion effects. Does not change stats.",
+                "debug-restore-vitals"));
         inventory.setItem(40, testBotButton(Material.BARRIER, "Reset to Defaults",
                 "Clear this profile's overrides and restore intended mechanics.", "debug-reset"));
         inventory.setItem(49, testBotButton(Material.BARRIER, "Close", "debug-close"));
@@ -1043,6 +1046,13 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             boolean advanced = manager.debugAdvanceStartPhase(player, game);
             player.sendMessage(advanced ? ChatColor.GREEN + "The current supported game phase was advanced."
                     : ChatColor.YELLOW + "This game has no supported active phase to advance.");
+            openDebugMenu(player);
+            return;
+        }
+        if ("debug-restore-vitals".equals(action)) {
+            boolean restored = manager.debugRestoreTesterVitals(player, game);
+            player.sendMessage(restored ? ChatColor.GREEN + "Your in-round tester vitals were restored."
+                    : ChatColor.YELLOW + "Join a live round of this game before restoring tester vitals.");
             openDebugMenu(player);
             return;
         }

@@ -1,6 +1,7 @@
 package au.com.testplex.arcadeports;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
@@ -10,6 +11,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class GameDebugProfilesTest {
     @TempDir Path directory;
+
+    @AfterEach
+    void clearRuntimeOverrides() { GameDebugRuntimeOverrides.clear(); }
 
     @Test
     void profilesPersistPerTesterAndGameAndSupportLifecycleOperations() {
@@ -59,6 +63,20 @@ class GameDebugProfilesTest {
     }
 
     @Test
+    void resetCanRestoreTheActiveRuntimeToIntendedDefaults() {
+        GameDebugProfiles profiles = new GameDebugProfiles(directory.resolve("active-reset.yml").toFile(), ignored -> { });
+        UUID tester = UUID.randomUUID();
+        profiles.setVariable(tester, ArcadePortGame.BACON_BRAWL, "BACON_1_8_HIT_DELAY_MILLIS", 250.0D);
+        GameDebugRuntimeOverrides.activate(profiles.values(tester, ArcadePortGame.BACON_BRAWL));
+        assertEquals(250L, GameDebugRuntimeOverrides.longValue("BACON_1_8_HIT_DELAY_MILLIS", 400L));
+
+        profiles.resetSelected(tester, ArcadePortGame.BACON_BRAWL);
+        GameDebugRuntimeOverrides.activate(profiles.values(tester, ArcadePortGame.BACON_BRAWL));
+
+        assertEquals(400L, GameDebugRuntimeOverrides.longValue("BACON_1_8_HIT_DELAY_MILLIS", 400L));
+    }
+
+    @Test
     void testBotRosterSettingsPersistSeparatelyFromNormalGameConfiguration() {
         Path file = directory.resolve("debug-profiles.yml");
         GameDebugProfiles profiles = new GameDebugProfiles(file.toFile(), ignored -> { });
@@ -91,5 +109,8 @@ class GameDebugProfilesTest {
         assertNull(profiles.variable(tester, ArcadePortGame.BACON_BRAWL, "UNRELATED_SERVER_SETTING"));
         assertNull(profiles.variable(tester, ArcadePortGame.BACON_BRAWL, "BACON_BRAWL_HAS_ROUND_TIMER"));
         assertFalse(profiles.values(tester, ArcadePortGame.BACON_BRAWL).containsKey("UNRELATED_SERVER_SETTING"));
+
+        profiles.setVariable(tester, ArcadePortGame.SNAKE, "SNAKE_MAX_HAZARDS", 1_000_000.0D);
+        assertEquals(64.0D, profiles.variable(tester, ArcadePortGame.SNAKE, "SNAKE_MAX_HAZARDS"));
     }
 }

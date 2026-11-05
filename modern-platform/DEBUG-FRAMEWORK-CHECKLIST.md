@@ -13,9 +13,10 @@ This checklist tracks implemented controls, not menu/catalog presence alone. A g
 - [x] The variable menu exposes only rules with an explicit production runtime consumer; persisted values are clamped to the rule's safe range and malformed integer conversions cannot crash gameplay.
 - [x] Shared feature switches cover kit unlock, invulnerability, fall damage and hunger; Bacon Brawl also has its unlimited-ability switch.
 - [x] Achievement preview mode runs real achievement conditions through shared Arcade award helpers and Snap; preview notices do not persist unlocks.
-- [x] Authorized testers can advance the initial countdown in a live shared Arcade session and the current Speed Builders phase; bot rosters are configured for the next round.
+- [x] Authorized testers can advance any shared Arcade start countdown, the live Draw My Thing turn, Master Builders build/review phase, Turf Wars phase, any supported shared round timeout, or the current Speed Builders phase; bot rosters are configured for the next round.
+- [x] Authorized testers can restore only their own active-round health/hunger and clear fire/potion effects without invoking damage, scoring, or achievement paths.
 - [ ] Add explicit per-game control metadata for every meaningful mechanic, beyond primitive `ArcadePortRules` fields.
-- [ ] Add per-game event triggers, phase controls and non-persistent achievement simulation where practical.
+- [ ] Add per-game event triggers and non-persistent achievement simulation beyond the award-preview hooks; the current vitals action is a shared tester utility, not a substitute for game event triggers.
 - [ ] Add automated persistence, permission, reset, live-effect and round-restart tests for profiles.
 - [ ] Verify every setting listed below against its gameplay consumer; keep unchecked games out of the **complete** state until done.
 

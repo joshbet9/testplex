@@ -724,9 +724,13 @@ public final class ArcadePortRules {
 
     public static boolean shouldTriggerDragonEscapeDisruptor(
             int itemAgeTicks, double distanceToTarget, boolean sameOwner) {
-        return !sameOwner && itemAgeTicks >= DRAGON_ESCAPE_DISRUPTOR_ARM_TICKS
+        int armTicks = Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "DRAGON_ESCAPE_DISRUPTOR_ARM_TICKS", DRAGON_ESCAPE_DISRUPTOR_ARM_TICKS));
+        double triggerRadius = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS", DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS));
+        return !sameOwner && itemAgeTicks >= armTicks
                 && Double.isFinite(distanceToTarget) && distanceToTarget >= 0.0D
-                && distanceToTarget <= DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS;
+                && distanceToTarget <= triggerRadius;
     }
 
     public static int dragonEscapeLeapUses(String kit) {
@@ -1452,7 +1456,9 @@ public final class ArcadePortRules {
     }
 
     public static boolean shouldDropRunnerBlock(long elapsedMillis) {
-        return elapsedMillis >= RUNNER_BLOCK_DECAY_MILLIS;
+        long decayMillis = Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "RUNNER_BLOCK_DECAY_MILLIS", RUNNER_BLOCK_DECAY_MILLIS));
+        return elapsedMillis >= decayMillis;
     }
 
     public static String normalizeDeathTagRunnerKit(String requested) {
@@ -1547,8 +1553,9 @@ public final class ArcadePortRules {
     public static final double EVOLUTION_SULPHUR_BOMB_DAMAGE = 4.0D;
 
     public static int nextEvolutionLevel(int currentLevel, boolean wonEvolve) {
-        int safeLevel = Math.max(0, Math.min(EVOLUTION_WIN_LEVEL, currentLevel));
-        return wonEvolve ? Math.min(EVOLUTION_WIN_LEVEL, safeLevel + 1) : safeLevel;
+        int winningLevel = Math.max(1, GameDebugRuntimeOverrides.intValue("EVOLUTION_WIN_LEVEL", EVOLUTION_WIN_LEVEL));
+        int safeLevel = Math.max(0, Math.min(winningLevel, currentLevel));
+        return wonEvolve ? Math.min(winningLevel, safeLevel + 1) : safeLevel;
     }
 
     public static double evolutionMaxHealth(int level) {
@@ -1998,11 +2005,13 @@ public final class ArcadePortRules {
 
     /** The source game finishes near its final map waypoint, not anywhere on a Z plane. */
     public static boolean isDragonEscapeFinishReached(double x, double y, double z) {
-        double dx = x - DRAGON_ESCAPE_FINISH_X;
-        double dy = y - DRAGON_ESCAPE_FINISH_Y;
-        double dz = z - DRAGON_ESCAPE_FINISH_Z;
+        double dx = x - GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_FINISH_X", DRAGON_ESCAPE_FINISH_X);
+        double dy = y - GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_FINISH_Y", DRAGON_ESCAPE_FINISH_Y);
+        double dz = z - GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_FINISH_Z", DRAGON_ESCAPE_FINISH_Z);
+        double radius = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "DRAGON_ESCAPE_FINISH_RADIUS", DRAGON_ESCAPE_FINISH_RADIUS));
         return dx * dx + dy * dy + dz * dz
-                < DRAGON_ESCAPE_FINISH_RADIUS * DRAGON_ESCAPE_FINISH_RADIUS;
+                < radius * radius;
     }
 
     /** Reborn kills runners once Douglas's route progress has overtaken theirs. */
@@ -2093,7 +2102,9 @@ public final class ArcadePortRules {
     }
 
     public static boolean isDuplicateDragonEscapeWaypoint(double distance) {
-        return isDuplicateDragonEscapeWaypoint(distance, DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE);
+        double threshold = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE", DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE));
+        return isDuplicateDragonEscapeWaypoint(distance, threshold);
     }
 
     public static boolean isDuplicateDragonEscapeWaypoint(double distance, double threshold) {
@@ -2473,28 +2484,47 @@ public final class ArcadePortRules {
     }
 
     public static int turfWarsConstructorMax(String kit) {
-        return switch (normalizeTurfWarsKit(kit) == null ? "marksman" : normalizeTurfWarsKit(kit)) {
+        String normalized = normalizeTurfWarsKit(kit) == null ? "marksman" : normalizeTurfWarsKit(kit);
+        String key = switch (normalized) {
+            case "infiltrator" -> "TURF_WARS_INFILTRATOR_MAX_WOOL";
+            case "shredder" -> "TURF_WARS_SHREDDER_MAX_WOOL";
+            case "fortifier" -> "TURF_WARS_FORTIFIER_MAX_WOOL";
+            default -> "TURF_WARS_MARKSMAN_MAX_WOOL";
+        };
+        int fallback = switch (normalized) {
             case "infiltrator" -> TURF_WARS_INFILTRATOR_MAX_WOOL;
             case "shredder" -> TURF_WARS_SHREDDER_MAX_WOOL;
             case "fortifier" -> TURF_WARS_FORTIFIER_MAX_WOOL;
             default -> TURF_WARS_MARKSMAN_MAX_WOOL;
         };
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(key, fallback));
     }
 
     public static int turfWarsArrowMax(String kit) {
-        return switch (normalizeTurfWarsKit(kit) == null ? "marksman" : normalizeTurfWarsKit(kit)) {
+        String normalized = normalizeTurfWarsKit(kit) == null ? "marksman" : normalizeTurfWarsKit(kit);
+        String key = normalized.equals("infiltrator") ? "TURF_WARS_INFILTRATOR_MAX_ARROWS"
+                : normalized.equals("shredder") ? "TURF_WARS_SHREDDER_MAX_ARROWS" : "TURF_WARS_MARKSMAN_MAX_ARROWS";
+        int fallback = switch (normalized) {
             case "infiltrator" -> TURF_WARS_INFILTRATOR_MAX_ARROWS;
             case "shredder" -> TURF_WARS_SHREDDER_MAX_ARROWS;
             default -> TURF_WARS_MARKSMAN_MAX_ARROWS;
         };
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(key, fallback));
     }
 
     public static long turfWarsArrowIntervalMillis(String kit) {
-        return switch (normalizeTurfWarsKit(kit) == null ? "marksman" : normalizeTurfWarsKit(kit)) {
+        String normalized = normalizeTurfWarsKit(kit) == null ? "marksman" : normalizeTurfWarsKit(kit);
+        String key = switch (normalized) {
+            case "infiltrator" -> "TURF_WARS_INFILTRATOR_ARROW_INTERVAL_MILLIS";
+            case "shredder" -> "TURF_WARS_SHREDDER_ARROW_INTERVAL_MILLIS";
+            default -> "TURF_WARS_MARKSMAN_ARROW_INTERVAL_MILLIS";
+        };
+        long fallback = switch (normalized) {
             case "infiltrator" -> TURF_WARS_INFILTRATOR_ARROW_INTERVAL_MILLIS;
             case "shredder" -> TURF_WARS_SHREDDER_ARROW_INTERVAL_MILLIS;
             default -> TURF_WARS_MARKSMAN_ARROW_INTERVAL_MILLIS;
         };
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(key, fallback));
     }
 
     /** The source drains two hearts at a time during combat and is lethal outside combat. */

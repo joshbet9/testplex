@@ -345,6 +345,8 @@ public final class ArcadePortManager implements Listener {
     static final int MANUAL_START_COUNTDOWN_SECONDS = 0;
     private final ArcadeMechanicsModernPlugin plugin;
     private final GameDebugProfiles debugProfiles;
+    private UUID activeDebugProfileOwner;
+    private ArcadePortGame activeDebugProfileGame;
     private final SuperSploorRuntime superSploor;
     private final ArcadeTestPlayerManager testPlayers;
     private boolean testPlayerStartPending;
@@ -785,12 +787,52 @@ public final class ArcadePortManager implements Listener {
             return plugin.getSpeedBuildersGame().debugAdvancePhase();
         }
         Session session = active;
-        if (session == null || session.type != type || session.liveStarted || !session.startupComplete) {
+        if (session == null || session.type != type || !session.startupComplete) {
             return false;
         }
-        session.prepareEndsAt = System.currentTimeMillis();
-        session.lastPrepareSecond = -1;
-        if (type == ArcadePortGame.SKY_WARS) session.skyWarsLiveAt = session.prepareEndsAt;
+        long now = System.currentTimeMillis();
+        boolean builderPhase = session.masterBuilderPhase == MasterBuildersPhase.BUILDING
+                || session.masterBuilderPhase == MasterBuildersPhase.REVIEW;
+        GameDebugPhaseAction action = GameDebugPhaseActions.resolve(type, session.liveStarted,
+                session.endsAt > 0L, session.drawRoundEndsAt > 0L, builderPhase,
+                session.turfPhaseEndsAt > 0L);
+        switch (action) {
+            case START_COUNTDOWN -> {
+                session.prepareEndsAt = now;
+                session.lastPrepareSecond = -1;
+                if (type == ArcadePortGame.SKY_WARS) session.skyWarsLiveAt = session.prepareEndsAt;
+                return true;
+            }
+            case DRAW_TURN -> session.drawRoundEndsAt = now;
+            case MASTER_BUILDERS_PHASE -> {
+                if (session.masterBuilderPhase == MasterBuildersPhase.BUILDING) {
+                    session.masterBuilderBuildEndsAt = now;
+                } else {
+                    session.masterBuilderReviewEndsAt = now;
+                }
+            }
+            case TURF_WARS_PHASE -> session.turfPhaseEndsAt = now;
+            case ROUND_TIMEOUT -> {
+                // Let the game's ordinary timeout handler resolve scores, overtime,
+                // placements, achievements and cleanup on the next tick.
+                session.endsAt = now;
+            }
+            case NONE -> { return false; }
+        }
+        return true;
+    }
+
+    boolean debugRestoreTesterVitals(Player tester, ArcadePortGame type) {
+        if (tester == null || !tester.isOnline() || !plugin.hasAdminAccess(tester)) return false;
+        Session session = active;
+        if (session == null || session.type != type || !session.alive.contains(tester.getUniqueId())) return false;
+        AttributeInstance health = tester.getAttribute(Attribute.MAX_HEALTH);
+        double maximumHealth = health == null ? 20.0D : health.getValue();
+        tester.setHealth(maximumHealth);
+        tester.setFoodLevel(20);
+        tester.setSaturation(20.0F);
+        tester.setFireTicks(0);
+        tester.getActivePotionEffects().forEach(effect -> tester.removePotionEffect(effect.getType()));
         return true;
     }
 
@@ -802,7 +844,12 @@ public final class ArcadePortManager implements Listener {
         return debugProfiles.variable(tester, type, key);
     }
 
-    void resetDebugProfile(UUID tester, ArcadePortGame type) { debugProfiles.resetSelected(tester, type); }
+    void resetDebugProfile(UUID tester, ArcadePortGame type) {
+        debugProfiles.resetSelected(tester, type);
+        if (tester != null && tester.equals(activeDebugProfileOwner) && type == activeDebugProfileGame) {
+            GameDebugRuntimeOverrides.activate(Map.of());
+        }
+    }
 
     void saveDebugProfile(UUID tester, ArcadePortGame type) { debugProfiles.save(tester, type); }
 
@@ -811,8 +858,9 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void activateDebugProfile(Player starter, ArcadePortGame type) {
-        GameDebugRuntimeOverrides.activate(starter == null ? Map.of()
-                : debugProfiles.values(starter.getUniqueId(), type));
+        activeDebugProfileOwner = starter == null ? null : starter.getUniqueId();
+        activeDebugProfileGame = type;
+        GameDebugRuntimeOverrides.activate(starter == null ? Map.of() : debugProfiles.values(starter.getUniqueId(), type));
     }
 
     String configuredTestBotKit(ArcadePortGame type, int botIndex) {
@@ -19050,6 +19098,10 @@ public final class ArcadePortManager implements Listener {
         }
         active = null;
         GameDebugRuntimeOverrides.clear();
+        if (activeDebugProfileGame == session.type) {
+            activeDebugProfileOwner = null;
+            activeDebugProfileGame = null;
+        }
         if (session.tickTask != null) session.tickTask.cancel();
         if (announceWinner && session.type == ArcadePortGame.BACON_BRAWL && winner != null) {
             recordBaconBrawlAchievements(session, winner);
