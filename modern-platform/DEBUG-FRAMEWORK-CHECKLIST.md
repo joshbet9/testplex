@@ -47,7 +47,7 @@ The common tester switches (all kits, invulnerability, no fall damage, and no hu
 | Monster Maze (all modes) | Partial | Per-mode mob speed, Body Rush duration, Cryo cooldown/freeze/radius and jump strength are profile-backed in the existing in-process engine | Mob/theme/stage/map controls, achievement/event preview paths, test event/phase actions and direct mode behavior tests |
 | One in the Quiver | Partial | Shared rule overrides and common switches | Arrow/kit feature switches and kill/round event tools |
 | Paintball | Partial | Shared rule overrides include Machine Gun heat capacity, shots-per-cycle and cooling | Weapon, reload, map and team-event controls |
-| Plexball | Partial | Player limits, match/batting timing, rewind, ball physics, home-run distance and catch windows are profile-backed and consumed by the rule/runtime code | Remaining scoring/possession tunables, bot integration and direct match behavior tests |
+| Plexball | Partial | Player limits, match/batting timing, rewind, ball physics, home-run distance and catch windows are profile-backed and consumed by the rule/runtime code; debug controls advance intro, turn-break, and batting timeout phases through normal transitions | Remaining scoring/possession tunables, bot integration and direct match behavior tests |
 | Runner | Partial | Shared rule overrides and common switches | Switcher/blocks/kit feature controls and phase/event tools |
 | Sheep Quest | Partial | Shared rule overrides and common switches | Sheep/carry/kit/score controls and capture event simulation |
 | SkyWars | Partial | Shared rule overrides and common switches | Chest/loot/island/void controls and event simulation |

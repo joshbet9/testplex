@@ -818,6 +818,9 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.SPEED_BUILDERS && plugin.getSpeedBuildersGame() != null) {
             return plugin.getSpeedBuildersGame().debugAdvancePhase();
         }
+        if (type == ArcadePortGame.PLEXBALL && plugin.getPlexballGame() != null) {
+            return plugin.getPlexballGame().debugAdvancePhase();
+        }
         Session session = active;
         if (session == null || session.type != type || !session.startupComplete) {
             return false;

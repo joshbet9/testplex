@@ -291,6 +291,16 @@ public final class PlexballGame implements Listener {
                 + ", time=" + Math.max(0L, (matchEndNanos - System.nanoTime()) / 1_000_000_000L) + "s";
     }
 
+    /** Debug control: advance a timed Plexball phase through its normal transition. */
+    public boolean debugAdvancePhase() {
+        switch (phase) {
+            case INTRO, TURN_BREAK -> phaseEndTick = serverTick;
+            case BATTING -> battingDeadlineNanos = System.nanoTime() - inputGraceNanos();
+            case BALL_FLIGHT, IDLE -> { return false; }
+        }
+        return true;
+    }
+
     /** Open the local Plexball career page used by /stats plexball. */
     public void openStats(Player player) {
         if (player == null || !player.isOnline()) return;
