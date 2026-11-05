@@ -40,6 +40,12 @@ final class GameDebugEventCatalog {
     private static final List<Event> MILK_THE_COW = List.of(
             new Event("spawn-herd", "Spawn Cow Herd Now", Material.COW_SPAWN_EGG,
                     "Run the normal herd follow and spawn update beside the active Cow-role tester."));
+    private static final List<Event> SHEEP_QUEST = List.of(
+            new Event("spawn-sheep", "Spawn Sheep Now", Material.WHITE_WOOL,
+                    "Spawn and configure one neutral sheep using the normal round map spawn rules."));
+    private static final List<Event> SKY_WARS = List.of(
+            new Event("spawn-tnt", "Spawn Generator TNT", Material.TNT,
+                    "Run the selected map's normal TNT generator drop immediately."));
     private static final Set<ArcadePortGame> KIT_REFRESH_GAMES = Set.of(
             ArcadePortGame.BACON_BRAWL, ArcadePortGame.BOMB_LOBBERS, ArcadePortGame.CASTLE_ASSAULT,
             ArcadePortGame.DRAGON_ESCAPE, ArcadePortGame.DRAGONS, ArcadePortGame.EVOLUTION,
@@ -57,6 +63,8 @@ final class GameDebugEventCatalog {
         if (game == ArcadePortGame.ONE_IN_THE_QUIVER) return ONE_IN_THE_QUIVER;
         if (game == ArcadePortGame.SPLEEF) return SPLEEF;
         if (game == ArcadePortGame.MILK_THE_COW) return MILK_THE_COW;
+        if (game == ArcadePortGame.SHEEP_QUEST) return SHEEP_QUEST;
+        if (game == ArcadePortGame.SKY_WARS) return SKY_WARS;
         if (game == ArcadePortGame.PAINTBALL) return PAINTBALL;
         if (game == ArcadePortGame.DEATH_TAG) return DEATH_TAG;
         if (game == ArcadePortGame.WIZARDS) return WIZARDS;

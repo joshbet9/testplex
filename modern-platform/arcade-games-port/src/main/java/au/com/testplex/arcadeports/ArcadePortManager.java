@@ -907,6 +907,16 @@ public final class ArcadePortManager implements Listener {
             updateMilkCowHerd(session, tester, System.currentTimeMillis());
             triggered = session.milkCowHerd.stream().anyMatch(cow -> cow != null && cow.isValid());
         }
+        if (type == ArcadePortGame.SHEEP_QUEST && "spawn-sheep".equals(eventId)) {
+            int sheepBefore = session.sheep.size();
+            GameDebugRuntimeOverrides.markDebugSession();
+            spawnSheep(session);
+            triggered = session.sheep.size() > sheepBefore;
+        }
+        if (type == ArcadePortGame.SKY_WARS && "spawn-tnt".equals(eventId)) {
+            GameDebugRuntimeOverrides.markDebugSession();
+            triggered = spawnSkyWarsTnt(session, System.currentTimeMillis());
+        }
         if (type == ArcadePortGame.DRAW_MY_THING && "reveal-letter".equals(eventId)
                 && session.drawCurrentDrawer != null && session.drawWord != null) {
             int revealedIndex = DrawMyThingDebugRules.nextHiddenLetterIndex(
@@ -8562,14 +8572,7 @@ public final class ArcadePortManager implements Listener {
     private void updateSkyWars(Session session, long now) {
         if (!session.liveStarted) return;
         updateSkyWarsCompass(session);
-        if (session.skyWarsTntGenerator != null && now >= session.skyWarsNextTntAt) {
-            ItemStack tnt = skyWarsKitItem(Material.TNT, "Left Click - Throw / Right Click - Drop",
-                    "Throwable TNT", false);
-            tnt.setAmount(2);
-            Item dropped = session.world.dropItem(session.skyWarsTntGenerator.clone().add(0.5D, 0.2D, 0.5D), tnt);
-            dropped.setPickupDelay(0);
-            session.skyWarsNextTntAt = now + SkyWarsMixedArcadeRules.TNT_GENERATOR_INTERVAL_MILLIS;
-        }
+        spawnSkyWarsTnt(session, now);
 
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
@@ -8652,6 +8655,19 @@ public final class ArcadePortManager implements Listener {
                 }
             }
         }
+    }
+
+    private boolean spawnSkyWarsTnt(Session session, long now) {
+        if (session == null || active != session || session.type != ArcadePortGame.SKY_WARS
+                || !session.liveStarted || session.skyWarsTntGenerator == null
+                || now < session.skyWarsNextTntAt) return false;
+        ItemStack tnt = skyWarsKitItem(Material.TNT, "Left Click - Throw / Right Click - Drop",
+                "Throwable TNT", false);
+        tnt.setAmount(2);
+        Item dropped = session.world.dropItem(session.skyWarsTntGenerator.clone().add(0.5D, 0.2D, 0.5D), tnt);
+        dropped.setPickupDelay(0);
+        session.skyWarsNextTntAt = now + SkyWarsMixedArcadeRules.TNT_GENERATOR_INTERVAL_MILLIS;
+        return true;
     }
 
     private void scanSkyWarsCrumbleLayer(Session session) {

@@ -78,6 +78,45 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void sheepQuestSpawnEventUsesNormalConfiguredMapSpawnPath() throws IOException {
+        Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ArcadePortManager.java");
+        if (!Files.isRegularFile(managerPath)) {
+            managerPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ArcadePortManager.java");
+        }
+        String source = Files.readString(managerPath);
+        assertTrue(source.contains("type == ArcadePortGame.SHEEP_QUEST && \"spawn-sheep\".equals(eventId)"));
+        int spawn = source.indexOf("private void spawnSheep(Session session)");
+        int configure = source.indexOf("private void configureQuestSheep", spawn);
+        assertTrue(spawn >= 0 && configure > spawn);
+        String spawner = source.substring(spawn, configure);
+        assertTrue(spawner.contains("mapData.dataLocations(\"WHITE\")"));
+        assertTrue(spawner.contains("configureQuestSheep(session"));
+    }
+
+    @Test
+    void skyWarsGeneratorEventSharesTheNormalTntDropPath() throws IOException {
+        Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ArcadePortManager.java");
+        if (!Files.isRegularFile(managerPath)) {
+            managerPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ArcadePortManager.java");
+        }
+        String source = Files.readString(managerPath);
+        assertTrue(source.contains("type == ArcadePortGame.SKY_WARS && \"spawn-tnt\".equals(eventId)"));
+        int updater = source.indexOf("private void updateSkyWars(Session session, long now)");
+        int helper = source.indexOf("private boolean spawnSkyWarsTnt(Session session, long now)");
+        int nextMethod = source.indexOf("private void ", helper + 1);
+        assertTrue(updater >= 0 && helper > updater && nextMethod > helper);
+        assertTrue(source.substring(updater, helper).contains("spawnSkyWarsTnt(session, now)"));
+        String generator = source.substring(helper, nextMethod);
+        assertTrue(generator.contains("session.skyWarsTntGenerator"));
+        assertTrue(generator.contains("session.world.dropItem"));
+        assertTrue(generator.contains("SkyWarsMixedArcadeRules.TNT_GENERATOR_INTERVAL_MILLIS"));
+    }
+
+    @Test
     void kitRefreshIsOnlyOfferedForGamesWithSharedKitSetup() {
         for (ArcadePortGame game : ArcadePortGame.values()) {
             boolean offered = GameDebugEventCatalog.events(game).stream()
