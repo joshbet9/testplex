@@ -11,6 +11,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class GameDebugEventCatalogTest {
     @Test
+    void everyGameHasAtLeastOneGameScopedEventTool() {
+        for (ArcadePortGame game : ArcadePortGame.values()) {
+            assertFalse(GameDebugEventCatalog.events(game).isEmpty(),
+                    game.id() + " needs at least one meaningful event tool");
+        }
+    }
+
+    @Test
     void eventToolsAreExplicitlyScopedToTheirGame() {
         var witherEvents = GameDebugEventCatalog.events(ArcadePortGame.WITHER_ASSAULT);
         assertEquals(List.of("spawn-minions", "refresh-kit"), witherEvents.stream()
