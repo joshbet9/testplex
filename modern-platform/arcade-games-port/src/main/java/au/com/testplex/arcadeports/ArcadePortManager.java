@@ -6881,16 +6881,25 @@ public final class ArcadePortManager implements Listener {
 
         boolean forcedAlpha = reason != null && reason.contains("forced by the time limit");
         UUID convertedPlayerId = player.getUniqueId();
-        UUID traitorId = session.deathTagLastTraitorHit.get(convertedPlayerId);
-        long traitorHitAt = session.deathTagLastTraitorHitAt.getOrDefault(convertedPlayerId, 0L);
-        if (!forcedAlpha && traitorId != null && System.currentTimeMillis() - traitorHitAt <= 8_000L
+        UUID traitorId = session.deathTagAchievements.consumeTraitorAssist(convertedPlayerId,
+                System.currentTimeMillis());
+        // Gallows credits a Traitor for knocking a fellow Runner into a Chaser's reach,
+        // not for attacking the Chaser. Environmental deaths and forced promotions do not count.
+        if (!forcedAlpha && killer != null && session.tagged.contains(killer.getUniqueId())
+                && traitorId != null && !session.tagged.contains(traitorId)
                 && "traitor".equals(session.deathTagRunnerKits.get(traitorId))) {
-            int assists = session.deathTagTraitorAssists.merge(traitorId, 1, Integer::sum);
-            Player traitor = session.players.get(traitorId);
-            if (assists >= 3 && traitor != null) awardCatalogAchievement(traitor, "death-tag", "gallows");
+            if (session.deathTagAchievements.creditTraitorAssist(traitorId)) {
+                Player traitor = session.players.get(traitorId);
+                if (traitor != null) awardCatalogAchievement(traitor, "death-tag", "gallows");
+            }
         }
-        session.deathTagLastTraitorHit.remove(convertedPlayerId);
-        session.deathTagLastTraitorHitAt.remove(convertedPlayerId);
+        UUID patientZeroAlpha = session.deathTagAchievements.recordConversion(convertedPlayerId,
+                killer == null || !session.tagged.contains(killer.getUniqueId())
+                        ? null : killer.getUniqueId(), forcedAlpha);
+        if (patientZeroAlpha != null) {
+            Player alpha = session.players.get(patientZeroAlpha);
+            if (alpha != null) awardCatalogAchievement(alpha, "death-tag", "patient-zero");
+        }
         if (!forcedAlpha) session.deathTagDeathsByPlayer.merge(convertedPlayerId, 1, Integer::sum);
         // Legacy GetKillsGems pays 4 for a Runner kill and 0 for a Chaser kill.
         if (!forcedAlpha && killer != null && session.tagged.contains(killer.getUniqueId())) {
@@ -6955,6 +6964,20 @@ public final class ArcadePortManager implements Listener {
         target.setVelocity(velocity);
     }
 
+    private boolean applyDeathTagTraitorKnockback(Session session, Player attacker, Player target) {
+        String cooldownKey = attacker.getUniqueId() + ":" + target.getUniqueId();
+        long now = System.currentTimeMillis();
+        long lastUse = session.deathTagTraitorKnockbackAt.getOrDefault(cooldownKey, 0L);
+        if (!ArcadePortRules.deathTagTraitorKnockbackReady(now, lastUse)) return false;
+        Vector direction = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
+        if (direction.lengthSquared() <= 0.001D) return false;
+        session.deathTagTraitorKnockbackAt.put(cooldownKey, now);
+        double multiplier = ArcadePortRules.deathTagKnockbackMultiplier(
+                session.alphaChasers.contains(target.getUniqueId()));
+        target.setVelocity(direction.normalize().multiply(0.8D * multiplier).setY(0.1D));
+        return true;
+    }
+
     private void awardDeathTagKill(Session session, Player killer) {
         if (killer == null || !killer.isOnline() || !session.scores.containsKey(killer.getUniqueId())) return;
         int kills = session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
@@ -6979,20 +7002,18 @@ public final class ArcadePortManager implements Listener {
         int runnerKills = session.deathTagRunnerKillsByPlayer.merge(id, 1, Integer::sum);
         if (runnerKills >= 8) awardCatalogAchievement(killer, "death-tag", "ultimate-chaser");
 
-        long now = System.currentTimeMillis();
-        List<Long> recentKills = session.deathTagRunnerKillTimes.computeIfAbsent(id, ignored -> new ArrayList<>());
-        recentKills.removeIf(killAt -> now - killAt > 60_000L);
-        recentKills.add(now);
-        if (recentKills.size() >= 3) awardCatalogAchievement(killer, "death-tag", "hasty-hunter");
+        if (session.deathTagAchievements.recordChaserKillForHastyHunter(id, System.currentTimeMillis())) {
+            awardCatalogAchievement(killer, "death-tag", "hasty-hunter");
+        }
     }
 
     private void recordDeathTagTurtleHit(Session session, Player runner, Player chaser) {
         UUID runnerId = runner.getUniqueId();
         UUID chaserId = chaser.getUniqueId();
-        int hits = session.deathTagTurtleHitsByRunner.merge(runnerId, 1, Integer::sum);
-        if (hits >= 3) awardCatalogAchievement(runner, "death-tag", "turtle-shell");
-
         long now = System.currentTimeMillis();
+        if (session.deathTagAchievements.recordTurtleHit(runnerId, chaserId, now)) {
+            awardCatalogAchievement(runner, "death-tag", "shell-shock");
+        }
         long lastHit = session.deathTagTurtleLastHitAt.getOrDefault(chaserId, 0L);
         int stack = now - lastHit > 5_000L ? 1
                 : Math.min(3, session.deathTagTurtleStacksByChaser.getOrDefault(chaserId, 0) + 1);
@@ -7043,6 +7064,10 @@ public final class ArcadePortManager implements Listener {
         }
         Player target = eligible.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(eligible.size()));
         Location runnerLocation = runner.getLocation().clone();
+        boolean nearbyChaser = session.tagged.stream().filter(session.alive::contains)
+                .map(session.players::get).filter(java.util.Objects::nonNull).filter(Player::isOnline)
+                .anyMatch(chaser -> chaser.getWorld() == runner.getWorld()
+                        && chaser.getLocation().distanceSquared(runnerLocation) <= 25.0D);
         Location chaserLocation = target.getLocation().clone();
         if (!isSafeDeathTagRespawnSpawn(runnerLocation)) {
             runner.sendMessage(ChatColor.YELLOW + "Your position is not safe to swap from.");
@@ -7054,6 +7079,14 @@ public final class ArcadePortManager implements Listener {
         session.deathTagRespawnGraceUntil.put(id, graceUntil);
         session.deathTagRespawnGraceUntil.put(target.getUniqueId(), graceUntil);
         session.deathTagTricksterSwapUsed.add(id);
+        if (nearbyChaser) {
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (active == session && runner.isOnline() && session.alive.contains(id)
+                        && !session.tagged.contains(id)) {
+                    awardCatalogAchievement(runner, "death-tag", "sleight-of-hand");
+                }
+            }, 600L);
+        }
         runner.getInventory().remove(Material.ENDER_EYE);
         runner.playSound(runner.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 1.15F);
         target.playSound(target.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 0.85F);
@@ -7220,6 +7253,10 @@ public final class ArcadePortManager implements Listener {
 
         if (session.deathTagRespawnGraceUntil.getOrDefault(targetId, 0L)
                 > System.currentTimeMillis()) return;
+
+        if (session.deathTagAchievements.recordArcherHit(shooterId)) {
+            awardCatalogAchievement(shooter, "death-tag", "fletching-frenzy");
+        }
 
         double baseDamage = session.deathTagProjectileDamage.getOrDefault(arrow.getUniqueId(),
                 ArcadePortRules.deathTagRunnerDamage("archer", true));
@@ -17633,7 +17670,17 @@ public final class ArcadePortManager implements Listener {
             case DEATH_TAG: {
                 boolean attackerChaser = session.tagged.contains(attacker.getUniqueId());
                 boolean targetChaser = session.tagged.contains(target.getUniqueId());
-                if (attackerChaser == targetChaser) break;
+                if (attackerChaser == targetChaser) {
+                    // Traitor can betray fellow Runners with knockback but never deals
+                    // friendly-fire damage. A subsequent Chaser kill can credit Gallows.
+                    if (!attackerChaser && "melee".equals(source)
+                            && "traitor".equals(session.deathTagRunnerKits.get(attacker.getUniqueId()))
+                            && applyDeathTagTraitorKnockback(session, attacker, target)) {
+                        session.deathTagAchievements.recordTraitorKnockback(attacker.getUniqueId(),
+                                target.getUniqueId(), System.currentTimeMillis());
+                    }
+                    break;
+                }
                 if (ArcadePortRules.shouldSpreadDeathTag(attackerChaser, targetChaser)) {
                     applyDeathTagDefaultMeleeKnockback(attacker, target, false);
                     double damage = ArcadePortRules.deathTagChaserDamage(
@@ -17643,6 +17690,8 @@ public final class ArcadePortManager implements Listener {
                         checkRoundEnd(session);
                     } else {
                         target.setHealth(target.getHealth() - damage);
+                        session.deathTagAchievements.recordChaserDamageToRunner(
+                                attacker.getUniqueId(), target.getUniqueId());
                         playLegacyDamageFeedback(target);
                         target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.9F, 0.75F);
                     }
@@ -17658,6 +17707,10 @@ public final class ArcadePortManager implements Listener {
                             session.alphaChasers.contains(target.getUniqueId()));
                     boolean lethalHit = ArcadePortRules.deathTagHitIsLethal(target.getHealth(), damage);
                     if (damage > 0.0D) {
+                        if ("melee".equals(source) && session.deathTagAchievements.recordRunnerMeleeHit(
+                                attacker.getUniqueId(), target.getUniqueId())) {
+                            awardCatalogAchievement(attacker, "death-tag", "lots-of-subject-matter");
+                        }
                         if ("turtle".equals(kit) && !"projectile hit".equals(source)) {
                             recordDeathTagTurtleHit(session, attacker, target);
                         }
@@ -17674,22 +17727,7 @@ public final class ArcadePortManager implements Listener {
                     if (!lethalHit && "basher".equals(kit) && !"projectile hit".equals(source)) {
                         target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 2, false, false, true));
                     } else if (!lethalHit && "traitor".equals(kit) && !"projectile hit".equals(source)) {
-                        String cooldownKey = attacker.getUniqueId() + ":" + target.getUniqueId();
-                        long now = System.currentTimeMillis();
-                        long lastUse = session.deathTagTraitorKnockbackAt.getOrDefault(cooldownKey, 0L);
-                        if (ArcadePortRules.deathTagTraitorKnockbackReady(now, lastUse)) {
-                            session.deathTagTraitorKnockbackAt.put(cooldownKey, now);
-                            session.deathTagLastTraitorHit.put(target.getUniqueId(), attacker.getUniqueId());
-                            session.deathTagLastTraitorHitAt.put(target.getUniqueId(), now);
-                            session.deathTagLastTraitorHit.put(target.getUniqueId(), attacker.getUniqueId());
-                            session.deathTagLastTraitorHitAt.put(target.getUniqueId(), now);
-                            Vector knockbackDirection = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
-                            double multiplier = ArcadePortRules.deathTagKnockbackMultiplier(
-                                    session.alphaChasers.contains(target.getUniqueId()));
-                            if (knockbackDirection.lengthSquared() > 0.001D) {
-                                target.setVelocity(knockbackDirection.normalize().multiply(0.8D * multiplier).setY(0.1D));
-                            }
-                        }
+                        applyDeathTagTraitorKnockback(session, attacker, target);
                     }
                 }
                 break;
@@ -19442,7 +19480,8 @@ public final class ArcadePortManager implements Listener {
                         && session.alive.contains(id)
                         && session.teams.getOrDefault(id, -2) == winningTeam));
             if (session.type == ArcadePortGame.DEATH_TAG && won && session.alive.contains(id)
-                    && !session.tagged.contains(id)) {
+                    && !session.tagged.contains(id)
+                    && session.deathTagAchievements.survivedThreeChasers(id)) {
                 awardCatalogAchievement(entry.getValue(), "death-tag", "smoke-and-mirrors");
             }
             if (session.type == ArcadePortGame.DRAGONS) {
@@ -19497,7 +19536,7 @@ public final class ArcadePortManager implements Listener {
                             "Speedster — win Micro Battles in under 1:30.");
                 }
                 if (session.type == ArcadePortGame.DEATH_TAG) {
-                    if (lifetimeWins >= 50) {
+                    if (lifetimeWins >= 20) {
                         awardCatalogAchievement(entry.getValue(), "death-tag", "death-proof");
                     }
                     String roleWins = session.tagged.contains(id) ? "chaser-wins" : "runner-wins";
@@ -28639,7 +28678,7 @@ public final class ArcadePortManager implements Listener {
         Team deathTagChaserScoreboardLine;
         String deathTagChaserScoreboardEntry;
         final Map<UUID, String> deathTagRunnerKits = new HashMap<>();
-        final Map<UUID, Integer> deathTagTurtleHitsByRunner = new HashMap<>();
+        final DeathTagAchievementTracker deathTagAchievements = new DeathTagAchievementTracker();
         final Map<UUID, Integer> deathTagTurtleStacksByChaser = new HashMap<>();
         final Map<UUID, Long> deathTagTurtleLastHitAt = new HashMap<>();
         final Map<UUID, Integer> deathTagTurtleWindCharges = new HashMap<>();
@@ -28649,7 +28688,6 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, String> deathTagRunnerTrailStyles = new HashMap<>();
         final Map<UUID, Integer> deathTagChaserKillsByPlayer = new HashMap<>();
         final Map<UUID, Integer> deathTagRunnerKillsByPlayer = new HashMap<>();
-        final Map<UUID, List<Long>> deathTagRunnerKillTimes = new HashMap<>();
         final Map<UUID, Double> deathTagRunDistanceByPlayer = new HashMap<>();
         final Map<UUID, Double> deathTagBasherHeartsRegenerated = new HashMap<>();
         final Map<UUID, Integer> deathTagComeAtMeBroAwards = new HashMap<>();
@@ -28658,9 +28696,6 @@ public final class ArcadePortManager implements Listener {
         boolean deathTagRewardsAwarded;
         final Map<UUID, Integer> deathTagDeathsByPlayer = new HashMap<>();
         final Map<UUID, Long> deathTagRespawnGraceUntil = new HashMap<>();
-        final Map<UUID, Integer> deathTagTraitorAssists = new HashMap<>();
-        final Map<UUID, UUID> deathTagLastTraitorHit = new HashMap<>();
-        final Map<UUID, Long> deathTagLastTraitorHitAt = new HashMap<>();
         final Map<UUID, String> deathTagStatueArea = new HashMap<>();
         final Map<UUID, Long> deathTagStatueSince = new HashMap<>();
         final Map<UUID, Long> deathTagLastArrowAt = new HashMap<>();

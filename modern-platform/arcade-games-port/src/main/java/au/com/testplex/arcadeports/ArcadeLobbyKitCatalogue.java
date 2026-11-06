@@ -91,10 +91,10 @@ final class ArcadeLobbyKitCatalogue {
                             Unlock.GEM, Zombie.class, Material.BOW),
                     choice("runner-traitor", "Runner Traitor", Material.GOLD_INGOT,
                             Unlock.GEM, Zombie.class, Material.IRON_AXE),
-                    choice("runner-turtle", "Turtle", Material.COPPER_AXE,
+                    choice("runner-turtle", "Runner Turtle", Material.COPPER_AXE,
                             Unlock.ACHIEVEMENT, Zombie.class, Material.COPPER_AXE,
                             Material.TURTLE_HELMET),
-                    choice("runner-trickster", "Trickster", Material.FIREWORK_ROCKET,
+                    choice("runner-trickster", "Runner Trickster", Material.FIREWORK_ROCKET,
                             Unlock.ACHIEVEMENT, Zombie.class, Material.FIREWORK_ROCKET));
             case DRAGON_ESCAPE -> List.of(
                     choice("jumper", "Jumper", Material.FEATHER,

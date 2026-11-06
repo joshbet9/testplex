@@ -77,5 +77,11 @@ class AchievementKitUnlockPolicyTest {
         assertFalse(AchievementKitUnlockPolicy.find(ArcadePortGame.SUPER_SPLOOR, "dualies")
                 .requirements().contains("master-of-the-palette"));
         assertEquals(1, AchievementKitUnlockPolicy.unlockedBy("monster-maze-speed", "perfect-run").size());
+        var turtle = AchievementKitUnlockPolicy.find(ArcadePortGame.DEATH_TAG, "runner-turtle");
+        var trickster = AchievementKitUnlockPolicy.find(ArcadePortGame.DEATH_TAG, "runner-trickster");
+        assertEquals(java.util.List.of("lots-of-subject-matter"), turtle.requirements());
+        assertEquals(java.util.List.of("smoke-and-mirrors"), trickster.requirements());
+        assertFalse(turtle.requirements().contains("shell-shock"));
+        assertFalse(trickster.requirements().contains("sleight-of-hand"));
     }
 }

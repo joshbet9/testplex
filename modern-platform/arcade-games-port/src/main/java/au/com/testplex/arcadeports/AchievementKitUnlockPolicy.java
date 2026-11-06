@@ -85,8 +85,8 @@ final class AchievementKitUnlockPolicy {
         // Reviewed four-achievement Constructor gate; all four can be earned without the kit.
         add(rules, "bomb-lobbers", "constructor", "Constructor", "two-birds-one-stone",
                 "whats-a-double-jump", "blast-proof", "jelly-skin");
-        add(rules, "death-tag", "runner-turtle", "Turtle", "turtle-shell");
-        add(rules, "death-tag", "runner-trickster", "Trickster", "smoke-and-mirrors");
+        add(rules, "death-tag", "runner-turtle", "Runner Turtle", "lots-of-subject-matter");
+        add(rules, "death-tag", "runner-trickster", "Runner Trickster", "smoke-and-mirrors");
         add(rules, "dragon-escape", "digger", "Digger", "to-hell-and-back", "paralympics");
         add(rules, "micro-battles", "dasher", "Dasher", "speedster");
         add(rules, "sheep-quest", "shepherd", "Shepherd", "cheeky");

@@ -10,6 +10,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ArcadeLobbyKitCatalogueTest {
     @Test
+    void deathTagKeepsItsStableKitIdsAndUsesTheApprovedRunnerNames() {
+        List<ArcadeLobbyKitCatalogue.KitChoice> kits =
+                ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.DEATH_TAG, List.of());
+        assertEquals(List.of("runner-basher", "runner-archer", "runner-traitor",
+                "runner-turtle", "runner-trickster"), kits.stream().map(kit -> kit.id).toList());
+        assertEquals("Runner Turtle", kits.get(3).name);
+        assertEquals("Runner Trickster", kits.get(4).name);
+    }
+
+    @Test
     void preservesTheReviewedBombLobbersKitOrder() {
         assertEquals(List.of("acrobat", "armorer", "constructor"),
                 ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.BOMB_LOBBERS, List.of()).stream()

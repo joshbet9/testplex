@@ -11,6 +11,22 @@ import org.junit.jupiter.api.Test;
 
 class ArcadeProgressCatalogTest {
     @Test
+    void deathTagHasFourteenReviewedAchievementsAndNoCircularKitUnlocks() {
+        var achievements = ArcadeProgressCatalog.achievements("death-tag");
+        assertEquals(14, achievements.size());
+        assertEquals(14, achievements.stream().map(ArcadeProgressCatalog.Achievement::id).distinct().count());
+        assertEquals("Win 20 games of Death Tag.", achievements.stream()
+                .filter(a -> a.id().equals("death-proof")).findFirst().orElseThrow().requirement());
+        assertEquals("Kill 3 Runners within 30 seconds.", achievements.stream()
+                .filter(a -> a.id().equals("hasty-hunter")).findFirst().orElseThrow().requirement());
+        for (String id : java.util.List.of("lots-of-subject-matter", "smoke-and-mirrors",
+                "fletching-frenzy", "shell-shock", "sleight-of-hand", "patient-zero")) {
+            assertTrue(achievements.stream().anyMatch(a -> a.id().equals(id)), id);
+        }
+        assertFalse(achievements.stream().anyMatch(a -> a.id().equals("turtle-shell")));
+    }
+
+    @Test
     void baconBrawlHasFourteenAchievementsAndOneSpecificToEveryKit() {
         assertEquals(14, ArcadeProgressCatalog.achievements("bacon-brawl").size());
         assertTrue(hasAchievement("bacon-brawl", "three-for-one", "Three for One!"));
