@@ -31,5 +31,16 @@ final class ArcadeAchievementKitRequirements {
         return KNOWN.get(game + "/" + kit);
     }
 
+    /** Only confirmed relationships are advertised as achievement rewards. */
+    static List<String> kitIdsForAchievement(String game, String achievement) {
+        return KNOWN.entrySet().stream()
+                .filter(entry -> entry.getKey().startsWith(game + "/"))
+                .filter(entry -> entry.getValue().allAchievements()
+                        || entry.getValue().achievementIds().contains(achievement))
+                .map(entry -> entry.getKey().substring(game.length() + 1))
+                .sorted()
+                .toList();
+    }
+
     private ArcadeAchievementKitRequirements() { }
 }

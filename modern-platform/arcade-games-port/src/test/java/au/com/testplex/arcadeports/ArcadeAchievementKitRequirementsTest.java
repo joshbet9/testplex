@@ -20,5 +20,13 @@ class ArcadeAchievementKitRequirementsTest {
 
     @Test void unauditedKitsDoNotReceiveInventedUnlockRequirements() {
         assertNull(ArcadeAchievementKitRequirements.find("dragons", "tamer"));
+        assertTrue(ArcadeAchievementKitRequirements.kitIdsForAchievement("dragons", "adept").isEmpty());
+    }
+
+    @Test void knownRewardsCanBeShownInAchievementTooltips() {
+        assertEquals(java.util.List.of("dasher"),
+                ArcadeAchievementKitRequirements.kitIdsForAchievement("micro-battles", "speedster"));
+        assertEquals(java.util.List.of("runnerkit-switcher"),
+                ArcadeAchievementKitRequirements.kitIdsForAchievement("runner", "nsfm"));
     }
 }

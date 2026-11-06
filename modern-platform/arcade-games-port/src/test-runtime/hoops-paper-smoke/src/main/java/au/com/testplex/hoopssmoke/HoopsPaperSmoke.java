@@ -4,16 +4,23 @@ import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.boss.BossBar;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.TextDisplay;
 import org.bukkit.event.player.PlayerToggleFlightEvent;
+import org.bukkit.event.inventory.ClickType;
+import org.bukkit.event.inventory.InventoryAction;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
@@ -26,9 +33,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -118,6 +127,10 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         owner = players.get(0);
         owner.setOp(true);
 
+        // Exercise all 30 genuine GUI inventories in the disposable Paper host,
+        // before any Hoops match changes lobby inventory or player game mode.
+        verifyStatsInventories();
+
         // The host sanitises enabled-games against its production READY_FOR_TEST
         // list during onEnable. Add Hoops only to this disposable server's
         // in-memory config after that guard has run; never persist this override.
@@ -136,6 +149,151 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         stage = 1;
         ticks = 0L;
         getLogger().info("HOOPS_SMOKE|QUEUED|players=4|format=2v2");
+    }
+
+    private void verifyStatsInventories() throws Exception {
+        Class<?> directory = Class.forName("au.com.testplex.arcadeports.ArcadeGameDirectory");
+        @SuppressWarnings("unchecked")
+        List<Object> games = (List<Object>) method(directory, "games").invoke(null);
+        require(games.size() >= 30, "stats directory contains fewer than 30 games");
+        NamespacedKey entryKey = new NamespacedKey((JavaPlugin) arcade, "stats-entry");
+        int checkedAchievements = 0;
+        int checkedMilestones = 0;
+
+        for (Object game : games) {
+            String id = (String) method(game.getClass(), "id").invoke(game);
+            Material expectedIcon = (Material) method(game.getClass(), "icon").invoke(game);
+            @SuppressWarnings("unchecked")
+            List<Object> achievements = (List<Object>) invoke(manager, "statsAchievements",
+                    new Class<?>[]{String.class}, id);
+            @SuppressWarnings("unchecked")
+            List<Object> milestones = (List<Object>) invoke(manager, "statsMilestones",
+                    new Class<?>[]{String.class}, id);
+            Set<String> expectedAchievements = new HashSet<>();
+            for (Object achievement : achievements) {
+                String entryId = (String) method(achievement.getClass(), "id").invoke(achievement);
+                require(expectedAchievements.add("achievement:" + entryId), id + " duplicate achievement id: " + entryId);
+            }
+            Set<String> expectedMilestoneTiers = new HashSet<>();
+            for (Object milestone : milestones) {
+                String entryId = (String) method(milestone.getClass(), "id").invoke(milestone);
+                long[] stages = (long[]) method(milestone.getClass(), "stages").invoke(milestone);
+                for (int tier = 1; tier <= stages.length; tier++)
+                    require(expectedMilestoneTiers.add("milestone:" + entryId + ":" + tier),
+                            id + " duplicate milestone tier: " + entryId + "/" + tier);
+            }
+            Set<String> seenAchievements = new HashSet<>();
+            int achievementPages = Math.max(1, (achievements.size() + 13) / 14);
+            for (int page = 1; page <= achievementPages; page++) {
+                require(Bukkit.dispatchCommand(owner, "stats " + id + " " + page), id + " stats command failed");
+                Inventory inventory = owner.getOpenInventory().getTopInventory();
+                require(inventory.getSize() == 54, id + " achievements inventory is not 9x6");
+                require(owner.getOpenInventory().getTitle().endsWith("Achievements"), id + " wrong title");
+                require(inventory.getItem(13) != null && inventory.getItem(0) != null,
+                        id + " missing centred logo or back button");
+                require(inventory.getItem(13).getType() == expectedIcon,
+                        id + " game logo does not match the Arcade directory icon");
+                require(inventory.getItem(8) != null, id + " missing incomplete filter");
+                int count = 0;
+                for (int slot = 18; slot <= 35; slot++) {
+                    String entry = statsEntry(inventory.getItem(slot), entryKey);
+                    if (entry == null) continue;
+                    require(expectedAchievements.contains(entry), id + " unknown achievement " + entry);
+                    require(seenAchievements.add(entry), id + " rendered achievement twice: " + entry);
+                    count++;
+                }
+                require(count == Math.min(14, Math.max(0, achievements.size() - (page - 1) * 14)),
+                        id + " page " + page + " achievement count mismatch: " + count);
+                if (page > 1) require(inventory.getItem(45) != null, id + " missing previous page arrow");
+                if (page < achievementPages)
+                    require(inventory.getItem(53) != null, id + " missing next page arrow");
+            }
+            require(seenAchievements.equals(expectedAchievements), id + " omitted achievements");
+            checkedAchievements += seenAchievements.size();
+
+            require(Bukkit.dispatchCommand(owner, "stats " + id), id + " stats command failed");
+            Inventory current = owner.getOpenInventory().getTopInventory();
+            int milestonesButton = -1;
+            for (int slot = 45; slot < 54; slot++) {
+                ItemStack item = current.getItem(slot);
+                if (item != null && item.getType() == Material.PAPER) { milestonesButton = slot; break; }
+            }
+            require(milestonesButton >= 0, id + " missing milestones button");
+            clickStatsSlot(milestonesButton);
+            Set<String> seenMilestones = new HashSet<>();
+            for (int page = 0; page < 40; page++) {
+                Inventory inventory = owner.getOpenInventory().getTopInventory();
+                require(owner.getOpenInventory().getTitle().endsWith("Milestones"), id + " milestones did not open");
+                require(inventory.getItem(49) != null && inventory.getItem(49).getType() == Material.DIAMOND,
+                        id + " missing diamond achievements return");
+                for (int slot = 9; slot <= 44; slot++) {
+                    String entry = statsEntry(inventory.getItem(slot), entryKey);
+                    if (entry == null) continue;
+                    require(expectedMilestoneTiers.contains(entry), id + " unexpected milestone " + entry);
+                    require(seenMilestones.add(entry), id + " rendered milestone twice: " + entry);
+                }
+                if (inventory.getItem(53) == null || inventory.getItem(53).getType() != Material.ARROW) break;
+                clickStatsSlot(53);
+                require(page < 39, id + " milestone pagination never terminates");
+            }
+            require(seenMilestones.equals(expectedMilestoneTiers), id + " omitted milestone tiers");
+            checkedMilestones += seenMilestones.size();
+            clickStatsSlot(49);
+            require(owner.getOpenInventory().getTitle().endsWith("Achievements"),
+                    id + " diamond did not return to achievements");
+        }
+
+        // Incomplete filter, rarity ordering and page memory on a 20-achievement game.
+        String sampleUnlock = "local-achievements." + owner.getUniqueId() + ".camera-shy.smoke-and-mirrors";
+        ((JavaPlugin) arcade).getConfig().set(sampleUnlock, true);
+        require(Bukkit.dispatchCommand(owner, "stats camera-shy 2"), "Snap page 2 did not open");
+        clickStatsSlot(8);
+        Inventory filtered = owner.getOpenInventory().getTopInventory();
+        require(filtered.getItem(8) != null && filtered.getItem(8).getType() == Material.LIME_DYE,
+                "incomplete filter did not activate");
+        int filteredPageCount = 0;
+        for (int slot = 18; slot <= 35; slot++) {
+            if (statsEntry(filtered.getItem(slot), entryKey) != null) filteredPageCount++;
+        }
+        require(filteredPageCount == 5, "Snap incomplete page 2 should have 5 achievements: " + filteredPageCount);
+        clickStatsSlot(49);
+        require(owner.getOpenInventory().getTitle().endsWith("Milestones"), "Snap filter milestone navigation failed");
+        clickStatsSlot(49);
+        Inventory returned = owner.getOpenInventory().getTopInventory();
+        require(returned.getItem(8) != null && returned.getItem(8).getType() == Material.LIME_DYE,
+                "incomplete filter state was lost returning from milestones");
+        require(returned.getItem(45) != null && returned.getItem(45).getType() == Material.ARROW,
+                "Snap previous achievement page was not remembered");
+
+        require(Bukkit.dispatchCommand(owner, "stats"), "root stats command did not open");
+        clickStatsSlot(38);
+        Inventory gameSelection = owner.getOpenInventory().getTopInventory();
+        require("Arcade Games".equals(owner.getOpenInventory().getTitle()),
+                "30-game Arcade selection page did not open");
+        for (int slot = 9; slot < 9 + games.size(); slot++) {
+            ItemStack item = gameSelection.getItem(slot);
+            require(item != null && item.hasItemMeta() && item.getItemMeta().hasLore(),
+                    "missing stats summary for Arcade directory slot " + slot);
+            List<String> lore = item.getItemMeta().getLore();
+            require(lore.stream().anyMatch(line -> org.bukkit.ChatColor.stripColor(line).startsWith("Achievements:")),
+                    "game directory is missing achievement completion for slot " + slot);
+            require(lore.stream().anyMatch(line -> org.bukkit.ChatColor.stripColor(line).startsWith("Milestone tiers:")),
+                    "game directory is missing milestone completion for slot " + slot);
+        }
+        owner.closeInventory();
+        getLogger().info("STATS_GUI_SMOKE|PASS|games=" + games.size()
+                + "|achievements=" + checkedAchievements + "|milestone-tiers=" + checkedMilestones
+                + "|filter-and-navigation=PASS");
+    }
+
+    private static String statsEntry(ItemStack item, NamespacedKey key) {
+        if (item == null || !item.hasItemMeta()) return null;
+        return item.getItemMeta().getPersistentDataContainer().get(key, PersistentDataType.STRING);
+    }
+
+    private void clickStatsSlot(int slot) {
+        Bukkit.getPluginManager().callEvent(new InventoryClickEvent(owner.getOpenInventory(),
+                InventoryType.SlotType.CONTAINER, slot, ClickType.LEFT, InventoryAction.PICKUP_ALL));
     }
 
     private void queueAndStart() throws Exception {
