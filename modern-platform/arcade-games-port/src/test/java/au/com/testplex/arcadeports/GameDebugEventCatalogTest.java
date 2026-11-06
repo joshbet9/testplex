@@ -1055,7 +1055,8 @@ class GameDebugEventCatalogTest {
         assertTrue(manager.contains("type == ArcadePortGame.SUPER_SPLOOR && \"use-special\".equals(eventId)"));
         assertTrue(manager.contains("superSploor.debugUseSelectedSpecial(tester)"));
         assertTrue(runtime.contains("public boolean debugUseSelectedSpecial(Player tester)"));
-        assertTrue(runtime.contains("specialCharge.put(id, 100.0D)"));
+        assertTrue(runtime.contains("specialCharge.put(id, GameDebugRuntimeOverrides.doubleValue("));
+        assertTrue(runtime.contains("\"SUPER_SPLOOR_SPECIAL_CHARGE_REQUIRED\", SuperSploorRules.SPECIAL_CHARGE_REQUIRED)"));
         assertTrue(runtime.contains("useSpecial(tester, id)"));
     }
 

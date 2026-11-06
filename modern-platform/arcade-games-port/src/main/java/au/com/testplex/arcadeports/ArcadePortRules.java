@@ -990,6 +990,34 @@ public final class ArcadePortRules {
     public static final long DRAGONS_BARRAGE_INTERVAL_MILLIS = 200L;
     public static final long DRAGONS_BARRAGE_INITIAL_CHARGE_MILLIS = 1_000L;
     public static final long DRAGONS_COWARD_LEAP_COOLDOWN_MILLIS = 8_000L;
+    public static final long DRAGONS_DODGEMS_QUIET_MILLIS = 60_000L;
+    public static final double DRAGONS_COWARD_LEAP_HORIZONTAL_SPEED = 1.2D;
+    public static final double DRAGONS_COWARD_LEAP_FACING_Y_BONUS = 0.2D;
+    public static final double DRAGONS_COWARD_LEAP_MAX_Y = 1.0D;
+    public static final double DRAGONS_COWARD_LEAP_GROUNDED_Y_BONUS = 0.2D;
+    public static final double DRAGONS_CONTACT_HORIZONTAL_KNOCKBACK = 1.0D;
+    public static final double DRAGONS_CONTACT_VERTICAL_BONUS = 0.6D;
+    public static final double DRAGONS_CONTACT_MAX_Y = 2.0D;
+    public static final double DRAGONS_CONTACT_GROUNDED_Y_BONUS = 0.2D;
+    public static final double DRAGONS_TAMER_VERTICAL_FLIGHT_FACTOR = 0.30D;
+    public static final double DRAGONS_TAMER_VERTICAL_FLIGHT_CAP = 0.14D;
+    public static final double DRAGONS_TAMER_LOOKAHEAD_BLOCKS = 12.0D;
+    public static final double DRAGONS_RETARGET_ALTITUDE_Y = 10.0D;
+    public static final double DRAGONS_RETARGET_DISTANCE_SQUARED = 36.0D;
+    public static final double DRAGONS_SPARKLER_MIN_ATTRACT_Y = 4.0D;
+    public static final double DRAGONS_GLIDER_HORIZONTAL_SPEED = 0.72D;
+    public static final double DRAGONS_GLIDER_VERTICAL_BASE = 0.12D;
+    public static final double DRAGONS_GLIDER_MIN_VERTICAL = 0.08D;
+    public static final double DRAGONS_GLIDER_MAX_VERTICAL = 0.42D;
+    public static final double DRAGONS_FROST_LAUNCH_Y = 0.5D;
+    public static final double DRAGONS_FROST_PATH_STEP = 0.2D;
+    public static final double DRAGONS_BARRAGE_ARROW_SPEED = 3.0D;
+    public static final double DRAGONS_BARRAGE_ARROW_SPREAD = 0.1D;
+    public static final double DRAGONS_FLIGHT_VERTICAL_BIAS = 0.04D;
+    public static final double DRAGONS_FLIGHT_MIN_VERTICAL_SPEED = -0.08D;
+    public static final double DRAGONS_FLIGHT_MAX_VERTICAL_SPEED = 0.16D;
+    public static final double DRAGONS_COWARD_LEAP_DANGER_FALL_BLOCKS = 6.0D;
+    public static final double DRAGONS_FALL_DAMAGE_REDUCTION = 1.0D;
     public static final long MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS = 20_000L;
     public static final int MICRO_BATTLES_FLETCHER_MAX_ARROWS = 3;
     public static final long MICRO_BATTLES_SPEEDSTER_MAX_GAME_MILLIS = 90_000L;
@@ -1243,6 +1271,11 @@ public final class ArcadePortRules {
         return won && !tookDamage;
     }
 
+    public static boolean shouldAwardDragonsDodgems(long millisSinceContact) {
+        return millisSinceContact >= GameDebugRuntimeOverrides.longValue(
+                "DRAGONS_DODGEMS_QUIET_MILLIS", DRAGONS_DODGEMS_QUIET_MILLIS);
+    }
+
     public static boolean shouldCancelDragonsPvp(boolean directPlayerDamager, boolean playerProjectileShooter) {
         return directPlayerDamager || playerProjectileShooter;
     }
@@ -1279,10 +1312,17 @@ public final class ArcadePortRules {
                 || !Double.isFinite(facing.getZ()) || facing.lengthSquared() <= 1.0E-12D) {
             return new Vector();
         }
-        Vector velocity = facing.clone().normalize().multiply(1.2D);
-        velocity.setY(velocity.getY() + 0.2D);
-        if (velocity.getY() > 1.0D) velocity.setY(1.0D);
-        if (grounded) velocity.setY(velocity.getY() + 0.2D);
+        Vector velocity = facing.clone().normalize().multiply(GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_COWARD_LEAP_HORIZONTAL_SPEED", DRAGONS_COWARD_LEAP_HORIZONTAL_SPEED));
+        velocity.setY(velocity.getY() + GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_COWARD_LEAP_FACING_Y_BONUS", DRAGONS_COWARD_LEAP_FACING_Y_BONUS));
+        if (velocity.getY() > GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_COWARD_LEAP_MAX_Y", DRAGONS_COWARD_LEAP_MAX_Y)) {
+            velocity.setY(GameDebugRuntimeOverrides.doubleValue(
+                    "DRAGONS_COWARD_LEAP_MAX_Y", DRAGONS_COWARD_LEAP_MAX_Y));
+        }
+        if (grounded) velocity.setY(velocity.getY() + GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_COWARD_LEAP_GROUNDED_Y_BONUS", DRAGONS_COWARD_LEAP_GROUNDED_Y_BONUS));
         return velocity;
     }
 
@@ -1292,10 +1332,16 @@ public final class ArcadePortRules {
                 || !Double.isFinite(trajectory.getZ()) || trajectory.lengthSquared() <= 1.0E-12D) {
             return new Vector();
         }
-        Vector velocity = trajectory.clone().normalize();
-        velocity.setY(velocity.getY() + 0.6D);
-        if (velocity.getY() > 2.0D) velocity.setY(2.0D);
-        if (grounded) velocity.setY(velocity.getY() + 0.2D);
+        Vector velocity = trajectory.clone().normalize().multiply(GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_CONTACT_HORIZONTAL_KNOCKBACK", DRAGONS_CONTACT_HORIZONTAL_KNOCKBACK));
+        velocity.setY(velocity.getY() + GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_CONTACT_VERTICAL_BONUS", DRAGONS_CONTACT_VERTICAL_BONUS));
+        if (velocity.getY() > GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_CONTACT_MAX_Y", DRAGONS_CONTACT_MAX_Y)) {
+            velocity.setY(GameDebugRuntimeOverrides.doubleValue("DRAGONS_CONTACT_MAX_Y", DRAGONS_CONTACT_MAX_Y));
+        }
+        if (grounded) velocity.setY(velocity.getY() + GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_CONTACT_GROUNDED_Y_BONUS", DRAGONS_CONTACT_GROUNDED_Y_BONUS));
         return velocity;
     }
 
@@ -1313,12 +1359,68 @@ public final class ArcadePortRules {
     public static Vector autonomousDragonFlight(Vector heading, double speed) {
         if (heading == null || heading.lengthSquared() < 1.0E-6D) heading = new Vector(0.0D, 0.0D, 1.0D);
         Vector flight = heading.clone().normalize().multiply(Math.max(0.0D, speed));
-        flight.setY(Math.max(-0.08D, Math.min(0.16D, flight.getY() + 0.04D)));
+        double y = flight.getY() + GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_FLIGHT_VERTICAL_BIAS", DRAGONS_FLIGHT_VERTICAL_BIAS);
+        double minY = GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_FLIGHT_MIN_VERTICAL_SPEED", DRAGONS_FLIGHT_MIN_VERTICAL_SPEED);
+        double maxY = GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_FLIGHT_MAX_VERTICAL_SPEED", DRAGONS_FLIGHT_MAX_VERTICAL_SPEED);
+        flight.setY(Math.max(Math.min(minY, maxY), Math.min(Math.max(minY, maxY), y)));
         return flight;
     }
 
     public static boolean shouldDragonSparklerAttract(double y, boolean inLiquid) {
-        return y >= 4.0D && !inLiquid;
+        return y >= GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_SPARKLER_MIN_ATTRACT_Y", DRAGONS_SPARKLER_MIN_ATTRACT_Y) && !inLiquid;
+    }
+
+    public static double dragonsTamerVerticalVelocity(double facingY) {
+        double cap = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_TAMER_VERTICAL_FLIGHT_CAP", DRAGONS_TAMER_VERTICAL_FLIGHT_CAP));
+        double scaled = facingY * GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_TAMER_VERTICAL_FLIGHT_FACTOR", DRAGONS_TAMER_VERTICAL_FLIGHT_FACTOR);
+        return Math.max(-cap, Math.min(cap, scaled));
+    }
+
+    public static boolean shouldRetargetDragon(double dragonY, double distanceSquared, boolean hasTarget) {
+        return dragonY < GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_RETARGET_ALTITUDE_Y", DRAGONS_RETARGET_ALTITUDE_Y)
+                || !hasTarget || distanceSquared <= GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_RETARGET_DISTANCE_SQUARED", DRAGONS_RETARGET_DISTANCE_SQUARED);
+    }
+
+    public static Vector dragonsGliderVelocity(Vector facing) {
+        if (facing == null || facing.lengthSquared() <= 1.0E-12D) return new Vector();
+        Vector velocity = facing.clone().normalize().multiply(GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_GLIDER_HORIZONTAL_SPEED", DRAGONS_GLIDER_HORIZONTAL_SPEED));
+        double minY = GameDebugRuntimeOverrides.doubleValue("DRAGONS_GLIDER_MIN_VERTICAL", DRAGONS_GLIDER_MIN_VERTICAL);
+        double maxY = GameDebugRuntimeOverrides.doubleValue("DRAGONS_GLIDER_MAX_VERTICAL", DRAGONS_GLIDER_MAX_VERTICAL);
+        double y = velocity.getY() + GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_GLIDER_VERTICAL_BASE", DRAGONS_GLIDER_VERTICAL_BASE);
+        velocity.setY(Math.max(Math.min(minY, maxY), Math.min(Math.max(minY, maxY), y)));
+        return velocity;
+    }
+
+    public static Vector dragonsBarrageArrowVelocity(Vector facing, Vector jitter) {
+        if (facing == null) return new Vector();
+        Vector velocity = facing.clone();
+        if (jitter != null) velocity.add(jitter);
+        return velocity.multiply(GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_BARRAGE_ARROW_SPEED", DRAGONS_BARRAGE_ARROW_SPEED));
+    }
+
+    public static double dragonsBarrageJitterComponent(double randomValue) {
+        return (randomValue - 0.5D) * GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_BARRAGE_ARROW_SPREAD", DRAGONS_BARRAGE_ARROW_SPREAD);
+    }
+
+    public static double dragonsFrostInitialLift() {
+        return GameDebugRuntimeOverrides.doubleValue("DRAGONS_FROST_LAUNCH_Y", DRAGONS_FROST_LAUNCH_Y);
+    }
+
+    public static double dragonsFrostPathStep() {
+        return Math.max(0.01D, GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_FROST_PATH_STEP", DRAGONS_FROST_PATH_STEP));
     }
 
     public static boolean canUseDragonSpectatorTeleport(long nowMillis, long nextAllowedMillis) {
@@ -1327,7 +1429,8 @@ public final class ArcadePortRules {
 
 
     public static boolean shouldSpawnTestDragon(int currentCount, long now, long nextSpawnAt) {
-        return currentCount < DRAGONS_MAX_DRAGONS && now >= nextSpawnAt;
+        return currentCount < Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "DRAGONS_MAX_DRAGONS", DRAGONS_MAX_DRAGONS)) && now >= nextSpawnAt;
     }
 
     public static boolean shouldReplenishDragonSparkler(long now, long nextSpawnAt, int currentCount) {
@@ -1345,7 +1448,8 @@ public final class ArcadePortRules {
     }
 
     public static double dragonFallDamageAfterReduction(double damage) {
-        return Math.max(0.0D, damage - 1.0D);
+        return Math.max(0.0D, damage - GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_FALL_DAMAGE_REDUCTION", DRAGONS_FALL_DAMAGE_REDUCTION));
     }
 
     public static String normalizeMicroBattlesKit(String requested) {

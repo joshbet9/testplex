@@ -9870,7 +9870,8 @@ public final class ArcadePortManager implements Listener {
         session.dragonLeapReadyAt.put(id, now + GameDebugRuntimeOverrides.longValue("DRAGONS_COWARD_LEAP_COOLDOWN_MILLIS", ArcadePortRules.DRAGONS_COWARD_LEAP_COOLDOWN_MILLIS));
         cooldownProgress.start(player, "Coward's Leap", GameDebugRuntimeOverrides.longValue("DRAGONS_COWARD_LEAP_COOLDOWN_MILLIS", ArcadePortRules.DRAGONS_COWARD_LEAP_COOLDOWN_MILLIS));
         session.dragonAbilitiesUsed.add(id);
-        if (!player.isOnGround() && player.getFallDistance() >= 6.0F) {
+        if (!player.isOnGround() && player.getFallDistance() >= GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_COWARD_LEAP_DANGER_FALL_BLOCKS", ArcadePortRules.DRAGONS_COWARD_LEAP_DANGER_FALL_BLOCKS)) {
             session.dragonLeapSavedDangerousFall.add(id);
         }
         player.setCooldown(Material.IRON_AXE,
@@ -9968,8 +9969,9 @@ public final class ArcadePortManager implements Listener {
 
             double distance = 0.0D;
             while (distance < GameDebugRuntimeOverrides.intValue("DRAGONS_FROST_BRIDGE_LENGTH", ArcadePortRules.DRAGONS_FROST_BRIDGE_LENGTH)) {
-                distance += 0.2D;
-                cursor.add(direction.clone().multiply(0.2D));
+                double pathStep = ArcadePortRules.dragonsFrostPathStep();
+                distance += pathStep;
+                cursor.add(direction.clone().multiply(pathStep));
                 Block candidate = cursor.getBlock();
                 if (!isDragonFrostPlacementSafe(session, candidate, player.getUniqueId())) continue;
                 if (unique.add(candidate)) blocks.add(candidate);
@@ -10002,7 +10004,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
 
-        player.setVelocity(new Vector(0.0D, 0.5D, 0.0D));
+        player.setVelocity(new Vector(0.0D, ArcadePortRules.dragonsFrostInitialLift(), 0.0D));
         session.dragonFrostBridgePaths.put(id, path);
         session.dragonFrostBridgePathIndexes.put(id, 0);
         session.dragonFrostReadyAt.put(id, now + GameDebugRuntimeOverrides.longValue("DRAGONS_FROST_COOLDOWN_MILLIS", ArcadePortRules.DRAGONS_FROST_COOLDOWN_MILLIS));
@@ -10025,9 +10027,8 @@ public final class ArcadePortManager implements Listener {
         session.dragonGliderOriginalChestplates.put(id, chestplate == null ? new ItemStack(Material.AIR) : chestplate.clone());
         player.getInventory().setChestplate(namedItem(Material.ELYTRA, "Temporary Glider", "Temporary movement ability; restored automatically."));
         player.setFallDistance(0.0F);
-        Vector glide = player.getLocation().getDirection().normalize().multiply(0.72D);
-        glide.setY(Math.max(0.08D, Math.min(0.42D, glide.getY() + 0.12D)));
-        player.setVelocity(glide); player.setGliding(true);
+        player.setVelocity(ArcadePortRules.dragonsGliderVelocity(player.getLocation().getDirection()));
+        player.setGliding(true);
         session.dragonGliderUntil.put(id, now + GameDebugRuntimeOverrides.longValue("DRAGONS_GLIDER_DURATION_MILLIS", ArcadePortRules.DRAGONS_GLIDER_DURATION_MILLIS));
         session.dragonGliderReadyAt.put(id, now + GameDebugRuntimeOverrides.longValue("DRAGONS_GLIDER_COOLDOWN_MILLIS", ArcadePortRules.DRAGONS_GLIDER_COOLDOWN_MILLIS));
         cooldownProgress.start(player, "Glider", GameDebugRuntimeOverrides.longValue("DRAGONS_GLIDER_COOLDOWN_MILLIS", ArcadePortRules.DRAGONS_GLIDER_COOLDOWN_MILLIS));
@@ -14560,7 +14561,7 @@ public final class ArcadePortManager implements Listener {
             UUID id = player.getUniqueId();
             if (player.getHealth() <= 1.0D) session.dragonHalfHeartReached.add(id);
             long lastHitAt = session.dragonLastContactAt.getOrDefault(id, session.dragonRoundStartedAt);
-            if (lastHitAt > 0L && now - lastHitAt >= 60_000L
+            if (lastHitAt > 0L && ArcadePortRules.shouldAwardDragonsDodgems(now - lastHitAt)
                     && session.dragonDodgemsAwarded.add(id)) {
                 awardDragonAchievement(id, player, "dodgems", "Dodgems");
             }
@@ -14582,7 +14583,8 @@ public final class ArcadePortManager implements Listener {
         }
 
         long dragonCount = session.entities.stream().filter(e -> e instanceof EnderDragon && e.isValid()).count();
-        if (now >= session.dragonNextSpawnAt && GameDebugRuntimeOverrides.booleanValue(
+        if (ArcadePortRules.shouldSpawnTestDragon((int) dragonCount, now, session.dragonNextSpawnAt)
+                && GameDebugRuntimeOverrides.booleanValue(
                 "DRAGONS_SPAWNING_ENABLED", ArcadePortRules.DRAGONS_SPAWNING_ENABLED)) {
             session.dragonNextSpawnAt = now + GameDebugRuntimeOverrides.longValue("DRAGONS_SPAWN_INTERVAL_MILLIS", ArcadePortRules.DRAGONS_SPAWN_INTERVAL_MILLIS);
             if (dragonCount < GameDebugRuntimeOverrides.intValue("DRAGONS_MAX_DRAGONS", ArcadePortRules.DRAGONS_MAX_DRAGONS)) {
@@ -14692,8 +14694,10 @@ public final class ArcadePortManager implements Listener {
 
                 // MineplexDragon.updateTarget() runs on FASTEST: if below Y=10, target sky;
                 // otherwise only select a new target within six blocks of the current one.
-                if (dragon.getLocation().getY() < 10.0D || target == null
-                        || dragon.getLocation().distanceSquared(target) <= 36.0D) {
+                double targetDistanceSquared = target == null ? Double.POSITIVE_INFINITY
+                        : dragon.getLocation().distanceSquared(target);
+                if (ArcadePortRules.shouldRetargetDragon(
+                        dragon.getLocation().getY(), targetDistanceSquared, target != null)) {
                     session.dragonSparklerDragonOwners.remove(dragonId);
                     if (session.dragonSpectatorLocation != null
                             && dragon.getLocation().getY() > session.dragonSpectatorLocation.getY()
@@ -14727,10 +14731,11 @@ public final class ArcadePortManager implements Listener {
                     facing.normalize();
                     flight = facing.clone().multiply(GameDebugRuntimeOverrides.doubleValue(
                             "DRAGONS_TAMER_FLIGHT_SPEED", ArcadePortRules.DRAGONS_TAMER_FLIGHT_SPEED));
-                    flight.setY(Math.max(-0.14D, Math.min(0.14D, facing.getY() * 0.30D)));
+                    flight.setY(ArcadePortRules.dragonsTamerVerticalVelocity(facing.getY()));
                     session.dragonTargetPlayers.remove(dragonId);
                     session.dragonTargetLocations.put(dragonId,
-                            dragon.getLocation().clone().add(facing.clone().multiply(12.0D)));
+                            dragon.getLocation().clone().add(facing.clone().multiply(GameDebugRuntimeOverrides.doubleValue(
+                                    "DRAGONS_TAMER_LOOKAHEAD_BLOCKS", ArcadePortRules.DRAGONS_TAMER_LOOKAHEAD_BLOCKS))));
                 }
             } else if (GameDebugRuntimeOverrides.booleanValue("DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED",
                     ArcadePortRules.DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED)) {
@@ -15086,12 +15091,14 @@ public final class ArcadePortManager implements Listener {
             }
             long nextAt = session.dragonMarksmanNextChargeAt.getOrDefault(id, now);
             if (now < nextAt) return;
-            Vector jitter = new Vector((ThreadLocalRandom.current().nextDouble() - 0.5D) / 10.0D,
-                    (ThreadLocalRandom.current().nextDouble() - 0.5D) / 10.0D,
-                    (ThreadLocalRandom.current().nextDouble() - 0.5D) / 10.0D);
+            Vector jitter = new Vector(
+                    ArcadePortRules.dragonsBarrageJitterComponent(ThreadLocalRandom.current().nextDouble()),
+                    ArcadePortRules.dragonsBarrageJitterComponent(ThreadLocalRandom.current().nextDouble()),
+                    ArcadePortRules.dragonsBarrageJitterComponent(ThreadLocalRandom.current().nextDouble()));
             Arrow arrow = player.launchProjectile(Arrow.class);
             // Reborn's PerkBarrage adds jitter to the facing vector before multiplying by three.
-            arrow.setVelocity(player.getLocation().getDirection().clone().add(jitter).multiply(3.0D));
+            arrow.setVelocity(ArcadePortRules.dragonsBarrageArrowVelocity(
+                    player.getLocation().getDirection(), jitter));
             session.entities.add(arrow);
             session.dragonTrackedArrows.add(arrow.getUniqueId());
             session.dragonMarksmanCharge.put(id, remaining - 1);

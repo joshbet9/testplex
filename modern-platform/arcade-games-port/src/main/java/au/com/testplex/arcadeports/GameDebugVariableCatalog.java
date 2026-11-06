@@ -317,8 +317,21 @@ final class GameDebugVariableCatalog {
         if (name.equals("DRAGON_ESCAPE_DEFEATER_WINS")
                 || name.equals("DRAGON_ESCAPE_MAP_WINS_FOR_ACHIEVEMENT")
                 || name.equals("DRAGON_ESCAPE_RAGEBAITER_KILLS")) return 1.0D;
+        if (name.equals("DRAGONS_MAX_DRAGONS") || name.equals("DRAGONS_MAX_SPARKLERS")
+                || name.equals("DRAGONS_MARKSMAN_START_ARROWS") || name.equals("DRAGONS_MARKSMAN_MAX_ARROWS")
+                || name.equals("DRAGONS_BARRAGE_MAX_ARROWS") || name.equals("DRAGONS_RETARGET_DISTANCE_SQUARED")) return 0.0D;
+        if (name.equals("DRAGONS_TAMER_VERTICAL_FLIGHT_CAP")) return 0.0D;
+        if (name.equals("DRAGONS_DODGEMS_QUIET_MILLIS")) return 0.0D;
+        if (name.equals("DRAGONS_FROST_PATH_STEP")) return 0.01D;
         if (name.startsWith("DRAGON_ESCAPE_") && name.endsWith("_LEAP_USES")) return 0.0D;
         if (name.startsWith("DRAGON_ESCAPE_LEAP_") && name.endsWith("_Y_BONUS")) return 0.0D;
+        if (name.startsWith("DRAGONS_FLIGHT_") && name.endsWith("_VERTICAL_SPEED")) return -1.0D;
+        if (name.equals("DRAGONS_FLIGHT_VERTICAL_BIAS") || name.equals("DRAGONS_TURN_RATE")) return 0.0D;
+        if (name.equals("DRAGONS_GLIDER_MIN_VERTICAL")) return -1.0D;
+        if (name.startsWith("DRAGONS_") && (name.endsWith("_SPEED") || name.endsWith("_KNOCKBACK")
+                || name.endsWith("_SPREAD") || name.endsWith("_BONUS") || name.endsWith("_FACTOR")
+                || name.endsWith("_CAP") || name.endsWith("_MAX_Y") || name.endsWith("_LAUNCH_Y")
+                || name.endsWith("_RANGE_SQUARED") || name.endsWith("_BLOCKS"))) return 0.0D;
         if (name.startsWith("DRAGON_ESCAPE_") && (name.endsWith("_MILLIS") || name.endsWith("_TICKS"))) return 0.0D;
         if (name.equals("DRAGON_ESCAPE_DIGGER_MAX_USES") || name.equals("DRAGON_ESCAPE_DISRUPTOR_MAX_TNT")) return 0.0D;
         if (name.startsWith("DRAGON_ESCAPE_") && (name.endsWith("_SPEED") || name.endsWith("_RADIUS")
@@ -532,6 +545,26 @@ final class GameDebugVariableCatalog {
         if (name.endsWith("_LEAP_USES")) return 64.0D;
         if (name.startsWith("DRAGON_ESCAPE_LEAP_") && name.endsWith("_Y_BONUS")) return 2.0D;
         if (name.equals("DRAGON_ESCAPE_STRATS_GAP_BLOCKS")) return 64.0D;
+        if (name.equals("DRAGONS_MAX_DRAGONS") || name.equals("DRAGONS_MAX_SPARKLERS")
+                || name.equals("DRAGONS_MARKSMAN_START_ARROWS") || name.equals("DRAGONS_MARKSMAN_MAX_ARROWS")
+                || name.equals("DRAGONS_BARRAGE_MAX_ARROWS")) return 64.0D;
+        if (name.equals("DRAGONS_TAMER_LOOKAHEAD_BLOCKS") || name.equals("DRAGONS_SPARKLER_MIN_ATTRACT_Y")
+                || name.equals("DRAGONS_RETARGET_ALTITUDE_Y")) return 128.0D;
+        if (name.equals("DRAGONS_RETARGET_DISTANCE_SQUARED")) return 4_096.0D;
+        if (name.equals("DRAGONS_TURN_RATE")) return 1.0D;
+        if (name.startsWith("DRAGONS_FLIGHT_") && name.endsWith("_VERTICAL_SPEED")) return 1.0D;
+        if (name.equals("DRAGONS_FLIGHT_VERTICAL_BIAS")) return 1.0D;
+        if (name.equals("DRAGONS_TAMER_VERTICAL_FLIGHT_CAP")) return 8.0D;
+        if (name.equals("DRAGONS_FALL_DAMAGE_REDUCTION")) return 40.0D;
+        if (name.equals("DRAGONS_DODGEMS_QUIET_MILLIS")) return 120_000.0D;
+        if (name.equals("DRAGONS_BARRAGE_ARROW_SPREAD")) return 1.0D;
+        if (name.startsWith("DRAGONS_") && (name.endsWith("_Y_BONUS") || name.endsWith("_MAX_Y")
+                || name.endsWith("_VERTICAL") || name.endsWith("_VERTICAL_BASE")
+                || name.endsWith("_VERTICAL_CAP") || name.endsWith("_VERTICAL_FLIGHT_FACTOR")
+                || name.endsWith("_VERTICAL_SPEED") || name.endsWith("_LAUNCH_Y"))) return 8.0D;
+        if (name.startsWith("DRAGONS_") && (name.endsWith("_SPEED") || name.endsWith("_KNOCKBACK"))) return 8.0D;
+        if (name.equals("DRAGONS_COWARD_LEAP_DANGER_FALL_BLOCKS")) return 128.0D;
+        if (name.equals("DRAGONS_FROST_PATH_STEP")) return 4.0D;
         if (name.equals("DRAGON_ESCAPE_BLOCK_RADIUS") || name.equals("DRAGON_ESCAPE_DIGGER_NEARBY_PLAYER_RADIUS")
                 || name.equals("DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS")) return 64.0D;
         if (name.equals("DRAGON_ESCAPE_FINISH_RADIUS") || name.equals("DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE")) return 32.0D;
