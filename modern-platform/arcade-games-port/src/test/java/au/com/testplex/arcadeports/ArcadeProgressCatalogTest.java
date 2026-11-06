@@ -295,6 +295,22 @@ class ArcadeProgressCatalogTest {
         assertMilestone("castle-assault", "crystals-destroyed", "crystals-destroyed", 250, new long[] {25, 63, 125, 250});
     }
 
+    @Test
+    void heroesOfGwenHasFifteenAchievementsAndEverySelectableHeroHasSpecificCoverage() {
+        var achievements = ArcadeProgressCatalog.achievements("heroes-of-gwen");
+        assertEquals(15, achievements.size());
+        assertTrue(achievements.stream().anyMatch(a -> a.id().equals("rowena-bombardment")
+                && a.name().equals("Bombardment!")
+                && a.requirement().contains("As Rowena")
+                && a.requirement().contains("Light Arrows")
+                && a.requirement().contains("minion damage is allowed")));
+        for (String hero : new String[] {"Hattori", "Bardolf", "Devon", "Rowena", "Anath",
+                "Larissa", "Dana", "Biff", "Ivy"}) {
+            assertTrue(achievements.stream().anyMatch(a -> a.requirement().startsWith("As " + hero + ",")),
+                    "Missing hero-specific achievement for " + hero);
+        }
+    }
+
     private void assertMilestone(String game, String id, String statKey, long maximum, long[] stages) {
         var milestone = ArcadeProgressCatalog.milestones(game).stream()
                 .filter(entry -> entry.id().equals(id))

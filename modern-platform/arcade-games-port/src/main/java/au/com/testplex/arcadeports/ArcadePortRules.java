@@ -5029,15 +5029,14 @@ public final class ArcadePortRules {
         };
     }
 
-    /** Canonical source Heroes of Gwen hero IDs, including the hidden Bob Ross hero. */
+    /** Canonical IDs for heroes currently enabled in the Heroes of GWEN lobby picker. */
     public static String normalizeHeroesOfGwenHero(String requested) {
         if (requested == null) return null;
         String value = requested.toLowerCase(java.util.Locale.ROOT).trim()
                 .replace('_', '-').replace(' ', '-');
-        if ("bob".equals(value) || "ross".equals(value) || "bobross".equals(value)) value = "bob-ross";
         return switch (value) {
             case "hattori", "devon", "anath", "dana", "biff", "larissa",
-                    "bardolf", "rowena", "ivy", "bob-ross" -> value;
+                    "bardolf", "rowena", "ivy" -> value;
             default -> null;
         };
     }
@@ -5049,7 +5048,7 @@ public final class ArcadePortRules {
         return switch (canonical) {
             case "hattori", "bardolf" -> "Assassin";
             case "devon", "rowena" -> "Hunter";
-            case "anath", "larissa", "bob-ross" -> "Mage";
+            case "anath", "larissa" -> "Mage";
             case "dana", "biff", "ivy" -> "Warrior";
             default -> null;
         };
@@ -5058,8 +5057,7 @@ public final class ArcadePortRules {
     public static String heroesOfGwenHeroDisplayName(String hero) {
         String canonical = normalizeHeroesOfGwenHero(hero);
         if (canonical == null) return null;
-        return "bob-ross".equals(canonical) ? "Bob Ross"
-                : Character.toUpperCase(canonical.charAt(0)) + canonical.substring(1);
+        return Character.toUpperCase(canonical.charAt(0)) + canonical.substring(1);
     }
 
 

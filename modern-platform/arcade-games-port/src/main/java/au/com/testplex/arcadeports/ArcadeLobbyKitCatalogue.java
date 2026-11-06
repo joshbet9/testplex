@@ -56,8 +56,7 @@ final class ArcadeLobbyKitCatalogue {
                     choice("larissa", "Larissa", Material.WATER_BUCKET, Unlock.FREE, Villager.class, Material.WATER_BUCKET),
                     choice("bardolf", "Bardolf", Material.STONE_SWORD, Unlock.FREE, Villager.class, Material.STONE_SWORD),
                     choice("rowena", "Rowena", Material.CROSSBOW, Unlock.FREE, Villager.class, Material.CROSSBOW),
-                    choice("ivy", "Ivy", Material.SHIELD, Unlock.FREE, Villager.class, Material.SHIELD),
-                    choice("bob-ross", "Bob Ross", Material.PAINTING, Unlock.FREE, Villager.class, Material.PAINTING));
+                    choice("ivy", "Ivy", Material.SHIELD, Unlock.FREE, Villager.class, Material.SHIELD));
             case SKY_WARS -> List.of(
                     choice("ice", "Ice", Material.ICE, Unlock.FREE, Skeleton.class, Material.ICE),
                     choice("fire", "Fire", Material.BLAZE_POWDER, Unlock.FREE, Skeleton.class, Material.BLAZE_POWDER),
