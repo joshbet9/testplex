@@ -76,18 +76,14 @@ final class ArcadeLobbyKitCatalogue {
                     choice("chris-p-bacon", "Chris P. Bacon", Material.COOKED_PORKCHOP,
                             Unlock.ACHIEVEMENT, Pig.class, Material.IRON_AXE));
             case BOMB_LOBBERS -> List.of(
-                    choice("jumper", "Jumper", Material.RABBIT_FOOT,
+                    choice("acrobat", "Acrobat", Material.RABBIT_FOOT,
                             Unlock.FREE, Zombie.class, Material.IRON_AXE),
                     choice("armorer", "Armorer", Material.IRON_CHESTPLATE,
                             Unlock.GEM, Zombie.class, Material.IRON_HELMET,
                             Material.IRON_BOOTS, Material.IRON_LEGGINGS,
                             Material.IRON_CHESTPLATE, Material.IRON_HELMET),
-                    choice("pitcher", "Pitcher", Material.SNOWBALL,
-                            Unlock.GEM, Zombie.class, Material.LEVER,
-                            Material.CHAINMAIL_BOOTS, Material.CHAINMAIL_LEGGINGS,
-                            Material.CHAINMAIL_CHESTPLATE, Material.CHAINMAIL_HELMET),
-                    choice("waller", "Waller", Material.BRICKS,
-                            Unlock.ACHIEVEMENT, Zombie.class, Material.STONE_BRICKS));
+                    choice("constructor", "Constructor", Material.BRICKS,
+                            Unlock.ACHIEVEMENT, Zombie.class, Material.BRICKS));
             case DEATH_TAG -> List.of(
                     choice("runner-basher", "Runner Basher", Material.IRON_SWORD,
                             Unlock.FREE, Zombie.class, Material.IRON_SWORD),

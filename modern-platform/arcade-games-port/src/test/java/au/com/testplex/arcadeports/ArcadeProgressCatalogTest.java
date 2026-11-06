@@ -82,6 +82,15 @@ class ArcadeProgressCatalogTest {
         assertTrue(BombLobbersAchievement.shouldAwardGrenadeFromTheGrave(3));
     }
 
+    @Test void bombLobbersHasFourteenAchievementsWithOneForEveryKit() {
+        assertEquals(14, ArcadeProgressCatalog.achievements("bomb-lobbers").size());
+        assertTrue(hasAchievement("bomb-lobbers", "whats-a-double-jump", "What's a double jump?"));
+        assertTrue(hasAchievement("bomb-lobbers", "blast-proof", "Blast Proof"));
+        assertTrue(hasAchievement("bomb-lobbers", "not-on-my-watch", "Not On My Watch"));
+        assertEquals(14, ArcadeProgressCatalog.achievements("bomb-lobbers").stream()
+                .map(ArcadeProgressCatalog.Achievement::id).distinct().count());
+    }
+
 
     @Test
     void nextSevenGameMilestonesUseTheRequestedLifetimeThresholds() {

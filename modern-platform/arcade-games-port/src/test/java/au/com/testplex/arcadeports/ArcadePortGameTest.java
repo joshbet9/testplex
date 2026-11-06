@@ -1012,11 +1012,11 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldThrowBombLobbersOnAction(true)); // pressure-plate / physical
     }
 
-    @Test void bombLobbersOnlyArmorerAndPitcherEquipArmor() {
-        assertFalse(ArcadePortRules.bombLobbersKitUsesArmor("jumper"));
+    @Test void bombLobbersOnlyArmorerEquipsMetalArmor() {
+        assertFalse(ArcadePortRules.bombLobbersKitUsesArmor("acrobat"));
         assertTrue(ArcadePortRules.bombLobbersKitUsesArmor("armorer"));
-        assertTrue(ArcadePortRules.bombLobbersKitUsesArmor("pitcher"));
-        assertFalse(ArcadePortRules.bombLobbersKitUsesArmor("waller"));
+        assertFalse(ArcadePortRules.bombLobbersKitUsesArmor("pitcher"));
+        assertFalse(ArcadePortRules.bombLobbersKitUsesArmor("constructor"));
         assertFalse(ArcadePortRules.bombLobbersKitUsesArmor("unknown"));
     }
 
@@ -1079,10 +1079,12 @@ class ArcadePortGameTest {
     }
 
     @Test void bombLobbersKitsPitchLevelsCraftmanAndBombPrimingMatchSourceTiming() {
-        assertEquals("jumper", ArcadePortRules.normalizeBombLobbersKit("Jumper"));
+        assertEquals("acrobat", ArcadePortRules.normalizeBombLobbersKit("Jumper"));
+        assertEquals("acrobat", ArcadePortRules.normalizeBombLobbersKit("Acrobat"));
         assertEquals("armorer", ArcadePortRules.normalizeBombLobbersKit("armourer"));
-        assertEquals("pitcher", ArcadePortRules.normalizeBombLobbersKit("Pitcher"));
-        assertEquals("waller", ArcadePortRules.normalizeBombLobbersKit("Waller"));
+        assertNull(ArcadePortRules.normalizeBombLobbersKit("Pitcher"));
+        assertEquals("constructor", ArcadePortRules.normalizeBombLobbersKit("Waller"));
+        assertEquals("constructor", ArcadePortRules.normalizeBombLobbersKit("Constructor"));
         assertNull(ArcadePortRules.normalizeBombLobbersKit("unknown"));
         assertEquals(1.75D, ArcadePortRules.bombLobbersPitchVelocity(1), 0.00001D);
         assertEquals(2.0D, ArcadePortRules.bombLobbersPitchVelocity(2), 0.00001D);
@@ -1108,6 +1110,20 @@ class ArcadePortGameTest {
         assertEquals(1, ArcadePortRules.bombLobbersWallFacingIndex(270.0F));
         assertEquals(2, ArcadePortRules.bombLobbersWallFacingIndex(Float.NaN));
         assertEquals(2, ArcadePortRules.bombLobbersWallFacingIndex(360.0F));
+    }
+
+    @Test void bombLobbersConstructorCyclesItsThreeDefenses() {
+        assertEquals("walls", ArcadePortRules.nextBombConstructorMode("platforms"));
+        assertEquals("stairs", ArcadePortRules.nextBombConstructorMode("walls"));
+        assertEquals("platforms", ArcadePortRules.nextBombConstructorMode("stairs"));
+        assertEquals(15, ArcadePortRules.bombConstructorOffsets("platforms").size());
+        assertEquals(15, ArcadePortRules.bombConstructorOffsets("walls").size());
+        assertEquals(9, ArcadePortRules.bombConstructorOffsets("stairs").size());
+        assertEquals(3, ArcadePortRules.bombConstructorOffsets("stairs").stream()
+                .map(ArcadePortRules.BombConstructorOffset::height).distinct().count());
+        assertTrue(ArcadePortRules.bombConstructorBlockedEnemyTnt(0, 1));
+        assertFalse(ArcadePortRules.bombConstructorBlockedEnemyTnt(1, 1));
+        assertFalse(ArcadePortRules.bombConstructorBlockedEnemyTnt(-1, 0));
     }
 
     @Test void bombLobbersWallerRespectsSourceShortPlacementCooldown() {

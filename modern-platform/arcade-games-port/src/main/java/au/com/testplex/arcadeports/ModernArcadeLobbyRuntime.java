@@ -652,6 +652,17 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     it = item(choice.icon, ChatColor.YELLOW + choice.name,
                             ChatColor.GRAY + "Choose this kit for your next Snap round.",
                             selected ? ChatColor.GOLD + "Currently selected" : ChatColor.GREEN + "Click to select");
+                } else if (selectedGame == ArcadePortGame.BOMB_LOBBERS
+                        && "constructor".equals(choice.id)) {
+                    it = item(choice.icon, ChatColor.GREEN + "Constructor",
+                            ChatColor.GRAY + "When the times get rough, build yourself the perfect defense!",
+                            " ",
+                            ChatColor.GRAY + "Receive " + ChatColor.GREEN + "1 TNT" + ChatColor.GRAY + " every "
+                                    + ChatColor.GREEN + "4-8" + ChatColor.GRAY + " seconds. Max "
+                                    + ChatColor.GREEN + "3" + ChatColor.GRAY + ".",
+                            ChatColor.YELLOW + "Left-click" + ChatColor.GRAY + " to cycle through "
+                                    + ChatColor.GREEN + "Platforms, Walls, and Stairs",
+                            ChatColor.YELLOW + "Right-click" + ChatColor.GRAY + " a block to place your defense");
                 } else if (choice.unlock == ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT) {
                     boolean unlocked = manager.hasAchievementKitUnlocked(p.getUniqueId(), selectedGame, choice.id);
                     it = item(choice.icon, ChatColor.YELLOW + choice.name,
@@ -665,6 +676,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 }
                 if (choice.unlock == ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT) {
                     boolean earned = manager.hasAchievementKitUnlocked(p.getUniqueId(), selectedGame, choice.id);
+                    boolean constructor = selectedGame == ArcadePortGame.BOMB_LOBBERS
+                            && "constructor".equals(choice.id);
                     ItemMeta metadata = it.getItemMeta();
                     List<String> lore = new java.util.ArrayList<>(metadata.getLore() == null
                             ? List.of() : metadata.getLore());
@@ -672,13 +685,18 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     lore.removeIf(line -> line != null && (ChatColor.stripColor(line).equals("Click to select")
                             || ChatColor.stripColor(line).equals("Locked")));
                     lore.add(" ");
-                    lore.add(ChatColor.GOLD + "Achievement Kit");
-                    lore.add(ChatColor.GRAY + manager.achievementKitUnlockDescription(selectedGame, choice.id));
+                    if (constructor) lore.add(ChatColor.RED + "Requires 6 Achievements to unlock.");
+                    else {
+                        lore.add(ChatColor.GOLD + "Achievement Kit");
+                        lore.add(ChatColor.GRAY + manager.achievementKitUnlockDescription(selectedGame, choice.id));
+                    }
                     if (AchievementKitUnlockPolicy.find(selectedGame, choice.id) != null) {
                         lore.add(ChatColor.GRAY + "Progress: " + ChatColor.WHITE
                                 + manager.achievementKitUnlockProgress(p.getUniqueId(), selectedGame, choice.id));
                     }
-                    lore.add(earned ? ChatColor.GREEN + "Click to select" : ChatColor.RED + "Locked");
+                    lore.add(earned ? ChatColor.GREEN + (constructor ? "Right-click to select" : "Click to select")
+                            : ChatColor.RED + "Locked");
+                    if (constructor) lore.add(ChatColor.YELLOW + "Left-click" + ChatColor.GRAY + " View achievements");
                     metadata.setDisplayName(ChatColor.LIGHT_PURPLE + choice.name);
                     metadata.setLore(lore);
                     it.setItemMeta(metadata);
@@ -746,6 +764,11 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         if(KIT_TITLE.equals(title)){
             if(action!=null&&action.startsWith("kit:")){
                 String kit=action.substring(4);
+                if (selectedGame == ArcadePortGame.BOMB_LOBBERS
+                        && "constructor".equals(kit) && e.isLeftClick()) {
+                    manager.openOwnGameAchievements(p, selectedGame);
+                    return;
+                }
                 if (!manager.selectKitFromLobby(p, selectedGame, kit)) return;
                 plugin.getConfig().set("lobby-kit-preferences."+p.getUniqueId()+"."+selectedGame.id(),kit);
                 plugin.saveConfig();

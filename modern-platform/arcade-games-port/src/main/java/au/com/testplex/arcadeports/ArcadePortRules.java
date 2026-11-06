@@ -1032,18 +1032,55 @@ public final class ArcadePortRules {
         if (requested == null) return null;
         String value = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
         return switch (value) {
-            case "jumper" -> "jumper";
+            case "acrobat", "jumper" -> "acrobat";
             case "armorer", "armourer" -> "armorer";
-            case "pitcher" -> "pitcher";
-            case "waller" -> "waller";
+            case "constructor", "waller" -> "constructor";
             default -> null;
         };
     }
 
-    /** Jumper and Waller inherit TeamArmorModule's team-coloured leather set. */
+    /** Relative to the block clicked by Constructor: forward, sideways, height. */
+    public record BombConstructorOffset(int forward, int sideways, int height) {}
+
+    public static String nextBombConstructorMode(String current) {
+        return switch (current == null ? "" : current.toLowerCase(java.util.Locale.ROOT)) {
+            case "platforms" -> "walls";
+            case "walls" -> "stairs";
+            default -> "platforms";
+        };
+    }
+
+    public static List<BombConstructorOffset> bombConstructorOffsets(String mode) {
+        List<BombConstructorOffset> blocks = new ArrayList<>();
+        switch (mode == null ? "" : mode.toLowerCase(java.util.Locale.ROOT)) {
+            case "platforms" -> {
+                for (int forward = 1; forward <= 3; forward++)
+                    for (int sideways = -2; sideways <= 2; sideways++)
+                        blocks.add(new BombConstructorOffset(forward, sideways, 0));
+            }
+            case "walls" -> {
+                for (int sideways = -2; sideways <= 2; sideways++)
+                    for (int height = 0; height < 3; height++)
+                        blocks.add(new BombConstructorOffset(1, sideways, height));
+            }
+            case "stairs" -> {
+                for (int forward = 1; forward <= 3; forward++)
+                    for (int sideways = -1; sideways <= 1; sideways++)
+                        blocks.add(new BombConstructorOffset(forward, sideways, forward - 1));
+            }
+            default -> throw new IllegalArgumentException("Unknown Constructor mode: " + mode);
+        }
+        return List.copyOf(blocks);
+    }
+
+    public static boolean bombConstructorBlockedEnemyTnt(int constructorTeam, int throwerTeam) {
+        return areBombLobbersEnemies(constructorTeam, throwerTeam);
+    }
+
+    /** Acrobat and Constructor inherit TeamArmorModule's team-coloured leather set. */
     public static boolean bombLobbersKitUsesTeamArmor(String kit) {
         String normalized = normalizeBombLobbersKit(kit);
-        return "jumper".equals(normalized) || "waller".equals(normalized);
+        return "acrobat".equals(normalized) || "constructor".equals(normalized);
     }
 
     /** Reborn's two Bomb Lobbers sides use red and aqua team colours for their trails/gear. */
@@ -1073,12 +1110,12 @@ public final class ArcadePortRules {
         return (int) Math.floor(segmentLength / BOMB_LOBBERS_TRAIL_SAMPLE_SPACING) + 1;
     }
 
-    /** True for the metal armour supplied directly by the source Armorer/Pitcher kits.
+    /** True for the metal armour supplied by the Armorer kit.
      * Jumper/Waller instead inherit the separate team-coloured leather armour module.
      */
     public static boolean bombLobbersKitUsesArmor(String kit) {
         String normalized = normalizeBombLobbersKit(kit);
-        return "armorer".equals(normalized) || "pitcher".equals(normalized);
+        return "armorer".equals(normalized);
     }
 
     /** Reborn's default DamagePvP flag is enabled for Bomb Lobbers; only live participants may damage another participant. */

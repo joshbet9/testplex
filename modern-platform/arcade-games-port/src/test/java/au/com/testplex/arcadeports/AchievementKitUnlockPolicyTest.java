@@ -48,6 +48,10 @@ class AchievementKitUnlockPolicyTest {
     }
 
     @Test void combinationsRequireEverySpecificAchievement() {
+        var constructor = AchievementKitUnlockPolicy.find(ArcadePortGame.BOMB_LOBBERS, "constructor");
+        assertEquals(6, constructor.requirements().size());
+        assertFalse(constructor.requirements().contains("not-on-my-watch"));
+        assertFalse(constructor.unlocked(Set.of("blast-proof", "jelly-skin")::contains));
         AchievementKitUnlockPolicy.Rule digger = AchievementKitUnlockPolicy.find(ArcadePortGame.DRAGON_ESCAPE, "digger");
         Set<String> earned = new HashSet<>(Set.of("to-hell-and-back"));
         assertEquals(java.util.List.of("paralympics"), digger.missing(earned::contains));

@@ -4,7 +4,7 @@
 
 ## Existing implementation
 
-The current port documents the authentic archived map and team spawn centres, 20-minute source timeout, TNT throw/fuse/wall-contact lifecycle, eight-second detonation, direct-hit detection and feedback, legacy armour damage/knockback, blast exposure and block conversion, team-side checks, four kits (Jumper, Armorer, Pitcher and Waller), double-jump recharge, Pitcher/Craftman TNT regeneration, Waller's 5×3 wall, spectator compass, water damage and isolated achievement/stat tracking.
+The current port documents the authentic archived map and team spawn centres, 20-minute source timeout, TNT throw/fuse/wall-contact lifecycle, eight-second detonation, direct-hit detection and feedback, legacy armour damage/knockback, blast exposure and block conversion, team-side checks, three kits (Acrobat, Armorer and Constructor), double-jump recharge, 4–8-second TNT regeneration for all kits (max three carried), Constructor's three defense shapes, spectator compass, water damage and isolated achievement/stat tracking.
 
 The original map archive is packaged at `maps/bomb-lobbers.zip`.
 
@@ -31,10 +31,12 @@ The original map archive is packaged at `maps/bomb-lobbers.zip`.
 
 ### Kits
 
-- [ ] Jumper: double-jump activation, recharge, exhausted feedback and reset between rounds.
-- [ ] Armorer: source armour/damage reduction and correct kit inventory.
-- [ ] Pitcher: TNT regeneration cadence, inventory cap and throw behaviour.
-- [ ] Waller: 5×3 wall placement, collision/cover, placement restrictions and cleanup.
+- [ ] Acrobat: stronger double-jump activation, recharge, exhausted feedback and reset between rounds.
+- [ ] Armorer: metal armour/damage reduction, weaker double jump and correct inventory.
+- [ ] Constructor: weaker double jump, persistent selector, left-click cycles Platforms → Walls → Stairs, right-click **a block** to build the selected geometry. Verify no block is overwritten or placed inside a player and teardown restores original blocks.
+- [ ] TNT regeneration: all three kits receive one TNT every 8→4 seconds as the match ages, with three carried maximum.
+- [ ] Verify Pitcher no longer appears in selection and saved legacy Jumper/Waller preferences map safely to Acrobat/Constructor.
+- [ ] Constructor's six-achievement unlock: review the exact six prerequisites with Josh before merging; confirm previously earned unlocks are handled intentionally.
 
 ### Arena hazards and match flow
 
@@ -53,6 +55,10 @@ The original map archive is packaged at `maps/bomb-lobbers.zip`.
 - [ ] The MVP: win alone against at least three opponents.
 - [ ] Master Bomber: 30 wins.
 - [ ] Blast Proof and Jelly Skin retain their existing triggers.
+- [ ] Not On My Watch: as Constructor, block three **distinct enemy TNT** with structures in one game; friendly TNT and repeated contacts with one projectile do not count.
+- [ ] Technical: a close-range TNT only awards its own actual killing blow, with no stale credit for a later, different TNT.
+- [ ] Over 9000: a 1v3 powerup-only comeback includes an actual power-up use in the clutch.
+- [ ] Grenade From the Grave: two TNT kills after death, including direct-impact kills and blast kills.
 - [ ] Test-player actions do not grant or persist player stats, achievements, rewards or personal-best records.
 
 ## Lifecycle / regression

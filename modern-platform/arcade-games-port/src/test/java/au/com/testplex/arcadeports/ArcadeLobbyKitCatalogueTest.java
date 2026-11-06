@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ArcadeLobbyKitCatalogueTest {
     @Test
     void preservesTheReviewedBombLobbersKitOrder() {
-        assertEquals(List.of("jumper", "armorer", "pitcher", "waller"),
+        assertEquals(List.of("acrobat", "armorer", "constructor"),
                 ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.BOMB_LOBBERS, List.of()).stream()
                         .map(choice -> choice.id).toList());
     }
@@ -70,9 +70,9 @@ class ArcadeLobbyKitCatalogueTest {
 
     @Test
     void configuredKitOrderMovesKnownEntriesAndKeepsUnlistedCatalogueOrder() {
-        assertEquals(List.of("waller", "jumper", "armorer", "pitcher"),
+        assertEquals(List.of("constructor", "acrobat", "armorer"),
                 ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.BOMB_LOBBERS, List.of(),
-                        List.of("waller", "not-a-kit", "jumper")).stream()
+                        List.of("constructor", "not-a-kit", "acrobat")).stream()
                         .map(choice -> choice.id).toList());
     }
 
