@@ -810,7 +810,8 @@ public final class ArcadePortRules {
 
     /** A Disruptor mine starts its own recharge window when it is thrown. */
     public static long dragonEscapeNextTntChargeAt(long thrownAtMillis) {
-        return thrownAtMillis + DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS;
+        return thrownAtMillis + Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS", DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS));
     }
 
     public static boolean isDragonEscapeDiggerOpeningLocked(long elapsedMillis) {
@@ -903,7 +904,8 @@ public final class ArcadePortRules {
     }
 
     public static long nextDragonEscapeScoreUpdateAt(long nowMillis) {
-        return nowMillis + DRAGON_ESCAPE_SCORE_UPDATE_MILLIS;
+        return nowMillis + Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "DRAGON_ESCAPE_SCORE_UPDATE_MILLIS", DRAGON_ESCAPE_SCORE_UPDATE_MILLIS));
     }
 
     /** Reborn applies the 0.2 lift, caps Y, then adds a further 0.2 when grounded. */

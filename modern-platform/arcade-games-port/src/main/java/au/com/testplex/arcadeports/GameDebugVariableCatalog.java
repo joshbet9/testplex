@@ -225,6 +225,11 @@ final class GameDebugVariableCatalog {
         if (name.startsWith("RUNNER_") && name.endsWith("_MILLIS")) return 0.0D;
         if (name.startsWith("RUNNER_") && name.endsWith("_TICKS")) return 0.0D;
         if (name.startsWith("SHEEP_QUEST_") && (name.endsWith("_MILLIS") || name.endsWith("_TICKS"))) return 0.0D;
+        if (name.equals("DRAGON_ESCAPE_SCORE_UPDATE_MILLIS")) return 1.0D;
+        if (name.startsWith("DRAGON_ESCAPE_") && (name.endsWith("_MILLIS") || name.endsWith("_TICKS"))) return 0.0D;
+        if (name.equals("DRAGON_ESCAPE_DIGGER_MAX_USES") || name.equals("DRAGON_ESCAPE_DISRUPTOR_MAX_TNT")) return 0.0D;
+        if (name.startsWith("DRAGON_ESCAPE_") && (name.endsWith("_SPEED") || name.endsWith("_RADIUS")
+                || name.endsWith("_DISTANCE") || name.endsWith("_LAUNCH_Y"))) return 0.0D;
         if (name.equals("SHEEP_QUEST_THROW_BOUNCE_MULTIPLIER")) return -1.0D;
         if (name.startsWith("SHEEP_QUEST_") && (name.endsWith("_SPEED") || name.endsWith("_ADD")
                 || name.endsWith("_MIN") || name.endsWith("_MAX") || name.endsWith("_SCALE")
@@ -321,6 +326,15 @@ final class GameDebugVariableCatalog {
         if (name.equals("SHEEP_QUEST_THROW_BOUNCE_MULTIPLIER")) return 1.0D;
         if (name.startsWith("SHEEP_QUEST_") && name.endsWith("_SPEED")) return 4.0D;
         if (name.startsWith("SHEEP_QUEST_") && (name.endsWith("_RADIUS") || name.endsWith("_BLOCKS"))) return 64.0D;
+        if (name.startsWith("DRAGON_ESCAPE_") && name.endsWith("_MILLIS")) return 120_000.0D;
+        if (name.startsWith("DRAGON_ESCAPE_") && name.endsWith("_TICKS")) return 2_400.0D;
+        if (name.equals("DRAGON_ESCAPE_DIGGER_MAX_USES") || name.equals("DRAGON_ESCAPE_DISRUPTOR_MAX_TNT")) return 64.0D;
+        if (name.equals("DRAGON_ESCAPE_CHASE_SPEED")) return 2.0D;
+        if (name.equals("DRAGON_ESCAPE_RACE_GAP_ESTIMATED_SPEED")) return 30.0D;
+        if (name.equals("DRAGON_ESCAPE_BLOCK_RADIUS") || name.equals("DRAGON_ESCAPE_DIGGER_NEARBY_PLAYER_RADIUS")
+                || name.equals("DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS")) return 64.0D;
+        if (name.equals("DRAGON_ESCAPE_FINISH_RADIUS") || name.equals("DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE")) return 32.0D;
+        if (name.equals("DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y")) return 5.0D;
         if (name.equals("CASTLE_ASSAULT_KING_HEALTH_BASE")) return 5_000.0D;
         if (name.equals("CASTLE_ASSAULT_KING_HEALTH_REFERENCE_PLAYERS")) return 64.0D;
         if (name.equals("CASTLE_ASSAULT_CARRIER_FUSE_MILLIS")) return 600_000.0D;
