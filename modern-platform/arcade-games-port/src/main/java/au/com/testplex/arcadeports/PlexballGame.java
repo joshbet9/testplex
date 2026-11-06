@@ -344,7 +344,7 @@ public final class PlexballGame implements Listener {
         Inventory inventory = Bukkit.createInventory(null, 27, KIT_MENU_TITLE);
         ItemStack filler = progressItem(Material.BLACK_STAINED_GLASS_PANE, " ", List.of());
         for (int slot = 0; slot < inventory.getSize(); slot++) inventory.setItem(slot, filler);
-        Kit selected = selectedKits.getOrDefault(player.getUniqueId(), Kit.TECHNICIAN);
+        Kit selected = playableKit(player.getUniqueId());
         inventory.setItem(4, progressItem(Material.BOOK, ChatColor.AQUA + "Choose your Plexball kit", List.of(
                 ChatColor.GRAY + "Each kit has a distinct batting style and fielding ability.",
                 ChatColor.GRAY + "Your selection is saved for your next match.")));
@@ -357,7 +357,15 @@ public final class PlexballGame implements Listener {
             List<String> lore = new ArrayList<>();
             lore.add(ChatColor.GRAY + describeKit(kit));
             lore.add(ChatColor.GRAY + "Ability: " + ChatColor.AQUA + kit.abilityName());
-            lore.add(active ? ChatColor.GREEN + "CURRENT KIT" : ChatColor.YELLOW + "Click to select");
+            boolean skyguardUnlocked = kit != Kit.SKYGUARD || AchievementKitUnlockPolicy
+                    .find(ArcadePortGame.PLEXBALL, "skyguard")
+                    .unlocked(id -> hasAchievement(player.getUniqueId(), id));
+            if (kit == Kit.SKYGUARD) {
+                lore.add(ChatColor.GOLD + "Achievement Kit");
+                lore.add(ChatColor.GRAY + "Requires Sticky Gloves and Sweet Spot.");
+            }
+            lore.add(!skyguardUnlocked ? ChatColor.RED + "LOCKED"
+                    : active ? ChatColor.GREEN + "CURRENT KIT" : ChatColor.YELLOW + "Click to select");
             inventory.setItem(slots[index], progressItem(kit.abilityItem,
                     (active ? ChatColor.GREEN : ChatColor.WHITE) + kit.displayName(), lore));
         }
@@ -415,6 +423,13 @@ public final class PlexballGame implements Listener {
     public boolean selectKit(Player player, String id) {
         Kit kit = Kit.fromId(id);
         if (kit == null) return false;
+        if (kit == Kit.SKYGUARD) {
+            AchievementKitUnlockPolicy.Rule rule = AchievementKitUnlockPolicy.find(ArcadePortGame.PLEXBALL, "skyguard");
+            if (rule == null || !rule.unlocked(achievement -> hasAchievement(player.getUniqueId(), achievement))) {
+                player.sendMessage(ChatColor.RED + "Skyguard is locked. Earn Sticky Gloves and Sweet Spot first.");
+                return false;
+            }
+        }
         if (isActive() && matchPlayers.contains(player.getUniqueId())) {
             player.sendMessage(ChatColor.RED + "Your Plexball kit is locked for this match.");
             return true;
@@ -424,6 +439,24 @@ public final class PlexballGame implements Listener {
         player.sendMessage(ChatColor.GREEN + "Plexball kit selected: " + ChatColor.GOLD + kit.displayName()
                 + ChatColor.GRAY + " — " + kit.abilityName() + ".");
         return true;
+    }
+
+    /** Read the authoritative Plexball profile, not the main Arcade config. */
+    public boolean hasAchievement(UUID playerId, String achievementSlug) {
+        if (playerId == null || achievementSlug == null) return false;
+        for (PlexballAchievement achievement : PlexballAchievement.values()) {
+            if (achievement.slug().equals(achievementSlug)) {
+                return progressionData.getBoolean(achievement.configPath(playerId), false);
+            }
+        }
+        return false;
+    }
+
+    private Kit playableKit(UUID playerId) {
+        Kit saved = selectedKits.getOrDefault(playerId, Kit.TECHNICIAN);
+        if (saved != Kit.SKYGUARD) return saved;
+        AchievementKitUnlockPolicy.Rule rule = AchievementKitUnlockPolicy.find(ArcadePortGame.PLEXBALL, "skyguard");
+        return rule != null && rule.unlocked(id -> hasAchievement(playerId, id)) ? saved : Kit.TECHNICIAN;
     }
 
     /** Arena creation is invoked by ArcadePortManager before it creates the global Session. */
@@ -471,7 +504,7 @@ public final class PlexballGame implements Listener {
             if (i == 0) teleportToBatter(player);
             else teleportToField(player, i);
             player.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "PLEXBALL"
-                    + ChatColor.GRAY + " — " + selectedKits.getOrDefault(id, Kit.TECHNICIAN).displayName());
+                    + ChatColor.GRAY + " — " + playableKit(id).displayName());
             player.sendMessage(ChatColor.YELLOW + "You get one 10-second batting turn. Everyone else fields.");
             player.sendMessage(ChatColor.GRAY + "View achievements and career milestones any time with /stats.");
             applyPlayerScoreboard(player);
@@ -1056,7 +1089,7 @@ public final class PlexballGame implements Listener {
             if (id.equals(batterId)) continue;
             Player fielder = Bukkit.getPlayer(id);
             if (fielder == null || !fielder.isOnline()) continue;
-            Kit kit = selectedKits.getOrDefault(id, Kit.TECHNICIAN);
+            Kit kit = playableKit(id);
             fielder.sendActionBar(Component.text("FIELDING  |  Watch batter  |  On contact: [1] glove  [2] "
                     + kit.abilityName()));
         }
@@ -1221,7 +1254,7 @@ public final class PlexballGame implements Listener {
             PlayerResult ownResult = results.getOrDefault(viewer.getUniqueId(), new PlayerResult());
             lines.add(ChatColor.GREEN + "Best hit: " + formatDistance(ownResult.bestDistance));
             lines.add(ChatColor.AQUA + "Catches: " + ownResult.catches);
-            Kit kit = selectedKits.getOrDefault(viewer.getUniqueId(), Kit.TECHNICIAN);
+            Kit kit = playableKit(viewer.getUniqueId());
             lines.add(ChatColor.LIGHT_PURPLE + "Kit: " + kit.displayName());
             lines.add(ChatColor.LIGHT_PURPLE + "Ability: " + kit.abilityName());
             lines.add(ChatColor.DARK_GRAY + "----------------");
@@ -1335,7 +1368,7 @@ public final class PlexballGame implements Listener {
                 if (id.equals(batterId)) continue;
                 Player fielder = Bukkit.getPlayer(id);
                 if (fielder != null && fielder.isOnline()) {
-                    Kit kit = selectedKits.getOrDefault(id, Kit.TECHNICIAN);
+                    Kit kit = playableKit(id);
                     String catchHint = catchUsedThisBall.contains(id) ? "Catch used"
                             : (catchAttempts.containsKey(id) ? "Catch window active" : "[1] Right-click glove");
                     String abilityHint = abilityUsedThisBall.contains(id) ? "Ability used"
@@ -1446,7 +1479,7 @@ public final class PlexballGame implements Listener {
         Vector forward = new Vector(-Math.sin(yawRadians), 0.0D, Math.cos(yawRadians)).normalize();
         Vector right = new Vector(Math.cos(yawRadians), 0.0D, Math.sin(yawRadians)).normalize();
         double contactSide = PlexballRules.clamp(normal.dot(right), -1.0D, 1.0D);
-        Kit kit = selectedKits.getOrDefault(player.getUniqueId(), Kit.TECHNICIAN);
+        Kit kit = playableKit(player.getUniqueId());
 
         int gradedTimingDistance = kit == Kit.TECHNICIAN ? Math.max(0, timingDistance - 2) : timingDistance;
         timing = PlexballRules.timingMultiplier(gradedTimingDistance);
@@ -1540,7 +1573,7 @@ public final class PlexballGame implements Listener {
             player.sendActionBar(Component.text("Your kit ability is already used for this ball."));
             return;
         }
-        Kit kit = selectedKits.getOrDefault(id, Kit.TECHNICIAN);
+        Kit kit = playableKit(id);
         Vector facing = player.getLocation().getDirection().setY(0.0D);
         if (facing.lengthSquared() < 1.0E-5D) facing = new Vector(0.0D, 0.0D, 1.0D);
         facing.normalize();
@@ -1665,7 +1698,7 @@ public final class PlexballGame implements Listener {
 
     private void giveFieldingItems(Player player) {
         player.getInventory().clear();
-        Kit kit = selectedKits.getOrDefault(player.getUniqueId(), Kit.TECHNICIAN);
+        Kit kit = playableKit(player.getUniqueId());
         player.getInventory().setItem(0, namedItem(Material.LEATHER, ChatColor.GREEN + "Catcher's Glove",
                 "Right-click to attempt one timed catch.", "glove"));
         player.getInventory().setItem(1, namedItem(kit.abilityItem, ChatColor.AQUA + kit.abilityName,

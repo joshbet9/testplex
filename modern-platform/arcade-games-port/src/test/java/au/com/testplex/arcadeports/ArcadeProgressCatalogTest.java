@@ -6,10 +6,110 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.UUID;
+import java.util.List;
+import java.util.Set;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.junit.jupiter.api.Test;
 
 class ArcadeProgressCatalogTest {
+    @Test
+    void dragonEscapeHasFourteenAchievementsAndWorldTourIsADynamicMilestone() {
+        var achievements = ArcadeProgressCatalog.achievements("dragon-escape");
+        assertEquals(14, achievements.size());
+        assertEquals(14, achievements.stream().map(ArcadeProgressCatalog.Achievement::id).distinct().count());
+        assertFalse(achievements.stream().anyMatch(entry -> entry.id().equals("world-tour")));
+        for (String id : List.of("ragebaiter", "learn-to-code", "last-leap", "brick-by-brick",
+                "beat-the-clock", "hot-on-your-heels", "untouchable")) {
+            assertTrue(achievements.stream().anyMatch(entry -> entry.id().equals(id)), id);
+        }
+        assertTrue(achievements.stream().anyMatch(entry -> entry.id().equals("ragebaiter")
+                && entry.name().equals("Ragebaiter") && entry.requirement().contains("7 seconds")));
+        assertTrue(achievements.stream().anyMatch(entry -> entry.id().equals("last-leap")
+                && entry.requirement().contains("8 blocks")));
+        assertTrue(achievements.stream().anyMatch(entry -> entry.id().equals("learn-to-code")
+                && entry.requirement().contains("six consecutive blocks")));
+        assertTrue(ArcadeProgressCatalog.milestones("dragon-escape").stream()
+                .anyMatch(milestone -> milestone.id().equals("world-tour") && milestone.name().equals("World Tour")));
+    }
+
+    @Test
+    void worldTourTracksTheCurrentRotationWithoutForgettingPreviouslyCompletedMaps() {
+        var initial = ArcadeProgressCatalog.worldTourProgress(
+                List.of("map-a", "map-b", "map-c", "map-d"), Set.of("map-a", "map-c"));
+        assertEquals(2, initial.value());
+        assertEquals(4, initial.maximum());
+        assertArrayEquals(new long[] {1, 2, 3, 4}, initial.stages());
+
+        var added = ArcadeProgressCatalog.worldTourProgress(
+                List.of("map-a", "map-b", "map-c", "map-d", "map-e"), Set.of("map-a", "map-c"));
+        assertEquals(2, added.value());
+        assertEquals(5, added.maximum());
+        assertArrayEquals(new long[] {2, 3, 4, 5}, added.stages());
+
+        var removed = ArcadeProgressCatalog.worldTourProgress(
+                List.of("map-a", "map-c", "map-c"), Set.of("map-a", "map-c", "map-z"));
+        assertEquals(2, removed.value());
+        assertEquals(2, removed.maximum());
+        assertArrayEquals(new long[] {1, 2}, removed.stages());
+
+        var none = ArcadeProgressCatalog.worldTourProgress(List.of(), Set.of());
+        assertEquals(0, none.value());
+        assertEquals(1, none.maximum()); // No maps must never appear mastered.
+    }
+
+    @Test
+    void ragebaiterRequiresAnActualFallWithinSevenSecondsOfMineLaunch() {
+        assertTrue(ArcadePortRules.shouldCreditDragonEscapeRagebaiter(15_000L, 8_000L, "fell into the void"));
+        assertFalse(ArcadePortRules.shouldCreditDragonEscapeRagebaiter(15_001L, 8_000L, "fell into the void"));
+        assertFalse(ArcadePortRules.shouldCreditDragonEscapeRagebaiter(14_000L, 8_000L, "was caught by Douglas"));
+        assertFalse(ArcadePortRules.shouldCreditDragonEscapeRagebaiter(14_000L, 0L, "fell"));
+        assertFalse(ArcadePortRules.shouldCreditDragonEscapeRagebaiter(7_999L, 8_000L, "fell"));
+    }
+
+    @Test
+    void deathTagHasFourteenReviewedAchievementsAndNoCircularKitUnlocks() {
+        var achievements = ArcadeProgressCatalog.achievements("death-tag");
+        assertEquals(14, achievements.size());
+        assertEquals(14, achievements.stream().map(ArcadeProgressCatalog.Achievement::id).distinct().count());
+        assertEquals("Win 20 games of Death Tag.", achievements.stream()
+                .filter(a -> a.id().equals("death-proof")).findFirst().orElseThrow().requirement());
+        assertEquals("Kill 3 Runners within 30 seconds.", achievements.stream()
+                .filter(a -> a.id().equals("hasty-hunter")).findFirst().orElseThrow().requirement());
+        for (String id : java.util.List.of("lots-of-subject-matter", "smoke-and-mirrors",
+                "fletching-frenzy", "shell-shock", "sleight-of-hand", "patient-zero")) {
+            assertTrue(achievements.stream().anyMatch(a -> a.id().equals(id)), id);
+        }
+        assertFalse(achievements.stream().anyMatch(a -> a.id().equals("turtle-shell")));
+    }
+
+    @Test
+    void baconBrawlHasFourteenAchievementsAndOneSpecificToEveryKit() {
+        assertEquals(14, ArcadeProgressCatalog.achievements("bacon-brawl").size());
+        assertTrue(hasAchievement("bacon-brawl", "three-for-one", "Three for One!"));
+        assertTrue(hasAchievement("bacon-brawl", "mama-camera", "Mama Get the Camera"));
+        assertTrue(hasAchievement("bacon-brawl", "goat-sty", "GOAT Sty"));
+        assertTrue(hasAchievement("bacon-brawl", "iron-hog", "Iron Hog"));
+        assertTrue(hasAchievement("bacon-brawl", "extra-crispy", "Extra Crispy"));
+        assertTrue(hasAchievement("bacon-brawl", "variety-pack", "Variety Pack"));
+        assertTrue(hasAchievement("bacon-brawl", "quadruple-serving", "Quadruple Serving"));
+        assertEquals(14, ArcadeProgressCatalog.achievements("bacon-brawl").stream()
+                .map(ArcadeProgressCatalog.Achievement::id).distinct().count());
+    }
+
+    @Test
+    void baconBrawlApprovedWordingMatchesTheActualDetectors() {
+        var achievements = ArcadeProgressCatalog.achievements("bacon-brawl");
+        assertEquals("Win as Pig with at least one kill. Every kill must come from a melee backstab while Cloak is active.",
+                achievements.stream().filter(entry -> entry.id().equals("goat-sty"))
+                        .findFirst().orElseThrow().requirement());
+        assertEquals("Hit a player after they activate Body Slam while airborne, and have them be knocked off the arena before they land.",
+                achievements.stream().filter(entry -> entry.id().equals("got-em"))
+                        .findFirst().orElseThrow().requirement());
+        assertEquals("Get 4 consecutive kills, each within 10 seconds of the previous kill.",
+                achievements.stream().filter(entry -> entry.id().equals("quadruple-serving"))
+                        .findFirst().orElseThrow().requirement());
+    }
+
     @Test
     void monsterMazeUsesTheRequestedMilestoneThresholds() {
         assertArrayEquals(new long[] {25, 50, 100, 250}, stages("monster-maze", "wins"));
@@ -66,6 +166,15 @@ class ArcadeProgressCatalogTest {
         assertFalse(BombLobbersAchievement.shouldAwardGrenadeFromTheGrave(1));
         assertTrue(BombLobbersAchievement.shouldAwardGrenadeFromTheGrave(2));
         assertTrue(BombLobbersAchievement.shouldAwardGrenadeFromTheGrave(3));
+    }
+
+    @Test void bombLobbersHasFourteenAchievementsWithOneForEveryKit() {
+        assertEquals(14, ArcadeProgressCatalog.achievements("bomb-lobbers").size());
+        assertTrue(hasAchievement("bomb-lobbers", "whats-a-double-jump", "What's a double jump?"));
+        assertTrue(hasAchievement("bomb-lobbers", "blast-proof", "Blast Proof"));
+        assertTrue(hasAchievement("bomb-lobbers", "not-on-my-watch", "Not On My Watch"));
+        assertEquals(14, ArcadeProgressCatalog.achievements("bomb-lobbers").stream()
+                .map(ArcadeProgressCatalog.Achievement::id).distinct().count());
     }
 
 
@@ -147,6 +256,21 @@ class ArcadeProgressCatalogTest {
         assertTrue(hasAchievement("skywars", "death-bomber", "Death Bomber"));
         assertTrue(hasAchievement("skywars", "no-chest", "No Chest"));
         assertTrue(hasAchievement("skywars", "no-armor", "No Armor"));
+    }
+
+    @Test
+    void castleAssaultHasFourteenAchievementsCoveringAllFiveKits() {
+        assertEquals(14, ArcadeProgressCatalog.achievements("castle-assault").size());
+        assertTrue(hasAchievement("castle-assault", "bad-chemistry", "Bad Chemistry"));
+        assertTrue(hasAchievement("castle-assault", "pin-cushion", "Pin Cushion"));
+        assertTrue(hasAchievement("castle-assault", "tnt-rrific", "TNT-rrific"));
+        assertTrue(hasAchievement("castle-assault", "golden-boy", "Golden Boy"));
+        assertTrue(hasAchievement("castle-assault", "immovable-object", "Immovable Object"));
+        assertTrue(hasAchievement("castle-assault", "express-delivery", "Express Delivery"));
+        assertTrue(hasAchievement("castle-assault", "royal-guard", "Royal Guard"));
+        assertTrue(hasAchievement("castle-assault", "against-all-odds", "Against All Odds"));
+        assertTrue(ArcadeProgressCatalog.achievements("castle-assault").stream()
+                .anyMatch(a -> a.id().equals("clutchness") && a.requirement().contains("less than 10 health")));
     }
 
     @Test

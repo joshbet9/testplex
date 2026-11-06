@@ -10,8 +10,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ArcadeLobbyKitCatalogueTest {
     @Test
+    void deathTagKeepsItsStableKitIdsAndUsesTheApprovedRunnerNames() {
+        List<ArcadeLobbyKitCatalogue.KitChoice> kits =
+                ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.DEATH_TAG, List.of());
+        assertEquals(List.of("runner-basher", "runner-archer", "runner-traitor",
+                "runner-turtle", "runner-trickster"), kits.stream().map(kit -> kit.id).toList());
+        assertEquals("Runner Turtle", kits.get(3).name);
+        assertEquals("Runner Trickster", kits.get(4).name);
+    }
+
+    @Test
     void preservesTheReviewedBombLobbersKitOrder() {
-        assertEquals(List.of("jumper", "armorer", "pitcher", "waller"),
+        assertEquals(List.of("acrobat", "armorer", "constructor"),
                 ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.BOMB_LOBBERS, List.of()).stream()
                         .map(choice -> choice.id).toList());
     }
@@ -24,6 +34,14 @@ class ArcadeLobbyKitCatalogueTest {
         assertEquals("Chris P. Bacon", chris.name);
         assertEquals(ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT, chris.unlock);
         assertEquals(org.bukkit.Material.IRON_AXE, chris.heldItem);
+    }
+
+    @Test
+    void pigIsTheKitNameAndRemainsGemUnlocked() {
+        var pig = ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.BACON_BRAWL, List.of()).stream()
+                .filter(choice -> choice.id.equals("pig")).findFirst().orElseThrow();
+        assertEquals("Pig", pig.name);
+        assertEquals(ArcadeLobbyKitCatalogue.Unlock.GEM, pig.unlock);
     }
 
     @Test
@@ -59,10 +77,20 @@ class ArcadeLobbyKitCatalogueTest {
     }
 
     @Test
+    void dragonEscapeBuilderIsASeparateGemKitAndDiggerRemainsAchievementLocked() {
+        List<ArcadeLobbyKitCatalogue.KitChoice> choices =
+                ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.DRAGON_ESCAPE, List.of());
+        assertEquals(List.of("jumper", "disruptor", "builder", "warper", "digger"),
+                choices.stream().map(choice -> choice.id).toList());
+        assertEquals(ArcadeLobbyKitCatalogue.Unlock.GEM, choices.get(2).unlock);
+        assertEquals(ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT, choices.get(4).unlock);
+    }
+
+    @Test
     void configuredKitOrderMovesKnownEntriesAndKeepsUnlistedCatalogueOrder() {
-        assertEquals(List.of("waller", "jumper", "armorer", "pitcher"),
+        assertEquals(List.of("constructor", "acrobat", "armorer"),
                 ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.BOMB_LOBBERS, List.of(),
-                        List.of("waller", "not-a-kit", "jumper")).stream()
+                        List.of("constructor", "not-a-kit", "acrobat")).stream()
                         .map(choice -> choice.id).toList());
     }
 

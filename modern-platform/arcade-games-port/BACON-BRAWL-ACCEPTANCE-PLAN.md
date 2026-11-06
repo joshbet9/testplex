@@ -45,7 +45,7 @@ Kit changes made during an active round should apply to the next round, not imme
 - [ ] The scaled timing window rewards the run-back-in rhythm as knockback rises; vanilla falling criticals remain critical regardless of timing.
 - [ ] Hits show the legacy red hurt flash and impact feedback on the visible pig or sheep avatar.
 - [ ] Bacon Blast resolves the first collision along its swept path, has the expected hit radius/expiry, and does not break source arena blocks.
-- [ ] The Brutus guard blocks front hits, backstabs bypass it, and Pig Cloak duration/behaviour match the selected kit.
+- [ ] The Brutus guard blocks front hits, backstabs bypass it, and Pig's Cloak ability duration/behaviour match the selected kit.
 - [ ] Knock-off/fall/water/lava eliminations credit the recent attacker only inside the configured five-second window and do not create duplicate kills.
 - [ ] Round kill score credits a human attacker for a test-player victim when that bot is knocked out; test-player progression remains excluded from persistent awards.
 

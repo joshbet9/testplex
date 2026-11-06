@@ -2,8 +2,10 @@ package au.com.testplex.arcadeports;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.plugin.java.JavaPlugin;
 
 /** Local Testplex Arcade achievements and long-term milestone tracks. */
 public final class ArcadeProgressCatalog {
@@ -28,6 +30,36 @@ public final class ArcadeProgressCatalog {
             String path = "local-stats." + playerId + "." + gameId + ".";
             return Math.max(0L, config.getLong(path + statKey, 0L));
         }
+
+        /** Dynamic tracks are derived from live content, not a stale stored target. */
+        public Progress progress(JavaPlugin plugin, UUID playerId, String gameId) {
+            if ("dragon-escape".equals(gameId) && "world-tour".equals(id)) {
+                List<SourceMapCatalog.MapArchive> maps = SourceMapCatalog.mapsFor(plugin, ArcadePortGame.DRAGON_ESCAPE);
+                Set<String> completed = maps.stream().map(SourceMapCatalog.MapArchive::resource).filter(resource -> {
+                    String key = ArcadePortRules.dragonEscapeMapStorageKey(resource);
+                    return !key.isEmpty() && plugin.getConfig().getLong(
+                            "dragon-escape-pb." + playerId + "." + key + ".time-ms", -1L) > 0L;
+                }).collect(java.util.stream.Collectors.toSet());
+                return worldTourProgress(maps.stream().map(SourceMapCatalog.MapArchive::resource).toList(), completed);
+            }
+            return new Progress(value(plugin.getConfig(), playerId, gameId), maximum, stages());
+        }
+    }
+
+    public record Progress(long value, long maximum, long[] stages) { }
+
+    /** A change to the selectable map pool immediately changes World Tour's target and progress. */
+    static Progress worldTourProgress(List<String> rotation, Set<String> completed) {
+        Set<String> playable = new java.util.HashSet<>(rotation);
+        playable.removeIf(resource -> resource == null || resource.isBlank());
+        if (playable.isEmpty()) return new Progress(0L, 1L, new long[] {1L});
+        long total = playable.size();
+        long value = playable.stream().filter(completed::contains).count();
+        java.util.TreeSet<Long> thresholds = new java.util.TreeSet<>();
+        for (int fraction = 1; fraction <= 4; fraction++) {
+            thresholds.add((total * fraction + 3L) / 4L);
+        }
+        return new Progress(value, total, thresholds.stream().mapToLong(Long::longValue).toArray());
     }
 
     private static final Map<String, List<Achievement>> ACHIEVEMENTS = Map.ofEntries(
@@ -37,11 +69,15 @@ public final class ArcadeProgressCatalog {
                     a("flash-fried", "Flash Fried", "Win Bacon Brawl in 60 seconds or less."),
                     a("raw-pork", "Raw Pork", "Win Bacon Brawl without using an ability."),
                     a("three-for-one", "Three for One!", "Get 3 Body Slam kills in one game."),
-                    a("goat-sty", "GOAT Sty", "Win as Pig, landing only cloaked backstabs."),
+                    a("goat-sty", "GOAT Sty", "Win as Pig with at least one kill. Every kill must come from a melee backstab while Cloak is active."),
                     a("pork-on-fork", "Get Some Pork on Your Fork", "Win a game without a kill."),
                     a("mama-camera", "Mama Get the Camera", "As Mama Piggles, get 4 kills from Bacon Blast or its kill combo."),
-                    a("got-em", "Got em’", "Kill a player during their Body Slam recovery before they land."),
-                    a("hamished", "Hamished", "Win while taking starvation damage."))),
+                    a("got-em", "Got em’", "Hit a player after they activate Body Slam while airborne, and have them be knocked off the arena before they land."),
+                    a("hamished", "Hamished", "Win while taking starvation damage."),
+                    a("iron-hog", "Iron Hog", "As Brutus Bacon, block 8 enemy attacks with Brutus Guard in one game."),
+                    a("extra-crispy", "Extra Crispy", "As Chris P. Bacon, ignite 5 different opponents with Crispy Bacon projectiles or dash in one game."),
+                    a("variety-pack", "Variety Pack", "Win at least one Bacon Brawl game using each of the 5 kits."),
+                    a("quadruple-serving", "Quadruple Serving", "Get 4 consecutive kills, each within 10 seconds of the previous kill."))),
             Map.entry("skywars", List.of(
                     a("death-bomber", "Death Bomber", "Kill 3 players with Throwable TNT in one game."),
                     a("no-chest", "No Chest", "Win without opening a chest."),
@@ -50,27 +86,32 @@ public final class ArcadeProgressCatalog {
                     a("ultimate-killer", "Ultimate Killer", "Get 5 kills in one game."),
                     a("two-birds-one-stone", "Two birds, one stone", "Kill 2 players with one TNT."),
                     a("team-player", "Team player!", "Get 5 assists in one game."),
-                    a("whats-a-double-jump", "What's a double jump?", "Win as Jumper/Acrobat without using double jump while alive."),
+                    a("whats-a-double-jump", "What's a double jump?", "Win as Acrobat without using your double jump."),
                     a("the-mvp", "The MVP", "Win a 1v3 clutch as the last living member of your team."),
-                    a("blast-proof", "Blast Proof", "Win a game as the Armorer."),
+                    a("blast-proof", "Blast Proof", "Win 10 games as Armorer."),
                     a("jelly-skin", "Jelly Skin", "Win a game without taking damage."),
                     a("master-bomber", "Master Bomber", "Win 30 Bomb Lobbers games."),
-                    a("wonderkid", "Wonderkid", "Get 3 kills without throwing TNT that explodes immediately on impact."),
-                    a("technical", "Technical", "Kill a player with a TNT thrown from less than 20 blocks away."),
+                    a("wonderkid", "Wonderkid", "Get 3 kills in one game from high-lob TNT that explodes immediately on impact."),
+                    a("technical", "Technical", "Kill a player with TNT thrown from less than 10 blocks away."),
                     a("calma", "Calma", "Double-jump 100 times in one game."),
-                    a("over-9000", "Over 9000", "Win a 1v3 clutch using only powerups."),
-                    a("grenade-from-the-grave", "Grenade From the Grave", "Get 2 kills after you die in one Bomb Lobbers game."))),
+                    a("over-9000", "Over 9000", "Get 3 kills with one power-up TNT."),
+                    a("grenade-from-the-grave", "Grenade From the Grave", "Get 2 TNT kills after you die in one game."),
+                    a("not-on-my-watch", "Not On My Watch", "Block 3 enemy TNT throws with Constructor defenses in one game."))),
             Map.entry("death-tag", List.of(
-                    a("death-proof", "Death Proof", "Win 50 games of Death Tag."),
+                    a("death-proof", "Death Proof", "Win 20 games of Death Tag."),
                     a("come-at-me-bro", "Come At Me Bro!", "Kill 2 Undead Chasers in a single game."),
                     a("statue", "Statue", "Win while staying in the same 5×5 area for 3 minutes."),
-                    a("gallows", "Gallows", "As Runner Traitor, assist 3 comrade deaths in one game."),
+                    a("gallows", "Gallows", "As Runner Traitor, knock fellow Runners toward danger and assist 3 of their deaths to Chasers within 8 seconds of hitting them, in one game."),
                     a("ultimate-chaser", "The Ultimate Chaser", "Kill 8 Runners in a single game."),
-                    a("hasty-hunter", "Hasty Hunter", "Kill 3 Runners within one minute."),
+                    a("hasty-hunter", "Hasty Hunter", "Kill 3 Runners within 30 seconds."),
                     a("resilient-runner", "Resilient Runner", "Regenerate 250 hearts total while using Runner Basher."),
                     a("catch-me-if-you-can", "Catch Me If You Can", "Run 10,000 blocks in Death Tag."),
-                    a("turtle-shell", "Turtle Shell", "As a Runner, land three melee hits on Chasers in one game."),
-                    a("smoke-and-mirrors", "Smoke and Mirrors", "Win Death Tag as a Runner without being tagged."))),
+                    a("lots-of-subject-matter", "Lots of Subject Matter", "As a Runner, land melee hits on 5 different Chasers in one game. Unlocks Runner Turtle."),
+                    a("smoke-and-mirrors", "Smoke and Mirrors", "Win as a Runner after surviving nonlethal hits from 3 different Chasers in one game. Unlocks Runner Trickster."),
+                    a("fletching-frenzy", "Fletching Frenzy", "As Runner Archer, land 10 successful arrow hits on Chasers in one game."),
+                    a("shell-shock", "Shell Shock", "As Runner Turtle, apply a full three-stack Slowness and Weakness effect to 2 different Chasers in one game."),
+                    a("sleight-of-hand", "Sleight of Hand", "As Runner Trickster, use Chaser Swap within 5 blocks of a Chaser, then survive 30 seconds without being tagged."),
+                    a("patient-zero", "Patient Zero", "As the original Alpha Chaser, have your first converted Runner start a four-generation infection chain: Alpha → A → B → C → D."))),
             Map.entry("dragon-escape", List.of(
                     a("douglas-defeater", "Douglas Defeater", "Win 50 games of Dragon Escape."),
                     a("paralympics", "Paralympics", "Win a game without using Leap."),
@@ -78,9 +119,14 @@ public final class ArcadeProgressCatalog {
                     a("to-hell-and-back", "To Hell and Back", "Finish Through Hell 5 times."),
                     a("plundered", "Plundered", "Finish Pirate Bay 5 times."),
                     a("strats", "Strats", "As Warper, warp to a leader at least 40 blocks ahead and win."),
-                    a("ragebaiter", "Ragebaiter", "Kill 3 players with Disruptor TNT in one game."),
+                    a("ragebaiter", "Ragebaiter", "Cause 3 opponents to fall within 7 seconds of launching them with Disruptor TNT, in one game."),
                     a("twinning-this-halloween", "Twinning This Halloween?", "Tie a race with your ghost."),
-                    a("learn-to-code", "Learn to Code", "As Digger, use all breaks in a winning race without running through a broken block."))),
+                    a("learn-to-code", "Learn to Code", "As Digger, pillar straight up six consecutive blocks and win the race."),
+                    a("last-leap", "Last Leap", "As Jumper, use your final Leap after falling at least 8 blocks, recover onto the course, and win."),
+                    a("brick-by-brick", "Brick by Brick", "As Builder, use 3 different temporary Builder bricks as footholds in one winning race."),
+                    a("beat-the-clock", "Beat the Clock", "With your PB ghost enabled, beat your previous best time by at least 10 seconds."),
+                    a("hot-on-your-heels", "Hot on Your Heels", "Finish a race with Douglas within 5 blocks behind you."),
+                    a("untouchable", "Untouchable", "Win a Dragon Escape race without taking any damage."))),
             Map.entry("dragons", List.of(
                     a("win-three-in-a-row", "Win 3 in a row", "Win three completed Dragons games consecutively."),
                     a("survive-five-minutes", "Survive 5 minutes", "Stay alive in a Dragons match for at least five minutes."),
@@ -195,16 +241,16 @@ public final class ArcadeProgressCatalog {
                     a("the-duels-duels-duel", "The Duel’s Duel’s Duel", "Win as a Master Assassin against at least two other Master Assassins."),
                     a("disappointment-is-immeasurable", "Disappointment is Immeasurable", "Kill a player within one second of them collecting a power-up."))),
             Map.entry("speed-builders-arcade", List.of(
-                    a("speedrunner", "Speedrunner", "Win a Speed Builders game that is scored by time."),
-                    a("unlucky", "Unlucky", "Lose a Speed Builders game that is scored by time."),
+                    a("speedrunner", "Speedrunner", "Win a tied top-score Speed Builders game on the cumulative build-time tiebreak."),
+                    a("unlucky", "Unlucky", "Lose a tied top-score Speed Builders game on the cumulative build-time tiebreak."),
                     a("bad-builds", "Bad Builds", "Win a game with 3 or fewer perfect builds."),
                     a("right-on-time", "Right on time", "Win with a perfect build in the final round with less than one second remaining."))),
             Map.entry("wizards", List.of(
                     a("youre-a-wizard-harry", "You’re a wizard Harry", "Win a game without casting a spell."),
-                    a("strong-willed-small-minded", "Strong Willed, Small Minded", "Win using only max-level spells."),
+                    a("strong-willed-small-minded", "Strong Willed, Small Minded", "Win after casting at least one spell, with every spell cast at its maximum level."),
                     a("ding-dong", "Ding Dong", "Lose a game after getting 6 kills."),
                     a("trifecta", "Trifecta", "Kill three players with one spell."),
-                    a("one-trick-wizard", "One-Trick Wizard", "Win using spells from only one spell family."),
+                    a("one-trick-wizard", "One-Trick Wizard", "Win after casting spells from exactly one category: Attack, Support or Misc."),
                     a("spell-it-out", "Spell it out", "Get a kill finalised by your opponent killing themselves with their own spell."))),
             Map.entry("wither-assault", List.of(
                     a("lucid-dreams", "Lucid Dreams", "Win as a human without taking any damage."),
@@ -248,16 +294,24 @@ public final class ArcadeProgressCatalog {
                     a("mvp", "MVP", "Win after landing the final hit on both towers and the final boss."),
                     a("moba-master", "MOBA Master", "Win a game with every hero."),
                     a("tactical-genius", "Tactical Genius", "Come back from at least one crystal down after changing hero mid-game."),
-                    a("gold-mine", "Gold Mine", "Win while holding both beacons for the entire game."),
+                    a("gold-mine", "Gold Mine", "Win after your team holds both beacons simultaneously for 60 uninterrupted seconds."),
                     a("objective-null", "Objective Null", "Get 15 kills in one game."),
                     a("know-your-enemy", "Know Your Enemy", "Only damage opposing players in your own role, out-kill their counterpart, and win."))),
             Map.entry("castle-assault", List.of(
                     a("one-man-army", "One Man Army", "Destroy both enemy crystals and land the final hit on the King."),
                     a("remember-the-days", "Remember The Days", "Win 3 Castle Assault games in a row."),
-                    a("clutchness", "Clutchness", "Win while your King has less than 50 health."),
-                    a("multiplicative", "Multiplicative", "Get twice as many kills as the next-highest killer on your team."),
+                    a("clutchness", "Clutchness", "Win while your King has less than 10 health."),
+                    a("multiplicative", "Multiplicative", "Get at least 5 kills and twice as many as the next-highest killer on your team."),
                     a("blasphemous", "Blasphemous", "Get 8 kills in one game without using a fishing rod."),
-                    a("moral-exercise", "Moral Exercise", "Get 5 kills by blowing up opponents as the TNT Holder."))),
+                    a("moral-exercise", "Moral Exercise", "Get 5 kills by blowing up opponents as the TNT Holder."),
+                    a("bad-chemistry", "Bad Chemistry", "As Alchemist, kill 2 enemies affected by your Slowness or Weakness potions in one game."),
+                    a("pin-cushion", "Pin Cushion", "As Archer, get 5 bow kills in one game."),
+                    a("tnt-rrific", "TNT-rrific", "As Demolitionist, get 3 kills with your thrown TNT in one game."),
+                    a("golden-boy", "Golden Boy", "As Fighter, eat a Golden Applegate and get 5 kills without dying in the same life."),
+                    a("immovable-object", "Immovable Object", "As Tank, survive 10 enemy hits in one life, then kill an enemy before dying."),
+                    a("express-delivery", "Express Delivery", "Destroy an enemy crystal with objective TNT within 15 seconds of picking it up."),
+                    a("royal-guard", "Royal Guard", "Kill 3 enemies within 15 blocks of your King in one game."),
+                    a("against-all-odds", "Against All Odds", "Win after both of your team’s crystals are destroyed."))),
             Map.entry("monster-maze", List.of(
                     a("jumpman", "Jumpman", "Spend all jumps on stage 1, reach the first safe pad, and win."),
                     a("just-to-suffer", "Just to Suffer", "Use a jump on a one-block gap."),
@@ -273,7 +327,7 @@ public final class ArcadeProgressCatalog {
             Map.entry("bacon-brawl", List.of(m("wins", "Wins", "wins", 250, "wins"), m("kills", "Kills", "kills", 1000, "kills"))),
             Map.entry("bomb-lobbers", List.of(m("wins", "Wins", "wins", 500, "wins"), m("kills", "Kills", "kills", 1000, "kills"))),
             Map.entry("death-tag", List.of(m("kills", "Kills", "kills", 500, "kills"), m("chaser-wins", "Chaser Wins", "chaser-wins", 125, "wins"), m("runner-wins", "Runner Wins", "runner-wins", 125, "wins"))),
-            Map.entry("dragon-escape", List.of(m("wins", "Wins", "wins", 2000, "wins"), m("courses", "Course Completes", "course-completes", 3000, "courses"), m("distance", "Blocks Travelled", "blocks-travelled", 750000, "blocks"))),
+            Map.entry("dragon-escape", List.of(m("wins", "Wins", "wins", 2000, "wins"), m("courses", "Course Completes", "course-completes", 3000, "courses"), m("distance", "Blocks Travelled", "blocks-travelled", 750000, "blocks"), m("world-tour", "World Tour", "world-tour", 1, "maps"))),
             Map.entry("dragons", List.of(m("survival", "Survive", "survival-millis", 36_000_000, "milliseconds"), m("wins", "Wins", "wins", 250, "wins"))),
             Map.entry("evolution", List.of(m("wins", "Wins", "wins", 250, "wins"), m("kills", "Kills", "kills", 2000, "kills"))),
             Map.entry("gladiators", List.of(m("wins", "Wins", "wins", 250, "wins"), m("kills", "Kills", "kills", 1000, "kills"), m("brawler", "Brawler", "brawler", 3, "kills"), m("precision", "Precision", "precision", 1, "wins"), m("swift-kill", "Swift Kill", "swift-kill", 15, "first bloods"), m("loser-bracket-wins", "Loser Bracket Wins", "loser-bracket-wins", 100, "wins"))),
