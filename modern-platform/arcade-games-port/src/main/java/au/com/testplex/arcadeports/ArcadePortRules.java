@@ -2819,6 +2819,28 @@ public final class ArcadePortRules {
     public static final int CASTLE_ASSAULT_DEMOLITIONIST_MAX_TNT = 2;
     public static final long CASTLE_ASSAULT_EXPRESS_DELIVERY_MILLIS = 15_000L;
     public static final double CASTLE_ASSAULT_ROYAL_GUARD_RANGE = 15.0D;
+    public static final double CASTLE_ASSAULT_KIT_PASSIVE_MULTIPLIER = 1.25D;
+
+    /** Only Alchemist splash potions originating from Castle Assault chests receive this bonus. */
+    public static boolean shouldBoostCastleChestSplashPotion(boolean alchemist, boolean castleChestOrigin) {
+        return alchemist && castleChestOrigin;
+    }
+
+    public static int castleAssaultBoostedChestPotionDuration(int normalDurationTicks) {
+        if (normalDurationTicks <= 0) return normalDurationTicks;
+        return (int) Math.min(Integer.MAX_VALUE,
+                Math.ceil(normalDurationTicks * CASTLE_ASSAULT_KIT_PASSIVE_MULTIPLIER));
+    }
+
+    public static double castleAssaultChestPotionInstantBonus(double normalInstantAmount) {
+        if (!Double.isFinite(normalInstantAmount) || normalInstantAmount <= 0.0D) return 0.0D;
+        return normalInstantAmount * (CASTLE_ASSAULT_KIT_PASSIVE_MULTIPLIER - 1.0D);
+    }
+
+    public static double castleAssaultArcherArrowDamage(double normalDamage) {
+        if (!Double.isFinite(normalDamage) || normalDamage <= 0.0D) return normalDamage;
+        return normalDamage * CASTLE_ASSAULT_KIT_PASSIVE_MULTIPLIER;
+    }
 
     public static boolean shouldAwardCastleAssaultClutchness(int winningKingHealth) {
         return winningKingHealth > 0 && winningKingHealth < 10;
