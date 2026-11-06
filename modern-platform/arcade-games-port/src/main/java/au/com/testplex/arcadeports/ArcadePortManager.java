@@ -9111,7 +9111,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void spawnSkyWarsGuardians(Session session, SourceMapCatalog.MapData map) {
-        if (map == null) return;
+        if (map == null || !debugFeatureEnabledForActiveSession(ArcadePortGame.SKY_WARS, "guardian-spawns")) return;
         for (Location marker : map.dataLocations("RED")) {
             if (marker == null || marker.getWorld() != session.world) continue;
             Zombie guardian = session.world.spawn(marker, Zombie.class);
@@ -9119,8 +9119,9 @@ public final class ArcadePortManager implements Listener {
             guardian.setCustomName(ChatColor.DARK_RED + "Zombie Guardian");
             guardian.setCustomNameVisible(true);
             var guardianHealth = guardian.getAttribute(Attribute.MAX_HEALTH);
-            if (guardianHealth != null) guardianHealth.setBaseValue(15.0D);
-            guardian.setHealth(15.0D);
+            double health = SkyWarsMixedArcadeRules.guardianHealth();
+            if (guardianHealth != null) guardianHealth.setBaseValue(health);
+            guardian.setHealth(health);
             guardian.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE,
                     Integer.MAX_VALUE, 0, false, false, false), true);
             guardian.getEquipment().setArmorContents(new ItemStack[] {
@@ -9174,11 +9175,11 @@ public final class ArcadePortManager implements Listener {
                 for (ItemStack item : player.getInventory().getContents()) {
                     if (isSkyWarsSkill(item, "Throwable Dirt")) dirtCount += item.getAmount();
                 }
-                if (dirtCount < 4) {
+                if (dirtCount < SkyWarsMixedArcadeRules.earthMaxDirt()) {
                     player.getInventory().addItem(skyWarsKitItem(Material.DIRT, "Throwable Dirt",
-                            "Right-click to throw dirt (maximum 4).", true));
+                            "Right-click to throw dirt (maximum " + SkyWarsMixedArcadeRules.earthMaxDirt() + ").", true));
                 }
-                session.skyWarsNextDirtAt.put(id, now + 20_000L);
+                session.skyWarsNextDirtAt.put(id, now + SkyWarsMixedArcadeRules.earthDirtRefillIntervalMillis());
             }
             if ("fire".equals(kit) && kitEnabled && !player.hasPotionEffect(PotionEffectType.FIRE_RESISTANCE)) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE,
@@ -9194,11 +9195,14 @@ public final class ArcadePortManager implements Listener {
                         for (ItemStack armor : player.getInventory().getArmorContents()) {
                             if (armor != null && (armor.getType().name().startsWith("IRON_")
                                     || armor.getType().name().startsWith("GOLDEN_")
-                                    || armor.getType().name().startsWith("CHAINMAIL_"))) bonus += 1.0D;
+                                    || armor.getType().name().startsWith("CHAINMAIL_"))) {
+                                bonus += SkyWarsMixedArcadeRules.metalArmorHealthPerPiece();
+                            }
                         }
                     }
-                    maxHealth.setBaseValue(20.0D + bonus);
-                    if (player.getHealth() > 20.0D + bonus) player.setHealth(20.0D + bonus);
+                    double maximumHealth = SkyWarsMixedArcadeRules.metalBaseMaxHealth() + bonus;
+                    maxHealth.setBaseValue(maximumHealth);
+                    if (player.getHealth() > maximumHealth) player.setHealth(maximumHealth);
                 }
             }
             updateSkyWarsAbilityBar(player, session, now);
@@ -9219,10 +9223,12 @@ public final class ArcadePortManager implements Listener {
             }
         }
         if (islandCrumblingEnabled && session.skyWarsCrumbleBoundsValid && !session.skyWarsCrumbleScanComplete) {
-            scanSkyWarsCrumbleLayer(session);
+            for (int layer = 0; layer < SkyWarsMixedArcadeRules.crumbleLayersPerTick()
+                    && !session.skyWarsCrumbleScanComplete; layer++) scanSkyWarsCrumbleLayer(session);
         }
         if (islandCrumblingEnabled && session.skyWarsCrumbleStarted && session.skyWarsCrumbleScanComplete) {
-            for (int count = 0; count < 4 && !session.skyWarsCrumbleQueue.isEmpty(); count++) {
+            for (int count = 0; count < SkyWarsMixedArcadeRules.crumbleBlocksPerTick()
+                    && !session.skyWarsCrumbleQueue.isEmpty(); count++) {
                 SkyWarsCrumbleCandidate candidate = session.skyWarsCrumbleQueue.poll();
                 Block block = candidate.block();
                 if (!java.util.Objects.equals(
@@ -9240,7 +9246,7 @@ public final class ArcadePortManager implements Listener {
                     block.getRelative(BlockFace.UP).setType(Material.AIR, false);
                 }
                 block.setType(Material.AIR, false);
-                if (ThreadLocalRandom.current().nextDouble() > 0.95D) {
+                if (ThreadLocalRandom.current().nextDouble() < SkyWarsMixedArcadeRules.crumbleFallingBlockChance()) {
                     FallingBlock falling = session.world.spawnFallingBlock(
                             block.getLocation().add(0.5D, 0.5D, 0.5D), data);
                     falling.setDropItem(false);
@@ -9327,7 +9333,8 @@ public final class ArcadePortManager implements Listener {
                 }
             }
         }
-        if (SkyWarsMixedArcadeRules.shouldHideOre(hasNonOccludingNeighbour)) {
+        if (SkyWarsMixedArcadeRules.shouldHideOre(hasNonOccludingNeighbour,
+                debugFeatureEnabledForActiveSession(ArcadePortGame.SKY_WARS, "ore-hiding"))) {
             session.skyWarsHiddenOres.put(oreBlock, oreType);
         } else {
             oreBlock.setType(oreType, false);
@@ -9377,7 +9384,8 @@ public final class ArcadePortManager implements Listener {
             case "earth" -> {
                 player.getInventory().addItem(new ItemStack(Material.WOODEN_SHOVEL));
                 player.getInventory().addItem(skyWarsKitItem(Material.DIRT,
-                        "Throwable Dirt", "Right-click to throw dirt (maximum 4).", true));
+                        "Throwable Dirt", "Right-click to throw dirt (maximum "
+                                + SkyWarsMixedArcadeRules.earthMaxDirt() + ").", true));
                 session.skyWarsNextDirtAt.put(id, System.currentTimeMillis());
             }
             default -> player.getInventory().addItem(skyWarsKitItem(Material.ICE,
@@ -9480,7 +9488,7 @@ public final class ArcadePortManager implements Listener {
             if (safe != null) {
                 player.getInventory().setItemInMainHand(null);
                 player.getInventory().remove(Material.ENDER_EYE);
-                player.teleport(safe.clone().add(0.0D, 2.0D, 0.0D));
+                player.teleport(safe.clone().add(0.0D, SkyWarsMixedArcadeRules.airSafeReturnVerticalOffset(), 0.0D));
                 player.setFallDistance(0.0F);
                 player.getWorld().spawnParticle(Particle.PORTAL, player.getLocation().add(0, 1, 0),
                         10, 0.5D, 0.5D, 0.5D, 0.1D);
@@ -9507,7 +9515,7 @@ public final class ArcadePortManager implements Listener {
             Vector pull = player.getLocation().toVector().subtract(target.getLocation().toVector())
                     .normalize().multiply(SkyWarsMixedArcadeRules.metalMagnetPullBase()
                             + armorPieces * SkyWarsMixedArcadeRules.metalMagnetPullPerArmor());
-            pull.setY(Math.max(0.6D, pull.getY()));
+            pull.setY(Math.max(SkyWarsMixedArcadeRules.metalPullMinVertical(), pull.getY()));
             target.setVelocity(pull);
             player.getWorld().spawnParticle(Particle.FIREWORK, player.getEyeLocation(), 8,
                     0.2D, 0.2D, 0.2D, 0.05D);
@@ -9563,8 +9571,9 @@ public final class ArcadePortManager implements Listener {
         Vector side = new Vector(-forward.getZ(), 0.0D, forward.getX());
         Location origin = player.getLocation().clone();
         List<Block> path = new ArrayList<>();
-        for (int step = 1; step <= 16; step++) {
-            for (int width = -1; width <= 1; width++) {
+        for (int step = 1; step <= SkyWarsMixedArcadeRules.iceBridgeLengthBlocks(); step++) {
+            int halfWidth = SkyWarsMixedArcadeRules.iceBridgeHalfWidthBlocks();
+            for (int width = -halfWidth; width <= halfWidth; width++) {
                 Location point = origin.clone().add(forward.clone().multiply(step)).add(side.clone().multiply(width));
                 Block block = point.getBlock().getRelative(BlockFace.DOWN);
                 if (!(block.getType().isAir() || block.getType() == Material.SNOW)) continue;
@@ -9582,21 +9591,24 @@ public final class ArcadePortManager implements Listener {
             if (original != null && block.getType() == Material.ICE) block.setBlockData(original, false);
             session.skyWarsIceBridgeExpiresAt.remove(block);
         }
-        for (List<List<Block>> playerPaths : session.skyWarsIceBridgePaths.values()) {
-            if (playerPaths.isEmpty()) continue;
-            List<Block> path = playerPaths.get(0);
-            if (path.isEmpty()) {
-                playerPaths.remove(0);
-                continue;
+        for (List<List<Block>> playerPaths : new ArrayList<>(session.skyWarsIceBridgePaths.values())) {
+            int blocksToProcess = SkyWarsMixedArcadeRules.iceBridgeBlocksPerTick();
+            while (blocksToProcess > 0 && !playerPaths.isEmpty()) {
+                List<Block> path = playerPaths.get(0);
+                if (path.isEmpty()) {
+                    playerPaths.remove(0);
+                    continue;
+                }
+                Block block = path.remove(0);
+                blocksToProcess--;
+                if (block.getType().isAir() || block.getType() == Material.SNOW) {
+                    session.skyWarsIceBridgeOriginals.putIfAbsent(block, block.getBlockData().clone());
+                    block.setType(Material.ICE, false);
+                    block.getWorld().playSound(block.getLocation(), Sound.BLOCK_STONE_STEP, 0.35F, 1.2F);
+                    session.skyWarsIceBridgeExpiresAt.put(block, now + SkyWarsMixedArcadeRules.iceBridgeDurationMillis());
+                }
+                if (path.isEmpty()) playerPaths.remove(0);
             }
-            Block block = path.remove(0);
-            if (block.getType().isAir() || block.getType() == Material.SNOW) {
-                session.skyWarsIceBridgeOriginals.putIfAbsent(block, block.getBlockData().clone());
-                block.setType(Material.ICE, false);
-                block.getWorld().playSound(block.getLocation(), Sound.BLOCK_STONE_STEP, 0.35F, 1.2F);
-                session.skyWarsIceBridgeExpiresAt.put(block, now + 4_000L);
-            }
-            if (path.isEmpty()) playerPaths.remove(0);
         }
         session.skyWarsIceBridgePaths.entrySet().removeIf(entry -> entry.getValue().isEmpty());
     }
@@ -9611,12 +9623,12 @@ public final class ArcadePortManager implements Listener {
             Player owner = session.players.get(entry.getValue());
             Player target = alivePlayers(session).stream()
                     .filter(candidate -> !candidate.getUniqueId().equals(entry.getValue()))
-                    .filter(candidate -> candidate.getLocation().distanceSquared(projectile.getLocation()) < 1.2D)
+                    .filter(candidate -> candidate.getLocation().distanceSquared(projectile.getLocation())
+                            < SkyWarsMixedArcadeRules.dirtProjectileHitRadiusSquared())
                     .findFirst().orElse(null);
             if (target == null) continue;
-            target.damage(1.0D, owner == null ? projectile : owner);
-            Vector knockback = projectile.getVelocity().clone().normalize().setY(0.5D);
-            target.setVelocity(knockback);
+            target.damage(SkyWarsMixedArcadeRules.dirtProjectileDamage(), owner == null ? projectile : owner);
+            target.setVelocity(SkyWarsMixedArcadeRules.dirtProjectileKnockback(projectile.getVelocity()));
             session.skyWarsDirtProjectiles.remove(entry.getKey());
             session.entities.remove(projectile);
             projectile.remove();
@@ -9631,9 +9643,10 @@ public final class ArcadePortManager implements Listener {
                 continue;
             }
             Location home = entry.getValue();
-            if (zombie.getTarget() == null || zombie.getLocation().distanceSquared(home) > 64.0D) {
+            double leashRadius = SkyWarsMixedArcadeRules.guardianHomeLeashRadiusBlocks();
+            if (zombie.getTarget() == null || zombie.getLocation().distanceSquared(home) > leashRadius * leashRadius) {
                 zombie.setTarget(null);
-                zombie.getPathfinder().moveTo(home, 1.0D);
+                zombie.getPathfinder().moveTo(home, SkyWarsMixedArcadeRules.guardianHomeSpeed());
             }
         }
     }
@@ -9643,7 +9656,7 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         Player player = event.getPlayer();
         UUID id = player.getUniqueId();
-        if (GameDebugRuntimeOverrides.isDebugSession() || session == null || session.type != ArcadePortGame.SKY_WARS
+        if (session == null || session.type != ArcadePortGame.SKY_WARS
                 || !session.alive.contains(id) || !"air".equals(session.skyWarsKits.get(id))) return;
         if (!debugKitFeatureEnabled(player, ArcadePortGame.SKY_WARS, "air")) {
             event.setCancelled(true);
@@ -9656,11 +9669,12 @@ public final class ArcadePortManager implements Listener {
             player.setFlying(false);
             return;
         }
-        session.skyWarsKitReadyAt.put(id, System.currentTimeMillis() + 25_000L);
+        session.skyWarsKitReadyAt.put(id, System.currentTimeMillis() + SkyWarsMixedArcadeRules.airDoubleJumpCooldownMillis());
         player.setAllowFlight(false);
         player.setFlying(false);
         Vector velocity = player.getVelocity();
-        velocity.setY(Math.max(1.0D, velocity.getY() + 0.8D));
+        velocity.setY(Math.max(SkyWarsMixedArcadeRules.airDoubleJumpMinVertical(),
+                velocity.getY() + SkyWarsMixedArcadeRules.airDoubleJumpVerticalAdd()));
         player.setVelocity(velocity);
         player.setFallDistance(0.0F);
     }
@@ -9692,7 +9706,8 @@ public final class ArcadePortManager implements Listener {
                 || !(event.getEntity() instanceof Zombie zombie)) return;
         Location home = session.skyWarsGuardianHomes.get(zombie.getUniqueId());
         if (home == null || event.getTarget() == null) return;
-        if (event.getTarget().getLocation().distanceSquared(home) > 64.0D) {
+        double leashRadius = SkyWarsMixedArcadeRules.guardianHomeLeashRadiusBlocks();
+        if (event.getTarget().getLocation().distanceSquared(home) > leashRadius * leashRadius) {
             event.setCancelled(true);
             zombie.setTarget(null);
         }
@@ -9709,7 +9724,7 @@ public final class ArcadePortManager implements Listener {
         if (ownerId == null && tnt.getSource() != null) ownerId = tnt.getSource().getUniqueId();
         if (ownerId == null || ownerId.equals(victim.getUniqueId())) return;
         int kills = session.skyWarsTntKills.merge(ownerId, 1, Integer::sum);
-        if (kills >= 3) {
+        if (kills >= SkyWarsMixedArcadeRules.deathBomberKills()) {
             Player owner = session.players.get(ownerId);
             if (owner != null) awardCatalogAchievement(owner, "skywars", "death-bomber");
         }
@@ -9758,7 +9773,9 @@ public final class ArcadePortManager implements Listener {
                 || !session.skyWarsGuardianHomes.containsKey(event.getEntity().getUniqueId())) return;
         EntityDamageEvent.DamageCause cause = event.getCause();
         if (cause == EntityDamageEvent.DamageCause.BLOCK_EXPLOSION
-                || cause == EntityDamageEvent.DamageCause.ENTITY_EXPLOSION) event.setDamage(8.0D);
+                || cause == EntityDamageEvent.DamageCause.ENTITY_EXPLOSION) {
+            event.setDamage(SkyWarsMixedArcadeRules.guardianExplosionDamage());
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)

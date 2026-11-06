@@ -393,6 +393,13 @@ final class GameDebugVariableCatalog {
                 || name.endsWith("_DISTANCE") || name.endsWith("_LAUNCH_Y"))) return 0.0D;
         if (name.equals("SHEEP_QUEST_THROW_BOUNCE_MULTIPLIER")) return -1.0D;
         if (name.equals("SHEEP_QUEST_SHEPHERD_SLOWNESS_MAX_AMPLIFIER")) return 0.0D;
+        if (Set.of("MAX_PLAYERS", "EARTH_MAX_DIRT", "CRUMBLE_LAYERS_PER_TICK",
+                "CRUMBLE_BLOCKS_PER_TICK", "GUARDIAN_HEALTH", "DEATH_BOMBER_KILLS",
+                "METAL_BASE_MAX_HEALTH", "ICE_BRIDGE_LENGTH_BLOCKS",
+                "ICE_BRIDGE_BLOCKS_PER_TICK").contains(name)) return 1.0D;
+        if (name.equals("GUARDIAN_HOME_LEASH_RADIUS_BLOCKS") || name.equals("CRUMBLE_FALLING_BLOCK_CHANCE")
+                || name.equals("ICE_BRIDGE_HALF_WIDTH_BLOCKS")) return 0.0D;
+        if (name.equals("METAL_PULL_MIN_VERTICAL") || name.equals("DIRT_PROJECTILE_KNOCKBACK_VERTICAL")) return -4.0D;
         if (name.startsWith("SHEEP_QUEST_") && (name.endsWith("_SPEED") || name.endsWith("_ADD")
                 || name.endsWith("_MIN") || name.endsWith("_MAX") || name.endsWith("_SCALE")
                 || name.endsWith("_KNOCKBACK") || name.endsWith("_RADIUS")
@@ -634,6 +641,27 @@ final class GameDebugVariableCatalog {
         if (name.startsWith("SHEEP_QUEST_") && (name.endsWith("_THRESHOLD")
                 || name.endsWith("_ACHIEVEMENT_COUNT") || name.endsWith("_WINS")
                 || name.endsWith("_PER_TARGET"))) return 10_000.0D;
+        if (name.equals("MAX_PLAYERS")) return 16.0D;
+        if (name.equals("EARTH_MAX_DIRT")) return 64.0D;
+        if (name.equals("CRUMBLE_LAYERS_PER_TICK")) return 16.0D;
+        if (name.equals("CRUMBLE_BLOCKS_PER_TICK")) return 256.0D;
+        if (name.equals("GUARDIAN_HEALTH")) return 100.0D;
+        if (name.equals("DEATH_BOMBER_KILLS")) return 1_000.0D;
+        if (name.equals("CRUMBLE_FALLING_BLOCK_CHANCE")) return 1.0D;
+        if (name.equals("METAL_BASE_MAX_HEALTH")) return 40.0D;
+        if (name.equals("METAL_ARMOR_HEALTH_PER_PIECE")) return 20.0D;
+        if (Set.of("METAL_PULL_MIN_VERTICAL", "AIR_DOUBLE_JUMP_MIN_VERTICAL", "AIR_DOUBLE_JUMP_VERTICAL_ADD" )
+                .contains(name)) return 8.0D;
+        if (name.equals("DIRT_PROJECTILE_HIT_RADIUS_SQUARED")) return 64.0D;
+        if (name.equals("DIRT_PROJECTILE_DAMAGE") || name.equals("GUARDIAN_EXPLOSION_DAMAGE")) return 40.0D;
+        if (name.equals("GUARDIAN_HOME_SPEED")) return 4.0D;
+        if (name.equals("AIR_SAFE_RETURN_VERTICAL_OFFSET")
+                || name.equals("DIRT_PROJECTILE_KNOCKBACK_HORIZONTAL_MULTIPLIER")) return 8.0D;
+        if (name.equals("ICE_BRIDGE_LENGTH_BLOCKS")) return 64.0D;
+        if (name.equals("ICE_BRIDGE_HALF_WIDTH_BLOCKS")) return 8.0D;
+        if (name.equals("ICE_BRIDGE_BLOCKS_PER_TICK")) return 64.0D;
+        if (name.equals("AIR_DOUBLE_JUMP_COOLDOWN_MILLIS")
+                || name.equals("EARTH_DIRT_REFILL_INTERVAL_MILLIS")) return 120_000.0D;
         if (name.startsWith("SHEEP_QUEST_") && name.endsWith("_SPEED")) return 4.0D;
         if (name.startsWith("SHEEP_QUEST_") && (name.endsWith("_RADIUS") || name.endsWith("_BLOCKS"))) return 64.0D;
         if (name.startsWith("DRAGON_ESCAPE_") && name.endsWith("_MILLIS")) return 120_000.0D;
@@ -826,6 +854,9 @@ final class GameDebugVariableCatalog {
                 || name.endsWith("_ACHIEVEMENT_COUNT") || name.endsWith("_WINS")
                 || name.endsWith("_PER_TARGET") || name.endsWith("_AMPLIFIER")
                 || name.endsWith("_SHEEP_PER_LEVEL") || name.endsWith("_SCORE"))) return 1.0D;
+        if (name.startsWith("SKY_WARS_") && (name.endsWith("_DIRT") || name.endsWith("_PER_TICK")
+                || name.endsWith("_KILLS") || name.endsWith("_PLAYERS"))) return 1.0D;
+        if (name.endsWith("_CHANCE")) return 0.05D;
         if (Set.of("MANA_REGEN_MULTIPLIER", "PROJECTILE_SPEED_MULTIPLIER", "SPELL_COOLDOWN_MULTIPLIER",
                 "SPELL_DAMAGE_MULTIPLIER", "SPELL_HEAL_MULTIPLIER", "SPELL_MANA_COST_MULTIPLIER")
                 .contains(name)) return 0.1D;

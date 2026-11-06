@@ -1497,6 +1497,10 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     "Start and process the normal SkyWars island crumble event.", true));
             features.put("tnt-generator", new DebugFeature("tnt-generator", "TNT generator", Material.TNT,
                     "Generate throwable TNT at the map's normal generator on its regular timer.", true));
+            features.put("guardian-spawns", new DebugFeature("guardian-spawns", "Zombie guardians", Material.ZOMBIE_HEAD,
+                    "Spawn and run the map-authored Zombie Guardians for the next round.", false));
+            features.put("ore-hiding", new DebugFeature("ore-hiding", "Hidden island ores", Material.DIAMOND_ORE,
+                    "Use the source OreHider behavior for the next round's island ores.", false));
             for (String kit : List.of("ice", "fire", "air", "metal", "earth")) {
                 String key = "ability-" + kit;
                 features.put(key, new DebugFeature(key, "Kit feature: " + humanizeDebugKey(kit),

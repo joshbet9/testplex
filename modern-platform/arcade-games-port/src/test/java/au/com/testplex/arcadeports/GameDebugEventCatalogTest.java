@@ -1205,9 +1205,20 @@ class GameDebugEventCatalogTest {
         assertTrue(lobby.contains("features.put(\"chest-looting\""));
         assertTrue(lobby.contains("features.put(\"island-crumbling\""));
         assertTrue(lobby.contains("features.put(\"tnt-generator\""));
+        assertTrue(lobby.contains("features.put(\"guardian-spawns\""));
+        assertTrue(lobby.contains("features.put(\"ore-hiding\""));
+        assertTrue(normalize(lobby).contains(normalize("new DebugFeature(\"guardian-spawns\", \"Zombie guardians\", Material.ZOMBIE_HEAD,\n                    \"Spawn and run the map-authored Zombie Guardians for the next round.\", false)")));
+        assertTrue(normalize(lobby).contains(normalize("new DebugFeature(\"ore-hiding\", \"Hidden island ores\", Material.DIAMOND_ORE,\n                    \"Use the source OreHider behavior for the next round's island ores.\", false)")));
         assertTrue(normalize(manager).contains("ArcadePortGame.SKY_WARS, \"chest-looting\", true"));
         assertTrue(normalize(manager).contains(normalize("debugFeatureEnabledForActiveSession(\n                ArcadePortGame.SKY_WARS, \"island-crumbling\")")));
         assertTrue(manager.contains("debugFeatureEnabledForActiveSession(ArcadePortGame.SKY_WARS, \"tnt-generator\")"));
+        assertTrue(manager.contains("debugFeatureEnabledForActiveSession(ArcadePortGame.SKY_WARS, \"guardian-spawns\")"));
+        assertTrue(normalize(manager).contains(normalize("debugFeatureEnabledForActiveSession(ArcadePortGame.SKY_WARS, \"ore-hiding\")")));
+        int airAbility = manager.indexOf("public void onSkyWarsAirDoubleJump(PlayerToggleFlightEvent event)");
+        int airDamage = manager.indexOf("public void onSkyWarsAirFallDamage", airAbility);
+        assertTrue(airAbility >= 0 && airDamage > airAbility);
+        assertFalse(manager.substring(airAbility, airDamage).contains("GameDebugRuntimeOverrides.isDebugSession()"),
+                "The Air kit double jump must remain usable in a debug round.");
     }
 
     @Test
