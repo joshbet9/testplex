@@ -15162,7 +15162,8 @@ public final class ArcadePortManager implements Listener {
                 spawn = starts.get(0).clone();
                 // Reborn's DragonEscape.ParseData orders BLACK markers by nearest neighbour
                 // from RED start and skips duplicate markers closer than three blocks.
-                for (Location marker : SourceMapCatalog.MapData.legacyNearestRouteMarkers(spawn, sourceRoute)) {
+                for (Location marker : SourceMapCatalog.MapData.legacyNearestRouteMarkers(
+                        spawn, sourceRoute, ArcadePortRules.dragonEscapeDuplicateWaypointDistance())) {
                     session.dragonEscapeWaypoints.add(marker.subtract(0.0D, 1.0D, 0.0D));
                 }
             }
@@ -15242,7 +15243,8 @@ public final class ArcadePortManager implements Listener {
         }
         List<Player> rankedBeforeWarp = dragonEscapeRaceOrder(session);
         if (!rankedBeforeWarp.isEmpty() && rankedBeforeWarp.get(0).getUniqueId().equals(ahead.getUniqueId())
-                && dragonEscapeCourseDistance(session, ahead) - dragonEscapeCourseDistance(session, player) >= 40.0D) {
+                && ArcadePortRules.shouldAwardDragonEscapeStrats(
+                dragonEscapeCourseDistance(session, ahead) - dragonEscapeCourseDistance(session, player))) {
             session.dragonEscapeStratsEligible.add(id);
         }
         Location safeLocation = session.dragonEscapeSafeLocations.get(ahead.getUniqueId());
@@ -17693,10 +17695,11 @@ public final class ArcadePortManager implements Listener {
             UUID mineOwnerId = session.dragonEscapeMineLaunchedBy.remove(victimId);
             long launchedAt = session.dragonEscapeMineLaunchedAt.getOrDefault(victimId, 0L);
             session.dragonEscapeMineLaunchedAt.remove(victimId);
-            if (mineOwnerId != null && System.currentTimeMillis() - launchedAt <= 12_000L) {
+            if (mineOwnerId != null && ArcadePortRules.dragonEscapeRagebaiterKillWithinWindow(
+                    System.currentTimeMillis() - launchedAt)) {
                 int mineKills = session.dragonEscapeDisruptorKills.merge(mineOwnerId, 1, Integer::sum);
                 Player mineOwner = session.players.get(mineOwnerId);
-                if (mineKills >= 3 && mineOwner != null) {
+                if (ArcadePortRules.shouldAwardDragonEscapeRagebaiter(mineKills) && mineOwner != null) {
                     awardCatalogAchievement(mineOwner, "dragon-escape", "ragebaiter");
                 }
             }
@@ -20557,7 +20560,7 @@ public final class ArcadePortManager implements Listener {
     private void recordDragonEscapeAchievements(Session session, Player winner) {
         UUID id = winner.getUniqueId();
         String statsPath = localStatsPath(id, ArcadePortGame.DRAGON_ESCAPE.id());
-        if (plugin.getConfig().getInt(statsPath + "wins", 0) >= 50) {
+        if (ArcadePortRules.shouldAwardDragonEscapeDefeater(plugin.getConfig().getInt(statsPath + "wins", 0))) {
             awardCatalogAchievement(winner, "dragon-escape", "douglas-defeater");
         }
         if (!session.dragonEscapeLeaped.contains(id)) {
@@ -20565,7 +20568,8 @@ public final class ArcadePortManager implements Listener {
         }
         String mapWinKey = dragonEscapeMapWinKey(session.dragonEscapeMapName);
         if (!mapWinKey.isEmpty()
-                && plugin.getConfig().getInt(statsPath + "map-wins." + mapWinKey, 0) >= 5) {
+                && ArcadePortRules.shouldAwardDragonEscapeMapMaster(
+                plugin.getConfig().getInt(statsPath + "map-wins." + mapWinKey, 0))) {
             String achievement = switch (mapWinKey) {
                 case "skylands" -> "skylands-master";
                 case "through-hell" -> "to-hell-and-back";

@@ -1024,7 +1024,9 @@ public final class ArcadePortRules {
     }
 
     public static boolean isDragonEscapeDiggerOpeningLocked(long elapsedMillis) {
-        return elapsedMillis < DRAGON_ESCAPE_DIGGER_OPENING_LOCKOUT_MILLIS;
+        long lockout = Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "DRAGON_ESCAPE_DIGGER_OPENING_LOCKOUT_MILLIS", DRAGON_ESCAPE_DIGGER_OPENING_LOCKOUT_MILLIS));
+        return elapsedMillis < lockout;
     }
 
     public static boolean shouldAllowDragonEscapeDigger(long nowMillis, long nextUseAtMillis) {
@@ -1083,10 +1085,14 @@ public final class ArcadePortRules {
     }
 
     public static int dragonEscapeLeapUses(String kit) {
-        return switch (normalizeDragonEscapeKit(kit) == null ? "" : normalizeDragonEscapeKit(kit)) {
-            case "jumper" -> 4;
-            case "disruptor" -> 3;
-            case "warper" -> 2;
+        String normalized = normalizeDragonEscapeKit(kit);
+        return switch (normalized == null ? "" : normalized) {
+            case "jumper" -> Math.max(0, GameDebugRuntimeOverrides.intValue(
+                    "DRAGON_ESCAPE_JUMPER_LEAP_USES", DRAGON_ESCAPE_JUMPER_LEAP_USES));
+            case "disruptor" -> Math.max(0, GameDebugRuntimeOverrides.intValue(
+                    "DRAGON_ESCAPE_DISRUPTOR_LEAP_USES", DRAGON_ESCAPE_DISRUPTOR_LEAP_USES));
+            case "warper" -> Math.max(0, GameDebugRuntimeOverrides.intValue(
+                    "DRAGON_ESCAPE_WARPER_LEAP_USES", DRAGON_ESCAPE_WARPER_LEAP_USES));
             default -> 0;
         };
     }
@@ -1103,6 +1109,11 @@ public final class ArcadePortRules {
     public static final long DRAGON_ESCAPE_LEAP_RECHARGE_MILLIS = 8_000L;
     public static final long DRAGON_ESCAPE_SCORE_UPDATE_MILLIS = 500L;
     public static final int DRAGON_ESCAPE_DISRUPTOR_ARM_TICKS = 40;
+    public static final int DRAGON_ESCAPE_JUMPER_LEAP_USES = 4;
+    public static final int DRAGON_ESCAPE_DISRUPTOR_LEAP_USES = 3;
+    public static final int DRAGON_ESCAPE_WARPER_LEAP_USES = 2;
+    public static final double DRAGON_ESCAPE_LEAP_FACING_Y_BONUS = 0.2D;
+    public static final double DRAGON_ESCAPE_LEAP_GROUNDED_Y_BONUS = 0.2D;
 
     public static boolean shouldAllowDragonEscapeKitChange(boolean activeRaceParticipant) {
         return !activeRaceParticipant;
@@ -1120,8 +1131,12 @@ public final class ArcadePortRules {
     /** Reborn applies the 0.2 lift, caps Y, then adds a further 0.2 when grounded. */
     public static double dragonEscapeLeapVerticalVelocity(double normalizedFacingY, boolean grounded) {
         if (!Double.isFinite(normalizedFacingY)) normalizedFacingY = 0.0D;
-        double y = Math.min(1.0D, normalizedFacingY + 0.2D);
-        if (grounded) y += 0.2D;
+        double facingBonus = GameDebugRuntimeOverrides.doubleValue(
+                "DRAGON_ESCAPE_LEAP_FACING_Y_BONUS", DRAGON_ESCAPE_LEAP_FACING_Y_BONUS);
+        double groundedBonus = GameDebugRuntimeOverrides.doubleValue(
+                "DRAGON_ESCAPE_LEAP_GROUNDED_Y_BONUS", DRAGON_ESCAPE_LEAP_GROUNDED_Y_BONUS);
+        double y = Math.min(1.0D, normalizedFacingY + facingBonus);
+        if (grounded) y += groundedBonus;
         return y;
     }
 
@@ -1131,6 +1146,56 @@ public final class ArcadePortRules {
     }
     public static final double DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS = 2.0D;
     public static final double DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y = 0.5D;
+    public static final int DRAGON_ESCAPE_DEFEATER_WINS = 50;
+    public static final int DRAGON_ESCAPE_MAP_WINS_FOR_ACHIEVEMENT = 5;
+    public static final double DRAGON_ESCAPE_STRATS_GAP_BLOCKS = 40.0D;
+    public static final int DRAGON_ESCAPE_RAGEBAITER_KILLS = 3;
+    public static final long DRAGON_ESCAPE_RAGEBAITER_KILL_WINDOW_MILLIS = 12_000L;
+
+    public static int dragonEscapeDefeaterWins() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "DRAGON_ESCAPE_DEFEATER_WINS", DRAGON_ESCAPE_DEFEATER_WINS));
+    }
+
+    public static boolean shouldAwardDragonEscapeDefeater(int lifetimeWins) {
+        return lifetimeWins >= dragonEscapeDefeaterWins();
+    }
+
+    public static int dragonEscapeMapWinsForAchievement() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "DRAGON_ESCAPE_MAP_WINS_FOR_ACHIEVEMENT", DRAGON_ESCAPE_MAP_WINS_FOR_ACHIEVEMENT));
+    }
+
+    public static boolean shouldAwardDragonEscapeMapMaster(int mapWins) {
+        return mapWins >= dragonEscapeMapWinsForAchievement();
+    }
+
+    public static double dragonEscapeStratsGapBlocks() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "DRAGON_ESCAPE_STRATS_GAP_BLOCKS", DRAGON_ESCAPE_STRATS_GAP_BLOCKS));
+    }
+
+    public static boolean shouldAwardDragonEscapeStrats(double distanceAhead) {
+        return Double.isFinite(distanceAhead) && distanceAhead >= dragonEscapeStratsGapBlocks();
+    }
+
+    public static int dragonEscapeRagebaiterKills() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "DRAGON_ESCAPE_RAGEBAITER_KILLS", DRAGON_ESCAPE_RAGEBAITER_KILLS));
+    }
+
+    public static long dragonEscapeRagebaiterKillWindowMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "DRAGON_ESCAPE_RAGEBAITER_KILL_WINDOW_MILLIS", DRAGON_ESCAPE_RAGEBAITER_KILL_WINDOW_MILLIS));
+    }
+
+    public static boolean dragonEscapeRagebaiterKillWithinWindow(long elapsedMillis) {
+        return elapsedMillis >= 0L && elapsedMillis <= dragonEscapeRagebaiterKillWindowMillis();
+    }
+
+    public static boolean shouldAwardDragonEscapeRagebaiter(int qualifyingKills) {
+        return qualifyingKills >= dragonEscapeRagebaiterKills();
+    }
 
     public static String normalizeDragonsKit(String requested) {
         if (requested == null) return null;
@@ -2784,8 +2849,10 @@ public final class ArcadePortRules {
 
     /** Avoid rechecking the same destruction sphere every server tick. */
     public static boolean isDragonEscapeBlockInsideDestructionRadius(double distanceSquared) {
+        double radius = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "DRAGON_ESCAPE_BLOCK_RADIUS", DRAGON_ESCAPE_BLOCK_RADIUS));
         return Double.isFinite(distanceSquared) && distanceSquared >= 0.0D
-                && distanceSquared <= DRAGON_ESCAPE_BLOCK_RADIUS * DRAGON_ESCAPE_BLOCK_RADIUS;
+                && distanceSquared <= radius * radius;
     }
 
     public static boolean shouldProcessDragonEscapeDestruction(double distanceSquared, boolean hasPreviousCenter) {
@@ -2836,9 +2903,12 @@ public final class ArcadePortRules {
     }
 
     public static boolean isDuplicateDragonEscapeWaypoint(double distance) {
-        double threshold = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+        return isDuplicateDragonEscapeWaypoint(distance, dragonEscapeDuplicateWaypointDistance());
+    }
+
+    public static double dragonEscapeDuplicateWaypointDistance() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
                 "DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE", DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE));
-        return isDuplicateDragonEscapeWaypoint(distance, threshold);
     }
 
     public static boolean isDuplicateDragonEscapeWaypoint(double distance, double threshold) {

@@ -314,6 +314,11 @@ final class GameDebugVariableCatalog {
         if (name.startsWith("RUNNER_") && name.endsWith("_TICKS")) return 0.0D;
         if (name.startsWith("SHEEP_QUEST_") && (name.endsWith("_MILLIS") || name.endsWith("_TICKS"))) return 0.0D;
         if (name.equals("DRAGON_ESCAPE_SCORE_UPDATE_MILLIS")) return 1.0D;
+        if (name.equals("DRAGON_ESCAPE_DEFEATER_WINS")
+                || name.equals("DRAGON_ESCAPE_MAP_WINS_FOR_ACHIEVEMENT")
+                || name.equals("DRAGON_ESCAPE_RAGEBAITER_KILLS")) return 1.0D;
+        if (name.startsWith("DRAGON_ESCAPE_") && name.endsWith("_LEAP_USES")) return 0.0D;
+        if (name.startsWith("DRAGON_ESCAPE_LEAP_") && name.endsWith("_Y_BONUS")) return 0.0D;
         if (name.startsWith("DRAGON_ESCAPE_") && (name.endsWith("_MILLIS") || name.endsWith("_TICKS"))) return 0.0D;
         if (name.equals("DRAGON_ESCAPE_DIGGER_MAX_USES") || name.equals("DRAGON_ESCAPE_DISRUPTOR_MAX_TNT")) return 0.0D;
         if (name.startsWith("DRAGON_ESCAPE_") && (name.endsWith("_SPEED") || name.endsWith("_RADIUS")
@@ -521,6 +526,12 @@ final class GameDebugVariableCatalog {
         if (name.equals("DRAGON_ESCAPE_DIGGER_MAX_USES") || name.equals("DRAGON_ESCAPE_DISRUPTOR_MAX_TNT")) return 64.0D;
         if (name.equals("DRAGON_ESCAPE_CHASE_SPEED")) return 2.0D;
         if (name.equals("DRAGON_ESCAPE_RACE_GAP_ESTIMATED_SPEED")) return 30.0D;
+        if (name.equals("DRAGON_ESCAPE_DEFEATER_WINS")
+                || name.equals("DRAGON_ESCAPE_MAP_WINS_FOR_ACHIEVEMENT")
+                || name.equals("DRAGON_ESCAPE_RAGEBAITER_KILLS")) return 1_000.0D;
+        if (name.endsWith("_LEAP_USES")) return 64.0D;
+        if (name.startsWith("DRAGON_ESCAPE_LEAP_") && name.endsWith("_Y_BONUS")) return 2.0D;
+        if (name.equals("DRAGON_ESCAPE_STRATS_GAP_BLOCKS")) return 64.0D;
         if (name.equals("DRAGON_ESCAPE_BLOCK_RADIUS") || name.equals("DRAGON_ESCAPE_DIGGER_NEARBY_PLAYER_RADIUS")
                 || name.equals("DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS")) return 64.0D;
         if (name.equals("DRAGON_ESCAPE_FINISH_RADIUS") || name.equals("DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE")) return 32.0D;
