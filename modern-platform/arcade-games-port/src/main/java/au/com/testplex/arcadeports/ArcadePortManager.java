@@ -20672,7 +20672,12 @@ public final class ArcadePortManager implements Listener {
     }
 
     private List<String> gameStatsLore(UUID targetId, String gameId, boolean compact) {
-        String statsGameId = gameId.startsWith("monster-maze") ? "monster-maze" : gameId;
+        if ("plexball".equals(gameId) && plugin.getPlexballGame() != null) {
+            List<String> plexball = new ArrayList<>(plugin.getPlexballGame().statsSummary(targetId));
+            if (compact) plexball.add(ChatColor.RESET + "Click for more details!");
+            return plexball;
+        }
+        String statsGameId = statsCatalogId(gameId);
         String path = localStatsPath(targetId, statsGameId);
         List<String> lore = new ArrayList<>();
         lore.add(" ");
@@ -26224,6 +26229,17 @@ public final class ArcadePortManager implements Listener {
         if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         if (event.getView().getTopInventory().getHolder() instanceof GladiatorMenuHolder) {
             event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onStatsMenuDrag(InventoryDragEvent event) {
+        if (!(event.getView().getTopInventory().getHolder() instanceof StatsMenuHolder)) return;
+        for (int rawSlot : event.getRawSlots()) {
+            if (rawSlot < event.getView().getTopInventory().getSize()) {
+                event.setCancelled(true);
+                return;
+            }
         }
     }
 

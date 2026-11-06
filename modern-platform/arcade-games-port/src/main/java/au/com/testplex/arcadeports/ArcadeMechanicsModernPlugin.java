@@ -529,7 +529,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     if (speedBuilders != null) speedBuilders.leaveQueue(leavingPlayer);
                     return true;
                 }
-                if (isSnapStatsArgument(args[1])) {
+                if ("camera-shy".equals(statsGameArgument(args[1]))) {
                     if (cameraShy != null) cameraShy.leaveQueue(leavingPlayer);
                     return true;
                 }
