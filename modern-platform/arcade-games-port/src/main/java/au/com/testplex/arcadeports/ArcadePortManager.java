@@ -19346,7 +19346,8 @@ public final class ArcadePortManager implements Listener {
         plugin.saveConfig();
     }
 
-    private enum StatsPage { ROOT, ARCADE, CATEGORY, GAME, MILESTONES, DRAGON_ESCAPE_MAPS, DRAGON_ESCAPE_COLOURS }
+    private enum StatsPage { ROOT, ARCADE, CATEGORY, GAME, MILESTONES, DRAGON_ESCAPE_MAPS,
+        DRAGON_ESCAPE_COLOURS, MONSTER_MAZE_PBS, MONSTER_MAZE_KITS }
 
     private static final class SkyWarsCompassMenuHolder implements InventoryHolder {
         private final UUID ownerId;
@@ -19672,12 +19673,17 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void openStatsGame(Player viewer, UUID targetId, String targetName, String gameId) {
-        openStatsGame(viewer, targetId, targetName, gameId, false);
+        openGameStats(viewer, targetId, targetName, gameId, 0);
     }
 
-
-
     private void openStatsGame(Player viewer, UUID targetId, String targetName, String gameId, boolean milestones) {
+        if (milestones) openGameMilestones(viewer, targetId, targetName, gameId, 0);
+        else openGameStats(viewer, targetId, targetName, gameId, 0);
+    }
+
+    /** Kept for source-parity reference during migration; all /stats entries use the unified renderer. */
+    @Deprecated
+    private void openLegacyStatsGame(Player viewer, UUID targetId, String targetName, String gameId, boolean milestones) {
         if (gameId == null) return;
         String displayName = statsGameName(gameId);
         String statsGameId = gameId.startsWith("monster-maze") ? "monster-maze" : gameId;
@@ -20102,6 +20108,267 @@ public final class ArcadePortManager implements Listener {
         viewer.openInventory(inventory);
     }
 
+    private record StatsAchievement(String id, String name, String requirement) { }
+
+    private record StatsMilestone(String id, String name, String unit, long[] stages,
+                                  java.util.function.ToLongFunction<UUID> value) { }
+
+    private String statsCatalogId(String gameId) {
+        if (gameId.startsWith("monster-maze")) return "monster-maze";
+        return "speed-builders".equals(gameId) ? "speed-builders-arcade" : gameId;
+    }
+
+    private List<StatsAchievement> statsAchievements(String gameId) {
+        List<StatsAchievement> entries = new ArrayList<>();
+        if ("plexball".equals(gameId)) {
+            for (PlexballAchievement achievement : PlexballAchievement.values()) {
+                entries.add(new StatsAchievement(achievement.slug(), achievement.displayName(),
+                        achievement.requirement()));
+            }
+        } else if ("camera-shy".equals(gameId)) {
+            for (CameraShyProgressCatalog.Achievement achievement : CameraShyProgressCatalog.achievements()) {
+                entries.add(new StatsAchievement(achievement.id(), achievement.name(), achievement.requirement()));
+            }
+        } else if ("super-sploor".equals(gameId)) {
+            for (SuperSploorProgressCatalog.Achievement achievement : SuperSploorProgressCatalog.achievements()) {
+                entries.add(new StatsAchievement(achievement.id(), achievement.name(), achievement.requirement()));
+            }
+        } else {
+            for (ArcadeProgressCatalog.Achievement achievement : ArcadeProgressCatalog.achievements(statsCatalogId(gameId))) {
+                entries.add(new StatsAchievement(achievement.id(), achievement.name(), achievement.requirement()));
+            }
+        }
+        return List.copyOf(entries);
+    }
+
+    private List<StatsMilestone> statsMilestones(String gameId) {
+        List<StatsMilestone> entries = new ArrayList<>();
+        if ("plexball".equals(gameId)) {
+            PlexballGame plexball = plugin.getPlexballGame();
+            for (PlexballMilestone milestone : PlexballMilestone.values()) {
+                entries.add(new StatsMilestone(milestone.slug(), milestone.displayName(),
+                        milestone.metric() == PlexballMilestone.Metric.DISTANCE_TENTHS ? "tenths-of-metres" :
+                                milestone.metric().displayName(), ArcadeStatsLayout.fourStages(milestone.target()),
+                        id -> plexball == null ? 0L : plexball.milestoneValue(id, milestone)));
+            }
+        } else if ("camera-shy".equals(gameId)) {
+            for (CameraShyProgressCatalog.Milestone milestone : CameraShyProgressCatalog.milestones()) {
+                entries.add(new StatsMilestone(milestone.id(), milestone.name(), milestone.unit(),
+                        ArcadeStatsLayout.fourStages(milestone.target()),
+                        id -> {
+                            long progress = Math.max(0L, plugin.getConfig().getLong(
+                                    localStatsPath(id, "camera-shy") + milestone.statKey(), 0L));
+                            return plugin.getConfig().getBoolean(
+                                    "local-milestones." + id + ".camera-shy." + milestone.id(), false)
+                                    ? Math.max(progress, milestone.target()) : progress;
+                        }));
+            }
+        } else if ("super-sploor".equals(gameId)) {
+            for (SuperSploorProgressCatalog.Milestone milestone : SuperSploorProgressCatalog.milestones()) {
+                entries.add(new StatsMilestone(milestone.id(), milestone.name(), milestone.unit(),
+                        milestone.stages(), id -> Math.max(0L, plugin.getConfig().getLong(
+                                localStatsPath(id, "super-sploor") + milestone.statKey(), 0L))));
+            }
+        } else {
+            String catalogId = statsCatalogId(gameId);
+            for (ArcadeProgressCatalog.Milestone milestone : ArcadeProgressCatalog.milestones(catalogId)) {
+                entries.add(new StatsMilestone(milestone.id(), milestone.name(), milestone.unit(),
+                        milestone.stages(), id -> milestone.value(plugin.getConfig(), id, catalogId)));
+            }
+        }
+        return List.copyOf(entries);
+    }
+
+    private boolean statsAchievementUnlocked(UUID playerId, String gameId, StatsAchievement achievement) {
+        if ("plexball".equals(gameId)) {
+            PlexballGame plexball = plugin.getPlexballGame();
+            if (plexball == null) return false;
+            for (PlexballAchievement item : PlexballAchievement.values()) {
+                if (item.slug().equals(achievement.id())) return plexball.hasAchievement(playerId, item);
+            }
+            return false;
+        }
+        String catalogId = statsCatalogId(gameId);
+        if (plugin.getConfig().getBoolean(arcadeAchievementConfigKey(playerId, catalogId, achievement.id()), false))
+            return true;
+        // Existing source-compatible award paths must continue to count after the visual migration.
+        if ("runner".equals(gameId))
+            return plugin.getConfig().getBoolean(runnerAchievementKey(playerId, achievement.id()), false);
+        if ("sneaky-assassins".equals(gameId) && "the-masters-master".equals(achievement.id()))
+            return plugin.getConfig().getBoolean(
+                    "test-achievements.sneaky-assassins." + playerId + ".the-masters-master", false);
+        return false;
+    }
+
+    private List<UUID> statsEligiblePlayers(String gameId) {
+        if ("plexball".equals(gameId)) {
+            PlexballGame plexball = plugin.getPlexballGame();
+            return plexball == null ? List.of() : plexball.recordedPlayers().stream()
+                    .filter(id -> !testPlayers.isTestPlayer(id)).toList();
+        }
+        var root = plugin.getConfig().getConfigurationSection("local-stats");
+        if (root == null) return List.of();
+        String catalogId = statsCatalogId(gameId);
+        List<UUID> eligible = new ArrayList<>();
+        for (String key : root.getKeys(false)) {
+            try {
+                UUID id = UUID.fromString(key);
+                String path = localStatsPath(id, catalogId);
+                boolean played = plugin.getConfig().getLong(path + "games-played", 0L) > 0L;
+                // Monster Maze tracks stages and pads, not the shared completed-match counter.
+                if ("monster-maze".equals(catalogId)) played |= plugin.getConfig().getLong(
+                        path + "highest-stage", 0L) > 0L || plugin.getConfig().getLong(
+                        path + "first-safe-pads", 0L) > 0L || plugin.getConfig().getLong(
+                        path + "wins", 0L) > 0L;
+                if (!testPlayers.isTestPlayer(id) && played) eligible.add(id);
+            } catch (IllegalArgumentException ignored) { }
+        }
+        return eligible;
+    }
+
+    private int statsUnlockCount(List<UUID> eligible, String gameId, StatsAchievement achievement) {
+        int count = 0;
+        for (UUID id : eligible) if (statsAchievementUnlocked(id, gameId, achievement)) count++;
+        return count;
+    }
+
+    /** Opens the single Mineplex-style /stats achievements view, including Plexball and Snap. */
+    public void openGameStats(Player viewer, UUID targetId, String targetName, String gameId, int requestedPage) {
+        if (viewer == null || gameId == null || ArcadeGameDirectory.find(gameId) == null) return;
+        String displayName = statsGameName(gameId);
+        List<UUID> eligible = statsEligiblePlayers(gameId);
+        List<StatsAchievement> catalog = statsAchievements(gameId);
+        Map<StatsAchievement, Integer> unlockCounts = new HashMap<>();
+        for (StatsAchievement achievement : catalog)
+            unlockCounts.put(achievement, statsUnlockCount(eligible, gameId, achievement));
+        List<StatsAchievement> sorted = ArcadeStatsRarity.hardestFirst(catalog, unlockCounts::get);
+        int page = ArcadeStatsLayout.clampPage(requestedPage, sorted.size(), ArcadeStatsLayout.ACHIEVEMENTS_PER_PAGE);
+        int pageCount = ArcadeStatsLayout.pages(sorted.size(), ArcadeStatsLayout.ACHIEVEMENTS_PER_PAGE);
+        Inventory inventory = createStatsInventory(StatsPage.GAME, targetId, targetName,
+                displayName + " Achievements", gameId);
+        inventory.setItem(ArcadeStatsLayout.BACK, statsItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back",
+                List.of(ChatColor.GRAY + "Return to Arcade games."), "back-arcade", null, null));
+        List<String> summary = new ArrayList<>("plexball".equals(gameId) && plugin.getPlexballGame() != null
+                ? plugin.getPlexballGame().statsSummary(targetId)
+                : gameStatsLore(targetId, gameId, false));
+        summary.removeIf(line -> {
+            String plain = ChatColor.stripColor(line);
+            return plain != null && (plain.startsWith("Achievements:")
+                    || plain.startsWith("Click for more details!"));
+        });
+        summary.add(" ");
+        summary.add(ChatColor.YELLOW + "Achievements unlocked: " + ChatColor.WHITE
+                + catalog.stream().filter(a -> statsAchievementUnlocked(targetId, gameId, a)).count()
+                + "/" + catalog.size());
+        summary.add(ChatColor.GRAY + "Page " + (page + 1) + "/" + pageCount);
+        inventory.setItem(ArcadeStatsLayout.GAME_LOGO, statsSummaryItem(
+                ArcadeGameDirectory.find(gameId).icon(), ChatColor.BOLD + displayName + " Stats", summary));
+        int start = page * ArcadeStatsLayout.ACHIEVEMENTS_PER_PAGE;
+        List<StatsAchievement> visible = sorted.subList(start,
+                Math.min(sorted.size(), start + ArcadeStatsLayout.ACHIEVEMENTS_PER_PAGE));
+        List<Integer> slots = ArcadeStatsLayout.achievementSlots(visible.size());
+        for (int index = 0; index < visible.size(); index++) {
+            StatsAchievement achievement = visible.get(index);
+            boolean unlocked = statsAchievementUnlocked(targetId, gameId, achievement);
+            inventory.setItem(slots.get(index), statsItem(
+                    unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                    (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.name(),
+                    List.of(" ", ChatColor.GRAY + achievement.requirement(), " ",
+                            unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked",
+                            ChatColor.GOLD + "Players unlocked: " + ChatColor.WHITE
+                                    + ArcadeStatsRarity.percent(unlockCounts.get(achievement), eligible.size())),
+                    "noop", null, gameId));
+        }
+        if (catalog.isEmpty()) inventory.setItem(22, statsItem(Material.BARRIER,
+                ChatColor.GRAY + "No Achievements Configured",
+                List.of(ChatColor.GRAY + "This game has no registered achievements yet."), "noop", null, gameId));
+        List<String> footer = new ArrayList<>();
+        if (!statsMilestones(gameId).isEmpty()) footer.add("milestones");
+        if ("dragon-escape".equals(gameId) || "monster-maze".equals(gameId)) footer.add("personal-bests");
+        List<Integer> footerSlots = ArcadeStatsLayout.footerSlots(footer.size());
+        for (int i = 0; i < footer.size(); i++) {
+            boolean milestone = "milestones".equals(footer.get(i));
+            inventory.setItem(footerSlots.get(i), milestone
+                    ? statsItem(Material.PAPER, ChatColor.LIGHT_PURPLE + "Milestones",
+                            List.of(ChatColor.GRAY + "View lifetime milestone tracks and tiers."),
+                            "open-game-milestones", null, gameId)
+                    : statsItem(Material.CLOCK, ChatColor.AQUA + "Personal Bests",
+                            List.of(ChatColor.GRAY + "View map/pattern-specific personal bests."),
+                            "dragon-escape".equals(gameId) ? "open-dragon-escape-pbs" : "open-maze-pbs", null, gameId));
+        }
+        if (page > 0) inventory.setItem(ArcadeStatsLayout.PREVIOUS,
+                statsItem(Material.ARROW, ChatColor.YELLOW + "← Previous Page", List.of(),
+                        "open-game-page", Integer.toString(page - 1), gameId));
+        if (page + 1 < pageCount) inventory.setItem(ArcadeStatsLayout.NEXT,
+                statsItem(Material.ARROW, ChatColor.YELLOW + "Next Page →", List.of(),
+                        "open-game-page", Integer.toString(page + 1), gameId));
+        viewer.openInventory(inventory);
+    }
+
+    private void openGameMilestones(Player viewer, UUID targetId, String targetName, String gameId, int requestedPage) {
+        if (viewer == null || gameId == null || ArcadeGameDirectory.find(gameId) == null) return;
+        List<StatsMilestone> tracks = statsMilestones(gameId);
+        int maxStages = tracks.stream().mapToInt(track -> track.stages().length).max().orElse(0);
+        int trackPages = ArcadeStatsLayout.pages(tracks.size(), ArcadeStatsLayout.TRACKS_PER_PAGE);
+        int stagePages = ArcadeStatsLayout.pages(maxStages, ArcadeStatsLayout.STAGES_PER_PAGE);
+        int pages = trackPages * stagePages;
+        int page = Math.max(0, Math.min(requestedPage, pages - 1));
+        int trackStart = (page % trackPages) * ArcadeStatsLayout.TRACKS_PER_PAGE;
+        int stageStart = (page / trackPages) * ArcadeStatsLayout.STAGES_PER_PAGE;
+        List<StatsMilestone> visible = tracks.subList(trackStart,
+                Math.min(tracks.size(), trackStart + ArcadeStatsLayout.TRACKS_PER_PAGE));
+        List<Integer> columns = ArcadeStatsLayout.milestoneColumns(visible.size());
+        List<UUID> eligible = statsEligiblePlayers(gameId);
+        Inventory inventory = createStatsInventory(StatsPage.MILESTONES, targetId, targetName,
+                statsGameName(gameId) + " Milestones", gameId);
+        inventory.setItem(ArcadeStatsLayout.BACK, statsItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back",
+                List.of(ChatColor.GRAY + "Return to Arcade games."), "back-arcade", null, null));
+        for (int index = 0; index < visible.size(); index++) {
+            StatsMilestone track = visible.get(index);
+            int column = columns.get(index);
+            long value = track.value().applyAsLong(targetId);
+            long[] stages = track.stages();
+            long completed = java.util.Arrays.stream(stages).filter(threshold -> value >= threshold).count();
+            inventory.setItem(column, statsItem(completed == stages.length ? Material.SEA_LANTERN
+                            : completed > 0 ? Material.PRISMARINE : Material.BLACKSTONE,
+                    (completed > 0 ? ChatColor.GREEN : ChatColor.GRAY) + track.name(),
+                    List.of(" ", ChatColor.GRAY + "Lifetime progress: " + ChatColor.WHITE
+                                    + formatMilestoneValue(value, track.unit()),
+                            ChatColor.LIGHT_PURPLE + "Tiers earned: " + completed + "/" + stages.length),
+                    "noop", null, gameId));
+            for (int stage = stageStart; stage < Math.min(stages.length,
+                    stageStart + ArcadeStatsLayout.STAGES_PER_PAGE); stage++) {
+                long threshold = stages[stage];
+                boolean earned = value >= threshold;
+                int totalEarned = 0;
+                for (UUID id : eligible) if (track.value().applyAsLong(id) >= threshold) totalEarned++;
+                inventory.setItem(9 * (stage - stageStart + 1) + column,
+                        statsItem(earned ? Material.GREEN_TERRACOTTA : Material.GRAY_TERRACOTTA,
+                                (earned ? ChatColor.GREEN : ChatColor.GRAY) + track.name() + " — Tier " + (stage + 1),
+                                List.of(" ", ChatColor.YELLOW + "Requires: " + ChatColor.WHITE
+                                                + formatMilestoneValue(threshold, track.unit()),
+                                        ChatColor.YELLOW + "Progress: " + ChatColor.WHITE
+                                                + formatMilestoneValue(value, track.unit()),
+                                        earned ? ChatColor.GREEN + "Status: Earned" : ChatColor.RED + "Status: Locked",
+                                        ChatColor.GOLD + "Players unlocked: " + ChatColor.WHITE
+                                                + ArcadeStatsRarity.percent(totalEarned, eligible.size())),
+                                "noop", null, gameId));
+            }
+        }
+        if (tracks.isEmpty()) inventory.setItem(22, statsItem(Material.BARRIER,
+                ChatColor.GRAY + "No Milestones Configured", List.of(), "noop", null, gameId));
+        inventory.setItem(49, statsItem(Material.DIAMOND, ChatColor.AQUA + "Achievements",
+                List.of(ChatColor.GRAY + "Return to this game's achievements."),
+                "open-game-achievements", null, gameId));
+        if (page > 0) inventory.setItem(ArcadeStatsLayout.PREVIOUS,
+                statsItem(Material.ARROW, ChatColor.YELLOW + "← Previous Page", List.of(),
+                        "open-milestones-page", Integer.toString(page - 1), gameId));
+        if (page + 1 < pages) inventory.setItem(ArcadeStatsLayout.NEXT,
+                statsItem(Material.ARROW, ChatColor.YELLOW + "Next Page →", List.of(),
+                        "open-milestones-page", Integer.toString(page + 1), gameId));
+        viewer.openInventory(inventory);
+    }
+
     private void renderGameAchievements(Inventory inventory, UUID targetId, String gameId) {
         List<ArcadeProgressCatalog.Achievement> achievements = ArcadeProgressCatalog.achievements(gameId);
         int slot = 10;
@@ -20152,6 +20419,12 @@ public final class ArcadePortManager implements Listener {
         if ("milliseconds".equals(unit)) {
             long minutes = value / 60_000L;
             return (minutes / 60L) + "h " + (minutes % 60L) + "m";
+        }
+        if ("tenths-of-metres".equals(unit)) {
+            double metres = value / 10.0D;
+            return metres >= 1_000.0D
+                    ? String.format(java.util.Locale.ROOT, "%.2f km", metres / 1_000.0D)
+                    : String.format(java.util.Locale.ROOT, "%.1f m", metres);
         }
         return String.format(java.util.Locale.ROOT, "%,d %s", value, unit);
     }
@@ -20278,6 +20551,64 @@ public final class ArcadePortManager implements Listener {
 
 
 
+
+    /** All three selectable Testplex modes, each with three genuine per-kit pattern PBs. */
+    private void openMonsterMazePersonalBests(Player viewer, UUID targetId, String targetName) {
+        Inventory inventory = createStatsInventory(StatsPage.MONSTER_MAZE_PBS, targetId, targetName,
+                "Monster Maze Personal Bests", "monster-maze");
+        var leaderboard = monsterMazeModule == null ? null : monsterMazeModule.getLeaderboards();
+        me.monstermaze.game.MazeMode[] modes = {me.monstermaze.game.MazeMode.ORIGINAL,
+                me.monstermaze.game.MazeMode.SPEED, me.monstermaze.game.MazeMode.MODERN};
+        for (int modeIndex = 0; modeIndex < modes.length; modeIndex++) {
+            var mode = modes[modeIndex];
+            for (int pattern = 0; pattern < me.monstermaze.stats.LeaderboardManager.PATTERN_COUNT; pattern++) {
+                var best = leaderboard == null ? null : leaderboard.getBest(mode, pattern, targetId);
+                List<String> lore = new ArrayList<>();
+                lore.add(" ");
+                lore.add(ChatColor.YELLOW + "Best stage: " + ChatColor.WHITE
+                        + (best == null ? "Not recorded" : best.stage));
+                if (best != null) lore.add(ChatColor.GRAY + "Best kit: " + ChatColor.WHITE + best.kit);
+                lore.add(ChatColor.AQUA + "Click to view every kit's PB.");
+                inventory.setItem(11 + modeIndex * 9 + pattern * 2,
+                        statsItem(best == null ? Material.GRAY_DYE : Material.LIME_DYE,
+                                mode.color + mode.id + ChatColor.WHITE + " — "
+                                        + me.monstermaze.stats.LeaderboardManager.patternName(pattern),
+                                lore, "open-maze-kits", modeIndex + ":" + pattern, "monster-maze"));
+            }
+        }
+        inventory.setItem(ArcadeStatsLayout.BACK, statsItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back",
+                List.of(ChatColor.GRAY + "Return to Monster Maze achievements."),
+                "back-maze", null, "monster-maze"));
+        viewer.openInventory(inventory);
+    }
+
+    private void openMonsterMazeKitBests(Player viewer, UUID targetId, String targetName, String selection) {
+        if (selection == null || !selection.matches("[0-2]:[0-2]")) return;
+        int modeIndex = selection.charAt(0) - '0';
+        int pattern = selection.charAt(2) - '0';
+        me.monstermaze.game.MazeMode[] modes = {me.monstermaze.game.MazeMode.ORIGINAL,
+                me.monstermaze.game.MazeMode.SPEED, me.monstermaze.game.MazeMode.MODERN};
+        var mode = modes[modeIndex];
+        Inventory inventory = createStatsInventory(StatsPage.MONSTER_MAZE_KITS, targetId, targetName,
+                mode.id + " Pattern " + (pattern + 1) + " PBs", "monster-maze");
+        var leaderboard = monsterMazeModule == null ? null : monsterMazeModule.getLeaderboards();
+        List<me.monstermaze.kit.KitType> kits = me.monstermaze.kit.KitType.available(mode);
+        List<Integer> columns = ArcadeStatsLayout.columns(kits.size());
+        for (int index = 0; index < kits.size(); index++) {
+            var kit = kits.get(index);
+            int stage = leaderboard == null ? 0 : leaderboard.getKitPB(mode, pattern, targetId, kit.id);
+            inventory.setItem(18 + columns.get(index),
+                    statsItem(kit.icon, kit.display,
+                            List.of(" ", ChatColor.YELLOW + "Personal best: " + ChatColor.WHITE
+                                    + (stage > 0 ? "Stage " + stage : "Not recorded"),
+                                    ChatColor.GRAY + "Saved for this mode, pattern and kit."),
+                            "noop", null, "monster-maze"));
+        }
+        inventory.setItem(ArcadeStatsLayout.BACK, statsItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back",
+                List.of(ChatColor.GRAY + "Return to Monster Maze pattern PBs."),
+                "back-maze-pbs", null, "monster-maze"));
+        viewer.openInventory(inventory);
+    }
 
     private void openDragonEscapePersonalBests(Player viewer, UUID targetId, String targetName) {
         Inventory inventory = createStatsInventory(StatsPage.DRAGON_ESCAPE_MAPS, targetId, targetName,
@@ -25828,21 +26159,26 @@ public final class ArcadePortManager implements Listener {
                 }
                 case "open-category" -> openStatsCategory(player, holder.targetId, holder.targetName,
                         category == null ? "global" : category);
-                case "open-game" -> {
-                    if ("plexball".equals(gameId) && holder.targetId.equals(player.getUniqueId())
-                            && plugin.getPlexballGame() != null) {
-                        plugin.getPlexballGame().openStats(player);
-                    } else {
-                        openStatsGame(player, holder.targetId, holder.targetName, gameId);
-                    }
-                }
+                case "open-game" -> openStatsGame(player, holder.targetId, holder.targetName, gameId);
                 case "open-game-achievements" -> openStatsGame(player, holder.targetId, holder.targetName, gameId, false);
                 case "open-game-milestones" -> openStatsGame(player, holder.targetId, holder.targetName, gameId, true);
+                case "open-game-page", "open-milestones-page" -> {
+                    int page = 0;
+                    try { page = Integer.parseInt(category == null ? "0" : category); }
+                    catch (NumberFormatException ignored) { }
+                    if ("open-game-page".equals(action))
+                        openGameStats(player, holder.targetId, holder.targetName, gameId, page);
+                    else openGameMilestones(player, holder.targetId, holder.targetName, gameId, page);
+                }
                 case "open-super-sploor-milestones" ->
-                        openSuperSploorMilestones(player, holder.targetId, holder.targetName);
+                        openGameMilestones(player, holder.targetId, holder.targetName, "super-sploor", 0);
                 case "back-super-sploor" ->
                         openStatsGame(player, holder.targetId, holder.targetName, "super-sploor");
                 case "open-dragon-escape-pbs" -> openDragonEscapePersonalBests(player, holder.targetId, holder.targetName);
+                case "open-maze-pbs" -> openMonsterMazePersonalBests(player, holder.targetId, holder.targetName);
+                case "open-maze-kits" -> openMonsterMazeKitBests(player, holder.targetId, holder.targetName, category);
+                case "back-maze" -> openStatsGame(player, holder.targetId, holder.targetName, "monster-maze");
+                case "back-maze-pbs" -> openMonsterMazePersonalBests(player, holder.targetId, holder.targetName);
                 case "open-dragon-escape-colours" -> openDragonEscapeBeaconColours(player, holder.targetId, holder.targetName);
                 case "toggle-dragon-ghost" -> {
                     setDragonEscapeGhost(player, "toggle");

@@ -430,8 +430,12 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         return normalized.equals("wizards") || normalized.equals("wizard");
     }
 
-    private static boolean isSnapStatsArgument(String argument) {
-        return "snap".equalsIgnoreCase(argument) || "camera-shy".equalsIgnoreCase(argument);
+    private static String statsGameArgument(String argument) {
+        if (argument == null) return null;
+        String normalized = argument.toLowerCase(java.util.Locale.ROOT).replace('_', '-');
+        if ("snap".equals(normalized)) normalized = "camera-shy";
+        if ("speed-builders-arcade".equals(normalized)) normalized = "speed-builders";
+        return ArcadeGameDirectory.find(normalized) == null ? null : normalized;
     }
 
     private boolean handleStatsCommand(CommandSender sender, String[] args) {
@@ -439,48 +443,44 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             sender.sendMessage("Players only.");
             return true;
         }
-        boolean snapStatsRequest = args.length > 0 && (isSnapStatsArgument(args[0])
-                || (args.length > 1 && isSnapStatsArgument(args[1])));
-        if (!snapStatsRequest) {
-            String requestedPlayerName = args.length == 0 ? null : args[0];
-            if (manager != null) manager.openStats(viewer, requestedPlayerName);
-            else viewer.sendMessage(ChatColor.RED + "Arcade statistics are unavailable.");
+        if (manager == null) {
+            viewer.sendMessage(ChatColor.RED + "Arcade statistics are unavailable.");
             return true;
         }
-        if (cameraShy == null) {
-            viewer.sendMessage(ChatColor.RED + "Snap progression is unavailable.");
+        if (args.length == 0) {
+            manager.openStats(viewer, null);
             return true;
         }
-
         Player subject = viewer;
-        int index = 0;
-        if (args.length > 0 && !isSnapStatsArgument(args[0])) {
+        int gameIndex = 0;
+        if (statsGameArgument(args[0]) == null) {
+            if (args.length == 1) {
+                manager.openStats(viewer, args[0]);
+                return true;
+            }
             subject = Bukkit.getPlayerExact(args[0]);
             if (subject == null) {
-                viewer.sendMessage(ChatColor.RED + "That player is not online.");
-                viewer.sendMessage(ChatColor.YELLOW + "Usage: /stats [player] [snap] [page]");
+                viewer.sendMessage(ChatColor.RED + "That player must be online to view their stats.");
                 return true;
             }
-            index = 1;
+            gameIndex = 1;
         }
-        if (args.length > index && isSnapStatsArgument(args[index])) index++;
-
-        int page = 1;
-        if (args.length > index) {
-            try {
-                page = Integer.parseInt(args[index]);
-            } catch (NumberFormatException invalidPage) {
-                viewer.sendMessage(ChatColor.YELLOW + "Page must be a number from 1 to "
-                        + CameraShyProgressCatalog.pageCount() + ".");
-                return true;
-            }
-        }
-        if (args.length > index + 1 || page < 1 || page > CameraShyProgressCatalog.pageCount()) {
-            viewer.sendMessage(ChatColor.YELLOW + "Usage: /stats [player] [snap] [page 1-"
-                    + CameraShyProgressCatalog.pageCount() + "]");
+        String gameId = gameIndex < args.length ? statsGameArgument(args[gameIndex]) : null;
+        if (gameId == null || args.length > gameIndex + 2) {
+            viewer.sendMessage(ChatColor.YELLOW + "Usage: /stats [online-player] [game] [page]");
             return true;
         }
-        cameraShy.sendStats(viewer, subject, page);
+        int page = 0;
+        if (args.length > gameIndex + 1) {
+            try {
+                page = Integer.parseInt(args[gameIndex + 1]) - 1;
+                if (page < 0) throw new NumberFormatException();
+            } catch (NumberFormatException invalidPage) {
+                viewer.sendMessage(ChatColor.YELLOW + "Page must be a positive whole number.");
+                return true;
+            }
+        }
+        manager.openGameStats(viewer, subject.getUniqueId(), subject.getName(), gameId, page);
         return true;
     }
 
@@ -488,24 +488,6 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if ("stats".equalsIgnoreCase(command.getName())
                 || "stats".equalsIgnoreCase(label) || "arcadestats".equalsIgnoreCase(label)) {
-            if (CameraShyRules.routesToPlexballStats(args)) {
-                if (!(sender instanceof Player player)) {
-                    sender.sendMessage("Players only.");
-                    return true;
-                }
-                if (plexball != null) plexball.openStats(player);
-                else sender.sendMessage(ChatColor.RED + "Plexball progression is unavailable.");
-                return true;
-            }
-            if (SpeedBuildersGame.isStatsRequest(args)) {
-                if (!(sender instanceof Player player)) {
-                    sender.sendMessage("Players only.");
-                    return true;
-                }
-                if (speedBuilders != null) speedBuilders.showStats(player, args);
-                else sender.sendMessage(ChatColor.RED + "Speed Builders statistics are unavailable.");
-                return true;
-            }
             return handleStatsCommand(sender, args);
         }
         if (command.getName().equalsIgnoreCase("gamepreferences")) {

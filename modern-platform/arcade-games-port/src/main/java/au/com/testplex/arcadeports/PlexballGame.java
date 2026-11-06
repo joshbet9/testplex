@@ -283,63 +283,49 @@ public final class PlexballGame implements Listener {
     /** Open the local Plexball career page used by /stats plexball. */
     public void openStats(Player player) {
         if (player == null || !player.isOnline()) return;
-        UUID id = player.getUniqueId();
-        PlayerProgress profile = readProgress(id);
-        Inventory inventory = Bukkit.createInventory(null, 54, STATS_MENU_TITLE);
-        ItemStack filler = progressItem(Material.BLACK_STAINED_GLASS_PANE, " ", List.of());
-        for (int slot = 0; slot < inventory.getSize(); slot++) inventory.setItem(slot, filler);
+        ArcadePortManager manager = plugin.getArcadePortManager();
+        if (manager != null) manager.openGameStats(player, player.getUniqueId(), player.getName(), "plexball", 0);
+    }
 
-        inventory.setItem(4, progressItem(Material.BOOK, ChatColor.GOLD + "Career Summary", List.of(
-                ChatColor.GRAY + "Matches: " + ChatColor.WHITE + profile.matches,
+    /** Read-only progression access for the same shared GUI used by every other Arcade game. */
+    public boolean hasAchievement(UUID playerId, PlexballAchievement achievement) {
+        return playerId != null && progressionData.getBoolean(achievement.configPath(playerId), false);
+    }
+
+    public long milestoneValue(UUID playerId, PlexballMilestone milestone) {
+        if (playerId == null) return 0L;
+        long value = Math.max(0L, readProgress(playerId).value(milestone.metric()));
+        return progressionData.getBoolean(milestone.configPath(playerId), false)
+                ? Math.max(value, milestone.target()) : value;
+    }
+
+    public java.util.Set<UUID> recordedPlayers() {
+        java.util.Set<UUID> players = new java.util.HashSet<>();
+        var section = progressionData.getConfigurationSection("players");
+        if (section == null) return players;
+        for (String key : section.getKeys(false)) {
+            try {
+                UUID id = UUID.fromString(key);
+                if (progressionData.getLong("players." + id + ".matches", 0L) > 0L) players.add(id);
+            } catch (IllegalArgumentException ignored) { }
+        }
+        return players;
+    }
+
+    public List<String> statsSummary(UUID playerId) {
+        PlayerProgress profile = readProgress(playerId);
+        return List.of(ChatColor.GRAY + "Matches: " + ChatColor.WHITE + profile.matches,
                 ChatColor.GRAY + "Wins: " + ChatColor.WHITE + profile.wins,
-                ChatColor.GRAY + "Win streak: " + ChatColor.GOLD + profile.currentWinStreak
-                        + ChatColor.GRAY + " (best " + ChatColor.GOLD + profile.bestWinStreak + ChatColor.GRAY + ")",
+                ChatColor.GRAY + "Win streak: " + ChatColor.WHITE + profile.currentWinStreak
+                        + ChatColor.GRAY + " (best " + profile.bestWinStreak + ")",
                 ChatColor.GRAY + "At-bats: " + ChatColor.WHITE + profile.atBats,
-                ChatColor.GRAY + "Uncaught distance: " + ChatColor.GREEN
+                ChatColor.GRAY + "Uncaught distance: " + ChatColor.WHITE
                         + formatMilestoneValue(PlexballMilestone.Metric.DISTANCE_TENTHS, profile.totalDistanceTenths),
-                ChatColor.GRAY + "Best hit: " + ChatColor.GREEN
+                ChatColor.GRAY + "Best hit: " + ChatColor.WHITE
                         + String.format(java.util.Locale.ROOT, "%.1fm", profile.bestDistanceTenths / 10.0D),
-                ChatColor.GRAY + "Catches: " + ChatColor.AQUA + profile.catches,
-                ChatColor.GRAY + "Home runs: " + ChatColor.GOLD + profile.homeRuns,
-                ChatColor.GRAY + "Perfect contacts: " + ChatColor.LIGHT_PURPLE + profile.perfectHits)));
-
-        inventory.setItem(9, progressItem(Material.PAPER,
-                ChatColor.YELLOW + "" + ChatColor.BOLD + "ACHIEVEMENTS", List.of(
-                        ChatColor.GRAY + "One-time challenges earned through play.")));
-        PlexballAchievement[] achievements = PlexballAchievement.values();
-        for (int index = 0; index < achievements.length; index++) {
-            PlexballAchievement achievement = achievements[index];
-            boolean unlocked = progressionData.getBoolean(achievement.configPath(id), false);
-            List<String> lore = new ArrayList<>();
-            lore.add(ChatColor.GRAY + achievement.requirement());
-            lore.add(unlocked ? ChatColor.GREEN + "UNLOCKED" : ChatColor.RED + "LOCKED");
-            inventory.setItem(10 + index, progressItem(
-                    unlocked ? achievement.icon() : Material.GRAY_DYE,
-                    (unlocked ? ChatColor.GREEN : ChatColor.WHITE) + achievement.displayName(), lore));
-        }
-
-        inventory.setItem(27, progressItem(Material.WRITABLE_BOOK,
-                ChatColor.AQUA + "" + ChatColor.BOLD + "CAREER MILESTONES", List.of(
-                        ChatColor.GRAY + "Cumulative progress across all Plexball matches.")));
-        for (int index = 0; index < PlexballMilestone.values().length; index++) {
-            PlexballMilestone milestone = PlexballMilestone.values()[index];
-            long current = profile.value(milestone.metric());
-            boolean unlocked = progressionData.getBoolean(milestone.configPath(id), false);
-            int percent = PlexballProgressionRules.milestoneProgressPercent(current, milestone.target());
-            List<String> lore = new ArrayList<>();
-            lore.add(ChatColor.GRAY + milestone.metric().displayName());
-            lore.add(ChatColor.WHITE.toString() + formatMilestoneValue(milestone.metric(), current)
-                    + ChatColor.GRAY + " / " + ChatColor.WHITE + milestone.targetLabel());
-            lore.add(progressBar(percent));
-            lore.add(unlocked ? ChatColor.GREEN + "COMPLETED"
-                    : ChatColor.YELLOW.toString() + percent + "% complete");
-            inventory.setItem(28 + index, progressItem(
-                    unlocked ? Material.EMERALD : milestoneIcon(milestone.metric()),
-                    (unlocked ? ChatColor.GREEN : ChatColor.WHITE) + milestone.displayName(), lore));
-        }
-        inventory.setItem(53, progressItem(Material.BARRIER, ChatColor.RED + "Close",
-                List.of(ChatColor.GRAY + "Click to close this page.")));
-        player.openInventory(inventory);
+                ChatColor.GRAY + "Catches: " + ChatColor.WHITE + profile.catches,
+                ChatColor.GRAY + "Home runs: " + ChatColor.WHITE + profile.homeRuns,
+                ChatColor.GRAY + "Perfect contacts: " + ChatColor.WHITE + profile.perfectHits);
     }
 
     public void openKitMenu(Player player) {
@@ -1880,6 +1866,9 @@ public final class PlexballGame implements Listener {
     private void updateCareerProgress(List<UUID> participants, List<UUID> winners) {
         Set<UUID> winnerIds = winners == null ? Set.of() : new HashSet<>(winners);
         for (UUID id : participants) {
+            ArcadePortManager arcade = plugin.getArcadePortManager();
+            if (!ArcadeTestPlayerManager.shouldPersistProgression(id,
+                    arcade != null && arcade.isTestPlayer(id))) continue;
             PlayerResult match = results.getOrDefault(id, new PlayerResult());
             String root = "players." + id + ".";
             PlayerProgress before = readProgress(id);
