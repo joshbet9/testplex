@@ -674,7 +674,18 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                             ChatColor.GRAY + "Choose this kit for your next " + selectedGame.displayName() + ".",
                             ChatColor.GREEN + "Click to select");
                 }
-                if (choice.unlock == ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT) {
+                // Keep shared per-game achievement requirement details in the kit menu.
+                List<String> requirements = manager.achievementKitRequirementLore(
+                        p.getUniqueId(), selectedGame, choice);
+                if (!requirements.isEmpty()) {
+                    ItemMeta requirementMeta = it.getItemMeta();
+                    List<String> requirementLore = new java.util.ArrayList<>(requirementMeta.getLore() == null
+                            ? List.of() : requirementMeta.getLore());
+                    requirementLore.add(" ");
+                    requirementLore.addAll(requirements);
+                    requirementMeta.setLore(requirementLore);
+                    it.setItemMeta(requirementMeta);
+                }                if (choice.unlock == ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT) {
                     boolean earned = manager.hasAchievementKitUnlocked(p.getUniqueId(), selectedGame, choice.id);
                     boolean constructor = selectedGame == ArcadePortGame.BOMB_LOBBERS
                             && "constructor".equals(choice.id);

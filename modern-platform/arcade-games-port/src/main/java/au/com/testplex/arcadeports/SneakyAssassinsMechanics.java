@@ -1286,7 +1286,6 @@ final class SneakyAssassinsMechanics {
         if (plugin.getConfig().getBoolean(path, false)) return;
         plugin.getConfig().set(path, true);
         plugin.saveConfig();
-        player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + ChatColor.YELLOW + displayName);
         player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.8F, 1.15F);
     }
 
@@ -1332,7 +1331,6 @@ final class SneakyAssassinsMechanics {
         if (plugin.getConfig().getBoolean(path, false)) return;
         plugin.getConfig().set(path, true);
         plugin.saveConfig();
-        player.sendMessage(ChatColor.GOLD + "Achievement unlocked: The Master's Master — defeat an assassin with 4+ power-ups while you have none.");
     }
 
     private void announce(String message) {

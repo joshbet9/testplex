@@ -4215,13 +4215,6 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         String key = "local-achievements." + playerId + ".castle-assault." + achievementId;
         if (plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
-        Player player = players.get(playerId);
-        if (player != null && player.isOnline()) {
-            String name = ArcadeProgressCatalog.achievements("castle-assault").stream()
-                    .filter(achievement -> achievement.id().equals(achievementId))
-                    .map(ArcadeProgressCatalog.Achievement::name).findFirst().orElse(achievementId);
-            player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + name);
-        }
     }
 
     private void finishHeroesOfGwen(int winningTeam, String reason) {
@@ -4273,10 +4266,6 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         String key = "local-achievements." + playerId + ".heroes-of-gwen." + achievementId;
         if (plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
-        String name = ArcadeProgressCatalog.achievements("heroes-of-gwen").stream()
-                .filter(achievement -> achievement.id().equals(achievementId))
-                .map(ArcadeProgressCatalog.Achievement::name).findFirst().orElse(achievementId);
-        if (player.isOnline()) player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + name);
         plugin.saveConfig();
     }
 
