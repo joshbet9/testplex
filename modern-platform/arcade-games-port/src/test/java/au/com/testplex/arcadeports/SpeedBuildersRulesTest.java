@@ -2,6 +2,7 @@ package au.com.testplex.arcadeports;
 
 import org.bukkit.Material;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 
 import java.util.List;
 import java.util.Map;
@@ -9,6 +10,8 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SpeedBuildersRulesTest {
+    @AfterEach void clearDebugOverrides() { GameDebugRuntimeOverrides.clear(); }
+
     @Test
     void ownBuildResetRequiresAnAuthorisedActiveUnfinishedBuilderAndModel() {
         assertTrue(SpeedBuildersRules.canDebugResetOwnBuild(true, true, true, false, true));
@@ -72,6 +75,21 @@ class SpeedBuildersRulesTest {
                 new SpeedBuildersRules.Coordinate(0, 0, 0), Material.STONE,
                 new SpeedBuildersRules.Coordinate(1, 0, 0), Material.STONE);
         assertTrue(SpeedBuildersRules.isPerfect(expected, actual));
+    }
+
+    @Test
+    void configurablePerfectScoreChangesTheLiveThresholdAndRestoresTheSourceDefault() {
+        assertTrue(SpeedBuildersRules.meetsPerfectScore(10, 10));
+        assertFalse(SpeedBuildersRules.meetsPerfectScore(9, 10));
+        assertFalse(SpeedBuildersRules.meetsPerfectScore(0, 0));
+
+        GameDebugRuntimeOverrides.activate(Map.of("SPEED_BUILDERS_PERFECT_SCORE_PERCENT", 80));
+        assertTrue(SpeedBuildersRules.meetsPerfectScore(8, 10));
+        assertFalse(SpeedBuildersRules.meetsPerfectScore(7, 10));
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertFalse(SpeedBuildersRules.meetsPerfectScore(8, 10));
+        assertTrue(SpeedBuildersRules.meetsPerfectScore(10, 10));
     }
 
     @Test

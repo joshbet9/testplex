@@ -78,6 +78,7 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SPLEEF), "SPLEEF_HUNGER_DRAIN_ENABLED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MILK_THE_COW), "MILK_THE_COW_SCORE_TO_WIN");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SPEED_BUILDERS), "SPEED_BUILDERS_DEFAULT_VIEW_SECONDS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SPEED_BUILDERS), "SPEED_BUILDERS_PERFECT_SCORE_PERCENT");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SPEED_BUILDERS), "SPEED_BUILDERS_TEMPLATE_MOBS_ENABLED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.PLEXBALL), "PLEXBALL_BALL_GRAVITY_PER_TICK");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.WIZARDS), "WIZARDS_ENDGAME_START_MINUTES");
@@ -486,6 +487,11 @@ class GameDebugVariableCatalogTest {
                 "SPEED_BUILDERS_MAX_BUILD_SECONDS", 12));
 
         assertEquals(12, SpeedBuildersRules.buildSeconds(40, 0, 0, 1.0D, null));
+        GameDebugVariableCatalog.Variable perfect = GameDebugVariableCatalog.variable(
+                ArcadePortGame.SPEED_BUILDERS, "SPEED_BUILDERS_PERFECT_SCORE_PERCENT");
+        assertNotNull(perfect);
+        assertEquals(1.0D, perfect.minimum());
+        assertEquals(100.0D, perfect.maximum());
     }
 
     @Test

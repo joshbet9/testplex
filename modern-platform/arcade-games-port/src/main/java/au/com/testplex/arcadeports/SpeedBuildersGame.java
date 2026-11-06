@@ -872,7 +872,8 @@ public final class SpeedBuildersGame implements Listener {
 
         for (PlayerState state : builders) {
             state.score = score(state);
-            boolean perfectBuild = state.score == currentTemplate.expectedScore();
+            boolean perfectBuild = SpeedBuildersRules.meetsPerfectScore(
+                    state.score, currentTemplate.expectedScore());
             if (perfectBuild && !state.perfect) {
                 markPerfectBuild(state);
             } else if (!perfectBuild) {

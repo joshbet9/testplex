@@ -25,6 +25,7 @@ public final class SpeedBuildersRules {
     public static final int INTERMISSION_SECONDS = 3;
     public static final int DEFAULT_MATCH_ROUNDS = 5;
     public static final boolean TEMPLATE_MOBS_ENABLED = true;
+    public static final int PERFECT_SCORE_PERCENT = 100;
 
     private SpeedBuildersRules() { }
 
@@ -152,6 +153,14 @@ public final class SpeedBuildersRules {
         int min = GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_MIN_BUILD_SECONDS", MIN_BUILD_SECONDS);
         int max = GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_MAX_BUILD_SECONDS", MAX_BUILD_SECONDS);
         return Math.max(min, Math.min(max, adjusted));
+    }
+
+    /** The source default requires every expected cell; testers can lower the threshold for focused scoring drills. */
+    public static boolean meetsPerfectScore(int score, int expectedScore) {
+        if (expectedScore <= 0 || score < 0) return false;
+        int threshold = Math.max(1, Math.min(100, GameDebugRuntimeOverrides.intValue(
+                "SPEED_BUILDERS_PERFECT_SCORE_PERCENT", PERFECT_SCORE_PERCENT)));
+        return score * 100L >= expectedScore * (long) threshold;
     }
 
     /** Material-only compatibility scorer used by older simple fixtures. */

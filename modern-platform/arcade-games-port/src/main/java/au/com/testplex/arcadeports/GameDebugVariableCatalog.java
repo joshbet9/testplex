@@ -113,7 +113,7 @@ final class GameDebugVariableCatalog {
         if (game == ArcadePortGame.SPEED_BUILDERS) {
             return Set.of("DEFAULT_VIEW_SECONDS", "DEFAULT_BUILD_SECONDS", "MIN_BUILD_SECONDS",
                     "MAX_BUILD_SECONDS", "INTERMISSION_SECONDS", "DEFAULT_MATCH_ROUNDS",
-                    "TEMPLATE_MOBS_ENABLED")
+                    "TEMPLATE_MOBS_ENABLED", "PERFECT_SCORE_PERCENT")
                     .contains(name);
         }
         if (game == ArcadePortGame.WIZARDS) {
@@ -219,6 +219,7 @@ final class GameDebugVariableCatalog {
         if (name.equals("CASTLE_ASSAULT_TNT_THROW_SPEED")
                 || name.equals("CASTLE_ASSAULT_TNT_THROW_VERTICAL_SPEED")) return 0.0D;
         if (name.equals("PAINTBALL_SHOTGUN_PELLETS")) return 1.0D;
+        if (name.equals("PERFECT_SCORE_PERCENT")) return 1.0D;
         if (name.equals("RUNNER_MAX_FROSTBALLS")) return 0.0D;
         if (name.equals("SHEEP_QUEST_MAX_CARRY")) return 0.0D;
         if (name.startsWith("RUNNER_") && name.endsWith("_MILLIS")) return 0.0D;
@@ -290,6 +291,7 @@ final class GameDebugVariableCatalog {
         if (name.contains("_LAUNCH_SPEED") || name.contains("_LAUNCH_HORIZONTAL")) return 8.0D;
         if (name.contains("_LAUNCH_VERTICAL") || name.endsWith("_EGG_SPEED")) return 5.0D;
         if (name.equals("HOOPS_MIN_PLAYERS") || name.equals("HOOPS_MAX_PLAYERS")) return 16.0D;
+        if (name.equals("PERFECT_SCORE_PERCENT")) return 100.0D;
         if (name.startsWith("RUNNER_") && name.endsWith("_SPEED")) return 4.0D;
         if (name.equals("RUNNER_SWITCH_GRACE_MILLIS")) return 5_000.0D;
         if (name.equals("RUNNER_BLOCK_DECAY_MILLIS")) return 60_000.0D;
