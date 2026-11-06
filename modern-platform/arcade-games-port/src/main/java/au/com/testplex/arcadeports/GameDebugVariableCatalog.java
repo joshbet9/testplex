@@ -255,13 +255,19 @@ final class GameDebugVariableCatalog {
         if (name.equals("CLOSE_PHOTO_BLOCKS") || name.equals("LONG_PHOTO_BLOCKS")) return 0.1D;
         if (name.equals("PHOTO_LENS_MIN_DOT")) return 0.5D;
         if (name.equals("MASTER_BUILDERS_MAX_RATING")) return 1.0D;
-        if (name.equals("PLEXBALL_BALL_RADIUS")) return 0.05D;
-        if (name.equals("PLEXBALL_BALL_MAX_FLIGHT_TICKS")) return 1.0D;
-        if (name.equals("PLEXBALL_BATTING_POWER_MULTIPLIER")) return 0.25D;
-        if (name.equals("PLEXBALL_CURVE_ACCELERATION") || name.equals("PLEXBALL_CURVE_ARTIST_SIDE_SPEED")
-                || name.equals("PLEXBALL_SLUGGER_DIVE_SPEED")
-                || name.equals("PLEXBALL_SPRINTER_BURST_SPEED")
-                || name.equals("PLEXBALL_SKYGUARD_LEAP_SPEED")) return 0.0D;
+        if (name.equals("SUPER_SPLOOR_MAX_PAINT_MARKS")) return 1.0D;
+        if (name.equals("BALL_RADIUS")) return 0.05D;
+        if (name.equals("BALL_MAX_FLIGHT_TICKS")) return 1.0D;
+        if (name.equals("BATTING_POWER_MULTIPLIER")) return 0.25D;
+        if (name.equals("CURVE_ACCELERATION") || name.equals("CURVE_ARTIST_SIDE_SPEED")
+                || name.equals("SLUGGER_DIVE_SPEED") || name.equals("SPRINTER_BURST_SPEED")
+                || name.equals("SKYGUARD_LEAP_SPEED")) return 0.0D;
+        if (name.equals("CHARGER_FULL_CHARGE_MILLIS") || name.equals("INK_REGEN_INTERVAL_MILLIS")) return 1.0D;
+        if (name.equals("CHARGER_MIN_INK_COST") || name.equals("CHARGER_MAX_INK_COST")) return 0.0D;
+        if (name.equals("SPECIAL_CHARGE_REQUIRED")) return 1.0D;
+        if ((name.startsWith("CHARGER_") && name.endsWith("_SPEED"))
+                || name.startsWith("SPECIAL_CHARGE_PER_")
+                || name.endsWith("_INK_REGEN_PER_SECOND")) return 0.0D;
         if (name.equals("COW_SPRINT_SPEED_AMPLIFIER") || name.equals("SCORE_PER_COW_KILL")) return 0.0D;
         if (name.startsWith("GLADIATOR_TIER_") && name.endsWith("_ARROWS")) return 0.0D;
         if (name.equals("GLADIATOR_POTION_HEALING")
@@ -423,14 +429,24 @@ final class GameDebugVariableCatalog {
         if (name.equals("CLOSE_PHOTO_BLOCKS")) return 32.0D;
         if (name.equals("LONG_PHOTO_BLOCKS")) return 64.0D;
         if (name.equals("PHOTO_LENS_MIN_DOT")) return 0.999D;
-        if (name.equals("PLEXBALL_BALL_RADIUS")) return 1.0D;
-        if (name.equals("PLEXBALL_BALL_MAX_FLIGHT_TICKS")) return 400.0D;
-        if (name.equals("PLEXBALL_BATTING_POWER_MULTIPLIER")) return 3.0D;
-        if (name.equals("PLEXBALL_CURVE_ACCELERATION")) return 0.03D;
-        if (name.equals("PLEXBALL_CURVE_ARTIST_SIDE_SPEED")) return 1.0D;
-        if (name.equals("PLEXBALL_SLUGGER_DIVE_SPEED")
-                || name.equals("PLEXBALL_SPRINTER_BURST_SPEED")
-                || name.equals("PLEXBALL_SKYGUARD_LEAP_SPEED")) return 5.0D;
+        if (name.equals("BALL_RADIUS")) return 1.0D;
+        if (name.equals("BALL_MAX_FLIGHT_TICKS")) return 400.0D;
+        if (name.equals("BATTING_POWER_MULTIPLIER")) return 3.0D;
+        if (name.equals("CURVE_ACCELERATION")) return 0.03D;
+        if (name.equals("CURVE_ARTIST_SIDE_SPEED")) return 1.0D;
+        if (name.equals("SLUGGER_DIVE_SPEED") || name.equals("SPRINTER_BURST_SPEED")
+                || name.equals("SKYGUARD_LEAP_SPEED")) return 5.0D;
+        if (name.startsWith("CHARGER_") && name.endsWith("_MILLIS")) return 120_000.0D;
+        if (name.endsWith("_INK_COST")) return 500.0D;
+        if (name.startsWith("CHARGER_") && name.endsWith("_SPEED")) return 10.0D;
+        if (name.equals("INK_REGEN_INTERVAL_MILLIS")) return 120_000.0D;
+        if (name.endsWith("_INK_REGEN_PER_SECOND")) return 200.0D;
+        if (name.equals("SPECIAL_CHARGE_REQUIRED")) return 100.0D;
+        if (name.startsWith("SPECIAL_CHARGE_PER_")) return 100.0D;
+        if (name.equals("MAX_INK") || name.equals("INK_PER_PRIMARY_SHOT")) return 500.0D;
+        if (name.equals("MAX_PAINT_MARKS")) return 10.0D;
+        if (name.equals("DODGE_ROLL_MAX_CHARGES")) return 5.0D;
+        if (name.equals("SQUID_WALK_SPEED") || name.equals("SQUID_CLIMB_VELOCITY")) return 1.0D;
         if (name.equals("MASTER_BUILDERS_MAX_RATING")) return 6.0D;
         if (Set.of("MANA_REGEN_MULTIPLIER", "PROJECTILE_SPEED_MULTIPLIER", "SPELL_COOLDOWN_MULTIPLIER",
                 "SPELL_DAMAGE_MULTIPLIER", "SPELL_HEAL_MULTIPLIER", "SPELL_MANA_COST_MULTIPLIER")
@@ -606,10 +622,17 @@ final class GameDebugVariableCatalog {
 
     private static double step(String name, double defaultValue, Kind kind) {
         if (kind == Kind.BOOLEAN) return 1.0D;
-        if (name.equals("PLEXBALL_BALL_RADIUS")) return 0.05D;
-        if (name.equals("PLEXBALL_BATTING_POWER_MULTIPLIER")) return 0.05D;
-        if (name.equals("PLEXBALL_CURVE_ACCELERATION")) return 0.0005D;
-        if (name.startsWith("PLEXBALL_") && (name.endsWith("_SPEED") || name.endsWith("_SIDE_SPEED"))) return 0.05D;
+        if (name.equals("BALL_RADIUS")) return 0.05D;
+        if (name.equals("BATTING_POWER_MULTIPLIER")) return 0.05D;
+        if (name.equals("CURVE_ACCELERATION")) return 0.0005D;
+        if (Set.of("SLUGGER_DIVE_SPEED", "SPRINTER_BURST_SPEED", "SKYGUARD_LEAP_SPEED",
+                "CURVE_ARTIST_SIDE_SPEED", "CHARGER_MIN_SPEED", "CHARGER_MAX_SPEED",
+                "SQUID_WALK_SPEED", "SQUID_CLIMB_VELOCITY").contains(name)) return 0.05D;
+        if (name.endsWith("_PRIMARY_INTERVAL_MILLIS") || name.equals("SECONDARY_COOLDOWN_MILLIS")
+                || name.equals("CHARGER_FULL_CHARGE_MILLIS") || name.equals("INK_REGEN_INTERVAL_MILLIS")) return 100.0D;
+        if (name.startsWith("SPECIAL_CHARGE_PER_")) return 0.1D;
+        if (name.endsWith("_INK_REGEN_PER_SECOND")) return 1.0D;
+        if (name.startsWith("CHARGER_") && name.endsWith("_SPEED")) return 0.1D;
         if (name.startsWith("EVOLUTION_CHARGE_")) return 0.001D;
         if (name.startsWith("SKY_WARS_") && name.endsWith("_MILLIS")) return 100.0D;
         if (name.startsWith("RUNNER_") && name.endsWith("_SPEED")) return 0.1D;

@@ -227,7 +227,8 @@ public final class SuperSploorRuntime implements Listener {
         UUID id = tester.getUniqueId();
         if (!players.containsKey(id)
                 || !debugSpecialEnabled(tester, "special-" + kits.getOrDefault(id, "sprayer"))) return false;
-        specialCharge.put(id, 100.0D);
+        specialCharge.put(id, GameDebugRuntimeOverrides.doubleValue(
+                "SUPER_SPLOOR_SPECIAL_CHARGE_REQUIRED", SuperSploorRules.SPECIAL_CHARGE_REQUIRED));
         specialChargeSuppressed.remove(id);
         useSpecial(tester, id);
         return specialChargeSuppressed.contains(id) && specialCharge.getOrDefault(id, 0.0D) == 0.0D;
@@ -383,8 +384,10 @@ public final class SuperSploorRuntime implements Listener {
                     ? host.getArcadePortManager() : null;
             if (arcade != null && arcade.isDebugOverrideEnabled(id, ArcadePortGame.SUPER_SPLOOR,
                     "unlimited-specials") && !specialChargeSuppressed.contains(id)
-                    && specialCharge.getOrDefault(id, 0.0D) < 100.0D) {
-                specialCharge.put(id, 100.0D);
+                    && specialCharge.getOrDefault(id, 0.0D) < GameDebugRuntimeOverrides.doubleValue(
+                            "SUPER_SPLOOR_SPECIAL_CHARGE_REQUIRED", SuperSploorRules.SPECIAL_CHARGE_REQUIRED)) {
+                specialCharge.put(id, GameDebugRuntimeOverrides.doubleValue(
+                        "SUPER_SPLOOR_SPECIAL_CHARGE_REQUIRED", SuperSploorRules.SPECIAL_CHARGE_REQUIRED));
                 updateInkBar(player, id);
             }
             if (!respawnAt.containsKey(id) && player.getLocation().getY() <= world.getMinHeight() + 4.0D) {
@@ -496,12 +499,15 @@ public final class SuperSploorRuntime implements Listener {
     }
 
     private String secondaryDescription(String kit) {
+        int cost = SuperSploorRules.secondaryInkCost(kit);
+        long cooldownSeconds = (SuperSploorRules.secondaryCooldownMillis() + 999L) / 1_000L;
+        String details = "Costs " + cost + " ink; " + cooldownSeconds + "-second cooldown.";
         return switch (kit) {
-            case "roller" -> "Right-click to place a proximity mine. Costs 30 ink; 4-second cooldown.";
-            case "charger" -> "Right-click to reveal nearby enemies to your team. Costs 25 ink; 4-second cooldown.";
-            case "lobber" -> "Right-click to launch a temporary area sprinkler. Costs 35 ink; 4-second cooldown.";
-            case "dualies" -> "Right-click to launch a delayed suction blast. Costs 30 ink; 4-second cooldown.";
-            default -> "Right-click to throw an area paint bomb. Costs 25 ink; 4-second cooldown.";
+            case "roller" -> "Right-click to place a proximity mine. " + details;
+            case "charger" -> "Right-click to reveal nearby enemies to your team. " + details;
+            case "lobber" -> "Right-click to launch a temporary area sprinkler. " + details;
+            case "dualies" -> "Right-click to launch a delayed suction blast. " + details;
+            default -> "Right-click to throw an area paint bomb. " + details;
         };
     }
 
@@ -516,24 +522,20 @@ public final class SuperSploorRuntime implements Listener {
     }
 
     private String specialDescription(String kit) {
+        String required = Math.round(GameDebugRuntimeOverrides.doubleValue(
+                "SUPER_SPLOOR_SPECIAL_CHARGE_REQUIRED", SuperSploorRules.SPECIAL_CHARGE_REQUIRED)) + "%";
         return switch (kit) {
-            case "roller" -> "Paint through enemies and leave a damaging trail. Charges by painting; use at 100%.";
-            case "charger" -> "Fire a long beam that paints a straight path and marks enemies. Charges by painting; use at 100%.";
-            case "lobber" -> "Create a pulsing storm that paints a wide area and marks enemies. Charges by painting; use at 100%.";
-            case "dualies" -> "Dash through an afterimage, painting the route and disrupting enemies. Charges by painting; use at 100%.";
-            default -> "Blast nearby ground with team-coloured ink and mark close enemies. Charges by painting; use at 100%.";
+            case "roller" -> "Paint through enemies and leave a damaging trail. Charges by painting; use at " + required + ".";
+            case "charger" -> "Fire a long beam that paints a straight path and marks enemies. Charges by painting; use at " + required + ".";
+            case "lobber" -> "Create a pulsing storm that paints a wide area and marks enemies. Charges by painting; use at " + required + ".";
+            case "dualies" -> "Dash through an afterimage, painting the route and disrupting enemies. Charges by painting; use at " + required + ".";
+            default -> "Blast nearby ground with team-coloured ink and mark close enemies. Charges by painting; use at " + required + ".";
         };
     }
 
     private void useSecondary(Player player, UUID id) {
         String kit = kits.getOrDefault(id, "sprayer");
-        int cost = switch (kit) {
-            case "roller" -> 30;
-            case "charger" -> 25;
-            case "lobber" -> 35;
-            case "dualies" -> 30;
-            default -> 25;
-        };
+        int cost = SuperSploorRules.secondaryInkCost(kit);
         long now = System.currentTimeMillis();
         if (now < secondaryReadyAt.getOrDefault(id, 0L)) {
             player.sendActionBar(ChatColor.YELLOW + "Secondary recharging.");
@@ -546,8 +548,9 @@ public final class SuperSploorRuntime implements Listener {
         }
         ink.put(id, SuperSploorRules.spendInk(current, cost));
         lastInkUseAt.put(id, now);
-        secondaryReadyAt.put(id, now + 4_000L);
-        cooldownProgress.start(player, secondaryName(kit), 4_000L);
+        long cooldown = SuperSploorRules.secondaryCooldownMillis();
+        secondaryReadyAt.put(id, now + cooldown);
+        cooldownProgress.start(player, secondaryName(kit), cooldown);
 
         if ("roller".equals(kit)) {
             Location mineLocation = player.getLocation().getBlock().getRelative(0, -1, 0)
@@ -1180,20 +1183,8 @@ public final class SuperSploorRuntime implements Listener {
         String kit = kits.getOrDefault(id, "sprayer");
         int current = ink.getOrDefault(id, 0);
         long previous = lastShotAt.getOrDefault(id, 0L);
-        int cost = switch (kit) {
-            case "roller" -> 4;
-            case "charger" -> 18;
-            case "lobber" -> 14;
-            case "dualies" -> 4;
-            default -> GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_INK_PER_PRIMARY_SHOT", SuperSploorRules.INK_PER_PRIMARY_SHOT);
-        };
-        long interval = switch (kit) {
-            case "roller" -> 550L;
-            case "charger" -> 1_000L;
-            case "lobber" -> 1_100L;
-            case "dualies" -> 350L;
-            default -> GameDebugRuntimeOverrides.longValue("SUPER_SPLOOR_PRIMARY_SHOT_INTERVAL_MILLIS", SuperSploorRules.PRIMARY_SHOT_INTERVAL_MILLIS);
-        };
+        int cost = SuperSploorRules.primaryInkCost(kit);
+        long interval = SuperSploorRules.primaryIntervalMillis(kit);
         if (current < cost || now < previous || now - previous < interval) {
             if (current < cost) player.sendActionBar(ChatColor.RED + "Out of ink! Swim through your team's paint to refill.");
             return;
@@ -1471,7 +1462,8 @@ public final class SuperSploorRuntime implements Listener {
             }
             splat(targetId, target, attackerId);
         } else {
-            target.sendActionBar(ChatColor.RED + "SPLAT MARK " + count + "/4");
+            target.sendActionBar(ChatColor.RED + "SPLAT MARK " + count + "/"
+                    + GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_MAX_PAINT_MARKS", SuperSploorRules.MAX_PAINT_MARKS));
         }
     }
 

@@ -69,6 +69,16 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.TURF_WARS), "TURF_WARS_BARRAGE_ARROW_SPEED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.TURF_WARS), "TURF_WARS_BARRAGE_ARROW_SPREAD");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SUPER_SPLOOR), "SUPER_SPLOOR_MAX_INK");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SUPER_SPLOOR), "SUPER_SPLOOR_NORMAL_INK_REGEN_PER_SECOND");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SUPER_SPLOOR), "SUPER_SPLOOR_SQUID_INK_REGEN_PER_SECOND");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SUPER_SPLOOR), "SUPER_SPLOOR_CHARGER_FULL_CHARGE_MILLIS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SUPER_SPLOOR), "SUPER_SPLOOR_CHARGER_MAX_INK_COST");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SUPER_SPLOOR), "SUPER_SPLOOR_CHARGER_MIN_SPEED");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SUPER_SPLOOR), "SUPER_SPLOOR_SPECIAL_CHARGE_REQUIRED");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SUPER_SPLOOR), "SUPER_SPLOOR_ROLLER_PRIMARY_INK_COST");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SUPER_SPLOOR), "SUPER_SPLOOR_CHARGER_PRIMARY_INTERVAL_MILLIS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SUPER_SPLOOR), "SUPER_SPLOOR_LOBBER_SECONDARY_INK_COST");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SUPER_SPLOOR), "SUPER_SPLOOR_SECONDARY_COOLDOWN_MILLIS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAGONS), "DRAGONS_AUTONOMOUS_FLIGHT_SPEED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAGONS), "DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAGONS), "DRAGONS_SPAWNING_ENABLED");
@@ -254,6 +264,16 @@ class GameDebugVariableCatalogTest {
                 .anyMatch(variable -> variable.key().equals("BACON_FLASH_FRIED_MAX_WIN_MILLIS")));
         assertTrue(GameDebugVariableCatalog.appliesImmediately(
                 GameDebugVariableCatalog.variable(ArcadePortGame.BACON_BRAWL, "BACON_BRAWL_HITS_DAMAGE_HEALTH")));
+    }
+
+    @Test
+    void superSploorMechanicControlsHaveSafeRangesAndPracticalSteps() {
+        assertGameRange(ArcadePortGame.SUPER_SPLOOR, "SUPER_SPLOOR_MAX_PAINT_MARKS", 1.0D, 10.0D);
+        assertGameRange(ArcadePortGame.SUPER_SPLOOR, "SUPER_SPLOOR_SPECIAL_CHARGE_REQUIRED", 1.0D, 100.0D);
+        assertGameRange(ArcadePortGame.SUPER_SPLOOR, "SUPER_SPLOOR_CHARGER_MIN_SPEED", 0.0D, 10.0D);
+        assertGameRange(ArcadePortGame.SUPER_SPLOOR, "SUPER_SPLOOR_CHARGER_MAX_INK_COST", 0.0D, 500.0D);
+        assertEquals(100.0D, GameDebugVariableCatalog.variable(ArcadePortGame.SUPER_SPLOOR,
+                "SUPER_SPLOOR_ROLLER_PRIMARY_INTERVAL_MILLIS").step());
     }
 
     @Test

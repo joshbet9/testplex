@@ -5,6 +5,20 @@ public final class SuperSploorRules {
     public static final int MAX_INK = 100;
     public static final int INK_PER_PRIMARY_SHOT = 4;
     public static final long PRIMARY_SHOT_INTERVAL_MILLIS = 200L;
+    public static final int ROLLER_PRIMARY_INK_COST = 4;
+    public static final long ROLLER_PRIMARY_INTERVAL_MILLIS = 550L;
+    public static final int CHARGER_PRIMARY_INK_COST = 18;
+    public static final long CHARGER_PRIMARY_INTERVAL_MILLIS = 1_000L;
+    public static final int LOBBER_PRIMARY_INK_COST = 14;
+    public static final long LOBBER_PRIMARY_INTERVAL_MILLIS = 1_100L;
+    public static final int DUALIES_PRIMARY_INK_COST = 4;
+    public static final long DUALIES_PRIMARY_INTERVAL_MILLIS = 350L;
+    public static final int SPRAYER_SECONDARY_INK_COST = 25;
+    public static final int ROLLER_SECONDARY_INK_COST = 30;
+    public static final int CHARGER_SECONDARY_INK_COST = 25;
+    public static final int LOBBER_SECONDARY_INK_COST = 35;
+    public static final int DUALIES_SECONDARY_INK_COST = 30;
+    public static final long SECONDARY_COOLDOWN_MILLIS = 4_000L;
     public static final long SPLAT_RESPAWN_MILLIS = 2_500L;
     public static final long SPAWN_PROTECTION_MILLIS = 2_000L;
     public static final long MARK_RECOVERY_DELAY_MILLIS = 6_000L;
@@ -12,6 +26,7 @@ public final class SuperSploorRules {
     public static final int MAX_PAINT_MARKS = 4;
     public static final int NORMAL_INK_REGEN_PER_SECOND = 6;
     public static final int SQUID_INK_REGEN_PER_SECOND = 30;
+    public static final long INK_REGEN_INTERVAL_MILLIS = 1_000L;
     public static final double SQUID_WALK_SPEED = 0.34D;
     public static final double SQUID_CLIMB_VELOCITY = 0.30D;
     public static final int OVERTIME_MILLIS = 30_000;
@@ -26,54 +41,109 @@ public final class SuperSploorRules {
     public static final long DODGE_ROLL_RECHARGE_MILLIS = 5_000L;
     public static final double SPECIAL_CHARGE_PER_TERRITORY_UNIT = 0.10D;
     public static final double SPECIAL_CHARGE_PER_SPLAT = 5.0D;
+    public static final double SPECIAL_CHARGE_REQUIRED = 100.0D;
 
     private SuperSploorRules() { }
 
+    public static int primaryInkCost(String kit) {
+        return switch (kit == null ? "sprayer" : kit) {
+            case "roller" -> GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_ROLLER_PRIMARY_INK_COST", ROLLER_PRIMARY_INK_COST);
+            case "charger" -> GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_CHARGER_PRIMARY_INK_COST", CHARGER_PRIMARY_INK_COST);
+            case "lobber" -> GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_LOBBER_PRIMARY_INK_COST", LOBBER_PRIMARY_INK_COST);
+            case "dualies" -> GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_DUALIES_PRIMARY_INK_COST", DUALIES_PRIMARY_INK_COST);
+            default -> GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_INK_PER_PRIMARY_SHOT", INK_PER_PRIMARY_SHOT);
+        };
+    }
+
+    public static long primaryIntervalMillis(String kit) {
+        return switch (kit == null ? "sprayer" : kit) {
+            case "roller" -> GameDebugRuntimeOverrides.longValue("SUPER_SPLOOR_ROLLER_PRIMARY_INTERVAL_MILLIS", ROLLER_PRIMARY_INTERVAL_MILLIS);
+            case "charger" -> GameDebugRuntimeOverrides.longValue("SUPER_SPLOOR_CHARGER_PRIMARY_INTERVAL_MILLIS", CHARGER_PRIMARY_INTERVAL_MILLIS);
+            case "lobber" -> GameDebugRuntimeOverrides.longValue("SUPER_SPLOOR_LOBBER_PRIMARY_INTERVAL_MILLIS", LOBBER_PRIMARY_INTERVAL_MILLIS);
+            case "dualies" -> GameDebugRuntimeOverrides.longValue("SUPER_SPLOOR_DUALIES_PRIMARY_INTERVAL_MILLIS", DUALIES_PRIMARY_INTERVAL_MILLIS);
+            default -> GameDebugRuntimeOverrides.longValue("SUPER_SPLOOR_PRIMARY_SHOT_INTERVAL_MILLIS", PRIMARY_SHOT_INTERVAL_MILLIS);
+        };
+    }
+
+    public static int secondaryInkCost(String kit) {
+        return switch (kit == null ? "sprayer" : kit) {
+            case "roller" -> GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_ROLLER_SECONDARY_INK_COST", ROLLER_SECONDARY_INK_COST);
+            case "charger" -> GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_CHARGER_SECONDARY_INK_COST", CHARGER_SECONDARY_INK_COST);
+            case "lobber" -> GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_LOBBER_SECONDARY_INK_COST", LOBBER_SECONDARY_INK_COST);
+            case "dualies" -> GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_DUALIES_SECONDARY_INK_COST", DUALIES_SECONDARY_INK_COST);
+            default -> GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_SPRAYER_SECONDARY_INK_COST", SPRAYER_SECONDARY_INK_COST);
+        };
+    }
+
+    public static long secondaryCooldownMillis() {
+        return GameDebugRuntimeOverrides.longValue("SUPER_SPLOOR_SECONDARY_COOLDOWN_MILLIS", SECONDARY_COOLDOWN_MILLIS);
+    }
+
     public static double chargerChargeFraction(long elapsedMillis) {
+        long fullChargeMillis = GameDebugRuntimeOverrides.longValue(
+                "SUPER_SPLOOR_CHARGER_FULL_CHARGE_MILLIS", CHARGER_FULL_CHARGE_MILLIS);
         return Math.max(0.2D, Math.min(1.0D,
-                Math.max(0L, elapsedMillis) / (double) CHARGER_FULL_CHARGE_MILLIS));
+                Math.max(0L, elapsedMillis) / (double) Math.max(1L, fullChargeMillis)));
     }
 
     public static int chargerInkCost(double chargeFraction) {
         double fraction = Double.isFinite(chargeFraction)
                 ? Math.max(0.2D, Math.min(1.0D, chargeFraction)) : 0.2D;
-        return CHARGER_MIN_INK_COST
-                + (int) Math.ceil((CHARGER_MAX_INK_COST - CHARGER_MIN_INK_COST) * fraction);
+        int minimum = Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "SUPER_SPLOOR_CHARGER_MIN_INK_COST", CHARGER_MIN_INK_COST));
+        int maximum = Math.max(minimum, GameDebugRuntimeOverrides.intValue(
+                "SUPER_SPLOOR_CHARGER_MAX_INK_COST", CHARGER_MAX_INK_COST));
+        return minimum + (int) Math.ceil((maximum - minimum) * fraction);
     }
 
     public static double chargerProjectileSpeed(double chargeFraction) {
         double fraction = Double.isFinite(chargeFraction)
                 ? Math.max(0.2D, Math.min(1.0D, chargeFraction)) : 0.2D;
-        return CHARGER_MIN_SPEED + (CHARGER_MAX_SPEED - CHARGER_MIN_SPEED) * fraction;
+        double minimum = GameDebugRuntimeOverrides.doubleValue(
+                "SUPER_SPLOOR_CHARGER_MIN_SPEED", CHARGER_MIN_SPEED);
+        double maximum = Math.max(minimum, GameDebugRuntimeOverrides.doubleValue(
+                "SUPER_SPLOOR_CHARGER_MAX_SPEED", CHARGER_MAX_SPEED));
+        return minimum + (maximum - minimum) * fraction;
     }
 
     public static double nextSpecialCharge(double current, int changedTerritoryUnits,
             boolean suppressedDuringSpecial) {
         double safeCurrent = Double.isFinite(current) ? Math.max(0.0D, Math.min(100.0D, current)) : 0.0D;
         if (suppressedDuringSpecial || changedTerritoryUnits <= 0) return safeCurrent;
-        return Math.min(100.0D, safeCurrent
-                + changedTerritoryUnits * SPECIAL_CHARGE_PER_TERRITORY_UNIT);
+        double required = specialChargeRequired();
+        double perUnit = GameDebugRuntimeOverrides.doubleValue(
+                "SUPER_SPLOOR_SPECIAL_CHARGE_PER_TERRITORY_UNIT", SPECIAL_CHARGE_PER_TERRITORY_UNIT);
+        return Math.min(required, safeCurrent + changedTerritoryUnits * perUnit);
     }
 
     public static double specialChargeAfterSplat(double current) {
         double safeCurrent = Double.isFinite(current) ? Math.max(0.0D, Math.min(100.0D, current)) : 0.0D;
-        return Math.min(100.0D, safeCurrent + SPECIAL_CHARGE_PER_SPLAT);
+        double required = specialChargeRequired();
+        return Math.min(required, safeCurrent + GameDebugRuntimeOverrides.doubleValue(
+                "SUPER_SPLOOR_SPECIAL_CHARGE_PER_SPLAT", SPECIAL_CHARGE_PER_SPLAT));
+    }
+
+    private static double specialChargeRequired() {
+        return Math.max(1.0D, GameDebugRuntimeOverrides.doubleValue(
+                "SUPER_SPLOOR_SPECIAL_CHARGE_REQUIRED", SPECIAL_CHARGE_REQUIRED));
     }
 
     public static boolean canUseSpecial(double charge) {
-        return Double.isFinite(charge) && charge >= 100.0D;
+        return Double.isFinite(charge) && charge >= specialChargeRequired();
     }
 
     public static int dodgeRollChargesAfterUse(int current) {
-        return Math.max(0, Math.min(DODGE_ROLL_MAX_CHARGES, current) - 1);
+        return Math.max(0, Math.min(GameDebugRuntimeOverrides.intValue(
+                "SUPER_SPLOOR_DODGE_ROLL_MAX_CHARGES", DODGE_ROLL_MAX_CHARGES), current) - 1);
     }
 
     public static int nextDodgeRollCharge(int current) {
-        return Math.min(DODGE_ROLL_MAX_CHARGES, Math.max(0, current) + 1);
+        return Math.min(GameDebugRuntimeOverrides.intValue(
+                "SUPER_SPLOOR_DODGE_ROLL_MAX_CHARGES", DODGE_ROLL_MAX_CHARGES), Math.max(0, current) + 1);
     }
 
     public static int clampInk(int ink) {
-        return Math.max(0, Math.min(MAX_INK, ink));
+        return Math.max(0, Math.min(GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_MAX_INK", MAX_INK), ink));
     }
 
     public static int spendInk(int current, int cost) {
@@ -82,8 +152,11 @@ public final class SuperSploorRules {
     }
 
     public static boolean canFire(int ink, long nowMillis, long lastShotAtMillis) {
-        return ink >= INK_PER_PRIMARY_SHOT && nowMillis >= lastShotAtMillis
-                && nowMillis - lastShotAtMillis >= PRIMARY_SHOT_INTERVAL_MILLIS;
+        return ink >= GameDebugRuntimeOverrides.intValue(
+                "SUPER_SPLOOR_INK_PER_PRIMARY_SHOT", INK_PER_PRIMARY_SHOT)
+                && nowMillis >= lastShotAtMillis
+                && nowMillis - lastShotAtMillis >= GameDebugRuntimeOverrides.longValue(
+                        "SUPER_SPLOOR_PRIMARY_SHOT_INTERVAL_MILLIS", PRIMARY_SHOT_INTERVAL_MILLIS);
     }
 
     /** 0 = no change, 1 = neutral claim, 2 = enemy reclaim. */
@@ -95,29 +168,35 @@ public final class SuperSploorRules {
     }
 
     public static int markCountAfterHit(int currentMarks) {
-        return Math.min(MAX_PAINT_MARKS, Math.max(0, currentMarks) + 1);
+        return Math.min(GameDebugRuntimeOverrides.intValue(
+                "SUPER_SPLOOR_MAX_PAINT_MARKS", MAX_PAINT_MARKS), Math.max(0, currentMarks) + 1);
     }
 
     public static boolean isSplatted(int marks) {
-        return marks >= MAX_PAINT_MARKS;
+        return marks >= GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_MAX_PAINT_MARKS", MAX_PAINT_MARKS);
     }
 
     public static boolean canRecoverMark(long nowMillis, long lastHitAtMillis,
             long nextRecoveryAtMillis, boolean standingOnFriendlyPaint, int currentMarks) {
         return standingOnFriendlyPaint && currentMarks > 0
-                && nowMillis >= lastHitAtMillis + MARK_RECOVERY_DELAY_MILLIS
+                && nowMillis >= lastHitAtMillis + GameDebugRuntimeOverrides.longValue(
+                        "SUPER_SPLOOR_MARK_RECOVERY_DELAY_MILLIS", MARK_RECOVERY_DELAY_MILLIS)
                 && nowMillis >= nextRecoveryAtMillis;
     }
 
     public static int nextInkAfterRegeneration(int current, int seconds, boolean squidMode) {
-        int rate = squidMode ? SQUID_INK_REGEN_PER_SECOND : NORMAL_INK_REGEN_PER_SECOND;
+        int rate = squidMode
+                ? GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_SQUID_INK_REGEN_PER_SECOND", SQUID_INK_REGEN_PER_SECOND)
+                : GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_NORMAL_INK_REGEN_PER_SECOND", NORMAL_INK_REGEN_PER_SECOND);
         return clampInk(current + Math.max(0, seconds) * rate);
     }
 
     public static boolean canRegenerateInk(long nowMillis, long lastInkUseAtMillis,
             boolean squidMode, boolean standingOnFriendlyPaint) {
         if (squidMode && standingOnFriendlyPaint) return true;
-        return nowMillis >= lastInkUseAtMillis && nowMillis - lastInkUseAtMillis >= 1_000L;
+        return nowMillis >= lastInkUseAtMillis && nowMillis - lastInkUseAtMillis
+                >= GameDebugRuntimeOverrides.longValue(
+                        "SUPER_SPLOOR_INK_REGEN_INTERVAL_MILLIS", INK_REGEN_INTERVAL_MILLIS);
     }
 
     public static int overtimeLeadThreshold(int totalTerritoryUnits) {
