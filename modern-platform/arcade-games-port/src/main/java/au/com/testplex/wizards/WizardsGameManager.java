@@ -698,9 +698,11 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
             // Their progress is persisted here because they are removed from states
             // before the match-wide finish pass can record it.
             state.alive = false;
-            WizardsProgressStore.increment(plugin.getConfig(), id, "kills", state.kills);
-            WizardsProgressStore.increment(plugin.getConfig(), id, "spells-bound", state.spellsBound);
-            plugin.saveConfig();
+            if (WizardsRules.shouldRecordProgress(plugin.isArcadeDebugRound())) {
+                WizardsProgressStore.increment(plugin.getConfig(), id, "kills", state.kills);
+                WizardsProgressStore.increment(plugin.getConfig(), id, "spells-bound", state.spellsBound);
+                plugin.saveConfig();
+            }
             removeManaBar(id);
             if (arcadeManaged) plugin.returnWizardsParticipantToLobby(player);
             restoreTemporaryPlayer(player, id);
