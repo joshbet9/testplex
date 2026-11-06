@@ -2823,7 +2823,9 @@ public final class ArcadePortManager implements Listener {
                     Vector away = spawn == null ? new Vector(0.0D, 0.0D, 0.0D)
                             : spawn.toVector().subtract(player.getLocation().toVector()).setY(0.0D);
                     if (away.lengthSquared() > 0.001D) {
-                        player.setVelocity(away.normalize().multiply(2.0D).setY(0.8D));
+                        player.setVelocity(away.normalize()
+                                .multiply(ArcadePortRules.turfWarsTerritoryKnockbackHorizontal())
+                                .setY(ArcadePortRules.turfWarsTerritoryKnockbackVertical()));
                     }
                     player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 0.8F, 0.8F);
                     player.sendMessage(ChatColor.RED + "You cannot walk on the enemy's turf!");
@@ -8467,12 +8469,14 @@ public final class ArcadePortManager implements Listener {
                 continue;
             }
 
+            double spread = ArcadePortRules.turfWarsBarrageArrowSpread();
             Vector jitter = new Vector(
-                    ThreadLocalRandom.current().nextDouble(-0.05D, 0.05D),
-                    ThreadLocalRandom.current().nextDouble(-0.05D, 0.05D),
-                    ThreadLocalRandom.current().nextDouble(-0.05D, 0.05D));
+                    randomTurfWarsBarrageSpread(spread),
+                    randomTurfWarsBarrageSpread(spread),
+                    randomTurfWarsBarrageSpread(spread));
             Arrow arrow = player.launchProjectile(Arrow.class);
-            arrow.setVelocity(player.getLocation().getDirection().add(jitter).multiply(3.0D));
+            arrow.setVelocity(player.getLocation().getDirection().add(jitter)
+                    .multiply(ArcadePortRules.turfWarsBarrageArrowSpeed()));
             session.entities.add(arrow);
             session.turfTrackedArrows.add(arrow.getUniqueId());
             session.turfBarrageArrowOwners.put(arrow.getUniqueId(), id);
@@ -8493,6 +8497,10 @@ public final class ArcadePortManager implements Listener {
         session.turfBarrageNextChargeAt.put(id,
                 System.currentTimeMillis() + GameDebugRuntimeOverrides.longValue("TURF_WARS_BARRAGE_FIRST_CHARGE_MILLIS", ArcadePortRules.TURF_WARS_BARRAGE_FIRST_CHARGE_MILLIS));
         player.sendMessage(ChatColor.YELLOW + "Charging Barrage. Release your bow to fire.");
+    }
+
+    private double randomTurfWarsBarrageSpread(double spread) {
+        return spread <= 0.0D ? 0.0D : ThreadLocalRandom.current().nextDouble(-spread, spread);
     }
 
     private void giveTurfWarsWool(Session session, Player player) {

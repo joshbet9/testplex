@@ -219,6 +219,13 @@ final class GameDebugVariableCatalog {
         if (name.equals("CASTLE_ASSAULT_TNT_THROW_SPEED")
                 || name.equals("CASTLE_ASSAULT_TNT_THROW_VERTICAL_SPEED")) return 0.0D;
         if (name.equals("PAINTBALL_SHOTGUN_PELLETS")) return 1.0D;
+        if (name.equals("TURF_WARS_LINES_PER_KILL_MULTIPLIER")) return 1.0D;
+        if (name.equals("TURF_WARS_COMBAT_BOUNDARY_DAMAGE")
+                || name.equals("TURF_WARS_BUILD_BOUNDARY_DAMAGE")
+                || name.equals("TURF_WARS_TERRITORY_KNOCKBACK_HORIZONTAL")
+                || name.equals("TURF_WARS_TERRITORY_KNOCKBACK_VERTICAL")
+                || name.equals("TURF_WARS_BARRAGE_ARROW_SPEED")
+                || name.equals("TURF_WARS_BARRAGE_ARROW_SPREAD")) return 0.0D;
         if (name.equals("PERFECT_SCORE_PERCENT")) return 1.0D;
         if (name.equals("RUNNER_MAX_FROSTBALLS")) return 0.0D;
         if (name.equals("SHEEP_QUEST_MAX_CARRY")) return 0.0D;
@@ -288,6 +295,7 @@ final class GameDebugVariableCatalog {
     private static double maximum(String name, Kind kind, double defaultValue) {
         if (kind == Kind.BOOLEAN) return 1.0D;
         if (name.contains("_FALL_DAMAGE_MULTIPLIER")) return 1.0D;
+        if (name.equals("TURF_WARS_TERRITORY_KNOCKBACK_VERTICAL")) return 5.0D;
         if (name.contains("_MAX_HEALTH")) return 80.0D;
         if (name.contains("_MELEE_DAMAGE")) return 40.0D;
         if (name.startsWith("EVOLUTION_CHARGE_")) return 0.2D;
@@ -297,6 +305,13 @@ final class GameDebugVariableCatalog {
         if (name.contains("_LAUNCH_VERTICAL") || name.endsWith("_EGG_SPEED")) return 5.0D;
         if (name.equals("HOOPS_MIN_PLAYERS") || name.equals("HOOPS_MAX_PLAYERS")) return 16.0D;
         if (name.equals("PERFECT_SCORE_PERCENT")) return 100.0D;
+        if (name.equals("TURF_WARS_LINES_PER_KILL_MULTIPLIER")) return 8.0D;
+        if (name.equals("TURF_WARS_COMBAT_BOUNDARY_DAMAGE")) return 40.0D;
+        if (name.equals("TURF_WARS_BUILD_BOUNDARY_DAMAGE")) return 500.0D;
+        if (name.equals("TURF_WARS_TERRITORY_KNOCKBACK_HORIZONTAL")) return 8.0D;
+        if (name.equals("TURF_WARS_TERRITORY_KNOCKBACK_VERTICAL")) return 5.0D;
+        if (name.equals("TURF_WARS_BARRAGE_ARROW_SPEED")) return 8.0D;
+        if (name.equals("TURF_WARS_BARRAGE_ARROW_SPREAD")) return 1.0D;
         if (name.startsWith("RUNNER_") && name.endsWith("_SPEED")) return 4.0D;
         if (name.equals("RUNNER_SWITCH_GRACE_MILLIS")) return 5_000.0D;
         if (name.equals("RUNNER_BLOCK_DECAY_MILLIS")) return 60_000.0D;

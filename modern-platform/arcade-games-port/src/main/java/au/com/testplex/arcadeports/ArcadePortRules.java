@@ -737,6 +737,13 @@ public final class ArcadePortRules {
     public static final long TURF_WARS_MIXED_ARCADE_BUILD_PHASE_MILLIS = 10_000L;
     public static final long TURF_WARS_MIXED_ARCADE_COMBAT_PHASE_MILLIS = 45_000L;
     public static final int TURF_WARS_MIXED_ARCADE_TURF_ADVANCE_BLOCKS = 2;
+    public static final int TURF_WARS_LINES_PER_KILL_MULTIPLIER = 1;
+    public static final double TURF_WARS_COMBAT_BOUNDARY_DAMAGE = 2.0D;
+    public static final double TURF_WARS_BUILD_BOUNDARY_DAMAGE = 500.0D;
+    public static final double TURF_WARS_TERRITORY_KNOCKBACK_HORIZONTAL = 2.0D;
+    public static final double TURF_WARS_TERRITORY_KNOCKBACK_VERTICAL = 0.8D;
+    public static final double TURF_WARS_BARRAGE_ARROW_SPEED = 3.0D;
+    public static final double TURF_WARS_BARRAGE_ARROW_SPREAD = 0.05D;
     public static final long MICRO_BATTLES_CHEAT_WINDOW_MILLIS = 4_000L;
     public static final long MICRO_BATTLES_BARRIER_DURATION_MILLIS = 10_000L;
     public static final boolean MICRO_BATTLES_CRUMBLE_ENABLED = true;
@@ -3092,7 +3099,9 @@ public final class ArcadePortRules {
 
     /** The source drains two hearts at a time during combat and is lethal outside combat. */
     public static double turfWarsSpawnBoundaryDamage(boolean combatPhase) {
-        return combatPhase ? 2.0D : 500.0D;
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(combatPhase
+                ? "TURF_WARS_COMBAT_BOUNDARY_DAMAGE" : "TURF_WARS_BUILD_BOUNDARY_DAMAGE",
+                combatPhase ? TURF_WARS_COMBAT_BOUNDARY_DAMAGE : TURF_WARS_BUILD_BOUNDARY_DAMAGE));
     }
 
     /** Reborn's Comeback tracker remembers a team once its remaining line count reaches five. */
@@ -3103,7 +3112,29 @@ public final class ArcadePortRules {
     /** Reborn advances one line for the first combat round, two for the second, etc. */
     public static int turfWarsLinesPerKill(int combatRoundsStarted, boolean mixedArcadeVariant) {
         int sourceLines = Math.max(1, combatRoundsStarted);
-        return sourceLines * (mixedArcadeVariant ? 2 : 1);
+        int multiplier = Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "TURF_WARS_LINES_PER_KILL_MULTIPLIER", TURF_WARS_LINES_PER_KILL_MULTIPLIER));
+        return sourceLines * (mixedArcadeVariant ? 2 : 1) * multiplier;
+    }
+
+    public static double turfWarsTerritoryKnockbackHorizontal() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue("TURF_WARS_TERRITORY_KNOCKBACK_HORIZONTAL",
+                TURF_WARS_TERRITORY_KNOCKBACK_HORIZONTAL));
+    }
+
+    public static double turfWarsTerritoryKnockbackVertical() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue("TURF_WARS_TERRITORY_KNOCKBACK_VERTICAL",
+                TURF_WARS_TERRITORY_KNOCKBACK_VERTICAL));
+    }
+
+    public static double turfWarsBarrageArrowSpeed() {
+        return Math.max(0.1D, GameDebugRuntimeOverrides.doubleValue("TURF_WARS_BARRAGE_ARROW_SPEED",
+                TURF_WARS_BARRAGE_ARROW_SPEED));
+    }
+
+    public static double turfWarsBarrageArrowSpread() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue("TURF_WARS_BARRAGE_ARROW_SPREAD",
+                TURF_WARS_BARRAGE_ARROW_SPREAD));
     }
 
     /** Source axis vector points from the blue marker back toward the red marker. */

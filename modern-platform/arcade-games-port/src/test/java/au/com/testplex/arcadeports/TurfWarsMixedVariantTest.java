@@ -36,6 +36,60 @@ class TurfWarsMixedVariantTest {
     }
 
     @Test
+    void debugProfileChangesFrontlineProgressionAndResetRestoresBothVariants() {
+        assertEquals(3, ArcadePortRules.turfWarsLinesPerKill(3, false));
+        assertEquals(6, ArcadePortRules.turfWarsLinesPerKill(3, true));
+
+        GameDebugRuntimeOverrides.activate(Map.of("TURF_WARS_LINES_PER_KILL_MULTIPLIER", 2));
+        assertEquals(6, ArcadePortRules.turfWarsLinesPerKill(3, false));
+        assertEquals(12, ArcadePortRules.turfWarsLinesPerKill(3, true));
+
+        GameDebugRuntimeOverrides.clear();
+        assertEquals(3, ArcadePortRules.turfWarsLinesPerKill(3, false));
+        assertEquals(6, ArcadePortRules.turfWarsLinesPerKill(3, true));
+    }
+
+    @Test
+    void debugProfileChangesBoundaryDamageAndTerritoryKnockbackThenResetRestoresDefaults() {
+        assertEquals(2.0D, ArcadePortRules.turfWarsSpawnBoundaryDamage(true), 1.0e-9);
+        assertEquals(500.0D, ArcadePortRules.turfWarsSpawnBoundaryDamage(false), 1.0e-9);
+        assertEquals(2.0D, ArcadePortRules.turfWarsTerritoryKnockbackHorizontal(), 1.0e-9);
+        assertEquals(0.8D, ArcadePortRules.turfWarsTerritoryKnockbackVertical(), 1.0e-9);
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "TURF_WARS_COMBAT_BOUNDARY_DAMAGE", 4.0D,
+                "TURF_WARS_BUILD_BOUNDARY_DAMAGE", 10.0D,
+                "TURF_WARS_TERRITORY_KNOCKBACK_HORIZONTAL", 3.5D,
+                "TURF_WARS_TERRITORY_KNOCKBACK_VERTICAL", 1.2D));
+        assertEquals(4.0D, ArcadePortRules.turfWarsSpawnBoundaryDamage(true), 1.0e-9);
+        assertEquals(10.0D, ArcadePortRules.turfWarsSpawnBoundaryDamage(false), 1.0e-9);
+        assertEquals(3.5D, ArcadePortRules.turfWarsTerritoryKnockbackHorizontal(), 1.0e-9);
+        assertEquals(1.2D, ArcadePortRules.turfWarsTerritoryKnockbackVertical(), 1.0e-9);
+
+        GameDebugRuntimeOverrides.clear();
+        assertEquals(2.0D, ArcadePortRules.turfWarsSpawnBoundaryDamage(true), 1.0e-9);
+        assertEquals(500.0D, ArcadePortRules.turfWarsSpawnBoundaryDamage(false), 1.0e-9);
+        assertEquals(2.0D, ArcadePortRules.turfWarsTerritoryKnockbackHorizontal(), 1.0e-9);
+        assertEquals(0.8D, ArcadePortRules.turfWarsTerritoryKnockbackVertical(), 1.0e-9);
+    }
+
+    @Test
+    void debugProfileChangesBarrageProjectileSpeedAndSpreadThenResetRestoresDefaults() {
+        assertEquals(3.0D, ArcadePortRules.turfWarsBarrageArrowSpeed(), 1.0e-9);
+        assertEquals(0.05D, ArcadePortRules.turfWarsBarrageArrowSpread(), 1.0e-9);
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "TURF_WARS_BARRAGE_ARROW_SPEED", 4.5D,
+                "TURF_WARS_BARRAGE_ARROW_SPREAD", 0.2D));
+        assertEquals(4.5D, ArcadePortRules.turfWarsBarrageArrowSpeed(), 1.0e-9);
+        assertEquals(0.2D, ArcadePortRules.turfWarsBarrageArrowSpread(), 1.0e-9);
+
+        GameDebugRuntimeOverrides.clear();
+        assertEquals(3.0D, ArcadePortRules.turfWarsBarrageArrowSpeed(), 1.0e-9);
+        assertEquals(0.05D, ArcadePortRules.turfWarsBarrageArrowSpread(), 1.0e-9);
+    }
+
+    @Test
     void legacyFrontlineHelperKeepsItsSimpleFixedStepCompatibilityContract() {
         assertEquals(0, ArcadePortRules.advanceTurfFrontline(-1, 0, false));
         assertEquals(-2, ArcadePortRules.advanceTurfFrontline(-1, 1, false));

@@ -52,6 +52,13 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DEATH_TAG), "DEATH_TAG_MELEE_KNOCKBACK_HORIZONTAL");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.CAMERA_SHY), "CAMERA_SHY_MATCH_SECONDS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.HOOPS_REMASTERED), "HOOPS_TARGET_SCORE");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.TURF_WARS), "TURF_WARS_LINES_PER_KILL_MULTIPLIER");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.TURF_WARS), "TURF_WARS_COMBAT_BOUNDARY_DAMAGE");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.TURF_WARS), "TURF_WARS_BUILD_BOUNDARY_DAMAGE");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.TURF_WARS), "TURF_WARS_TERRITORY_KNOCKBACK_HORIZONTAL");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.TURF_WARS), "TURF_WARS_TERRITORY_KNOCKBACK_VERTICAL");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.TURF_WARS), "TURF_WARS_BARRAGE_ARROW_SPEED");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.TURF_WARS), "TURF_WARS_BARRAGE_ARROW_SPREAD");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SUPER_SPLOOR), "SUPER_SPLOOR_MAX_INK");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAGONS), "DRAGONS_AUTONOMOUS_FLIGHT_SPEED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAGONS), "DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED");
@@ -94,6 +101,24 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.BACON_BRAWL), "BACON_BRAWL_HITS_DAMAGE_HEALTH");
         assertFalse(GameDebugVariableCatalog.variables(ArcadePortGame.SPEED_BUILDERS).stream()
                 .anyMatch(variable -> variable.key().equals("SPEED_BUILDERS_BUILD_WIDTH")));
+    }
+
+    @Test
+    void turfWarsControlsHaveSafeMechanicSpecificRanges() {
+        assertRange("TURF_WARS_LINES_PER_KILL_MULTIPLIER", 1.0D, 8.0D);
+        assertRange("TURF_WARS_COMBAT_BOUNDARY_DAMAGE", 0.0D, 40.0D);
+        assertRange("TURF_WARS_BUILD_BOUNDARY_DAMAGE", 0.0D, 500.0D);
+        assertRange("TURF_WARS_TERRITORY_KNOCKBACK_HORIZONTAL", 0.0D, 8.0D);
+        assertRange("TURF_WARS_TERRITORY_KNOCKBACK_VERTICAL", 0.0D, 5.0D);
+        assertRange("TURF_WARS_BARRAGE_ARROW_SPEED", 0.0D, 8.0D);
+        assertRange("TURF_WARS_BARRAGE_ARROW_SPREAD", 0.0D, 1.0D);
+    }
+
+    private static void assertRange(String key, double minimum, double maximum) {
+        GameDebugVariableCatalog.Variable variable = GameDebugVariableCatalog.variable(ArcadePortGame.TURF_WARS, key);
+        assertNotNull(variable, key + " must be exposed to the Turf Wars debug menu");
+        assertEquals(minimum, variable.minimum());
+        assertEquals(maximum, variable.maximum());
     }
 
     @Test
@@ -238,7 +263,11 @@ class GameDebugVariableCatalogTest {
                         && productionSources.contains("GameDebugRuntimeOverrides.longValue(key, fallback)")
                         || game == ArcadePortGame.TURF_WARS
                         && (key.endsWith("_MAX_ARROWS") || key.endsWith("_MAX_WOOL"))
-                        && productionSources.contains("GameDebugRuntimeOverrides.intValue(key, fallback)");
+                        && productionSources.contains("GameDebugRuntimeOverrides.intValue(key, fallback)")
+                        || game == ArcadePortGame.TURF_WARS
+                        && (key.equals("TURF_WARS_BUILD_BOUNDARY_DAMAGE")
+                                || key.equals("TURF_WARS_COMBAT_BOUNDARY_DAMAGE"))
+                        && productionSources.contains("turfWarsSpawnBoundaryDamage(session.turfCombat)");
                 boolean dynamicSkyWarsConsumer = game == ArcadePortGame.SKY_WARS
                         && key.startsWith("SKY_WARS_")
                         && (productionSources.contains("GameDebugRuntimeOverrides.longValue(key, fallback)")
