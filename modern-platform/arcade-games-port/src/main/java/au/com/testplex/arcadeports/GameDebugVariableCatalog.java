@@ -48,6 +48,8 @@ final class GameDebugVariableCatalog {
                 Object raw = field.get(null);
                 double value = raw instanceof Boolean enabled ? (enabled ? 1.0D : 0.0D)
                         : ((Number) raw).doubleValue();
+                if (game == ArcadePortGame.MONSTER_MAZE && source.getSimpleName().equals("MazeDebugRules")
+                        && name.equals("JUMPER_MAX_JUMPS")) value = 5.0D;
                 result.add(new Variable(key, humanize(name), kind, value,
                         minimum(name, value, kind), maximum(name, kind, value), step(name, value, kind)));
             } catch (IllegalAccessException ignored) {
@@ -159,7 +161,15 @@ final class GameDebugVariableCatalog {
                     "PLAYER_BUMP_COOLDOWN_MILLIS", "BUMP_RADIUS_BLOCKS", "BUMP_DAMAGE",
                     "BUMP_KNOCKBACK_STRENGTH", "BUMP_KNOCKBACK_Y_ADD", "BUMP_KNOCKBACK_Y_MAX",
                     "BODY_RUSH_STRENGTH", "BODY_RUSH_Y_ADD", "BODY_RUSH_Y_MAX",
-                    "SAFE_PAD_DECAY_STAGES", "SAFE_PAD_CAPTURE_RADIUS_BLOCKS").contains(name);
+                    "SAFE_PAD_DECAY_STAGES", "SAFE_PAD_CAPTURE_RADIUS_BLOCKS",
+                    "JUMPER_MAX_JUMPS", "JUMPER_JUMP_COOLDOWN_MILLIS",
+                    "SLOWBALL_MAX_SNOWBALLS", "SLOWBALL_REGEN_INTERVAL_MILLIS",
+                    "SLOWBALL_SLOW_TICKS", "SLOWBALL_SLOW_AMPLIFIER",
+                    "BODY_BUILDER_HEALTH_PER_PAD", "BODY_BUILDER_MAX_HEALTH",
+                    "BODY_RUSH_ACTIVATION_CHARGES", "BODY_RUSH_DURATION_REDUCTION_MILLIS",
+                    "BODY_RUSH_ACHIEVEMENT_CONTACTS", "REPULSOR_RADIUS_BLOCKS",
+                    "REPULSOR_LAUNCH_STRENGTH", "REPULSOR_LAUNCH_Y_ADD", "REPULSOR_LAUNCH_Y_MAX",
+                    "REPULSOR_GROUND_CLEANUP_DELAY_MILLIS", "REPULSOR_MAX_LIFETIME_MILLIS").contains(name);
         }
         return true;
     }
@@ -297,6 +307,10 @@ final class GameDebugVariableCatalog {
                 || name.equals("GROUND_POUND_VERTICAL_PROXIMITY")) return 0.0D;
         if (name.equals("REBOUND_MAX_IMPACT_DISTANCE_SQUARED")) return 0.0D;
         if (name.equals("SAFE_PAD_CAPTURE_RADIUS_BLOCKS")) return 0.5D;
+        if (name.equals("JUMPER_MAX_JUMPS") || name.equals("BODY_RUSH_ACHIEVEMENT_CONTACTS")) return 0.0D;
+        if (name.equals("SLOWBALL_MAX_SNOWBALLS") || name.equals("BODY_RUSH_ACTIVATION_CHARGES")) return 1.0D;
+        if (name.equals("BODY_BUILDER_MAX_HEALTH")) return 20.0D;
+        if (name.equals("REPULSOR_RADIUS_BLOCKS")) return 0.1D;
         if (name.equals("MOB_MOVE_SPEED")) return 0.05D;
         if (name.equals("BUMP_RADIUS_BLOCKS")) return 0.25D;
         if (name.endsWith("_SECONDS")) return 1.0D;
@@ -353,6 +367,19 @@ final class GameDebugVariableCatalog {
         if (name.equals("TURF_WARS_TERRITORY_KNOCKBACK_VERTICAL")) return 5.0D;
         if (name.equals("TURF_WARS_BARRAGE_ARROW_SPEED")) return 8.0D;
         if (name.equals("TURF_WARS_BARRAGE_ARROW_SPREAD")) return 1.0D;
+        if (name.equals("JUMPER_MAX_JUMPS") || name.equals("SLOWBALL_MAX_SNOWBALLS")
+                || name.equals("BODY_RUSH_ACTIVATION_CHARGES")
+                || name.equals("BODY_RUSH_ACHIEVEMENT_CONTACTS")) return 64.0D;
+        if (name.equals("SLOWBALL_SLOW_AMPLIFIER")) return 10.0D;
+        if (name.equals("SLOWBALL_SLOW_TICKS")) return 1_200.0D;
+        if (name.equals("SLOWBALL_REGEN_INTERVAL_MILLIS") || name.endsWith("CLEANUP_DELAY_MILLIS")
+                || name.equals("REPULSOR_MAX_LIFETIME_MILLIS")
+                || name.equals("BODY_RUSH_DURATION_REDUCTION_MILLIS")) return 120_000.0D;
+        if (name.equals("BODY_BUILDER_MAX_HEALTH")) return 80.0D;
+        if (name.equals("BODY_BUILDER_HEALTH_PER_PAD")) return 40.0D;
+        if (name.equals("REPULSOR_RADIUS_BLOCKS")) return 64.0D;
+        if (name.startsWith("REPULSOR_LAUNCH_")) return 8.0D;
+        if (name.equals("JUMPER_JUMP_COOLDOWN_MILLIS")) return 120_000.0D;
         if (name.startsWith("RUNNER_") && name.endsWith("_SPEED")) return 4.0D;
         if (name.equals("RUNNER_SWITCH_GRACE_MILLIS")) return 5_000.0D;
         if (name.equals("RUNNER_BLOCK_DECAY_MILLIS")) return 60_000.0D;

@@ -648,4 +648,30 @@ class GameDebugVariableCatalogTest {
     private static void assertContains(List<GameDebugVariableCatalog.Variable> variables, String key) {
         assertTrue(variables.stream().anyMatch(variable -> variable.key().equals(key)), key);
     }
+
+    @Test
+    void monsterMazeKitVariablesShowModeCorrectDefaultsAndValidatedRanges() {
+        GameDebugVariableCatalog.Variable originalJumps = GameDebugVariableCatalog.variable(
+                ArcadePortGame.MONSTER_MAZE, "MONSTER_MAZE_JUMPER_MAX_JUMPS");
+        GameDebugVariableCatalog.Variable speedJumps = GameDebugVariableCatalog.variable(
+                ArcadePortGame.MONSTER_MAZE_SPEED, "MONSTER_MAZE_SPEED_JUMPER_MAX_JUMPS");
+        GameDebugVariableCatalog.Variable modernJumps = GameDebugVariableCatalog.variable(
+                ArcadePortGame.MONSTER_MAZE_MODERN, "MONSTER_MAZE_MODERN_JUMPER_MAX_JUMPS");
+        GameDebugVariableCatalog.Variable modernSlow = GameDebugVariableCatalog.variable(
+                ArcadePortGame.MONSTER_MAZE_MODERN, "MONSTER_MAZE_MODERN_SLOWBALL_SLOW_TICKS");
+        GameDebugVariableCatalog.Variable modernRepulsor = GameDebugVariableCatalog.variable(
+                ArcadePortGame.MONSTER_MAZE_MODERN, "MONSTER_MAZE_MODERN_REPULSOR_RADIUS_BLOCKS");
+        assertNotNull(originalJumps);
+        assertNotNull(speedJumps);
+        assertNotNull(modernJumps);
+        assertNotNull(modernSlow);
+        assertNotNull(modernRepulsor);
+        assertEquals(5.0D, originalJumps.defaultValue());
+        assertEquals(3.0D, speedJumps.defaultValue());
+        assertEquals(0.0D, modernJumps.minimum());
+        assertEquals(1_200.0D, modernSlow.maximum());
+        assertEquals(0.1D, modernRepulsor.minimum());
+        assertEquals(64.0D, modernRepulsor.maximum());
+    }
+
 }

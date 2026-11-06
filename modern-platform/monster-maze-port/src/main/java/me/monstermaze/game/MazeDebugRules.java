@@ -28,6 +28,23 @@ public final class MazeDebugRules {
     public static final long CRYO_FREEZE_MILLIS = 3_000L;
     public static final int CRYO_RADIUS_BLOCKS = 6;
     public static final double JUMP_STRENGTH = 0.42D;
+    public static final int JUMPER_MAX_JUMPS = 3;
+    public static final long JUMPER_JUMP_COOLDOWN_MILLIS = 750L;
+    public static final int SLOWBALL_MAX_SNOWBALLS = 16;
+    public static final long SLOWBALL_REGEN_INTERVAL_MILLIS = 2_000L;
+    public static final int SLOWBALL_SLOW_TICKS = 40;
+    public static final int SLOWBALL_SLOW_AMPLIFIER = 1;
+    public static final double BODY_BUILDER_HEALTH_PER_PAD = 2.0D;
+    public static final double BODY_BUILDER_MAX_HEALTH = 30.0D;
+    public static final int BODY_RUSH_ACTIVATION_CHARGES = 2;
+    public static final long BODY_RUSH_DURATION_REDUCTION_MILLIS = 2_000L;
+    public static final int BODY_RUSH_ACHIEVEMENT_CONTACTS = 10;
+    public static final double REPULSOR_RADIUS_BLOCKS = 6.0D;
+    public static final double REPULSOR_LAUNCH_STRENGTH = 1.0D;
+    public static final double REPULSOR_LAUNCH_Y_ADD = 0.8D;
+    public static final double REPULSOR_LAUNCH_Y_MAX = 2.0D;
+    public static final long REPULSOR_GROUND_CLEANUP_DELAY_MILLIS = 500L;
+    public static final long REPULSOR_MAX_LIFETIME_MILLIS = 1_500L;
 
     private MazeDebugRules() { }
 
@@ -78,5 +95,92 @@ public final class MazeDebugRules {
 
     public static double bumpDamage(MazeMode mode) {
         return Math.max(0.0D, doubleValue(mode, "BUMP_DAMAGE", BUMP_DAMAGE));
+    }
+
+    public static int jumperMaxJumps(MazeMode mode) {
+        int defaultJumps = mode == null || mode == MazeMode.ORIGINAL ? 5 : JUMPER_MAX_JUMPS;
+        return Math.max(0, intValue(mode, "JUMPER_MAX_JUMPS", defaultJumps));
+    }
+
+    public static long jumperCooldownMillis(MazeMode mode) {
+        return Math.max(0L, longValue(mode, "JUMPER_JUMP_COOLDOWN_MILLIS", JUMPER_JUMP_COOLDOWN_MILLIS));
+    }
+
+    public static int slowballMaxSnowballs(MazeMode mode) {
+        return Math.max(1, intValue(mode, "SLOWBALL_MAX_SNOWBALLS", SLOWBALL_MAX_SNOWBALLS));
+    }
+
+    public static long slowballRegenIntervalMillis(MazeMode mode) {
+        return Math.max(1L, longValue(mode, "SLOWBALL_REGEN_INTERVAL_MILLIS", SLOWBALL_REGEN_INTERVAL_MILLIS));
+    }
+
+    public static int slowballSlowTicks(MazeMode mode) {
+        return Math.max(0, intValue(mode, "SLOWBALL_SLOW_TICKS", SLOWBALL_SLOW_TICKS));
+    }
+
+    public static int slowballSlowAmplifier(MazeMode mode) {
+        return Math.max(0, intValue(mode, "SLOWBALL_SLOW_AMPLIFIER", SLOWBALL_SLOW_AMPLIFIER));
+    }
+
+    public static double bodyBuilderHealthPerPad(MazeMode mode) {
+        return Math.max(0.0D, doubleValue(mode, "BODY_BUILDER_HEALTH_PER_PAD", BODY_BUILDER_HEALTH_PER_PAD));
+    }
+
+    public static double bodyBuilderMaxHealth(MazeMode mode) {
+        return Math.max(20.0D, doubleValue(mode, "BODY_BUILDER_MAX_HEALTH", BODY_BUILDER_MAX_HEALTH));
+    }
+
+    public static double bodyBuilderMaxHealthAfterPad(MazeMode mode, double currentMaxHealth) {
+        if (!Double.isFinite(currentMaxHealth)) return bodyBuilderMaxHealth(mode);
+        double cap = bodyBuilderMaxHealth(mode);
+        return currentMaxHealth >= cap ? currentMaxHealth
+                : Math.min(cap, Math.max(20.0D, currentMaxHealth) + bodyBuilderHealthPerPad(mode));
+    }
+
+    public static int bodyRushActivationCharges(MazeMode mode) {
+        return Math.max(1, intValue(mode, "BODY_RUSH_ACTIVATION_CHARGES", BODY_RUSH_ACTIVATION_CHARGES));
+    }
+
+    public static long bodyRushDurationReductionMillis(MazeMode mode) {
+        return Math.max(0L, longValue(mode, "BODY_RUSH_DURATION_REDUCTION_MILLIS",
+                BODY_RUSH_DURATION_REDUCTION_MILLIS));
+    }
+
+    public static int bodyRushAchievementContacts(MazeMode mode) {
+        return Math.max(1, intValue(mode, "BODY_RUSH_ACHIEVEMENT_CONTACTS", BODY_RUSH_ACHIEVEMENT_CONTACTS));
+    }
+
+    public static boolean shouldAwardBodyRushAchievement(MazeMode mode, int contacts) {
+        return contacts >= bodyRushAchievementContacts(mode);
+    }
+
+    public static long bodyRushUntilAfterContact(MazeMode mode, long activeUntilMillis) {
+        long reduction = bodyRushDurationReductionMillis(mode);
+        return activeUntilMillis < Long.MIN_VALUE + reduction ? Long.MIN_VALUE : activeUntilMillis - reduction;
+    }
+
+    public static double repulsorRadiusBlocks(MazeMode mode) {
+        return Math.max(0.1D, doubleValue(mode, "REPULSOR_RADIUS_BLOCKS", REPULSOR_RADIUS_BLOCKS));
+    }
+
+    public static double repulsorLaunchStrength(MazeMode mode) {
+        return Math.max(0.0D, doubleValue(mode, "REPULSOR_LAUNCH_STRENGTH", REPULSOR_LAUNCH_STRENGTH));
+    }
+
+    public static double repulsorLaunchYAdd(MazeMode mode) {
+        return Math.max(0.0D, doubleValue(mode, "REPULSOR_LAUNCH_Y_ADD", REPULSOR_LAUNCH_Y_ADD));
+    }
+
+    public static double repulsorLaunchYMax(MazeMode mode) {
+        return Math.max(0.0D, doubleValue(mode, "REPULSOR_LAUNCH_Y_MAX", REPULSOR_LAUNCH_Y_MAX));
+    }
+
+    public static long repulsorGroundCleanupDelayMillis(MazeMode mode) {
+        return Math.max(0L, longValue(mode, "REPULSOR_GROUND_CLEANUP_DELAY_MILLIS",
+                REPULSOR_GROUND_CLEANUP_DELAY_MILLIS));
+    }
+
+    public static long repulsorMaxLifetimeMillis(MazeMode mode) {
+        return Math.max(1L, longValue(mode, "REPULSOR_MAX_LIFETIME_MILLIS", REPULSOR_MAX_LIFETIME_MILLIS));
     }
 }

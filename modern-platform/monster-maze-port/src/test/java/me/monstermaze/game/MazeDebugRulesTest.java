@@ -67,4 +67,61 @@ class MazeDebugRulesTest {
         assertEquals(11, MazeDebugRules.SAFE_PAD_DECAY_STAGES);
         assertEquals(2.0D, MazeDebugRules.SAFE_PAD_CAPTURE_RADIUS_BLOCKS);
     }
+
+    @Test void kitMechanicsHaveModeScopedTuningAndRestoreSourceDefaults() {
+        assertEquals(5, MazeDebugRules.jumperMaxJumps(MazeMode.ORIGINAL));
+        assertEquals(3, MazeDebugRules.jumperMaxJumps(MazeMode.SPEED));
+        assertEquals(750L, MazeDebugRules.jumperCooldownMillis(MazeMode.ORIGINAL));
+        assertEquals(16, MazeDebugRules.slowballMaxSnowballs(MazeMode.ORIGINAL));
+        assertEquals(2_000L, MazeDebugRules.slowballRegenIntervalMillis(MazeMode.ORIGINAL));
+        assertEquals(40, MazeDebugRules.slowballSlowTicks(MazeMode.ORIGINAL));
+        assertEquals(1, MazeDebugRules.slowballSlowAmplifier(MazeMode.ORIGINAL));
+        assertEquals(22.0D, MazeDebugRules.bodyBuilderMaxHealthAfterPad(MazeMode.MODERN, 20.0D));
+        assertEquals(30.0D, MazeDebugRules.bodyBuilderMaxHealthAfterPad(MazeMode.MODERN, 29.0D));
+        assertEquals(10_000L, MazeDebugRules.bodyRushUntilAfterContact(MazeMode.MODERN, 12_000L));
+        assertFalse(MazeDebugRules.shouldAwardBodyRushAchievement(MazeMode.MODERN, 9));
+        assertTrue(MazeDebugRules.shouldAwardBodyRushAchievement(MazeMode.MODERN, 10));
+        assertEquals(6.0D, MazeDebugRules.repulsorRadiusBlocks(MazeMode.MODERN));
+        assertEquals(1.0D, MazeDebugRules.repulsorLaunchStrength(MazeMode.MODERN));
+        assertEquals(0.8D, MazeDebugRules.repulsorLaunchYAdd(MazeMode.MODERN));
+        assertEquals(2.0D, MazeDebugRules.repulsorLaunchYMax(MazeMode.MODERN));
+        assertEquals(500L, MazeDebugRules.repulsorGroundCleanupDelayMillis(MazeMode.MODERN));
+        assertEquals(1_500L, MazeDebugRules.repulsorMaxLifetimeMillis(MazeMode.MODERN));
+
+        GameDebugRuntimeOverrides.activate(Map.ofEntries(
+                Map.entry("MONSTER_MAZE_MODERN_JUMPER_MAX_JUMPS", 7),
+                Map.entry("MONSTER_MAZE_MODERN_JUMPER_JUMP_COOLDOWN_MILLIS", 100L),
+                Map.entry("MONSTER_MAZE_MODERN_SLOWBALL_MAX_SNOWBALLS", 8),
+                Map.entry("MONSTER_MAZE_MODERN_SLOWBALL_REGEN_INTERVAL_MILLIS", 500L),
+                Map.entry("MONSTER_MAZE_MODERN_SLOWBALL_SLOW_TICKS", 80),
+                Map.entry("MONSTER_MAZE_MODERN_SLOWBALL_SLOW_AMPLIFIER", 2),
+                Map.entry("MONSTER_MAZE_MODERN_BODY_BUILDER_HEALTH_PER_PAD", 4.0D),
+                Map.entry("MONSTER_MAZE_MODERN_BODY_BUILDER_MAX_HEALTH", 40.0D),
+                Map.entry("MONSTER_MAZE_MODERN_BODY_RUSH_DURATION_REDUCTION_MILLIS", 500L),
+                Map.entry("MONSTER_MAZE_MODERN_BODY_RUSH_ACHIEVEMENT_CONTACTS", 3),
+                Map.entry("MONSTER_MAZE_MODERN_REPULSOR_RADIUS_BLOCKS", 10.0D),
+                Map.entry("MONSTER_MAZE_MODERN_REPULSOR_LAUNCH_STRENGTH", 2.0D),
+                Map.entry("MONSTER_MAZE_MODERN_REPULSOR_LAUNCH_Y_ADD", 1.5D),
+                Map.entry("MONSTER_MAZE_MODERN_REPULSOR_LAUNCH_Y_MAX", 3.0D),
+                Map.entry("MONSTER_MAZE_MODERN_REPULSOR_GROUND_CLEANUP_DELAY_MILLIS", 100L),
+                Map.entry("MONSTER_MAZE_MODERN_REPULSOR_MAX_LIFETIME_MILLIS", 3_000L)));
+
+        assertEquals(7, MazeDebugRules.jumperMaxJumps(MazeMode.MODERN));
+        assertEquals(5, MazeDebugRules.jumperMaxJumps(MazeMode.ORIGINAL), "mode-specific profiles do not leak");
+        assertEquals(8, MazeDebugRules.slowballMaxSnowballs(MazeMode.MODERN));
+        assertEquals(80, MazeDebugRules.slowballSlowTicks(MazeMode.MODERN));
+        assertEquals(2, MazeDebugRules.slowballSlowAmplifier(MazeMode.MODERN));
+        assertEquals(24.0D, MazeDebugRules.bodyBuilderMaxHealthAfterPad(MazeMode.MODERN, 20.0D));
+        assertEquals(40.0D, MazeDebugRules.bodyBuilderMaxHealthAfterPad(MazeMode.MODERN, 39.0D));
+        assertEquals(11_500L, MazeDebugRules.bodyRushUntilAfterContact(MazeMode.MODERN, 12_000L));
+        assertTrue(MazeDebugRules.shouldAwardBodyRushAchievement(MazeMode.MODERN, 3));
+        assertEquals(10.0D, MazeDebugRules.repulsorRadiusBlocks(MazeMode.MODERN));
+        assertEquals(2.0D, MazeDebugRules.repulsorLaunchStrength(MazeMode.MODERN));
+
+        GameDebugRuntimeOverrides.clear();
+        assertEquals(3, MazeDebugRules.jumperMaxJumps(MazeMode.MODERN));
+        assertEquals(16, MazeDebugRules.slowballMaxSnowballs(MazeMode.MODERN));
+        assertEquals(22.0D, MazeDebugRules.bodyBuilderMaxHealthAfterPad(MazeMode.MODERN, 20.0D));
+        assertEquals(6.0D, MazeDebugRules.repulsorRadiusBlocks(MazeMode.MODERN));
+    }
 }

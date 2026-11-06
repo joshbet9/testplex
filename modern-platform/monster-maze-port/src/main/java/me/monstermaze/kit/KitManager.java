@@ -134,16 +134,17 @@ public class KitManager implements Listener {
         Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
 
 
-        // Slowball constructor tick (every 2 seconds = PerkConstructor rate)
+        // Poll the PerkConstructor at short intervals so its per-mode delay is tunable.
         Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
+            private int ticks;
             @Override
             public void run() {
                 if (game.getState() != GameState.LIVE) return;
                 constructorSlowball();
                 // Re-sync per-observer views so late/returning players show up correctly.
-                refreshViews();
+                if (++ticks % 8 == 0) refreshViews();
             }
-        }, 40L, 40L);
+        }, 5L, 5L);
 
         // Jumper jumpEvent + Repulsor launched cleanup every tick
         Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
@@ -237,7 +238,8 @@ public class KitManager implements Listener {
             case BODY_BUILDER:
                 // compass only (plus the Body Rush secondary item in QOL modes)
                 if (game.qolEnabled()) {
-                    player.getInventory().setItem(0, bodyRushItem(2));
+                    player.getInventory().setItem(0, bodyRushItem(
+                            MazeDebugRules.bodyRushActivationCharges(game.getMode())));
                 }
                 break;
             case REPULSOR:
@@ -380,7 +382,8 @@ public class KitManager implements Listener {
 
             // Recharge 750ms
             Long last = jumpRecharge.get(p.getUniqueId());
-            if (last != null && System.currentTimeMillis() - last < 750L) continue;
+            if (last != null && System.currentTimeMillis() - last
+                    < MazeDebugRules.jumperCooldownMillis(game.getMode())) continue;
 
             // Don't consume while launched by bump (isLaunched)
             if (isPlayerLaunched(p)) continue;
@@ -620,11 +623,17 @@ public class KitManager implements Listener {
             if (getKit(p) != KitType.SLOWBALL || !MazeDebugRules.kitEnabled(p.getUniqueId(), "slowball")) continue;
 
             ItemStack slot = p.getInventory().getItem(0);
-            if (slot != null && slot.getType() == Material.SNOWBALL && slot.getAmount() >= 16) continue;
+            if (slot != null && slot.getType() == Material.SNOWBALL
+                    && slot.getAmount() >= MazeDebugRules.slowballMaxSnowballs(game.getMode())) continue;
+
+            long now = System.currentTimeMillis();
+            long lastGiven = snowballConstructor.getOrDefault(p.getUniqueId(), now);
+            if (now - lastGiven < MazeDebugRules.slowballRegenIntervalMillis(game.getMode())) continue;
 
             int amount = (slot != null && slot.getType() == Material.SNOWBALL) ? slot.getAmount() : 0;
             // Always rebuild with the live Cryo Blitz cooldown lore.
             p.getInventory().setItem(0, slowballItem(p.getUniqueId(), amount + 1));
+            snowballConstructor.put(p.getUniqueId(), now);
             p.updateInventory();
         }
     }
@@ -660,7 +669,9 @@ public class KitManager implements Listener {
         }
 
         // Manager.GetCondition().Factory().Slow(..., 2, 1, ...) → 2 seconds, amplifier 1
-        target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 1), true);
+          target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,
+                  MazeDebugRules.slowballSlowTicks(game.getMode()),
+                  MazeDebugRules.slowballSlowAmplifier(game.getMode())), true);
         game.noteOutOfCupSlowball(shooter, target);
         target.getWorld().playSound(target.getLocation(), Sound.ENTITY_SLIME_SQUISH, 1f, 1.2f);
     }
@@ -689,8 +700,9 @@ public class KitManager implements Listener {
             if (getKit(player) == KitType.BODY_BUILDER
                     && MazeDebugRules.kitEnabled(player.getUniqueId(), "body-builder")) {
                 double max = player.getMaxHealth();
-                if (max < 30.0) {
-                    player.setMaxHealth(Math.min(30.0, max + 2.0));
+                  double configuredCap = MazeDebugRules.bodyBuilderMaxHealth(game.getMode());
+                  if (max < configuredCap) {
+                      player.setMaxHealth(MazeDebugRules.bodyBuilderMaxHealthAfterPad(game.getMode(), max));
                     // hearts particle approx
                     player.getWorld().spawnParticle(Particle.HEART, player.getEyeLocation().add(0, 0.5, 0), 6, 0.2, 0.2, 0.2, 0);
                 }
@@ -709,7 +721,7 @@ public class KitManager implements Listener {
 
     /** Jumper jump charges for the active mode. QOL modes (Speed/Modern) = 3 leaps, Original = 5. */
     private int jumperMaxJumps() {
-        return game.qolEnabled() ? 3 : 5;
+        return MazeDebugRules.jumperMaxJumps(game.getMode());
     }
 
     /** Legacy name used by GameManager. */
@@ -778,15 +790,19 @@ public class KitManager implements Listener {
             player.getWorld().spawnParticle(Particle.FIREWORK, player.getLocation().add(0, 0.5, 0), 20, 0.2, 0.2, 0.2, 0.05);
         }
 
-        // Radius 6 — living non-players
-        for (Entity ent : player.getNearbyEntities(6, 6, 6)) {
+          // Source radius — living non-players.
+          double radius = MazeDebugRules.repulsorRadiusBlocks(game.getMode());
+          double radiusSquared = radius * radius;
+          for (Entity ent : player.getNearbyEntities(radius, radius, radius)) {
             if (ent instanceof Player) continue;
             if (!(ent instanceof LivingEntity)) continue;
-            if (player.getLocation().distanceSquared(ent.getLocation()) > 36) continue;
+              if (player.getLocation().distanceSquared(ent.getLocation()) > radiusSquared) continue;
 
             ent.playEffect(org.bukkit.EntityEffect.HURT);
-            // Exact: UtilAction.velocity(ent, UtilAlg.getTrajectory2d(player, ent), 1, true, 0, 0.8, 2, true);
-            UtilAction.velocity(ent, UtilAlg.getTrajectory2d(player, ent), 1, true, 0, 0.8, 2, true);
+              UtilAction.velocity(ent, UtilAlg.getTrajectory2d(player, ent),
+                      MazeDebugRules.repulsorLaunchStrength(game.getMode()), true, 0,
+                      MazeDebugRules.repulsorLaunchYAdd(game.getMode()),
+                      MazeDebugRules.repulsorLaunchYMax(game.getMode()), true);
 
             launched.put(ent, System.currentTimeMillis());
             Bukkit.getPluginManager().callEvent(new EntityLaunchEvent(ent));
@@ -815,13 +831,14 @@ public class KitManager implements Listener {
                 continue;
             }
             // On ground after 500ms
-            if (en.isOnGround() && now - start >= 500L) {
+            if (en.isOnGround() && now - start
+                    >= MazeDebugRules.repulsorGroundCleanupDelayMillis(game.getMode())) {
                 removeLaunched(en);
                 it.remove();
                 continue;
             }
             // Timeout 1500ms
-            if (now - start >= 1500L) {
+            if (now - start >= MazeDebugRules.repulsorMaxLifetimeMillis(game.getMode())) {
                 removeLaunched(en);
                 it.remove();
             }
@@ -880,7 +897,8 @@ public class KitManager implements Listener {
         bodyRushUntil.put(player.getUniqueId(), now + bodyRushDurationMillis());
         bodyRushHitFeedback.remove(player.getUniqueId());
         bodyRushVisual(player);
-        TextUtil.actionBar(player, ChatColor.RED + ChatColor.BOLD.toString() + "BODY RUSH 10.0s");
+          TextUtil.actionBar(player, ChatColor.RED + ChatColor.BOLD.toString() + "BODY RUSH "
+                  + String.format(java.util.Locale.US, "%.1fs", bodyRushDurationMillis() / 1000.0D));
         Bukkit.getPluginManager().callEvent(new AbilityUseEvent(player));
     }
 
@@ -898,8 +916,9 @@ public class KitManager implements Listener {
         long now=System.currentTimeMillis();
         Long until=bodyRushUntil.get(id);
         if (until==null || until.longValue()<=now) { bodyRushUntil.remove(id); return 0; }
-        long remaining=until.longValue()-2000L;
-        if (bodyRushLaunches.merge(id, 1, Integer::sum) == 10) game.recordAchievement(id, "stampede");
+          long remaining = MazeDebugRules.bodyRushUntilAfterContact(game.getMode(), until.longValue());
+          if (MazeDebugRules.shouldAwardBodyRushAchievement(game.getMode(),
+                  bodyRushLaunches.merge(id, 1, Integer::sum))) game.recordAchievement(id, "stampede");
         bodyRushHitFeedback.put(id,now+750L);
         bodyRushImpactVisual(player);
         if (remaining<=now) { bodyRushUntil.remove(id); return 0; }
