@@ -1121,10 +1121,6 @@ public final class HoopsRemasteredRuntime implements Listener {
         String key = "local-achievements." + id + "." + GAME_ID + "." + achievementId;
         if (plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
-        String name = ArcadeProgressCatalog.achievements(GAME_ID).stream()
-                .filter(achievement -> achievement.id().equals(achievementId))
-                .map(ArcadeProgressCatalog.Achievement::name).findFirst().orElse(achievementId);
-        if (player != null && player.isOnline()) player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + name);
     }
 
     private void stopRuntime() {

@@ -666,6 +666,19 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                             ChatColor.GRAY + "Choose this kit for your next " + selectedGame.displayName() + ".",
                             ChatColor.GREEN + "Click to select");
                 }
+                // Share the genuine per-game achievement requirements with /stats.
+                // The separate achievement-kit audit controls selection enforcement.
+                List<String> requirements = manager.achievementKitRequirementLore(
+                        p.getUniqueId(), selectedGame, choice);
+                if (!requirements.isEmpty()) {
+                    org.bukkit.inventory.meta.ItemMeta kitMeta = it.getItemMeta();
+                    List<String> lore = new java.util.ArrayList<>(kitMeta.getLore() == null
+                            ? List.of() : kitMeta.getLore());
+                    lore.add(" ");
+                    lore.addAll(requirements);
+                    kitMeta.setLore(lore);
+                    it.setItemMeta(kitMeta);
+                }
                 mark(it, "kit:" + choice.id, null);
                 inv.setItem(KIT_MENU_SLOTS[i], it);
             }

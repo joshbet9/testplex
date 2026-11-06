@@ -1887,9 +1887,6 @@ public final class CameraShyGame implements Listener {
             plugin.getConfig().set(key, true);
             Player player = Bukkit.getPlayer(id);
             if (player != null && player.isOnline()) {
-                player.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "MILESTONE COMPLETE: "
-                        + ChatColor.YELLOW + milestone.name() + ChatColor.GRAY
-                        + " (" + milestone.target() + " " + milestone.unit() + ")");
                 player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.9F, 1.2F);
             }
         }
@@ -1900,13 +1897,8 @@ public final class CameraShyGame implements Listener {
         String key = "local-achievements." + id + ".camera-shy." + achievementId;
         if (plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
-        String name = CameraShyProgressCatalog.achievements().stream()
-                .filter(achievement -> achievement.id().equals(achievementId))
-                .map(CameraShyProgressCatalog.Achievement::name).findFirst().orElse(achievementId);
         Player player = Bukkit.getPlayer(id);
         if (player != null && player.isOnline()) {
-            player.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "ACHIEVEMENT UNLOCKED: "
-                    + ChatColor.YELLOW + name);
             player.playSound(player.getLocation(), Sound.UI_TOAST_IN, 0.9F, 1.25F);
         }
         plugin.saveConfig();
