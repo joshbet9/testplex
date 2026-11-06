@@ -493,9 +493,19 @@ class GameDebugEventCatalogTest {
             assertTrue(lobby.contains("features.put(\"" + key + "\""), key + " is configurable");
             assertTrue(game.contains("debugFeatureEnabled(player, \"" + key + "\")"),
                     key + " gates the active gameplay action");
-            assertTrue(lobby.contains("Set.of(\"batting\", \"catching\", \"kit-abilities\").contains(key)"),
-                    key + " is marked for immediate application");
         }
+        assertTrue(lobby.contains("List.of(\"slugger\", \"technician\", \"curve-artist\", \"sprinter\", \"skyguard\")"));
+        assertTrue(lobby.contains("features.put(key, new DebugFeature(key"));
+        assertTrue(game.contains("debugFeatureEnabled(player, \"ability-\" + kit.id())"),
+                "each selected kit has its own independently gated ability");
+        assertTrue(lobby.contains("key.startsWith(\"ability-\")"),
+                "ability switches are applied immediately to the selected tester");
+        assertTrue(game.contains("serverTick + PlexballRules.introTicks()"));
+        assertTrue(game.contains("serverTick + PlexballRules.turnBreakTicks()"));
+        assertTrue(game.contains("random.nextInt(maximumCycle - minimumCycle + 1)"));
+        assertTrue(game.contains("PlexballRules.kitBattingPower(kit.id(), kit.battingPower)"));
+        assertTrue(game.contains("PlexballRules.battingBaseHorizontalSpeed()"));
+        assertTrue(game.contains("PlexballRules.technicianTimingBonusTicks()"));
         assertTrue(game.contains("!plugin.hasAdminAccess(player)) return true"),
                 "non-authorised players retain normal Plexball rules");
         assertTrue(GameDebugEventCatalog.events(ArcadePortGame.PLEXBALL).stream()

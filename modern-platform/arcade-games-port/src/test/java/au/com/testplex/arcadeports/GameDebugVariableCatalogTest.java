@@ -727,15 +727,65 @@ class GameDebugVariableCatalogTest {
 
     @Test
     void plexballDebugValuesChangePlayerValidationAndFieldRules() {
-        GameDebugRuntimeOverrides.activate(Map.of(
-                "PLEXBALL_MIN_PLAYERS", 4,
-                "PLEXBALL_MAX_PLAYERS", 8,
-                "PLEXBALL_FAIR_ANGLE_DEGREES", 10.0D));
+        GameDebugRuntimeOverrides.activate(Map.ofEntries(
+                Map.entry("PLEXBALL_MIN_PLAYERS", 4),
+                Map.entry("PLEXBALL_MAX_PLAYERS", 8),
+                Map.entry("PLEXBALL_FAIR_ANGLE_DEGREES", 10.0D),
+                Map.entry("PLEXBALL_INTRO_TICKS", 5),
+                Map.entry("PLEXBALL_TURN_BREAK_TICKS", 3),
+                Map.entry("PLEXBALL_TIMING_CYCLE_MIN_TICKS", 8),
+                Map.entry("PLEXBALL_TIMING_CYCLE_MAX_TICKS", 12),
+                Map.entry("PLEXBALL_TECHNICIAN_TIMING_BONUS_TICKS", 4),
+                Map.entry("PLEXBALL_SLUGGER_BATTING_POWER", 1.5D),
+                Map.entry("PLEXBALL_BATTING_BASE_HORIZONTAL_SPEED", 4.0D),
+                Map.entry("PLEXBALL_TIMING_POWER_BASE", 0.5D),
+                Map.entry("PLEXBALL_TIMING_PERFECT_MAX_TICKS", 0),
+                Map.entry("PLEXBALL_TIMING_POOR_POWER", 0.1D)));
 
         assertFalse(PlexballRules.hasValidPlayerCount(2));
         assertTrue(PlexballRules.hasValidPlayerCount(6));
         assertFalse(PlexballRules.hasValidPlayerCount(9));
         assertFalse(PlexballRules.isFairYaw(160.0D));
+        assertEquals(5, PlexballRules.introTicks());
+        assertEquals(3, PlexballRules.turnBreakTicks());
+        assertEquals(8, PlexballRules.timingCycleMinTicks());
+        assertEquals(12, PlexballRules.timingCycleMaxTicks());
+        assertEquals(4, PlexballRules.technicianTimingBonusTicks());
+        assertEquals(1.5D, PlexballRules.kitBattingPower("slugger", PlexballRules.SLUGGER_BATTING_POWER));
+        assertEquals(4.0D, PlexballRules.battingBaseHorizontalSpeed());
+        assertEquals(0.5D, PlexballRules.timingPowerBase());
+        assertEquals(0.1D, PlexballRules.timingMultiplier(100));
+        assertEquals(1.0D, PlexballRules.timingMultiplier(0));
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertEquals(PlexballRules.INTRO_TICKS, PlexballRules.introTicks());
+        assertEquals(PlexballRules.TURN_BREAK_TICKS, PlexballRules.turnBreakTicks());
+        assertEquals(PlexballRules.TIMING_CYCLE_MIN_TICKS, PlexballRules.timingCycleMinTicks());
+        assertEquals(PlexballRules.SLUGGER_BATTING_POWER,
+                PlexballRules.kitBattingPower("slugger", PlexballRules.SLUGGER_BATTING_POWER));
+        assertEquals(PlexballRules.TIMING_PERFECT_POWER, PlexballRules.timingMultiplier(0));
+        assertEquals(PlexballRules.TIMING_POOR_POWER, PlexballRules.timingMultiplier(100));
+    }
+
+    @Test
+    void plexballDebugVariablesExposeBoundedPhysicsAndPhaseControls() {
+        for (String key : List.of("PLEXBALL_INTRO_TICKS", "PLEXBALL_TURN_BREAK_TICKS",
+                "PLEXBALL_TIMING_CYCLE_MIN_TICKS", "PLEXBALL_TIMING_CYCLE_MAX_TICKS",
+                "PLEXBALL_TECHNICIAN_TIMING_BONUS_TICKS", "PLEXBALL_SLUGGER_BATTING_POWER",
+                "PLEXBALL_TECHNICIAN_BATTING_POWER", "PLEXBALL_CURVE_ARTIST_BATTING_POWER",
+                "PLEXBALL_SPRINTER_BATTING_POWER", "PLEXBALL_SKYGUARD_BATTING_POWER",
+                "PLEXBALL_BATTING_BASE_HORIZONTAL_SPEED", "PLEXBALL_BATTING_CONTACT_HORIZONTAL_SCALE",
+                "PLEXBALL_BATTING_BASE_VERTICAL_SPEED", "PLEXBALL_BATTING_CONTACT_VERTICAL_SCALE",
+                "PLEXBALL_TIMING_POWER_BASE", "PLEXBALL_TIMING_POWER_SCALE",
+                "PLEXBALL_TIMING_PERFECT_MAX_TICKS", "PLEXBALL_TIMING_GREAT_MAX_TICKS",
+                "PLEXBALL_TIMING_GOOD_MAX_TICKS", "PLEXBALL_TIMING_FAIR_MAX_TICKS",
+                "PLEXBALL_TIMING_WEAK_MAX_TICKS", "PLEXBALL_TIMING_PERFECT_POWER",
+                "PLEXBALL_TIMING_GREAT_POWER", "PLEXBALL_TIMING_GOOD_POWER",
+                "PLEXBALL_TIMING_FAIR_POWER", "PLEXBALL_TIMING_WEAK_POWER", "PLEXBALL_TIMING_POOR_POWER")) {
+            GameDebugVariableCatalog.Variable variable = GameDebugVariableCatalog.variable(ArcadePortGame.PLEXBALL, key);
+            assertNotNull(variable, key + " appears in the game's sorted debug controls");
+            assertTrue(variable.maximum() > variable.minimum(), key + " has a useful bounded range");
+        }
     }
 
     @Test

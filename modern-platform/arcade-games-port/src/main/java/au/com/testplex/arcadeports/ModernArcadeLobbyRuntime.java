@@ -1462,6 +1462,12 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     "Allow this tester to start their normal catch window during ball flight.", true));
             features.put("kit-abilities", new DebugFeature("kit-abilities", "Kit abilities", Material.FIREWORK_STAR,
                     "Allow this tester to use their selected Plexball kit ability.", true));
+            for (String kit : List.of("slugger", "technician", "curve-artist", "sprinter", "skyguard")) {
+                String key = "ability-" + kit;
+                features.put(key, new DebugFeature(key, "Ability: " + humanizeDebugKey(kit),
+                        Material.FIREWORK_STAR,
+                        "Allow this tester to use " + humanizeDebugKey(kit) + " ability while its kit is selected.", true));
+            }
         }
         if (game == ArcadePortGame.MICRO_BATTLES) {
             for (String kit : List.of("archer", "fighter", "dasher")) {
@@ -1615,7 +1621,9 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.SKY_WARS && key.startsWith("ability-"))
                 || (game == ArcadePortGame.SKY_WARS && Set.of("chest-looting", "island-crumbling", "tnt-generator").contains(key))
                 || (game == ArcadePortGame.WIZARDS && Set.of("spell-casting", "chest-looting").contains(key))
-                || (game == ArcadePortGame.PLEXBALL && Set.of("batting", "catching", "kit-abilities").contains(key))
+                || (game == ArcadePortGame.PLEXBALL
+                        && (Set.of("batting", "catching", "kit-abilities").contains(key)
+                                || key.startsWith("ability-")))
                 || (game == ArcadePortGame.SNAKE
                         && (key.startsWith("ability-") || "tail-collisions".equals(key)
                                 || "self-collisions".equals(key) || "opponent-collisions".equals(key)

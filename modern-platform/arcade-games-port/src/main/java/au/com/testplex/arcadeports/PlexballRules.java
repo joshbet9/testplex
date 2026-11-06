@@ -34,6 +34,33 @@ public final class PlexballRules {
     public static final double SKYGUARD_LEAP_SPEED = 0.48D;
     public static final int BASE_CATCH_WINDOW_TICKS = 8;
     public static final double BASE_CATCH_RADIUS = 1.25D;
+    public static final int INTRO_TICKS = 40;
+    public static final int TURN_BREAK_TICKS = 12;
+    public static final int TIMING_CYCLE_MIN_TICKS = 30;
+    public static final int TIMING_CYCLE_MAX_TICKS = 42;
+    public static final int TECHNICIAN_TIMING_BONUS_TICKS = 2;
+    public static final double BATTING_BASE_HORIZONTAL_SPEED = 3.0D;
+    public static final double BATTING_CONTACT_HORIZONTAL_SCALE = 1.1D;
+    public static final double BATTING_BASE_VERTICAL_SPEED = 0.47D;
+    public static final double BATTING_CONTACT_VERTICAL_SCALE = 0.25D;
+    public static final double TIMING_POWER_BASE = 0.65D;
+    public static final double TIMING_POWER_SCALE = 0.35D;
+    public static final double SLUGGER_BATTING_POWER = 1.07D;
+    public static final double TECHNICIAN_BATTING_POWER = 1.00D;
+    public static final double CURVE_ARTIST_BATTING_POWER = 0.97D;
+    public static final double SPRINTER_BATTING_POWER = 1.00D;
+    public static final double SKYGUARD_BATTING_POWER = 0.99D;
+    public static final int TIMING_PERFECT_MAX_TICKS = 2;
+    public static final int TIMING_GREAT_MAX_TICKS = 4;
+    public static final int TIMING_GOOD_MAX_TICKS = 6;
+    public static final int TIMING_FAIR_MAX_TICKS = 9;
+    public static final int TIMING_WEAK_MAX_TICKS = 13;
+    public static final double TIMING_PERFECT_POWER = 1.00D;
+    public static final double TIMING_GREAT_POWER = 0.94D;
+    public static final double TIMING_GOOD_POWER = 0.84D;
+    public static final double TIMING_FAIR_POWER = 0.70D;
+    public static final double TIMING_WEAK_POWER = 0.54D;
+    public static final double TIMING_POOR_POWER = 0.38D;
 
     private PlexballRules() { }
 
@@ -72,6 +99,68 @@ public final class PlexballRules {
     public static double battingPower(double kitPower) {
         return kitPower * GameDebugRuntimeOverrides.doubleValue(
                 "PLEXBALL_BATTING_POWER_MULTIPLIER", BATTING_POWER_MULTIPLIER);
+    }
+
+    public static int introTicks() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue("PLEXBALL_INTRO_TICKS", INTRO_TICKS));
+    }
+
+    public static int turnBreakTicks() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue("PLEXBALL_TURN_BREAK_TICKS", TURN_BREAK_TICKS));
+    }
+
+    public static int timingCycleMinTicks() {
+        return Math.max(4, GameDebugRuntimeOverrides.intValue(
+                "PLEXBALL_TIMING_CYCLE_MIN_TICKS", TIMING_CYCLE_MIN_TICKS));
+    }
+
+    public static int timingCycleMaxTicks() {
+        return Math.max(timingCycleMinTicks(), GameDebugRuntimeOverrides.intValue(
+                "PLEXBALL_TIMING_CYCLE_MAX_TICKS", TIMING_CYCLE_MAX_TICKS));
+    }
+
+    public static int technicianTimingBonusTicks() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "PLEXBALL_TECHNICIAN_TIMING_BONUS_TICKS", TECHNICIAN_TIMING_BONUS_TICKS));
+    }
+
+    public static double kitBattingPower(String kit, double sourceDefault) {
+        return switch (kit == null ? "" : kit.toLowerCase(java.util.Locale.ROOT)) {
+            case "slugger" -> GameDebugRuntimeOverrides.doubleValue("PLEXBALL_SLUGGER_BATTING_POWER", sourceDefault);
+            case "technician" -> GameDebugRuntimeOverrides.doubleValue("PLEXBALL_TECHNICIAN_BATTING_POWER", sourceDefault);
+            case "curve-artist" -> GameDebugRuntimeOverrides.doubleValue("PLEXBALL_CURVE_ARTIST_BATTING_POWER", sourceDefault);
+            case "sprinter" -> GameDebugRuntimeOverrides.doubleValue("PLEXBALL_SPRINTER_BATTING_POWER", sourceDefault);
+            case "skyguard" -> GameDebugRuntimeOverrides.doubleValue("PLEXBALL_SKYGUARD_BATTING_POWER", sourceDefault);
+            default -> sourceDefault;
+        };
+    }
+
+    public static double battingBaseHorizontalSpeed() {
+        return GameDebugRuntimeOverrides.doubleValue(
+                "PLEXBALL_BATTING_BASE_HORIZONTAL_SPEED", BATTING_BASE_HORIZONTAL_SPEED);
+    }
+
+    public static double battingContactHorizontalScale() {
+        return GameDebugRuntimeOverrides.doubleValue(
+                "PLEXBALL_BATTING_CONTACT_HORIZONTAL_SCALE", BATTING_CONTACT_HORIZONTAL_SCALE);
+    }
+
+    public static double battingBaseVerticalSpeed() {
+        return GameDebugRuntimeOverrides.doubleValue(
+                "PLEXBALL_BATTING_BASE_VERTICAL_SPEED", BATTING_BASE_VERTICAL_SPEED);
+    }
+
+    public static double battingContactVerticalScale() {
+        return GameDebugRuntimeOverrides.doubleValue(
+                "PLEXBALL_BATTING_CONTACT_VERTICAL_SCALE", BATTING_CONTACT_VERTICAL_SCALE);
+    }
+
+    public static double timingPowerBase() {
+        return GameDebugRuntimeOverrides.doubleValue("PLEXBALL_TIMING_POWER_BASE", TIMING_POWER_BASE);
+    }
+
+    public static double timingPowerScale() {
+        return GameDebugRuntimeOverrides.doubleValue("PLEXBALL_TIMING_POWER_SCALE", TIMING_POWER_SCALE);
     }
 
     public static double curveAcceleration() {
@@ -117,12 +206,37 @@ public final class PlexballRules {
      * a single tick, then the server-side rewind removes most ordinary RTT bias.
      */
     public static double timingMultiplier(int distanceTicks) {
-        if (distanceTicks <= 2) return 1.00D;
-        if (distanceTicks <= 4) return 0.94D;
-        if (distanceTicks <= 6) return 0.84D;
-        if (distanceTicks <= 9) return 0.70D;
-        if (distanceTicks <= 13) return 0.54D;
-        return 0.38D;
+        if (distanceTicks <= timingThreshold("PERFECT", TIMING_PERFECT_MAX_TICKS)) return timingPower("PERFECT", TIMING_PERFECT_POWER);
+        if (distanceTicks <= timingThreshold("GREAT", TIMING_GREAT_MAX_TICKS)) return timingPower("GREAT", TIMING_GREAT_POWER);
+        if (distanceTicks <= timingThreshold("GOOD", TIMING_GOOD_MAX_TICKS)) return timingPower("GOOD", TIMING_GOOD_POWER);
+        if (distanceTicks <= timingThreshold("FAIR", TIMING_FAIR_MAX_TICKS)) return timingPower("FAIR", TIMING_FAIR_POWER);
+        if (distanceTicks <= timingThreshold("WEAK", TIMING_WEAK_MAX_TICKS)) return timingPower("WEAK", TIMING_WEAK_POWER);
+        return timingPower("POOR", TIMING_POOR_POWER);
+    }
+
+    private static int timingThreshold(String tier, int sourceDefault) {
+        int value = switch (tier) {
+            case "PERFECT" -> GameDebugRuntimeOverrides.intValue("PLEXBALL_TIMING_PERFECT_MAX_TICKS", sourceDefault);
+            case "GREAT" -> GameDebugRuntimeOverrides.intValue("PLEXBALL_TIMING_GREAT_MAX_TICKS", sourceDefault);
+            case "GOOD" -> GameDebugRuntimeOverrides.intValue("PLEXBALL_TIMING_GOOD_MAX_TICKS", sourceDefault);
+            case "FAIR" -> GameDebugRuntimeOverrides.intValue("PLEXBALL_TIMING_FAIR_MAX_TICKS", sourceDefault);
+            case "WEAK" -> GameDebugRuntimeOverrides.intValue("PLEXBALL_TIMING_WEAK_MAX_TICKS", sourceDefault);
+            default -> sourceDefault;
+        };
+        return Math.max(0, value);
+    }
+
+    private static double timingPower(String tier, double sourceDefault) {
+        double value = switch (tier) {
+            case "PERFECT" -> GameDebugRuntimeOverrides.doubleValue("PLEXBALL_TIMING_PERFECT_POWER", sourceDefault);
+            case "GREAT" -> GameDebugRuntimeOverrides.doubleValue("PLEXBALL_TIMING_GREAT_POWER", sourceDefault);
+            case "GOOD" -> GameDebugRuntimeOverrides.doubleValue("PLEXBALL_TIMING_GOOD_POWER", sourceDefault);
+            case "FAIR" -> GameDebugRuntimeOverrides.doubleValue("PLEXBALL_TIMING_FAIR_POWER", sourceDefault);
+            case "WEAK" -> GameDebugRuntimeOverrides.doubleValue("PLEXBALL_TIMING_WEAK_POWER", sourceDefault);
+            case "POOR" -> GameDebugRuntimeOverrides.doubleValue("PLEXBALL_TIMING_POOR_POWER", sourceDefault);
+            default -> sourceDefault;
+        };
+        return Math.max(0.0D, Math.min(1.0D, value));
     }
 
     /** Fair cone is centred on the field's -Z direction (Minecraft yaw 180). */

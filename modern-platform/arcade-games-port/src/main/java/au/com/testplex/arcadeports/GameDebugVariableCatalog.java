@@ -222,6 +222,12 @@ final class GameDebugVariableCatalog {
 
     private static double minimum(String name, double defaultValue, Kind kind) {
         if (kind == Kind.BOOLEAN) return 0.0D;
+        if (name.startsWith("PLEXBALL_TIMING_") && name.endsWith("_MAX_TICKS")) return 0.0D;
+        if (name.startsWith("PLEXBALL_BATTING_") || name.startsWith("PLEXBALL_TIMING_POWER_")
+                || name.endsWith("_BATTING_POWER") || name.endsWith("_TIMING_PERFECT_POWER")
+                || name.endsWith("_TIMING_GREAT_POWER") || name.endsWith("_TIMING_GOOD_POWER")
+                || name.endsWith("_TIMING_FAIR_POWER") || name.endsWith("_TIMING_WEAK_POWER")
+                || name.endsWith("_TIMING_POOR_POWER")) return 0.0D;
         if (name.equals("PAINTBALL_SPEEDRUNNER_MAX_MILLIS")
                 || name.equals("PAINTBALL_GROUND_STARE_MILLIS")) return 0.0D;
         if (name.equals("PAINTBALL_FLAWLESS_MIN_STARTERS") || name.equals("PAINTBALL_KILLING_SPREE_KILLS")
@@ -443,6 +449,15 @@ final class GameDebugVariableCatalog {
 
     private static double maximum(String name, Kind kind, double defaultValue) {
         if (kind == Kind.BOOLEAN) return 1.0D;
+        if (name.startsWith("PLEXBALL_TIMING_POWER_") || name.startsWith("PLEXBALL_TIMING_")
+                && name.endsWith("_POWER")) return 1.0D;
+        if (name.startsWith("PLEXBALL_TIMING_") && name.endsWith("_MAX_TICKS")) return 200.0D;
+        if (name.startsWith("PLEXBALL_BATTING_")) return 10.0D;
+        if (name.endsWith("_BATTING_POWER")) return 4.0D;
+        if (name.equals("PLEXBALL_TIMING_CYCLE_MIN_TICKS")
+                || name.equals("PLEXBALL_TIMING_CYCLE_MAX_TICKS")) return 200.0D;
+        if (name.equals("PLEXBALL_TECHNICIAN_TIMING_BONUS_TICKS")) return 40.0D;
+        if (name.equals("PLEXBALL_INTRO_TICKS") || name.equals("PLEXBALL_TURN_BREAK_TICKS")) return 600.0D;
         if (name.contains("_FALL_DAMAGE_MULTIPLIER")) return 1.0D;
         if (name.equals("TURF_WARS_TERRITORY_KNOCKBACK_VERTICAL")) return 5.0D;
         if (name.contains("_MAX_HEALTH")) return 80.0D;

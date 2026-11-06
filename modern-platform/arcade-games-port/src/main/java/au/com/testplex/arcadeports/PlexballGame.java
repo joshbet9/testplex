@@ -105,11 +105,11 @@ public final class PlexballGame implements Listener {
     }
 
     public enum Kit {
-        SLUGGER("slugger", "Slugger", "Power Dive", Material.IRON_SWORD, 1.07D),
-        TECHNICIAN("technician", "Technician", "Sure Hands", Material.SHIELD, 1.00D),
-        CURVE_ARTIST("curve-artist", "Curve Artist", "Read Flight", Material.COMPASS, 0.97D),
-        SPRINTER("sprinter", "Sprinter", "Burst", Material.SUGAR, 1.00D),
-        SKYGUARD("skyguard", "Skyguard", "Leap", Material.FEATHER, 0.99D);
+        SLUGGER("slugger", "Slugger", "Power Dive", Material.IRON_SWORD, PlexballRules.SLUGGER_BATTING_POWER),
+        TECHNICIAN("technician", "Technician", "Sure Hands", Material.SHIELD, PlexballRules.TECHNICIAN_BATTING_POWER),
+        CURVE_ARTIST("curve-artist", "Curve Artist", "Read Flight", Material.COMPASS, PlexballRules.CURVE_ARTIST_BATTING_POWER),
+        SPRINTER("sprinter", "Sprinter", "Burst", Material.SUGAR, PlexballRules.SPRINTER_BATTING_POWER),
+        SKYGUARD("skyguard", "Skyguard", "Leap", Material.FEATHER, PlexballRules.SKYGUARD_BATTING_POWER);
 
         private final String id;
         private final String displayName;
@@ -501,7 +501,7 @@ public final class PlexballGame implements Listener {
         matchEndNanos = System.nanoTime() + GameDebugRuntimeOverrides.intValue(
                 "PLEXBALL_MATCH_LIMIT_TICKS", PlexballRules.MATCH_LIMIT_TICKS) * 50_000_000L;
         phase = Phase.INTRO;
-        phaseEndTick = serverTick + INTRO_TICKS;
+        phaseEndTick = serverTick + PlexballRules.introTicks();
         for (int i = 0; i < participants.size(); i++) {
             Player player = participants.get(i);
             UUID id = player.getUniqueId();
@@ -680,7 +680,9 @@ public final class PlexballGame implements Listener {
 
         createTeeBall();
         battingStartTick = serverTick;
-        timingCycleTicks = 30 + random.nextInt(13);
+        int minimumCycle = PlexballRules.timingCycleMinTicks();
+        int maximumCycle = PlexballRules.timingCycleMaxTicks();
+        timingCycleTicks = minimumCycle + random.nextInt(maximumCycle - minimumCycle + 1);
         timingPhaseOffset = random.nextInt(timingCycleTicks);
         int battingTicks = playoff ? GameDebugRuntimeOverrides.intValue("PLEXBALL_SUDDEN_DEATH_BATTING_TICKS", PlexballRules.SUDDEN_DEATH_BATTING_TICKS)
                 : GameDebugRuntimeOverrides.intValue("PLEXBALL_NORMAL_BATTING_TICKS", PlexballRules.NORMAL_BATTING_TICKS);
@@ -832,7 +834,7 @@ public final class PlexballGame implements Listener {
         phase = Phase.TURN_BREAK;
         refreshScoreboards();
         refreshSpectatorTargets();
-        phaseEndTick = serverTick + TURN_BREAK_TICKS;
+        phaseEndTick = serverTick + PlexballRules.turnBreakTicks();
     }
 
     private void broadcastLeaderboard() {
@@ -1493,7 +1495,8 @@ public final class PlexballGame implements Listener {
         double contactSide = PlexballRules.clamp(normal.dot(right), -1.0D, 1.0D);
         Kit kit = selectedKits.getOrDefault(player.getUniqueId(), Kit.TECHNICIAN);
 
-        int gradedTimingDistance = kit == Kit.TECHNICIAN ? Math.max(0, timingDistance - 2) : timingDistance;
+        int gradedTimingDistance = kit == Kit.TECHNICIAN
+                ? Math.max(0, timingDistance - PlexballRules.technicianTimingBonusTicks()) : timingDistance;
         timing = PlexballRules.timingMultiplier(gradedTimingDistance);
         if (PlexballProgressionRules.isPerfectContact(timing)) {
             PlayerResult result = results.get(player.getUniqueId());
@@ -1501,9 +1504,13 @@ public final class PlexballGame implements Listener {
         }
         // Server-tick physics are tuned as a pair: lower contact is a loft,
         // upper contact is a faster line drive, and good timing preserves power.
-        double horizontalSpeed = (3.0D + 1.1D * contactY)
-                * (0.65D + 0.35D * timing) * PlexballRules.battingPower(kit.battingPower);
-        double verticalSpeed = PlexballRules.clamp(0.47D - 0.25D * contactY, 0.20D, 0.75D)
+        double kitPower = PlexballRules.kitBattingPower(kit.id(), kit.battingPower);
+        double horizontalSpeed = (PlexballRules.battingBaseHorizontalSpeed()
+                + PlexballRules.battingContactHorizontalScale() * contactY)
+                * (PlexballRules.timingPowerBase() + PlexballRules.timingPowerScale() * timing)
+                * PlexballRules.battingPower(kitPower);
+        double verticalSpeed = PlexballRules.clamp(PlexballRules.battingBaseVerticalSpeed()
+                - PlexballRules.battingContactVerticalScale() * contactY, 0.20D, 0.75D)
                 * GameDebugRuntimeOverrides.doubleValue(
                         "PLEXBALL_BATTING_POWER_MULTIPLIER", PlexballRules.BATTING_POWER_MULTIPLIER);
         if (kit == Kit.SPRINTER) {
@@ -1592,11 +1599,15 @@ public final class PlexballGame implements Listener {
             player.sendActionBar(Component.text("Kit abilities are disabled in your debug profile."));
             return;
         }
+        Kit kit = selectedKits.getOrDefault(id, Kit.TECHNICIAN);
+        if (!debugFeatureEnabled(player, "ability-" + kit.id())) {
+            player.sendActionBar(Component.text(kit.displayName() + " abilities are disabled in your debug profile."));
+            return;
+        }
         if (!abilityUsedThisBall.add(id)) {
             player.sendActionBar(Component.text("Your kit ability is already used for this ball."));
             return;
         }
-        Kit kit = selectedKits.getOrDefault(id, Kit.TECHNICIAN);
         Vector facing = player.getLocation().getDirection().setY(0.0D);
         if (facing.lengthSquared() < 1.0E-5D) facing = new Vector(0.0D, 0.0D, 1.0D);
         facing.normalize();
