@@ -1561,7 +1561,7 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         String kit = ArcadePortRules.normalizeBaconBrawlKit(requestedKit);
         if (kit == null) {
-            player.sendMessage(ChatColor.YELLOW + "Bacon Brawl kits: El Muchacho Pigo, Mama Piggles, Pig Cloak, Brutus Bacon, Chris P Bacon.");
+            player.sendMessage(ChatColor.YELLOW + "Bacon Brawl kits: El Muchacho Pigo, Mama Piggles, Pig, Brutus Bacon, Chris P Bacon.");
             return;
         }
         if (!permitKitSelection(player, ArcadePortGame.BACON_BRAWL, kit)) return;
@@ -1572,7 +1572,7 @@ public final class ArcadePortManager implements Listener {
         boolean roundLocked = ArcadePortRules.shouldDeferBaconBrawlKitChange(activeBaconRound);
         String displayKit = switch (kit) {
             case "mama-piggles" -> "Mama Piggles";
-            case "pig" -> "Pig Cloak";
+            case "pig" -> "Pig";
             case "brutus-bacon" -> "Brutus Bacon";
             case "chris-p-bacon" -> "Chris P Bacon";
             default -> "El Muchacho Pigo";
@@ -11788,7 +11788,7 @@ public final class ArcadePortManager implements Listener {
         return switch (session.baconKits.getOrDefault(playerId, "el-muchacho-pigo")) {
             case "mama-piggles" -> "Bacon Blast";
             case "chris-p-bacon" -> "Crispy Bacon";
-            case "pig" -> "Pig Cloak";
+            case "pig" -> "Cloak";
             case "brutus-bacon" -> "Brutus Bacon";
             default -> "Body Slam";
         };
@@ -11838,7 +11838,7 @@ public final class ArcadePortManager implements Listener {
                     "Blast force %.2fx at %d%% charge; right-click spends all charge.",
                     ArcadePortRules.baconBlastPowerMultiplier(safeCharge), safeCharge);
             case "pig" -> String.format(java.util.Locale.ROOT,
-                    "Pig Cloak lasts %.1fs at %d%% charge; right-click spends all charge.",
+                    "Cloak lasts %.1fs at %d%% charge; right-click spends all charge.",
                     ArcadePortRules.baconAbilityDurationMillis(safeCharge) / 1_000.0D, safeCharge);
             case "brutus-bacon" -> String.format(java.util.Locale.ROOT,
                     "Brutus guard lasts %.1fs at %d%% charge; right-click spends all charge.",
