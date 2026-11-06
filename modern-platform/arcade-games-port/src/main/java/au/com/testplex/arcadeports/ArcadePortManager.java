@@ -19912,13 +19912,18 @@ public final class ArcadePortManager implements Listener {
             }
         }
         if (announceWinner && session.type == ArcadePortGame.DRAW_MY_THING) {
+            boolean debugSession = GameDebugRuntimeOverrides.isDebugSession();
+            boolean changedStats = false;
             for (UUID playerId : session.players.keySet()) {
-                if (testPlayers.isTestPlayer(playerId) || session.drawKeenEyeFailed.contains(playerId)) continue;
+                if (testPlayers.isTestPlayer(playerId)
+                        || !ArcadeProgressRules.shouldRecordDrawMyThingKeenEye(debugSession,
+                        session.drawKeenEyeFailed.contains(playerId))) continue;
                 String statsPath = localStatsPath(playerId, "draw-my-thing");
                 plugin.getConfig().set(statsPath + "keen-eye",
                         plugin.getConfig().getInt(statsPath + "keen-eye", 0) + 1);
+                changedStats = true;
             }
-            plugin.saveConfig();
+            if (changedStats) plugin.saveConfig();
         }
         if (announceWinner && session.type == ArcadePortGame.MICRO_BATTLES) {
             for (Map.Entry<UUID, Integer> assists : session.microAssists.entrySet()) {

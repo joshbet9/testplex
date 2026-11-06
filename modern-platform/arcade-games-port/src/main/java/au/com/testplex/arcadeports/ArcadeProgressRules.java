@@ -19,6 +19,10 @@ public final class ArcadeProgressRules {
         return elapsedMillis >= 0L && elapsedMillis <= 5_000L;
     }
 
+    public static boolean shouldRecordDrawMyThingKeenEye(boolean debugSession, boolean failedAnyRound) {
+        return !debugSession && !failedAnyRound;
+    }
+
     public static boolean isMasterBuildersPurist(Set<Material> placedTypes) {
         return placedTypes != null && placedTypes.size() == 1;
     }

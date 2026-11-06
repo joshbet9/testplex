@@ -22,6 +22,13 @@ class ArcadeProgressRulesTest {
         assertFalse(ArcadeProgressRules.shouldAwardDrawMyThingFastGuesser(-1));
     }
 
+    @Test void drawMyThingKeenEyeProgressIsSuppressedForDebugAndFailedRounds() {
+        assertTrue(ArcadeProgressRules.shouldRecordDrawMyThingKeenEye(false, false));
+        assertFalse(ArcadeProgressRules.shouldRecordDrawMyThingKeenEye(false, true));
+        assertFalse(ArcadeProgressRules.shouldRecordDrawMyThingKeenEye(true, false));
+        assertFalse(ArcadeProgressRules.shouldRecordDrawMyThingKeenEye(true, true));
+    }
+
     @Test void masterBuildersPuristAndArchitectRequireTheExactConditions() {
         assertTrue(ArcadeProgressRules.isMasterBuildersPurist(Set.of(Material.OAK_PLANKS)));
         assertFalse(ArcadeProgressRules.isMasterBuildersPurist(Set.of(Material.OAK_PLANKS, Material.GLASS)));
