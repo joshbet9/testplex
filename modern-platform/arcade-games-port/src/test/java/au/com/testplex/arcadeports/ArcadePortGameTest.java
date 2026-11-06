@@ -1126,12 +1126,13 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.bombConstructorBlockedEnemyTnt(-1, 0));
     }
 
-    @Test void bombLobbersBlastProofRequiresFiveCompletedArmorerWins() {
+    @Test void bombLobbersBlastProofRequiresTenCompletedArmorerWins() {
         assertFalse(ArcadePortRules.shouldAwardBombLobbersBlastProof(0));
         assertFalse(ArcadePortRules.shouldAwardBombLobbersBlastProof(1));
-        assertFalse(ArcadePortRules.shouldAwardBombLobbersBlastProof(4));
-        assertTrue(ArcadePortRules.shouldAwardBombLobbersBlastProof(5));
-        assertTrue(ArcadePortRules.shouldAwardBombLobbersBlastProof(6));
+        assertFalse(ArcadePortRules.shouldAwardBombLobbersBlastProof(5));
+        assertFalse(ArcadePortRules.shouldAwardBombLobbersBlastProof(9));
+        assertTrue(ArcadePortRules.shouldAwardBombLobbersBlastProof(10));
+        assertTrue(ArcadePortRules.shouldAwardBombLobbersBlastProof(11));
         assertTrue(ArcadePortRules.shouldCountBombLobbersArmorerWin(true, true, "armorer"));
         assertFalse(ArcadePortRules.shouldCountBombLobbersArmorerWin(false, true, "armorer"));
         assertFalse(ArcadePortRules.shouldCountBombLobbersArmorerWin(true, false, "armorer"));
@@ -2441,6 +2442,24 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldProcessBombLobbersPlayerHit(false, true));
         assertFalse(ArcadePortRules.shouldProcessBombLobbersPlayerHit(true, false));
         assertFalse(ArcadePortRules.shouldProcessBombLobbersPlayerHit(false, false));
+    }
+
+    @Test void bombLobbersOver9000RequiresThreeKillsFromOnePoweredTnt() {
+        assertFalse(ArcadePortRules.shouldAwardBombLobbersOver9000("super-tnt", 2));
+        assertTrue(ArcadePortRules.shouldAwardBombLobbersOver9000("super-tnt", 3));
+        assertFalse(ArcadePortRules.shouldAwardBombLobbersOver9000("fiery-tnt", 1));
+        assertTrue(ArcadePortRules.shouldAwardBombLobbersOver9000("fiery-tnt", 3));
+        assertFalse(ArcadePortRules.shouldAwardBombLobbersOver9000("normal", 3));
+        assertFalse(ArcadePortRules.shouldAwardBombLobbersOver9000("wind-charge", 3));
+        assertFalse(ArcadePortRules.shouldAwardBombLobbersOver9000("speed-boost", 3));
+        assertFalse(ArcadePortRules.shouldAwardBombLobbersOver9000(null, 3));
+    }
+
+    @Test void bombLobbersTechnicalRequiresThrowUnderTenBlocksFromVictim() {
+        assertTrue(ArcadePortRules.bombLobbersTechnicalThrowWithinRange(9.99D));
+        assertFalse(ArcadePortRules.bombLobbersTechnicalThrowWithinRange(10.0D));
+        assertFalse(ArcadePortRules.bombLobbersTechnicalThrowWithinRange(20.0D));
+        assertFalse(ArcadePortRules.bombLobbersTechnicalThrowWithinRange(Double.NaN));
     }
 
     @Test void bombLobbersTwoBirdsCountsDirectHitAndBlastKillsTogether() {
