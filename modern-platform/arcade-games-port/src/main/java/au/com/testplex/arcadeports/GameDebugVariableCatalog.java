@@ -255,6 +255,13 @@ final class GameDebugVariableCatalog {
         if (name.equals("CLOSE_PHOTO_BLOCKS") || name.equals("LONG_PHOTO_BLOCKS")) return 0.1D;
         if (name.equals("PHOTO_LENS_MIN_DOT")) return 0.5D;
         if (name.equals("MASTER_BUILDERS_MAX_RATING")) return 1.0D;
+        if (name.equals("PLEXBALL_BALL_RADIUS")) return 0.05D;
+        if (name.equals("PLEXBALL_BALL_MAX_FLIGHT_TICKS")) return 1.0D;
+        if (name.equals("PLEXBALL_BATTING_POWER_MULTIPLIER")) return 0.25D;
+        if (name.equals("PLEXBALL_CURVE_ACCELERATION") || name.equals("PLEXBALL_CURVE_ARTIST_SIDE_SPEED")
+                || name.equals("PLEXBALL_SLUGGER_DIVE_SPEED")
+                || name.equals("PLEXBALL_SPRINTER_BURST_SPEED")
+                || name.equals("PLEXBALL_SKYGUARD_LEAP_SPEED")) return 0.0D;
         if (name.equals("COW_SPRINT_SPEED_AMPLIFIER") || name.equals("SCORE_PER_COW_KILL")) return 0.0D;
         if (name.startsWith("GLADIATOR_TIER_") && name.endsWith("_ARROWS")) return 0.0D;
         if (name.equals("GLADIATOR_POTION_HEALING")
@@ -416,6 +423,14 @@ final class GameDebugVariableCatalog {
         if (name.equals("CLOSE_PHOTO_BLOCKS")) return 32.0D;
         if (name.equals("LONG_PHOTO_BLOCKS")) return 64.0D;
         if (name.equals("PHOTO_LENS_MIN_DOT")) return 0.999D;
+        if (name.equals("PLEXBALL_BALL_RADIUS")) return 1.0D;
+        if (name.equals("PLEXBALL_BALL_MAX_FLIGHT_TICKS")) return 400.0D;
+        if (name.equals("PLEXBALL_BATTING_POWER_MULTIPLIER")) return 3.0D;
+        if (name.equals("PLEXBALL_CURVE_ACCELERATION")) return 0.03D;
+        if (name.equals("PLEXBALL_CURVE_ARTIST_SIDE_SPEED")) return 1.0D;
+        if (name.equals("PLEXBALL_SLUGGER_DIVE_SPEED")
+                || name.equals("PLEXBALL_SPRINTER_BURST_SPEED")
+                || name.equals("PLEXBALL_SKYGUARD_LEAP_SPEED")) return 5.0D;
         if (name.equals("MASTER_BUILDERS_MAX_RATING")) return 6.0D;
         if (Set.of("MANA_REGEN_MULTIPLIER", "PROJECTILE_SPEED_MULTIPLIER", "SPELL_COOLDOWN_MULTIPLIER",
                 "SPELL_DAMAGE_MULTIPLIER", "SPELL_HEAL_MULTIPLIER", "SPELL_MANA_COST_MULTIPLIER")
@@ -591,6 +606,10 @@ final class GameDebugVariableCatalog {
 
     private static double step(String name, double defaultValue, Kind kind) {
         if (kind == Kind.BOOLEAN) return 1.0D;
+        if (name.equals("PLEXBALL_BALL_RADIUS")) return 0.05D;
+        if (name.equals("PLEXBALL_BATTING_POWER_MULTIPLIER")) return 0.05D;
+        if (name.equals("PLEXBALL_CURVE_ACCELERATION")) return 0.0005D;
+        if (name.startsWith("PLEXBALL_") && (name.endsWith("_SPEED") || name.endsWith("_SIDE_SPEED"))) return 0.05D;
         if (name.startsWith("EVOLUTION_CHARGE_")) return 0.001D;
         if (name.startsWith("SKY_WARS_") && name.endsWith("_MILLIS")) return 100.0D;
         if (name.startsWith("RUNNER_") && name.endsWith("_SPEED")) return 0.1D;

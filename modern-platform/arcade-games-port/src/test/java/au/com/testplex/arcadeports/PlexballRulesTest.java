@@ -1,13 +1,19 @@
 package au.com.testplex.arcadeports;
 
 import org.bukkit.util.Vector;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class PlexballRulesTest {
+    @AfterEach
+    void clearRuntimeOverrides() { GameDebugRuntimeOverrides.clear(); }
+
     @Test
     void sharedArcadeLifecycleAcceptsOnlySupportedPlexballPlayerCounts() {
         assertFalse(PlexballRules.hasValidPlayerCount(0));
@@ -99,5 +105,42 @@ class PlexballRulesTest {
         Vector from = new Vector(-2.0D, 0.0D, 0.0D);
         Vector to = new Vector(2.0D, 0.0D, 0.0D);
         assertEquals(0.0D, PlexballRules.distanceSquaredToSegment(player, from, to), 1.0E-9D);
+    }
+
+    @Test
+    void debugPhysicsAndKitControlsChangeProductionRuleOutputsAndResetToSourceDefaults() {
+        assertEquals(85, PlexballRules.ballMaxFlightTicks());
+        assertEquals(0.24D, PlexballRules.ballRadius());
+        assertEquals(1.07D, PlexballRules.battingPower(1.07D), 1.0e-9D);
+        assertEquals(0.0035D, PlexballRules.curveAcceleration());
+        assertEquals(0.25D, PlexballRules.curveArtistSideSpeed());
+        assertEquals(0.62D, PlexballRules.sluggerDiveSpeed());
+        assertEquals(0.78D, PlexballRules.sprinterBurstSpeed());
+        assertEquals(0.48D, PlexballRules.skyguardLeapSpeed());
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "PLEXBALL_BALL_MAX_FLIGHT_TICKS", 120,
+                "PLEXBALL_BALL_RADIUS", 0.4D,
+                "PLEXBALL_BATTING_POWER_MULTIPLIER", 1.5D,
+                "PLEXBALL_CURVE_ACCELERATION", 0.008D,
+                "PLEXBALL_CURVE_ARTIST_SIDE_SPEED", 0.5D,
+                "PLEXBALL_SLUGGER_DIVE_SPEED", 1.0D,
+                "PLEXBALL_SPRINTER_BURST_SPEED", 1.2D,
+                "PLEXBALL_SKYGUARD_LEAP_SPEED", 0.8D), UUID.randomUUID());
+
+        assertEquals(120, PlexballRules.ballMaxFlightTicks());
+        assertEquals(0.4D, PlexballRules.ballRadius());
+        assertEquals(1.605D, PlexballRules.battingPower(1.07D), 1.0e-9D);
+        assertEquals(0.008D, PlexballRules.curveAcceleration());
+        assertEquals(0.5D, PlexballRules.curveArtistSideSpeed());
+        assertEquals(1.0D, PlexballRules.sluggerDiveSpeed());
+        assertEquals(1.2D, PlexballRules.sprinterBurstSpeed());
+        assertEquals(0.8D, PlexballRules.skyguardLeapSpeed());
+
+        GameDebugRuntimeOverrides.clear();
+        assertEquals(85, PlexballRules.ballMaxFlightTicks());
+        assertEquals(0.24D, PlexballRules.ballRadius());
+        assertEquals(1.07D, PlexballRules.battingPower(1.07D), 1.0e-9D);
+        assertEquals(0.0035D, PlexballRules.curveAcceleration());
     }
 }

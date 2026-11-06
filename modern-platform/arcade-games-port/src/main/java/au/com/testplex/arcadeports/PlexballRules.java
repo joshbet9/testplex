@@ -24,6 +24,14 @@ public final class PlexballRules {
     public static final double FIELD_HALF_WIDTH_PER_DEPTH = 0.65D;
     public static final double FAIR_ANGLE_DEGREES = 34.0D;
     public static final double BALL_GRAVITY_PER_TICK = 0.030D;
+    public static final int BALL_MAX_FLIGHT_TICKS = 85;
+    public static final double BALL_RADIUS = 0.24D;
+    public static final double BATTING_POWER_MULTIPLIER = 1.0D;
+    public static final double CURVE_ACCELERATION = 0.0035D;
+    public static final double CURVE_ARTIST_SIDE_SPEED = 0.25D;
+    public static final double SLUGGER_DIVE_SPEED = 0.62D;
+    public static final double SPRINTER_BURST_SPEED = 0.78D;
+    public static final double SKYGUARD_LEAP_SPEED = 0.48D;
     public static final int BASE_CATCH_WINDOW_TICKS = 8;
     public static final double BASE_CATCH_RADIUS = 1.25D;
 
@@ -50,6 +58,41 @@ public final class PlexballRules {
         if (pingEstimateMillis <= 0) return 0;
         return Math.max(0, Math.min(GameDebugRuntimeOverrides.intValue("PLEXBALL_MAX_REWIND_TICKS", MAX_REWIND_TICKS),
                 (int) Math.round(pingEstimateMillis / 100.0D)));
+    }
+
+    public static int ballMaxFlightTicks() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "PLEXBALL_BALL_MAX_FLIGHT_TICKS", BALL_MAX_FLIGHT_TICKS));
+    }
+
+    public static double ballRadius() {
+        return GameDebugRuntimeOverrides.doubleValue("PLEXBALL_BALL_RADIUS", BALL_RADIUS);
+    }
+
+    public static double battingPower(double kitPower) {
+        return kitPower * GameDebugRuntimeOverrides.doubleValue(
+                "PLEXBALL_BATTING_POWER_MULTIPLIER", BATTING_POWER_MULTIPLIER);
+    }
+
+    public static double curveAcceleration() {
+        return GameDebugRuntimeOverrides.doubleValue("PLEXBALL_CURVE_ACCELERATION", CURVE_ACCELERATION);
+    }
+
+    public static double curveArtistSideSpeed() {
+        return GameDebugRuntimeOverrides.doubleValue(
+                "PLEXBALL_CURVE_ARTIST_SIDE_SPEED", CURVE_ARTIST_SIDE_SPEED);
+    }
+
+    public static double sluggerDiveSpeed() {
+        return GameDebugRuntimeOverrides.doubleValue("PLEXBALL_SLUGGER_DIVE_SPEED", SLUGGER_DIVE_SPEED);
+    }
+
+    public static double sprinterBurstSpeed() {
+        return GameDebugRuntimeOverrides.doubleValue("PLEXBALL_SPRINTER_BURST_SPEED", SPRINTER_BURST_SPEED);
+    }
+
+    public static double skyguardLeapSpeed() {
+        return GameDebugRuntimeOverrides.doubleValue("PLEXBALL_SKYGUARD_LEAP_SPEED", SKYGUARD_LEAP_SPEED);
     }
 
     /**

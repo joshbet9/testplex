@@ -85,8 +85,6 @@ public final class PlexballGame implements Listener {
     private static final int QUICK_COUNTDOWN_TICKS = 40;
     private static final int INTRO_TICKS = 40;
     private static final int TURN_BREAK_TICKS = 12;
-    private static final int BALL_MAX_FLIGHT_TICKS = 85;
-    private static final double BALL_RADIUS = 0.24D;
     private static final double FIELD_PLAYER_EYE_OFFSET = 1.0D;
     private static final String STATS_MENU_TITLE = ChatColor.GOLD + "Plexball Progress";
     private static final String KIT_MENU_TITLE = ChatColor.AQUA + "Plexball Kits";
@@ -500,7 +498,8 @@ public final class PlexballGame implements Listener {
         suddenDeath = false;
         batterId = participants.get(0).getUniqueId();
         matchEndTick = serverTick + GameDebugRuntimeOverrides.intValue("PLEXBALL_MATCH_LIMIT_TICKS", PlexballRules.MATCH_LIMIT_TICKS);
-        matchEndNanos = System.nanoTime() + 180_000_000_000L;
+        matchEndNanos = System.nanoTime() + GameDebugRuntimeOverrides.intValue(
+                "PLEXBALL_MATCH_LIMIT_TICKS", PlexballRules.MATCH_LIMIT_TICKS) * 50_000_000L;
         phase = Phase.INTRO;
         phaseEndTick = serverTick + INTRO_TICKS;
         for (int i = 0; i < participants.size(); i++) {
@@ -1362,7 +1361,7 @@ public final class PlexballGame implements Listener {
             scheduleTerminalResolution(0.0D, false, "Foul ball — outside the fair triangle.");
             return;
         }
-        if (ballPosition.getY() <= FLOOR_Y + 0.28D || ballFlightTicks >= BALL_MAX_FLIGHT_TICKS) {
+        if (ballPosition.getY() <= FLOOR_Y + 0.28D || ballFlightTicks >= PlexballRules.ballMaxFlightTicks()) {
             scheduleTerminalResolution(distance, false, null);
             return;
         }
@@ -1481,7 +1480,7 @@ public final class PlexballGame implements Listener {
         double timing = PlexballRules.timingMultiplier(timingDistance);
         Vector eyeDirection = aimFrame.eyeLocation(arena, player.getEyeHeight()).getDirection().normalize();
         Vector eyeOrigin = aimFrame.eyeLocation(arena, player.getEyeHeight()).toVector();
-        Vector normal = contactNormal(eyeOrigin, eyeDirection, teeBallPosition, BALL_RADIUS);
+        Vector normal = contactNormal(eyeOrigin, eyeDirection, teeBallPosition, PlexballRules.ballRadius());
         if (normal == null) {
             player.sendActionBar(Component.text("SWING AND A MISS!"));
             resolveAttempt(0.0D, false, false, "Swing and a miss — the one batting attempt is used.");
@@ -1503,8 +1502,10 @@ public final class PlexballGame implements Listener {
         // Server-tick physics are tuned as a pair: lower contact is a loft,
         // upper contact is a faster line drive, and good timing preserves power.
         double horizontalSpeed = (3.0D + 1.1D * contactY)
-                * (0.65D + 0.35D * timing) * kit.battingPower;
-        double verticalSpeed = PlexballRules.clamp(0.47D - 0.25D * contactY, 0.20D, 0.75D);
+                * (0.65D + 0.35D * timing) * PlexballRules.battingPower(kit.battingPower);
+        double verticalSpeed = PlexballRules.clamp(0.47D - 0.25D * contactY, 0.20D, 0.75D)
+                * GameDebugRuntimeOverrides.doubleValue(
+                        "PLEXBALL_BATTING_POWER_MULTIPLIER", PlexballRules.BATTING_POWER_MULTIPLIER);
         if (kit == Kit.SPRINTER) {
             horizontalSpeed *= 1.08D;
             verticalSpeed = Math.min(verticalSpeed, 0.30D);
@@ -1512,11 +1513,12 @@ public final class PlexballGame implements Listener {
             horizontalSpeed *= 0.94D;
             verticalSpeed = Math.min(0.78D, verticalSpeed + 0.08D);
         }
-        double sideSpeed = contactSide * (kit == Kit.CURVE_ARTIST ? 0.25D : 0.10D);
+        double sideSpeed = contactSide * (kit == Kit.CURVE_ARTIST
+                ? PlexballRules.curveArtistSideSpeed() : 0.10D);
         ballVelocity = forward.multiply(horizontalSpeed).add(right.multiply(sideSpeed));
         ballVelocity.setY(verticalSpeed);
         curveDirection = right.clone().multiply(contactSide);
-        curveAcceleration = kit == Kit.CURVE_ARTIST ? 0.0035D : 0.0D;
+        curveAcceleration = kit == Kit.CURVE_ARTIST ? PlexballRules.curveAcceleration() : 0.0D;
         ballPosition = teeBallPosition.clone();
         ballStartTick = serverTick;
         ballFlightTicks = 0;
@@ -1600,7 +1602,7 @@ public final class PlexballGame implements Listener {
         facing.normalize();
         switch (kit) {
             case SLUGGER -> {
-                player.setVelocity(facing.multiply(0.62D).setY(0.12D));
+                player.setVelocity(facing.multiply(PlexballRules.sluggerDiveSpeed()).setY(0.12D));
                 player.sendActionBar(Component.text("POWER DIVE!"));
             }
             case TECHNICIAN -> {
@@ -1612,11 +1614,11 @@ public final class PlexballGame implements Listener {
                 player.sendActionBar(Component.text("READ FLIGHT — projected path revealed."));
             }
             case SPRINTER -> {
-                player.setVelocity(player.getVelocity().add(facing.multiply(0.78D)));
+                player.setVelocity(player.getVelocity().add(facing.multiply(PlexballRules.sprinterBurstSpeed())));
                 player.sendActionBar(Component.text("BURST!"));
             }
             case SKYGUARD -> {
-                player.setVelocity(player.getVelocity().add(new Vector(0.0D, 0.48D, 0.0D)));
+                player.setVelocity(player.getVelocity().add(new Vector(0.0D, PlexballRules.skyguardLeapSpeed(), 0.0D)));
                 player.sendActionBar(Component.text("LEAP!"));
             }
         }
