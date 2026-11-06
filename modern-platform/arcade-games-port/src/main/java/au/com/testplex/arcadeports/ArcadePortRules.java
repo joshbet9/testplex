@@ -84,6 +84,59 @@ public final class ArcadePortRules {
                 "CASTLE_ASSAULT_CARRIER_FUSE_MILLIS", CASTLE_ASSAULT_CARRIER_FUSE_MILLIS));
     }
 
+    public static int castleAssaultTntFuseTicks() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "CASTLE_ASSAULT_TNT_FUSE_TICKS", CASTLE_ASSAULT_TNT_FUSE_TICKS));
+    }
+
+    public static Vector castleAssaultTntThrowVelocity(Vector direction) {
+        Vector velocity = direction == null ? new Vector() : direction.clone();
+        if (velocity.lengthSquared() > 0.0D) velocity.normalize();
+        double horizontalSpeed = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "CASTLE_ASSAULT_TNT_THROW_SPEED", CASTLE_ASSAULT_TNT_THROW_SPEED));
+        double verticalSpeed = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "CASTLE_ASSAULT_TNT_THROW_VERTICAL_SPEED", CASTLE_ASSAULT_TNT_THROW_VERTICAL_SPEED));
+        return velocity.multiply(horizontalSpeed).add(new Vector(0.0D, verticalSpeed, 0.0D));
+    }
+
+    public static double castleAssaultTntVerticalKnockback() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "CASTLE_ASSAULT_TNT_VERTICAL_KNOCKBACK", CASTLE_ASSAULT_TNT_VERTICAL_KNOCKBACK));
+    }
+
+    public static int castleAssaultTntKingDamage() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "CASTLE_ASSAULT_TNT_KING_DAMAGE", CASTLE_ASSAULT_TNT_KING_DAMAGE));
+    }
+
+    public static int castleAssaultArcherArrowCap() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "CASTLE_ASSAULT_ARCHER_MAX_ARROWS", CASTLE_ASSAULT_ARCHER_MAX_ARROWS));
+    }
+
+    public static long castleAssaultArcherRefillMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "CASTLE_ASSAULT_ARCHER_REFILL_MILLIS", CASTLE_ASSAULT_ARCHER_REFILL_MILLIS));
+    }
+
+    public static boolean castleAssaultCanRefillArrows(int currentArrows) {
+        return Math.max(0, currentArrows) < castleAssaultArcherArrowCap();
+    }
+
+    public static int castleAssaultDemolitionistTntCap() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "CASTLE_ASSAULT_DEMOLITIONIST_MAX_TNT", CASTLE_ASSAULT_DEMOLITIONIST_MAX_TNT));
+    }
+
+    public static long castleAssaultDemolitionistRefillMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "CASTLE_ASSAULT_DEMOLITIONIST_TNT_REFILL_MILLIS", CASTLE_ASSAULT_DEMOLITIONIST_TNT_REFILL_MILLIS));
+    }
+
+    public static boolean castleAssaultCanRefillTnt(int currentTnt) {
+        return Math.max(0, currentTnt) < castleAssaultDemolitionistTntCap();
+    }
+
     /** Mixed Arcade halves the wait between objective TNT spawns. */
     public static long castleAssaultObjectiveTntRespawnMillis(boolean mixedArcadeVariant) {
         long delay = Math.max(1L, GameDebugRuntimeOverrides.longValue(

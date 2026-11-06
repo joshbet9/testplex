@@ -6,7 +6,9 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class CastleAssaultDebugRulesTest {
     @AfterEach void resetOverrides() { GameDebugRuntimeOverrides.clear(); }
@@ -88,5 +90,60 @@ final class CastleAssaultDebugRulesTest {
         GameDebugRuntimeOverrides.resetActiveValues();
         assertEquals(1, ArcadePortRules.castleAssaultKillStreakRewardTier(2));
         assertEquals(0, ArcadePortRules.castleAssaultKillStreakRewardTier(1));
+    }
+
+    @Test void kitRefillsAndThrownTntPhysicsFollowProfileAndResetToSourceDefaults() {
+        assertEquals(10, ArcadePortRules.castleAssaultArcherArrowCap());
+        assertTrue(ArcadePortRules.castleAssaultCanRefillArrows(9));
+        assertFalse(ArcadePortRules.castleAssaultCanRefillArrows(10));
+        assertEquals(6_000L, ArcadePortRules.castleAssaultArcherRefillMillis());
+        assertEquals(2, ArcadePortRules.castleAssaultDemolitionistTntCap());
+        assertTrue(ArcadePortRules.castleAssaultCanRefillTnt(1));
+        assertFalse(ArcadePortRules.castleAssaultCanRefillTnt(2));
+        assertEquals(10_000L, ArcadePortRules.castleAssaultDemolitionistRefillMillis());
+        assertEquals(60, ArcadePortRules.castleAssaultTntFuseTicks());
+        assertEquals(0.3D, ArcadePortRules.castleAssaultTntThrowVelocity(new org.bukkit.util.Vector(3, 0, 4)).getX());
+        assertEquals(0.1D, ArcadePortRules.castleAssaultTntThrowVelocity(new org.bukkit.util.Vector(3, 0, 4)).getY());
+        assertEquals(0.35D, ArcadePortRules.castleAssaultTntVerticalKnockback());
+        assertEquals(50, ArcadePortRules.castleAssaultTntKingDamage());
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "CASTLE_ASSAULT_ARCHER_MAX_ARROWS", 1,
+                "CASTLE_ASSAULT_ARCHER_REFILL_MILLIS", 2_000L,
+                "CASTLE_ASSAULT_DEMOLITIONIST_MAX_TNT", 1,
+                "CASTLE_ASSAULT_DEMOLITIONIST_TNT_REFILL_MILLIS", 3_000L,
+                "CASTLE_ASSAULT_TNT_FUSE_TICKS", 20,
+                "CASTLE_ASSAULT_TNT_THROW_SPEED", 1.0D,
+                "CASTLE_ASSAULT_TNT_THROW_VERTICAL_SPEED", 0.4D,
+                "CASTLE_ASSAULT_TNT_VERTICAL_KNOCKBACK", 0.8D,
+                "CASTLE_ASSAULT_TNT_KING_DAMAGE", 80));
+        assertFalse(ArcadePortRules.castleAssaultCanRefillArrows(1));
+        assertEquals(2_000L, ArcadePortRules.castleAssaultArcherRefillMillis());
+        assertFalse(ArcadePortRules.castleAssaultCanRefillTnt(1));
+        assertEquals(3_000L, ArcadePortRules.castleAssaultDemolitionistRefillMillis());
+        assertEquals(20, ArcadePortRules.castleAssaultTntFuseTicks());
+        org.bukkit.util.Vector velocity = ArcadePortRules.castleAssaultTntThrowVelocity(
+                new org.bukkit.util.Vector(3, 0, 4));
+        assertEquals(0.6D, velocity.getX());
+        assertEquals(0.4D, velocity.getY());
+        assertEquals(0.8D, ArcadePortRules.castleAssaultTntVerticalKnockback());
+        assertEquals(80, ArcadePortRules.castleAssaultTntKingDamage());
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertTrue(ArcadePortRules.castleAssaultCanRefillArrows(9));
+        assertTrue(ArcadePortRules.castleAssaultCanRefillTnt(1));
+        assertEquals(60, ArcadePortRules.castleAssaultTntFuseTicks());
+        assertEquals(0.35D, ArcadePortRules.castleAssaultTntVerticalKnockback());
+        assertEquals(50, ArcadePortRules.castleAssaultTntKingDamage());
+    }
+
+    @Test void objectiveTntRespawnProfileAppliesToNormalAndMixedArcadeIntervals() {
+        assertEquals(60_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(false));
+        assertEquals(30_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(true));
+        GameDebugRuntimeOverrides.activate(Map.of("CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS", 20_000L));
+        assertEquals(20_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(false));
+        assertEquals(10_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(true));
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertEquals(60_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(false));
     }
 }
