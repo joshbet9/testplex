@@ -272,6 +272,19 @@ class GameDebugVariableCatalogTest {
         assertGameRange(ArcadePortGame.CAMERA_SHY, "CAMERA_SHY_CLOSE_PHOTO_BLOCKS", 0.1D, 32.0D);
         assertGameRange(ArcadePortGame.CAMERA_SHY, "CAMERA_SHY_LONG_PHOTO_BLOCKS", 0.1D, 64.0D);
         assertGameRange(ArcadePortGame.CAMERA_SHY, "CAMERA_SHY_PHOTO_LENS_MIN_DOT", 0.5D, 0.999D);
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.CAMERA_SHY), "CAMERA_SHY_SPOTLIGHT_INTERVAL_MILLIS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.CAMERA_SHY), "CAMERA_SHY_SMOKE_ABILITY_COOLDOWN_MILLIS");
+        assertTrue(CameraShyRules.debuggableRule("DECOY_ABILITY_COOLDOWN_MILLIS"));
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.CAMERA_SHY), "CAMERA_SHY_PURSUIT_ESCAPE_DISTANCE_BLOCKS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.CAMERA_SHY), "CAMERA_SHY_DECOY_LOOK_MIN_DOT");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.CAMERA_SHY), "CAMERA_SHY_PICTURE_PERFECT_PHOTOS_REQUIRED");
+        assertGameRange(ArcadePortGame.CAMERA_SHY, "CAMERA_SHY_SPOTLIGHT_INTERVAL_MILLIS", 0.0D, 600_000.0D);
+        assertGameRange(ArcadePortGame.CAMERA_SHY, "CAMERA_SHY_DECOY_LOOK_MIN_DOT", 0.0D, 1.0D);
+        assertGameRange(ArcadePortGame.CAMERA_SHY, "CAMERA_SHY_FALSE_ALARM_TARGETS_REQUIRED", 1.0D, 1_000.0D);
+        assertTrue(GameDebugVariableCatalog.appliesImmediately(GameDebugVariableCatalog.variable(
+                ArcadePortGame.CAMERA_SHY, "CAMERA_SHY_SMOKE_ABILITY_COOLDOWN_MILLIS")));
+        assertFalse(GameDebugVariableCatalog.appliesImmediately(GameDebugVariableCatalog.variable(
+                ArcadePortGame.CAMERA_SHY, "CAMERA_SHY_MATCH_SECONDS")));
     }
 
     @Test
@@ -318,7 +331,8 @@ class GameDebugVariableCatalogTest {
                 assertTrue(GameDebugWiredRuleKeys.KEYS.contains(variable.key())
                                 || game.isMonsterMaze() && variable.key().startsWith(GameDebugVariableCatalog.rulePrefix(game))
                                 || game == ArcadePortGame.SNEAKY_ASSASSINS
-                                        && variable.key().startsWith(GameDebugVariableCatalog.rulePrefix(game)),
+                                        && variable.key().startsWith(GameDebugVariableCatalog.rulePrefix(game))
+                                || game == ArcadePortGame.CAMERA_SHY && variable.key().startsWith("CAMERA_SHY_"),
                         game.id() + " exposes a rule without a runtime consumer: " + variable.key());
             }
         }
@@ -448,6 +462,9 @@ class GameDebugVariableCatalogTest {
                 boolean dynamicSneakyConsumer = game == ArcadePortGame.SNEAKY_ASSASSINS
                         && key.startsWith(GameDebugVariableCatalog.rulePrefix(game))
                         && productionSources.contains("GameDebugRuntimeOverrides.longValue(\"SNEAKY_ASSASSINS_\" + name");
+                boolean dynamicCameraConsumer = game == ArcadePortGame.CAMERA_SHY
+                        && key.startsWith("CAMERA_SHY_")
+                        && CameraShyRules.debuggableRule(key.substring("CAMERA_SHY_".length()));
                 boolean dynamicTurfWarsConsumer = game == ArcadePortGame.TURF_WARS
                         && (key.endsWith("_ARROW_INTERVAL_MILLIS") || key.endsWith("_SLOW_INTERVAL_MILLIS")
                                 || key.endsWith("_MAX_ARROWS")
@@ -498,6 +515,7 @@ class GameDebugVariableCatalogTest {
                         && productionSources.contains("\"SNAKE_\" + key")
                         && productionSources.contains("GameDebugRuntimeOverrides.");
                 assertTrue(literalConsumers.contains(key) || dynamicMazeConsumer || dynamicSneakyConsumer
+                                || dynamicCameraConsumer
                                 || dynamicMilkCowConsumer || dynamicTurfWarsConsumer || dynamicSkyWarsConsumer || dynamicEvolutionConsumer
                                 || dynamicGladiatorConsumer || dynamicWizardsConsumer || dynamicDeathTagRewardConsumer
                                 || dynamicSnakeConsumer,

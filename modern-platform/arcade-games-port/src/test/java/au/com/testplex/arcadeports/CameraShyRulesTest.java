@@ -180,6 +180,52 @@ class CameraShyRulesTest {
     }
 
     @Test
+    void snapDebugProfilesTuneKitEffectsPursuitAndProgressionThenRestoreDefaults() {
+        assertEquals(55_000L, CameraShyRules.longSetting("SPOTLIGHT_INTERVAL_MILLIS",
+                CameraShyRules.SPOTLIGHT_INTERVAL_MILLIS));
+        assertEquals(25_000L, CameraShyRules.longSetting("DECOY_ABILITY_COOLDOWN_MILLIS",
+                CameraShyRules.DECOY_ABILITY_COOLDOWN_MILLIS));
+        assertEquals(18.0D, CameraShyRules.doubleSetting("SPOTTER_RANGE_BLOCKS",
+                CameraShyRules.SPOTTER_RANGE_BLOCKS));
+        assertEquals(3, CameraShyRules.intSetting("FALSE_ALARM_TARGETS_REQUIRED",
+                CameraShyRules.FALSE_ALARM_TARGETS_REQUIRED));
+        assertTrue(CameraShyRules.insidePhotoCone(new Vector(1, 0, 0), new Vector(1, 0.35D, 0), 0.94D));
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "CAMERA_SHY_SPOTLIGHT_INTERVAL_MILLIS", 10_000L,
+                "CAMERA_SHY_DECOY_ABILITY_COOLDOWN_MILLIS", 5_000L,
+                "CAMERA_SHY_SPOTTER_RANGE_BLOCKS", 4.0D,
+                "CAMERA_SHY_DECOY_LOOK_MIN_DOT", 0.99D,
+                "CAMERA_SHY_PURSUIT_ESCAPE_MILLIS", 500L,
+                "CAMERA_SHY_RUNNER_ABILITY_DURATION_MILLIS", 7_000L,
+                "CAMERA_SHY_FALSE_ALARM_TARGETS_REQUIRED", 1));
+        assertEquals(10_000L, CameraShyRules.longSetting("SPOTLIGHT_INTERVAL_MILLIS",
+                CameraShyRules.SPOTLIGHT_INTERVAL_MILLIS));
+        assertEquals(5_000L, CameraShyRules.longSetting("DECOY_ABILITY_COOLDOWN_MILLIS",
+                CameraShyRules.DECOY_ABILITY_COOLDOWN_MILLIS));
+        assertEquals(4.0D, CameraShyRules.doubleSetting("SPOTTER_RANGE_BLOCKS",
+                CameraShyRules.SPOTTER_RANGE_BLOCKS));
+        assertEquals(500L, CameraShyRules.longSetting("PURSUIT_ESCAPE_MILLIS",
+                CameraShyRules.PURSUIT_ESCAPE_MILLIS));
+        assertEquals(7_000L, CameraShyRules.longSetting("RUNNER_ABILITY_DURATION_MILLIS",
+                CameraShyRules.RUNNER_ABILITY_DURATION_MILLIS));
+        assertEquals(1, CameraShyRules.intSetting("FALSE_ALARM_TARGETS_REQUIRED",
+                CameraShyRules.FALSE_ALARM_TARGETS_REQUIRED));
+        assertFalse(CameraShyRules.insidePhotoCone(new Vector(1, 0, 0), new Vector(1, 0.35D, 0),
+                CameraShyRules.doubleSetting("DECOY_LOOK_MIN_DOT", CameraShyRules.DECOY_LOOK_MIN_DOT)));
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertEquals(55_000L, CameraShyRules.longSetting("SPOTLIGHT_INTERVAL_MILLIS",
+                CameraShyRules.SPOTLIGHT_INTERVAL_MILLIS));
+        assertEquals(25_000L, CameraShyRules.longSetting("DECOY_ABILITY_COOLDOWN_MILLIS",
+                CameraShyRules.DECOY_ABILITY_COOLDOWN_MILLIS));
+        assertEquals(18.0D, CameraShyRules.doubleSetting("SPOTTER_RANGE_BLOCKS",
+                CameraShyRules.SPOTTER_RANGE_BLOCKS));
+        assertEquals(3, CameraShyRules.intSetting("FALSE_ALARM_TARGETS_REQUIRED",
+                CameraShyRules.FALSE_ALARM_TARGETS_REQUIRED));
+    }
+
+    @Test
     void groupPhotoRequiresASecondPlayerInsideTheCameraCone() {
         assertTrue(CameraShyRules.insidePhotoCone(new Vector(1, 0, 0), new Vector(5, 0, 0), 0.985D));
         assertFalse(CameraShyRules.insidePhotoCone(new Vector(1, 0, 0), new Vector(0, 0, 5), 0.985D));

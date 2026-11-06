@@ -48,6 +48,30 @@ final class GameDebugVariableCatalog {
             "SNEAKY_ASSASSINS_NPC_PATROL_WAYPOINT_ATTEMPTS", "SNEAKY_ASSASSINS_NPC_SPAWN_SEARCH_ATTEMPTS",
             "SNEAKY_ASSASSINS_PROSECUTOR_DISTINCT_TARGETS_REQUIRED", "SNEAKY_ASSASSINS_DUELS_OTHER_MASTERS_REQUIRED",
             "SNEAKY_ASSASSINS_POWERUP_SMOKE_BOMBS", "SNEAKY_ASSASSINS_KILL_BONUS_SMOKE_BOMBS");
+    private static final Set<String> LIVE_CAMERA_NUMERIC_RULES = Set.of(
+            "CAMERA_SHY_CAMERA_RANGE_BLOCKS", "CAMERA_SHY_CLOSE_PHOTO_BLOCKS", "CAMERA_SHY_LONG_PHOTO_BLOCKS",
+            "CAMERA_SHY_PHOTO_COOLDOWN_MILLIS", "CAMERA_SHY_FINAL_SNAPSHOT_COOLDOWN_MILLIS",
+            "CAMERA_SHY_EXPOSURE_PROTECTION_MILLIS", "CAMERA_SHY_DOUBLE_TAKE_WINDOW_MILLIS",
+            "CAMERA_SHY_DOUBLE_ELIMINATION_WINDOW_MILLIS", "CAMERA_SHY_PHOTO_LENS_MIN_DOT",
+            "CAMERA_SHY_SPOTLIGHT_INTERVAL_MILLIS", "CAMERA_SHY_SPOTLIGHT_GLOW_DURATION_MILLIS",
+            "CAMERA_SHY_DECOY_FLASH_LIFETIME_MILLIS", "CAMERA_SHY_SMOKE_LIFETIME_MILLIS",
+            "CAMERA_SHY_SMOKE_ESCAPE_CREDIT_WINDOW_MILLIS", "CAMERA_SHY_PURSUIT_ESCAPE_MILLIS",
+            "CAMERA_SHY_PURSUIT_ESCAPE_DISTANCE_BLOCKS", "CAMERA_SHY_SPOTTER_RANGE_BLOCKS",
+            "CAMERA_SHY_SMOKE_ABILITY_COOLDOWN_MILLIS", "CAMERA_SHY_DECOY_ABILITY_COOLDOWN_MILLIS",
+            "CAMERA_SHY_RUNNER_ABILITY_COOLDOWN_MILLIS", "CAMERA_SHY_SPOTTER_ABILITY_COOLDOWN_MILLIS",
+            "CAMERA_SHY_UNDERSTUDY_ABILITY_COOLDOWN_MILLIS", "CAMERA_SHY_RUNNER_ABILITY_DURATION_MILLIS",
+            "CAMERA_SHY_RUNNER_SPEED_AMPLIFIER", "CAMERA_SHY_RUNNER_ACHIEVEMENT_WINDOW_MILLIS",
+            "CAMERA_SHY_SPOTTER_MARK_DURATION_MILLIS", "CAMERA_SHY_DECOY_FORWARD_OFFSET_BLOCKS",
+            "CAMERA_SHY_UNDERSTUDY_FORWARD_OFFSET_BLOCKS", "CAMERA_SHY_DECOY_APPROACH_RANGE_BLOCKS",
+            "CAMERA_SHY_DECOY_LOOK_RANGE_BLOCKS", "CAMERA_SHY_DECOY_LOOK_MIN_DOT",
+            "CAMERA_SHY_SMOKE_OCCLUSION_RADIUS_BLOCKS", "CAMERA_SHY_OUT_OF_FOCUS_WINDOW_TICKS",
+            "CAMERA_SHY_OUT_OF_FOCUS_MOVEMENT_DISTANCE_BLOCKS", "CAMERA_SHY_GROUP_PHOTO_MIN_TARGETS",
+            "CAMERA_SHY_PAPARAZZI_UNIQUE_PHOTOS_REQUIRED", "CAMERA_SHY_PRIVATE_INVESTIGATOR_TARGETS_REQUIRED",
+            "CAMERA_SHY_FALSE_ALARM_TARGETS_REQUIRED", "CAMERA_SHY_ESCAPE_STREAK_REQUIRED",
+            "CAMERA_SHY_SMOKE_ESCAPE_STREAK_REQUIRED", "CAMERA_SHY_DOUBLE_ELIMINATION_STREAK_REQUIRED",
+            "CAMERA_SHY_REVENGE_KILLS_REQUIRED", "CAMERA_SHY_UNTOUCHABLE_WINS_REQUIRED",
+            "CAMERA_SHY_NARROW_ESCAPE_EXPOSURES", "CAMERA_SHY_PICTURE_PERFECT_PHOTOS_REQUIRED",
+            "CAMERA_SHY_STAGE_FRIGHT_EXPOSURES", "CAMERA_SHY_STAGE_FRIGHT_DURATION_MILLIS");
 
     private GameDebugVariableCatalog() { }
 
@@ -65,7 +89,8 @@ final class GameDebugVariableCatalog {
             if (!sharedRules && !Modifier.isPublic(field.getModifiers())) continue;
             if (!sharedRules && !standaloneFieldIsWired(game, name)) continue;
             String key = sharedRules ? name : rulePrefix(game) + name;
-            boolean dynamicConsumer = game.isMonsterMaze() || game == ArcadePortGame.SNEAKY_ASSASSINS;
+            boolean dynamicConsumer = game.isMonsterMaze() || game == ArcadePortGame.SNEAKY_ASSASSINS
+                    || game == ArcadePortGame.CAMERA_SHY;
             if (!GameDebugWiredRuleKeys.KEYS.contains(key) && !dynamicConsumer) continue;
             Kind kind = kind(field.getType());
             if (kind == null) continue;
@@ -94,7 +119,8 @@ final class GameDebugVariableCatalog {
     static boolean appliesImmediately(Variable variable) {
         if (variable == null) return false;
         return variable.kind() == Kind.BOOLEAN && LIVE_BOOLEAN_RULES.contains(variable.key())
-                || variable.kind() != Kind.BOOLEAN && LIVE_SNEAKY_NUMERIC_RULES.contains(variable.key());
+                || variable.kind() != Kind.BOOLEAN && (LIVE_SNEAKY_NUMERIC_RULES.contains(variable.key())
+                || LIVE_CAMERA_NUMERIC_RULES.contains(variable.key()));
     }
 
     static double clamp(Variable variable, double value) {
@@ -182,6 +208,7 @@ final class GameDebugVariableCatalog {
                 "SHOT_DUNK_FLIGHT_TICKS_PER_BLOCK", "SHOT_LAYUP_FLIGHT_TICKS_PER_BLOCK",
                 "SHOT_NORMAL_FLIGHT_TICKS_PER_BLOCK", "POSSESSION_MOVEMENT_DAMPING").contains(name);
         if (game == ArcadePortGame.SNEAKY_ASSASSINS) return SneakyAssassinsRules.debuggableRule(name);
+        if (game == ArcadePortGame.CAMERA_SHY) return CameraShyRules.debuggableRule(name);
         if (game.isMonsterMaze()) {
             return Set.of("MOB_MOVE_SPEED", "BODY_RUSH_DURATION_MILLIS", "CRYO_COOLDOWN_MILLIS",
                     "CRYO_FREEZE_MILLIS", "CRYO_RADIUS_BLOCKS", "JUMP_STRENGTH",
@@ -248,6 +275,24 @@ final class GameDebugVariableCatalog {
 
     private static double minimum(String name, double defaultValue, Kind kind) {
         if (kind == Kind.BOOLEAN) return 0.0D;
+        if (Set.of("SPOTLIGHT_INTERVAL_MILLIS", "SPOTLIGHT_GLOW_DURATION_MILLIS", "DECOY_FLASH_LIFETIME_MILLIS",
+                "SMOKE_LIFETIME_MILLIS", "SMOKE_ESCAPE_CREDIT_WINDOW_MILLIS", "PURSUIT_ESCAPE_MILLIS",
+                "SMOKE_ABILITY_COOLDOWN_MILLIS", "DECOY_ABILITY_COOLDOWN_MILLIS",
+                "RUNNER_ABILITY_COOLDOWN_MILLIS", "SPOTTER_ABILITY_COOLDOWN_MILLIS",
+                "UNDERSTUDY_ABILITY_COOLDOWN_MILLIS", "RUNNER_ABILITY_DURATION_MILLIS",
+                "RUNNER_ACHIEVEMENT_WINDOW_MILLIS", "SPOTTER_MARK_DURATION_MILLIS",
+                "STAGE_FRIGHT_DURATION_MILLIS").contains(name)) return 0.0D;
+        if (Set.of("PURSUIT_ESCAPE_DISTANCE_BLOCKS", "SPOTTER_RANGE_BLOCKS", "DECOY_FORWARD_OFFSET_BLOCKS",
+                "UNDERSTUDY_FORWARD_OFFSET_BLOCKS", "DECOY_APPROACH_RANGE_BLOCKS", "DECOY_LOOK_RANGE_BLOCKS",
+                "SMOKE_OCCLUSION_RADIUS_BLOCKS").contains(name)) return 0.1D;
+        if (name.equals("DECOY_LOOK_MIN_DOT")) return 0.0D;
+        if (name.equals("RUNNER_SPEED_AMPLIFIER")) return 0.0D;
+        if (name.equals("OUT_OF_FOCUS_WINDOW_TICKS")) return 0.0D;
+        if (Set.of("GROUP_PHOTO_MIN_TARGETS", "PAPARAZZI_UNIQUE_PHOTOS_REQUIRED",
+                "PRIVATE_INVESTIGATOR_TARGETS_REQUIRED", "FALSE_ALARM_TARGETS_REQUIRED",
+                "ESCAPE_STREAK_REQUIRED", "SMOKE_ESCAPE_STREAK_REQUIRED", "DOUBLE_ELIMINATION_STREAK_REQUIRED",
+                "REVENGE_KILLS_REQUIRED", "UNTOUCHABLE_WINS_REQUIRED", "NARROW_ESCAPE_EXPOSURES",
+                "PICTURE_PERFECT_PHOTOS_REQUIRED", "STAGE_FRIGHT_EXPOSURES").contains(name)) return 1.0D;
         if (Set.of("MAX_ACTIVE_POWERUPS",
                 "SOURCE_NPC_COUNT", "POWERUP_BONUS_HEALTH", "KILL_BONUS_HEALTH").contains(name)) return 0.0D;
         if (Set.of("MAX_POWERUP_PROGRESS", "MASTER_ASSASSIN_POWERUPS_REQUIRED",
@@ -520,6 +565,24 @@ final class GameDebugVariableCatalog {
 
     private static double maximum(String name, Kind kind, double defaultValue) {
         if (kind == Kind.BOOLEAN) return 1.0D;
+        if (Set.of("SPOTLIGHT_INTERVAL_MILLIS", "SPOTLIGHT_GLOW_DURATION_MILLIS", "DECOY_FLASH_LIFETIME_MILLIS",
+                "SMOKE_LIFETIME_MILLIS", "SMOKE_ESCAPE_CREDIT_WINDOW_MILLIS", "PURSUIT_ESCAPE_MILLIS",
+                "SMOKE_ABILITY_COOLDOWN_MILLIS", "DECOY_ABILITY_COOLDOWN_MILLIS",
+                "RUNNER_ABILITY_COOLDOWN_MILLIS", "SPOTTER_ABILITY_COOLDOWN_MILLIS",
+                "UNDERSTUDY_ABILITY_COOLDOWN_MILLIS", "RUNNER_ABILITY_DURATION_MILLIS",
+                "RUNNER_ACHIEVEMENT_WINDOW_MILLIS", "SPOTTER_MARK_DURATION_MILLIS",
+                "STAGE_FRIGHT_DURATION_MILLIS").contains(name)) return 600_000.0D;
+        if (Set.of("PURSUIT_ESCAPE_DISTANCE_BLOCKS", "SPOTTER_RANGE_BLOCKS", "DECOY_FORWARD_OFFSET_BLOCKS",
+                "UNDERSTUDY_FORWARD_OFFSET_BLOCKS", "DECOY_APPROACH_RANGE_BLOCKS", "DECOY_LOOK_RANGE_BLOCKS",
+                "SMOKE_OCCLUSION_RADIUS_BLOCKS").contains(name)) return 64.0D;
+        if (name.equals("DECOY_LOOK_MIN_DOT")) return 1.0D;
+        if (name.equals("RUNNER_SPEED_AMPLIFIER")) return 4.0D;
+        if (name.equals("OUT_OF_FOCUS_WINDOW_TICKS")) return 1_200.0D;
+        if (Set.of("GROUP_PHOTO_MIN_TARGETS", "PAPARAZZI_UNIQUE_PHOTOS_REQUIRED",
+                "PRIVATE_INVESTIGATOR_TARGETS_REQUIRED", "FALSE_ALARM_TARGETS_REQUIRED",
+                "ESCAPE_STREAK_REQUIRED", "SMOKE_ESCAPE_STREAK_REQUIRED", "DOUBLE_ELIMINATION_STREAK_REQUIRED",
+                "REVENGE_KILLS_REQUIRED", "UNTOUCHABLE_WINS_REQUIRED", "NARROW_ESCAPE_EXPOSURES",
+                "PICTURE_PERFECT_PHOTOS_REQUIRED", "STAGE_FRIGHT_EXPOSURES").contains(name)) return 1_000.0D;
         if (name.equals("MAX_POWERUP_PROGRESS") || name.equals("MASTER_ASSASSIN_POWERUPS_REQUIRED")
                 || name.equals("MASTERS_MASTER_POWERUPS_REQUIRED")) return 32.0D;
         if (name.equals("MAX_ACTIVE_POWERUPS")) return 32.0D;
@@ -931,6 +994,23 @@ final class GameDebugVariableCatalog {
 
     private static double step(String name, double defaultValue, Kind kind) {
         if (kind == Kind.BOOLEAN) return 1.0D;
+        if (Set.of("SPOTLIGHT_INTERVAL_MILLIS", "SPOTLIGHT_GLOW_DURATION_MILLIS", "DECOY_FLASH_LIFETIME_MILLIS",
+                "SMOKE_LIFETIME_MILLIS", "SMOKE_ESCAPE_CREDIT_WINDOW_MILLIS", "PURSUIT_ESCAPE_MILLIS",
+                "SMOKE_ABILITY_COOLDOWN_MILLIS", "DECOY_ABILITY_COOLDOWN_MILLIS",
+                "RUNNER_ABILITY_COOLDOWN_MILLIS", "SPOTTER_ABILITY_COOLDOWN_MILLIS",
+                "UNDERSTUDY_ABILITY_COOLDOWN_MILLIS", "RUNNER_ABILITY_DURATION_MILLIS",
+                "RUNNER_ACHIEVEMENT_WINDOW_MILLIS", "SPOTTER_MARK_DURATION_MILLIS",
+                "STAGE_FRIGHT_DURATION_MILLIS").contains(name)) return 100.0D;
+        if (Set.of("PURSUIT_ESCAPE_DISTANCE_BLOCKS", "SPOTTER_RANGE_BLOCKS", "DECOY_FORWARD_OFFSET_BLOCKS",
+                "UNDERSTUDY_FORWARD_OFFSET_BLOCKS", "DECOY_APPROACH_RANGE_BLOCKS", "DECOY_LOOK_RANGE_BLOCKS",
+                "SMOKE_OCCLUSION_RADIUS_BLOCKS").contains(name)) return 0.1D;
+        if (name.equals("DECOY_LOOK_MIN_DOT")) return 0.01D;
+        if (name.equals("RUNNER_SPEED_AMPLIFIER") || name.equals("OUT_OF_FOCUS_WINDOW_TICKS")
+                || Set.of("GROUP_PHOTO_MIN_TARGETS", "PAPARAZZI_UNIQUE_PHOTOS_REQUIRED",
+                "PRIVATE_INVESTIGATOR_TARGETS_REQUIRED", "FALSE_ALARM_TARGETS_REQUIRED",
+                "ESCAPE_STREAK_REQUIRED", "SMOKE_ESCAPE_STREAK_REQUIRED", "DOUBLE_ELIMINATION_STREAK_REQUIRED",
+                "REVENGE_KILLS_REQUIRED", "UNTOUCHABLE_WINS_REQUIRED", "NARROW_ESCAPE_EXPOSURES",
+                "PICTURE_PERFECT_PHOTOS_REQUIRED", "STAGE_FRIGHT_EXPOSURES").contains(name)) return 1.0D;
         if (name.endsWith("_SWORD_DAMAGE") || name.startsWith("PROJECTILE_DAMAGE_")
                 || name.startsWith("NPC_") && (name.endsWith("_SPEED") || name.endsWith("_DAMAGE")
                 || name.endsWith("_HORIZONTAL") || name.endsWith("_VERTICAL")
