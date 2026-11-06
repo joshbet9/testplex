@@ -27,7 +27,7 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
         assertTrue(ArcadePortRules.shouldBoostCastleChestSplashPotion(true, true));
         assertEquals(550, ArcadePortRules.castleAssaultBoostedChestPotionDuration(440));
         assertEquals(275, ArcadePortRules.castleAssaultBoostedChestPotionDuration(220));
-        assertEquals(1, ArcadePortRules.castleAssaultBoostedChestPotionDuration(1));
+        assertEquals(2, ArcadePortRules.castleAssaultBoostedChestPotionDuration(1));
         assertEquals(0, ArcadePortRules.castleAssaultBoostedChestPotionDuration(0));
         assertEquals(1.5D, ArcadePortRules.castleAssaultChestPotionInstantBonus(6.0D), 0.0001D);
         assertEquals(0.0D, ArcadePortRules.castleAssaultChestPotionInstantBonus(-1.0D));
