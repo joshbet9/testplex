@@ -1430,11 +1430,11 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             }
         }
         if (game == ArcadePortGame.SHEEP_QUEST) {
-            for (String kit : List.of("beserker", "archer", "shepherd")) {
+            for (String kit : List.of("beserker", "archer", "brute", "shepherd")) {
                 String key = "ability-" + kit;
                 features.put(key, new DebugFeature(key, "Kit feature: " + humanizeDebugKey(kit),
                         Material.SADDLE,
-                        "Allow this kit's leap, arrows or carry effects for authorised testers.", true));
+                        "Allow this kit's normal gameplay abilities for authorised testers.", true));
             }
         }
         if (game == ArcadePortGame.TURF_WARS) {

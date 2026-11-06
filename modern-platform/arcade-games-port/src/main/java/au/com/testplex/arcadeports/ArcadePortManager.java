@@ -1157,6 +1157,15 @@ public final class ArcadePortManager implements Listener {
             spawnSheep(session);
             triggered = session.sheep.size() > sheepBefore;
         }
+        if (type == ArcadePortGame.SHEEP_QUEST && "throw-passenger".equals(eventId)
+                && session.alive.contains(tester.getUniqueId())
+                && "brute".equals(session.sheepQuestKits.getOrDefault(tester.getUniqueId(), "beserker"))
+                && debugKitFeatureEnabled(tester, ArcadePortGame.SHEEP_QUEST, "brute")
+                && !tester.getPassengers().isEmpty()) {
+            throwSheepQuestPassenger(session, tester);
+            triggered = session.sheepThrownBy.values().contains(tester.getUniqueId());
+            if (triggered) GameDebugRuntimeOverrides.markDebugSession();
+        }
         if (type == ArcadePortGame.SKY_WARS && "spawn-tnt".equals(eventId)) {
             GameDebugRuntimeOverrides.markDebugSession();
             triggered = spawnSkyWarsTnt(session, System.currentTimeMillis());
@@ -16912,7 +16921,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (count > 0) {
             int amplifier = shepherd
-                    ? Math.min(127, (count - 1) / 2)
+                    ? ArcadePortRules.sheepQuestShepherdSlownessAmplifier(count)
                     : ArcadePortRules.sheepQuestCarrySlownessAmplifier(count);
             player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,
                     GameDebugRuntimeOverrides.intValue("SHEEP_QUEST_CARRY_SLOWNESS_TICKS", ArcadePortRules.SHEEP_QUEST_CARRY_SLOWNESS_TICKS),
@@ -16977,7 +16986,7 @@ public final class ArcadePortManager implements Listener {
         if (holder != null && holder.isOnline()
                 && session.teams.getOrDefault(holderId, -1) == team) {
             recordSheepQuestCapture(session, holderId);
-            session.scores.merge(holderId, 1, Integer::sum);
+            session.scores.merge(holderId, ArcadePortRules.sheepQuestCaptureScore(), Integer::sum);
             GameAbilityCosmetics.hit(holder, sheep.getLocation(),
                     selectedGameCosmeticOption(holder, "sheep-quest", "capture-effects", "wool-burst"));
             holder.playSound(holder.getLocation(), Sound.ENTITY_SHEEP_AMBIENT, 1.0F, 1.5F);
@@ -17047,7 +17056,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void throwSheepQuestPassenger(Session session, Player thrower) {
-        if (session == null || thrower == null || thrower.getPassengers().isEmpty()) return;
+        if (session == null || thrower == null || thrower.getPassengers().isEmpty()
+                || !debugKitFeatureEnabled(thrower, ArcadePortGame.SHEEP_QUEST, "brute")) return;
         UUID throwerId = thrower.getUniqueId();
         Entity thrown = thrower.getPassengers().get(0);
         Entity trailing = thrown.getPassengers().isEmpty() ? null : thrown.getPassengers().get(0);
@@ -17180,7 +17190,7 @@ public final class ArcadePortManager implements Listener {
         long now = System.currentTimeMillis();
         session.sheepQuestCaptures.merge(playerId, 1, Integer::sum);
         session.sheepQuestCaptureTimes.computeIfAbsent(playerId, ignored -> new ArrayList<>()).add(now);
-        if (session.sheepQuestKills.getOrDefault(playerId, 0) >= 3) {
+        if (ArcadePortRules.sheepQuestSoloCarryQualified(session.sheepQuestKills.getOrDefault(playerId, 0))) {
             session.sheepQuestSoloCarryCaptures.merge(playerId, 1, Integer::sum);
         }
         Player carrier = session.players.get(playerId);
@@ -17201,9 +17211,9 @@ public final class ArcadePortManager implements Listener {
         String key = localStatsPath(playerId, "sheep-quest") + stat;
         int value = plugin.getConfig().getInt(key, 0) + 1;
         plugin.getConfig().set(key, value);
-        if ("thief".equals(stat) && value >= 300) {
+        if ("thief".equals(stat) && ArcadePortRules.sheepQuestThiefAchievementReached(value)) {
             awardCatalogAchievement(playerId, "sheep-quest", "thief");
-        } else if ("animal-rescue".equals(stat) && value >= 300) {
+        } else if ("animal-rescue".equals(stat) && ArcadePortRules.sheepQuestAnimalRescueAchievementReached(value)) {
             awardCatalogAchievement(playerId, "sheep-quest", "animal-rescue");
         }
         plugin.saveConfig();
@@ -17220,8 +17230,10 @@ public final class ArcadePortManager implements Listener {
             String path = localStatsPath(playerId, "sheep-quest");
             int wins = plugin.getConfig().getInt(path + "wins", 0) + 1;
             plugin.getConfig().set(path + "wins", wins);
-            if (wins >= 50) awardCatalogAchievement(player, "sheep-quest", "hungry-hungry-hippo");
-            if (sheepQuestTeamCount(session, winnerTeam) > 12) {
+            if (ArcadePortRules.sheepQuestHungryHungryHippoAchievementReached(wins)) {
+                awardCatalogAchievement(player, "sheep-quest", "hungry-hungry-hippo");
+            }
+            if (ArcadePortRules.sheepQuestSelfishAchievementReached(sheepQuestTeamCount(session, winnerTeam))) {
                 awardCatalogAchievement(player, "sheep-quest", "selfish");
             }
         }
@@ -17446,7 +17458,7 @@ public final class ArcadePortManager implements Listener {
                     0.0D, ThreadLocalRandom.current().nextDouble(-2.0D, 2.0D)));
             iterator.remove();
             if (previousOwner != team) {
-                session.scores.merge(carrierId, 1, Integer::sum);
+                session.scores.merge(carrierId, ArcadePortRules.sheepQuestCaptureScore(), Integer::sum);
                 carrier.playSound(carrier.getLocation(), Sound.ENTITY_SHEEP_AMBIENT, 1.0F, 1.5F);
                 carrier.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, carrier.getLocation().add(0, 1, 0),
                         12, 0.35D, 0.4D, 0.35D, 0.04D);
@@ -19439,12 +19451,13 @@ public final class ArcadePortManager implements Listener {
                         && "archer".equals(session.sheepQuestKits.getOrDefault(attacker.getUniqueId(), "beserker"))
                         && !isInsideSheepPen(session, target.getLocation(),
                                 session.teams.getOrDefault(target.getUniqueId(), -1))
-                        && System.currentTimeMillis() - session.sheepQuestLastMoveAt.getOrDefault(
-                                target.getUniqueId(), 0L) <= 5_000L
+                        && ArcadePortRules.sheepQuestMovementCreditIsRecent(System.currentTimeMillis(),
+                                session.sheepQuestLastMoveAt.getOrDefault(target.getUniqueId(), 0L))
                         && target.getHealth() <= GameDebugRuntimeOverrides.doubleValue("SHEEP_QUEST_PLAYER_HIT_DAMAGE", ArcadePortRules.SHEEP_QUEST_PLAYER_HIT_DAMAGE)) {
                     Map<UUID, Integer> targets = session.sheepQuestArcherKills.computeIfAbsent(
                             attacker.getUniqueId(), ignored -> new HashMap<>());
-                    if (targets.merge(target.getUniqueId(), 1, Integer::sum) >= 5) {
+                    if (ArcadePortRules.sheepQuestArcherAchievementReached(
+                            targets.merge(target.getUniqueId(), 1, Integer::sum))) {
                         awardCatalogAchievement(attacker, "sheep-quest", "baaaad-to-the-bone");
                     }
                 }

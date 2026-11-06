@@ -2532,7 +2532,17 @@ public final class ArcadePortRules {
     public static final double SHEEP_QUEST_PEN_ROAM_SPEED = 0.8D;
     public static final double SHEEP_QUEST_HOME_RETURN_DISTANCE_BLOCKS = 14.0D;
     public static final int SHEEP_QUEST_CARRY_SLOWNESS_TICKS = 60;
+    public static final int SHEEP_QUEST_SHEPHERD_SLOWNESS_SHEEP_PER_LEVEL = 2;
+    public static final int SHEEP_QUEST_SHEPHERD_SLOWNESS_MAX_AMPLIFIER = 127;
     public static final long SHEEP_QUEST_HIT_DROP_COOLDOWN_MILLIS = 1_000L;
+    public static final int SHEEP_QUEST_CAPTURE_SCORE = 1;
+    public static final int SHEEP_QUEST_SOLO_CARRY_KILL_THRESHOLD = 3;
+    public static final int SHEEP_QUEST_THIEF_ACHIEVEMENT_COUNT = 300;
+    public static final int SHEEP_QUEST_ANIMAL_RESCUE_ACHIEVEMENT_COUNT = 300;
+    public static final int SHEEP_QUEST_HUNGRY_HUNGRY_HIPPO_WINS = 50;
+    public static final int SHEEP_QUEST_SELFISH_TEAM_SHEEP_THRESHOLD = 12;
+    public static final int SHEEP_QUEST_ARCHER_ACHIEVEMENT_KILLS_PER_TARGET = 5;
+    public static final long SHEEP_QUEST_ARCHER_MOVEMENT_CREDIT_WINDOW_MILLIS = 5_000L;
     public static double sheepQuestBruteThrowHorizontalSpeed() {
         return GameDebugRuntimeOverrides.doubleValue("SHEEP_QUEST_BRUTE_THROW_SPEED", SHEEP_QUEST_BRUTE_THROW_SPEED);
     }
@@ -2566,6 +2576,51 @@ public final class ArcadePortRules {
     public static double sheepQuestThrowHitRadiusSquared() {
         double radius = GameDebugRuntimeOverrides.doubleValue("SHEEP_QUEST_THROW_HIT_RADIUS", SHEEP_QUEST_THROW_HIT_RADIUS);
         return radius * radius;
+    }
+    public static int sheepQuestShepherdSlownessAmplifier(int carriedCount) {
+        if (carriedCount <= 0) return -1;
+        int sheepPerLevel = Math.max(1, Math.min(64, GameDebugRuntimeOverrides.intValue(
+                "SHEEP_QUEST_SHEPHERD_SLOWNESS_SHEEP_PER_LEVEL", SHEEP_QUEST_SHEPHERD_SLOWNESS_SHEEP_PER_LEVEL)));
+        int maximum = Math.max(0, Math.min(127, GameDebugRuntimeOverrides.intValue(
+                "SHEEP_QUEST_SHEPHERD_SLOWNESS_MAX_AMPLIFIER", SHEEP_QUEST_SHEPHERD_SLOWNESS_MAX_AMPLIFIER)));
+        return Math.min(maximum, (carriedCount - 1) / sheepPerLevel);
+    }
+    public static int sheepQuestCaptureScore() {
+        return Math.max(0, Math.min(100, GameDebugRuntimeOverrides.intValue(
+                "SHEEP_QUEST_CAPTURE_SCORE", SHEEP_QUEST_CAPTURE_SCORE)));
+    }
+    public static int sheepQuestSoloCarryKillThreshold() {
+        return Math.max(0, Math.min(100, GameDebugRuntimeOverrides.intValue(
+                "SHEEP_QUEST_SOLO_CARRY_KILL_THRESHOLD", SHEEP_QUEST_SOLO_CARRY_KILL_THRESHOLD)));
+    }
+    public static boolean sheepQuestSoloCarryQualified(int kills) {
+        return kills >= sheepQuestSoloCarryKillThreshold();
+    }
+    public static boolean sheepQuestThiefAchievementReached(int count) {
+        return count >= GameDebugRuntimeOverrides.intValue(
+                "SHEEP_QUEST_THIEF_ACHIEVEMENT_COUNT", SHEEP_QUEST_THIEF_ACHIEVEMENT_COUNT);
+    }
+    public static boolean sheepQuestAnimalRescueAchievementReached(int count) {
+        return count >= GameDebugRuntimeOverrides.intValue(
+                "SHEEP_QUEST_ANIMAL_RESCUE_ACHIEVEMENT_COUNT", SHEEP_QUEST_ANIMAL_RESCUE_ACHIEVEMENT_COUNT);
+    }
+    public static boolean sheepQuestHungryHungryHippoAchievementReached(int wins) {
+        return wins >= GameDebugRuntimeOverrides.intValue(
+                "SHEEP_QUEST_HUNGRY_HUNGRY_HIPPO_WINS", SHEEP_QUEST_HUNGRY_HUNGRY_HIPPO_WINS);
+    }
+    public static boolean sheepQuestSelfishAchievementReached(int teamSheep) {
+        return teamSheep > GameDebugRuntimeOverrides.intValue(
+                "SHEEP_QUEST_SELFISH_TEAM_SHEEP_THRESHOLD", SHEEP_QUEST_SELFISH_TEAM_SHEEP_THRESHOLD);
+    }
+    public static boolean sheepQuestArcherAchievementReached(int killsPerTarget) {
+        return killsPerTarget >= GameDebugRuntimeOverrides.intValue(
+                "SHEEP_QUEST_ARCHER_ACHIEVEMENT_KILLS_PER_TARGET",
+                SHEEP_QUEST_ARCHER_ACHIEVEMENT_KILLS_PER_TARGET);
+    }
+    public static boolean sheepQuestMovementCreditIsRecent(long nowMillis, long lastMovementMillis) {
+        return nowMillis >= lastMovementMillis && nowMillis - lastMovementMillis <= GameDebugRuntimeOverrides.longValue(
+                "SHEEP_QUEST_ARCHER_MOVEMENT_CREDIT_WINDOW_MILLIS",
+                SHEEP_QUEST_ARCHER_MOVEMENT_CREDIT_WINDOW_MILLIS);
     }
     public static final long SHEEP_QUEST_OVERTIME_ANNOUNCE_INTERVAL_MILLIS = 10_000L;
     public static final long SHEEP_QUEST_ARCHER_FLETCHER_INTERVAL_MILLIS = 2_000L;

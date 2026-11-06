@@ -352,6 +352,7 @@ final class GameDebugVariableCatalog {
                 || name.equals("RUNNER_HOP_ACHIEVEMENT_JUMPS")
                 || name.equals("RUNNER_FLASH_ACHIEVEMENT_MAX_WIN_MILLIS")) return 0.0D;
         if (name.equals("SHEEP_QUEST_MAX_CARRY")) return 0.0D;
+        if (name.equals("SHEEP_QUEST_SHEPHERD_SLOWNESS_SHEEP_PER_LEVEL")) return 1.0D;
         if (name.startsWith("RUNNER_") && name.endsWith("_MILLIS")) return 0.0D;
         if (name.startsWith("RUNNER_") && name.endsWith("_TICKS")) return 0.0D;
         if (name.startsWith("SHEEP_QUEST_") && (name.endsWith("_MILLIS") || name.endsWith("_TICKS"))) return 0.0D;
@@ -391,6 +392,7 @@ final class GameDebugVariableCatalog {
         if (name.startsWith("DRAGON_ESCAPE_") && (name.endsWith("_SPEED") || name.endsWith("_RADIUS")
                 || name.endsWith("_DISTANCE") || name.endsWith("_LAUNCH_Y"))) return 0.0D;
         if (name.equals("SHEEP_QUEST_THROW_BOUNCE_MULTIPLIER")) return -1.0D;
+        if (name.equals("SHEEP_QUEST_SHEPHERD_SLOWNESS_MAX_AMPLIFIER")) return 0.0D;
         if (name.startsWith("SHEEP_QUEST_") && (name.endsWith("_SPEED") || name.endsWith("_ADD")
                 || name.endsWith("_MIN") || name.endsWith("_MAX") || name.endsWith("_SCALE")
                 || name.endsWith("_KNOCKBACK") || name.endsWith("_RADIUS")
@@ -626,6 +628,12 @@ final class GameDebugVariableCatalog {
                 || name.equals("SHEEP_QUEST_THROW_VERTICAL_KNOCKBACK")
                 || name.equals("SHEEP_QUEST_THROW_BOUNCE_VERTICAL")) return 8.0D;
         if (name.equals("SHEEP_QUEST_THROW_BOUNCE_MULTIPLIER")) return 1.0D;
+        if (name.equals("SHEEP_QUEST_SHEPHERD_SLOWNESS_SHEEP_PER_LEVEL")) return 64.0D;
+        if (name.equals("SHEEP_QUEST_SHEPHERD_SLOWNESS_MAX_AMPLIFIER")) return 127.0D;
+        if (name.equals("SHEEP_QUEST_CAPTURE_SCORE")) return 100.0D;
+        if (name.startsWith("SHEEP_QUEST_") && (name.endsWith("_THRESHOLD")
+                || name.endsWith("_ACHIEVEMENT_COUNT") || name.endsWith("_WINS")
+                || name.endsWith("_PER_TARGET"))) return 10_000.0D;
         if (name.startsWith("SHEEP_QUEST_") && name.endsWith("_SPEED")) return 4.0D;
         if (name.startsWith("SHEEP_QUEST_") && (name.endsWith("_RADIUS") || name.endsWith("_BLOCKS"))) return 64.0D;
         if (name.startsWith("DRAGON_ESCAPE_") && name.endsWith("_MILLIS")) return 120_000.0D;
@@ -814,6 +822,10 @@ final class GameDebugVariableCatalog {
         if (name.startsWith("SHEEP_QUEST_") && name.endsWith("_MILLIS")) return 100.0D;
         if (name.startsWith("SHEEP_QUEST_") && (name.endsWith("_SPEED") || name.endsWith("_RADIUS")
                 || name.endsWith("_BLOCKS") || name.endsWith("_KNOCKBACK"))) return 0.1D;
+        if (name.startsWith("SHEEP_QUEST_") && (name.endsWith("_THRESHOLD")
+                || name.endsWith("_ACHIEVEMENT_COUNT") || name.endsWith("_WINS")
+                || name.endsWith("_PER_TARGET") || name.endsWith("_AMPLIFIER")
+                || name.endsWith("_SHEEP_PER_LEVEL") || name.endsWith("_SCORE"))) return 1.0D;
         if (Set.of("MANA_REGEN_MULTIPLIER", "PROJECTILE_SPEED_MULTIPLIER", "SPELL_COOLDOWN_MULTIPLIER",
                 "SPELL_DAMAGE_MULTIPLIER", "SPELL_HEAL_MULTIPLIER", "SPELL_MANA_COST_MULTIPLIER")
                 .contains(name)) return 0.1D;

@@ -115,7 +115,9 @@ final class GameDebugEventCatalog {
                     "Use the active role's Cow Bomb or Body Slam through the normal cooldown and impact path."));
     private static final List<Event> SHEEP_QUEST = List.of(
             new Event("spawn-sheep", "Spawn Sheep Now", Material.WHITE_WOOL,
-                    "Spawn and configure one neutral sheep using the normal round map spawn rules."));
+                    "Spawn and configure one neutral sheep using the normal round map spawn rules."),
+            new Event("throw-passenger", "Test Brute Throw", Material.LEAD,
+                    "Throw the Brute's currently carried player or sheep through its normal impact path."));
     private static final List<Event> SKY_WARS = List.of(
             new Event("spawn-tnt", "Spawn Generator TNT", Material.TNT,
                     "Run the selected map's normal TNT generator drop immediately."));

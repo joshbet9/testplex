@@ -56,6 +56,69 @@ class SheepQuestDebugRulesTest {
         assertVariable("SHEEP_QUEST_MAX_CARRY", 0.0D, 64.0D);
         assertVariable("SHEEP_QUEST_THROW_BOUNCE_MULTIPLIER", -1.0D, 1.0D);
         assertVariable("SHEEP_QUEST_HOME_SPEED", 0.0D, 4.0D);
+        assertVariable("SHEEP_QUEST_SHEPHERD_SLOWNESS_SHEEP_PER_LEVEL", 1.0D, 64.0D);
+        assertVariable("SHEEP_QUEST_SHEPHERD_SLOWNESS_MAX_AMPLIFIER", 0.0D, 127.0D);
+        assertVariable("SHEEP_QUEST_CAPTURE_SCORE", 0.0D, 100.0D);
+        assertVariable("SHEEP_QUEST_ARCHER_ACHIEVEMENT_KILLS_PER_TARGET", 0.0D, 10_000.0D);
+    }
+
+    @Test void shepherdStackSlowdownAndCaptureScoringAreProfileBackedAndResettable() {
+        assertEquals(-1, ArcadePortRules.sheepQuestShepherdSlownessAmplifier(0));
+        assertEquals(0, ArcadePortRules.sheepQuestShepherdSlownessAmplifier(1));
+        assertEquals(0, ArcadePortRules.sheepQuestShepherdSlownessAmplifier(2));
+        assertEquals(1, ArcadePortRules.sheepQuestShepherdSlownessAmplifier(3));
+        assertEquals(1, ArcadePortRules.sheepQuestShepherdSlownessAmplifier(4));
+        assertEquals(2, ArcadePortRules.sheepQuestShepherdSlownessAmplifier(5));
+        assertEquals(1, ArcadePortRules.sheepQuestCaptureScore());
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "SHEEP_QUEST_SHEPHERD_SLOWNESS_SHEEP_PER_LEVEL", 1,
+                "SHEEP_QUEST_SHEPHERD_SLOWNESS_MAX_AMPLIFIER", 2,
+                "SHEEP_QUEST_CAPTURE_SCORE", 4));
+        assertEquals(2, ArcadePortRules.sheepQuestShepherdSlownessAmplifier(3));
+        assertEquals(2, ArcadePortRules.sheepQuestShepherdSlownessAmplifier(4));
+        assertEquals(4, ArcadePortRules.sheepQuestCaptureScore());
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertEquals(0, ArcadePortRules.sheepQuestShepherdSlownessAmplifier(2));
+        assertEquals(1, ArcadePortRules.sheepQuestShepherdSlownessAmplifier(3));
+        assertEquals(1, ArcadePortRules.sheepQuestCaptureScore());
+    }
+
+    @Test void progressionAndAchievementConditionsUseProfileThresholdsAndResetToSourceValues() {
+        assertFalse(ArcadePortRules.sheepQuestSoloCarryQualified(2));
+        assertTrue(ArcadePortRules.sheepQuestSoloCarryQualified(3));
+        assertFalse(ArcadePortRules.sheepQuestThiefAchievementReached(299));
+        assertTrue(ArcadePortRules.sheepQuestAnimalRescueAchievementReached(300));
+        assertFalse(ArcadePortRules.sheepQuestHungryHungryHippoAchievementReached(49));
+        assertTrue(ArcadePortRules.sheepQuestSelfishAchievementReached(13));
+        assertFalse(ArcadePortRules.sheepQuestSelfishAchievementReached(12));
+        assertFalse(ArcadePortRules.sheepQuestArcherAchievementReached(4));
+        assertTrue(ArcadePortRules.sheepQuestMovementCreditIsRecent(10_000L, 5_000L));
+        assertFalse(ArcadePortRules.sheepQuestMovementCreditIsRecent(10_001L, 5_000L));
+
+        GameDebugRuntimeOverrides.activate(Map.ofEntries(
+                Map.entry("SHEEP_QUEST_SOLO_CARRY_KILL_THRESHOLD", 1),
+                Map.entry("SHEEP_QUEST_THIEF_ACHIEVEMENT_COUNT", 2),
+                Map.entry("SHEEP_QUEST_ANIMAL_RESCUE_ACHIEVEMENT_COUNT", 3),
+                Map.entry("SHEEP_QUEST_HUNGRY_HUNGRY_HIPPO_WINS", 4),
+                Map.entry("SHEEP_QUEST_SELFISH_TEAM_SHEEP_THRESHOLD", 5),
+                Map.entry("SHEEP_QUEST_ARCHER_ACHIEVEMENT_KILLS_PER_TARGET", 6),
+                Map.entry("SHEEP_QUEST_ARCHER_MOVEMENT_CREDIT_WINDOW_MILLIS", 7)));
+        assertTrue(ArcadePortRules.sheepQuestSoloCarryQualified(1));
+        assertTrue(ArcadePortRules.sheepQuestThiefAchievementReached(2));
+        assertTrue(ArcadePortRules.sheepQuestAnimalRescueAchievementReached(3));
+        assertTrue(ArcadePortRules.sheepQuestHungryHungryHippoAchievementReached(4));
+        assertTrue(ArcadePortRules.sheepQuestSelfishAchievementReached(6));
+        assertTrue(ArcadePortRules.sheepQuestArcherAchievementReached(6));
+        assertTrue(ArcadePortRules.sheepQuestMovementCreditIsRecent(17L, 10L));
+        assertFalse(ArcadePortRules.sheepQuestMovementCreditIsRecent(18L, 10L));
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertFalse(ArcadePortRules.sheepQuestSoloCarryQualified(2));
+        assertFalse(ArcadePortRules.sheepQuestThiefAchievementReached(299));
+        assertFalse(ArcadePortRules.sheepQuestArcherAchievementReached(4));
+        assertFalse(ArcadePortRules.sheepQuestMovementCreditIsRecent(10_001L, 5_000L));
     }
 
     private static void assertVariable(String key, double minimum, double maximum) {

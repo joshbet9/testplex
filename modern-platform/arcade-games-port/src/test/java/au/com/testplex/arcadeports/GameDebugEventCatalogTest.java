@@ -533,6 +533,24 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void sheepQuestBruteDebugEventUsesTheNormalPassengerThrowConsumer() throws IOException {
+        Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ArcadePortManager.java");
+        if (!Files.isRegularFile(managerPath)) {
+            managerPath = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports", "ArcadePortManager.java");
+        }
+        String source = Files.readString(managerPath);
+        int dispatcher = source.indexOf("type == ArcadePortGame.SHEEP_QUEST && \"throw-passenger\".equals(eventId)");
+        int thrower = source.indexOf("private void throwSheepQuestPassenger(Session session, Player thrower)");
+        assertTrue(dispatcher >= 0);
+        assertTrue(thrower > dispatcher);
+        assertTrue(source.substring(dispatcher, thrower).contains("throwSheepQuestPassenger(session, tester)"));
+        assertTrue(source.substring(thrower, source.indexOf("private void updateSheepQuestKits", thrower))
+                .contains("sheepQuestBruteThrowHorizontalSpeed()"));
+    }
+
+    @Test
     void skyWarsGeneratorEventSharesTheNormalTntDropPath() throws IOException {
         Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
                 "ArcadePortManager.java");
@@ -1094,11 +1112,14 @@ class GameDebugEventCatalogTest {
         }
         String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
         String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
-        assertTrue(lobby.contains("List.of(\"beserker\", \"archer\", \"shepherd\")"));
+        assertTrue(lobby.contains("List.of(\"beserker\", \"archer\", \"brute\", \"shepherd\")"));
         for (String kit : List.of("beserker", "archer", "shepherd")) {
             assertTrue(manager.contains("debugKitFeatureEnabled(player, ArcadePortGame.SHEEP_QUEST, \"" + kit + "\")"),
                     kit + " has a runtime consumer");
         }
+        assertTrue(GameDebugEventCatalog.events(ArcadePortGame.SHEEP_QUEST).stream()
+                .anyMatch(event -> event.id().equals("throw-passenger")));
+        assertTrue(manager.contains("debugKitFeatureEnabled(thrower, ArcadePortGame.SHEEP_QUEST, \"brute\")"));
         assertTrue(manager.contains("debugKitFeatureEnabled(player, ArcadePortGame.SHEEP_QUEST, \"shepherd\")"));
         assertTrue(manager.contains("public void onSheepQuestArcherBowShoot(EntityShootBowEvent event)"));
         assertTrue(manager.contains("Archer abilities are disabled in your debug profile."));
