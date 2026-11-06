@@ -1920,6 +1920,11 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
             player.sendMessage(ChatColor.YELLOW + "Spell casting is disabled for your debug profile.");
             return;
         }
+        if (!plugin.isArcadeDebugFeatureEnabled(player,
+                au.com.testplex.arcadeports.ArcadePortGame.WIZARDS, "spell-" + spell.id(), true)) {
+            player.sendMessage(ChatColor.YELLOW + spell.displayName() + " is disabled for your debug profile.");
+            return;
+        }
         int level = state.known.getOrDefault(spell, 0);
         if (level <= 0) return;
         if (!spell.implemented()) {

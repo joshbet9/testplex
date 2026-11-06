@@ -154,6 +154,8 @@ final class GameDebugEventCatalog {
             new Event("spawn-monster-wave", "Spawn Monster Wave", Material.ZOMBIE_SPAWN_EGG,
                     "Spawn the selected mode's normal safe-pad monster wave around the active maze."));
     private static final List<Event> HEROES_OF_GWEN = List.of(
+            new Event("use-hero-ability", "Test Held Hero Ability", Material.NETHER_STAR,
+                    "Activate the selected hero ability held in your hotbar through its normal cooldown, target and effect path."),
             new Event("spawn-minion-wave", "Start Minion Wave", Material.ZOMBIE_SPAWN_EGG,
                     "Start both teams' normal minion wave and source-map route processing."),
             new Event("damage-tower", "Damage Next Tower", Material.IRON_PICKAXE,

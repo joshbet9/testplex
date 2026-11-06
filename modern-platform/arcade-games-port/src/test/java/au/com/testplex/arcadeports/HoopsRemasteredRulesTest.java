@@ -204,5 +204,48 @@ class HoopsRemasteredRulesTest {
         assertNotNull(GameDebugVariableCatalog.variable(ArcadePortGame.HOOPS_REMASTERED, "HOOPS_SHOT_AIM_TOLERANCE"));
         assertNotNull(GameDebugVariableCatalog.variable(ArcadePortGame.HOOPS_REMASTERED, "HOOPS_STEAL_COOLDOWN_MILLIS"));
         assertNotNull(GameDebugVariableCatalog.variable(ArcadePortGame.HOOPS_REMASTERED, "HOOPS_MAX_PLAYERS"));
+        assertNotNull(GameDebugVariableCatalog.variable(ArcadePortGame.HOOPS_REMASTERED, "HOOPS_BALL_CATCH_RADIUS_SQUARED"));
+        assertNotNull(GameDebugVariableCatalog.variable(ArcadePortGame.HOOPS_REMASTERED, "HOOPS_SHOT_NORMAL_MIN_FLIGHT_TICKS"));
+        assertNotNull(GameDebugVariableCatalog.variable(ArcadePortGame.HOOPS_REMASTERED, "HOOPS_SHOT_DUNK_MAX_FLIGHT_TICKS"));
+        assertNotNull(GameDebugVariableCatalog.variable(ArcadePortGame.HOOPS_REMASTERED, "HOOPS_BLOCK_AIM_DOT"));
+        assertNotNull(GameDebugVariableCatalog.variable(ArcadePortGame.HOOPS_REMASTERED, "HOOPS_STEAL_AIM_DOT"));
+    }
+
+    @Test void ballPickupShotFlightAndClutchProfilesChangeGameplayAndReset() {
+        assertTrue(HoopsRemasteredRules.isClutchTime(60_000L));
+        assertFalse(HoopsRemasteredRules.isClutchTime(60_001L));
+        assertTrue(HoopsRemasteredRules.isWithinBallCatchRadius(2.25D));
+        assertTrue(HoopsRemasteredRules.isShooterInsideLaunchProtection(2.24D));
+        assertTrue(HoopsRemasteredRules.isFacingBallForBlock(0.25D));
+        assertTrue(HoopsRemasteredRules.isFacingHolderForSteal(0.20D));
+        assertEquals(22, HoopsRemasteredRuntime.shotFlightTicks(100.0D, false, false));
+
+        GameDebugRuntimeOverrides.activate(java.util.Map.ofEntries(
+                java.util.Map.entry("HOOPS_CLUTCH_WINDOW_MILLIS", 10_000L),
+                java.util.Map.entry("HOOPS_BALL_CATCH_RADIUS_SQUARED", 1.0D),
+                java.util.Map.entry("HOOPS_SHOT_LAUNCH_PROTECTION_DISTANCE_SQUARED", 0.5D),
+                java.util.Map.entry("HOOPS_SHOT_NORMAL_FLIGHT_TICKS_PER_BLOCK", 10.0D),
+                java.util.Map.entry("HOOPS_SHOT_NORMAL_MIN_FLIGHT_TICKS", 2),
+                java.util.Map.entry("HOOPS_SHOT_NORMAL_MAX_FLIGHT_TICKS", 4),
+                java.util.Map.entry("HOOPS_BLOCK_AIM_DOT", 0.9D),
+                java.util.Map.entry("HOOPS_STEAL_AIM_DOT", 0.8D)));
+        assertTrue(HoopsRemasteredRules.isClutchTime(10_000L));
+        assertFalse(HoopsRemasteredRules.isClutchTime(10_001L));
+        assertFalse(HoopsRemasteredRules.isWithinBallCatchRadius(1.01D));
+        assertFalse(HoopsRemasteredRules.isShooterInsideLaunchProtection(0.5D));
+        assertEquals(4, HoopsRemasteredRuntime.shotFlightTicks(100.0D, false, false));
+        assertFalse(HoopsRemasteredRules.isFacingBallForBlock(0.89D));
+        assertTrue(HoopsRemasteredRules.isFacingBallForBlock(0.9D));
+        assertFalse(HoopsRemasteredRules.isFacingHolderForSteal(0.79D));
+        assertTrue(HoopsRemasteredRules.isFacingHolderForSteal(0.8D));
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertTrue(HoopsRemasteredRules.isClutchTime(60_000L));
+        assertFalse(HoopsRemasteredRules.isClutchTime(60_001L));
+        assertTrue(HoopsRemasteredRules.isWithinBallCatchRadius(2.25D));
+        assertTrue(HoopsRemasteredRules.isShooterInsideLaunchProtection(2.24D));
+        assertTrue(HoopsRemasteredRules.isFacingBallForBlock(0.25D));
+        assertTrue(HoopsRemasteredRules.isFacingHolderForSteal(0.20D));
+        assertEquals(22, HoopsRemasteredRuntime.shotFlightTicks(100.0D, false, false));
     }
 }

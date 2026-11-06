@@ -1,6 +1,7 @@
 package au.com.testplex.arcadeports;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 
 import java.util.List;
 import java.util.Map;
@@ -8,6 +9,9 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 class TurfWarsMixedVariantTest {
+    @AfterEach
+    void resetDebugOverrides() { GameDebugRuntimeOverrides.clear(); }
+
     @Test
     void mixedArcadeHalvesEveryTurfWarsPhaseWithoutChangingStandardTimings() {
         assertEquals(40_000L, ArcadePortRules.turfWarsInitialBuildPhaseMillis(false));
@@ -176,6 +180,53 @@ class TurfWarsMixedVariantTest {
         assertFalse(ArcadePortRules.turfWarsShouldTrackComeback(6));
         assertTrue(ArcadePortRules.turfWarsShouldTrackComeback(5));
         assertTrue(ArcadePortRules.turfWarsShouldTrackComeback(0));
+
+        GameDebugRuntimeOverrides.activate(Map.of("TURF_WARS_COMEBACK_REMAINING_LINES", 10));
+        assertTrue(ArcadePortRules.turfWarsShouldTrackComeback(10));
+        assertFalse(ArcadePortRules.turfWarsShouldTrackComeback(11));
+        GameDebugVariableCatalog.Variable threshold = GameDebugVariableCatalog.variable(
+                ArcadePortGame.TURF_WARS, "TURF_WARS_COMEBACK_REMAINING_LINES");
+        assertNotNull(threshold);
+        assertEquals(0.0D, threshold.minimum());
+        assertEquals(100.0D, threshold.maximum());
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertFalse(ArcadePortRules.turfWarsShouldTrackComeback(6));
+        assertTrue(ArcadePortRules.turfWarsShouldTrackComeback(5));
+    }
+
+    @Test
+    void roundClocksCombatDamageAndKitAmmunitionUseProfilesAndReset() {
+        assertEquals(40_000L, ArcadePortRules.turfWarsInitialBuildPhaseMillis(false));
+        assertEquals(9.0D, ArcadePortRules.turfWarsHitDamage("shredder", true, false), 1.0e-9);
+        assertEquals(6.0D, ArcadePortRules.turfWarsHitDamage("marksman", false, false), 1.0e-9);
+        assertEquals(8, ArcadePortRules.turfWarsConstructorMax("marksman"));
+        assertEquals(2, ArcadePortRules.turfWarsArrowMax("marksman"));
+
+        GameDebugRuntimeOverrides.activate(Map.ofEntries(
+                Map.entry("TURF_WARS_INITIAL_BUILD_PHASE_MILLIS", 12_000L),
+                Map.entry("TURF_WARS_BUILD_PHASE_MILLIS", 6_000L),
+                Map.entry("TURF_WARS_COMBAT_PHASE_MILLIS", 30_000L),
+                Map.entry("TURF_WARS_SHREDDER_ARROW_DAMAGE", 3.5D),
+                Map.entry("TURF_WARS_MELEE_DAMAGE", 4.0D),
+                Map.entry("TURF_WARS_MARKSMAN_MAX_WOOL", 14),
+                Map.entry("TURF_WARS_MARKSMAN_MAX_ARROWS", 5)));
+        assertEquals(12_000L, ArcadePortRules.turfWarsInitialBuildPhaseMillis(false));
+        assertEquals(6_000L, ArcadePortRules.turfWarsBuildPhaseMillis(false));
+        assertEquals(30_000L, ArcadePortRules.turfWarsCombatPhaseMillis(false));
+        assertEquals(3.5D, ArcadePortRules.turfWarsHitDamage("shredder", true, false), 1.0e-9);
+        assertEquals(4.0D, ArcadePortRules.turfWarsHitDamage("marksman", false, false), 1.0e-9);
+        assertEquals(14, ArcadePortRules.turfWarsConstructorMax("marksman"));
+        assertEquals(5, ArcadePortRules.turfWarsArrowMax("marksman"));
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertEquals(40_000L, ArcadePortRules.turfWarsInitialBuildPhaseMillis(false));
+        assertEquals(20_000L, ArcadePortRules.turfWarsBuildPhaseMillis(false));
+        assertEquals(90_000L, ArcadePortRules.turfWarsCombatPhaseMillis(false));
+        assertEquals(9.0D, ArcadePortRules.turfWarsHitDamage("shredder", true, false), 1.0e-9);
+        assertEquals(6.0D, ArcadePortRules.turfWarsHitDamage("marksman", false, false), 1.0e-9);
+        assertEquals(8, ArcadePortRules.turfWarsConstructorMax("marksman"));
+        assertEquals(2, ArcadePortRules.turfWarsArrowMax("marksman"));
     }
 
     @Test

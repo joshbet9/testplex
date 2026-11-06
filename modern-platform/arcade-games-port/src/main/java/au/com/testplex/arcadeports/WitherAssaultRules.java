@@ -45,6 +45,12 @@ public final class WitherAssaultRules {
     public static final double SKULL_KNOCKBACK_Y_MULTIPLIER = 0.65D;
     public static final int SKULL_TERRAIN_RADIUS_BLOCKS = 4;
     public static final int SKULL_BLOCK_RESTORE_TICKS = 120;
+    public static final double HUMAN_LEAP_HORIZONTAL_POWER = 1.0D;
+    public static final double ARCHER_LEAP_HORIZONTAL_MULTIPLIER = 1.2D;
+    public static final double HUMAN_LEAP_VERTICAL_MINIMUM = 0.65D;
+    public static final double HUMAN_LEAP_VERTICAL_MAXIMUM = 1.0D;
+    public static final double HUMAN_LEAP_VERTICAL_LOOK_ADD = 0.35D;
+    public static final double SKULL_LAUNCH_SPEED = 1.15D;
     private static final Set<String> HUMAN_KITS = Set.of("archer", "medic", "editor", "warden");
 
     private WitherAssaultRules() { }
@@ -271,6 +277,34 @@ public final class WitherAssaultRules {
     public static int skullBlockRestoreTicks() {
         return Math.max(1, GameDebugRuntimeOverrides.intValue(
                 "WITHER_ASSAULT_SKULL_BLOCK_RESTORE_TICKS", SKULL_BLOCK_RESTORE_TICKS));
+    }
+
+    public static double humanLeapHorizontalPower(String kit) {
+        double base = finiteClamp(GameDebugRuntimeOverrides.doubleValue(
+                "WITHER_ASSAULT_HUMAN_LEAP_HORIZONTAL_POWER", HUMAN_LEAP_HORIZONTAL_POWER), 0.0D, 4.0D,
+                HUMAN_LEAP_HORIZONTAL_POWER);
+        double archerMultiplier = finiteClamp(GameDebugRuntimeOverrides.doubleValue(
+                "WITHER_ASSAULT_ARCHER_LEAP_HORIZONTAL_MULTIPLIER", ARCHER_LEAP_HORIZONTAL_MULTIPLIER),
+                0.0D, 4.0D, ARCHER_LEAP_HORIZONTAL_MULTIPLIER);
+        return base * ("archer".equals(normalizeHumanKit(kit)) ? archerMultiplier : 1.0D);
+    }
+
+    public static double humanLeapVerticalVelocity(double lookY) {
+        double minimum = finiteClamp(GameDebugRuntimeOverrides.doubleValue(
+                "WITHER_ASSAULT_HUMAN_LEAP_VERTICAL_MINIMUM", HUMAN_LEAP_VERTICAL_MINIMUM), 0.0D, 3.0D,
+                HUMAN_LEAP_VERTICAL_MINIMUM);
+        double maximum = finiteClamp(GameDebugRuntimeOverrides.doubleValue(
+                "WITHER_ASSAULT_HUMAN_LEAP_VERTICAL_MAXIMUM", HUMAN_LEAP_VERTICAL_MAXIMUM), minimum, 4.0D,
+                HUMAN_LEAP_VERTICAL_MAXIMUM);
+        double lookAdd = finiteClamp(GameDebugRuntimeOverrides.doubleValue(
+                "WITHER_ASSAULT_HUMAN_LEAP_VERTICAL_LOOK_ADD", HUMAN_LEAP_VERTICAL_LOOK_ADD), 0.0D, 2.0D,
+                HUMAN_LEAP_VERTICAL_LOOK_ADD);
+        return Math.max(minimum, Math.min(maximum, Math.abs(Double.isFinite(lookY) ? lookY : 0.0D) + lookAdd));
+    }
+
+    public static double skullLaunchSpeed() {
+        return finiteClamp(GameDebugRuntimeOverrides.doubleValue(
+                "WITHER_ASSAULT_SKULL_LAUNCH_SPEED", SKULL_LAUNCH_SPEED), 0.1D, 5.0D, SKULL_LAUNCH_SPEED);
     }
 
     private static double finiteClamp(double value, double minimum, double maximum, double fallback) {

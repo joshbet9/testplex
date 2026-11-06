@@ -1247,7 +1247,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             features.put("plot-editing", new DebugFeature("plot-editing", "Plot block editing", Material.OAK_PLANKS,
                     "Allow this tester to place and break blocks inside their assigned plot during Build.", true));
             features.put("review-voting", new DebugFeature("review-voting", "Review voting", Material.LIME_CONCRETE,
-                    "Allow this tester to submit ratings through the normal six-level review vote.", true));
+                    "Allow this tester to submit ratings through the configured review scale.", true));
         }
         if (game == ArcadePortGame.CAMERA_SHY) {
             features.put("photo-outlines", new DebugFeature("photo-outlines", "Spyglass target outlines", Material.SPYGLASS,
@@ -1274,6 +1274,22 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     "Allow this tester to use the Human team's grounded double jump.", true));
             features.put("human-revival", new DebugFeature("human-revival", "Human revival potions", Material.SPLASH_POTION,
                     "Allow this tester to revive downed Human teammates with a Revival Potion.", true));
+            features.put("wither-skull", new DebugFeature("wither-skull", "Wither Skull", Material.WITHER_SKELETON_SKULL,
+                    "Allow this tester to fire the Wither's aimed skull attack.", true));
+            features.put("wither-minions", new DebugFeature("wither-minions", "Minion Wave", Material.SKELETON_SKULL,
+                    "Allow this tester to summon the Wither's skeletal minion wave.", true));
+            features.put("wither-scent", new DebugFeature("wither-scent", "Human Scent", Material.COMPASS,
+                    "Allow this tester to reveal living Humans with the Wither's scent ability.", true));
+            features.put("wither-fire-storm", new DebugFeature("wither-fire-storm", "Fire Storm", Material.BLAZE_POWDER,
+                    "Allow this tester to activate and maintain the Wither's Fire Storm.", true));
+            features.put("smoke-arrow", new DebugFeature("smoke-arrow", "Smoke Arrow", Material.TIPPED_ARROW,
+                    "Allow smoke arrows to blind nearby Withers.", true));
+            features.put("medic-refill", new DebugFeature("medic-refill", "Medic Refill", Material.SPLASH_POTION,
+                    "Allow the Medic kit to periodically refill revival potions.", true));
+            features.put("fletcher-refill", new DebugFeature("fletcher-refill", "Fletcher Refill", Material.ARROW,
+                    "Allow Archer and Editor kits to periodically refill arrows.", true));
+            features.put("editor-build", new DebugFeature("editor-build", "Editor Building", Material.BRICKS,
+                    "Allow the Editor kit to place and remove its temporary blocks.", true));
             for (String feature : List.of("archer", "medic", "editor", "wither")) {
                 String key = "ability-" + feature;
                 features.put(key, new DebugFeature(key, "Kit feature: " + humanizeDebugKey(feature), Material.WITHER_SKELETON_SKULL,
@@ -1293,8 +1309,14 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     "Allow this tester to deal and receive Gladiators duel damage.", true));
         }
         if (game == ArcadePortGame.HOOPS_REMASTERED) {
+            features.put("shooting", new DebugFeature("shooting", "Shooting", Material.SNOWBALL,
+                    "Allow this tester to take normal shots with aim, flight and scoring checks.", true));
+            features.put("scoring", new DebugFeature("scoring", "Basket scoring", Material.GOLD_INGOT,
+                    "Allow valid shots by this tester to score and advance normal match results.", true));
             features.put("passing", new DebugFeature("passing", "Passing", Material.SNOWBALL,
                     "Allow this tester to pass the ball using normal aim and teammate selection.", true));
+            features.put("steals", new DebugFeature("steals", "Steals", Material.IRON_SWORD,
+                    "Allow this tester to steal possession using normal range, facing and cooldown checks.", true));
             features.put("blocking", new DebugFeature("blocking", "Shot blocks", Material.SHIELD,
                     "Allow this tester to contest and block opposing shots.", true));
             features.put("rebounding", new DebugFeature("rebounding", "Rebounds", Material.SLIME_BALL,
@@ -1454,6 +1476,11 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     "Allow this tester to cast their selected Wizards spells.", true));
             features.put("chest-looting", new DebugFeature("chest-looting", "Chest looting", Material.CHEST,
                     "Allow this tester to collect spellbooks, wands and mana from arena chests.", true));
+            for (au.com.testplex.wizards.WizardsSpell spell : au.com.testplex.wizards.WizardsSpell.implementedSpells()) {
+                String key = "spell-" + spell.id();
+                features.put(key, new DebugFeature(key, "Spell: " + spell.displayName(), spell.icon(),
+                        "Allow this tester to cast " + spell.displayName() + " independently of other spells.", true));
+            }
         }
         if (game == ArcadePortGame.PLEXBALL) {
             features.put("batting", new DebugFeature("batting", "Batter swings", Material.STICK,
@@ -1586,7 +1613,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.HEROES_OF_GWEN && Set.of("minion-waves", "minion-combat",
                         "beacon-captures", "health-regeneration", "gold-income", "overtime").contains(key))
                 || (game == ArcadePortGame.HOOPS_REMASTERED
-                        && Set.of("passing", "blocking", "rebounding", "hops").contains(key))
+                        && Set.of("shooting", "scoring", "passing", "steals", "blocking", "rebounding", "hops").contains(key))
                 || (game == ArcadePortGame.DRAW_MY_THING
                         && ("canvas-tools".equals(key) || "palette-selection".equals(key)
                                 || "guess-submission".equals(key) || "timed-hints".equals(key)
@@ -1624,7 +1651,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                                         "border-elimination").contains(key)))
                 || (game == ArcadePortGame.SKY_WARS && key.startsWith("ability-"))
                 || (game == ArcadePortGame.SKY_WARS && Set.of("chest-looting", "island-crumbling", "tnt-generator").contains(key))
-                || (game == ArcadePortGame.WIZARDS && Set.of("spell-casting", "chest-looting").contains(key))
+                || (game == ArcadePortGame.WIZARDS
+                        && (Set.of("spell-casting", "chest-looting").contains(key) || key.startsWith("spell-")))
                 || (game == ArcadePortGame.PLEXBALL
                         && (Set.of("batting", "catching", "kit-abilities").contains(key)
                                 || key.startsWith("ability-")))

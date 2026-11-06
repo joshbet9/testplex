@@ -25,6 +25,9 @@ final class GameDebugVariableCatalog {
             "SPLEEF_HUNGER_DRAIN_ENABLED",
             "SPEED_BUILDERS_DOUBLE_JUMP_ENABLED",
             "SPEED_BUILDERS_PERFECT_BUILD_TIME_TIEBREAK_ENABLED");
+    private static final Set<String> LIVE_SUPER_SPLOOR_BOOLEAN_RULES = Set.of(
+            "SUPER_SPLOOR_SQUID_MODE_ENABLED", "SUPER_SPLOOR_INK_REGEN_ENABLED",
+            "SUPER_SPLOOR_SECONDARIES_ENABLED", "SUPER_SPLOOR_SPECIALS_ENABLED");
     private static final Set<String> LIVE_SNEAKY_NUMERIC_RULES = Set.of(
             "SNEAKY_ASSASSINS_POWERUP_KILL_WINDOW_MILLIS", "SNEAKY_ASSASSINS_NEXT_POWERUP_DELAY_MILLIS",
             "SNEAKY_ASSASSINS_MAX_ACTIVE_POWERUPS", "SNEAKY_ASSASSINS_MASTER_ASSASSIN_POWERUPS_REQUIRED",
@@ -89,6 +92,50 @@ final class GameDebugVariableCatalog {
             "SPLEEF_ARROW_CLEAR_RADIUS_SPEED_DIVISOR", "SPLEEF_ARROW_CLEAR_RADIUS_CAP_BLOCKS",
             "SPLEEF_PROJECTILE_CLEAR_RADIUS_MIN_BLOCKS", "SPLEEF_PROJECTILE_CLEAR_RADIUS_MAX_BLOCKS",
             "SPLEEF_PROJECTILE_IMPACT_SEARCH_RADIUS_BLOCKS");
+    private static final Set<String> LIVE_SUPER_SPLOOR_NUMERIC_RULES = Set.of(
+            "SUPER_SPLOOR_MAX_INK", "SUPER_SPLOOR_INK_PER_PRIMARY_SHOT", "SUPER_SPLOOR_PRIMARY_SHOT_INTERVAL_MILLIS",
+            "SUPER_SPLOOR_ROLLER_PRIMARY_INK_COST", "SUPER_SPLOOR_ROLLER_PRIMARY_INTERVAL_MILLIS",
+            "SUPER_SPLOOR_CHARGER_PRIMARY_INK_COST", "SUPER_SPLOOR_CHARGER_PRIMARY_INTERVAL_MILLIS",
+            "SUPER_SPLOOR_LOBBER_PRIMARY_INK_COST", "SUPER_SPLOOR_LOBBER_PRIMARY_INTERVAL_MILLIS",
+            "SUPER_SPLOOR_DUALIES_PRIMARY_INK_COST", "SUPER_SPLOOR_DUALIES_PRIMARY_INTERVAL_MILLIS",
+            "SUPER_SPLOOR_SPRAYER_SECONDARY_INK_COST", "SUPER_SPLOOR_ROLLER_SECONDARY_INK_COST",
+            "SUPER_SPLOOR_CHARGER_SECONDARY_INK_COST", "SUPER_SPLOOR_LOBBER_SECONDARY_INK_COST",
+            "SUPER_SPLOOR_DUALIES_SECONDARY_INK_COST", "SUPER_SPLOOR_SECONDARY_COOLDOWN_MILLIS",
+            "SUPER_SPLOOR_MARK_RECOVERY_DELAY_MILLIS", "SUPER_SPLOOR_MARK_RECOVERY_INTERVAL_MILLIS",
+            "SUPER_SPLOOR_MAX_PAINT_MARKS", "SUPER_SPLOOR_NORMAL_INK_REGEN_PER_SECOND",
+            "SUPER_SPLOOR_SQUID_INK_REGEN_PER_SECOND", "SUPER_SPLOOR_INK_REGEN_INTERVAL_MILLIS",
+            "SUPER_SPLOOR_SQUID_WALK_SPEED", "SUPER_SPLOOR_SQUID_CLIMB_VELOCITY",
+            "SUPER_SPLOOR_CHARGER_FULL_CHARGE_MILLIS", "SUPER_SPLOOR_CHARGER_RECHARGE_MILLIS",
+            "SUPER_SPLOOR_CHARGER_MIN_INK_COST", "SUPER_SPLOOR_CHARGER_MAX_INK_COST",
+            "SUPER_SPLOOR_CHARGER_MIN_SPEED", "SUPER_SPLOOR_CHARGER_MAX_SPEED",
+            "SUPER_SPLOOR_DODGE_ROLL_MAX_CHARGES", "SUPER_SPLOOR_DODGE_ROLL_RECHARGE_MILLIS",
+            "SUPER_SPLOOR_SPECIAL_CHARGE_PER_TERRITORY_UNIT", "SUPER_SPLOOR_SPECIAL_CHARGE_PER_SPLAT",
+            "SUPER_SPLOOR_SPECIAL_CHARGE_REQUIRED", "SUPER_SPLOOR_SPAWN_PROTECTION_MILLIS",
+            "SUPER_SPLOOR_SPLAT_RESPAWN_MILLIS", "SUPER_SPLOOR_ROLLER_MINE_ARM_MILLIS",
+            "SUPER_SPLOOR_ROLLER_MINE_LIFETIME_MILLIS", "SUPER_SPLOOR_ROLLER_MINE_TRIGGER_RADIUS_BLOCKS",
+            "SUPER_SPLOOR_ROLLER_MINE_PAINT_RADIUS_BLOCKS", "SUPER_SPLOOR_ROLLER_STAMPEDE_DURATION_MILLIS",
+            "SUPER_SPLOOR_ROLLER_STAMPEDE_PAINT_INTERVAL_MILLIS", "SUPER_SPLOOR_ROLLER_STAMPEDE_SPEED",
+            "SUPER_SPLOOR_ROLLER_STAMPEDE_HIT_REACH_BLOCKS", "SUPER_SPLOOR_ROLLER_STAMPEDE_HIT_WIDTH_BLOCKS",
+            "SUPER_SPLOOR_CHARGER_TRACKER_DURATION_MILLIS", "SUPER_SPLOOR_CHARGER_TRACKER_PULSE_MILLIS",
+            "SUPER_SPLOOR_CHARGER_TRACKER_RADIUS_BLOCKS", "SUPER_SPLOOR_CHARGER_PRISM_BEAM_STEPS",
+            "SUPER_SPLOOR_CHARGER_PRISM_BEAM_STEP_BLOCKS", "SUPER_SPLOOR_CHARGER_PRISM_BEAM_HIT_RADIUS_BLOCKS",
+            "SUPER_SPLOOR_CHARGER_FULL_SHOT_COOLDOWN_MILLIS", "SUPER_SPLOOR_LOBBER_SPRINKLER_DURATION_MILLIS",
+            "SUPER_SPLOOR_LOBBER_SPRINKLER_PULSE_MILLIS", "SUPER_SPLOOR_LOBBER_SPRINKLER_PAINT_RADIUS_BLOCKS",
+            "SUPER_SPLOOR_LOBBER_SPRINKLER_HIT_RADIUS_BLOCKS", "SUPER_SPLOOR_LOBBER_PAINTSTORM_DURATION_MILLIS",
+            "SUPER_SPLOOR_LOBBER_PAINTSTORM_PULSE_MILLIS", "SUPER_SPLOOR_LOBBER_PAINTSTORM_PULSES",
+            "SUPER_SPLOOR_LOBBER_PAINTSTORM_PAINT_RADIUS_BLOCKS", "SUPER_SPLOOR_LOBBER_PAINTSTORM_HIT_RADIUS_BLOCKS",
+            "SUPER_SPLOOR_DUALIES_SUCTION_BOMB_FUSE_MILLIS", "SUPER_SPLOOR_DUALIES_SUCTION_BOMB_PAINT_RADIUS_BLOCKS",
+            "SUPER_SPLOOR_SPRAYER_BURST_BOMB_PAINT_RADIUS_BLOCKS", "SUPER_SPLOOR_SPRAYER_COLOURBURST_PAINT_RADIUS_BLOCKS",
+            "SUPER_SPLOOR_DUALIES_AFTERIMAGE_DASH_INTERVAL_MILLIS", "SUPER_SPLOOR_DUALIES_AFTERIMAGE_DASHES",
+            "SUPER_SPLOOR_DUALIES_AFTERIMAGE_DISTANCE_BLOCKS", "SUPER_SPLOOR_DUALIES_AFTERIMAGE_VERTICAL_VELOCITY",
+            "SUPER_SPLOOR_OVERTIME_LEAD_PERCENT", "SUPER_SPLOOR_SPRAYER_PRIMARY_PROJECTILE_SPEED",
+            "SUPER_SPLOOR_LOBBER_PRIMARY_PROJECTILE_SPEED",
+            "SUPER_SPLOOR_LOBBER_PRIMARY_VERTICAL_ARC", "SUPER_SPLOOR_DUALIES_PRIMARY_PROJECTILE_SPEED",
+            "SUPER_SPLOOR_DUALIES_PRIMARY_SPREAD_RADIANS", "SUPER_SPLOOR_DUALIES_PRIMARY_PROJECTILES",
+            "SUPER_SPLOOR_SPRAYER_PRIMARY_PAINT_RADIUS_BLOCKS", "SUPER_SPLOOR_CHARGER_PRIMARY_PAINT_RADIUS_BLOCKS",
+            "SUPER_SPLOOR_LOBBER_PRIMARY_PAINT_RADIUS_BLOCKS", "SUPER_SPLOOR_DUALIES_PRIMARY_PAINT_RADIUS_BLOCKS",
+            "SUPER_SPLOOR_ROLLER_PRIMARY_PAINT_RADIUS_BLOCKS", "SUPER_SPLOOR_ROLLER_PRIMARY_PAINT_STEPS",
+            "SUPER_SPLOOR_ROLLER_PRIMARY_HIT_REACH_BLOCKS", "SUPER_SPLOOR_ROLLER_PRIMARY_HIT_WIDTH_BLOCKS");
 
     private GameDebugVariableCatalog() { }
 
@@ -117,12 +164,36 @@ final class GameDebugVariableCatalog {
                         : ((Number) raw).doubleValue();
                 if (game == ArcadePortGame.MONSTER_MAZE && source.getSimpleName().equals("MazeDebugRules")
                         && name.equals("JUMPER_MAX_JUMPS")) value = 5.0D;
+                double minimum = minimum(name, value, kind);
+                double maximum = maximum(name, kind, value);
+                if (game == ArcadePortGame.SUPER_SPLOOR && source == SuperSploorRules.class) {
+                    minimum = superSploorMinimum(name, kind);
+                    maximum = superSploorMaximum(name, kind);
+                }
                 result.add(new Variable(key, humanize(name), kind, value,
-                        minimum(name, value, kind), maximum(name, kind, value), step(name, value, kind)));
+                        minimum, maximum, step(name, value, kind)));
             } catch (IllegalAccessException ignored) {
                 // Public constants should be readable; ignore a field if a JVM denies access.
             }
         }
+        }
+        if (game == ArcadePortGame.WIZARDS) {
+            for (au.com.testplex.wizards.WizardsKit kit : au.com.testplex.wizards.WizardsKit.values()) {
+                String prefix = "WIZARDS_KIT_" + kit.name() + "_";
+                result.add(new Variable(prefix + "MAX_MANA", kit.name() + " maximum mana",
+                        Kind.FLOAT, kit.maximumMana(), 1.0D, 1_000.0D, 5.0D));
+                result.add(new Variable(prefix + "MANA_PER_SECOND", kit.name() + " mana regeneration",
+                        Kind.FLOAT, kit.manaPerSecond(), 0.0D, 50.0D, 0.25D));
+                result.add(new Variable(prefix + "STARTING_WANDS", kit.name() + " starting wands",
+                        Kind.INTEGER, kit.startingWands(), 1.0D, 9.0D, 1.0D));
+            }
+            for (au.com.testplex.wizards.WizardsSpell spell : au.com.testplex.wizards.WizardsSpell.implementedSpells()) {
+                String prefix = "WIZARDS_SPELL_" + spell.name() + "_";
+                result.add(new Variable(prefix + "MANA_COST_MULTIPLIER",
+                        spell.displayName() + " mana cost multiplier", Kind.DOUBLE, 1.0D, 0.0D, 5.0D, 0.1D));
+                result.add(new Variable(prefix + "COOLDOWN_MULTIPLIER",
+                        spell.displayName() + " cooldown multiplier", Kind.DOUBLE, 1.0D, 0.0D, 5.0D, 0.1D));
+            }
         }
         result.sort(Comparator.comparing(Variable::key));
         return List.copyOf(result);
@@ -135,10 +206,14 @@ final class GameDebugVariableCatalog {
 
     static boolean appliesImmediately(Variable variable) {
         if (variable == null) return false;
-        return variable.kind() == Kind.BOOLEAN && LIVE_BOOLEAN_RULES.contains(variable.key())
+        return variable.kind() == Kind.BOOLEAN && (LIVE_BOOLEAN_RULES.contains(variable.key())
+                || LIVE_SUPER_SPLOOR_BOOLEAN_RULES.contains(variable.key()))
                 || variable.kind() != Kind.BOOLEAN && (LIVE_SNEAKY_NUMERIC_RULES.contains(variable.key())
                 || LIVE_CAMERA_NUMERIC_RULES.contains(variable.key())
-                || LIVE_SPLEEF_NUMERIC_RULES.contains(variable.key()));
+                || LIVE_SPLEEF_NUMERIC_RULES.contains(variable.key())
+                || LIVE_SUPER_SPLOOR_NUMERIC_RULES.contains(variable.key())
+                || variable.key().startsWith("WIZARDS_SPELL_")
+                || variable.key().startsWith("WIZARDS_KIT_") && variable.key().endsWith("_MANA_PER_SECOND"));
     }
 
     static double clamp(Variable variable, double value) {
@@ -212,7 +287,9 @@ final class GameDebugVariableCatalog {
                 "FLIGHT_BLEND_END_BLOCKS", "FLIGHT_MAX_SPEED_CHANGE_PER_TICK", "HUMAN_ARROW_DAMAGE_MULTIPLIER",
                 "SKULL_BLAST_RADIUS_BLOCKS", "SKULL_MIN_DAMAGE", "SKULL_MAX_DAMAGE",
                 "SKULL_KNOCKBACK_POWER", "SKULL_KNOCKBACK_Y_MULTIPLIER", "SKULL_TERRAIN_RADIUS_BLOCKS",
-                "SKULL_KNOCKBACK_Y_MINIMUM", "SKULL_BLOCK_RESTORE_TICKS").contains(name);
+                "SKULL_KNOCKBACK_Y_MINIMUM", "SKULL_BLOCK_RESTORE_TICKS", "HUMAN_LEAP_HORIZONTAL_POWER",
+                "ARCHER_LEAP_HORIZONTAL_MULTIPLIER", "HUMAN_LEAP_VERTICAL_MINIMUM",
+                "HUMAN_LEAP_VERTICAL_MAXIMUM", "HUMAN_LEAP_VERTICAL_LOOK_ADD", "SKULL_LAUNCH_SPEED").contains(name);
         if (game == ArcadePortGame.HOOPS_REMASTERED) return Set.of("TARGET_SCORE", "REGULATION_MILLIS",
                 "SHOT_CLOCK_MILLIS", "HOPS_COOLDOWN_MILLIS", "OFFENSIVE_REBOUND_SHOT_CLOCK_MILLIS",
                 "THREE_POINT_DISTANCE", "STEAL_RADIUS", "BLOCK_RADIUS", "BLOCK_COOLDOWN_MILLIS",
@@ -226,7 +303,11 @@ final class GameDebugVariableCatalog {
                 "PASS_MIN_DISTANCE", "PASS_MAX_DISTANCE", "PASS_AIM_DOT", "BLOCK_KNOCKBACK_HORIZONTAL",
                 "BLOCK_KNOCKBACK_VERTICAL", "HOPS_HORIZONTAL", "HOPS_VERTICAL",
                 "SHOT_DUNK_FLIGHT_TICKS_PER_BLOCK", "SHOT_LAYUP_FLIGHT_TICKS_PER_BLOCK",
-                "SHOT_NORMAL_FLIGHT_TICKS_PER_BLOCK", "POSSESSION_MOVEMENT_DAMPING").contains(name);
+                "SHOT_NORMAL_FLIGHT_TICKS_PER_BLOCK", "SHOT_DUNK_MIN_FLIGHT_TICKS", "SHOT_DUNK_MAX_FLIGHT_TICKS",
+                "SHOT_LAYUP_MIN_FLIGHT_TICKS", "SHOT_LAYUP_MAX_FLIGHT_TICKS",
+                "SHOT_NORMAL_MIN_FLIGHT_TICKS", "SHOT_NORMAL_MAX_FLIGHT_TICKS",
+                "BALL_CATCH_RADIUS_SQUARED", "SHOT_LAUNCH_PROTECTION_DISTANCE_SQUARED",
+                "BLOCK_AIM_DOT", "STEAL_AIM_DOT", "POSSESSION_MOVEMENT_DAMPING").contains(name);
         if (game == ArcadePortGame.SNEAKY_ASSASSINS) return SneakyAssassinsRules.debuggableRule(name);
         if (game == ArcadePortGame.CAMERA_SHY) return CameraShyRules.debuggableRule(name);
         if (game.isMonsterMaze()) {
@@ -295,6 +376,13 @@ final class GameDebugVariableCatalog {
 
     private static double minimum(String name, double defaultValue, Kind kind) {
         if (kind == Kind.BOOLEAN) return 0.0D;
+        if (name.startsWith("SUPER_SPLOOR_")) {
+            if (name.endsWith("_MILLIS")) return 1.0D;
+            if (name.endsWith("_BLOCKS") || name.endsWith("_SPEED") || name.endsWith("_VELOCITY")) return 0.05D;
+            if (name.endsWith("_PERCENT")) return 0.1D;
+            if (name.contains("_PER_")) return 0.01D;
+            return 1.0D;
+        }
         if (Set.of("SPOTLIGHT_INTERVAL_MILLIS", "SPOTLIGHT_GLOW_DURATION_MILLIS", "DECOY_FLASH_LIFETIME_MILLIS",
                 "SMOKE_LIFETIME_MILLIS", "SMOKE_ESCAPE_CREDIT_WINDOW_MILLIS", "PURSUIT_ESCAPE_MILLIS",
                 "SMOKE_ABILITY_COOLDOWN_MILLIS", "DECOY_ABILITY_COOLDOWN_MILLIS",
@@ -419,6 +507,8 @@ final class GameDebugVariableCatalog {
         if (name.equals("CLOSE_PHOTO_BLOCKS") || name.equals("LONG_PHOTO_BLOCKS")) return 0.1D;
         if (name.equals("PHOTO_LENS_MIN_DOT")) return 0.5D;
         if (name.equals("MASTER_BUILDERS_MAX_RATING")) return 1.0D;
+        if (name.equals("MASTER_BUILDERS_MAX_BUILDERS")) return 1.0D;
+        if (name.equals("MASTER_BUILDERS_THEME_OVERRIDE")) return 0.0D;
         if (name.equals("SUPER_SPLOOR_MAX_PAINT_MARKS")) return 1.0D;
         if (name.equals("BALL_RADIUS")) return 0.05D;
         if (name.equals("BALL_MAX_FLIGHT_TICKS")) return 1.0D;
@@ -448,6 +538,7 @@ final class GameDebugVariableCatalog {
         if (name.equals("GLADIATOR_MODE_OVERRIDE") || name.equals("GLADIATOR_POTION_COUNT")) return 0.0D;
         if (name.equals("GLADIATOR_VOTE_MILLIS") || name.equals("GLADIATOR_ARENA_TRANSITION_MILLIS")) return 0.0D;
         if (name.equals("TURF_WARS_LINES_PER_KILL_MULTIPLIER")) return 1.0D;
+        if (name.equals("TURF_WARS_COMEBACK_REMAINING_LINES")) return 0.0D;
         if (name.equals("HEROES_OF_GWEN_OVERTIME_PATH_ADVANCE_DISTANCE_SQUARED")
                 || name.equals("HEROES_OF_GWEN_DEVON_TNT_BOW_BASE_DAMAGE")
                 || name.equals("HEROES_OF_GWEN_DEVON_TNT_BOW_POWER_DAMAGE_PER_LEVEL")
@@ -459,6 +550,18 @@ final class GameDebugVariableCatalog {
                 || name.equals("HEROES_OF_GWEN_ROWENA_FLETCHER_MAX_ARROWS")) return 0.0D;
         if (name.equals("HEROES_OF_GWEN_SMALL_HEALTH_POTION_HEAL_HP")
                 || name.equals("HEROES_OF_GWEN_LARGE_HEALTH_POTION_HEAL_HP")) return 0.0D;
+        if (name.equals("HEROES_OF_GWEN_CAPTURE_UPDATE_INTERVAL_MILLIS")
+                || name.equals("HEROES_OF_GWEN_MINION_COMBAT_INTERVAL_MILLIS")) return 1.0D;
+        if (name.equals("HEROES_OF_GWEN_CAPTURE_POINT_RANGE_SQUARED")
+                || name.equals("HEROES_OF_GWEN_MINION_DAMAGE")
+                || name.equals("HEROES_OF_GWEN_MINION_TOWER_DAMAGE")) return 0.0D;
+        if (name.equals("HEROES_OF_GWEN_MINION_HEALTH")) return 1.0D;
+        if (name.equals("HEROES_OF_GWEN_MINION_SOURCE_TARGET_RANGE_SQUARED")) return 0.0D;
+        if (name.equals("HOOPS_BALL_CATCH_RADIUS_SQUARED")
+                || name.equals("HOOPS_SHOT_LAUNCH_PROTECTION_DISTANCE_SQUARED")) return 0.0D;
+        if (name.equals("HOOPS_BLOCK_AIM_DOT") || name.equals("HOOPS_STEAL_AIM_DOT")) return -1.0D;
+        if (name.startsWith("HOOPS_SHOT_") && (name.endsWith("_MIN_FLIGHT_TICKS")
+                || name.endsWith("_MAX_FLIGHT_TICKS"))) return 1.0D;
         if (name.equals("SPLEEF_SMASHER_RADIUS_BLOCKS")) return 0.0D;
         if (Set.of("MANA_REGEN_MULTIPLIER", "PROJECTILE_SPEED_MULTIPLIER", "SPELL_COOLDOWN_MULTIPLIER",
                 "SPELL_DAMAGE_MULTIPLIER", "SPELL_HEAL_MULTIPLIER", "SPELL_MANA_COST_MULTIPLIER")
@@ -592,8 +695,36 @@ final class GameDebugVariableCatalog {
         return 0.0D;
     }
 
+    private static double superSploorMinimum(String name, Kind kind) {
+        if (kind == Kind.BOOLEAN) return 0.0D;
+        if (Set.of("CHARGER_MIN_SPEED", "CHARGER_MIN_INK_COST", "CHARGER_MAX_INK_COST").contains(name)) return 0.0D;
+        if (name.endsWith("_MILLIS")) return 1.0D;
+        if (name.endsWith("_BLOCKS") || name.endsWith("_SPEED") || name.endsWith("_VELOCITY")) return 0.05D;
+        if (name.startsWith("SPECIAL_CHARGE_PER_")) return 0.01D;
+        return 1.0D;
+    }
+
+    private static double superSploorMaximum(String name, Kind kind) {
+        if (kind == Kind.BOOLEAN) return 1.0D;
+        if (name.endsWith("_MILLIS")) return 600_000.0D;
+        if (name.endsWith("_BLOCKS")) return 64.0D;
+        if (name.endsWith("_SPEED") || name.endsWith("_VELOCITY")) return 10.0D;
+        if (name.endsWith("_PERCENT")) return 100.0D;
+        if (name.equals("MAX_PAINT_MARKS")) return 10.0D;
+        if (name.equals("SPECIAL_CHARGE_REQUIRED")) return 100.0D;
+        if (name.equals("CHARGER_MAX_INK_COST")) return 500.0D;
+        return 1_000.0D;
+    }
+
     private static double maximum(String name, Kind kind, double defaultValue) {
         if (kind == Kind.BOOLEAN) return 1.0D;
+        if (name.startsWith("SUPER_SPLOOR_")) {
+            if (name.endsWith("_MILLIS")) return 600_000.0D;
+            if (name.endsWith("_BLOCKS")) return 64.0D;
+            if (name.endsWith("_SPEED") || name.endsWith("_VELOCITY")) return 10.0D;
+            if (name.endsWith("_PERCENT")) return 100.0D;
+            return 1_000.0D;
+        }
         if (Set.of("SPOTLIGHT_INTERVAL_MILLIS", "SPOTLIGHT_GLOW_DURATION_MILLIS", "DECOY_FLASH_LIFETIME_MILLIS",
                 "SMOKE_LIFETIME_MILLIS", "SMOKE_ESCAPE_CREDIT_WINDOW_MILLIS", "PURSUIT_ESCAPE_MILLIS",
                 "SMOKE_ABILITY_COOLDOWN_MILLIS", "DECOY_ABILITY_COOLDOWN_MILLIS",
@@ -726,6 +857,18 @@ final class GameDebugVariableCatalog {
                 || name.equals("HEROES_OF_GWEN_ROWENA_FLETCHER_MAX_ARROWS")) return 64.0D;
         if (name.equals("HEROES_OF_GWEN_SMALL_HEALTH_POTION_HEAL_HP")
                 || name.equals("HEROES_OF_GWEN_LARGE_HEALTH_POTION_HEAL_HP")) return 40.0D;
+        if (name.equals("HEROES_OF_GWEN_CAPTURE_UPDATE_INTERVAL_MILLIS")
+                || name.equals("HEROES_OF_GWEN_MINION_COMBAT_INTERVAL_MILLIS")) return 30_000.0D;
+        if (name.equals("HEROES_OF_GWEN_CAPTURE_POINT_RANGE_SQUARED")
+                || name.equals("HEROES_OF_GWEN_MINION_SOURCE_TARGET_RANGE_SQUARED")) return 1_024.0D;
+        if (name.equals("HEROES_OF_GWEN_MINION_HEALTH")) return 200.0D;
+        if (name.equals("HEROES_OF_GWEN_MINION_DAMAGE")
+                || name.equals("HEROES_OF_GWEN_MINION_TOWER_DAMAGE")) return 40.0D;
+        if (name.equals("HOOPS_BALL_CATCH_RADIUS_SQUARED")
+                || name.equals("HOOPS_SHOT_LAUNCH_PROTECTION_DISTANCE_SQUARED")) return 100.0D;
+        if (name.equals("HOOPS_BLOCK_AIM_DOT") || name.equals("HOOPS_STEAL_AIM_DOT")) return 1.0D;
+        if (name.startsWith("HOOPS_SHOT_") && (name.endsWith("_MIN_FLIGHT_TICKS")
+                || name.endsWith("_MAX_FLIGHT_TICKS"))) return 60.0D;
         if (name.equals("SPLEEF_SMASHER_RADIUS_BLOCKS")) return 8.0D;
         if (name.equals("DEATH_TAG_TURTLE_STACK_RESET_MILLIS")
                 || name.equals("DEATH_TAG_TRICKSTER_FIREWORKS_COOLDOWN_MILLIS")) return 600_000.0D;
@@ -785,6 +928,8 @@ final class GameDebugVariableCatalog {
         if (name.equals("DODGE_ROLL_MAX_CHARGES")) return 5.0D;
         if (name.equals("SQUID_WALK_SPEED") || name.equals("SQUID_CLIMB_VELOCITY")) return 1.0D;
         if (name.equals("MASTER_BUILDERS_MAX_RATING")) return 6.0D;
+        if (name.equals("MASTER_BUILDERS_MAX_BUILDERS")) return 16.0D;
+        if (name.equals("MASTER_BUILDERS_THEME_OVERRIDE")) return 16.0D;
         if (Set.of("MANA_REGEN_MULTIPLIER", "PROJECTILE_SPEED_MULTIPLIER", "SPELL_COOLDOWN_MULTIPLIER",
                 "SPELL_DAMAGE_MULTIPLIER", "SPELL_HEAL_MULTIPLIER", "SPELL_MANA_COST_MULTIPLIER")
                 .contains(name)) return 5.0D;
@@ -800,6 +945,7 @@ final class GameDebugVariableCatalog {
                 || name.equals("GLADIATOR_ENVIRONMENTAL_NO_DAMAGE_TICKS")) return 40.0D;
         if (name.equals("GLADIATOR_PVP_DAMAGE_MULTIPLIER")) return 5.0D;
         if (name.equals("TURF_WARS_LINES_PER_KILL_MULTIPLIER")) return 8.0D;
+        if (name.equals("TURF_WARS_COMEBACK_REMAINING_LINES")) return 100.0D;
         if (name.equals("TURF_WARS_COMBAT_BOUNDARY_DAMAGE")) return 40.0D;
         if (name.equals("TURF_WARS_BUILD_BOUNDARY_DAMAGE")) return 500.0D;
         if (name.equals("TURF_WARS_TERRITORY_KNOCKBACK_HORIZONTAL")) return 8.0D;
@@ -1038,6 +1184,12 @@ final class GameDebugVariableCatalog {
     }
 
     private static double step(String name, double defaultValue, Kind kind) {
+        if (name.startsWith("SUPER_SPLOOR_")) {
+            if (name.endsWith("_MILLIS")) return 100.0D;
+            if (name.endsWith("_BLOCKS") || name.endsWith("_SPEED") || name.endsWith("_VELOCITY")
+                    || name.endsWith("_PERCENT")) return 0.1D;
+            return 1.0D;
+        }
         if (kind == Kind.BOOLEAN) return 1.0D;
         if (Set.of("SPOTLIGHT_INTERVAL_MILLIS", "SPOTLIGHT_GLOW_DURATION_MILLIS", "DECOY_FLASH_LIFETIME_MILLIS",
                 "SMOKE_LIFETIME_MILLIS", "SMOKE_ESCAPE_CREDIT_WINDOW_MILLIS", "PURSUIT_ESCAPE_MILLIS",

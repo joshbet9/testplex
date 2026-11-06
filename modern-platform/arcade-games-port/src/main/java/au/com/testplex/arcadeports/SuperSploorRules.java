@@ -42,8 +42,72 @@ public final class SuperSploorRules {
     public static final double SPECIAL_CHARGE_PER_TERRITORY_UNIT = 0.10D;
     public static final double SPECIAL_CHARGE_PER_SPLAT = 5.0D;
     public static final double SPECIAL_CHARGE_REQUIRED = 100.0D;
+    public static final long ROLLER_MINE_ARM_MILLIS = 800L;
+    public static final long ROLLER_MINE_LIFETIME_MILLIS = 8_000L;
+    public static final double ROLLER_MINE_TRIGGER_RADIUS_BLOCKS = 1.5D;
+    public static final int ROLLER_MINE_PAINT_RADIUS_BLOCKS = 2;
+    public static final long ROLLER_STAMPEDE_DURATION_MILLIS = 4_000L;
+    public static final long ROLLER_STAMPEDE_PAINT_INTERVAL_MILLIS = 150L;
+    public static final double ROLLER_STAMPEDE_SPEED = 0.28D;
+    public static final double ROLLER_STAMPEDE_HIT_REACH_BLOCKS = 3.2D;
+    public static final double ROLLER_STAMPEDE_HIT_WIDTH_BLOCKS = 2.0D;
+    public static final long CHARGER_TRACKER_DURATION_MILLIS = 4_000L;
+    public static final long CHARGER_TRACKER_PULSE_MILLIS = 400L;
+    public static final double CHARGER_TRACKER_RADIUS_BLOCKS = 18.0D;
+    public static final long LOBBER_SPRINKLER_DURATION_MILLIS = 6_000L;
+    public static final long LOBBER_SPRINKLER_PULSE_MILLIS = 650L;
+    public static final int LOBBER_SPRINKLER_PAINT_RADIUS_BLOCKS = 2;
+    public static final double LOBBER_SPRINKLER_HIT_RADIUS_BLOCKS = 2.0D;
+    public static final long LOBBER_PAINTSTORM_DURATION_MILLIS = 2_000L;
+    public static final long LOBBER_PAINTSTORM_PULSE_MILLIS = 400L;
+    public static final int LOBBER_PAINTSTORM_PULSES = 4;
+    public static final int LOBBER_PAINTSTORM_PAINT_RADIUS_BLOCKS = 3;
+    public static final double LOBBER_PAINTSTORM_HIT_RADIUS_BLOCKS = 4.0D;
+    public static final long DUALIES_SUCTION_BOMB_FUSE_MILLIS = 1_400L;
+    public static final int DUALIES_SUCTION_BOMB_PAINT_RADIUS_BLOCKS = 2;
+    public static final int SPRAYER_BURST_BOMB_PAINT_RADIUS_BLOCKS = 3;
+    public static final int SPRAYER_COLOURBURST_PAINT_RADIUS_BLOCKS = 5;
+    public static final long DUALIES_AFTERIMAGE_DASH_INTERVAL_MILLIS = 260L;
+    public static final int DUALIES_AFTERIMAGE_DASHES = 3;
+    public static final double DUALIES_AFTERIMAGE_DISTANCE_BLOCKS = 1.2D;
+    public static final double DUALIES_AFTERIMAGE_VERTICAL_VELOCITY = 0.16D;
+    public static final int CHARGER_PRISM_BEAM_STEPS = 56;
+    public static final double CHARGER_PRISM_BEAM_STEP_BLOCKS = 0.5D;
+    public static final double CHARGER_PRISM_BEAM_HIT_RADIUS_BLOCKS = Math.sqrt(1.2D);
+    public static final long CHARGER_FULL_SHOT_COOLDOWN_MILLIS = 1_000L;
+    public static final double OVERTIME_LEAD_PERCENT = 1.0D;
+    public static final boolean SQUID_MODE_ENABLED = true;
+    public static final boolean INK_REGEN_ENABLED = true;
+    public static final boolean SECONDARIES_ENABLED = true;
+    public static final boolean SPECIALS_ENABLED = true;
+    public static final double SPRAYER_PRIMARY_PROJECTILE_SPEED = 1.85D;
+    public static final double LOBBER_PRIMARY_PROJECTILE_SPEED = 1.15D;
+    public static final double LOBBER_PRIMARY_VERTICAL_ARC = 0.16D;
+    public static final double DUALIES_PRIMARY_PROJECTILE_SPEED = 1.45D;
+    public static final double DUALIES_PRIMARY_SPREAD_RADIANS = 0.075D;
+    public static final int DUALIES_PRIMARY_PROJECTILES = 2;
+    public static final int SPRAYER_PRIMARY_PAINT_RADIUS_BLOCKS = 2;
+    public static final int CHARGER_PRIMARY_PAINT_RADIUS_BLOCKS = 0;
+    public static final int LOBBER_PRIMARY_PAINT_RADIUS_BLOCKS = 3;
+    public static final int DUALIES_PRIMARY_PAINT_RADIUS_BLOCKS = 1;
+    public static final int ROLLER_PRIMARY_PAINT_RADIUS_BLOCKS = 1;
+    public static final int ROLLER_PRIMARY_PAINT_STEPS = 5;
+    public static final double ROLLER_PRIMARY_HIT_REACH_BLOCKS = 4.5D;
+    public static final double ROLLER_PRIMARY_HIT_WIDTH_BLOCKS = 1.25D;
 
     private SuperSploorRules() { }
+
+    public static int debugInt(String suffix, int fallback) {
+        return GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_" + suffix, fallback);
+    }
+
+    public static long debugLong(String suffix, long fallback) {
+        return GameDebugRuntimeOverrides.longValue("SUPER_SPLOOR_" + suffix, fallback);
+    }
+
+    public static double debugDouble(String suffix, double fallback) {
+        return GameDebugRuntimeOverrides.doubleValue("SUPER_SPLOOR_" + suffix, fallback);
+    }
 
     public static int primaryInkCost(String kit) {
         return switch (kit == null ? "sprayer" : kit) {
@@ -201,7 +265,9 @@ public final class SuperSploorRules {
 
     public static int overtimeLeadThreshold(int totalTerritoryUnits) {
         long total = Math.max(0L, (long) totalTerritoryUnits);
-        return (int) Math.max(1L, (total + 99L) / 100L);
+        double percent = Math.max(0.01D, GameDebugRuntimeOverrides.doubleValue(
+                "SUPER_SPLOOR_OVERTIME_LEAD_PERCENT", OVERTIME_LEAD_PERCENT));
+        return (int) Math.max(1L, Math.ceil(total * percent / 100.0D));
     }
 
     /** Returns 0 for Red, 1 for Blue, and -1 for a tied territory score. */

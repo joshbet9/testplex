@@ -1,6 +1,7 @@
 package au.com.testplex.wizards;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 import au.com.testplex.arcadeports.GameDebugRuntimeOverrides;
 
 import java.util.Map;
@@ -9,6 +10,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WizardsRulesTest {
+    @AfterEach void clearDebugOverrides() { GameDebugRuntimeOverrides.clear(); }
+
     @Test
     void debugRoundsDoNotPersistWizardsLifetimeProgress() {
         assertTrue(WizardsRules.shouldRecordProgress(false));
@@ -92,6 +95,43 @@ class WizardsRulesTest {
         assertEquals(4.0D, WizardsRules.fireballDamage(1), 0.000001D);
         assertEquals(2.0D, WizardsRules.healAmount(1), 0.000001D);
         assertEquals(0.3D, WizardsRules.manaBoltVelocity(), 0.000001D);
+    }
+
+    @Test
+    void individualSpellCostAndCooldownProfilesComposeWithGlobalMultipliersAndReset() {
+        assertEquals(30, WizardsSpell.FIREBALL.manaCost(1, 1.0D));
+        assertEquals(15, WizardsSpell.FIREBALL.cooldownSeconds(1, 1.0D));
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "WIZARDS_SPELL_MANA_COST_MULTIPLIER", 2.0D,
+                "WIZARDS_SPELL_FIREBALL_MANA_COST_MULTIPLIER", 0.5D,
+                "WIZARDS_SPELL_FIREBALL_COOLDOWN_MULTIPLIER", 2.0D));
+        assertEquals(30, WizardsSpell.FIREBALL.manaCost(1, 1.0D));
+        assertEquals(30, WizardsSpell.MANA_BOLT.manaCost(1, 1.0D));
+        assertEquals(30, WizardsSpell.FIREBALL.cooldownSeconds(1, 1.0D));
+        assertEquals(5, WizardsSpell.MANA_BOLT.cooldownSeconds(1, 1.0D));
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertEquals(30, WizardsSpell.FIREBALL.manaCost(1, 1.0D));
+        assertEquals(15, WizardsSpell.FIREBALL.cooldownSeconds(1, 1.0D));
+    }
+
+    @Test
+    void perKitManaCapacityRegenerationAndStartingWandsUseProfileValuesAndRestoreDefaults() {
+        assertEquals(100.0F, WizardsRules.maximumMana(WizardsKit.MAGE));
+        assertEquals(2.5F, WizardsRules.manaPerSecond(WizardsKit.MAGE, 0));
+        assertEquals(2, WizardsRules.startingWands(WizardsKit.MAGE));
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "WIZARDS_KIT_MAGE_MAX_MANA", 180.0F,
+                "WIZARDS_KIT_MAGE_MANA_PER_SECOND", 4.0F,
+                "WIZARDS_KIT_MAGE_STARTING_WANDS", 4));
+        assertEquals(180.0F, WizardsRules.maximumMana(WizardsKit.MAGE));
+        assertEquals(4.0F, WizardsRules.manaPerSecond(WizardsKit.MAGE, 0));
+        assertEquals(4, WizardsRules.startingWands(WizardsKit.MAGE));
+        assertEquals(2.75F, WizardsRules.manaPerSecond(WizardsKit.MYSTIC, 0));
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertEquals(100.0F, WizardsRules.maximumMana(WizardsKit.MAGE));
+        assertEquals(2.5F, WizardsRules.manaPerSecond(WizardsKit.MAGE, 0));
+        assertEquals(2, WizardsRules.startingWands(WizardsKit.MAGE));
     }
 
     @Test

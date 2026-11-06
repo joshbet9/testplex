@@ -31,17 +31,35 @@ public final class WizardsRules {
 
     public static float manaPerSecond(WizardsKit kit, int soulStars) {
         if (kit == null) throw new IllegalArgumentException("kit is required");
-        return (kit.manaPerSecond() + Math.max(0, soulStars) * GameDebugRuntimeOverrides.floatValue(
+        return (kitManaPerSecond(kit) + Math.max(0, soulStars) * GameDebugRuntimeOverrides.floatValue(
                 "WIZARDS_SOUL_STAR_MANA_PER_SECOND", SOUL_STAR_MANA_PER_SECOND))
                 * (float) boundedMultiplier("WIZARDS_MANA_REGEN_MULTIPLIER", MANA_REGEN_MULTIPLIER);
+    }
+
+    private static float kitManaPerSecond(WizardsKit kit) {
+        return boundedFloat("WIZARDS_KIT_" + kit.name() + "_MANA_PER_SECOND", kit.manaPerSecond(), 0.0F, 50.0F);
     }
 
     public static double spellManaCostMultiplier() {
         return boundedMultiplier("WIZARDS_SPELL_MANA_COST_MULTIPLIER", SPELL_MANA_COST_MULTIPLIER);
     }
 
+    public static double spellManaCostMultiplier(WizardsSpell spell) {
+        if (spell == null) return spellManaCostMultiplier();
+        return spellManaCostMultiplier() * boundedMultiplier(spellDebugKey(spell, "MANA_COST"), 1.0D);
+    }
+
     public static double spellCooldownMultiplier() {
         return boundedMultiplier("WIZARDS_SPELL_COOLDOWN_MULTIPLIER", SPELL_COOLDOWN_MULTIPLIER);
+    }
+
+    public static double spellCooldownMultiplier(WizardsSpell spell) {
+        if (spell == null) return spellCooldownMultiplier();
+        return spellCooldownMultiplier() * boundedMultiplier(spellDebugKey(spell, "COOLDOWN"), 1.0D);
+    }
+
+    private static String spellDebugKey(WizardsSpell spell, String suffix) {
+        return "WIZARDS_SPELL_" + spell.name() + "_" + suffix + "_MULTIPLIER";
     }
 
     private static double boundedMultiplier(String key, double intended) {
@@ -165,12 +183,18 @@ public final class WizardsRules {
 
     public static float maximumMana(WizardsKit kit) {
         if (kit == null) throw new IllegalArgumentException("kit is required");
-        return kit.maximumMana();
+        return boundedFloat("WIZARDS_KIT_" + kit.name() + "_MAX_MANA", kit.maximumMana(), 1.0F, 1_000.0F);
     }
 
     public static int startingWands(WizardsKit kit) {
         if (kit == null) throw new IllegalArgumentException("kit is required");
-        return kit.startingWands();
+        return Math.max(1, Math.min(9, GameDebugRuntimeOverrides.intValue(
+                "WIZARDS_KIT_" + kit.name() + "_STARTING_WANDS", kit.startingWands())));
+    }
+
+    private static float boundedFloat(String key, float intended, float minimum, float maximum) {
+        float value = GameDebugRuntimeOverrides.floatValue(key, intended);
+        return Float.isFinite(value) ? Math.max(minimum, Math.min(maximum, value)) : intended;
     }
 
     public static int nextSpellLevel(int currentLevel, int maximumLevel) {

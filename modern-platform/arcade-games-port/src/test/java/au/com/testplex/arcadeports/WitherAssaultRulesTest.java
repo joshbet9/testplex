@@ -187,6 +187,7 @@ final class WitherAssaultRulesTest {
         assertEquals(0.3D, WitherAssaultRules.skullKnockbackYMinimum());
         assertEquals(4, WitherAssaultRules.skullTerrainRadiusBlocks());
         assertEquals(120, WitherAssaultRules.skullBlockRestoreTicks());
+        assertEquals(1.15D, WitherAssaultRules.skullLaunchSpeed());
 
         GameDebugRuntimeOverrides.activate(Map.ofEntries(
                 Map.entry("WITHER_ASSAULT_HUMAN_ARROW_DAMAGE_MULTIPLIER", 1.25D),
@@ -197,7 +198,8 @@ final class WitherAssaultRulesTest {
                 Map.entry("WITHER_ASSAULT_SKULL_KNOCKBACK_Y_MINIMUM", 0.0D),
                 Map.entry("WITHER_ASSAULT_SKULL_KNOCKBACK_Y_MULTIPLIER", 1.0D),
                 Map.entry("WITHER_ASSAULT_SKULL_TERRAIN_RADIUS_BLOCKS", 2),
-                Map.entry("WITHER_ASSAULT_SKULL_BLOCK_RESTORE_TICKS", 40)));
+                Map.entry("WITHER_ASSAULT_SKULL_BLOCK_RESTORE_TICKS", 40),
+                Map.entry("WITHER_ASSAULT_SKULL_LAUNCH_SPEED", 2.5D)));
         assertEquals(1.25D, WitherAssaultRules.humanArrowDamageMultiplier());
         assertEquals(20.0D, WitherAssaultRules.skullDamageAtDistance(0.0D, 1.0D), 1.0e-9);
         assertEquals(12.0D, WitherAssaultRules.skullDamageAtDistance(5.0D, 1.0D), 1.0e-9);
@@ -205,6 +207,7 @@ final class WitherAssaultRulesTest {
         assertEquals(0.0D, WitherAssaultRules.skullKnockbackYMinimum());
         assertEquals(2, WitherAssaultRules.skullTerrainRadiusBlocks());
         assertEquals(40, WitherAssaultRules.skullBlockRestoreTicks());
+        assertEquals(2.5D, WitherAssaultRules.skullLaunchSpeed());
 
         GameDebugRuntimeOverrides.clear();
         assertEquals(0.75D, WitherAssaultRules.humanArrowDamageMultiplier());
@@ -212,5 +215,30 @@ final class WitherAssaultRulesTest {
         assertEquals(0.3D, WitherAssaultRules.skullKnockbackYMinimum());
         assertEquals(4, WitherAssaultRules.skullTerrainRadiusBlocks());
         assertEquals(120, WitherAssaultRules.skullBlockRestoreTicks());
+        assertEquals(1.15D, WitherAssaultRules.skullLaunchSpeed());
+    }
+
+    @Test
+    void humanLeapProfileControlsChangeRealVelocityComponentsAndRestoreKitDefaults() {
+        assertEquals(1.2D, WitherAssaultRules.humanLeapHorizontalPower("archer"), 1.0e-9);
+        assertEquals(1.0D, WitherAssaultRules.humanLeapHorizontalPower("medic"), 1.0e-9);
+        assertEquals(0.65D, WitherAssaultRules.humanLeapVerticalVelocity(0.0D), 1.0e-9);
+        assertEquals(1.0D, WitherAssaultRules.humanLeapVerticalVelocity(1.0D), 1.0e-9);
+
+        GameDebugRuntimeOverrides.activate(Map.ofEntries(
+                Map.entry("WITHER_ASSAULT_HUMAN_LEAP_HORIZONTAL_POWER", 1.5D),
+                Map.entry("WITHER_ASSAULT_ARCHER_LEAP_HORIZONTAL_MULTIPLIER", 2.0D),
+                Map.entry("WITHER_ASSAULT_HUMAN_LEAP_VERTICAL_MINIMUM", 0.8D),
+                Map.entry("WITHER_ASSAULT_HUMAN_LEAP_VERTICAL_MAXIMUM", 1.8D),
+                Map.entry("WITHER_ASSAULT_HUMAN_LEAP_VERTICAL_LOOK_ADD", 0.5D)));
+        assertEquals(3.0D, WitherAssaultRules.humanLeapHorizontalPower("archer"), 1.0e-9);
+        assertEquals(1.5D, WitherAssaultRules.humanLeapHorizontalPower("medic"), 1.0e-9);
+        assertEquals(0.8D, WitherAssaultRules.humanLeapVerticalVelocity(0.0D), 1.0e-9);
+        assertEquals(1.5D, WitherAssaultRules.humanLeapVerticalVelocity(1.0D), 1.0e-9);
+        assertEquals(1.8D, WitherAssaultRules.humanLeapVerticalVelocity(2.0D), 1.0e-9);
+
+        GameDebugRuntimeOverrides.clear();
+        assertEquals(1.2D, WitherAssaultRules.humanLeapHorizontalPower("archer"), 1.0e-9);
+        assertEquals(0.65D, WitherAssaultRules.humanLeapVerticalVelocity(0.0D), 1.0e-9);
     }
 }

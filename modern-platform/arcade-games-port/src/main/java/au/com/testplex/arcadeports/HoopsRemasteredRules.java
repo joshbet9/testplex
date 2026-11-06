@@ -48,6 +48,16 @@ public final class HoopsRemasteredRules {
     public static final double SHOT_DUNK_FLIGHT_TICKS_PER_BLOCK = 1.35D;
     public static final double SHOT_LAYUP_FLIGHT_TICKS_PER_BLOCK = 1.2D;
     public static final double SHOT_NORMAL_FLIGHT_TICKS_PER_BLOCK = 1.05D;
+    public static final int SHOT_DUNK_MIN_FLIGHT_TICKS = 5;
+    public static final int SHOT_DUNK_MAX_FLIGHT_TICKS = 8;
+    public static final int SHOT_LAYUP_MIN_FLIGHT_TICKS = 7;
+    public static final int SHOT_LAYUP_MAX_FLIGHT_TICKS = 11;
+    public static final int SHOT_NORMAL_MIN_FLIGHT_TICKS = 8;
+    public static final int SHOT_NORMAL_MAX_FLIGHT_TICKS = 22;
+    public static final double BALL_CATCH_RADIUS_SQUARED = 2.25D;
+    public static final double SHOT_LAUNCH_PROTECTION_DISTANCE_SQUARED = 2.25D;
+    public static final double BLOCK_AIM_DOT = 0.25D;
+    public static final double STEAL_AIM_DOT = 0.20D;
 
     private HoopsRemasteredRules() { }
 
@@ -124,7 +134,30 @@ public final class HoopsRemasteredRules {
     }
 
     public static boolean isClutchTime(long remainingMillis) {
-        return remainingMillis >= 0L && remainingMillis <= CLUTCH_WINDOW_MILLIS;
+        return remainingMillis >= 0L && remainingMillis <= GameDebugRuntimeOverrides.longValue(
+                "HOOPS_CLUTCH_WINDOW_MILLIS", CLUTCH_WINDOW_MILLIS);
+    }
+
+    public static boolean isWithinBallCatchRadius(double distanceSquared) {
+        double radiusSquared = GameDebugRuntimeOverrides.doubleValue(
+                "HOOPS_BALL_CATCH_RADIUS_SQUARED", BALL_CATCH_RADIUS_SQUARED);
+        return Double.isFinite(distanceSquared) && distanceSquared >= 0.0D && distanceSquared <= radiusSquared;
+    }
+
+    public static boolean isShooterInsideLaunchProtection(double distanceSquared) {
+        double protectionSquared = GameDebugRuntimeOverrides.doubleValue(
+                "HOOPS_SHOT_LAUNCH_PROTECTION_DISTANCE_SQUARED", SHOT_LAUNCH_PROTECTION_DISTANCE_SQUARED);
+        return Double.isFinite(distanceSquared) && distanceSquared >= 0.0D && distanceSquared < protectionSquared;
+    }
+
+    public static boolean isFacingBallForBlock(double facingDot) {
+        return Double.isFinite(facingDot) && facingDot >= GameDebugRuntimeOverrides.doubleValue(
+                "HOOPS_BLOCK_AIM_DOT", BLOCK_AIM_DOT);
+    }
+
+    public static boolean isFacingHolderForSteal(double facingDot) {
+        return Double.isFinite(facingDot) && facingDot >= GameDebugRuntimeOverrides.doubleValue(
+                "HOOPS_STEAL_AIM_DOT", STEAL_AIM_DOT);
     }
 
     public static boolean isHopsReady(long now, long readyAt) {

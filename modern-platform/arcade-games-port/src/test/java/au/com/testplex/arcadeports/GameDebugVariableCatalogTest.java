@@ -79,6 +79,13 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SUPER_SPLOOR), "SUPER_SPLOOR_CHARGER_PRIMARY_INTERVAL_MILLIS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SUPER_SPLOOR), "SUPER_SPLOOR_LOBBER_SECONDARY_INK_COST");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SUPER_SPLOOR), "SUPER_SPLOOR_SECONDARY_COOLDOWN_MILLIS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SUPER_SPLOOR), "SUPER_SPLOOR_ROLLER_STAMPEDE_HIT_REACH_BLOCKS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SUPER_SPLOOR), "SUPER_SPLOOR_CHARGER_PRISM_BEAM_STEPS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SUPER_SPLOOR), "SUPER_SPLOOR_LOBBER_PAINTSTORM_PULSES");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SUPER_SPLOOR), "SUPER_SPLOOR_DUALIES_AFTERIMAGE_DASHES");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SUPER_SPLOOR), "SUPER_SPLOOR_DUALIES_PRIMARY_PROJECTILES");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SUPER_SPLOOR), "SUPER_SPLOOR_ROLLER_PRIMARY_PAINT_STEPS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SUPER_SPLOOR), "SUPER_SPLOOR_LOBBER_PRIMARY_PROJECTILE_SPEED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAGONS), "DRAGONS_AUTONOMOUS_FLIGHT_SPEED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAGONS), "DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAGONS), "DRAGONS_SPAWNING_ENABLED");
@@ -332,7 +339,9 @@ class GameDebugVariableCatalogTest {
                                 || game.isMonsterMaze() && variable.key().startsWith(GameDebugVariableCatalog.rulePrefix(game))
                                 || game == ArcadePortGame.SNEAKY_ASSASSINS
                                         && variable.key().startsWith(GameDebugVariableCatalog.rulePrefix(game))
-                                || game == ArcadePortGame.CAMERA_SHY && variable.key().startsWith("CAMERA_SHY_"),
+                                || game == ArcadePortGame.CAMERA_SHY && variable.key().startsWith("CAMERA_SHY_")
+                                || game == ArcadePortGame.WIZARDS && (variable.key().startsWith("WIZARDS_SPELL_")
+                                        || variable.key().startsWith("WIZARDS_KIT_")),
                         game.id() + " exposes a rule without a runtime consumer: " + variable.key());
             }
         }
@@ -348,6 +357,8 @@ class GameDebugVariableCatalogTest {
         assertGameRange(ArcadePortGame.SUPER_SPLOOR, "SUPER_SPLOOR_SPECIAL_CHARGE_REQUIRED", 1.0D, 100.0D);
         assertGameRange(ArcadePortGame.SUPER_SPLOOR, "SUPER_SPLOOR_CHARGER_MIN_SPEED", 0.0D, 10.0D);
         assertGameRange(ArcadePortGame.SUPER_SPLOOR, "SUPER_SPLOOR_CHARGER_MAX_INK_COST", 0.0D, 500.0D);
+        assertGameRange(ArcadePortGame.SUPER_SPLOOR, "SUPER_SPLOOR_ROLLER_STAMPEDE_HIT_REACH_BLOCKS", 0.05D, 64.0D);
+        assertGameRange(ArcadePortGame.SUPER_SPLOOR, "SUPER_SPLOOR_LOBBER_PAINTSTORM_PULSES", 1.0D, 1_000.0D);
         assertEquals(100.0D, GameDebugVariableCatalog.variable(ArcadePortGame.SUPER_SPLOOR,
                 "SUPER_SPLOOR_ROLLER_PRIMARY_INTERVAL_MILLIS").step());
     }
@@ -505,6 +516,17 @@ class GameDebugVariableCatalogTest {
                         && key.startsWith("WIZARDS_") && key.endsWith("_MULTIPLIER")
                         && productionSources.contains(key)
                         && productionSources.contains("boundedMultiplier(");
+                boolean dynamicWizardSpellConsumer = game == ArcadePortGame.WIZARDS
+                        && key.startsWith("WIZARDS_SPELL_")
+                        && (key.endsWith("_MANA_COST_MULTIPLIER") || key.endsWith("_COOLDOWN_MULTIPLIER"))
+                        && productionSources.contains("spellDebugKey(spell")
+                        && productionSources.contains("GameDebugRuntimeOverrides.doubleValue(key, intended)");
+                boolean dynamicWizardKitConsumer = game == ArcadePortGame.WIZARDS
+                        && key.startsWith("WIZARDS_KIT_")
+                        && (key.endsWith("_MAX_MANA") || key.endsWith("_MANA_PER_SECOND")
+                                || key.endsWith("_STARTING_WANDS"))
+                        && productionSources.contains("\"WIZARDS_KIT_\" + kit.name()")
+                        && productionSources.contains("GameDebugRuntimeOverrides.floatValue(key, intended)");
                 boolean dynamicDeathTagRewardConsumer = game == ArcadePortGame.DEATH_TAG
                         && Set.of("DEATH_TAG_FIRST_PLACE_REWARD_GEMS", "DEATH_TAG_SECOND_PLACE_REWARD_GEMS",
                                 "DEATH_TAG_THIRD_PLACE_REWARD_GEMS")
@@ -518,11 +540,20 @@ class GameDebugVariableCatalogTest {
                 boolean dynamicSnakeConsumer = game == ArcadePortGame.SNAKE
                         && productionSources.contains("\"SNAKE_\" + key")
                         && productionSources.contains("GameDebugRuntimeOverrides.");
+                boolean dynamicSuperSploorConsumer = game == ArcadePortGame.SUPER_SPLOOR
+                        && key.startsWith("SUPER_SPLOOR_")
+                        && productionSources.contains("GameDebugRuntimeOverrides.intValue(\"SUPER_SPLOOR_\" + suffix, fallback)")
+                        && productionSources.contains("GameDebugRuntimeOverrides.longValue(\"SUPER_SPLOOR_\" + suffix, fallback)")
+                        && productionSources.contains("GameDebugRuntimeOverrides.doubleValue(\"SUPER_SPLOOR_\" + suffix, fallback)")
+                        && (productionSources.contains("debugInt(\"") || productionSources.contains("debugLong(\"")
+                                || productionSources.contains("debugDouble(\""));
                 assertTrue(literalConsumers.contains(key) || dynamicMazeConsumer || dynamicSneakyConsumer
                                 || dynamicCameraConsumer || dynamicSpleefProjectileSpeedConsumer
                                 || dynamicMilkCowConsumer || dynamicTurfWarsConsumer || dynamicSkyWarsConsumer || dynamicEvolutionConsumer
-                                || dynamicGladiatorConsumer || dynamicWizardsConsumer || dynamicDeathTagRewardConsumer
-                                || dynamicSnakeConsumer,
+                                || dynamicGladiatorConsumer || dynamicWizardsConsumer || dynamicWizardSpellConsumer
+                                || dynamicWizardKitConsumer
+                                || dynamicDeathTagRewardConsumer
+                                || dynamicSnakeConsumer || dynamicSuperSploorConsumer,
                         game.id() + " exposes " + key + " without a gameplay consumer");
             }
         }
@@ -795,7 +826,7 @@ class GameDebugVariableCatalogTest {
                 GameDebugRuntimeOverrides.longValue("MASTER_BUILDERS_REVIEW_MILLIS",
                         ArcadePortRules.MASTER_BUILDERS_REVIEW_MILLIS));
 
-        assertEquals(170_000L, buildMillis);
+        assertEquals(168_000L, buildMillis);
         assertEquals(1_200L, GameDebugRuntimeOverrides.longValue("MASTER_BUILDERS_VOTE_MILLIS",
                 ArcadePortRules.MASTER_BUILDERS_VOTE_MILLIS));
     }
@@ -883,6 +914,18 @@ class GameDebugVariableCatalogTest {
             assertEquals(0.0D, variable.minimum(), key);
             assertEquals(5.0D, variable.maximum(), key);
             assertEquals(0.1D, variable.step(), key);
+        }
+        assertNotNull(GameDebugVariableCatalog.variable(ArcadePortGame.WIZARDS, "WIZARDS_KIT_MAGE_MAX_MANA"));
+        assertNotNull(GameDebugVariableCatalog.variable(ArcadePortGame.WIZARDS, "WIZARDS_KIT_MAGE_MANA_PER_SECOND"));
+        assertNotNull(GameDebugVariableCatalog.variable(ArcadePortGame.WIZARDS, "WIZARDS_KIT_MAGE_STARTING_WANDS"));
+        for (String key : List.of("WIZARDS_SPELL_FIREBALL_MANA_COST_MULTIPLIER",
+                "WIZARDS_SPELL_FIREBALL_COOLDOWN_MULTIPLIER")) {
+            GameDebugVariableCatalog.Variable variable = GameDebugVariableCatalog.variable(ArcadePortGame.WIZARDS, key);
+            assertNotNull(variable, key + " is an individually tunable spell control");
+            assertEquals(0.0D, variable.minimum(), key);
+            assertEquals(5.0D, variable.maximum(), key);
+            assertEquals(0.1D, variable.step(), key);
+            assertTrue(GameDebugVariableCatalog.appliesImmediately(variable), key + " applies to the next cast");
         }
     }
 

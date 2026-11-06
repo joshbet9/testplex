@@ -1045,15 +1045,11 @@ public final class ArcadePortManager implements Listener {
             GameDebugRuntimeOverrides.markDebugSession();
             triggered = true;
         }
-        if (type == ArcadePortGame.HEROES_OF_GWEN && "damage-tower".equals(eventId)
-                && session.variantRuntime != null) {
+        if (type == ArcadePortGame.HEROES_OF_GWEN && "use-hero-ability".equals(eventId)
+                && session.variantRuntime != null
+                && session.variantRuntime.debugUseHeldHeroesOfGwenAbility(tester)) {
             GameDebugRuntimeOverrides.markDebugSession();
-            triggered = session.variantRuntime.debugDamageNextHeroesOfGwenTower(tester);
-        }
-        if (type == ArcadePortGame.HEROES_OF_GWEN && "capture-point".equals(eventId)
-                && session.variantRuntime != null) {
-            GameDebugRuntimeOverrides.markDebugSession();
-            triggered = session.variantRuntime.debugCaptureNextHeroesOfGwenPoint(tester);
+            triggered = true;
         }
         if (type == ArcadePortGame.HEROES_OF_GWEN && "damage-tower".equals(eventId)
                 && session.variantRuntime != null) {
@@ -4668,10 +4664,17 @@ public final class ArcadePortManager implements Listener {
             sender.sendMessage(ChatColor.RED + "Super Sploor supports up to 16 players (8 per team).");
             return;
         }
-        if (type == ArcadePortGame.MASTER_BUILDERS
-                && !ArcadePortRules.supportsMasterBuildersPlayerCount(participants.size())) {
-            sender.sendMessage(ChatColor.RED + "Master Builders supports up to 16 builders (one per plot).");
-            return;
+        if (type == ArcadePortGame.MASTER_BUILDERS) {
+            int maximumBuilders = ArcadePortRules.MASTER_BUILDERS_MAX_BUILDERS;
+            if (requester != null && plugin.hasAdminAccess(requester)) {
+                Double configured = debugProfiles.variable(requester.getUniqueId(), type, "MASTER_BUILDERS_MAX_BUILDERS");
+                if (configured != null) maximumBuilders = (int) Math.round(configured);
+            }
+            if (!ArcadePortRules.supportsMasterBuildersPlayerCount(participants.size(), maximumBuilders)) {
+                sender.sendMessage(ChatColor.RED + "This Master Builders profile supports up to "
+                        + maximumBuilders + " builders (one per plot).");
+                return;
+            }
         }
         if (queue != null) queues.remove(selectedQueueKey);
         if (pendingStart != null && pendingType == type
@@ -12687,14 +12690,13 @@ public final class ArcadePortManager implements Listener {
         List<String> themes=List.of("Castle","Dragon","Treehouse","Robot","Pirate Ship","Underwater City",
                 "Volcano","Space Station","Farm","Haunted House","Rollercoaster","Zoo","Airplane",
                 "Lighthouse","Wizard Tower","Football Stadium");
-        session.masterBuilderTheme=themes.get(ThreadLocalRandom.current().nextInt(themes.size()));
+        session.masterBuilderTheme=themes.get(ArcadePortRules.masterBuildersThemeIndex(
+                ThreadLocalRandom.current().nextInt(themes.size()) + 1) - 1);
         session.masterBuilderPhase=MasterBuildersPhase.BUILDING;
         int judgedBuildCount=session.masterBuilderReviewOrder.size();
         long buildMillis = ArcadeProgressRules.masterBuildersBuildMillis(
-                GameDebugRuntimeOverrides.longValue("MASTER_BUILDERS_TOTAL_MILLIS",
-                        ArcadePortRules.MASTER_BUILDERS_TOTAL_MILLIS), judgedBuildCount,
-                GameDebugRuntimeOverrides.longValue("MASTER_BUILDERS_REVIEW_MILLIS",
-                        ArcadePortRules.MASTER_BUILDERS_REVIEW_MILLIS));
+                ArcadePortRules.masterBuildersTotalMillis(), judgedBuildCount,
+                ArcadePortRules.masterBuildersReviewMillis());
         session.masterBuilderBuildEndsAt=now+buildMillis;
         for(Player p:session.players.values())if(p!=null&&p.isOnline()){
             p.getInventory().clear();
@@ -12741,9 +12743,11 @@ public final class ArcadePortManager implements Listener {
             finish(session,solo,true);return;
         }
         int maxRating = ArcadePortRules.masterBuildersMaxRating();
-        announce(session,ChatColor.GOLD+"Build time is over! Review each human-built plot for 18 seconds. "
-                +ChatColor.YELLOW+"Right-click a rating from 1 (low) to " + maxRating
-                + " (outstanding) during the first 14 seconds.");
+        long reviewSeconds = (ArcadePortRules.masterBuildersReviewMillis() + 999L) / 1_000L;
+        long voteSeconds = (ArcadePortRules.masterBuildersVoteMillis() + 999L) / 1_000L;
+        announce(session,ChatColor.GOLD+"Build time is over! Review each human-built plot for "
+                + reviewSeconds + " seconds. " + ChatColor.YELLOW + "Right-click a rating from 1 (low) to "
+                + maxRating + " (outstanding) during the first " + voteSeconds + " seconds.");
         showNextMasterBuilderReview(session,now);
     }
 
@@ -12753,10 +12757,8 @@ public final class ArcadePortManager implements Listener {
             Player target=session.players.get(targetId);
             if(target==null||!target.isOnline()){session.masterBuilderReviewIndex++;continue;}
             session.masterBuilderCurrentTarget=targetId;
-            session.masterBuilderReviewEndsAt = now + GameDebugRuntimeOverrides.longValue(
-                    "MASTER_BUILDERS_REVIEW_MILLIS", ArcadePortRules.MASTER_BUILDERS_REVIEW_MILLIS);
-            session.masterBuilderVoteEndsAt = now + GameDebugRuntimeOverrides.longValue(
-                    "MASTER_BUILDERS_VOTE_MILLIS", ArcadePortRules.MASTER_BUILDERS_VOTE_MILLIS);
+            session.masterBuilderReviewEndsAt = now + ArcadePortRules.masterBuildersReviewMillis();
+            session.masterBuilderVoteEndsAt = now + ArcadePortRules.masterBuildersVoteMillis();
             session.masterBuilderLastReviewSecond=-1;
             Location centre=masterBuilderPlotCenter(session.world,session.masterBuilderPlots.getOrDefault(targetId,0));
             Material[] ratings={Material.RED_CONCRETE,Material.ORANGE_CONCRETE,Material.YELLOW_CONCRETE,
@@ -12776,7 +12778,7 @@ public final class ArcadePortManager implements Listener {
                 viewerSlot++;
                 p.teleport(view);
                 if(!p.getUniqueId().equals(targetId))for(int i=0;i<maxRating;i++)
-                    p.getInventory().setItem(i,namedItem(ratings[i],(i+1)+" / 6",
+                    p.getInventory().setItem(i,namedItem(ratings[i],(i+1)+" / " + maxRating,
                             "Right-click to rate. You can change your rating before voting closes."));
                 p.sendTitle(ChatColor.GOLD+"PLOT "+(session.masterBuilderReviewIndex+1)+" / "+session.masterBuilderReviewOrder.size(),
                         ChatColor.YELLOW+"Built by "+target.getName(),0,40,5);
@@ -12801,7 +12803,7 @@ public final class ArcadePortManager implements Listener {
         if(score==0)return;
         session.masterBuilderVotes.computeIfAbsent(session.masterBuilderCurrentTarget,k->new HashMap<>())
                 .put(player.getUniqueId(),score);
-        player.sendActionBar(Component.text("Your rating: "+score+"/6"));
+        player.sendActionBar(Component.text("Your rating: "+score+"/"+ArcadePortRules.masterBuildersMaxRating()));
     }
 
     private void finishMasterBuilders(Session session) {
@@ -25121,7 +25123,8 @@ public final class ArcadePortManager implements Listener {
                 || !(event.getProjectile() instanceof Arrow arrow)) return;
         UUID id = player.getUniqueId();
         String kit = session.witherAssaultKits.getOrDefault(id, "archer");
-        if (!debugKitFeatureEnabled(player, ArcadePortGame.WITHER_ASSAULT, "archer")) return;
+        if (!debugKitFeatureEnabled(player, ArcadePortGame.WITHER_ASSAULT, "archer")
+                || !debugFeatureEnabled(id, ArcadePortGame.WITHER_ASSAULT, "smoke-arrow", true)) return;
         if (!WitherAssaultRules.shouldTrackSmokeArrow(
                 session.teams.getOrDefault(id, 1), kit, session.alive.contains(id), true)) return;
         session.entities.add(arrow);
@@ -25878,6 +25881,7 @@ public final class ArcadePortManager implements Listener {
                 && session.alive.contains(player.getUniqueId())
                 && event.getAction().isRightClick() && event.getClickedBlock() != null
                 && debugKitFeatureEnabled(player, ArcadePortGame.WITHER_ASSAULT, "editor")
+                && debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.WITHER_ASSAULT, "editor-build", true)
                 && session.witherEditorBlocks.contains(event.getClickedBlock())) {
             event.setCancelled(true);
             temporarilyRemoveWitherEditorBlock(session, event.getClickedBlock());
@@ -26903,7 +26907,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void launchWitherMinions(Session session, Player player, long now) {
-        if (!debugKitFeatureEnabled(player, ArcadePortGame.WITHER_ASSAULT, "wither")) return;
+        if (!debugKitFeatureEnabled(player, ArcadePortGame.WITHER_ASSAULT, "wither")
+                || !debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.WITHER_ASSAULT, "wither-minions", true)) return;
         UUID owner = player.getUniqueId();
         if (now < session.witherMinionReadyAt.getOrDefault(owner, 0L)) {
             player.sendMessage(ChatColor.YELLOW + "Wither Minions are recharging.");
@@ -26942,7 +26947,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void useWitherScent(Session session, Player player, long now) {
-        if (!debugKitFeatureEnabled(player, ArcadePortGame.WITHER_ASSAULT, "wither")) return;
+        if (!debugKitFeatureEnabled(player, ArcadePortGame.WITHER_ASSAULT, "wither")
+                || !debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.WITHER_ASSAULT, "wither-scent", true)) return;
         UUID id = player.getUniqueId();
         if (now < session.witherScentReadyAt.getOrDefault(id, 0L)) {
             player.sendMessage(ChatColor.YELLOW + "Smell Humans is recharging.");
@@ -27024,6 +27030,7 @@ public final class ArcadePortManager implements Listener {
             long medicRefill = WitherAssaultRules.medicRefillIntervalMillis();
             if ("medic".equals(kit) && now >= session.witherMedicNextRefillAt.getOrDefault(id, now + medicRefill)) {
                 if (debugKitFeatureEnabled(human, ArcadePortGame.WITHER_ASSAULT, "medic")
+                        && debugFeatureEnabled(id, ArcadePortGame.WITHER_ASSAULT, "medic-refill", true)
                         && !hasRevivalPotion(human)) {
                     human.getInventory().addItem(revivalPotion());
                     human.playSound(human.getLocation(), Sound.ENTITY_ITEM_PICKUP, 1.0F, 1.0F);
@@ -27033,6 +27040,7 @@ public final class ArcadePortManager implements Listener {
             long arrowRefill = WitherAssaultRules.fletcherArrowRefillMillis();
             if (WitherAssaultRules.hasFletcher(kit)
                     && debugKitFeatureEnabled(human, ArcadePortGame.WITHER_ASSAULT, "archer")
+                    && debugFeatureEnabled(id, ArcadePortGame.WITHER_ASSAULT, "fletcher-refill", true)
                     && now >= session.witherFletcherNextAt.getOrDefault(id, now + arrowRefill)) {
                 int arrows = human.getInventory().all(Material.ARROW).values().stream()
                         .mapToInt(ItemStack::getAmount).sum();
@@ -27044,6 +27052,10 @@ public final class ArcadePortManager implements Listener {
         // Fire Storm: right-click either source sword to spend the XP charge on an arrow storm.
         for (Player wither : withers) {
             UUID witherId = wither.getUniqueId();
+            if (!debugFeatureEnabled(witherId, ArcadePortGame.WITHER_ASSAULT, "wither-fire-storm", true)) {
+                session.witherFireStormActive.remove(witherId);
+                continue;
+            }
             if (!session.witherFireStormActive.contains(witherId)) {
                 wither.setExp(WitherAssaultRules.fireStormExperienceAfterTick(wither.getExp(), false));
             } else if (wither.getExp() > 0.0F) {
@@ -27073,6 +27085,14 @@ public final class ArcadePortManager implements Listener {
                 session.witherBlindArrows.remove(arrowId);
                 session.entities.remove(entity);
                 if (entity != null && entity.isValid()) entity.remove();
+                continue;
+            }
+            Player smokeArrowOwner = arrow.getShooter() instanceof Player owner ? owner : null;
+            if (smokeArrowOwner == null || !debugFeatureEnabled(smokeArrowOwner.getUniqueId(),
+                    ArcadePortGame.WITHER_ASSAULT, "smoke-arrow", true)) {
+                session.witherBlindArrows.remove(arrowId);
+                session.entities.remove(arrow);
+                arrow.remove();
                 continue;
             }
             List<Player> closeWithers = withers.stream()
@@ -27109,7 +27129,9 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void startWitherFireStorm(Session session, Player player) {
-        if (!debugKitFeatureEnabled(player, ArcadePortGame.WITHER_ASSAULT, "wither")) return;
+        if (!debugKitFeatureEnabled(player, ArcadePortGame.WITHER_ASSAULT, "wither")
+                || !debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.WITHER_ASSAULT,
+                        "wither-fire-storm", true)) return;
         UUID id = player.getUniqueId();
         if (player.getExp() <= 0.0F) {
             player.sendMessage(ChatColor.YELLOW + "Fire Storm is recharging.");
@@ -27121,6 +27143,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void launchWitherAssaultSkull(Session session, Player player, long now) {
+        if (!debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.WITHER_ASSAULT, "wither-skull", true)) return;
         UUID id = player.getUniqueId();
         if (now < session.witherLastAttackAt.getOrDefault(id, 0L)) {
             player.sendMessage(ChatColor.YELLOW + "Wither Skull is recharging.");
@@ -27130,7 +27153,8 @@ public final class ArcadePortManager implements Listener {
         WitherSkull skull = player.launchProjectile(WitherSkull.class);
         skull.setIsIncendiary(false);
         skull.setYield(0.0F);
-        skull.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(1.15D));
+        skull.setVelocity(player.getEyeLocation().getDirection().normalize()
+                .multiply(WitherAssaultRules.skullLaunchSpeed()));
         session.entities.add(skull);
         player.getWorld().playSound(player.getLocation(), Sound.ENTITY_WITHER_SHOOT, 0.8F, 1.0F);
     }
@@ -27627,6 +27651,7 @@ public final class ArcadePortManager implements Listener {
             boolean canEdit = session.alive.contains(editor.getUniqueId())
                     && session.teams.getOrDefault(editor.getUniqueId(), 1) == 0
                     && debugKitFeatureEnabled(editor, ArcadePortGame.WITHER_ASSAULT, "editor")
+                    && debugFeatureEnabled(editor.getUniqueId(), ArcadePortGame.WITHER_ASSAULT, "editor-build", true)
                     && "editor".equals(session.witherAssaultKits.getOrDefault(editor.getUniqueId(), "archer"))
                     && WitherAssaultRules.canEditorModifyBlock(block.getY(), session.witherAssaultSpawnY,
                             isWitherEditorBlockUnderAnotherPlayer(session, block, editor));
@@ -27787,6 +27812,7 @@ public final class ArcadePortManager implements Listener {
             boolean canEdit = session.alive.contains(editor.getUniqueId())
                     && session.teams.getOrDefault(editor.getUniqueId(), 1) == 0
                     && debugKitFeatureEnabled(editor, ArcadePortGame.WITHER_ASSAULT, "editor")
+                    && debugFeatureEnabled(editor.getUniqueId(), ArcadePortGame.WITHER_ASSAULT, "editor-build", true)
                     && "editor".equals(session.witherAssaultKits.getOrDefault(editor.getUniqueId(), "archer"))
                     && WitherAssaultRules.canEditorModifyBlock(placed.getY(), session.witherAssaultSpawnY,
                             isWitherEditorBlockUnderAnotherPlayer(session, placed, editor));
@@ -27924,7 +27950,8 @@ public final class ArcadePortManager implements Listener {
                 || !session.alive.contains(player.getUniqueId())) return;
         if (session.teams.getOrDefault(player.getUniqueId(), 1) != 0
                 || !"editor".equals(session.witherAssaultKits.getOrDefault(player.getUniqueId(), "archer"))
-                || !debugKitFeatureEnabled(player, ArcadePortGame.WITHER_ASSAULT, "editor")) {
+                || !debugKitFeatureEnabled(player, ArcadePortGame.WITHER_ASSAULT, "editor")
+                || !debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.WITHER_ASSAULT, "editor-build", true)) {
             event.setCancelled(true);
         }
     }
@@ -29635,9 +29662,9 @@ public final class ArcadePortManager implements Listener {
         player.setFlying(false);
         player.setAllowFlight(false);
         String kit = session.witherAssaultKits.getOrDefault(id, "archer");
-        double power = "archer".equals(kit) ? 1.2D : 1.0D;
-        Vector direction = player.getLocation().getDirection().normalize().multiply(power);
-        direction.setY(Math.max(0.65D, Math.min(1.0D, Math.abs(direction.getY()) + 0.35D)));
+        Vector direction = player.getLocation().getDirection().normalize()
+                .multiply(WitherAssaultRules.humanLeapHorizontalPower(kit));
+        direction.setY(WitherAssaultRules.humanLeapVerticalVelocity(direction.getY()));
         player.setVelocity(direction);
         player.setFallDistance(0.0F);
         player.getWorld().playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 0.8F, 1.2F);

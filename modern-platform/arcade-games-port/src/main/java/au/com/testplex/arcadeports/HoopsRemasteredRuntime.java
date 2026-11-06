@@ -598,10 +598,11 @@ public final class HoopsRemasteredRuntime implements Listener {
                 // immediate launch overlap; a player may still recover their
                 // own miss once the ball has travelled away and rebounds.
                 if (ball.mode == BallMode.SHOT
-                        && ball.location.distanceSquared(ball.origin) < 2.25D) continue;
+                        && HoopsRemasteredRules.isShooterInsideLaunchProtection(
+                                ball.location.distanceSquared(ball.origin))) continue;
             }
             Location catchPoint = player.getLocation().clone().add(0.0D, 1.0D, 0.0D);
-            if (catchPoint.distanceSquared(ball.location) > 2.25D) continue;
+            if (!HoopsRemasteredRules.isWithinBallCatchRadius(catchPoint.distanceSquared(ball.location))) continue;
             boolean rebound = ball.reboundEligible;
             if (rebound && !debugFeatureEnabled(player, "rebounding")) continue;
             UUID previousTeam = ball.lastToucher;
@@ -815,6 +816,25 @@ public final class HoopsRemasteredRuntime implements Listener {
                 Math.round(distance / Math.max(0.05D, ticksPerBlock))));
     }
 
+    static int shotFlightTicks(double distance, boolean dunk, boolean layup) {
+        if (dunk) {
+            return boundedFlightTicks(distance, GameDebugRuntimeOverrides.doubleValue(
+                            "HOOPS_SHOT_DUNK_FLIGHT_TICKS_PER_BLOCK", HoopsRemasteredRules.SHOT_DUNK_FLIGHT_TICKS_PER_BLOCK),
+                    GameDebugRuntimeOverrides.intValue("HOOPS_SHOT_DUNK_MIN_FLIGHT_TICKS", HoopsRemasteredRules.SHOT_DUNK_MIN_FLIGHT_TICKS),
+                    GameDebugRuntimeOverrides.intValue("HOOPS_SHOT_DUNK_MAX_FLIGHT_TICKS", HoopsRemasteredRules.SHOT_DUNK_MAX_FLIGHT_TICKS));
+        }
+        if (layup) {
+            return boundedFlightTicks(distance, GameDebugRuntimeOverrides.doubleValue(
+                            "HOOPS_SHOT_LAYUP_FLIGHT_TICKS_PER_BLOCK", HoopsRemasteredRules.SHOT_LAYUP_FLIGHT_TICKS_PER_BLOCK),
+                    GameDebugRuntimeOverrides.intValue("HOOPS_SHOT_LAYUP_MIN_FLIGHT_TICKS", HoopsRemasteredRules.SHOT_LAYUP_MIN_FLIGHT_TICKS),
+                    GameDebugRuntimeOverrides.intValue("HOOPS_SHOT_LAYUP_MAX_FLIGHT_TICKS", HoopsRemasteredRules.SHOT_LAYUP_MAX_FLIGHT_TICKS));
+        }
+        return boundedFlightTicks(distance, GameDebugRuntimeOverrides.doubleValue(
+                        "HOOPS_SHOT_NORMAL_FLIGHT_TICKS_PER_BLOCK", HoopsRemasteredRules.SHOT_NORMAL_FLIGHT_TICKS_PER_BLOCK),
+                GameDebugRuntimeOverrides.intValue("HOOPS_SHOT_NORMAL_MIN_FLIGHT_TICKS", HoopsRemasteredRules.SHOT_NORMAL_MIN_FLIGHT_TICKS),
+                GameDebugRuntimeOverrides.intValue("HOOPS_SHOT_NORMAL_MAX_FLIGHT_TICKS", HoopsRemasteredRules.SHOT_NORMAL_MAX_FLIGHT_TICKS));
+    }
+
     private void shoot(Match current, Player shooter) {
         if (!debugFeatureEnabled(shooter, "shooting")) {
             shooter.sendActionBar(ChatColor.RED + "Shooting is disabled in your debug profile.");
@@ -840,14 +860,7 @@ public final class HoopsRemasteredRuntime implements Listener {
         Location target = aimedAtHoop ? hoop : eye.clone().add(aim.multiply(18.0D));
         double horizontal = Math.max(1.0D, Math.sqrt(
                 Math.pow(target.getX() - eye.getX(), 2.0D) + Math.pow(target.getZ() - eye.getZ(), 2.0D)));
-        int flightTicks = dunk
-                ? boundedFlightTicks(horizontal, GameDebugRuntimeOverrides.doubleValue(
-                        "HOOPS_SHOT_DUNK_FLIGHT_TICKS_PER_BLOCK", HoopsRemasteredRules.SHOT_DUNK_FLIGHT_TICKS_PER_BLOCK), 5, 8)
-                : layup
-                        ? boundedFlightTicks(horizontal, GameDebugRuntimeOverrides.doubleValue(
-                                "HOOPS_SHOT_LAYUP_FLIGHT_TICKS_PER_BLOCK", HoopsRemasteredRules.SHOT_LAYUP_FLIGHT_TICKS_PER_BLOCK), 7, 11)
-                        : boundedFlightTicks(horizontal, GameDebugRuntimeOverrides.doubleValue(
-                                "HOOPS_SHOT_NORMAL_FLIGHT_TICKS_PER_BLOCK", HoopsRemasteredRules.SHOT_NORMAL_FLIGHT_TICKS_PER_BLOCK), 8, 22);
+        int flightTicks = shotFlightTicks(horizontal, dunk, layup);
         Vector velocity = new Vector(
                 (target.getX() - eye.getX()) / flightTicks,
                 (target.getY() - eye.getY() + GameDebugRuntimeOverrides.doubleValue("HOOPS_BALL_GRAVITY", HoopsRemasteredRules.BALL_GRAVITY)
@@ -890,7 +903,8 @@ public final class HoopsRemasteredRuntime implements Listener {
         if (now < current.blockReadyAt.getOrDefault(defender.getUniqueId(), 0L)) return;
         Vector toBall = ball.location.toVector().subtract(defender.getEyeLocation().toVector());
         if (toBall.lengthSquared() < 0.001D
-                || defender.getEyeLocation().getDirection().normalize().dot(toBall.normalize()) < 0.25D) {
+                || !HoopsRemasteredRules.isFacingBallForBlock(
+                        defender.getEyeLocation().getDirection().normalize().dot(toBall.normalize()))) {
             defender.sendActionBar(ChatColor.GRAY + "FACE THE BALL TO BLOCK");
             return;
         }
@@ -924,7 +938,8 @@ public final class HoopsRemasteredRuntime implements Listener {
         if (now < readyAt || attacker.getLocation().distanceSquared(target.getLocation())
                 > GameDebugRuntimeOverrides.doubleValue("HOOPS_STEAL_RADIUS", HoopsRemasteredRules.STEAL_RADIUS) * GameDebugRuntimeOverrides.doubleValue("HOOPS_STEAL_RADIUS", HoopsRemasteredRules.STEAL_RADIUS)
                 || !attacker.hasLineOfSight(target) || toHolder.lengthSquared() < 0.001D
-                || attacker.getEyeLocation().getDirection().normalize().dot(toHolder.normalize()) < 0.20D) return;
+                || !HoopsRemasteredRules.isFacingHolderForSteal(
+                        attacker.getEyeLocation().getDirection().normalize().dot(toHolder.normalize()))) return;
         long stealCooldown = GameDebugRuntimeOverrides.longValue("HOOPS_STEAL_COOLDOWN_MILLIS", HoopsRemasteredRules.STEAL_COOLDOWN_MILLIS);
         current.stealReadyAt.put(attacker.getUniqueId(), now + stealCooldown);
         cooldownProgress.start(attacker, "Steal", stealCooldown);

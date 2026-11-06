@@ -175,6 +175,8 @@ public final class ArcadePortRules {
     public static final long MASTER_BUILDERS_VOTE_MILLIS = 8_000L;
     public static final long MASTER_BUILDERS_REVIEW_MILLIS = 8_000L;
     public static final int MASTER_BUILDERS_MAX_RATING = 6;
+    /** Zero selects a random theme; 1..16 select the matching source theme. */
+    public static final int MASTER_BUILDERS_THEME_OVERRIDE = 0;
 
     /**
      * Divides the five-minute-twenty-second match timer across each participant's
@@ -261,7 +263,16 @@ public final class ArcadePortRules {
     }
 
     public static boolean supportsMasterBuildersPlayerCount(int playerCount) {
-        return playerCount >= 1 && playerCount <= MASTER_BUILDERS_MAX_BUILDERS;
+        return supportsMasterBuildersPlayerCount(playerCount, masterBuildersMaxBuilders());
+    }
+
+    public static int masterBuildersMaxBuilders() {
+        return Math.max(1, Math.min(MASTER_BUILDERS_MAX_BUILDERS, GameDebugRuntimeOverrides.intValue(
+                "MASTER_BUILDERS_MAX_BUILDERS", MASTER_BUILDERS_MAX_BUILDERS)));
+    }
+
+    public static boolean supportsMasterBuildersPlayerCount(int playerCount, int maximumBuilders) {
+        return playerCount >= 1 && playerCount <= Math.max(1, Math.min(MASTER_BUILDERS_MAX_BUILDERS, maximumBuilders));
     }
 
     public static double masterBuildersPlotCenterX(int plotIndex) {
@@ -274,9 +285,31 @@ public final class ArcadePortRules {
         return -24.0D + (plot / 4) * 16.0D + 0.5D;
     }
 
+    public static long masterBuildersTotalMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "MASTER_BUILDERS_TOTAL_MILLIS", MASTER_BUILDERS_TOTAL_MILLIS));
+    }
+
+    public static long masterBuildersReviewMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "MASTER_BUILDERS_REVIEW_MILLIS", MASTER_BUILDERS_REVIEW_MILLIS));
+    }
+
+    public static long masterBuildersVoteMillis() {
+        return Math.min(masterBuildersReviewMillis(), Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "MASTER_BUILDERS_VOTE_MILLIS", MASTER_BUILDERS_VOTE_MILLIS)));
+    }
+
     public static int masterBuildersMaxRating() {
         return Math.max(1, Math.min(MASTER_BUILDERS_MAX_RATING, GameDebugRuntimeOverrides.intValue(
                 "MASTER_BUILDERS_MAX_RATING", MASTER_BUILDERS_MAX_RATING)));
+    }
+
+    public static int masterBuildersThemeIndex(int randomThemeIndex) {
+        int selected = GameDebugRuntimeOverrides.intValue(
+                "MASTER_BUILDERS_THEME_OVERRIDE", MASTER_BUILDERS_THEME_OVERRIDE);
+        if (selected == 0) return Math.max(1, Math.min(16, randomThemeIndex));
+        return Math.max(1, Math.min(16, selected));
     }
 
     public static int masterBuildersRatingScore(org.bukkit.Material material) {
@@ -1083,6 +1116,7 @@ public final class ArcadePortRules {
     public static final long TURF_WARS_MIXED_ARCADE_COMBAT_PHASE_MILLIS = 45_000L;
     public static final int TURF_WARS_MIXED_ARCADE_TURF_ADVANCE_BLOCKS = 2;
     public static final int TURF_WARS_LINES_PER_KILL_MULTIPLIER = 1;
+    public static final int TURF_WARS_COMEBACK_REMAINING_LINES = 5;
     public static final double TURF_WARS_COMBAT_BOUNDARY_DAMAGE = 2.0D;
     public static final double TURF_WARS_BUILD_BOUNDARY_DAMAGE = 500.0D;
     public static final double TURF_WARS_TERRITORY_KNOCKBACK_HORIZONTAL = 2.0D;
@@ -4069,7 +4103,8 @@ public final class ArcadePortRules {
 
     /** Reborn's Comeback tracker remembers a team once its remaining line count reaches five. */
     public static boolean turfWarsShouldTrackComeback(int remainingLines) {
-        return remainingLines <= 5;
+        return remainingLines <= Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "TURF_WARS_COMEBACK_REMAINING_LINES", TURF_WARS_COMEBACK_REMAINING_LINES));
     }
 
     /** Reborn advances one line for the first combat round, two for the second, etc. */
@@ -4380,6 +4415,20 @@ public final class ArcadePortRules {
     public static final double HEROES_OF_GWEN_WITHER_HOME_SPEED = 6.0D;
     public static final double HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS = 8.0D;
     public static final double HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE = 4.0D;
+    public static final int HEROES_OF_GWEN_TOWER_REFERENCE_TEAM_SIZE = 9;
+    public static final int HEROES_OF_GWEN_OUTER_TOWER_HEALTH = 500;
+    public static final int HEROES_OF_GWEN_INNER_TOWER_HEALTH = 1_000;
+    public static final long HEROES_OF_GWEN_TOWER_UPDATE_INTERVAL_MILLIS = 1_000L;
+    public static final double HEROES_OF_GWEN_TOWER_RANGE_SQUARED = 100.0D;
+    public static final double HEROES_OF_GWEN_TOWER_DAMAGE = 3.0D;
+    public static final double HEROES_OF_GWEN_TOWER_HEAL = 2.6D;
+    public static final long HEROES_OF_GWEN_CAPTURE_UPDATE_INTERVAL_MILLIS = 1_000L;
+    public static final double HEROES_OF_GWEN_CAPTURE_POINT_RANGE_SQUARED = 25.0D;
+    public static final double HEROES_OF_GWEN_MINION_HEALTH = 10.0D;
+    public static final double HEROES_OF_GWEN_MINION_DAMAGE = 0.2D;
+    public static final double HEROES_OF_GWEN_MINION_TOWER_DAMAGE = 0.4D;
+    public static final double HEROES_OF_GWEN_MINION_SOURCE_TARGET_RANGE_SQUARED = 100.0D;
+    public static final long HEROES_OF_GWEN_MINION_COMBAT_INTERVAL_MILLIS = 500L;
 
     // Source Moba Heroes Valley / Monochrome mid-match sidequests.
     public static final long HEROES_OF_GWEN_SIDEQUEST_INITIAL_DELAY_MILLIS = 300_000L;
@@ -4730,6 +4779,64 @@ public final class ArcadePortRules {
                 radius, distanceFromBoss)) / Math.max(0.001D, radius);
         return GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE",
                 HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE) * (proximity + 0.5D);
+    }
+
+    public static double heroesOfGwenTowerMaximumHealth(boolean outerTower, int opposingPlayers) {
+        int base = outerTower
+                ? GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_OUTER_TOWER_HEALTH", HEROES_OF_GWEN_OUTER_TOWER_HEALTH)
+                : GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_INNER_TOWER_HEALTH", HEROES_OF_GWEN_INNER_TOWER_HEALTH);
+        int referencePlayers = Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "HEROES_OF_GWEN_TOWER_REFERENCE_TEAM_SIZE", HEROES_OF_GWEN_TOWER_REFERENCE_TEAM_SIZE));
+        return Math.max(1.0D, Math.ceil(Math.max(1, base) * Math.max(1, opposingPlayers) / (double) referencePlayers));
+    }
+
+    public static double heroesOfGwenTowerDamage() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "HEROES_OF_GWEN_TOWER_DAMAGE", HEROES_OF_GWEN_TOWER_DAMAGE));
+    }
+
+    public static double heroesOfGwenTowerHeal() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "HEROES_OF_GWEN_TOWER_HEAL", HEROES_OF_GWEN_TOWER_HEAL));
+    }
+
+    public static double heroesOfGwenTowerRangeSquared() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "HEROES_OF_GWEN_TOWER_RANGE_SQUARED", HEROES_OF_GWEN_TOWER_RANGE_SQUARED));
+    }
+
+    public static double heroesOfGwenCapturePointRangeSquared() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "HEROES_OF_GWEN_CAPTURE_POINT_RANGE_SQUARED", HEROES_OF_GWEN_CAPTURE_POINT_RANGE_SQUARED));
+    }
+
+    public static long heroesOfGwenCaptureUpdateIntervalMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "HEROES_OF_GWEN_CAPTURE_UPDATE_INTERVAL_MILLIS", HEROES_OF_GWEN_CAPTURE_UPDATE_INTERVAL_MILLIS));
+    }
+
+    public static long heroesOfGwenMinionCombatIntervalMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "HEROES_OF_GWEN_MINION_COMBAT_INTERVAL_MILLIS", HEROES_OF_GWEN_MINION_COMBAT_INTERVAL_MILLIS));
+    }
+
+    public static double heroesOfGwenMinionHealth() {
+        return Math.max(1.0D, GameDebugRuntimeOverrides.doubleValue(
+                "HEROES_OF_GWEN_MINION_HEALTH", HEROES_OF_GWEN_MINION_HEALTH));
+    }
+
+    public static double heroesOfGwenMinionDamage(boolean towerTarget) {
+        double damage = towerTarget
+                ? GameDebugRuntimeOverrides.doubleValue(
+                        "HEROES_OF_GWEN_MINION_TOWER_DAMAGE", HEROES_OF_GWEN_MINION_TOWER_DAMAGE)
+                : GameDebugRuntimeOverrides.doubleValue(
+                        "HEROES_OF_GWEN_MINION_DAMAGE", HEROES_OF_GWEN_MINION_DAMAGE);
+        return Math.max(0.0D, damage);
+    }
+
+    public static double heroesOfGwenMinionTargetRangeSquared() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "HEROES_OF_GWEN_MINION_SOURCE_TARGET_RANGE_SQUARED", HEROES_OF_GWEN_MINION_SOURCE_TARGET_RANGE_SQUARED));
     }
 
     /** Reborn caps blast protection EPF at 20 before applying its TNT damage multiplier. */
@@ -5183,8 +5290,10 @@ public final class ArcadePortRules {
     }
 
     public static boolean heroesOfGwenAnathMeteorContainsDistance(double distance) {
+        double radius = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ANATH_METEOR_RADIUS",
+                HEROES_OF_GWEN_ANATH_METEOR_RADIUS);
         return Double.isFinite(distance) && distance >= 0.0D
-                && distance <= HEROES_OF_GWEN_ANATH_METEOR_RADIUS;
+                && distance <= Math.max(0.0D, radius);
     }
 
     // Heroes of Gwen: source-derived lane minion and economy timings.

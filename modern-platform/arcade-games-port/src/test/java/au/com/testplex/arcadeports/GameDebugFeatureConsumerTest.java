@@ -56,4 +56,18 @@ class GameDebugFeatureConsumerTest {
             }
         }
     }
+
+    @Test
+    void wizardsSpellFeatureMenuIsGeneratedFromImplementedSpellsAndGatesEachCast() throws IOException {
+        Path project = Files.isDirectory(Path.of("modern-platform"))
+                ? Path.of("modern-platform", "arcade-games-port") : Path.of(".");
+        String menu = Files.readString(project.resolve(Path.of("src", "main", "java", "au", "com",
+                "testplex", "arcadeports", "ModernArcadeLobbyRuntime.java")));
+        String manager = Files.readString(project.resolve(Path.of("src", "main", "java", "au", "com",
+                "testplex", "wizards", "WizardsGameManager.java")));
+        assertTrue(menu.contains("WizardsSpell.implementedSpells()"));
+        assertTrue(menu.contains("\"spell-\" + spell.id()"));
+        assertTrue(manager.contains("\"spell-\" + spell.id()"));
+        assertTrue(manager.contains("Spell casting is disabled for your debug profile."));
+    }
 }

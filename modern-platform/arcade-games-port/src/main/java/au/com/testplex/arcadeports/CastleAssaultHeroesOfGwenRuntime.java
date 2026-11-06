@@ -111,9 +111,6 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         boolean debugFeatureEnabledForActiveSession(String feature);
     }
 
-    private static final int MOBA_TOWER_REFERENCE_TEAM_SIZE = 9;
-    private static final int MOBA_OUTER_TOWER_HEALTH = 500;
-    private static final int MOBA_INNER_TOWER_HEALTH = 1_000;
     private static final int CASTLE_CRYSTAL_COUNT = 2;
     private static long mobaPassiveGoldInterval() {
         return GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_GOLD_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_GOLD_INTERVAL_MILLIS);
@@ -130,18 +127,15 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private static long mobaMinionWaveInterval() {
         return GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_MINION_WAVE_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_MINION_WAVE_INTERVAL_MILLIS);
     }
-    private static final long MOBA_TOWER_UPDATE_INTERVAL = 1_000L;
-    private static final long MOBA_CAPTURE_UPDATE_INTERVAL = 1_000L;
-    private static final double MOBA_TOWER_RANGE_SQUARED = 100.0D;
-    private static final double MOBA_CAPTURE_POINT_RANGE_SQUARED = 25.0D;
-    private static final double MOBA_TOWER_DAMAGE = 3.0D;
-    private static final double MOBA_TOWER_HEAL = 2.6D;
-    private static final double MOBA_MINION_HEALTH = 10.0D;
-    private static final double MOBA_MINION_DAMAGE = 0.2D;
-    // The source applies tower damage in both its damageMinions and damageTower FAST handlers.
-    private static final double MOBA_MINION_TOWER_DAMAGE = MOBA_MINION_DAMAGE * 2.0D;
-    private static final double MOBA_MINION_SOURCE_TARGET_RANGE_SQUARED = 100.0D;
-    private static final long MOBA_MINION_COMBAT_INTERVAL = 500L;
+    private static long mobaTowerUpdateInterval() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_TOWER_UPDATE_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_TOWER_UPDATE_INTERVAL_MILLIS));
+    }
+    private static long mobaCaptureUpdateInterval() {
+        return ArcadePortRules.heroesOfGwenCaptureUpdateIntervalMillis();
+    }
+    private static long mobaMinionCombatInterval() {
+        return ArcadePortRules.heroesOfGwenMinionCombatIntervalMillis();
+    }
     private static final List<String> HEROES_OF_GWEN_HERO_ORDER = List.of(
             "hattori", "bardolf", "devon", "rowena", "anath", "larissa", "dana", "biff", "ivy");
 
@@ -357,9 +351,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             nextGoldAt = now + mobaPassiveGoldInterval();
             if (game == ArcadePortGame.HEROES_OF_GWEN) {
                 nextMinionWaveAt = now + mobaMinionWaveInterval();
-                nextMinionCombatAt = now + MOBA_MINION_COMBAT_INTERVAL;
+                nextMinionCombatAt = now + mobaMinionCombatInterval();
             }
-            nextStructureUpdateAt = now + MOBA_TOWER_UPDATE_INTERVAL;
+            nextStructureUpdateAt = now + mobaTowerUpdateInterval();
             plugin.getLogger().info("Prepared " + game.displayName() + (mixedArcade ? " Mixed Arcade" : "")
                     + " source runtime using " + map.mapName() + ".");
         }
@@ -612,9 +606,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private double heroesOfGwenTowerMaxHealth(int owner, boolean first) {
-        int baseHealth = first ? MOBA_OUTER_TOWER_HEALTH : MOBA_INNER_TOWER_HEALTH;
         int attackers = Math.max(1, heroesOfGwenOpponentCount(owner));
-        return Math.max(1.0D, Math.ceil(baseHealth * attackers / (double) MOBA_TOWER_REFERENCE_TEAM_SIZE));
+        return ArcadePortRules.heroesOfGwenTowerMaximumHealth(first, attackers);
     }
 
     private void refreshHeroesOfGwenTowerHealthForOpponentTeam(int team) {
@@ -658,8 +651,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
         if (minion instanceof Ageable ageable) ageable.setBaby();
         var health = minion.getAttribute(Attribute.MAX_HEALTH);
-        if (health != null) health.setBaseValue(MOBA_MINION_HEALTH);
-        minion.setHealth(MOBA_MINION_HEALTH);
+        double minionHealth = ArcadePortRules.heroesOfGwenMinionHealth();
+        if (health != null) health.setBaseValue(minionHealth);
+        minion.setHealth(minionHealth);
         minion.setAI(false);
         minion.setAware(false);
         minion.setSilent(true);
@@ -746,7 +740,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         TowerState enemyTower = towers.getOrDefault(1 - team, List.of()).stream()
                 .filter(tower -> !tower.dead && canDamageMobaTower(tower, team))
                 .filter(tower -> minion.getLocation().distanceSquared(tower.location)
-                        <= MOBA_MINION_SOURCE_TARGET_RANGE_SQUARED)
+                        <= ArcadePortRules.heroesOfGwenMinionTargetRangeSquared())
                 .min(java.util.Comparator.comparingInt(tower -> tower.first ? 0 : 1))
                 .orElse(null);
         if (enemyTower != null) return enemyTower.guardian;
@@ -755,7 +749,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 .filter(other -> heroesOfGwenMinionTeams.getOrDefault(other.getUniqueId(), -1) == 1 - team)
                 .filter(other -> other.getWorld() == world
                         && other.getLocation().distanceSquared(minion.getLocation())
-                                <= MOBA_MINION_SOURCE_TARGET_RANGE_SQUARED)
+                                <= ArcadePortRules.heroesOfGwenMinionTargetRangeSquared())
                 .min(java.util.Comparator
                         .comparingDouble((Mob other) -> other.getHealth())
                         .thenComparingDouble(other -> other.getLocation().distanceSquared(minion.getLocation())))
@@ -764,7 +758,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         Wither enemyWither = withers.get(1 - team);
         return enemyWither != null && enemyWither.isValid()
                 && minion.getLocation().distanceSquared(enemyWither.getLocation())
-                        <= MOBA_MINION_SOURCE_TARGET_RANGE_SQUARED ? enemyWither : null;
+                        <= ArcadePortRules.heroesOfGwenMinionTargetRangeSquared() ? enemyWither : null;
     }
 
     private void updateHeroesOfGwenMinions(long now) {
@@ -816,24 +810,24 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             }
         }
         if (hooks.debugFeatureEnabledForActiveSession("minion-combat") && now >= nextMinionCombatAt) {
-            nextMinionCombatAt = now + MOBA_MINION_COMBAT_INTERVAL;
+            nextMinionCombatAt = now + mobaMinionCombatInterval();
             for (Mob attacker : minions) {
                 int team = heroesOfGwenMinionTeams.getOrDefault(attacker.getUniqueId(), -1);
                 if (team < 0) continue;
                 for (Mob victim : minions) {
                     if (heroesOfGwenMinionTeams.getOrDefault(victim.getUniqueId(), -1) != 1 - team
                             || attacker.getLocation().distanceSquared(victim.getLocation()) > 16.0D) continue;
-                    victim.damage(MOBA_MINION_DAMAGE, attacker);
+                    victim.damage(ArcadePortRules.heroesOfGwenMinionDamage(false), attacker);
                 }
                 for (TowerState tower : towers.getOrDefault(1 - team, List.of())) {
                     if (!canDamageMobaTower(tower, team) || tower.crystal == null || !tower.crystal.isValid()
                             || attacker.getLocation().distanceSquared(tower.crystal.getLocation()) > 16.0D) continue;
-                    damageMobaTower(tower, MOBA_MINION_TOWER_DAMAGE, null);
+                    damageMobaTower(tower, ArcadePortRules.heroesOfGwenMinionDamage(true), null);
                 }
                 Wither enemyWither = withers.get(1 - team);
                 if (enemyWither != null && enemyWither.isValid()
                         && attacker.getLocation().distanceSquared(enemyWither.getLocation()) <= 16.0D) {
-                    enemyWither.damage(MOBA_MINION_DAMAGE, attacker);
+                    enemyWither.damage(ArcadePortRules.heroesOfGwenMinionDamage(false), attacker);
                 }
             }
         }
@@ -1532,7 +1526,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             for (int by = y - 2; by <= y + 2; by++) {
                 for (int bz = z - radius; bz <= z + radius; bz++) {
                     Block block = world.getBlockAt(bx, by, bz);
-                    if (block.getLocation().distanceSquared(center) > MOBA_CAPTURE_POINT_RANGE_SQUARED) continue;
+                    if (block.getLocation().distanceSquared(center) > ArcadePortRules.heroesOfGwenCapturePointRangeSquared()) continue;
                     if (block.equals(center.getBlock().getRelative(BlockFace.DOWN))) continue;
                     String material = block.getType().name();
                     if (material.equals("WOOL") || material.endsWith("_WOOL")) result.add(block);
@@ -1832,6 +1826,30 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         return heroesOfGwenMinionTeams.size() > before;
     }
 
+    boolean debugUseHeldHeroesOfGwenAbility(Player tester) {
+        if (stopped || !ready || game != ArcadePortGame.HEROES_OF_GWEN || tester == null
+                || !tester.isOnline() || !activePlayers.contains(tester.getUniqueId())) return false;
+        ItemStack held = tester.getInventory().getItemInMainHand();
+        String hero = selectedHeroesOfGwen.get(tester.getUniqueId());
+        if (held == null || held.getType().isAir() || hero == null) return false;
+        String skill = heroSkillId(held);
+        if ("anath".equals(hero) && held.getType() == Material.BLAZE_ROD) {
+            fireAnathFlameWand(tester);
+            return true;
+        }
+        if ("larissa".equals(hero) && held.getType() == Material.DIAMOND_HOE) {
+            fireLarissaAquaCannon(tester);
+            return true;
+        }
+        if (isRowenaBombardmentItem(held)) {
+            fireRowenaBombardmentShot(tester);
+            return true;
+        }
+        if (skill == null || !skill.startsWith(hero + ".")) return false;
+        activateHeroesOfGwenSkill(tester, skill);
+        return true;
+    }
+
     boolean debugDamageNextHeroesOfGwenTower(Player tester) {
         if (stopped || !ready || game != ArcadePortGame.HEROES_OF_GWEN || tester == null
                 || !tester.isOnline() || !activePlayers.contains(tester.getUniqueId())
@@ -2081,11 +2099,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
         if (hooks.debugFeatureEnabledForActiveSession("beacon-captures") && now >= nextCapturePointUpdateAt) {
             updateCapturePoints();
-            nextCapturePointUpdateAt = now + MOBA_CAPTURE_UPDATE_INTERVAL;
+            nextCapturePointUpdateAt = now + mobaCaptureUpdateInterval();
         }
         if (now >= nextStructureUpdateAt) {
             updateMobaTowers();
-            nextStructureUpdateAt = now + MOBA_TOWER_UPDATE_INTERVAL;
+            nextStructureUpdateAt = now + mobaTowerUpdateInterval();
         }
         checkTeamDeparture();
     }
@@ -2987,7 +3005,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             TowerState tower = towerFor(target);
             if (tower != null) {
                 if (tower.owner != ownerTeam && canDamageMobaTower(tower, ownerTeam)
-                        && owner.getLocation().distanceSquared(tower.location) <= MOBA_TOWER_RANGE_SQUARED) {
+                        && owner.getLocation().distanceSquared(tower.location) <= ArcadePortRules.heroesOfGwenTowerRangeSquared()) {
                     damageMobaTower(tower, damage, owner);
                 }
             } else if (target instanceof Wither wither) {
@@ -3200,7 +3218,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             int redPlayers = 0;
             int bluePlayers = 0;
             for (Player player : activeMatchPlayers()) {
-                if (player.getLocation().distanceSquared(point.center) > MOBA_CAPTURE_POINT_RANGE_SQUARED) continue;
+                if (player.getLocation().distanceSquared(point.center) > ArcadePortRules.heroesOfGwenCapturePointRangeSquared()) continue;
                 int team = teams.getOrDefault(player.getUniqueId(), -1);
                 if (team == 0) redPlayers++;
                 else if (team == 1) bluePlayers++;
@@ -3300,14 +3318,14 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 Set<UUID> inRange = new HashSet<>();
                 for (Mob minion : minions) {
                     if (heroesOfGwenMinionTeams.getOrDefault(minion.getUniqueId(), -1) != 1 - owner
-                            || minion.getLocation().distanceSquared(tower.location) > MOBA_TOWER_RANGE_SQUARED) continue;
+                            || minion.getLocation().distanceSquared(tower.location) > ArcadePortRules.heroesOfGwenTowerRangeSquared()) continue;
                     UUID id = minion.getUniqueId();
                     inRange.add(id);
                     tower.targetEnteredAt.putIfAbsent(id, now);
                 }
                 for (Player player : matchPlayers) {
                     if (teams.getOrDefault(player.getUniqueId(), -1) != 1 - owner
-                            || player.getLocation().distanceSquared(tower.location) > MOBA_TOWER_RANGE_SQUARED) continue;
+                            || player.getLocation().distanceSquared(tower.location) > ArcadePortRules.heroesOfGwenTowerRangeSquared()) continue;
                     UUID id = player.getUniqueId();
                     inRange.add(id);
                     tower.targetEnteredAt.putIfAbsent(id, now);
@@ -3326,7 +3344,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 UUID targetId = target == null ? null : target.getUniqueId();
                 if (!java.util.Objects.equals(tower.currentTarget, targetId)) {
                     tower.currentTarget = targetId;
-                    tower.nextDamage = MOBA_TOWER_DAMAGE;
+                    tower.nextDamage = ArcadePortRules.heroesOfGwenTowerDamage();
                 }
                 if (target instanceof Mob minion) {
                     // Source MinionWave halves incoming custom Tower damage for minions.
@@ -3341,8 +3359,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 if (target != null) tower.nextDamage += 1.0D;
                 for (Player teammate : activeMatchPlayers()) {
                     if (teams.getOrDefault(teammate.getUniqueId(), -1) != owner
-                            || teammate.getLocation().distanceSquared(tower.location) > MOBA_TOWER_RANGE_SQUARED) continue;
-                    teammate.setHealth(Math.min(teammate.getMaxHealth(), teammate.getHealth() + MOBA_TOWER_HEAL));
+                            || teammate.getLocation().distanceSquared(tower.location) > ArcadePortRules.heroesOfGwenTowerRangeSquared()) continue;
+                    teammate.setHealth(Math.min(teammate.getMaxHealth(), teammate.getHealth() + ArcadePortRules.heroesOfGwenTowerHeal()));
                 }
             }
         }
@@ -3424,7 +3442,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             Player attacker = resolveAttacker(byEntity);
             if (attacker == null || teams.getOrDefault(attacker.getUniqueId(), -1) == tower.owner) return;
             if (!hooks.debugFeatureEnabled(attacker, "tower-damage")) return;
-            if (attacker.getLocation().distanceSquared(tower.location) > MOBA_TOWER_RANGE_SQUARED) {
+            if (attacker.getLocation().distanceSquared(tower.location) > ArcadePortRules.heroesOfGwenTowerRangeSquared()) {
                 attacker.sendMessage(ChatColor.RED + "You must enter the tower's 10-block range to damage it.");
                 return;
             }
@@ -3532,7 +3550,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private Player nearestEnemy(Location origin, int owner) {
         Player best = null;
-        double distance = MOBA_TOWER_RANGE_SQUARED;
+        double distance = ArcadePortRules.heroesOfGwenTowerRangeSquared();
         for (Player player : activeMatchPlayers()) {
             if (teams.getOrDefault(player.getUniqueId(), -1) == owner) continue;
             double candidate = player.getLocation().distanceSquared(origin);
@@ -4816,7 +4834,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 TowerState tower = towerFor(target);
                 if (tower != null) {
                     if (tower.owner != ownerTeam && canDamageMobaTower(tower, ownerTeam)
-                            && owner.getLocation().distanceSquared(tower.location) <= MOBA_TOWER_RANGE_SQUARED) {
+                            && owner.getLocation().distanceSquared(tower.location) <= ArcadePortRules.heroesOfGwenTowerRangeSquared()) {
                         damageMobaTower(tower,
                                 GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE), owner);
                         hit = true;
@@ -4903,7 +4921,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                     TowerState tower = towerFor(target);
                     if (tower != null) {
                         if (tower.owner != team && canDamageMobaTower(tower, team)
-                                && owner.getLocation().distanceSquared(tower.location) <= MOBA_TOWER_RANGE_SQUARED) {
+                                && owner.getLocation().distanceSquared(tower.location) <= ArcadePortRules.heroesOfGwenTowerRangeSquared()) {
                             damageMobaTower(tower, GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE), owner);
                         }
                     } else if (target instanceof Wither wither) {
@@ -5182,7 +5200,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 TowerState tower = towerFor(target);
                 if (tower != null) {
                     if (tower.owner != team && canDamageMobaTower(tower, team)
-                            && player.getLocation().distanceSquared(tower.location) <= MOBA_TOWER_RANGE_SQUARED) {
+                            && player.getLocation().distanceSquared(tower.location) <= ArcadePortRules.heroesOfGwenTowerRangeSquared()) {
                         damageMobaTower(tower,
                                 GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_HATTORI_NINJA_DASH_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_DAMAGE), player);
                     }
@@ -5266,7 +5284,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 if (tower != null) {
                     if (tower.owner != team && canDamageMobaTower(tower, team)
                             && player.getLocation().distanceSquared(tower.location)
-                                    <= MOBA_TOWER_RANGE_SQUARED) {
+                                    <= ArcadePortRules.heroesOfGwenTowerRangeSquared()) {
                         damageMobaTower(tower, GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE), player);
                         hit = true;
                         break;
@@ -6125,7 +6143,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 TowerState tower = towerFor(target);
                 if (tower != null) {
                     if (tower.owner != team && canDamageMobaTower(tower, team)
-                            && player.getLocation().distanceSquared(tower.location) <= MOBA_TOWER_RANGE_SQUARED) {
+                            && player.getLocation().distanceSquared(tower.location) <= ArcadePortRules.heroesOfGwenTowerRangeSquared()) {
                         damageMobaTower(tower, damage, player);
                     }
                     continue;
@@ -6179,7 +6197,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             TowerState tower = towerFor(target);
             if (tower != null) {
                 if (tower.owner != team && canDamageMobaTower(tower, team)
-                        && player.getLocation().distanceSquared(tower.location) <= MOBA_TOWER_RANGE_SQUARED) {
+                        && player.getLocation().distanceSquared(tower.location) <= ArcadePortRules.heroesOfGwenTowerRangeSquared()) {
                     damageMobaTower(tower, damage, player);
                 }
             } else if (target instanceof Wither wither) {
@@ -6350,7 +6368,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             TowerState tower = towerFor(target);
             if (tower != null) {
                 if (tower.owner != team && canDamageMobaTower(tower, team)
-                        && player.getLocation().distanceSquared(tower.location) <= MOBA_TOWER_RANGE_SQUARED) {
+                        && player.getLocation().distanceSquared(tower.location) <= ArcadePortRules.heroesOfGwenTowerRangeSquared()) {
                     damageMobaTower(tower, GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_DANA_RALLY_LANDING_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_LANDING_DAMAGE), player);
                 }
             } else {
@@ -6593,7 +6611,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 TowerState tower = towerFor(target);
                 if (tower != null) {
                     if (tower.owner != team && canDamageMobaTower(tower, team)
-                            && player.getLocation().distanceSquared(tower.location) <= MOBA_TOWER_RANGE_SQUARED) {
+                            && player.getLocation().distanceSquared(tower.location) <= ArcadePortRules.heroesOfGwenTowerRangeSquared()) {
                         damageMobaTower(tower, GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BIFF_BATTLE_LEAP_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_DAMAGE), player);
                     }
                 } else {
@@ -7137,7 +7155,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         final EnderCrystal crystal;
         final Map<UUID, Long> targetEnteredAt = new HashMap<>();
         UUID currentTarget;
-        double nextDamage = MOBA_TOWER_DAMAGE;
+        double nextDamage = ArcadePortRules.heroesOfGwenTowerDamage();
         double health;
         double maxHealth;
         boolean dead;
