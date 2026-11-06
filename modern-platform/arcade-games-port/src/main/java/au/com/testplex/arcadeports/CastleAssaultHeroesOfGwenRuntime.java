@@ -53,10 +53,12 @@ import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.EntityPotionEffectEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
+import org.bukkit.event.entity.PotionSplashEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerToggleFlightEvent;
@@ -213,6 +215,14 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final Map<UUID, Long> castleDemolitionistNextTntAt = new HashMap<>();
     private final Map<UUID, Integer> castleKillsByPlayer = new HashMap<>();
     private final Map<UUID, Integer> castleTntHolderKillsByPlayer = new HashMap<>();
+    private final Map<UUID, Map<UUID, Long>> castleAlchemistDebuffExpires = new HashMap<>();
+    private final Map<UUID, Integer> castleAlchemistDebuffKills = new HashMap<>();
+    private final Map<UUID, Integer> castleArcherBowKills = new HashMap<>();
+    private final Map<UUID, Integer> castleDemolitionistTntKills = new HashMap<>();
+    private final Set<UUID> castleFighterAppleConsumedThisLife = new HashSet<>();
+    private final Map<UUID, Integer> castleFighterKillsThisLife = new HashMap<>();
+    private final Map<UUID, Integer> castleTankHitsThisLife = new HashMap<>();
+    private final Map<UUID, Integer> castleRoyalGuardKills = new HashMap<>();
     private final Map<UUID, Integer> castleCrystalsDestroyedByPlayer = new HashMap<>();
     private final Set<UUID> castleRodUsed = new HashSet<>();
     private final Set<UUID> castleFinalKingHitByPlayer = new HashSet<>();
@@ -2171,10 +2181,68 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         return meta != null && meta.hasDisplayName() && meta.getDisplayName().contains("Fletched Arrow");
     }
 
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onCastleAlchemistPotionSplash(PotionSplashEvent event) {
+        if (stopped || game != ArcadePortGame.CASTLE_ASSAULT
+                || !(event.getPotion().getShooter() instanceof Player thrower)
+                || !"alchemist".equals(castleAssaultPlayerKits.get(thrower.getUniqueId()))) return;
+        int sourceTeam = teams.getOrDefault(thrower.getUniqueId(), -1);
+        if (sourceTeam < 0) return;
+        long durationTicks = event.getPotion().getEffects().stream()
+                .filter(effect -> effect.getType().equals(PotionEffectType.SLOWNESS)
+                        || effect.getType().equals(PotionEffectType.WEAKNESS))
+                .mapToLong(PotionEffect::getDuration).max().orElse(0L);
+        if (durationTicks <= 0L) return;
+        long now = System.currentTimeMillis();
+        for (LivingEntity affected : event.getAffectedEntities()) {
+            if (!(affected instanceof Player target)
+                    || !activePlayers.contains(target.getUniqueId())
+                    || teams.getOrDefault(target.getUniqueId(), -2) == sourceTeam) continue;
+            double intensity = event.getIntensity(target);
+            if (intensity <= 0.0D) continue;
+            long expiry = now + Math.max(50L, Math.round(durationTicks * 50.0D * intensity));
+            castleAlchemistDebuffExpires.computeIfAbsent(target.getUniqueId(), ignored -> new HashMap<>())
+                    .merge(thrower.getUniqueId(), expiry, (oldExpiry, nextExpiry) -> Math.max(oldExpiry, nextExpiry));
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onCastleFighterAppleConsumed(PlayerItemConsumeEvent event) {
+        if (stopped || game != ArcadePortGame.CASTLE_ASSAULT
+                || !"fighter".equals(castleAssaultPlayerKits.get(event.getPlayer().getUniqueId()))
+                || event.getItem().getType() != Material.GOLDEN_APPLE
+                || !event.getItem().hasItemMeta()) return;
+        ItemMeta meta = event.getItem().getItemMeta();
+        if (meta == null || !meta.hasDisplayName()
+                || !"Golden Applegate".equalsIgnoreCase(ChatColor.stripColor(meta.getDisplayName()))) return;
+        castleFighterAppleConsumedThisLife.add(event.getPlayer().getUniqueId());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onCastleTankSurvivedEnemyHit(EntityDamageByEntityEvent event) {
+        if (stopped || game != ArcadePortGame.CASTLE_ASSAULT
+                || !(event.getEntity() instanceof Player target)
+                || !"tank".equals(castleAssaultPlayerKits.get(target.getUniqueId()))
+                || !activePlayers.contains(target.getUniqueId())
+                || event.getFinalDamage() <= 0.0D || target.getHealth() <= event.getFinalDamage()) return;
+        Player attacker = event.getDamager() instanceof Player direct ? direct
+                : event.getDamager() instanceof Projectile projectile
+                        && projectile.getShooter() instanceof Player shooter ? shooter : null;
+        if (attacker == null || !activePlayers.contains(attacker.getUniqueId())
+                || teams.getOrDefault(attacker.getUniqueId(), -1) < 0
+                || teams.getOrDefault(attacker.getUniqueId(), -1)
+                        == teams.getOrDefault(target.getUniqueId(), -2)) return;
+        castleTankHitsThisLife.merge(target.getUniqueId(), 1, Integer::sum);
+    }
+
     @EventHandler(priority = EventPriority.MONITOR)
     public void onCastlePlayerRespawn(org.bukkit.event.player.PlayerRespawnEvent event) {
         if (game == ArcadePortGame.CASTLE_ASSAULT) {
             castleCreditedVictims.remove(event.getPlayer().getUniqueId());
+            castleFighterAppleConsumedThisLife.remove(event.getPlayer().getUniqueId());
+            castleFighterKillsThisLife.remove(event.getPlayer().getUniqueId());
+            castleTankHitsThisLife.remove(event.getPlayer().getUniqueId());
+            castleAlchemistDebuffExpires.remove(event.getPlayer().getUniqueId());
         }
     }
 
@@ -2866,10 +2934,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void detonateObjectiveTnt(Player carrier) {
+        boolean expressDelivery = ArcadePortRules.isCastleAssaultExpressDelivery(
+                objectiveCarryStartedAt, System.currentTimeMillis());
         restoreCarrierHelmet(carrier);
         objectiveCarrier = null;
         objectiveCarryStartedAt = 0L;
-        resolveCastleExplosion(carrier.getLocation().clone(), carrier, true, castleTntRadius(carrier));
+        resolveCastleExplosion(carrier.getLocation().clone(), carrier, true,
+                castleTntRadius(carrier), expressDelivery);
         carrier.sendMessage(ChatColor.GOLD + "Objective TNT detonated!");
     }
 
@@ -2900,7 +2971,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             owner = Bukkit.getPlayer(UUID.fromString(ownerValue));
         } catch (IllegalArgumentException ignored) {
         }
-        if (owner != null && owner.isOnline()) resolveCastleExplosion(tnt.getLocation(), owner, false, castleTntRadius(owner));
+        if (owner != null && owner.isOnline()) resolveCastleExplosion(tnt.getLocation(), owner, false, castleTntRadius(owner), false);
         entities.remove(tnt);
         tnt.remove();
     }
@@ -2969,7 +3040,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         return highest;
     }
 
-    private void resolveCastleExplosion(Location center, Player owner, boolean objective, double radius) {
+    private void resolveCastleExplosion(Location center, Player owner, boolean objective, double radius, boolean expressDelivery) {
         world.spawnParticle(Particle.EXPLOSION_EMITTER, center, 1);
         world.spawnParticle(Particle.CLOUD, center, 30, 0.65D, 0.65D, 0.65D, 0.08D);
         world.playSound(center, Sound.ENTITY_GENERIC_EXPLODE, 1.3F, 0.9F);
@@ -2983,7 +3054,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             damage *= ArcadePortRules.castleAssaultBlastDamageMultiplier(castleBlastProtectionEpf(target));
             if (damage <= 0.0D) continue;
             if (target.getHealth() <= damage) {
-                recordCastleKill(owner, target, objective);
+                recordCastleKill(owner, target, objective,
+                        !objective && "demolitionist".equals(castleAssaultPlayerKits.get(owner.getUniqueId())));
                 hooks.eliminate(target, owner, "was caught in a Castle Assault TNT blast");
             } else target.setHealth(target.getHealth() - damage);
             Vector direction = target.getLocation().toVector().subtract(center.toVector());
@@ -3000,6 +3072,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         for (EnderCrystal crystal : new ArrayList<>(enemyKing.crystals)) {
             if (!crystal.isValid() || crystal.getLocation().distance(center) > radius) continue;
             destroyCastleCrystal(enemyKing, crystal, owner);
+            if (expressDelivery) awardCastleAssaultAchievement(owner.getUniqueId(), "express-delivery");
         }
         if (enemyKing.activeCrystals() == 0 && enemyKing.entity != null
                 && enemyKing.location.distance(center) <= radius) damageCastleKing(enemyKing, 50, owner);
@@ -3864,6 +3937,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         UUID id = player.getUniqueId();
         if (game == ArcadePortGame.CASTLE_ASSAULT) {
             castleKillStreaks.remove(id);
+            castleFighterAppleConsumedThisLife.remove(id);
+            castleFighterKillsThisLife.remove(id);
+            castleTankHitsThisLife.remove(id);
+            castleAlchemistDebuffExpires.remove(id);
             castleArcherNextArrowAt.remove(id);
             castleDemolitionistNextTntAt.remove(id);
         }
@@ -4123,6 +4200,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         String kit = ArcadePortRules.normalizeCastleAssaultKit(requestedKit);
         if (kit == null) kit = "fighter";
         castleAssaultPlayerKits.put(player.getUniqueId(), kit);
+        castleFighterAppleConsumedThisLife.remove(player.getUniqueId());
+        castleFighterKillsThisLife.remove(player.getUniqueId());
+        castleTankHitsThisLife.remove(player.getUniqueId());
         long kitAppliedAt = System.currentTimeMillis();
         if ("archer".equals(kit)) {
             castleArcherNextArrowAt.put(player.getUniqueId(),
@@ -6728,6 +6808,14 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         witherBoundaries.clear();
         witherNextEarthquakeAt.clear();
         castleKillStreaks.clear();
+        castleAlchemistDebuffExpires.clear();
+        castleAlchemistDebuffKills.clear();
+        castleArcherBowKills.clear();
+        castleDemolitionistTntKills.clear();
+        castleFighterAppleConsumedThisLife.clear();
+        castleFighterKillsThisLife.clear();
+        castleTankHitsThisLife.clear();
+        castleRoyalGuardKills.clear();
         heroSkillReadyAt.clear();
         heroTntArrowCharges.clear();
         heroAmmoNextAt.clear();
