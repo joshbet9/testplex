@@ -80,8 +80,8 @@ final class AchievementKitUnlockPolicy {
     private static Map<String, Rule> createRules() {
         Map<String, Rule> rules = new LinkedHashMap<>();
         add(rules, "bacon-brawl", "brutus-bacon", "Brutus Bacon", "king-of-bacon", "pigs-in-blankets");
-        // Chris P. Bacon was deliberately removed in the Bacon Brawl redesign.
-        // Keep it unavailable until its obsolete catalogue entry is reviewed.
+        // Chris P. Bacon is an active redesigned achievement kit. Its specific
+        // achievement gate must be selected with Josh before activation.
         add(rules, "bomb-lobbers", "waller", "Waller", "blast-proof", "jelly-skin");
         add(rules, "death-tag", "runner-turtle", "Turtle", "turtle-shell");
         add(rules, "death-tag", "runner-trickster", "Trickster", "smoke-and-mirrors");

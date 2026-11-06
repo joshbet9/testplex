@@ -37,10 +37,10 @@ public final class ArcadeProgressCatalog {
                     a("flash-fried", "Flash Fried", "Win Bacon Brawl in 60 seconds or less."),
                     a("raw-pork", "Raw Pork", "Win Bacon Brawl without using an ability."),
                     a("three-for-one", "Three for One!", "Get 3 Body Slam kills in one game."),
-                    a("goat-sty", "GOAT Sty", "Win as Pig, landing only cloaked backstabs."),
+                    a("goat-sty", "GOAT Sty", "Win as Pig Cloak with at least one kill. Every kill must come from a melee backstab made while cloaked."),
                     a("pork-on-fork", "Get Some Pork on Your Fork", "Win a game without a kill."),
                     a("mama-camera", "Mama Get the Camera", "As Mama Piggles, get 4 kills from Bacon Blast or its kill combo."),
-                    a("got-em", "Got em’", "Kill a player during their Body Slam recovery before they land."),
+                    a("got-em", "Got em’", "Knock a player off the arena after they use an airborne Body Slam to recover, before they touch the ground."),
                     a("hamished", "Hamished", "Win while taking starvation damage."))),
             Map.entry("skywars", List.of(
                     a("death-bomber", "Death Bomber", "Kill 3 players with Throwable TNT in one game."),

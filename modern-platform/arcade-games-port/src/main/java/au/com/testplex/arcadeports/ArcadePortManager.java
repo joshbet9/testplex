@@ -11545,6 +11545,11 @@ public final class ArcadePortManager implements Listener {
         // Advance thrown Bacon Blast items each tick; hunger/escalation stay on the slow cadence.
         updateBaconBlastProjectiles(session, now);
         if (active != session) return;
+        // The first landing after a recovery Slam ends the Got em' window, even
+        // when the player jumps or is struck off again later in the same match.
+        for (Player player : alivePlayers(session)) {
+            if (player.isOnGround()) session.baconSlamRecoveries.landed(player.getUniqueId());
+        }
         updateCrispyBaconBurning(session, now);
         // Source UpdateType.SLOW runs every 4 seconds. Keep ability contact/expiry checks
         // on every tick, but gate hunger and knockback escalation on that slower cadence.
@@ -12565,7 +12570,7 @@ public final class ArcadePortManager implements Listener {
             }
             default: {
                 session.baconSlamPowerPercent.put(id, charge);
-                if (!player.isOnGround()) session.baconSlamRecoveryAttempts.add(id);
+                session.baconSlamRecoveries.bodySlam(id, !player.isOnGround());
                 double launchScale = 0.5D + charge / 200.0D;
                 Vector leap = player.getLocation().getDirection().normalize().multiply(1.2D * launchScale);
                 leap.setY(ArcadePortRules.baconBrawlBodySlamLaunchY(
@@ -12803,7 +12808,9 @@ public final class ArcadePortManager implements Listener {
             if (combo != null) {
                 if (ArcadePortRules.shouldCountMamaCameraBlastKill(
                         true, false, attackerId, combo.ownerId(), now, combo.lastHitAtMillis())) {
-                    session.baconBlastCombosByVictim.put(targetId, new BaconBlastCombo(attackerId, now));
+                    // Preserve the original Blast timestamp: follow-up punches must
+                    // not extend this five-second combo window indefinitely.
+                    session.baconBlastCombosByVictim.put(targetId, combo);
                 } else {
                     session.baconBlastCombosByVictim.remove(targetId);
                 }
@@ -12843,6 +12850,9 @@ public final class ArcadePortManager implements Listener {
         target.setVelocity(baconBrawlKnockbackVelocity(attacker, target,
                 "melee".equals(source) ? 6.0D : rawDamage,
                 knockbackMultiplier, projectileVelocity));
+        // Record only a successful opponent hit during the airborne recovery.
+        // The achievement is awarded later, if the player is knocked out before landing.
+        session.baconSlamRecoveries.successfulHit(targetId, attackerId, !target.isOnGround());
         target.getWorld().spawnParticle(Particle.CLOUD, target.getLocation().add(0, 1, 0),
                 10, 0.35D, 0.4D, 0.35D, 0.04D);
 
@@ -16248,6 +16258,9 @@ public final class ArcadePortManager implements Listener {
                 }
             }
             String lastHitSource = session.baconLastHitSource.get(playerId);
+            BaconBlastCombo blastCombo = session.baconBlastCombosByVictim.remove(playerId);
+            UUID recoveryInterrupterId = session.baconSlamRecoveries.knockout(playerId,
+                    ArcadePortRules.isBaconArenaKnockoutReason(reason), !player.isOnGround());
             if (killer != null) {
                 String kit = session.baconKits.getOrDefault(killer.getUniqueId(), "el-muchacho-pigo");
                 boolean cloakedBackstab = "pig".equals(kit)
@@ -16255,12 +16268,18 @@ public final class ArcadePortManager implements Listener {
                         && session.baconLastHitBackstab.getOrDefault(playerId, false)
                         && session.baconLastHitCloaked.getOrDefault(playerId, false);
                 if (!cloakedBackstab) session.baconGoatStyEligible.remove(killer.getUniqueId());
-                if ("mama-piggles".equals(kit) && "bacon-blast".equals(lastHitSource)) {
+                if (ArcadePortRules.shouldCountMamaCameraBlastKill(
+                        "mama-piggles".equals(kit), "bacon-blast".equals(lastHitSource),
+                        killer.getUniqueId(), blastCombo == null ? null : blastCombo.ownerId(),
+                        System.currentTimeMillis(), blastCombo == null ? 0L : blastCombo.lastHitAtMillis())) {
                     int blastKills = session.baconBlastKills.merge(killer.getUniqueId(), 1, Integer::sum);
                     if (blastKills >= 4) awardCatalogAchievement(killer, "bacon-brawl", "mama-camera");
                 }
-                if (session.baconSlamRecoveryAttempts.contains(playerId) && !player.isOnGround()) {
-                    awardCatalogAchievement(killer, "bacon-brawl", "got-em");
+            }
+            if (recoveryInterrupterId != null && session.scores.containsKey(recoveryInterrupterId)) {
+                Player recoveryInterrupter = session.players.get(recoveryInterrupterId);
+                if (recoveryInterrupter != null) {
+                    awardCatalogAchievement(recoveryInterrupter, "bacon-brawl", "got-em");
                 }
             }
             if (killer != null && "body-slam".equals(lastHitSource)) {
@@ -16278,7 +16297,6 @@ public final class ArcadePortManager implements Listener {
             session.baconLastHitSource.remove(playerId);
             session.baconLastHitBackstab.remove(playerId);
             session.baconLastHitCloaked.remove(playerId);
-            session.baconSlamRecoveryAttempts.remove(playerId);
             removeBaconBabyPig(session, playerId);
             removeBaconPlayerPig(session, playerId);
             session.baconSlams.remove(playerId);
@@ -18663,6 +18681,7 @@ public final class ArcadePortManager implements Listener {
         session.baconLastHitAtByPair.clear();
         session.baconLastHitSource.clear();
         session.baconBlastCombosByVictim.clear();
+        session.baconSlamRecoveries.clearAll();
         session.baconMeters.clear();
         session.baconAbilitiesUsed.clear();
         session.baconBrutusUntil.clear();
@@ -27922,6 +27941,7 @@ public final class ArcadePortManager implements Listener {
             restoreBaconPlayerVisibilityForOwner(session, id, player);
             restoreBaconDisguiseNameTagEntry(session, id);
             session.baconSlams.remove(id);
+            session.baconSlamRecoveries.clear(id);
             session.baconSlamPowerPercent.remove(id);
             session.baconMeters.remove(id);
             session.baconAbilitiesUsed.remove(id);
@@ -28584,7 +28604,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Integer> baconBlastKills = new HashMap<>();
         final Set<UUID> baconGoatStyEligible = new HashSet<>();
         final Set<UUID> baconStarvationDamaged = new HashSet<>();
-        final Set<UUID> baconSlamRecoveryAttempts = new HashSet<>();
+        final BaconSlamRecoveryTracker baconSlamRecoveries = new BaconSlamRecoveryTracker();
         final Map<UUID, UUID> baconBabyPigs = new HashMap<>();
         final Map<UUID, Item> baconBlastItems = new HashMap<>();
         final Set<UUID> baconCrispyProjectiles = new HashSet<>();
