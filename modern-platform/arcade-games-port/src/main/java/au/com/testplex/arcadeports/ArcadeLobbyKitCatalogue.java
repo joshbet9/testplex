@@ -123,7 +123,7 @@ final class ArcadeLobbyKitCatalogue {
                     choice("glider", "Glider", Material.ELYTRA,
                             Unlock.GEM, Zombie.class, Material.ELYTRA),
                     choice("tamer", "Tamer", Material.END_CRYSTAL,
-                            Unlock.GEM, Zombie.class, Material.END_CRYSTAL));
+                            Unlock.ACHIEVEMENT, Zombie.class, Material.END_CRYSTAL));
             case EVOLUTION -> List.of(
                     choice("standard-evolution", "Standard Evolution", Material.DRAGON_EGG,
                             Unlock.FREE, Zombie.class, Material.IRON_INGOT),
