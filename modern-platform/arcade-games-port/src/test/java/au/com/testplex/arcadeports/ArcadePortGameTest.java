@@ -2444,6 +2444,19 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldProcessBombLobbersPlayerHit(false, false));
     }
 
+    @Test void bombLobbersWonderkidCountsThreeActualImpactExplosionKills() {
+        // Low throws may land before 3s and wait; high lobs arrive after 3s and explode on impact.
+        assertFalse(ArcadePortRules.isBombLobbersImpactDetonation(2_999L, true));
+        assertTrue(ArcadePortRules.isBombLobbersImpactDetonation(3_000L, true));
+        assertTrue(ArcadePortRules.isBombLobbersImpactDetonation(7_999L, true));
+        assertFalse(ArcadePortRules.isBombLobbersImpactDetonation(8_000L, true));
+        assertFalse(ArcadePortRules.isBombLobbersImpactDetonation(4_000L, false));
+        assertFalse(ArcadePortRules.shouldAwardBombLobbersWonderkid(0));
+        assertFalse(ArcadePortRules.shouldAwardBombLobbersWonderkid(2));
+        assertTrue(ArcadePortRules.shouldAwardBombLobbersWonderkid(3));
+        assertTrue(ArcadePortRules.shouldAwardBombLobbersWonderkid(4));
+    }
+
     @Test void bombLobbersOver9000RequiresThreeKillsFromOnePoweredTnt() {
         assertFalse(ArcadePortRules.shouldAwardBombLobbersOver9000("super-tnt", 2));
         assertTrue(ArcadePortRules.shouldAwardBombLobbersOver9000("super-tnt", 3));
