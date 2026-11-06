@@ -1295,6 +1295,16 @@ public final class ArcadePortRules {
                 || (ageMillis >= BOMB_LOBBERS_WALL_CONTACT_DELAY_MILLIS && touchingSolidBlock);
     }
 
+    /** High lobs reach terrain after the three-second grace period and explode on contact. */
+    public static boolean isBombLobbersImpactDetonation(long ageMillis, boolean touchingBlock) {
+        return touchingBlock && ageMillis >= BOMB_LOBBERS_WALL_CONTACT_DELAY_MILLIS
+                && ageMillis < BOMB_LOBBERS_MAX_FLIGHT_MILLIS;
+    }
+
+    public static boolean shouldAwardBombLobbersWonderkid(int impactExplosionKillsThisMatch) {
+        return impactExplosionKillsThisMatch >= 3;
+    }
+
     /** Whether a Waller can place a wall at this time, including the source's short Recharge gate. */
     public static boolean isBombLobbersWallerReady(long nowMillis, long readyAtMillis) {
         return nowMillis >= 0L && readyAtMillis >= 0L && nowMillis >= readyAtMillis;
