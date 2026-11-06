@@ -968,6 +968,23 @@ public final class ArcadePortRules {
     public static final double SPLEEF_BRAWLER_KNOCKBACK = 0.6D;
     public static final long SPLEEF_SMASHER_COOLDOWN_MILLIS = 250L;
     public static final int SPLEEF_SMASHER_RADIUS_BLOCKS = 1;
+    public static final int SPLEEF_HUNGER_RESTORE_PER_HIT = 1;
+    public static final double SPLEEF_LEAP_FORWARD_POWER = 1.2D;
+    public static final double SPLEEF_LEAP_VERTICAL_ADD = 0.2D;
+    public static final double SPLEEF_LEAP_VERTICAL_CAP = 1.2D;
+    public static final double SPLEEF_LEAP_GROUND_BONUS = 0.2D;
+    public static final double SPLEEF_KNOCKBACK_VERTICAL_BASE = 0.1D;
+    public static final double SPLEEF_KNOCKBACK_GROUND_BONUS = 0.2D;
+    public static final double SPLEEF_KNOCKBACK_VERTICAL_CAP = 10.0D;
+    public static final double SPLEEF_ARROW_CLEAR_RADIUS_BASE_BLOCKS = 0.5D;
+    public static final double SPLEEF_ARROW_CLEAR_RADIUS_SPEED_DIVISOR = 1.6D;
+    public static final double SPLEEF_ARROW_CLEAR_RADIUS_CAP_BLOCKS = 3.0D;
+    public static final int SPLEEF_PROJECTILE_CLEAR_RADIUS_MIN_BLOCKS = 1;
+    public static final int SPLEEF_PROJECTILE_CLEAR_RADIUS_MAX_BLOCKS = 3;
+    public static final int SPLEEF_PROJECTILE_IMPACT_SEARCH_RADIUS_BLOCKS = 1;
+    public static final double SPLEEF_ARCHER_ARROW_SPEED_MULTIPLIER = 1.0D;
+    public static final double SPLEEF_SNOWBALL_SPEED_MULTIPLIER = 1.0D;
+    public static final double SPLEEF_GUST_SPEED_MULTIPLIER = 1.0D;
 
     record SpleefBlockOffset(int x, int y, int z) { }
 
@@ -992,9 +1009,47 @@ public final class ArcadePortRules {
                 || !Double.isFinite(facing.getZ()) || facing.lengthSquared() <= 1.0E-12D) {
             return new Vector(0.0D, 0.0D, 0.0D);
         }
-        Vector velocity = facing.clone().normalize().multiply(1.2D);
-        velocity.setY(Math.min(1.2D, velocity.getY() + 0.2D + (grounded ? 0.2D : 0.0D)));
+        Vector velocity = facing.clone().normalize().multiply(Math.max(0.0D, Math.min(5.0D,
+                GameDebugRuntimeOverrides.doubleValue("SPLEEF_LEAP_FORWARD_POWER", SPLEEF_LEAP_FORWARD_POWER))));
+        double verticalAdd = GameDebugRuntimeOverrides.doubleValue(
+                "SPLEEF_LEAP_VERTICAL_ADD", SPLEEF_LEAP_VERTICAL_ADD);
+        double verticalCap = GameDebugRuntimeOverrides.doubleValue(
+                "SPLEEF_LEAP_VERTICAL_CAP", SPLEEF_LEAP_VERTICAL_CAP);
+        double groundedBonus = GameDebugRuntimeOverrides.doubleValue(
+                "SPLEEF_LEAP_GROUND_BONUS", SPLEEF_LEAP_GROUND_BONUS);
+        velocity.setY(Math.min(Math.max(0.0D, Math.min(5.0D, verticalCap)), velocity.getY()
+                + Math.max(0.0D, Math.min(5.0D, verticalAdd))
+                + (grounded ? Math.max(0.0D, Math.min(5.0D, groundedBonus)) : 0.0D)));
         return velocity;
+    }
+
+    public static Vector spleefKnockbackVelocity(Vector direction, boolean targetGrounded, double power) {
+        if (direction == null || !Double.isFinite(power) || direction.lengthSquared() <= 1.0E-12D) {
+            return new Vector();
+        }
+        Vector velocity = direction.clone().normalize().multiply(Math.max(0.0D, Math.min(8.0D, power)));
+        double base = GameDebugRuntimeOverrides.doubleValue(
+                "SPLEEF_KNOCKBACK_VERTICAL_BASE", SPLEEF_KNOCKBACK_VERTICAL_BASE);
+        double groundedBonus = GameDebugRuntimeOverrides.doubleValue(
+                "SPLEEF_KNOCKBACK_GROUND_BONUS", SPLEEF_KNOCKBACK_GROUND_BONUS);
+        double cap = GameDebugRuntimeOverrides.doubleValue(
+                "SPLEEF_KNOCKBACK_VERTICAL_CAP", SPLEEF_KNOCKBACK_VERTICAL_CAP);
+        velocity.setY(Math.min(Math.max(0.0D, Math.min(12.0D, cap)), velocity.getY()
+                + Math.max(0.0D, Math.min(5.0D, base))
+                + (targetGrounded ? Math.max(0.0D, Math.min(5.0D, groundedBonus)) : 0.0D)));
+        return velocity;
+    }
+
+    public static double spleefArrowClearRadius(double velocity) {
+        double base = GameDebugRuntimeOverrides.doubleValue(
+                "SPLEEF_ARROW_CLEAR_RADIUS_BASE_BLOCKS", SPLEEF_ARROW_CLEAR_RADIUS_BASE_BLOCKS);
+        double divisor = GameDebugRuntimeOverrides.doubleValue(
+                "SPLEEF_ARROW_CLEAR_RADIUS_SPEED_DIVISOR", SPLEEF_ARROW_CLEAR_RADIUS_SPEED_DIVISOR);
+        double cap = GameDebugRuntimeOverrides.doubleValue(
+                "SPLEEF_ARROW_CLEAR_RADIUS_CAP_BLOCKS", SPLEEF_ARROW_CLEAR_RADIUS_CAP_BLOCKS);
+        if (!Double.isFinite(velocity) || !Double.isFinite(base) || !Double.isFinite(divisor)
+                || !Double.isFinite(cap) || divisor <= 0.0D) return SPLEEF_ARROW_CLEAR_RADIUS_CAP_BLOCKS;
+        return Math.max(0.0D, Math.min(Math.max(0.0D, cap), Math.max(0.0D, base) + Math.max(0.0D, velocity) / divisor));
     }
     public static final long TURF_WARS_GAME_TIMEOUT_MILLIS = 900_000L;
     public static final long TURF_WARS_INITIAL_BUILD_PHASE_MILLIS = 40_000L;
@@ -2183,8 +2238,44 @@ public final class ArcadePortRules {
 
     public static int spleefProjectileClearRadius(boolean arrow, double velocity) {
         if (!arrow) return 1;
-        double safeVelocity = Math.max(0.0D, velocity);
-        return Math.max(1, Math.min(3, (int) Math.ceil(0.5D + safeVelocity / 1.6D)));
+        double radius = spleefArrowClearRadius(velocity);
+        int minimum = Math.max(0, Math.min(4, GameDebugRuntimeOverrides.intValue(
+                "SPLEEF_PROJECTILE_CLEAR_RADIUS_MIN_BLOCKS", SPLEEF_PROJECTILE_CLEAR_RADIUS_MIN_BLOCKS)));
+        int maximum = Math.max(minimum, Math.min(8, GameDebugRuntimeOverrides.intValue(
+                "SPLEEF_PROJECTILE_CLEAR_RADIUS_MAX_BLOCKS", SPLEEF_PROJECTILE_CLEAR_RADIUS_MAX_BLOCKS)));
+        return Math.max(minimum, Math.min(maximum, (int) Math.ceil(radius)));
+    }
+
+    public static int spleefProjectileImpactSearchRadius() {
+        return Math.max(0, Math.min(4, GameDebugRuntimeOverrides.intValue(
+                "SPLEEF_PROJECTILE_IMPACT_SEARCH_RADIUS_BLOCKS", SPLEEF_PROJECTILE_IMPACT_SEARCH_RADIUS_BLOCKS)));
+    }
+
+    public static double spleefProjectileSpeedMultiplier(String kit) {
+        String key = switch (kit == null ? "" : kit.toLowerCase(java.util.Locale.ROOT)) {
+            case "archer" -> "SPLEEF_ARCHER_ARROW_SPEED_MULTIPLIER";
+            case "snowballer" -> "SPLEEF_SNOWBALL_SPEED_MULTIPLIER";
+            case "gust" -> "SPLEEF_GUST_SPEED_MULTIPLIER";
+            default -> null;
+        };
+        double fallback = switch (kit == null ? "" : kit.toLowerCase(java.util.Locale.ROOT)) {
+            case "archer" -> SPLEEF_ARCHER_ARROW_SPEED_MULTIPLIER;
+            case "snowballer" -> SPLEEF_SNOWBALL_SPEED_MULTIPLIER;
+            case "gust" -> SPLEEF_GUST_SPEED_MULTIPLIER;
+            default -> 1.0D;
+        };
+        double multiplier = key == null ? fallback : GameDebugRuntimeOverrides.doubleValue(key, fallback);
+        return Double.isFinite(multiplier) ? Math.max(0.1D, Math.min(4.0D, multiplier)) : fallback;
+    }
+
+    public static double spleefProjectileImpactRadius(boolean arrow, double velocity) {
+        return arrow ? spleefArrowClearRadius(velocity) : 1.0D;
+    }
+
+    public static int spleefHungerAfterHit(int currentFoodLevel) {
+        int restore = Math.max(0, Math.min(20, GameDebugRuntimeOverrides.intValue(
+                "SPLEEF_HUNGER_RESTORE_PER_HIT", SPLEEF_HUNGER_RESTORE_PER_HIT)));
+        return Math.max(0, Math.min(20, currentFoodLevel + restore));
     }
 
     public static final long EVOLUTION_RESPAWN_TICKS = 80L;

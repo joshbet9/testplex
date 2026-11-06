@@ -465,6 +465,10 @@ class GameDebugVariableCatalogTest {
                 boolean dynamicCameraConsumer = game == ArcadePortGame.CAMERA_SHY
                         && key.startsWith("CAMERA_SHY_")
                         && CameraShyRules.debuggableRule(key.substring("CAMERA_SHY_".length()));
+                boolean dynamicSpleefProjectileSpeedConsumer = game == ArcadePortGame.SPLEEF
+                        && key.endsWith("_SPEED_MULTIPLIER")
+                        && productionSources.contains("spleefProjectileSpeedMultiplier(kit)")
+                        && productionSources.contains("\"" + key + "\"");
                 boolean dynamicTurfWarsConsumer = game == ArcadePortGame.TURF_WARS
                         && (key.endsWith("_ARROW_INTERVAL_MILLIS") || key.endsWith("_SLOW_INTERVAL_MILLIS")
                                 || key.endsWith("_MAX_ARROWS")
@@ -515,7 +519,7 @@ class GameDebugVariableCatalogTest {
                         && productionSources.contains("\"SNAKE_\" + key")
                         && productionSources.contains("GameDebugRuntimeOverrides.");
                 assertTrue(literalConsumers.contains(key) || dynamicMazeConsumer || dynamicSneakyConsumer
-                                || dynamicCameraConsumer
+                                || dynamicCameraConsumer || dynamicSpleefProjectileSpeedConsumer
                                 || dynamicMilkCowConsumer || dynamicTurfWarsConsumer || dynamicSkyWarsConsumer || dynamicEvolutionConsumer
                                 || dynamicGladiatorConsumer || dynamicWizardsConsumer || dynamicDeathTagRewardConsumer
                                 || dynamicSnakeConsumer,

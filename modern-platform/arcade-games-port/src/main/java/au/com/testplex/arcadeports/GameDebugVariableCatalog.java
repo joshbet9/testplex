@@ -74,6 +74,21 @@ final class GameDebugVariableCatalog {
             "CAMERA_SHY_REVENGE_KILLS_REQUIRED", "CAMERA_SHY_UNTOUCHABLE_WINS_REQUIRED",
             "CAMERA_SHY_NARROW_ESCAPE_EXPOSURES", "CAMERA_SHY_PICTURE_PERFECT_PHOTOS_REQUIRED",
             "CAMERA_SHY_STAGE_FRIGHT_EXPOSURES", "CAMERA_SHY_STAGE_FRIGHT_DURATION_MILLIS");
+    private static final Set<String> LIVE_SPLEEF_NUMERIC_RULES = Set.of(
+            "SPLEEF_HUNGER_DRAIN_INTERVAL_MILLIS", "SPLEEF_HUNGER_DRAIN_PER_INTERVAL",
+            "SPLEEF_HUNGER_RESTORE_COOLDOWN_MILLIS", "SPLEEF_HUNGER_RESTORE_PER_HIT",
+            "SPLEEF_ARCHER_ARROW_INTERVAL_MILLIS", "SPLEEF_ARCHER_MAX_ARROWS",
+            "SPLEEF_ARCHER_ARROW_SPEED_MULTIPLIER", "SPLEEF_SNOWBALLER_MAX_SNOWBALLS",
+            "SPLEEF_SNOWBALL_SPEED_MULTIPLIER", "SPLEEF_BRAWLER_LEAP_COOLDOWN_MILLIS",
+            "SPLEEF_BRAWLER_KNOCKBACK", "SPLEEF_DEFAULT_KNOCKBACK", "SPLEEF_KNOCKBACK_COOLDOWN_MILLIS",
+            "SPLEEF_KNOCKBACK_VERTICAL_BASE", "SPLEEF_KNOCKBACK_GROUND_BONUS",
+            "SPLEEF_KNOCKBACK_VERTICAL_CAP", "SPLEEF_GUST_COOLDOWN_MILLIS", "SPLEEF_GUST_SPEED_MULTIPLIER",
+            "SPLEEF_SMASHER_COOLDOWN_MILLIS", "SPLEEF_SMASHER_RADIUS_BLOCKS",
+            "SPLEEF_LEAP_FORWARD_POWER", "SPLEEF_LEAP_VERTICAL_ADD", "SPLEEF_LEAP_VERTICAL_CAP",
+            "SPLEEF_LEAP_GROUND_BONUS", "SPLEEF_ARROW_CLEAR_RADIUS_BASE_BLOCKS",
+            "SPLEEF_ARROW_CLEAR_RADIUS_SPEED_DIVISOR", "SPLEEF_ARROW_CLEAR_RADIUS_CAP_BLOCKS",
+            "SPLEEF_PROJECTILE_CLEAR_RADIUS_MIN_BLOCKS", "SPLEEF_PROJECTILE_CLEAR_RADIUS_MAX_BLOCKS",
+            "SPLEEF_PROJECTILE_IMPACT_SEARCH_RADIUS_BLOCKS");
 
     private GameDebugVariableCatalog() { }
 
@@ -122,7 +137,8 @@ final class GameDebugVariableCatalog {
         if (variable == null) return false;
         return variable.kind() == Kind.BOOLEAN && LIVE_BOOLEAN_RULES.contains(variable.key())
                 || variable.kind() != Kind.BOOLEAN && (LIVE_SNEAKY_NUMERIC_RULES.contains(variable.key())
-                || LIVE_CAMERA_NUMERIC_RULES.contains(variable.key()));
+                || LIVE_CAMERA_NUMERIC_RULES.contains(variable.key())
+                || LIVE_SPLEEF_NUMERIC_RULES.contains(variable.key()));
     }
 
     static double clamp(Variable variable, double value) {
@@ -457,6 +473,12 @@ final class GameDebugVariableCatalog {
         if (name.equals("BUILD_TIME_DECREASE_PER_ROUND_SECONDS")
                 || name.equals("FINAL_RESULTS_SECONDS")) return 0.0D;
         if (name.equals("DOUBLE_JUMP_VERTICAL_VELOCITY")) return 0.1D;
+        if (name.equals("SPLEEF_ARROW_CLEAR_RADIUS_SPEED_DIVISOR")) return 0.1D;
+        if (name.startsWith("SPLEEF_") && name.endsWith("_SPEED_MULTIPLIER")) return 0.1D;
+        if (name.startsWith("SPLEEF_") && (name.endsWith("_BLOCKS") || name.contains("_VERTICAL_") || name.endsWith("_BONUS")
+                || name.endsWith("_POWER") || name.endsWith("_KNOCKBACK")
+                || name.endsWith("_REACH_BLOCKS"))) return 0.0D;
+        if (name.equals("SPLEEF_HUNGER_RESTORE_PER_HIT")) return 0.0D;
         if (name.equals("RUNNER_MAX_FROSTBALLS")) return 0.0D;
         if (name.equals("RUNNER_STEPS_ACHIEVEMENT_BLOCKS")
                 || name.equals("RUNNER_HOP_ACHIEVEMENT_JUMPS")
@@ -666,6 +688,7 @@ final class GameDebugVariableCatalog {
         if (name.equals("GLADIATOR_MELEE_KNOCKBACK_VERTICAL")
                 || name.equals("GLADIATOR_PROJECTILE_KNOCKBACK_VERTICAL")) return 2.0D;
         if (name.startsWith("PAINTBALL_") && name.endsWith("_KNOCKBACK_MULTIPLIER")) return 3.0D;
+        if (name.equals("SPLEEF_KNOCKBACK_VERTICAL_CAP")) return 12.0D;
         if (name.contains("_KNOCKBACK")) return 8.0D;
         if (name.contains("_LAUNCH_SPEED") || name.contains("_LAUNCH_HORIZONTAL")) return 8.0D;
         if (name.contains("_LAUNCH_VERTICAL") || name.endsWith("_EGG_SPEED")) return 5.0D;
@@ -679,6 +702,18 @@ final class GameDebugVariableCatalog {
         if (name.equals("BUILD_TIME_DECREASE_PER_ROUND_SECONDS")) return 30.0D;
         if (name.equals("FINAL_RESULTS_SECONDS")) return 60.0D;
         if (name.equals("DOUBLE_JUMP_VERTICAL_VELOCITY")) return 2.5D;
+        if (name.equals("SPLEEF_HUNGER_RESTORE_PER_HIT")) return 20.0D;
+        if (name.startsWith("SPLEEF_") && name.endsWith("_SPEED_MULTIPLIER")) return 4.0D;
+        if (name.equals("SPLEEF_LEAP_FORWARD_POWER") || name.equals("SPLEEF_LEAP_VERTICAL_ADD")
+                || name.equals("SPLEEF_LEAP_VERTICAL_CAP") || name.equals("SPLEEF_LEAP_GROUND_BONUS")
+                || name.equals("SPLEEF_KNOCKBACK_VERTICAL_BASE")
+                || name.equals("SPLEEF_KNOCKBACK_GROUND_BONUS")) return 5.0D;
+        if (name.equals("SPLEEF_KNOCKBACK_VERTICAL_CAP")) return 12.0D;
+        if (name.equals("SPLEEF_ARROW_CLEAR_RADIUS_SPEED_DIVISOR")) return 10.0D;
+        if (name.startsWith("SPLEEF_ARROW_CLEAR_RADIUS_") && name.endsWith("_BLOCKS")) return 8.0D;
+        if (name.equals("SPLEEF_PROJECTILE_CLEAR_RADIUS_MIN_BLOCKS")) return 4.0D;
+        if (name.equals("SPLEEF_PROJECTILE_CLEAR_RADIUS_MAX_BLOCKS")) return 8.0D;
+        if (name.equals("SPLEEF_PROJECTILE_IMPACT_SEARCH_RADIUS_BLOCKS")) return 4.0D;
         if (name.equals("HEROES_OF_GWEN_OVERTIME_DELAY_MILLIS")) return 3_600_000.0D;
         if (name.equals("HEROES_OF_GWEN_OVERTIME_PATH_ADVANCE_DISTANCE_SQUARED")) return 256.0D;
         if (name.equals("HEROES_OF_GWEN_DEVON_TNT_BOW_BASE_DAMAGE")

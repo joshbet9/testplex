@@ -9344,9 +9344,10 @@ public final class ArcadePortManager implements Listener {
     /** Reveals the source OreHider's 26 neighbouring hidden ore blocks after a break/blast. */
     private void revealSkyWarsOresAround(Session session, Block brokenBlock) {
         if (session == null || brokenBlock == null || session.type != ArcadePortGame.SKY_WARS) return;
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dy = -1; dy <= 1; dy++) {
-                for (int dz = -1; dz <= 1; dz++) {
+        int searchRadius = ArcadePortRules.spleefProjectileImpactSearchRadius();
+        for (int dx = -searchRadius; dx <= searchRadius; dx++) {
+            for (int dy = -searchRadius; dy <= searchRadius; dy++) {
+                for (int dz = -searchRadius; dz <= searchRadius; dz++) {
                     if (dx == 0 && dy == 0 && dz == 0) continue;
                     Block neighbour = brokenBlock.getRelative(dx, dy, dz);
                     Material hiddenOre = session.skyWarsHiddenOres.remove(neighbour);
@@ -23525,7 +23526,7 @@ public final class ArcadePortManager implements Listener {
         long last = session.spleefLastHungerGainAt.getOrDefault(id, 0L);
         if (now - last >= GameDebugRuntimeOverrides.longValue("SPLEEF_HUNGER_RESTORE_COOLDOWN_MILLIS", ArcadePortRules.SPLEEF_HUNGER_RESTORE_COOLDOWN_MILLIS)) {
             session.spleefLastHungerGainAt.put(id, now);
-            player.setFoodLevel(Math.min(20, player.getFoodLevel() + 1));
+            player.setFoodLevel(ArcadePortRules.spleefHungerAfterHit(player.getFoodLevel()));
         }
     }
 
@@ -23649,8 +23650,7 @@ public final class ArcadePortManager implements Listener {
                 : GameDebugRuntimeOverrides.doubleValue("SPLEEF_DEFAULT_KNOCKBACK", ArcadePortRules.SPLEEF_DEFAULT_KNOCKBACK);
         Vector direction = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
         if (direction.lengthSquared() <= 0.000001D) return;
-        Vector velocity = direction.normalize().multiply(power);
-        velocity.setY(Math.min(10.0D, velocity.getY() + 0.1D + (target.isOnGround() ? 0.2D : 0.0D)));
+        Vector velocity = ArcadePortRules.spleefKnockbackVelocity(direction, target.isOnGround(), power);
         target.setVelocity(velocity);
         target.playEffect(EntityEffect.HURT);
     }
@@ -25448,7 +25448,7 @@ public final class ArcadePortManager implements Listener {
                 restoreSpleefHunger(session, shooter, now);
                 if (projectile instanceof Arrow arrow) {
                     double arrowSpeed = arrow.getVelocity().length();
-                    double radius = Math.min(3.0D, 0.5D + arrowSpeed / 1.6D);
+                    double radius = ArcadePortRules.spleefProjectileImpactRadius(true, arrowSpeed);
                     int limit = ArcadePortRules.spleefProjectileClearRadius(true, arrowSpeed);
                     fadeSpleefBlock(session, shooter, center, false);
                     for (int dx = -limit; dx <= limit; dx++) {
@@ -27726,12 +27726,15 @@ public final class ArcadePortManager implements Listener {
                 || !session.alive.contains(player.getUniqueId())) return;
         String kit = session.spleefKits.getOrDefault(player.getUniqueId(), "snowballer");
         String feature = event.getEntity().getType() == EntityType.WIND_CHARGE && "gust".equals(kit) ? "gust"
-                : event.getEntity().getType() == EntityType.SNOWBALL && "snowballer".equals(kit) ? "snowballer" : null;
+                : event.getEntity().getType() == EntityType.SNOWBALL && "snowballer".equals(kit) ? "snowballer"
+                : event.getEntity() instanceof Arrow && "archer".equals(kit) ? "archer" : null;
         if (feature == null) return;
         if (!isDebugAbilityAllowed(player, ArcadePortGame.SPLEEF, feature)) {
             event.setCancelled(true);
             return;
         }
+        event.getEntity().setVelocity(event.getEntity().getVelocity().multiply(
+                ArcadePortRules.spleefProjectileSpeedMultiplier(kit)));
         if (!"gust".equals(feature)) return;
         long cooldown = GameDebugRuntimeOverrides.longValue("SPLEEF_GUST_COOLDOWN_MILLIS", ArcadePortRules.SPLEEF_GUST_COOLDOWN_MILLIS);
         session.spleefGustReadyAt.put(player.getUniqueId(), System.currentTimeMillis() + cooldown);
