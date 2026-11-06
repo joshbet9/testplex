@@ -1172,6 +1172,15 @@ public final class ArcadePortManager implements Listener {
             beginEvolution(session, tester);
             triggered = session.evolving.contains(tester.getUniqueId());
         }
+        if (type == ArcadePortGame.EVOLUTION && "make-pity-ready".equals(eventId)
+                && session.alive.contains(tester.getUniqueId())
+                && !session.evolutionAvailable.contains(tester.getUniqueId())) {
+            GameDebugRuntimeOverrides.markDebugSession();
+            long now = System.currentTimeMillis();
+            session.evolutionPityUntil.put(tester.getUniqueId(), now);
+            updateEvolutionProgress(session, now);
+            triggered = session.evolutionAvailable.contains(tester.getUniqueId());
+        }
         if (type == ArcadePortGame.HOOPS_REMASTERED && "shoot-ball".equals(eventId)
                 && hoops.debugShoot(tester)) {
             GameDebugRuntimeOverrides.markDebugSession();
@@ -18644,12 +18653,14 @@ public final class ArcadePortManager implements Listener {
             if (level == 1 && player.getLocation().getBlock().isLiquid()) {
                 long nextDamageAt = session.evolutionWaterDamageReadyAt.getOrDefault(id, 0L);
                 if (now >= nextDamageAt) {
-                    session.evolutionWaterDamageReadyAt.put(id, now + 250L);
-                    if (player.getHealth() <= 1.0D) {
+                    long damageInterval = ArcadePortRules.evolutionWaterDamageIntervalMillis();
+                    double waterDamage = ArcadePortRules.evolutionWaterDamage();
+                    session.evolutionWaterDamageReadyAt.put(id, now + damageInterval);
+                    if (player.getHealth() <= waterDamage) {
                         eliminate(session, player, null, "was burned by water");
                         if (active != session) return;
                     } else {
-                        player.setHealth(player.getHealth() - 1.0D);
+                        player.setHealth(player.getHealth() - waterDamage);
                         playLegacyDamageFeedback(player);
                         player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.5F, 0.8F);
                     }
@@ -18670,7 +18681,8 @@ public final class ArcadePortManager implements Listener {
             }
 
             Long slamStartedAt = session.evolutionGolemSlamStartedAt.get(id);
-            if (slamStartedAt != null && now - slamStartedAt >= 1_000L && player.isOnGround()) {
+            if (slamStartedAt != null && now - slamStartedAt >= ArcadePortRules.evolutionGolemSlamImpactDelayMillis()
+                    && player.isOnGround()) {
                 session.evolutionGolemSlamStartedAt.remove(id);
                 resolveEvolutionGolemSlam(session, player);
                 if (active != session) return;
@@ -18678,7 +18690,9 @@ public final class ArcadePortManager implements Listener {
 
             Long slimeStartedAt = session.evolutionSlimeSlamStartedAt.get(id);
             if (slimeStartedAt != null) {
-                if (now - slimeStartedAt > 1_000L || (now - slimeStartedAt > 100L && player.isOnGround())) {
+                if (now - slimeStartedAt > ArcadePortRules.evolutionSlimeSlamMaxDurationMillis()
+                        || (now - slimeStartedAt > ArcadePortRules.evolutionSlimeSlamMinAirtimeMillis()
+                                && player.isOnGround())) {
                     session.evolutionSlimeSlamStartedAt.remove(id);
                     session.evolutionSlimeSlamActive.remove(id);
                     continue;
@@ -18702,10 +18716,11 @@ public final class ArcadePortManager implements Listener {
 
     private void launchEvolutionFlame(Session session, Player player) {
         Vector direction = player.getEyeLocation().getDirection().normalize();
+        double spreadRadians = ArcadePortRules.evolutionBlazeSpreadRadians();
         Vector spread = direction.clone().add(new Vector(
-                ThreadLocalRandom.current().nextDouble(-0.07D, 0.07D),
-                ThreadLocalRandom.current().nextDouble(-0.07D, 0.07D),
-                ThreadLocalRandom.current().nextDouble(-0.07D, 0.07D))).normalize();
+                ThreadLocalRandom.current().nextDouble(-spreadRadians, spreadRadians),
+                ThreadLocalRandom.current().nextDouble(-spreadRadians, spreadRadians),
+                ThreadLocalRandom.current().nextDouble(-spreadRadians, spreadRadians))).normalize();
         Snowball flame = player.launchProjectile(Snowball.class);
         flame.setItem(new ItemStack(Material.BLAZE_POWDER));
         flame.setVelocity(spread.multiply(GameDebugRuntimeOverrides.doubleValue("EVOLUTION_BLAZE_FLAME_SPEED", ArcadePortRules.EVOLUTION_BLAZE_FLAME_SPEED)));
@@ -18725,8 +18740,7 @@ public final class ArcadePortManager implements Listener {
             if (target.equals(player)) continue;
             double distance = target.getLocation().distance(centre);
             if (distance > GameDebugRuntimeOverrides.doubleValue("EVOLUTION_GOLEM_SLAM_RADIUS", ArcadePortRules.EVOLUTION_GOLEM_SLAM_RADIUS)) continue;
-            double damage = GameDebugRuntimeOverrides.doubleValue("EVOLUTION_GOLEM_SLAM_DAMAGE", ArcadePortRules.EVOLUTION_GOLEM_SLAM_DAMAGE)
-                    * (1.0D - distance / GameDebugRuntimeOverrides.doubleValue("EVOLUTION_GOLEM_SLAM_RADIUS", ArcadePortRules.EVOLUTION_GOLEM_SLAM_RADIUS)) + 0.5D;
+            double damage = ArcadePortRules.evolutionGolemSlamDamageAtDistance(distance);
             hitEvolutionAbilityTarget(session, player, target, damage, GameDebugRuntimeOverrides.doubleValue(
                     "EVOLUTION_GOLEM_SLAM_KNOCKBACK", ArcadePortRules.EVOLUTION_GOLEM_SLAM_KNOCKBACK), "Seismic Slam");
             if (active != session) return;

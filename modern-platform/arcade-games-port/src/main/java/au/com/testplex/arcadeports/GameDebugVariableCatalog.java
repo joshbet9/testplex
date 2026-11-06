@@ -321,6 +321,13 @@ final class GameDebugVariableCatalog {
                 || name.equals("DRAGONS_MARKSMAN_START_ARROWS") || name.equals("DRAGONS_MARKSMAN_MAX_ARROWS")
                 || name.equals("DRAGONS_BARRAGE_MAX_ARROWS") || name.equals("DRAGONS_RETARGET_DISTANCE_SQUARED")) return 0.0D;
         if (name.equals("DRAGONS_TAMER_VERTICAL_FLIGHT_CAP")) return 0.0D;
+        if (name.equals("EVOLUTION_BLAZE_SPREAD_RADIANS")
+                || name.equals("EVOLUTION_GOLEM_SLAM_DAMAGE_FLOOR")
+                || name.equals("EVOLUTION_WATER_DAMAGE")) return 0.0D;
+        if (name.equals("EVOLUTION_WATER_DAMAGE_INTERVAL_MILLIS")
+                || name.equals("EVOLUTION_GOLEM_SLAM_IMPACT_DELAY_MILLIS")
+                || name.equals("EVOLUTION_SLIME_SLAM_MAX_DURATION_MILLIS")
+                || name.equals("EVOLUTION_SLIME_SLAM_MIN_AIRTIME_MILLIS")) return 1.0D;
         if (name.equals("DRAW_MY_THING_HINT_REVEAL_DURATION_MULTIPLIER")) return 0.1D;
         if (name.equals("DRAW_MY_THING_MAX_HINTED_LETTER_FRACTION")) return 0.0D;
         if (name.equals("DRAW_MY_THING_BRUSH_RADIUS_BLOCKS")
@@ -567,6 +574,12 @@ final class GameDebugVariableCatalog {
         if (name.equals("DRAW_MY_THING_BRUSH_RADIUS_BLOCKS")) return 4.0D;
         if (name.equals("DRAW_MY_THING_GUESS_COOLDOWN_MILLIS")
                 || name.equals("DRAW_MY_THING_INTERMISSION_MILLIS")) return 120_000.0D;
+        if (name.equals("EVOLUTION_BLAZE_SPREAD_RADIANS")) return 0.5D;
+        if (name.equals("EVOLUTION_GOLEM_SLAM_DAMAGE_FLOOR") || name.equals("EVOLUTION_WATER_DAMAGE")) return 20.0D;
+        if (name.equals("EVOLUTION_WATER_DAMAGE_INTERVAL_MILLIS")
+                || name.equals("EVOLUTION_GOLEM_SLAM_IMPACT_DELAY_MILLIS")
+                || name.equals("EVOLUTION_SLIME_SLAM_MAX_DURATION_MILLIS")) return 10_000.0D;
+        if (name.equals("EVOLUTION_SLIME_SLAM_MIN_AIRTIME_MILLIS")) return 2_000.0D;
         if (name.equals("DRAGONS_BARRAGE_ARROW_SPREAD")) return 1.0D;
         if (name.startsWith("DRAGONS_") && (name.endsWith("_Y_BONUS") || name.endsWith("_MAX_Y")
                 || name.endsWith("_VERTICAL") || name.endsWith("_VERTICAL_BASE")

@@ -2179,6 +2179,13 @@ public final class ArcadePortRules {
     public static final double EVOLUTION_CHICKEN_DOUBLE_JUMP_HORIZONTAL = 0.6D;
     public static final double EVOLUTION_CHICKEN_DOUBLE_JUMP_VERTICAL = 0.6D;
     public static final double EVOLUTION_EGG_DAMAGE = 2.0D;
+    public static final double EVOLUTION_BLAZE_SPREAD_RADIANS = 0.07D;
+    public static final long EVOLUTION_WATER_DAMAGE_INTERVAL_MILLIS = 250L;
+    public static final double EVOLUTION_WATER_DAMAGE = 1.0D;
+    public static final long EVOLUTION_GOLEM_SLAM_IMPACT_DELAY_MILLIS = 1_000L;
+    public static final double EVOLUTION_GOLEM_SLAM_DAMAGE_FLOOR = 0.5D;
+    public static final long EVOLUTION_SLIME_SLAM_MAX_DURATION_MILLIS = 1_000L;
+    public static final long EVOLUTION_SLIME_SLAM_MIN_AIRTIME_MILLIS = 100L;
 
     public static double evolutionEggDamage() {
         return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
@@ -2290,6 +2297,45 @@ public final class ArcadePortRules {
         double maximum = Math.max(base, GameDebugRuntimeOverrides.doubleValue(
                 "EVOLUTION_CHARGE_MAX_PER_TICK", EVOLUTION_CHARGE_MAX_PER_TICK));
         return Math.min(maximum, base + perKill * extraKills);
+    }
+
+    public static long evolutionWaterDamageIntervalMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue("EVOLUTION_WATER_DAMAGE_INTERVAL_MILLIS",
+                EVOLUTION_WATER_DAMAGE_INTERVAL_MILLIS));
+    }
+
+    public static double evolutionWaterDamage() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue("EVOLUTION_WATER_DAMAGE", EVOLUTION_WATER_DAMAGE));
+    }
+
+    public static long evolutionGolemSlamImpactDelayMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue("EVOLUTION_GOLEM_SLAM_IMPACT_DELAY_MILLIS",
+                EVOLUTION_GOLEM_SLAM_IMPACT_DELAY_MILLIS));
+    }
+
+    public static double evolutionGolemSlamDamageAtDistance(double distance) {
+        double radius = Math.max(0.1D, GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_GOLEM_SLAM_RADIUS", EVOLUTION_GOLEM_SLAM_RADIUS));
+        double baseDamage = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_GOLEM_SLAM_DAMAGE", EVOLUTION_GOLEM_SLAM_DAMAGE));
+        double damageFloor = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_GOLEM_SLAM_DAMAGE_FLOOR", EVOLUTION_GOLEM_SLAM_DAMAGE_FLOOR));
+        return baseDamage * (1.0D - Math.max(0.0D, distance) / radius) + damageFloor;
+    }
+
+    public static long evolutionSlimeSlamMaxDurationMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue("EVOLUTION_SLIME_SLAM_MAX_DURATION_MILLIS",
+                EVOLUTION_SLIME_SLAM_MAX_DURATION_MILLIS));
+    }
+
+    public static long evolutionSlimeSlamMinAirtimeMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue("EVOLUTION_SLIME_SLAM_MIN_AIRTIME_MILLIS",
+                EVOLUTION_SLIME_SLAM_MIN_AIRTIME_MILLIS));
+    }
+
+    public static double evolutionBlazeSpreadRadians() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_BLAZE_SPREAD_RADIANS", EVOLUTION_BLAZE_SPREAD_RADIANS));
     }
 
     public static final long BACON_BLAST_KILL_COMBO_WINDOW_MILLIS = 5_000L;

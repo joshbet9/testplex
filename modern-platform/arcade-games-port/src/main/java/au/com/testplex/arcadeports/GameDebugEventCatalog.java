@@ -48,7 +48,9 @@ final class GameDebugEventCatalog {
                     "Run your selected kit's normal ability and cooldown checks immediately."));
     private static final List<Event> EVOLUTION = List.of(
             new Event("begin-evolution", "Start Evolution", Material.DRAGON_EGG,
-                    "Begin your normal evolution animation immediately to test form and cosmetic effects."));
+                    "Begin your normal evolution animation immediately to test form and cosmetic effects."),
+            new Event("make-pity-ready", "Make Pity Evolution Ready", Material.CLOCK,
+                    "Set your normal pity deadline due now, then let the regular Evolution update unlock it."));
     private static final List<Event> HOOPS_REMASTERED = List.of(
             new Event("shoot-ball", "Take a Shot", Material.MAGMA_CREAM,
                     "If you currently have possession, release a normal shot using your current aim and position."),

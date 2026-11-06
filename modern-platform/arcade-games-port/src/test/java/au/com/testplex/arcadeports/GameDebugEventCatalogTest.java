@@ -42,7 +42,9 @@ class GameDebugEventCatalogTest {
         assertEquals(List.of("advance-dragon", "use-kit-ability", "finish-run", "refresh-kit"),
                 GameDebugEventCatalog.events(ArcadePortGame.DRAGON_ESCAPE).stream()
                         .map(GameDebugEventCatalog.Event::id).toList());
-        assertEquals("begin-evolution", GameDebugEventCatalog.events(ArcadePortGame.EVOLUTION).getFirst().id());
+        assertEquals(List.of("begin-evolution", "make-pity-ready", "refresh-kit"),
+                GameDebugEventCatalog.events(ArcadePortGame.EVOLUTION).stream()
+                        .map(GameDebugEventCatalog.Event::id).toList());
         assertEquals(List.of("shoot-ball", "try-steal"),
                 GameDebugEventCatalog.events(ArcadePortGame.HOOPS_REMASTERED).stream()
                         .map(GameDebugEventCatalog.Event::id).toList());

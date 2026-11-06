@@ -33,6 +33,14 @@ final class EvolutionDebugRulesTest {
         assertEquals(0.018D, ArcadePortRules.evolutionChargePerTick(3), 0.0000001D);
         assertEquals(2, ArcadePortRules.evolutionOverkillKillsRequired());
         assertEquals(2.0D, ArcadePortRules.evolutionEggDamage());
+        assertEquals(250L, ArcadePortRules.evolutionWaterDamageIntervalMillis());
+        assertEquals(1.0D, ArcadePortRules.evolutionWaterDamage());
+        assertEquals(1_000L, ArcadePortRules.evolutionGolemSlamImpactDelayMillis());
+        assertEquals(1_000L, ArcadePortRules.evolutionSlimeSlamMaxDurationMillis());
+        assertEquals(100L, ArcadePortRules.evolutionSlimeSlamMinAirtimeMillis());
+        assertEquals(0.07D, ArcadePortRules.evolutionBlazeSpreadRadians());
+        assertEquals(16.5D, ArcadePortRules.evolutionGolemSlamDamageAtDistance(0.0D));
+        assertEquals(0.5D, ArcadePortRules.evolutionGolemSlamDamageAtDistance(6.0D));
     }
 
     @Test void profileOverridesChangeFormCombatChargeAndOverkillProgressionThenReset() {
@@ -64,6 +72,35 @@ final class EvolutionDebugRulesTest {
         assertEquals(2, ArcadePortRules.nextEvolutionOverkillKillCount(9));
         assertEquals(2, ArcadePortRules.evolutionOverkillKillsRequired());
         assertEquals(2.0D, ArcadePortRules.evolutionEggDamage());
+        GameDebugRuntimeOverrides.clear();
+    }
+
+    @Test void profileOverridesTuneHazardsAndAbilityTimingThenRestoreDefaults() {
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "EVOLUTION_WATER_DAMAGE_INTERVAL_MILLIS", 500L,
+                "EVOLUTION_WATER_DAMAGE", 2.5D,
+                "EVOLUTION_GOLEM_SLAM_IMPACT_DELAY_MILLIS", 400L,
+                "EVOLUTION_GOLEM_SLAM_DAMAGE_FLOOR", 3.0D,
+                "EVOLUTION_SLIME_SLAM_MAX_DURATION_MILLIS", 2_000L,
+                "EVOLUTION_SLIME_SLAM_MIN_AIRTIME_MILLIS", 250L,
+                "EVOLUTION_BLAZE_SPREAD_RADIANS", 0.2D,
+                "EVOLUTION_GOLEM_SLAM_RADIUS", 8.0D,
+                "EVOLUTION_GOLEM_SLAM_DAMAGE", 20.0D));
+        assertEquals(500L, ArcadePortRules.evolutionWaterDamageIntervalMillis());
+        assertEquals(2.5D, ArcadePortRules.evolutionWaterDamage());
+        assertEquals(400L, ArcadePortRules.evolutionGolemSlamImpactDelayMillis());
+        assertEquals(2_000L, ArcadePortRules.evolutionSlimeSlamMaxDurationMillis());
+        assertEquals(250L, ArcadePortRules.evolutionSlimeSlamMinAirtimeMillis());
+        assertEquals(0.2D, ArcadePortRules.evolutionBlazeSpreadRadians());
+        assertEquals(23.0D, ArcadePortRules.evolutionGolemSlamDamageAtDistance(0.0D));
+        assertEquals(13.0D, ArcadePortRules.evolutionGolemSlamDamageAtDistance(4.0D));
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertEquals(250L, ArcadePortRules.evolutionWaterDamageIntervalMillis());
+        assertEquals(1.0D, ArcadePortRules.evolutionWaterDamage());
+        assertEquals(1_000L, ArcadePortRules.evolutionGolemSlamImpactDelayMillis());
+        assertEquals(0.07D, ArcadePortRules.evolutionBlazeSpreadRadians());
+        assertEquals(16.5D, ArcadePortRules.evolutionGolemSlamDamageAtDistance(0.0D));
         assertTrue(GameDebugRuntimeOverrides.isDebugSession());
     }
 
@@ -85,5 +122,19 @@ final class EvolutionDebugRulesTest {
         assertEquals(0.0D, fall.minimum());
         assertEquals(1.0D, fall.maximum());
         assertEquals(0.001D, charge.step());
+        assertVariable("EVOLUTION_BLAZE_SPREAD_RADIANS", 0.0D, 0.5D);
+        assertVariable("EVOLUTION_WATER_DAMAGE_INTERVAL_MILLIS", 1.0D, 10_000.0D);
+        assertVariable("EVOLUTION_WATER_DAMAGE", 0.0D, 20.0D);
+        assertVariable("EVOLUTION_GOLEM_SLAM_DAMAGE_FLOOR", 0.0D, 20.0D);
+        assertVariable("EVOLUTION_GOLEM_SLAM_IMPACT_DELAY_MILLIS", 1.0D, 10_000.0D);
+        assertVariable("EVOLUTION_SLIME_SLAM_MAX_DURATION_MILLIS", 1.0D, 10_000.0D);
+        assertVariable("EVOLUTION_SLIME_SLAM_MIN_AIRTIME_MILLIS", 1.0D, 2_000.0D);
+    }
+
+    private static void assertVariable(String key, double minimum, double maximum) {
+        GameDebugVariableCatalog.Variable variable = GameDebugVariableCatalog.variable(ArcadePortGame.EVOLUTION, key);
+        assertNotNull(variable, key);
+        assertEquals(minimum, variable.minimum(), key);
+        assertEquals(maximum, variable.maximum(), key);
     }
 }
