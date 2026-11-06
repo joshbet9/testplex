@@ -9,7 +9,7 @@ public enum BombLobbersAchievement {
     TEAM_PLAYER("team-player", "Team player!", "Get 5 assists in one game."),
     WHATS_A_DOUBLE_JUMP("whats-a-double-jump", "What's a double jump?", "Win as Acrobat without using your double jump."),
     THE_MVP("the-mvp", "The MVP", "Win against 3 opponents while the last living member of your team."),
-    BLAST_PROOF("blast-proof", "Blast Proof", "Win 5 games as Armorer."),
+    BLAST_PROOF("blast-proof", "Blast Proof", "Win 10 games as Armorer."),
     JELLY_SKIN("jelly-skin", "Jelly Skin", "Win a game without taking damage."),
     MASTER_BOMBER("master-bomber", "Master Bomber", "Win 30 Bomb Lobbers games."),
     GRENADE_FROM_THE_GRAVE("grenade-from-the-grave", "Grenade From the Grave",
