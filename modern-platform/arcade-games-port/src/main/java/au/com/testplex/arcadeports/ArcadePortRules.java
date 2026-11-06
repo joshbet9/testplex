@@ -3130,6 +3130,16 @@ public final class ArcadePortRules {
         return Math.max(1, GameDebugRuntimeOverrides.intValue(key, fallback));
     }
 
+    public static long turfWarsInfiltratorSlowIntervalMillis(boolean killTrigger) {
+        String key = killTrigger
+                ? "TURF_WARS_INFIlTRATOR_KILL_SLOW_INTERVAL_MILLIS"
+                : "TURF_WARS_INFIlTRATOR_SLOW_INTERVAL_MILLIS";
+        long fallback = killTrigger
+                ? TURF_WARS_INFIlTRATOR_KILL_SLOW_INTERVAL_MILLIS
+                : TURF_WARS_INFIlTRATOR_SLOW_INTERVAL_MILLIS;
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue(key, fallback));
+    }
+
     public static int turfWarsArrowMax(String kit) {
         String normalized = normalizeTurfWarsKit(kit) == null ? "marksman" : normalizeTurfWarsKit(kit);
         String key = normalized.equals("infiltrator") ? "TURF_WARS_INFILTRATOR_MAX_ARROWS"

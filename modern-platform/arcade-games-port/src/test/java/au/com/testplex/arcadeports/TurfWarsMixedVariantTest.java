@@ -190,6 +190,26 @@ class TurfWarsMixedVariantTest {
     }
 
     @Test
+    void fortifierAndInfiltratorSettingsChangeProductionRulesAndReset() {
+        assertEquals(12, ArcadePortRules.turfWarsConstructorMax("fortifier"));
+        assertEquals(5_000L, ArcadePortRules.turfWarsInfiltratorSlowIntervalMillis(false));
+        assertEquals(2_500L, ArcadePortRules.turfWarsInfiltratorSlowIntervalMillis(true));
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "TURF_WARS_FORTIFIER_MAX_WOOL", 20,
+                "TURF_WARS_INFIlTRATOR_SLOW_INTERVAL_MILLIS", 3_000L,
+                "TURF_WARS_INFIlTRATOR_KILL_SLOW_INTERVAL_MILLIS", 1_000L));
+        assertEquals(20, ArcadePortRules.turfWarsConstructorMax("fortifier"));
+        assertEquals(3_000L, ArcadePortRules.turfWarsInfiltratorSlowIntervalMillis(false));
+        assertEquals(1_000L, ArcadePortRules.turfWarsInfiltratorSlowIntervalMillis(true));
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertEquals(12, ArcadePortRules.turfWarsConstructorMax("fortifier"));
+        assertEquals(5_000L, ArcadePortRules.turfWarsInfiltratorSlowIntervalMillis(false));
+        assertEquals(2_500L, ArcadePortRules.turfWarsInfiltratorSlowIntervalMillis(true));
+    }
+
+    @Test
     void everyNewlyCapturedColumnIsRepaintedForBothTeams() {
         assertEquals(List.of(0), ArcadePortRules.turfWarsCapturedColumns(-1, 0, 0, -20, 20));
         assertEquals(List.of(0, 1), ArcadePortRules.turfWarsCapturedColumns(-1, 1, 0, -20, 20));

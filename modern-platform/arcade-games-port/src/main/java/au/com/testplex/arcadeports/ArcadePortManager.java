@@ -2801,9 +2801,7 @@ public final class ArcadePortManager implements Listener {
                             plugin.getConfig().set(statPath, plugin.getConfig().getInt(statPath, 0) + 1);
                         }
                     }
-                    long slowInterval = state.hasKilled
-                            ? GameDebugRuntimeOverrides.longValue("TURF_WARS_INFIlTRATOR_KILL_SLOW_INTERVAL_MILLIS", ArcadePortRules.TURF_WARS_INFIlTRATOR_KILL_SLOW_INTERVAL_MILLIS)
-                            : GameDebugRuntimeOverrides.longValue("TURF_WARS_INFIlTRATOR_SLOW_INTERVAL_MILLIS", ArcadePortRules.TURF_WARS_INFIlTRATOR_SLOW_INTERVAL_MILLIS);
+                    long slowInterval = ArcadePortRules.turfWarsInfiltratorSlowIntervalMillis(state.hasKilled);
                     if (now - state.lastSlowAt >= slowInterval) {
                         state.lastSlowAt = now;
                         state.slowLevel++;

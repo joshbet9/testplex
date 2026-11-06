@@ -295,7 +295,8 @@ class GameDebugVariableCatalogTest {
                         && key.startsWith(GameDebugVariableCatalog.rulePrefix(game))
                         && productionSources.contains("GameDebugRuntimeOverrides.longValue(\"SNEAKY_ASSASSINS_\" + name");
                 boolean dynamicTurfWarsConsumer = game == ArcadePortGame.TURF_WARS
-                        && (key.endsWith("_ARROW_INTERVAL_MILLIS") || key.endsWith("_MAX_ARROWS")
+                        && (key.endsWith("_ARROW_INTERVAL_MILLIS") || key.endsWith("_SLOW_INTERVAL_MILLIS")
+                                || key.endsWith("_MAX_ARROWS")
                                 || key.endsWith("_MAX_WOOL"))
                         && productionSources.contains("GameDebugRuntimeOverrides.longValue(key, fallback)")
                         || game == ArcadePortGame.TURF_WARS
