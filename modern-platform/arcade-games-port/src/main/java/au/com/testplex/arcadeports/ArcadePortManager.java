@@ -8965,8 +8965,8 @@ public final class ArcadePortManager implements Listener {
                 }
             }
             if (nearestSpawn >= 0 && nearestDistanceSquared
-                    <= SkyWarsMixedArcadeRules.ORE_ISLAND_RADIUS_BLOCKS
-                            * SkyWarsMixedArcadeRules.ORE_ISLAND_RADIUS_BLOCKS) {
+                    <= SkyWarsMixedArcadeRules.oreIslandRadiusBlocks()
+                            * SkyWarsMixedArcadeRules.oreIslandRadiusBlocks()) {
                 islandOreSlots.get(nearestSpawn).add(slot);
             }
         }
@@ -8978,13 +8978,13 @@ public final class ArcadePortManager implements Listener {
                 continue;
             }
             createSkyWarsOreVeins(session, slots,
-                    Material.DIAMOND_ORE, SkyWarsMixedArcadeRules.DIAMOND_VEINS_PER_ISLAND,
-                    SkyWarsMixedArcadeRules.DIAMOND_VEIN_SIZE, true);
+                    Material.DIAMOND_ORE, SkyWarsMixedArcadeRules.diamondVeinsPerIsland(),
+                    SkyWarsMixedArcadeRules.diamondVeinSize(), true);
             createSkyWarsOreVeins(session, slots,
-                    Material.IRON_ORE, SkyWarsMixedArcadeRules.IRON_VEINS_PER_ISLAND,
+                    Material.IRON_ORE, SkyWarsMixedArcadeRules.ironVeinsPerIsland(),
                     -1, true);
             createSkyWarsOreVeins(session, slots,
-                    Material.GRAVEL, SkyWarsMixedArcadeRules.GRAVEL_VEINS_PER_ISLAND,
+                    Material.GRAVEL, SkyWarsMixedArcadeRules.gravelVeinsPerIsland(),
                     -1, false);
             islandIndex++;
         }
@@ -9181,7 +9181,8 @@ public final class ArcadePortManager implements Listener {
             Material oreType, int veinCount, int fixedVeinSize, boolean allowAboveAir) {
         for (int vein = 0; vein < veinCount && !remainingSlots.isEmpty(); vein++) {
             int veinSize = fixedVeinSize >= 0 ? fixedVeinSize
-                    : SkyWarsMixedArcadeRules.randomVeinSize(ThreadLocalRandom.current().nextInt(3));
+                    : SkyWarsMixedArcadeRules.randomVeinSize(ThreadLocalRandom.current().nextInt(
+                            SkyWarsMixedArcadeRules.randomVeinExtraSize() + 1));
             Block current = remainingSlots.get(ThreadLocalRandom.current().nextInt(remainingSlots.size()));
             for (int step = 0; step < veinSize && current != null; step++) {
                 if (allowAboveAir || !current.getRelative(BlockFace.DOWN).getType().isAir()) {
@@ -9305,16 +9306,16 @@ public final class ArcadePortManager implements Listener {
             long now = System.currentTimeMillis();
             long readyAt = session.skyWarsLastTntThrowAt.getOrDefault(player.getUniqueId(), 0L);
             if (now < readyAt) return true;
-            session.skyWarsLastTntThrowAt.put(player.getUniqueId(), now + 500L);
+            session.skyWarsLastTntThrowAt.put(player.getUniqueId(), now + SkyWarsMixedArcadeRules.tntThrowCooldownMillis());
             if (item.getAmount() <= 1) player.getInventory().setItemInMainHand(null);
             else item.setAmount(item.getAmount() - 1);
             Location spawn = player.getEyeLocation().add(player.getEyeLocation().getDirection());
             TNTPrimed tnt = session.world.spawn(spawn, TNTPrimed.class);
-            tnt.setFuseTicks((int) SkyWarsMixedArcadeRules.TNT_THROW_FUSE_TICKS);
+            tnt.setFuseTicks((int) SkyWarsMixedArcadeRules.tntThrowFuseTicks());
             tnt.setSource(player);
             if (event.getAction().isLeftClick()) {
                 tnt.setVelocity(player.getEyeLocation().getDirection()
-                        .multiply(SkyWarsMixedArcadeRules.TNT_THROW_STRENGTH).add(new Vector(0.0D, 0.3D, 0.0D)));
+                        .multiply(SkyWarsMixedArcadeRules.tntThrowStrength()).add(new Vector(0.0D, 0.3D, 0.0D)));
             }
             session.skyWarsTntOwners.put(tnt.getUniqueId(), player.getUniqueId());
             session.entities.add(tnt);
@@ -9330,11 +9331,11 @@ public final class ArcadePortManager implements Listener {
             if (!session.liveStarted) return true;
             long now = System.currentTimeMillis();
             if (now < session.skyWarsKitReadyAt.getOrDefault(id, 0L)) return true;
-            session.skyWarsKitReadyAt.put(id, now + 30_000L);
+            session.skyWarsKitReadyAt.put(id, now + SkyWarsMixedArcadeRules.iceBridgeCooldownMillis());
             Location launch = player.getLocation().clone().add(0.0D, 1.0D, 0.0D);
             player.teleport(launch);
-            player.setVelocity(new Vector(0.0D, 0.5D, 0.0D));
-            addSkyWarsIceBridge(session, player, now + 4_000L);
+            player.setVelocity(new Vector(0.0D, SkyWarsMixedArcadeRules.iceBridgeLaunchY(), 0.0D));
+            addSkyWarsIceBridge(session, player, now + SkyWarsMixedArcadeRules.iceBridgeDurationMillis());
             player.sendMessage(ChatColor.GREEN + "You used Ice Bridge.");
             return true;
         }
@@ -9344,11 +9345,12 @@ public final class ArcadePortManager implements Listener {
             if (!session.liveStarted) return true;
             long now = System.currentTimeMillis();
             if (now < session.skyWarsKitReadyAt.getOrDefault(id, 0L)) return true;
-            session.skyWarsKitReadyAt.put(id, now + 30_000L);
+            session.skyWarsKitReadyAt.put(id, now + SkyWarsMixedArcadeRules.fireKitCooldownMillis());
             for (Player target : alivePlayers(session)) {
-                if (target.equals(player) || target.getLocation().distanceSquared(player.getLocation()) > 36.0D) continue;
-                target.setFireTicks(100);
-                target.damage(6.0D, player);
+                double radius = SkyWarsMixedArcadeRules.fireBurstRadiusBlocks();
+                if (target.equals(player) || target.getLocation().distanceSquared(player.getLocation()) > radius * radius) continue;
+                target.setFireTicks(SkyWarsMixedArcadeRules.fireBurstFireTicks());
+                target.damage(SkyWarsMixedArcadeRules.fireBurstDamage(), player);
                 target.getWorld().spawnParticle(Particle.FLAME,
                         target.getLocation().add(0.0D, 1.0D, 0.0D), 12, 0.25D, 0.4D, 0.25D, 0.02D);
             }
@@ -9376,7 +9378,7 @@ public final class ArcadePortManager implements Listener {
             event.setCancelled(true);
             if (!isDebugAbilityAllowed(player, ArcadePortGame.SKY_WARS, kit)) return true;
             if (!session.liveStarted) return true;
-            Player target = skyWarsPlayerInSight(session, player, 12.0D);
+            Player target = skyWarsPlayerInSight(session, player, SkyWarsMixedArcadeRules.metalMagnetRangeBlocks());
             if (target == null) return true;
             int armorPieces = skyWarsMetalArmorPieces(target);
             if (armorPieces == 0) {
@@ -9385,10 +9387,11 @@ public final class ArcadePortManager implements Listener {
             }
             long now = System.currentTimeMillis();
             if (now < session.skyWarsKitReadyAt.getOrDefault(id, 0L)) return true;
-            session.skyWarsKitReadyAt.put(id, now + 15_000L);
-            target.damage(1.0D, player);
+            session.skyWarsKitReadyAt.put(id, now + SkyWarsMixedArcadeRules.metalMagnetCooldownMillis());
+            target.damage(SkyWarsMixedArcadeRules.metalMagnetDamage(), player);
             Vector pull = player.getLocation().toVector().subtract(target.getLocation().toVector())
-                    .normalize().multiply(0.5D + armorPieces / 4.0D);
+                    .normalize().multiply(SkyWarsMixedArcadeRules.metalMagnetPullBase()
+                            + armorPieces * SkyWarsMixedArcadeRules.metalMagnetPullPerArmor());
             pull.setY(Math.max(0.6D, pull.getY()));
             target.setVelocity(pull);
             player.getWorld().spawnParticle(Particle.FIREWORK, player.getEyeLocation(), 8,
@@ -9401,13 +9404,13 @@ public final class ArcadePortManager implements Listener {
             if (!session.liveStarted) return true;
             long now = System.currentTimeMillis();
             if (now < session.skyWarsKitReadyAt.getOrDefault(id, 0L)) return true;
-            session.skyWarsKitReadyAt.put(id, now + 500L);
+            session.skyWarsKitReadyAt.put(id, now + SkyWarsMixedArcadeRules.earthThrowCooldownMillis());
             if (item.getAmount() <= 1) player.getInventory().setItemInMainHand(null);
             else item.setAmount(item.getAmount() - 1);
             FallingBlock dirt = session.world.spawnFallingBlock(
                     player.getEyeLocation().add(player.getLocation().getDirection()), Material.DIRT.createBlockData());
             dirt.setDropItem(false);
-            dirt.setVelocity(player.getLocation().getDirection().multiply(2.0D));
+            dirt.setVelocity(player.getLocation().getDirection().multiply(SkyWarsMixedArcadeRules.earthThrowSpeed()));
             session.skyWarsDirtProjectiles.put(dirt.getUniqueId(), id);
             session.entities.add(dirt);
             return true;

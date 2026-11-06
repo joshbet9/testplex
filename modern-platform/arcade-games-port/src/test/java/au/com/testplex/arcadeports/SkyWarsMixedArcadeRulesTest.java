@@ -1,10 +1,13 @@
 package au.com.testplex.arcadeports;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SkyWarsMixedArcadeRulesTest {
+    @AfterEach void clearDebugOverrides() { GameDebugRuntimeOverrides.clear(); }
+
     @Test void debugProfileValuesChangeSkyWarsQueueAndRoundRulesAtRuntime() {
         GameDebugRuntimeOverrides.activate(Map.of(
                 "SKY_WARS_MAX_PLAYERS", 12,
@@ -89,5 +92,48 @@ class SkyWarsMixedArcadeRulesTest {
         assertEquals(500L, SkyWarsMixedArcadeRules.TNT_THROW_COOLDOWN_MILLIS);
         assertEquals(1.6D, SkyWarsMixedArcadeRules.TNT_THROW_STRENGTH);
         assertEquals(2, SkyWarsMixedArcadeRules.TNT_PER_DROP);
+    }
+
+    @Test void abilityAndResourceProfileValuesChangeProductionRulesAndRestoreDefaults() {
+        GameDebugRuntimeOverrides.activate(Map.ofEntries(
+                Map.entry("SKY_WARS_ORE_ISLAND_RADIUS_BLOCKS", 12.0D),
+                Map.entry("SKY_WARS_DIAMOND_VEINS_PER_ISLAND", 5),
+                Map.entry("SKY_WARS_TNT_THROW_STRENGTH", 2.5D),
+                Map.entry("SKY_WARS_ICE_BRIDGE_DURATION_MILLIS", 6_000L),
+                Map.entry("SKY_WARS_FIRE_BURST_DAMAGE", 9.0D),
+                Map.entry("SKY_WARS_METAL_MAGNET_PULL_PER_ARMOR", 0.5D),
+                Map.entry("SKY_WARS_EARTH_THROW_SPEED", 3.0D)));
+        assertTrue(SkyWarsMixedArcadeRules.isOreSlotInIsland(10.0D, 0.0D, 0.0D, 0.0D));
+        assertEquals(5, SkyWarsMixedArcadeRules.diamondVeinsPerIsland());
+        assertEquals(2.5D, SkyWarsMixedArcadeRules.tntThrowStrength());
+        assertEquals(6_000L, SkyWarsMixedArcadeRules.iceBridgeDurationMillis());
+        assertEquals(9.0D, SkyWarsMixedArcadeRules.fireBurstDamage());
+        assertEquals(0.5D, SkyWarsMixedArcadeRules.metalMagnetPullPerArmor());
+        assertEquals(3.0D, SkyWarsMixedArcadeRules.earthThrowSpeed());
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertFalse(SkyWarsMixedArcadeRules.isOreSlotInIsland(10.0D, 0.0D, 0.0D, 0.0D));
+        assertEquals(3, SkyWarsMixedArcadeRules.diamondVeinsPerIsland());
+        assertEquals(1.6D, SkyWarsMixedArcadeRules.tntThrowStrength());
+        assertEquals(4_000L, SkyWarsMixedArcadeRules.iceBridgeDurationMillis());
+        assertEquals(6.0D, SkyWarsMixedArcadeRules.fireBurstDamage());
+        assertEquals(0.25D, SkyWarsMixedArcadeRules.metalMagnetPullPerArmor());
+        assertEquals(2.0D, SkyWarsMixedArcadeRules.earthThrowSpeed());
+    }
+
+    @Test void newSkyWarsControlsAreListedWithBoundedGameplayRanges() {
+        assertVariable("SKY_WARS_FIRE_BURST_DAMAGE", 0.0D, 40.0D);
+        assertVariable("SKY_WARS_ORE_ISLAND_RADIUS_BLOCKS", 1.0D, 32.0D);
+        assertVariable("SKY_WARS_TNT_THROW_STRENGTH", 0.0D, 8.0D);
+        assertVariable("SKY_WARS_ICE_BRIDGE_DURATION_MILLIS", 1.0D, 120_000.0D);
+        assertVariable("SKY_WARS_EARTH_THROW_SPEED", 0.0D, 8.0D);
+    }
+
+    private static void assertVariable(String key, double minimum, double maximum) {
+        GameDebugVariableCatalog.Variable variable = GameDebugVariableCatalog.variable(ArcadePortGame.SKY_WARS, key);
+        assertNotNull(variable, key);
+        assertEquals(minimum, variable.minimum(), key);
+        assertEquals(maximum, variable.maximum(), key);
+        assertTrue(GameDebugVariableCatalog.clamp(variable, maximum) >= minimum, key);
     }
 }

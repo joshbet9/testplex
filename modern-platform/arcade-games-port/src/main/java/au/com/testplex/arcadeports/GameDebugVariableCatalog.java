@@ -224,6 +224,12 @@ final class GameDebugVariableCatalog {
         if (name.startsWith("RUNNER_") && name.endsWith("_TICKS")) return 0.0D;
         if (name.startsWith("RUNNER_") && (name.endsWith("_SPEED") || name.endsWith("_SPEED_MILLIS"))) return 0.0D;
         if (name.startsWith("PAINTBALL_") && name.endsWith("_MILLIS")) return 1.0D;
+        if (name.equals("ORE_ISLAND_RADIUS_BLOCKS")) return 1.0D;
+        if (name.endsWith("_VEINS_PER_ISLAND") || name.equals("RANDOM_VEIN_EXTRA_SIZE")) return 0.0D;
+        if (name.equals("TNT_THROW_STRENGTH") || name.equals("ICE_BRIDGE_LAUNCH_Y")
+                || name.equals("FIRE_BURST_DAMAGE") || name.equals("METAL_MAGNET_DAMAGE")
+                || name.equals("METAL_MAGNET_PULL_BASE") || name.equals("METAL_MAGNET_PULL_PER_ARMOR")
+                || name.equals("EARTH_THROW_SPEED")) return 0.0D;
         if (name.startsWith("PAINTBALL_") && (name.endsWith("_SPREAD") || name.endsWith("_SPEED")
                 || name.endsWith("_SPEED_MULTIPLIER") || name.endsWith("_RADIUS")
                 || name.endsWith("_CHARGE_PER_TICK") || name.endsWith("_CHARGE_PER_EXTRA_PAINT")
@@ -299,6 +305,21 @@ final class GameDebugVariableCatalog {
         if (name.equals("CASTLE_ASSAULT_TNT_VERTICAL_KNOCKBACK")) return 2.0D;
         if (name.equals("CASTLE_ASSAULT_TNT_KING_DAMAGE")) return 500.0D;
         if (name.startsWith("PAINTBALL_") && name.endsWith("_MILLIS")) return 10_000.0D;
+        if (name.equals("TNT_THROW_FUSE_TICKS")) return 1_200.0D;
+        if (name.equals("TNT_THROW_COOLDOWN_MILLIS") || name.equals("ICE_BRIDGE_COOLDOWN_MILLIS")
+                || name.equals("ICE_BRIDGE_DURATION_MILLIS") || name.equals("KIT_FIRE_COOLDOWN_MILLIS")
+                || name.equals("METAL_MAGNET_COOLDOWN_MILLIS") || name.equals("EARTH_THROW_COOLDOWN_MILLIS")) return 120_000.0D;
+        if (name.equals("TNT_THROW_STRENGTH") || name.equals("EARTH_THROW_SPEED")) return 8.0D;
+        if (name.equals("ORE_ISLAND_RADIUS_BLOCKS")) return 32.0D;
+        if (name.endsWith("_VEINS_PER_ISLAND")) return 32.0D;
+        if (name.endsWith("_VEIN_SIZE")) return 16.0D;
+        if (name.equals("RANDOM_VEIN_EXTRA_SIZE")) return 16.0D;
+        if (name.equals("ICE_BRIDGE_LAUNCH_Y")) return 3.0D;
+        if (name.equals("FIRE_BURST_RADIUS_BLOCKS") || name.equals("METAL_MAGNET_RANGE_BLOCKS")) return 64.0D;
+        if (name.equals("FIRE_BURST_DAMAGE") || name.equals("METAL_MAGNET_DAMAGE")) return 40.0D;
+        if (name.equals("FIRE_BURST_FIRE_TICKS")) return 2_400.0D;
+        if (name.equals("METAL_MAGNET_PULL_BASE")) return 4.0D;
+        if (name.equals("METAL_MAGNET_PULL_PER_ARMOR")) return 2.0D;
         if (name.equals("PAINTBALL_SHOTGUN_PELLETS")) return 32.0D;
         if (name.endsWith("_PAINT_PER_HIT") || name.endsWith("_SNIPER_BASE_PAINT")
                 || name.endsWith("_SNIPER_MAX_EXTRA_PAINT")) return 4.0D;
@@ -375,6 +396,7 @@ final class GameDebugVariableCatalog {
     private static double step(String name, double defaultValue, Kind kind) {
         if (kind == Kind.BOOLEAN) return 1.0D;
         if (name.startsWith("EVOLUTION_CHARGE_")) return 0.001D;
+        if (name.startsWith("SKY_WARS_") && name.endsWith("_MILLIS")) return 100.0D;
         if (name.startsWith("RUNNER_") && name.endsWith("_SPEED")) return 0.1D;
         if (name.equals("RUNNER_SWITCH_GRACE_MILLIS")) return 50.0D;
         if (name.contains("_FALL_DAMAGE_MULTIPLIER")) return 0.05D;
