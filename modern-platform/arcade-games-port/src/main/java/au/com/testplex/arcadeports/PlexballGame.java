@@ -1959,8 +1959,6 @@ public final class PlexballGame implements Listener {
     private void notifyProgressUnlock(UUID id, String kind, String name, String detail) {
         Player player = Bukkit.getPlayer(id);
         if (player == null || !player.isOnline()) return;
-        player.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + kind + " UNLOCKED "
-                + ChatColor.YELLOW + name + ChatColor.GRAY + " — " + detail);
         player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.8F, 1.0F);
     }
 

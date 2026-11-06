@@ -393,6 +393,9 @@ public final class ArcadePortManager implements Listener {
     private BukkitTask postGameReturnTask;
     private final Map<UUID, PlayerSnapshot> endingSnapshots = new HashMap<>();
     private BukkitTask automaticRotationTask;
+    /** Watches the same canonical unlocks rendered by /stats, including mid-match changes. */
+    private final ArcadeStatsUnlockTracker statsUnlockTracker = new ArcadeStatsUnlockTracker();
+    private BukkitTask statsUnlockNotificationTask;
     private String lastAutomaticRotationGameId;
     private boolean automaticRotationOnReturn;
     private long lastDragonHazard;
@@ -480,6 +483,14 @@ public final class ArcadePortManager implements Listener {
         initializeWizardsGameModule();
         initializeSnakeGameModule();
         gameModulesInitialized = true;
+        // Take the saved-progress baseline first: restarting the server must not
+        // replay existing achievements and milestone tiers into chat.
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (!testPlayers.isTestPlayer(player)) statsUnlockTracker.observe(
+                    player.getUniqueId(), earnedStatsUnlocks(player.getUniqueId()));
+        }
+        statsUnlockNotificationTask = Bukkit.getScheduler().runTaskTimer(
+                plugin, () -> announceNewStatsUnlocks(), 20L, 20L);
     }
 
     private void initializeSnakeGameModule() {
@@ -5185,7 +5196,6 @@ public final class ArcadePortManager implements Listener {
         if (plugin.getConfig().getBoolean(path, false)) return;
         plugin.getConfig().set(path, true);
         plugin.saveConfig();
-        player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + ChatColor.YELLOW + displayName);
         player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.8F, 1.15F);
     }
 
@@ -8934,7 +8944,6 @@ public final class ArcadePortManager implements Listener {
         String key = "local-achievements." + id + ".dragons." + achievementId;
         if (plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
-        if (player != null && player.isOnline()) player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + description);
         plugin.saveConfig();
     }
 
@@ -17820,7 +17829,6 @@ public final class ArcadePortManager implements Listener {
         String key = achievement.configKey(player.getUniqueId());
         if (key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
-        if (player.isOnline()) player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + description);
         plugin.saveConfig();
     }
 
@@ -18527,9 +18535,6 @@ public final class ArcadePortManager implements Listener {
         if (player == null || testPlayers.isTestPlayer(player)
                 || key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
-        if (player != null && player.isOnline()) {
-            player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + description);
-        }
         plugin.saveConfig();
     }
 
@@ -18753,9 +18758,6 @@ public final class ArcadePortManager implements Listener {
         if (player == null || testPlayers.isTestPlayer(player)
                 || key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
-        if (player != null && player.isOnline()) {
-            player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + description);
-        }
         plugin.saveConfig();
     }
 
@@ -18778,10 +18780,6 @@ public final class ArcadePortManager implements Listener {
         String key = arcadeAchievementConfigKey(playerId, gameId, achievementId);
         if (key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
-        if (player != null && player.isOnline()) player.sendMessage(ChatColor.GOLD + "Achievement unlocked: "
-                + ArcadeProgressCatalog.achievements(gameId).stream()
-                        .filter(achievement -> achievement.id().equals(achievementId))
-                        .map(ArcadeProgressCatalog.Achievement::name).findFirst().orElse(achievementId));
         plugin.saveConfig();
     }
 
@@ -18789,7 +18787,6 @@ public final class ArcadePortManager implements Listener {
         if (player == null || testPlayers.isTestPlayer(player)
                 || key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
-        if (player != null && player.isOnline()) player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + description);
         plugin.saveConfig();
     }
 
@@ -18797,9 +18794,6 @@ public final class ArcadePortManager implements Listener {
         if (player == null || testPlayers.isTestPlayer(player)
                 || key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
-        if (player != null && player.isOnline()) {
-            player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + description);
-        }
         plugin.saveConfig();
     }
 
@@ -18810,7 +18804,6 @@ public final class ArcadePortManager implements Listener {
     private void awardBaconAchievement(Player player, String key, String description) {
         if (player == null || testPlayers.isTestPlayer(player) || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
-        player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + description);
         plugin.saveConfig();
     }
 
@@ -18996,8 +18989,6 @@ public final class ArcadePortManager implements Listener {
         String key = SuperSploorProgressCatalog.achievementConfigKey(playerId, achievementId);
         if (plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
-        if (player != null && player.isOnline()) player.sendMessage(ChatColor.GOLD
-                + "Achievement unlocked: " + achievement.name());
     }
 
     private void recordSuperSploorPlayerStats(Session session, UUID playerId,
@@ -19858,6 +19849,52 @@ public final class ArcadePortManager implements Listener {
         long earnedTiers = milestones.stream().mapToLong(m -> java.util.Arrays.stream(m.stages())
                 .filter(t -> m.value().applyAsLong(targetId) >= t).count()).sum();
         return new StatsCompletion(unlocked, achievements.size(), earnedTiers, totalTiers);
+    }
+
+    /** Canonical per-player snapshot covers every registered game and every milestone tier. */
+    private Map<String, ArcadeStatsUnlockTracker.Unlock> earnedStatsUnlocks(UUID playerId) {
+        Map<String, ArcadeStatsUnlockTracker.Unlock> earned = new LinkedHashMap<>();
+        for (ArcadeGameDirectory.Game game : ARCADE_STATS_GAMES) {
+            String gameId = game.id();
+            for (StatsAchievement achievement : statsAchievements(gameId)) {
+                if (!statsAchievementUnlocked(playerId, gameId, achievement)) continue;
+                String key = "a:" + gameId + ":" + achievement.id();
+                earned.put(key, new ArcadeStatsUnlockTracker.Unlock(
+                        key, game.name(), achievement.name(), 0, achievement.requirement()));
+            }
+            for (StatsMilestone milestone : statsMilestones(gameId)) {
+                long value = milestone.value().applyAsLong(playerId);
+                long[] stages = milestone.stages();
+                for (int stage = 0; stage < stages.length; stage++) {
+                    if (value < stages[stage]) continue;
+                    int tier = stage + 1;
+                    String key = "m:" + gameId + ":" + milestone.id() + ":" + tier;
+                    earned.put(key, new ArcadeStatsUnlockTracker.Unlock(key, game.name(),
+                            milestone.name(), tier, formatMilestoneValue(stages[stage], milestone.unit())));
+                }
+            }
+        }
+        return earned;
+    }
+
+    private int announceNewStatsUnlocks() {
+        int count = 0;
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (testPlayers.isTestPlayer(player)) continue;
+            for (ArcadeStatsUnlockTracker.Unlock unlocked : statsUnlockTracker.observe(
+                    player.getUniqueId(), earnedStatsUnlocks(player.getUniqueId()))) {
+                if (unlocked.milestone()) {
+                    player.sendMessage(ChatColor.GOLD + "Milestone Unlocked! " + ChatColor.YELLOW
+                            + unlocked.game() + ChatColor.GRAY + " — " + ChatColor.WHITE + unlocked.name()
+                            + " Tier " + unlocked.tier() + ChatColor.GRAY + " (" + unlocked.requirement() + ")");
+                } else {
+                    player.sendMessage(ChatColor.GOLD + "Achievement Unlocked! " + ChatColor.YELLOW
+                            + unlocked.game() + ChatColor.GRAY + " — " + ChatColor.WHITE + unlocked.name());
+                }
+                count++;
+            }
+        }
+        return count;
     }
 
     private List<String> statsCompletionLore(StatsCompletion completion) {
@@ -20781,6 +20818,9 @@ public final class ArcadePortManager implements Listener {
     }
 
     public void shutdown() {
+        if (statsUnlockNotificationTask != null) statsUnlockNotificationTask.cancel();
+        statsUnlockNotificationTask = null;
+        statsUnlockTracker.clear();
         automaticRotationOnReturn = false;
         cancelAutomaticRotationVote();
         if (manualStartCountdown != null) manualStartCountdown.cancel();
@@ -27581,6 +27621,7 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
+        statsUnlockTracker.forget(event.getPlayer().getUniqueId());
         // Bukkit removes the quitter after this event. Rebuild active-match tab
         // groups and lobby scoreboards on the next tick using the final player roster.
         Bukkit.getScheduler().runTask(plugin, () -> {
@@ -27751,6 +27792,7 @@ public final class ArcadePortManager implements Listener {
         PlayerSnapshot snapshot = pendingRestore.remove(player.getUniqueId());
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (!player.isOnline()) return;
+            statsUnlockTracker.observe(player.getUniqueId(), earnedStatsUnlocks(player.getUniqueId()));
             if (snapshot != null) snapshot.restore(player);
             if (!lobby.isLobbyWorld(player.getWorld())) lobby.sendToLobby(player);
             else lobby.ensurePanelItem(player);

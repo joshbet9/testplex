@@ -72,6 +72,7 @@ public final class HoopsPaperSmoke extends JavaPlugin {
     private int stage;
     private long ticks;
     private boolean closing;
+    private boolean midgameUnlockChatChecked;
 
     @Override
     public void onEnable() {
@@ -152,6 +153,7 @@ public final class HoopsPaperSmoke extends JavaPlugin {
     }
 
     private void verifyStatsInventories() throws Exception {
+        require(unlockChatCount() == 0, "existing progression must not replay unlock chat on join");
         Class<?> directory = Class.forName("au.com.testplex.arcadeports.ArcadeGameDirectory");
         @SuppressWarnings("unchecked")
         List<Object> games = (List<Object>) method(directory, "games").invoke(null);
@@ -246,6 +248,8 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         // Incomplete filter, rarity ordering and page memory on a 20-achievement game.
         String sampleUnlock = "local-achievements." + owner.getUniqueId() + ".camera-shy.smoke-and-mirrors";
         ((JavaPlugin) arcade).getConfig().set(sampleUnlock, true);
+        require(unlockChatCount() == 1, "fresh achievement must notify chat while player is online");
+        require(unlockChatCount() == 0, "achievement must not notify chat twice");
         require(Bukkit.dispatchCommand(owner, "stats camera-shy 2"), "Snap page 2 did not open");
         clickStatsSlot(8);
         Inventory filtered = owner.getOpenInventory().getTopInventory();
@@ -302,6 +306,9 @@ public final class HoopsPaperSmoke extends JavaPlugin {
             arcadePlugin.getConfig().set("local-achievements." + owner.getUniqueId()
                     + ".camera-shy." + achievementId, true);
         }
+        require(unlockChatCount() == snapAchievements.size() - 1,
+                "new achievement unlocks must each send one chat notification");
+        require(unlockChatCount() == 0, "achievement chat announcements were duplicated");
         require(!glints(openArcadeDirectory().getItem(snapSlot)),
                 "all achievements alone must not grant mastery before milestones are earned");
 
@@ -314,6 +321,17 @@ public final class HoopsPaperSmoke extends JavaPlugin {
             arcadePlugin.getConfig().set("local-stats." + owner.getUniqueId()
                     + ".camera-shy." + key, target);
         }
+        @SuppressWarnings("unchecked")
+        List<Object> snapTracks = (List<Object>) invoke(manager, "statsMilestones",
+                new Class<?>[]{String.class}, "camera-shy");
+        int expectedTiers = 0;
+        for (Object track : snapTracks) {
+            long[] stages = (long[]) method(track.getClass(), "stages").invoke(track);
+            expectedTiers += stages.length;
+        }
+        require(unlockChatCount() == expectedTiers,
+                "each newly completed milestone tier must send a chat notification");
+        require(unlockChatCount() == 0, "milestone chat announcements were duplicated");
         require(glints(openArcadeDirectory().getItem(snapSlot)),
                 "fully completed Snap game icon did not gain enchantment glint");
         require(Bukkit.dispatchCommand(owner, "stats camera-shy"), "Snap mastered detail page failed to open");
@@ -322,7 +340,11 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         owner.closeInventory();
         getLogger().info("STATS_GUI_SMOKE|PASS|games=" + games.size()
                 + "|achievements=" + checkedAchievements + "|milestone-tiers=" + checkedMilestones
-                + "|filter-and-navigation=PASS|mastery-glint=PASS");
+                + "|filter-and-navigation=PASS|mastery-glint=PASS|unlock-chat=PASS");
+    }
+
+    private int unlockChatCount() throws Exception {
+        return (Integer) invoke(manager, "announceNewStatsUnlocks", new Class<?>[0]);
     }
 
     private Inventory openArcadeDirectory() {
@@ -396,6 +418,18 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         if (firstMatch == null) return;
         World world = (World) field(firstMatch, "world");
         require(world != null, "Hoops did not create an isolated arena world");
+        if (!midgameUnlockChatChecked) {
+            // These mutations happen with the Hoops match LIVE, not after its result.
+            JavaPlugin arcadePlugin = (JavaPlugin) arcade;
+            String prefix = "local-stats." + owner.getUniqueId() + ".hoops-remastered.";
+            arcadePlugin.getConfig().set("local-achievements." + owner.getUniqueId()
+                    + ".hoops-remastered.double-double", true);
+            require(unlockChatCount() == 1, "midgame achievement did not announce in chat");
+            arcadePlugin.getConfig().set(prefix + "points", 125);
+            require(unlockChatCount() == 1, "midgame milestone tier did not announce in chat");
+            require(unlockChatCount() == 0, "midgame notifications repeated without new progress");
+            midgameUnlockChatChecked = true;
+        }
         require(field(firstMatch, "players") instanceof Map<?, ?> roster && roster.size() == 4,
                 "Hoops roster does not contain all four clients");
         @SuppressWarnings("unchecked")
