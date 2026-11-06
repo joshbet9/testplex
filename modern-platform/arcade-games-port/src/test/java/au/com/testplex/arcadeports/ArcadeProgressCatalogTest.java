@@ -198,7 +198,7 @@ class ArcadeProgressCatalogTest {
         assertTrue(hasAchievement("castle-assault", "royal-guard", "Royal Guard"));
         assertTrue(hasAchievement("castle-assault", "against-all-odds", "Against All Odds"));
         assertTrue(ArcadeProgressCatalog.achievements("castle-assault").stream()
-                .anyMatch(a -> a.id().equals("clutchness") && a.description().contains("less than 10 health")));
+                .anyMatch(a -> a.id().equals("clutchness") && a.requirement().contains("less than 10 health")));
     }
 
     @Test
