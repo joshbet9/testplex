@@ -83,9 +83,13 @@ Builder/Disruptor draft PR so the gameplay work can be tested independently.
   a separate reviewed redesign explicitly replaces them.
 - For games with a normal kit system but no purple kit, propose one **distinctive,
   balanced, mechanically testable** new kit; avoid a stronger version of an existing one.
-- Purple-kit completion requirements need a separate decision: should a player complete
-  **all active achievements** (20 for Snap, 15 for Super Sploor), or a designated threshold?
-  Milestones remain separate. No unlock-rule change is implemented yet.
+- Purple-kit completion requirements are **game- and kit-specific**, not a global
+  complete-all or fixed-number rule. Use an obtainable signature feat, a curated
+  feat bundle, or a stable mastery set according to each kit's role. Prevent
+  circular prerequisites and avoid silently moving the goalposts when the
+  catalogue expands. Milestones remain separate. See
+  `ACHIEVEMENT-IMPLEMENTATION-AUDIT.md` for the source-backed audit and draft
+  kit-specific examples. No unlock-rule change is implemented yet.
 - For kitless/fixed-role games (for example, Hoops, Draw My Thing, Master Builders, or
   Gladiators), decide separately whether to introduce an actual gameplay kit, a side-grade
   toolset, or an achievement prestige cosmetic. Introducing a kit is a gameplay-design
@@ -93,8 +97,9 @@ Builder/Disruptor draft PR so the gameplay work can be tested independently.
 
 ### Decisions needed before the 175-achievement proposal pass
 
-1. **Unlock rule:** Require all active achievements, including 20 for Snap and 15 for Super
-   Sploor, or grant a purple kit at a separate threshold?
+1. **Individual unlock predicates:** Approve the actual prerequisite achievement IDs
+   for each purple kit, using an obtainable signature feat, curated bundle or stable
+   mastery set. Confirm how existing unlocks are grandfathered.
 2. **Kitless games:** Should *every* game gain gameplay-changing purple-kit mechanics, or
    should fixed-role/creative games receive side-grade or cosmetic prestige rewards?
 3. **Existing achievements:** Should genuine originals always be retained, unless mechanically
