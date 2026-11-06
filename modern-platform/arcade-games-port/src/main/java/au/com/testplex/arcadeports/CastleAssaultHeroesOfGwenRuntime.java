@@ -2749,7 +2749,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     public void onHeroesOfGwenRoleDamage(EntityDamageByEntityEvent event) {
         if (!(event.getEntity() instanceof Player victim)) return;
         String abilitySource = heroesOfGwenAbilitySourceByTarget.remove(victim.getUniqueId());
-        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN || event.isCancelled()) return;
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN || event.isCancelled()
+                || event.getFinalDamage() <= 0.0D) return;
         Player attacker = resolveAttacker(event);
         if (attacker == null || attacker.equals(victim)
                 || teams.getOrDefault(attacker.getUniqueId(), -1) == teams.getOrDefault(victim.getUniqueId(), -2)) return;
@@ -3237,8 +3238,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                     return;
                 }
             } else {
-                damageHeroesOfGwenAbility(target, owner, damage, "devon.tnt_infusion");
-                if (target instanceof Player) hitEnemyHero = true;
+                boolean damaged = damageHeroesOfGwenAbility(target, owner, damage, "devon.tnt_infusion");
+                if (target instanceof Player && damaged) hitEnemyHero = true;
             }
             Vector knockback = target.getLocation().toVector().subtract(center.toVector());
             if (knockback.lengthSquared() > 0.001D) {
@@ -4106,14 +4107,16 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         recipient.setHealth(Math.min(recipient.getMaxHealth(), recipient.getHealth() + amount));
     }
 
-    private void damageHeroesOfGwenAbility(Entity target, Player owner, double damage) {
-        damageHeroesOfGwenAbility(target, owner, damage, null);
+    private boolean damageHeroesOfGwenAbility(Entity target, Player owner, double damage) {
+        return damageHeroesOfGwenAbility(target, owner, damage, null);
     }
 
-    private void damageHeroesOfGwenAbility(Entity target, Player owner, double damage, String abilitySource) {
+    private boolean damageHeroesOfGwenAbility(Entity target, Player owner, double damage, String abilitySource) {
         if (!(target instanceof LivingEntity living) || !living.isValid() || living.isDead()
-                || owner == null || !owner.isOnline()) return;
+                || owner == null || !owner.isOnline()) return false;
         UUID targetId = living.getUniqueId();
+        double healthBefore = living.getHealth();
+        double absorptionBefore = living.getAbsorptionAmount();
         heroesOfGwenAbilityDamageTargets.add(targetId);
         if (abilitySource != null) heroesOfGwenAbilitySourceByTarget.put(targetId, abilitySource);
         try {
@@ -4122,6 +4125,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             heroesOfGwenAbilityDamageTargets.remove(targetId);
             heroesOfGwenAbilitySourceByTarget.remove(targetId);
         }
+        return living.isDead() || living.getHealth() < healthBefore
+                || living.getAbsorptionAmount() < absorptionBefore;
     }
 
     private Set<String> heroesOfGwenOwnedStoreItemNames(Player player) {
