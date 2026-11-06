@@ -1209,6 +1209,17 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         String value = requestedKit.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        Session currentRound = active;
+        ArcadePortGame choiceGame = currentRound != null && currentRound.players.containsKey(player.getUniqueId())
+                ? currentRound.type
+                : lobby.isLobbyWorld(player.getWorld())
+                        ? ArcadePortGame.fromId(plugin.getConfig().getString("lobby-selected-game", "")) : null;
+        ArcadeLobbyKitCatalogue.KitChoice lockedChoice = achievementKitChoice(choiceGame, value);
+        if (lockedChoice != null && !hasAchievementKitUnlocked(player.getUniqueId(), choiceGame, lockedChoice.id)) {
+            player.sendMessage(ChatColor.RED + "That achievement kit is locked. "
+                    + achievementKitUnlockDescription(choiceGame, lockedChoice.id));
+            return;
+        }
         if (value.equals("quick-evolver") || value.equals("evolution-quick-evolver")
                 || value.equals("standard-evolution") || value.equals("evolution-standard")) {
             selectEvolutionKit(player, value);
@@ -1236,12 +1247,9 @@ public final class ArcadePortManager implements Listener {
                 player.sendMessage(ChatColor.RED + "That kit is not available for " + lobbyGame.displayName() + ".");
                 return;
             }
-            String requiredAchievement = achievementKitUnlock(lobbyGame, catalogueKitId);
-            if (requiredAchievement != null && !plugin.getConfig().getBoolean("local-achievements."
-                    + player.getUniqueId() + "." + lobbyGame.id() + "." + requiredAchievement, false)) {
-                player.sendMessage(ChatColor.RED + "That achievement kit is still locked. Earn "
-                        + titleCaseAchievement(requiredAchievement)
-                        + " with the available kits first.");
+            if (!hasAchievementKitUnlocked(player.getUniqueId(), lobbyGame, catalogueKitId)) {
+                player.sendMessage(ChatColor.RED + "That achievement kit is still locked. "
+                        + achievementKitUnlockDescription(lobbyGame, catalogueKitId));
                 return;
             }
             if (lobbyGame == ArcadePortGame.SHEEP_QUEST && !value.startsWith("monster-maze-")) {
@@ -1359,18 +1367,81 @@ public final class ArcadePortManager implements Listener {
         else selectDeathTagRunnerKit(player, value);
     }
 
-    static String achievementKitUnlock(ArcadePortGame game, String kit) {
-        if (game == null || kit == null) return null;
-        return switch (game) {
-            case DEATH_TAG -> switch (kit) {
-                case "runner-turtle" -> "turtle-shell";
-                case "runner-trickster" -> "smoke-and-mirrors";
-                default -> null;
-            };
-            case SHEEP_QUEST -> "shepherd".equals(kit) ? "cheeky" : null;
-            case WITHER_ASSAULT -> "warden".equals(kit) ? "savior" : null;
-            default -> null;
-        };
+    private ArcadeLobbyKitCatalogue.KitChoice achievementKitChoice(ArcadePortGame game, String requested) {
+        if (game == null || requested == null) return null;
+        String normalized = requested.startsWith("monster-maze-")
+                ? requested.substring("monster-maze-".length()) : requested;
+        for (ArcadeLobbyKitCatalogue.KitChoice choice : ArcadeLobbyKitCatalogue.forGame(game, List.of())) {
+            if (choice.unlock != ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT) continue;
+            if (choice.id.equals(normalized) || choice.id.endsWith("-" + normalized)) return choice;
+        }
+        return null;
+    }
+
+    /** Central entitlement lookup, including legacy progression backends. */
+    boolean hasAchievementKitUnlocked(UUID playerId, ArcadePortGame game, String kitId) {
+        if (playerId == null || game == null || kitId == null) return false;
+        ArcadeLobbyKitCatalogue.KitChoice choice = ArcadeLobbyKitCatalogue.forGame(game, List.of()).stream()
+                .filter(item -> item.id.equals(kitId)).findFirst().orElse(null);
+        if (choice == null) return false;
+        if (choice.unlock != ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT) return true;
+        AchievementKitUnlockPolicy.Rule rule = AchievementKitUnlockPolicy.find(game, kitId);
+        // Never treat a purple kit with no approved predicate as free.
+        return rule != null && rule.unlocked(id -> hasAchievementForKit(playerId, rule.gameId(), id));
+    }
+
+    private boolean hasAchievementForKit(UUID playerId, String gameId, String achievementId) {
+        if (achievementId.startsWith("legacy-runner:")) return plugin.getConfig().getBoolean(
+                runnerAchievementKey(playerId, achievementId.substring("legacy-runner:".length())), false);
+        if ("plexball".equals(gameId)) {
+            PlexballGame game = plugin.getPlexballGame();
+            return game != null && game.hasAchievement(playerId, achievementId);
+        }
+        return plugin.getConfig().getBoolean(arcadeAchievementConfigKey(playerId, gameId, achievementId), false);
+    }
+
+    private String validKitForMatch(UUID playerId, ArcadePortGame game, String requested, String fallback) {
+        ArcadeLobbyKitCatalogue.KitChoice purple = achievementKitChoice(game, requested);
+        return purple != null && !hasAchievementKitUnlocked(playerId, game, purple.id)
+                ? fallback : requested;
+    }
+
+    private boolean permitKitSelection(Player player, ArcadePortGame game, String normalizedKit) {
+        ArcadeLobbyKitCatalogue.KitChoice purple = achievementKitChoice(game, normalizedKit);
+        if (purple == null || hasAchievementKitUnlocked(player.getUniqueId(), game, purple.id)) return true;
+        player.sendMessage(ChatColor.RED + "That achievement kit is locked. "
+                + achievementKitUnlockDescription(game, purple.id));
+        return false;
+    }
+
+    String achievementKitUnlockDescription(ArcadePortGame game, String kitId) {
+        AchievementKitUnlockPolicy.Rule rule = AchievementKitUnlockPolicy.find(game, kitId);
+        if (rule == null) return "This kit has no approved unlock requirement yet.";
+        if (rule.originalAllAchievements()) return "Earn all 10 original Runner achievements.";
+        return "Earn " + rule.requirements().stream().map(ArcadePortManager::titleCaseAchievement)
+                .collect(java.util.stream.Collectors.joining(" and ")) + ".";
+    }
+
+    String achievementKitUnlockProgress(UUID playerId, ArcadePortGame game, String kitId) {
+        AchievementKitUnlockPolicy.Rule rule = AchievementKitUnlockPolicy.find(game, kitId);
+        if (rule == null) return "Kit unavailable";
+        long earned = rule.requirements().stream()
+                .filter(id -> hasAchievementForKit(playerId, rule.gameId(), id)).count();
+        return earned + "/" + rule.requirements().size() + " requirements";
+    }
+
+    /** The lobby must never persist a rejected kit, even if a selector is void. */
+    boolean selectKitFromLobby(Player player, ArcadePortGame game, String kitId) {
+        if (player == null || game == null || kitId == null || isPreparingParticipant(player)) return false;
+        if (!lobby.isLobbyWorld(player.getWorld()) || !lobbyRuntime.hasKit(game, kitId)) return false;
+        if (game != ArcadePortGame.fromId(plugin.getConfig().getString("lobby-selected-game", ""))) return false;
+        if (!hasAchievementKitUnlocked(player.getUniqueId(), game, kitId)) {
+            player.sendMessage(ChatColor.RED + "That achievement kit is locked. "
+                    + achievementKitUnlockDescription(game, kitId));
+            return false;
+        }
+        selectKit(player, kitId);
+        return true;
     }
 
     static String titleCaseAchievement(String id) {
@@ -1391,6 +1462,7 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "Wither Assault Human kits: Archer, Medic, Editor or Warden.");
             return;
         }
+        if (!permitKitSelection(player, ArcadePortGame.WITHER_ASSAULT, kit)) return;
         UUID id = player.getUniqueId();
         witherAssaultKitPreferences.put(id, kit);
         plugin.getConfig().set("lobby-kit-preferences." + id + ".wither-assault", kit);
@@ -1417,6 +1489,10 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "Super Sploor kits: sprayer, roller, charger, lobber, dualies.");
             return;
         }
+        if ("dualies".equals(kit) && !hasAchievementKitUnlocked(player.getUniqueId(), ArcadePortGame.SUPER_SPLOOR, kit)) {
+            player.sendMessage(ChatColor.RED + achievementKitUnlockDescription(ArcadePortGame.SUPER_SPLOOR, kit));
+            return;
+        }
         UUID id = player.getUniqueId();
         superSploorKitPreferences.put(id, kit);
         plugin.getConfig().set("lobby-kit-preferences." + id + ".super-sploor", kit);
@@ -1436,7 +1512,7 @@ public final class ArcadePortManager implements Listener {
             String kit = normalizeSuperSploorKit(saved);
             if (kit == null) kit = "sprayer";
             superSploorKitPreferences.put(id, kit);
-            selected.put(id, kit);
+            selected.put(id, validKitForMatch(id, ArcadePortGame.SUPER_SPLOOR, kit, "sprayer"));
         }
         return selected;
     }
@@ -1465,6 +1541,7 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "Bomb Lobbers kits: jumper, armorer, pitcher, waller.");
             return;
         }
+        if (!permitKitSelection(player, ArcadePortGame.BOMB_LOBBERS, kit)) return;
         bombLobbersKitPreferences.put(player.getUniqueId(), kit);
         Session session = active;
         if (session != null && session.type == ArcadePortGame.BOMB_LOBBERS
@@ -1483,6 +1560,7 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "Bacon Brawl kits: El Muchacho Pigo, Mama Piggles, Pig Cloak, Brutus Bacon, Chris P Bacon.");
             return;
         }
+        if (!permitKitSelection(player, ArcadePortGame.BACON_BRAWL, kit)) return;
         baconKitPreferences.put(player.getUniqueId(), kit);
         Session session = active;
         boolean activeBaconRound = session != null && session.type == ArcadePortGame.BACON_BRAWL
@@ -1600,6 +1678,7 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "One in the Quiver kits: leaper, brawler, enchanter, slam-shot, ninja.");
             return;
         }
+        if (!permitKitSelection(player, ArcadePortGame.ONE_IN_THE_QUIVER, kit)) return;
         UUID id = player.getUniqueId();
         quiverKitPreferences.put(id, kit);
         player.sendMessage(ChatColor.GREEN + "One in the Quiver kit set to " + kit + " for your next test.");
@@ -1631,6 +1710,7 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "Dragon Escape kits: jumper, disruptor, builder, warper, digger.");
             return;
         }
+        if (!permitKitSelection(player, ArcadePortGame.DRAGON_ESCAPE, kit)) return;
         UUID id = player.getUniqueId();
         Session session = active;
         if (session != null && session.type == ArcadePortGame.DRAGON_ESCAPE
@@ -1720,6 +1800,7 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "Death Tag runner kits: basher, archer, traitor, null.");
             return;
         }
+        if (!permitKitSelection(player, ArcadePortGame.DEATH_TAG, kit)) return;
         Session session = active;
         if (session != null && session.type == ArcadePortGame.DEATH_TAG
                 && session.players.containsKey(player.getUniqueId())) {
@@ -2076,6 +2157,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if ("machinegun".equals(kit)) kit = "machine-gun";
+        if (!permitKitSelection(player, ArcadePortGame.PAINTBALL, kit)) return;
         paintballKitPreferences.put(player.getUniqueId(), kit);
         Session session = active;
         if (session != null && session.type == ArcadePortGame.PAINTBALL
@@ -3978,16 +4060,17 @@ public final class ArcadePortManager implements Listener {
             session.scores.put(player.getUniqueId(), 0);
             if (type == ArcadePortGame.PAINTBALL) {
                 session.paintPiecesRemaining.put(player.getUniqueId(), 4);
-                session.paintballKits.put(player.getUniqueId(),
-                        paintballKitPreferences.getOrDefault(player.getUniqueId(), "rifle"));
+                session.paintballKits.put(player.getUniqueId(), validKitForMatch(player.getUniqueId(), type,
+                        paintballKitPreferences.getOrDefault(player.getUniqueId(), "rifle"), "rifle"));
             }
             if (type == ArcadePortGame.DEATH_TAG) {
-                session.deathTagRunnerKits.put(player.getUniqueId(),
-                        deathTagRunnerKitPreferences.getOrDefault(player.getUniqueId(), "basher"));
+                session.deathTagRunnerKits.put(player.getUniqueId(), validKitForMatch(player.getUniqueId(), type,
+                        deathTagRunnerKitPreferences.getOrDefault(player.getUniqueId(), "basher"), "basher"));
             }
             if (type == ArcadePortGame.SPLEEF) {
                 UUID playerId = player.getUniqueId();
-                session.spleefKits.put(playerId, spleefKitPreferences.getOrDefault(playerId, "snowballer"));
+                session.spleefKits.put(playerId, validKitForMatch(playerId, type,
+                        spleefKitPreferences.getOrDefault(playerId, "snowballer"), "snowballer"));
                 session.spleefNextArrowAt.put(playerId, now);
             }
             if (type == ArcadePortGame.SHEEP_QUEST) {
@@ -3995,8 +4078,9 @@ public final class ArcadePortManager implements Listener {
                 String saved = plugin.getConfig().getString(
                         "lobby-kit-preferences." + playerId + ".sheep-quest", "beserker");
                 String normalized = ArcadePortRules.normalizeSheepQuestKit(saved);
-                session.sheepQuestKits.put(playerId, sheepQuestKitPreferences.getOrDefault(
-                        playerId, normalized == null ? "beserker" : normalized));
+                session.sheepQuestKits.put(playerId, validKitForMatch(playerId, type,
+                        sheepQuestKitPreferences.getOrDefault(playerId, normalized == null ? "beserker" : normalized),
+                        "beserker"));
                 session.sheepBerserkerReadyAt.put(playerId, now);
                 // Fletcher's first arrow is available immediately in the legacy kit.
                 session.sheepFletcherNextArrowAt.put(playerId, now);
@@ -4020,7 +4104,8 @@ public final class ArcadePortManager implements Listener {
                 UUID playerId = player.getUniqueId();
                 session.dragonEscapeRunSplitMillis.put(playerId, new HashMap<>(Map.of(0, 0L)));
                 session.dragonEscapeRunSplitLocations.put(playerId, new HashMap<>());
-                String kit = dragonEscapeKitPreferences.getOrDefault(playerId, "jumper");
+                String kit = validKitForMatch(playerId, type,
+                        dragonEscapeKitPreferences.getOrDefault(playerId, "jumper"), "jumper");
                 session.dragonEscapeKits.put(playerId, kit);
                 session.dragonEscapeLeapUsesRemaining.put(playerId, ArcadePortRules.dragonEscapeLeapUses(kit));
                 session.dragonEscapeDiggerUsesRemaining.put(playerId, ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES);
@@ -4046,28 +4131,32 @@ public final class ArcadePortManager implements Listener {
                         "lobby-kit-preferences." + witherPlayerId + ".wither-assault", "archer");
                 String requested = witherAssaultKitPreferences.getOrDefault(witherPlayerId, savedKit);
                 String selected = WitherAssaultRules.normalizeHumanKit(requested);
-                session.witherAssaultKits.put(witherPlayerId, selected == null ? "archer" : selected);
+                session.witherAssaultKits.put(witherPlayerId, validKitForMatch(witherPlayerId, type,
+                        selected == null ? "archer" : selected, "archer"));
             }
             if (type == ArcadePortGame.TURF_WARS) {
-                session.turfWarsKits.put(player.getUniqueId(),
-                        turfWarsKitPreferences.getOrDefault(player.getUniqueId(), "marksman"));
+                session.turfWarsKits.put(player.getUniqueId(), validKitForMatch(player.getUniqueId(), type,
+                        turfWarsKitPreferences.getOrDefault(player.getUniqueId(), "marksman"), "marksman"));
             }
             if (type == ArcadePortGame.BACON_BRAWL) {
                 UUID baconId = player.getUniqueId();
-                session.baconKits.put(baconId, baconKitPreferences.getOrDefault(baconId, "el-muchacho-pigo"));
+                session.baconKits.put(baconId, validKitForMatch(baconId, type,
+                        baconKitPreferences.getOrDefault(baconId, "el-muchacho-pigo"), "el-muchacho-pigo"));
                 session.baconMeters.put(baconId, 0);
                 session.baconGoatStyEligible.add(baconId);
             }
             if (type == ArcadePortGame.BOMB_LOBBERS) {
                 UUID bombId = player.getUniqueId();
-                session.bombLobbersKits.put(bombId, bombLobbersKitPreferences.getOrDefault(bombId, "jumper"));
+                session.bombLobbersKits.put(bombId, validKitForMatch(bombId, type,
+                        bombLobbersKitPreferences.getOrDefault(bombId, "jumper"), "jumper"));
                 session.bombPitchLevels.put(bombId, 2);
                 session.bombDoubleJumpAvailable.add(bombId);
                 session.bombPowerupClutchEligible.add(bombId);
             }
             if (type == ArcadePortGame.MICRO_BATTLES) {
                 UUID microId = player.getUniqueId();
-                session.microKits.put(microId, microKitPreferences.getOrDefault(microId, "archer"));
+                session.microKits.put(microId, validKitForMatch(microId, type,
+                        microKitPreferences.getOrDefault(microId, "archer"), "archer"));
                 session.microNextArrowAt.put(microId,
                         now + ArcadePortRules.MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS);
                 session.microGlassColours.put(microId, microBattlesColourSelection(
@@ -4076,7 +4165,8 @@ public final class ArcadePortManager implements Listener {
                         microCosmeticPreferences, microId, "border-particle-colour"));
             }
             if (type == ArcadePortGame.ONE_IN_THE_QUIVER) {
-                session.quiverKits.put(player.getUniqueId(), quiverKitPreferences.getOrDefault(player.getUniqueId(), "leaper"));
+                session.quiverKits.put(player.getUniqueId(), validKitForMatch(player.getUniqueId(), type,
+                        quiverKitPreferences.getOrDefault(player.getUniqueId(), "leaper"), "leaper"));
             }
             if (type == ArcadePortGame.SKY_WARS) {
                 String selectedKit = skyWarsKitPreferences.getOrDefault(player.getUniqueId(), "ice");
@@ -4087,7 +4177,8 @@ public final class ArcadePortManager implements Listener {
             if (type == ArcadePortGame.RUNNER) {
                 UUID playerId = player.getUniqueId();
                 session.runnerStartY.put(playerId, player.getLocation().getY());
-                session.runnerKits.put(playerId, runnerKitPreferences.getOrDefault(playerId, "leaper"));
+                session.runnerKits.put(playerId, validKitForMatch(playerId, type,
+                        runnerKitPreferences.getOrDefault(playerId, "leaper"), "leaper"));
                 session.runnerNextFrostBallAt.put(playerId, now + ArcadePortRules.RUNNER_FROSTBALL_INTERVAL_MILLIS);
                 String selectedTrail = runnerTrailCosmeticOption(playerId);
                 String requestedTrail = selectedTrail.startsWith("trail-")
@@ -15232,7 +15323,7 @@ public final class ArcadePortManager implements Listener {
         Player holder = holderId == null ? null : session.players.get(holderId);
         if (holder != null && holder.isOnline()
                 && session.teams.getOrDefault(holderId, -1) == team) {
-            recordSheepQuestCapture(session, holderId);
+            recordSheepQuestCapture(session, holderId, previousOwner >= 0 && previousOwner != team);
             session.scores.merge(holderId, 1, Integer::sum);
             holder.playSound(holder.getLocation(), Sound.ENTITY_SHEEP_AMBIENT, 1.0F, 1.5F);
             holder.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, holder.getLocation().add(0, 1, 0),
@@ -15408,12 +15499,12 @@ public final class ArcadePortManager implements Listener {
     }
 
 
-    private void recordSheepQuestCapture(Session session, UUID playerId) {
+    private void recordSheepQuestCapture(Session session, UUID playerId, boolean stolenFromEnemy) {
         if (session == null || playerId == null) return;
         long now = System.currentTimeMillis();
         session.sheepQuestCaptures.merge(playerId, 1, Integer::sum);
         session.sheepQuestCaptureTimes.computeIfAbsent(playerId, ignored -> new ArrayList<>()).add(now);
-        if (session.sheepQuestKills.getOrDefault(playerId, 0) >= 3) {
+        if (stolenFromEnemy && session.sheepQuestUnassistedKills.getOrDefault(playerId, 0) >= 3) {
             session.sheepQuestSoloCarryCaptures.merge(playerId, 1, Integer::sum);
         }
         Player carrier = session.players.get(playerId);
@@ -16285,6 +16376,19 @@ public final class ArcadePortManager implements Listener {
         }
 
         if (session.type == ArcadePortGame.SHEEP_QUEST && session.alive.contains(player.getUniqueId())) {
+            UUID victimId = player.getUniqueId();
+            Set<UUID> attackers = session.sheepQuestAttackersByVictim.remove(victimId);
+            if (killer != null && session.players.containsKey(killer.getUniqueId())
+                    && !killer.getUniqueId().equals(victimId)
+                    && session.teams.getOrDefault(killer.getUniqueId(), -1)
+                            != session.teams.getOrDefault(victimId, -1)) {
+                UUID killerId = killer.getUniqueId();
+                session.sheepQuestKills.merge(killerId, 1, Integer::sum);
+                boolean teammateAssisted = attackers != null && attackers.stream().anyMatch(attackerId ->
+                        !attackerId.equals(killerId) && session.teams.getOrDefault(attackerId, -1)
+                                == session.teams.getOrDefault(killerId, -2));
+                if (!teammateAssisted) session.sheepQuestUnassistedKills.merge(killerId, 1, Integer::sum);
+            }
             dropSheepFromCarrier(session, player, reason);
             if (!session.alive.remove(player.getUniqueId())) return;
             UUID playerId = player.getUniqueId();
@@ -18603,12 +18707,9 @@ public final class ArcadePortManager implements Listener {
 
     private boolean hasAllRunnerAchievements(UUID playerId) {
         if (playerId == null) return false;
-        boolean catalogComplete = ArcadeProgressCatalog.achievements("runner").stream()
-                .allMatch(achievement -> plugin.getConfig().getBoolean(
-                        arcadeAchievementConfigKey(playerId, "runner", achievement.id()), false));
-        String[] localAchievements = {"gettin-those-steps-in", "hop-to-it", "flash"};
-        return catalogComplete && java.util.Arrays.stream(localAchievements)
-                .allMatch(slug -> plugin.getConfig().getBoolean(runnerAchievementKey(playerId, slug), false));
+        AchievementKitUnlockPolicy.Rule rule = AchievementKitUnlockPolicy.find(
+                ArcadePortGame.RUNNER, "runnerkit-switcher");
+        return rule != null && rule.unlocked(id -> hasAchievementForKit(playerId, "runner", id));
     }
 
     private void recordRunnerAchievements(Session session, Player winner) {
@@ -18898,6 +18999,7 @@ public final class ArcadePortManager implements Listener {
 
     private void awardCatalogAchievement(UUID playerId, Player player, String gameId, String achievementId) {
         if (playerId == null) return;
+        if (!ArcadeTestPlayerManager.shouldPersistProgression(playerId, testPlayers.isTestPlayer(playerId))) return;
         String key = arcadeAchievementConfigKey(playerId, gameId, achievementId);
         if (key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
@@ -18971,8 +19073,11 @@ public final class ArcadePortManager implements Listener {
         for (String achievement : List.of("Cannibal", "ChooChoo", "SlimySheep",
                 "dont-want-none", "resilience-snakeified", "busted",
                 "one-of-the-ogs", "flawless", "bots-everywhere")) {
-            plugin.getConfig().set(path + "achievements." + achievement,
-                    achievements != null && achievements.contains(achievement));
+            // The bridge sends a snapshot of current achievements. A partial or
+            // stale snapshot must never erase an award already earned in another match.
+            if (achievements != null && achievements.contains(achievement)) {
+                plugin.getConfig().set(path + "achievements." + achievement, true);
+            }
         }
         plugin.saveConfig();
     }
@@ -19225,6 +19330,7 @@ public final class ArcadePortManager implements Listener {
             awardDragonEndGems(session, winner);
         }
         UUID winnerId = winner == null ? null : winner.getUniqueId();
+        long completedAtMillis = System.currentTimeMillis();
         int winningTeam = winnerId == null ? -1 : session.teams.getOrDefault(winnerId, -1);
         for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
             UUID id = entry.getKey();
@@ -19256,8 +19362,10 @@ public final class ArcadePortManager implements Listener {
                     && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
             boolean witherAssaultWinner = session.type == ArcadePortGame.WITHER_ASSAULT
                     && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
+            boolean sheepQuestWinner = session.type == ArcadePortGame.SHEEP_QUEST
+                    && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
             boolean won = winnerId != null && (winnerId.equals(id) || turfWarsWinner || paintballWinner
-                    || deathTagWinner || superSploorWinner || milkCowWinner || witherAssaultWinner
+                    || deathTagWinner || superSploorWinner || milkCowWinner || witherAssaultWinner || sheepQuestWinner
                     || ((session.type == ArcadePortGame.BOMB_LOBBERS
                             || session.type == ArcadePortGame.MICRO_BATTLES)
                         && session.alive.contains(id)
@@ -19330,6 +19438,22 @@ public final class ArcadePortManager implements Listener {
                     String roleWins = humanWinner ? "human-wins" : "wither-wins";
                     plugin.getConfig().set(path + roleWins,
                             plugin.getConfig().getInt(path + roleWins, 0) + 1);
+                    // The two map-completion achievements track each side independently.
+                    // Persist the full archive key rather than a display name that can collide.
+                    String selectedMap = SourceMapCatalog.selectedResource(plugin, ArcadePortGame.WITHER_ASSAULT);
+                    if (selectedMap != null) {
+                        String mapWinsRoot = path + "map-wins." + (humanWinner ? "human." : "wither.");
+                        plugin.getConfig().set(mapWinsRoot + ArcadePortRules.dragonEscapeMapStorageKey(selectedMap), true);
+                        List<SourceMapCatalog.MapArchive> requiredMaps =
+                                SourceMapCatalog.mapsFor(plugin, ArcadePortGame.WITHER_ASSAULT);
+                        if (WitherAssaultAchievementRules.allMapsWon(requiredMaps.stream()
+                                .map(SourceMapCatalog.MapArchive::resource).toList(), resource ->
+                                plugin.getConfig().getBoolean(mapWinsRoot
+                                        + ArcadePortRules.dragonEscapeMapStorageKey(resource), false))) {
+                            awardCatalogAchievement(id, "wither-assault",
+                                    humanWinner ? "its-a-mans-world" : "wither-world");
+                        }
+                    }
                     if (humanWinner && ArcadeProgressRules.shouldAwardWitherLucidDreams(
                             true, session.witherHumanDamaged.contains(id))) {
                         awardCatalogAchievement(entry.getValue(), "wither-assault", "lucid-dreams");
@@ -19387,6 +19511,33 @@ public final class ArcadePortManager implements Listener {
                         + session.paintballLastStandAwards.getOrDefault(id, 0));
             }
             if (session.type == ArcadePortGame.SHEEP_QUEST) {
+                int kills = session.sheepQuestKills.getOrDefault(id, 0);
+                int captures = session.sheepQuestCaptures.getOrDefault(id, 0);
+                String kit = session.sheepQuestKits.getOrDefault(id, "beserker");
+                if (SheepQuestAchievementRules.whatsASheep(won, kills, captures)) {
+                    awardCatalogAchievement(id, "sheep-quest", "whats-a-sheep");
+                }
+                if (SheepQuestAchievementRules.cheeky(won,
+                        session.sheepQuestCaptureTimes.getOrDefault(id, List.of()), completedAtMillis)) {
+                    awardCatalogAchievement(id, "sheep-quest", "cheeky");
+                }
+                if (SheepQuestAchievementRules.yeet(won, kit,
+                        session.sheepQuestLeapCaptures.getOrDefault(id, 0),
+                        session.sheepQuestNonLeapCaptures.getOrDefault(id, 0))) {
+                    awardCatalogAchievement(id, "sheep-quest", "yeet");
+                }
+                if (SheepQuestAchievementRules.unconventional(won, kit,
+                        session.sheepQuestEnteredOwnPen.contains(id))) {
+                    awardCatalogAchievement(id, "sheep-quest", "unconventional-but-effective");
+                }
+                if (SheepQuestAchievementRules.soloCarry(won,
+                        session.sheepQuestUnassistedKills.getOrDefault(id, 0),
+                        session.sheepQuestSoloCarryCaptures.getOrDefault(id, 0))) {
+                    awardCatalogAchievement(id, "sheep-quest", "solo-carry");
+                }
+                if (SheepQuestAchievementRules.biggestLoser(won, captures)) {
+                    awardCatalogAchievement(id, "sheep-quest", "the-biggest-loser");
+                }
                 plugin.getConfig().set(path + "kills", plugin.getConfig().getInt(path + "kills", 0)
                         + session.sheepQuestKills.getOrDefault(id, 0));
                 plugin.getConfig().set(path + "sheep-captures",
@@ -19828,11 +19979,17 @@ public final class ArcadePortManager implements Listener {
                 CameraShyProgressCatalog.Achievement achievement = achievements.get(i);
                 boolean unlocked = plugin.getConfig().getBoolean(
                         "local-achievements." + targetId + ".camera-shy." + achievement.id(), false);
+                List<String> achievementLore = new ArrayList<>();
+                achievementLore.add(" ");
+                achievementLore.addAll(AchievementKitUnlockPolicy.achievementHoverUnlocks("camera-shy", achievement.id()));
+                if (achievementLore.size() > 1) achievementLore.add(" ");
+                achievementLore.add(ChatColor.GRAY + achievement.requirement());
+                achievementLore.add(" ");
+                achievementLore.add(unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked");
                 inventory.setItem(achievementSlots[i], statsItem(
                         unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
                         (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.name(),
-                        List.of(" ", ChatColor.GRAY + achievement.requirement(), " ",
-                                unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked"),
+                        achievementLore,
                         "noop", null, null));
             }
             int[] milestoneSlots = {37, 40, 43};
@@ -20132,11 +20289,17 @@ public final class ArcadePortManager implements Listener {
                 SuperSploorProgressCatalog.Achievement achievement = achievements.get(i);
                 boolean unlocked = plugin.getConfig().getBoolean(
                         SuperSploorProgressCatalog.achievementConfigKey(targetId, achievement.id()), false);
+                List<String> achievementLore = new ArrayList<>();
+                achievementLore.add(" ");
+                achievementLore.addAll(AchievementKitUnlockPolicy.achievementHoverUnlocks("super-sploor", achievement.id()));
+                if (achievementLore.size() > 1) achievementLore.add(" ");
+                achievementLore.add(ChatColor.GRAY + achievement.requirement());
+                achievementLore.add(" ");
+                achievementLore.add(unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked");
                 inventory.setItem(achievementSlots[i], statsItem(
                         unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
                         (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.name(),
-                        List.of(" ", ChatColor.GRAY + achievement.requirement(), " ",
-                                unlocked ? ChatColor.GREEN + "Achievement unlocked" : "Not yet unlocked"),
+                        achievementLore,
                         "noop", null, null));
             }
             int[] statSlots = {29, 30, 31, 32, 33, 34, 35, 36};
@@ -20233,9 +20396,14 @@ public final class ArcadePortManager implements Listener {
         for (ArcadeProgressCatalog.Achievement achievement : achievements) {
             String key = arcadeAchievementConfigKey(targetId, gameId, achievement.id());
             boolean unlocked = plugin.getConfig().getBoolean(key, false);
-            List<String> lore = List.of(" ", ChatColor.GRAY + achievement.requirement(), " ",
-                    unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked",
-                    ChatColor.DARK_GRAY + "Progress is saved locally on this Testplex server.");
+            List<String> lore = new ArrayList<>();
+            lore.add(" ");
+            lore.addAll(AchievementKitUnlockPolicy.achievementHoverUnlocks(gameId, achievement.id()));
+            if (!lore.isEmpty() && lore.size() > 1) lore.add(" ");
+            lore.add(ChatColor.GRAY + achievement.requirement());
+            lore.add(" ");
+            lore.add(unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked");
+            lore.add(ChatColor.DARK_GRAY + "Progress is saved locally on this Testplex server.");
             inventory.setItem(slot++, statsItem(unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
                     (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.name(),
                     lore, "noop", null, null));
@@ -21068,6 +21236,11 @@ public final class ArcadePortManager implements Listener {
             if (Double.isFinite(runSegment) && runSegment > 0.0D && runSegment <= 8.0D) {
                 session.deathTagRunDistanceByPlayer.merge(playerId, runSegment, Double::sum);
             }
+        }
+        if (session.type == ArcadePortGame.SHEEP_QUEST && session.alive.contains(playerId)
+                && !(event instanceof PlayerTeleportEvent)
+                && isInsideSheepPen(session, event.getTo(), session.teams.getOrDefault(playerId, -1))) {
+            session.sheepQuestEnteredOwnPen.add(playerId);
         }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE && session.alive.contains(playerId)
                 && !(event instanceof PlayerTeleportEvent)
@@ -28456,6 +28629,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Integer> sheepQuestSoloCarryCaptures = new HashMap<>();
         final Map<UUID, List<Long>> sheepQuestCaptureTimes = new HashMap<>();
         final Map<UUID, Integer> sheepQuestKills = new HashMap<>();
+        final Map<UUID, Integer> sheepQuestUnassistedKills = new HashMap<>();
         final Set<UUID> sheepQuestEnteredOwnPen = new HashSet<>();
         final Set<UUID> sheepQuestAirborneCaptures = new HashSet<>();
         final Map<UUID, Map<UUID, Integer>> sheepQuestArcherKills = new HashMap<>();

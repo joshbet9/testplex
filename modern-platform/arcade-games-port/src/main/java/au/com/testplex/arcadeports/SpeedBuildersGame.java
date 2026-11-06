@@ -748,6 +748,20 @@ public final class SpeedBuildersGame implements Listener {
         }
         Set<String> winnerIds = new LinkedHashSet<>(
                 SpeedBuildersRules.winnersByScoreThenBuildTime(totals, eligibleBuildTimes));
+        // A build-time victory/loss only exists when at least two top scorers
+        // qualified for the time tie-break and their times actually differ.
+        int highestScore = totals.values().stream().mapToInt(Integer::intValue).max().orElse(0);
+        List<String> timeFinalists = totals.keySet().stream()
+                .filter(id -> totals.get(id) == highestScore && eligibleBuildTimes.containsKey(id)).toList();
+        if (timeFinalists.size() > 1 && timeFinalists.stream()
+                .map(eligibleBuildTimes::get).distinct().count() > 1L) {
+            for (String id : timeFinalists) {
+                try {
+                    UUID playerId = UUID.fromString(id);
+                    awardAchievement(playerId, winnerIds.contains(id) ? "speedrunner" : "unlucky");
+                } catch (IllegalArgumentException ignored) { /* validated roster UUIDs only */ }
+            }
+        }
         List<PlayerState> winners = builders.stream()
                 .filter(state -> winnerIds.contains(state.player.getUniqueId().toString()))
                 .sorted(java.util.Comparator.comparing(state -> state.player.getName(),
@@ -846,6 +860,8 @@ public final class SpeedBuildersGame implements Listener {
             SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "perfect-builds", state.perfectBuilds);
             if (winnerIds.contains(playerId)) {
                 SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "wins", 1L);
+                if (state.perfectBuilds <= 3) awardAchievement(playerId, "bad-builds");
+                if (state.finalRoundLastSecondPerfect) awardAchievement(playerId, "right-on-time");
             }
         }
         if (!players.isEmpty()) plugin.saveConfig();
@@ -1379,6 +1395,10 @@ public final class SpeedBuildersGame implements Listener {
         recordBuildTime(state, Math.max(0L, tick - buildPhaseStartedTick));
         state.perfect = true;
         state.perfectBuilds++;
+        if (round == matchRoundLimit && phase == Phase.BUILDING
+                && phaseDeadlineTick >= tick && phaseDeadlineTick - tick < 20L) {
+            state.finalRoundLastSecondPerfect = true;
+        }
         long elapsedMillis = state.roundBuildTimeTicks * 50L;
         if (!firstPerfectBuildAwarded) {
             firstPerfectBuildAwarded = true;
@@ -1395,6 +1415,20 @@ public final class SpeedBuildersGame implements Listener {
                 0, 40, 10);
         state.player.playSound(state.player.getLocation(), org.bukkit.Sound.UI_TOAST_CHALLENGE_COMPLETE,
                 0.8F, 1.15F);
+    }
+
+    private void awardAchievement(UUID playerId, String achievementId) {
+        if (playerId == null || plugin.isTestPlayer(playerId)
+                || ArcadeProgressCatalog.achievements("speed-builders-arcade").stream()
+                        .noneMatch(achievement -> achievement.id().equals(achievementId))) return;
+        String path = "local-achievements." + playerId + ".speed-builders-arcade." + achievementId;
+        if (plugin.getConfig().getBoolean(path, false)) return;
+        plugin.getConfig().set(path, true);
+        Player player = Bukkit.getPlayer(playerId);
+        if (player != null && player.isOnline()) {
+            player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + achievementId.replace('-', ' '));
+        }
+        plugin.saveConfig();
     }
 
     private void checkPerfectBuild(PlayerState state) {
@@ -1662,6 +1696,7 @@ public final class SpeedBuildersGame implements Listener {
         private boolean buildTimeRecorded;
         private boolean perfectedEveryBuild = true;
         private int perfectBuilds;
+        private boolean finalRoundLastSecondPerfect;
         private int blocksPlaced;
         private int blocksBroken;
         private int mobsBuilt;

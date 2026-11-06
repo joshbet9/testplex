@@ -1,6 +1,20 @@
 # Achievement detection and achievement-kit integrity audit — review draft
 
-**Status:** Static source audit, 2026-11-06. **No achievement, kit unlock, or gameplay changes approved or implemented by this document.** This is a companion to `ACHIEVEMENT-AND-KIT-REVIEW.md` in the Dragon Escape draft PR. Findings below distinguish confirmed code-path defects from items needing multiplayer verification.
+**Status:** Static source audit and implementation checklist, 2026-11-06. The historical findings below describe the **pre-implementation baseline**, not the current branch. Josh approved the listed kit prerequisites and requested repairing achievement detection. All changes remain in a draft PR until gameplay verification. This is a companion to `ACHIEVEMENT-AND-KIT-REVIEW.md`.
+
+## Implementation checkpoint (draft, not yet live-verified)
+
+| Area | Progress and remaining checks |
+| --- | --- |
+| Purple kit entitlements | Reviewed prerequisites for **19** active designs are declared and checked at lobby selection, shared match setup, and affected specialist selectors. Chris P. Bacon intentionally remains unavailable pending removal from the obsolete catalogue. Test every command/NPC/direct-kit route in Paper; Monster Maze external kit manager still needs a direct bypass check. |
+| Kit display / `/stats` | Locked-kit progress and required feats appear in kit menus. Hovering over a prerequisite achievement now adds a gold **Unlocks:** line naming the kit. The separate `/stats` layout PR owns positioning, rarity sorting and 14-achievements-per-page pagination. |
+| Sheep Quest | All six formerly unawarded catalogue IDs now have event-derived conditions and unit tests; team winners credited together. Needs multiplayer timing and carry/kill attribution playtests. |
+| Speed Builders | All four formerly unawarded IDs now have conditions using cumulative time tie-break and final-round precision. Needs 16-player mirrored-arena verification and test-player exclusion validation. |
+| Heroes of Gwen | `moba-master` records wins on the existing ten heroes; `gold-mine` measures 60 seconds holding both beacons; `know-your-enemy` uses role-matched kill evidence. Needs role-vs-role multiplayer playtest. |
+| Wizards | Four of six missing IDs now have detectors from successful casts, spell categories, levels, and defeats. **Still missing:** multi-kill attribution for `trifecta` and self-spell finalisation for `spell-it-out`. These must not be granted by raw kill-count approximations. |
+| Wither Assault | Both all-map wins now track the human/Wither role separately using stable archive identities. **Still missing:** exact Labyrinth-top detector for `eye-candy` and teammate-following miner-tunnel detector for `split-up`. |
+| Snake | The progression bridge no longer overwrites previously earned achievements with `false` when a later snapshot omits them. Still inspect the standalone Snake producer and verify all nine mapped identifiers end-to-end. |
+| Unreviewed award candidates | Existing code references across other games are **not yet proof of valid detection**. Each game needs positive, negative and no-bot test coverage before sign-off. New achievement concepts and new achievement kits for games lacking them are still design proposals, not implemented here. |
 
 ## Agreed constraints
 

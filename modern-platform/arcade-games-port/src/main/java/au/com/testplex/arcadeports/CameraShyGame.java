@@ -482,7 +482,7 @@ public final class CameraShyGame implements Listener {
         manager.returnPlayerToLobby(player);
         queue.put(player.getUniqueId(), player);
         String kit = plugin.getConfig().getString("camera-shy-kit-preferences." + player.getUniqueId(), "smoke-artist");
-        selectedKits.put(player.getUniqueId(), Kit.fromId(kit) == null ? "smoke-artist" : kit);
+        selectedKits.put(player.getUniqueId(), eligibleKit(player.getUniqueId(), kit));
         player.sendMessage(ChatColor.GREEN + "Queued for Snap (" + queue.size() + "/16).");
         if (quickStart && quickStartTask == null) {
             quickStartTask = Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -514,6 +514,10 @@ public final class CameraShyGame implements Listener {
             player.sendMessage(ChatColor.YELLOW + "Snap kits: smoke-artist, decoy, runner, spotter, understudy.");
             return;
         }
+        if (kit == Kit.UNDERSTUDY && !eligibleKit(player.getUniqueId(), kit.id()).equals(kit.id())) {
+            player.sendMessage(ChatColor.RED + "Understudy requires Snap and Double Take achievements.");
+            return;
+        }
         if (phase == Phase.LIVE && players.containsKey(player.getUniqueId())) {
             player.sendMessage(ChatColor.RED + "Snap kits cannot be changed during a live match.");
             return;
@@ -524,6 +528,17 @@ public final class CameraShyGame implements Listener {
         player.sendMessage(ChatColor.GREEN + "Snap kit selected: " + kit.display() + ".");
     }
 
+    private String eligibleKit(UUID playerId, String requestedKit) {
+        Kit kit = Kit.fromId(requestedKit);
+        if (kit == null) return "smoke-artist";
+        if (kit != Kit.UNDERSTUDY) return kit.id();
+        AchievementKitUnlockPolicy.Rule rule = AchievementKitUnlockPolicy.find(
+                ArcadePortGame.CAMERA_SHY, "snap-understudy");
+        boolean earned = rule != null && rule.unlocked(id -> plugin.getConfig().getBoolean(
+                "local-achievements." + playerId + ".camera-shy." + id, false));
+        return earned ? kit.id() : "smoke-artist";
+    }
+
     public void startFromLobby(org.bukkit.command.CommandSender sender, Collection<Player> lobbyPlayers) {
         if (lobbyPlayers != null) {
             for (Player player : lobbyPlayers) {
@@ -531,7 +546,7 @@ public final class CameraShyGame implements Listener {
                     if (!queue.containsKey(player.getUniqueId())) {
                         queue.put(player.getUniqueId(), player);
                         String kit = plugin.getConfig().getString("camera-shy-kit-preferences." + player.getUniqueId(), "smoke-artist");
-                        selectedKits.put(player.getUniqueId(), Kit.fromId(kit) == null ? "smoke-artist" : kit);
+                        selectedKits.put(player.getUniqueId(), eligibleKit(player.getUniqueId(), kit));
                     }
                 }
             }
@@ -880,7 +895,7 @@ public final class CameraShyGame implements Listener {
     private void giveKit(Player player) {
         String selected = selectedKits.getOrDefault(player.getUniqueId(),
                 plugin.getConfig().getString("camera-shy-kit-preferences." + player.getUniqueId(), "smoke-artist"));
-        Kit kit = Kit.fromId(selected);
+        Kit kit = Kit.fromId(eligibleKit(player.getUniqueId(), selected));
         if (kit == null) kit = Kit.SMOKE_ARTIST;
         selectedKits.put(player.getUniqueId(), kit.id());
         ItemStack camera = namedItem(Material.SPYGLASS, ChatColor.AQUA + "Camera",

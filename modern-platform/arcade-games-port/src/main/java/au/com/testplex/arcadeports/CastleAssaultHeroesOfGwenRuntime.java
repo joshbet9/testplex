@@ -222,6 +222,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final Map<UUID, Integer> heroesOfGwenKills = new HashMap<>();
     private final Map<UUID, Map<String, Integer>> heroesOfGwenRoleKills = new HashMap<>();
     private final Set<UUID> heroesOfGwenCounterpartOnly = new HashSet<>();
+    private final Map<Integer, Long> heroesOfGwenBothBeaconsSince = new HashMap<>();
+    private final Set<Integer> heroesOfGwenHeldBothBeaconsForMinute = new HashSet<>();
     private final Set<UUID> heroesOfGwenChangedAfterTowerLoss = new HashSet<>();
     private final Map<UUID, Set<String>> heroesOfGwenFinalObjectiveHits = new HashMap<>();
     private boolean heroesOfGwenResultRecorded;
@@ -1927,6 +1929,17 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (now >= nextCapturePointUpdateAt) {
             updateCapturePoints();
             nextCapturePointUpdateAt = now + MOBA_CAPTURE_UPDATE_INTERVAL;
+        }
+        // Two originally-neutral beacons cannot be owned for the entire match.
+        // Measure a genuine uninterrupted simultaneous hold instead.
+        for (int team = 0; team < 2; team++) {
+            int candidateTeam = team;
+            if (capturePoints.size() >= 2 && capturePoints.stream().allMatch(point -> point.owner == candidateTeam)) {
+                long since = heroesOfGwenBothBeaconsSince.computeIfAbsent(team, ignored -> now);
+                if (now - since >= 60_000L) heroesOfGwenHeldBothBeaconsForMinute.add(team);
+            } else {
+                heroesOfGwenBothBeaconsSince.remove(team);
+            }
         }
         if (now >= nextStructureUpdateAt) {
             updateMobaTowers();
@@ -3962,6 +3975,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         for (Player player : activeMatchPlayers()) {
             UUID id = player.getUniqueId();
             if (teams.getOrDefault(id, -1) != winningTeam) continue;
+            if (plugin.isTestPlayer(player)) continue;
             Set<String> finalHits = heroesOfGwenFinalObjectiveHits.getOrDefault(id, Set.of());
             long towerFinalHits = finalHits.stream().filter(value -> value.startsWith("tower:")).distinct().count();
             boolean finalBossHit = finalHits.stream().anyMatch(value -> value.startsWith("boss:"));
@@ -3969,12 +3983,33 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             if (heroesOfGwenChangedAfterTowerLoss.contains(id)) {
                 awardHeroesOfGwenAchievement(player, "tactical-genius");
             }
+            String hero = selectedHeroesOfGwen.getOrDefault(id, "hattori");
+            String winsPath = "local-stats." + id + ".heroes-of-gwen.hero-wins." + hero;
+            plugin.getConfig().set(winsPath, plugin.getConfig().getInt(winsPath, 0) + 1);
+            boolean wonWithAllHeroes = ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.HEROES_OF_GWEN, List.of())
+                    .stream().allMatch(choice -> plugin.getConfig().getInt(
+                            "local-stats." + id + ".heroes-of-gwen.hero-wins." + choice.id, 0) > 0);
+            if (wonWithAllHeroes) awardHeroesOfGwenAchievement(player, "moba-master");
+            if (heroesOfGwenHeldBothBeaconsForMinute.contains(winningTeam)) {
+                awardHeroesOfGwenAchievement(player, "gold-mine");
+            }
+            String ownRole = ArcadePortRules.heroesOfGwenHeroRole(hero);
+            int ownRoleKills = ownRole == null ? 0 : heroesOfGwenRoleKills.getOrDefault(id, Map.of())
+                    .getOrDefault(ownRole, 0);
+            int bestCounterpartKills = ownRole == null ? 0 : activeMatchPlayers().stream()
+                    .filter(other -> teams.getOrDefault(other.getUniqueId(), -1) != winningTeam)
+                    .mapToInt(other -> heroesOfGwenRoleKills.getOrDefault(other.getUniqueId(), Map.of())
+                            .getOrDefault(ownRole, 0)).max().orElse(0);
+            if (ownRole != null && ownRoleKills > bestCounterpartKills
+                    && heroesOfGwenCounterpartOnly.contains(id)) {
+                awardHeroesOfGwenAchievement(player, "know-your-enemy");
+            }
         }
         hooks.finish(firstPlayerOnTeam(winningTeam), winningTeam, reason == null ? "Heroes of Gwen finished" : reason);
     }
 
     private void awardHeroesOfGwenAchievement(Player player, String achievementId) {
-        if (player == null || achievementId == null || achievementId.isBlank()) return;
+        if (player == null || plugin.isTestPlayer(player) || achievementId == null || achievementId.isBlank()) return;
         UUID playerId = player.getUniqueId();
         String key = "local-achievements." + playerId + ".heroes-of-gwen." + achievementId;
         if (plugin.getConfig().getBoolean(key, false)) return;
@@ -6733,6 +6768,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         heroesOfGwenKills.clear();
         heroesOfGwenRoleKills.clear();
         heroesOfGwenCounterpartOnly.clear();
+        heroesOfGwenBothBeaconsSince.clear();
+        heroesOfGwenHeldBothBeaconsForMinute.clear();
         heroesOfGwenChangedAfterTowerLoss.clear();
         heroesOfGwenFinalObjectiveHits.clear();
     }

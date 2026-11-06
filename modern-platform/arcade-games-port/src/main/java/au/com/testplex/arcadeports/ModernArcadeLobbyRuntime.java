@@ -666,6 +666,26 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                             ChatColor.GRAY + "Choose this kit for your next " + selectedGame.displayName() + ".",
                             ChatColor.GREEN + "Click to select");
                 }
+                if (choice.unlock == ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT) {
+                    boolean earned = manager.hasAchievementKitUnlocked(p.getUniqueId(), selectedGame, choice.id);
+                    ItemMeta metadata = it.getItemMeta();
+                    List<String> lore = new java.util.ArrayList<>(metadata.getLore() == null
+                            ? List.of() : metadata.getLore());
+                    // Replace any optimistic legacy "Click to select" or stale locked line.
+                    lore.removeIf(line -> line != null && (ChatColor.stripColor(line).equals("Click to select")
+                            || ChatColor.stripColor(line).equals("Locked")));
+                    lore.add(" ");
+                    lore.add(ChatColor.GOLD + "Achievement Kit");
+                    lore.add(ChatColor.GRAY + manager.achievementKitUnlockDescription(selectedGame, choice.id));
+                    if (AchievementKitUnlockPolicy.find(selectedGame, choice.id) != null) {
+                        lore.add(ChatColor.GRAY + "Progress: " + ChatColor.WHITE
+                                + manager.achievementKitUnlockProgress(p.getUniqueId(), selectedGame, choice.id));
+                    }
+                    lore.add(earned ? ChatColor.GREEN + "Click to select" : ChatColor.RED + "Locked");
+                    metadata.setDisplayName(ChatColor.LIGHT_PURPLE + choice.name);
+                    metadata.setLore(lore);
+                    it.setItemMeta(metadata);
+                }
                 mark(it, "kit:" + choice.id, null);
                 inv.setItem(KIT_MENU_SLOTS[i], it);
             }
@@ -728,13 +748,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         String action=it.getItemMeta().getPersistentDataContainer().get(actionKey,PersistentDataType.STRING);
         if(KIT_TITLE.equals(title)){
             if(action!=null&&action.startsWith("kit:")){
-                String kit=action.substring(4);manager.selectKit(p,kit);
-                if (selectedGame == ArcadePortGame.TURF_WARS && "turf-wars-fortifier".equals(kit)
-                        && !plugin.getConfig().getBoolean("local-achievements." + p.getUniqueId()
-                                + ".turf-wars.genius-mathematician", false)) {
-                    p.closeInventory();
-                    return;
-                }
+                String kit=action.substring(4);
+                if (!manager.selectKitFromLobby(p, selectedGame, kit)) return;
                 plugin.getConfig().set("lobby-kit-preferences."+p.getUniqueId()+"."+selectedGame.id(),kit);
                 plugin.saveConfig();
                 lobby.refreshPlayerScoreboard(p);

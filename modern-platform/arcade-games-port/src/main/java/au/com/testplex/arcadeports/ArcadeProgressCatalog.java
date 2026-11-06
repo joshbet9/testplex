@@ -195,16 +195,16 @@ public final class ArcadeProgressCatalog {
                     a("the-duels-duels-duel", "The Duel’s Duel’s Duel", "Win as a Master Assassin against at least two other Master Assassins."),
                     a("disappointment-is-immeasurable", "Disappointment is Immeasurable", "Kill a player within one second of them collecting a power-up."))),
             Map.entry("speed-builders-arcade", List.of(
-                    a("speedrunner", "Speedrunner", "Win a Speed Builders game that is scored by time."),
-                    a("unlucky", "Unlucky", "Lose a Speed Builders game that is scored by time."),
+                    a("speedrunner", "Speedrunner", "Win a tied top-score Speed Builders game on the cumulative build-time tiebreak."),
+                    a("unlucky", "Unlucky", "Lose a tied top-score Speed Builders game on the cumulative build-time tiebreak."),
                     a("bad-builds", "Bad Builds", "Win a game with 3 or fewer perfect builds."),
                     a("right-on-time", "Right on time", "Win with a perfect build in the final round with less than one second remaining."))),
             Map.entry("wizards", List.of(
                     a("youre-a-wizard-harry", "You’re a wizard Harry", "Win a game without casting a spell."),
-                    a("strong-willed-small-minded", "Strong Willed, Small Minded", "Win using only max-level spells."),
+                    a("strong-willed-small-minded", "Strong Willed, Small Minded", "Win after casting at least one spell, with every spell cast at its maximum level."),
                     a("ding-dong", "Ding Dong", "Lose a game after getting 6 kills."),
                     a("trifecta", "Trifecta", "Kill three players with one spell."),
-                    a("one-trick-wizard", "One-Trick Wizard", "Win using spells from only one spell family."),
+                    a("one-trick-wizard", "One-Trick Wizard", "Win after casting spells from exactly one category: Attack, Support or Misc."),
                     a("spell-it-out", "Spell it out", "Get a kill finalised by your opponent killing themselves with their own spell."))),
             Map.entry("wither-assault", List.of(
                     a("lucid-dreams", "Lucid Dreams", "Win as a human without taking any damage."),
@@ -248,7 +248,7 @@ public final class ArcadeProgressCatalog {
                     a("mvp", "MVP", "Win after landing the final hit on both towers and the final boss."),
                     a("moba-master", "MOBA Master", "Win a game with every hero."),
                     a("tactical-genius", "Tactical Genius", "Come back from at least one crystal down after changing hero mid-game."),
-                    a("gold-mine", "Gold Mine", "Win while holding both beacons for the entire game."),
+                    a("gold-mine", "Gold Mine", "Win after your team holds both beacons simultaneously for 60 uninterrupted seconds."),
                     a("objective-null", "Objective Null", "Get 15 kills in one game."),
                     a("know-your-enemy", "Know Your Enemy", "Only damage opposing players in your own role, out-kill their counterpart, and win."))),
             Map.entry("castle-assault", List.of(

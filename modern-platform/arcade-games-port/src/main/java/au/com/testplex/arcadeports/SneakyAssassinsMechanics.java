@@ -157,6 +157,10 @@ final class SneakyAssassinsMechanics {
             player.sendMessage(ChatColor.YELLOW + "Sneaky Assassins kits: escape-artist, assassin, briber, revealer.");
             return;
         }
+        if ("briber".equals(kit) && !briberUnlocked(player.getUniqueId())) {
+            player.sendMessage(ChatColor.RED + "Briber requires Prosecutor and Idiot achievements.");
+            return;
+        }
         if (players.containsKey(player.getUniqueId())) {
             player.sendMessage(ChatColor.YELLOW + "Sneaky Assassins kits are locked once the round starts.");
             return;
@@ -166,7 +170,15 @@ final class SneakyAssassinsMechanics {
     }
 
     String selectedKit(UUID playerId) {
-        return kitPreferences.getOrDefault(playerId, "escape-artist");
+        String kit = kitPreferences.getOrDefault(playerId, "escape-artist");
+        return "briber".equals(kit) && !briberUnlocked(playerId) ? "escape-artist" : kit;
+    }
+
+    private boolean briberUnlocked(UUID playerId) {
+        if (playerId == null) return false;
+        AchievementKitUnlockPolicy.Rule rule = AchievementKitUnlockPolicy.find(ArcadePortGame.SNEAKY_ASSASSINS, "briber");
+        return rule != null && rule.unlocked(id -> plugin.getConfig().getBoolean(
+                "local-achievements." + playerId + ".sneaky-assassins." + id, false));
     }
 
     String statusText(UUID playerId) {
