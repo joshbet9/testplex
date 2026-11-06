@@ -247,6 +247,9 @@ final class GameDebugVariableCatalog {
                 || name.equals("COW_SPRINT_SPEED_DURATION_TICKS")) return 1.0D;
         if (name.equals("COW_CHARGE_TARGET_COOLDOWN_MILLIS")) return 0.0D;
         if (name.equals("HERD_FOLLOW_MIN_DISTANCE_SQUARED")) return 0.0D;
+        if (name.equals("PHOTOS_TO_ELIMINATE")) return 1.0D;
+        if (name.equals("CLOSE_PHOTO_BLOCKS") || name.equals("LONG_PHOTO_BLOCKS")) return 0.1D;
+        if (name.equals("PHOTO_LENS_MIN_DOT")) return 0.5D;
         if (name.equals("COW_SPRINT_SPEED_AMPLIFIER") || name.equals("SCORE_PER_COW_KILL")) return 0.0D;
         if (name.startsWith("GLADIATOR_TIER_") && name.endsWith("_ARROWS")) return 0.0D;
         if (name.equals("GLADIATOR_POTION_HEALING")
@@ -400,6 +403,10 @@ final class GameDebugVariableCatalog {
         if (name.equals("COW_SPRINT_SPEED_DURATION_TICKS")) return 1_200.0D;
         if (name.equals("COW_SPRINT_SPEED_AMPLIFIER")) return 10.0D;
         if (name.equals("SCORE_PER_COW_KILL")) return 64.0D;
+        if (name.equals("PHOTOS_TO_ELIMINATE")) return 100.0D;
+        if (name.equals("CLOSE_PHOTO_BLOCKS")) return 32.0D;
+        if (name.equals("LONG_PHOTO_BLOCKS")) return 64.0D;
+        if (name.equals("PHOTO_LENS_MIN_DOT")) return 0.999D;
         if (Set.of("MANA_REGEN_MULTIPLIER", "PROJECTILE_SPEED_MULTIPLIER", "SPELL_COOLDOWN_MULTIPLIER",
                 "SPELL_DAMAGE_MULTIPLIER", "SPELL_HEAL_MULTIPLIER", "SPELL_MANA_COST_MULTIPLIER")
                 .contains(name)) return 5.0D;

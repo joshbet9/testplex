@@ -19,6 +19,7 @@ public final class CameraShyRules {
     public static final long EXPOSURE_PROTECTION_MILLIS = 1_250L;
     public static final long DOUBLE_TAKE_WINDOW_MILLIS = 5_000L;
     public static final long DOUBLE_ELIMINATION_WINDOW_MILLIS = 15_000L;
+    public static final double PHOTO_LENS_MIN_DOT = 0.94D;
 
     public static long debugRoundDeadline(boolean live, long nowMillis, long currentDeadlineMillis) {
         return live ? Math.min(currentDeadlineMillis, nowMillis) : currentDeadlineMillis;
@@ -74,7 +75,8 @@ public final class CameraShyRules {
     }
 
     public static boolean eliminatedAt(int exposures) {
-        return exposures >= PHOTOS_TO_ELIMINATE;
+        return exposures >= GameDebugRuntimeOverrides.intValue(
+                "CAMERA_SHY_PHOTOS_TO_ELIMINATE", PHOTOS_TO_ELIMINATE);
     }
 
     public static boolean mayPhotograph(long now, long nextCameraReadyAt, long targetProtectedUntil) {
@@ -82,11 +84,20 @@ public final class CameraShyRules {
     }
 
     public static boolean isClosePhoto(double distance) {
-        return distance >= 0.0D && distance <= CLOSE_PHOTO_BLOCKS;
+        return distance >= 0.0D && distance <= GameDebugRuntimeOverrides.doubleValue(
+                "CAMERA_SHY_CLOSE_PHOTO_BLOCKS", CLOSE_PHOTO_BLOCKS);
     }
 
     public static boolean isLongDistancePhoto(double distance) {
-        return distance >= LONG_PHOTO_BLOCKS && distance <= CAMERA_RANGE_BLOCKS;
+        return distance >= GameDebugRuntimeOverrides.doubleValue(
+                "CAMERA_SHY_LONG_PHOTO_BLOCKS", LONG_PHOTO_BLOCKS)
+                && distance <= GameDebugRuntimeOverrides.doubleValue(
+                        "CAMERA_SHY_CAMERA_RANGE_BLOCKS", CAMERA_RANGE_BLOCKS);
+    }
+
+    public static double photoLensMinDot() {
+        return Math.max(-1.0D, Math.min(1.0D, GameDebugRuntimeOverrides.doubleValue(
+                "CAMERA_SHY_PHOTO_LENS_MIN_DOT", PHOTO_LENS_MIN_DOT)));
     }
 
     public static boolean withinWindow(long now, long previous, long windowMillis) {

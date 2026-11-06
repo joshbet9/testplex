@@ -92,7 +92,6 @@ public final class CameraShyGame implements Listener {
     private static final long PURSUIT_ESCAPE_MILLIS = 2_000L;
     private static final double PURSUIT_ESCAPE_DISTANCE = 8.0D;
     private static final double SPOTTER_RANGE = 18.0D;
-    private static final double PHOTO_LENS_MIN_DOT = 0.94D;
     private static final long ABILITY_SMOKE_COOLDOWN = 25_000L;
     private static final long ABILITY_DECOY_COOLDOWN = 25_000L;
     private static final long ABILITY_RUNNER_COOLDOWN = 20_000L;
@@ -1226,7 +1225,7 @@ public final class CameraShyGame implements Listener {
             Location targetEye = candidate.getEyeLocation();
             Vector toTarget = targetEye.toVector().subtract(eye.toVector());
             if (toTarget.length() > GameDebugRuntimeOverrides.doubleValue("CAMERA_SHY_CAMERA_RANGE_BLOCKS", CameraShyRules.CAMERA_RANGE_BLOCKS)
-                    || !CameraShyRules.insidePhotoCone(direction, toTarget, PHOTO_LENS_MIN_DOT)
+                    || !CameraShyRules.insidePhotoCone(direction, toTarget, CameraShyRules.photoLensMinDot())
                     || !CameraShyRules.mayPhotograph(now, cameraReadyAt.getOrDefault(shooterId, 0L),
                             protectedUntil.getOrDefault(candidate.getUniqueId(), 0L))
                     || !shooter.hasLineOfSight(candidate)
@@ -1245,7 +1244,7 @@ public final class CameraShyGame implements Listener {
             if (!(entity instanceof Player candidate) || !isEligiblePlayerTarget(shooter, candidate)) continue;
             Vector toTarget = candidate.getEyeLocation().toVector().subtract(eye.toVector());
             if (toTarget.length() <= GameDebugRuntimeOverrides.doubleValue("CAMERA_SHY_CAMERA_RANGE_BLOCKS", CameraShyRules.CAMERA_RANGE_BLOCKS)
-                    && CameraShyRules.insidePhotoCone(direction, toTarget, PHOTO_LENS_MIN_DOT)
+                    && CameraShyRules.insidePhotoCone(direction, toTarget, CameraShyRules.photoLensMinDot())
                     && shooter.hasLineOfSight(candidate)
                     && !isBlockedBySmoke(eye, candidate.getEyeLocation())) return true;
         }

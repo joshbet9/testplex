@@ -178,6 +178,14 @@ class GameDebugVariableCatalogTest {
         assertGameRange(ArcadePortGame.MILK_THE_COW, "MILK_THE_COW_FARMER_HEAL_PER_MILK_HP", 0.0D, 40.0D);
     }
 
+    @Test
+    void snapPhotoMechanicControlsHaveBoundedRanges() {
+        assertGameRange(ArcadePortGame.CAMERA_SHY, "CAMERA_SHY_PHOTOS_TO_ELIMINATE", 1.0D, 100.0D);
+        assertGameRange(ArcadePortGame.CAMERA_SHY, "CAMERA_SHY_CLOSE_PHOTO_BLOCKS", 0.1D, 32.0D);
+        assertGameRange(ArcadePortGame.CAMERA_SHY, "CAMERA_SHY_LONG_PHOTO_BLOCKS", 0.1D, 64.0D);
+        assertGameRange(ArcadePortGame.CAMERA_SHY, "CAMERA_SHY_PHOTO_LENS_MIN_DOT", 0.5D, 0.999D);
+    }
+
     private static void assertRange(String key, double minimum, double maximum) {
         assertGameRange(ArcadePortGame.TURF_WARS, key, minimum, maximum);
     }

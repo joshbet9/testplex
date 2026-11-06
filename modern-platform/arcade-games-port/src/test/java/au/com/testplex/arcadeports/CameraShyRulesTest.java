@@ -4,11 +4,48 @@ import org.bukkit.Material;
 import org.bukkit.util.Vector;
 
 import java.util.UUID;
+import java.util.Map;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class CameraShyRulesTest {
+    @AfterEach
+    void clearDebugOverrides() {
+        GameDebugRuntimeOverrides.clear();
+    }
+
+    @Test
+    void photoEliminationDistanceAndLensSettingsChangeLiveRulesAndRestore() {
+        assertFalse(CameraShyRules.eliminatedAt(4));
+        assertTrue(CameraShyRules.eliminatedAt(5));
+        assertTrue(CameraShyRules.isClosePhoto(3.0D));
+        assertTrue(CameraShyRules.isLongDistancePhoto(18.0D));
+        assertTrue(CameraShyRules.insidePhotoCone(new Vector(1.0D, 0.0D, 0.0D),
+                new Vector(1.0D, 0.35D, 0.0D), CameraShyRules.photoLensMinDot()));
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "CAMERA_SHY_PHOTOS_TO_ELIMINATE", 3,
+                "CAMERA_SHY_CLOSE_PHOTO_BLOCKS", 5.0D,
+                "CAMERA_SHY_LONG_PHOTO_BLOCKS", 12.0D,
+                "CAMERA_SHY_CAMERA_RANGE_BLOCKS", 16.0D,
+                "CAMERA_SHY_PHOTO_LENS_MIN_DOT", 0.98D));
+        assertTrue(CameraShyRules.eliminatedAt(3));
+        assertTrue(CameraShyRules.isClosePhoto(5.0D));
+        assertTrue(CameraShyRules.isLongDistancePhoto(12.0D));
+        assertFalse(CameraShyRules.isLongDistancePhoto(18.0D));
+        assertFalse(CameraShyRules.insidePhotoCone(new Vector(1.0D, 0.0D, 0.0D),
+                new Vector(1.0D, 0.35D, 0.0D), CameraShyRules.photoLensMinDot()));
+
+        GameDebugRuntimeOverrides.clear();
+        assertFalse(CameraShyRules.eliminatedAt(4));
+        assertTrue(CameraShyRules.eliminatedAt(5));
+        assertFalse(CameraShyRules.isClosePhoto(3.01D));
+        assertTrue(CameraShyRules.isLongDistancePhoto(24.0D));
+        assertEquals(0.94D, CameraShyRules.photoLensMinDot());
+    }
+
     @Test
     void debugRoundAdvanceUsesTheNormalTimeoutDeadlineOnlyDuringLivePlay() {
         assertEquals(9_000L, CameraShyRules.debugRoundDeadline(false, 1_000L, 9_000L));
