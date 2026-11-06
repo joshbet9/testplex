@@ -155,6 +155,12 @@ public final class ArcadePortRules {
         return !mixedArcadeVariant || !middleTower;
     }
 
+    public static final long HEROES_OF_GWEN_GOLD_MINE_HOLD_MILLIS = 120_000L;
+
+    public static boolean heroesOfGwenGoldMineReady(long heldMillis) {
+        return heldMillis >= HEROES_OF_GWEN_GOLD_MINE_HOLD_MILLIS;
+    }
+
     public static final long DRAW_MY_THING_GAME_MILLIS = 320_000L;
     public static final long DRAW_MY_THING_BASE_ROUND_MILLIS = 40_000L;
     /** Turns start back-to-back so the drawing budget stays within the match timer. */

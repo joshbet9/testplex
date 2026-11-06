@@ -294,7 +294,7 @@ public final class ArcadeProgressCatalog {
                     a("mvp", "MVP", "Win after landing the final hit on both towers and the final boss."),
                     a("moba-master", "MOBA Master", "Win a game with every available hero."),
                     a("tactical-genius", "Tactical Genius", "After one of your towers falls, switch heroes and win the game."),
-                    a("gold-mine", "Gold Mine", "Win after your team holds both beacons simultaneously for 60 uninterrupted seconds."),
+                    a("gold-mine", "Gold Mine", "Win after your team holds both beacons simultaneously for 120 uninterrupted seconds."),
                     a("objective-null", "Objective Null", "Get 15 kills in one game."),
                     a("know-your-enemy", "Know Your Enemy", "Only damage opposing heroes in your role, out-kill the opposing role, and win."),
                     a("hattori-smoke-and-mirrors", "Smoke and Mirrors", "As Hattori, hit the same enemy with Shuriken, Ninja Dash, and Ender Blade within 15 seconds."),

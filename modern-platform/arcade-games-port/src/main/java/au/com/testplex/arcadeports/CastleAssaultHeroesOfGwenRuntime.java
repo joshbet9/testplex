@@ -2125,7 +2125,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             int candidateTeam = team;
             if (capturePoints.size() >= 2 && capturePoints.stream().allMatch(point -> point.owner == candidateTeam)) {
                 long since = heroesOfGwenBothBeaconsSince.computeIfAbsent(team, ignored -> now);
-                if (now - since >= 60_000L) heroesOfGwenHeldBothBeaconsForMinute.add(team);
+                if (ArcadePortRules.heroesOfGwenGoldMineReady(now - since)) {
+                    heroesOfGwenHeldBothBeaconsForMinute.add(team);
+                }
             } else {
                 heroesOfGwenBothBeaconsSince.remove(team);
             }
