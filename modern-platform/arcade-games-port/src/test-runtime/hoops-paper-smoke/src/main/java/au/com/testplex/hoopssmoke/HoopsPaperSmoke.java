@@ -280,10 +280,62 @@ public final class HoopsPaperSmoke extends JavaPlugin {
             require(lore.stream().anyMatch(line -> org.bukkit.ChatColor.stripColor(line).startsWith("Milestone tiers:")),
                     "game directory is missing milestone completion for slot " + slot);
         }
+        int snapIndex = -1;
+        for (int index = 0; index < games.size(); index++) {
+            if ("camera-shy".equals(method(games.get(index).getClass(), "id").invoke(games.get(index)))) {
+                snapIndex = index;
+                break;
+            }
+        }
+        require(snapIndex >= 0, "Snap is missing from the Arcade directory");
+        int snapSlot = 9 + snapIndex;
+        require(!glints(gameSelection.getItem(snapSlot)), "partially completed Snap icon must not glow");
+
+        // Mastery requires *both* catalogues, not just every achievement. Only
+        // this disposable smoke-test account is modified; no real save is used.
+        JavaPlugin arcadePlugin = (JavaPlugin) arcade;
+        @SuppressWarnings("unchecked")
+        List<Object> snapAchievements = (List<Object>) invoke(manager, "statsAchievements",
+                new Class<?>[]{String.class}, "camera-shy");
+        for (Object achievement : snapAchievements) {
+            String achievementId = (String) method(achievement.getClass(), "id").invoke(achievement);
+            arcadePlugin.getConfig().set("local-achievements." + owner.getUniqueId()
+                    + ".camera-shy." + achievementId, true);
+        }
+        require(!glints(openArcadeDirectory().getItem(snapSlot)),
+                "all achievements alone must not grant mastery before milestones are earned");
+
+        Class<?> snapCatalog = Class.forName("au.com.testplex.arcadeports.CameraShyProgressCatalog");
+        @SuppressWarnings("unchecked")
+        List<Object> snapMilestones = (List<Object>) method(snapCatalog, "milestones").invoke(null);
+        for (Object milestone : snapMilestones) {
+            String key = (String) method(milestone.getClass(), "statKey").invoke(milestone);
+            int target = (Integer) method(milestone.getClass(), "target").invoke(milestone);
+            arcadePlugin.getConfig().set("local-stats." + owner.getUniqueId()
+                    + ".camera-shy." + key, target);
+        }
+        require(glints(openArcadeDirectory().getItem(snapSlot)),
+                "fully completed Snap game icon did not gain enchantment glint");
+        require(Bukkit.dispatchCommand(owner, "stats camera-shy"), "Snap mastered detail page failed to open");
+        require(glints(owner.getOpenInventory().getTopInventory().getItem(13)),
+                "fully completed Snap game logo did not gain enchantment glint");
         owner.closeInventory();
         getLogger().info("STATS_GUI_SMOKE|PASS|games=" + games.size()
                 + "|achievements=" + checkedAchievements + "|milestone-tiers=" + checkedMilestones
-                + "|filter-and-navigation=PASS");
+                + "|filter-and-navigation=PASS|mastery-glint=PASS");
+    }
+
+    private Inventory openArcadeDirectory() {
+        require(Bukkit.dispatchCommand(owner, "stats"), "stats root did not open");
+        clickStatsSlot(38);
+        require("Arcade Games".equals(owner.getOpenInventory().getTitle()),
+                "Arcade directory did not open");
+        return owner.getOpenInventory().getTopInventory();
+    }
+
+    private static boolean glints(ItemStack item) {
+        if (item == null || !item.hasItemMeta() || !item.getItemMeta().hasEnchantmentGlintOverride()) return false;
+        return Boolean.TRUE.equals(item.getItemMeta().getEnchantmentGlintOverride());
     }
 
     private static String statsEntry(ItemStack item, NamespacedKey key) {

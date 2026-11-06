@@ -19634,16 +19634,22 @@ public final class ArcadePortManager implements Listener {
         int firstSlot = 9;
         for (int index = 0; index < ARCADE_STATS_GAMES.size(); index++) {
             ArcadeGameDirectory.Game game = ARCADE_STATS_GAMES.get(index);
+            StatsCompletion completion = statsCompletion(targetId, game.id());
             List<String> lore = new ArrayList<>(gameStatsLore(targetId, game.id(), false));
             lore.removeIf(line -> {
                 String plain = ChatColor.stripColor(line);
                 return plain != null && plain.startsWith("Achievements:");
             });
             lore.add(" ");
-            lore.addAll(statsCompletionLore(targetId, game.id()));
+            lore.addAll(statsCompletionLore(completion));
             lore.add(ChatColor.RESET + "Click to view achievements!");
             ItemStack item = statsItem(game.icon(), ChatColor.BOLD + game.name(),
                     lore, "open-game", null, game.id());
+            if (completion.mastered()) {
+                ItemMeta meta = item.getItemMeta();
+                meta.setEnchantmentGlintOverride(true);
+                item.setItemMeta(meta);
+            }
             inventory.setItem(firstSlot + index, item);
         }
         inventory.setItem(4, statsItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back", List.of(),
@@ -19837,7 +19843,12 @@ public final class ArcadePortManager implements Listener {
     }
 
     private record StatsCompletion(long achievementsEarned, int achievementCount,
-                                   long milestoneTiersEarned, long milestoneTierCount) { }
+                                   long milestoneTiersEarned, long milestoneTierCount) {
+        boolean mastered() {
+            return ArcadeStatsMastery.mastered(achievementsEarned, achievementCount,
+                    milestoneTiersEarned, milestoneTierCount);
+        }
+    }
 
     private StatsCompletion statsCompletion(UUID targetId, String gameId) {
         List<StatsAchievement> achievements = statsAchievements(gameId);
@@ -19849,8 +19860,7 @@ public final class ArcadePortManager implements Listener {
         return new StatsCompletion(unlocked, achievements.size(), earnedTiers, totalTiers);
     }
 
-    private List<String> statsCompletionLore(UUID targetId, String gameId) {
-        StatsCompletion completion = statsCompletion(targetId, gameId);
+    private List<String> statsCompletionLore(StatsCompletion completion) {
         return List.of(ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE
                         + completion.achievementsEarned() + "/" + completion.achievementCount() + " ("
                         + ArcadeStatsRarity.completionPercent(completion.achievementsEarned(),
@@ -19987,12 +19997,19 @@ public final class ArcadePortManager implements Listener {
                     || plain.startsWith("Click for more details!"));
         });
         summary.add(" ");
-        summary.addAll(statsCompletionLore(targetId, gameId));
+        StatsCompletion completion = statsCompletion(targetId, gameId);
+        summary.addAll(statsCompletionLore(completion));
         List<StatsMilestone> milestones = statsMilestones(gameId);
         summary.add(ChatColor.GRAY + (incompleteOnly ? "Incomplete achievements" : "All achievements")
                 + " — page " + (page + 1) + "/" + pageCount);
-        inventory.setItem(ArcadeStatsLayout.GAME_LOGO, statsSummaryItem(
-                ArcadeGameDirectory.find(gameId).icon(), ChatColor.BOLD + displayName + " Stats", summary));
+        ItemStack gameLogo = statsSummaryItem(
+                ArcadeGameDirectory.find(gameId).icon(), ChatColor.BOLD + displayName + " Stats", summary);
+        if (completion.mastered()) {
+            ItemMeta meta = gameLogo.getItemMeta();
+            meta.setEnchantmentGlintOverride(true);
+            gameLogo.setItemMeta(meta);
+        }
+        inventory.setItem(ArcadeStatsLayout.GAME_LOGO, gameLogo);
         int start = page * ArcadeStatsLayout.ACHIEVEMENTS_PER_PAGE;
         List<StatsAchievement> visible = sorted.subList(start,
                 Math.min(sorted.size(), start + ArcadeStatsLayout.ACHIEVEMENTS_PER_PAGE));
