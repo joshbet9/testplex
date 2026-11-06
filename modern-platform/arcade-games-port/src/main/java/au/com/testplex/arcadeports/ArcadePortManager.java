@@ -16679,7 +16679,8 @@ public final class ArcadePortManager implements Listener {
             if (item != null && item.getType().name().endsWith("_WOOL")) carrier.getInventory().setItem(slot, null);
         }
         String lowerReason = reason == null ? "" : reason.toLowerCase(java.util.Locale.ROOT);
-        long cooldown = lowerReason.contains("hit") ? 1_000L
+        long cooldown = lowerReason.contains("hit")
+                ? GameDebugRuntimeOverrides.longValue("SHEEP_QUEST_HIT_DROP_COOLDOWN_MILLIS", ArcadePortRules.SHEEP_QUEST_HIT_DROP_COOLDOWN_MILLIS)
                 : lowerReason.contains("held item") ? 0L
                 : GameDebugRuntimeOverrides.longValue("SHEEP_QUEST_PICKUP_COOLDOWN_MILLIS", ArcadePortRules.SHEEP_QUEST_PICKUP_COOLDOWN_MILLIS);
         session.sheepNextPickupAt.put(carrierId, System.currentTimeMillis() + cooldown);
@@ -16713,14 +16714,16 @@ public final class ArcadePortManager implements Listener {
                 .map(Map.Entry::getKey).collect(java.util.stream.Collectors.toList());
         boolean shepherd = "shepherd".equals(session.sheepQuestKits.get(player.getUniqueId()))
                 && debugKitFeatureEnabled(player, ArcadePortGame.SHEEP_QUEST, "shepherd");
+        int carryLimit = Math.max(1, Math.min(64, GameDebugRuntimeOverrides.intValue(
+                "SHEEP_QUEST_MAX_CARRY", ArcadePortRules.SHEEP_QUEST_MAX_CARRY)));
         int count = shepherd ? carried.size()
-                : Math.min(GameDebugRuntimeOverrides.intValue("SHEEP_QUEST_MAX_CARRY", ArcadePortRules.SHEEP_QUEST_MAX_CARRY), carried.size());
+                : Math.min(carryLimit, carried.size());
         if (shepherd) {
             player.setLevel(count);
             player.setExp(0.0F);
         } else {
             player.setLevel(0);
-            player.setExp(count / (float) GameDebugRuntimeOverrides.intValue("SHEEP_QUEST_MAX_CARRY", ArcadePortRules.SHEEP_QUEST_MAX_CARRY));
+            player.setExp(count / (float) carryLimit);
         }
         int visibleCount = Math.min(count, 4);
         for (int index = 0; index < 4; index++) {
@@ -16731,7 +16734,8 @@ public final class ArcadePortManager implements Listener {
             int amplifier = shepherd
                     ? Math.min(127, (count - 1) / 2)
                     : ArcadePortRules.sheepQuestCarrySlownessAmplifier(count);
-            player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60,
+            player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,
+                    GameDebugRuntimeOverrides.intValue("SHEEP_QUEST_CARRY_SLOWNESS_TICKS", ArcadePortRules.SHEEP_QUEST_CARRY_SLOWNESS_TICKS),
                     Math.max(0, amplifier), false, false, true));
         } else {
             player.removePotionEffect(PotionEffectType.SLOWNESS);
@@ -16810,7 +16814,8 @@ public final class ArcadePortManager implements Listener {
         for (Map.Entry<UUID, UUID> entry : new ArrayList<>(session.sheepThrownBy.entrySet())) {
             Entity thrown = Bukkit.getEntity(entry.getKey());
             long createdAt = session.sheepThrownAt.getOrDefault(entry.getKey(), now);
-            if (thrown == null || !thrown.isValid() || now - createdAt > 5_000L) {
+            if (thrown == null || !thrown.isValid() || now - createdAt > GameDebugRuntimeOverrides.longValue(
+                    "SHEEP_QUEST_THROW_ENTITY_LIFETIME_MILLIS", ArcadePortRules.SHEEP_QUEST_THROW_ENTITY_LIFETIME_MILLIS)) {
                 session.sheepThrownBy.remove(entry.getKey());
                 session.sheepThrownAt.remove(entry.getKey());
                 if (thrown instanceof Sheep sheep && sheep.isValid()) sheep.setAI(true);
@@ -16822,7 +16827,8 @@ public final class ArcadePortManager implements Listener {
                         || (thrown instanceof Player thrownPlayer && thrownPlayer.equals(target))
                         || session.teams.getOrDefault(target.getUniqueId(), -2)
                                 == session.teams.getOrDefault(entry.getValue(), -1)
-                        || target.getLocation().distanceSquared(thrown.getLocation()) > 1.44D) continue;
+                        || target.getLocation().distanceSquared(thrown.getLocation())
+                                > ArcadePortRules.sheepQuestThrowHitRadiusSquared()) continue;
                 if (sheepCarriedBy(session, target.getUniqueId()) > 0) {
                     if (thrower != null && thrower.isOnline()) recordSheepQuestStat(thrower.getUniqueId(), "animal-rescue");
                     dropSheepFromCarrier(session, target, "was hit by a thrown passenger");
@@ -16845,10 +16851,16 @@ public final class ArcadePortManager implements Listener {
                     playLegacyDamageFeedback(target);
                     Vector knockback = target.getLocation().toVector().subtract(thrown.getLocation().toVector());
                     if (knockback.lengthSquared() < 0.001D) knockback = new Vector(0.0D, 0.0D, 1.0D);
-                    target.setVelocity(knockback.normalize().multiply(1.2D).setY(0.4D));
+                    target.setVelocity(knockback.normalize().multiply(GameDebugRuntimeOverrides.doubleValue(
+                            "SHEEP_QUEST_THROW_KNOCKBACK", ArcadePortRules.SHEEP_QUEST_THROW_KNOCKBACK))
+                            .setY(GameDebugRuntimeOverrides.doubleValue("SHEEP_QUEST_THROW_VERTICAL_KNOCKBACK",
+                                    ArcadePortRules.SHEEP_QUEST_THROW_VERTICAL_KNOCKBACK)));
                     target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 1.0F, 1.0F);
                 }
-                thrown.setVelocity(thrown.getVelocity().multiply(-0.2D).setY(0.3D));
+                thrown.setVelocity(thrown.getVelocity().multiply(GameDebugRuntimeOverrides.doubleValue(
+                        "SHEEP_QUEST_THROW_BOUNCE_MULTIPLIER", ArcadePortRules.SHEEP_QUEST_THROW_BOUNCE_MULTIPLIER))
+                        .setY(GameDebugRuntimeOverrides.doubleValue("SHEEP_QUEST_THROW_BOUNCE_VERTICAL",
+                                ArcadePortRules.SHEEP_QUEST_THROW_BOUNCE_VERTICAL)));
                 break;
             }
         }
@@ -16871,8 +16883,9 @@ public final class ArcadePortManager implements Listener {
             session.sheepCarriers.remove(sheep);
             sheep.setAI(false);
         }
-        Vector velocity = thrower.getLocation().getDirection().normalize().multiply(1.4D);
-        velocity.setY(Math.max(0.3D, Math.min(0.8D, 0.3D + velocity.getY() * 0.25D)));
+        Vector velocity = thrower.getLocation().getDirection().normalize()
+                .multiply(ArcadePortRules.sheepQuestBruteThrowHorizontalSpeed());
+        velocity.setY(ArcadePortRules.sheepQuestBruteThrowVerticalSpeed(velocity.getY()));
         thrown.setVelocity(velocity);
         session.sheepThrownBy.put(thrown.getUniqueId(), throwerId);
         session.sheepThrownAt.put(thrown.getUniqueId(), System.currentTimeMillis());
@@ -17139,10 +17152,12 @@ public final class ArcadePortManager implements Listener {
                 }
                 if (owner < 0) {
                     Location home = session.sheepHomes.get(sheep);
-                    if (home != null && sheep.getLocation().distanceSquared(home) > 196.0D) {
+                    if (home != null && sheep.getLocation().distanceSquared(home) > Math.pow(GameDebugRuntimeOverrides.doubleValue(
+                            "SHEEP_QUEST_HOME_RETURN_DISTANCE_BLOCKS", ArcadePortRules.SHEEP_QUEST_HOME_RETURN_DISTANCE_BLOCKS), 2.0D)) {
                         Vector direction = home.toVector().subtract(sheep.getLocation().toVector());
                         if (direction.lengthSquared() > 0.25D) {
-                            moveSheepQuestToward(session, sheep, home, now, 1.2D);
+                            moveSheepQuestToward(session, sheep, home, now, GameDebugRuntimeOverrides.doubleValue(
+                                    "SHEEP_QUEST_HOME_SPEED", ArcadePortRules.SHEEP_QUEST_HOME_SPEED));
                         } else {
                             sheep.getPathfinder().stopPathfinding();
                             session.sheepQuestTargets.remove(sheep);
@@ -17157,7 +17172,8 @@ public final class ArcadePortManager implements Listener {
                 }
             }
             if (!isInsideSheepPen(session, sheep.getLocation(), owner)) {
-                moveSheepQuestToward(session, sheep, sheepQuestPenCenter(session, owner), now, 1.2D);
+                moveSheepQuestToward(session, sheep, sheepQuestPenCenter(session, owner), now,
+                        GameDebugRuntimeOverrides.doubleValue("SHEEP_QUEST_OWNED_SHEEP_SPEED", ArcadePortRules.SHEEP_QUEST_OWNED_SHEEP_SPEED));
             } else {
                 List<Location> pen = sourceSheepPenBlocks(session, owner);
                 Location target = session.sheepQuestTargets.get(sheep);
@@ -17169,9 +17185,11 @@ public final class ArcadePortManager implements Listener {
                         || !sheep.getPathfinder().hasPath()) {
                     Location roamTarget = pen.get(ThreadLocalRandom.current().nextInt(pen.size()))
                             .clone().add(0.5D, 0.0D, 0.5D);
-                    moveSheepQuestToward(session, sheep, roamTarget, now, 0.8D);
+                    moveSheepQuestToward(session, sheep, roamTarget, now,
+                            GameDebugRuntimeOverrides.doubleValue("SHEEP_QUEST_PEN_ROAM_SPEED", ArcadePortRules.SHEEP_QUEST_PEN_ROAM_SPEED));
                 } else {
-                    moveSheepQuestToward(session, sheep, target, now, 0.8D);
+                    moveSheepQuestToward(session, sheep, target, now,
+                            GameDebugRuntimeOverrides.doubleValue("SHEEP_QUEST_PEN_ROAM_SPEED", ArcadePortRules.SHEEP_QUEST_PEN_ROAM_SPEED));
                 }
             }
         }
@@ -17236,7 +17254,8 @@ public final class ArcadePortManager implements Listener {
 
             int team = session.teams.getOrDefault(carrierId, -1);
             if (team < 0 || team > 3) continue;
-            if (horizontalDistanceSquared(carrier.getLocation(), sheepQuestPenCenter(session, team)) > 20.25D) continue;
+            if (horizontalDistanceSquared(carrier.getLocation(), sheepQuestPenCenter(session, team))
+                    > ArcadePortRules.sheepQuestCaptureRadiusSquared()) continue;
 
             int previousOwner = session.sheepOwners.getOrDefault(sheep, -1);
             session.sheepOwners.put(sheep, team);
@@ -29304,11 +29323,15 @@ public final class ArcadePortManager implements Listener {
             player.sendActionBar(ChatColor.YELLOW + "Berserker Jump is recharging.");
             return;
         }
-        session.sheepBerserkerReadyAt.put(id, now + 8_000L);
-        cooldownProgress.start(player, "Berserker Jump", 8_000L);
-        session.sheepBerserkerLeapUntil.put(id, now + 3_000L);
-        Vector launch = player.getLocation().getDirection().normalize().multiply(0.9D);
-        launch.setY(Math.max(0.65D, Math.min(1.0D, launch.getY() + 0.4D)));
+        session.sheepBerserkerReadyAt.put(id, now + GameDebugRuntimeOverrides.longValue(
+                "SHEEP_QUEST_BESERKER_JUMP_COOLDOWN_MILLIS", ArcadePortRules.SHEEP_QUEST_BESERKER_JUMP_COOLDOWN_MILLIS));
+        cooldownProgress.start(player, "Berserker Jump", GameDebugRuntimeOverrides.longValue(
+                "SHEEP_QUEST_BESERKER_JUMP_COOLDOWN_MILLIS", ArcadePortRules.SHEEP_QUEST_BESERKER_JUMP_COOLDOWN_MILLIS));
+        session.sheepBerserkerLeapUntil.put(id, now + GameDebugRuntimeOverrides.longValue(
+                "SHEEP_QUEST_BESERKER_LEAP_WINDOW_MILLIS", ArcadePortRules.SHEEP_QUEST_BESERKER_LEAP_WINDOW_MILLIS));
+        Vector launch = player.getLocation().getDirection().normalize()
+                .multiply(ArcadePortRules.sheepQuestBerserkerHorizontalSpeed());
+        launch.setY(ArcadePortRules.sheepQuestBerserkerVerticalSpeed(launch.getY()));
         player.setVelocity(launch);
         player.setFallDistance(0.0F);
         player.getWorld().playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 0.8F, 1.15F);

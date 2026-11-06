@@ -220,8 +220,15 @@ final class GameDebugVariableCatalog {
                 || name.equals("CASTLE_ASSAULT_TNT_THROW_VERTICAL_SPEED")) return 0.0D;
         if (name.equals("PAINTBALL_SHOTGUN_PELLETS")) return 1.0D;
         if (name.equals("RUNNER_MAX_FROSTBALLS")) return 0.0D;
+        if (name.equals("SHEEP_QUEST_MAX_CARRY")) return 0.0D;
         if (name.startsWith("RUNNER_") && name.endsWith("_MILLIS")) return 0.0D;
         if (name.startsWith("RUNNER_") && name.endsWith("_TICKS")) return 0.0D;
+        if (name.startsWith("SHEEP_QUEST_") && (name.endsWith("_MILLIS") || name.endsWith("_TICKS"))) return 0.0D;
+        if (name.equals("SHEEP_QUEST_THROW_BOUNCE_MULTIPLIER")) return -1.0D;
+        if (name.startsWith("SHEEP_QUEST_") && (name.endsWith("_SPEED") || name.endsWith("_ADD")
+                || name.endsWith("_MIN") || name.endsWith("_MAX") || name.endsWith("_SCALE")
+                || name.endsWith("_KNOCKBACK") || name.endsWith("_RADIUS")
+                || name.endsWith("_BLOCKS"))) return 0.0D;
         if (name.startsWith("RUNNER_") && (name.endsWith("_SPEED") || name.endsWith("_SPEED_MILLIS"))) return 0.0D;
         if (name.startsWith("PAINTBALL_") && name.endsWith("_MILLIS")) return 1.0D;
         if (name.equals("ORE_ISLAND_RADIUS_BLOCKS")) return 1.0D;
@@ -292,6 +299,26 @@ final class GameDebugVariableCatalog {
         if (name.equals("RUNNER_MAX_FROSTBALLS")) return 64.0D;
         if (name.equals("RUNNER_FROSTBALL_SLOW_TICKS")) return 1_200.0D;
         if (name.equals("RUNNER_FROSTBALL_SLOW_AMPLIFIER")) return 10.0D;
+        if (name.startsWith("SHEEP_QUEST_") && name.endsWith("_MILLIS")) return 120_000.0D;
+        if (name.startsWith("SHEEP_QUEST_") && name.endsWith("_TICKS")) return 2_400.0D;
+        if (name.equals("SHEEP_QUEST_BESERKER_JUMP_COOLDOWN_MILLIS")
+                || name.equals("SHEEP_QUEST_BESERKER_LEAP_WINDOW_MILLIS")) return 120_000.0D;
+        if (name.equals("SHEEP_QUEST_BESERKER_LEAP_HORIZONTAL_SPEED")
+                || name.equals("SHEEP_QUEST_BESERKER_LEAP_VERTICAL_ADD")
+                || name.equals("SHEEP_QUEST_BESERKER_LEAP_VERTICAL_MIN")
+                || name.equals("SHEEP_QUEST_BESERKER_LEAP_VERTICAL_MAX")) return 4.0D;
+        if (name.equals("SHEEP_QUEST_BRUTE_THROW_SPEED")
+                || name.equals("SHEEP_QUEST_BRUTE_THROW_VERTICAL_MIN")
+                || name.equals("SHEEP_QUEST_BRUTE_THROW_VERTICAL_MAX")
+                || name.equals("SHEEP_QUEST_BRUTE_THROW_VERTICAL_PITCH_SCALE")) return 4.0D;
+        if (name.equals("SHEEP_QUEST_THROW_HIT_RADIUS") || name.equals("SHEEP_QUEST_CAPTURE_RADIUS_BLOCKS")
+                || name.equals("SHEEP_QUEST_HOME_RETURN_DISTANCE_BLOCKS")) return 64.0D;
+        if (name.equals("SHEEP_QUEST_THROW_KNOCKBACK")
+                || name.equals("SHEEP_QUEST_THROW_VERTICAL_KNOCKBACK")
+                || name.equals("SHEEP_QUEST_THROW_BOUNCE_VERTICAL")) return 8.0D;
+        if (name.equals("SHEEP_QUEST_THROW_BOUNCE_MULTIPLIER")) return 1.0D;
+        if (name.startsWith("SHEEP_QUEST_") && name.endsWith("_SPEED")) return 4.0D;
+        if (name.startsWith("SHEEP_QUEST_") && (name.endsWith("_RADIUS") || name.endsWith("_BLOCKS"))) return 64.0D;
         if (name.equals("CASTLE_ASSAULT_KING_HEALTH_BASE")) return 5_000.0D;
         if (name.equals("CASTLE_ASSAULT_KING_HEALTH_REFERENCE_PLAYERS")) return 64.0D;
         if (name.equals("CASTLE_ASSAULT_CARRIER_FUSE_MILLIS")) return 600_000.0D;
@@ -399,6 +426,9 @@ final class GameDebugVariableCatalog {
         if (name.startsWith("SKY_WARS_") && name.endsWith("_MILLIS")) return 100.0D;
         if (name.startsWith("RUNNER_") && name.endsWith("_SPEED")) return 0.1D;
         if (name.equals("RUNNER_SWITCH_GRACE_MILLIS")) return 50.0D;
+        if (name.startsWith("SHEEP_QUEST_") && name.endsWith("_MILLIS")) return 100.0D;
+        if (name.startsWith("SHEEP_QUEST_") && (name.endsWith("_SPEED") || name.endsWith("_RADIUS")
+                || name.endsWith("_BLOCKS") || name.endsWith("_KNOCKBACK"))) return 0.1D;
         if (name.contains("_FALL_DAMAGE_MULTIPLIER")) return 0.05D;
         if (name.endsWith("_MILLIS")) return defaultValue >= 10_000.0D ? 1_000.0D : defaultValue >= 1_000.0D ? 100.0D : 25.0D;
         if (name.endsWith("_TICKS")) return defaultValue >= 100.0D ? 20.0D : 1.0D;

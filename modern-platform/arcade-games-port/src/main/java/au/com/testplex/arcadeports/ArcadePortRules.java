@@ -1964,6 +1964,62 @@ public final class ArcadePortRules {
     public static final long SHEEP_QUEST_PICKUP_COOLDOWN_MILLIS = 500L;
     public static final double SHEEP_QUEST_PICKUP_RADIUS = 2.5D;
     public static final long SHEEP_QUEST_BESERKER_JUMP_COOLDOWN_MILLIS = 8_000L;
+    public static final long SHEEP_QUEST_BESERKER_LEAP_WINDOW_MILLIS = 3_000L;
+    public static final double SHEEP_QUEST_BESERKER_LEAP_HORIZONTAL_SPEED = 0.9D;
+    public static final double SHEEP_QUEST_BESERKER_LEAP_VERTICAL_ADD = 0.4D;
+    public static final double SHEEP_QUEST_BESERKER_LEAP_VERTICAL_MIN = 0.65D;
+    public static final double SHEEP_QUEST_BESERKER_LEAP_VERTICAL_MAX = 1.0D;
+    public static final double SHEEP_QUEST_BRUTE_THROW_SPEED = 1.4D;
+    public static final double SHEEP_QUEST_BRUTE_THROW_VERTICAL_MIN = 0.3D;
+    public static final double SHEEP_QUEST_BRUTE_THROW_VERTICAL_MAX = 0.8D;
+    public static final double SHEEP_QUEST_BRUTE_THROW_VERTICAL_PITCH_SCALE = 0.25D;
+    public static final double SHEEP_QUEST_THROW_HIT_RADIUS = 1.2D;
+    public static final long SHEEP_QUEST_THROW_ENTITY_LIFETIME_MILLIS = 5_000L;
+    public static final double SHEEP_QUEST_THROW_KNOCKBACK = 1.2D;
+    public static final double SHEEP_QUEST_THROW_VERTICAL_KNOCKBACK = 0.4D;
+    public static final double SHEEP_QUEST_THROW_BOUNCE_MULTIPLIER = -0.2D;
+    public static final double SHEEP_QUEST_THROW_BOUNCE_VERTICAL = 0.3D;
+    public static final double SHEEP_QUEST_CAPTURE_RADIUS_BLOCKS = 4.5D;
+    public static final double SHEEP_QUEST_HOME_SPEED = 1.2D;
+    public static final double SHEEP_QUEST_OWNED_SHEEP_SPEED = 1.2D;
+    public static final double SHEEP_QUEST_PEN_ROAM_SPEED = 0.8D;
+    public static final double SHEEP_QUEST_HOME_RETURN_DISTANCE_BLOCKS = 14.0D;
+    public static final int SHEEP_QUEST_CARRY_SLOWNESS_TICKS = 60;
+    public static final long SHEEP_QUEST_HIT_DROP_COOLDOWN_MILLIS = 1_000L;
+    public static double sheepQuestBruteThrowHorizontalSpeed() {
+        return GameDebugRuntimeOverrides.doubleValue("SHEEP_QUEST_BRUTE_THROW_SPEED", SHEEP_QUEST_BRUTE_THROW_SPEED);
+    }
+    public static double sheepQuestBruteThrowVerticalSpeed(double directionY) {
+        double minimum = GameDebugRuntimeOverrides.doubleValue(
+                "SHEEP_QUEST_BRUTE_THROW_VERTICAL_MIN", SHEEP_QUEST_BRUTE_THROW_VERTICAL_MIN);
+        double maximum = GameDebugRuntimeOverrides.doubleValue(
+                "SHEEP_QUEST_BRUTE_THROW_VERTICAL_MAX", SHEEP_QUEST_BRUTE_THROW_VERTICAL_MAX);
+        double pitchScale = GameDebugRuntimeOverrides.doubleValue(
+                "SHEEP_QUEST_BRUTE_THROW_VERTICAL_PITCH_SCALE", SHEEP_QUEST_BRUTE_THROW_VERTICAL_PITCH_SCALE);
+        return Math.max(minimum, Math.min(maximum, minimum + directionY * pitchScale));
+    }
+    public static double sheepQuestBerserkerHorizontalSpeed() {
+        return GameDebugRuntimeOverrides.doubleValue(
+                "SHEEP_QUEST_BESERKER_LEAP_HORIZONTAL_SPEED", SHEEP_QUEST_BESERKER_LEAP_HORIZONTAL_SPEED);
+    }
+    public static double sheepQuestBerserkerVerticalSpeed(double directionY) {
+        double minimum = GameDebugRuntimeOverrides.doubleValue(
+                "SHEEP_QUEST_BESERKER_LEAP_VERTICAL_MIN", SHEEP_QUEST_BESERKER_LEAP_VERTICAL_MIN);
+        double maximum = GameDebugRuntimeOverrides.doubleValue(
+                "SHEEP_QUEST_BESERKER_LEAP_VERTICAL_MAX", SHEEP_QUEST_BESERKER_LEAP_VERTICAL_MAX);
+        double add = GameDebugRuntimeOverrides.doubleValue(
+                "SHEEP_QUEST_BESERKER_LEAP_VERTICAL_ADD", SHEEP_QUEST_BESERKER_LEAP_VERTICAL_ADD);
+        return Math.max(minimum, Math.min(maximum, directionY + add));
+    }
+    public static double sheepQuestCaptureRadiusSquared() {
+        double radius = GameDebugRuntimeOverrides.doubleValue(
+                "SHEEP_QUEST_CAPTURE_RADIUS_BLOCKS", SHEEP_QUEST_CAPTURE_RADIUS_BLOCKS);
+        return radius * radius;
+    }
+    public static double sheepQuestThrowHitRadiusSquared() {
+        double radius = GameDebugRuntimeOverrides.doubleValue("SHEEP_QUEST_THROW_HIT_RADIUS", SHEEP_QUEST_THROW_HIT_RADIUS);
+        return radius * radius;
+    }
     public static final long SHEEP_QUEST_OVERTIME_ANNOUNCE_INTERVAL_MILLIS = 10_000L;
     public static final long SHEEP_QUEST_ARCHER_FLETCHER_INTERVAL_MILLIS = 2_000L;
     public static final int SHEEP_QUEST_ARCHER_MAX_ARROWS = 5;
@@ -2006,13 +2062,17 @@ public final class ArcadePortRules {
     }
 
     public static boolean canCarryAnotherSheep(int carriedCount) {
-        return carriedCount >= 0 && carriedCount < SHEEP_QUEST_MAX_CARRY;
+        int maxCarry = Math.max(0, Math.min(64, GameDebugRuntimeOverrides.intValue(
+                "SHEEP_QUEST_MAX_CARRY", SHEEP_QUEST_MAX_CARRY)));
+        return carriedCount >= 0 && carriedCount < maxCarry;
     }
 
     /** Source Sheep Quest slows carriers progressively, up to the three-sheep limit. */
     public static int sheepQuestCarrySlownessAmplifier(int carriedCount) {
         if (carriedCount <= 0) return -1;
-        return Math.min(SHEEP_QUEST_MAX_CARRY - 1, carriedCount - 1);
+        int maxCarry = Math.max(1, Math.min(64, GameDebugRuntimeOverrides.intValue(
+                "SHEEP_QUEST_MAX_CARRY", SHEEP_QUEST_MAX_CARRY)));
+        return Math.min(maxCarry - 1, carriedCount - 1);
     }
 
 
