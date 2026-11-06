@@ -27,6 +27,14 @@ class ArcadeLobbyKitCatalogueTest {
     }
 
     @Test
+    void pigIsTheKitNameAndRemainsGemUnlocked() {
+        var pig = ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.BACON_BRAWL, List.of()).stream()
+                .filter(choice -> choice.id.equals("pig")).findFirst().orElseThrow();
+        assertEquals("Pig", pig.name);
+        assertEquals(ArcadeLobbyKitCatalogue.Unlock.GEM, pig.unlock);
+    }
+
+    @Test
     void hidesOnlyTheConfiguredGameAndKitPair() {
         List<ArcadeLobbyKitCatalogue.KitChoice> monsterMaze =
                 ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.MONSTER_MAZE,
