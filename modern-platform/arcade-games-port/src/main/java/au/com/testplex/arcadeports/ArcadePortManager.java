@@ -1628,7 +1628,7 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         String kit = ArcadePortRules.normalizeDragonEscapeKit(requestedKit);
         if (kit == null) {
-            player.sendMessage(ChatColor.YELLOW + "Dragon Escape kits: jumper, disruptor, warper, digger.");
+            player.sendMessage(ChatColor.YELLOW + "Dragon Escape kits: jumper, disruptor, builder, warper, digger.");
             return;
         }
         UUID id = player.getUniqueId();
@@ -4026,6 +4026,8 @@ public final class ArcadePortManager implements Listener {
                 session.dragonEscapeDiggerUsesRemaining.put(playerId, ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES);
                 session.dragonEscapeNextTntAt.put(playerId,
                         now + ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS);
+                session.dragonEscapeNextBrickAt.put(playerId,
+                        now + ArcadePortRules.DRAGON_ESCAPE_BUILDER_RECHARGE_MILLIS);
             }
             int teamCount = teamCountForGame(type);
             boolean teamMode = teamCount > 0;
@@ -7509,8 +7511,11 @@ public final class ArcadePortManager implements Listener {
                     setDragonEscapeLeapItem(player, leaps);
                 }
                 if ("disruptor".equals(kit)) {
-                    player.getInventory().addItem(namedItem(Material.TNT, "Mini Explosive",
-                            "Right-click to throw a trip mine. Recharges every 8 seconds.", 1));
+                    player.getInventory().addItem(namedItem(Material.TNT, "Disruptor",
+                            "Click to place a dropped TNT trap; arms after 2 seconds. Recharges every 8 seconds.", 1));
+                } else if ("builder".equals(kit)) {
+                    player.getInventory().setItem(1, namedItem(Material.BRICKS, "Temporary Brick",
+                            "Right-click to place a temporary foothold. One active at a time; recharges every 8 seconds.", 1));
                 } else if ("warper".equals(kit)) {
                     player.getInventory().addItem(namedItem(Material.ENDER_PEARL, "Warp",
                             "Right-click to warp to the next-ranked racer ahead. One use."));
@@ -11315,6 +11320,7 @@ public final class ArcadePortManager implements Listener {
             updateDragonEscapeTunnelBlocks(session);
             updateDragonEscapeResources(session, now);
             updateDragonEscapeMines(session);
+            updateDragonEscapeBuilderBricks(session, now);
             updateDragonEscapeChase(session);
             if (active == session) {
                 recordDragonEscapeGhostFrames(session, now);
@@ -13668,6 +13674,85 @@ public final class ArcadePortManager implements Listener {
         player.playSound(player.getLocation(), Sound.ENTITY_TNT_PRIMED, 0.8F, 1.15F);
     }
 
+    /** Server-authoritative placement also supports an air click while falling. */
+    private void placeDragonEscapeBuilderBrick(Session session, Player player, Block clicked, BlockFace face) {
+        UUID id = player.getUniqueId();
+        if (active != session || !session.alive.contains(id)
+                || !"builder".equals(session.dragonEscapeKits.get(id))) return;
+        if (session.dragonEscapeBuilderBricks.containsKey(id)) {
+            player.sendActionBar(ChatColor.YELLOW + "Wait for your previous brick to disappear.");
+            return;
+        }
+        if (inventoryCount(player, Material.BRICKS) <= 0
+                || player.getInventory().getItemInMainHand().getType() != Material.BRICKS) return;
+        Block target = clicked != null && face != null && face != BlockFace.SELF
+                ? clicked.getRelative(face)
+                : player.getLocation().getBlock().getRelative(BlockFace.DOWN);
+        if (target.getWorld() != session.world || !target.isEmpty()
+                || !isDragonEscapeDiggerBuildLocationAllowed(session, target)) {
+            player.sendActionBar(ChatColor.YELLOW + "You cannot place a temporary brick there.");
+            return;
+        }
+        // No block is allowed to appear inside another racer's body, including the owner.
+        org.bukkit.util.BoundingBox placementBox = new org.bukkit.util.BoundingBox(
+                target.getX(), target.getY(), target.getZ(),
+                target.getX() + 1, target.getY() + 1, target.getZ() + 1);
+        for (Player racer : alivePlayers(session)) {
+            if (racer.getWorld() == session.world
+                    && racer.getBoundingBox().overlaps(placementBox)) {
+                player.sendActionBar(ChatColor.YELLOW + "A racer is occupying that space.");
+                return;
+            }
+        }
+        BlockState previous = target.getState();
+        target.setType(Material.BRICKS, false);
+        consumeHeld(player);
+        long expiresAt = System.currentTimeMillis()
+                + ArcadePortRules.dragonEscapeBuilderBlockLifetimeMillis(player.getPing());
+        session.dragonEscapeBuilderBricks.put(id, new DragonEscapeBuilderBrick(previous, expiresAt));
+        session.dragonEscapeNextBrickAt.put(id,
+                System.currentTimeMillis() + ArcadePortRules.DRAGON_ESCAPE_BUILDER_RECHARGE_MILLIS);
+        cooldownProgress.start(player, "Builder Brick",
+                ArcadePortRules.DRAGON_ESCAPE_BUILDER_RECHARGE_MILLIS);
+        player.playSound(target.getLocation(), Sound.BLOCK_STONE_PLACE, 0.65F, 1.3F);
+    }
+
+    private void updateDragonEscapeBuilderBricks(Session session, long now) {
+        for (Map.Entry<UUID, DragonEscapeBuilderBrick> entry
+                : new ArrayList<>(session.dragonEscapeBuilderBricks.entrySet())) {
+            Player owner = session.players.get(entry.getKey());
+            DragonEscapeBuilderBrick brick = entry.getValue();
+            Block block = brick.original.getBlock();
+            boolean standingOnBrick = owner != null && owner.isOnline() && owner.isOnGround()
+                    && owner.getWorld() == block.getWorld()
+                    && Math.abs(owner.getLocation().getY() - (block.getY() + 1.0D)) < 0.18D
+                    && owner.getLocation().getX() > block.getX() - 0.3D
+                    && owner.getLocation().getX() < block.getX() + 1.3D
+                    && owner.getLocation().getZ() > block.getZ() - 0.3D
+                    && owner.getLocation().getZ() < block.getZ() + 1.3D;
+            if (standingOnBrick) brick.used = true;
+            if (ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(now, brick.expiresAt,
+                    brick.used, standingOnBrick, session.alive.contains(entry.getKey()))
+                    || block.getType() != Material.BRICKS) {
+                restoreDragonEscapeBuilderBrick(brick);
+                session.dragonEscapeBuilderBricks.remove(entry.getKey());
+            }
+        }
+    }
+
+    private void restoreAllDragonEscapeBuilderBricks(Session session) {
+        for (DragonEscapeBuilderBrick brick : session.dragonEscapeBuilderBricks.values()) {
+            restoreDragonEscapeBuilderBrick(brick);
+        }
+        session.dragonEscapeBuilderBricks.clear();
+    }
+
+    private void restoreDragonEscapeBuilderBrick(DragonEscapeBuilderBrick brick) {
+        Block block = brick.original.getBlock();
+        if (block.getWorld().isChunkLoaded(block.getX() >> 4, block.getZ() >> 4)
+                && block.getType() == Material.BRICKS) brick.original.update(true, false);
+    }
+
     private void updateDragonEscapeSafeLocations(Session session) {
         for (Player player : alivePlayers(session)) {
             if (player.isOnGround()) {
@@ -13706,19 +13791,31 @@ public final class ArcadePortManager implements Listener {
                 player.setFoodLevel(20);
                 player.setSaturation(1.0F);
             }
-            if (!"disruptor".equals(session.dragonEscapeKits.getOrDefault(id, "jumper"))) continue;
-            long nextAt = session.dragonEscapeNextTntAt.getOrDefault(id,
-                    now + ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS);
-            if (now < nextAt) continue;
-            if (inventoryCount(player, Material.TNT) < ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_MAX_TNT) {
-                player.getInventory().addItem(namedItem(Material.TNT, "Disruptor",
-                        "Stationary trip mine; triggers nearby opponents after 2 seconds."));
-                player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.4F, 1.2F);
+            String kit = session.dragonEscapeKits.getOrDefault(id, "jumper");
+            if ("disruptor".equals(kit)) {
+                long nextAt = session.dragonEscapeNextTntAt.getOrDefault(id, Long.MAX_VALUE);
+                if (now >= nextAt) {
+                    if (inventoryCount(player, Material.TNT) < ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_MAX_TNT) {
+                        player.getInventory().addItem(namedItem(Material.TNT, "Disruptor",
+                                "Stationary trip mine; triggers opponents on pickup after 2 seconds."));
+                        player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.4F, 1.2F);
+                    }
+                    session.dragonEscapeNextTntAt.put(id, ArcadePortRules.dragonEscapeNextTntChargeAt(now));
+                    cooldownProgress.start(player, "Disruptor TNT",
+                            ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS);
+                }
+            } else if ("builder".equals(kit)) {
+                long nextAt = session.dragonEscapeNextBrickAt.getOrDefault(id, Long.MAX_VALUE);
+                if (now >= nextAt) {
+                    if (inventoryCount(player, Material.BRICKS) < ArcadePortRules.DRAGON_ESCAPE_BUILDER_MAX_BRICKS) {
+                        player.getInventory().addItem(namedItem(Material.BRICKS, "Temporary Brick",
+                                "Right-click for a short-lived foothold. One active at a time."));
+                        player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.4F, 1.2F);
+                    }
+                    session.dragonEscapeNextBrickAt.put(id,
+                            now + ArcadePortRules.DRAGON_ESCAPE_BUILDER_RECHARGE_MILLIS);
+                }
             }
-            session.dragonEscapeNextTntAt.put(id,
-                    ArcadePortRules.dragonEscapeNextTntChargeAt(now));
-            cooldownProgress.start(player, "Disruptor TNT",
-                    ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS);
         }
         updateDragonEscapeSpectatorCompasses(session);
     }
@@ -18226,6 +18323,7 @@ public final class ArcadePortManager implements Listener {
             restoreDragonFrostBlocks(session);
             session.dragonSparklerStyles.clear();
         }
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE) restoreAllDragonEscapeBuilderBricks(session);
         active = null;
         if (session.tickTask != null) session.tickTask.cancel();
         if (announceWinner && session.type == ArcadePortGame.BACON_BRAWL && winner != null) {
@@ -23785,6 +23883,11 @@ public final class ArcadePortManager implements Listener {
                 throwDragonEscapeMine(session, player);
                 return;
             }
+            if (event.getAction().isRightClick() && item == Material.BRICKS && "builder".equals(kit)) {
+                event.setCancelled(true);
+                placeDragonEscapeBuilderBrick(session, player, event.getClickedBlock(), event.getBlockFace());
+                return;
+            }
         }
         if (session.type == ArcadePortGame.DRAGONS) {
             UUID id = player.getUniqueId();
@@ -24079,6 +24182,7 @@ public final class ArcadePortManager implements Listener {
                 yield (item == Material.IRON_AXE && !"digger".equals(kit))
                         || (item == Material.ENDER_PEARL && "warper".equals(kit))
                         || (item == Material.TNT && "disruptor".equals(kit))
+                        || (item == Material.BRICKS && "builder".equals(kit))
                         || (!session.alive.contains(id) && isDragonEscapeTrackingCompass(heldItem));
             }
             case DRAGONS -> {
@@ -25312,6 +25416,12 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
             Player player = event.getPlayer();
             Block placed = event.getBlockPlaced();
+            // Builder is exclusively server-placed through the right-click handler.
+            // Never allow vanilla placement to bypass charge and lifetime checks.
+            if ("builder".equals(session.dragonEscapeKits.getOrDefault(player.getUniqueId(), "jumper"))) {
+                event.setCancelled(true);
+                return;
+            }
             boolean allowed = session.alive.contains(player.getUniqueId())
                     && "digger".equals(session.dragonEscapeKits.getOrDefault(player.getUniqueId(), "jumper"))
                     && isDragonEscapeDiggerBlockAllowed(placed.getType())
@@ -27939,6 +28049,17 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private static final class DragonEscapeBuilderBrick {
+        final BlockState original;
+        final long expiresAt;
+        boolean used;
+
+        DragonEscapeBuilderBrick(BlockState original, long expiresAt) {
+            this.original = original;
+            this.expiresAt = expiresAt;
+        }
+    }
+
     private static final class Session {
         final Map<Block, Long> evolutionWebs = new HashMap<>();
         SuperSploorEngine superSploorEngine;
@@ -28546,6 +28667,8 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> dragonEscapeLeaped = new HashSet<>();
         final Map<UUID, Integer> dragonEscapeDiggerUsesRemaining = new HashMap<>();
         final Map<UUID, Long> dragonEscapeNextTntAt = new HashMap<>();
+        final Map<UUID, Long> dragonEscapeNextBrickAt = new HashMap<>();
+        final Map<UUID, DragonEscapeBuilderBrick> dragonEscapeBuilderBricks = new HashMap<>();
         final Set<UUID> dragonEscapeWarperUsed = new HashSet<>();
         final Map<UUID, Location> dragonEscapeSafeLocations = new HashMap<>();
         final Map<UUID, Long> dragonEscapeWarpedAt = new HashMap<>();

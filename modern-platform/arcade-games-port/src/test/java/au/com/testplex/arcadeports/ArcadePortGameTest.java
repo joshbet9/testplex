@@ -1612,15 +1612,19 @@ class ArcadePortGameTest {
     @Test void dragonEscapeKitsExposeSourceKitChoicesAndLeapCharges() {
         assertEquals("jumper", ArcadePortRules.normalizeDragonEscapeKit("Jumper"));
         assertEquals("disruptor", ArcadePortRules.normalizeDragonEscapeKit("DISRUPTOR"));
+        assertEquals("builder", ArcadePortRules.normalizeDragonEscapeKit("Builder"));
         assertEquals("warper", ArcadePortRules.normalizeDragonEscapeKit("Warper"));
         assertEquals("digger", ArcadePortRules.normalizeDragonEscapeKit("Digger"));
         assertNull(ArcadePortRules.normalizeDragonEscapeKit("speedster"));
         assertEquals(4, ArcadePortRules.dragonEscapeLeapUses("jumper"));
         assertEquals(3, ArcadePortRules.dragonEscapeLeapUses("disruptor"));
+        assertEquals(3, ArcadePortRules.dragonEscapeLeapUses("builder"));
         assertEquals(2, ArcadePortRules.dragonEscapeLeapUses("warper"));
         assertEquals(0, ArcadePortRules.dragonEscapeLeapUses("digger"));
         assertEquals(6, ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES);
         assertEquals(2, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_MAX_TNT);
+        assertEquals(2, ArcadePortRules.DRAGON_ESCAPE_BUILDER_MAX_BRICKS);
+        assertEquals(8_000L, ArcadePortRules.DRAGON_ESCAPE_BUILDER_RECHARGE_MILLIS);
         assertEquals(8_000L, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS);
         assertEquals(8_000L, ArcadePortRules.DRAGON_ESCAPE_LEAP_RECHARGE_MILLIS);
         assertEquals(40, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_ARM_TICKS);
@@ -1791,6 +1795,18 @@ class ArcadePortGameTest {
         assertEquals(23_000L, ArcadePortRules.dragonEscapeNextTntChargeAt(15_000L));
         assertEquals(ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS,
                 ArcadePortRules.dragonEscapeNextTntChargeAt(-1_000L) - (-1_000L));
+    }
+
+    @Test void dragonEscapeBuilderUsesBoundedPingFairnessWindow() {
+        assertEquals(500L, ArcadePortRules.dragonEscapeBuilderBlockLifetimeMillis(0));
+        assertEquals(550L, ArcadePortRules.dragonEscapeBuilderBlockLifetimeMillis(100));
+        assertEquals(750L, ArcadePortRules.dragonEscapeBuilderBlockLifetimeMillis(900));
+        assertEquals(500L, ArcadePortRules.dragonEscapeBuilderBlockLifetimeMillis(-20));
+        assertFalse(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(250L, 500L, false, false, true));
+        assertFalse(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(250L, 500L, true, true, true));
+        assertTrue(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(250L, 500L, true, false, true));
+        assertTrue(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(500L, 500L, false, false, true));
+        assertTrue(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(250L, 500L, false, false, false));
     }
 
     @Test void dragonEscapeDisruptorMineTriggersOnlyOnArmedOpponentPickup() {

@@ -661,13 +661,14 @@ public final class ArcadePortRules {
         return switch (value) {
             case "jumper" -> "jumper";
             case "disruptor" -> "disruptor";
+            case "builder" -> "builder";
             case "warper" -> "warper";
             case "digger" -> "digger";
             default -> null;
         };
     }
 
-    /** A Disruptor mine starts its own recharge window when it is thrown. */
+    /** Source-style periodic TNT recharge; throwing a mine does not reset this timer. */
     public static long dragonEscapeNextTntChargeAt(long thrownAtMillis) {
         return thrownAtMillis + DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS;
     }
@@ -727,6 +728,7 @@ public final class ArcadePortRules {
         return switch (normalizeDragonEscapeKit(kit) == null ? "" : normalizeDragonEscapeKit(kit)) {
             case "jumper" -> 4;
             case "disruptor" -> 3;
+            case "builder" -> 3;
             case "warper" -> 2;
             default -> 0;
         };
@@ -741,9 +743,25 @@ public final class ArcadePortRules {
     public static final long DRAGON_ESCAPE_WATER_DAMAGE_INTERVAL_MILLIS = 500L;
     public static final int DRAGON_ESCAPE_DISRUPTOR_MAX_TNT = 2;
     public static final long DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS = 8_000L;
+    public static final int DRAGON_ESCAPE_BUILDER_MAX_BRICKS = 2;
+    public static final long DRAGON_ESCAPE_BUILDER_RECHARGE_MILLIS = 8_000L;
+    public static final long DRAGON_ESCAPE_BUILDER_BLOCK_LIFETIME_MILLIS = 500L;
+    public static final long DRAGON_ESCAPE_BUILDER_MAX_PING_COMPENSATION_MILLIS = 250L;
     public static final long DRAGON_ESCAPE_LEAP_RECHARGE_MILLIS = 8_000L;
     public static final long DRAGON_ESCAPE_SCORE_UPDATE_MILLIS = 500L;
     public static final int DRAGON_ESCAPE_DISRUPTOR_ARM_TICKS = 40;
+
+    /** A conservative one-way allowance, never an unbounded high-ping platform extension. */
+    public static long dragonEscapeBuilderBlockLifetimeMillis(int pingMillis) {
+        return DRAGON_ESCAPE_BUILDER_BLOCK_LIFETIME_MILLIS
+                + Math.min(DRAGON_ESCAPE_BUILDER_MAX_PING_COMPENSATION_MILLIS,
+                        Math.max(0, pingMillis) / 2L);
+    }
+
+    public static boolean shouldRemoveDragonEscapeBuilderBrick(
+            long now, long expiresAt, boolean hasBeenUsed, boolean stillStandingOnIt, boolean ownerAlive) {
+        return now >= expiresAt || !ownerAlive || (hasBeenUsed && !stillStandingOnIt);
+    }
 
     public static boolean shouldAllowDragonEscapeKitChange(boolean activeRaceParticipant) {
         return !activeRaceParticipant;

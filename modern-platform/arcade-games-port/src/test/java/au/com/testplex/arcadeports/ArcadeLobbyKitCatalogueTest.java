@@ -59,6 +59,16 @@ class ArcadeLobbyKitCatalogueTest {
     }
 
     @Test
+    void dragonEscapeBuilderIsASeparateGemKitAndDiggerRemainsAchievementLocked() {
+        List<ArcadeLobbyKitCatalogue.KitChoice> choices =
+                ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.DRAGON_ESCAPE, List.of());
+        assertEquals(List.of("jumper", "disruptor", "builder", "warper", "digger"),
+                choices.stream().map(choice -> choice.id).toList());
+        assertEquals(ArcadeLobbyKitCatalogue.Unlock.GEM, choices.get(2).unlock);
+        assertEquals(ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT, choices.get(4).unlock);
+    }
+
+    @Test
     void configuredKitOrderMovesKnownEntriesAndKeepsUnlistedCatalogueOrder() {
         assertEquals(List.of("waller", "jumper", "armorer", "pitcher"),
                 ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.BOMB_LOBBERS, List.of(),
