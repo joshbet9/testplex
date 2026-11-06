@@ -19,26 +19,35 @@ final class DrawMyThingCanvas {
     }
 
     static void point(Set<Block> canvas, Block block, Material colour, boolean thick) {
+        point(canvas, block, colour, thick ? 1 : 0);
+    }
+
+    static void point(Set<Block> canvas, Block block, Material colour, int radius) {
         if (!canvas.contains(block)) return;
         block.setType(colour, false);
-        if (!thick) return;
+        if (radius <= 0) return;
         int normal = normalAxis(canvas);
         int[] axes = planeAxes(normal);
-        for (int first : new int[] {-1, 1}) {
-            for (int second : new int[] {-1, 1}) {
-                Block nearby = offset(block, axes[0], first).getRelative(face(axes[1], second));
+        int fixed = coordinate(block, normal);
+        int centerA = coordinate(block, axes[0]);
+        int centerB = coordinate(block, axes[1]);
+        for (int first = -radius; first <= radius; first++) {
+            for (int second = -radius; second <= radius; second++) {
+                int[] coordinates = new int[3];
+                coordinates[normal] = fixed;
+                coordinates[axes[0]] = centerA + first;
+                coordinates[axes[1]] = centerB + second;
+                Block nearby = block.getWorld().getBlockAt(coordinates[0], coordinates[1], coordinates[2]);
                 if (canvas.contains(nearby)) nearby.setType(colour, false);
             }
-            Block nearby = block.getRelative(face(axes[0], first));
-            if (canvas.contains(nearby)) nearby.setType(colour, false);
-        }
-        for (int second : new int[] {-1, 1}) {
-            Block nearby = block.getRelative(face(axes[1], second));
-            if (canvas.contains(nearby)) nearby.setType(colour, false);
         }
     }
 
     static void line(Set<Block> canvas, Block from, Block to, Material colour, boolean thick) {
+        line(canvas, from, to, colour, thick ? 1 : 0);
+    }
+
+    static void line(Set<Block> canvas, Block from, Block to, Material colour, int radius) {
         int dx = to.getX() - from.getX();
         int dy = to.getY() - from.getY();
         int dz = to.getZ() - from.getZ();
@@ -49,7 +58,7 @@ final class DrawMyThingCanvas {
                     (int) Math.round(from.getX() + dx * ratio),
                     (int) Math.round(from.getY() + dy * ratio),
                     (int) Math.round(from.getZ() + dz * ratio));
-            point(canvas, point, colour, thick);
+            point(canvas, point, colour, radius);
         }
     }
 
@@ -147,10 +156,6 @@ final class DrawMyThingCanvas {
 
     private static int coordinate(Block block, int axis) {
         return axis == 0 ? block.getX() : axis == 1 ? block.getY() : block.getZ();
-    }
-
-    private static Block offset(Block block, int axis, int amount) {
-        return block.getRelative(face(axis, amount));
     }
 
     private static BlockFace face(int axis, int amount) {

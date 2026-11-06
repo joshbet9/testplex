@@ -160,6 +160,11 @@ public final class ArcadePortRules {
     /** Turns start back-to-back so the drawing budget stays within the match timer. */
     public static final long DRAW_MY_THING_INTERMISSION_MILLIS = 0L;
     public static final int DRAW_MY_THING_FULL_ROUND_PLAYER_LIMIT = 8;
+    public static final double DRAW_MY_THING_HINT_REVEAL_DURATION_MULTIPLIER = 1.75D;
+    public static final double DRAW_MY_THING_MAX_HINTED_LETTER_FRACTION = 1.0D;
+    public static final int DRAW_MY_THING_BRUSH_RADIUS_BLOCKS = 1;
+    public static final long DRAW_MY_THING_GUESS_COOLDOWN_MILLIS = 0L;
+    public static final boolean DRAW_MY_THING_END_AFTER_ALL_GUESSED = true;
     public static final int DRAW_MY_THING_MAX_GUESSES = 10;
     public static final int DRAW_MY_THING_FIRST_GUESS_POINTS = 3;
     public static final int DRAW_MY_THING_LATER_GUESS_POINTS = 1;
@@ -184,6 +189,46 @@ public final class ArcadePortRules {
                 "DRAW_MY_THING_BASE_ROUND_MILLIS", DRAW_MY_THING_BASE_ROUND_MILLIS));
         long budgetPerTurn = totalMillis / turns;
         return Math.max(1L, Math.min(baseRoundMillis, budgetPerTurn));
+    }
+
+    public static long drawMyThingIntermissionMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue("DRAW_MY_THING_INTERMISSION_MILLIS",
+                DRAW_MY_THING_INTERMISSION_MILLIS));
+    }
+
+    public static double drawMyThingHintRevealDurationMultiplier() {
+        return Math.max(0.1D, GameDebugRuntimeOverrides.doubleValue(
+                "DRAW_MY_THING_HINT_REVEAL_DURATION_MULTIPLIER",
+                DRAW_MY_THING_HINT_REVEAL_DURATION_MULTIPLIER));
+    }
+
+    public static int drawMyThingHintRevealCount(long elapsedMillis, long roundDurationMillis, int letterCount) {
+        if (letterCount <= 0 || roundDurationMillis <= 0L || elapsedMillis <= 0L) return 0;
+        double scaledDuration = roundDurationMillis * drawMyThingHintRevealDurationMultiplier();
+        int desired = (int) Math.floor(Math.max(0L, elapsedMillis) * letterCount / scaledDuration);
+        int maximum = (int) Math.floor(letterCount * Math.max(0.0D, Math.min(1.0D,
+                GameDebugRuntimeOverrides.doubleValue("DRAW_MY_THING_MAX_HINTED_LETTER_FRACTION",
+                        DRAW_MY_THING_MAX_HINTED_LETTER_FRACTION))));
+        return Math.max(0, Math.min(maximum, desired));
+    }
+
+    public static int drawMyThingBrushRadiusBlocks() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue("DRAW_MY_THING_BRUSH_RADIUS_BLOCKS",
+                DRAW_MY_THING_BRUSH_RADIUS_BLOCKS));
+    }
+
+    public static long drawMyThingGuessCooldownMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue("DRAW_MY_THING_GUESS_COOLDOWN_MILLIS",
+                DRAW_MY_THING_GUESS_COOLDOWN_MILLIS));
+    }
+
+    public static boolean drawMyThingCanSubmitGuess(long lastGuessAtMillis, long nowMillis) {
+        return lastGuessAtMillis <= 0L || nowMillis - lastGuessAtMillis >= drawMyThingGuessCooldownMillis();
+    }
+
+    public static boolean drawMyThingEndAfterAllGuessed() {
+        return GameDebugRuntimeOverrides.booleanValue("DRAW_MY_THING_END_AFTER_ALL_GUESSED",
+                DRAW_MY_THING_END_AFTER_ALL_GUESSED);
     }
 
     public static int drawMyThingMaxGuesses() {

@@ -321,6 +321,11 @@ final class GameDebugVariableCatalog {
                 || name.equals("DRAGONS_MARKSMAN_START_ARROWS") || name.equals("DRAGONS_MARKSMAN_MAX_ARROWS")
                 || name.equals("DRAGONS_BARRAGE_MAX_ARROWS") || name.equals("DRAGONS_RETARGET_DISTANCE_SQUARED")) return 0.0D;
         if (name.equals("DRAGONS_TAMER_VERTICAL_FLIGHT_CAP")) return 0.0D;
+        if (name.equals("DRAW_MY_THING_HINT_REVEAL_DURATION_MULTIPLIER")) return 0.1D;
+        if (name.equals("DRAW_MY_THING_MAX_HINTED_LETTER_FRACTION")) return 0.0D;
+        if (name.equals("DRAW_MY_THING_BRUSH_RADIUS_BLOCKS")
+                || name.equals("DRAW_MY_THING_GUESS_COOLDOWN_MILLIS")
+                || name.equals("DRAW_MY_THING_INTERMISSION_MILLIS")) return 0.0D;
         if (name.equals("DRAGONS_DODGEMS_QUIET_MILLIS")) return 0.0D;
         if (name.equals("DRAGONS_FROST_PATH_STEP")) return 0.01D;
         if (name.startsWith("DRAGON_ESCAPE_") && name.endsWith("_LEAP_USES")) return 0.0D;
@@ -557,6 +562,11 @@ final class GameDebugVariableCatalog {
         if (name.equals("DRAGONS_TAMER_VERTICAL_FLIGHT_CAP")) return 8.0D;
         if (name.equals("DRAGONS_FALL_DAMAGE_REDUCTION")) return 40.0D;
         if (name.equals("DRAGONS_DODGEMS_QUIET_MILLIS")) return 120_000.0D;
+        if (name.equals("DRAW_MY_THING_HINT_REVEAL_DURATION_MULTIPLIER")) return 10.0D;
+        if (name.equals("DRAW_MY_THING_MAX_HINTED_LETTER_FRACTION")) return 1.0D;
+        if (name.equals("DRAW_MY_THING_BRUSH_RADIUS_BLOCKS")) return 4.0D;
+        if (name.equals("DRAW_MY_THING_GUESS_COOLDOWN_MILLIS")
+                || name.equals("DRAW_MY_THING_INTERMISSION_MILLIS")) return 120_000.0D;
         if (name.equals("DRAGONS_BARRAGE_ARROW_SPREAD")) return 1.0D;
         if (name.startsWith("DRAGONS_") && (name.endsWith("_Y_BONUS") || name.endsWith("_MAX_Y")
                 || name.endsWith("_VERTICAL") || name.endsWith("_VERTICAL_BASE")

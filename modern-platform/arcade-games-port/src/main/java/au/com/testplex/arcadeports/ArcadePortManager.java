@@ -12074,6 +12074,7 @@ public final class ArcadePortManager implements Listener {
         session.drawCurrentDrawer=drawer.getUniqueId();
         session.drawWord=chooseDrawWord(session);
         session.drawCorrectGuessers.clear();session.drawGuessAttempts.clear();session.drawRevealedLetters.clear();
+        session.drawLastGuessAt.clear();
         session.drawRoundStartedAt=now;session.drawRoundEndsAt=now+session.drawRoundDurationMillis;session.drawNextRoundAt=0L;
         session.drawStartedPainting = false;
         session.drawShapeStarts.remove(drawer.getUniqueId());
@@ -12142,9 +12143,9 @@ public final class ArcadePortManager implements Listener {
         session.drawRoundEndsAt=0L;
         boolean hasRemainingDrawer = session.drawTurnOrder.subList(session.drawTurnIndex, session.drawTurnOrder.size())
                 .stream().map(session.players::get).anyMatch(p -> p != null && p.isOnline());
-        session.drawNextRoundAt = now;
+        session.drawNextRoundAt = now + ArcadePortRules.drawMyThingIntermissionMillis();
         if (hasRemainingDrawer) {
-            startNextDrawMyThingRound(session, now);
+            if (session.drawNextRoundAt <= now) startNextDrawMyThingRound(session, now);
         }
     }
 
@@ -12160,12 +12161,14 @@ public final class ArcadePortManager implements Listener {
         }
         List<UUID> guessers=session.players.keySet().stream().filter(id->!id.equals(session.drawCurrentDrawer))
                 .filter(id->{Player p=session.players.get(id);return p!=null&&p.isOnline();}).toList();
-        boolean allGuessed=!guessers.isEmpty()&&guessers.stream().allMatch(session.drawCorrectGuessers::contains);
+        boolean allGuessed=ArcadePortRules.drawMyThingEndAfterAllGuessed() && !guessers.isEmpty()
+                && guessers.stream().allMatch(session.drawCorrectGuessers::contains);
         if(now>=session.drawRoundEndsAt||allGuessed){finishDrawMyThingRound(session,now);return;}
         int letters=(int)session.drawWord.chars().filter(ch->ch!=' ').count();
         boolean timedHints = GameDebugRuntimeOverrides.booleanValue("timed-hints", true);
         if (!timedHints) session.drawRevealedLetters.clear();
-        int reveal=!timedHints||letters==0?0:(int)Math.floor(Math.max(0,now-session.drawRoundStartedAt)*(double)letters/(session.drawRoundDurationMillis*1.75D));
+        int reveal=!timedHints?0:ArcadePortRules.drawMyThingHintRevealCount(
+                now-session.drawRoundStartedAt, session.drawRoundDurationMillis, letters);
         int revealedBefore = session.drawRevealedLetters.size();
         while(session.drawRevealedLetters.size()<reveal){
             List<Integer> hidden=new ArrayList<>();
@@ -12210,6 +12213,13 @@ public final class ArcadePortManager implements Listener {
         int used=session.drawGuessAttempts.getOrDefault(playerId,0);
         int maxGuesses = ArcadePortRules.drawMyThingMaxGuesses();
         if(used>=maxGuesses){player.sendMessage(ChatColor.RED+"No guesses remaining.");return;}
+        long now = System.currentTimeMillis();
+        long lastGuessAt = session.drawLastGuessAt.getOrDefault(playerId, 0L);
+        if (!ArcadePortRules.drawMyThingCanSubmitGuess(lastGuessAt, now)) {
+            player.sendActionBar(ChatColor.RED + "Wait before submitting another guess.");
+            return;
+        }
+        session.drawLastGuessAt.put(playerId, now);
         session.drawGuessAttempts.put(playerId,used+1);
         String statPath = localStatsPath(playerId, "draw-my-thing");
         if (!testPlayers.isTestPlayer(playerId) && !GameDebugRuntimeOverrides.isDebugSession()) {
@@ -12447,7 +12457,8 @@ public final class ArcadePortManager implements Listener {
                 markDrawPainted(session);
             }
             case "Spray Can" -> {
-                DrawMyThingCanvas.point(session.drawCanvasBlocks, target, colour, true);
+                DrawMyThingCanvas.point(session.drawCanvasBlocks, target, colour,
+                        ArcadePortRules.drawMyThingBrushRadiusBlocks());
                 for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST,
                         BlockFace.WEST, BlockFace.UP, BlockFace.DOWN)) {
                     Block adjacent = target.getRelative(face);
@@ -12482,10 +12493,11 @@ public final class ArcadePortManager implements Listener {
         UUID id = player.getUniqueId();
         Material colour = session.drawBrushColours.getOrDefault(id, Material.BLACK_WOOL);
         Block previous = session.drawPreviousPaintPoints.put(id, target);
+        int radius = thick ? ArcadePortRules.drawMyThingBrushRadiusBlocks() : 0;
         if (previous != null && session.drawCanvasBlocks.contains(previous)) {
-            DrawMyThingCanvas.line(session.drawCanvasBlocks, previous, target, colour, thick);
+            DrawMyThingCanvas.line(session.drawCanvasBlocks, previous, target, colour, radius);
         } else {
-            DrawMyThingCanvas.point(session.drawCanvasBlocks, target, colour, thick);
+            DrawMyThingCanvas.point(session.drawCanvasBlocks, target, colour, radius);
         }
         markDrawPainted(session);
         playDrawMyThingSound(session, Sound.BLOCK_FIRE_EXTINGUISH, 0.2F, 2.0F);
@@ -30314,6 +30326,7 @@ public final class ArcadePortManager implements Listener {
         final Set<Block> drawCanvasBlocks = new HashSet<>();
         final Set<UUID> drawCorrectGuessers = new HashSet<>();
         final Map<UUID, Integer> drawGuessAttempts = new HashMap<>();
+        final Map<UUID, Long> drawLastGuessAt = new HashMap<>();
         final Set<Integer> drawRevealedLetters = new HashSet<>();
         final Map<UUID, Material> drawBrushColours = new HashMap<>();
         final Map<UUID, Block> drawPreviousPaintPoints = new HashMap<>();
