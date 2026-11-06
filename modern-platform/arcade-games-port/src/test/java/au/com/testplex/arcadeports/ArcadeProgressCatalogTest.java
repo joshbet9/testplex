@@ -187,6 +187,21 @@ class ArcadeProgressCatalogTest {
     }
 
     @Test
+    void castleAssaultHasFourteenAchievementsCoveringAllFiveKits() {
+        assertEquals(14, ArcadeProgressCatalog.achievements("castle-assault").size());
+        assertTrue(hasAchievement("castle-assault", "bad-chemistry", "Bad Chemistry"));
+        assertTrue(hasAchievement("castle-assault", "pin-cushion", "Pin Cushion"));
+        assertTrue(hasAchievement("castle-assault", "tnt-rrific", "TNT-rrific"));
+        assertTrue(hasAchievement("castle-assault", "golden-boy", "Golden Boy"));
+        assertTrue(hasAchievement("castle-assault", "immovable-object", "Immovable Object"));
+        assertTrue(hasAchievement("castle-assault", "express-delivery", "Express Delivery"));
+        assertTrue(hasAchievement("castle-assault", "royal-guard", "Royal Guard"));
+        assertTrue(hasAchievement("castle-assault", "against-all-odds", "Against All Odds"));
+        assertTrue(ArcadeProgressCatalog.achievements("castle-assault").stream()
+                .anyMatch(a -> a.id().equals("clutchness") && a.description().contains("less than 10 health")));
+    }
+
+    @Test
     void secondMilestoneBatchUsesAllRequestedLifetimeTargets() {
         assertMilestone("sneaky-assassins", "kills", "kills", 1000, new long[] {100, 250, 500, 1000});
         assertMilestone("sneaky-assassins", "wins", "wins", 250, new long[] {25, 63, 125, 250});
