@@ -54,11 +54,12 @@ The original map archive is packaged at `maps/bomb-lobbers.zip`.
 - [ ] What's a double jump?: win alive without double-jumping.
 - [ ] The MVP: win alone against at least three opponents.
 - [ ] Master Bomber: 30 wins.
-- [ ] Blast Proof: complete five **separate wins as Armorer** (track across games; don't count a mid-match switch); previously earned flags remain unlocked. Jelly Skin retains its existing trigger.
+- [ ] Blast Proof: complete ten **separate wins as Armorer** (track across games; don't count a mid-match switch); previously earned flags remain unlocked. Jelly Skin retains its existing trigger.
 - [ ] Not On My Watch: as Constructor, block three **distinct enemy TNT** with structures in one game; friendly TNT and repeated contacts with one projectile do not count.
-- [ ] Technical: a close-range TNT only awards its own actual killing blow, with no stale credit for a later, different TNT.
-- [ ] Over 9000: a 1v3 powerup-only comeback includes an actual power-up use in the clutch.
+- [ ] Technical: throw TNT while less than 10 blocks from the victim, then secure that TNT's own killing blow; no stale credit from a later TNT or throws at 10+ blocks.
+- [ ] Over 9000: one single Super Explosive TNT or Fiery TNT activation must score 3 actual credited player kills (direct hits and/or explosion); ordinary TNT, multiple power-ups, and the unrelated 1v3 clutch don't count.
 - [ ] Grenade From the Grave: two TNT kills after death, including direct-impact kills and blast kills.
+- [ ] Wonderkid: current detector is 3 kills in one match without block-contact detonation before the 8-second timeout. Pending confirmation of intended challenge; do not approve this detector yet.
 - [ ] Test-player actions do not grant or persist player stats, achievements, rewards or personal-best records.
 
 ## Lifecycle / regression
