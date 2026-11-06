@@ -101,6 +101,8 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MICRO_BATTLES), "MICRO_BATTLES_BORDER_PARTICLE_VERTICAL_POINTS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MICRO_BATTLES), "MICRO_BATTLES_ANNIHILATION_KILLS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MICRO_BATTLES), "MICRO_BATTLES_COMBAT_LOG_EXPIRE_MILLIS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MICRO_BATTLES), "MICRO_BATTLES_DASHER_JUMP_HORIZONTAL_SPEED");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MICRO_BATTLES), "MICRO_BATTLES_DASHER_JUMP_VERTICAL_SPEED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SPLEEF), "SPLEEF_HUNGER_DRAIN_ENABLED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MILK_THE_COW), "MILK_THE_COW_SCORE_TO_WIN");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SPEED_BUILDERS), "SPEED_BUILDERS_DEFAULT_VIEW_SECONDS");

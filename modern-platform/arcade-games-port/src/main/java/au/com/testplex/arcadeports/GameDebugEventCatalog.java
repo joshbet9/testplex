@@ -94,6 +94,8 @@ final class GameDebugEventCatalog {
     private static final List<Event> MICRO_BATTLES = List.of(
             new Event("drop-barriers", "Drop Start Barriers", Material.GLASS,
                     "Run the normal start-glass removal now so you can test combat through the opening."),
+            new Event("test-dasher-jump", "Test Dasher Jump", Material.FEATHER,
+                    "Use Dasher's normal double jump with its real cooldown, velocity and effects."),
             REFRESH_KIT.getFirst());
     private static final List<Event> SPLEEF = List.of(
             new Event("restore-hunger", "Restore Hunger", Material.COOKED_BEEF,

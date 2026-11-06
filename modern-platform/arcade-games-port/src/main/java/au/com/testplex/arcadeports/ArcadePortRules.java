@@ -1067,12 +1067,26 @@ public final class ArcadePortRules {
     public static final int MICRO_BATTLES_FLETCHER_MAX_ARROWS = 3;
     public static final long MICRO_BATTLES_SPEEDSTER_MAX_GAME_MILLIS = 90_000L;
     public static final long MICRO_BATTLES_DASHER_JUMP_COOLDOWN_MILLIS = 15_000L;
+    public static final double MICRO_BATTLES_DASHER_JUMP_HORIZONTAL_SPEED = 0.45D;
+    public static final double MICRO_BATTLES_DASHER_JUMP_VERTICAL_SPEED = 0.55D;
     public static final double MICRO_BATTLES_BORDER_PARTICLE_DISTANCE = 3.0D;
     public static final int MICRO_BATTLES_BORDER_PARTICLE_INTERVAL_TICKS = 4;
     public static final int MICRO_BATTLES_BORDER_PARTICLE_VERTICAL_POINTS = 3;
     public static final int MICRO_BATTLES_ANNIHILATION_KILLS = 8;
     public static final String MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR = "light-blue";
     public static final long MICRO_BATTLES_COMBAT_LOG_EXPIRE_MILLIS = 15_000L;
+
+    public static Vector microBattlesDasherJumpVelocity(Vector facing) {
+        Vector velocity = facing == null ? new Vector() : facing.clone();
+        velocity.setY(0.0D);
+        if (velocity.lengthSquared() > 0.0001D) {
+            velocity.normalize().multiply(GameDebugRuntimeOverrides.doubleValue(
+                    "MICRO_BATTLES_DASHER_JUMP_HORIZONTAL_SPEED", MICRO_BATTLES_DASHER_JUMP_HORIZONTAL_SPEED));
+        }
+        velocity.setY(GameDebugRuntimeOverrides.doubleValue(
+                "MICRO_BATTLES_DASHER_JUMP_VERTICAL_SPEED", MICRO_BATTLES_DASHER_JUMP_VERTICAL_SPEED));
+        return velocity;
+    }
 
     private ArcadePortRules() {
     }

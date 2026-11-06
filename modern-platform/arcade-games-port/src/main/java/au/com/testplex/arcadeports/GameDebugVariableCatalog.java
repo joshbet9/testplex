@@ -374,6 +374,8 @@ final class GameDebugVariableCatalog {
                 || name.endsWith("_PELLETS") || name.endsWith("_TICKS") || name.endsWith("_AMPLIFIER"))) return 0.0D;
         if (name.equals("MICRO_BATTLES_CHEAT_WINDOW_MILLIS")
                 || name.equals("MICRO_BATTLES_COMBAT_LOG_EXPIRE_MILLIS")) return 0.0D;
+        if (name.equals("MICRO_BATTLES_DASHER_JUMP_HORIZONTAL_SPEED")
+                || name.equals("MICRO_BATTLES_DASHER_JUMP_VERTICAL_SPEED")) return 0.0D;
         if (name.equals("MICRO_BATTLES_BORDER_PARTICLE_DISTANCE")) return 0.5D;
         if (name.equals("MICRO_BATTLES_BORDER_PARTICLE_VERTICAL_POINTS")) return 1.0D;
         if (name.equals("MINION_TARGET_RANGE_BLOCKS")) return 0.0D;
@@ -647,6 +649,8 @@ final class GameDebugVariableCatalog {
         if (name.equals("MICRO_BATTLES_COMBAT_LOG_EXPIRE_MILLIS")) return 120_000.0D;
         if (name.equals("MICRO_BATTLES_BORDER_PARTICLE_DISTANCE")) return 16.0D;
         if (name.equals("MICRO_BATTLES_BORDER_PARTICLE_VERTICAL_POINTS")) return 8.0D;
+        if (name.equals("MICRO_BATTLES_DASHER_JUMP_HORIZONTAL_SPEED")
+                || name.equals("MICRO_BATTLES_DASHER_JUMP_VERTICAL_SPEED")) return 2.0D;
         if (name.equals("MINION_TARGET_RANGE_BLOCKS")) return 128.0D;
         if (name.equals("MINION_LAUNCH_SPEED")) return 4.0D;
         if (name.equals("MINION_SPEED_AMPLIFIER")) return 4.0D;

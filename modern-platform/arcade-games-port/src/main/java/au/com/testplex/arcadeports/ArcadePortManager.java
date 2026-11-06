@@ -1277,6 +1277,10 @@ public final class ArcadePortManager implements Listener {
             GameDebugRuntimeOverrides.markDebugSession();
             triggered = true;
         }
+        if (type == ArcadePortGame.MICRO_BATTLES && "test-dasher-jump".equals(eventId)) {
+            triggered = useMicroDasherJump(session, tester);
+            if (triggered) GameDebugRuntimeOverrides.markDebugSession();
+        }
         if (type == ArcadePortGame.DEATH_TAG && "promote-self".equals(eventId)
                 && !session.tagged.contains(tester.getUniqueId())) {
             GameDebugRuntimeOverrides.markDebugSession();
@@ -29526,32 +29530,36 @@ public final class ArcadePortManager implements Listener {
         if (session == null || session.type != ArcadePortGame.MICRO_BATTLES || !session.liveStarted
                 || !session.alive.contains(player.getUniqueId())
                 || !"dasher".equals(session.microKits.getOrDefault(player.getUniqueId(), "archer"))) return;
-        if (!debugKitFeatureEnabled(player, ArcadePortGame.MICRO_BATTLES, "dasher")) {
-            event.setCancelled(true);
-            player.setFlying(false);
-            player.setAllowFlight(false);
-            return;
-        }
         event.setCancelled(true);
         player.setFlying(false);
+        useMicroDasherJump(session, player);
+    }
+
+    private boolean useMicroDasherJump(Session session, Player player) {
+        if (session == null || active != session || session.type != ArcadePortGame.MICRO_BATTLES
+                || !session.liveStarted || player == null || !player.isOnline()
+                || !session.alive.contains(player.getUniqueId())
+                || !"dasher".equals(session.microKits.getOrDefault(player.getUniqueId(), "archer"))) return false;
+        if (!debugKitFeatureEnabled(player, ArcadePortGame.MICRO_BATTLES, "dasher")) {
+            player.setAllowFlight(false);
+            return false;
+        }
         player.setAllowFlight(false);
         UUID id = player.getUniqueId();
         long now = System.currentTimeMillis();
         long readyAt = session.microDasherJumpReadyAt.getOrDefault(id, 0L);
         if (now < readyAt) {
             player.sendActionBar(ChatColor.YELLOW + "Double Jump is recharging.");
-            return;
+            return false;
         }
         long cooldown = GameDebugRuntimeOverrides.longValue("MICRO_BATTLES_DASHER_JUMP_COOLDOWN_MILLIS", ArcadePortRules.MICRO_BATTLES_DASHER_JUMP_COOLDOWN_MILLIS);
         session.microDasherJumpReadyAt.put(id, now + cooldown);
         cooldownProgress.start(player, "Double Jump", cooldown);
-        Vector velocity = player.getLocation().getDirection().clone();
-        velocity.setY(0.0D);
-        if (velocity.lengthSquared() > 0.0001D) velocity.normalize().multiply(0.45D);
-        velocity.setY(0.55D);
+        Vector velocity = ArcadePortRules.microBattlesDasherJumpVelocity(player.getLocation().getDirection());
         player.setVelocity(velocity);
         player.setFallDistance(0.0F);
         player.playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 0.65F, 1.4F);
+        return true;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)

@@ -81,6 +81,8 @@ class GameDebugEventCatalogTest {
                 .getFirst().id());
         assertTrue(GameDebugEventCatalog.events(ArcadePortGame.MICRO_BATTLES).stream()
                 .anyMatch(event -> event.id().equals("drop-barriers")));
+        assertTrue(GameDebugEventCatalog.events(ArcadePortGame.MICRO_BATTLES).stream()
+                .anyMatch(event -> event.id().equals("test-dasher-jump")));
         assertEquals("grant-spells", GameDebugEventCatalog.events(ArcadePortGame.WIZARDS)
                 .getFirst().id());
         assertEquals(List.of("fill-meter", "use-ability", "use-crouch-dash", "refresh-kit"),
@@ -1702,6 +1704,27 @@ class GameDebugEventCatalogTest {
         assertTrue(manager.contains("releaseMicroBattlesBarrier(session);"));
         assertTrue(manager.contains("private void updateMicroBarrier(Session session, long now)"));
         assertTrue(manager.contains("private void releaseMicroBattlesBarrier(Session session)"));
+    }
+
+    @Test
+    void microBattlesDasherDebugEventUsesTheProductionCooldownAndJumpPath() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String events = Files.readString(sourceRoot.resolve("GameDebugEventCatalog.java"));
+        assertTrue(events.contains("new Event(\"test-dasher-jump\""));
+        assertTrue(manager.contains("\"test-dasher-jump\".equals(eventId)"));
+        assertTrue(manager.contains("triggered = useMicroDasherJump(session, tester)"));
+        int jump = manager.indexOf("private boolean useMicroDasherJump(Session session, Player player)");
+        int end = manager.indexOf("@EventHandler", jump);
+        String productionJump = manager.substring(jump, end < 0 ? manager.length() : end);
+        assertTrue(productionJump.contains("debugKitFeatureEnabled(player, ArcadePortGame.MICRO_BATTLES, \"dasher\")"));
+        assertTrue(productionJump.contains("MICRO_BATTLES_DASHER_JUMP_COOLDOWN_MILLIS"));
+        assertTrue(productionJump.contains("player.setVelocity(velocity)"));
+        assertTrue(productionJump.contains("player.setFallDistance(0.0F)"));
     }
 
     @Test
