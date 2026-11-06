@@ -281,7 +281,12 @@ final class GameDebugVariableCatalog {
                 || name.equals("GLADIATOR_PROJECTILE_KNOCKBACK_VERTICAL")) return 0.0D;
         if (name.equals("GLADIATOR_POTION_SPLASH_RADIUS")) return 0.1D;
         if (name.equals("GLADIATOR_MELEE_NO_DAMAGE_TICKS")
-                || name.equals("GLADIATOR_PROJECTILE_NO_DAMAGE_TICKS")) return 0.0D;
+                || name.equals("GLADIATOR_PROJECTILE_NO_DAMAGE_TICKS")
+                || name.equals("GLADIATOR_ENVIRONMENTAL_NO_DAMAGE_TICKS")
+                || name.equals("GLADIATOR_PVP_DAMAGE_MULTIPLIER")) return 0.0D;
+        if (name.equals("GLADIATOR_STARTING_TIER_OVERRIDE")) return -1.0D;
+        if (name.equals("GLADIATOR_MODE_OVERRIDE") || name.equals("GLADIATOR_POTION_COUNT")) return 0.0D;
+        if (name.equals("GLADIATOR_VOTE_MILLIS") || name.equals("GLADIATOR_ARENA_TRANSITION_MILLIS")) return 0.0D;
         if (name.equals("TURF_WARS_LINES_PER_KILL_MULTIPLIER")) return 1.0D;
         if (name.equals("HEROES_OF_GWEN_OVERTIME_PATH_ADVANCE_DISTANCE_SQUARED")
                 || name.equals("HEROES_OF_GWEN_DEVON_TNT_BOW_BASE_DAMAGE")
@@ -492,8 +497,14 @@ final class GameDebugVariableCatalog {
         if (name.startsWith("GLADIATOR_TIER_") && name.endsWith("_ARROWS")) return 64.0D;
         if (name.equals("GLADIATOR_POTION_HEALING")) return 20.0D;
         if (name.equals("GLADIATOR_POTION_SPLASH_RADIUS")) return 16.0D;
+        if (name.equals("GLADIATOR_POTION_COUNT")) return 64.0D;
+        if (name.equals("GLADIATOR_STARTING_TIER_OVERRIDE")) return 3.0D;
+        if (name.equals("GLADIATOR_MODE_OVERRIDE")) return 4.0D;
+        if (name.equals("GLADIATOR_VOTE_MILLIS") || name.equals("GLADIATOR_ARENA_TRANSITION_MILLIS")) return 60_000.0D;
         if (name.equals("GLADIATOR_MELEE_NO_DAMAGE_TICKS")
-                || name.equals("GLADIATOR_PROJECTILE_NO_DAMAGE_TICKS")) return 40.0D;
+                || name.equals("GLADIATOR_PROJECTILE_NO_DAMAGE_TICKS")
+                || name.equals("GLADIATOR_ENVIRONMENTAL_NO_DAMAGE_TICKS")) return 40.0D;
+        if (name.equals("GLADIATOR_PVP_DAMAGE_MULTIPLIER")) return 5.0D;
         if (name.equals("TURF_WARS_LINES_PER_KILL_MULTIPLIER")) return 8.0D;
         if (name.equals("TURF_WARS_COMBAT_BOUNDARY_DAMAGE")) return 40.0D;
         if (name.equals("TURF_WARS_BUILD_BOUNDARY_DAMAGE")) return 500.0D;
@@ -732,6 +743,8 @@ final class GameDebugVariableCatalog {
     }
 
     static String humanize(String key) {
+        if ("GLADIATOR_MODE_OVERRIDE".equals(key)) return "mode override (0 Normal, 1 Rodless, 2 Bowless, 3 Modern, 4 Pot)";
+        if ("GLADIATOR_STARTING_TIER_OVERRIDE".equals(key)) return "starting tier override (-1 auto, 0-3 arena tier)";
         return key.toLowerCase(Locale.ROOT).replace('_', ' ');
     }
 }

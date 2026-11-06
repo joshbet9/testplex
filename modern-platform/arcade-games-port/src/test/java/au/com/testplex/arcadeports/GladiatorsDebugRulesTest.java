@@ -6,6 +6,9 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GladiatorsDebugRulesTest {
     @AfterEach
@@ -81,5 +84,72 @@ class GladiatorsDebugRulesTest {
         GameDebugRuntimeOverrides.clear();
         assertEquals(4.0D, ArcadePortRules.gladiatorsPotionHealing(), 1.0e-9);
         assertEquals(4.0D, ArcadePortRules.gladiatorsPotionSplashRadius(), 1.0e-9);
+    }
+
+    @Test
+    void tournamentSetupControlsKeepVoteDefaultsAndCanForceModeTierAndPacing() {
+        assertFalse(ArcadePortRules.gladiatorsForceModeEnabled());
+        assertEquals(0, ArcadePortRules.gladiatorsModeOverrideIndex());
+        assertEquals(15_000L, ArcadePortRules.gladiatorsVoteMillis());
+        assertEquals(15_000L, ArcadePortRules.gladiatorsArenaTransitionMillis());
+        assertEquals(5, ArcadePortRules.gladiatorsPotionCount());
+        assertEquals(3, ArcadePortRules.gladiatorsStartingTierForPlayers(2));
+        assertEquals(2, ArcadePortRules.gladiatorsStartingTierForPlayers(4));
+        assertEquals(1, ArcadePortRules.gladiatorsStartingTierForPlayers(8));
+        assertEquals(0, ArcadePortRules.gladiatorsStartingTierForPlayers(16));
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "GLADIATOR_FORCE_MODE_ENABLED", true,
+                "GLADIATOR_MODE_OVERRIDE", 3,
+                "GLADIATOR_STARTING_TIER_OVERRIDE", 1,
+                "GLADIATOR_VOTE_MILLIS", 3_000L,
+                "GLADIATOR_ARENA_TRANSITION_MILLIS", 2_000L,
+                "GLADIATOR_POTION_COUNT", 9));
+        assertTrue(ArcadePortRules.gladiatorsForceModeEnabled());
+        assertEquals(GladiatorsMode.MODERN, GladiatorsMode.values()[ArcadePortRules.gladiatorsModeOverrideIndex()]);
+        assertEquals(1, ArcadePortRules.gladiatorsStartingTierForPlayers(16));
+        assertEquals(3_000L, ArcadePortRules.gladiatorsVoteMillis());
+        assertEquals(2_000L, ArcadePortRules.gladiatorsArenaTransitionMillis());
+        assertEquals(9, ArcadePortRules.gladiatorsPotionCount());
+
+        GameDebugRuntimeOverrides.clear();
+        assertFalse(ArcadePortRules.gladiatorsForceModeEnabled());
+        assertEquals(3, ArcadePortRules.gladiatorsStartingTierForPlayers(2));
+        assertEquals(5, ArcadePortRules.gladiatorsPotionCount());
+    }
+
+    @Test
+    void pvpAndEnvironmentalDamagePacingAreAdjustableAndRestoreDefaults() {
+        assertEquals(20.0D, ArcadePortRules.gladiatorsPvpDamage(20.0D), 1.0e-9);
+        assertEquals(10, ArcadePortRules.gladiatorsEnvironmentalNoDamageTicks());
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "GLADIATOR_PVP_DAMAGE_MULTIPLIER", 1.5D,
+                "GLADIATOR_ENVIRONMENTAL_NO_DAMAGE_TICKS", 5));
+        assertEquals(30.0D, ArcadePortRules.gladiatorsPvpDamage(20.0D), 1.0e-9);
+        assertEquals(5, ArcadePortRules.gladiatorsEnvironmentalNoDamageTicks());
+        GameDebugRuntimeOverrides.clear();
+        assertEquals(20.0D, ArcadePortRules.gladiatorsPvpDamage(20.0D), 1.0e-9);
+        assertEquals(10, ArcadePortRules.gladiatorsEnvironmentalNoDamageTicks());
+    }
+
+    @Test
+    void setupVariablesAreExposedWithBoundedRangesAndModeDescriptions() {
+        assertVariable("GLADIATOR_MODE_OVERRIDE", 0.0D, 4.0D);
+        assertVariable("GLADIATOR_STARTING_TIER_OVERRIDE", -1.0D, 3.0D);
+        assertVariable("GLADIATOR_POTION_COUNT", 0.0D, 64.0D);
+        assertVariable("GLADIATOR_ARENA_TRANSITION_MILLIS", 0.0D, 60_000.0D);
+        assertVariable("GLADIATOR_VOTE_MILLIS", 0.0D, 60_000.0D);
+        assertVariable("GLADIATOR_PVP_DAMAGE_MULTIPLIER", 0.0D, 5.0D);
+        assertVariable("GLADIATOR_ENVIRONMENTAL_NO_DAMAGE_TICKS", 0.0D, 40.0D);
+        assertTrue(GameDebugVariableCatalog.humanize("GLADIATOR_MODE_OVERRIDE").contains("0 Normal"));
+        assertNotNull(GameDebugVariableCatalog.variable(ArcadePortGame.GLADIATORS,
+                "GLADIATOR_FORCE_MODE_ENABLED"));
+    }
+
+    private static void assertVariable(String key, double minimum, double maximum) {
+        GameDebugVariableCatalog.Variable variable = GameDebugVariableCatalog.variable(ArcadePortGame.GLADIATORS, key);
+        assertNotNull(variable, key);
+        assertEquals(minimum, variable.minimum(), key);
+        assertEquals(maximum, variable.maximum(), key);
     }
 }

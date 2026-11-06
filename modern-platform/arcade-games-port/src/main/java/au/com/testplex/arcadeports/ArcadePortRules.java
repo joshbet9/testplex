@@ -2815,11 +2815,20 @@ public final class ArcadePortRules {
 
 
     public static final long GLADIATOR_ROUND_COUNTDOWN_MILLIS = 5_000L;
+    public static final long GLADIATOR_VOTE_MILLIS = 15_000L;
+    public static final long GLADIATOR_ARENA_TRANSITION_MILLIS = 15_000L;
+    /** -1 preserves lobby-size-based source tier selection; 0 through 3 force an arena tier for testing. */
+    public static final int GLADIATOR_STARTING_TIER_OVERRIDE = -1;
+    /** Mode indices follow GladiatorsMode: Normal, Rodless, Bowless, Modern, Pot. */
+    public static final boolean GLADIATOR_FORCE_MODE_ENABLED = false;
+    public static final int GLADIATOR_MODE_OVERRIDE = 0;
     public static final long GLADIATOR_POISON_DELAY_MILLIS = 60_000L;
     public static final long GLADIATOR_POISON_INTERVAL_MILLIS = 1_000L;
     public static final double GLADIATOR_POISON_DAMAGE = 1.0D;
     public static final int GLADIATOR_MELEE_NO_DAMAGE_TICKS = 10;
     public static final int GLADIATOR_PROJECTILE_NO_DAMAGE_TICKS = 8;
+    public static final int GLADIATOR_ENVIRONMENTAL_NO_DAMAGE_TICKS = 10;
+    public static final double GLADIATOR_PVP_DAMAGE_MULTIPLIER = 1.0D;
     public static final double GLADIATOR_MELEE_KNOCKBACK_HORIZONTAL = 0.32D;
     public static final double GLADIATOR_MELEE_KNOCKBACK_VERTICAL = 0.12D;
     public static final double GLADIATOR_PROJECTILE_KNOCKBACK_HORIZONTAL = 0.18D;
@@ -2830,6 +2839,29 @@ public final class ArcadePortRules {
     public static final int GLADIATOR_TIER_3_ARROWS = 10;
     public static final double GLADIATOR_POTION_HEALING = 4.0D;
     public static final double GLADIATOR_POTION_SPLASH_RADIUS = 4.0D;
+    public static final int GLADIATOR_POTION_COUNT = 5;
+
+    public static long gladiatorsVoteMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue("GLADIATOR_VOTE_MILLIS", GLADIATOR_VOTE_MILLIS));
+    }
+
+    public static long gladiatorsArenaTransitionMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "GLADIATOR_ARENA_TRANSITION_MILLIS", GLADIATOR_ARENA_TRANSITION_MILLIS));
+    }
+
+    public static int gladiatorsModeOverrideIndex() {
+        return Math.max(0, Math.min(4, GameDebugRuntimeOverrides.intValue(
+                "GLADIATOR_MODE_OVERRIDE", GLADIATOR_MODE_OVERRIDE)));
+    }
+
+    public static boolean gladiatorsForceModeEnabled() {
+        return GameDebugRuntimeOverrides.booleanValue("GLADIATOR_FORCE_MODE_ENABLED", GLADIATOR_FORCE_MODE_ENABLED);
+    }
+
+    public static int gladiatorsPotionCount() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue("GLADIATOR_POTION_COUNT", GLADIATOR_POTION_COUNT));
+    }
 
     public static int gladiatorsArrowCount(int tier) {
         return Math.max(0, GameDebugRuntimeOverrides.intValue(switch (Math.max(0, Math.min(3, tier))) {
@@ -2849,6 +2881,16 @@ public final class ArcadePortRules {
         return Math.max(0, GameDebugRuntimeOverrides.intValue(projectile
                 ? "GLADIATOR_PROJECTILE_NO_DAMAGE_TICKS" : "GLADIATOR_MELEE_NO_DAMAGE_TICKS",
                 projectile ? GLADIATOR_PROJECTILE_NO_DAMAGE_TICKS : GLADIATOR_MELEE_NO_DAMAGE_TICKS));
+    }
+
+    public static int gladiatorsEnvironmentalNoDamageTicks() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue("GLADIATOR_ENVIRONMENTAL_NO_DAMAGE_TICKS",
+                GLADIATOR_ENVIRONMENTAL_NO_DAMAGE_TICKS));
+    }
+
+    public static double gladiatorsPvpDamage(double damage) {
+        return Math.max(0.0D, damage * Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "GLADIATOR_PVP_DAMAGE_MULTIPLIER", GLADIATOR_PVP_DAMAGE_MULTIPLIER)));
     }
 
     public static double gladiatorsKnockbackHorizontal(boolean projectile) {
@@ -3942,6 +3984,9 @@ public final class ArcadePortRules {
      * Tier index is GREEN=0, YELLOW=1, ORANGE=2, RED=3.
      */
     public static int gladiatorsStartingTierForPlayers(int players) {
+        int overrideTier = GameDebugRuntimeOverrides.intValue("GLADIATOR_STARTING_TIER_OVERRIDE",
+                GLADIATOR_STARTING_TIER_OVERRIDE);
+        if (overrideTier >= 0) return Math.min(3, overrideTier);
         if (players <= 2) return 3;
         if (players <= 4) return 2;
         if (players <= 8) return 1;

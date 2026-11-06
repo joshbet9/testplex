@@ -5277,7 +5277,10 @@ public final class ArcadePortManager implements Listener {
             setupGladiatorsScoreboard(session);
             String savedVote = gladiatorLobbyVotes.remove(participants.get(0).getUniqueId());
             GladiatorsMode soloMode = GladiatorsMode.fromId(savedVote);
-            session.gladiatorMode = soloMode == null ? GladiatorsMode.defaultMode().id() : soloMode.id();
+            session.gladiatorMode = GameDebugRuntimeOverrides.isDebugSession()
+                    && ArcadePortRules.gladiatorsForceModeEnabled()
+                    ? GladiatorsMode.values()[ArcadePortRules.gladiatorsModeOverrideIndex()].id()
+                    : soloMode == null ? GladiatorsMode.defaultMode().id() : soloMode.id();
             giveGladiatorKit(session, participants.get(0));
             participants.get(0).sendMessage(ChatColor.YELLOW
                     + "Solo practice only: the double-elimination tournament begins when at least two players join.");
@@ -6286,7 +6289,7 @@ public final class ArcadePortManager implements Listener {
             if (GladiatorsMode.fromId(vote) != null) session.gladiatorVotes.put(id, vote);
         }
         session.gladiatorMode = GladiatorsMode.defaultMode().id();
-        session.gladiatorVotingEndsAt = System.currentTimeMillis() + 15_000L;
+        session.gladiatorVotingEndsAt = System.currentTimeMillis() + ArcadePortRules.gladiatorsVoteMillis();
         announce(session, ChatColor.GOLD + "Gladiators vote: choose the PvP rules for this tournament.");
         for (Player player : session.players.values()) {
             if (player == null || !player.isOnline()) continue;
@@ -6730,6 +6733,9 @@ public final class ArcadePortManager implements Listener {
                 selected = mode;
             }
         }
+        if (GameDebugRuntimeOverrides.isDebugSession() && ArcadePortRules.gladiatorsForceModeEnabled()) {
+            selected = GladiatorsMode.values()[ArcadePortRules.gladiatorsModeOverrideIndex()];
+        }
         session.gladiatorMode = selected.id();
         for (Player player : session.players.values()) {
             if (player != null && player.isOnline()
@@ -6998,7 +7004,7 @@ public final class ArcadePortManager implements Listener {
             }
         }
         boolean walkToNextArena = advancingDoors.size() == 2;
-        long transitionUntil = walkToNextArena ? now + 15_000L : now;
+        long transitionUntil = walkToNextArena ? now + ArcadePortRules.gladiatorsArenaTransitionMillis() : now;
         long fightStartsAt = transitionUntil + GameDebugRuntimeOverrides.longValue("GLADIATOR_ROUND_COUNTDOWN_MILLIS", ArcadePortRules.GLADIATOR_ROUND_COUNTDOWN_MILLIS);
         session.gladiatorRoundStartedAtByPair.put(pair, fightStartsAt);
         session.gladiatorFightStartsAtByPair.put(pair, fightStartsAt);
@@ -7087,15 +7093,18 @@ public final class ArcadePortManager implements Listener {
                 player.getInventory().setItemInOffHand(new ItemStack(Material.SHIELD));
             }
             case POT -> {
-                ItemStack potions = namedItem(Material.SPLASH_POTION, "Healing Potions",
-                        "Right-click to restore two hearts.", 5);
-                ItemMeta meta = potions.getItemMeta();
-                if (meta instanceof org.bukkit.inventory.meta.PotionMeta potionMeta) {
-                    potionMeta.setColor(Color.PURPLE);
+                int potionCount = ArcadePortRules.gladiatorsPotionCount();
+                if (potionCount > 0) {
+                    ItemStack potions = namedItem(Material.SPLASH_POTION, "Healing Potions",
+                            "Right-click to restore two hearts.", potionCount);
+                    ItemMeta meta = potions.getItemMeta();
+                    if (meta instanceof org.bukkit.inventory.meta.PotionMeta potionMeta) {
+                        potionMeta.setColor(Color.PURPLE);
+                    }
+                    meta.getPersistentDataContainer().set(gladiatorPotionKey, PersistentDataType.BYTE, (byte) 1);
+                    potions.setItemMeta(meta);
+                    player.getInventory().addItem(potions);
                 }
-                meta.getPersistentDataContainer().set(gladiatorPotionKey, PersistentDataType.BYTE, (byte) 1);
-                potions.setItemMeta(meta);
-                player.getInventory().addItem(potions);
             }
         }
         ItemStack[] armorItems = new ItemStack[4];
@@ -18264,7 +18273,7 @@ public final class ArcadePortManager implements Listener {
         if (pair == null || session.gladiatorResolvedPairs.contains(pair)) return;
         long fightStartsAt = session.gladiatorFightStartsAtByPair.getOrDefault(pair, Long.MAX_VALUE);
         if (System.currentTimeMillis() < fightStartsAt || target.getNoDamageTicks() > 0) return;
-        target.setNoDamageTicks(10);
+        target.setNoDamageTicks(ArcadePortRules.gladiatorsEnvironmentalNoDamageTicks());
         if (target.getHealth() <= damage) {
             session.gladiatorRoundDamageTaken.merge(target.getUniqueId(), damage, Double::sum);
             session.gladiatorLethalMargin.put(target.getUniqueId(), target.getHealth() - damage);
@@ -24523,7 +24532,7 @@ public final class ArcadePortManager implements Listener {
                     if (session.alive.contains(attacker.getUniqueId())
                             && session.alive.contains(gladiatorTarget.getUniqueId())) {
                         applyGladiatorDamage(session, attacker, gladiatorTarget,
-                                finalDamage, damager instanceof Projectile);
+                                ArcadePortRules.gladiatorsPvpDamage(finalDamage), damager instanceof Projectile);
                     }
                 } else {
                     applyGladiatorEnvironmentalDamage(session, gladiatorTarget, finalDamage, damageReason);
