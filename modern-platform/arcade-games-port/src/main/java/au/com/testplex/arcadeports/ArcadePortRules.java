@@ -2817,6 +2817,51 @@ public final class ArcadePortRules {
     public static final int CASTLE_ASSAULT_ARCHER_MAX_ARROWS = 10;
     public static final long CASTLE_ASSAULT_DEMOLITIONIST_TNT_REFILL_MILLIS = 10_000L;
     public static final int CASTLE_ASSAULT_DEMOLITIONIST_MAX_TNT = 2;
+    public static final long CASTLE_ASSAULT_EXPRESS_DELIVERY_MILLIS = 15_000L;
+    public static final double CASTLE_ASSAULT_ROYAL_GUARD_RANGE = 15.0D;
+
+    public static boolean shouldAwardCastleAssaultClutchness(int winningKingHealth) {
+        return winningKingHealth > 0 && winningKingHealth < 10;
+    }
+
+    public static boolean shouldAwardCastleAssaultMultiplicative(int playerKills, int nextHighestTeammateKills) {
+        return playerKills >= 5 && nextHighestTeammateKills >= 0
+                && (long) playerKills >= 2L * nextHighestTeammateKills;
+    }
+
+    public static boolean shouldAwardCastleAssaultBadChemistry(int attributedDebuffKills) {
+        return attributedDebuffKills >= 2;
+    }
+
+    public static boolean shouldAwardCastleAssaultPinCushion(int bowKills) {
+        return bowKills >= 5;
+    }
+
+    public static boolean shouldAwardCastleAssaultTntRrific(int demolitionistTntKills) {
+        return demolitionistTntKills >= 3;
+    }
+
+    public static boolean shouldAwardCastleAssaultGoldenBoy(boolean consumedGoldenApplegateThisLife,
+            int killsThisLife) {
+        return consumedGoldenApplegateThisLife && killsThisLife >= 5;
+    }
+
+    public static boolean shouldAwardCastleAssaultImmovableObject(int survivedEnemyHitsThisLife) {
+        return survivedEnemyHitsThisLife >= 10;
+    }
+
+    public static boolean isCastleAssaultExpressDelivery(long pickupAtMillis, long detonationAtMillis) {
+        return pickupAtMillis > 0L && detonationAtMillis >= pickupAtMillis
+                && detonationAtMillis - pickupAtMillis <= CASTLE_ASSAULT_EXPRESS_DELIVERY_MILLIS;
+    }
+
+    public static boolean shouldAwardCastleAssaultRoyalGuard(int kingDefenseKills) {
+        return kingDefenseKills >= 3;
+    }
+
+    public static boolean shouldAwardCastleAssaultAgainstAllOdds(int survivingFriendlyCrystals) {
+        return survivingFriendlyCrystals == 0;
+    }
 
     public static final long HEROES_OF_GWEN_WITHER_EARTHQUAKE_INTERVAL_MILLIS = 4_000L;
     public static final double HEROES_OF_GWEN_WITHER_TARGET_SPEED = 4.0D;
