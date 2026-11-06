@@ -40,6 +40,16 @@ class BaconBrawlDebugRulesTest {
         assertEquals(1.25D, ArcadePortRules.baconBlastPowerMultiplier(50), 0.00001D);
     }
 
+    @Test void hungerFoodChangesUseSourceSaturationAndAllowTuningThenReset() {
+        assertEquals(5.0F, ArcadePortRules.baconSaturationOnFoodChange());
+        GameDebugRuntimeOverrides.activate(Map.of("BACON_SATURATION_ON_FOOD_CHANGE", 12.0F));
+        assertEquals(12.0F, ArcadePortRules.baconSaturationOnFoodChange());
+        GameDebugRuntimeOverrides.activate(Map.of("BACON_SATURATION_ON_FOOD_CHANGE", 25.0F));
+        assertEquals(20.0F, ArcadePortRules.baconSaturationOnFoodChange());
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertEquals(5.0F, ArcadePortRules.baconSaturationOnFoodChange());
+    }
+
     @Test void combatTimingReachAndBlastCollisionUseLiveRuleValues() {
         assertEquals(0.65D, ArcadePortRules.baconTimedHitKnockbackMultiplier(200L), 0.00001D);
         assertFalse(ArcadePortRules.shouldAcceptBaconAvatarPacketHit(true, true, true, false, 13.0D, true));

@@ -13043,7 +13043,7 @@ public final class ArcadePortManager implements Listener {
             for (Player player : new ArrayList<>(alivePlayers(session))) {
                 if (player.getFoodLevel() > 0) {
                     player.setFoodLevel(Math.max(0, player.getFoodLevel() - GameDebugRuntimeOverrides.intValue("BACON_HUNGER_DRAIN_PER_INTERVAL", ArcadePortRules.BACON_HUNGER_DRAIN_PER_INTERVAL)));
-                    player.setSaturation(0.0F);
+                    player.setSaturation(ArcadePortRules.baconSaturationOnFoodChange());
                 } else if (player.getHealth() <= GameDebugRuntimeOverrides.doubleValue("BACON_STARVATION_DAMAGE", ArcadePortRules.BACON_STARVATION_DAMAGE)) {
                     session.baconStarvationDamaged.add(player.getUniqueId());
                     eliminate(session, player, null, "starved");
@@ -14372,7 +14372,7 @@ public final class ArcadePortManager implements Listener {
         // Reborn restores hunger to the attacker for each successful hit.
         attacker.setFoodLevel(Math.min(20,
                 attacker.getFoodLevel() + GameDebugRuntimeOverrides.intValue("BACON_HUNGER_RESTORE_PER_HIT", ArcadePortRules.BACON_HUNGER_RESTORE_PER_HIT)));
-        attacker.setSaturation(0.0F);
+        attacker.setSaturation(ArcadePortRules.baconSaturationOnFoodChange());
         target.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
                 target.getLocation().add(0.0D, 1.0D, 0.0D), 6, 0.28D, 0.35D, 0.28D, 0.01D);
         attacker.playSound(attacker.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 0.8F, 1.1F);
@@ -25443,7 +25443,7 @@ public final class ArcadePortManager implements Listener {
         // 1.8 only restores food after a successful hit. Prevent vanilla regen from
         // undoing the round's explicit hunger drain on the next tick.
         if (event.getFoodLevel() > player.getFoodLevel()) event.setCancelled(true);
-        player.setSaturation(0.0F);
+        player.setSaturation(ArcadePortRules.baconSaturationOnFoodChange());
     }
 
     private boolean isTurfWarsProtectedKitItem(ItemStack item) {

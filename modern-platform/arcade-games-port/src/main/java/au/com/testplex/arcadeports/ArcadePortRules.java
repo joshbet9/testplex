@@ -601,6 +601,11 @@ public final class ArcadePortRules {
     public static final int BACON_HUNGER_DRAIN_PER_INTERVAL = 2;
     public static final int BACON_HUNGER_RESTORE_PER_HIT = 2;
     public static final float BACON_SATURATION_ON_FOOD_CHANGE = 5.0F;
+
+    public static float baconSaturationOnFoodChange() {
+        return Math.max(0.0F, Math.min(20.0F, GameDebugRuntimeOverrides.floatValue(
+                "BACON_SATURATION_ON_FOOD_CHANGE", BACON_SATURATION_ON_FOOD_CHANGE)));
+    }
     public static final double BACON_STARVATION_DAMAGE = 4.0D;
     /** Ordinary Bacon Brawl hits use knockback; health loss is reserved for arena/environment hazards. */
     public static final boolean BACON_BRAWL_HITS_DAMAGE_HEALTH = false;
