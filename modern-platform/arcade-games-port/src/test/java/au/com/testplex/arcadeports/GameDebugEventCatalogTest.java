@@ -91,6 +91,28 @@ class GameDebugEventCatalogTest {
     }
 
     @Test
+    void milkTheCowAbilityEventUsesTheRoleAbilityImplementationsAndDebugFeatureGates() throws IOException {
+        assertEquals(List.of("spawn-herd", "use-kit-ability"),
+                GameDebugEventCatalog.events(ArcadePortGame.MILK_THE_COW).stream()
+                        .map(GameDebugEventCatalog.Event::id).toList());
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String runtime = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        assertTrue(manager.contains("launchMilkCowBomb(session, tester, now)"));
+        assertTrue(manager.contains("startMilkCowBodySlam(session, tester, now)"));
+        assertTrue(manager.contains("\"cow-bomb\", true)"));
+        assertTrue(manager.contains("\"body-slam\", true)"));
+        assertTrue(manager.contains("MilkCowRules.cowBombDamage()"));
+        assertTrue(manager.contains("MilkCowRules.bodySlamDamageAtDistance(distance)"));
+        assertTrue(runtime.contains("features.put(\"cow-bomb\""));
+        assertTrue(runtime.contains("features.put(\"body-slam\""));
+    }
+
+    @Test
     void everyMonsterMazeModeUsesTheSharedMonsterWaveEventBridge() {
         for (ArcadePortGame game : List.of(ArcadePortGame.MONSTER_MAZE,
                 ArcadePortGame.MONSTER_MAZE_SPEED, ArcadePortGame.MONSTER_MAZE_MODERN)) {

@@ -222,6 +222,22 @@ final class GameDebugVariableCatalog {
 
     private static double minimum(String name, double defaultValue, Kind kind) {
         if (kind == Kind.BOOLEAN) return 0.0D;
+        if (name.startsWith("COW_BOMB_") || name.startsWith("BODY_SLAM_")
+                || name.equals("ASSIST_CREDIT_WINDOW_MILLIS")) {
+            if (name.equals("COW_BOMB_LIFETIME_MILLIS")) return 1.0D;
+            if (name.endsWith("_MILLIS")) return 0.0D;
+        }
+        if (name.equals("FARMER_DOUBLE_JUMP_MIN_VERTICAL")
+                || name.equals("PERFECT_GAME_MAX_FARMER_DEATHS")) return 0.0D;
+        if (name.equals("COMEBACK_LEAD_THRESHOLD") || name.equals("GOT_THE_CHOPS_AIRBORNE_KILLS")
+                || name.equals("SLAUGHTERHOUSE_ASSISTS")) return 1.0D;
+        if (name.equals("COW_BOMB_CONTACT_RADIUS_BLOCKS") || name.equals("BODY_SLAM_RADIUS_BLOCKS")
+                || name.equals("BODY_SLAM_HEIGHT_BLOCKS")) return 0.1D;
+        if (name.startsWith("MILK_THE_COW_") && name.endsWith("_MILLIS")) {
+            if (name.endsWith("COW_CHARGE_HUNGER_INTERVAL_MILLIS")
+                    || name.endsWith("HERD_UPDATE_INTERVAL_MILLIS")) return 1.0D;
+            return 0.0D;
+        }
         if (name.contains("_FALL_DAMAGE_MULTIPLIER") || name.startsWith("EVOLUTION_CHARGE_")) return 0.0D;
         if (name.contains("_MAX_HEALTH")) return 1.0D;
         if (name.contains("_MELEE_DAMAGE")) return 0.0D;
@@ -250,6 +266,12 @@ final class GameDebugVariableCatalog {
         if (name.equals("COW_CHARGE_TARGET_RADIUS_BLOCKS")
                 || name.equals("COW_CHARGE_TARGET_HEIGHT_BLOCKS")
                 || name.equals("HERD_SPAWN_RADIUS_BLOCKS")) return 0.1D;
+        if (name.equals("COW_CHARGE_IMPACT_VERTICAL") || name.startsWith("COW_BOMB_")
+                || name.startsWith("BODY_SLAM_") || name.startsWith("FARMER_DOUBLE_JUMP_")) return 0.0D;
+        if (name.equals("MILK_THE_COW_PERFECT_GAME_MAX_FARMER_DEATHS")) return 0.0D;
+        if (name.equals("MILK_THE_COW_COMEBACK_LEAD_THRESHOLD")
+                || name.equals("MILK_THE_COW_GOT_THE_CHOPS_AIRBORNE_KILLS")
+                || name.equals("MILK_THE_COW_SLAUGHTERHOUSE_ASSISTS")) return 1.0D;
         if (name.equals("COW_CHARGE_HUNGER_INTERVAL_MILLIS")
                 || name.equals("HERD_UPDATE_INTERVAL_MILLIS")
                 || name.equals("COW_SPRINT_SPEED_DURATION_TICKS")) return 1.0D;
@@ -460,6 +482,15 @@ final class GameDebugVariableCatalog {
         if (name.equals("COW_CHARGE_HUNGER_INTERVAL_MILLIS")
                 || name.equals("HERD_UPDATE_INTERVAL_MILLIS")
                 || name.equals("COW_CHARGE_TARGET_COOLDOWN_MILLIS")) return 120_000.0D;
+        if (name.startsWith("COW_BOMB_") || name.startsWith("BODY_SLAM_")
+                || name.equals("ASSIST_CREDIT_WINDOW_MILLIS")) {
+            if (name.endsWith("_MILLIS")) return 600_000.0D;
+            if (name.endsWith("_RADIUS_BLOCKS") || name.endsWith("_HEIGHT_BLOCKS")) return 64.0D;
+            return 16.0D;
+        }
+        if (name.startsWith("FARMER_DOUBLE_JUMP_") || name.equals("COW_CHARGE_IMPACT_VERTICAL")) return 16.0D;
+        if (name.equals("COMEBACK_LEAD_THRESHOLD") || name.equals("GOT_THE_CHOPS_AIRBORNE_KILLS")
+                || name.equals("SLAUGHTERHOUSE_ASSISTS") || name.equals("PERFECT_GAME_MAX_FARMER_DEATHS")) return 100.0D;
         if (name.equals("COW_CHARGE_TARGET_RADIUS_BLOCKS")
                 || name.equals("COW_CHARGE_TARGET_HEIGHT_BLOCKS")
                 || name.equals("HERD_SPAWN_RADIUS_BLOCKS")) return 64.0D;
@@ -729,6 +760,15 @@ final class GameDebugVariableCatalog {
         if (name.startsWith("CHARGER_") && name.endsWith("_SPEED")) return 0.1D;
         if (name.startsWith("EVOLUTION_CHARGE_")) return 0.001D;
         if (name.startsWith("SKY_WARS_") && name.endsWith("_MILLIS")) return 100.0D;
+        if (name.startsWith("COW_BOMB_") || name.startsWith("BODY_SLAM_")
+                || name.equals("ASSIST_CREDIT_WINDOW_MILLIS")) {
+            if (name.endsWith("_MILLIS")) return 100.0D;
+            if (name.endsWith("_RADIUS_BLOCKS") || name.endsWith("_HEIGHT_BLOCKS")) return 0.1D;
+            return 0.1D;
+        }
+        if (name.startsWith("FARMER_DOUBLE_JUMP_") || name.equals("COW_CHARGE_IMPACT_VERTICAL")) return 0.1D;
+        if (name.equals("COMEBACK_LEAD_THRESHOLD") || name.equals("GOT_THE_CHOPS_AIRBORNE_KILLS")
+                || name.equals("SLAUGHTERHOUSE_ASSISTS") || name.equals("PERFECT_GAME_MAX_FARMER_DEATHS")) return 1.0D;
         if (name.startsWith("RUNNER_") && name.endsWith("_SPEED")) return 0.1D;
         if (name.equals("RUNNER_SWITCH_GRACE_MILLIS")) return 50.0D;
         if (name.equals("RUNNER_STEPS_ACHIEVEMENT_BLOCKS")) return 100.0D;

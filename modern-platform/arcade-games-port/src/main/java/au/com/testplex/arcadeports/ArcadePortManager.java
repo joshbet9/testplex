@@ -1105,6 +1105,28 @@ public final class ArcadePortManager implements Listener {
             updateMilkCowHerd(session, tester, System.currentTimeMillis());
             triggered = session.milkCowHerd.stream().anyMatch(cow -> cow != null && cow.isValid());
         }
+        if (type == ArcadePortGame.MILK_THE_COW && "use-kit-ability".equals(eventId)) {
+            UUID testerId = tester.getUniqueId();
+            long now = System.currentTimeMillis();
+            if (session.teams.getOrDefault(testerId, 0) == 1) {
+                if (!debugFeatureEnabled(testerId, ArcadePortGame.MILK_THE_COW, "cow-bomb", true)) {
+                    tester.sendMessage(ChatColor.RED + "Cow Bomb is disabled in your debug profile.");
+                    return false;
+                }
+                int before = session.milkCowBombs.size();
+                launchMilkCowBomb(session, tester, now);
+                triggered = session.milkCowBombs.size() > before;
+            } else if (session.teams.getOrDefault(testerId, 0) == 0) {
+                if (!debugFeatureEnabled(testerId, ArcadePortGame.MILK_THE_COW, "body-slam", true)) {
+                    tester.sendMessage(ChatColor.RED + "Body Slam is disabled in your debug profile.");
+                    return false;
+                }
+                int before = session.milkBodySlamStartedAt.size();
+                startMilkCowBodySlam(session, tester, now);
+                triggered = session.milkBodySlamStartedAt.size() > before;
+            }
+            if (triggered) GameDebugRuntimeOverrides.markDebugSession();
+        }
         if (type == ArcadePortGame.SHEEP_QUEST && "spawn-sheep".equals(eventId)) {
             int sheepBefore = session.sheep.size();
             GameDebugRuntimeOverrides.markDebugSession();
@@ -27120,7 +27142,7 @@ public final class ArcadePortManager implements Listener {
                 }
                 damageMilkCowFarmer(session, target, cowPlayer, MilkCowRules.cowChargeDamage());
                 Vector push = target.getLocation().toVector().subtract(cowPlayer.getLocation().toVector());
-                push.setY(0.45D);
+                push.setY(MilkCowRules.cowChargeImpactVertical());
                 if (push.lengthSquared() > 0.001D) {
                     Vector chargeDirection = cowPlayer.getLocation().getDirection().clone();
                     chargeDirection.setY(0.0D);
@@ -27146,7 +27168,9 @@ public final class ArcadePortManager implements Listener {
                 session.milkCowBombOwners.remove(entry.getKey());
                 continue;
             }
-            boolean hitPlayer = session.world.getNearbyEntities(bomb.getLocation(), 1.1D, 1.1D, 1.1D).stream()
+            double contactRadius = MilkCowRules.cowBombContactRadiusBlocks();
+            boolean hitPlayer = session.world.getNearbyEntities(bomb.getLocation(), contactRadius, contactRadius,
+                    contactRadius).stream()
                     .anyMatch(entity -> entity instanceof Player target
                             && session.teams.getOrDefault(target.getUniqueId(), 1) == 0
                             && session.alive.contains(target.getUniqueId()));
@@ -27161,7 +27185,7 @@ public final class ArcadePortManager implements Listener {
             Player player = session.players.get(entry.getKey());
             if (player == null || !player.isOnline()) {
                 session.milkBodySlamStartedAt.remove(entry.getKey());
-            } else if (player.isOnGround() && now - entry.getValue() >= 1_000L) {
+            } else if (player.isOnGround() && now - entry.getValue() >= MilkCowRules.bodySlamLandingDelayMillis()) {
                 session.milkBodySlamStartedAt.remove(entry.getKey());
                 resolveMilkCowBodySlam(session, player);
                 if (active != session) return;
@@ -27236,7 +27260,8 @@ public final class ArcadePortManager implements Listener {
                 }
                 for (Map.Entry<UUID, Long> contribution : contributors.entrySet()) {
                     UUID assisterId = contribution.getKey();
-                    if (assisterId.equals(attackerId) || now - contribution.getValue() > 10_000L) continue;
+                    if (assisterId.equals(attackerId)
+                            || now - contribution.getValue() > MilkCowRules.assistCreditWindowMillis()) continue;
                     int assists = session.milkAssistsByPlayer.merge(assisterId, 1, Integer::sum);
                     Player assister = session.players.get(assisterId);
                     if (ArcadeProgressRules.shouldAwardMilkCowSlaughterhouse(assists) && assister != null) {
@@ -27273,8 +27298,9 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "Cow Bomb is recharging.");
             return;
         }
-        session.milkBombReadyAt.put(owner, now + 3_000L);
-        cooldownProgress.start(player, "Cow Bomb", 3_000L);
+        long cooldown = MilkCowRules.cowBombCooldownMillis();
+        session.milkBombReadyAt.put(owner, now + cooldown);
+        cooldownProgress.start(player, "Cow Bomb", cooldown);
         Cow bomb = session.world.spawn(player.getEyeLocation().add(player.getLocation().getDirection()), Cow.class);
         bomb.setBaby();
         bomb.setAgeLock(true);
@@ -27282,10 +27308,11 @@ public final class ArcadePortManager implements Listener {
         bomb.setRemoveWhenFarAway(false);
         bomb.setCustomName(ChatColor.RED + "Cow Bomb");
         bomb.setCustomNameVisible(false);
-        bomb.setVelocity(player.getLocation().getDirection().normalize().multiply(1.35D).setY(0.28D));
+        bomb.setVelocity(player.getLocation().getDirection().normalize()
+                .multiply(MilkCowRules.cowBombLaunchSpeed()).setY(MilkCowRules.cowBombLaunchVerticalSpeed()));
         session.milkCowBombs.put(bomb.getUniqueId(), bomb);
         session.milkCowBombOwners.put(bomb.getUniqueId(), owner);
-        session.milkCowBombExpiresAt.put(bomb.getUniqueId(), now + 2_500L);
+        session.milkCowBombExpiresAt.put(bomb.getUniqueId(), now + MilkCowRules.cowBombLifetimeMillis());
         session.entities.add(bomb);
         player.getWorld().playSound(player.getLocation(), Sound.ENTITY_COW_AMBIENT, 1.0F, 1.5F);
     }
@@ -27302,13 +27329,14 @@ public final class ArcadePortManager implements Listener {
         centre.getWorld().playSound(centre, Sound.ENTITY_COW_HURT, 1.5F, 1.1F);
         centre.getWorld().spawnParticle(Particle.EXPLOSION, centre, 1);
         // The source Cow Bomb is a direct-impact attack rather than a large radial AoE.
-        for (Entity nearby : centre.getWorld().getNearbyEntities(centre, 1.0D, 1.0D, 1.0D)) {
+        double contactRadius = MilkCowRules.cowBombContactRadiusBlocks();
+        for (Entity nearby : centre.getWorld().getNearbyEntities(centre, contactRadius, contactRadius, contactRadius)) {
             if (!(nearby instanceof Player target) || session.teams.getOrDefault(target.getUniqueId(), 1) != 0
                     || !session.alive.contains(target.getUniqueId())) continue;
-            damageMilkCowFarmer(session, target, owner, 4.0D);
+            damageMilkCowFarmer(session, target, owner, MilkCowRules.cowBombDamage());
             Vector push = target.getLocation().toVector().subtract(centre.toVector());
-            push.setY(0.8D);
-            if (push.lengthSquared() > 0.001D) target.setVelocity(push.normalize().multiply(2.5D));
+            push.setY(MilkCowRules.cowBombKnockbackVertical());
+            if (push.lengthSquared() > 0.001D) target.setVelocity(push.normalize().multiply(MilkCowRules.cowBombKnockback()));
             if (active != session) return;
         }
     }
@@ -27320,11 +27348,13 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "Body Slam is recharging.");
             return;
         }
-        session.milkBodySlamReadyAt.put(id, now + 6_000L);
-        cooldownProgress.start(player, "Body Slam", 6_000L);
+        long cooldown = MilkCowRules.bodySlamCooldownMillis();
+        session.milkBodySlamReadyAt.put(id, now + cooldown);
+        cooldownProgress.start(player, "Body Slam", cooldown);
         session.milkBodySlamStartedAt.put(id, now);
-        Vector leap = player.getLocation().getDirection().normalize().multiply(0.9D);
-        leap.setY(Math.max(0.65D, Math.abs(leap.getY()) + 0.35D));
+        Vector leap = player.getLocation().getDirection().normalize().multiply(MilkCowRules.bodySlamLaunchSpeed());
+        leap.setY(Math.max(MilkCowRules.bodySlamMinLaunchVertical(),
+                Math.abs(leap.getY()) + MilkCowRules.bodySlamLaunchVerticalBonus()));
         player.setVelocity(leap);
         player.setFallDistance(0.0F);
     }
@@ -27332,16 +27362,19 @@ public final class ArcadePortManager implements Listener {
     private void resolveMilkCowBodySlam(Session session, Player player) {
         Location centre = player.getLocation().clone();
         centre.getWorld().playSound(centre, Sound.ENTITY_GENERIC_EXPLODE, 0.8F, 0.65F);
-        for (Entity nearby : centre.getWorld().getNearbyEntities(centre, 6.0D, 4.0D, 6.0D)) {
+        double radius = MilkCowRules.bodySlamRadiusBlocks();
+        for (Entity nearby : centre.getWorld().getNearbyEntities(centre, radius,
+                MilkCowRules.bodySlamHeightBlocks(), radius)) {
             if (!(nearby instanceof Player target) || target == player
                     || session.teams.getOrDefault(target.getUniqueId(), 1) != 0
                     || !session.alive.contains(target.getUniqueId())) continue;
             double distance = target.getLocation().distance(centre);
-            double scale = Math.max(0.0D, 1.0D - distance / 6.0D);
-            damageMilkCowFarmer(session, target, player, 4.0D * scale + 0.5D);
+            damageMilkCowFarmer(session, target, player, MilkCowRules.bodySlamDamageAtDistance(distance));
             Vector push = target.getLocation().toVector().subtract(centre.toVector());
-            push.setY(0.4D + scale);
-            if (push.lengthSquared() > 0.001D) target.setVelocity(push.normalize().multiply(1.8D * scale));
+            push.setY(MilkCowRules.bodySlamKnockbackVerticalAtDistance(distance));
+            if (push.lengthSquared() > 0.001D) {
+                target.setVelocity(push.normalize().multiply(MilkCowRules.bodySlamKnockbackHorizontalAtDistance(distance)));
+            }
             if (active != session) return;
         }
     }
@@ -29516,8 +29549,11 @@ public final class ArcadePortManager implements Listener {
         }
         player.setFlying(false);
         player.setAllowFlight(false);
-        Vector velocity = player.getLocation().getDirection().normalize().multiply(0.8D);
-        velocity.setY(Math.max(0.7D, Math.min(0.9D, velocity.getY() + 0.45D)));
+        Vector velocity = player.getLocation().getDirection().normalize()
+                .multiply(MilkCowRules.farmerDoubleJumpHorizontalSpeed());
+        velocity.setY(Math.max(MilkCowRules.farmerDoubleJumpMinVertical(),
+                Math.min(MilkCowRules.farmerDoubleJumpMaxVertical(),
+                        velocity.getY() + MilkCowRules.farmerDoubleJumpVerticalBonus())));
         player.setVelocity(velocity);
         player.setFallDistance(0.0F);
     }

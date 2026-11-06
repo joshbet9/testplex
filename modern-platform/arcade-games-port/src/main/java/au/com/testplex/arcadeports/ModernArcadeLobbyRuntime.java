@@ -1264,6 +1264,10 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     "Allow this tester to fill a bucket by interacting with a Cow player.", true));
             features.put("milk-scoring", new DebugFeature("milk-scoring", "Milk score", Material.MILK_BUCKET,
                     "Award this tester the normal points when they drink a captured milk bucket.", true));
+            features.put("cow-bomb", new DebugFeature("cow-bomb", "Cow Bomb", Material.COW_SPAWN_EGG,
+                    "Allow this tester to launch and damage with the Cow Bomb role ability.", true));
+            features.put("body-slam", new DebugFeature("body-slam", "Body Slam", Material.ANVIL,
+                    "Allow this tester to launch and damage with the Farmer Body Slam role ability.", true));
         }
         if (game == ArcadePortGame.WITHER_ASSAULT) {
             features.put("ability-human-leap", new DebugFeature("ability-human-leap", "Human double jump", Material.FEATHER,
@@ -1573,7 +1577,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                         && ("plot-editing".equals(key) || "review-voting".equals(key)))
                 || (game == ArcadePortGame.CAMERA_SHY && "photo-outlines".equals(key))
                 || (game == ArcadePortGame.MILK_THE_COW && Set.of("cow-charge", "farmer-double-jump",
-                        "herd-spawning", "milk-capture", "milk-scoring").contains(key))
+                        "herd-spawning", "milk-capture", "milk-scoring", "cow-bomb", "body-slam").contains(key))
                 || (game == ArcadePortGame.WITHER_ASSAULT
                         && ("ability-human-leap".equals(key) || "human-revival".equals(key) || key.startsWith("ability-")))
                 || (game == ArcadePortGame.HOOPS_REMASTERED

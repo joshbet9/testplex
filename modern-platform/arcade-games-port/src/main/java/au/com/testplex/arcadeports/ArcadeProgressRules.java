@@ -47,7 +47,7 @@ public final class ArcadeProgressRules {
     }
 
     public static boolean shouldAwardMilkCowPerfectGame(int farmerDeaths) {
-        return farmerDeaths == 0;
+        return farmerDeaths <= MilkCowRules.perfectGameMaxFarmerDeaths();
     }
 
     public static boolean shouldAwardMilkCowHighClub(boolean drankWhileAirborne, boolean drankWhileGrounded) {
@@ -55,15 +55,15 @@ public final class ArcadeProgressRules {
     }
 
     public static boolean shouldAwardMilkCowStopStopHeIsAlreadyDead(int opponentLeadCount) {
-        return opponentLeadCount >= 3;
+        return opponentLeadCount >= MilkCowRules.comebackLeadThreshold();
     }
 
     public static boolean shouldAwardMilkCowGotTheChops(int airborneKills) {
-        return airborneKills >= 10;
+        return airborneKills >= MilkCowRules.gotTheChopsAirborneKills();
     }
 
     public static boolean shouldAwardMilkCowSlaughterhouse(int assists) {
-        return assists >= 15;
+        return assists >= MilkCowRules.slaughterhouseAssists();
     }
 
 

@@ -96,6 +96,11 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MASTER_BUILDERS), "MASTER_BUILDERS_REVIEW_MILLIS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MICRO_BATTLES), "MICRO_BATTLES_BARRIER_DURATION_MILLIS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MICRO_BATTLES), "MICRO_BATTLES_CRUMBLE_ENABLED");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MILK_THE_COW), "MILK_THE_COW_COW_BOMB_DAMAGE");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MILK_THE_COW), "MILK_THE_COW_BODY_SLAM_RADIUS_BLOCKS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MILK_THE_COW), "MILK_THE_COW_ASSIST_CREDIT_WINDOW_MILLIS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MILK_THE_COW), "MILK_THE_COW_GOT_THE_CHOPS_AIRBORNE_KILLS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MILK_THE_COW), "MILK_THE_COW_FARMER_DOUBLE_JUMP_HORIZONTAL_SPEED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MICRO_BATTLES), "MICRO_BATTLES_CHEAT_WINDOW_MILLIS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MICRO_BATTLES), "MICRO_BATTLES_BORDER_PARTICLE_DISTANCE");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MICRO_BATTLES), "MICRO_BATTLES_BORDER_PARTICLE_VERTICAL_POINTS");
@@ -157,6 +162,15 @@ class GameDebugVariableCatalogTest {
         assertGameRange(ArcadePortGame.GLADIATORS, "GLADIATOR_TIER_3_ARROWS", 0.0D, 64.0D);
         assertGameRange(ArcadePortGame.GLADIATORS, "GLADIATOR_POTION_HEALING", 0.0D, 20.0D);
         assertGameRange(ArcadePortGame.GLADIATORS, "GLADIATOR_POTION_SPLASH_RADIUS", 0.1D, 16.0D);
+    }
+
+    @Test
+    void milkTheCowAbilityAndProgressControlsHaveSafeRanges() {
+        assertGameRange(ArcadePortGame.MILK_THE_COW, "MILK_THE_COW_COW_BOMB_COOLDOWN_MILLIS", 0.0D, 600_000.0D);
+        assertGameRange(ArcadePortGame.MILK_THE_COW, "MILK_THE_COW_COW_BOMB_CONTACT_RADIUS_BLOCKS", 0.1D, 64.0D);
+        assertGameRange(ArcadePortGame.MILK_THE_COW, "MILK_THE_COW_COW_BOMB_DAMAGE", 0.0D, 16.0D);
+        assertGameRange(ArcadePortGame.MILK_THE_COW, "MILK_THE_COW_BODY_SLAM_RADIUS_BLOCKS", 0.1D, 64.0D);
+        assertGameRange(ArcadePortGame.MILK_THE_COW, "MILK_THE_COW_COMEBACK_LEAD_THRESHOLD", 1.0D, 100.0D);
     }
 
     @Test
@@ -433,8 +447,13 @@ class GameDebugVariableCatalogTest {
                                 "DEATH_TAG_THIRD_PLACE_REWARD_GEMS")
                                 .contains(key)
                         && productionSources.contains("ArcadePortRules.deathTagPlacementRewardGems(");
+                boolean dynamicMilkCowConsumer = game == ArcadePortGame.MILK_THE_COW
+                        && key.startsWith("MILK_THE_COW_")
+                        && productionSources.contains("private static String key(String suffix)")
+                        && productionSources.contains("return \"MILK_THE_COW_\" + suffix")
+                        && productionSources.contains("GameDebugRuntimeOverrides.longValue(key(suffix), fallback)");
                 assertTrue(literalConsumers.contains(key) || dynamicMazeConsumer || dynamicSneakyConsumer
-                                || dynamicTurfWarsConsumer || dynamicSkyWarsConsumer || dynamicEvolutionConsumer
+                                || dynamicMilkCowConsumer || dynamicTurfWarsConsumer || dynamicSkyWarsConsumer || dynamicEvolutionConsumer
                                 || dynamicGladiatorConsumer || dynamicWizardsConsumer || dynamicDeathTagRewardConsumer,
                         game.id() + " exposes " + key + " without a gameplay consumer");
             }

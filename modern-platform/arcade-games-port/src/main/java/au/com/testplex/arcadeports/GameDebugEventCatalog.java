@@ -108,7 +108,9 @@ final class GameDebugEventCatalog {
                     "Fill and activate your selected kit's normal Special so you can test its full effect."));
     private static final List<Event> MILK_THE_COW = List.of(
             new Event("spawn-herd", "Spawn Cow Herd Now", Material.COW_SPAWN_EGG,
-                    "Run the normal herd follow and spawn update beside the active Cow-role tester."));
+                    "Run the normal herd follow and spawn update beside the active Cow-role tester."),
+            new Event("use-kit-ability", "Test Role Ability", Material.FIREWORK_STAR,
+                    "Use the active role's Cow Bomb or Body Slam through the normal cooldown and impact path."));
     private static final List<Event> SHEEP_QUEST = List.of(
             new Event("spawn-sheep", "Spawn Sheep Now", Material.WHITE_WOOL,
                     "Spawn and configure one neutral sheep using the normal round map spawn rules."));
