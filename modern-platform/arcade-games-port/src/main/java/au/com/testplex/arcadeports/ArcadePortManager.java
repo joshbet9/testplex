@@ -23335,9 +23335,9 @@ public final class ArcadePortManager implements Listener {
                 session.spleefSmasherReadyAt.put(player.getUniqueId(),
                         now + GameDebugRuntimeOverrides.longValue("SPLEEF_SMASHER_COOLDOWN_MILLIS", ArcadePortRules.SPLEEF_SMASHER_COOLDOWN_MILLIS));
                 cooldownProgress.start(player, "Smasher", GameDebugRuntimeOverrides.longValue("SPLEEF_SMASHER_COOLDOWN_MILLIS", ArcadePortRules.SPLEEF_SMASHER_COOLDOWN_MILLIS));
-                for (BlockFace face : new BlockFace[] {BlockFace.UP, BlockFace.DOWN, BlockFace.NORTH,
-                        BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST}) {
-                    fadeSpleefBlock(session, player, block.getRelative(face), false);
+                for (ArcadePortRules.SpleefBlockOffset offset : ArcadePortRules.spleefSmasherOffsets()) {
+                    fadeSpleefBlock(session, player, block.getRelative(
+                            offset.x(), offset.y(), offset.z()), false);
                 }
                 fadeSpleefBlock(session, player, block, false);
             } else fadeSpleefBlock(session, player, block, false);

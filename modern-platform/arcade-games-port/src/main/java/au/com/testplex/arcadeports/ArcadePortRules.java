@@ -704,6 +704,24 @@ public final class ArcadePortRules {
     public static final double SPLEEF_DEFAULT_KNOCKBACK = 0.3D;
     public static final double SPLEEF_BRAWLER_KNOCKBACK = 0.6D;
     public static final long SPLEEF_SMASHER_COOLDOWN_MILLIS = 250L;
+    public static final int SPLEEF_SMASHER_RADIUS_BLOCKS = 1;
+
+    record SpleefBlockOffset(int x, int y, int z) { }
+
+    public static java.util.List<SpleefBlockOffset> spleefSmasherOffsets() {
+        int radius = Math.max(0, Math.min(8, GameDebugRuntimeOverrides.intValue(
+                "SPLEEF_SMASHER_RADIUS_BLOCKS", SPLEEF_SMASHER_RADIUS_BLOCKS)));
+        java.util.List<SpleefBlockOffset> offsets = new java.util.ArrayList<>(radius * 6);
+        for (int distance = 1; distance <= radius; distance++) {
+            offsets.add(new SpleefBlockOffset(distance, 0, 0));
+            offsets.add(new SpleefBlockOffset(-distance, 0, 0));
+            offsets.add(new SpleefBlockOffset(0, distance, 0));
+            offsets.add(new SpleefBlockOffset(0, -distance, 0));
+            offsets.add(new SpleefBlockOffset(0, 0, distance));
+            offsets.add(new SpleefBlockOffset(0, 0, -distance));
+        }
+        return java.util.List.copyOf(offsets);
+    }
 
     /** Reborn PerkLeap: forward power 1.2, Y +0.2, max Y 1.2, plus a 0.2 ground boost. */
     public static Vector spleefLeapVelocity(Vector facing, boolean grounded) {
