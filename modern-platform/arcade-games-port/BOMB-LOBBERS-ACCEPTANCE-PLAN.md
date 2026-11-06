@@ -59,7 +59,7 @@ The original map archive is packaged at `maps/bomb-lobbers.zip`.
 - [ ] Technical: throw TNT while less than 10 blocks from the victim, then secure that TNT's own killing blow; no stale credit from a later TNT or throws at 10+ blocks.
 - [ ] Over 9000: one single Super Explosive TNT or Fiery TNT activation must score 3 actual credited player kills (direct hits and/or explosion); ordinary TNT, multiple power-ups, and the unrelated 1v3 clutch don't count.
 - [ ] Grenade From the Grave: two TNT kills after death, including direct-impact kills and blast kills.
-- [ ] Wonderkid: current detector is 3 kills in one match without block-contact detonation before the 8-second timeout. Pending confirmation of intended challenge; do not approve this detector yet.
+- [ ] Wonderkid: get 3 credited enemy kills in one match from TNT **explosions** that detonate on terrain contact after at least 3 seconds of flight and before the 8-second automatic timeout (high lobs). Low throws that land before the 3-second grace period and TNT that expires at 8 seconds do not count. Direct-hit-only kills do not count. Qualifying kills may come from separate TNT throws.
 - [ ] Test-player actions do not grant or persist player stats, achievements, rewards or personal-best records.
 
 ## Lifecycle / regression
