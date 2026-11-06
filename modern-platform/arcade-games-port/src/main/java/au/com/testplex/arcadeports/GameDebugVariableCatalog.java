@@ -23,6 +23,31 @@ final class GameDebugVariableCatalog {
             "MICRO_BATTLES_CRUMBLE_ENABLED",
             "QUIVER_LEAPER_DOUBLE_JUMP_ENABLED",
             "SPLEEF_HUNGER_DRAIN_ENABLED");
+    private static final Set<String> LIVE_SNEAKY_NUMERIC_RULES = Set.of(
+            "SNEAKY_ASSASSINS_POWERUP_KILL_WINDOW_MILLIS", "SNEAKY_ASSASSINS_NEXT_POWERUP_DELAY_MILLIS",
+            "SNEAKY_ASSASSINS_MAX_ACTIVE_POWERUPS", "SNEAKY_ASSASSINS_MASTER_ASSASSIN_POWERUPS_REQUIRED",
+            "SNEAKY_ASSASSINS_REVEAL_RADIUS_BLOCKS", "SNEAKY_ASSASSINS_SMOKE_RADIUS_BLOCKS",
+            "SNEAKY_ASSASSINS_GLOBAL_REVEAL_CYCLE_MILLIS", "SNEAKY_ASSASSINS_REVEALER_DURATION_MILLIS",
+            "SNEAKY_ASSASSINS_SMOKE_CLOAK_DURATION_MILLIS", "SNEAKY_ASSASSINS_BRIBE_COOLDOWN_MILLIS",
+            "SNEAKY_ASSASSINS_NPC_CULL_INTERVAL_MILLIS", "SNEAKY_ASSASSINS_NPC_PATROL_ANCHOR_DISTANCE_BLOCKS",
+            "SNEAKY_ASSASSINS_NPC_PATROL_ORDER_CHANCE_DENOMINATOR", "SNEAKY_ASSASSINS_NPC_STUCK_RECOVERY_MILLIS",
+            "SNEAKY_ASSASSINS_MAX_POWERUP_PROGRESS", "SNEAKY_ASSASSINS_GLOBAL_REVEAL_DURATION_MILLIS",
+            "SNEAKY_ASSASSINS_SMOKE_BLINDNESS_DURATION_MILLIS", "SNEAKY_ASSASSINS_POWERUP_PICKUP_RADIUS_BLOCKS",
+            "SNEAKY_ASSASSINS_WOOD_SWORD_DAMAGE", "SNEAKY_ASSASSINS_STONE_SWORD_DAMAGE",
+            "SNEAKY_ASSASSINS_GOLD_SWORD_DAMAGE", "SNEAKY_ASSASSINS_IRON_SWORD_DAMAGE",
+            "SNEAKY_ASSASSINS_DIAMOND_SWORD_DAMAGE", "SNEAKY_ASSASSINS_PROJECTILE_DAMAGE_MIN",
+            "SNEAKY_ASSASSINS_PROJECTILE_DAMAGE_PER_SPEED", "SNEAKY_ASSASSINS_POWERUP_BONUS_HEALTH",
+            "SNEAKY_ASSASSINS_POWERUP_MAX_HEALTH", "SNEAKY_ASSASSINS_KILL_BONUS_HEALTH",
+            "SNEAKY_ASSASSINS_MASTERS_MASTER_POWERUPS_REQUIRED", "SNEAKY_ASSASSINS_NPC_ATTACK_COOLDOWN_MILLIS",
+            "SNEAKY_ASSASSINS_NPC_ATTACK_RANGE_BLOCKS", "SNEAKY_ASSASSINS_NPC_ATTACK_DAMAGE",
+            "SNEAKY_ASSASSINS_NPC_BRIBE_MOVE_SPEED", "SNEAKY_ASSASSINS_NPC_PATROL_MOVE_SPEED",
+            "SNEAKY_ASSASSINS_NPC_RECOVERY_HORIZONTAL", "SNEAKY_ASSASSINS_NPC_RECOVERY_VERTICAL",
+            "SNEAKY_ASSASSINS_NPC_MOTION_FACTOR", "SNEAKY_ASSASSINS_NPC_MIN_VERTICAL_SPEED",
+            "SNEAKY_ASSASSINS_NPC_MAX_VERTICAL_SPEED", "SNEAKY_ASSASSINS_REVEALER_PROJECTILE_LIFETIME_TICKS",
+            "SNEAKY_ASSASSINS_REVEALER_PROJECTILE_SPEED", "SNEAKY_ASSASSINS_REVEALER_PROJECTILE_VERTICAL_SPEED",
+            "SNEAKY_ASSASSINS_NPC_PATROL_WAYPOINT_ATTEMPTS", "SNEAKY_ASSASSINS_NPC_SPAWN_SEARCH_ATTEMPTS",
+            "SNEAKY_ASSASSINS_PROSECUTOR_DISTINCT_TARGETS_REQUIRED", "SNEAKY_ASSASSINS_DUELS_OTHER_MASTERS_REQUIRED",
+            "SNEAKY_ASSASSINS_POWERUP_SMOKE_BOMBS", "SNEAKY_ASSASSINS_KILL_BONUS_SMOKE_BOMBS");
 
     private GameDebugVariableCatalog() { }
 
@@ -67,8 +92,9 @@ final class GameDebugVariableCatalog {
     }
 
     static boolean appliesImmediately(Variable variable) {
-        return variable != null && variable.kind() == Kind.BOOLEAN
-                && LIVE_BOOLEAN_RULES.contains(variable.key());
+        if (variable == null) return false;
+        return variable.kind() == Kind.BOOLEAN && LIVE_BOOLEAN_RULES.contains(variable.key())
+                || variable.kind() != Kind.BOOLEAN && LIVE_SNEAKY_NUMERIC_RULES.contains(variable.key());
     }
 
     static double clamp(Variable variable, double value) {
@@ -222,6 +248,21 @@ final class GameDebugVariableCatalog {
 
     private static double minimum(String name, double defaultValue, Kind kind) {
         if (kind == Kind.BOOLEAN) return 0.0D;
+        if (Set.of("MAX_ACTIVE_POWERUPS",
+                "SOURCE_NPC_COUNT", "POWERUP_BONUS_HEALTH", "KILL_BONUS_HEALTH").contains(name)) return 0.0D;
+        if (Set.of("MAX_POWERUP_PROGRESS", "MASTER_ASSASSIN_POWERUPS_REQUIRED",
+                "MASTERS_MASTER_POWERUPS_REQUIRED", "NPC_PATROL_ORDER_CHANCE_DENOMINATOR", "PROSECUTOR_DISTINCT_TARGETS_REQUIRED",
+                "DUELS_OTHER_MASTERS_REQUIRED").contains(name)) return 1.0D;
+        if (name.endsWith("_SMOKE_BOMBS") || name.endsWith("_STARTING_ARROWS")
+                || name.endsWith("_STARTING_EMERALDS") || name.endsWith("_STARTING_DIAMONDS")) return 0.0D;
+        if (Set.of("GLOBAL_REVEAL_DURATION_MILLIS", "SMOKE_BLINDNESS_DURATION_MILLIS",
+                "NPC_ATTACK_COOLDOWN_MILLIS").contains(name)) return 0.0D;
+        if (name.equals("POWERUP_PICKUP_RADIUS_BLOCKS") || name.equals("NPC_ATTACK_RANGE_BLOCKS")) return 0.1D;
+        if (name.equals("NPC_MIN_VERTICAL_SPEED")) return -1.0D;
+        if (name.startsWith("NPC_") && (name.endsWith("_SPEED") || name.endsWith("_DAMAGE")
+                || name.endsWith("_HORIZONTAL") || name.endsWith("_VERTICAL")
+                || name.equals("NPC_MOTION_FACTOR"))) return 0.0D;
+        if (name.endsWith("_SWORD_DAMAGE") || name.startsWith("PROJECTILE_DAMAGE_")) return 0.0D;
         if (Set.of("SPEED_REFERENCE_LENGTH", "FOOD_SPAWN_ATTEMPTS", "CANNIBAL_KILLS_REQUIRED",
                 "CHOO_CHOO_LENGTH_REQUIRED", "SLIMY_SHEEP_REQUIRED", "ROULETTE_HIT_1_SECONDS",
                 "ROULETTE_HIT_2_SECONDS", "ROULETTE_HIT_3_SECONDS", "ROULETTE_HIT_4_SECONDS",
@@ -479,6 +520,28 @@ final class GameDebugVariableCatalog {
 
     private static double maximum(String name, Kind kind, double defaultValue) {
         if (kind == Kind.BOOLEAN) return 1.0D;
+        if (name.equals("MAX_POWERUP_PROGRESS") || name.equals("MASTER_ASSASSIN_POWERUPS_REQUIRED")
+                || name.equals("MASTERS_MASTER_POWERUPS_REQUIRED")) return 32.0D;
+        if (name.equals("MAX_ACTIVE_POWERUPS")) return 32.0D;
+        if (name.endsWith("_SMOKE_BOMBS") || name.endsWith("_STARTING_ARROWS")
+                || name.endsWith("_STARTING_EMERALDS") || name.endsWith("_STARTING_DIAMONDS")) return 64.0D;
+        if (name.equals("SOURCE_NPC_COUNT")) return 500.0D;
+        if (name.equals("NPC_PATROL_WAYPOINT_ATTEMPTS")) return 64.0D;
+        if (name.equals("NPC_SPAWN_SEARCH_ATTEMPTS")) return 1_000.0D;
+        if (name.equals("REVEALER_PROJECTILE_LIFETIME_TICKS")) return 1_200.0D;
+        if (name.equals("POWERUP_PICKUP_RADIUS_BLOCKS") || name.equals("NPC_ATTACK_RANGE_BLOCKS")) return 16.0D;
+        if (name.endsWith("_SWORD_DAMAGE") || name.startsWith("PROJECTILE_DAMAGE_")) return 40.0D;
+        if (Set.of("POWERUP_BONUS_HEALTH", "POWERUP_MAX_HEALTH", "KILL_BONUS_HEALTH").contains(name)) {
+            return 40.0D;
+        }
+        if (name.startsWith("NPC_") && (name.endsWith("_SPEED") || name.endsWith("_DAMAGE")
+                || name.endsWith("_HORIZONTAL") || name.endsWith("_VERTICAL")
+                || name.equals("NPC_MOTION_FACTOR"))) return 8.0D;
+        if (name.startsWith("NPC_") && name.endsWith("_DENOMINATOR")) return 1_000.0D;
+        if (Set.of("GLOBAL_REVEAL_DURATION_MILLIS", "SMOKE_BLINDNESS_DURATION_MILLIS",
+                "NPC_ATTACK_COOLDOWN_MILLIS", "REVEALER_PROJECTILE_LIFETIME_TICKS").contains(name)) {
+            return name.endsWith("_TICKS") ? 1_200.0D : 600_000.0D;
+        }
         if (Set.of("IDLE_TIMEOUT_MILLIS", "PREPARE_COUNTDOWN_MILLIS", "FOOD_SPAWN_INTERVAL_MILLIS",
                 "GROWTH_INTERVAL_MILLIS", "FIRST_HAZARD_DELAY_MILLIS", "HAZARD_INTERVAL_MILLIS",
                 "HAZARD_RETRY_MILLIS", "SPEED_ABILITY_DURATION_MILLIS", "REVERSE_ABILITY_DURATION_MILLIS",
@@ -868,6 +931,24 @@ final class GameDebugVariableCatalog {
 
     private static double step(String name, double defaultValue, Kind kind) {
         if (kind == Kind.BOOLEAN) return 1.0D;
+        if (name.endsWith("_SWORD_DAMAGE") || name.startsWith("PROJECTILE_DAMAGE_")
+                || name.startsWith("NPC_") && (name.endsWith("_SPEED") || name.endsWith("_DAMAGE")
+                || name.endsWith("_HORIZONTAL") || name.endsWith("_VERTICAL")
+                || name.equals("NPC_MOTION_FACTOR"))
+                || name.equals("POWERUP_PICKUP_RADIUS_BLOCKS")) return 0.1D;
+        if (name.endsWith("_RADIUS_BLOCKS")) return kind == Kind.INTEGER || kind == Kind.LONG ? 1.0D : 0.1D;
+        if (name.equals("NPC_PATROL_ORDER_CHANCE_DENOMINATOR")
+                || name.equals("NPC_PATROL_WAYPOINT_ATTEMPTS") || name.equals("NPC_SPAWN_SEARCH_ATTEMPTS")
+                || name.endsWith("_SMOKE_BOMBS") || name.endsWith("_STARTING_ARROWS")
+                || name.endsWith("_STARTING_EMERALDS") || name.endsWith("_STARTING_DIAMONDS")
+                || Set.of("POWERUP_BONUS_HEALTH", "POWERUP_MAX_HEALTH", "KILL_BONUS_HEALTH").contains(name)
+                || name.equals("MAX_POWERUP_PROGRESS")
+                || name.equals("MASTER_ASSASSIN_POWERUPS_REQUIRED")
+                || name.equals("MASTERS_MASTER_POWERUPS_REQUIRED")
+                || name.equals("PROSECUTOR_DISTINCT_TARGETS_REQUIRED")
+                || name.equals("DUELS_OTHER_MASTERS_REQUIRED")) return 1.0D;
+        if (Set.of("GLOBAL_REVEAL_DURATION_MILLIS", "SMOKE_BLINDNESS_DURATION_MILLIS",
+                "NPC_ATTACK_COOLDOWN_MILLIS").contains(name)) return 100.0D;
         if ((name.endsWith("_RADIUS") || name.endsWith("_SPACING"))
                 && (kind == Kind.INTEGER || kind == Kind.LONG)) return 1.0D;
         if (name.startsWith("ROULETTE_HIT_") && name.endsWith("_SECONDS")) return 1.0D;

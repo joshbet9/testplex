@@ -142,6 +142,14 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.WITHER_ASSAULT), "WITHER_ASSAULT_FIRE_STORM_ARROWS_PER_TICK");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.WITHER_ASSAULT), "WITHER_ASSAULT_FLIGHT_MAX_SPEED_CHANGE_PER_TICK");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNEAKY_ASSASSINS), "SNEAKY_ASSASSINS_FIRST_POWERUP_DELAY_MILLIS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNEAKY_ASSASSINS), "SNEAKY_ASSASSINS_WOOD_SWORD_DAMAGE");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNEAKY_ASSASSINS), "SNEAKY_ASSASSINS_PROJECTILE_DAMAGE_PER_SPEED");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNEAKY_ASSASSINS), "SNEAKY_ASSASSINS_MAX_POWERUP_PROGRESS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNEAKY_ASSASSINS), "SNEAKY_ASSASSINS_GLOBAL_REVEAL_DURATION_MILLIS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNEAKY_ASSASSINS), "SNEAKY_ASSASSINS_NPC_ATTACK_DAMAGE");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNEAKY_ASSASSINS), "SNEAKY_ASSASSINS_NPC_RECOVERY_HORIZONTAL");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNEAKY_ASSASSINS), "SNEAKY_ASSASSINS_ASSASSIN_STARTING_ARROWS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNEAKY_ASSASSINS), "SNEAKY_ASSASSINS_REVEALER_STARTING_DIAMONDS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MONSTER_MAZE), "MONSTER_MAZE_CRYO_RADIUS_BLOCKS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MONSTER_MAZE_SPEED), "MONSTER_MAZE_SPEED_CRYO_RADIUS_BLOCKS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MONSTER_MAZE_MODERN), "MONSTER_MAZE_MODERN_CRYO_RADIUS_BLOCKS");
@@ -169,6 +177,28 @@ class GameDebugVariableCatalogTest {
         assertGameRange(ArcadePortGame.GLADIATORS, "GLADIATOR_TIER_3_ARROWS", 0.0D, 64.0D);
         assertGameRange(ArcadePortGame.GLADIATORS, "GLADIATOR_POTION_HEALING", 0.0D, 20.0D);
         assertGameRange(ArcadePortGame.GLADIATORS, "GLADIATOR_POTION_SPLASH_RADIUS", 0.1D, 16.0D);
+    }
+
+    @Test
+    void sneakyAssassinsCombatAndNpcControlsHaveSafeRanges() {
+        assertGameRange(ArcadePortGame.SNEAKY_ASSASSINS, "SNEAKY_ASSASSINS_WOOD_SWORD_DAMAGE", 0.0D, 40.0D);
+        assertGameRange(ArcadePortGame.SNEAKY_ASSASSINS, "SNEAKY_ASSASSINS_PROJECTILE_DAMAGE_PER_SPEED", 0.0D, 40.0D);
+        assertGameRange(ArcadePortGame.SNEAKY_ASSASSINS, "SNEAKY_ASSASSINS_MAX_POWERUP_PROGRESS", 1.0D, 32.0D);
+        assertGameRange(ArcadePortGame.SNEAKY_ASSASSINS, "SNEAKY_ASSASSINS_POWERUP_PICKUP_RADIUS_BLOCKS", 0.1D, 16.0D);
+        assertGameRange(ArcadePortGame.SNEAKY_ASSASSINS, "SNEAKY_ASSASSINS_GLOBAL_REVEAL_DURATION_MILLIS", 0.0D, 600_000.0D);
+        assertGameRange(ArcadePortGame.SNEAKY_ASSASSINS, "SNEAKY_ASSASSINS_SOURCE_NPC_COUNT", 0.0D, 500.0D);
+        assertGameRange(ArcadePortGame.SNEAKY_ASSASSINS, "SNEAKY_ASSASSINS_NPC_ATTACK_DAMAGE", 0.0D, 8.0D);
+        assertGameRange(ArcadePortGame.SNEAKY_ASSASSINS, "SNEAKY_ASSASSINS_ASSASSIN_STARTING_ARROWS", 0.0D, 64.0D);
+        assertGameRange(ArcadePortGame.SNEAKY_ASSASSINS, "SNEAKY_ASSASSINS_NPC_ATTACK_COOLDOWN_MILLIS", 0.0D, 600_000.0D);
+        assertGameRange(ArcadePortGame.SNEAKY_ASSASSINS, "SNEAKY_ASSASSINS_REVEALER_PROJECTILE_LIFETIME_TICKS", 1.0D, 1_200.0D);
+        assertTrue(GameDebugVariableCatalog.appliesImmediately(GameDebugVariableCatalog.variable(
+                ArcadePortGame.SNEAKY_ASSASSINS, "SNEAKY_ASSASSINS_WOOD_SWORD_DAMAGE")));
+        assertTrue(GameDebugVariableCatalog.appliesImmediately(GameDebugVariableCatalog.variable(
+                ArcadePortGame.SNEAKY_ASSASSINS, "SNEAKY_ASSASSINS_NPC_ATTACK_DAMAGE")));
+        assertFalse(GameDebugVariableCatalog.appliesImmediately(GameDebugVariableCatalog.variable(
+                ArcadePortGame.SNEAKY_ASSASSINS, "SNEAKY_ASSASSINS_SOURCE_NPC_COUNT")));
+        assertFalse(GameDebugVariableCatalog.appliesImmediately(GameDebugVariableCatalog.variable(
+                ArcadePortGame.SNEAKY_ASSASSINS, "SNEAKY_ASSASSINS_ASSASSIN_STARTING_ARROWS")));
     }
 
     @Test

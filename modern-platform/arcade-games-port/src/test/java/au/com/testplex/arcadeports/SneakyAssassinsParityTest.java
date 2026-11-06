@@ -3,6 +3,8 @@ package au.com.testplex.arcadeports;
 import org.bukkit.Material;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class SneakyAssassinsParityTest {
@@ -97,6 +99,106 @@ class SneakyAssassinsParityTest {
         assertEquals(8_000L, SneakyAssassinsRules.bribeCooldownMillis());
         assertEquals(144.0D, SneakyAssassinsRules.revealRadiusSquared(), 0.00001D);
         assertEquals(25.0D, SneakyAssassinsRules.smokeRadiusSquared(), 0.00001D);
+    }
+
+    @Test void debugOverridesChangeCombatPowerupAndResetToSourceDefaults() {
+        GameDebugRuntimeOverrides.clear();
+        assertEquals(4.0D, SneakyAssassinsRules.swordDamage(Material.WOODEN_SWORD), 0.00001D);
+        assertEquals(2.0D, SneakyAssassinsRules.projectileDamage(0.5D), 0.00001D);
+        assertEquals(1.0D, SneakyAssassinsRules.powerUpPickupRadiusSquared(), 0.00001D);
+        assertEquals(5, SneakyAssassinsRules.nextPowerUpCount(4));
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "SNEAKY_ASSASSINS_WOOD_SWORD_DAMAGE", 9.0D,
+                "SNEAKY_ASSASSINS_PROJECTILE_DAMAGE_MIN", 6.0D,
+                "SNEAKY_ASSASSINS_POWERUP_PICKUP_RADIUS_BLOCKS", 2.0D,
+                "SNEAKY_ASSASSINS_MAX_POWERUP_PROGRESS", 8));
+        assertEquals(9.0D, SneakyAssassinsRules.swordDamage(Material.WOODEN_SWORD), 0.00001D);
+        assertEquals(6.0D, SneakyAssassinsRules.projectileDamage(0.5D), 0.00001D);
+        assertEquals(4.0D, SneakyAssassinsRules.powerUpPickupRadiusSquared(), 0.00001D);
+        assertEquals(5, SneakyAssassinsRules.nextPowerUpCount(4));
+        assertEquals(8, SneakyAssassinsRules.nextPowerUpCount(7));
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertEquals(4.0D, SneakyAssassinsRules.swordDamage(Material.WOODEN_SWORD), 0.00001D);
+        assertEquals(2.0D, SneakyAssassinsRules.projectileDamage(0.5D), 0.00001D);
+        assertEquals(1.0D, SneakyAssassinsRules.powerUpPickupRadiusSquared(), 0.00001D);
+        assertEquals(5, SneakyAssassinsRules.nextPowerUpCount(4));
+        GameDebugRuntimeOverrides.clear();
+    }
+
+    @Test void debugOverridesChangeRevealSmokeAndBribedNpcBehaviourAndReset() {
+        GameDebugRuntimeOverrides.clear();
+        assertEquals(4_000L, SneakyAssassinsRules.globalRevealDurationMillis());
+        assertEquals(3_000, SneakyAssassinsRules.smokeBlindnessDurationMillis());
+        assertTrue(SneakyAssassinsRules.npcAttackInRange(2.25D));
+        assertFalse(SneakyAssassinsRules.npcAttackInRange(2.26D));
+        assertTrue(SneakyAssassinsRules.npcAttackReady(1_000L, 1_000L));
+        assertEquals(2_000L, SneakyAssassinsRules.nextNpcAttackAt(1_000L));
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "SNEAKY_ASSASSINS_GLOBAL_REVEAL_DURATION_MILLIS", 10_000L,
+                "SNEAKY_ASSASSINS_SMOKE_BLINDNESS_DURATION_MILLIS", 1_000,
+                "SNEAKY_ASSASSINS_NPC_ATTACK_RANGE_BLOCKS", 3.0D,
+                "SNEAKY_ASSASSINS_NPC_ATTACK_COOLDOWN_MILLIS", 2_000L,
+                "SNEAKY_ASSASSINS_NPC_ATTACK_DAMAGE", 4.0D,
+                "SNEAKY_ASSASSINS_NPC_PATROL_ORDER_CHANCE_DENOMINATOR", 2));
+        assertEquals(10_000L, SneakyAssassinsRules.globalRevealDurationMillis());
+        assertEquals(1_000, SneakyAssassinsRules.smokeBlindnessDurationMillis());
+        assertTrue(SneakyAssassinsRules.npcAttackInRange(9.0D));
+        assertFalse(SneakyAssassinsRules.npcAttackInRange(9.01D));
+        assertEquals(3_000L, SneakyAssassinsRules.nextNpcAttackAt(1_000L));
+        assertEquals(4.0D, SneakyAssassinsRules.npcAttackDamage(), 0.00001D);
+        assertTrue(SneakyAssassinsRules.shouldIssueNpcPatrolOrder(1));
+        assertFalse(SneakyAssassinsRules.shouldIssueNpcPatrolOrder(2));
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertEquals(4_000L, SneakyAssassinsRules.globalRevealDurationMillis());
+        assertEquals(3_000, SneakyAssassinsRules.smokeBlindnessDurationMillis());
+        assertFalse(SneakyAssassinsRules.npcAttackInRange(9.0D));
+        assertEquals(2_000L, SneakyAssassinsRules.nextNpcAttackAt(1_000L));
+        assertEquals(1.0D, SneakyAssassinsRules.npcAttackDamage(), 0.00001D);
+        GameDebugRuntimeOverrides.clear();
+    }
+
+    @Test void debugOverridesChangeKitLoadoutsAndAchievementThresholdsAndReset() {
+        GameDebugRuntimeOverrides.clear();
+        assertEquals(1, SneakyAssassinsRules.baseSmokeBombs());
+        assertEquals(2, SneakyAssassinsRules.escapeArtistExtraSmokeBombs());
+        assertEquals(32, SneakyAssassinsRules.assassinStartingArrows());
+        assertEquals(4, SneakyAssassinsRules.briberStartingEmeralds());
+        assertEquals(3, SneakyAssassinsRules.revealerStartingDiamonds());
+        assertEquals(1, SneakyAssassinsRules.powerUpSmokeBombs());
+        assertEquals(1, SneakyAssassinsRules.killBonusSmokeBombs());
+        assertFalse(SneakyAssassinsRules.shouldAwardProsecutor(4));
+        assertFalse(SneakyAssassinsRules.shouldAwardTheDuelsDuelsDuel(true, 1));
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "SNEAKY_ASSASSINS_BASE_SMOKE_BOMBS", 0,
+                "SNEAKY_ASSASSINS_ESCAPE_ARTIST_EXTRA_SMOKE_BOMBS", 5,
+                "SNEAKY_ASSASSINS_ASSASSIN_STARTING_ARROWS", 48,
+                "SNEAKY_ASSASSINS_BRIBER_STARTING_EMERALDS", 8,
+                "SNEAKY_ASSASSINS_REVEALER_STARTING_DIAMONDS", 6,
+                "SNEAKY_ASSASSINS_POWERUP_SMOKE_BOMBS", 0,
+                "SNEAKY_ASSASSINS_KILL_BONUS_SMOKE_BOMBS", 2,
+                "SNEAKY_ASSASSINS_PROSECUTOR_DISTINCT_TARGETS_REQUIRED", 3,
+                "SNEAKY_ASSASSINS_DUELS_OTHER_MASTERS_REQUIRED", 1,
+                "SNEAKY_ASSASSINS_MASTERS_MASTER_POWERUPS_REQUIRED", 7));
+        assertEquals(0, SneakyAssassinsRules.baseSmokeBombs());
+        assertEquals(5, SneakyAssassinsRules.escapeArtistExtraSmokeBombs());
+        assertEquals(48, SneakyAssassinsRules.assassinStartingArrows());
+        assertEquals(8, SneakyAssassinsRules.briberStartingEmeralds());
+        assertEquals(6, SneakyAssassinsRules.revealerStartingDiamonds());
+        assertEquals(0, SneakyAssassinsRules.powerUpSmokeBombs());
+        assertEquals(2, SneakyAssassinsRules.killBonusSmokeBombs());
+        assertTrue(SneakyAssassinsRules.shouldAwardProsecutor(3));
+        assertTrue(SneakyAssassinsRules.shouldAwardTheDuelsDuelsDuel(true, 1));
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertEquals(32, SneakyAssassinsRules.assassinStartingArrows());
+        assertFalse(SneakyAssassinsRules.shouldAwardProsecutor(4));
+        assertFalse(SneakyAssassinsRules.shouldAwardTheDuelsDuelsDuel(true, 1));
+        GameDebugRuntimeOverrides.clear();
     }
 
     @Test void sneakAssassinAwardConditionsRejectFalsePositiveKills() {
