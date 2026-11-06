@@ -10,6 +10,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WizardsRulesTest {
     @Test
+    void debugRoundsDoNotPersistWizardsLifetimeProgress() {
+        assertTrue(WizardsRules.shouldRecordProgress(false));
+        assertEquals(false, WizardsRules.shouldRecordProgress(true));
+    }
+
+    @Test
     void wandSlotDebugRuleChangesTheLiveWandCapacityAndClampsToHotbar() {
         GameDebugRuntimeOverrides.activate(Map.of("WIZARDS_WAND_SLOT_COUNT", 3));
         assertEquals(3, WizardsRules.maxWandSlots());

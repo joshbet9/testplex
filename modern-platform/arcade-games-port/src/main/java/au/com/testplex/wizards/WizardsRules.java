@@ -211,6 +211,11 @@ public final class WizardsRules {
         return Math.max(minimum, currentMillis - reduction);
     }
 
+    /** Debug sessions must not write match counters to the persistent local-stats store. */
+    public static boolean shouldRecordProgress(boolean debugRound) {
+        return !debugRound;
+    }
+
     public static double endgameDamage(double size, double distance) {
         if (!Double.isFinite(size) || !Double.isFinite(distance) || size <= 0 || distance < 0) return 0.0D;
         double radius = 4.0D * size;

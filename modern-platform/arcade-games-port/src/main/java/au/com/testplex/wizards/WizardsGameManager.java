@@ -2900,6 +2900,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
 
     /** Persist match progress to the local-stats keys shared with the Arcade stats browser. */
     private void recordWizardsProgress(Player winner) {
+        if (!WizardsRules.shouldRecordProgress(plugin.isArcadeDebugRound())) return;
         org.bukkit.configuration.file.FileConfiguration config = plugin.getConfig();
         for (Map.Entry<UUID, WizardState> entry : states.entrySet()) {
             WizardState state = entry.getValue();
