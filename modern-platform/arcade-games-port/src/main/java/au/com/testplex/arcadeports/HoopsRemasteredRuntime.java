@@ -625,6 +625,7 @@ public final class HoopsRemasteredRuntime implements Listener {
             if (rebound) {
                 PlayerStats stats = current.playerStats.get(player.getUniqueId());
                 stats.rebounds++;
+                awardBoxScoreAchievements(current, player.getUniqueId());
                 player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8F, 1.35F);
                 player.sendActionBar(ChatColor.GREEN + "REBOUND!");
                 current.shotClockEndsAt = now + (previousPossessionTeam == catchingTeam
@@ -634,6 +635,7 @@ public final class HoopsRemasteredRuntime implements Listener {
             } else if (ball.mode == BallMode.PASS && previousPossessionTeam >= 0
                     && previousPossessionTeam != catchingTeam) {
                 current.playerStats.get(player.getUniqueId()).steals++;
+                awardBoxScoreAchievements(current, player.getUniqueId());
                 current.shotClockEndsAt = now + GameDebugRuntimeOverrides.longValue("HOOPS_SHOT_CLOCK_MILLIS", HoopsRemasteredRules.SHOT_CLOCK_MILLIS);
                 current.lastPasserId = null;
                 player.sendActionBar(ChatColor.GREEN + "INTERCEPTION!");
@@ -708,6 +710,8 @@ public final class HoopsRemasteredRuntime implements Listener {
                 }
             }
         }
+        awardBoxScoreAchievements(current, ball.shooterId);
+        if (ball.passerId != null) awardBoxScoreAchievements(current, ball.passerId);
         if (!current.overtime && current.remainingMillis <= GameDebugRuntimeOverrides.longValue("HOOPS_CLUTCH_WINDOW_MILLIS", HoopsRemasteredRules.CLUTCH_WINDOW_MILLIS)) {
             current.clutchContributions.merge(ball.shooterId, points, Integer::sum);
         }
@@ -954,6 +958,7 @@ public final class HoopsRemasteredRuntime implements Listener {
         ball.lastToucher = defender.getUniqueId();
         ball.blockedBy = defender.getUniqueId();
         stats.blocks++;
+        awardBoxScoreAchievements(current, defender.getUniqueId());
         defender.playSound(defender.getLocation(), Sound.ITEM_SHIELD_BLOCK, 1.0F, 1.5F);
         defender.sendActionBar(ChatColor.GREEN + "" + ChatColor.BOLD + "BLOCK!");
         current.lastPasserId = null;
@@ -980,6 +985,7 @@ public final class HoopsRemasteredRuntime implements Listener {
         current.stealReadyAt.put(attacker.getUniqueId(), now + stealCooldown);
         cooldownProgress.start(attacker, "Steal", stealCooldown);
         current.playerStats.get(attacker.getUniqueId()).steals++;
+        awardBoxScoreAchievements(current, attacker.getUniqueId());
         current.lastPasserId = null;
         current.shotClockEndsAt = now + GameDebugRuntimeOverrides.longValue("HOOPS_SHOT_CLOCK_MILLIS", HoopsRemasteredRules.SHOT_CLOCK_MILLIS);
         givePossession(current, attacker, false);
@@ -1206,14 +1212,6 @@ public final class HoopsRemasteredRuntime implements Listener {
             plugin.getConfig().set(path + "ppg", plugin.getConfig().getInt(path + "points", 0) / (double) games);
             plugin.getConfig().set(path + "apg", plugin.getConfig().getInt(path + "assists", 0) / (double) games);
             plugin.getConfig().set(path + "rpg", plugin.getConfig().getInt(path + "rebounds", 0) / (double) games);
-            if (HoopsRemasteredRules.isDoubleDouble(stats.points, stats.assists, stats.rebounds, stats.blocks, stats.steals))
-                award(current, id, player, "double-double");
-            if (HoopsRemasteredRules.isTripleDouble(stats.points, stats.assists, stats.rebounds, stats.blocks, stats.steals))
-                award(current, id, player, "triple-double");
-            if (HoopsRemasteredRules.isQuadrupleDouble(stats.points, stats.assists, stats.rebounds, stats.blocks, stats.steals))
-                award(current, id, player, "quadruple-double");
-            if (HoopsRemasteredRules.isQuintupleDouble(stats.points, stats.assists, stats.rebounds, stats.blocks, stats.steals))
-                award(current, id, player, "quintuple-double");
             if (won && stats.shotsAttempted >= 3 && stats.points == 0) award(current, id, player, "brick-by-brick");
             if (won && current.comebackTeams.contains(team)) award(current, id, player, "comeback-kings");
             if (won && current.clutchContributions.getOrDefault(id, 0) >= 6)
@@ -1224,6 +1222,19 @@ public final class HoopsRemasteredRuntime implements Listener {
 
     private String statsPath(UUID id) {
         return "local-stats." + id + "." + GAME_ID + ".";
+    }
+
+    private void awardBoxScoreAchievements(Match current, UUID id) {
+        PlayerStats stats = current.playerStats.get(id);
+        if (stats == null) return;
+        if (HoopsRemasteredRules.isDoubleDouble(stats.points, stats.assists, stats.rebounds, stats.blocks, stats.steals))
+            award(current, id, "double-double");
+        if (HoopsRemasteredRules.isTripleDouble(stats.points, stats.assists, stats.rebounds, stats.blocks, stats.steals))
+            award(current, id, "triple-double");
+        if (HoopsRemasteredRules.isQuadrupleDouble(stats.points, stats.assists, stats.rebounds, stats.blocks, stats.steals))
+            award(current, id, "quadruple-double");
+        if (HoopsRemasteredRules.isQuintupleDouble(stats.points, stats.assists, stats.rebounds, stats.blocks, stats.steals))
+            award(current, id, "quintuple-double");
     }
 
     private void increment(String key, int amount) {
