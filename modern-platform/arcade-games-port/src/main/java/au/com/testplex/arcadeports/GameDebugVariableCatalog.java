@@ -122,7 +122,10 @@ final class GameDebugVariableCatalog {
             return Set.of("SOUL_STAR_MANA_PER_SECOND", "MAGE_RANDOM_STARTER_SPELL_COUNT",
                     "MAGE_STARTER_SPELL_SELECTION_ATTEMPTS", "FULL_WAND_CONVERSION",
                     "MIN_PLAYERS", "MAX_PLAYERS", "WAND_SLOT_COUNT", "ENDGAME_START_MINUTES", "ENDGAME_INITIAL_STRIKE_MILLIS",
-                    "ENDGAME_MIN_STRIKE_MILLIS", "ENDGAME_STRIKE_REDUCTION_PER_TICK_MILLIS").contains(name);
+                    "ENDGAME_MIN_STRIKE_MILLIS", "ENDGAME_STRIKE_REDUCTION_PER_TICK_MILLIS",
+                    "MANA_REGEN_MULTIPLIER", "PROJECTILE_SPEED_MULTIPLIER",
+                    "SPELL_COOLDOWN_MULTIPLIER", "SPELL_DAMAGE_MULTIPLIER",
+                    "SPELL_HEAL_MULTIPLIER", "SPELL_MANA_COST_MULTIPLIER").contains(name);
         }
         if (game == ArcadePortGame.WITHER_ASSAULT) return Set.of("MINIONS_PER_WAVE",
                 "MINION_COOLDOWN_MILLIS", "MINION_LIFETIME_MILLIS", "SCENT_COOLDOWN_MILLIS",
@@ -252,6 +255,9 @@ final class GameDebugVariableCatalog {
         if (name.equals("HEROES_OF_GWEN_SMALL_HEALTH_POTION_HEAL_HP")
                 || name.equals("HEROES_OF_GWEN_LARGE_HEALTH_POTION_HEAL_HP")) return 0.0D;
         if (name.equals("SPLEEF_SMASHER_RADIUS_BLOCKS")) return 0.0D;
+        if (Set.of("MANA_REGEN_MULTIPLIER", "PROJECTILE_SPEED_MULTIPLIER", "SPELL_COOLDOWN_MULTIPLIER",
+                "SPELL_DAMAGE_MULTIPLIER", "SPELL_HEAL_MULTIPLIER", "SPELL_MANA_COST_MULTIPLIER")
+                .contains(name)) return 0.0D;
         if (name.equals("TURF_WARS_COMBAT_BOUNDARY_DAMAGE")
                 || name.equals("TURF_WARS_BUILD_BOUNDARY_DAMAGE")
                 || name.equals("TURF_WARS_TERRITORY_KNOCKBACK_HORIZONTAL")
@@ -361,6 +367,9 @@ final class GameDebugVariableCatalog {
         if (name.equals("HEROES_OF_GWEN_SMALL_HEALTH_POTION_HEAL_HP")
                 || name.equals("HEROES_OF_GWEN_LARGE_HEALTH_POTION_HEAL_HP")) return 40.0D;
         if (name.equals("SPLEEF_SMASHER_RADIUS_BLOCKS")) return 8.0D;
+        if (Set.of("MANA_REGEN_MULTIPLIER", "PROJECTILE_SPEED_MULTIPLIER", "SPELL_COOLDOWN_MULTIPLIER",
+                "SPELL_DAMAGE_MULTIPLIER", "SPELL_HEAL_MULTIPLIER", "SPELL_MANA_COST_MULTIPLIER")
+                .contains(name)) return 5.0D;
         if (name.startsWith("GLADIATOR_TIER_") && name.endsWith("_ARROWS")) return 64.0D;
         if (name.equals("GLADIATOR_POTION_HEALING")) return 20.0D;
         if (name.equals("GLADIATOR_POTION_SPLASH_RADIUS")) return 16.0D;
@@ -540,6 +549,9 @@ final class GameDebugVariableCatalog {
         if (name.startsWith("SHEEP_QUEST_") && name.endsWith("_MILLIS")) return 100.0D;
         if (name.startsWith("SHEEP_QUEST_") && (name.endsWith("_SPEED") || name.endsWith("_RADIUS")
                 || name.endsWith("_BLOCKS") || name.endsWith("_KNOCKBACK"))) return 0.1D;
+        if (Set.of("MANA_REGEN_MULTIPLIER", "PROJECTILE_SPEED_MULTIPLIER", "SPELL_COOLDOWN_MULTIPLIER",
+                "SPELL_DAMAGE_MULTIPLIER", "SPELL_HEAL_MULTIPLIER", "SPELL_MANA_COST_MULTIPLIER")
+                .contains(name)) return 0.1D;
         if (name.contains("_FALL_DAMAGE_MULTIPLIER")) return 0.05D;
         if (name.endsWith("_MILLIS")) return defaultValue >= 10_000.0D ? 1_000.0D : defaultValue >= 1_000.0D ? 100.0D : 25.0D;
         if (name.endsWith("_TICKS")) return defaultValue >= 100.0D ? 20.0D : 1.0D;

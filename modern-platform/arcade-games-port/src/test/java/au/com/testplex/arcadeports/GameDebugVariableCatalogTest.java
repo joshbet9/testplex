@@ -99,6 +99,12 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.PLEXBALL), "PLEXBALL_BALL_GRAVITY_PER_TICK");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.WIZARDS), "WIZARDS_ENDGAME_START_MINUTES");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.WIZARDS), "WIZARDS_WAND_SLOT_COUNT");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.WIZARDS), "WIZARDS_MANA_REGEN_MULTIPLIER");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.WIZARDS), "WIZARDS_SPELL_MANA_COST_MULTIPLIER");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.WIZARDS), "WIZARDS_SPELL_COOLDOWN_MULTIPLIER");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.WIZARDS), "WIZARDS_SPELL_DAMAGE_MULTIPLIER");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.WIZARDS), "WIZARDS_SPELL_HEAL_MULTIPLIER");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.WIZARDS), "WIZARDS_PROJECTILE_SPEED_MULTIPLIER");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.WITHER_ASSAULT), "WITHER_ASSAULT_MINIONS_PER_WAVE");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.WITHER_ASSAULT), "WITHER_ASSAULT_SKULL_BLAST_RADIUS_BLOCKS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.WITHER_ASSAULT), "WITHER_ASSAULT_FIRE_STORM_ARROWS_PER_TICK");
@@ -326,9 +332,13 @@ class GameDebugVariableCatalogTest {
                                 && productionSources.contains("ArcadePortRules.gladiatorsPotionHealing()")
                             || key.equals("GLADIATOR_POTION_SPLASH_RADIUS")
                                 && productionSources.contains("ArcadePortRules.gladiatorsPotionSplashRadius()"));
+                boolean dynamicWizardsConsumer = game == ArcadePortGame.WIZARDS
+                        && key.startsWith("WIZARDS_") && key.endsWith("_MULTIPLIER")
+                        && productionSources.contains(key)
+                        && productionSources.contains("boundedMultiplier(");
                 assertTrue(literalConsumers.contains(key) || dynamicMazeConsumer || dynamicSneakyConsumer
                                 || dynamicTurfWarsConsumer || dynamicSkyWarsConsumer || dynamicEvolutionConsumer
-                                || dynamicGladiatorConsumer,
+                                || dynamicGladiatorConsumer || dynamicWizardsConsumer,
                         game.id() + " exposes " + key + " without a gameplay consumer");
             }
         }
@@ -614,6 +624,19 @@ class GameDebugVariableCatalogTest {
 
         assertEquals(990, au.com.testplex.wizards.WizardsRules.nextEndgameStrikeInterval(1_000));
         assertEquals(200, au.com.testplex.wizards.WizardsRules.nextEndgameStrikeInterval(100));
+    }
+
+    @Test
+    void wizardSpellDebugMultipliersHaveBoundedRangesAndUsefulSteps() {
+        for (String key : List.of("WIZARDS_MANA_REGEN_MULTIPLIER", "WIZARDS_SPELL_MANA_COST_MULTIPLIER",
+                "WIZARDS_SPELL_COOLDOWN_MULTIPLIER", "WIZARDS_SPELL_DAMAGE_MULTIPLIER",
+                "WIZARDS_SPELL_HEAL_MULTIPLIER", "WIZARDS_PROJECTILE_SPEED_MULTIPLIER")) {
+            GameDebugVariableCatalog.Variable variable = GameDebugVariableCatalog.variable(ArcadePortGame.WIZARDS, key);
+            assertNotNull(variable, key);
+            assertEquals(0.0D, variable.minimum(), key);
+            assertEquals(5.0D, variable.maximum(), key);
+            assertEquals(0.1D, variable.step(), key);
+        }
     }
 
     @Test

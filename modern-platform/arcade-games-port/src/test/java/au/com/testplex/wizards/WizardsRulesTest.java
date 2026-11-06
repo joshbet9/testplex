@@ -63,6 +63,32 @@ class WizardsRulesTest {
     }
 
     @Test
+    void debugProfileScalesSpellCostsCooldownsEffectsAndManaRegenThenDefaultsReturn() {
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "WIZARDS_MANA_REGEN_MULTIPLIER", 2.0D,
+                "WIZARDS_SPELL_MANA_COST_MULTIPLIER", 2.0D,
+                "WIZARDS_SPELL_COOLDOWN_MULTIPLIER", 2.0D,
+                "WIZARDS_SPELL_DAMAGE_MULTIPLIER", 2.0D,
+                "WIZARDS_SPELL_HEAL_MULTIPLIER", 0.5D,
+                "WIZARDS_PROJECTILE_SPEED_MULTIPLIER", 2.0D));
+
+        assertEquals(5.0F, WizardsRules.manaPerSecond(WizardsKit.WIZARD, 0));
+        assertEquals(60, WizardsSpell.FIREBALL.manaCost(1, 1.0D));
+        assertEquals(30, WizardsSpell.FIREBALL.cooldownSeconds(1, 1.0D));
+        assertEquals(8.0D, WizardsRules.fireballDamage(1), 0.000001D);
+        assertEquals(1.0D, WizardsRules.healAmount(1), 0.000001D);
+        assertEquals(0.6D, WizardsRules.manaBoltVelocity(), 0.000001D);
+
+        GameDebugRuntimeOverrides.clear();
+        assertEquals(2.5F, WizardsRules.manaPerSecond(WizardsKit.WIZARD, 0));
+        assertEquals(30, WizardsSpell.FIREBALL.manaCost(1, 1.0D));
+        assertEquals(15, WizardsSpell.FIREBALL.cooldownSeconds(1, 1.0D));
+        assertEquals(4.0D, WizardsRules.fireballDamage(1), 0.000001D);
+        assertEquals(2.0D, WizardsRules.healAmount(1), 0.000001D);
+        assertEquals(0.3D, WizardsRules.manaBoltVelocity(), 0.000001D);
+    }
+
+    @Test
     void everyHistoricalSpellHasAnImplementedModernMechanic() {
         assertEquals(21, WizardsSpell.values().length);
         assertEquals(21, WizardsSpell.implementedSpells().size());

@@ -75,13 +75,14 @@ public enum WizardsSpell {
 
     public int manaCost(int level, double modifier) {
         int raw = baseManaCost + manaPerLevel * Math.max(0, level - 1);
-        return Math.max(0, (int) Math.round(raw * Math.max(0.0D, modifier)));
+        return Math.max(0, (int) Math.round(raw * Math.max(0.0D, modifier)
+                * WizardsRules.spellManaCostMultiplier()));
     }
 
     public int cooldownSeconds(int level, double modifier) {
         int raw = baseCooldown + cooldownPerLevel * Math.max(0, level - 1);
         double scale = Math.max(0.0D, modifier);
-        return Math.max(0, (int) Math.round(raw * scale));
+        return Math.max(0, (int) Math.round(raw * scale * WizardsRules.spellCooldownMultiplier()));
     }
 
     public static WizardsSpell fromId(String id) {
