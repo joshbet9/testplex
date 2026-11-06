@@ -130,11 +130,13 @@ class GameDebugEventCatalogTest {
         }
         String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
         String eventCatalog = Files.readString(sourceRoot.resolve("GameDebugEventCatalog.java"));
-        assertTrue(eventCatalog.contains("new Event(\"use-kit-ability\", \"Test Ground Pound\""));
+        assertTrue(eventCatalog.contains("new Event(\"use-kit-ability\", \"Test Selected Kit Ability\""));
         assertTrue(manager.contains("\"slam-shot\".equals(session.quiverKits"));
         assertTrue(manager.contains("useQuiverGroundPound(session, tester, now)"),
                 "the event must execute the same cooldown and knockback path as the live ability");
-        assertTrue(manager.contains("isDebugAbilityAllowed(tester, ArcadePortGame.ONE_IN_THE_QUIVER, \"slam-shot\")"));
+        assertTrue(manager.contains("useQuiverLeaperDoubleJump(session, tester)"),
+                "the selected-kit event must also use the normal Leaper jump path");
+        assertTrue(manager.contains("isDebugAbilityAllowed(tester, ArcadePortGame.ONE_IN_THE_QUIVER, kit)"));
         assertTrue(manager.contains("GameDebugRuntimeOverrides.markDebugSession()"));
     }
 
@@ -929,9 +931,10 @@ class GameDebugEventCatalogTest {
         }
         String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
         String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
-        assertTrue(lobby.contains("List.of(\"brawler\", \"enchanter\", \"slam-shot\", \"ninja\")"));
+        assertTrue(lobby.contains("List.of(\"leaper\", \"brawler\", \"enchanter\", \"slam-shot\", \"ninja\")"));
         assertTrue(lobby.contains("game == ArcadePortGame.ONE_IN_THE_QUIVER && key.startsWith(\"ability-\")"));
-        for (String hook : List.of("ArcadePortGame.ONE_IN_THE_QUIVER, \"slam-shot\"",
+        for (String hook : List.of("ArcadePortGame.ONE_IN_THE_QUIVER, \"leaper\"",
+                "ArcadePortGame.ONE_IN_THE_QUIVER, \"slam-shot\"",
                 "ArcadePortGame.ONE_IN_THE_QUIVER, \"enchanter\"",
                 "ArcadePortGame.ONE_IN_THE_QUIVER, \"brawler\"",
                 "ArcadePortGame.ONE_IN_THE_QUIVER, \"ninja\"")) {

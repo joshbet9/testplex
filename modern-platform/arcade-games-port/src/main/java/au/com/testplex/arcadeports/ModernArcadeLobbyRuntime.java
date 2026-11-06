@@ -1371,7 +1371,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             }
         }
         if (game == ArcadePortGame.ONE_IN_THE_QUIVER) {
-            for (String kit : List.of("brawler", "enchanter", "slam-shot", "ninja")) {
+            for (String kit : List.of("leaper", "brawler", "enchanter", "slam-shot", "ninja")) {
                 String key = "ability-" + kit;
                 features.put(key, new DebugFeature(key, "Ability: " + humanizeDebugKey(kit),
                         Material.ARROW, "Allow this kit's ability or kill perk for authorised testers.", true));

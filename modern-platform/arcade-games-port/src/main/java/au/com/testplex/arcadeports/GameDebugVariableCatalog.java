@@ -243,6 +243,7 @@ final class GameDebugVariableCatalog {
         if (name.contains("_MELEE_DAMAGE")) return 0.0D;
         if (name.equals("HOOPS_MIN_PLAYERS")) return 2.0D;
         if (name.equals("HOOPS_MAX_PLAYERS")) return 2.0D;
+        if (name.equals("QUIVER_SCORE_TO_WIN")) return 1.0D;
         if (name.equals("CASTLE_ASSAULT_KING_HEALTH_BASE")
                 || name.equals("CASTLE_ASSAULT_KING_HEALTH_REFERENCE_PLAYERS")) return 1.0D;
         if (name.startsWith("CASTLE_ASSAULT_KILLSTREAK_TIER_")) return 1.0D;
@@ -452,6 +453,7 @@ final class GameDebugVariableCatalog {
         if (name.contains("_LAUNCH_SPEED") || name.contains("_LAUNCH_HORIZONTAL")) return 8.0D;
         if (name.contains("_LAUNCH_VERTICAL") || name.endsWith("_EGG_SPEED")) return 5.0D;
         if (name.equals("HOOPS_MIN_PLAYERS") || name.equals("HOOPS_MAX_PLAYERS")) return 16.0D;
+        if (name.equals("QUIVER_SCORE_TO_WIN")) return 200.0D;
         if (name.equals("PERFECT_SCORE_PERCENT")) return 100.0D;
         if (name.equals("HEROES_OF_GWEN_OVERTIME_DELAY_MILLIS")) return 3_600_000.0D;
         if (name.equals("HEROES_OF_GWEN_OVERTIME_PATH_ADVANCE_DISTANCE_SQUARED")) return 256.0D;

@@ -24,6 +24,8 @@ class OneInTheQuiverDebugRulesTest {
         assertTrue(ArcadePortRules.isQuiverPerfectRun(20));
         assertTrue(ArcadePortRules.isQuiverSpeedrunnerWin(89_999L));
         assertTrue(ArcadePortRules.shouldAwardQuiverFistPunchKills(3));
+        assertEquals(20, ArcadePortRules.quiverScoreToWin());
+        assertFalse(ArcadePortRules.isQuiverWinnerScoreReached(19));
 
         GameDebugRuntimeOverrides.activate(Map.of(
                 "QUIVER_BRAWLER_WEAPON_DAMAGE", 9.0D,
@@ -33,7 +35,8 @@ class OneInTheQuiverDebugRulesTest {
                 "QUIVER_BRAWLER_HEALTH_PER_KILL", 5.0D,
                 "QUIVER_PERFECT_RUN_KILL_STREAK", 12D,
                 "QUIVER_SPEEDRUNNER_MAX_WIN_MILLIS", 30_000D,
-                "QUIVER_FIST_PUNCH_ACHIEVEMENT_KILLS", 5D));
+                "QUIVER_FIST_PUNCH_ACHIEVEMENT_KILLS", 5D,
+                "QUIVER_SCORE_TO_WIN", 12));
         assertEquals(9.0D, ArcadePortRules.quiverMeleeDamage("brawler", true));
         assertEquals(4.0D, ArcadePortRules.quiverMeleeDamage("brawler", false));
         assertEquals(8.0D, ArcadePortRules.quiverMeleeDamage("slam-shot", true));
@@ -43,12 +46,16 @@ class OneInTheQuiverDebugRulesTest {
         assertEquals("PERFECT RUN", ArcadePortRules.quiverKillstreakTitle(12));
         assertFalse(ArcadePortRules.isQuiverSpeedrunnerWin(30_000L));
         assertTrue(ArcadePortRules.shouldAwardQuiverFistPunchKills(5));
+        assertEquals(12, ArcadePortRules.quiverScoreToWin());
+        assertTrue(ArcadePortRules.isQuiverWinnerScoreReached(12));
 
         GameDebugRuntimeOverrides.clear();
         assertEquals(7.0D, ArcadePortRules.quiverMeleeDamage("brawler", true));
         assertEquals(10.0D, ArcadePortRules.quiverBrawlerHealthAfterKill(8.0D, 20.0D));
         assertFalse(ArcadePortRules.isQuiverPerfectRun(12));
         assertTrue(ArcadePortRules.isQuiverSpeedrunnerWin(89_999L));
+        assertEquals(20, ArcadePortRules.quiverScoreToWin());
+        assertFalse(ArcadePortRules.isQuiverWinnerScoreReached(12));
     }
 
     @Test

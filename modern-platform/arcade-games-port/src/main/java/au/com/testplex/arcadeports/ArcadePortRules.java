@@ -3209,6 +3209,7 @@ public final class ArcadePortRules {
     public static final int QUIVER_SWORD_SLOT = 0;
     public static final int QUIVER_BOW_SLOT = 1;
     public static final int QUIVER_ARROW_SLOT = 2;
+    public static final int QUIVER_SCORE_TO_WIN = 20;
     /** Original Quiver checks that a chain-arrow impact is within one block of a player. */
     public static final double QUIVER_REBOUND_MAX_IMPACT_DISTANCE_SQUARED = 1.0D;
     /** The requested modern Enchanter change is two rebounds, instead of the source's one. */
@@ -3448,7 +3449,11 @@ public final class ArcadePortRules {
     }
 
     public static boolean isQuiverWinnerScoreReached(int kills) {
-        return kills >= 20;
+        return kills >= Math.max(1, GameDebugRuntimeOverrides.intValue("QUIVER_SCORE_TO_WIN", QUIVER_SCORE_TO_WIN));
+    }
+
+    public static int quiverScoreToWin() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue("QUIVER_SCORE_TO_WIN", QUIVER_SCORE_TO_WIN));
     }
 
     public static boolean shouldFinishWhenNobodyIsAlive(int alivePlayers, int respawningPlayers) {

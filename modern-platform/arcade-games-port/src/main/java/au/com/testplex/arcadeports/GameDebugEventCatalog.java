@@ -67,8 +67,8 @@ final class GameDebugEventCatalog {
     private static final List<Event> ONE_IN_THE_QUIVER = List.of(
             new Event("refill-arrow", "Restore Super Arrow", Material.ARROW,
                     "Restore the normal one-shot arrow to its configured hotbar slot for testing."),
-            new Event("use-kit-ability", "Test Ground Pound", Material.DIAMOND_SHOVEL,
-                    "Use Slam Shot's normal Ground Pound, cooldown, knockback, and feedback while selected."),
+            new Event("use-kit-ability", "Test Selected Kit Ability", Material.DIAMOND_SHOVEL,
+                    "Use Leaper's normal double jump or Slam Shot's Ground Pound; passive kits use their normal combat/perk triggers."),
             new Event("test-bot-kill", "Test Kill and Respawn", Material.IRON_SWORD,
                     "Resolve a normal Quiver kill against the nearest living test bot, including score and its respawn."));
     private static final List<Event> WIZARDS = List.of(

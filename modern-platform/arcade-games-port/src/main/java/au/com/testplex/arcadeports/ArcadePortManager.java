@@ -1239,15 +1239,22 @@ public final class ArcadePortManager implements Listener {
             tester.getInventory().setItem(arrowSlot, allowQuiverGlassBreaks(arrow));
             triggered = true;
         }
-        if (type == ArcadePortGame.ONE_IN_THE_QUIVER && "use-kit-ability".equals(eventId)
-                && "slam-shot".equals(session.quiverKits.getOrDefault(tester.getUniqueId(), "leaper"))) {
-            long now = System.currentTimeMillis();
-            long readyAt = session.quiverGroundPoundReadyAt.getOrDefault(tester.getUniqueId(), 0L);
-            if (now >= readyAt && isDebugAbilityAllowed(tester, ArcadePortGame.ONE_IN_THE_QUIVER, "slam-shot")) {
-                useQuiverGroundPound(session, tester, now);
-                triggered = session.quiverGroundPoundReadyAt.getOrDefault(tester.getUniqueId(), 0L) > now;
-                if (triggered) GameDebugRuntimeOverrides.markDebugSession();
+        if (type == ArcadePortGame.ONE_IN_THE_QUIVER && "use-kit-ability".equals(eventId)) {
+            String kit = session.quiverKits.getOrDefault(tester.getUniqueId(), "leaper");
+            if (!isDebugAbilityAllowed(tester, ArcadePortGame.ONE_IN_THE_QUIVER, kit)) return false;
+            if ("leaper".equals(kit)) {
+                triggered = useQuiverLeaperDoubleJump(session, tester);
+            } else if ("slam-shot".equals(kit)) {
+                long now = System.currentTimeMillis();
+                long readyAt = session.quiverGroundPoundReadyAt.getOrDefault(tester.getUniqueId(), 0L);
+                if (now >= readyAt) {
+                    useQuiverGroundPound(session, tester, now);
+                    triggered = session.quiverGroundPoundReadyAt.getOrDefault(tester.getUniqueId(), 0L) > now;
+                }
+            } else {
+                tester.sendMessage(ChatColor.YELLOW + "This kit's perk triggers through normal combat; use the test kill or weapon to activate it.");
             }
+            if (triggered) GameDebugRuntimeOverrides.markDebugSession();
         }
         if (type == ArcadePortGame.ONE_IN_THE_QUIVER && "test-bot-kill".equals(eventId)) {
             Player target = alivePlayers(session).stream()
@@ -9882,6 +9889,14 @@ public final class ArcadePortManager implements Listener {
             UUID id = player.getUniqueId();
             String kit = session.quiverKits.getOrDefault(id, "leaper");
             if ("leaper".equals(kit)) {
+                boolean jumpEnabled = GameDebugRuntimeOverrides.booleanValue("QUIVER_LEAPER_DOUBLE_JUMP_ENABLED",
+                        ArcadePortRules.QUIVER_LEAPER_DOUBLE_JUMP_ENABLED)
+                        && debugKitFeatureEnabled(player, ArcadePortGame.ONE_IN_THE_QUIVER, "leaper");
+                if (!jumpEnabled) {
+                    if (player.isFlying()) player.setFlying(false);
+                    if (player.getAllowFlight()) player.setAllowFlight(false);
+                    continue;
+                }
                 boolean awaitingLanding = session.quiverLeapAwaitingLanding.contains(id);
                 if (ArcadePortRules.shouldRearmQuiverLeap(
                         player.isOnGround(), awaitingLanding, player.getVelocity().getY())) {
@@ -16439,7 +16454,7 @@ public final class ArcadePortManager implements Listener {
                 int kills = session.scores.getOrDefault(rankedPlayer.getUniqueId(), 0);
                 line.setPrefix((alive ? ChatColor.GREEN : ChatColor.RED) + "#" + (i + 1)
                         + " " + rankedPlayer.getName());
-                line.setSuffix(ChatColor.GRAY + " " + kills + "/20");
+                line.setSuffix(ChatColor.GRAY + " " + kills + "/" + ArcadePortRules.quiverScoreToWin());
                 objective.getScore(entry).setScore(session.quiverScoreboardTeams.size() - i);
             } else {
                 line.setPrefix("");
@@ -17960,7 +17975,7 @@ public final class ArcadePortManager implements Listener {
                 session.alive.add(victimId);
                 session.lastLocations.put(victimId, spawn.clone());
                 giveKit(session, player);
-                player.sendMessage(ChatColor.GREEN + "Respawned. First to 20 kills wins.");
+                player.sendMessage(ChatColor.GREEN + "Respawned. First to " + ArcadePortRules.quiverScoreToWin() + " kills wins.");
                 checkRoundEnd(session);
             }, GameDebugRuntimeOverrides.longValue("QUIVER_RESPAWN_DELAY_TICKS", ArcadePortRules.QUIVER_RESPAWN_DELAY_TICKS));
             return;
@@ -19526,7 +19541,7 @@ public final class ArcadePortManager implements Listener {
                     "Super Arrow", "One arrow per shot; earn another with each kill.")));
         }
         updateQuiverScoreboard(session);
-        attacker.sendMessage(ChatColor.GREEN + "Quiver kill! " + kills + "/20.");
+        attacker.sendMessage(ChatColor.GREEN + "Quiver kill! " + kills + "/" + ArcadePortRules.quiverScoreToWin() + ".");
         checkWinnerForScore(session, attacker);
         if (active != session) return;
         activateQuiverNinjaVanish(session, attacker, System.currentTimeMillis());
@@ -19556,7 +19571,7 @@ public final class ArcadePortManager implements Listener {
             session.alive.add(targetId);
             session.lastLocations.put(targetId, spawn.clone());
             giveKit(session, target);
-            target.sendMessage(ChatColor.GREEN + "Respawned. First to 20 kills wins.");
+            target.sendMessage(ChatColor.GREEN + "Respawned. First to " + ArcadePortRules.quiverScoreToWin() + " kills wins.");
             checkRoundEnd(session);
         }, GameDebugRuntimeOverrides.longValue("QUIVER_RESPAWN_DELAY_TICKS", ArcadePortRules.QUIVER_RESPAWN_DELAY_TICKS));
     }
@@ -19702,9 +19717,10 @@ public final class ArcadePortManager implements Listener {
             awardQuiverAchievement(winner, QuiverAchievement.SPEEDRUNNER,
                     "Speedrunner — won a game in under 1:30.");
         }
-        if (session.scores.getOrDefault(id, 0) >= 20 && !session.quiverUsedBow.contains(id)) {
+        if (ArcadePortRules.isQuiverWinnerScoreReached(session.scores.getOrDefault(id, 0))
+                && !session.quiverUsedBow.contains(id)) {
             awardQuiverAchievement(winner, QuiverAchievement.WHATS_A_BOW,
-                    "What's A bow? — won with 20 kills without using archery.");
+                    "What's A bow? — won with " + ArcadePortRules.quiverScoreToWin() + " kills without using archery.");
         }
         if (QuiverAchievementRules.hasTenTwoKillStreaks(
                 session.quiverTwoKillStreaks.getOrDefault(id, 0))) {
@@ -29617,17 +29633,28 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null || session.type != ArcadePortGame.ONE_IN_THE_QUIVER
                 || !session.alive.contains(player.getUniqueId())
-                || !GameDebugRuntimeOverrides.booleanValue("QUIVER_LEAPER_DOUBLE_JUMP_ENABLED",
-                        ArcadePortRules.QUIVER_LEAPER_DOUBLE_JUMP_ENABLED)
                 || !"leaper".equals(session.quiverKits.getOrDefault(player.getUniqueId(), "leaper"))) return;
         event.setCancelled(true);
-        session.quiverLeapAwaitingLanding.add(player.getUniqueId());
+        useQuiverLeaperDoubleJump(session, player);
+    }
+
+    private boolean useQuiverLeaperDoubleJump(Session session, Player player) {
+        UUID id = player.getUniqueId();
+        if (session == null || player == null || active != session || session.type != ArcadePortGame.ONE_IN_THE_QUIVER
+                || !session.alive.contains(id)
+                || !"leaper".equals(session.quiverKits.getOrDefault(id, "leaper"))) return false;
+        if (!GameDebugRuntimeOverrides.booleanValue("QUIVER_LEAPER_DOUBLE_JUMP_ENABLED",
+                ArcadePortRules.QUIVER_LEAPER_DOUBLE_JUMP_ENABLED)) return false;
+        if (!isDebugAbilityAllowed(player, ArcadePortGame.ONE_IN_THE_QUIVER, "leaper")) return false;
+        if (!player.getAllowFlight() || session.quiverLeapAwaitingLanding.contains(id)) return false;
+        session.quiverLeapAwaitingLanding.add(id);
         player.setFlying(false);
         player.setAllowFlight(false);
         Vector direction = ArcadePortRules.quiverLeaperJumpVelocity(player.getLocation().getDirection());
         if (direction != null) player.setVelocity(direction);
         player.setFallDistance(0.0F);
         player.getWorld().playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 0.8F, 1.2F);
+        return true;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)

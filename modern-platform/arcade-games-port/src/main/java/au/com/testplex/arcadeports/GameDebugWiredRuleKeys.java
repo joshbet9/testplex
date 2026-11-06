@@ -773,6 +773,7 @@ final class GameDebugWiredRuleKeys {
             "QUIVER_REBOUND_POWER_PER_BLOCK",
             "QUIVER_REBOUND_VERTICAL_ARC_PER_BLOCK",
             "QUIVER_RESPAWN_DELAY_TICKS",
+            "QUIVER_SCORE_TO_WIN",
             "QUIVER_SLAM_SHOT_WEAPON_DAMAGE",
             "QUIVER_SPEEDRUNNER_MAX_WIN_MILLIS",
             "QUIVER_SWORD_SLOT",

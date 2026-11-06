@@ -91,6 +91,7 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.ONE_IN_THE_QUIVER), "QUIVER_BRAWLER_WEAPON_DAMAGE");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.ONE_IN_THE_QUIVER), "QUIVER_GROUND_POUND_RADIUS_BLOCKS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.ONE_IN_THE_QUIVER), "QUIVER_REBOUND_MAX_POWER");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.ONE_IN_THE_QUIVER), "QUIVER_SCORE_TO_WIN");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MASTER_BUILDERS), "MASTER_BUILDERS_TOTAL_MILLIS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MASTER_BUILDERS), "MASTER_BUILDERS_VOTE_MILLIS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MASTER_BUILDERS), "MASTER_BUILDERS_REVIEW_MILLIS");
@@ -171,6 +172,11 @@ class GameDebugVariableCatalogTest {
         assertGameRange(ArcadePortGame.MILK_THE_COW, "MILK_THE_COW_COW_BOMB_DAMAGE", 0.0D, 16.0D);
         assertGameRange(ArcadePortGame.MILK_THE_COW, "MILK_THE_COW_BODY_SLAM_RADIUS_BLOCKS", 0.1D, 64.0D);
         assertGameRange(ArcadePortGame.MILK_THE_COW, "MILK_THE_COW_COMEBACK_LEAD_THRESHOLD", 1.0D, 100.0D);
+    }
+
+    @Test
+    void quiverScoreGoalHasASafeAdjustableRange() {
+        assertGameRange(ArcadePortGame.ONE_IN_THE_QUIVER, "QUIVER_SCORE_TO_WIN", 1.0D, 200.0D);
     }
 
     @Test
