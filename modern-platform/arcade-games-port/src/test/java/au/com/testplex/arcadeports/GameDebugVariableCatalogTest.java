@@ -186,6 +186,10 @@ class GameDebugVariableCatalogTest {
         assertGameRange(ArcadePortGame.BACON_BRAWL, "BACON_CRISPY_DASH_HIT_RADIUS_SQUARED", 0.0D, 64.0D);
         assertGameRange(ArcadePortGame.BACON_BRAWL, "BACON_CRISPY_FIRE_CONTACT_RADIUS_SQUARED", 0.0D, 64.0D);
         assertGameRange(ArcadePortGame.BACON_BRAWL, "BACON_CRISPY_IMPACT_FIRE_BLOCKS", 1.0D, 9.0D);
+        assertGameRange(ArcadePortGame.BACON_BRAWL, "BACON_CHRIS_ABILITY_METER_COST", 0.0D, 100.0D);
+        assertGameRange(ArcadePortGame.BACON_BRAWL, "BACON_CRISPY_SHOT_COUNT", 1.0D, 9.0D);
+        assertGameRange(ArcadePortGame.BACON_BRAWL, "BACON_CRISPY_SHOT_SPREAD_RADIANS", 0.0D, 0.6D);
+        assertGameRange(ArcadePortGame.BACON_BRAWL, "BACON_CRISPY_SHOT_VELOCITY", 0.1D, 3.0D);
     }
 
     @Test

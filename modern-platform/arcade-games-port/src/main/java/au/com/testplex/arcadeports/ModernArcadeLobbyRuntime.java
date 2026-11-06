@@ -1309,6 +1309,12 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 features.put(key, new DebugFeature(key, "Ability: " + humanizeDebugKey(kit),
                         Material.IRON_AXE, "Allow this kit's ability to activate for authorised testers.", true));
             }
+            features.put("ability-chris-p-bacon-shot", new DebugFeature("ability-chris-p-bacon-shot",
+                    "Crispy Fire shot", Material.FIRE_CHARGE,
+                    "Allow Chris P Bacon's fixed-strength three-shot fire blast for this tester.", true));
+            features.put("ability-chris-p-bacon-dash", new DebugFeature("ability-chris-p-bacon-dash",
+                    "Crispy crouch dash", Material.FIREWORK_ROCKET,
+                    "Allow Chris P Bacon's crouch-triggered fire dash for this tester.", true));
         }
         if (game == ArcadePortGame.SUPER_SPLOOR) {
             features.put("unlimited-specials", new DebugFeature("unlimited-specials", "Unlimited Specials",

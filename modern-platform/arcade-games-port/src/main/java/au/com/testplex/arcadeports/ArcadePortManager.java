@@ -13989,6 +13989,13 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.RED + "This ability is disabled in your Bacon Brawl debug profile.");
             return;
         }
+        if (plugin.hasAdminAccess(player) && "chris-p-bacon".equals(kit)) {
+            String actionFeature = crouchDash ? "ability-chris-p-bacon-dash" : "ability-chris-p-bacon-shot";
+            if (!debugFeatureEnabled(id, ArcadePortGame.BACON_BRAWL, actionFeature, true)) {
+                player.sendMessage(ChatColor.RED + "This Chris P Bacon ability is disabled in your debug profile.");
+                return;
+            }
+        }
         boolean unlimitedAbilityDebug = isDebugOverrideEnabled(id, ArcadePortGame.BACON_BRAWL,
                 "unlimited-abilities");
         int charge = unlimitedAbilityDebug ? GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", ArcadePortRules.BACON_METER_MAX)
@@ -13996,8 +14003,7 @@ public final class ArcadePortManager implements Listener {
         if (!unlimitedAbilityDebug && !ArcadePortRules.canUseBaconMeterAbility(charge)) return;
         // Chris P Bacon has fixed-strength actions that each cost exactly half the meter.
         int chargeCost = "chris-p-bacon".equals(kit)
-                ? GameDebugRuntimeOverrides.intValue("BACON_CHRIS_ABILITY_METER_COST",
-                        ArcadePortRules.BACON_CHRIS_ABILITY_METER_COST)
+                ? ArcadePortRules.baconChrisAbilityMeterCost()
                 : charge;
         // Other abilities spend their full current charge; none use a wall-clock cooldown.
         session.baconAbilitiesUsed.add(id);
@@ -14034,15 +14040,18 @@ public final class ArcadePortManager implements Listener {
                     useCrispyBaconDash(session, player);
                     break;
                 }
+                double power = 1.0D;
                 Vector direction = player.getEyeLocation().getDirection().normalize();
                 Location launch = player.getEyeLocation().add(direction.clone().multiply(1.4D));
-                double power = 1.0D;
-                for (int shot = -1; shot <= 1; shot++) {
-                    Vector shotDirection = direction.clone().rotateAroundY(shot * 0.13D);
+                int shotCount = ArcadePortRules.baconCrispyShotCount();
+                double shotSpeed = ArcadePortRules.baconCrispyShotVelocity();
+                for (int shot = 0; shot < shotCount; shot++) {
+                    Vector shotDirection = direction.clone().rotateAroundY(
+                            ArcadePortRules.baconCrispyShotYawOffset(shot));
                     Item bacon = player.getWorld().dropItem(launch, new ItemStack(Material.COOKED_PORKCHOP));
                     bacon.setPickupDelay(Short.MAX_VALUE);
                     bacon.setInvulnerable(true);
-                    bacon.setVelocity(shotDirection.multiply(0.78D + power * 0.22D));
+                    bacon.setVelocity(shotDirection.multiply(shotSpeed));
                     UUID blastId = bacon.getUniqueId();
                     session.entities.add(bacon);
                     session.baconBlastItems.put(blastId, bacon);
@@ -19858,6 +19867,7 @@ public final class ArcadePortManager implements Listener {
 
     private void finish(Session session, Player winner, boolean announceWinner) {
         if (active != session) return;
+        boolean debugRound = GameDebugRuntimeOverrides.isDebugSession();
         if (session.type == ArcadePortGame.BACON_BRAWL) {
             restoreBaconDashFireBlocks(session);
             session.baconCrispyDashes.clear();
@@ -20045,7 +20055,8 @@ public final class ArcadePortManager implements Listener {
             activeDebugProfileGame = null;
         }
         if (session.tickTask != null) session.tickTask.cancel();
-        if (announceWinner && session.type == ArcadePortGame.BACON_BRAWL && winner != null) {
+        if (session.type == ArcadePortGame.BACON_BRAWL
+                && ArcadePortRules.shouldRecordBaconBrawlAchievements(debugRound, announceWinner, winner != null)) {
             recordBaconBrawlAchievements(session, winner);
         }
         if (announceWinner) {

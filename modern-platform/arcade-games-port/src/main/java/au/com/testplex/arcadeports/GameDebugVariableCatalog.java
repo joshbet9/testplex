@@ -242,6 +242,10 @@ final class GameDebugVariableCatalog {
         if (name.equals("BACON_CRISPY_BURN_DURATION_MILLIS")
                 || name.equals("BACON_CRISPY_DASH_HIT_RADIUS_SQUARED")
                 || name.equals("BACON_CRISPY_FIRE_CONTACT_RADIUS_SQUARED")) return 0.0D;
+        if (name.equals("BACON_CRISPY_SHOT_COUNT")) return 1.0D;
+        if (name.equals("BACON_CHRIS_ABILITY_METER_COST")) return 0.0D;
+        if (name.equals("BACON_CRISPY_SHOT_SPREAD_RADIANS")) return 0.0D;
+        if (name.equals("BACON_CRISPY_SHOT_VELOCITY")) return 0.1D;
         if (name.equals("BACON_CRISPY_IMPACT_FIRE_BLOCKS")) return 1.0D;
         if (name.equals("COW_CHARGE_TARGET_RADIUS_BLOCKS")
                 || name.equals("COW_CHARGE_TARGET_HEIGHT_BLOCKS")
@@ -412,6 +416,10 @@ final class GameDebugVariableCatalog {
         if (name.equals("BACON_CRISPY_DASH_HIT_RADIUS_SQUARED")
                 || name.equals("BACON_CRISPY_FIRE_CONTACT_RADIUS_SQUARED")) return 64.0D;
         if (name.equals("BACON_CRISPY_IMPACT_FIRE_BLOCKS")) return 9.0D;
+        if (name.equals("BACON_CRISPY_SHOT_COUNT")) return 9.0D;
+        if (name.equals("BACON_CHRIS_ABILITY_METER_COST")) return 100.0D;
+        if (name.equals("BACON_CRISPY_SHOT_SPREAD_RADIANS")) return 0.6D;
+        if (name.equals("BACON_CRISPY_SHOT_VELOCITY")) return 3.0D;
         if (name.equals("COW_CHARGE_HUNGER_INTERVAL_MILLIS")
                 || name.equals("HERD_UPDATE_INTERVAL_MILLIS")
                 || name.equals("COW_CHARGE_TARGET_COOLDOWN_MILLIS")) return 120_000.0D;
@@ -622,6 +630,10 @@ final class GameDebugVariableCatalog {
 
     private static double step(String name, double defaultValue, Kind kind) {
         if (kind == Kind.BOOLEAN) return 1.0D;
+        if (name.equals("BACON_CHRIS_ABILITY_METER_COST")) return 5.0D;
+        if (name.equals("BACON_CRISPY_SHOT_COUNT")) return 1.0D;
+        if (name.equals("BACON_CRISPY_SHOT_SPREAD_RADIANS")) return 0.01D;
+        if (name.equals("BACON_CRISPY_SHOT_VELOCITY")) return 0.1D;
         if (name.equals("BALL_RADIUS")) return 0.05D;
         if (name.equals("BATTING_POWER_MULTIPLIER")) return 0.05D;
         if (name.equals("CURVE_ACCELERATION")) return 0.0005D;

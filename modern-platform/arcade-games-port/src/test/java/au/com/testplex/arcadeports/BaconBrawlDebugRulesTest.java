@@ -73,6 +73,37 @@ class BaconBrawlDebugRulesTest {
         assertEquals(3, ArcadePortRules.baconCrispyImpactFireBlocks());
     }
 
+    @Test void crispyBaconKeepsFixedHalfMeterCostAndShotShapeButAllowsDebugTuning() {
+        assertEquals(50, ArcadePortRules.baconChrisAbilityMeterCost());
+        assertEquals(3, ArcadePortRules.baconCrispyShotCount());
+        assertEquals(0.13D, ArcadePortRules.baconCrispyShotSpreadRadians(), 0.000001D);
+        assertEquals(1.0D, ArcadePortRules.baconCrispyShotVelocity(), 0.000001D);
+        assertEquals(-0.13D, ArcadePortRules.baconCrispyShotYawOffset(0), 0.000001D);
+        assertEquals(0.0D, ArcadePortRules.baconCrispyShotYawOffset(1), 0.000001D);
+        assertEquals(0.13D, ArcadePortRules.baconCrispyShotYawOffset(2), 0.000001D);
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "BACON_CHRIS_ABILITY_METER_COST", 35,
+                "BACON_CRISPY_SHOT_COUNT", 5,
+                "BACON_CRISPY_SHOT_SPREAD_RADIANS", 0.2D,
+                "BACON_CRISPY_SHOT_VELOCITY", 1.6D));
+        assertEquals(35, ArcadePortRules.baconChrisAbilityMeterCost());
+        assertEquals(5, ArcadePortRules.baconCrispyShotCount());
+        assertEquals(0.2D, ArcadePortRules.baconCrispyShotSpreadRadians(), 0.000001D);
+        assertEquals(1.6D, ArcadePortRules.baconCrispyShotVelocity(), 0.000001D);
+        assertEquals(-0.4D, ArcadePortRules.baconCrispyShotYawOffset(0), 0.000001D);
+        assertEquals(0.0D, ArcadePortRules.baconCrispyShotYawOffset(2), 0.000001D);
+        assertEquals(0.4D, ArcadePortRules.baconCrispyShotYawOffset(4), 0.000001D);
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertEquals(50, ArcadePortRules.baconChrisAbilityMeterCost());
+        assertEquals(3, ArcadePortRules.baconCrispyShotCount());
+        assertEquals(0.13D, ArcadePortRules.baconCrispyShotSpreadRadians(), 0.000001D);
+        assertEquals(1.0D, ArcadePortRules.baconCrispyShotVelocity(), 0.000001D);
+        assertEquals(-0.13D, ArcadePortRules.baconCrispyShotYawOffset(0), 0.000001D);
+        assertEquals(0.13D, ArcadePortRules.baconCrispyShotYawOffset(2), 0.000001D);
+    }
+
     @Test void combatTimingReachAndBlastCollisionUseLiveRuleValues() {
         assertEquals(0.65D, ArcadePortRules.baconTimedHitKnockbackMultiplier(200L), 0.00001D);
         assertFalse(ArcadePortRules.shouldAcceptBaconAvatarPacketHit(true, true, true, false, 13.0D, true));
@@ -125,5 +156,19 @@ class BaconBrawlDebugRulesTest {
         assertEquals(50_000L, ArcadePortRules.nextBaconKnockbackInterval(0, 8));
         assertFalse(ArcadePortRules.shouldCreditBaconFallKill(40_000L, 1L, true));
         assertFalse(ArcadePortRules.shouldCountMamaCameraBlastKill(true, false, killer, killer, 16_000L, 9_000L));
+    }
+
+    @Test void debugFinishesNeverPersistBaconAchievements() {
+        assertTrue(ArcadePortRules.shouldRecordBaconBrawlAchievements(false, true, true));
+        assertFalse(ArcadePortRules.shouldRecordBaconBrawlAchievements(true, true, true));
+        assertFalse(ArcadePortRules.shouldRecordBaconBrawlAchievements(false, false, true));
+        assertFalse(ArcadePortRules.shouldRecordBaconBrawlAchievements(false, true, false));
+
+        GameDebugRuntimeOverrides.activate(Map.of("BACON_METER_MAX", 120));
+        boolean debugAtMatchFinish = GameDebugRuntimeOverrides.isDebugSession();
+        GameDebugRuntimeOverrides.clear();
+        assertFalse(ArcadePortRules.shouldRecordBaconBrawlAchievements(
+                debugAtMatchFinish, true, true),
+                "finish-path cleanup must not turn a debug win into a persistent achievement award");
     }
 }

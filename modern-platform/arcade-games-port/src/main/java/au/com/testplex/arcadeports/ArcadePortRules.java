@@ -373,6 +373,9 @@ public final class ArcadePortRules {
     public static final int BACON_METER_GAIN_CRITICAL_HIT = 10;
     public static final double BACON_METER_POPULATION_SCALE = 14.0D;
     public static final int BACON_CHRIS_ABILITY_METER_COST = 50;
+    public static final int BACON_CRISPY_SHOT_COUNT = 3;
+    public static final double BACON_CRISPY_SHOT_SPREAD_RADIANS = 0.13D;
+    public static final double BACON_CRISPY_SHOT_VELOCITY = 1.0D;
     /** Per attacker-victim throttle, allowing the classic ten hits per second. */
     public static final long BACON_HIT_COOLDOWN_MILLIS = 100L;
     public static final long BACON_CRISPY_DASH_DURATION_MILLIS = 250L;
@@ -430,6 +433,12 @@ public final class ArcadePortRules {
     public static boolean shouldAwardBaconKingOfBacon(int totalWins) {
         return totalWins >= GameDebugRuntimeOverrides.intValue("BACON_BRAWL_KING_OF_BACON_WINS", BACON_BRAWL_KING_OF_BACON_WINS);
     }
+
+    public static boolean shouldRecordBaconBrawlAchievements(boolean debugRound,
+                                                              boolean announcedWin,
+                                                              boolean hasWinner) {
+        return !debugRound && announcedWin && hasWinner;
+    }
     public static int baconMeterGainForHit(boolean critical, int alivePlayers) {
         int alive = Math.max(1, Math.min(16, alivePlayers));
         double scale = 1.0D + (16 - alive) / Math.max(1.0D, GameDebugRuntimeOverrides.doubleValue(
@@ -464,6 +473,37 @@ public final class ArcadePortRules {
     public static int baconCrispyImpactFireBlocks() {
         return Math.max(1, Math.min(9, GameDebugRuntimeOverrides.intValue(
                 "BACON_CRISPY_IMPACT_FIRE_BLOCKS", BACON_CRISPY_IMPACT_FIRE_BLOCKS)));
+    }
+
+    public static int baconChrisAbilityMeterCost() {
+        int maxMeter = Math.max(1, GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", BACON_METER_MAX));
+        return Math.max(0, Math.min(maxMeter, GameDebugRuntimeOverrides.intValue(
+                "BACON_CHRIS_ABILITY_METER_COST", BACON_CHRIS_ABILITY_METER_COST)));
+    }
+
+    public static int baconCrispyShotCount() {
+        return Math.max(1, Math.min(9, GameDebugRuntimeOverrides.intValue(
+                "BACON_CRISPY_SHOT_COUNT", BACON_CRISPY_SHOT_COUNT)));
+    }
+
+    public static double baconCrispyShotYawOffset(int shotIndex) {
+        int count = baconCrispyShotCount();
+        int index = Math.max(0, Math.min(count - 1, shotIndex));
+        return (index - (count - 1) / 2.0D) * baconCrispyShotSpreadRadians();
+    }
+
+    public static double baconCrispyShotSpreadRadians() {
+        double spread = GameDebugRuntimeOverrides.doubleValue(
+                "BACON_CRISPY_SHOT_SPREAD_RADIANS", BACON_CRISPY_SHOT_SPREAD_RADIANS);
+        return Double.isFinite(spread) ? Math.max(0.0D, Math.min(0.6D, spread))
+                : BACON_CRISPY_SHOT_SPREAD_RADIANS;
+    }
+
+    public static double baconCrispyShotVelocity() {
+        double speed = GameDebugRuntimeOverrides.doubleValue(
+                "BACON_CRISPY_SHOT_VELOCITY", BACON_CRISPY_SHOT_VELOCITY);
+        return Double.isFinite(speed) ? Math.max(0.1D, Math.min(3.0D, speed))
+                : BACON_CRISPY_SHOT_VELOCITY;
     }
 
     /** Keep the Bacon Brawl sidebar within Minecraft's 15-row limit without merging names. */
