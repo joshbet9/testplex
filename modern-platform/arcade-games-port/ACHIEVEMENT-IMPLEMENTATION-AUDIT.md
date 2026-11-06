@@ -108,7 +108,7 @@ This table is a discussion starter. It deliberately favours accomplishments that
 | --- | --- | --- |
 | Bacon Brawl — Brutus Bacon | `king-of-bacon` + `pigs-in-blankets` | Basic mastery and a high-kill match; neither needs Brutus. |
 | Bacon Brawl — Chris P. Bacon | `flash-fried` + `raw-pork` (**approved**) | Both earned without Chris; his new `extra-crispy` achievement is intentionally **not** a prerequisite, avoiding a circular lock. |
-| Bomb Lobbers — Constructor | **Approved:** `two-birds-one-stone` + `whats-a-double-jump` + `blast-proof` + `jelly-skin` | Four independent feats obtainable without Constructor. Blast Proof requires five wins as Armorer; prior earned records remain true. Decide whether to grandfather prior Waller entitlement before merge. |
+| Bomb Lobbers — Constructor | **Approved:** `two-birds-one-stone` + `whats-a-double-jump` + `blast-proof` + `jelly-skin` | Four independent feats obtainable without Constructor. Blast Proof requires five wins as Armorer; prior earned records remain true. No Waller entitlement grandfathering is needed: the server is not live and nobody has unlocked that kit. Keep its legacy name alias without bypassing Constructor's four-achievement gate. |
 | Death Tag — Turtle | `turtle-shell` (*retain*) | Existing obtainable runner-chaser challenge. |
 | Death Tag — Trickster | `smoke-and-mirrors` (*retain*) | Existing runner win challenge. |
 | Dragon Escape — Digger | `to-hell-and-back` + `paralympics` | Course mastery without Leap, obtainable without Digger; **do not use Digger-only `learn-to-code`**. |
