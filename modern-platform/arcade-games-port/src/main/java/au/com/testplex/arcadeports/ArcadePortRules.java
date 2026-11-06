@@ -116,6 +116,7 @@ public final class ArcadePortRules {
     public static final long MASTER_BUILDERS_TOTAL_MILLIS = 300_000L;
     public static final long MASTER_BUILDERS_VOTE_MILLIS = 8_000L;
     public static final long MASTER_BUILDERS_REVIEW_MILLIS = 8_000L;
+    public static final int MASTER_BUILDERS_MAX_RATING = 6;
 
     /**
      * Divides the five-minute-twenty-second match timer across each participant's
@@ -173,6 +174,24 @@ public final class ArcadePortRules {
     public static double masterBuildersPlotCenterZ(int plotIndex) {
         int plot = Math.floorMod(plotIndex, MASTER_BUILDERS_MAX_BUILDERS);
         return -24.0D + (plot / 4) * 16.0D + 0.5D;
+    }
+
+    public static int masterBuildersMaxRating() {
+        return Math.max(1, Math.min(MASTER_BUILDERS_MAX_RATING, GameDebugRuntimeOverrides.intValue(
+                "MASTER_BUILDERS_MAX_RATING", MASTER_BUILDERS_MAX_RATING)));
+    }
+
+    public static int masterBuildersRatingScore(org.bukkit.Material material) {
+        int score = switch (material) {
+            case RED_CONCRETE -> 1;
+            case ORANGE_CONCRETE -> 2;
+            case YELLOW_CONCRETE -> 3;
+            case LIME_CONCRETE -> 4;
+            case LIGHT_BLUE_CONCRETE -> 5;
+            case PURPLE_CONCRETE -> 6;
+            default -> 0;
+        };
+        return score <= masterBuildersMaxRating() ? score : 0;
     }
     public static final long DEATH_TAG_CHASER_PROMOTION_INTERVAL_MILLIS = 30_000L;
     public static final double DEATH_TAG_CHASER_DAMAGE = 4.0D;

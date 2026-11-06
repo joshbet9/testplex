@@ -12566,8 +12566,10 @@ public final class ArcadePortManager implements Listener {
                     .filter(p->p!=null&&p.isOnline()).findFirst().orElse(null);
             finish(session,solo,true);return;
         }
+        int maxRating = ArcadePortRules.masterBuildersMaxRating();
         announce(session,ChatColor.GOLD+"Build time is over! Review each human-built plot for 18 seconds. "
-                +ChatColor.YELLOW+"Right-click a rating from 1 (low) to 6 (outstanding) during the first 14 seconds.");
+                +ChatColor.YELLOW+"Right-click a rating from 1 (low) to " + maxRating
+                + " (outstanding) during the first 14 seconds.");
         showNextMasterBuilderReview(session,now);
     }
 
@@ -12585,6 +12587,7 @@ public final class ArcadePortManager implements Listener {
             Location centre=masterBuilderPlotCenter(session.world,session.masterBuilderPlots.getOrDefault(targetId,0));
             Material[] ratings={Material.RED_CONCRETE,Material.ORANGE_CONCRETE,Material.YELLOW_CONCRETE,
                     Material.LIME_CONCRETE,Material.LIGHT_BLUE_CONCRETE,Material.PURPLE_CONCRETE};
+            int maxRating = ArcadePortRules.masterBuildersMaxRating();
             long onlineCount=session.players.values().stream()
                     .filter(p->p!=null&&p.isOnline()&&!testPlayers.isTestPlayer(p)).count();
             int viewerSlot=0;
@@ -12598,7 +12601,7 @@ public final class ArcadePortManager implements Listener {
                 view.setDirection(centre.toVector().subtract(view.toVector()));
                 viewerSlot++;
                 p.teleport(view);
-                if(!p.getUniqueId().equals(targetId))for(int i=0;i<ratings.length;i++)
+                if(!p.getUniqueId().equals(targetId))for(int i=0;i<maxRating;i++)
                     p.getInventory().setItem(i,namedItem(ratings[i],(i+1)+" / 6",
                             "Right-click to rate. You can change your rating before voting closes."));
                 p.sendTitle(ChatColor.GOLD+"PLOT "+(session.masterBuilderReviewIndex+1)+" / "+session.masterBuilderReviewOrder.size(),
@@ -12620,10 +12623,7 @@ public final class ArcadePortManager implements Listener {
                 ||!event.getAction().isRightClick()||session.masterBuilderCurrentTarget==null
                 ||player.getUniqueId().equals(session.masterBuilderCurrentTarget))return;
         ItemStack item=event.getItem();if(item==null)return;
-        int score=switch(item.getType()){
-            case RED_CONCRETE -> 1;case ORANGE_CONCRETE -> 2;case YELLOW_CONCRETE -> 3;
-            case LIME_CONCRETE -> 4;case LIGHT_BLUE_CONCRETE -> 5;case PURPLE_CONCRETE -> 6;default -> 0;
-        };
+        int score = ArcadePortRules.masterBuildersRatingScore(item.getType());
         if(score==0)return;
         session.masterBuilderVotes.computeIfAbsent(session.masterBuilderCurrentTarget,k->new HashMap<>())
                 .put(player.getUniqueId(),score);

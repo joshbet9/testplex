@@ -541,6 +541,7 @@ final class GameDebugWiredRuleKeys {
             "LEGACY_HEALTH_REGEN_TICKS",
             "LEGACY_REGEN_EXHAUSTION",
             "MASTER_BUILDERS_MAX_BUILDERS",
+            "MASTER_BUILDERS_MAX_RATING",
             "MASTER_BUILDERS_REVIEW_MILLIS",
             "MASTER_BUILDERS_TOTAL_MILLIS",
             "MASTER_BUILDERS_VOTE_MILLIS",

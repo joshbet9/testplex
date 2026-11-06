@@ -186,6 +186,23 @@ class GameDebugVariableCatalogTest {
         assertGameRange(ArcadePortGame.CAMERA_SHY, "CAMERA_SHY_PHOTO_LENS_MIN_DOT", 0.5D, 0.999D);
     }
 
+    @Test
+    void masterBuildersRatingScaleChangesAcceptedVotesAndRestoresSourceScale() {
+        assertEquals(6, ArcadePortRules.masterBuildersMaxRating());
+        assertEquals(6, ArcadePortRules.masterBuildersRatingScore(org.bukkit.Material.PURPLE_CONCRETE));
+        assertGameRange(ArcadePortGame.MASTER_BUILDERS, "MASTER_BUILDERS_MAX_RATING", 1.0D, 6.0D);
+
+        GameDebugRuntimeOverrides.activate(Map.of("MASTER_BUILDERS_MAX_RATING", 3));
+        assertEquals(3, ArcadePortRules.masterBuildersMaxRating());
+        assertEquals(3, ArcadePortRules.masterBuildersRatingScore(org.bukkit.Material.YELLOW_CONCRETE));
+        assertEquals(0, ArcadePortRules.masterBuildersRatingScore(org.bukkit.Material.LIME_CONCRETE));
+        assertEquals(0, ArcadePortRules.masterBuildersRatingScore(org.bukkit.Material.PURPLE_CONCRETE));
+
+        GameDebugRuntimeOverrides.clear();
+        assertEquals(6, ArcadePortRules.masterBuildersMaxRating());
+        assertEquals(6, ArcadePortRules.masterBuildersRatingScore(org.bukkit.Material.PURPLE_CONCRETE));
+    }
+
     private static void assertRange(String key, double minimum, double maximum) {
         assertGameRange(ArcadePortGame.TURF_WARS, key, minimum, maximum);
     }
