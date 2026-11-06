@@ -29877,7 +29877,7 @@ public final class ArcadePortManager implements Listener {
             session.turfBarrageFiring.remove(id);
         }
         if (session.type == ArcadePortGame.DRAGONS) {
-            if (!testPlayers.isTestPlayer(id)) {
+            if (ArcadeTestPlayerManager.shouldPersistProgression(id, testPlayers.isTestPlayer(id))) {
                 plugin.getConfig().set(localStatsPath(id, "dragons") + "win-streak", 0);
                 plugin.saveConfig();
             }
