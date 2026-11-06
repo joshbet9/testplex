@@ -152,6 +152,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final Map<Block, BlockData> changedBlocks = new HashMap<>();
     private final NamespacedKey objectiveTntKey;
     private final NamespacedKey thrownTntOwnerKey;
+    private final NamespacedKey castleChestPotionKey;
+    private final NamespacedKey castleArcherArrowKey;
     private final NamespacedKey shopItemKey;
     private final NamespacedKey shopRoleKey;
     private final NamespacedKey kingKey;
@@ -320,6 +322,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         this.hooks = hooks;
         this.objectiveTntKey = new NamespacedKey(plugin, "castle-objective-tnt");
         this.thrownTntOwnerKey = new NamespacedKey(plugin, "castle-thrown-tnt-owner");
+        this.castleChestPotionKey = new NamespacedKey(plugin, "castle-chest-potion");
+        this.castleArcherArrowKey = new NamespacedKey(plugin, "castle-archer-shot");
         this.shopItemKey = new NamespacedKey(plugin, "heroes-gwen-store-item");
         this.shopRoleKey = new NamespacedKey(plugin, "heroes-gwen-store-role");
         this.kingKey = new NamespacedKey(plugin, "castle-king-team");
@@ -2007,6 +2011,16 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         : weighted < 6 ? castleFlintAndSteel(4, false)
                         : new ItemStack(Material.SNOWBALL, 16);
             }
+            // The Alchemist passive recognises chest provenance, not potion type or item name.
+            // Kit-streak and ordinary player potions never receive this tag.
+            if (loot != null && (loot.getType() == Material.SPLASH_POTION
+                    || loot.getType() == Material.POTION || loot.getType() == Material.LINGERING_POTION)) {
+                ItemMeta potionMeta = loot.getItemMeta();
+                if (potionMeta != null) {
+                    potionMeta.getPersistentDataContainer().set(castleChestPotionKey, PersistentDataType.BYTE, (byte) 1);
+                    loot.setItemMeta(potionMeta);
+                }
+            }
             inventory.setItem(slot, loot);
         }
         chest.update(true, false);
@@ -2188,6 +2202,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 || !"alchemist".equals(castleAssaultPlayerKits.get(thrower.getUniqueId()))) return;
         int sourceTeam = teams.getOrDefault(thrower.getUniqueId(), -1);
         if (sourceTeam < 0) return;
+        boolean boostedChestPotion = ArcadePortRules.shouldBoostCastleChestSplashPotion(
+                true, isCastleChestPotion(event.getPotion().getItem()));
+        if (boostedChestPotion) applyCastleAlchemistChestSplashPassive(event, thrower);
         long durationTicks = event.getPotion().getEffects().stream()
                 .filter(effect -> effect.getType().equals(PotionEffectType.SLOWNESS)
                         || effect.getType().equals(PotionEffectType.WEAKNESS))
@@ -2200,10 +2217,87 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                     || teams.getOrDefault(target.getUniqueId(), -2) == sourceTeam) continue;
             double intensity = event.getIntensity(target);
             if (intensity <= 0.0D) continue;
-            long expiry = now + Math.max(50L, Math.round(durationTicks * 50.0D * intensity));
+            int normalTicks = (int) Math.max(1L, Math.round(durationTicks * intensity));
+            int duration = boostedChestPotion
+                    ? ArcadePortRules.castleAssaultBoostedChestPotionDuration(normalTicks) : normalTicks;
+            long expiry = now + Math.max(50L, duration * 50L);
             castleAlchemistDebuffExpires.computeIfAbsent(target.getUniqueId(), ignored -> new HashMap<>())
                     .merge(thrower.getUniqueId(), expiry, (oldExpiry, nextExpiry) -> Math.max(oldExpiry, nextExpiry));
         }
+    }
+
+    private boolean isCastleChestPotion(ItemStack potion) {
+        if (potion == null || !potion.hasItemMeta()) return false;
+        ItemMeta meta = potion.getItemMeta();
+        return meta != null && meta.getPersistentDataContainer()
+                .has(castleChestPotionKey, PersistentDataType.BYTE);
+    }
+
+    /**
+     * Apply the Alchemist's +25% bonus after Bukkit has resolved the splash.
+     * Timed effects receive 25% more applied duration; instant effects receive
+     * 25% additional healing/damage. The bonus is strictly tied to a chest tag.
+     */
+    private void applyCastleAlchemistChestSplashPassive(PotionSplashEvent event, Player thrower) {
+        for (LivingEntity affected : event.getAffectedEntities()) {
+            double intensity = event.getIntensity(affected);
+            if (!Double.isFinite(intensity) || intensity <= 0.0D) continue;
+            for (PotionEffect effect : event.getPotion().getEffects()) {
+                PotionEffectType type = effect.getType();
+                if (type.equals(PotionEffectType.INSTANT_HEALTH)
+                        || type.equals(PotionEffectType.INSTANT_DAMAGE)) {
+                    double baseAmount = (type.equals(PotionEffectType.INSTANT_HEALTH) ? 4.0D : 6.0D)
+                            * Math.pow(2.0D, Math.min(5, effect.getAmplifier())) * intensity;
+                    double bonus = ArcadePortRules.castleAssaultChestPotionInstantBonus(baseAmount);
+                    if (bonus <= 0.0D) continue;
+                    Bukkit.getScheduler().runTask(plugin, () -> {
+                        if (stopped || !affected.isValid() || affected.isDead()) return;
+                        if (type.equals(PotionEffectType.INSTANT_HEALTH)) {
+                            var maxHealth = affected.getAttribute(Attribute.MAX_HEALTH);
+                            double limit = maxHealth == null ? 20.0D : maxHealth.getValue();
+                            affected.setHealth(Math.min(limit, affected.getHealth() + bonus));
+                        } else {
+                            affected.damage(bonus, thrower);
+                        }
+                    });
+                    continue;
+                }
+                int normalDuration = (int) Math.max(1L,
+                        Math.round(effect.getDuration() * intensity));
+                int additional = ArcadePortRules.castleAssaultBoostedChestPotionDuration(normalDuration)
+                        - normalDuration;
+                if (additional <= 0) continue;
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (stopped || !affected.isValid() || affected.isDead()) return;
+                    PotionEffect active = affected.getPotionEffect(type);
+                    // Do not replace unrelated longer or stronger effects already on the target.
+                    if (active == null || active.getAmplifier() != effect.getAmplifier()
+                            || active.getDuration() > normalDuration + 5) return;
+                    affected.addPotionEffect(new PotionEffect(type,
+                            active.getDuration() + additional, active.getAmplifier(),
+                            active.isAmbient(), active.hasParticles(), active.hasIcon()), true);
+                });
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onCastleArcherShoot(EntityShootBowEvent event) {
+        if (stopped || game != ArcadePortGame.CASTLE_ASSAULT
+                || !(event.getEntity() instanceof Player shooter)
+                || !(event.getProjectile() instanceof Arrow arrow)
+                || !activePlayers.contains(shooter.getUniqueId())
+                || !"archer".equals(castleAssaultPlayerKits.get(shooter.getUniqueId()))) return;
+        arrow.getPersistentDataContainer().set(castleArcherArrowKey, PersistentDataType.BYTE, (byte) 1);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onCastleArcherArrowDamage(EntityDamageByEntityEvent event) {
+        if (stopped || game != ArcadePortGame.CASTLE_ASSAULT
+                || !(event.getDamager() instanceof Arrow arrow)
+                || event.getEntity().getWorld() != world
+                || !arrow.getPersistentDataContainer().has(castleArcherArrowKey, PersistentDataType.BYTE)) return;
+        event.setDamage(ArcadePortRules.castleAssaultArcherArrowDamage(event.getDamage()));
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
