@@ -6,21 +6,23 @@ Builder/Disruptor draft PR so the gameplay work can be tested independently.
 
 ## Target and source-of-truth
 
-- Target **14 core achievements per game family**. Treat Monster Maze Original, Speed and Modern
+- Target **at least 14 active achievements per game family**, displaying at most 14 per
+  `/stats` page. Treat Monster Maze Original, Speed and Modern
   as a single achievement family (as `/stats` already does). Speed Builders Arcade is its own
   family even though it is not a value of `ArcadePortGame`.
 - There are **30 game families** represented across four catalogues: `ArcadeProgressCatalog`,
   `PlexballAchievement`, `CameraShyProgressCatalog`, and `SuperSploorProgressCatalog`.
-- The snapshot below contains **252 declared achievements**. The target is 420 core slots.
-- **175 additions** would fill all under-target catalogues. Snap currently has six extra
-  achievements; Super Sploor has one extra. Seven above-cap definitions require a deliberate
-  preservation/bonus/retirement decision before the final core count can be exactly 14.
+- The snapshot below contains **252 declared achievements**. The 30-family minimum is 420.
+- **175 additions** would fill all under-target catalogues, resulting in **427 total active
+  achievements** if the existing definitions are retained: Snap has 20 and Super Sploor 15.
+  **No existing achievements are to be archived, deleted, or retired.** This supersedes the
+  earlier exact-14/archiving proposal following the user's decision.
 - Catalogue declarations are **not proof that award tracking is complete**. Every proposed or
   existing achievement must be cross-checked against the actual awarding events and persistence.
 
 ## Catalogue audit (2026-11-06)
 
-| Game family | Declared | To add for 14 | Above cap |
+| Game family | Declared | To add for minimum 14 | Already above 14 |
 | --- | ---: | ---: | ---: |
 | Bacon Brawl | 10 | 4 | 0 |
 | Bomb Lobbers | 13 | 1 | 0 |
@@ -59,7 +61,7 @@ Builder/Disruptor draft PR so the gameplay work can be tested independently.
 1. **Preserve source achievements.** Identify authentic Mineplex challenges first, then
    distinguish existing user-approved Testplex changes from placeholders or obsolete rules.
    Preserve stable IDs and unlock history whenever possible.
-2. **One meaningful 14-slot set per family.** A suggested spread is 3 approachable,
+2. **At least 14 meaningful achievements per family.** A suggested spread is 3 approachable,
    4 general mastery, 4 kit/role-specific, 2 hard challenges, and 1 prestige challenge.
    Adjust this balance for games without traditional kits; avoid padding with duplicate win totals.
 3. **Implementable trigger contract.** Each row needs name, precise success condition,
@@ -81,8 +83,9 @@ Builder/Disruptor draft PR so the gameplay work can be tested independently.
   a separate reviewed redesign explicitly replaces them.
 - For games with a normal kit system but no purple kit, propose one **distinctive,
   balanced, mechanically testable** new kit; avoid a stronger version of an existing one.
-- Default proposal: the purple kit unlocks on **14/14 core achievements** for that family.
-  Milestones do not gate the kit. This is a proposal, not an implemented unlock rule.
+- Purple-kit completion requirements need a separate decision: should a player complete
+  **all active achievements** (20 for Snap, 15 for Super Sploor), or a designated threshold?
+  Milestones remain separate. No unlock-rule change is implemented yet.
 - For kitless/fixed-role games (for example, Hoops, Draw My Thing, Master Builders, or
   Gladiators), decide separately whether to introduce an actual gameplay kit, a side-grade
   toolset, or an achievement prestige cosmetic. Introducing a kit is a gameplay-design
@@ -90,39 +93,22 @@ Builder/Disruptor draft PR so the gameplay work can be tested independently.
 
 ### Decisions needed before the 175-achievement proposal pass
 
-1. **Snap/Super Sploor:** Retain every existing award as a bonus/legacy achievement outside
-   the 14 core slots, replace/retire selected definitions while preserving existing earned
-   progress, or allow these two games to exceed 14? The first option retains all past work.
-2. **Unlock rule:** Complete 14/14 achievements, or unlock a purple kit through a specific
-   prestige challenge (possibly more accessible)?
-3. **Kitless games:** Should *every* game gain gameplay-changing purple-kit mechanics, or
+1. **Unlock rule:** Require all active achievements, including 20 for Snap and 15 for Super
+   Sploor, or grant a purple kit at a separate threshold?
+2. **Kitless games:** Should *every* game gain gameplay-changing purple-kit mechanics, or
    should fixed-role/creative games receive side-grade or cosmetic prestige rewards?
-4. **Existing achievements:** Should genuine originals always be retained, unless mechanically
+3. **Existing achievements:** Should genuine originals always be retained, unless mechanically
    impossible, even if they produce a less uniform difficulty spread?
 
-### Concrete suggestion for the seven above-cap achievements
+### `/stats` pagination contract
 
-**Do not delete award flags or remove definitions yet.** The Snap and Super Sploor runtimes
-have actual award paths for these existing achievements.
-
-If exactly 14 *active* achievements is the priority, a first shortlist for moving out of
-the active completion pool is:
-
-| Game | Candidate to archive as legacy/bonus | Why review it first |
-| --- | --- | --- |
-| Snap | Out of Focus | Near-miss variation rather than a specific kit mastery task |
-| Snap | Now You See Me | Overlaps the escape-focused Smoke Artist/Runner challenges |
-| Snap | Double Take | Additional rapid-photography variation |
-| Snap | Close Encounter | Standalone shot-distance task |
-| Snap | Long Distance Photography | Standalone shot-distance task |
-| Snap | Candid Camera | Standalone target-state shot task |
-| Super Sploor | First Splash | Automatic first-match participation rather than a mastery achievement |
-
-These are **discussion candidates, not final selections**. Another legitimate option is to
-retain 14 *core* achievements plus a separate non-core legacy/bonus collection; that does not
-produce an exact 14-total count, but retains each challenge's visibility and honour.
-Whichever path is chosen, earned progress should remain readable, and the unlock denominator
-for purple kits should be explicit.
+- Show **14 achievements per page**; create a second page only when a family has 15 or more.
+- Snap's current 20 therefore occupy **14 on page 1 and 6 on page 2**.
+- Super Sploor's 15 occupy **14 on page 1 and 1 on page 2**.
+- Apply the separate `/stats` PR's dynamic unlock-rarity sort **before** paginating, so the
+  first 14 are the highest-rarity entries at the time of viewing. Percentages remain visible
+  on hover. Do not duplicate navigation logic inside this gameplay PR.
+- Preserve every existing achievement ID, award trigger, and earned unlock flag.
 
 ## Dragon Escape Adventure-mode acceptance
 
@@ -146,7 +132,7 @@ for purple kits should be explicit.
 - **In this initial draft:** Dragon Escape Builder gameplay, source-accurate Disruptor
   item presentation and protection against accidental recharge-rule regressions,
   gameplay tests, and this catalogue/design audit only.
-- **After decisions above:** propose each game's missing achievements, fully specified and
+- **After the remaining kit/unlock decisions:** propose each game's missing achievements, fully specified and
   cross-checked against runtime tracking, plus missing achievement-kit designs.
 - **After proposal approval:** implement and test the approved 14-achievement catalogues,
   award tracking, purple-kit unlock conditions and actual abilities. This is a separate
