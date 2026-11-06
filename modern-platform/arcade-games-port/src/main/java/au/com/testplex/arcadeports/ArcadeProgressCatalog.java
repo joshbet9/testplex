@@ -270,7 +270,12 @@ public final class ArcadeProgressCatalog {
                     a("buzzer-beater", "Buzzer Beater", "Score or assist the game-winning shot with 3 seconds or less remaining."),
                     a("in-the-clutch", "In The Clutch", "Contribute 6 points through points or assists in the final minute."),
                     a("comeback-kings", "Comeback Kings", "Win after your team was at least 10 points behind."),
-                    a("brick-by-brick", "Brick by Brick", "Take at least 3 shots, score 0 points, and win the game."))),
+                    a("brick-by-brick", "Brick by Brick", "Take at least 3 shots, score 0 points, and win the game."),
+                    a("skywalker", "Skywalker", "Score a dunk without touching the ground after using Hops."),
+                    a("alley-oop", "Alley-Oop", "After using Hops, receive a teammate’s pass and dunk without touching the ground."),
+                    a("pickpockets-payback", "Pickpocket’s Payback", "Steal the ball and score before the other team gets possession."),
+                    a("swat-team", "Swat Team", "Block a shot and have your team recover the ball before your opponents do."),
+                    a("logo-launcher", "Logo Launcher", "Win Hoops with a game-winning three-pointer."))),
             Map.entry("milk-the-cow", List.of(
                     a("pure-skill", "Pure Skill", "Win a game after being 5 points behind."),
                     a("pinger", "Pinger", "Win while a player you are tied with is mid-drink."),

@@ -495,6 +495,10 @@ public final class HoopsRemasteredRuntime implements Listener {
     private void updateHops(Match current, long now) {
         for (Player player : alivePlayers(current)) {
             UUID id = player.getUniqueId();
+            if (player.isOnGround()) {
+                current.hopsDunkEligible.remove(id);
+                current.alleyOopEligible.remove(id);
+            }
             long readyAt = current.hopsReadyAt.getOrDefault(id, 0L);
             if (now >= readyAt && player.isOnGround() && !player.getAllowFlight()) {
                 player.setAllowFlight(true);
@@ -610,6 +614,14 @@ public final class HoopsRemasteredRuntime implements Listener {
                     ? current.teams.getOrDefault(ball.shooterId, -1)
                     : previousTeam == null ? -1 : current.teams.getOrDefault(previousTeam, -1);
             int catchingTeam = current.teams.getOrDefault(player.getUniqueId(), -1);
+            if (ball.mode == BallMode.PASS && previousPossessionTeam == catchingTeam
+                    && !player.isOnGround() && current.hopsDunkEligible.contains(player.getUniqueId())) {
+                current.alleyOopEligible.add(player.getUniqueId());
+            }
+            if (ball.blockedBy != null && HoopsRemasteredAchievementRules.isBlockedShotRecovery(
+                    true, current.teams.getOrDefault(ball.blockedBy, -1), catchingTeam)) {
+                award(current, ball.blockedBy, "swat-team");
+            }
             if (rebound) {
                 PlayerStats stats = current.playerStats.get(player.getUniqueId());
                 stats.rebounds++;
@@ -707,8 +719,26 @@ public final class HoopsRemasteredRuntime implements Listener {
                 && HoopsRemasteredRules.isBuzzerBeater(current.remainingMillis);
         boolean won = HoopsRemasteredRules.isWinningBasket(
                 current.teamScore[0], current.teamScore[1], current.overtime);
+        if (HoopsRemasteredAchievementRules.isHopsDunk(ball.dunk,
+                current.hopsDunkEligible.contains(ball.shooterId))) {
+            award(current, ball.shooterId, "skywalker");
+        }
+        if (HoopsRemasteredAchievementRules.isAlleyOopDunk(ball.dunk,
+                current.hopsDunkEligible.contains(ball.shooterId),
+                current.alleyOopEligible.contains(ball.shooterId))) {
+            award(current, ball.shooterId, "alley-oop");
+        }
+        if (HoopsRemasteredAchievementRules.isStealScore(
+                current.stealScoreEligible.contains(ball.shooterId), true)) {
+            award(current, ball.shooterId, "pickpockets-payback");
+        }
+        if (HoopsRemasteredAchievementRules.isGameWinningThree(won, points)) {
+            award(current, ball.shooterId, "logo-launcher");
+        }
         if (buzzer && won) {
-            if (ball.passerId != null && current.players.containsKey(ball.passerId)) {
+            if (ball.passerId != null && current.players.containsKey(ball.passerId)
+                    && HoopsRemasteredAchievementRules.isValidBuzzerAssist(now, ball.passedAt,
+                            current.teams.getOrDefault(ball.passerId, -1), scoringTeam)) {
                 award(current, ball.passerId, "buzzer-beater");
             }
             award(current, ball.shooterId, "buzzer-beater");
@@ -751,6 +781,11 @@ public final class HoopsRemasteredRuntime implements Listener {
 
     private void givePossession(Match current, Player player, boolean rebound) {
         if (player == null || !player.isOnline()) return;
+        int receivingTeam = current.teams.getOrDefault(player.getUniqueId(), -1);
+        if (receivingTeam >= 0) {
+            current.stealScoreEligible.removeIf(id ->
+                    current.teams.getOrDefault(id, -1) != receivingTeam);
+        }
         removeBall(current);
         Player previous = current.holderId == null ? null : current.players.get(current.holderId);
         if (previous != null) clearBallItem(previous);
@@ -917,6 +952,7 @@ public final class HoopsRemasteredRuntime implements Listener {
                 GameDebugRuntimeOverrides.doubleValue("HOOPS_BLOCK_KNOCKBACK_VERTICAL", HoopsRemasteredRules.BLOCK_KNOCKBACK_VERTICAL)));
         ball.mode = BallMode.LOOSE;
         ball.lastToucher = defender.getUniqueId();
+        ball.blockedBy = defender.getUniqueId();
         stats.blocks++;
         defender.playSound(defender.getLocation(), Sound.ITEM_SHIELD_BLOCK, 1.0F, 1.5F);
         defender.sendActionBar(ChatColor.GREEN + "" + ChatColor.BOLD + "BLOCK!");
@@ -947,6 +983,7 @@ public final class HoopsRemasteredRuntime implements Listener {
         current.lastPasserId = null;
         current.shotClockEndsAt = now + GameDebugRuntimeOverrides.longValue("HOOPS_SHOT_CLOCK_MILLIS", HoopsRemasteredRules.SHOT_CLOCK_MILLIS);
         givePossession(current, attacker, false);
+        current.stealScoreEligible.add(attacker.getUniqueId());
         attacker.sendActionBar(ChatColor.GREEN + "" + ChatColor.BOLD + "STEAL!");
         target.sendActionBar(ChatColor.RED + "Ball stolen by " + attacker.getName());
         announce(current, ChatColor.YELLOW + attacker.getName() + " stole the ball from " + target.getName() + "!");
@@ -1141,6 +1178,7 @@ public final class HoopsRemasteredRuntime implements Listener {
         for (Map.Entry<UUID, Player> entry : current.players.entrySet()) {
             UUID id = entry.getKey();
             Player player = entry.getValue();
+            if (plugin.isTestPlayer(id)) continue;
             int team = current.teams.getOrDefault(id, -1);
             boolean won = winningTeam >= 0 && team == winningTeam;
             PlayerStats stats = current.playerStats.getOrDefault(id, new PlayerStats());
@@ -1197,10 +1235,11 @@ public final class HoopsRemasteredRuntime implements Listener {
     }
 
     private void award(Match current, UUID id, Player player, String achievementId) {
-        if (GameDebugRuntimeOverrides.isDebugSession()) return;
+        if (GameDebugRuntimeOverrides.isDebugSession() || plugin.isTestPlayer(id)) return;
         String key = "local-achievements." + id + "." + GAME_ID + "." + achievementId;
         if (plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
+        plugin.saveConfig();
     }
 
     private void stopRuntime() {
@@ -1352,6 +1391,8 @@ public final class HoopsRemasteredRuntime implements Listener {
         player.setAllowFlight(false);
         player.setVelocity(new Vector(direction.getX(), GameDebugRuntimeOverrides.doubleValue(
                 "HOOPS_HOPS_VERTICAL", HoopsRemasteredRules.HOPS_VERTICAL), direction.getZ()));
+        current.hopsDunkEligible.add(player.getUniqueId());
+        current.alleyOopEligible.remove(player.getUniqueId());
         current.hopsReadyAt.put(player.getUniqueId(), now + GameDebugRuntimeOverrides.longValue("HOOPS_HOPS_COOLDOWN_MILLIS", HoopsRemasteredRules.HOPS_COOLDOWN_MILLIS));
         cooldownProgress.start(player, "Hops", GameDebugRuntimeOverrides.longValue("HOOPS_HOPS_COOLDOWN_MILLIS", HoopsRemasteredRules.HOPS_COOLDOWN_MILLIS));
         player.getWorld().spawnParticle(org.bukkit.Particle.CLOUD,
@@ -1438,6 +1479,9 @@ public final class HoopsRemasteredRuntime implements Listener {
         final Map<UUID, Long> stealReadyAt = new HashMap<>();
         final Map<UUID, Long> blockReadyAt = new HashMap<>();
         final Map<UUID, Long> hopsReadyAt = new HashMap<>();
+        final Set<UUID> hopsDunkEligible = new HashSet<>();
+        final Set<UUID> alleyOopEligible = new HashSet<>();
+        final Set<UUID> stealScoreEligible = new HashSet<>();
         final Map<UUID, Integer> clutchContributions = new HashMap<>();
         final Set<Integer> comebackTeams = new HashSet<>();
         final Set<UUID> entities = new HashSet<>();
@@ -1488,6 +1532,7 @@ public final class HoopsRemasteredRuntime implements Listener {
         int bounces;
         boolean reboundEligible;
         boolean dunk;
+        UUID blockedBy;
         boolean warnedDisplayRecoveryFailure;
         double releaseDistance;
         long passedAt;
