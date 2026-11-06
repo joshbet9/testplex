@@ -133,11 +133,30 @@ class ArcadeProgressCatalogTest {
         String[] games = {"bacon-brawl", "bomb-lobbers", "death-tag", "dragon-escape", "dragons",
                 "evolution", "gladiators", "micro-battles", "monster-maze", "one-in-the-quiver",
                 "paintball", "runner", "sheep-quest", "snake", "spleef", "turf-wars"};
-        int[] achievementCounts = {5, 4, 4, 4, 3, 5, 4, 6, 9, 8, 5, 7, 8, 6, 7, 9};
+        int[] achievementCounts = {5, 4, 4, 4, 3, 5, 14, 6, 9, 8, 5, 7, 8, 6, 7, 9};
         for (int i = 0; i < games.length; i++) {
             assertTrue(ArcadeProgressCatalog.milestones(games[i]).size() >= 2, games[i]);
             assertTrue(ArcadeProgressCatalog.achievements(games[i]).size() >= achievementCounts[i], games[i]);
         }
+    }
+
+    @Test
+    void gladiatorsKeepsBrawlerAndPrecisionAsAchievementsButNotMilestones() {
+        var achievements = ArcadeProgressCatalog.achievements("gladiators");
+        assertEquals(14, achievements.size());
+        assertEquals(14, achievements.stream().map(ArcadeProgressCatalog.Achievement::id).distinct().count());
+        assertTrue(ArcadeProgressCatalog.achievements("gladiators").stream()
+                .anyMatch(achievement -> achievement.id().equals("brawler")));
+        assertTrue(ArcadeProgressCatalog.achievements("gladiators").stream()
+                .anyMatch(achievement -> achievement.id().equals("precision")));
+        assertTrue(achievements.stream().anyMatch(achievement -> achievement.id().equals("all-modes")
+                && achievement.requirement().contains("every PvP mode")));
+        assertTrue(achievements.stream().anyMatch(achievement -> achievement.id().equals("full-arsenal")
+                && achievement.requirement().contains("every opponent")));
+        assertTrue(achievements.stream().anyMatch(achievement -> achievement.id().equals("blade-protocol")
+                && achievement.requirement().contains("timed critical")));
+        assertFalse(ArcadeProgressCatalog.milestones("gladiators").stream()
+                .anyMatch(milestone -> milestone.id().equals("brawler") || milestone.id().equals("precision")));
     }
 
     @Test

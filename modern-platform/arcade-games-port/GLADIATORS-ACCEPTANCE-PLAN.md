@@ -78,3 +78,15 @@ For a tournament with multiple players:
 ## Exit criteria
 
 Keep Gladiators enabled in the shared queue while fixing any defects found. Do not mark it gameplay-accepted until the five rulesets, bracket simulations, both world instances, spectator switching, disconnect cases, environmental damage and saved hotbar behaviour have been exercised on Paper 26.3. Automated bracket checks are not live gameplay acceptance.
+
+## Achievement checks
+
+- [ ] Confirm the catalogue contains 14 unique achievements; Brawler and Precision remain achievements and are absent from Gladiators milestones.
+- [ ] Verify Brawler and Swift Kill progress only from legitimate player kills/first bloods, and Precision counts only arrows that hit the player's current duel opponent.
+- [ ] Verify Silky Seconds uses the opposing fighter's remaining health at the first-round loss and does not count forfeits.
+- [ ] Verify Untouchable records a duel win only when the winner took no damage and the match was not forfeited; award on the tenth qualifying duel.
+- [ ] Verify All-Round Gladiator persists wins by player and ruleset, then awards only after a win in Normal, Rodless, Bowless, Modern and Pot.
+- [ ] Verify Full Arsenal requires a Normal-mode tournament win and a successful sword, bow and fishing-rod hit on every opponent in every duel, including duels the champion lost before advancing.
+- [ ] Verify Blade Protocol requires three consecutive falling critical sword hits in Modern mode; any incoming opponent hit or noncritical sword hit resets the streak.
+- [ ] Verify Second Wind awards only for winning the deciding Grand Final reset after the first Grand Final was lost, including a resolved reset match against a forfeit.
+- [ ] Confirm debug rounds and test bots do not persist achievement progress.

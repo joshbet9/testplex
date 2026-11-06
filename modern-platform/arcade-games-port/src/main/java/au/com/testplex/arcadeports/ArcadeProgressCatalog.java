@@ -156,7 +156,12 @@ public final class ArcadeProgressCatalog {
                     a("silky-seconds", "Silky Seconds", "Win from loser bracket after a first-round loss by less than 0.5 hearts."),
                     a("comeback-kid", "Comeback Kid", "Win from loser bracket after being 10-d in round one."),
                     a("who-do-you-think-you-are", "Who do you think you are?", "Beat an opponent who used all potions/arrows without using any."),
-                    a("man-of-integrity", "Man of Integrity", "Win without using a fishing rod when it was available."))),
+                    a("man-of-integrity", "Man of Integrity", "Win without using a fishing rod when it was available."),
+                    a("second-wind", "Second Wind", "Lose the first Grand Final, then win the deciding rematch."),
+                    a("untouchable", "Untouchable", "Win 10 Gladiators duels without taking damage."),
+                    a("all-modes", "All-Round Gladiator", "Win a Gladiators tournament in every PvP mode."),
+                    a("full-arsenal", "Full Arsenal", "Win a Normal-mode tournament after landing a sword, bow, and fishing-rod hit on every opponent."),
+                    a("blade-protocol", "Blade Protocol", "Win a Modern-mode duel after landing 3 timed critical sword hits in a row without taking an opponent hit between them."))),
             Map.entry("micro-battles", List.of(
                     a("annihilation", "Annihilation", "Get 8 kills in one Micro Battles game."),
                     a("last-two", "Last Two", "Be alive when exactly two teams remain."),
@@ -330,7 +335,7 @@ public final class ArcadeProgressCatalog {
             Map.entry("dragon-escape", List.of(m("wins", "Wins", "wins", 2000, "wins"), m("courses", "Course Completes", "course-completes", 3000, "courses"), m("distance", "Blocks Travelled", "blocks-travelled", 750000, "blocks"), m("world-tour", "World Tour", "world-tour", 1, "maps"))),
             Map.entry("dragons", List.of(m("survival", "Survive", "survival-millis", 36_000_000, "milliseconds"), m("wins", "Wins", "wins", 250, "wins"))),
             Map.entry("evolution", List.of(m("wins", "Wins", "wins", 250, "wins"), m("kills", "Kills", "kills", 2000, "kills"))),
-            Map.entry("gladiators", List.of(m("wins", "Wins", "wins", 250, "wins"), m("kills", "Kills", "kills", 1000, "kills"), m("brawler", "Brawler", "brawler", 3, "kills"), m("precision", "Precision", "precision", 1, "wins"), m("swift-kill", "Swift Kill", "swift-kill", 15, "first bloods"), m("loser-bracket-wins", "Loser Bracket Wins", "loser-bracket-wins", 100, "wins"))),
+            Map.entry("gladiators", List.of(m("wins", "Wins", "wins", 250, "wins"), m("kills", "Kills", "kills", 1000, "kills"), m("swift-kill", "Swift Kill", "swift-kill", 15, "first bloods"), m("loser-bracket-wins", "Loser Bracket Wins", "loser-bracket-wins", 100, "wins"))),
             Map.entry("micro-battles", List.of(m("wins", "Wins", "wins", 1500, "wins"), m("kills", "Kills", "kills", 5000, "kills"))),
 
             Map.entry("one-in-the-quiver", List.of(m("wins", "Wins", "wins", 250, "wins"), m("kills", "Kills", "kills", 5000, "kills"))),
