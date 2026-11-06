@@ -19681,437 +19681,12 @@ public final class ArcadePortManager implements Listener {
         else openGameStats(viewer, targetId, targetName, gameId, 0);
     }
 
-    /** Kept for source-parity reference during migration; all /stats entries use the unified renderer. */
-    @Deprecated
-    private void openLegacyStatsGame(Player viewer, UUID targetId, String targetName, String gameId, boolean milestones) {
-        if (gameId == null) return;
-        String displayName = statsGameName(gameId);
-        String statsGameId = gameId.startsWith("monster-maze") ? "monster-maze" : gameId;
-        String path = localStatsPath(targetId, statsGameId);
-        int played = plugin.getConfig().getInt(path + "games-played", 0);
-        int wins = plugin.getConfig().getInt(path + "wins", 0);
-        int score = plugin.getConfig().getInt(path + "score", 0);
-        int knockouts = plugin.getConfig().getInt(path + "knockouts", 0);
-        Inventory inventory = createStatsInventory(milestones ? StatsPage.MILESTONES : StatsPage.GAME,
-                targetId, targetName, milestones ? displayName + " Milestones" : displayName, gameId);
-        if (milestones) {
-            renderGameMilestones(inventory, targetId, statsGameId);
-        } else if (!ArcadeProgressCatalog.achievements(
-                "speed-builders".equals(gameId) ? "speed-builders-arcade" : gameId).isEmpty()
-                && !"dragon-escape".equals(gameId)) {
-            renderGameAchievements(inventory, targetId,
-                    "speed-builders".equals(gameId) ? "speed-builders-arcade" : gameId);
-        } else if ("camera-shy".equals(gameId)) {
-            int[] achievementSlots = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21,
-                    23, 24, 25, 28, 29, 30, 31, 32, 33, 34};
-            List<CameraShyProgressCatalog.Achievement> achievements = CameraShyProgressCatalog.achievements();
-            for (int i = 0; i < achievements.size(); i++) {
-                CameraShyProgressCatalog.Achievement achievement = achievements.get(i);
-                boolean unlocked = plugin.getConfig().getBoolean(
-                        "local-achievements." + targetId + ".camera-shy." + achievement.id(), false);
-                inventory.setItem(achievementSlots[i], statsItem(
-                        unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
-                        (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.name(),
-                        List.of(" ", ChatColor.GRAY + achievement.requirement(), " ",
-                                unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked"),
-                        "noop", null, null));
-            }
-            int[] milestoneSlots = {37, 40, 43};
-            for (int i = 0; i < CameraShyProgressCatalog.milestones().size(); i++) {
-                CameraShyProgressCatalog.Milestone milestone = CameraShyProgressCatalog.milestones().get(i);
-                int value = plugin.getConfig().getInt(path + milestone.statKey(), 0);
-                boolean complete = value >= milestone.target();
-                inventory.setItem(milestoneSlots[i], statsItem(
-                        complete ? Material.NETHER_STAR : Material.CLOCK,
-                        (complete ? ChatColor.GREEN + "✓ " : ChatColor.GOLD) + milestone.name(),
-                        List.of(" ", ChatColor.GRAY + "Progress: " + ChatColor.WHITE + value + "/" + milestone.target(),
-                                ChatColor.GRAY + "Lifetime " + milestone.unit() + ".",
-                                complete ? ChatColor.GREEN + "Milestone complete" : ChatColor.YELLOW + "In progress"),
-                        "noop", null, null));
-            }
-        } else if ("bacon-brawl".equals(gameId)) {
-            // Match the 1.8 achievement-bottle pattern: unlocked achievements use
-            // experience bottles, and unearned achievements use glass bottles.
-            int[] achievementSlots = {10, 11, 12, 13, 14};
-            BaconBrawlAchievement[] achievements = BaconBrawlAchievement.values();
-            for (int i = 0; i < achievements.length; i++) {
-                BaconBrawlAchievement achievement = achievements[i];
-                boolean unlocked = plugin.getConfig().getBoolean(achievement.configKey(targetId), false);
-                List<String> lore = List.of(" ",
-                        ChatColor.GRAY + achievement.requirement(),
-                        " ",
-                        unlocked ? ChatColor.GREEN + "Achievement unlocked"
-                                : ChatColor.RED + "Not yet unlocked");
-                inventory.setItem(achievementSlots[i],
-                        statsItem(unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
-                                (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ")
-                                        + achievement.displayName(),
-                                lore, "noop", null, null));
-            }
-        } else if ("micro-battles".equals(gameId)) {
-            MicroBattlesAchievement[] achievements = MicroBattlesAchievement.values();
-            int[] achievementSlots = {10, 11, 12, 13, 14, 15, 16};
-            for (int i = 0; i < achievements.length; i++) {
-                MicroBattlesAchievement achievement = achievements[i];
-                boolean unlocked = plugin.getConfig().getBoolean(achievement.configKey(targetId), false);
-                List<String> lore = List.of(" ", ChatColor.GRAY + achievement.requirement(), " ",
-                        unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked",
-                        ChatColor.DARK_GRAY + "Local test-server equivalent; not production Mineplex data.");
-                inventory.setItem(achievementSlots[i], statsItem(
-                        unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
-                        (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.displayName(),
-                        lore, "noop", null, null));
-            }
-        } else if ("snake".equals(gameId)) {
-            String[] ids = {"Cannibal", "ChooChoo", "SlimySheep",
-                    "dont-want-none", "resilience-snakeified", "busted",
-                    "one-of-the-ogs", "flawless", "bots-everywhere"};
-            String[] names = {"Cannibal", "Choo Choo", "Slimy Sheep",
-                    "Don't want none", "Resilience Snakeified", "Busted",
-                    "One of the OGs", "Flawless", "Bots Everywhere!"};
-            String[] requirements = {
-                    "Get six kills in one Snake game.",
-                    "Grow your tail to at least 60 sheep segments.",
-                    "Eat 20 green slime pickups in one Snake game.",
-                    "Win a game without getting a kill.",
-                    "Win after being hit by a 10-second Magma Cube nerf.",
-                    "Roll the same Magma Cube nerf 3 times in a row.",
-                    "Win a game without using an ability.",
-                    "Win with every kill earned while an ability is active.",
-                    "Win while staying within 10 blocks of the map edge throughout the game."
-            };
-            int[] achievementSlots = {9, 10, 11, 12, 13, 14, 15, 16, 17};
-            for (int i = 0; i < ids.length; i++) {
-                boolean unlocked = plugin.getConfig().getBoolean(path + "achievements." + ids[i], false);
-                inventory.setItem(achievementSlots[i], statsItem(
-                        unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
-                        (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + names[i],
-                        List.of(" ", ChatColor.GRAY + requirements[i], " ",
-                                unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked"),
-                        "noop", null, null));
-            }
-            int lifetimeKills = plugin.getConfig().getInt(path + "lifetime-kills", 0);
-            int lifetimeSlimes = plugin.getConfig().getInt(path + "lifetime-slimes", 0);
-            int bestTail = plugin.getConfig().getInt(path + "best-tail-length", 0);
-            inventory.setItem(30, statsItem(Material.IRON_SWORD, ChatColor.GOLD + "Lifetime Kills",
-                    List.of(" ", ChatColor.GRAY + "Snake tail eliminations: " + ChatColor.WHITE + lifetimeKills),
-                    "noop", null, null));
-            inventory.setItem(32, statsItem(Material.SLIME_BALL, ChatColor.GREEN + "Slimes Eaten",
-                    List.of(" ", ChatColor.GRAY + "Green slime upgrades: " + ChatColor.WHITE + lifetimeSlimes),
-                    "noop", null, null));
-            inventory.setItem(34, statsItem(Material.SHEEP_SPAWN_EGG, ChatColor.AQUA + "Best Tail Length",
-                    List.of(" ", ChatColor.GRAY + "Longest Snake: " + ChatColor.WHITE + bestTail,
-                            ChatColor.GRAY + "Reborn Choo Choo milestone: 60 segments."),
-                    "noop", null, null));
-            int[] statSlots = {29, 31};
-            int[] values = {played, wins};
-            String[] labels = {"Games Played", "Wins"};
-            for (int i = 0; i < values.length; i++) {
-                int value = values[i];
-                inventory.setItem(statSlots[i], statsItem(
-                        value > 0 ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
-                        (value > 0 ? ChatColor.GREEN : ChatColor.RED) + labels[i],
-                        List.of(" ", ChatColor.GRAY + "Recorded by this local Testplex server: " + ChatColor.WHITE + value),
-                        "noop", null, null));
-            }
-        } else if ("dragons".equals(gameId)) {
-            List<ArcadeProgressCatalog.Achievement> dragonAchievements =
-                    ArcadeProgressCatalog.achievements("dragons");
-            int[] achievementSlots = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22};
-            for (int i = 0; i < dragonAchievements.size() && i < achievementSlots.length; i++) {
-                ArcadeProgressCatalog.Achievement achievement = dragonAchievements.get(i);
-                boolean unlocked = plugin.getConfig().getBoolean(
-                        "local-achievements." + targetId + ".dragons." + achievement.id(), false);
-                inventory.setItem(achievementSlots[i], statsItem(
-                        unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
-                        (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.name(),
-                        List.of(" ", ChatColor.GRAY + achievement.requirement(), " ",
-                                unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked"),
-                        "noop", null, null));
-            }
-            int sparklez = plugin.getConfig().getInt(path + "sparklez", 0);
-            double testGems = plugin.getConfig().getDouble(path + "test-gems", 0.0D)
-                    + plugin.getConfig().getDouble(path + "survival-gems", 0.0D);
-            inventory.setItem(31, statsItem(testGems > 0.0D ? Material.EMERALD : Material.COAL,
-                    ChatColor.GOLD + "Testplex Gems",
-                    List.of(" ", ChatColor.GRAY + "Survival and placement rewards: "
-                                    + ChatColor.WHITE + String.format(java.util.Locale.ROOT, "%.2f", testGems),
-                            ChatColor.DARK_GRAY + "Local ledger; not Mineplex account currency."),
-                    "noop", null, null));
-            inventory.setItem(33, statsItem(sparklez > 0 ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
-                    (sparklez > 0 ? ChatColor.GREEN : ChatColor.RED) + "Sparklez",
-                    List.of(" ", ChatColor.GRAY + "Pyro sparklers thrown: " + ChatColor.WHITE + sparklez,
-                            ChatColor.DARK_GRAY + "Recorded locally by this Testplex server."),
-                    "noop", null, null));
-        } else if ("dragon-escape".equals(gameId)) {
-            renderGameAchievements(inventory, targetId, gameId);
-            String resource = SourceMapCatalog.selectedResource(plugin, ArcadePortGame.DRAGON_ESCAPE);
-            long personalBest = dragonEscapePersonalBestMillis(targetId, resource);
-            inventory.setItem(30, statsItem(Material.MAP, ChatColor.AQUA + "Personal Bests — Every Map",
-                    List.of(" ", ChatColor.GRAY + "View " + SourceMapCatalog.mapsFor(plugin, ArcadePortGame.DRAGON_ESCAPE).size()
-                                    + " Dragon Escape maps and your saved personal bests.",
-                            ChatColor.YELLOW + "Current map PB: " + ChatColor.WHITE
-                                    + (personalBest > 0L ? ArcadePortRules.formatDragonEscapeTime(personalBest) : "Not completed"),
-                            " ", ChatColor.RESET + "Click to open the map list."),
-                    "open-dragon-escape-pbs", null, gameId));
-            boolean canEditSelf = targetId.equals(viewer.getUniqueId());
-            inventory.setItem(32, statsItem(Material.BEACON,
-                    ChatColor.LIGHT_PURPLE + "Leader Beacon Colour",
-                    List.of(" ", ChatColor.GRAY + "Current choice: " + dragonEscapeBeaconColor(targetId),
-                            ChatColor.GRAY + "The leading racer supplies the visible beacon colour.",
-                            ChatColor.RESET + (canEditSelf ? "Click to select a colour." : "Only your own colour can be changed.")),
-                    "open-dragon-escape-colours", null, gameId));
-            inventory.setItem(34, statsItem(Material.ENDER_EYE,
-                    (isDragonEscapeGhostEnabled(viewer.getUniqueId()) ? ChatColor.GREEN : ChatColor.GRAY)
-                            + "PB Ghost: " + (isDragonEscapeGhostEnabled(viewer.getUniqueId()) ? "ON" : "OFF"),
-                    List.of(" ", ChatColor.GRAY + "Show your saved best-time ghost while racing.",
-                            ChatColor.GRAY + "Your above-hotbar PB delta always remains visible.",
-                            ChatColor.RESET + (canEditSelf ? "Click to toggle." : "This controls your own display.")),
-                    "toggle-dragon-ghost", null, gameId));
-        } else if ("gladiators".equals(gameId)) {
-            String[] ids = {"brawler", "precision", "swift-kill",
-                    "are-you-not-entertained", "not-even-close"};
-            String[] names = {"Brawler", "Precision", "Swift Kill",
-                    "Are you not entertained?", "Not even close."};
-            String[] requirements = {
-                    "Get 3 Gladiators kills with your bare hands.",
-                    "Win after hitting every arrow, with at least 3 shots.",
-                    "Earn first blood in 15 Gladiators games.",
-                    "Win a game without using a bow or a rod in a ruleset where one is available.",
-                    "Win a duel with half a heart remaining."
-            };
-            String[] trackedStats = {"brawler", "precision", "swift-kill", null, null};
-            int[] thresholds = {3, 1, 15, 0, 0};
-            int[] slots = {10, 11, 12, 13, 15};
-            String gladiatorStatsPath = localStatsPath(targetId, gameId);
-            int unlocked = 0;
-            for (int i = 0; i < ids.length; i++) {
-                boolean earned = plugin.getConfig().getBoolean(
-                        ArcadePortRules.gladiatorsAchievementConfigKey(targetId, ids[i]), false);
-                if (earned) unlocked++;
-                List<String> achievementLore = new ArrayList<>(List.of(" ", ChatColor.GRAY + requirements[i]));
-                if (trackedStats[i] != null) {
-                    int progress = plugin.getConfig().getInt(gladiatorStatsPath + trackedStats[i], 0);
-                    achievementLore.add(ChatColor.GRAY + "Progress: " + ChatColor.WHITE
-                            + Math.min(progress, thresholds[i]) + "/" + thresholds[i]);
-                }
-                achievementLore.add(" ");
-                achievementLore.add(earned ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked");
-                inventory.setItem(slots[i], statsItem(
-                        earned ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
-                        (earned ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + names[i],
-                        achievementLore,
-                        "noop", null, null));
-            }
-            String milestonePath = ArcadePortRules.gladiatorsMilestoneConfigKey(targetId);
-            int bracketWins = plugin.getConfig().getInt(milestonePath, 0);
-            inventory.setItem(14, statsItem(Material.GOLD_INGOT,
-                    ChatColor.LIGHT_PURPLE + "Silky Seconds — Loser Bracket Wins",
-                    List.of(" ", ChatColor.GRAY + "Loser-bracket duel victories: " + ChatColor.WHITE + bracketWins,
-                            ChatColor.GRAY + "Every victory in the loser's bracket increases this milestone.",
-                            " ", ChatColor.DARK_GRAY + "Milestone progress is saved per player."),
-                    "noop", null, null));
-            int[] statSlots = {29, 30, 31, 32, 33};
-            String statsPath = localStatsPath(targetId, "gladiators");
-            String[] values = {Integer.toString(played), Integer.toString(wins),
-                    String.format(java.util.Locale.ROOT, "%.2f", plugin.getConfig().getDouble(statsPath + "ppg", 0.0D)),
-                    String.format(java.util.Locale.ROOT, "%.2f", plugin.getConfig().getDouble(statsPath + "apg", 0.0D)),
-                    String.format(java.util.Locale.ROOT, "%.2f", plugin.getConfig().getDouble(statsPath + "rpg", 0.0D))};
-            String[] labels = {"Games Played", "Wins", "Points per Game", "Assists per Game", "Rebounds per Game"};
-            for (int i = 0; i < values.length; i++) {
-                boolean recorded = Double.parseDouble(values[i]) > 0.0D;
-                inventory.setItem(statSlots[i], statsItem(
-                        recorded ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
-                        (recorded ? ChatColor.GREEN : ChatColor.RED) + labels[i],
-                        List.of(" ", ChatColor.GRAY + "Recorded by this local test server: " + ChatColor.WHITE + values[i]),
-                        "noop", null, null));
-            }
-        } else if ("bomb-lobbers".equals(gameId)) {
-            int[] achievementSlots = {10, 11, 12, 13, 14, 15, 16, 17, 18};
-            BombLobbersAchievement[] achievements = BombLobbersAchievement.values();
-            for (int i = 0; i < achievements.length; i++) {
-                BombLobbersAchievement achievement = achievements[i];
-                boolean unlocked = plugin.getConfig().getBoolean(achievement.configKey(targetId), false);
-                List<String> lore = List.of(" ", ChatColor.GRAY + achievement.requirement(), " ",
-                        unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked");
-                inventory.setItem(achievementSlots[i], statsItem(
-                        unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
-                        (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.displayName(),
-                        lore, "noop", null, null));
-            }
-        } else if ("turf-wars".equals(gameId)) {
-            String[] statKeys = {"blocks-placed", "blocks-broken", "behind-enemy-lines",
-                    "the-shreddinator", "the-comeback"};
-            String[] statNames = {"Blocks Placed", "Blocks Broken", "Behind Enemy Lines",
-                    "The Shreddinator", "The Comeback"};
-            Material[] icons = {Material.RED_WOOL, Material.IRON_PICKAXE, Material.COMPASS,
-                    Material.ARROW, Material.GOLD_INGOT};
-            int[] statSlots = {10, 11, 12, 13, 14};
-            for (int i = 0; i < statKeys.length; i++) {
-                int value = plugin.getConfig().getInt(path + statKeys[i], 0);
-                inventory.setItem(statSlots[i], statsItem(value > 0 ? Material.EXPERIENCE_BOTTLE : icons[i],
-                        (value > 0 ? ChatColor.GREEN : ChatColor.GRAY) + statNames[i],
-                        List.of(" ", ChatColor.GRAY + "Recorded by this local Testplex server: " + ChatColor.WHITE + value,
-                                ChatColor.DARK_GRAY + "Reborn Turf Wars stat tracker parity."),
-                        "noop", null, null));
-            }
-        } else if ("runner".equals(gameId)) {
-            String[] slugs = {"gettin-those-steps-in", "hop-to-it", "flash"};
-            String[] names = {"Gettin’ those steps in!", "Hop to it", "Flash"};
-            String[] requirements = {
-                    "Walk over 400 blocks in one game.",
-                    "Jump 100 times in one game.",
-                    "Win a game within 1.5 minutes."
-            };
-            int[] achievementSlots = {10, 11, 12};
-            for (int i = 0; i < slugs.length; i++) {
-                boolean unlocked = plugin.getConfig().getBoolean(runnerAchievementKey(targetId, slugs[i]), false);
-                inventory.setItem(achievementSlots[i], statsItem(
-                        unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
-                        (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + names[i],
-                        List.of(" ", ChatColor.GRAY + requirements[i], " ",
-                                unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked"),
-                        "noop", null, null));
-            }
-        } else if ("sneaky-assassins".equals(gameId)) {
-            String achievementPath = "test-achievements.sneaky-assassins." + targetId + ".the-masters-master";
-            boolean unlocked = plugin.getConfig().getBoolean(achievementPath, false);
-            inventory.setItem(10, statsItem(
-                    unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
-                    (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + "The Master's Master",
-                    List.of(" ", ChatColor.GRAY + "Defeat an assassin with at least four power-ups while you have none.",
-                            " ", unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked"),
-                    "noop", null, null));
-            int[] statSlots = {29, 30, 31};
-            int[] values = {played, wins, score};
-            String[] labels = {"Games Played", "Wins", "Kills"};
-            for (int i = 0; i < values.length; i++) {
-                int value = values[i];
-                inventory.setItem(statSlots[i], statsItem(
-                        value > 0 ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
-                        (value > 0 ? ChatColor.GREEN : ChatColor.RED) + labels[i],
-                        List.of(" ", ChatColor.GRAY + "Recorded by this local test server: " + ChatColor.WHITE + value),
-                        "noop", null, null));
-            }
-            String statPath = "local-stats." + targetId + ".sneaky-assassins.";
-            String[] statIds = {"master-assassin", "i-see-you", "incompetence", "the-masters-master"};
-            String[] statNames = {"Master Assassin", "I See You", "Incompetence", "The Master's Master"};
-            int[] statSlots2 = {33, 34, 35, 36};
-            for (int i = 0; i < statIds.length; i++) {
-                int value = plugin.getConfig().getInt(statPath + statIds[i], 0);
-                inventory.setItem(statSlots2[i], statsItem(
-                        value > 0 ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
-                        (value > 0 ? ChatColor.GREEN : ChatColor.RED) + statNames[i],
-                        List.of(" ", ChatColor.GRAY + "Times recorded: " + ChatColor.WHITE + value,
-                                ChatColor.DARK_GRAY + "Local source-style stat tracker."),
-                        "noop", null, null));
-            }
-        } else if ("super-sploor".equals(gameId)) {
-            int[] achievementSlots = {10, 11, 12, 13, 14, 15, 16, 17, 19, 20, 21, 23, 24, 25, 26};
-            List<SuperSploorProgressCatalog.Achievement> achievements = SuperSploorProgressCatalog.achievements();
-            for (int i = 0; i < achievements.size(); i++) {
-                SuperSploorProgressCatalog.Achievement achievement = achievements.get(i);
-                boolean unlocked = plugin.getConfig().getBoolean(
-                        SuperSploorProgressCatalog.achievementConfigKey(targetId, achievement.id()), false);
-                inventory.setItem(achievementSlots[i], statsItem(
-                        unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
-                        (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.name(),
-                        List.of(" ", ChatColor.GRAY + achievement.requirement(), " ",
-                                unlocked ? ChatColor.GREEN + "Achievement unlocked" : "Not yet unlocked"),
-                        "noop", null, null));
-            }
-            int[] statSlots = {29, 30, 31, 32, 33, 34, 35, 36};
-            String[] statKeys = {"territory-blocks-painted", "enemy-blocks-reclaimed", "neutral-territory-claimed",
-                    "splats", "deaths", "assists", "squid-distance-blocks", "specials-used"};
-            String[] statNames = {"Territory Painted", "Enemy Turf Reclaimed", "Neutral Turf Claimed",
-                    "Splats", "Deaths", "Assists", "Squid Travel", "Specials Used"};
-            Material[] statIcons = {Material.PAINTING, Material.CYAN_DYE, Material.WHITE_DYE,
-                    Material.IRON_SWORD, Material.SKELETON_SKULL, Material.GREEN_DYE,
-                    Material.INK_SAC, Material.FIREWORK_ROCKET};
-            for (int i = 0; i < statKeys.length; i++) {
-                long value = plugin.getConfig().getLong(path + statKeys[i], 0L);
-                inventory.setItem(statSlots[i], statsItem(value > 0L ? Material.EXPERIENCE_BOTTLE : statIcons[i],
-                        (value > 0L ? ChatColor.GREEN : ChatColor.GRAY) + statNames[i],
-                        List.of(" ", ChatColor.GRAY + "Recorded by this local Testplex server: " + ChatColor.WHITE + value),
-                        "noop", null, null));
-            }
-            inventory.setItem(40, statsItem(Material.AMETHYST_SHARD, ChatColor.LIGHT_PURPLE + "Milestones",
-                    List.of(" ", ChatColor.GRAY + "Seven lifetime tracks, each with four stages.",
-                            ChatColor.RESET + "Click to view your Super Sploor milestones."),
-                    "open-super-sploor-milestones", null, gameId));
-        } else {
-            int[] slots = {29, 30};
-            int[] values = {played, wins};
-            String[] labels = {"Games Played", "Wins"};
-            for (int i = 0; i < values.length; i++) {
-                int value = values[i];
-                List<String> lore = List.of(" ",
-                        ChatColor.GRAY + "Recorded by this local test server: " + ChatColor.WHITE + value,
-                        ChatColor.DARK_GRAY + "Not production Mineplex achievement data.");
-                inventory.setItem(slots[i], statsItem(value > 0 ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
-                        (value > 0 ? ChatColor.GREEN : ChatColor.RED) + labels[i], lore, "noop", null, null));
-            }
-            String scoreLabel = relevantScoreLabel(gameId);
-            if (scoreLabel != null) {
-                int kills = plugin.getConfig().getInt(path + "kills", score);
-                inventory.setItem(31, statsItem(kills > 0 ? Material.IRON_SWORD : Material.WOODEN_SWORD,
-                        (kills > 0 ? ChatColor.GREEN : ChatColor.GRAY) + scoreLabel,
-                        List.of(" ", ChatColor.GRAY + "Recorded by this local test server: "
-                                + ChatColor.WHITE + kills), "noop", null, null));
-            }
-        }
-        if ("spleef".equals(gameId)) {
-            inventory.setItem(33, statsItem(Material.SNOWBALL, ChatColor.AQUA + "Blocks Broken",
-                    List.of(" ", ChatColor.GRAY + "Blocks destroyed in Spleef: " + ChatColor.WHITE
-                            + plugin.getConfig().getInt(path + "blocks-broken", 0),
-                            ChatColor.DARK_GRAY + "Recorded locally by this Testplex server."),
-                    "noop", null, null));
-        }
-        if (!milestones && "draw-my-thing".equals(gameId)) {
-            String[] statKeys = {"total-guesses", "pure-luck", "keen-eye", "mr-squiggle"};
-            String[] statNames = {"Total Guesses", "Lucky Guesses", "Keen Eye", "Mr Squiggle"};
-            Material[] icons = {Material.PAPER, Material.FIREWORK_STAR, Material.SPYGLASS, Material.PAINTING};
-            int[] statSlots = {29, 30, 31, 32};
-            for (int i = 0; i < statKeys.length; i++) {
-                int value = plugin.getConfig().getInt(path + statKeys[i], 0);
-                inventory.setItem(statSlots[i], statsItem(value > 0 ? Material.EXPERIENCE_BOTTLE : icons[i],
-                        (value > 0 ? ChatColor.GREEN : ChatColor.GRAY) + statNames[i],
-                        List.of(" ", ChatColor.GRAY + "Recorded by this local Testplex server: "
-                                + ChatColor.WHITE + value),
-                        "noop", null, null));
-            }
-        }
-        inventory.setItem(22, statsSummaryItem(Material.BOOK, ChatColor.BOLD + displayName + " Stats",
-                gameStatsLore(targetId, gameId, false)));
-        inventory.setItem(4, statsItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back", List.of(),
-                "back-arcade", null, null));
-        if (milestones) {
-            inventory.setItem(45, statsItem(Material.BOOK, ChatColor.LIGHT_PURPLE + "Achievements",
-                    List.of(" ", ChatColor.GRAY + "Return to this game's achievements."),
-                    "open-game-achievements", null, gameId));
-        } else if (!ArcadeProgressCatalog.milestones(gameId).isEmpty()) {
-            inventory.setItem(45, statsItem(Material.NETHER_STAR, ChatColor.LIGHT_PURPLE + "Milestones",
-                    List.of(" ", ChatColor.GRAY + "Track long-term progress across " + displayName + "."),
-                    "open-game-milestones", null, gameId));
-        }
-        if (milestones) {
-            inventory.setItem(45, statsItem(Material.BOOK, ChatColor.LIGHT_PURPLE + "Achievements",
-                    List.of(" ", ChatColor.GRAY + "Return to this game's achievements."),
-                    "open-game-achievements", null, gameId));
-        } else if (!ArcadeProgressCatalog.milestones(gameId).isEmpty()) {
-            inventory.setItem(45, statsItem(Material.NETHER_STAR, ChatColor.LIGHT_PURPLE + "Milestones",
-                    List.of(" ", ChatColor.GRAY + "Track long-term progress across " + displayName + "."),
-                    "open-game-milestones", null, gameId));
-        }
-        inventory.setItem(49, statsItem(Material.BARRIER, ChatColor.RED + "Close", List.of(),
-                "close", null, null));
-        viewer.openInventory(inventory);
-    }
-
     private record StatsAchievement(String id, String name, String requirement) { }
 
     private record StatsMilestone(String id, String name, String unit, long[] stages,
                                   java.util.function.ToLongFunction<UUID> value) { }
+
+    private record StatsMilestoneSlice(int trackStart, int stageStart) { }
 
     private String statsCatalogId(String gameId) {
         if (gameId.startsWith("monster-maze")) return "monster-maze";
@@ -20173,7 +19748,9 @@ public final class ArcadePortManager implements Listener {
             String catalogId = statsCatalogId(gameId);
             for (ArcadeProgressCatalog.Milestone milestone : ArcadeProgressCatalog.milestones(catalogId)) {
                 entries.add(new StatsMilestone(milestone.id(), milestone.name(), milestone.unit(),
-                        milestone.stages(), id -> milestone.value(plugin.getConfig(), id, catalogId)));
+                        // Avoid four duplicate "Tier 1" blocks for tiny source totals such as Precision (1).
+                        java.util.Arrays.stream(milestone.stages()).distinct().toArray(),
+                        id -> milestone.value(plugin.getConfig(), id, catalogId)));
             }
         }
         return List.copyOf(entries);
@@ -20308,15 +19885,23 @@ public final class ArcadePortManager implements Listener {
     private void openGameMilestones(Player viewer, UUID targetId, String targetName, String gameId, int requestedPage) {
         if (viewer == null || gameId == null || ArcadeGameDirectory.find(gameId) == null) return;
         List<StatsMilestone> tracks = statsMilestones(gameId);
-        int maxStages = tracks.stream().mapToInt(track -> track.stages().length).max().orElse(0);
-        int trackPages = ArcadeStatsLayout.pages(tracks.size(), ArcadeStatsLayout.TRACKS_PER_PAGE);
-        int stagePages = ArcadeStatsLayout.pages(maxStages, ArcadeStatsLayout.STAGES_PER_PAGE);
-        int pages = trackPages * stagePages;
+        List<StatsMilestoneSlice> slices = new ArrayList<>();
+        for (int trackStart = 0; trackStart < tracks.size(); trackStart += ArcadeStatsLayout.TRACKS_PER_PAGE) {
+            List<StatsMilestone> group = tracks.subList(trackStart,
+                    Math.min(tracks.size(), trackStart + ArcadeStatsLayout.TRACKS_PER_PAGE));
+            int maxStages = group.stream().mapToInt(track -> track.stages().length).max().orElse(0);
+            for (int stageStart = 0; stageStart < maxStages; stageStart += ArcadeStatsLayout.STAGES_PER_PAGE)
+                slices.add(new StatsMilestoneSlice(trackStart, stageStart));
+        }
+        if (slices.isEmpty()) slices.add(new StatsMilestoneSlice(0, 0));
+        int pages = slices.size();
         int page = Math.max(0, Math.min(requestedPage, pages - 1));
-        int trackStart = (page % trackPages) * ArcadeStatsLayout.TRACKS_PER_PAGE;
-        int stageStart = (page / trackPages) * ArcadeStatsLayout.STAGES_PER_PAGE;
+        StatsMilestoneSlice slice = slices.get(page);
+        int trackStart = slice.trackStart();
+        int stageStart = slice.stageStart();
         List<StatsMilestone> visible = tracks.subList(trackStart,
-                Math.min(tracks.size(), trackStart + ArcadeStatsLayout.TRACKS_PER_PAGE));
+                Math.min(tracks.size(), trackStart + ArcadeStatsLayout.TRACKS_PER_PAGE)).stream()
+                .filter(track -> track.stages().length > stageStart).toList();
         List<Integer> columns = ArcadeStatsLayout.milestoneColumns(visible.size());
         List<UUID> eligible = statsEligiblePlayers(gameId);
         Inventory inventory = createStatsInventory(StatsPage.MILESTONES, targetId, targetName,
@@ -20369,52 +19954,6 @@ public final class ArcadePortManager implements Listener {
         viewer.openInventory(inventory);
     }
 
-    private void renderGameAchievements(Inventory inventory, UUID targetId, String gameId) {
-        List<ArcadeProgressCatalog.Achievement> achievements = ArcadeProgressCatalog.achievements(gameId);
-        int slot = 10;
-        for (ArcadeProgressCatalog.Achievement achievement : achievements) {
-            String key = arcadeAchievementConfigKey(targetId, gameId, achievement.id());
-            boolean unlocked = plugin.getConfig().getBoolean(key, false);
-            List<String> lore = List.of(" ", ChatColor.GRAY + achievement.requirement(), " ",
-                    unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked",
-                    ChatColor.DARK_GRAY + "Progress is saved locally on this Testplex server.");
-            inventory.setItem(slot++, statsItem(unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
-                    (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.name(),
-                    lore, "noop", null, null));
-        }
-    }
-
-    private void renderGameMilestones(Inventory inventory, UUID targetId, String gameId) {
-        List<ArcadeProgressCatalog.Milestone> milestones = ArcadeProgressCatalog.milestones(gameId);
-        int slot = 20 - milestones.size() / 2;
-        for (ArcadeProgressCatalog.Milestone milestone : milestones) {
-            long value = milestone.value(plugin.getConfig(), targetId, gameId);
-            long[] stages = milestone.stages();
-            int completed = 0;
-            for (long stage : stages) if (value >= stage) completed++;
-            long next = completed < stages.length ? stages[completed] : milestone.maximum();
-            List<String> lore = new ArrayList<>();
-            lore.add(" ");
-            lore.add(ChatColor.GRAY + "Progress: " + ChatColor.WHITE + formatMilestoneValue(value, milestone.unit())
-                    + ChatColor.GRAY + " / " + ChatColor.WHITE + formatMilestoneValue(milestone.maximum(), milestone.unit()));
-            lore.add(ChatColor.LIGHT_PURPLE + "Stages completed: " + completed + "/" + stages.length);
-            if (completed < stages.length) {
-                lore.add(ChatColor.YELLOW + "Next stage: " + ChatColor.WHITE + formatMilestoneValue(next, milestone.unit()));
-                lore.add(milestoneProgressBar(value, next));
-            } else {
-                lore.add(ChatColor.GREEN + "Milestone maxed out!");
-                lore.add(ChatColor.GREEN + "▰▰▰▰▰▰▰▰▰▰");
-            }
-            lore.add(" ");
-            lore.add(ChatColor.DARK_GRAY + "Stages: " + java.util.Arrays.stream(stages)
-                    .mapToObj(stage -> formatMilestoneValue(stage, milestone.unit()))
-                    .collect(java.util.stream.Collectors.joining(" → ")));
-            inventory.setItem(slot++, statsItem(completed == stages.length ? Material.NETHER_STAR : Material.AMETHYST_SHARD,
-                    (completed == stages.length ? ChatColor.GREEN : ChatColor.LIGHT_PURPLE) + milestone.name(),
-                    lore, "noop", null, null));
-        }
-    }
-
     private String formatMilestoneValue(long value, String unit) {
         if ("milliseconds".equals(unit)) {
             long minutes = value / 60_000L;
@@ -20429,11 +19968,6 @@ public final class ArcadePortManager implements Listener {
         return String.format(java.util.Locale.ROOT, "%,d %s", value, unit);
     }
 
-    private String milestoneProgressBar(long current, long target) {
-        int filled = target <= 0 ? 10 : (int) Math.min(10L, Math.max(0L, current * 10L / target));
-        return ChatColor.LIGHT_PURPLE + "▰".repeat(filled) + ChatColor.DARK_GRAY + "▱".repeat(10 - filled);
-    }
-
     private String arcadeAchievementConfigKey(UUID playerId, String gameId, String achievementId) {
         return switch (gameId) {
             case "bacon-brawl" -> ArcadePortRules.baconBrawlAchievementConfigKey(playerId, achievementId);
@@ -20445,112 +19979,6 @@ public final class ArcadePortManager implements Listener {
             default -> "local-achievements." + playerId + "." + gameId + "." + achievementId;
         };
     }
-
-    private void openSuperSploorMilestones(Player viewer, UUID targetId, String targetName) {
-        String gameId = "super-sploor";
-        Inventory inventory = createStatsInventory(StatsPage.GAME, targetId, targetName,
-                targetName + "'s Super Sploor Milestones", gameId);
-        String path = localStatsPath(targetId, gameId);
-        int slot = 10;
-        for (SuperSploorProgressCatalog.Milestone milestone : SuperSploorProgressCatalog.milestones()) {
-            long value = Math.max(0L, plugin.getConfig().getLong(path + milestone.statKey(), 0L));
-            long[] stages = milestone.stages();
-            int completed = 0;
-            for (long stage : stages) if (value >= stage) completed++;
-            long next = completed < stages.length ? stages[completed] : milestone.maximum();
-            List<String> lore = new ArrayList<>();
-            lore.add(" ");
-            lore.add(ChatColor.GRAY + "Progress: " + ChatColor.WHITE + String.format(java.util.Locale.ROOT,
-                    "%,d %s", value, milestone.unit()) + ChatColor.GRAY + " / " + ChatColor.WHITE
-                    + String.format(java.util.Locale.ROOT, "%,d %s", milestone.maximum(), milestone.unit()));
-            lore.add(ChatColor.LIGHT_PURPLE + "Stages completed: " + completed + "/" + stages.length);
-            if (completed < stages.length) {
-                lore.add(ChatColor.YELLOW + "Next stage: " + ChatColor.WHITE
-                        + String.format(java.util.Locale.ROOT, "%,d %s", next, milestone.unit()));
-                int filled = next <= 0 ? 10 : (int) Math.min(10L, value * 10L / next);
-                lore.add(ChatColor.LIGHT_PURPLE + "▰".repeat(filled)
-                        + ChatColor.DARK_GRAY + "▱".repeat(10 - filled));
-            } else lore.add(ChatColor.GREEN + "Milestone maxed out!");
-            lore.add(" ");
-            lore.add(ChatColor.DARK_GRAY + "Stages: " + java.util.Arrays.stream(stages)
-                    .mapToObj(stage -> String.format(java.util.Locale.ROOT, "%,d", stage))
-                    .collect(java.util.stream.Collectors.joining(" → ")));
-            inventory.setItem(slot++, statsItem(completed == stages.length ? Material.NETHER_STAR : Material.AMETHYST_SHARD,
-                    (completed == stages.length ? ChatColor.GREEN : ChatColor.LIGHT_PURPLE) + milestone.name(),
-                    lore, "noop", null, gameId));
-        }
-        inventory.setItem(4, statsItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back", List.of(),
-                "back-super-sploor", null, gameId));
-        inventory.setItem(49, statsItem(Material.BARRIER, ChatColor.RED + "Close", List.of(), "close", null, null));
-        viewer.openInventory(inventory);
-    }
-
-    private void renderHoopsRemasteredStats(Inventory inventory, UUID targetId, int played, int wins) {
-        String path = localStatsPath(targetId, "hoops-remastered");
-        int losses = plugin.getConfig().getInt(path + "losses", Math.max(0, played - wins));
-        double divisor = Math.max(1.0D, played);
-        double ppg = plugin.getConfig().getDouble(path + "ppg",
-                plugin.getConfig().getDouble(path + "points", 0.0D) / divisor);
-        double apg = plugin.getConfig().getDouble(path + "apg",
-                plugin.getConfig().getDouble(path + "assists", 0.0D) / divisor);
-        double rpg = plugin.getConfig().getDouble(path + "rpg",
-                plugin.getConfig().getDouble(path + "rebounds", 0.0D) / divisor);
-        int[] slots = {29, 30, 31, 32, 33};
-        String[] labels = {"Wins", "Losses", "PPG", "APG", "RPG"};
-        String[] values = {
-                Integer.toString(wins),
-                Integer.toString(losses),
-                String.format(java.util.Locale.ROOT, "%.2f", ppg),
-                String.format(java.util.Locale.ROOT, "%.2f", apg),
-                String.format(java.util.Locale.ROOT, "%.2f", rpg)
-        };
-        for (int i = 0; i < slots.length; i++) {
-            boolean recorded = i < 2 ? Integer.parseInt(values[i]) > 0 : Double.parseDouble(values[i]) > 0.0D;
-            inventory.setItem(slots[i], statsItem(recorded ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
-                    (recorded ? ChatColor.GREEN : ChatColor.RED) + labels[i],
-                    List.of(" ", ChatColor.GRAY + "Recorded by this local Testplex server: "
-                            + ChatColor.WHITE + values[i],
-                            i < 2 ? ChatColor.DARK_GRAY + "Career total" : ChatColor.DARK_GRAY + "Average per game"),
-                    "noop", null, null));
-        }
-    }
-
-    private void renderSneakyAssassinsStats(Inventory inventory, UUID targetId,
-                                                int played, int wins, int score, int knockouts) {
-        String legacyAchievementPath = "test-achievements.sneaky-assassins." + targetId + ".the-masters-master";
-        boolean legacyUnlocked = plugin.getConfig().getBoolean(legacyAchievementPath, false);
-        inventory.setItem(16, statsItem(legacyUnlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
-                (legacyUnlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + "The Master’s Master",
-                List.of(" ", ChatColor.GRAY + "Defeat an assassin with at least four power-ups while you have none.",
-                        " ", legacyUnlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked"),
-                "noop", null, null));
-        String path = localStatsPath(targetId, "sneaky-assassins");
-        int[] slots = {29, 30, 31, 32, 33, 34, 35};
-        int[] values = {played, wins, score,
-                plugin.getConfig().getInt(path + "master-assassin", 0),
-                plugin.getConfig().getInt(path + "i-see-you", 0),
-                plugin.getConfig().getInt(path + "incompetence", 0),
-                plugin.getConfig().getInt(path + "powerups", 0)};
-        String[] labels = {"Games Played", "Wins", "Kills",
-                "Master Assassin", "I See You", "Incompetence", "Power-ups"};
-        for (int i = 0; i < slots.length; i++) {
-            int value = values[i];
-            inventory.setItem(slots[i], statsItem(value > 0 ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
-                    (value > 0 ? ChatColor.GREEN : ChatColor.RED) + labels[i],
-                    List.of(" ", ChatColor.GRAY + "Recorded by this local Testplex server: "
-                            + ChatColor.WHITE + value), "noop", null, null));
-        }
-    }
-
-
-
-
-
-
-
-
-
-
 
     /** All three selectable Testplex modes, each with three genuine per-kit pattern PBs. */
     private void openMonsterMazePersonalBests(Player viewer, UUID targetId, String targetName) {
@@ -20708,6 +20136,29 @@ public final class ArcadePortManager implements Listener {
             lore.add(ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE + unlocked + "/"
                     + CameraShyProgressCatalog.achievements().size());
         }
+        if ("hoops-remastered".equals(gameId)) {
+            long games = plugin.getConfig().getLong(path + "games-played", 0L);
+            double divisor = Math.max(1.0D, games);
+            lore.add(ChatColor.GRAY + "Losses: " + ChatColor.WHITE
+                    + plugin.getConfig().getLong(path + "losses", Math.max(0L, games
+                            - plugin.getConfig().getLong(path + "wins", 0L))));
+            for (String metric : List.of("points", "assists", "rebounds")) {
+                String label = switch (metric) {
+                    case "points" -> "PPG";
+                    case "assists" -> "APG";
+                    default -> "RPG";
+                };
+                String average = switch (metric) {
+                    case "points" -> "ppg";
+                    case "assists" -> "apg";
+                    default -> "rpg";
+                };
+                lore.add(ChatColor.GRAY + label + ": " + ChatColor.WHITE
+                        + String.format(java.util.Locale.ROOT, "%.2f",
+                        plugin.getConfig().getDouble(path + average,
+                                plugin.getConfig().getDouble(path + metric, 0.0D) / divisor)));
+            }
+        }
         if ("draw-my-thing".equals(gameId)) {
             lore.add(ChatColor.GRAY + "Total Guesses: " + ChatColor.WHITE
                     + plugin.getConfig().getInt(path + "total-guesses", 0));
@@ -20743,6 +20194,12 @@ public final class ArcadePortManager implements Listener {
                     + plugin.getConfig().getLong(path + "enemy-blocks-reclaimed", 0L));
             lore.add(ChatColor.GRAY + "Splats: " + ChatColor.WHITE
                     + plugin.getConfig().getInt(path + "splats", 0));
+            lore.add(ChatColor.GRAY + "Assists: " + ChatColor.WHITE
+                    + plugin.getConfig().getLong(path + "assists", 0L));
+            lore.add(ChatColor.GRAY + "Squid Travel: " + ChatColor.WHITE
+                    + plugin.getConfig().getLong(path + "squid-distance-blocks", 0L));
+            lore.add(ChatColor.GRAY + "Specials Used: " + ChatColor.WHITE
+                    + plugin.getConfig().getLong(path + "specials-used", 0L));
             long unlocked = SuperSploorProgressCatalog.achievements().stream()
                     .filter(achievement -> plugin.getConfig().getBoolean(
                             SuperSploorProgressCatalog.achievementConfigKey(targetId, achievement.id()), false))
@@ -20784,6 +20241,12 @@ public final class ArcadePortManager implements Listener {
                     + plugin.getConfig().getInt(path + "flawless-victory", 0));
         }
         if ("snake".equals(gameId)) {
+            lore.add(ChatColor.GRAY + "Lifetime Kills: " + ChatColor.WHITE
+                    + plugin.getConfig().getLong(path + "lifetime-kills", 0L));
+            lore.add(ChatColor.GRAY + "Slimes Eaten: " + ChatColor.WHITE
+                    + plugin.getConfig().getLong(path + "lifetime-slimes", 0L));
+            lore.add(ChatColor.GRAY + "Best Tail Length: " + ChatColor.WHITE
+                    + plugin.getConfig().getLong(path + "best-tail-length", 0L));
             String[] snakeAchievementIds = {"Cannibal", "ChooChoo", "SlimySheep",
                     "dont-want-none", "resilience-snakeified", "busted",
                     "one-of-the-ogs", "flawless", "bots-everywhere"};
@@ -20827,6 +20290,18 @@ public final class ArcadePortManager implements Listener {
             lore.add(ChatColor.GRAY + "Master Assassin: " + plugin.getConfig().getInt(statPath + "master-assassin", 0));
             lore.add(ChatColor.GRAY + "I See You: " + plugin.getConfig().getInt(statPath + "i-see-you", 0));
             lore.add(ChatColor.GRAY + "Incompetence: " + plugin.getConfig().getInt(statPath + "incompetence", 0));
+        }
+        if ("speed-builders".equals(gameId)) {
+            lore.add(ChatColor.GRAY + "Perfect Builds: " + ChatColor.WHITE
+                    + plugin.getConfig().getLong(path + "perfect-builds", 0L));
+            lore.add(ChatColor.GRAY + "Blocks Placed: " + ChatColor.WHITE
+                    + plugin.getConfig().getLong(path + "blocks-placed", 0L));
+            lore.add(ChatColor.GRAY + "Blocks Broken: " + ChatColor.WHITE
+                    + plugin.getConfig().getLong(path + "blocks-broken", 0L));
+            lore.add(ChatColor.GRAY + "Mobs Built: " + ChatColor.WHITE
+                    + plugin.getConfig().getLong(path + "mobs-built", 0L));
+            lore.add(ChatColor.GRAY + "First Perfects: " + ChatColor.WHITE
+                    + plugin.getConfig().getLong(path + "perfect-first", 0L));
         }
         String milestoneCatalogId = "speed-builders".equals(gameId) ? "speed-builders-arcade" : statsGameId;
         List<ArcadeProgressCatalog.Milestone> trackedMilestones = ArcadeProgressCatalog.milestones(milestoneCatalogId);
@@ -26175,10 +25650,6 @@ public final class ArcadePortManager implements Listener {
                         openGameStats(player, holder.targetId, holder.targetName, gameId, page);
                     else openGameMilestones(player, holder.targetId, holder.targetName, gameId, page);
                 }
-                case "open-super-sploor-milestones" ->
-                        openGameMilestones(player, holder.targetId, holder.targetName, "super-sploor", 0);
-                case "back-super-sploor" ->
-                        openStatsGame(player, holder.targetId, holder.targetName, "super-sploor");
                 case "open-dragon-escape-pbs" -> openDragonEscapePersonalBests(player, holder.targetId, holder.targetName);
                 case "open-maze-pbs" -> openMonsterMazePersonalBests(player, holder.targetId, holder.targetName);
                 case "open-maze-kits" -> openMonsterMazeKitBests(player, holder.targetId, holder.targetName, category);
