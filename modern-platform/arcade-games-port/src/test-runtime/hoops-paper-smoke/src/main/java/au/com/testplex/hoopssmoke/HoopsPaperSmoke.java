@@ -425,7 +425,16 @@ public final class HoopsPaperSmoke extends JavaPlugin {
             arcadePlugin.getConfig().set("local-achievements." + owner.getUniqueId()
                     + ".hoops-remastered.double-double", true);
             require(unlockChatCount() == 1, "midgame achievement did not announce in chat");
-            arcadePlugin.getConfig().set(prefix + "points", 125);
+            @SuppressWarnings("unchecked")
+            List<Object> hoopsMilestones = (List<Object>) invoke(manager, "statsMilestones",
+                    new Class<?>[]{String.class}, "hoops-remastered");
+            Object pointsMilestone = hoopsMilestones.stream().filter(track -> {
+                try { return "points".equals(method(track.getClass(), "id").invoke(track)); }
+                catch (Exception exception) { throw new IllegalStateException(exception); }
+            }).findFirst().orElseThrow();
+            long firstPointsTier = ((long[]) method(pointsMilestone.getClass(), "stages")
+                    .invoke(pointsMilestone))[0];
+            arcadePlugin.getConfig().set(prefix + "points", firstPointsTier);
             require(unlockChatCount() == 1, "midgame milestone tier did not announce in chat");
             require(unlockChatCount() == 0, "midgame notifications repeated without new progress");
             midgameUnlockChatChecked = true;
