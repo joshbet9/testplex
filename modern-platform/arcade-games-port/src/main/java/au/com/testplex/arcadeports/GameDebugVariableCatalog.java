@@ -219,6 +219,10 @@ final class GameDebugVariableCatalog {
         if (name.equals("CASTLE_ASSAULT_TNT_THROW_SPEED")
                 || name.equals("CASTLE_ASSAULT_TNT_THROW_VERTICAL_SPEED")) return 0.0D;
         if (name.equals("PAINTBALL_SHOTGUN_PELLETS")) return 1.0D;
+        if (name.equals("RUNNER_MAX_FROSTBALLS")) return 0.0D;
+        if (name.startsWith("RUNNER_") && name.endsWith("_MILLIS")) return 0.0D;
+        if (name.startsWith("RUNNER_") && name.endsWith("_TICKS")) return 0.0D;
+        if (name.startsWith("RUNNER_") && (name.endsWith("_SPEED") || name.endsWith("_SPEED_MILLIS"))) return 0.0D;
         if (name.startsWith("PAINTBALL_") && name.endsWith("_MILLIS")) return 1.0D;
         if (name.startsWith("PAINTBALL_") && (name.endsWith("_SPREAD") || name.endsWith("_SPEED")
                 || name.endsWith("_SPEED_MULTIPLIER") || name.endsWith("_RADIUS")
@@ -273,6 +277,15 @@ final class GameDebugVariableCatalog {
         if (name.contains("_LAUNCH_SPEED") || name.contains("_LAUNCH_HORIZONTAL")) return 8.0D;
         if (name.contains("_LAUNCH_VERTICAL") || name.endsWith("_EGG_SPEED")) return 5.0D;
         if (name.equals("HOOPS_MIN_PLAYERS") || name.equals("HOOPS_MAX_PLAYERS")) return 16.0D;
+        if (name.startsWith("RUNNER_") && name.endsWith("_SPEED")) return 4.0D;
+        if (name.equals("RUNNER_SWITCH_GRACE_MILLIS")) return 5_000.0D;
+        if (name.equals("RUNNER_BLOCK_DECAY_MILLIS")) return 60_000.0D;
+        if (name.equals("RUNNER_FROSTBALL_INTERVAL_MILLIS")) return 10_000.0D;
+        if (name.equals("RUNNER_LEAP_COOLDOWN_MILLIS")
+                || name.equals("RUNNER_QUICKSHOT_COOLDOWN_MILLIS")) return 120_000.0D;
+        if (name.equals("RUNNER_MAX_FROSTBALLS")) return 64.0D;
+        if (name.equals("RUNNER_FROSTBALL_SLOW_TICKS")) return 1_200.0D;
+        if (name.equals("RUNNER_FROSTBALL_SLOW_AMPLIFIER")) return 10.0D;
         if (name.equals("CASTLE_ASSAULT_KING_HEALTH_BASE")) return 5_000.0D;
         if (name.equals("CASTLE_ASSAULT_KING_HEALTH_REFERENCE_PLAYERS")) return 64.0D;
         if (name.equals("CASTLE_ASSAULT_CARRIER_FUSE_MILLIS")) return 600_000.0D;
@@ -362,6 +375,8 @@ final class GameDebugVariableCatalog {
     private static double step(String name, double defaultValue, Kind kind) {
         if (kind == Kind.BOOLEAN) return 1.0D;
         if (name.startsWith("EVOLUTION_CHARGE_")) return 0.001D;
+        if (name.startsWith("RUNNER_") && name.endsWith("_SPEED")) return 0.1D;
+        if (name.equals("RUNNER_SWITCH_GRACE_MILLIS")) return 50.0D;
         if (name.contains("_FALL_DAMAGE_MULTIPLIER")) return 0.05D;
         if (name.endsWith("_MILLIS")) return defaultValue >= 10_000.0D ? 1_000.0D : defaultValue >= 1_000.0D ? 100.0D : 25.0D;
         if (name.endsWith("_TICKS")) return defaultValue >= 100.0D ? 20.0D : 1.0D;

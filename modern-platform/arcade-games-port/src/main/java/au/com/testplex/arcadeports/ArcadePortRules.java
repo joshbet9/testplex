@@ -220,6 +220,10 @@ public final class ArcadePortRules {
     public static final int RUNNER_MAX_FROSTBALLS = 16;
     public static final int RUNNER_FROSTBALL_SLOW_TICKS = 40;
     public static final int RUNNER_FROSTBALL_SLOW_AMPLIFIER = 2;
+    public static final double RUNNER_LEAP_HORIZONTAL_SPEED = 1.2D;
+    public static final double RUNNER_LEAP_VERTICAL_SPEED = 1.2D;
+    public static final double RUNNER_QUICKSHOT_PROJECTILE_SPEED = 1.2D;
+    public static final long RUNNER_SWITCH_GRACE_MILLIS = 750L;
     public static final double RUNNER_STEPS_ACHIEVEMENT_BLOCKS = 400.0D;
     public static final int RUNNER_HOP_ACHIEVEMENT_JUMPS = 100;
     public static final long RUNNER_FLASH_ACHIEVEMENT_MAX_WIN_MILLIS = 90_000L;
@@ -1632,6 +1636,22 @@ public final class ArcadePortRules {
         long decayMillis = Math.max(0L, GameDebugRuntimeOverrides.longValue(
                 "RUNNER_BLOCK_DECAY_MILLIS", RUNNER_BLOCK_DECAY_MILLIS));
         return elapsedMillis >= decayMillis;
+    }
+
+    public static double runnerLeapHorizontalSpeed() {
+        return GameDebugRuntimeOverrides.doubleValue("RUNNER_LEAP_HORIZONTAL_SPEED", RUNNER_LEAP_HORIZONTAL_SPEED);
+    }
+
+    public static double runnerLeapVerticalSpeed() {
+        return GameDebugRuntimeOverrides.doubleValue("RUNNER_LEAP_VERTICAL_SPEED", RUNNER_LEAP_VERTICAL_SPEED);
+    }
+
+    public static double runnerQuickshotProjectileSpeed() {
+        return GameDebugRuntimeOverrides.doubleValue("RUNNER_QUICKSHOT_PROJECTILE_SPEED", RUNNER_QUICKSHOT_PROJECTILE_SPEED);
+    }
+
+    public static long runnerSwitchGraceMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue("RUNNER_SWITCH_GRACE_MILLIS", RUNNER_SWITCH_GRACE_MILLIS));
     }
 
     public static String normalizeDeathTagRunnerKit(String requested) {

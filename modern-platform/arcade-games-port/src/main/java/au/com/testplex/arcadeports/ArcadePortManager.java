@@ -23622,8 +23622,8 @@ public final class ArcadePortManager implements Listener {
         }
         session.runnerLeapReadyAt.put(id, now + GameDebugRuntimeOverrides.longValue("RUNNER_LEAP_COOLDOWN_MILLIS", ArcadePortRules.RUNNER_LEAP_COOLDOWN_MILLIS));
         cooldownProgress.start(player, "Leap", GameDebugRuntimeOverrides.longValue("RUNNER_LEAP_COOLDOWN_MILLIS", ArcadePortRules.RUNNER_LEAP_COOLDOWN_MILLIS));
-        Vector velocity = player.getLocation().getDirection().normalize().multiply(1.2D);
-        velocity.setY(1.2D);
+        Vector velocity = player.getLocation().getDirection().normalize().multiply(ArcadePortRules.runnerLeapHorizontalSpeed());
+        velocity.setY(ArcadePortRules.runnerLeapVerticalSpeed());
         player.setVelocity(velocity);
         player.setFallDistance(0.0F);
         player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation(), 8, 0.2D, 0.15D, 0.2D, 0.02D);
@@ -23641,7 +23641,7 @@ public final class ArcadePortManager implements Listener {
         session.runnerQuickshotReadyAt.put(id, now + GameDebugRuntimeOverrides.longValue("RUNNER_QUICKSHOT_COOLDOWN_MILLIS", ArcadePortRules.RUNNER_QUICKSHOT_COOLDOWN_MILLIS));
         cooldownProgress.start(player, "Quickshot", GameDebugRuntimeOverrides.longValue("RUNNER_QUICKSHOT_COOLDOWN_MILLIS", ArcadePortRules.RUNNER_QUICKSHOT_COOLDOWN_MILLIS));
         Arrow arrow = player.launchProjectile(Arrow.class);
-        arrow.setVelocity(player.getLocation().getDirection().multiply(1.2D));
+        arrow.setVelocity(player.getLocation().getDirection().multiply(ArcadePortRules.runnerQuickshotProjectileSpeed()));
         session.entities.add(arrow);
         player.playSound(player.getLocation(), Sound.ENTITY_ARROW_SHOOT, 0.9F, 1.1F);
         player.sendMessage(ChatColor.GREEN + "Quickshot!");
@@ -23701,7 +23701,7 @@ public final class ArcadePortManager implements Listener {
             return false;
         }
         session.runnerSwapUsed.add(id);
-        long graceUntil = now + 750L;
+        long graceUntil = now + ArcadePortRules.runnerSwitchGraceMillis();
         protectRunnerSwapLanding(session, player, graceUntil);
         protectRunnerSwapLanding(session, target, graceUntil);
         player.getWorld().spawnParticle(Particle.PORTAL, player.getLocation().add(0.0D, 1.0D, 0.0D),
