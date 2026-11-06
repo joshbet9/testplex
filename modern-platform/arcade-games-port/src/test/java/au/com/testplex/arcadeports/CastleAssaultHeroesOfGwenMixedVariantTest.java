@@ -21,6 +21,21 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     }
 
     @Test
+    void castleAssaultPassivesAreExactAndSourceBound() {
+        assertFalse(ArcadePortRules.shouldBoostCastleChestSplashPotion(true, false));
+        assertFalse(ArcadePortRules.shouldBoostCastleChestSplashPotion(false, true));
+        assertTrue(ArcadePortRules.shouldBoostCastleChestSplashPotion(true, true));
+        assertEquals(550, ArcadePortRules.castleAssaultBoostedChestPotionDuration(440));
+        assertEquals(275, ArcadePortRules.castleAssaultBoostedChestPotionDuration(220));
+        assertEquals(1, ArcadePortRules.castleAssaultBoostedChestPotionDuration(1));
+        assertEquals(0, ArcadePortRules.castleAssaultBoostedChestPotionDuration(0));
+        assertEquals(1.5D, ArcadePortRules.castleAssaultChestPotionInstantBonus(6.0D), 0.0001D);
+        assertEquals(0.0D, ArcadePortRules.castleAssaultChestPotionInstantBonus(-1.0D));
+        assertEquals(12.5D, ArcadePortRules.castleAssaultArcherArrowDamage(10.0D), 0.0001D);
+        assertEquals(0.0D, ArcadePortRules.castleAssaultArcherArrowDamage(0.0D));
+    }
+
+    @Test
     void castleAssaultApprovedAchievementThresholds() {
         assertFalse(ArcadePortRules.shouldAwardCastleAssaultClutchness(10));
         assertTrue(ArcadePortRules.shouldAwardCastleAssaultClutchness(9));
