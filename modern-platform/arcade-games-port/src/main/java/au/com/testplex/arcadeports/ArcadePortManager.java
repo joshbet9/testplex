@@ -18554,6 +18554,8 @@ public final class ArcadePortManager implements Listener {
         }
         session.bombOwners.clear();
         session.bombPostDeathKills.clear();
+        session.bombWonderkidImpactKills.clear();
+        session.bombImpactDetonatedTnt.clear();
         for (Map.Entry<Block, BlockData> entry : session.bombConstructorOriginals.entrySet()) {
             Block block = entry.getKey();
             if (block != null && block.getWorld() == session.world) {
@@ -18934,10 +18936,6 @@ public final class ArcadePortManager implements Listener {
         for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
             UUID id = entry.getKey();
             Player player = entry.getValue();
-            if (session.scores.getOrDefault(id, 0) >= 3
-                    && !session.bombImmediateImpactThrowers.contains(id)) {
-                awardCatalogAchievement(player, "bomb-lobbers", "wonderkid");
-            }
             if (session.bombDoubleJumpCounts.getOrDefault(id, 0) >= 100) {
                 awardCatalogAchievement(player, "bomb-lobbers", "calma");
             }
@@ -27047,9 +27045,9 @@ public final class ArcadePortManager implements Listener {
             long age = Math.max(0L, now - createdAt);
             boolean touchingSolid = isBombTouchingAnyBlock(bomb);
             if (ArcadePortRules.shouldPrimeBombLobbersBomb(age, touchingSolid)) {
-                if (touchingSolid && age < ArcadePortRules.BOMB_LOBBERS_MAX_FLIGHT_MILLIS) {
-                    UUID impactOwner = session.bombOwners.get(bombId);
-                    if (impactOwner != null) session.bombImmediateImpactThrowers.add(impactOwner);
+                if (ArcadePortRules.isBombLobbersImpactDetonation(age, touchingSolid)) {
+                    // This high lob reached terrain after the 3s grace period: blast on impact.
+                    session.bombImpactDetonatedTnt.add(bombId);
                 }
                 session.bombPrimed.add(bombId);
                 bomb.setFuseTicks(0);
@@ -27215,6 +27213,7 @@ public final class ArcadePortManager implements Listener {
         session.bombPrimed.remove(bombId);
         session.bombDirectHitResolved.remove(bombId);
         session.bombKillsByTnt.remove(bombId);
+        session.bombImpactDetonatedTnt.remove(bombId);
         session.bombCloseRangeTargets.remove(bombId);
         session.bombConstructorBlockedBombs.remove(bombId);
     }
@@ -27803,6 +27802,7 @@ public final class ArcadePortManager implements Listener {
         UUID bombId = bomb.getUniqueId();
         UUID ownerId = session.bombOwners.get(bombId);
         int priorTntKills = session.bombKillsByTnt.getOrDefault(bombId, 0);
+        boolean qualifyingHighLobImpact = session.bombImpactDetonatedTnt.contains(bombId);
         Set<UUID> closeRangeKillTargets = session.bombCloseRangeTargets.getOrDefault(bombId, Set.of());
         String bombPowerupType = session.bombPowerTypes.getOrDefault(bombId, "normal");
         boolean bombLobbersBlast = session.type == ArcadePortGame.BOMB_LOBBERS;
@@ -27894,6 +27894,14 @@ public final class ArcadePortManager implements Listener {
                             }
                             recordBombLobbersPostDeathKill(session, owner, ownerId);
                             killsFromThisTnt = ArcadePortRules.nextBombLobbersTntKillCount(killsFromThisTnt, true);
+                            if (qualifyingHighLobImpact && ArcadePortRules.areBombLobbersEnemies(
+                                    session.teams.getOrDefault(ownerId, -1),
+                                    session.teams.getOrDefault(target.getUniqueId(), -2))) {
+                                int impactKills = session.bombWonderkidImpactKills.merge(ownerId, 1, Integer::sum);
+                                if (ArcadePortRules.shouldAwardBombLobbersWonderkid(impactKills)) {
+                                    awardCatalogAchievement(owner, "bomb-lobbers", "wonderkid");
+                                }
+                            }
                             if (ArcadePortRules.shouldAwardBombLobbersTwoBirdsOneStone(killsFromThisTnt)) {
                                 awardBombLobbersAchievement(owner,
                                         BombLobbersAchievement.TWO_BIRDS_ONE_STONE.configKey(ownerId),
@@ -28786,7 +28794,8 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> bombDoubleJumpAvailable = new HashSet<>();
         final Set<UUID> bombDoubleJumpUsed = new HashSet<>();
         final Map<UUID, Integer> bombDoubleJumpCounts = new HashMap<>();
-        final Set<UUID> bombImmediateImpactThrowers = new HashSet<>();
+        final Set<UUID> bombImpactDetonatedTnt = new HashSet<>();
+        final Map<UUID, Integer> bombWonderkidImpactKills = new HashMap<>();
         final Map<UUID, Set<UUID>> bombCloseRangeTargets = new HashMap<>();
         final Set<UUID> bombMvpPressurePlayers = new HashSet<>();
         final Set<UUID> bombPlayersDamaged = new HashSet<>();
