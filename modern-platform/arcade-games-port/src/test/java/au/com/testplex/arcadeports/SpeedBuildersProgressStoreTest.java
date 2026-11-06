@@ -37,4 +37,21 @@ class SpeedBuildersProgressStoreTest {
         assertEquals(0L, config.getLong(root + "wins"));
         assertEquals(0L, config.getLong(root + "losses"));
     }
+
+    @Test
+    void debugRoundDoesNotPersistStatsOrAchievements() {
+        YamlConfiguration config = new YamlConfiguration();
+        UUID player = UUID.fromString("d91366e2-e997-4ae4-a411-4502fd4d2207");
+        try {
+            GameDebugRuntimeOverrides.activate(java.util.Map.of("__DEBUG_TEST_BOT_ROSTER", true));
+            SpeedBuildersProgressStore.increment(config, player, "wins", 1);
+            SpeedBuildersProgressStore.increment(config, player, "perfect-builds", 1);
+
+            String root = "local-stats." + player + ".speed-builders-arcade.";
+            assertEquals(0L, config.getLong(root + "wins"));
+            assertEquals(0L, config.getLong(root + "perfect-builds"));
+        } finally {
+            GameDebugRuntimeOverrides.clear();
+        }
+    }
 }

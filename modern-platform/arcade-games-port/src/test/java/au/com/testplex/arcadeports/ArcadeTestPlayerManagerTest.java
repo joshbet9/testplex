@@ -1,6 +1,7 @@
 package au.com.testplex.arcadeports;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 
 import java.util.UUID;
 
@@ -9,6 +10,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ArcadeTestPlayerManagerTest {
+    @AfterEach
+    void clearDebugSession() { GameDebugRuntimeOverrides.clear(); }
+
     @Test
     void fillsEachGameToSixteenTotalPlayersRatherThanAddingSixteenExtraBots() {
         assertEquals(16, ArcadeTestPlayerManager.additionalPlayersNeeded(0));
@@ -69,6 +73,8 @@ class ArcadeTestPlayerManagerTest {
         assertFalse(ArcadeTestPlayerManager.shouldPersistProgression(UUID.randomUUID(), true));
         assertFalse(ArcadeTestPlayerManager.shouldPersistProgression(null, false));
         assertFalse(ArcadeTestPlayerManager.shouldPersistProgression(null, true));
+        GameDebugRuntimeOverrides.markDebugSession();
+        assertFalse(ArcadeTestPlayerManager.shouldPersistProgression(UUID.randomUUID(), false));
     }
 
     @Test

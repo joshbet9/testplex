@@ -30,6 +30,7 @@ public enum ArcadePortGame {
     TURF_WARS("turf-wars", "Turf Wars", Material.GREEN_WOOL, 2),
     DRAW_MY_THING("draw-my-thing", "Draw My Thing", Material.WHITE_WOOL, 0),
     MASTER_BUILDERS("master-builders", "Master Builders", Material.GRASS_BLOCK, 0),
+    SPEED_BUILDERS("speed-builders", "Speed Builders", Material.QUARTZ_BLOCK, 0),
     MONSTER_MAZE("monster-maze", "Monster Maze (Original)", Material.ROTTEN_FLESH, 0),
     MONSTER_MAZE_SPEED("monster-maze-speed", "Monster Maze (Speed)", Material.ROTTEN_FLESH, 0),
     MONSTER_MAZE_MODERN("monster-maze-modern", "Monster Maze (Modern)", Material.ROTTEN_FLESH, 0),

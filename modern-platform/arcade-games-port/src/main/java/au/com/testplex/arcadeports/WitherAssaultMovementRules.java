@@ -28,27 +28,33 @@ public final class WitherAssaultMovementRules {
         if (!Double.isFinite(y) || !Double.isFinite(spawnY) || !Double.isFinite(yLimit)) {
             return SPAWN_HOVER_SPEED;
         }
-        double altitudeSpeed = clamp(
-                BASE_FLY_SPEED + (y - yLimit) * SPEED_PER_Y_BLOCK,
-                MIN_FLY_SPEED, MAX_FLY_SPEED);
+        double minSpeed = WitherAssaultRules.flightMinSpeed();
+        double maxSpeed = Math.max(minSpeed, WitherAssaultRules.flightMaxSpeed());
+        double hoverSpeed = clamp(WitherAssaultRules.flightSpawnHoverSpeed(), minSpeed, maxSpeed);
+        double altitudeSpeed = clamp(WitherAssaultRules.flightBaseSpeed()
+                        + (y - yLimit) * WitherAssaultRules.flightSpeedPerYBlock(),
+                minSpeed, maxSpeed);
         double distance = Math.abs(y - spawnY);
-        double linearBlend = clamp((distance - BLEND_START_BLOCKS)
-                / (BLEND_END_BLOCKS - BLEND_START_BLOCKS), 0.0D, 1.0D);
+        double blendStart = WitherAssaultRules.flightBlendStartBlocks();
+        double blendEnd = WitherAssaultRules.flightBlendEndBlocks();
+        double linearBlend = clamp((distance - blendStart)
+                / (blendEnd - blendStart), 0.0D, 1.0D);
         double easedBlend = linearBlend * linearBlend * (3.0D - 2.0D * linearBlend);
-        return clamp(SPAWN_HOVER_SPEED
-                + (altitudeSpeed - SPAWN_HOVER_SPEED) * easedBlend,
-                MIN_FLY_SPEED, MAX_FLY_SPEED);
+        return clamp(hoverSpeed + (altitudeSpeed - hoverSpeed) * easedBlend, minSpeed, maxSpeed);
     }
 
     /** Move toward the target without a one-tick fly-speed jump. */
     public static double approachSpeed(double currentSpeed, double targetSpeed) {
         if (!Double.isFinite(currentSpeed)) currentSpeed = SPAWN_HOVER_SPEED;
         if (!Double.isFinite(targetSpeed)) targetSpeed = SPAWN_HOVER_SPEED;
-        double current = clamp(currentSpeed, MIN_FLY_SPEED, MAX_FLY_SPEED);
-        double target = clamp(targetSpeed, MIN_FLY_SPEED, MAX_FLY_SPEED);
+        double minSpeed = WitherAssaultRules.flightMinSpeed();
+        double maxSpeed = Math.max(minSpeed, WitherAssaultRules.flightMaxSpeed());
+        double current = clamp(currentSpeed, minSpeed, maxSpeed);
+        double target = clamp(targetSpeed, minSpeed, maxSpeed);
+        double maxChange = WitherAssaultRules.flightMaxSpeedChangePerTick();
         double delta = clamp(target - current,
-                -MAX_SPEED_CHANGE_PER_TICK, MAX_SPEED_CHANGE_PER_TICK);
-        return clamp(current + delta, MIN_FLY_SPEED, MAX_FLY_SPEED);
+                -maxChange, maxChange);
+        return clamp(current + delta, minSpeed, maxSpeed);
     }
 
     private static double clamp(double value, double min, double max) {

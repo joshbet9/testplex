@@ -24,16 +24,24 @@ public class SafePad implements Listener {
     private final Location center;
     private final int surfaceY;
     private final boolean qol;
+    private final MazeMode mode;
     private final List<BlockSnapshot> snapshots = new ArrayList<BlockSnapshot>();
-    private int decayCount = 11;
+    private int decayCount;
     private boolean active = true;
 
     public SafePad(Location pathLocation) { this(pathLocation, false); }
 
     public SafePad(Location pathLocation, boolean qol) {
+        this(pathLocation, qol, MazeMode.ORIGINAL);
+    }
+
+    public SafePad(Location pathLocation, boolean qol, MazeMode mode) {
         this.center = pathLocation.clone();
         this.surfaceY = pathLocation.getBlockY() - 1;
         this.qol = qol;
+        this.mode = mode == null ? MazeMode.ORIGINAL : mode;
+        this.decayCount = Math.max(1, MazeDebugRules.intValue(this.mode,
+                "SAFE_PAD_DECAY_STAGES", MazeDebugRules.SAFE_PAD_DECAY_STAGES));
         MonsterMazePlugin plugin = MonsterMazePlugin.getInstance();
         if (plugin != null && plugin.getMapThemeApplier() != null) plugin.getMapThemeApplier().refresh();
         captureAndBuild();
@@ -106,25 +114,41 @@ public class SafePad implements Listener {
     public boolean isActive() { return active; }
 
     public boolean isOn(Entity entity) {
-        return entity != null && isWithinFootprint(center, surfaceY, entity.getLocation());
+        return entity != null && isWithinFootprint(center, surfaceY, entity.getLocation(), mode);
     }
 
     static boolean isWithinFootprint(Location center, int surfaceY, Location location) {
+        return isWithinFootprint(center, surfaceY, location, 2.0D);
+    }
+
+    static boolean isWithinFootprint(Location center, int surfaceY, Location location, double radius) {
         if (center == null || location == null || center.getWorld() == null
                 || location.getWorld() != center.getWorld()) return false;
         // Off-centre pad fix: use the same symmetric 5x5 box as the visible pad in every mode.
         double dx = location.getX() - center.getX(), dz = location.getZ() - center.getZ();
-        return dx > -2.5 && dx < 2.5 && dz > -2.5 && dz < 2.5
+        double halfWidth = Math.max(0.1D, Math.min(2.0D, radius)) + 0.5D;
+        return dx > -halfWidth && dx < halfWidth && dz > -halfWidth && dz < halfWidth
                 && location.getY() > surfaceY && location.getY() < surfaceY + 5;
+    }
+
+    static boolean isWithinFootprint(Location center, int surfaceY, Location location, MazeMode mode) {
+        double radius = Math.max(0.1D, Math.min(2.0D, MazeDebugRules.doubleValue(mode,
+                "SAFE_PAD_CAPTURE_RADIUS_BLOCKS", MazeDebugRules.SAFE_PAD_CAPTURE_RADIUS_BLOCKS)));
+        return isWithinFootprint(center, surfaceY, location, radius);
     }
 
     public boolean decay() {
         if (!active) return true;
         decayCount--;
         Material clay = Material.LIME_TERRACOTTA;
-        if (decayCount <= 8 && decayCount > 6) clay = Material.YELLOW_TERRACOTTA;
-        else if (decayCount <= 6 && decayCount > 4) clay = Material.ORANGE_TERRACOTTA;
-        else if (decayCount <= 4) clay = Material.RED_TERRACOTTA;
+        int totalStages = Math.max(1, MazeDebugRules.intValue(mode,
+                "SAFE_PAD_DECAY_STAGES", MazeDebugRules.SAFE_PAD_DECAY_STAGES));
+        int yellowThreshold = (int) Math.ceil(totalStages * 8.0D / 11.0D);
+        int orangeThreshold = (int) Math.ceil(totalStages * 6.0D / 11.0D);
+        int redThreshold = (int) Math.ceil(totalStages * 4.0D / 11.0D);
+        if (decayCount <= yellowThreshold && decayCount > orangeThreshold) clay = Material.YELLOW_TERRACOTTA;
+        else if (decayCount <= orangeThreshold && decayCount > redThreshold) clay = Material.ORANGE_TERRACOTTA;
+        else if (decayCount <= redThreshold) clay = Material.RED_TERRACOTTA;
         World world = center.getWorld();
         int cx = center.getBlockX(), cy = surfaceY, cz = center.getBlockZ();
         for (int x = -2; x <= 2; x++) for (int z = -2; z <= 2; z++) {

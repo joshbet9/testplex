@@ -6,6 +6,7 @@ import me.monstermaze.event.AbilityUseEvent;
 import me.monstermaze.event.EntityLaunchEvent;
 import me.monstermaze.event.MonsterBumpPlayerEvent;
 import me.monstermaze.game.GameManager;
+import me.monstermaze.game.MazeDebugRules;
 import me.monstermaze.game.GameState;
 import me.monstermaze.game.MazeMode;
 import me.monstermaze.util.TextUtil;
@@ -91,12 +92,22 @@ public class KitManager implements Listener {
     private final Map<UUID, Long> cryoCooldown = new HashMap<UUID, Long>();
 
     /** Body Builder secondary config. */
-    private static final long BODY_RUSH_DURATION_MS = 10000L;
-
-    /** Slowballer secondary config. */
-    private static final int CRYO_COOLDOWN_MS = 30000;
-    private static final long CRYO_FREEZE_MS = 3000;
-    private static final int CRYO_RADIUS = 6;
+    private long bodyRushDurationMillis() {
+        return MazeDebugRules.longValue(game.getMode(), "BODY_RUSH_DURATION_MILLIS",
+                MazeDebugRules.BODY_RUSH_DURATION_MILLIS);
+    }
+    private int cryoCooldownMillis() {
+        return MazeDebugRules.intValue(game.getMode(), "CRYO_COOLDOWN_MILLIS",
+                MazeDebugRules.CRYO_COOLDOWN_MILLIS);
+    }
+    private long cryoFreezeMillis() {
+        return MazeDebugRules.longValue(game.getMode(), "CRYO_FREEZE_MILLIS",
+                MazeDebugRules.CRYO_FREEZE_MILLIS);
+    }
+    private int cryoRadiusBlocks() {
+        return MazeDebugRules.intValue(game.getMode(), "CRYO_RADIUS_BLOCKS",
+                MazeDebugRules.CRYO_RADIUS_BLOCKS);
+    }
 
     /** Player -> how they view OTHER players (their dye state). Default VISIBLE. */
     private final Map<UUID, VisMode> visMode = new HashMap<UUID, VisMode>();
@@ -123,16 +134,17 @@ public class KitManager implements Listener {
         Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
 
 
-        // Slowball constructor tick (every 2 seconds = PerkConstructor rate)
+        // Poll the PerkConstructor at short intervals so its per-mode delay is tunable.
         Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
+            private int ticks;
             @Override
             public void run() {
                 if (game.getState() != GameState.LIVE) return;
                 constructorSlowball();
                 // Re-sync per-observer views so late/returning players show up correctly.
-                refreshViews();
+                if (++ticks % 8 == 0) refreshViews();
             }
-        }, 40L, 40L);
+        }, 5L, 5L);
 
         // Jumper jumpEvent + Repulsor launched cleanup every tick
         Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
@@ -226,7 +238,8 @@ public class KitManager implements Listener {
             case BODY_BUILDER:
                 // compass only (plus the Body Rush secondary item in QOL modes)
                 if (game.qolEnabled()) {
-                    player.getInventory().setItem(0, bodyRushItem(2));
+                    player.getInventory().setItem(0, bodyRushItem(
+                            MazeDebugRules.bodyRushActivationCharges(game.getMode())));
                 }
                 break;
             case REPULSOR:
@@ -252,8 +265,8 @@ public class KitManager implements Listener {
         player.removePotionEffect(PotionEffectType.INVISIBILITY);
         player.removePotionEffect(PotionEffectType.SPEED);
         AttributeInstance a = player.getAttribute(Attribute.JUMP_STRENGTH);
-        if (a != null && Math.abs(a.getBaseValue() - JUMP_STRENGTH_DEFAULT) > 0.0001) {
-            a.setBaseValue(JUMP_STRENGTH_DEFAULT);
+        if (a != null && Math.abs(a.getBaseValue() - jumpStrengthDefault()) > 0.0001) {
+            a.setBaseValue(jumpStrengthDefault());
         }
         AttributeInstance m = player.getAttribute(Attribute.MOVEMENT_SPEED);
         if (m != null && Math.abs(m.getBaseValue() - 0.100D) > 0.0001) {
@@ -294,13 +307,16 @@ public class KitManager implements Listener {
      * single-block gaps, so it was removed as redundant.
      */
     /** Vanilla jump strength (attribute default) — restored for Jumpers / out of game. */
-    private static final double JUMP_STRENGTH_DEFAULT = 0.42D;
+    private double jumpStrengthDefault() {
+        return MazeDebugRules.doubleValue(game.getMode(), "JUMP_STRENGTH", MazeDebugRules.JUMP_STRENGTH);
+    }
 
     public void tickJumpLock() {
         if (game.getState() != GameState.LIVE && game.getState() != GameState.STARTING) return;
 
         for (Player p : game.getAlivePlayers()) {
-            boolean allowJump = getKit(p) == KitType.JUMPER && hasJumpsLeft(p);
+            boolean allowJump = getKit(p) == KitType.JUMPER && MazeDebugRules.kitEnabled(p.getUniqueId(), "jumper")
+                    && hasJumpsLeft(p);
 
             // A stale JUMP_BOOST must never stay on anyone (clamped amp would boost jumps).
             if (p.hasPotionEffect(PotionEffectType.JUMP_BOOST)) {
@@ -310,7 +326,7 @@ public class KitManager implements Listener {
             // The lock itself: jump_strength 0 pins locked players to the ground exactly like
             // the -10 amp did. Setting the base attribute patches the value only when it
             // actually changed (the client is fully in sync, so no snap, no fights).
-            double jumpTarget = allowJump ? JUMP_STRENGTH_DEFAULT : 0.0D;
+            double jumpTarget = allowJump ? jumpStrengthDefault() : 0.0D;
             AttributeInstance a = p.getAttribute(Attribute.JUMP_STRENGTH);
             if (a != null && Math.abs(a.getBaseValue() - jumpTarget) > 0.0001) {
                 a.setBaseValue(jumpTarget);
@@ -348,7 +364,7 @@ public class KitManager implements Listener {
         if (center == null) return;
 
         for (Player p : game.getAlivePlayers()) {
-            if (getKit(p) != KitType.JUMPER) continue;
+            if (getKit(p) != KitType.JUMPER || !MazeDebugRules.kitEnabled(p.getUniqueId(), "jumper")) continue;
 
             // Must have "Jumps Remaining" feather
             ItemStack feather = p.getInventory().getItem(8);
@@ -366,7 +382,8 @@ public class KitManager implements Listener {
 
             // Recharge 750ms
             Long last = jumpRecharge.get(p.getUniqueId());
-            if (last != null && System.currentTimeMillis() - last < 750L) continue;
+            if (last != null && System.currentTimeMillis() - last
+                    < MazeDebugRules.jumperCooldownMillis(game.getMode())) continue;
 
             // Don't consume while launched by bump (isLaunched)
             if (isPlayerLaunched(p)) continue;
@@ -555,7 +572,7 @@ public class KitManager implements Listener {
         Long lastUse = cryoCooldown.get(id);
         if (lastUse == null) return "READY";
 
-        long remainingMs = lastUse.longValue() + CRYO_COOLDOWN_MS - System.currentTimeMillis();
+        long remainingMs = lastUse.longValue() + cryoCooldownMillis() - System.currentTimeMillis();
         if (remainingMs <= 0L) {
             cryoCooldown.remove(id);
             return "READY";
@@ -603,14 +620,20 @@ public class KitManager implements Listener {
     /** PerkConstructor("Slowballer", 2, 16, SNOW_BALL, "Slowball", true) — every 2s up to 16. */
     private void constructorSlowball() {
         for (Player p : game.getAlivePlayers()) {
-            if (getKit(p) != KitType.SLOWBALL) continue;
+            if (getKit(p) != KitType.SLOWBALL || !MazeDebugRules.kitEnabled(p.getUniqueId(), "slowball")) continue;
 
             ItemStack slot = p.getInventory().getItem(0);
-            if (slot != null && slot.getType() == Material.SNOWBALL && slot.getAmount() >= 16) continue;
+            if (slot != null && slot.getType() == Material.SNOWBALL
+                    && slot.getAmount() >= MazeDebugRules.slowballMaxSnowballs(game.getMode())) continue;
+
+            long now = System.currentTimeMillis();
+            long lastGiven = snowballConstructor.getOrDefault(p.getUniqueId(), now);
+            if (now - lastGiven < MazeDebugRules.slowballRegenIntervalMillis(game.getMode())) continue;
 
             int amount = (slot != null && slot.getType() == Material.SNOWBALL) ? slot.getAmount() : 0;
             // Always rebuild with the live Cryo Blitz cooldown lore.
             p.getInventory().setItem(0, slowballItem(p.getUniqueId(), amount + 1));
+            snowballConstructor.put(p.getUniqueId(), now);
             p.updateInventory();
         }
     }
@@ -626,7 +649,7 @@ public class KitManager implements Listener {
         Snowball ball = (Snowball) event.getDamager();
         if (!(ball.getShooter() instanceof Player)) return;
         Player shooter = (Player) ball.getShooter();
-        if (getKit(shooter) != KitType.SLOWBALL) return;
+        if (getKit(shooter) != KitType.SLOWBALL || !MazeDebugRules.kitEnabled(shooter.getUniqueId(), "slowball")) return;
         // The kit slows OTHER PLAYERS, not monsters.
         if (!(event.getEntity() instanceof Player)) return;
         Player target = (Player) event.getEntity();
@@ -646,7 +669,9 @@ public class KitManager implements Listener {
         }
 
         // Manager.GetCondition().Factory().Slow(..., 2, 1, ...) → 2 seconds, amplifier 1
-        target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 1), true);
+          target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,
+                  MazeDebugRules.slowballSlowTicks(game.getMode()),
+                  MazeDebugRules.slowballSlowAmplifier(game.getMode())), true);
         game.noteOutOfCupSlowball(shooter, target);
         target.getWorld().playSound(target.getLocation(), Sound.ENTITY_SLIME_SQUISH, 1f, 1.2f);
     }
@@ -672,10 +697,12 @@ public class KitManager implements Listener {
             player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
             TextUtil.title(player, "", ChatColor.YELLOW + "" + ChatColor.BOLD + "You got to the Safe Pad first!", 5, 40, 5);
 
-            if (getKit(player) == KitType.BODY_BUILDER) {
+            if (getKit(player) == KitType.BODY_BUILDER
+                    && MazeDebugRules.kitEnabled(player.getUniqueId(), "body-builder")) {
                 double max = player.getMaxHealth();
-                if (max < 30.0) {
-                    player.setMaxHealth(Math.min(30.0, max + 2.0));
+                  double configuredCap = MazeDebugRules.bodyBuilderMaxHealth(game.getMode());
+                  if (max < configuredCap) {
+                      player.setMaxHealth(MazeDebugRules.bodyBuilderMaxHealthAfterPad(game.getMode(), max));
                     // hearts particle approx
                     player.getWorld().spawnParticle(Particle.HEART, player.getEyeLocation().add(0, 0.5, 0), 6, 0.2, 0.2, 0.2, 0);
                 }
@@ -694,7 +721,7 @@ public class KitManager implements Listener {
 
     /** Jumper jump charges for the active mode. QOL modes (Speed/Modern) = 3 leaps, Original = 5. */
     private int jumperMaxJumps() {
-        return game.qolEnabled() ? 3 : 5;
+        return MazeDebugRules.jumperMaxJumps(game.getMode());
     }
 
     /** Legacy name used by GameManager. */
@@ -720,7 +747,8 @@ public class KitManager implements Listener {
         if (event.getHand() == EquipmentSlot.OFF_HAND) return;
 
         Player player = event.getPlayer();
-        if (getKit(player) != KitType.REPULSOR) return;
+        if (getKit(player) != KitType.REPULSOR
+                || !MazeDebugRules.kitEnabled(player.getUniqueId(), "repulsor")) return;
         if (!game.getAlivePlayers().contains(player)) return;
 
         ItemStack hand = player.getInventory().getItemInMainHand();
@@ -762,15 +790,19 @@ public class KitManager implements Listener {
             player.getWorld().spawnParticle(Particle.FIREWORK, player.getLocation().add(0, 0.5, 0), 20, 0.2, 0.2, 0.2, 0.05);
         }
 
-        // Radius 6 — living non-players
-        for (Entity ent : player.getNearbyEntities(6, 6, 6)) {
+          // Source radius — living non-players.
+          double radius = MazeDebugRules.repulsorRadiusBlocks(game.getMode());
+          double radiusSquared = radius * radius;
+          for (Entity ent : player.getNearbyEntities(radius, radius, radius)) {
             if (ent instanceof Player) continue;
             if (!(ent instanceof LivingEntity)) continue;
-            if (player.getLocation().distanceSquared(ent.getLocation()) > 36) continue;
+              if (player.getLocation().distanceSquared(ent.getLocation()) > radiusSquared) continue;
 
             ent.playEffect(org.bukkit.EntityEffect.HURT);
-            // Exact: UtilAction.velocity(ent, UtilAlg.getTrajectory2d(player, ent), 1, true, 0, 0.8, 2, true);
-            UtilAction.velocity(ent, UtilAlg.getTrajectory2d(player, ent), 1, true, 0, 0.8, 2, true);
+              UtilAction.velocity(ent, UtilAlg.getTrajectory2d(player, ent),
+                      MazeDebugRules.repulsorLaunchStrength(game.getMode()), true, 0,
+                      MazeDebugRules.repulsorLaunchYAdd(game.getMode()),
+                      MazeDebugRules.repulsorLaunchYMax(game.getMode()), true);
 
             launched.put(ent, System.currentTimeMillis());
             Bukkit.getPluginManager().callEvent(new EntityLaunchEvent(ent));
@@ -799,13 +831,14 @@ public class KitManager implements Listener {
                 continue;
             }
             // On ground after 500ms
-            if (en.isOnGround() && now - start >= 500L) {
+            if (en.isOnGround() && now - start
+                    >= MazeDebugRules.repulsorGroundCleanupDelayMillis(game.getMode())) {
                 removeLaunched(en);
                 it.remove();
                 continue;
             }
             // Timeout 1500ms
-            if (now - start >= 1500L) {
+            if (now - start >= MazeDebugRules.repulsorMaxLifetimeMillis(game.getMode())) {
                 removeLaunched(en);
                 it.remove();
             }
@@ -846,7 +879,8 @@ public class KitManager implements Listener {
         if (a != Action.RIGHT_CLICK_AIR && a != Action.RIGHT_CLICK_BLOCK) return;
 
         Player player = event.getPlayer();
-        if (getKit(player) != KitType.BODY_BUILDER) return;
+        if (getKit(player) != KitType.BODY_BUILDER
+                || !MazeDebugRules.kitEnabled(player.getUniqueId(), "body-builder")) return;
         if (!game.getAlivePlayers().contains(player)) return;
 
         ItemStack hand = player.getInventory().getItemInMainHand();
@@ -860,15 +894,16 @@ public class KitManager implements Listener {
         event.setCancelled(true);
         if (hand.getAmount() <= 1) player.getInventory().setItemInMainHand(null);
         else { hand.setAmount(hand.getAmount()-1); player.getInventory().setItemInMainHand(hand); }
-        bodyRushUntil.put(player.getUniqueId(), now + BODY_RUSH_DURATION_MS);
+        bodyRushUntil.put(player.getUniqueId(), now + bodyRushDurationMillis());
         bodyRushHitFeedback.remove(player.getUniqueId());
         bodyRushVisual(player);
-        TextUtil.actionBar(player, ChatColor.RED + ChatColor.BOLD.toString() + "BODY RUSH 10.0s");
+          TextUtil.actionBar(player, ChatColor.RED + ChatColor.BOLD.toString() + "BODY RUSH "
+                  + String.format(java.util.Locale.US, "%.1fs", bodyRushDurationMillis() / 1000.0D));
         Bukkit.getPluginManager().callEvent(new AbilityUseEvent(player));
     }
 
     public boolean isBodyRushActive(Player player) {
-        if (!game.qolEnabled()) return false;
+        if (!game.qolEnabled() || !MazeDebugRules.kitEnabled(player.getUniqueId(), "body-builder")) return false;
         Long until=bodyRushUntil.get(player.getUniqueId());
         if (until==null) return false;
         if (until.longValue()<=System.currentTimeMillis()) { bodyRushUntil.remove(player.getUniqueId()); return false; }
@@ -881,8 +916,9 @@ public class KitManager implements Listener {
         long now=System.currentTimeMillis();
         Long until=bodyRushUntil.get(id);
         if (until==null || until.longValue()<=now) { bodyRushUntil.remove(id); return 0; }
-        long remaining=until.longValue()-2000L;
-        if (bodyRushLaunches.merge(id, 1, Integer::sum) == 10) game.recordAchievement(id, "stampede");
+          long remaining = MazeDebugRules.bodyRushUntilAfterContact(game.getMode(), until.longValue());
+          if (MazeDebugRules.shouldAwardBodyRushAchievement(game.getMode(),
+                  bodyRushLaunches.merge(id, 1, Integer::sum))) game.recordAchievement(id, "stampede");
         bodyRushHitFeedback.put(id,now+750L);
         bodyRushImpactVisual(player);
         if (remaining<=now) { bodyRushUntil.remove(id); return 0; }
@@ -930,7 +966,7 @@ public class KitManager implements Listener {
             Long last=cryoCooldown.get(id);
             if(last==null) TextUtil.actionBar(p,ChatColor.AQUA+ChatColor.BOLD.toString()+"CRYO BLITZ READY");
             else {
-                long left=(last.longValue()+CRYO_COOLDOWN_MS)-now;
+                long left=(last.longValue()+cryoCooldownMillis())-now;
                 if(left<=0) { cryoCooldown.remove(id); TextUtil.actionBar(p,ChatColor.AQUA+ChatColor.BOLD.toString()+"CRYO BLITZ READY"); }
                 else TextUtil.actionBar(p,ChatColor.AQUA+ChatColor.BOLD.toString()+"CRYO BLITZ "+String.format(java.util.Locale.US,"%.1fs",left/1000.0));
             }
@@ -947,15 +983,16 @@ public class KitManager implements Listener {
         if (game.getState() != GameState.LIVE) return;
         if (!game.qolEnabled()) return;
         Player player = event.getPlayer();
-        if (getKit(player) != KitType.SLOWBALL) return;
+        if (getKit(player) != KitType.SLOWBALL
+                || !MazeDebugRules.kitEnabled(player.getUniqueId(), "slowball")) return;
         if (!game.getAlivePlayers().contains(player)) return;
 
         event.setCancelled(true);
 
         long now = System.currentTimeMillis();
         Long last = cryoCooldown.get(player.getUniqueId());
-        if (last != null && now - last < CRYO_COOLDOWN_MS) {
-            long left = (CRYO_COOLDOWN_MS - (now - last)) / 1000L;
+        if (last != null && now - last < cryoCooldownMillis()) {
+            long left = (cryoCooldownMillis() - (now - last)) / 1000L;
             player.sendMessage(ChatColor.AQUA + "Cryo Blitz on cooldown (" + left + "s).");
             return;
         }
@@ -968,8 +1005,8 @@ public class KitManager implements Listener {
             for (LivingEntity ent : mm.getMonsters()) list.add(ent);
             for (LivingEntity ent : list) {
                 if (ent == null || !ent.isValid()) continue;
-                if (player.getLocation().distanceSquared(ent.getLocation()) > CRYO_RADIUS * CRYO_RADIUS) continue;
-                mm.freeze(ent, now + CRYO_FREEZE_MS);
+                if (player.getLocation().distanceSquared(ent.getLocation()) > cryoRadiusBlocks() * cryoRadiusBlocks()) continue;
+                mm.freeze(ent, now + cryoFreezeMillis());
                 ent.getWorld().spawnParticle(Particle.SNOWFLAKE, ent.getLocation(), 12, 0.3, 0.6, 0.3, 0.02);
                 frozenCount++;
             }
@@ -978,7 +1015,7 @@ public class KitManager implements Listener {
         player.playSound(player.getLocation(), Sound.ENTITY_SNOWBALL_THROW, 1.0f, 0.5f);
         TextUtil.title(player, "", ChatColor.AQUA + "" + ChatColor.BOLD + "Cryo Blitz!"
                         + ChatColor.WHITE + " " + frozenCount + " mob(s) frozen", 5, 30, 5);
-        if (frozenCount > 0) cryoFrozenUntil.put(player.getUniqueId(), now + CRYO_FREEZE_MS);
+        if (frozenCount > 0) cryoFrozenUntil.put(player.getUniqueId(), now + cryoFreezeMillis());
         cryoVisual(player);
         // NOTE: do not rewrite slot 0 here. The dropped item is restored by the cancelled drop,
         // and swapping the slot's ItemStack before the restore could make 1.8 place the restored
@@ -1003,10 +1040,10 @@ public class KitManager implements Listener {
         long rem = -1;
         Long t = cryoCooldown.get(playerId);
         if (t != null) {
-            rem = (t.longValue() + CRYO_COOLDOWN_MS) - now;
+            rem = (t.longValue() + cryoCooldownMillis()) - now;
         }
         java.util.List<String> lore = new java.util.ArrayList<String>();
-        if (game.qolEnabled()) lore.add(ChatColor.GRAY + "Q-drop: Cryo Blitz (freeze " + CRYO_RADIUS + " blocks).");
+        if (game.qolEnabled()) lore.add(ChatColor.GRAY + "Q-drop: Cryo Blitz (freeze " + cryoRadiusBlocks() + " blocks).");
         if (rem >= 0) {
             if (game.qolEnabled()) lore.add(ChatColor.AQUA + "Cryo Blitz ready in " + (rem / 1000L) + "s");
         } else {

@@ -2,6 +2,7 @@ package au.com.testplex.arcadeports;
 
 import org.bukkit.Material;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 
 import java.util.List;
 import java.util.Map;
@@ -9,6 +10,29 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SpeedBuildersRulesTest {
+    @AfterEach void clearDebugOverrides() { GameDebugRuntimeOverrides.clear(); }
+
+    @Test
+    void ownBuildResetRequiresAnAuthorisedActiveUnfinishedBuilderAndModel() {
+        assertTrue(SpeedBuildersRules.canDebugResetOwnBuild(true, true, true, false, true));
+        assertFalse(SpeedBuildersRules.canDebugResetOwnBuild(false, true, true, false, true));
+        assertFalse(SpeedBuildersRules.canDebugResetOwnBuild(true, false, true, false, true));
+        assertFalse(SpeedBuildersRules.canDebugResetOwnBuild(true, true, false, false, true));
+        assertFalse(SpeedBuildersRules.canDebugResetOwnBuild(true, true, true, true, true));
+        assertFalse(SpeedBuildersRules.canDebugResetOwnBuild(true, true, true, false, false));
+    }
+
+    @Test
+    void configuredBotsFillOnlyAvailableSpeedBuildersSlots() {
+        assertEquals(16, SpeedBuildersRules.testPlayersNeeded(0, 16));
+        assertEquals(15, SpeedBuildersRules.testPlayersNeeded(1, 16));
+        assertEquals(4, SpeedBuildersRules.testPlayersNeeded(4, 4));
+        assertEquals(0, SpeedBuildersRules.testPlayersNeeded(16, 16));
+        assertEquals(0, SpeedBuildersRules.testPlayersNeeded(18, 16));
+        assertThrows(IllegalArgumentException.class, () -> SpeedBuildersRules.testPlayersNeeded(-1, 2));
+        assertThrows(IllegalArgumentException.class, () -> SpeedBuildersRules.testPlayersNeeded(1, -1));
+    }
+
     @Test
     void sixteenPlayersAreAllocatedAcrossTwoEightPlotArenaCopies() {
         assertEquals(1, SpeedBuildersRules.arenaCountForPlayers(1));
@@ -51,6 +75,61 @@ class SpeedBuildersRulesTest {
                 new SpeedBuildersRules.Coordinate(0, 0, 0), Material.STONE,
                 new SpeedBuildersRules.Coordinate(1, 0, 0), Material.STONE);
         assertTrue(SpeedBuildersRules.isPerfect(expected, actual));
+    }
+
+    @Test
+    void configurablePerfectScoreChangesTheLiveThresholdAndRestoresTheSourceDefault() {
+        assertTrue(SpeedBuildersRules.meetsPerfectScore(10, 10));
+        assertFalse(SpeedBuildersRules.meetsPerfectScore(9, 10));
+        assertFalse(SpeedBuildersRules.meetsPerfectScore(0, 0));
+
+        GameDebugRuntimeOverrides.activate(Map.of("SPEED_BUILDERS_PERFECT_SCORE_PERCENT", 80));
+        assertTrue(SpeedBuildersRules.meetsPerfectScore(8, 10));
+        assertFalse(SpeedBuildersRules.meetsPerfectScore(7, 10));
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertFalse(SpeedBuildersRules.meetsPerfectScore(8, 10));
+        assertTrue(SpeedBuildersRules.meetsPerfectScore(10, 10));
+    }
+
+    @Test
+    void profileControlsTuneDifficultyPhaseTimingTieBreakAndDoubleJumpThenReset() {
+        assertEquals(1, SpeedBuildersRules.buildTimeDecreasePerRoundSeconds());
+        assertEquals(39, SpeedBuildersRules.nextBuildTimeTracker(40));
+        assertEquals(5, SpeedBuildersRules.finalResultsSeconds());
+        assertEquals(100L, SpeedBuildersRules.intermissionOrResultsTicks(true, 3));
+        assertEquals(60L, SpeedBuildersRules.intermissionOrResultsTicks(false, 3));
+        assertTrue(SpeedBuildersRules.perfectBuildTimeTiebreakEnabled());
+        assertTrue(SpeedBuildersRules.doubleJumpEnabled());
+        assertEquals(1.0D, SpeedBuildersRules.doubleJumpVerticalVelocity());
+
+        Map<String, Integer> tiedScores = Map.of("fast", 100, "slow", 100);
+        Map<String, Long> times = Map.of("fast", 20L, "slow", 40L);
+        assertEquals(List.of("fast"), SpeedBuildersRules.winnersByConfiguredTieBreak(tiedScores, times));
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "SPEED_BUILDERS_BUILD_TIME_DECREASE_PER_ROUND_SECONDS", 3,
+                "SPEED_BUILDERS_FINAL_RESULTS_SECONDS", 0,
+                "SPEED_BUILDERS_PERFECT_BUILD_TIME_TIEBREAK_ENABLED", false,
+                "SPEED_BUILDERS_DOUBLE_JUMP_ENABLED", false,
+                "SPEED_BUILDERS_DOUBLE_JUMP_VERTICAL_VELOCITY", 2.0D));
+        assertEquals(3, SpeedBuildersRules.buildTimeDecreasePerRoundSeconds());
+        assertEquals(37, SpeedBuildersRules.nextBuildTimeTracker(40));
+        assertEquals(0, SpeedBuildersRules.finalResultsSeconds());
+        assertEquals(0L, SpeedBuildersRules.intermissionOrResultsTicks(true, 3));
+        assertFalse(SpeedBuildersRules.perfectBuildTimeTiebreakEnabled());
+        assertFalse(SpeedBuildersRules.doubleJumpEnabled());
+        assertEquals(2.0D, SpeedBuildersRules.doubleJumpVerticalVelocity());
+        assertEquals(List.of("fast", "slow"), SpeedBuildersRules.winnersByConfiguredTieBreak(tiedScores, times));
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertEquals(1, SpeedBuildersRules.buildTimeDecreasePerRoundSeconds());
+        assertEquals(39, SpeedBuildersRules.nextBuildTimeTracker(40));
+        assertEquals(5, SpeedBuildersRules.finalResultsSeconds());
+        assertEquals(100L, SpeedBuildersRules.intermissionOrResultsTicks(true, 3));
+        assertTrue(SpeedBuildersRules.perfectBuildTimeTiebreakEnabled());
+        assertTrue(SpeedBuildersRules.doubleJumpEnabled());
+        assertEquals(1.0D, SpeedBuildersRules.doubleJumpVerticalVelocity());
     }
 
     @Test

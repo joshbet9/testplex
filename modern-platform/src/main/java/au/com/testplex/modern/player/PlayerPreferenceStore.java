@@ -74,6 +74,9 @@ public final class PlayerPreferenceStore {
         CosmeticOption selectedOption = line.getOptions().stream()
                 .filter(option -> option.getId().equals(optionId)).findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Option does not belong to " + line.getId()));
+        if (line.getSelectionMode() == CosmeticLineDefinition.SelectionMode.SINGLE) {
+            return Set.of(optionId);
+        }
         Set<String> selected = new LinkedHashSet<>(currentSelections);
         String group = selectedOption.getSelectionGroup();
         if (group != null) {

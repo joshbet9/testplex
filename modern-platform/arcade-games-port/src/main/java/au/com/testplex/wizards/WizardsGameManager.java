@@ -4,6 +4,7 @@ import au.com.testplex.arcadeports.AbilityCooldownProgress;
 import au.com.testplex.arcadeports.ArcadeMechanicsModernPlugin;
 import au.com.testplex.arcadeports.ArcadeGameModule;
 import au.com.testplex.arcadeports.ArcadePortGame;
+import au.com.testplex.arcadeports.GameDebugRuntimeOverrides;
 import au.com.testplex.arcadeports.ArcadeProgressCatalog;
 import au.com.testplex.arcadeports.SourceMapCatalog;
 
@@ -91,7 +92,6 @@ import java.util.UUID;
 
 public final class WizardsGameManager implements Listener, ArcadeGameModule {
     private static final String SPELL_MENU_TITLE = ChatColor.DARK_PURPLE + "Wizards Spell Selector";
-    private static final int MAX_WAND_SLOTS = WizardsRules.WAND_SLOT_COUNT;
     private static final int MENU_SLOT = 8;
     private static final int ARENA_FLOOR_Y = 63;
     private static final int CHEST_COUNT_FALLBACK = 32;
@@ -154,7 +154,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
     private boolean endgameStarted;
     private int endgameType;
     private int endgameMessageCounter;
-    private int nextEndgameStrikeMillis = WizardsRules.ENDGAME_INITIAL_STRIKE_MILLIS;
+    private int nextEndgameStrikeMillis = GameDebugRuntimeOverrides.intValue("WIZARDS_ENDGAME_INITIAL_STRIKE_MILLIS", WizardsRules.ENDGAME_INITIAL_STRIKE_MILLIS);
     private long lastEndgameStrikeAt;
     private long lastEndgameMoanAt;
     private double endgameAccuracy;
@@ -417,8 +417,8 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
             player.sendMessage(ChatColor.YELLOW + "You are already queued for Wizards.");
             return;
         }
-        int maximumPlayers = Math.max(2, Math.min(WizardsRules.MAX_PLAYERS,
-                plugin.getConfig().getInt("wizards.maximum-players", WizardsRules.MAX_PLAYERS)));
+        int maximumPlayers = Math.max(2, Math.min(16, GameDebugRuntimeOverrides.intValue("WIZARDS_MAX_PLAYERS",
+                plugin.getConfig().getInt("wizards.maximum-players", WizardsRules.MAX_PLAYERS))));
         if (queue.size() >= maximumPlayers) {
             player.sendMessage(ChatColor.RED + "The Wizards queue is full (" + maximumPlayers + " players).");
             return;
@@ -493,10 +493,11 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
                 if (player.isOnline()) entrants.add(player);
             }
         }
-        int maximum = Math.max(2, Math.min(WizardsRules.MAX_PLAYERS,
-                plugin.getConfig().getInt("wizards.maximum-players", WizardsRules.MAX_PLAYERS)));
+        int maximum = Math.max(2, Math.min(16, GameDebugRuntimeOverrides.intValue("WIZARDS_MAX_PLAYERS",
+                plugin.getConfig().getInt("wizards.maximum-players", WizardsRules.MAX_PLAYERS))));
         int minimum = Math.max(2, Math.min(maximum,
-                plugin.getConfig().getInt("wizards.minimum-players", WizardsRules.MIN_PLAYERS)));
+                GameDebugRuntimeOverrides.intValue("WIZARDS_MIN_PLAYERS",
+                        plugin.getConfig().getInt("wizards.minimum-players", WizardsRules.MIN_PLAYERS))));
         boolean allowSolo = plugin.getConfig().getBoolean("wizards.allow-solo-start", false);
         if (entrants.size() < minimum && !(allowSolo && entrants.size() == 1)) {
             sender.sendMessage(ChatColor.RED + "Wizards needs " + minimum + " queued players to start ("
@@ -548,7 +549,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         endgameStarted = false;
         endgameType = random.nextInt(2);
         endgameMessageCounter = 0;
-        nextEndgameStrikeMillis = WizardsRules.ENDGAME_INITIAL_STRIKE_MILLIS;
+        nextEndgameStrikeMillis = GameDebugRuntimeOverrides.intValue("WIZARDS_ENDGAME_INITIAL_STRIKE_MILLIS", WizardsRules.ENDGAME_INITIAL_STRIKE_MILLIS);
         lastEndgameStrikeAt = 0L;
         lastEndgameMoanAt = 0L;
         endgameAccuracy = 0.0D;
@@ -583,8 +584,8 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
     private void grantMageStarterSpells(Player player, WizardState state) {
         if (state.kit != WizardsKit.MAGE) return;
         WizardsSpell[] spellTypes = WizardsSpell.values();
-        for (int bonus = 0; bonus < WizardsRules.MAGE_RANDOM_STARTER_SPELL_COUNT; bonus++) {
-            for (int attempt = 0; attempt < WizardsRules.MAGE_STARTER_SPELL_SELECTION_ATTEMPTS; attempt++) {
+        for (int bonus = 0; bonus < GameDebugRuntimeOverrides.intValue("WIZARDS_MAGE_RANDOM_STARTER_SPELL_COUNT", WizardsRules.MAGE_RANDOM_STARTER_SPELL_COUNT); bonus++) {
+            for (int attempt = 0; attempt < GameDebugRuntimeOverrides.intValue("WIZARDS_MAGE_STARTER_SPELL_SELECTION_ATTEMPTS", WizardsRules.MAGE_STARTER_SPELL_SELECTION_ATTEMPTS); attempt++) {
                 WizardsSpell candidate = spellTypes[random.nextInt(spellTypes.length)];
                 if (state.known.containsKey(candidate)) continue;
                 int rarityRoll = random.nextInt(10);
@@ -672,7 +673,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         });
         applyMatchScoreboard(player);
 
-        for (int slot = 0; slot < MAX_WAND_SLOTS; slot++) {
+        for (int slot = 0; slot < WizardsRules.maxWandSlots(); slot++) {
             if (slot < state.wandCount) {
                 player.getInventory().setItem(slot, makeWand(state, slot));
             } else {
@@ -699,11 +700,11 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
             // Their progress is persisted here because they are removed from states
             // before the match-wide finish pass can record it.
             state.alive = false;
-            if (!plugin.isTestPlayer(id)) {
+            if (!plugin.isTestPlayer(id) && WizardsRules.shouldRecordProgress(plugin.isArcadeDebugRound())) {
                 WizardsProgressStore.increment(plugin.getConfig(), id, "kills", state.kills);
                 WizardsProgressStore.increment(plugin.getConfig(), id, "spells-bound", state.spellsBound);
+                plugin.saveConfig();
             }
-            plugin.saveConfig();
             removeManaBar(id);
             if (arcadeManaged) plugin.returnWizardsParticipantToLobby(player);
             restoreTemporaryPlayer(player, id);
@@ -719,6 +720,38 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         long alive = states.values().stream().filter(state -> state.alive).count();
         long seconds = Math.max(0L, (System.currentTimeMillis() - startedAt) / 1000L);
         return alive + "/" + states.size() + " alive; " + queue.size() + " queued; " + seconds + "s elapsed";
+    }
+
+    /** Debug control: start the endgame or trigger its next strike through the normal tick logic. */
+    public boolean debugAdvancePhase() {
+        if (!running || startedAt <= 0L) return false;
+        long now = System.currentTimeMillis();
+        if (!endgameStarted) {
+            startedAt = now - GameDebugRuntimeOverrides.intValue(
+                    "WIZARDS_ENDGAME_START_MINUTES", WizardsRules.ENDGAME_START_MINUTES) * 60_000L;
+        } else {
+            endgameMessageCounter = 7;
+            lastEndgameStrikeAt = 0L;
+        }
+        tickEndgame();
+        return true;
+    }
+
+    /** Debug control: unlock the implemented spellbook, refill mana and clear spell cooldowns. */
+    public boolean debugGrantSpellAccess(Player player) {
+        if (!running || player == null || !player.isOnline()) return false;
+        WizardState state = states.get(player.getUniqueId());
+        if (state == null || !state.alive) return false;
+        GameDebugRuntimeOverrides.markDebugSession();
+        for (WizardsSpell spell : WizardsSpell.implementedSpells()) {
+            state.known.putIfAbsent(spell, 1);
+        }
+        state.mana = state.maximumMana;
+        state.cooldowns.clear();
+        updateWandLabels(player, state);
+        refreshManaBar(player, state);
+        player.sendMessage(ChatColor.AQUA + "Debug loadout: implemented spells known, mana restored and cooldowns cleared.");
+        return true;
     }
 
     public void stop(String reason) {
@@ -797,16 +830,16 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         long now = System.currentTimeMillis();
         long elapsed = now - startedAt;
 
-        if (!endgameStarted && elapsed >= WizardsRules.ENDGAME_START_MINUTES * 60_000L) {
+        if (!endgameStarted && elapsed >= GameDebugRuntimeOverrides.intValue("WIZARDS_ENDGAME_START_MINUTES", WizardsRules.ENDGAME_START_MINUTES) * 60_000L) {
             endgameStarted = true;
             endgameMessageCounter = 0;
-            nextEndgameStrikeMillis = WizardsRules.ENDGAME_INITIAL_STRIKE_MILLIS;
+            nextEndgameStrikeMillis = GameDebugRuntimeOverrides.intValue("WIZARDS_ENDGAME_INITIAL_STRIKE_MILLIS", WizardsRules.ENDGAME_INITIAL_STRIKE_MILLIS);
             lastEndgameStrikeAt = 0L;
             lastEndgameMoanAt = now;
         }
 
         if (endgameStarted) {
-            long phaseElapsed = elapsed - WizardsRules.ENDGAME_START_MINUTES * 60_000L;
+            long phaseElapsed = elapsed - GameDebugRuntimeOverrides.intValue("WIZARDS_ENDGAME_START_MINUTES", WizardsRules.ENDGAME_START_MINUTES) * 60_000L;
             if (endgameMessageCounter <= 6) {
                 long warningSecond = phaseElapsed / 1000L;
                 if (warningSecond >= endgameMessageCounter) {
@@ -1283,6 +1316,11 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         Inventory top = event.getView().getTopInventory();
         if (event.getClickedInventory() != null && event.getClickedInventory() == top
                 && top.getType() == InventoryType.CHEST) {
+            if (!plugin.isArcadeDebugFeatureEnabled(player,
+                    au.com.testplex.arcadeports.ArcadePortGame.WIZARDS, "chest-looting", true)) {
+                event.setCancelled(true);
+                return;
+            }
             ItemStack clicked = event.getCurrentItem();
             if (isSpellBook(clicked) || isLootWand(clicked) || isSoulStar(clicked)) {
                 event.setCancelled(true);
@@ -1334,7 +1372,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
                 player.getInventory().setItem(slot, makeWand(state, slot));
                 player.sendMessage(ChatColor.GOLD + "Wizards » " + ChatColor.GRAY + "Extra wand gained.");
             } else {
-                addMana(state, WizardsRules.FULL_WAND_CONVERSION);
+                addMana(state, GameDebugRuntimeOverrides.intValue("WIZARDS_FULL_WAND_CONVERSION", WizardsRules.FULL_WAND_CONVERSION));
                 player.sendMessage(ChatColor.GOLD + "Wizards » " + ChatColor.GRAY + "Extra wand converted into 100 mana.");
             }
             refreshManaBar(player, state);
@@ -1755,7 +1793,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
 
     private void dropDeathLoot(Player player, WizardState state) {
         PlayerInventory inventory = player.getInventory();
-        for (int slot = MAX_WAND_SLOTS; slot < inventory.getSize(); slot++) {
+        for (int slot = WizardsRules.maxWandSlots(); slot < inventory.getSize(); slot++) {
             ItemStack item = inventory.getItem(slot);
             if (item != null && !item.getType().isAir() && !isMenuBook(item)) drop(player, item.clone());
         }
@@ -1867,7 +1905,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
     public void onPlace(BlockPlaceEvent event) {
         WizardState state = states.get(event.getPlayer().getUniqueId());
         if (running && state != null && state.alive
-                && event.getPlayer().getInventory().getHeldItemSlot() < MAX_WAND_SLOTS
+                && event.getPlayer().getInventory().getHeldItemSlot() < WizardsRules.maxWandSlots()
                 && isWand(event.getItemInHand())) {
             event.setCancelled(true);
         }
@@ -1879,6 +1917,16 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
     }
 
     private void castSpell(Player player, WizardState state, WizardsSpell spell, Entity target, Block clickedBlock) {
+        if (!plugin.isArcadeDebugFeatureEnabled(player,
+                au.com.testplex.arcadeports.ArcadePortGame.WIZARDS, "spell-casting", true)) {
+            player.sendMessage(ChatColor.YELLOW + "Spell casting is disabled for your debug profile.");
+            return;
+        }
+        if (!plugin.isArcadeDebugFeatureEnabled(player,
+                au.com.testplex.arcadeports.ArcadePortGame.WIZARDS, "spell-" + spell.id(), true)) {
+            player.sendMessage(ChatColor.YELLOW + spell.displayName() + " is disabled for your debug profile.");
+            return;
+        }
         int level = state.known.getOrDefault(spell, 0);
         if (level <= 0) return;
         if (!spell.implemented()) {
@@ -1899,6 +1947,13 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
             return;
         }
         if (!applySpell(player, state, spell, level, target, clickedBlock)) return;
+
+        // Spell effects are game cosmetics: keep the spell's existing mechanics and
+        // impact visuals, then add the caster's style as a distinct accent.
+        if (plugin.getArcadePortManager() != null) {
+            plugin.getArcadePortManager().showAbilityActivationCosmetic(
+                    player, au.com.testplex.arcadeports.ArcadePortGame.WIZARDS, spell.displayName());
+        }
 
         // Count casts only after the spell's effect has actually been accepted.
         state.successfulCasts++;
@@ -2858,6 +2913,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
 
     /** Persist match progress to the local-stats keys shared with the Arcade stats browser. */
     private void recordWizardsProgress(Player winner) {
+        if (!WizardsRules.shouldRecordProgress(plugin.isArcadeDebugRound())) return;
         org.bukkit.configuration.file.FileConfiguration config = plugin.getConfig();
         for (Map.Entry<UUID, WizardState> entry : states.entrySet()) {
             WizardState state = entry.getValue();
@@ -3028,7 +3084,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         private final float maximumMana;
         private final EnumMap<WizardsSpell, Integer> known = new EnumMap<>(WizardsSpell.class);
         private final EnumMap<WizardsSpell, Long> cooldowns = new EnumMap<>(WizardsSpell.class);
-        private final WizardsSpell[] wands = new WizardsSpell[MAX_WAND_SLOTS];
+        private final WizardsSpell[] wands = new WizardsSpell[WizardsRules.maxWandSlots()];
         private float mana;
         private int wandCount;
         private int soulStars;

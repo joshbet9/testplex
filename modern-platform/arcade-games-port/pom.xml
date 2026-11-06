@@ -108,12 +108,32 @@
                         </configuration>
                     </execution>
                     <execution>
+                        <id>add-monster-maze-game-tests</id>
+                        <phase>generate-test-sources</phase>
+                        <goals><goal>add-test-source</goal></goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.basedir}/../monster-maze-port/src/test/java</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                    <execution>
                         <id>add-snake-game-tests</id>
                         <phase>generate-test-sources</phase>
                         <goals><goal>add-test-source</goal></goals>
                         <configuration>
                             <sources>
                                 <source>${project.basedir}/../snake-port/src/test/java</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>add-arcade-catalog-model-tests</id>
+                        <phase>generate-test-sources</phase>
+                        <goals><goal>add-test-source</goal></goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.basedir}/../src/main/java/au/com/testplex/modern/model</source>
                             </sources>
                         </configuration>
                     </execution>

@@ -19,6 +19,10 @@ public final class ArcadeProgressRules {
         return elapsedMillis >= 0L && elapsedMillis <= 5_000L;
     }
 
+    public static boolean shouldRecordDrawMyThingKeenEye(boolean debugSession, boolean failedAnyRound) {
+        return !debugSession && !failedAnyRound;
+    }
+
     public static boolean isMasterBuildersPurist(Set<Material> placedTypes) {
         return placedTypes != null && placedTypes.size() == 1;
     }
@@ -32,13 +36,18 @@ public final class ArcadeProgressRules {
         return (int) Math.round((voteSum - originalVote + 1.0D) / voteCount * 100.0D);
     }
 
+    public static long masterBuildersBuildMillis(long totalMillis, int judgedBuildCount, long reviewMillis) {
+        long reviewBudget = judgedBuildCount <= 1 ? 0L : judgedBuildCount * Math.max(0L, reviewMillis);
+        return Math.max(30_000L, Math.max(0L, totalMillis) - reviewBudget);
+    }
+
     public static boolean shouldAwardMasterBuildersGreaterGood(int ownScore, int hypotheticalWinnerScore,
             int highestOtherScore) {
         return ownScore > hypotheticalWinnerScore && ownScore > highestOtherScore;
     }
 
     public static boolean shouldAwardMilkCowPerfectGame(int farmerDeaths) {
-        return farmerDeaths == 0;
+        return farmerDeaths <= MilkCowRules.perfectGameMaxFarmerDeaths();
     }
 
     public static boolean shouldAwardMilkCowHighClub(boolean drankWhileAirborne, boolean drankWhileGrounded) {
@@ -46,15 +55,15 @@ public final class ArcadeProgressRules {
     }
 
     public static boolean shouldAwardMilkCowStopStopHeIsAlreadyDead(int opponentLeadCount) {
-        return opponentLeadCount >= 3;
+        return opponentLeadCount >= MilkCowRules.comebackLeadThreshold();
     }
 
     public static boolean shouldAwardMilkCowGotTheChops(int airborneKills) {
-        return airborneKills >= 10;
+        return airborneKills >= MilkCowRules.gotTheChopsAirborneKills();
     }
 
     public static boolean shouldAwardMilkCowSlaughterhouse(int assists) {
-        return assists >= 15;
+        return assists >= MilkCowRules.slaughterhouseAssists();
     }
 
 

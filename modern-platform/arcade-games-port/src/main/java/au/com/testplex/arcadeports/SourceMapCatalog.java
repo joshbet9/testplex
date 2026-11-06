@@ -1779,6 +1779,11 @@ public final class SourceMapCatalog {
 
         /** Reproduce Reborn Dragon Escape's ParseData nearest-marker route ordering. */
         public static List<Location> legacyNearestRouteMarkers(Location start, List<Location> markers) {
+            return legacyNearestRouteMarkers(start, markers, ArcadePortRules.DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE);
+        }
+
+        public static List<Location> legacyNearestRouteMarkers(
+                Location start, List<Location> markers, double duplicateDistance) {
             List<Location> remaining = new ArrayList<>();
             if (markers != null) {
                 for (Location marker : markers) if (marker != null) remaining.add(marker.clone());
@@ -1790,13 +1795,16 @@ public final class SourceMapCatalog {
                 Location nearest = null;
                 double nearestDistance = Double.POSITIVE_INFINITY;
                 for (Location marker : remaining) {
-                    double distance = last.distance(marker);
+                    double dx = marker.getX() - last.getX();
+                    double dy = marker.getY() - last.getY();
+                    double dz = marker.getZ() - last.getZ();
+                    double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
                     if (nearest == null || distance < nearestDistance) {
                         nearest = marker;
                         nearestDistance = distance;
                     }
                 }
-                if (nearestDistance < ArcadePortRules.DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE
+                if (nearestDistance < Math.max(0.0D, duplicateDistance)
                         && remaining.size() > 1) {
                     remaining.remove(nearest);
                     continue;

@@ -78,17 +78,17 @@ public final class SuperSploorRuntime implements Listener {
     private static final class Sprinkler {
         final UUID ownerId; final int team; final Location location; final long expiresAt;
         final Set<UUID> hitPlayers = new HashSet<>(); long nextPulseAt;
-        Sprinkler(UUID ownerId, int team, Location location, long now) {
+        Sprinkler(UUID ownerId, int team, Location location, long now, long lifetimeMillis) {
             this.ownerId=ownerId; this.team=team; this.location=location.clone();
-            this.expiresAt=now+6_000L; this.nextPulseAt=now;
+            this.expiresAt=now+lifetimeMillis; this.nextPulseAt=now;
         }
     }
     private static final class TrackerFlare {
         final UUID ownerId; final int team; final Location location; final long expiresAt;
         long nextPulseAt;
-        TrackerFlare(UUID ownerId, int team, Location location, long now) {
+        TrackerFlare(UUID ownerId, int team, Location location, long now, long lifetimeMillis) {
             this.ownerId=ownerId; this.team=team; this.location=location.clone();
-            this.expiresAt=now+4_000L; this.nextPulseAt=now;
+            this.expiresAt=now+lifetimeMillis; this.nextPulseAt=now;
         }
     }
     private static final class DelayedBlast {
@@ -100,9 +100,9 @@ public final class SuperSploorRuntime implements Listener {
     private static final class Paintstorm {
         final UUID ownerId; final int team; final Location center; final long expiresAt;
         final Set<UUID> hitPlayers = new HashSet<>(); long nextPulseAt; int pulsesRemaining=4;
-        Paintstorm(UUID ownerId, int team, Location center, long now) {
+        Paintstorm(UUID ownerId, int team, Location center, long now, long lifetimeMillis, int pulses) {
             this.ownerId=ownerId; this.team=team; this.center=center.clone();
-            this.expiresAt=now+2_000L; this.nextPulseAt=now;
+            this.expiresAt=now+lifetimeMillis; this.nextPulseAt=now; this.pulsesRemaining=pulses;
         }
     }
 
@@ -210,6 +210,29 @@ public final class SuperSploorRuntime implements Listener {
     }
 
     public boolean isRunning() { return running; }
+    /** Debug control: run the regular round or overtime deadline handler immediately. */
+    public boolean debugAdvancePhase() {
+        if (!GameDebugPhaseActions.canAdvanceSuperSploor(running)) return false;
+        long now = System.currentTimeMillis();
+        if (overtime) overtimeEndsAt = now;
+        else matchEndsAt = now;
+        return true;
+    }
+
+    /** Test the selected kit's real Special effect without waiting for ink charge. */
+    public boolean debugUseSelectedSpecial(Player tester) {
+        if (!running || tester == null || !tester.isOnline()
+                || !(plugin instanceof ArcadeMechanicsModernPlugin arcadePlugin)
+                || !arcadePlugin.hasAdminAccess(tester)) return false;
+        UUID id = tester.getUniqueId();
+        if (!players.containsKey(id)
+                || !debugSpecialEnabled(tester, "special-" + kits.getOrDefault(id, "sprayer"))) return false;
+        specialCharge.put(id, GameDebugRuntimeOverrides.doubleValue(
+                "SUPER_SPLOOR_SPECIAL_CHARGE_REQUIRED", SuperSploorRules.SPECIAL_CHARGE_REQUIRED));
+        specialChargeSuppressed.remove(id);
+        useSpecial(tester, id);
+        return specialChargeSuppressed.contains(id) && specialCharge.getOrDefault(id, 0.0D) == 0.0D;
+    }
 
     public Map<UUID, PlayerMatchStats> snapshotStats() {
         Map<UUID, PlayerMatchStats> copy = new HashMap<>();
@@ -255,12 +278,12 @@ public final class SuperSploorRuntime implements Listener {
             spawns.put(id, spawn.clone());
             String kit = normalizeKit(participantKits == null ? null : participantKits.get(id));
             kits.put(id, kit);
-            ink.put(id, SuperSploorRules.MAX_INK);
+            ink.put(id, GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_MAX_INK", SuperSploorRules.MAX_INK));
             marks.put(id, 0);
             lastShotAt.put(id, now - 2_000L);
             lastInkRegenAt.put(id, now);
             lastInkUseAt.put(id, now);
-            spawnProtectedUntil.put(id, now + SuperSploorRules.SPAWN_PROTECTION_MILLIS);
+            spawnProtectedUntil.put(id, now + GameDebugRuntimeOverrides.longValue("SUPER_SPLOOR_SPAWN_PROTECTION_MILLIS", SuperSploorRules.SPAWN_PROTECTION_MILLIS));
             kills.put(id, 0);
             MutableStats stats = new MutableStats();
             stats.kit = kit;
@@ -271,7 +294,7 @@ public final class SuperSploorRuntime implements Listener {
             contributors.put(id, new HashSet<>());
             contributorTimes.put(id, new HashMap<>());
             if ("dualies".equals(kit)) {
-                dodgeRollCharges.put(id, 2);
+                dodgeRollCharges.put(id, SuperSploorRules.debugInt("DODGE_ROLL_MAX_CHARGES", SuperSploorRules.DODGE_ROLL_MAX_CHARGES));
                 nextDodgeRollRechargeAt.put(id, Long.MAX_VALUE);
                 dualiesRollTargets.put(id, new HashSet<>());
                 dualiesPostRollUniqueTargets.put(id, new HashSet<>());
@@ -282,7 +305,7 @@ public final class SuperSploorRuntime implements Listener {
             updateInkBar(player, id);
         }
         if (players.isEmpty()) throw new IllegalArgumentException("Super Sploor has no online participants.");
-        this.matchEndsAt = now + SuperSploorRules.ROUND_MILLIS;
+        this.matchEndsAt = now + GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_ROUND_MILLIS", SuperSploorRules.ROUND_MILLIS);
         this.overtimeEndsAt = 0L;
         this.lastTickAt = now;
         this.overtime = false;
@@ -309,12 +332,12 @@ public final class SuperSploorRuntime implements Listener {
         teams.put(id, team);
         spawns.put(id, spawn.clone());
         kits.put(id, kit);
-        ink.put(id, SuperSploorRules.MAX_INK);
+        ink.put(id, GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_MAX_INK", SuperSploorRules.MAX_INK));
         marks.put(id, 0);
         lastShotAt.put(id, now - 2_000L);
         lastInkRegenAt.put(id, now);
         lastInkUseAt.put(id, now);
-        spawnProtectedUntil.put(id, now + SuperSploorRules.SPAWN_PROTECTION_MILLIS);
+        spawnProtectedUntil.put(id, now + GameDebugRuntimeOverrides.longValue("SUPER_SPLOOR_SPAWN_PROTECTION_MILLIS", SuperSploorRules.SPAWN_PROTECTION_MILLIS));
         kills.put(id, 0);
         MutableStats stats = new MutableStats();
         stats.kit = kit;
@@ -325,7 +348,7 @@ public final class SuperSploorRuntime implements Listener {
         contributors.put(id, new HashSet<>());
         contributorTimes.put(id, new HashMap<>());
         if ("dualies".equals(kit)) {
-            dodgeRollCharges.put(id, 2);
+            dodgeRollCharges.put(id, SuperSploorRules.debugInt("DODGE_ROLL_MAX_CHARGES", SuperSploorRules.DODGE_ROLL_MAX_CHARGES));
             nextDodgeRollRechargeAt.put(id, Long.MAX_VALUE);
             dualiesRollTargets.put(id, new HashSet<>());
             dualiesPostRollUniqueTargets.put(id, new HashSet<>());
@@ -340,6 +363,7 @@ public final class SuperSploorRuntime implements Listener {
 
     public void tick(long now) {
         if (!running || engine == null) return;
+        for (Player player : players.values()) ArcadeCollisionRules.disable(player);
         updateChargerPaintLines();
         rechargeDodgeRolls(now);
         updateTemporaryDevices(now);
@@ -348,7 +372,8 @@ public final class SuperSploorRuntime implements Listener {
         for (Map.Entry<UUID, Long> charge : new ArrayList<>(chargerChargeStartedAt.entrySet())) {
             Player chargingPlayer = players.get(charge.getKey());
             if (chargingPlayer != null && chargingPlayer.isOnline()) {
-                long percent = Math.min(100L, Math.max(0L, (now - charge.getValue()) * 100L / 900L));
+                long chargeDuration = Math.max(1L, SuperSploorRules.debugLong("CHARGER_FULL_CHARGE_MILLIS", SuperSploorRules.CHARGER_FULL_CHARGE_MILLIS));
+                long percent = Math.min(100L, Math.max(0L, (now - charge.getValue()) * 100L / chargeDuration));
                 chargingPlayer.sendActionBar(ChatColor.AQUA + "CHARGER " + percent + "%");
             }
         }
@@ -356,6 +381,16 @@ public final class SuperSploorRuntime implements Listener {
         for (UUID id : new ArrayList<>(players.keySet())) {
             Player player = players.get(id);
             if (player == null || !player.isOnline()) continue;
+            ArcadePortManager arcade = plugin instanceof ArcadeMechanicsModernPlugin host
+                    ? host.getArcadePortManager() : null;
+            if (arcade != null && arcade.isDebugOverrideEnabled(id, ArcadePortGame.SUPER_SPLOOR,
+                    "unlimited-specials") && !specialChargeSuppressed.contains(id)
+                    && specialCharge.getOrDefault(id, 0.0D) < GameDebugRuntimeOverrides.doubleValue(
+                            "SUPER_SPLOOR_SPECIAL_CHARGE_REQUIRED", SuperSploorRules.SPECIAL_CHARGE_REQUIRED)) {
+                specialCharge.put(id, GameDebugRuntimeOverrides.doubleValue(
+                        "SUPER_SPLOOR_SPECIAL_CHARGE_REQUIRED", SuperSploorRules.SPECIAL_CHARGE_REQUIRED));
+                updateInkBar(player, id);
+            }
             if (!respawnAt.containsKey(id) && player.getLocation().getY() <= world.getMinHeight() + 4.0D) {
                 splat(id, player, null);
                 continue;
@@ -365,20 +400,26 @@ public final class SuperSploorRuntime implements Listener {
                 continue;
             }
 
-            int currentInk = ink.getOrDefault(id, SuperSploorRules.MAX_INK);
+            int currentInk = ink.getOrDefault(id, GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_MAX_INK", SuperSploorRules.MAX_INK));
             boolean inFriendlyPaint = engine.isFriendlySurface(player.getLocation(), teams.getOrDefault(id, -1));
             boolean squid = squidMode.contains(id);
+            if (squid && !GameDebugRuntimeOverrides.booleanValue("SUPER_SPLOOR_SQUID_MODE_ENABLED", SuperSploorRules.SQUID_MODE_ENABLED)) {
+                exitSquidMode(player, id);
+                squid = false;
+            }
             if (squid && player.isOnGround() && !inFriendlyPaint) {
                 exitSquidMode(player, id);
                 squid = false;
             }
             if (squid) syncSquidEntity(player, id);
             long lastRegen = lastInkRegenAt.getOrDefault(id, now);
-            if (now - lastRegen >= 1_000L) {
-                int seconds = (int) Math.min(10L, (now - lastRegen) / 1_000L);
+            long regenInterval = Math.max(1L, SuperSploorRules.debugLong("INK_REGEN_INTERVAL_MILLIS", SuperSploorRules.INK_REGEN_INTERVAL_MILLIS));
+            if (now - lastRegen >= regenInterval) {
+                int seconds = (int) Math.min(10L, (now - lastRegen) / regenInterval);
                 boolean canRegen = SuperSploorRules.canRegenerateInk(now,
                         lastInkUseAt.getOrDefault(id, now), squid, inFriendlyPaint);
-                if (canRegen && seconds > 0) {
+                if (canRegen && seconds > 0 && GameDebugRuntimeOverrides.booleanValue(
+                        "SUPER_SPLOOR_INK_REGEN_ENABLED", SuperSploorRules.INK_REGEN_ENABLED)) {
                     int updated = SuperSploorRules.nextInkAfterRegeneration(
                             currentInk, seconds, squid && inFriendlyPaint);
                     if (updated != currentInk) {
@@ -386,7 +427,7 @@ public final class SuperSploorRuntime implements Listener {
                         updateInkBar(player, id);
                     }
                 }
-                lastInkRegenAt.put(id, lastRegen + seconds * 1_000L);
+                lastInkRegenAt.put(id, lastRegen + seconds * regenInterval);
             }
 
             long protectedUntil = spawnProtectedUntil.getOrDefault(id, 0L);
@@ -400,8 +441,8 @@ public final class SuperSploorRuntime implements Listener {
             recoverMarkIfEligible(id, player, now);
             if (squid && engine.isFriendlyWallAdjacent(player.getLocation(), teams.getOrDefault(id, -1))) {
                 Vector velocity = player.getVelocity();
-                if (velocity.getY() < SuperSploorRules.SQUID_CLIMB_VELOCITY) {
-                    velocity.setY(SuperSploorRules.SQUID_CLIMB_VELOCITY);
+                if (velocity.getY() < GameDebugRuntimeOverrides.doubleValue("SUPER_SPLOOR_SQUID_CLIMB_VELOCITY", SuperSploorRules.SQUID_CLIMB_VELOCITY)) {
+                    velocity.setY(GameDebugRuntimeOverrides.doubleValue("SUPER_SPLOOR_SQUID_CLIMB_VELOCITY", SuperSploorRules.SQUID_CLIMB_VELOCITY));
                     player.setVelocity(velocity);
                 }
                 world.spawnParticle(Particle.DUST, player.getLocation().add(0.0D, 0.15D, 0.0D),
@@ -417,7 +458,7 @@ public final class SuperSploorRuntime implements Listener {
                 return;
             }
             overtime = true;
-            overtimeEndsAt = now + SuperSploorRules.OVERTIME_MILLIS;
+            overtimeEndsAt = now + GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_OVERTIME_MILLIS", SuperSploorRules.OVERTIME_MILLIS);
             announce(ChatColor.GOLD + "" + ChatColor.BOLD
                     + "Turf War is tied! First team to lead by 1% wins — 30 seconds of overtime.");
         } else if (overtime) {
@@ -465,12 +506,15 @@ public final class SuperSploorRuntime implements Listener {
     }
 
     private String secondaryDescription(String kit) {
+        int cost = SuperSploorRules.secondaryInkCost(kit);
+        long cooldownSeconds = (SuperSploorRules.secondaryCooldownMillis() + 999L) / 1_000L;
+        String details = "Costs " + cost + " ink; " + cooldownSeconds + "-second cooldown.";
         return switch (kit) {
-            case "roller" -> "Right-click to place a proximity mine. Costs 30 ink; 4-second cooldown.";
-            case "charger" -> "Right-click to reveal nearby enemies to your team. Costs 25 ink; 4-second cooldown.";
-            case "lobber" -> "Right-click to launch a temporary area sprinkler. Costs 35 ink; 4-second cooldown.";
-            case "dualies" -> "Right-click to launch a delayed suction blast. Costs 30 ink; 4-second cooldown.";
-            default -> "Right-click to throw an area paint bomb. Costs 25 ink; 4-second cooldown.";
+            case "roller" -> "Right-click to place a proximity mine. " + details;
+            case "charger" -> "Right-click to reveal nearby enemies to your team. " + details;
+            case "lobber" -> "Right-click to launch a temporary area sprinkler. " + details;
+            case "dualies" -> "Right-click to launch a delayed suction blast. " + details;
+            default -> "Right-click to throw an area paint bomb. " + details;
         };
     }
 
@@ -485,24 +529,24 @@ public final class SuperSploorRuntime implements Listener {
     }
 
     private String specialDescription(String kit) {
+        String required = Math.round(GameDebugRuntimeOverrides.doubleValue(
+                "SUPER_SPLOOR_SPECIAL_CHARGE_REQUIRED", SuperSploorRules.SPECIAL_CHARGE_REQUIRED)) + "%";
         return switch (kit) {
-            case "roller" -> "Paint through enemies and leave a damaging trail. Charges by painting; use at 100%.";
-            case "charger" -> "Fire a long beam that paints a straight path and marks enemies. Charges by painting; use at 100%.";
-            case "lobber" -> "Create a pulsing storm that paints a wide area and marks enemies. Charges by painting; use at 100%.";
-            case "dualies" -> "Dash through an afterimage, painting the route and disrupting enemies. Charges by painting; use at 100%.";
-            default -> "Blast nearby ground with team-coloured ink and mark close enemies. Charges by painting; use at 100%.";
+            case "roller" -> "Paint through enemies and leave a damaging trail. Charges by painting; use at " + required + ".";
+            case "charger" -> "Fire a long beam that paints a straight path and marks enemies. Charges by painting; use at " + required + ".";
+            case "lobber" -> "Create a pulsing storm that paints a wide area and marks enemies. Charges by painting; use at " + required + ".";
+            case "dualies" -> "Dash through an afterimage, painting the route and disrupting enemies. Charges by painting; use at " + required + ".";
+            default -> "Blast nearby ground with team-coloured ink and mark close enemies. Charges by painting; use at " + required + ".";
         };
     }
 
     private void useSecondary(Player player, UUID id) {
+        if (!GameDebugRuntimeOverrides.booleanValue("SUPER_SPLOOR_SECONDARIES_ENABLED", SuperSploorRules.SECONDARIES_ENABLED)) {
+            player.sendActionBar(ChatColor.RED + "Secondary abilities are disabled in this debug profile.");
+            return;
+        }
         String kit = kits.getOrDefault(id, "sprayer");
-        int cost = switch (kit) {
-            case "roller" -> 30;
-            case "charger" -> 25;
-            case "lobber" -> 35;
-            case "dualies" -> 30;
-            default -> 25;
-        };
+        int cost = SuperSploorRules.secondaryInkCost(kit);
         long now = System.currentTimeMillis();
         if (now < secondaryReadyAt.getOrDefault(id, 0L)) {
             player.sendActionBar(ChatColor.YELLOW + "Secondary recharging.");
@@ -515,14 +559,16 @@ public final class SuperSploorRuntime implements Listener {
         }
         ink.put(id, SuperSploorRules.spendInk(current, cost));
         lastInkUseAt.put(id, now);
-        secondaryReadyAt.put(id, now + 4_000L);
-        cooldownProgress.start(player, secondaryName(kit), 4_000L);
+        long cooldown = SuperSploorRules.secondaryCooldownMillis();
+        secondaryReadyAt.put(id, now + cooldown);
+        cooldownProgress.start(player, secondaryName(kit), cooldown);
 
         if ("roller".equals(kit)) {
             Location mineLocation = player.getLocation().getBlock().getRelative(0, -1, 0)
                     .getLocation().add(0.5D, 1.0D, 0.5D);
             mines.add(new InkMine(id, teams.getOrDefault(id, -1), mineLocation,
-                    now + 800L, now + 8_000L));
+                    now + SuperSploorRules.debugLong("ROLLER_MINE_ARM_MILLIS", SuperSploorRules.ROLLER_MINE_ARM_MILLIS),
+                    now + SuperSploorRules.debugLong("ROLLER_MINE_LIFETIME_MILLIS", SuperSploorRules.ROLLER_MINE_LIFETIME_MILLIS)));
             world.spawnParticle(Particle.DUST, mineLocation, 12, 0.25D, 0.1D, 0.25D, 0.0D,
                     new Particle.DustOptions(teamColour(teams.get(id)), 1.4F));
             player.playSound(player.getLocation(), Sound.BLOCK_STONE_PRESSURE_PLATE_CLICK_ON, 0.7F, 1.4F);
@@ -556,12 +602,20 @@ public final class SuperSploorRuntime implements Listener {
     }
 
     private void useSpecial(Player player, UUID id) {
+        if (!GameDebugRuntimeOverrides.booleanValue("SUPER_SPLOOR_SPECIALS_ENABLED", SuperSploorRules.SPECIALS_ENABLED)) {
+            player.sendActionBar(ChatColor.RED + "Special abilities are disabled in this debug profile.");
+            return;
+        }
+        String kit = kits.getOrDefault(id, "sprayer");
+        if (!debugSpecialEnabled(player, "special-" + kit)) {
+            player.sendActionBar(ChatColor.RED + specialName(kit) + " is disabled in your debug profile.");
+            return;
+        }
         double charge = specialCharge.getOrDefault(id, 0.0D);
         if (!SuperSploorRules.canUseSpecial(charge)) {
             player.sendActionBar(ChatColor.LIGHT_PURPLE + "Special " + (int) Math.floor(charge) + "% — keep painting!");
             return;
         }
-        String kit = kits.getOrDefault(id, "sprayer");
         specialCharge.put(id, 0.0D);
         specialChargeSuppressed.add(id);
         specialTargetsThisActivation.computeIfAbsent(id, ignored -> new HashSet<>()).clear();
@@ -571,10 +625,10 @@ public final class SuperSploorRuntime implements Listener {
         switch (kit) {
             case "roller" -> {
                 long now = System.currentTimeMillis();
-                stampedeUntil.put(id, now + 4_000L);
+                stampedeUntil.put(id, now + SuperSploorRules.debugLong("ROLLER_STAMPEDE_DURATION_MILLIS", SuperSploorRules.ROLLER_STAMPEDE_DURATION_MILLIS));
                 stampedeNextPaintAt.put(id, now);
                 stampedeHitPlayers.put(id, new HashSet<>());
-                player.setWalkSpeed(0.28F);
+                player.setWalkSpeed((float) SuperSploorRules.debugDouble("ROLLER_STAMPEDE_SPEED", SuperSploorRules.ROLLER_STAMPEDE_SPEED));
                 player.playSound(player.getLocation(), Sound.ENTITY_RAVAGER_ROAR, 0.85F, 1.45F);
                 announceTeam(id, ChatColor.GOLD + player.getName() + " activated STAMPEDE!");
             }
@@ -585,14 +639,15 @@ public final class SuperSploorRuntime implements Listener {
                         ? player.getEyeLocation().add(player.getLocation().getDirection().multiply(12.0D))
                         : target.getLocation().add(0.5D, 1.0D, 0.5D);
                 paintstorms.add(new Paintstorm(id, teams.getOrDefault(id, -1), center,
-                        System.currentTimeMillis()));
+                        System.currentTimeMillis(), SuperSploorRules.debugLong("LOBBER_PAINTSTORM_DURATION_MILLIS", SuperSploorRules.LOBBER_PAINTSTORM_DURATION_MILLIS),
+                        SuperSploorRules.debugInt("LOBBER_PAINTSTORM_PULSES", SuperSploorRules.LOBBER_PAINTSTORM_PULSES)));
                 world.spawnParticle(Particle.DUST, center, 20, 1.3D, 0.25D, 1.3D, 0.0D,
                         new Particle.DustOptions(teamColour(teams.get(id)), 2.0F));
                 world.playSound(center, Sound.BLOCK_BEACON_ACTIVATE, 0.85F, 0.8F);
                 announceTeam(id, ChatColor.GOLD + player.getName() + " launched PAINTSTORM!");
             }
             case "dualies" -> {
-                afterimageDashesRemaining.put(id, 3);
+                afterimageDashesRemaining.put(id, SuperSploorRules.debugInt("DUALIES_AFTERIMAGE_DASHES", SuperSploorRules.DUALIES_AFTERIMAGE_DASHES));
                 afterimageNextAt.put(id, System.currentTimeMillis());
                 player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 0.9F, 1.5F);
                 announceTeam(id, ChatColor.GOLD + player.getName() + " activated AFTERIMAGE DASH!");
@@ -604,6 +659,19 @@ public final class SuperSploorRuntime implements Listener {
             }
         }
         updateInkBar(player, id);
+    }
+
+    private boolean debugSpecialEnabled(Player player, String feature) {
+        if (player == null || !player.isOnline() || !plugin.getName().equals("ArcadeMechanicsModern")) {
+            return true;
+        }
+        try {
+            Object enabled = plugin.getClass().getMethod("isArcadeDebugFeatureEnabled",
+                    Player.class, String.class, boolean.class).invoke(plugin, player, feature, true);
+            return !(enabled instanceof Boolean value) || value;
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+            return true;
+        }
     }
 
     private void announceTeam(UUID ownerId, String message) {
@@ -656,8 +724,11 @@ public final class SuperSploorRuntime implements Listener {
         Vector direction = origin.getDirection().normalize();
         int team = teams.getOrDefault(ownerId, -1);
         Set<UUID> hitPlayers = new HashSet<>();
-        for (int step = 1; step <= 56; step++) {
-            Location point = origin.clone().add(direction.clone().multiply(step * 0.5D));
+        int beamSteps = Math.max(1, SuperSploorRules.debugInt("CHARGER_PRISM_BEAM_STEPS", SuperSploorRules.CHARGER_PRISM_BEAM_STEPS));
+        double beamStep = SuperSploorRules.debugDouble("CHARGER_PRISM_BEAM_STEP_BLOCKS", SuperSploorRules.CHARGER_PRISM_BEAM_STEP_BLOCKS);
+        double beamHitRadiusSquared = Math.pow(SuperSploorRules.debugDouble("CHARGER_PRISM_BEAM_HIT_RADIUS_BLOCKS", SuperSploorRules.CHARGER_PRISM_BEAM_HIT_RADIUS_BLOCKS), 2.0D);
+        for (int step = 1; step <= beamSteps; step++) {
+            Location point = origin.clone().add(direction.clone().multiply(step * beamStep));
             Block block = point.getBlock();
             if (!block.isPassable() && engine.owner(block) == -2) break;
             recordPaint(ownerId, engine.paint(point, team, 0));
@@ -668,7 +739,7 @@ public final class SuperSploorRuntime implements Listener {
                         || teams.getOrDefault(target.getUniqueId(), -2) == team
                         || respawnAt.containsKey(target.getUniqueId())
                         || hitPlayers.contains(target.getUniqueId())) continue;
-                if (target.getEyeLocation().distanceSquared(point) <= 1.2D) {
+                if (target.getEyeLocation().distanceSquared(point) <= beamHitRadiusSquared) {
                     hitPlayers.add(target.getUniqueId());
                     markSpecialTarget(ownerId, target);
                 }
@@ -695,13 +766,14 @@ public final class SuperSploorRuntime implements Listener {
                 continue;
             }
             if (now < stampedeNextPaintAt.getOrDefault(id, 0L) || respawnAt.containsKey(id)) continue;
-            stampedeNextPaintAt.put(id, now + 150L);
+            stampedeNextPaintAt.put(id, now + SuperSploorRules.debugLong("ROLLER_STAMPEDE_PAINT_INTERVAL_MILLIS", SuperSploorRules.ROLLER_STAMPEDE_PAINT_INTERVAL_MILLIS));
             Vector direction = player.getLocation().getDirection().setY(0.0D);
             if (direction.lengthSquared() < 1.0E-5D) continue;
             direction.normalize();
             Location origin = player.getLocation();
             Set<UUID> alreadyHit = stampedeHitPlayers.computeIfAbsent(id, ignored -> new HashSet<>());
-            for (int step = 0; step <= 3; step++) {
+            int stampedeSteps = Math.max(1, (int) Math.floor(SuperSploorRules.debugDouble("ROLLER_STAMPEDE_HIT_REACH_BLOCKS", SuperSploorRules.ROLLER_STAMPEDE_HIT_REACH_BLOCKS)));
+            for (int step = 0; step <= stampedeSteps; step++) {
                 Location point = origin.clone().add(direction.clone().multiply(step));
                 recordRollerPaint(id, engine.paint(point, teams.getOrDefault(id, -1), 2));
             }
@@ -712,9 +784,9 @@ public final class SuperSploorRuntime implements Listener {
                         || alreadyHit.contains(target.getUniqueId())) continue;
                 Vector relative = target.getLocation().toVector().subtract(origin.toVector());
                 double along = relative.dot(direction);
-                if (along < 0.0D || along > 3.2D) continue;
+                if (along < 0.0D || along > SuperSploorRules.debugDouble("ROLLER_STAMPEDE_HIT_REACH_BLOCKS", SuperSploorRules.ROLLER_STAMPEDE_HIT_REACH_BLOCKS)) continue;
                 double lateral = relative.clone().subtract(direction.clone().multiply(along)).length();
-                if (lateral <= 2.0D) {
+                if (lateral <= SuperSploorRules.debugDouble("ROLLER_STAMPEDE_HIT_WIDTH_BLOCKS", 2.0D)) {
                     alreadyHit.add(target.getUniqueId());
                     markSpecialTarget(id, target);
                 }
@@ -727,20 +799,20 @@ public final class SuperSploorRuntime implements Listener {
         int team = teams.getOrDefault(ownerId, -1);
         long now = System.currentTimeMillis();
         switch (kind) {
-            case "burst-bomb" -> paintArea(ownerId, impact, 3, new HashSet<>(), false, now);
-            case "tracker-flare" -> trackerFlares.add(new TrackerFlare(ownerId, team, impact, now));
+            case "burst-bomb" -> paintArea(ownerId, impact, SuperSploorRules.debugInt("SPRAYER_BURST_BOMB_PAINT_RADIUS_BLOCKS", SuperSploorRules.SPRAYER_BURST_BOMB_PAINT_RADIUS_BLOCKS), new HashSet<>(), false, now);
+            case "tracker-flare" -> trackerFlares.add(new TrackerFlare(ownerId, team, impact, now, SuperSploorRules.debugLong("CHARGER_TRACKER_DURATION_MILLIS", SuperSploorRules.CHARGER_TRACKER_DURATION_MILLIS)));
             case "sprinkler" -> {
-                sprinklers.add(new Sprinkler(ownerId, team, impact, now));
+                sprinklers.add(new Sprinkler(ownerId, team, impact, now, SuperSploorRules.debugLong("LOBBER_SPRINKLER_DURATION_MILLIS", SuperSploorRules.LOBBER_SPRINKLER_DURATION_MILLIS)));
                 world.spawnParticle(Particle.DUST, impact, 16, 0.35D, 0.2D, 0.35D, 0.0D,
                         new Particle.DustOptions(teamColour(team), 1.7F));
             }
             case "suction-bomb" -> {
-                delayedBlasts.add(new DelayedBlast(ownerId, team, impact, now + 1_400L));
+                delayedBlasts.add(new DelayedBlast(ownerId, team, impact, now + SuperSploorRules.debugLong("DUALIES_SUCTION_BOMB_FUSE_MILLIS", SuperSploorRules.DUALIES_SUCTION_BOMB_FUSE_MILLIS)));
                 world.spawnParticle(Particle.DUST, impact, 18, 0.35D, 0.15D, 0.35D, 0.0D,
                         new Particle.DustOptions(teamColour(team), 1.6F));
             }
             case "colourburst" -> {
-                paintArea(ownerId, impact, 5, new HashSet<>(), true, now);
+                paintArea(ownerId, impact, SuperSploorRules.debugInt("SPRAYER_COLOURBURST_PAINT_RADIUS_BLOCKS", SuperSploorRules.SPRAYER_COLOURBURST_PAINT_RADIUS_BLOCKS), new HashSet<>(), true, now);
                 specialChargeSuppressed.remove(ownerId);
             }
             default -> { }
@@ -761,24 +833,25 @@ public final class SuperSploorRuntime implements Listener {
             Vector direction = player.getLocation().getDirection().setY(0.0D);
             if (direction.lengthSquared() < 1.0E-5D) direction = new Vector(0.0D, 0.0D, 1.0D);
             direction.normalize();
-            player.setVelocity(direction.clone().multiply(1.2D).setY(0.16D));
+            double dashDistance = SuperSploorRules.debugDouble("DUALIES_AFTERIMAGE_DISTANCE_BLOCKS", SuperSploorRules.DUALIES_AFTERIMAGE_DISTANCE_BLOCKS);
+            player.setVelocity(direction.clone().multiply(dashDistance).setY(SuperSploorRules.debugDouble("DUALIES_AFTERIMAGE_VERTICAL_VELOCITY", SuperSploorRules.DUALIES_AFTERIMAGE_VERTICAL_VELOCITY)));
             Location origin = player.getLocation().clone();
             int team = teams.getOrDefault(id, -1);
             for (int step = 0; step <= 2; step++) {
-                Location point = origin.clone().add(direction.clone().multiply(step * 1.2D));
+                Location point = origin.clone().add(direction.clone().multiply(step * dashDistance));
                 recordPaint(id, engine.paint(point, team, 1));
             }
             for (Player target : players.values()) {
                 if (target == null || !target.isOnline() || target.getUniqueId().equals(id)
                         || teams.getOrDefault(target.getUniqueId(), -2) == team
                         || respawnAt.containsKey(target.getUniqueId())) continue;
-                if (target.getLocation().distanceSquared(origin) <= 4.0D) markSpecialTarget(id, target);
+                if (target.getLocation().distanceSquared(origin) <= Math.pow(dashDistance + 0.8D, 2.0D)) markSpecialTarget(id, target);
             }
             world.spawnParticle(Particle.DUST, origin, 18, 0.45D, 0.3D, 0.45D, 0.0D,
                     new Particle.DustOptions(teamColour(team), 1.5F));
             world.playSound(origin, Sound.ENTITY_ENDERMAN_TELEPORT, 0.45F, 1.7F);
             afterimageDashesRemaining.put(id, remaining - 1);
-            afterimageNextAt.put(id, now + 260L);
+            afterimageNextAt.put(id, now + SuperSploorRules.debugLong("DUALIES_AFTERIMAGE_DASH_INTERVAL_MILLIS", SuperSploorRules.DUALIES_AFTERIMAGE_DASH_INTERVAL_MILLIS));
         }
     }
 
@@ -804,11 +877,11 @@ public final class SuperSploorRuntime implements Listener {
                     .filter(p -> p != null && p.isOnline() && !p.getUniqueId().equals(mine.ownerId)
                             && teams.getOrDefault(p.getUniqueId(), -2) != mine.team
                             && !respawnAt.containsKey(p.getUniqueId())
-                            && p.getLocation().distanceSquared(mine.location) <= 2.25D
+                            && p.getLocation().distanceSquared(mine.location) <= Math.pow(SuperSploorRules.debugDouble("ROLLER_MINE_TRIGGER_RADIUS_BLOCKS", SuperSploorRules.ROLLER_MINE_TRIGGER_RADIUS_BLOCKS), 2.0D)
                             && !mine.hitPlayers.contains(p.getUniqueId()))
                     .findFirst().orElse(null);
             if (target == null) continue;
-            paintArea(mine.ownerId, mine.location, 2, mine.hitPlayers, false, now);
+            paintArea(mine.ownerId, mine.location, SuperSploorRules.debugInt("ROLLER_MINE_PAINT_RADIUS_BLOCKS", SuperSploorRules.ROLLER_MINE_PAINT_RADIUS_BLOCKS), mine.hitPlayers, false, now);
             mines.remove(mine);
             break;
         }
@@ -821,14 +894,15 @@ public final class SuperSploorRuntime implements Listener {
                 continue;
             }
             if (now < sprinkler.nextPulseAt) continue;
-            sprinkler.nextPulseAt = now + 650L;
-            recordPaint(sprinkler.ownerId, engine.paint(sprinkler.location, sprinkler.team, 2));
+            sprinkler.nextPulseAt = now + SuperSploorRules.debugLong("LOBBER_SPRINKLER_PULSE_MILLIS", SuperSploorRules.LOBBER_SPRINKLER_PULSE_MILLIS);
+            recordPaint(sprinkler.ownerId, engine.paint(sprinkler.location, sprinkler.team,
+                    SuperSploorRules.debugInt("LOBBER_SPRINKLER_PAINT_RADIUS_BLOCKS", SuperSploorRules.LOBBER_SPRINKLER_PAINT_RADIUS_BLOCKS)));
             for (Player target : players.values()) {
                 if (target == null || !target.isOnline() || target.getUniqueId().equals(sprinkler.ownerId)
                         || teams.getOrDefault(target.getUniqueId(), -2) == sprinkler.team
                         || respawnAt.containsKey(target.getUniqueId())
                         || sprinkler.hitPlayers.contains(target.getUniqueId())) continue;
-                if (target.getLocation().distanceSquared(sprinkler.location) <= 4.0D) {
+                if (target.getLocation().distanceSquared(sprinkler.location) <= Math.pow(SuperSploorRules.debugDouble("LOBBER_SPRINKLER_HIT_RADIUS_BLOCKS", SuperSploorRules.LOBBER_SPRINKLER_HIT_RADIUS_BLOCKS), 2.0D)) {
                     sprinkler.hitPlayers.add(target.getUniqueId());
                     applyMark(sprinkler.ownerId, target.getUniqueId(), target);
                 }
@@ -840,7 +914,7 @@ public final class SuperSploorRuntime implements Listener {
         for (TrackerFlare flare : new ArrayList<>(trackerFlares)) {
             if (now >= flare.expiresAt) { trackerFlares.remove(flare); continue; }
             if (now < flare.nextPulseAt) continue;
-            flare.nextPulseAt = now + 400L;
+            flare.nextPulseAt = now + SuperSploorRules.debugLong("CHARGER_TRACKER_PULSE_MILLIS", SuperSploorRules.CHARGER_TRACKER_PULSE_MILLIS);
             for (Player viewer : players.values()) {
                 if (viewer == null || !viewer.isOnline()
                         || teams.getOrDefault(viewer.getUniqueId(), -2) != flare.team) continue;
@@ -848,7 +922,7 @@ public final class SuperSploorRuntime implements Listener {
                     if (enemy == null || !enemy.isOnline()
                             || teams.getOrDefault(enemy.getUniqueId(), -2) == flare.team
                             || respawnAt.containsKey(enemy.getUniqueId())
-                            || enemy.getLocation().distanceSquared(flare.location) > 324.0D) continue;
+                            || enemy.getLocation().distanceSquared(flare.location) > Math.pow(SuperSploorRules.debugDouble("CHARGER_TRACKER_RADIUS_BLOCKS", SuperSploorRules.CHARGER_TRACKER_RADIUS_BLOCKS), 2.0D)) continue;
                     viewer.spawnParticle(Particle.DUST, enemy.getLocation().add(0.0D, 1.0D, 0.0D),
                             7, 0.22D, 0.35D, 0.22D, 0.0D,
                             new Particle.DustOptions(teamColour(1 - flare.team), 1.4F));
@@ -858,7 +932,7 @@ public final class SuperSploorRuntime implements Listener {
 
         for (DelayedBlast blast : new ArrayList<>(delayedBlasts)) {
             if (now < blast.detonatesAt) continue;
-            paintArea(blast.ownerId, blast.location, 2, new HashSet<>(), false, now);
+            paintArea(blast.ownerId, blast.location, SuperSploorRules.debugInt("DUALIES_SUCTION_BOMB_PAINT_RADIUS_BLOCKS", SuperSploorRules.DUALIES_SUCTION_BOMB_PAINT_RADIUS_BLOCKS), new HashSet<>(), false, now);
             delayedBlasts.remove(blast);
         }
 
@@ -871,14 +945,15 @@ public final class SuperSploorRuntime implements Listener {
                 continue;
             }
             if (now < storm.nextPulseAt) continue;
-            storm.nextPulseAt = now + 400L;
+            storm.nextPulseAt = now + SuperSploorRules.debugLong("LOBBER_PAINTSTORM_PULSE_MILLIS", SuperSploorRules.LOBBER_PAINTSTORM_PULSE_MILLIS);
             storm.pulsesRemaining--;
-            recordPaint(storm.ownerId, engine.paint(storm.center, storm.team, 3));
+            recordPaint(storm.ownerId, engine.paint(storm.center, storm.team,
+                    SuperSploorRules.debugInt("LOBBER_PAINTSTORM_PAINT_RADIUS_BLOCKS", SuperSploorRules.LOBBER_PAINTSTORM_PAINT_RADIUS_BLOCKS)));
             for (Player target : players.values()) {
                 if (target == null || !target.isOnline() || target.getUniqueId().equals(storm.ownerId)
                         || teams.getOrDefault(target.getUniqueId(), -2) == storm.team
                         || respawnAt.containsKey(target.getUniqueId())
-                        || target.getLocation().distanceSquared(storm.center) > 16.0D) continue;
+                        || target.getLocation().distanceSquared(storm.center) > Math.pow(SuperSploorRules.debugDouble("LOBBER_PAINTSTORM_HIT_RADIUS_BLOCKS", SuperSploorRules.LOBBER_PAINTSTORM_HIT_RADIUS_BLOCKS), 2.0D)) continue;
                 if (!storm.hitPlayers.add(target.getUniqueId())) continue;
                 markSpecialTarget(storm.ownerId, target);
             }
@@ -1072,7 +1147,8 @@ public final class SuperSploorRuntime implements Listener {
         projectileOwners.put(projectileId, id);
         projectileEntities.put(projectileId, projectile);
         activeProjectiles.add(projectileId);
-        projectilePaintRadii.put(projectileId, 0);
+        projectilePaintRadii.put(projectileId, SuperSploorRules.debugInt(
+                "CHARGER_PRIMARY_PAINT_RADIUS_BLOCKS", SuperSploorRules.CHARGER_PRIMARY_PAINT_RADIUS_BLOCKS));
         projectilePaintLines.add(projectileId);
         projectileLastLocations.put(projectileId, projectile.getLocation().clone());
         if (charge >= 0.99D) fullyChargedProjectiles.add(projectileId);
@@ -1091,9 +1167,9 @@ public final class SuperSploorRuntime implements Listener {
             return;
         }
         dodgeRollCharges.put(id, SuperSploorRules.dodgeRollChargesAfterUse(charges));
-        if (charges == SuperSploorRules.DODGE_ROLL_MAX_CHARGES) {
-            nextDodgeRollRechargeAt.put(id, now + SuperSploorRules.DODGE_ROLL_RECHARGE_MILLIS);
-            cooldownProgress.start(player, "Dodge Roll", SuperSploorRules.DODGE_ROLL_RECHARGE_MILLIS);
+        if (charges == GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_DODGE_ROLL_MAX_CHARGES", SuperSploorRules.DODGE_ROLL_MAX_CHARGES)) {
+            nextDodgeRollRechargeAt.put(id, now + GameDebugRuntimeOverrides.longValue("SUPER_SPLOOR_DODGE_ROLL_RECHARGE_MILLIS", SuperSploorRules.DODGE_ROLL_RECHARGE_MILLIS));
+            cooldownProgress.start(player, "Dodge Roll", GameDebugRuntimeOverrides.longValue("SUPER_SPLOOR_DODGE_ROLL_RECHARGE_MILLIS", SuperSploorRules.DODGE_ROLL_RECHARGE_MILLIS));
         }
         dualiesRollExpiresAt.put(id, now + 5_000L);
         dualiesRollTargets.computeIfAbsent(id, ignored -> new HashSet<>()).clear();
@@ -1116,12 +1192,12 @@ public final class SuperSploorRuntime implements Listener {
             dodgeRollCharges.put(id, SuperSploorRules.nextDodgeRollCharge(
                     dodgeRollCharges.getOrDefault(id, 0)));
             nextDodgeRollRechargeAt.put(id,
-                    dodgeRollCharges.getOrDefault(id, 0) < SuperSploorRules.DODGE_ROLL_MAX_CHARGES
-                            ? now + SuperSploorRules.DODGE_ROLL_RECHARGE_MILLIS : Long.MAX_VALUE);
-            if (dodgeRollCharges.getOrDefault(id, 0) < SuperSploorRules.DODGE_ROLL_MAX_CHARGES) {
+                    dodgeRollCharges.getOrDefault(id, 0) < GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_DODGE_ROLL_MAX_CHARGES", SuperSploorRules.DODGE_ROLL_MAX_CHARGES)
+                            ? now + GameDebugRuntimeOverrides.longValue("SUPER_SPLOOR_DODGE_ROLL_RECHARGE_MILLIS", SuperSploorRules.DODGE_ROLL_RECHARGE_MILLIS) : Long.MAX_VALUE);
+            if (dodgeRollCharges.getOrDefault(id, 0) < GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_DODGE_ROLL_MAX_CHARGES", SuperSploorRules.DODGE_ROLL_MAX_CHARGES)) {
                 Player player = players.get(id);
                 if (player != null && player.isOnline()) {
-                    cooldownProgress.start(player, "Dodge Roll", SuperSploorRules.DODGE_ROLL_RECHARGE_MILLIS);
+                    cooldownProgress.start(player, "Dodge Roll", GameDebugRuntimeOverrides.longValue("SUPER_SPLOOR_DODGE_ROLL_RECHARGE_MILLIS", SuperSploorRules.DODGE_ROLL_RECHARGE_MILLIS));
                 }
             }
         }
@@ -1132,20 +1208,8 @@ public final class SuperSploorRuntime implements Listener {
         String kit = kits.getOrDefault(id, "sprayer");
         int current = ink.getOrDefault(id, 0);
         long previous = lastShotAt.getOrDefault(id, 0L);
-        int cost = switch (kit) {
-            case "roller" -> 4;
-            case "charger" -> 18;
-            case "lobber" -> 14;
-            case "dualies" -> 4;
-            default -> SuperSploorRules.INK_PER_PRIMARY_SHOT;
-        };
-        long interval = switch (kit) {
-            case "roller" -> 550L;
-            case "charger" -> 1_000L;
-            case "lobber" -> 1_100L;
-            case "dualies" -> 350L;
-            default -> SuperSploorRules.PRIMARY_SHOT_INTERVAL_MILLIS;
-        };
+        int cost = SuperSploorRules.primaryInkCost(kit);
+        long interval = SuperSploorRules.primaryIntervalMillis(kit);
         if (current < cost || now < previous || now - previous < interval) {
             if (current < cost) player.sendActionBar(ChatColor.RED + "Out of ink! Swim through your team's paint to refill.");
             return;
@@ -1170,13 +1234,13 @@ public final class SuperSploorRuntime implements Listener {
         projectile.setItem(new ItemStack(teams.get(id) == RED ? Material.RED_DYE : Material.LIGHT_BLUE_DYE));
         Vector direction = player.getEyeLocation().getDirection().normalize();
         double speed = switch (kit) {
-            case "charger" -> 3.0D;
-            case "lobber" -> 1.15D;
-            case "dualies" -> 1.45D;
-            default -> 1.85D;
+            case "charger" -> SuperSploorRules.chargerProjectileSpeed(1.0D);
+            case "lobber" -> SuperSploorRules.debugDouble("LOBBER_PRIMARY_PROJECTILE_SPEED", SuperSploorRules.LOBBER_PRIMARY_PROJECTILE_SPEED);
+            case "dualies" -> SuperSploorRules.debugDouble("DUALIES_PRIMARY_PROJECTILE_SPEED", SuperSploorRules.DUALIES_PRIMARY_PROJECTILE_SPEED);
+            default -> SuperSploorRules.debugDouble("SPRAYER_PRIMARY_PROJECTILE_SPEED", SuperSploorRules.SPRAYER_PRIMARY_PROJECTILE_SPEED);
         };
         Vector velocity = direction.multiply(speed);
-        if ("lobber".equals(kit)) velocity.setY(velocity.getY() + 0.16D);
+        if ("lobber".equals(kit)) velocity.setY(velocity.getY() + SuperSploorRules.debugDouble("LOBBER_PRIMARY_VERTICAL_ARC", SuperSploorRules.LOBBER_PRIMARY_VERTICAL_ARC));
         projectile.setVelocity(velocity);
         projectile.getPersistentDataContainer().set(projectileKey, PersistentDataType.BYTE, (byte) 1);
         UUID projectileId = projectile.getUniqueId();
@@ -1184,10 +1248,10 @@ public final class SuperSploorRuntime implements Listener {
         projectileEntities.put(projectileId, projectile);
         activeProjectiles.add(projectileId);
         projectilePaintRadii.put(projectileId, switch (kit) {
-            case "lobber" -> 3;
-            case "dualies" -> 1;
-            case "charger" -> 0;
-            default -> 2;
+            case "lobber" -> SuperSploorRules.debugInt("LOBBER_PRIMARY_PAINT_RADIUS_BLOCKS", SuperSploorRules.LOBBER_PRIMARY_PAINT_RADIUS_BLOCKS);
+            case "dualies" -> SuperSploorRules.debugInt("DUALIES_PRIMARY_PAINT_RADIUS_BLOCKS", SuperSploorRules.DUALIES_PRIMARY_PAINT_RADIUS_BLOCKS);
+            case "charger" -> SuperSploorRules.debugInt("CHARGER_PRIMARY_PAINT_RADIUS_BLOCKS", SuperSploorRules.CHARGER_PRIMARY_PAINT_RADIUS_BLOCKS);
+            default -> SuperSploorRules.debugInt("SPRAYER_PRIMARY_PAINT_RADIUS_BLOCKS", SuperSploorRules.SPRAYER_PRIMARY_PAINT_RADIUS_BLOCKS);
         });
         if ("charger".equals(kit)) {
             projectilePaintLines.add(projectileId);
@@ -1201,19 +1265,23 @@ public final class SuperSploorRuntime implements Listener {
     private void fireDualiesVolley(Player player, UUID ownerId) {
         UUID volleyId = UUID.randomUUID();
         volleyHitTargets.put(volleyId, new HashSet<>());
-        volleyRemaining.put(volleyId, 2);
+        int projectileCount = Math.max(1, SuperSploorRules.debugInt("DUALIES_PRIMARY_PROJECTILES", SuperSploorRules.DUALIES_PRIMARY_PROJECTILES));
+        volleyRemaining.put(volleyId, projectileCount);
         Vector forward = player.getEyeLocation().getDirection().normalize();
         int team = teams.getOrDefault(ownerId, RED);
-        for (double spread : new double[] {-0.075D, 0.075D}) {
+        double spread = SuperSploorRules.debugDouble("DUALIES_PRIMARY_SPREAD_RADIANS", SuperSploorRules.DUALIES_PRIMARY_SPREAD_RADIANS);
+        for (int index = 0; index < projectileCount; index++) {
+            double spreadAngle = (index - (projectileCount - 1) / 2.0D) * 2.0D * spread;
             Snowball projectile = player.launchProjectile(Snowball.class);
             projectile.setItem(new ItemStack(team == RED ? Material.RED_DYE : Material.LIGHT_BLUE_DYE));
-            projectile.setVelocity(forward.clone().rotateAroundY(spread).multiply(1.45D));
+            projectile.setVelocity(forward.clone().rotateAroundY(spreadAngle)
+                    .multiply(SuperSploorRules.debugDouble("DUALIES_PRIMARY_PROJECTILE_SPEED", SuperSploorRules.DUALIES_PRIMARY_PROJECTILE_SPEED)));
             UUID projectileId = projectile.getUniqueId();
             projectile.getPersistentDataContainer().set(projectileKey, PersistentDataType.BYTE, (byte) 1);
             projectileOwners.put(projectileId, ownerId);
             projectileEntities.put(projectileId, projectile);
             activeProjectiles.add(projectileId);
-            projectilePaintRadii.put(projectileId, 1);
+            projectilePaintRadii.put(projectileId, SuperSploorRules.debugInt("DUALIES_PRIMARY_PAINT_RADIUS_BLOCKS", SuperSploorRules.DUALIES_PRIMARY_PAINT_RADIUS_BLOCKS));
             projectileVolleyIds.put(projectileId, volleyId);
         }
         player.playSound(player.getLocation(), Sound.ENTITY_SNOWBALL_THROW, 0.7F, 1.65F);
@@ -1244,10 +1312,12 @@ public final class SuperSploorRuntime implements Listener {
         if (direction.lengthSquared() < 1.0E-5D) return;
         direction.normalize();
         Location origin = player.getLocation().clone();
-        for (int step = 0; step <= 5; step++) {
+        int rollerPaintSteps = Math.max(0, SuperSploorRules.debugInt("ROLLER_PRIMARY_PAINT_STEPS", SuperSploorRules.ROLLER_PRIMARY_PAINT_STEPS));
+        int rollerPaintRadius = SuperSploorRules.debugInt("ROLLER_PRIMARY_PAINT_RADIUS_BLOCKS", SuperSploorRules.ROLLER_PRIMARY_PAINT_RADIUS_BLOCKS);
+        for (int step = 0; step <= rollerPaintSteps; step++) {
             Location point = origin.clone().add(direction.clone().multiply(step));
             point.setY(player.getLocation().getY() - 0.35D);
-            recordRollerPaint(id, engine.paint(point, team, 1));
+            recordRollerPaint(id, engine.paint(point, team, rollerPaintRadius));
         }
         // The Roller pressures close opponents but cannot repeatedly mark one target every tick.
         for (Player target : new ArrayList<>(players.values())) {
@@ -1256,9 +1326,9 @@ public final class SuperSploorRuntime implements Listener {
                     || respawnAt.containsKey(target.getUniqueId())) continue;
             Vector relative = target.getLocation().toVector().subtract(origin.toVector());
             double along = relative.dot(direction);
-            if (along < 0.0D || along > 4.5D) continue;
+            if (along < 0.0D || along > SuperSploorRules.debugDouble("ROLLER_PRIMARY_HIT_REACH_BLOCKS", SuperSploorRules.ROLLER_PRIMARY_HIT_REACH_BLOCKS)) continue;
             double lateral = relative.clone().subtract(direction.clone().multiply(along)).length();
-            if (lateral <= 1.25D) {
+            if (lateral <= SuperSploorRules.debugDouble("ROLLER_PRIMARY_HIT_WIDTH_BLOCKS", SuperSploorRules.ROLLER_PRIMARY_HIT_WIDTH_BLOCKS)) {
                 applyMark(id, target.getUniqueId(), target);
             }
         }
@@ -1396,7 +1466,7 @@ public final class SuperSploorRuntime implements Listener {
         int count = SuperSploorRules.markCountAfterHit(marks.getOrDefault(targetId, 0));
         marks.put(targetId, count);
         lastHitAt.put(targetId, now);
-        nextMarkRecoveryAt.put(targetId, now + SuperSploorRules.MARK_RECOVERY_DELAY_MILLIS);
+        nextMarkRecoveryAt.put(targetId, now + GameDebugRuntimeOverrides.longValue("SUPER_SPLOOR_MARK_RECOVERY_DELAY_MILLIS", SuperSploorRules.MARK_RECOVERY_DELAY_MILLIS));
         paintArmour(target, targetTeam, count);
         target.playEffect(org.bukkit.EntityEffect.HURT);
         target.getWorld().spawnParticle(Particle.DUST, target.getLocation().add(0.0D, 1.0D, 0.0D),
@@ -1405,7 +1475,7 @@ public final class SuperSploorRuntime implements Listener {
         target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
         contributors.computeIfAbsent(targetId, ignored -> new HashSet<>()).add(attackerId);
         contributorTimes.computeIfAbsent(targetId, ignored -> new HashMap<>()).put(attackerId, now);
-        if (count >= SuperSploorRules.MAX_PAINT_MARKS) {
+        if (count >= GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_MAX_PAINT_MARKS", SuperSploorRules.MAX_PAINT_MARKS)) {
             kills.merge(attackerId, 1, Integer::sum);
             if (!specialChargeSuppressed.contains(attackerId)) {
                 specialCharge.put(attackerId,
@@ -1423,14 +1493,15 @@ public final class SuperSploorRuntime implements Listener {
             }
             splat(targetId, target, attackerId);
         } else {
-            target.sendActionBar(ChatColor.RED + "SPLAT MARK " + count + "/4");
+            target.sendActionBar(ChatColor.RED + "SPLAT MARK " + count + "/"
+                    + GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_MAX_PAINT_MARKS", SuperSploorRules.MAX_PAINT_MARKS));
         }
     }
 
     private void splat(UUID targetId, Player target, UUID killerId) {
         if (!running || respawnAt.containsKey(targetId)) return;
         long now = System.currentTimeMillis();
-        respawnAt.put(targetId, now + SuperSploorRules.SPLAT_RESPAWN_MILLIS);
+        respawnAt.put(targetId, now + GameDebugRuntimeOverrides.longValue("SUPER_SPLOOR_SPLAT_RESPAWN_MILLIS", SuperSploorRules.SPLAT_RESPAWN_MILLIS));
         exitSquidMode(target, targetId);
         chargerChargeStartedAt.remove(targetId);
         stampedeUntil.remove(targetId);
@@ -1495,8 +1566,8 @@ public final class SuperSploorRuntime implements Listener {
         marks.put(id, 0);
         lastHitAt.remove(id);
         nextMarkRecoveryAt.remove(id);
-        ink.put(id, SuperSploorRules.MAX_INK);
-        spawnProtectedUntil.put(id, now + SuperSploorRules.SPAWN_PROTECTION_MILLIS);
+        ink.put(id, GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_MAX_INK", SuperSploorRules.MAX_INK));
+        spawnProtectedUntil.put(id, now + GameDebugRuntimeOverrides.longValue("SUPER_SPLOOR_SPAWN_PROTECTION_MILLIS", SuperSploorRules.SPAWN_PROTECTION_MILLIS));
         contributors.remove(id);
         player.teleport(spawn.clone());
         player.setGameMode(GameMode.ADVENTURE);
@@ -1516,7 +1587,7 @@ public final class SuperSploorRuntime implements Listener {
         if (!SuperSploorRules.canRecoverMark(now, lastHit, nextAt, friendly, count)) return;
         int next = count - 1;
         marks.put(id, next);
-        nextMarkRecoveryAt.put(id, now + SuperSploorRules.MARK_RECOVERY_INTERVAL_MILLIS);
+        nextMarkRecoveryAt.put(id, now + GameDebugRuntimeOverrides.longValue("SUPER_SPLOOR_MARK_RECOVERY_INTERVAL_MILLIS", SuperSploorRules.MARK_RECOVERY_INTERVAL_MILLIS));
         paintArmour(player, teams.get(id), next);
         player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.45F, 1.8F);
     }
@@ -1557,6 +1628,11 @@ public final class SuperSploorRuntime implements Listener {
             if (squidMode.contains(id)) exitSquidMode(player, id);
             return;
         }
+        if (!GameDebugRuntimeOverrides.booleanValue("SUPER_SPLOOR_SQUID_MODE_ENABLED", SuperSploorRules.SQUID_MODE_ENABLED)) {
+            event.setCancelled(true);
+            player.sendActionBar(ChatColor.RED + "Squid Mode is disabled in this debug profile.");
+            return;
+        }
         // 1.8 entered Squid Mode by switching away from the paint gun. Any other
         // selected slot activates it while standing on friendly paint.
         if (event.getNewSlot() != PRIMARY_SLOT) {
@@ -1580,7 +1656,7 @@ public final class SuperSploorRuntime implements Listener {
             if (!viewer.getUniqueId().equals(id)) viewer.hidePlayer(plugin, player);
         }
         player.hideEntity(plugin, squid);
-        player.setWalkSpeed((float) SuperSploorRules.SQUID_WALK_SPEED);
+        player.setWalkSpeed((float) GameDebugRuntimeOverrides.doubleValue("SUPER_SPLOOR_SQUID_WALK_SPEED", SuperSploorRules.SQUID_WALK_SPEED));
         player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_SPLASH, 0.7F, 1.4F);
         player.sendActionBar(ChatColor.GREEN + "SQUID MODE — climb friendly-painted walls and refill ink faster.");
     }

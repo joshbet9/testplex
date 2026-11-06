@@ -19,6 +19,49 @@ public final class CameraShyRules {
     public static final long EXPOSURE_PROTECTION_MILLIS = 1_250L;
     public static final long DOUBLE_TAKE_WINDOW_MILLIS = 5_000L;
     public static final long DOUBLE_ELIMINATION_WINDOW_MILLIS = 15_000L;
+    public static final double PHOTO_LENS_MIN_DOT = 0.94D;
+    public static final long SPOTLIGHT_INTERVAL_MILLIS = 55_000L;
+    public static final long SPOTLIGHT_GLOW_DURATION_MILLIS = 3_000L;
+    public static final long DECOY_FLASH_LIFETIME_MILLIS = 6_000L;
+    public static final long SMOKE_LIFETIME_MILLIS = 4_500L;
+    public static final long SMOKE_ESCAPE_CREDIT_WINDOW_MILLIS = 7_000L;
+    public static final long PURSUIT_ESCAPE_MILLIS = 2_000L;
+    public static final double PURSUIT_ESCAPE_DISTANCE_BLOCKS = 8.0D;
+    public static final double SPOTTER_RANGE_BLOCKS = 18.0D;
+    public static final long SMOKE_ABILITY_COOLDOWN_MILLIS = 25_000L;
+    public static final long DECOY_ABILITY_COOLDOWN_MILLIS = 25_000L;
+    public static final long RUNNER_ABILITY_COOLDOWN_MILLIS = 20_000L;
+    public static final long SPOTTER_ABILITY_COOLDOWN_MILLIS = 25_000L;
+    public static final long UNDERSTUDY_ABILITY_COOLDOWN_MILLIS = 30_000L;
+    public static final long RUNNER_ABILITY_DURATION_MILLIS = 3_000L;
+    public static final int RUNNER_SPEED_AMPLIFIER = 1;
+    public static final long RUNNER_ACHIEVEMENT_WINDOW_MILLIS = 10_000L;
+    public static final long SPOTTER_MARK_DURATION_MILLIS = 15_000L;
+    public static final double DECOY_FORWARD_OFFSET_BLOCKS = 7.0D;
+    public static final double UNDERSTUDY_FORWARD_OFFSET_BLOCKS = 1.6D;
+    public static final double DECOY_APPROACH_RANGE_BLOCKS = 4.0D;
+    public static final double DECOY_LOOK_RANGE_BLOCKS = 11.0D;
+    public static final double DECOY_LOOK_MIN_DOT = 0.70D;
+    public static final double SMOKE_OCCLUSION_RADIUS_BLOCKS = 2.4D;
+    public static final int OUT_OF_FOCUS_WINDOW_TICKS = 10;
+    public static final double OUT_OF_FOCUS_MOVEMENT_DISTANCE_BLOCKS = 4.0D;
+    public static final int GROUP_PHOTO_MIN_TARGETS = 2;
+    public static final int PAPARAZZI_UNIQUE_PHOTOS_REQUIRED = 5;
+    public static final int PRIVATE_INVESTIGATOR_TARGETS_REQUIRED = 3;
+    public static final int FALSE_ALARM_TARGETS_REQUIRED = 3;
+    public static final int ESCAPE_STREAK_REQUIRED = 3;
+    public static final int SMOKE_ESCAPE_STREAK_REQUIRED = 3;
+    public static final int DOUBLE_ELIMINATION_STREAK_REQUIRED = 2;
+    public static final int REVENGE_KILLS_REQUIRED = 3;
+    public static final int UNTOUCHABLE_WINS_REQUIRED = 3;
+    public static final int NARROW_ESCAPE_EXPOSURES = 4;
+    public static final int PICTURE_PERFECT_PHOTOS_REQUIRED = 10;
+    public static final int STAGE_FRIGHT_EXPOSURES = 4;
+    public static final long STAGE_FRIGHT_DURATION_MILLIS = 60_000L;
+
+    public static long debugRoundDeadline(boolean live, long nowMillis, long currentDeadlineMillis) {
+        return live ? Math.min(currentDeadlineMillis, nowMillis) : currentDeadlineMillis;
+    }
 
     private CameraShyRules() { }
 
@@ -70,7 +113,8 @@ public final class CameraShyRules {
     }
 
     public static boolean eliminatedAt(int exposures) {
-        return exposures >= PHOTOS_TO_ELIMINATE;
+        return exposures >= GameDebugRuntimeOverrides.intValue(
+                "CAMERA_SHY_PHOTOS_TO_ELIMINATE", PHOTOS_TO_ELIMINATE);
     }
 
     public static boolean mayPhotograph(long now, long nextCameraReadyAt, long targetProtectedUntil) {
@@ -78,11 +122,56 @@ public final class CameraShyRules {
     }
 
     public static boolean isClosePhoto(double distance) {
-        return distance >= 0.0D && distance <= CLOSE_PHOTO_BLOCKS;
+        return distance >= 0.0D && distance <= GameDebugRuntimeOverrides.doubleValue(
+                "CAMERA_SHY_CLOSE_PHOTO_BLOCKS", CLOSE_PHOTO_BLOCKS);
     }
 
     public static boolean isLongDistancePhoto(double distance) {
-        return distance >= LONG_PHOTO_BLOCKS && distance <= CAMERA_RANGE_BLOCKS;
+        return distance >= GameDebugRuntimeOverrides.doubleValue(
+                "CAMERA_SHY_LONG_PHOTO_BLOCKS", LONG_PHOTO_BLOCKS)
+                && distance <= GameDebugRuntimeOverrides.doubleValue(
+                        "CAMERA_SHY_CAMERA_RANGE_BLOCKS", CAMERA_RANGE_BLOCKS);
+    }
+
+    public static double photoLensMinDot() {
+        return Math.max(-1.0D, Math.min(1.0D, GameDebugRuntimeOverrides.doubleValue(
+                "CAMERA_SHY_PHOTO_LENS_MIN_DOT", PHOTO_LENS_MIN_DOT)));
+    }
+
+    public static boolean debuggableRule(String name) {
+        return java.util.Set.of("PHOTOS_TO_ELIMINATE", "MAX_PLAYERS", "MIN_PLAYERS", "MATCH_SECONDS",
+                "CAMERA_RANGE_BLOCKS", "CLOSE_PHOTO_BLOCKS", "LONG_PHOTO_BLOCKS", "PHOTO_COOLDOWN_MILLIS",
+                "FINAL_SNAPSHOT_COOLDOWN_MILLIS", "EXPOSURE_PROTECTION_MILLIS", "DOUBLE_TAKE_WINDOW_MILLIS",
+                "DOUBLE_ELIMINATION_WINDOW_MILLIS", "PHOTO_LENS_MIN_DOT", "SPOTLIGHT_INTERVAL_MILLIS",
+                "SPOTLIGHT_GLOW_DURATION_MILLIS", "DECOY_FLASH_LIFETIME_MILLIS", "SMOKE_LIFETIME_MILLIS",
+                "SMOKE_ESCAPE_CREDIT_WINDOW_MILLIS", "PURSUIT_ESCAPE_MILLIS", "PURSUIT_ESCAPE_DISTANCE_BLOCKS",
+                "SPOTTER_RANGE_BLOCKS", "SMOKE_ABILITY_COOLDOWN_MILLIS", "DECOY_ABILITY_COOLDOWN_MILLIS",
+                "RUNNER_ABILITY_COOLDOWN_MILLIS", "SPOTTER_ABILITY_COOLDOWN_MILLIS",
+                "UNDERSTUDY_ABILITY_COOLDOWN_MILLIS", "RUNNER_ABILITY_DURATION_MILLIS", "RUNNER_SPEED_AMPLIFIER",
+                "RUNNER_ACHIEVEMENT_WINDOW_MILLIS", "SPOTTER_MARK_DURATION_MILLIS",
+                "DECOY_FORWARD_OFFSET_BLOCKS", "UNDERSTUDY_FORWARD_OFFSET_BLOCKS", "DECOY_APPROACH_RANGE_BLOCKS",
+                "DECOY_LOOK_RANGE_BLOCKS", "DECOY_LOOK_MIN_DOT", "SMOKE_OCCLUSION_RADIUS_BLOCKS",
+                "OUT_OF_FOCUS_WINDOW_TICKS", "OUT_OF_FOCUS_MOVEMENT_DISTANCE_BLOCKS",
+                "GROUP_PHOTO_MIN_TARGETS", "PAPARAZZI_UNIQUE_PHOTOS_REQUIRED",
+                "PRIVATE_INVESTIGATOR_TARGETS_REQUIRED", "FALSE_ALARM_TARGETS_REQUIRED",
+                "ESCAPE_STREAK_REQUIRED", "SMOKE_ESCAPE_STREAK_REQUIRED", "DOUBLE_ELIMINATION_STREAK_REQUIRED",
+                "REVENGE_KILLS_REQUIRED", "UNTOUCHABLE_WINS_REQUIRED", "NARROW_ESCAPE_EXPOSURES",
+                "PICTURE_PERFECT_PHOTOS_REQUIRED", "STAGE_FRIGHT_EXPOSURES", "STAGE_FRIGHT_DURATION_MILLIS")
+                .contains(name);
+    }
+
+    static int intSetting(String name, int fallback) {
+        return debuggableRule(name) ? GameDebugRuntimeOverrides.intValue("CAMERA_SHY_" + name, fallback) : fallback;
+    }
+
+    static long longSetting(String name, long fallback) {
+        return debuggableRule(name) ? GameDebugRuntimeOverrides.longValue("CAMERA_SHY_" + name, fallback) : fallback;
+    }
+
+    static double doubleSetting(String name, double fallback) {
+        double value = debuggableRule(name)
+                ? GameDebugRuntimeOverrides.doubleValue("CAMERA_SHY_" + name, fallback) : fallback;
+        return Double.isFinite(value) ? value : fallback;
     }
 
     public static boolean withinWindow(long now, long previous, long windowMillis) {

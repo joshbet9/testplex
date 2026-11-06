@@ -77,7 +77,7 @@ public final class TestplexModernArcade extends JavaPlugin implements Listener {
             long ready = catalog.getGames().stream().filter(game -> game.isReadyForTest()).count();
             sender.sendMessage(ChatColor.GRAY + "Ready for in-game testing: " + ready);
             sender.sendMessage(ChatColor.GRAY + "All 18 games remain mechanics-in-progress; 16 first-pass ports are available when ArcadeMechanicsModern is installed.");
-            sender.sendMessage(ChatColor.GRAY + "Live cosmetic renderers: Spleef Block Break Signature and Paintball Weapon & Pellet Identity; other game renderers remain in progress.");
+            sender.sendMessage(ChatColor.GRAY + "Approved per-game cosmetic lines are catalogued; gameplay hooks cover ability effects, scoring, projectiles, map visuals and Monster Maze mob sets. Live visual acceptance is still pending.");
         });
 
         getLogger().info("Modern Arcade platform enabled: " + catalog.size()
@@ -155,6 +155,19 @@ public final class TestplexModernArcade extends JavaPlugin implements Listener {
         return null;
     }
 
+    /** Return all selected options from one game cosmetic line, including multi-select lines. */
+    public java.util.Set<String> getSelectedCosmeticOptions(UUID playerId, String gameId, String lineId) {
+        if (playerId == null || gameId == null || lineId == null || catalog == null || preferences == null) {
+            return java.util.Set.of();
+        }
+        GameDefinition game = catalog.getGame(cosmeticGameId(gameId));
+        if (game == null) return java.util.Set.of();
+        for (var line : game.getCosmeticLines()) {
+            if (lineId.equals(line.getId())) return java.util.Set.copyOf(preferences.getSelected(playerId, game, line));
+        }
+        return java.util.Set.of();
+    }
+
     /** Persist a game-port selection through the same in-memory store used by the cosmetics menu. */
     public boolean chooseCosmeticOption(UUID playerId, String gameId, String lineId, String optionId) {
         if (playerId == null || gameId == null || lineId == null || optionId == null
@@ -165,12 +178,25 @@ public final class TestplexModernArcade extends JavaPlugin implements Listener {
             if (!lineId.equals(line.getId())) continue;
             try {
                 preferences.chooseOption(playerId, game, line, optionId);
+                if ("monster-maze".equals(game.getId())) refreshMonsterMazeCosmetics(playerId);
                 return true;
             } catch (IllegalArgumentException exception) {
                 return false;
             }
         }
         return false;
+    }
+
+    public void refreshMonsterMazeCosmetics(UUID playerId) {
+        Player player = Bukkit.getPlayer(playerId);
+        org.bukkit.plugin.Plugin mechanics = Bukkit.getPluginManager().getPlugin("ArcadeMechanicsModern");
+        if (player == null || mechanics == null || !mechanics.isEnabled()) return;
+        try {
+            mechanics.getClass().getMethod("refreshMonsterMazeCosmeticPreferences", Player.class)
+                    .invoke(mechanics, player);
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            getLogger().fine("Could not refresh Monster Maze mob and objective cosmetics: " + exception.getMessage());
+        }
     }
 
     private String cosmeticGameId(String gameId) {

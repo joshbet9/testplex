@@ -45,8 +45,11 @@ public final class ModernArcadeLobby implements Listener {
     public static final int PLANE_MIN = -50;
     public static final int PLANE_MAX_EXCLUSIVE = 50;
     public static final int FLOOR_Y = 100;
+    public static final int HOTBAR_PREVIEW_SLOT = 3;
     public static final int HOTBAR_COSMETICS_SLOT = 4;
+    public static final int HOTBAR_BOT_SETUP_SLOT = 5;
     public static final int HOTBAR_GAME_PREFERENCES_SLOT = 6;
+    public static final int HOTBAR_DEBUG_SLOT = 7;
     public static final int HOTBAR_GAME_PANEL_SLOT = 8;
 
     public static final double SPAWN_X = 0.0D;
@@ -191,6 +194,11 @@ public final class ModernArcadeLobby implements Listener {
             ItemStack item = inventory.getItem(slot);
             if (isLobbyHotbarItem(item)) inventory.setItem(slot, null);
         }
+        inventory.setItem(HOTBAR_PREVIEW_SLOT, createHotbarItem(Material.FIREWORK_ROCKET,
+                ChatColor.LIGHT_PURPLE + "Cosmetic Preview Sandbox",
+                List.of(ChatColor.GRAY + "Enter the preview space for the selected game.",
+                        ChatColor.YELLOW + "Show game-specific ability cosmetics.",
+                        ChatColor.DARK_GRAY + "Command: /arcadeport preview"), "arcadeport preview"));
         // Legacy Testplex sandbox hotbar: Mineplex Core supplied Cosmetics in slot 5;
         // GameHostManager supplied Game Panel in slot 9. /stats remained a command, not a hotbar item.
         inventory.setItem(HOTBAR_COSMETICS_SLOT, createHotbarItem(Material.CHEST,
@@ -198,6 +206,11 @@ public final class ModernArcadeLobby implements Listener {
                 List.of(ChatColor.GRAY + "Open the Mineplex-style Cosmetics menu.",
                         ChatColor.YELLOW + "Right-click to browse.",
                         ChatColor.DARK_GRAY + "Command: /cosmetics"), "cosmetics"));
+        inventory.setItem(HOTBAR_BOT_SETUP_SLOT, createHotbarItem(Material.IRON_GOLEM_SPAWN_EGG,
+                ChatColor.AQUA + "Bot Configuration",
+                List.of(ChatColor.GRAY + "Set the bot count and loadouts for the selected game.",
+                        ChatColor.YELLOW + "Choose each bot's kit, team and game cosmetics.",
+                        ChatColor.DARK_GRAY + "Command: /arcadeport bot"), "arcadeport bot"));
         // Speckled Melon (1.8) became Glistering Melon Slice in modern Minecraft.
         inventory.setItem(HOTBAR_GAME_PREFERENCES_SLOT, createHotbarItem(Material.WRITABLE_BOOK,
                 ChatColor.AQUA + "Game Preferences",
@@ -205,6 +218,11 @@ public final class ModernArcadeLobby implements Listener {
                         ChatColor.YELLOW + "Right-click to rate games.",
                         ChatColor.GRAY + "See the live selection likelihood for each game.",
                         ChatColor.DARK_GRAY + "Command: /gamepreferences"), "gamepreferences"));
+        inventory.setItem(HOTBAR_DEBUG_SLOT, createHotbarItem(Material.COMPARATOR,
+                ChatColor.RED + "Game Debug Controls",
+                List.of(ChatColor.GRAY + "Toggle test-only overrides for the selected game.",
+                        ChatColor.YELLOW + "Kit unlock and ability testing options.",
+                        ChatColor.DARK_GRAY + "Command: /arcadeport debug"), "arcadeport debug"));
         inventory.setItem(HOTBAR_GAME_PANEL_SLOT, createHotbarItem(Material.GLISTERING_MELON_SLICE,
                 ChatColor.GREEN + "" + ChatColor.BOLD + "Game Panel",
                 List.of(ChatColor.GRAY + "Open the Testplex Arcade game selector.",

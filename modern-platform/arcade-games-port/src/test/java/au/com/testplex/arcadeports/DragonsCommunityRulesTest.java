@@ -1,6 +1,10 @@
 package au.com.testplex.arcadeports;
 
 import org.junit.jupiter.api.Test;
+import org.bukkit.util.Vector;
+
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class DragonsCommunityRulesTest {
@@ -22,6 +26,27 @@ class DragonsCommunityRulesTest {
         assertEquals(3_500L, ArcadePortRules.DRAGONS_GLIDER_DURATION_MILLIS);
         assertEquals(90_000L, ArcadePortRules.DRAGONS_TAMER_COOLDOWN_MILLIS);
         assertEquals(15_000L, ArcadePortRules.DRAGONS_TAMER_DURATION_MILLIS);
+    }
+
+    @Test void debugFlightTuningChangesTheAutonomousDragonPath() {
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "DRAGONS_TURN_RATE", 0.5D,
+                "DRAGONS_AUTONOMOUS_FLIGHT_SPEED", 0.5D));
+        try {
+            Vector heading = ArcadePortRules.turnDragonHeading(new Vector(0.0D, 0.0D, 1.0D),
+                    new Vector(1.0D, 0.0D, 0.0D), GameDebugRuntimeOverrides.doubleValue(
+                            "DRAGONS_TURN_RATE", ArcadePortRules.DRAGONS_TURN_RATE));
+            Vector flight = ArcadePortRules.autonomousDragonFlight(heading,
+                    GameDebugRuntimeOverrides.doubleValue("DRAGONS_AUTONOMOUS_FLIGHT_SPEED",
+                            ArcadePortRules.DRAGONS_AUTONOMOUS_FLIGHT_SPEED));
+
+            assertTrue(heading.getX() > 0.0D);
+            assertTrue(heading.getZ() > 0.0D);
+            assertEquals(0.5D, Math.hypot(flight.getX(), flight.getZ()), 0.00001D);
+            assertEquals(0.04D, flight.getY(), 0.00001D);
+        } finally {
+            GameDebugRuntimeOverrides.clear();
+        }
     }
 
     @Test void frostPathClampsSteepDirectionsAndOnlyUsesAirOrSnow() {

@@ -3,6 +3,7 @@ package au.com.testplex.snake;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
+import au.com.testplex.arcadeports.GameDebugRuntimeOverrides;
 
 import java.io.File;
 import java.io.IOException;
@@ -37,6 +38,7 @@ public final class SnakeStatsStore {
     }
 
     public void recordKill(Player player, int killsThisRound) {
+        if (GameDebugRuntimeOverrides.isDebugSession()) return;
         String path = base(player.getUniqueId());
         data.set(path + ".lifetime-kills", data.getInt(path + ".lifetime-kills") + 1);
         if (killsThisRound == SnakeRules.CANNIBAL_KILLS_REQUIRED
@@ -44,6 +46,7 @@ public final class SnakeStatsStore {
     }
 
     public void recordSlime(Player player, int slimesThisRound) {
+        if (GameDebugRuntimeOverrides.isDebugSession()) return;
         String path = base(player.getUniqueId());
         data.set(path + ".lifetime-slimes", data.getInt(path + ".lifetime-slimes") + 1);
         if (slimesThisRound == SnakeRules.SLIMY_SHEEP_REQUIRED
@@ -51,6 +54,7 @@ public final class SnakeStatsStore {
     }
 
     public void recordTailLength(Player player, int tailLength) {
+        if (GameDebugRuntimeOverrides.isDebugSession()) return;
         String path = base(player.getUniqueId());
         if (tailLength > data.getInt(path + ".best-tail-length")) {
             data.set(path + ".best-tail-length", tailLength);
@@ -64,7 +68,8 @@ public final class SnakeStatsStore {
     }
 
     public boolean awardAchievement(UUID player, String achievement) {
-        if (player == null || achievement == null || !ACHIEVEMENTS.contains(achievement)) return false;
+        if (GameDebugRuntimeOverrides.isDebugSession()
+                || player == null || achievement == null || !ACHIEVEMENTS.contains(achievement)) return false;
         String path = base(player) + ".achievements." + achievement;
         if (data.getBoolean(path)) return false;
         data.set(path, true);
@@ -75,6 +80,7 @@ public final class SnakeStatsStore {
 
 
     public void recordGameEnd(UUID player, boolean won, int killsThisRound) {
+        if (GameDebugRuntimeOverrides.isDebugSession()) return;
         String path = base(player);
         data.set(path + ".games-played", data.getInt(path + ".games-played") + 1);
         if (won) data.set(path + ".wins", data.getInt(path + ".wins") + 1);
@@ -83,6 +89,7 @@ public final class SnakeStatsStore {
     }
 
     public void publishToArcadeStats(UUID player, boolean won, int kills, boolean knockedOut) {
+        if (GameDebugRuntimeOverrides.isDebugSession()) return;
         org.bukkit.plugin.Plugin arcade = plugin.getServer().getPluginManager().getPlugin("ArcadeMechanicsModern");
         if (arcade == null || !arcade.isEnabled()) return;
         try {

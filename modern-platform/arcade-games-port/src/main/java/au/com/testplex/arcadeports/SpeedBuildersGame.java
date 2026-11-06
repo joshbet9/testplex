@@ -81,8 +81,7 @@ public final class SpeedBuildersGame implements Listener {
     private static final String SOURCE_WORLD_NAME = "arcadeport_source_speedbuilders_v1";
     private static final String MIRROR_WORLD_NAME = "arcadeport_source_speedbuilders_v2";
     private static final String SOURCE_MAP_RESOURCE = "source-maps/Speed Builders/SpeedBuilders_Shroomland_Lake.zip";
-    private static final int DEFAULT_MATCH_ROUNDS = 5;
-    private static final int FINAL_RESULTS_SECONDS = 5;
+    private static final int DEFAULT_MATCH_ROUNDS = SpeedBuildersRules.DEFAULT_MATCH_ROUNDS;
     private static final long NORMAL_QUEUE_TICKS = 100L;
     private static final long QUICK_QUEUE_TICKS = 40L;
 
@@ -106,14 +105,17 @@ public final class SpeedBuildersGame implements Listener {
     private long phaseDeadlineTick;
     private int round;
     private int matchRoundLimit = DEFAULT_MATCH_ROUNDS;
-    private int buildTimeTracker = SpeedBuildersRules.DEFAULT_BUILD_SECONDS;
+    private int buildTimeTracker = GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_DEFAULT_BUILD_SECONDS", SpeedBuildersRules.DEFAULT_BUILD_SECONDS);
     private long buildPhaseStartedTick;
     private boolean firstPerfectBuildAwarded;
-    private int buildSeconds = SpeedBuildersRules.DEFAULT_BUILD_SECONDS;
+    private int buildSeconds = GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_DEFAULT_BUILD_SECONDS", SpeedBuildersRules.DEFAULT_BUILD_SECONDS);
     private Template currentTemplate;
     private String stopReason = "";
     private boolean shuttingDown;
     private boolean standaloneSessionLockAcquired;
+    private boolean testRosterStarting;
+    private boolean cancelPendingTestRoster;
+    private String pendingTestRosterStopReason = "Speed Builders start was cancelled.";
 
     SpeedBuildersGame(ArcadeMechanicsModernPlugin plugin) {
         this.plugin = plugin;
@@ -121,7 +123,45 @@ public final class SpeedBuildersGame implements Listener {
     }
 
     public boolean isActive() {
-        return phase != Phase.IDLE;
+        return phase != Phase.IDLE || testRosterStarting;
+    }
+
+    /** Shortens the current round phase to one tick for authorised test tooling. */
+    public boolean debugAdvancePhase() {
+        if (phase == Phase.IDLE) return false;
+        phaseDeadlineTick = tick;
+        return true;
+    }
+
+    /** Restore only this authorised tester's active build from the current source template. */
+    public boolean debugResetOwnBuild(Player tester) {
+        if (tester == null || !tester.isOnline()) return false;
+        UUID id = tester.getUniqueId();
+        PlayerState state = players.get(id);
+        if (!SpeedBuildersRules.canDebugResetOwnBuild(plugin.hasAdminAccess(tester), phase == Phase.BUILDING,
+                state != null && state.player.equals(tester), state != null && state.perfect, currentTemplate != null)) {
+            return false;
+        }
+        GameDebugRuntimeOverrides.markDebugSession();
+        state.blocksPlaced = 0;
+        state.blocksBroken = 0;
+        state.mobsBuilt = 0;
+        state.score = 0;
+        state.roundPoints = 0;
+        state.roundBuildTimeTicks = 0L;
+        state.buildTimeRecorded = false;
+        removeMobs(state.mobs);
+        restorePlot(state.plot);
+        pasteTemplate(state.plot, currentTemplate);
+        if (GameDebugRuntimeOverrides.booleanValue("SPEED_BUILDERS_TEMPLATE_MOBS_ENABLED",
+                SpeedBuildersRules.TEMPLATE_MOBS_ENABLED)) {
+            spawnTemplateMobs(state, state.plot, currentTemplate);
+        }
+        state.perfect = false;
+        teleportToPlot(state);
+        tester.sendMessage(ChatColor.YELLOW + "Your build was reset to the current template for testing.");
+        refreshHud();
+        return true;
     }
 
     public String status() {
@@ -129,6 +169,13 @@ public final class SpeedBuildersGame implements Listener {
         return phase.name() + " round=" + round + "/" + matchRoundLimit + " builders=" + activePlayers().size()
                 + " templates=" + templates.size()
                 + " build=" + (currentTemplate == null ? "none" : currentTemplate.name());
+    }
+
+    public int queuedCount() {
+        return (int) queue.stream().filter(id -> {
+            Player player = Bukkit.getPlayer(id);
+            return player != null && player.isOnline();
+        }).count();
     }
 
     public static boolean isStatsRequest(String[] args) {
@@ -230,18 +277,10 @@ public final class SpeedBuildersGame implements Listener {
         List<Player> participants = new ArrayList<>();
         for (UUID id : queue) {
             Player player = Bukkit.getPlayer(id);
-            if (player != null && player.isOnline()) participants.add(player);
+            if (player != null && player.isOnline() && !plugin.isTestPlayer(player)) participants.add(player);
             if (participants.size() == SpeedBuildersRules.MAX_PLAYERS) break;
         }
         queue.removeIf(id -> Bukkit.getPlayer(id) == null || !Bukkit.getPlayer(id).isOnline());
-        if (participants.size() < SpeedBuildersRules.MIN_PLAYERS) {
-            if (sender != null) sender.sendMessage(ChatColor.YELLOW + "Join the Speed Builders queue with /arcadeport play speed-builders, then start again.");
-            for (Player player : participants) {
-                player.sendMessage(ChatColor.YELLOW + "Speed Builders is waiting for another player; your queue place is retained.");
-            }
-            queueDeadlineTick = queue.isEmpty() ? -1L : tick + NORMAL_QUEUE_TICKS;
-            return;
-        }
         if (!plugin.canStartSpeedBuilders()) {
             if (sender != null) sender.sendMessage(ChatColor.RED + "Another Arcade game is currently active. Speed Builders will wait until it ends.");
             for (Player player : participants) {
@@ -250,12 +289,126 @@ public final class SpeedBuildersGame implements Listener {
             queueDeadlineTick = -1L;
             return;
         }
-        queue.clear();
-        queueDeadlineTick = -1L;
-        startMatch(participants);
+        ArcadePortManager manager = plugin.getArcadePortManager();
+        if (manager == null) {
+            if (sender != null) sender.sendMessage(ChatColor.RED + "Speed Builders cannot access the shared test-player manager.");
+            return;
+        }
+        int configuredBots = manager.configuredTestBotCount(ArcadePortGame.SPEED_BUILDERS);
+        int botsNeeded = SpeedBuildersRules.testPlayersNeeded(participants.size(), configuredBots);
+        if (participants.size() + botsNeeded < SpeedBuildersRules.MIN_PLAYERS) {
+            if (sender != null) sender.sendMessage(ChatColor.YELLOW
+                    + "Join Speed Builders or increase its configured bot count in Bot Configuration.");
+            for (Player player : participants) {
+                player.sendMessage(ChatColor.YELLOW + "Speed Builders is waiting for another player; your queue place is retained.");
+            }
+            queueDeadlineTick = queue.isEmpty() ? -1L : tick + NORMAL_QUEUE_TICKS;
+            return;
+        }
+        if (botsNeeded == 0) {
+            queue.clear();
+            queueDeadlineTick = -1L;
+            startMatch(participants);
+            return;
+        }
+
+        ArcadeTestPlayerManager testPlayers = manager.testPlayerManager();
+        if (!testPlayers.isStartupCleanupComplete() || testPlayers.isCleanupInProgress()) {
+            if (sender != null) sender.sendMessage(ChatColor.YELLOW
+                    + "Speed Builders is waiting for the previous test-player cleanup to finish.");
+            queueDeadlineTick = -1L;
+            return;
+        }
+        if (!testPlayers.isStartupCleanupSuccessful() || !testPlayers.isAvailableForDamageablePlayers()) {
+            if (sender != null) sender.sendMessage(ChatColor.RED
+                    + "Speed Builders cannot fill its configured test roster. Check FakePlayerPlugin startup and damageable-player settings.");
+            return;
+        }
+        try {
+            plugin.prepareForSpeedBuilders();
+            standaloneSessionLockAcquired = true;
+        } catch (RuntimeException failure) {
+            if (sender != null) sender.sendMessage(ChatColor.RED
+                    + "Speed Builders could not reserve the shared Arcade lane: " + failure.getMessage());
+            return;
+        }
+
+        testRosterStarting = true;
+        cancelPendingTestRoster = false;
+        Location botSpawn = participants.isEmpty()
+                ? manager.testPlayerLobbySpawn() : participants.get(0).getLocation();
+        Player owner = participants.isEmpty() ? null : participants.get(0);
+        try {
+            testPlayers.spawnForMatch(botsNeeded, botSpawn, owner, result -> {
+            testRosterStarting = false;
+            if (cancelPendingTestRoster) {
+                testPlayers.despawnSessionPlayers();
+                queue.clear();
+                queueDeadlineTick = -1L;
+                releaseSessionLockAfterRestoration();
+                Bukkit.broadcastMessage(ChatColor.YELLOW + pendingTestRosterStopReason);
+                return;
+            }
+            if (!result.succeeded()) {
+                if (sender != null) sender.sendMessage(ChatColor.RED
+                        + "Speed Builders could not create its configured AFK player roster: " + result.error());
+                testPlayers.despawnSessionPlayers();
+                releaseSessionLockAfterRestoration();
+                return;
+            }
+            try {
+                List<Player> roster = new ArrayList<>();
+                participants.stream().filter(player -> player != null && player.isOnline()).forEach(roster::add);
+                List<Player> bots = result.players();
+                for (int index = 0; index < bots.size(); index++) {
+                    Player bot = bots.get(index);
+                    if (bot == null || !bot.isOnline()) continue;
+                    manager.applyConfiguredTestBotLoadout(ArcadePortGame.SPEED_BUILDERS, index, bot);
+                    roster.add(bot);
+                }
+                if (roster.size() < SpeedBuildersRules.MIN_PLAYERS) {
+                    testPlayers.despawnSessionPlayers();
+                    releaseSessionLockAfterRestoration();
+                    if (sender != null) sender.sendMessage(ChatColor.RED
+                            + "Speed Builders lost all queued players before its test roster joined.");
+                    return;
+                }
+                queue.clear();
+                queueDeadlineTick = -1L;
+                startMatch(roster);
+                for (Player bot : bots) {
+                    if (bot != null && bot.isOnline()) {
+                        testPlayers.syncMatchRespawnLocation(bot);
+                        bot.sendMessage(ChatColor.GRAY + "AFK Test Player — controlled by Testplex game testing.");
+                    }
+                }
+            } catch (RuntimeException failure) {
+                plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                        "Speed Builders failed while applying its configured test-player loadouts.", failure);
+                testPlayers.despawnSessionPlayers();
+                releaseSessionLockAfterRestoration();
+                if (sender != null) sender.sendMessage(ChatColor.RED
+                        + "Speed Builders could not finish preparing the configured bot loadouts.");
+            }
+            });
+        } catch (RuntimeException failure) {
+            testRosterStarting = false;
+            testPlayers.despawnSessionPlayers();
+            releaseSessionLockAfterRestoration();
+            plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                    "Speed Builders could not start its configured test-player roster.", failure);
+            if (sender != null) sender.sendMessage(ChatColor.RED
+                    + "Speed Builders could not start its configured AFK player roster.");
+        }
     }
 
     public void stop(String reason) {
+        if (testRosterStarting) {
+            cancelPendingTestRoster = true;
+            pendingTestRosterStopReason = reason == null || reason.isBlank()
+                    ? "Speed Builders was stopped." : reason;
+            return;
+        }
         if (!isActive()) {
             queue.clear();
             queueDeadlineTick = -1L;
@@ -351,6 +504,10 @@ public final class SpeedBuildersGame implements Listener {
             return;
         }
 
+        for (PlayerState state : players.values()) {
+            if (state != null) disablePlayerCollision(state.player);
+        }
+
         if (tick >= phaseDeadlineTick) {
             switch (phase) {
                 case VIEWING -> beginBuildingPhase();
@@ -363,20 +520,32 @@ public final class SpeedBuildersGame implements Listener {
         if (tick % 20L == 0L) refreshHud();
     }
 
+    private static void disablePlayerCollision(Player player) {
+        if (player == null || !player.isOnline()) return;
+        player.setCollidable(false);
+        for (org.bukkit.scoreboard.Team team : player.getScoreboard().getTeams()) {
+            team.setOption(org.bukkit.scoreboard.Team.Option.COLLISION_RULE,
+                    org.bukkit.scoreboard.Team.OptionStatus.NEVER);
+        }
+    }
+
     private void startMatch(List<Player> participants) {
         try {
-            plugin.prepareForSpeedBuilders();
-            standaloneSessionLockAcquired = true;
+            if (!standaloneSessionLockAcquired) {
+                plugin.prepareForSpeedBuilders();
+                standaloneSessionLockAcquired = true;
+            }
             loadSourceTemplates(participants.size());
             arena = ensureArena();
             buildArenaFloor();
-            matchRoundLimit = Math.max(1, Math.min(templates.size(),
-                    plugin.getConfig().getInt("speed-builders.match-rounds", DEFAULT_MATCH_ROUNDS)));
+            int configuredRounds = GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_DEFAULT_MATCH_ROUNDS",
+                    plugin.getConfig().getInt("speed-builders.match-rounds", DEFAULT_MATCH_ROUNDS));
+            matchRoundLimit = Math.max(1, Math.min(templates.size(), configuredRounds));
             players.clear();
             matchHistory.clear();
             round = 0;
-            buildTimeTracker = SpeedBuildersRules.DEFAULT_BUILD_SECONDS;
-            buildSeconds = SpeedBuildersRules.DEFAULT_BUILD_SECONDS;
+            buildTimeTracker = GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_DEFAULT_BUILD_SECONDS", SpeedBuildersRules.DEFAULT_BUILD_SECONDS);
+            buildSeconds = GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_DEFAULT_BUILD_SECONDS", SpeedBuildersRules.DEFAULT_BUILD_SECONDS);
             firstPerfectBuildAwarded = false;
             unusedTemplates.clear();
             unusedTemplates.addAll(templates);
@@ -640,9 +809,9 @@ public final class SpeedBuildersGame implements Listener {
         round++;
         buildSeconds = currentTemplate.timing().buildSeconds(buildTimeTracker);
         // Reborn computes the next round's time before decrementing the tracker.
-        if (round > 1) buildTimeTracker = Math.max(1, buildTimeTracker - 1);
+        if (round > 1) buildTimeTracker = SpeedBuildersRules.nextBuildTimeTracker(buildTimeTracker);
         phase = Phase.VIEWING;
-        phaseDeadlineTick = tick + SpeedBuildersRules.DEFAULT_VIEW_SECONDS * 20L;
+        phaseDeadlineTick = tick + GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_DEFAULT_VIEW_SECONDS", SpeedBuildersRules.DEFAULT_VIEW_SECONDS) * 20L;
 
         for (PlayerState state : builders) {
             state.perfect = false;
@@ -652,10 +821,13 @@ public final class SpeedBuildersGame implements Listener {
             removeMobs(state.mobs);
             restorePlot(state.plot);
             pasteTemplate(state.plot, currentTemplate);
-            spawnTemplateMobs(state, state.plot, currentTemplate);
+            if (GameDebugRuntimeOverrides.booleanValue("SPEED_BUILDERS_TEMPLATE_MOBS_ENABLED",
+                    SpeedBuildersRules.TEMPLATE_MOBS_ENABLED)) {
+                spawnTemplateMobs(state, state.plot, currentTemplate);
+            }
             teleportToPlot(state);
             state.player.sendTitle(ChatColor.GOLD + currentTemplate.name(),
-                    ChatColor.YELLOW + "Memorise the model — " + SpeedBuildersRules.DEFAULT_VIEW_SECONDS + " seconds",
+                    ChatColor.YELLOW + "Memorise the model — " + GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_DEFAULT_VIEW_SECONDS", SpeedBuildersRules.DEFAULT_VIEW_SECONDS) + " seconds",
                     5, 50, 10);
             state.player.playSound(state.player.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_PLING, 0.8F, 1.15F);
         }
@@ -699,7 +871,8 @@ public final class SpeedBuildersGame implements Listener {
 
         for (PlayerState state : builders) {
             state.score = score(state);
-            boolean perfectBuild = state.score == currentTemplate.expectedScore();
+            boolean perfectBuild = SpeedBuildersRules.meetsPerfectScore(
+                    state.score, currentTemplate.expectedScore());
             if (perfectBuild && !state.perfect) {
                 markPerfectBuild(state);
             } else if (!perfectBuild) {
@@ -723,9 +896,9 @@ public final class SpeedBuildersGame implements Listener {
         Bukkit.broadcastMessage(ChatColor.YELLOW + "Round " + round + "/" + matchRoundLimit
                 + " complete. Scores are calculated automatically; every builder remains in the game.");
         phase = round >= matchRoundLimit ? Phase.RESULTS : Phase.INTERMISSION;
-        phaseDeadlineTick = tick + (phase == Phase.RESULTS
-                ? FINAL_RESULTS_SECONDS * 20L
-                : SpeedBuildersRules.INTERMISSION_SECONDS * 20L);
+        phaseDeadlineTick = tick + SpeedBuildersRules.intermissionOrResultsTicks(phase == Phase.RESULTS,
+                GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_INTERMISSION_SECONDS",
+                        SpeedBuildersRules.INTERMISSION_SECONDS));
         refreshHud();
     }
 
@@ -739,10 +912,11 @@ public final class SpeedBuildersGame implements Listener {
         }
         Map<String, Integer> totals = new LinkedHashMap<>();
         Map<String, Long> eligibleBuildTimes = new LinkedHashMap<>();
+        boolean timeTiebreakEnabled = SpeedBuildersRules.perfectBuildTimeTiebreakEnabled();
         for (PlayerState state : builders) {
             String id = state.player.getUniqueId().toString();
             totals.put(id, state.totalPoints);
-            if (state.perfectedEveryBuild && state.perfectBuilds == matchRoundLimit) {
+            if (timeTiebreakEnabled && state.perfectedEveryBuild && state.perfectBuilds == matchRoundLimit) {
                 eligibleBuildTimes.put(id, state.totalBuildTimeTicks);
             }
         }
@@ -769,23 +943,27 @@ public final class SpeedBuildersGame implements Listener {
                 .toList();
         String scoreboard = builders.stream()
                 .sorted(java.util.Comparator.comparingInt((PlayerState state) -> state.totalPoints).reversed()
-                        .thenComparing((PlayerState state) ->
-                                !(state.perfectedEveryBuild && state.perfectBuilds == matchRoundLimit))
-                        .thenComparingLong(state -> state.perfectedEveryBuild
+                        .thenComparing(state -> timeTiebreakEnabled
+                                && !(state.perfectedEveryBuild && state.perfectBuilds == matchRoundLimit))
+                        .thenComparingLong(state -> timeTiebreakEnabled && state.perfectedEveryBuild
                                 && state.perfectBuilds == matchRoundLimit
                                 ? state.totalBuildTimeTicks : Long.MAX_VALUE)
                         .thenComparing(state -> state.player.getName(), String.CASE_INSENSITIVE_ORDER))
                 .map(state -> {
                     String result = state.player.getName() + " " + state.totalPoints + " pts";
-                    if (state.perfectedEveryBuild && state.perfectBuilds == matchRoundLimit) {
+                    if (timeTiebreakEnabled && state.perfectedEveryBuild && state.perfectBuilds == matchRoundLimit) {
                         result += " / " + formatBuildTime(state.totalBuildTimeTicks);
                     }
                     return result;
                 })
                 .collect(java.util.stream.Collectors.joining(ChatColor.GRAY + " · " + ChatColor.WHITE));
-        Bukkit.broadcastMessage(ChatColor.GOLD + "Final Speed Builders scores (build time shown only for players who perfected every build): "
+        Bukkit.broadcastMessage(ChatColor.GOLD + (timeTiebreakEnabled
+                ? "Final Speed Builders scores (build time shown only for players who perfected every build): "
+                : "Final Speed Builders scores (accuracy only): ")
                 + ChatColor.WHITE + scoreboard);
-        finishMatchWithWinners(winners, "Highest cumulative accuracy; only players who perfected every build qualify for the cumulative-time tie-break.");
+        finishMatchWithWinners(winners, timeTiebreakEnabled
+                ? "Highest cumulative accuracy; only players who perfected every build qualify for the cumulative-time tie-break."
+                : "Highest cumulative accuracy; build-time tie-break is disabled.");
     }
 
     private String formatBuildTime(long ticks) {
@@ -849,9 +1027,11 @@ public final class SpeedBuildersGame implements Listener {
         matchHistory.clear();
         refreshHud();
         releaseSessionLockAfterRestoration();
+        GameDebugRuntimeOverrides.clear();
     }
 
     private void persistMatchProgress(Set<UUID> winnerIds) {
+        if (GameDebugRuntimeOverrides.isDebugSession()) return;
         for (PlayerState state : players.values()) {
             UUID playerId = state.player.getUniqueId();
             if (plugin.isTestPlayer(playerId)) continue;
@@ -869,6 +1049,7 @@ public final class SpeedBuildersGame implements Listener {
     }
 
     private void persistPlayerProgress(PlayerState state) {
+        if (GameDebugRuntimeOverrides.isDebugSession()) return;
         UUID playerId = state.player.getUniqueId();
         if (plugin.isTestPlayer(playerId)) return;
         SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "blocks-placed", state.blocksPlaced);
@@ -1200,12 +1381,19 @@ public final class SpeedBuildersGame implements Listener {
         PlayerState state = players.get(event.getPlayer().getUniqueId());
         if (state == null || (phase != Phase.BUILDING && phase != Phase.VIEWING)
                 || state.perfect) return;
+        if (!SpeedBuildersRules.doubleJumpEnabled()) {
+            event.setCancelled(true);
+            event.getPlayer().setAllowFlight(false);
+            event.getPlayer().setFlying(false);
+            return;
+        }
         event.setCancelled(true);
         Player player = event.getPlayer();
         player.setAllowFlight(false);
         player.setFlying(false);
         player.playSound(player.getEyeLocation(), org.bukkit.Sound.ENTITY_GHAST_SHOOT, 1.0F, 1.0F);
-        player.setVelocity(new org.bukkit.util.Vector(0.0D, 1.0D, 0.0D));
+        player.setVelocity(new org.bukkit.util.Vector(0.0D,
+                SpeedBuildersRules.doubleJumpVerticalVelocity(), 0.0D));
     }
 
     private boolean isWithinPlot(Plot plot, Block block) {
@@ -1402,14 +1590,16 @@ public final class SpeedBuildersGame implements Listener {
             state.finalRoundLastSecondPerfect = true;
         }
         long elapsedMillis = state.roundBuildTimeTicks * 50L;
-        if (!firstPerfectBuildAwarded) {
-            firstPerfectBuildAwarded = true;
-            SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(), "perfect-first", 1L);
+        if (!GameDebugRuntimeOverrides.isDebugSession()) {
+            if (!firstPerfectBuildAwarded) {
+                firstPerfectBuildAwarded = true;
+                SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(), "perfect-first", 1L);
+            }
+            if (elapsedMillis < 10_000L) {
+                SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(), "speediest-builderizer", 1L);
+            }
+            plugin.saveConfig();
         }
-        if (elapsedMillis < 10_000L) {
-            SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(), "speediest-builderizer", 1L);
-        }
-        plugin.saveConfig();
         Bukkit.broadcastMessage(ChatColor.GOLD + state.player.getName()
                 + ChatColor.YELLOW + " got a perfect build!");
         state.player.sendTitle(ChatColor.GREEN + "PERFECT BUILD!",
@@ -1436,7 +1626,7 @@ public final class SpeedBuildersGame implements Listener {
     private void checkPerfectBuild(PlayerState state) {
         if (phase != Phase.BUILDING || state.perfect || !state.player.isOnline()) return;
         int score = score(state);
-        if (score == currentTemplate.expectedScore()) {
+        if (SpeedBuildersRules.meetsPerfectScore(score, currentTemplate.expectedScore())) {
             markPerfectBuild(state);
             if (activePlayers().stream().allMatch(player -> player.perfect)) finishBuildingPhase();
         }

@@ -126,21 +126,64 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     public MonsterMazePlugin getMonsterMazeModule() {
         return manager == null ? null : manager.getMonsterMazeModule();
     }
+
+    public void refreshMonsterMazeCosmeticPreferences(Player player) {
+        MonsterMazePlugin module = getMonsterMazeModule();
+        if (player == null || module == null) return;
+        module.refreshPlayerMobThemes(player);
+        if (module.getMobThemeManager() != null) module.getMobThemeManager().refreshPlayerPads(player);
+    }
+
+    public boolean isArcadeDebugRound() { return GameDebugRuntimeOverrides.isDebugSession(); }
+    public boolean isArcadeDebugFeatureEnabled(Player player, String feature, boolean fallback) {
+        return player != null && hasAdminAccess(player) && manager != null
+                ? manager.debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.SUPER_SPLOOR, feature, fallback)
+                : fallback;
+    }
+    public boolean isArcadeDebugFeatureEnabled(Player player, ArcadePortGame game, String feature, boolean fallback) {
+        return player != null && hasAdminAccess(player) && manager != null && game != null
+                ? manager.debugFeatureEnabled(player.getUniqueId(), game, feature, fallback)
+                : fallback;
+    }
     public ArcadePortManager getArcadePortManager() { return manager; }
     public String selectedCosmeticOption(Player player, String group) {
-        if (player == null || group == null) return null;
+        return selectedCosmeticOption(player, "snake", group);
+    }
+
+    public String selectedCosmeticOption(Player player, String gameId, String group) {
+        if (player == null || gameId == null || gameId.isBlank() || group == null) return null;
         org.bukkit.plugin.Plugin platform = getServer().getPluginManager().getPlugin("TestplexModernArcade");
         if (platform == null || !platform.isEnabled()) return null;
         try {
             java.lang.reflect.Method method = platform.getClass().getMethod(
                     "getSelectedCosmeticOption", java.util.UUID.class, String.class, String.class);
-            Object value = method.invoke(platform, player.getUniqueId(), "snake", group);
+            Object value = method.invoke(platform, player.getUniqueId(), gameId, group);
             return value instanceof String text && !text.isBlank() ? text : null;
         } catch (ReflectiveOperationException exception) {
-            getLogger().warning("Could not read Snake cosmetic selection from TestplexModernArcade: "
+            getLogger().warning("Could not read " + gameId + " cosmetic selection from TestplexModernArcade: "
                     + exception.getMessage());
             return null;
         }
+    }
+
+    public java.util.Set<String> selectedCosmeticOptions(Player player, String gameId, String lineId) {
+        if (player == null || gameId == null || gameId.isBlank() || lineId == null || lineId.isBlank()) {
+            return null;
+        }
+        org.bukkit.plugin.Plugin platform = getServer().getPluginManager().getPlugin("TestplexModernArcade");
+        if (platform == null || !platform.isEnabled()) return null;
+        try {
+            java.lang.reflect.Method method = platform.getClass().getMethod(
+                    "getSelectedCosmeticOptions", java.util.UUID.class, String.class, String.class);
+            Object value = method.invoke(platform, player.getUniqueId(), gameId, lineId);
+            if (value instanceof java.util.Collection<?> collection) {
+                return collection.stream().filter(String.class::isInstance).map(String.class::cast)
+                        .collect(java.util.stream.Collectors.toUnmodifiableSet());
+            }
+        } catch (ReflectiveOperationException exception) {
+            getLogger().warning("Could not read " + gameId + " enabled cosmetic options: " + exception.getMessage());
+        }
+        return null;
     }
     public PlexballGame getPlexballGame() { return plexball; }
     public SpeedBuildersGame getSpeedBuildersGame() { return speedBuilders; }
@@ -547,8 +590,12 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     sender.sendMessage("Players only.");
                     return true;
                 }
+                if (args.length >= 2 && "gladiators".equalsIgnoreCase(args[1])) {
+                    manager.openGladiatorSpectatorMenu(spectator);
+                    return true;
+                }
                 if (args.length < 2 || !"plexball".equalsIgnoreCase(args[1])) {
-                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport spectate plexball");
+                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport spectate <plexball|gladiators>");
                     return true;
                 }
                 if (plexball != null) plexball.spectate(spectator);
@@ -576,6 +623,12 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             case "bot":
             case "bots":
                 manager.handleBotCommand(sender, java.util.Arrays.copyOfRange(args, 1, args.length));
+                return true;
+            case "debug":
+                manager.handleDebugCommand(sender, java.util.Arrays.copyOfRange(args, 1, args.length));
+                return true;
+            case "preview":
+                manager.handlePreviewCommand(sender, java.util.Arrays.copyOfRange(args, 1, args.length));
                 return true;
             case "maps":
             case "map":

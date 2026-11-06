@@ -28,6 +28,7 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerAnimationEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -35,6 +36,7 @@ import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.persistence.PersistentDataType;
@@ -49,13 +51,34 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /** Legacy-style kit/team lobby pads, cosmetics demo showcase and Bacon Brawl NPC test bots. */
 public final class ModernArcadeLobbyRuntime implements Listener {
     private static final String KIT_TITLE = "Kit Select";
     private static final String QUEUE_TITLE = "Team Select | Queue";
     private static final String BOT_MENU_PREFIX = "Bot Cosmetics | ";
+    private static final String TEST_BOTS_TITLE = "Test Bots: Setup";
+    private static final String TEST_BOT_LOADOUT_TITLE = "Test Bots: Loadout";
+    private static final String TEST_BOT_KITS_TITLE = "Test Bots: Kits";
+    private static final String TEST_BOT_COSMETICS_TITLE = "Test Bots: Cosmetics";
+    private static final String DEBUG_TITLE = "Game Debug Controls";
+    private static final String DEBUG_PROFILES_TITLE = "Debug Profiles";
+    private static final String DEBUG_FEATURES_TITLE = "Debug Features";
+    private static final String DEBUG_VARIABLES_TITLE = "Debug Variables";
+    private static final String DEBUG_EVENTS_TITLE = "Debug Events";
+    private static final String DEBUG_ACHIEVEMENTS_TITLE = "Debug Achievement Preview";
+    private static final List<DebugFeature> COMMON_DEBUG_FEATURES = List.of(
+            new DebugFeature("all-kits", "Unlock all kits", Material.NETHER_STAR,
+                    "Bypass achievement-kit locks for the selected game.", false),
+            new DebugFeature("invulnerable", "Invulnerability", Material.SHIELD,
+                    "Ignore damage to this tester in the selected game.", false),
+            new DebugFeature("no-fall-damage", "Disable fall damage", Material.FEATHER,
+                    "Ignore fall damage to this tester in the selected game.", false),
+            new DebugFeature("no-hunger-loss", "Lock hunger", Material.COOKED_BEEF,
+                    "Keep this tester's hunger full in the selected game.", false));
     private static final String[] THEMES = {"porky", "inferno", "frost", "slime", "royal", "confetti"};
     private static final String[] BOMB_LOBBERS_THEMES = {
             "classic", "ember", "shockwave", "spark", "confetti", "frost", "slime"
@@ -64,20 +87,36 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private static final int KIT_PEDESTAL_X = -17;
     private static final int QUEUE_PEDESTAL_X = 18;
 
-    private final JavaPlugin plugin;
+    private final ArcadeMechanicsModernPlugin plugin;
     private final ArcadePortManager manager;
     private final ModernArcadeLobby lobby;
     private final NamespacedKey actionKey, themeKey, botKey, formKey, displayKey, kitNpcKey, teamNpcKey;
     private final Map<String, Bot> bots = new LinkedHashMap<>();
+    private final Map<java.util.UUID, TestBotMenuState> testBotMenus = new LinkedHashMap<>();
+    private final Map<UUID, DebugPrompt> debugPrompts = new ConcurrentHashMap<>();
+    private final Map<UUID, Integer> debugVariablePages = new LinkedHashMap<>();
+    private final Map<UUID, ArcadePortGame> debugContextGames = new ConcurrentHashMap<>();
     private final Map<java.util.UUID, Long> lastBotHitAtByAttacker = new LinkedHashMap<>();
     private final Map<java.util.UUID, Long> lastBotSwingAtByAttacker = new LinkedHashMap<>();
     private final List<Entity> showcase = new ArrayList<>();
     private final List<Entity> kitNpcs = new ArrayList<>();
     private final List<Entity> teamNpcs = new ArrayList<>();
     private ArcadePortGame selectedGame = ArcadePortGame.BACON_BRAWL;
+    private World cosmeticPreviewWorld;
+    private record TestBotMenuState(TestBotMenuPage page, ArcadePortGame game, int botIndex) {}
+    private enum TestBotMenuPage { SETUP, LOADOUT, KITS, COSMETICS }
+    private record TestBotCosmetic(String lineId, String lineTitle, String optionId,
+            String optionName, String icon) {}
+    private record DebugFeature(String key, String title, Material icon, String description, boolean defaultValue,
+            boolean appliesImmediately) {
+        private DebugFeature(String key, String title, Material icon, String description, boolean defaultValue) {
+            this(key, title, icon, description, defaultValue, false);
+        }
+    }
+    private record DebugPrompt(ArcadePortGame game, String operation) {}
     private BukkitTask task;
 
-    ModernArcadeLobbyRuntime(JavaPlugin plugin, ArcadePortManager manager, ModernArcadeLobby lobby) {
+    ModernArcadeLobbyRuntime(ArcadeMechanicsModernPlugin plugin, ArcadePortManager manager, ModernArcadeLobby lobby) {
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=lobby-runtime-constructor-start");
         this.plugin = plugin; this.manager = manager; this.lobby = lobby;
         actionKey = new NamespacedKey(plugin, "lobby-runtime-action");
@@ -87,6 +126,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         displayKey = new NamespacedKey(plugin, "legacy-lobby-datapoint");
         kitNpcKey = new NamespacedKey(plugin, "lobby-kit-npc");
         teamNpcKey = new NamespacedKey(plugin, "lobby-team-npc");
+        clearLobbyShowcase();
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=lobby-runtime-legacy-bot-cleanup-start");
         clearLegacyBots();
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=lobby-runtime-legacy-bot-cleanup-complete");
@@ -119,6 +159,17 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         }
     }
 
+    private void clearLobbyShowcase() {
+        World world = lobby.ensureWorld();
+        if (world == null) return;
+        for (Entity entity : new ArrayList<>(world.getEntities())) {
+            String tag = entity.getPersistentDataContainer().get(themeKey, PersistentDataType.STRING);
+            if (tag != null && (tag.startsWith("showcase:") || "showcase-label".equals(tag))) {
+                entity.remove();
+            }
+        }
+    }
+
     /** Also purge legacy NPC bots from arena chunks that were not loaded at plugin startup. */
     @EventHandler
     public void onLegacyBotChunkLoad(ChunkLoadEvent event) {
@@ -141,8 +192,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=selected-game-displays-complete");
         refreshKitAndTeamNpcs();
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=selected-game-kit-team-npcs-complete");
-        refreshShowcase();
-        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=selected-game-showcase-complete");
+        if (cosmeticPreviewWorld != null) refreshShowcase();
     }
 
     public void refreshDisplays() {
@@ -403,7 +453,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     }
 
     private void refreshShowcase() {
-        World world = lobby.ensureWorld();
+        World world = ensureCosmeticPreviewWorld();
         if (world == null) return;
         for (Entity e : new ArrayList<>(showcase)) if (e != null && e.isValid()) e.remove();
         showcase.clear();
@@ -411,26 +461,6 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             String tag = e.getPersistentDataContainer().get(themeKey, PersistentDataType.STRING);
             if (tag != null && (tag.startsWith("showcase:") || "showcase-label".equals(tag))) e.remove();
         }
-        if (selectedGame == ArcadePortGame.BACON_BRAWL) {
-            int[] xs = {-9,-6,-3,0,3,6}, zs = {18,26};
-            String[] names = {"Porky","Inferno","Frost","Slime","Royal","Confetti"};
-            for (int row=0; row<2; row++) for (int col=0; col<THEMES.length; col++) {
-                Location at = new Location(world, xs[col]+0.5D, ModernArcadeLobby.FLOOR_Y+1.0D, zs[row]+0.5D);
-                LivingEntity demo;
-                if (row == 0) demo = world.spawn(at, Pig.class);
-                else {
-                    Sheep sheep = world.spawn(at, Sheep.class); sheep.setColor(DyeColor.PINK); demo = sheep;
-                }
-                demo.setCustomName((row==0 ? ChatColor.GOLD+"Pig - " : ChatColor.LIGHT_PURPLE+"Pink Sheep - ")+names[col]+" Set");
-                demo.setCustomNameVisible(true); demo.setInvulnerable(true); demo.setRemoveWhenFarAway(false);
-                demo.setPersistent(false); demo.setSilent(true); demo.setCollidable(false);
-                if(demo instanceof Mob mob) mob.setAI(false);
-                demo.getPersistentDataContainer().set(themeKey, PersistentDataType.STRING, "showcase:"+THEMES[col]);
-                showcase.add(demo);
-            }
-            return;
-        }
-
         String[] themes = showcaseOptions(selectedGame);
         int columns = Math.min(7, Math.max(3, themes.length));
         int left = columns == 7 ? -9 : -(columns - 1) * 2;
@@ -468,37 +498,119 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             label.setMarker(true);
             label.setInvulnerable(true);
             label.setCanPickupItems(false);
-            label.setCustomName(ChatColor.GOLD + titlePrefix + pretty(theme));
+            label.setCustomName(ChatColor.GOLD + titlePrefix + pretty(theme)
+                    + ChatColor.GRAY + " | Right-click to preview");
             label.setCustomNameVisible(true);
             label.getPersistentDataContainer().set(themeKey, PersistentDataType.STRING, "showcase-label");
             showcase.add(label);
         }
     }
 
+    private World ensureCosmeticPreviewWorld() {
+        if (cosmeticPreviewWorld != null) return cosmeticPreviewWorld;
+        World world = Bukkit.getWorld("testplex_cosmetic_preview_v1");
+        if (world == null) {
+            org.bukkit.WorldCreator creator = new org.bukkit.WorldCreator("testplex_cosmetic_preview_v1");
+            creator.type(org.bukkit.WorldType.FLAT);
+            creator.generateStructures(false);
+            world = creator.createWorld();
+        }
+        if (world == null) {
+            plugin.getLogger().severe("Could not create the dedicated game-cosmetic preview world.");
+            return null;
+        }
+        cosmeticPreviewWorld = world;
+        world.setTime(6000L);
+        world.setStorm(false);
+        world.setThundering(false);
+        world.setGameRule(org.bukkit.GameRule.DO_DAYLIGHT_CYCLE, false);
+        world.setGameRule(org.bukkit.GameRule.DO_WEATHER_CYCLE, false);
+        world.setGameRule(org.bukkit.GameRule.DO_MOB_SPAWNING, false);
+        world.getWorldBorder().setCenter(0.0D, 0.0D);
+        world.getWorldBorder().setSize(96.0D);
+        world.getWorldBorder().setDamageAmount(0.0D);
+        for (int x = -20; x <= 20; x++) {
+            for (int z = -4; z <= 36; z++) {
+                world.getBlockAt(x, ModernArcadeLobby.FLOOR_Y, z).setType(Material.SMOOTH_STONE, false);
+            }
+        }
+        world.setSpawnLocation(0, ModernArcadeLobby.FLOOR_Y + 1, 0);
+        return world;
+    }
+
+    public void handlePreviewCommand(org.bukkit.command.CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(ChatColor.YELLOW + "Cosmetic preview mode is available in-game from the Arcade lobby.");
+            return;
+        }
+        if (args.length > 0 && "exit".equalsIgnoreCase(args[0])) {
+            if (cosmeticPreviewWorld != null && player.getWorld() == cosmeticPreviewWorld) {
+                lobby.sendToLobby(player);
+                player.sendMessage(ChatColor.GREEN + "Returned to the Arcade lobby.");
+            }
+            return;
+        }
+        if (cosmeticPreviewWorld != null && player.getWorld() == cosmeticPreviewWorld) {
+            lobby.sendToLobby(player);
+            player.sendMessage(ChatColor.GREEN + "Returned to the Arcade lobby.");
+            return;
+        }
+        if (!lobby.isLobbyWorld(player.getWorld())) {
+            player.sendMessage(ChatColor.YELLOW + "Return to the Arcade lobby before entering cosmetic preview mode.");
+            return;
+        }
+        World world = ensureCosmeticPreviewWorld();
+        if (world == null) {
+            player.sendMessage(ChatColor.RED + "The cosmetic preview sandbox could not be loaded.");
+            return;
+        }
+        refreshShowcase();
+        player.teleport(new Location(world, 0.5D, ModernArcadeLobby.FLOOR_Y + 1.0D, 0.5D));
+        player.setGameMode(org.bukkit.GameMode.ADVENTURE);
+        player.setInvulnerable(true);
+        lobby.ensurePanelItem(player);
+        if (showcaseOptions(selectedGame).length == 0) {
+            player.sendMessage(ChatColor.YELLOW + selectedGame.displayName()
+                    + " has no game-specific cosmetic line to preview.");
+            lobby.sendToLobby(player);
+            return;
+        }
+        player.sendMessage(ChatColor.AQUA + selectedGame.displayName()
+                + ChatColor.GRAY + " cosmetic preview sandbox. Right-click a style to preview it. "
+                + "Use /arcadeport preview exit to return.");
+    }
+
     /**
-     * Keep the lobby preview specific to the selected game's own cosmetic prototype options.
+     * Keep the sandbox preview specific to the selected game's cosmetic options.
      */
     private String[] showcaseOptions(ArcadePortGame game) {
-        return switch (game) {
-            case BOMB_LOBBERS -> BOMB_LOBBERS_THEMES;
-            case DEATH_TAG -> new String[] {"bark-footprints", "soul-ribbons", "lantern-motes"};
-            case DRAGON_ESCAPE -> new String[] {"dragon-eye", "sky-compass", "wing-flare",
-                    "skylands-gate", "dragon-roar", "cloud-surf"};
-            case DRAGONS -> new String[] {"ember-wing", "phoenix-arc", "molten-orbit"};
-            case EVOLUTION -> new String[] {"shell-fragments", "nature-bloom", "void-unfold"};
-            case GLADIATORS -> new String[] {"arena-challenger", "red-sand", "oath-mark"};
-            case MICRO_BATTLES -> new String[] {"cracked-ice", "prism-grid", "molten-seam",
-                    "sweeping-tape", "warning-pips", "shatter-line"};
-            case ONE_IN_THE_QUIVER -> new String[] {"bullseye-dash", "fletching-sparks", "ricochet-rune"};
-            case PAINTBALL -> new String[] {"chrome-marker", "splatter-cannon", "neon-suppressor",
-                    "colourburst", "paint-drip", "stencil-stamp"};
-            case RUNNER -> new String[] {"red-walk", "chalk-dashes", "ribbon-replay"};
-            case SHEEP_QUEST -> new String[] {"sheep-bell", "wool-confetti", "shepherd-flare"};
-            case SPLEEF -> new String[] {"snowburst", "ice-shards", "chalk-grid"};
-            case TURF_WARS -> new String[] {"team-sigil", "turf-crack", "painted-chevron"};
-            case CAMERA_SHY -> new String[] {"smoke-artist", "decoy", "runner", "spotter", "understudy"};
-            default -> new String[] {"classic", "inferno", "frost"};
-        };
+        String[] registered = registeredCosmeticOptions(game);
+        return registered;
+    }
+
+    @SuppressWarnings("unchecked")
+    private String[] registeredCosmeticOptions(ArcadePortGame game) {
+        org.bukkit.plugin.Plugin cosmetics = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
+        if (cosmetics == null || game == null) return new String[0];
+        try {
+            Object catalog = cosmetics.getClass().getMethod("getCatalog").invoke(cosmetics);
+            String gameId = game.isMonsterMaze() ? "monster-maze" : game.id();
+            Object definition = catalog.getClass().getMethod("getGame", String.class).invoke(catalog, gameId);
+            if (definition == null) return new String[0];
+            List<Object> lines = (List<Object>) definition.getClass().getMethod("getCosmeticLines").invoke(definition);
+            List<String> options = new ArrayList<>();
+            for (Object line : lines) {
+                List<Object> choices = (List<Object>) line.getClass().getMethod("getOptions").invoke(line);
+                for (Object choice : choices) {
+                    String id = (String) choice.getClass().getMethod("getId").invoke(choice);
+                    if (!options.contains(id)) options.add(id);
+                }
+            }
+            return options.toArray(String[]::new);
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            plugin.getLogger().fine("Could not read cosmetic preview options: " + exception.getMessage());
+            return new String[0];
+        }
     }
 
     private Material showcaseIcon(ArcadePortGame game, String option) {
@@ -554,6 +666,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
 
     @EventHandler
     public void onLobbyNpcUse(PlayerInteractEntityEvent e) {
+        if (handleCosmeticPreviewUse(e)) return;
         Entity entity = e.getRightClicked();
         String kit = entity.getPersistentDataContainer().get(kitNpcKey, PersistentDataType.STRING);
         String queue = entity.getPersistentDataContainer().get(teamNpcKey, PersistentDataType.STRING);
@@ -584,6 +697,28 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             Bot b = bots.get(bot);
             if (b != null) openBotCosmetics(e.getPlayer(), b);
         }
+    }
+
+    private boolean handleCosmeticPreviewUse(PlayerInteractEntityEvent event) {
+        if (event.getHand() != EquipmentSlot.HAND || cosmeticPreviewWorld == null
+                || event.getPlayer().getWorld() != cosmeticPreviewWorld) return false;
+        Entity display = event.getRightClicked();
+        String tag = display.getPersistentDataContainer().get(themeKey, PersistentDataType.STRING);
+        if (tag == null || !tag.startsWith("showcase:") || "showcase-label".equals(tag)) return false;
+        event.setCancelled(true);
+        String style = tag.substring("showcase:".length());
+        playCosmeticPreview(event.getPlayer(), display.getLocation(), style);
+        return true;
+    }
+
+    private void playCosmeticPreview(Player player, Location source, String style) {
+        World world = source.getWorld();
+        if (world == null || player.getWorld() != world) return;
+        Location center = source.clone().add(0.0D, 1.1D, 0.0D);
+        GameAbilityCosmetics.preview(player, center, style);
+        player.playSound(center, Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8F, 1.2F);
+        player.sendMessage(ChatColor.AQUA + selectedGame.displayName() + ChatColor.GRAY
+                + " preview: " + ChatColor.GOLD + pretty(style));
     }
 
     private static String teamName(int team) {
@@ -767,11 +902,38 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     @EventHandler
     public void onMenuClick(InventoryClickEvent e){
         String title=ChatColor.stripColor(e.getView().getTitle());
-        if(title==null || !(title.equals(KIT_TITLE)||title.equals(QUEUE_TITLE)||title.startsWith(BOT_MENU_PREFIX)))return;
+        if(title==null || !(title.equals(KIT_TITLE)||title.equals(QUEUE_TITLE)||title.startsWith(BOT_MENU_PREFIX)
+                || title.equals(TEST_BOTS_TITLE) || title.equals(TEST_BOT_LOADOUT_TITLE)
+                || title.equals(TEST_BOT_KITS_TITLE) || title.equals(TEST_BOT_COSMETICS_TITLE)
+                || title.equals(DEBUG_TITLE) || title.equals(DEBUG_PROFILES_TITLE)
+                || title.equals(DEBUG_FEATURES_TITLE) || title.equals(DEBUG_EVENTS_TITLE)
+                || title.equals(DEBUG_ACHIEVEMENTS_TITLE)
+                || title.startsWith(DEBUG_VARIABLES_TITLE)))return;
         e.setCancelled(true);
         if(!(e.getWhoClicked() instanceof Player p)||e.getClickedInventory()==null||e.getClickedInventory()!=e.getView().getTopInventory())return;
+        if (isDebugMenuTitle(title) && !plugin.hasAdminAccess(p)) {
+            p.closeInventory();
+            p.sendMessage(ChatColor.RED + "Authorised tester access is required for game debug controls.");
+            return;
+        }
+        if ((title.equals(TEST_BOTS_TITLE) || title.equals(TEST_BOT_LOADOUT_TITLE)
+                || title.equals(TEST_BOT_KITS_TITLE) || title.equals(TEST_BOT_COSMETICS_TITLE))
+                && !plugin.hasAdminAccess(p)) {
+            p.closeInventory();
+            p.sendMessage(ChatColor.RED + "Authorised tester access is required for bot configuration.");
+            return;
+        }
         ItemStack it=e.getCurrentItem();if(it==null||it.getType().isAir()||!it.hasItemMeta())return;
         String action=it.getItemMeta().getPersistentDataContainer().get(actionKey,PersistentDataType.STRING);
+        if (isDebugMenuTitle(title)) {
+            handleDebugMenuClick(p, title, action, e.getClick());
+            return;
+        }
+        if (title.equals(TEST_BOTS_TITLE) || title.equals(TEST_BOT_LOADOUT_TITLE)
+                || title.equals(TEST_BOT_KITS_TITLE) || title.equals(TEST_BOT_COSMETICS_TITLE)) {
+            handleTestBotMenuClick(p, title, action);
+            return;
+        }
         if(KIT_TITLE.equals(title)){
             if(action!=null&&action.startsWith("kit:")){
                 String kit=action.substring(4);
@@ -855,10 +1017,1055 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     }
 
     public void handleBotCommand(org.bukkit.command.CommandSender sender, String[] args) {
-        sender.sendMessage(ChatColor.YELLOW + "Global lobby bots are disabled.");
-        sender.sendMessage(ChatColor.GRAY + "Testplex creates " + ArcadeTestPlayerManager.TARGET_ROSTER_SIZE
-                + " total server-side Player participants for each game start (human players included).");
-        sender.sendMessage(ChatColor.GRAY + "The AFK test players are removed automatically when that match ends.");
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(ChatColor.YELLOW + "Open Bot Configuration from the Arcade lobby hotbar.");
+            return;
+        }
+        if (!lobby.isLobbyWorld(player.getWorld())) {
+            player.sendMessage(ChatColor.YELLOW + "Bot loadouts can be configured from the Arcade lobby before a game starts.");
+            return;
+        }
+        openTestBotSetup(player, selectedGame);
+    }
+
+    public void handleDebugCommand(org.bukkit.command.CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(ChatColor.YELLOW + "Open Game Debug Controls from the Arcade lobby hotbar.");
+            return;
+        }
+        if (!plugin.hasAdminAccess(player)) {
+            player.sendMessage(ChatColor.RED + "Authorised tester access is required for game debug controls.");
+            return;
+        }
+        ArcadePortGame game = lobby.isLobbyWorld(player.getWorld())
+                ? selectedGame : manager.activeDebugGame();
+        if (game == null) {
+            player.sendMessage(ChatColor.YELLOW + "Select a game in the Arcade lobby or join an active game before opening its debug controls.");
+            return;
+        }
+        debugContextGames.put(player.getUniqueId(), game);
+        if (args != null && args.length > 0 && "profile".equalsIgnoreCase(args[0])) {
+            handleDebugProfileCommand(player, args);
+            return;
+        }
+        openDebugMenu(player);
+    }
+
+    private ArcadePortGame debugGame(Player player) {
+        return debugContextGames.getOrDefault(player.getUniqueId(), selectedGame);
+    }
+
+    private void openDebugMenu(Player player) {
+        ArcadePortGame game = debugGame(player);
+        manager.beginDebugContext(player, game);
+        Inventory inventory = Bukkit.createInventory(null, 54, DEBUG_TITLE);
+        String profile = manager.debugProfiles().selected(player.getUniqueId(), game);
+        inventory.setItem(4, item(Material.COMPARATOR, ChatColor.RED + game.displayName() + " Debug",
+                ChatColor.GRAY + "Selected profile: " + ChatColor.WHITE + profile,
+                ChatColor.GRAY + "Controls below are specific to this game."));
+        inventory.setItem(19, testBotButton(Material.WRITABLE_BOOK, "Profiles: " + profile,
+                "Create, load, duplicate, rename, save or delete configurations.", "debug-open:profiles"));
+        inventory.setItem(21, testBotButton(Material.LEVER, "Feature switches",
+                "Per-game features and common test overrides.", "debug-open:features"));
+        inventory.setItem(23, testBotButton(Material.COMPARATOR, "Gameplay variables",
+                "Tune rule constants. Numeric values apply after restarting the round.", "debug-open:variables:0"));
+        inventory.setItem(25, testBotButton(Material.IRON_GOLEM_SPAWN_EGG, "Test bot setup",
+                "Set up the next round's bot count, team, kit and cosmetics.", "debug-open:bots"));
+        inventory.setItem(27, testBotButton(Material.TARGET, "Game event tools",
+                "Trigger supported events in the active game through normal runtime handlers.", "debug-open:events"));
+        inventory.setItem(29, testBotButton(Material.KNOWLEDGE_BOOK, "Achievement previews",
+                "Preview each achievement message; previews never unlock or save progress.", "debug-open:achievements"));
+        inventory.setItem(37, testBotButton(Material.CLOCK, "Profile application",
+                "Immediate switches take effect now. Rule switches and numeric values apply when the next round starts."));
+        inventory.setItem(39, testBotButton(Material.FEATHER, "Advance game phase or timer",
+                "Skip this game's start countdown, live phase, turn, or round timer when supported.", "debug-advance-phase"));
+        inventory.setItem(41, testBotButton(Material.GOLDEN_APPLE, "Restore tester vitals",
+                "In your active round: restore health and hunger, clear fire and potion effects. Does not change stats.",
+                "debug-restore-vitals"));
+        inventory.setItem(40, testBotButton(Material.BARRIER, "Reset to Defaults",
+                "Clear this profile's overrides and restore intended mechanics.", "debug-reset"));
+        inventory.setItem(49, testBotButton(Material.BARRIER, "Close", "debug-close"));
+        player.openInventory(inventory);
+    }
+
+    private boolean isDebugMenuTitle(String title) {
+        return DEBUG_TITLE.equals(title) || DEBUG_PROFILES_TITLE.equals(title)
+                || DEBUG_FEATURES_TITLE.equals(title) || DEBUG_EVENTS_TITLE.equals(title)
+                || DEBUG_ACHIEVEMENTS_TITLE.equals(title)
+                || title != null && title.startsWith(DEBUG_VARIABLES_TITLE);
+    }
+
+    private void handleDebugMenuClick(Player player, String title, String action, ClickType click) {
+        if (action == null) return;
+        if ("debug-close".equals(action)) { player.closeInventory(); return; }
+        if ("debug-back".equals(action)) { openDebugMenu(player); return; }
+        if ("debug-open:profiles".equals(action)) { openDebugProfiles(player); return; }
+        if ("debug-open:features".equals(action)) { openDebugFeatures(player); return; }
+        if ("debug-open:events".equals(action)) { openDebugEvents(player); return; }
+        if ("debug-open:achievements".equals(action)) { openDebugAchievements(player); return; }
+        if ("debug-open:variables:0".equals(action)) { openDebugVariables(player, 0); return; }
+        if ("debug-open:bots".equals(action)) { openTestBotSetup(player, debugGame(player)); return; }
+        ArcadePortGame game = debugGame(player);
+        if (action.startsWith("debug-event:")) {
+            String eventId = action.substring("debug-event:".length());
+            boolean triggered = manager.debugTriggerEvent(player, game, eventId);
+            player.sendMessage(triggered ? ChatColor.GREEN + "The game event was triggered."
+                    : ChatColor.YELLOW + "That event is unavailable for your current game role or phase.");
+            openDebugEvents(player);
+            return;
+        }
+        if (action.startsWith("debug-achievement:")) {
+            boolean previewed = manager.previewAchievementForTester(player, game,
+                    action.substring("debug-achievement:".length()));
+            player.sendMessage(previewed ? ChatColor.AQUA + "Achievement preview shown; progress was not changed."
+                    : ChatColor.YELLOW + "That achievement is unavailable for this game.");
+            openDebugAchievements(player);
+            return;
+        }
+        if ("debug-advance-phase".equals(action)) {
+            boolean advanced = manager.debugAdvanceStartPhase(player, game);
+            player.sendMessage(advanced ? ChatColor.GREEN + "The current supported game phase was advanced."
+                    : ChatColor.YELLOW + "This game has no supported active phase to advance.");
+            openDebugMenu(player);
+            return;
+        }
+        if ("debug-restore-vitals".equals(action)) {
+            boolean restored = manager.debugRestoreTesterVitals(player, game);
+            player.sendMessage(restored ? ChatColor.GREEN + "Your in-round tester vitals were restored."
+                    : ChatColor.YELLOW + "Join a live round of this game before restoring tester vitals.");
+            openDebugMenu(player);
+            return;
+        }
+        if ("debug-reset".equals(action)) {
+            manager.resetDebugProfile(player.getUniqueId(), game);
+            player.sendMessage(ChatColor.GREEN + game.displayName()
+                    + " debug profile reset to intended game defaults.");
+            openDebugMenu(player);
+            return;
+        }
+        if (action.startsWith("debug-toggle:")) {
+            String key = action.substring("debug-toggle:".length());
+            boolean fallback = debugFeatures(game).stream().filter(feature -> feature.key().equals(key))
+                    .map(DebugFeature::defaultValue).findFirst().orElse(false);
+            manager.toggleDebugOverride(player, game, key, fallback);
+            openDebugFeatures(player);
+            return;
+        }
+        if (DEBUG_PROFILES_TITLE.equals(title)) { handleDebugProfileMenuClick(player, action); return; }
+        if (DEBUG_FEATURES_TITLE.equals(title)) return;
+        if (title != null && title.startsWith(DEBUG_VARIABLES_TITLE)) {
+            handleDebugVariableClick(player, action, click);
+        }
+    }
+
+    private void openDebugProfiles(Player player) {
+        ArcadePortGame game = debugGame(player);
+        Inventory inventory = Bukkit.createInventory(null, 54, DEBUG_PROFILES_TITLE);
+        String current = manager.debugProfiles().selected(player.getUniqueId(), game);
+        inventory.setItem(4, item(Material.WRITABLE_BOOK, ChatColor.AQUA + game.displayName() + " Profiles",
+                ChatColor.GRAY + "Selected: " + ChatColor.WHITE + current,
+                ChatColor.GRAY + "Profile changes are saved locally for this tester and game."));
+        int slot = 9;
+        for (String profile : manager.debugProfiles().profiles(player.getUniqueId(), game)) {
+            if (slot > 44) break;
+            boolean selected = profile.equals(current);
+            ItemStack choice = testBotButton(selected ? Material.ENCHANTED_BOOK : Material.BOOK,
+                    (selected ? ChatColor.GREEN : ChatColor.YELLOW) + profile,
+                    ChatColor.GRAY + "Left-click to load this profile.", "debug-profile-load:" + profile);
+            inventory.setItem(slot++, choice);
+        }
+        inventory.setItem(45, testBotButton(Material.WRITABLE_BOOK, "Create profile", "Start with default game mechanics and no overrides.", "debug-profile-prompt:create"));
+        inventory.setItem(46, testBotButton(Material.CARTOGRAPHY_TABLE, "Duplicate profile", "Copy the selected profile to a new name.", "debug-profile-prompt:duplicate"));
+        inventory.setItem(47, testBotButton(Material.NAME_TAG, "Rename profile", "Rename the selected non-default profile.", "debug-profile-prompt:rename"));
+        inventory.setItem(48, testBotButton(Material.LAVA_BUCKET, "Delete profile", "Delete the selected non-default profile.", "debug-profile-prompt:delete"));
+        inventory.setItem(49, testBotButton(Material.ARROW, "Back", "debug-back"));
+        inventory.setItem(51, testBotButton(Material.WRITABLE_BOOK, "Save profile", "Save the selected profile to disk.", "debug-profile-save"));
+        player.openInventory(inventory);
+    }
+
+    private void openDebugFeatures(Player player) {
+        ArcadePortGame game = debugGame(player);
+        Inventory inventory = Bukkit.createInventory(null, 54, DEBUG_FEATURES_TITLE);
+        inventory.setItem(4, item(Material.LEVER, ChatColor.AQUA + game.displayName() + " Features",
+                ChatColor.GRAY + "Settings are isolated to your profile. Each control shows when it applies."));
+        List<DebugFeature> features = debugFeatures(game);
+        int slot = 9;
+        for (DebugFeature feature : features) {
+            if (slot > 44) break;
+            boolean enabled = manager.debugFeatureEnabled(player.getUniqueId(), game,
+                    feature.key(), feature.defaultValue());
+            inventory.setItem(slot++, testBotButton(enabled ? Material.LIME_DYE : feature.icon(),
+                    feature.title() + ": " + (enabled ? ChatColor.GREEN + "On" : ChatColor.RED + "Off"),
+                    feature.description() + " " + (feature.appliesImmediately()
+                            ? "Applies immediately." : "Applies when the next round starts."),
+                    "debug-toggle:" + feature.key()));
+        }
+        inventory.setItem(49, testBotButton(Material.ARROW, "Back", "debug-back"));
+        player.openInventory(inventory);
+    }
+
+    private void openDebugEvents(Player player) {
+        ArcadePortGame game = debugGame(player);
+        Inventory inventory = Bukkit.createInventory(null, 54, DEBUG_EVENTS_TITLE);
+        inventory.setItem(4, item(Material.TARGET, ChatColor.AQUA + game.displayName() + " Event Tools",
+                ChatColor.GRAY + "Each button invokes a game-specific runtime event.",
+                ChatColor.YELLOW + "Only available to authorised testers."));
+        List<GameDebugEventCatalog.Event> events = GameDebugEventCatalog.events(game);
+        int slot = 9;
+        for (GameDebugEventCatalog.Event event : events) {
+            if (slot > 44) break;
+            inventory.setItem(slot++, testBotButton(event.icon(), event.title(), event.description(),
+                    "debug-event:" + event.id()));
+        }
+        if (events.isEmpty()) {
+            inventory.setItem(22, item(Material.BARRIER, ChatColor.GRAY + "No event tools registered for this game yet"));
+        }
+        inventory.setItem(49, testBotButton(Material.ARROW, "Back", "debug-back"));
+        player.openInventory(inventory);
+    }
+
+    private void openDebugAchievements(Player player) {
+        ArcadePortGame game = debugGame(player);
+        Inventory inventory = Bukkit.createInventory(null, 54, DEBUG_ACHIEVEMENTS_TITLE);
+        inventory.setItem(4, item(Material.KNOWLEDGE_BOOK,
+                ChatColor.AQUA + game.displayName() + " Achievement Previews",
+                ChatColor.GRAY + "Click one to display its message and sound.",
+                ChatColor.YELLOW + "No achievement or statistic will be saved."));
+        List<ArcadeProgressCatalog.Achievement> achievements = ArcadeProgressCatalog.achievements(game.id());
+        int slot = 9;
+        for (ArcadeProgressCatalog.Achievement achievement : achievements) {
+            if (slot > 44) break;
+            inventory.setItem(slot++, testBotButton(Material.PAPER,
+                    ChatColor.GOLD + achievement.name(),
+                    achievement.requirement(),
+                    "debug-achievement:" + achievement.id()));
+        }
+        if (achievements.isEmpty()) {
+            inventory.setItem(22, item(Material.BARRIER, ChatColor.GRAY + "No achievement entries registered"));
+        }
+        inventory.setItem(49, testBotButton(Material.ARROW, "Back", "debug-back"));
+        player.openInventory(inventory);
+    }
+
+    private List<DebugFeature> debugFeatures(ArcadePortGame game) {
+        Map<String, DebugFeature> features = new LinkedHashMap<>();
+        for (DebugFeature feature : COMMON_DEBUG_FEATURES) features.put(feature.key(), feature);
+        for (GameDebugVariableCatalog.Variable variable : manager.debugVariables(game)) {
+            if (variable.kind() != GameDebugVariableCatalog.Kind.BOOLEAN) continue;
+            String title = variable.key().equals("BOMB_LOBBERS_POWERUP_SPAWNING_ENABLED")
+                    ? "Power-up spawns" : variable.label();
+            String description = variable.key().equals("BOMB_LOBBERS_POWERUP_SPAWNING_ENABLED")
+                    ? "Pause power-up waves and clear loose drops; power-ups already carried can still be used."
+                    : "Game rule switch from " + variable.key() + ".";
+            features.put(variable.key(), new DebugFeature(variable.key(), title, Material.REDSTONE_TORCH,
+                    description, variable.defaultValue() != 0.0D));
+        }
+        if (game == ArcadePortGame.BOMB_LOBBERS) {
+            features.put("double-jump", new DebugFeature("double-jump", "Double jump", Material.FEATHER,
+                    "Allow authorised testers to use the normal grounded double jump.", true));
+            features.put("constructor-build", new DebugFeature("constructor-build", "Constructor defenses", Material.STONE_BRICKS,
+                    "Allow Constructor testers to cycle and build platforms, walls, and stairs.", true));
+        }
+        if (game == ArcadePortGame.CASTLE_ASSAULT) {
+            features.put("objective-tnt", new DebugFeature("objective-tnt", "Objective TNT", Material.TNT,
+                    "Allow the tester to collect new Objective TNT or spawn it for testing; carried TNT resolves normally.", true));
+            features.put("crystal-damage", new DebugFeature("crystal-damage", "Sentry crystal damage", Material.END_CRYSTAL,
+                    "Allow the tester's kills and Objective TNT to damage sentry crystals.", true));
+            features.put("king-damage", new DebugFeature("king-damage", "King damage", Material.ZOMBIE_HEAD,
+                    "Allow the tester's attacks and Objective TNT to damage the enemy King.", true));
+        }
+        if (game == ArcadePortGame.DRAW_MY_THING) {
+            features.put("canvas-tools", new DebugFeature("canvas-tools", "Canvas drawing tools", Material.BRUSH,
+                    "Allow this tester to paint and use the Pencil, Brush, Line, Square, Circle and Spray tools.", true));
+            features.put("palette-selection", new DebugFeature("palette-selection", "Palette selection", Material.PAINTING,
+                    "Allow this tester to change their drawing colour from the inventory or map palette.", true));
+            features.put("guess-submission", new DebugFeature("guess-submission", "Guess submissions", Material.WRITABLE_BOOK,
+                    "Allow this tester to submit guesses through the normal chat answer check.", true));
+            features.put("timed-hints", new DebugFeature("timed-hints", "Timed letter hints", Material.PAPER,
+                    "Reveal letters on the normal round schedule and play the hint sound.", true));
+            features.put("sound-feedback", new DebugFeature("sound-feedback", "Round sound effects", Material.NOTE_BLOCK,
+                    "Play the normal drawing, hint and guess feedback sounds.", true));
+        }
+        if (game == ArcadePortGame.MASTER_BUILDERS) {
+            features.put("plot-editing", new DebugFeature("plot-editing", "Plot block editing", Material.OAK_PLANKS,
+                    "Allow this tester to place and break blocks inside their assigned plot during Build.", true));
+            features.put("review-voting", new DebugFeature("review-voting", "Review voting", Material.LIME_CONCRETE,
+                    "Allow this tester to submit ratings through the configured review scale.", true));
+        }
+        if (game == ArcadePortGame.CAMERA_SHY) {
+            features.put("photo-outlines", new DebugFeature("photo-outlines", "Spyglass target outlines", Material.SPYGLASS,
+                    "Show eligible players with the normal outline while this tester aims their spyglass.", true));
+        }
+        if (game == ArcadePortGame.MILK_THE_COW) {
+            features.put("cow-charge", new DebugFeature("cow-charge", "Cow charge", Material.LEATHER_BOOTS,
+                    "Allow this tester's sprinting Cow-role charge to damage and knock back Farmers.", true));
+            features.put("farmer-double-jump", new DebugFeature("farmer-double-jump", "Farmer double jump", Material.FEATHER,
+                    "Allow this tester's one-per-airtime Farmer double jump.", true));
+            features.put("herd-spawning", new DebugFeature("herd-spawning", "Cow herd", Material.COW_SPAWN_EGG,
+                    "Spawn and move the normal Cow-role herd around the selected Cow.", true));
+            features.put("milk-capture", new DebugFeature("milk-capture", "Bucket capture", Material.BUCKET,
+                    "Allow this tester to fill a bucket by interacting with a Cow player.", true));
+            features.put("milk-scoring", new DebugFeature("milk-scoring", "Milk score", Material.MILK_BUCKET,
+                    "Award this tester the normal points when they drink a captured milk bucket.", true));
+            features.put("cow-bomb", new DebugFeature("cow-bomb", "Cow Bomb", Material.COW_SPAWN_EGG,
+                    "Allow this tester to launch and damage with the Cow Bomb role ability.", true));
+            features.put("body-slam", new DebugFeature("body-slam", "Body Slam", Material.ANVIL,
+                    "Allow this tester to launch and damage with the Farmer Body Slam role ability.", true));
+        }
+        if (game == ArcadePortGame.WITHER_ASSAULT) {
+            features.put("ability-human-leap", new DebugFeature("ability-human-leap", "Human double jump", Material.FEATHER,
+                    "Allow this tester to use the Human team's grounded double jump.", true));
+            features.put("human-revival", new DebugFeature("human-revival", "Human revival potions", Material.SPLASH_POTION,
+                    "Allow this tester to revive downed Human teammates with a Revival Potion.", true));
+            features.put("wither-skull", new DebugFeature("wither-skull", "Wither Skull", Material.WITHER_SKELETON_SKULL,
+                    "Allow this tester to fire the Wither's aimed skull attack.", true));
+            features.put("wither-minions", new DebugFeature("wither-minions", "Minion Wave", Material.SKELETON_SKULL,
+                    "Allow this tester to summon the Wither's skeletal minion wave.", true));
+            features.put("wither-scent", new DebugFeature("wither-scent", "Human Scent", Material.COMPASS,
+                    "Allow this tester to reveal living Humans with the Wither's scent ability.", true));
+            features.put("wither-fire-storm", new DebugFeature("wither-fire-storm", "Fire Storm", Material.BLAZE_POWDER,
+                    "Allow this tester to activate and maintain the Wither's Fire Storm.", true));
+            features.put("smoke-arrow", new DebugFeature("smoke-arrow", "Smoke Arrow", Material.TIPPED_ARROW,
+                    "Allow smoke arrows to blind nearby Withers.", true));
+            features.put("medic-refill", new DebugFeature("medic-refill", "Medic Refill", Material.SPLASH_POTION,
+                    "Allow the Medic kit to periodically refill revival potions.", true));
+            features.put("fletcher-refill", new DebugFeature("fletcher-refill", "Fletcher Refill", Material.ARROW,
+                    "Allow Archer and Editor kits to periodically refill arrows.", true));
+            features.put("editor-build", new DebugFeature("editor-build", "Editor Building", Material.BRICKS,
+                    "Allow the Editor kit to place and remove its temporary blocks.", true));
+            for (String feature : List.of("archer", "medic", "editor", "wither")) {
+                String key = "ability-" + feature;
+                features.put(key, new DebugFeature(key, "Kit feature: " + humanizeDebugKey(feature), Material.WITHER_SKELETON_SKULL,
+                        "Allow this tester's " + humanizeDebugKey(feature) + " kit features and abilities.", true));
+            }
+        }
+        if (game == ArcadePortGame.HOOPS_REMASTERED) {
+            features.put("shooting", new DebugFeature("shooting", "Shooting", Material.SNOWBALL,
+                    "Allow this tester to release shots, layups and dunks.", true));
+            features.put("scoring", new DebugFeature("scoring", "Basket scoring", Material.GOLD_INGOT,
+                    "Allow this tester's shots to change the team score when they pass through the hoop.", true));
+            features.put("steals", new DebugFeature("steals", "Ball steals", Material.LEATHER_BOOTS,
+                    "Allow this tester to steal possession from an opposing ball holder.", true));
+        }
+        if (game == ArcadePortGame.GLADIATORS) {
+            features.put("combat-damage", new DebugFeature("combat-damage", "Duel combat damage", Material.IRON_SWORD,
+                    "Allow this tester to deal and receive Gladiators duel damage.", true));
+        }
+        if (game == ArcadePortGame.HOOPS_REMASTERED) {
+            features.put("shooting", new DebugFeature("shooting", "Shooting", Material.SNOWBALL,
+                    "Allow this tester to take normal shots with aim, flight and scoring checks.", true));
+            features.put("scoring", new DebugFeature("scoring", "Basket scoring", Material.GOLD_INGOT,
+                    "Allow valid shots by this tester to score and advance normal match results.", true));
+            features.put("passing", new DebugFeature("passing", "Passing", Material.SNOWBALL,
+                    "Allow this tester to pass the ball using normal aim and teammate selection.", true));
+            features.put("steals", new DebugFeature("steals", "Steals", Material.IRON_SWORD,
+                    "Allow this tester to steal possession using normal range, facing and cooldown checks.", true));
+            features.put("blocking", new DebugFeature("blocking", "Shot blocks", Material.SHIELD,
+                    "Allow this tester to contest and block opposing shots.", true));
+            features.put("rebounding", new DebugFeature("rebounding", "Rebounds", Material.SLIME_BALL,
+                    "Allow this tester to recover missed shots and earn rebounds.", true));
+            features.put("hops", new DebugFeature("hops", "Hops ability", Material.FEATHER,
+                    "Allow this tester's normal Hops movement ability.", true));
+        }
+        if (game == ArcadePortGame.HEROES_OF_GWEN) {
+            features.put("tower-damage", new DebugFeature("tower-damage", "Tower damage", Material.IRON_PICKAXE,
+                    "Allow this tester's attacks to damage enemy Heroes towers.", true));
+            features.put("minion-waves", new DebugFeature("minion-waves", "Minion waves", Material.ZOMBIE_HEAD,
+                    "Spawn the normal lane minion waves.", true));
+            features.put("minion-combat", new DebugFeature("minion-combat", "Minion combat", Material.IRON_SWORD,
+                    "Allow lane minions to fight enemy minions, towers and Withers.", true));
+            features.put("beacon-captures", new DebugFeature("beacon-captures", "Beacon captures", Material.BEACON,
+                    "Allow players to capture and change ownership of beacons.", true));
+            features.put("health-regeneration", new DebugFeature("health-regeneration", "Health regeneration", Material.GOLDEN_APPLE,
+                    "Apply the normal Heroes health regeneration ticks.", true));
+            features.put("gold-income", new DebugFeature("gold-income", "Gold income", Material.GOLD_INGOT,
+                    "Award passive and owned-beacon gold on the normal interval.", true));
+            features.put("overtime", new DebugFeature("overtime", "Overtime", Material.WITHER_SKELETON_SKULL,
+                    "Start the normal moving-Wither overtime when its timer expires.", true));
+            for (String hero : List.of("hattori", "bardolf", "devon", "rowena", "anath", "larissa", "dana", "biff", "ivy")) {
+                String key = "hero-" + hero + "-abilities";
+                features.put(key, new DebugFeature(key, pretty(hero) + " abilities", Material.BLAZE_POWDER,
+                        "Allow the tester to activate " + pretty(hero) + " skills; other players and passive effects are unchanged.", true));
+            }
+        }
+        features.put("achievement-preview-only", new DebugFeature("achievement-preview-only",
+                "Achievement preview only", Material.KNOWLEDGE_BOOK,
+                "Show real achievement condition results without saving unlocks.", false));
+        if (game == ArcadePortGame.BACON_BRAWL) {
+            features.put("unlimited-abilities", new DebugFeature("unlimited-abilities", "Unlimited abilities",
+                    Material.FIREWORK_ROCKET, "Use full-charge Bacon Brawl abilities without consuming meter.", false));
+            for (String kit : List.of("mama-piggles", "chris-p-bacon", "pig", "brutus-bacon",
+                    "el-muchacho-pigo")) {
+                String key = "ability-" + kit;
+                features.put(key, new DebugFeature(key, "Ability: " + humanizeDebugKey(kit),
+                        Material.IRON_AXE, "Allow this kit's ability to activate for authorised testers.", true));
+            }
+            features.put("ability-chris-p-bacon-shot", new DebugFeature("ability-chris-p-bacon-shot",
+                    "Crispy Fire shot", Material.FIRE_CHARGE,
+                    "Allow Chris P Bacon's fixed-strength three-shot fire blast for this tester.", true));
+            features.put("ability-chris-p-bacon-dash", new DebugFeature("ability-chris-p-bacon-dash",
+                    "Crispy crouch dash", Material.FIREWORK_ROCKET,
+                    "Allow Chris P Bacon's crouch-triggered fire dash for this tester.", true));
+        }
+        if (game == ArcadePortGame.SUPER_SPLOOR) {
+            features.put("unlimited-specials", new DebugFeature("unlimited-specials", "Unlimited Specials",
+                    Material.FIREWORK_ROCKET,
+                    "Keep the kit special fully charged, except while its active effect is running.", false));
+            for (String kit : List.of("sprayer", "roller", "charger", "lobber", "dualies")) {
+                String key = "special-" + kit;
+                features.put(key, new DebugFeature(key, "Special: " + humanizeDebugKey(kit),
+                        Material.FIREWORK_STAR, "Allow this kit's Special to activate for authorised testers.", true));
+            }
+        }
+        if (game == ArcadePortGame.DRAGON_ESCAPE) {
+            features.put("finish-detection", new DebugFeature("finish-detection", "Course finish detection",
+                    Material.DRAGON_EGG, "Allow this tester to finish by reaching the map's authored beacon.", true));
+            features.put("dragon-movement", new DebugFeature("dragon-movement", "Douglas movement", Material.DRAGON_HEAD,
+                    "Move Douglas and destroy course blocks using the normal chase rules; racer finish checks continue.", true));
+            for (String kit : List.of("jumper", "warper", "digger", "disruptor")) {
+                String key = "ability-" + kit;
+                features.put(key, new DebugFeature(key, "Ability: " + humanizeDebugKey(kit),
+                        Material.ENDER_PEARL, "Allow this kit's ability for authorised testers.", true));
+            }
+        }
+        if (game == ArcadePortGame.DRAGONS) {
+            for (String kit : List.of("coward", "frost", "glider", "tamer", "pyrotechnic", "marksman")) {
+                String key = "ability-" + kit;
+                features.put(key, new DebugFeature(key, "Ability: " + humanizeDebugKey(kit),
+                        Material.DRAGON_BREATH, "Allow this kit's ability for authorised testers.", true));
+            }
+        }
+        if (game == ArcadePortGame.ONE_IN_THE_QUIVER) {
+            for (String kit : List.of("leaper", "brawler", "enchanter", "slam-shot", "ninja")) {
+                String key = "ability-" + kit;
+                features.put(key, new DebugFeature(key, "Ability: " + humanizeDebugKey(kit),
+                        Material.ARROW, "Allow this kit's ability or kill perk for authorised testers.", true));
+            }
+        }
+        if (game == ArcadePortGame.PAINTBALL) {
+            String key = "ignore-reload";
+            features.put(key, new DebugFeature(key, "Ignore reload and heat", Material.SNOWBALL,
+                    "Let your weapons fire continuously without reload waits or Machine Gun heat for testing.", false));
+            for (String kit : List.of("rifle", "sniper", "shotgun", "machine-gun")) {
+                String weaponKey = "weapon-" + kit;
+                features.put(weaponKey, new DebugFeature(weaponKey, "Weapon: " + humanizeDebugKey(kit), Material.ENDER_PEARL,
+                        "Allow this tester to fire the selected " + humanizeDebugKey(kit) + " weapon.", true));
+            }
+            features.put("water-bombs", new DebugFeature("water-bombs", "Water Bombs", Material.SPLASH_POTION,
+                    "Allow the tester to launch the normal water bomb projectile.", true));
+            features.put("save-me-marker", new DebugFeature("save-me-marker", "Save Me markers", Material.ARMOR_STAND,
+                    "Create this tester's normal marker after elimination so a teammate can revive them.", true));
+            features.put("water-bomb-revives", new DebugFeature("water-bomb-revives", "Water Bomb revives", Material.TOTEM_OF_UNDYING,
+                    "Allow this tester's Water Bomb to revive eligible teammates at their markers.", true));
+            features.put("water-bomb-cleanse", new DebugFeature("water-bomb-cleanse", "Water Bomb cleanse", Material.WATER_BUCKET,
+                    "Allow this tester's Water Bomb to restore living teammates' paint and armour.", true));
+        }
+        if (game == ArcadePortGame.SPLEEF) {
+            features.put("block-breaking", new DebugFeature("block-breaking", "Block breaking", Material.IRON_SHOVEL,
+                    "Allow this tester to damage and clear Spleef floor blocks.", true));
+            for (String kit : List.of("snowballer", "archer", "brawler", "gust")) {
+                String key = "ability-" + kit;
+                features.put(key, new DebugFeature(key, "Kit feature: " + humanizeDebugKey(kit),
+                        Material.SNOWBALL, "Enable this kit's special supplies and abilities for authorised testers.", true));
+            }
+        }
+        if (game == ArcadePortGame.RUNNER) {
+            features.put("runner-trail", new DebugFeature("runner-trail", "Runner block trail", Material.LIME_WOOL,
+                    "Let this runner paint visited blocks with their trail; trail blocks disappear after the normal delay.", true));
+            for (String kit : List.of("leaper", "archer", "frosty", "switcher")) {
+                String key = "ability-" + kit;
+                features.put(key, new DebugFeature(key, "Ability: " + humanizeDebugKey(kit),
+                        Material.ENDER_EYE, "Allow this kit's movement, attack or swap ability for authorised testers.", true));
+            }
+        }
+        if (game == ArcadePortGame.DEATH_TAG) {
+            for (String kit : List.of("basher", "archer", "traitor", "turtle", "trickster")) {
+                String key = "ability-" + kit;
+                features.put(key, new DebugFeature(key, "Kit feature: " + humanizeDebugKey(kit),
+                        Material.IRON_AXE,
+                        "Allow this kit's combat, movement or passive effect for authorised testers.", true));
+            }
+        }
+        if (game == ArcadePortGame.EVOLUTION) {
+            for (String form : List.of("golem", "blaze", "creeper", "slime", "chicken", "quick-evolver")) {
+                String key = "ability-" + form;
+                features.put(key, new DebugFeature(key, "Form feature: " + humanizeDebugKey(form),
+                        Material.DRAGON_EGG,
+                        "Allow this Evolution form's ability or progression perk for authorised testers.", true));
+            }
+        }
+        if (game == ArcadePortGame.SHEEP_QUEST) {
+            for (String kit : List.of("beserker", "archer", "brute", "shepherd")) {
+                String key = "ability-" + kit;
+                features.put(key, new DebugFeature(key, "Kit feature: " + humanizeDebugKey(kit),
+                        Material.SADDLE,
+                        "Allow this kit's normal gameplay abilities for authorised testers.", true));
+            }
+        }
+        if (game == ArcadePortGame.TURF_WARS) {
+            features.put("build-editing", new DebugFeature("build-editing", "Turf Wars building", Material.RED_WOOL,
+                    "Allow this tester to place and break Turf Wars blocks during the normal build phase.", true));
+            features.put("combat-damage", new DebugFeature("combat-damage", "Turf Wars combat damage", Material.BOW,
+                    "Allow this tester to deal and receive Turf Wars damage.", true));
+            for (String kit : List.of("infiltrator", "shredder", "fortifier")) {
+                String key = "ability-" + kit;
+                features.put(key, new DebugFeature(key, "Kit feature: " + humanizeDebugKey(kit),
+                        Material.BOW,
+                        "Allow this kit's territory, barrage or fortification feature for authorised testers.", true));
+            }
+        }
+        if (game == ArcadePortGame.WIZARDS) {
+            features.put("spell-casting", new DebugFeature("spell-casting", "Spell casting", Material.BLAZE_ROD,
+                    "Allow this tester to cast their selected Wizards spells.", true));
+            features.put("chest-looting", new DebugFeature("chest-looting", "Chest looting", Material.CHEST,
+                    "Allow this tester to collect spellbooks, wands and mana from arena chests.", true));
+            for (au.com.testplex.wizards.WizardsSpell spell : au.com.testplex.wizards.WizardsSpell.implementedSpells()) {
+                String key = "spell-" + spell.id();
+                features.put(key, new DebugFeature(key, "Spell: " + spell.displayName(), spell.icon(),
+                        "Allow this tester to cast " + spell.displayName() + " independently of other spells.", true));
+            }
+        }
+        if (game == ArcadePortGame.PLEXBALL) {
+            features.put("batting", new DebugFeature("batting", "Batter swings", Material.STICK,
+                    "Allow this tester to swing at the tee ball during their batting turn.", true));
+            features.put("catching", new DebugFeature("catching", "Fielder catches", Material.LEATHER_CHESTPLATE,
+                    "Allow this tester to start their normal catch window during ball flight.", true));
+            features.put("kit-abilities", new DebugFeature("kit-abilities", "Kit abilities", Material.FIREWORK_STAR,
+                    "Allow this tester to use their selected Plexball kit ability.", true));
+            for (String kit : List.of("slugger", "technician", "curve-artist", "sprinter", "skyguard")) {
+                String key = "ability-" + kit;
+                features.put(key, new DebugFeature(key, "Ability: " + humanizeDebugKey(kit),
+                        Material.FIREWORK_STAR,
+                        "Allow this tester to use " + humanizeDebugKey(kit) + " ability while its kit is selected.", true));
+            }
+        }
+        if (game == ArcadePortGame.MICRO_BATTLES) {
+            for (String kit : List.of("archer", "fighter", "dasher")) {
+                String key = "ability-" + kit;
+                features.put(key, new DebugFeature(key, "Kit feature: " + humanizeDebugKey(kit),
+                        Material.IRON_SWORD,
+                        "Allow this kit's arrows, damage resistance or double jump for authorised testers.", true));
+            }
+            features.put("worker-tools", new DebugFeature("worker-tools", "Worker mining tools",
+                    Material.STONE_PICKAXE,
+                    "Allow an authorised tester using Worker to mine with its pickaxe, shovel and axe.", true));
+            features.put("border-warning", new DebugFeature("border-warning", "Border warning label",
+                    Material.GOLDEN_HELMET, "Show the normal warning label above this tester near the border.", true));
+            features.put("border-particles", new DebugFeature("border-particles", "Border particles",
+                    Material.GLOWSTONE_DUST, "Show the normal coloured border particles to this tester.", true));
+            features.put("border-elimination", new DebugFeature("border-elimination", "Border elimination",
+                    Material.BARRIER, "Eliminate this tester when they cross the closing world border.", true));
+            features.put("blocks-place", new DebugFeature("blocks-place", "Block placing", Material.COBBLESTONE,
+                    "Allow authorised testers to place Micro Battles blocks.", true));
+            features.put("blocks-break", new DebugFeature("blocks-break", "Block breaking", Material.IRON_PICKAXE,
+                    "Allow authorised testers to break Micro Battles blocks.", true));
+        }
+        if (game == ArcadePortGame.SKY_WARS) {
+            features.put("chest-looting", new DebugFeature("chest-looting", "Chest looting", Material.CHEST,
+                    "Allow players to open SkyWars chests and take their contents.", true));
+            features.put("island-crumbling", new DebugFeature("island-crumbling", "Island crumbling", Material.GRAVEL,
+                    "Start and process the normal SkyWars island crumble event.", true));
+            features.put("tnt-generator", new DebugFeature("tnt-generator", "TNT generator", Material.TNT,
+                    "Generate throwable TNT at the map's normal generator on its regular timer.", true));
+            features.put("guardian-spawns", new DebugFeature("guardian-spawns", "Zombie guardians", Material.ZOMBIE_HEAD,
+                    "Spawn and run the map-authored Zombie Guardians for the next round.", false));
+            features.put("ore-hiding", new DebugFeature("ore-hiding", "Hidden island ores", Material.DIAMOND_ORE,
+                    "Use the source OreHider behavior for the next round's island ores.", false));
+            for (String kit : List.of("ice", "fire", "air", "metal", "earth")) {
+                String key = "ability-" + kit;
+                features.put(key, new DebugFeature(key, "Kit feature: " + humanizeDebugKey(kit),
+                        Material.ENDER_EYE,
+                        "Allow this tester's " + humanizeDebugKey(kit) + " kit ability and passive effects.", true));
+            }
+        }
+        if (game == ArcadePortGame.SNAKE) {
+            for (String kit : List.of("speed", "reverse", "invulnerable")) {
+                String key = "ability-" + kit;
+                features.put(key, new DebugFeature(key, "Kit ability: " + humanizeDebugKey(kit),
+                        Material.MAGMA_CREAM,
+                        "Allow this tester to use the selected Snake kit's normal ability.", true));
+            }
+            features.put("tail-collisions", new DebugFeature("tail-collisions", "Tail collisions", Material.SHEARS,
+                    "Enable normal Snake head-to-tail eliminations for this debug session.", true));
+            features.put("self-collisions", new DebugFeature("self-collisions", "Self-tail collisions", Material.LEAD,
+                    "Eliminate this tester when their own head hits their tail.", true));
+            features.put("opponent-collisions", new DebugFeature("opponent-collisions", "Opponent-tail collisions", Material.IRON_SWORD,
+                    "Eliminate this tester when their head hits another Snake's tail.", true));
+            features.put("magma-hazards", new DebugFeature("magma-hazards", "Magma Cube hazards", Material.MAGMA_CREAM,
+                    "Spawn and steer the normal Magma Cube item hazards for this debug session.", true));
+            features.put("lava-elimination", new DebugFeature("lava-elimination", "Lava elimination", Material.LAVA_BUCKET,
+                    "Eliminate this tester on lava contact using the normal Snake rule.", true));
+        }
+        if (game == ArcadePortGame.SNEAKY_ASSASSINS) {
+            for (String feature : List.of("disguises", "power-ups", "global-reveal", "npc-patrol",
+                    "town-npcs", "smoke-bomb", "revealer", "briber", "master-compass")) {
+                String key = switch (feature) {
+                    case "smoke-bomb", "revealer", "briber" -> "ability-" + feature;
+                    default -> feature;
+                };
+                features.put(key, new DebugFeature(key, "Feature: " + humanizeDebugKey(feature),
+                        Material.SKELETON_SKULL,
+                        "town-npcs".equals(feature)
+                                ? "Spawn the source town NPCs when the next test round starts."
+                                : "Enable this Sneaky Assassins runtime feature in the active test session.", true));
+            }
+        }
+        if (game.isMonsterMaze()) {
+            for (String kit : List.of("jumper", "slowball", "body-builder", "repulsor")) {
+                String key = "kit-" + kit;
+                features.put(key, new DebugFeature(key, "Kit: " + humanizeDebugKey(kit),
+                        Material.FEATHER,
+                        "Enable this kit's source ability and passive effects for authorised testers.", true));
+            }
+            if (game != ArcadePortGame.MONSTER_MAZE) {
+                features.put("kit-maverick", new DebugFeature("kit-maverick", "Kit: Maverick",
+                        Material.IRON_SWORD,
+                        "Enable Maverick's mode-specific passive for authorised testers.", true));
+            }
+        }
+        return features.values().stream()
+                .map(feature -> new DebugFeature(feature.key(), feature.title(), feature.icon(),
+                        feature.description(), feature.defaultValue(),
+                        debugFeatureAppliesImmediately(game, feature.key())))
+                .toList();
+    }
+
+    private String humanizeDebugKey(String key) {
+        String[] words = key.split("-");
+        StringBuilder result = new StringBuilder();
+        for (String word : words) {
+            if (result.length() > 0) result.append(' ');
+            if (!word.isEmpty()) result.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
+        }
+        return result.toString();
+    }
+
+    boolean debugFeatureAppliesImmediately(ArcadePortGame game, String key) {
+        if (GameDebugVariableCatalog.appliesImmediately(GameDebugVariableCatalog.variable(game, key))) return true;
+        if (game.isMonsterMaze() && key.startsWith("kit-")) return true;
+        return "all-kits".equals(key) || "invulnerable".equals(key) || "no-fall-damage".equals(key)
+                || "no-hunger-loss".equals(key) || "unlimited-abilities".equals(key)
+                || "unlimited-specials".equals(key)
+                || (game == ArcadePortGame.BACON_BRAWL && key.startsWith("ability-"))
+                || (game == ArcadePortGame.BOMB_LOBBERS
+                        && ("double-jump".equals(key) || "constructor-build".equals(key)))
+                || (game == ArcadePortGame.CASTLE_ASSAULT
+                        && ("objective-tnt".equals(key) || "crystal-damage".equals(key) || "king-damage".equals(key)))
+                || (game == ArcadePortGame.HEROES_OF_GWEN && key.startsWith("hero-") && key.endsWith("-abilities"))
+                || (game == ArcadePortGame.HEROES_OF_GWEN && "tower-damage".equals(key))
+                || (game == ArcadePortGame.HEROES_OF_GWEN && Set.of("minion-waves", "minion-combat",
+                        "beacon-captures", "health-regeneration", "gold-income", "overtime").contains(key))
+                || (game == ArcadePortGame.HOOPS_REMASTERED
+                        && Set.of("shooting", "scoring", "passing", "steals", "blocking", "rebounding", "hops").contains(key))
+                || (game == ArcadePortGame.DRAW_MY_THING
+                        && ("canvas-tools".equals(key) || "palette-selection".equals(key)
+                                || "guess-submission".equals(key) || "timed-hints".equals(key)
+                                || "sound-feedback".equals(key)))
+                || (game == ArcadePortGame.MASTER_BUILDERS
+                        && ("plot-editing".equals(key) || "review-voting".equals(key)))
+                || (game == ArcadePortGame.CAMERA_SHY && "photo-outlines".equals(key))
+                || (game == ArcadePortGame.MILK_THE_COW && Set.of("cow-charge", "farmer-double-jump",
+                        "herd-spawning", "milk-capture", "milk-scoring", "cow-bomb", "body-slam").contains(key))
+                || (game == ArcadePortGame.WITHER_ASSAULT
+                        && ("ability-human-leap".equals(key) || "human-revival".equals(key) || key.startsWith("ability-")))
+                || (game == ArcadePortGame.HOOPS_REMASTERED
+                        && ("shooting".equals(key) || "scoring".equals(key) || "steals".equals(key)))
+                || (game == ArcadePortGame.GLADIATORS && "combat-damage".equals(key))
+                || (game == ArcadePortGame.DRAGON_ESCAPE && "finish-detection".equals(key))
+                || (game == ArcadePortGame.DRAGON_ESCAPE && "dragon-movement".equals(key))
+                || (game == ArcadePortGame.DRAGON_ESCAPE && key.startsWith("ability-"))
+                || (game == ArcadePortGame.RUNNER && "runner-trail".equals(key))
+                || (game == ArcadePortGame.DRAGONS && key.startsWith("ability-"))
+                || (game == ArcadePortGame.ONE_IN_THE_QUIVER && key.startsWith("ability-"))
+                || (game == ArcadePortGame.PAINTBALL
+                        && (Set.of("ignore-reload", "water-bombs", "save-me-marker", "water-bomb-revives",
+                                "water-bomb-cleanse").contains(key) || key.startsWith("weapon-")))
+                || (game == ArcadePortGame.SPLEEF && key.startsWith("ability-"))
+                || (game == ArcadePortGame.SPLEEF && "block-breaking".equals(key))
+                || (game == ArcadePortGame.RUNNER && key.startsWith("ability-"))
+                || (game == ArcadePortGame.DEATH_TAG && key.startsWith("ability-"))
+                || (game == ArcadePortGame.EVOLUTION && key.startsWith("ability-"))
+                || (game == ArcadePortGame.SHEEP_QUEST && key.startsWith("ability-"))
+                || (game == ArcadePortGame.TURF_WARS && key.startsWith("ability-"))
+                || (game == ArcadePortGame.TURF_WARS && Set.of("build-editing", "combat-damage").contains(key))
+                || (game == ArcadePortGame.MICRO_BATTLES
+                        && (key.startsWith("ability-") || key.startsWith("blocks-")
+                                || Set.of("worker-tools", "border-warning", "border-particles",
+                                        "border-elimination").contains(key)))
+                || (game == ArcadePortGame.SKY_WARS && key.startsWith("ability-"))
+                || (game == ArcadePortGame.SKY_WARS && Set.of("chest-looting", "island-crumbling", "tnt-generator").contains(key))
+                || (game == ArcadePortGame.WIZARDS
+                        && (Set.of("spell-casting", "chest-looting").contains(key) || key.startsWith("spell-")))
+                || (game == ArcadePortGame.PLEXBALL
+                        && (Set.of("batting", "catching", "kit-abilities").contains(key)
+                                || key.startsWith("ability-")))
+                || (game == ArcadePortGame.SNAKE
+                        && (key.startsWith("ability-") || "tail-collisions".equals(key)
+                                || "self-collisions".equals(key) || "opponent-collisions".equals(key)
+                                || "magma-hazards".equals(key) || "lava-elimination".equals(key)))
+                || (game == ArcadePortGame.SNEAKY_ASSASSINS
+                        && (Set.of("disguises", "power-ups", "global-reveal", "npc-patrol", "master-compass")
+                                .contains(key) || key.startsWith("ability-")))
+                || (game == ArcadePortGame.SUPER_SPLOOR && key.startsWith("special-"))
+                || "DRAGONS_SPAWNING_ENABLED".equals(key)
+                || "DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED".equals(key)
+                || "QUIVER_LEAPER_DOUBLE_JUMP_ENABLED".equals(key)
+                || "SPLEEF_HUNGER_DRAIN_ENABLED".equals(key)
+                || "BOMB_LOBBERS_POWERUP_SPAWNING_ENABLED".equals(key)
+                || "achievement-preview-only".equals(key);
+    }
+
+    private void openDebugVariables(Player player, int requestedPage) {
+        ArcadePortGame game = debugGame(player);
+        List<GameDebugVariableCatalog.Variable> variables = manager.debugVariables(game).stream()
+                .filter(variable -> variable.kind() != GameDebugVariableCatalog.Kind.BOOLEAN).toList();
+        int pageCount = Math.max(1, (variables.size() + 44) / 45);
+        int page = Math.max(0, Math.min(pageCount - 1, requestedPage));
+        debugVariablePages.put(player.getUniqueId(), page);
+        Inventory inventory = Bukkit.createInventory(null, 54, DEBUG_VARIABLES_TITLE + " " + (page + 1));
+        String profile = manager.debugProfiles().selected(player.getUniqueId(), game);
+        inventory.setItem(4, item(Material.COMPARATOR, ChatColor.AQUA + game.displayName() + " Variables",
+                ChatColor.GRAY + "Profile: " + ChatColor.WHITE + profile,
+                ChatColor.YELLOW + "Rule edits apply at the next round start."));
+        int start = page * 45;
+        for (int i = start; i < Math.min(variables.size(), start + 45); i++) {
+            GameDebugVariableCatalog.Variable variable = variables.get(i);
+            Double configured = manager.debugVariable(player.getUniqueId(), game, variable.key());
+            double current = configured == null ? variable.defaultValue() : configured;
+            inventory.setItem(i - start, debugActionButton(Material.COMPARATOR,
+                    ChatColor.YELLOW + variable.label(), "debug-variable:" + variable.key(),
+                    ChatColor.GRAY + "Current: " + ChatColor.WHITE + formatDebugValue(current)
+                            + ChatColor.GRAY + " | Default: " + ChatColor.WHITE + formatDebugValue(variable.defaultValue()),
+                    ChatColor.GRAY + "Left-click: +" + formatDebugValue(variable.step())
+                            + " | Right-click: -" + formatDebugValue(variable.step()),
+                    ChatColor.GRAY + "Shift-click: reset this variable"));
+        }
+        if (page > 0) inventory.setItem(45, testBotButton(Material.ARROW, "Previous page", "debug-variable-page:" + (page - 1)));
+        inventory.setItem(49, testBotButton(Material.ARROW, "Back", "debug-back"));
+        if (page + 1 < pageCount) inventory.setItem(53, testBotButton(Material.ARROW, "Next page", "debug-variable-page:" + (page + 1)));
+        player.openInventory(inventory);
+    }
+
+    private String formatDebugValue(double value) {
+        return value == Math.rint(value) ? Long.toString(Math.round(value)) : String.format(Locale.ROOT, "%.3f", value);
+    }
+
+    private ItemStack debugActionButton(Material material, String title, String action, String... lore) {
+        ItemStack button = item(material, title, lore);
+        mark(button, action, null);
+        return button;
+    }
+
+    private void handleDebugVariableClick(Player player, String action, ClickType click) {
+        ArcadePortGame game = debugGame(player);
+        if (action.startsWith("debug-variable-page:")) {
+            openDebugVariables(player, Integer.parseInt(action.substring("debug-variable-page:".length())));
+            return;
+        }
+        if (!action.startsWith("debug-variable:")) return;
+        String key = action.substring("debug-variable:".length());
+        GameDebugVariableCatalog.Variable variable = manager.debugVariables(game).stream()
+                .filter(candidate -> candidate.key().equals(key)).findFirst().orElse(null);
+        if (variable == null || variable.kind() == GameDebugVariableCatalog.Kind.BOOLEAN) return;
+        if (click.isShiftClick()) {
+            manager.debugProfiles().setVariable(player.getUniqueId(), game, key, variable.defaultValue());
+        } else {
+            Double configured = manager.debugVariable(player.getUniqueId(), game, key);
+            double current = configured == null ? variable.defaultValue() : configured;
+            double direction = click.isRightClick() ? -1.0D : 1.0D;
+            double next = Math.max(variable.minimum(), Math.min(variable.maximum(), current + direction * variable.step()));
+            manager.setDebugVariable(player.getUniqueId(), game, key, next);
+        }
+        openDebugVariables(player, debugVariablePages.getOrDefault(player.getUniqueId(), 0));
+    }
+
+    private void handleDebugProfileMenuClick(Player player, String action) {
+        UUID id = player.getUniqueId();
+        ArcadePortGame game = debugGame(player);
+        if (action.startsWith("debug-profile-load:")) {
+            String profile = action.substring("debug-profile-load:".length());
+            if (manager.selectDebugProfile(player, game, profile)) {
+                player.sendMessage(ChatColor.GREEN + "Loaded " + game.displayName() + " profile '" + profile + "'.");
+                openDebugMenu(player);
+            }
+        } else if (action.startsWith("debug-profile-prompt:")) {
+            String operation = action.substring("debug-profile-prompt:".length());
+            debugPrompts.put(id, new DebugPrompt(game, operation));
+            player.closeInventory();
+            player.sendMessage("delete".equals(operation)
+                    ? ChatColor.RED + "Type DELETE to confirm removal of the selected profile, or CANCEL."
+                    : ChatColor.YELLOW + "Enter the new profile name in chat. Type CANCEL to stop.");
+        } else if ("debug-profile-save".equals(action)) {
+            manager.saveDebugProfile(id, game);
+            player.sendMessage(ChatColor.GREEN + "Debug profile saved.");
+            openDebugProfiles(player);
+        } else if ("debug-back".equals(action)) {
+            openDebugMenu(player);
+        }
+    }
+
+    @EventHandler
+    public void onDebugProfileChat(AsyncPlayerChatEvent event) {
+        UUID id = event.getPlayer().getUniqueId();
+        DebugPrompt prompt = debugPrompts.get(id);
+        if (prompt == null) return;
+        event.setCancelled(true);
+        String input = event.getMessage();
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            debugPrompts.remove(id);
+            Player player = event.getPlayer();
+            if (!player.isOnline() || !plugin.hasAdminAccess(player)) return;
+            if ("CANCEL".equalsIgnoreCase(input)) {
+                player.sendMessage(ChatColor.GRAY + "Profile action cancelled.");
+                return;
+            }
+            String result = switch (prompt.operation()) {
+                case "create" -> manager.createDebugProfile(player, prompt.game(), input);
+                case "duplicate" -> manager.duplicateDebugProfile(player, prompt.game(), input);
+                case "rename" -> manager.renameDebugProfile(player, prompt.game(), input);
+                case "delete" -> "DELETE".equalsIgnoreCase(input)
+                        && manager.deleteDebugProfile(player, prompt.game(), manager.debugProfiles().selected(id, prompt.game()))
+                        ? "deleted" : null;
+                default -> null;
+            };
+            player.sendMessage(result == null ? ChatColor.RED + "Profile action failed; check the name, profile limit or default-profile restriction."
+                    : ChatColor.GREEN + "Profile action complete: " + result + ".");
+            if (lobby.isLobbyWorld(player.getWorld())) openDebugProfiles(player);
+        });
+    }
+
+    @EventHandler
+    public void onDebugTesterQuit(org.bukkit.event.player.PlayerQuitEvent event) {
+        UUID id = event.getPlayer().getUniqueId();
+        debugContextGames.remove(id);
+        debugPrompts.remove(id);
+        debugVariablePages.remove(id);
+    }
+
+    private void handleDebugProfileCommand(Player player, String[] args) {
+        ArcadePortGame game = debugGame(player);
+        if (args.length < 2) {
+            player.sendMessage(ChatColor.YELLOW + "/arcadeport debug profile <create|duplicate|rename|delete|load|save|reset> [name]");
+            return;
+        }
+        String operation = args[1].toLowerCase(Locale.ROOT);
+        UUID id = player.getUniqueId();
+        String name = args.length > 2 ? String.join("-", java.util.Arrays.copyOfRange(args, 2, args.length)) : "";
+        boolean ok = switch (operation) {
+            case "create" -> manager.createDebugProfile(player, game, name) != null;
+            case "duplicate" -> manager.duplicateDebugProfile(player, game, name) != null;
+            case "rename" -> manager.renameDebugProfile(player, game, name) != null;
+            case "delete" -> manager.deleteDebugProfile(player, game, manager.debugProfiles().selected(id, game));
+            case "load" -> manager.selectDebugProfile(player, game, GameDebugProfiles.normalizeProfile(name));
+            case "save" -> { manager.saveDebugProfile(id, game); yield true; }
+            case "reset" -> { manager.resetDebugProfile(id, game); yield true; }
+            default -> false;
+        };
+        player.sendMessage(ok ? ChatColor.GREEN + "Debug profile updated." : ChatColor.RED + "Profile action failed. Check the name and selected game.");
+        openDebugProfiles(player);
+    }
+
+    private void openTestBotSetup(Player player, ArcadePortGame game) {
+        testBotMenus.put(player.getUniqueId(), new TestBotMenuState(TestBotMenuPage.SETUP, game, -1));
+        Inventory inventory = Bukkit.createInventory(null, 54, TEST_BOTS_TITLE);
+        int count = manager.configuredTestBotCount(game);
+        inventory.setItem(4, item(Material.PLAYER_HEAD, ChatColor.AQUA + game.displayName() + " bots",
+                ChatColor.GRAY + "The count is capped by the game's 16-player limit."));
+        inventory.setItem(11, testBotButton(Material.RED_CONCRETE, "Fewer bots", "bot-count:-1"));
+        inventory.setItem(13, item(Material.IRON_GOLEM_SPAWN_EGG, ChatColor.YELLOW + "Bots to load: " + count,
+                ChatColor.GRAY + "Configured for " + game.displayName() + ".",
+                ChatColor.DARK_GRAY + "Human players reduce the available slots."));
+        inventory.setItem(15, testBotButton(Material.LIME_CONCRETE, "More bots", "bot-count:+1"));
+        for (int index = 0; index < ArcadeTestPlayerManager.TARGET_ROSTER_SIZE; index++) {
+            String kit = manager.configuredTestBotKit(game, index);
+            int team = manager.configuredTestBotTeam(game, index);
+            String kitName = kit.isBlank() ? "Default kit" : kit.replace('-', ' ');
+            Material icon = configuredKitIcon(game, kit);
+            ItemStack bot = item(icon, ChatColor.YELLOW + "Bot " + (index + 1),
+                    ChatColor.GRAY + "Kit: " + kitName,
+                    ChatColor.GRAY + "Team: " + botTeamName(game, team),
+                    ChatColor.GREEN + "Click to configure kit, team and game cosmetics.");
+            mark(bot, "bot-slot:" + index, null);
+            inventory.setItem(botGridSlot(index), bot);
+        }
+        inventory.setItem(49, testBotButton(Material.BARRIER, "Close", "bot-close"));
+        player.openInventory(inventory);
+    }
+
+    private void openTestBotLoadout(Player player, ArcadePortGame game, int botIndex) {
+        testBotMenus.put(player.getUniqueId(), new TestBotMenuState(TestBotMenuPage.LOADOUT, game, botIndex));
+        Inventory inventory = Bukkit.createInventory(null, 27, TEST_BOT_LOADOUT_TITLE);
+        String kit = manager.configuredTestBotKit(game, botIndex);
+        inventory.setItem(11, testBotButton(configuredKitIcon(game, kit), "Choose Kit",
+                kit.isBlank() ? "Current: game default" : "Current: " + kit.replace('-', ' '), "bot-kits"));
+        int team = manager.configuredTestBotTeam(game, botIndex);
+        inventory.setItem(15, testBotButton(Material.WHITE_BANNER, "Team: " + botTeamName(game, team),
+                "Click to cycle through teams; Auto balances the bot.", "bot-team"));
+        inventory.setItem(13, testBotButton(Material.FIREWORK_STAR, "Game Cosmetic Style",
+                "Choose this bot's game-specific cosmetic options.", "bot-cosmetics"));
+        inventory.setItem(22, testBotButton(Material.ARROW, "Back to Bots", "bot-back"));
+        player.openInventory(inventory);
+    }
+
+    private void openTestBotKits(Player player, ArcadePortGame game, int botIndex) {
+        testBotMenus.put(player.getUniqueId(), new TestBotMenuState(TestBotMenuPage.KITS, game, botIndex));
+        Inventory inventory = Bukkit.createInventory(null, 54, TEST_BOT_KITS_TITLE);
+        List<ArcadeLobbyKitCatalogue.KitChoice> choices = ArcadeLobbyKitCatalogue.forGame(game, List.of());
+        int[] slots = menuSlots();
+        for (int index = 0; index < choices.size() && index < slots.length; index++) {
+            ArcadeLobbyKitCatalogue.KitChoice choice = choices.get(index);
+            ItemStack item = item(choice.icon, ChatColor.YELLOW + choice.name,
+                    ChatColor.GRAY + "Assign to Bot " + (botIndex + 1) + " for " + game.displayName() + ".",
+                    ChatColor.GREEN + "Click to select.");
+            mark(item, "bot-kit:" + choice.id, null);
+            inventory.setItem(slots[index], item);
+        }
+        if (choices.isEmpty()) {
+            inventory.setItem(22, item(Material.BARRIER, ChatColor.RED + "No kit station for this game"));
+        }
+        inventory.setItem(49, testBotButton(Material.ARROW, "Back", "bot-loadout"));
+        player.openInventory(inventory);
+    }
+
+    private void openTestBotCosmetics(Player player, ArcadePortGame game, int botIndex) {
+        testBotMenus.put(player.getUniqueId(), new TestBotMenuState(TestBotMenuPage.COSMETICS, game, botIndex));
+        Inventory inventory = Bukkit.createInventory(null, 54, TEST_BOT_COSMETICS_TITLE);
+        List<TestBotCosmetic> choices = testBotCosmetics(game);
+        int[] slots = menuSlots();
+        for (int index = 0; index < choices.size() && index < slots.length; index++) {
+            TestBotCosmetic choice = choices.get(index);
+            String selected = manager.configuredTestBotCosmetic(game, botIndex, choice.lineId());
+            ItemStack item = item(material(choice.icon()),
+                    (choice.optionId().equals(selected) ? ChatColor.GREEN : ChatColor.YELLOW) + choice.optionName(),
+                    ChatColor.GRAY + choice.lineTitle(),
+                    ChatColor.DARK_GRAY + "Game ability effects only; global cosmetics are unaffected.",
+                    choice.optionId().equals(selected) ? ChatColor.GREEN + "Selected" : ChatColor.GREEN + "Click to select.");
+            mark(item, "bot-cosmetic:" + choice.lineId() + ":" + choice.optionId(), null);
+            inventory.setItem(slots[index], item);
+        }
+        if (choices.isEmpty()) {
+            inventory.setItem(22, item(Material.BARRIER, ChatColor.RED + "No game cosmetic options are registered"));
+        }
+        inventory.setItem(49, testBotButton(Material.ARROW, "Back", "bot-loadout"));
+        player.openInventory(inventory);
+    }
+
+    private void handleTestBotMenuClick(Player player, String title, String action) {
+        TestBotMenuState state = testBotMenus.get(player.getUniqueId());
+        if (state == null) return;
+        ArcadePortGame game = state.game();
+        if (game == null) return;
+        if ("bot-close".equals(action)) {
+            testBotMenus.remove(player.getUniqueId());
+            player.closeInventory();
+            return;
+        }
+        if (state.page() == TestBotMenuPage.SETUP) {
+            if ("bot-count:-1".equals(action) || "bot-count:+1".equals(action)) {
+                int delta = "bot-count:+1".equals(action) ? 1 : -1;
+                manager.setConfiguredTestBotCount(game, manager.configuredTestBotCount(game) + delta);
+                openTestBotSetup(player, game);
+            } else if (action != null && action.startsWith("bot-slot:")) {
+                int index = Integer.parseInt(action.substring("bot-slot:".length()));
+                openTestBotLoadout(player, game, index);
+            }
+            return;
+        }
+        int botIndex = state.botIndex();
+        if (state.page() == TestBotMenuPage.LOADOUT) {
+            if ("bot-kits".equals(action)) openTestBotKits(player, game, botIndex);
+            else if ("bot-cosmetics".equals(action)) openTestBotCosmetics(player, game, botIndex);
+            else if ("bot-team".equals(action)) {
+                int teamCount = ArcadePortManager.teamCountForGame(game);
+                if (teamCount < 2) {
+                    player.sendMessage(ChatColor.YELLOW + game.displayName() + " does not use team assignments.");
+                } else {
+                    int current = manager.configuredTestBotTeam(game, botIndex);
+                    manager.setConfiguredTestBotTeam(game, botIndex, current >= teamCount - 1 ? -1 : current + 1);
+                }
+                openTestBotLoadout(player, game, botIndex);
+            } else if ("bot-back".equals(action)) openTestBotSetup(player, game);
+            return;
+        }
+        if (state.page() == TestBotMenuPage.KITS && action != null && action.startsWith("bot-kit:")) {
+            manager.setConfiguredTestBotKit(game, botIndex, action.substring("bot-kit:".length()));
+            openTestBotLoadout(player, game, botIndex);
+        } else if (state.page() == TestBotMenuPage.COSMETICS && action != null
+                && action.startsWith("bot-cosmetic:")) {
+            String[] selected = action.substring("bot-cosmetic:".length()).split(":", 2);
+            if (selected.length == 2) manager.setConfiguredTestBotCosmetic(game, botIndex, selected[0], selected[1]);
+            openTestBotCosmetics(player, game, botIndex);
+        } else if ("bot-loadout".equals(action)) {
+            openTestBotLoadout(player, game, botIndex);
+        }
+    }
+
+    private ItemStack testBotButton(Material material, String name, String action) {
+        return testBotButton(material, name, "", action);
+    }
+
+    private ItemStack testBotButton(Material material, String name, String detail, String action) {
+        ItemStack item = detail == null || detail.isBlank()
+                ? item(material, ChatColor.YELLOW + name)
+                : item(material, ChatColor.YELLOW + name, ChatColor.GRAY + detail);
+        mark(item, action, null);
+        return item;
+    }
+
+    private static int botGridSlot(int index) {
+        int[] slots = {19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34, 37, 38};
+        return slots[index];
+    }
+
+    private static int[] menuSlots() {
+        return new int[] {10,11,12,13,14,15,16,19,20,21,22,23,24,25,28,29,30,31,32,33,34,37,38,39,40,41,42,43};
+    }
+
+    private Material configuredKitIcon(ArcadePortGame game, String kitId) {
+        for (ArcadeLobbyKitCatalogue.KitChoice choice : ArcadeLobbyKitCatalogue.forGame(game, List.of())) {
+            if (choice.id.equalsIgnoreCase(kitId)) return choice.icon;
+        }
+        return Material.PLAYER_HEAD;
+    }
+
+    private String botTeamName(ArcadePortGame game, int selected) {
+        int teams = ArcadePortManager.teamCountForGame(game);
+        return teams < 2 || selected < 0 || selected >= teams ? "Auto balance" : "Team " + (selected + 1);
+    }
+
+    private List<TestBotCosmetic> testBotCosmetics(ArcadePortGame game) {
+        org.bukkit.plugin.Plugin cosmetics = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
+        if (cosmetics == null || game == null) return List.of();
+        try {
+            Object catalog = cosmetics.getClass().getMethod("getCatalog").invoke(cosmetics);
+            String gameId = game.isMonsterMaze() ? "monster-maze" : game.id();
+            Object definition = catalog.getClass().getMethod("getGame", String.class).invoke(catalog, gameId);
+            if (definition == null) return List.of();
+            @SuppressWarnings("unchecked")
+            List<Object> lines = (List<Object>) definition.getClass().getMethod("getCosmeticLines").invoke(definition);
+            List<TestBotCosmetic> choices = new ArrayList<>();
+            for (Object line : lines) {
+                String lineId = (String) line.getClass().getMethod("getId").invoke(line);
+                String lineTitle = (String) line.getClass().getMethod("getTitle").invoke(line);
+                String icon = (String) line.getClass().getMethod("getIcon").invoke(line);
+                @SuppressWarnings("unchecked")
+                List<Object> options = (List<Object>) line.getClass().getMethod("getOptions").invoke(line);
+                for (Object option : options) {
+                    String optionId = (String) option.getClass().getMethod("getId").invoke(option);
+                    String optionName = (String) option.getClass().getMethod("getName").invoke(option);
+                    choices.add(new TestBotCosmetic(lineId, lineTitle, optionId, optionName, icon));
+                }
+            }
+            return choices;
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            plugin.getLogger().fine("Could not read game cosmetic options for bot setup: " + exception.getMessage());
+            return List.of();
+        }
+    }
+
+    private Material material(String name) {
+        Material material = name == null ? null : Material.matchMaterial(name);
+        return material == null ? Material.FIREWORK_STAR : material;
     }
 
     private Bot createBot(String name){String k=key(name);if(k.isBlank()||bots.containsKey(k))return null;Bot b=new Bot(k,name,"porky","pig","el-muchacho-pigo");bots.put(k,b);saveBot(b);spawnBotEntity(b,lobby.spawnLocation().add(bots.size()*1.6D-3.0D,-3.0D,8.0D),false);refreshDisplays();return b;}
@@ -947,8 +2154,10 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private String pretty(String value){StringBuilder out=new StringBuilder();for(String part:value.split("-")){if(part.isEmpty())continue;if(out.length()>0)out.append(' ');out.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));}return out.toString();}
 
     private void tick(){
-        refreshDisplays();World world=lobby.ensureWorld();
+        refreshDisplays();
         clearLobbyNpcFire();
+        World world = cosmeticPreviewWorld;
+        if (world == null || world.getPlayers().isEmpty()) return;
         for (Entity e : new ArrayList<>(showcase)) {
             if (e == null || !e.isValid() || e.getWorld() != world) continue;
             String value = e.getPersistentDataContainer().get(themeKey, PersistentDataType.STRING);
@@ -1060,7 +2269,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         if (value.contains("cloud")) return Particle.CLOUD;
         if (value.contains("prism") || value.contains("shatter") || value.contains("pixel-crater")) return Particle.CRIT;
         if (value.contains("warning") || value.contains("turtle") || value.contains("pips")) return Particle.ELECTRIC_SPARK;
-        if (value.contains("sheep") || value.contains("shepherd")) return Particle.ITEM;
+        if (value.contains("sheep") || value.contains("shepherd")) return Particle.HAPPY_VILLAGER;
         if (value.contains("arena") || value.contains("red-sand")) return Particle.CRIT;
         return Particle.CRIT;
     }

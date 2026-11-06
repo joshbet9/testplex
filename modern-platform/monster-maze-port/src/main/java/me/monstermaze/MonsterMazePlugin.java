@@ -240,8 +240,10 @@ public final class MonsterMazePlugin {
         if (gameManager == null || !gameManager.isRunning()) activeArcadeGame = ArcadePortGame.MONSTER_MAZE;
     }
     public boolean isGameRunning() { return gameManager != null && gameManager.isRunning(); }
+    public boolean debugAdvancePhase() { return gameManager != null && gameManager.debugAdvancePhase(); }
 
     public ArcadeMechanicsModernPlugin getHostPlugin() { return host; }
+    public boolean isDebugRound() { return host.isArcadeDebugRound(); }
     public void recordFirstSafePad(UUID playerId) { host.recordMonsterMazeFirstSafePad(playerId); }
     public void recordHighestStage(UUID playerId, int stage) { host.recordMonsterMazeHighestStage(playerId, stage); }
     public void recordWin(UUID playerId, int stage) { host.recordMonsterMazeWin(playerId, stage); }

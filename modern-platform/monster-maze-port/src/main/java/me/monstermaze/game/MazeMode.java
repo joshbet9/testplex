@@ -34,18 +34,27 @@ public enum MazeMode {
     /** Source stage timer: Modern accelerates to 15 seconds; the other modes retain 60s - 2s/stage. */
     public int stageTimerSeconds(int stage) {
         int safeStage = Math.max(1, stage);
-        if (this == MODERN) return Math.max(15, 35 - ((safeStage - 1) * 20 / 9));
-        return Math.max(15, 60 - ((safeStage - 1) * 2));
+        int defaultInitial = this == MODERN ? 35 : MazeDebugRules.STAGE_TIMER_INITIAL_SECONDS;
+        double defaultDecrease = this == MODERN ? 20.0D / 9.0D
+                : MazeDebugRules.STAGE_TIMER_DECREASE_PER_STAGE_SECONDS;
+        int initial = Math.max(1, MazeDebugRules.intValue(this, "STAGE_TIMER_INITIAL_SECONDS", defaultInitial));
+        double decrease = Math.max(0.0D, MazeDebugRules.doubleValue(
+                this, "STAGE_TIMER_DECREASE_PER_STAGE_SECONDS", defaultDecrease));
+        int floor = Math.max(1, MazeDebugRules.intValue(this, "STAGE_TIMER_MIN_SECONDS",
+                MazeDebugRules.STAGE_TIMER_MIN_SECONDS));
+        return Math.max(floor, initial - (int) Math.floor((safeStage - 1) * decrease));
     }
 
     /** Source MonsterManager: only Modern starts with 225 monsters; other modes start with 150. */
     public int initialMonsterCount() {
-        return this == MODERN ? 225 : 150;
+        int fallback = this == MODERN ? 225 : MazeDebugRules.INITIAL_MONSTER_COUNT;
+        return Math.max(1, MazeDebugRules.intValue(this, "INITIAL_MONSTER_COUNT", fallback));
     }
 
     /** Source GameManager: Modern adds 30 monsters each stage; other modes add 15. */
     public int additionalMonstersPerSafePad() {
-        return this == MODERN ? 30 : 15;
+        int fallback = this == MODERN ? 30 : MazeDebugRules.ADDITIONAL_MONSTERS_PER_SAFE_PAD;
+        return Math.max(0, MazeDebugRules.intValue(this, "ADDITIONAL_MONSTERS_PER_SAFE_PAD", fallback));
     }
 
     /** Speed restores the old 1.8 speeding feel; Modern keeps its boost, Classic opts out. */

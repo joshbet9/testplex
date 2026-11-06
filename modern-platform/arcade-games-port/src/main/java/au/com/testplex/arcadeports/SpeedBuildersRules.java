@@ -23,9 +23,29 @@ public final class SpeedBuildersRules {
     public static final int MAX_BUILD_SECONDS = 60;
     public static final int REVIEW_SECONDS = 10;
     public static final int INTERMISSION_SECONDS = 3;
+    public static final int FINAL_RESULTS_SECONDS = 5;
     public static final int DEFAULT_MATCH_ROUNDS = 5;
+    public static final boolean TEMPLATE_MOBS_ENABLED = true;
+    public static final int PERFECT_SCORE_PERCENT = 100;
+    public static final int BUILD_TIME_DECREASE_PER_ROUND_SECONDS = 1;
+    public static final boolean PERFECT_BUILD_TIME_TIEBREAK_ENABLED = true;
+    public static final double DOUBLE_JUMP_VERTICAL_VELOCITY = 1.0D;
+    public static final boolean DOUBLE_JUMP_ENABLED = true;
 
     private SpeedBuildersRules() { }
+
+    public static boolean canDebugResetOwnBuild(boolean authorised, boolean building,
+            boolean participant, boolean alreadyPerfect, boolean hasTemplate) {
+        return authorised && building && participant && !alreadyPerfect && hasTemplate;
+    }
+
+    /** Fills only unused player slots, respecting both the bot setting and the map's roster limit. */
+    public static int testPlayersNeeded(int humanPlayers, int configuredTestPlayers) {
+        if (humanPlayers < 0 || configuredTestPlayers < 0) {
+            throw new IllegalArgumentException("Player counts cannot be negative.");
+        }
+        return Math.min(configuredTestPlayers, Math.max(0, MAX_PLAYERS - humanPlayers));
+    }
 
     /** Maps queue order to one of two authentic eight-plot arena copies. */
     public static int arenaIndexForPlayer(int playerIndex) {
@@ -135,7 +155,59 @@ public final class SpeedBuildersRules {
         }
         int adjusted = (int) (multiplier * (baseSeconds + addSeconds - subtractSeconds));
         if (exactSeconds != null) adjusted = exactSeconds;
-        return Math.max(MIN_BUILD_SECONDS, Math.min(MAX_BUILD_SECONDS, adjusted));
+        int min = GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_MIN_BUILD_SECONDS", MIN_BUILD_SECONDS);
+        int max = GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_MAX_BUILD_SECONDS", MAX_BUILD_SECONDS);
+        return Math.max(min, Math.min(max, adjusted));
+    }
+
+    /** The source default requires every expected cell; testers can lower the threshold for focused scoring drills. */
+    public static boolean meetsPerfectScore(int score, int expectedScore) {
+        if (expectedScore <= 0 || score < 0) return false;
+        int threshold = Math.max(1, Math.min(100, GameDebugRuntimeOverrides.intValue(
+                "SPEED_BUILDERS_PERFECT_SCORE_PERCENT", PERFECT_SCORE_PERCENT)));
+        return score * 100L >= expectedScore * (long) threshold;
+    }
+
+    public static int buildTimeDecreasePerRoundSeconds() {
+        return Math.max(0, Math.min(30, GameDebugRuntimeOverrides.intValue(
+                "SPEED_BUILDERS_BUILD_TIME_DECREASE_PER_ROUND_SECONDS",
+                BUILD_TIME_DECREASE_PER_ROUND_SECONDS)));
+    }
+
+    public static int nextBuildTimeTracker(int currentSeconds) {
+        return Math.max(1, currentSeconds - buildTimeDecreasePerRoundSeconds());
+    }
+
+    public static int finalResultsSeconds() {
+        return Math.max(0, Math.min(60, GameDebugRuntimeOverrides.intValue(
+                "SPEED_BUILDERS_FINAL_RESULTS_SECONDS", FINAL_RESULTS_SECONDS)));
+    }
+
+    public static long intermissionOrResultsTicks(boolean results, int configuredIntermissionSeconds) {
+        int seconds = results ? finalResultsSeconds() : Math.max(0, Math.min(60, configuredIntermissionSeconds));
+        return seconds * 20L;
+    }
+
+    public static boolean perfectBuildTimeTiebreakEnabled() {
+        return GameDebugRuntimeOverrides.booleanValue("SPEED_BUILDERS_PERFECT_BUILD_TIME_TIEBREAK_ENABLED",
+                PERFECT_BUILD_TIME_TIEBREAK_ENABLED);
+    }
+
+    public static boolean doubleJumpEnabled() {
+        return GameDebugRuntimeOverrides.booleanValue("SPEED_BUILDERS_DOUBLE_JUMP_ENABLED", DOUBLE_JUMP_ENABLED);
+    }
+
+    public static double doubleJumpVerticalVelocity() {
+        double velocity = GameDebugRuntimeOverrides.doubleValue("SPEED_BUILDERS_DOUBLE_JUMP_VERTICAL_VELOCITY",
+                DOUBLE_JUMP_VERTICAL_VELOCITY);
+        return Double.isFinite(velocity) ? Math.max(0.1D, Math.min(2.5D, velocity))
+                : DOUBLE_JUMP_VERTICAL_VELOCITY;
+    }
+
+    public static List<String> winnersByConfiguredTieBreak(Map<String, Integer> scores,
+                                                            Map<String, Long> perfectBuildTimes) {
+        return winnersByScoreThenBuildTime(scores, perfectBuildTimeTiebreakEnabled()
+                ? perfectBuildTimes : Map.of());
     }
 
     /** Material-only compatibility scorer used by older simple fixtures. */

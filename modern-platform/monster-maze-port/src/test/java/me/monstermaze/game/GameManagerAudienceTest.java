@@ -9,6 +9,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class GameManagerAudienceTest {
     @Test
+    void debugMonsterWaveRequiresLiveRoundSafePadAndLivingParticipant() {
+        assertTrue(GameManager.canDebugSpawnMonsterWave(GameState.LIVE, true, true));
+        assertFalse(GameManager.canDebugSpawnMonsterWave(GameState.STARTING, true, true));
+        assertFalse(GameManager.canDebugSpawnMonsterWave(GameState.LIVE, false, true));
+        assertFalse(GameManager.canDebugSpawnMonsterWave(GameState.LIVE, true, false));
+    }
+
+    @Test
     void gameAudienceIsScopedToTheConfiguredArenaWorld() {
         World arena = testWorld();
         World anotherGame = testWorld();

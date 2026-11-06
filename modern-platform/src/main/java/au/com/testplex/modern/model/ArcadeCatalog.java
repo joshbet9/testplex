@@ -6,11 +6,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-/**
- * Modern catalogue for all 30 Arcade games. Each game owns its own cosmetic
- * lines and win-scene choices; actual render/gameplay handlers are added with
- * each port rather than pretending global cosmetics are game-specific.
- */
+/** Modern catalogue for Arcade games, game-specific cosmetics and win scenes. */
 public final class ArcadeCatalog {
     private final Map<String, GameDefinition> games = new LinkedHashMap<>();
 
@@ -404,9 +400,274 @@ public final class ArcadeCatalog {
     }
 
     private void register(GameDefinition definition) {
-        if (games.putIfAbsent(definition.getId(), definition) != null) {
+        List<CosmeticLineDefinition> lines = approvedCosmeticLines(definition);
+        GameDefinition normalized = new GameDefinition(definition.getId(), definition.getName(),
+                definition.getDescription(), definition.getIcon(), definition.getPortStatus(), lines,
+                definition.getWinEffects(), definition.getDefaultWinEffectId());
+        if (games.putIfAbsent(normalized.getId(), normalized) != null) {
             throw new IllegalArgumentException("Duplicate Arcade game id: " + definition.getId());
         }
+    }
+
+    /** Keep only the game-specific cosmetic lines reviewed and approved for testing. */
+    private static List<CosmeticLineDefinition> approvedCosmeticLines(GameDefinition game) {
+        String id = game.getId();
+        return switch (id) {
+            case "bacon-brawl" -> List.of(line("ability-effects", "Bacon Ability Styles",
+                    "One visual style ties together this player's kit abilities.", "PORKCHOP",
+                    style("blue-flame", "Blue Flame", "Blue fire and matching accents across Bacon Brawl abilities."),
+                    style("crispy-comet", "Crispy Comet", "A warm comet finish across this player's abilities."),
+                    style("smokehouse", "Smokehouse", "Smoky curls and ember accents across abilities."),
+                    style("molten-pepper", "Molten Pepper", "A molten orange theme across the kit."),
+                    style("frosted-bacon", "Frosted Bacon", "Cool frost accents across the kit.")));
+            case "bomb-lobbers" -> List.of(line("tnt-explosions", "TNT Explosion Effects",
+                    "The regular TNT explosion always plays; this adds the thrower's chosen visual effect.", "TNT",
+                    style("ember-ring", "Ember Ring", "An extra ring of orange sparks around the blast."),
+                    style("arcane-burst", "Arcane Burst", "A brief burst of coloured magical runes."),
+                    style("frost-shards", "Frost Shards", "A spray of icy shards around the blast."),
+                    style("starburst", "Starburst", "A bright radial burst of coloured sparks.")));
+            case "castle-assault" -> List.of(line("siege-effects", "Siege Effects",
+                    "Extend the source TNT-holder particles and accent crystals broken by this player.", "TNT",
+                    style("royal-gold", "Royal Gold", "Golden sparks around carried TNT and crystal breaks."),
+                    style("void-siege", "Void Siege", "A purple runic accent on carried TNT and crystal breaks."),
+                    style("verdant-siege", "Verdant Siege", "A green shard accent on carried TNT and crystal breaks.")));
+            case "dragon-escape" -> List.of(line("winner-beacon-colour", "Winner Beacon Colour",
+                    "When this player wins, their selected colour changes the finish beacon for everyone.", "BEACON",
+                    color("white", "White"), color("orange", "Orange"), color("magenta", "Magenta"),
+                    color("light-blue", "Light Blue"), color("yellow", "Yellow"), color("lime", "Lime"),
+                    color("pink", "Pink"), color("gray", "Gray"), color("silver", "Silver"),
+                    color("cyan", "Cyan"), color("purple", "Purple"), color("blue", "Blue"),
+                    color("brown", "Brown"), color("green", "Green"), color("red", "Red"),
+                    color("black", "Black")));
+            case "dragons" -> List.of(line("sparkler-effects", "Pyro Sparkler Effects",
+                    "The sparkler owner's style controls its particles when the sparkler lands; everyone sees them.",
+                    "FIREWORK_ROCKET",
+                    style("golden-thread", "Golden Thread", "A warm golden streamer and soft end-rod shimmer."),
+                    style("cinder-drift", "Cinder Drift", "Tiny orange cinders drift from the landing point."),
+                    style("glacier-dust", "Glacier Dust", "Cool white and pale-blue frost motes."),
+                    style("void-motes", "Void Motes", "Violet motes swirl around the landing point."),
+                    style("starlight", "Starlight", "Bright star sparks flare where the sparkler lands."),
+                    style("prismatic", "Prismatic", "A multicolour shimmer and enchanting motes.")));
+            case "evolution" -> List.of(line("metamorphosis", "Evolution Styles",
+                    "Apply the chosen style to the evolving player, their egg and the transformation particles.",
+                    "DRAGON_EGG",
+                    style("shell-fragments", "Charged Dragon Egg", "Electric sparks spiral around the player and egg."),
+                    style("void-unfold", "Void Dragon Egg", "Portal particles spiral around the player and egg."),
+                    style("nature-bloom", "Nature Dragon Egg", "Green motes bloom around the player and egg.")));
+            case "gladiators" -> List.of(line("score-flares", "Gladiators Score Flares",
+                    "The scorer's selected flare triggers at their kill and is visible to everyone.", "FIREWORK_ROCKET",
+                    style("golden-burst", "Golden Burst", "A compact golden flare at the duel's scoring moment."),
+                    style("court-confetti", "Arena Confetti", "A short coloured confetti flourish after a point."),
+                    style("starflare", "Starflare", "A sharp star-shaped light burst when you score.")));
+            case "hoops-remastered" -> List.of(line("score-flares", "Score Celebration Flares",
+                    "The scorer's selected flare triggers at the hoop and is visible to everyone.", "FIREWORK_ROCKET",
+                    style("golden-burst", "Golden Burst", "A compact golden flare at the scoring hoop."),
+                    style("court-confetti", "Court Confetti", "A short team-coloured confetti flourish."),
+                    style("starflare", "Starflare", "A sharp star-shaped light burst.")));
+            case "micro-battles" -> List.of(line("start-glass-colour", "Start Glass Colour",
+                    "Colour your starting glass for everyone; the same colour marks you near the upper border.",
+                    "LIGHT_BLUE_STAINED_GLASS",
+                    color("white", "White"), color("orange", "Orange"), color("magenta", "Magenta"),
+                    color("light-blue", "Light Blue"), color("yellow", "Yellow"), color("lime", "Lime"),
+                    color("pink", "Pink"), color("gray", "Gray"), color("silver", "Silver"),
+                    color("cyan", "Cyan"), color("purple", "Purple"), color("blue", "Blue"),
+                    color("brown", "Brown"), color("green", "Green"), color("red", "Red"),
+                    color("black", "Black")));
+            case "monster-maze", "monster-maze-speed", "monster-maze-modern" -> List.of(monsterMazeMobSetLine());
+            case "paintball" -> List.of(line("pellet-styles", "Paintball Pellet Styles",
+                    "Choose the appearance of your paint pellets; team identity and hits remain unchanged.", "SNOWBALL",
+                    style("classic-pellet", "Classic Pellet", "A clean, compact paint pellet."),
+                    style("prism-pellet", "Prism Pellet", "A bright faceted pellet with a team-coloured core."),
+                    style("comet-pellet", "Comet Pellet", "A sleek pellet with a short team-coloured streak."),
+                    style("crystal-pellet", "Crystal Pellet", "A crisp crystal-like pellet, tinted for its team.")));
+            case "plexball" -> List.of(line("ball-styles", "Plexball Styles",
+                    "The ball keeps its owner's appearance while held and in flight; gameplay is unchanged.",
+                    "MAGMA_CREAM",
+                    style("carbon", "Carbon", "A dark carbon-fibre finish."),
+                    style("prism", "Prism", "A bright prismatic finish."),
+                    style("solar", "Solar", "A warm solar-orange finish.")));
+            case "runner" -> List.of(line("trail-colour", "Runner Trail Colour",
+                    "Colour the short-lived trail on blocks you run over; it adapts to the map palette. Red is the fallback.",
+                    "RED_CONCRETE",
+                    color("red", "Classic Red"), color("cyan", "Cyan"), color("orange", "Orange"),
+                    color("magenta", "Magenta"), color("yellow", "Yellow"), color("lime", "Lime"),
+                    color("pink", "Pink"), color("purple", "Purple"), color("white", "White")));
+            case "sheep-quest" -> List.of(line("capture-effects", "Sheep Capture Effects",
+                    "The capturer's selected effect plays at the capture point, visible to everyone.", "WHITE_WOOL",
+                    style("wool-burst", "Wool Burst", "A compact wool-coloured burst at capture."),
+                    style("golden-bell", "Golden Bell", "A brief golden bell flourish at capture."),
+                    style("pasture-bloom", "Pasture Bloom", "A short green bloom around the captured sheep.")));
+            case "snake" -> List.of(line("ability-effects", "Snake Ability Effects",
+                    "Each ability has a distinct signature within the selected visual theme.", "SLIME_BALL",
+                    style("anaconda", "Anaconda", "Scale pulses distinguish each ability in a shared green theme."),
+                    style("cobra", "Cobra", "Hood flashes and distinct scale marks identify each ability."),
+                    style("neon-viper", "Neon Viper", "Two-tone luminous effects distinguish each ability.")));
+            case "super-sploor" -> List.of(line("ability-effects", "Super Sploor Ability Effects",
+                    "Each ability has a distinct, recognizable effect within one cohesive theme.", "INK_SAC",
+                    style("ink-pearl", "Ink & Pearl", "Dark ink swirls and pale pearl flashes distinguish each ability."),
+                    style("deep-current", "Deep Current", "Teal currents and bubbles distinguish each ability."),
+                    style("reef-burst", "Reef Burst", "Coral and cyan flares distinguish each ability.")));
+            case "wizards" -> List.of(line("spell-effects", "Wizard Spell Effects",
+                    "Each spell keeps its own recognizable visual within the chosen theme.", "BLAZE_ROD",
+                    style("arcane-script", "Arcane Script", "Distinct rune patterns mark each spell."),
+                    style("frost-runes", "Frost Runes", "Ice sigils and sharp frost accents mark each spell."),
+                    style("ember-spiral", "Ember Spiral", "Warm ember spirals give each spell a clear signature.")));
+            case "camera-shy" -> List.of(line("camera-flash", "Camera Flash Styles",
+                    "The photographer's choice styles each F-press flash and successful photo confirmation.",
+                    "SPYGLASS",
+                    style("vintage-flash", "Vintage Flash", "A warm camera flash with a brief frame accent."),
+                    style("neon-shutter", "Neon Shutter", "A crisp neon shutter flash."),
+                    style("polaroid-frame", "Polaroid Frame", "A compact white frame flash and clean confirmation.")));
+            case "death-tag", "heroes-of-gwen", "one-in-the-quiver", "master-builders",
+                    "milk-the-cow", "sneaky-assassins", "skywars", "speed-builders", "spleef",
+                    "turf-wars", "wither-assault" -> List.of();
+            default -> List.of();
+        };
+    }
+
+    private static CosmeticOption color(String id, String name) {
+        return single(id, name, "Use the " + name.toLowerCase(Locale.ROOT) + " colour.");
+    }
+
+    /** One cohesive, game-scoped style choice changes ability/action feedback as a set. */
+    private static CosmeticLineDefinition abilityEffectsLine(GameDefinition game) {
+        return line("ability-effects", game.getName() + " Ability Effects",
+                "Choose one visual style for this game's abilities and action feedback. "
+                        + "It does not change global cosmetics or victory celebrations.",
+                game.getIcon(), abilityEffectStyles(game.getId()));
+    }
+
+    private static CosmeticOption[] abilityEffectStyles(String gameId) {
+        return switch (gameId) {
+            case "bacon-brawl" -> new CosmeticOption[] {
+                    style("crispy-comet", "Crispy Comet", "Warm bacon sparks, smoky trails and a bright impact ring."),
+                    style("blue-flame", "Blue Flame", "Cool blue fire traces every kit ability and hit."),
+                    style("smokehouse", "Smokehouse", "Smoked ember curls and dark, quick impact bursts.")};
+            case "bomb-lobbers" -> new CosmeticOption[] {
+                    style("turtle-shell", "Turtle Shell", "Shell-shaped rings mark throws, impacts and blocks."),
+                    style("starburst-tnt", "Starburst TNT", "A bright radial flash carries through every blast."),
+                    style("pixel-crater", "Pixel Crater", "Square shockwaves and ember sparks mark the action.")};
+            case "death-tag" -> new CosmeticOption[] {
+                    style("soul-ribbons", "Soul Ribbons", "Soul wisps and curved ribbons mark chases and hits."),
+                    style("lantern-motes", "Lantern Motes", "Warm motes trace movement, tags and escapes."),
+                    style("bone-dust", "Bone Dust", "Pale fragments and sharp white impact flashes.")};
+            case "dragon-escape" -> new CosmeticOption[] {
+                    style("dragon-eye", "Dragon Eye", "An iris pulse marks boosts, checkpoints and the finish."),
+                    style("wing-flare", "Wing Flare", "Wing-shaped bursts follow movement abilities."),
+                    style("cloud-surf", "Cloud Surf", "Cloud rings and sky-blue trails mark course actions.")};
+            case "dragons" -> new CosmeticOption[] {
+                    style("phoenix-arc", "Phoenix Arc", "A phoenix outline traces Pyro launches and impacts."),
+                    style("molten-orbit", "Molten Orbit", "Molten sparks spiral around ability effects."),
+                    style("glacier-dust", "Glacier Dust", "Cool frost motes and crystal flashes follow abilities.")};
+            case "evolution" -> new CosmeticOption[] {
+                    style("charged-shell", "Charged Shell", "Electric sparks spiral through each evolution effect."),
+                    style("void-unfold", "Void Unfold", "Portal fragments open and fold around ability effects."),
+                    style("nature-bloom", "Nature Bloom", "Green motes and petals bloom at each action.")};
+            case "gladiators" -> new CosmeticOption[] {
+                    style("oath-mark", "Oath Mark", "A restrained arena sigil marks combat abilities."),
+                    style("red-sand", "Red Sand", "Red sand bursts and crossed-sword impact flashes."),
+                    style("arena-challenger", "Arena Challenger", "A bright duel bell and steel glint mark each move.")};
+            case "micro-battles" -> new CosmeticOption[] {
+                    style("cracked-ice", "Cracked Ice", "Ice fractures mark hits, kit abilities and border pressure."),
+                    style("prism-grid", "Prism Grid", "Prismatic lines frame combat and island effects."),
+                    style("molten-seam", "Molten Seam", "Hot cracks and ember pips mark each action.")};
+            case "one-in-the-quiver" -> new CosmeticOption[] {
+                    style("bullseye-dash", "Bullseye Dash", "Target lines trace shots and impact confirms."),
+                    style("fletching-sparks", "Fletching Sparks", "Feather-like sparks follow shots and kit actions."),
+                    style("ricochet-rune", "Ricochet Rune", "A compact rune marks every ability and hit.")};
+            case "paintball" -> new CosmeticOption[] {
+                    style("chrome-marker", "Chrome Marker", "A polished marker with bright, clean paint impacts."),
+                    style("colourburst", "Colourburst", "A shared radial paint bloom styles weapons and pellets."),
+                    style("stencil-stamp", "Stencil Stamp", "A bold stencil pattern carries across every kit action.")};
+            case "runner" -> new CosmeticOption[] {
+                    style("trail-red", "Classic Red", "The source red trail styles every Runner ability."),
+                    style("trail-cyan", "Cyan Dash", "Cyan ribbons trace jumps, swaps and movement abilities."),
+                    style("trail-chalk", "Chalk Dashes", "Chalk strokes and route marks style every ability.")};
+            case "sheep-quest" -> new CosmeticOption[] {
+                    style("sheep-bell", "Sheep Bell", "A clear bell and wool puff mark abilities and captures."),
+                    style("wool-confetti", "Wool Confetti", "Team-coloured wool flecks follow every action."),
+                    style("shepherd-flare", "Shepherd Flare", "A crook-shaped flare ties movement and capture effects together.")};
+            case "snake" -> new CosmeticOption[] {
+                    style("anaconda", "Anaconda", "Segmented scale pulses mark movement and item abilities."),
+                    style("cobra", "Cobra", "A raised hood flash and alternating scales mark actions."),
+                    style("neon-viper", "Neon Viper", "A two-tone luminous stripe follows each ability.")};
+            case "spleef" -> new CosmeticOption[] {
+                    style("snowburst", "Snowburst", "A compact snow burst marks shovel hits and abilities."),
+                    style("ice-shards", "Ice Shards", "Crystalline fragments carry through the game's actions."),
+                    style("chalk-grid", "Chalk Grid", "A sharp grid outline marks breaks and kit abilities.")};
+            case "draw-my-thing" -> new CosmeticOption[] {
+                    style("ink-splash", "Ink Splash", "Colourful ink marks drawing tools and correct guesses."),
+                    style("chalk-stroke", "Chalk Stroke", "Soft chalk strokes style drawing and hint feedback."),
+                    style("prism-ink", "Prism Ink", "Prismatic strokes connect drawing and round feedback.")};
+            case "master-builders" -> new CosmeticOption[] {
+                    style("blueprint-pulse", "Blueprint Pulse", "Blueprint lines mark block placement and scoring."),
+                    style("builder-spark", "Builder Spark", "A brief spark follows successful build actions."),
+                    style("palette-flare", "Palette Flare", "Colour swatches pulse on block placement and review.")};
+            case "castle-assault" -> new CosmeticOption[] {
+                    style("crystal-fracture", "Crystal Fracture", "Crystal shards mark objective damage and abilities."),
+                    style("siege-spark", "Siege Spark", "A compact blast signature follows siege actions."),
+                    style("gate-rune", "Gate Rune", "Runic pulses tie combat abilities to castle objectives.")};
+            case "heroes-of-gwen" -> new CosmeticOption[] {
+                    style("beacon-pulse", "Beacon Pulse", "A beacon ring follows hero abilities and captures."),
+                    style("tower-impact", "Tower Impact", "Stone and crystal bursts mark hero attacks."),
+                    style("arcane-banner", "Arcane Banner", "A coloured hero sigil trails abilities and movement.")};
+            case "hoops-remastered" -> new CosmeticOption[] {
+                    style("court-trail", "Court Trail", "A court-line trail styles passes, steals and shots."),
+                    style("rim-spark", "Rim Spark", "A bright rim burst marks blocks, dunks and makes."),
+                    style("orange-comet", "Orange Comet", "A basketball-coloured comet follows every court action.")};
+            case "wizards" -> new CosmeticOption[] {
+                    style("arcane-glyph", "Arcane Glyph", "A rune signature follows spells and kit abilities."),
+                    style("elemental-burst", "Elemental Burst", "An elemental flare styles every spell impact."),
+                    style("void-script", "Void Script", "Violet glyphs trail casts and spellbook actions.")};
+            case "milk-the-cow" -> new CosmeticOption[] {
+                    style("dairy-splash", "Dairy Splash", "A clean splash marks Cow charges and body slams."),
+                    style("hoof-quake", "Hoof Quake", "Hoof-shaped shockwaves mark movement and hits."),
+                    style("hay-bloom", "Hay Bloom", "Warm hay motes follow abilities and team actions.")};
+            case "wither-assault" -> new CosmeticOption[] {
+                    style("soul-rift", "Soul Rift", "A dark rift marks objective and combat abilities."),
+                    style("wither-pulse", "Wither Pulse", "A smoky pulse follows every team ability."),
+                    style("siege-ember", "Siege Ember", "Soul embers trace attacks and objective damage.")};
+            case "skywars" -> new CosmeticOption[] {
+                    style("tnt-burst", "TNT Burst", "A bright blast signature follows TNT and combat actions."),
+                    style("skyfall", "Skyfall", "A wind ring traces throws and movement abilities."),
+                    style("island-collapse", "Island Collapse", "Block-shatter lines style hits and island events.")};
+            case "turf-wars" -> new CosmeticOption[] {
+                    style("team-sigil", "Team Sigil", "A team-coloured sigil marks shots and abilities."),
+                    style("turf-crack", "Turf Crack", "A short crack traces hits, shots and movement."),
+                    style("painted-chevron", "Painted Chevron", "A bold chevron carries the team palette through actions.")};
+            case "sneaky-assassins" -> new CosmeticOption[] {
+                    style("smoke-artist", "Smoke Artist", "A compact smoke flourish styles disguise abilities."),
+                    style("decoy", "Decoy", "A brief silhouette echo marks movement and tricks."),
+                    style("understudy", "Understudy", "A villager-like shimmer follows disguise actions.")};
+            case "camera-shy" -> new CosmeticOption[] {
+                    style("flash-frame", "Flash Frame", "A camera-frame flash styles photos and exposure effects."),
+                    style("smoke-artist", "Smoke Artist", "Soft smoke traces escapes and camera tricks."),
+                    style("spotter", "Spotter", "A focused lens ring marks photos and detection abilities.")};
+            case "plexball" -> new CosmeticOption[] {
+                    style("pitch-flare", "Pitch Flare", "A short trail styles throws, hits, catches and blocks."),
+                    style("curve-trail", "Curve Trail", "A curved stadium ribbon follows ball actions."),
+                    style("home-run-impact", "Home Run Impact", "A clean impact burst marks every batting ability.")};
+            case "super-sploor" -> new CosmeticOption[] {
+                    style("ink-current", "Ink Current", "A flowing ink signature styles Squid and kit abilities."),
+                    style("prism-splat", "Prism Splat", "A bright team-coloured splat follows every action."),
+                    style("neon-squid", "Neon Squid", "A luminous squid-shaped current traces abilities.")};
+            case "speed-builders" -> new CosmeticOption[] {
+                    style("blueprint-pulse", "Blueprint Pulse", "Blueprint lines mark block placement and accuracy."),
+                    style("perfect-match", "Perfect Match", "A bright match spark confirms accurate build actions."),
+                    style("speed-trace", "Speed Trace", "Fast construction leaves a short quartz-like trail.")};
+            case "monster-maze", "monster-maze-speed", "monster-maze-modern" -> new CosmeticOption[] {
+                    style("maze-pulse", "Maze Pulse", "A shared maze glyph styles boosts, hazards and stage events."),
+                    style("soul-grid", "Soul Grid", "A soul-lit grid marks the same abilities in every mode."),
+                    style("glow-path", "Glow Path", "A luminous path traces movement and objective actions.")};
+            default -> new CosmeticOption[] {
+                    style("classic-action", "Classic Action", "A compact visual signature for this game's actions."),
+                    style("arcade-pulse", "Arcade Pulse", "A bright pulse styles abilities and hit feedback."),
+                    style("prism-action", "Prism Action", "A prismatic flourish carries across game actions.")};
+        };
+    }
+
+    private static CosmeticOption style(String id, String name, String description) {
+        return single(id, name, description);
     }
 
     private static GameDefinition game(String id, String name, String icon, String description,
@@ -434,6 +695,51 @@ public final class ArcadeCatalog {
 
     private static CosmeticOption grouped(String id, String name, String description, String selectionGroup) {
         return new CosmeticOption(id, name, description, selectionGroup);
+    }
+
+    private static CosmeticLineDefinition monsterMazeMobSetLine() {
+        String[] mobSets = {"map_default", "creeper", "skeleton", "spider", "zombie", "slime", "witch",
+                "enderman", "guardian", "cave_spider", "silverfish", "blaze", "magma_cube", "bat",
+                "endermite", "pig", "sheep", "cow", "chicken", "squid", "wolf", "mooshroom", "snowman",
+                "ocelot", "horse", "rabbit", "villager", "axolotl", "allay", "frog", "goat", "fox", "panda",
+                "parrot", "turtle", "bee", "sniffer", "armadillo", "random"};
+        String[] dyeColours = {"white", "orange", "magenta", "light_blue", "yellow", "lime", "pink", "gray",
+                "light_gray", "cyan", "purple", "blue", "brown", "green", "red", "black"};
+        List<CosmeticOption> options = new ArrayList<>();
+        for (String mob : mobSets) {
+            String display = mobDisplayName(mob);
+            String description = switch (mob) {
+                case "map_default" -> "Use the selected map's default mob and objective colours.";
+                case "random" -> "Use a stable random mob form for each player and maze entity.";
+                case "axolotl", "allay", "frog", "goat", "fox", "panda", "parrot", "turtle", "bee",
+                        "sniffer", "armadillo" -> "Modern mob form under two blocks tall and long.";
+                default -> display + " form.";
+            };
+            options.add(single(mob, display, description));
+            for (String part : List.of("beacon", "pad")) {
+                String group = part + "-" + mob;
+                String label = "map_default".equals(mob) ? "Map Default" : display;
+                options.add(grouped(part + "-" + mob + "-inherit", label + " " + part + ": Mob colour",
+                        "Use the colour associated with this mob set.", group));
+                for (String colour : dyeColours) {
+                    options.add(grouped(part + "-" + mob + "-" + colour,
+                            label + " " + part + ": " + mobDisplayName(colour),
+                            "Use " + mobDisplayName(colour) + " for this mob set's " + part + " colour.", group));
+                }
+            }
+        }
+        return new CosmeticLineDefinition("mob-sets", "Monster Maze Mob Sets",
+                "Choose mob forms for your in-game cycle slot and set separate beacon-glass and Safe Pad colours for each form.",
+                "CREEPER_HEAD", CosmeticLineDefinition.SelectionMode.MULTI, options, "map_default");
+    }
+
+    private static String mobDisplayName(String id) {
+        StringBuilder result = new StringBuilder();
+        for (String part : id.split("_")) {
+            if (!result.isEmpty()) result.append(' ');
+            if (!part.isEmpty()) result.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));
+        }
+        return result.toString();
     }
 
     private static CosmeticOption win(String id, String name, String description) {

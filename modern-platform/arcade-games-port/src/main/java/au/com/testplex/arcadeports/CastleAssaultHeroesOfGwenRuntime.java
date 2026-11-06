@@ -69,6 +69,7 @@ import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -106,32 +107,36 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         void eliminate(Player victim, Player killer, String reason);
         void finish(Player winner, int winningTeam, String reason);
         void heroSelected(Player player, String hero);
+        String cosmeticOption(Player player, String lineId, String fallback);
+        boolean debugFeatureEnabled(Player player, String feature);
+        boolean debugFeatureEnabledForActiveSession(String feature);
     }
 
-    private static final int CASTLE_KING_HEALTH = 600;
-    private static final int CASTLE_KING_HEALTH_REFERENCE_PLAYERS = 15;
-    private static final int MOBA_TOWER_REFERENCE_TEAM_SIZE = 9;
-    private static final int MOBA_OUTER_TOWER_HEALTH = 500;
-    private static final int MOBA_INNER_TOWER_HEALTH = 1_000;
     private static final int CASTLE_CRYSTAL_COUNT = 2;
-    private static final long CASTLE_NORMAL_TNT_DELAY = 60_000L;
-    private static final long MOBA_PASSIVE_GOLD_INTERVAL = ArcadePortRules.HEROES_OF_GWEN_GOLD_INTERVAL_MILLIS;
-    private static final int MOBA_BASE_GOLD = ArcadePortRules.HEROES_OF_GWEN_BASE_GOLD_PER_INTERVAL;
-    private static final int MOBA_CAPTURE_GOLD = ArcadePortRules.HEROES_OF_GWEN_CAPTURE_POINT_GOLD_PER_INTERVAL;
-    private static final int MOBA_CAPTURE_REWARD = ArcadePortRules.HEROES_OF_GWEN_CAPTURE_POINT_REWARD_GOLD;
-    private static final long MOBA_MINION_WAVE_INTERVAL = ArcadePortRules.HEROES_OF_GWEN_MINION_WAVE_INTERVAL_MILLIS;
-    private static final long MOBA_TOWER_UPDATE_INTERVAL = 1_000L;
-    private static final long MOBA_CAPTURE_UPDATE_INTERVAL = 1_000L;
-    private static final double MOBA_TOWER_RANGE_SQUARED = 100.0D;
-    private static final double MOBA_CAPTURE_POINT_RANGE_SQUARED = 25.0D;
-    private static final double MOBA_TOWER_DAMAGE = 3.0D;
-    private static final double MOBA_TOWER_HEAL = 2.6D;
-    private static final double MOBA_MINION_HEALTH = 10.0D;
-    private static final double MOBA_MINION_DAMAGE = 0.2D;
-    // The source applies tower damage in both its damageMinions and damageTower FAST handlers.
-    private static final double MOBA_MINION_TOWER_DAMAGE = MOBA_MINION_DAMAGE * 2.0D;
-    private static final double MOBA_MINION_SOURCE_TARGET_RANGE_SQUARED = 100.0D;
-    private static final long MOBA_MINION_COMBAT_INTERVAL = 500L;
+    private static long mobaPassiveGoldInterval() {
+        return GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_GOLD_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_GOLD_INTERVAL_MILLIS);
+    }
+    private static int mobaBaseGold() {
+        return GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_BASE_GOLD_PER_INTERVAL", ArcadePortRules.HEROES_OF_GWEN_BASE_GOLD_PER_INTERVAL);
+    }
+    private static int mobaCaptureGold() {
+        return GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_CAPTURE_POINT_GOLD_PER_INTERVAL", ArcadePortRules.HEROES_OF_GWEN_CAPTURE_POINT_GOLD_PER_INTERVAL);
+    }
+    private static int mobaCaptureReward() {
+        return GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_CAPTURE_POINT_REWARD_GOLD", ArcadePortRules.HEROES_OF_GWEN_CAPTURE_POINT_REWARD_GOLD);
+    }
+    private static long mobaMinionWaveInterval() {
+        return GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_MINION_WAVE_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_MINION_WAVE_INTERVAL_MILLIS);
+    }
+    private static long mobaTowerUpdateInterval() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_TOWER_UPDATE_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_TOWER_UPDATE_INTERVAL_MILLIS));
+    }
+    private static long mobaCaptureUpdateInterval() {
+        return ArcadePortRules.heroesOfGwenCaptureUpdateIntervalMillis();
+    }
+    private static long mobaMinionCombatInterval() {
+        return ArcadePortRules.heroesOfGwenMinionCombatIntervalMillis();
+    }
     private static final List<String> HEROES_OF_GWEN_HERO_ORDER = List.of(
             "hattori", "bardolf", "devon", "rowena", "anath", "larissa", "dana", "biff", "ivy");
 
@@ -139,7 +144,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         return "demolitionist".equals(kit);
     }
 
-    private final JavaPlugin plugin;
+    private final ArcadeMechanicsModernPlugin plugin;
     private final ArcadePortGame game;
     private final World world;
     private final SourceMapCatalog.MapData map;
@@ -306,7 +311,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private Objective castleScoreboardObjective;
 
     CastleAssaultHeroesOfGwenRuntime(
-            JavaPlugin plugin,
+            ArcadeMechanicsModernPlugin plugin,
             ArcadePortGame game,
             World world,
             SourceMapCatalog.MapData map,
@@ -358,12 +363,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 createCastleScoreboard();
                 updateCastleScoreboard(now);
             }
-            nextGoldAt = now + MOBA_PASSIVE_GOLD_INTERVAL;
+            nextGoldAt = now + mobaPassiveGoldInterval();
             if (game == ArcadePortGame.HEROES_OF_GWEN) {
-                nextMinionWaveAt = now + MOBA_MINION_WAVE_INTERVAL;
-                nextMinionCombatAt = now + MOBA_MINION_COMBAT_INTERVAL;
+                nextMinionWaveAt = now + mobaMinionWaveInterval();
+                nextMinionCombatAt = now + mobaMinionCombatInterval();
             }
-            nextStructureUpdateAt = now + MOBA_TOWER_UPDATE_INTERVAL;
+            nextStructureUpdateAt = now + mobaTowerUpdateInterval();
             plugin.getLogger().info("Prepared " + game.displayName() + (mixedArcade ? " Mixed Arcade" : "")
                     + " source runtime using " + map.mapName() + ".");
         }
@@ -391,12 +396,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (game == ArcadePortGame.HEROES_OF_GWEN) {
             heroesOfGwenLiveStartedAt = System.currentTimeMillis();
             heroesOfGwenNextHpRegenAt = heroesOfGwenLiveStartedAt
-                    + ArcadePortRules.HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS;
+                    + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS);
         }
         if (game == ArcadePortGame.HEROES_OF_GWEN
                 && heroesOfGwenSidequestType != HeroesOfGwenSidequestType.NONE) {
             long firstSidequestAt = System.currentTimeMillis()
-                    + ArcadePortRules.HEROES_OF_GWEN_SIDEQUEST_INITIAL_DELAY_MILLIS;
+                    + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_SIDEQUEST_INITIAL_DELAY_MILLIS", ArcadePortRules.HEROES_OF_GWEN_SIDEQUEST_INITIAL_DELAY_MILLIS);
             if (heroesOfGwenSidequestType == HeroesOfGwenSidequestType.PUMPKIN_KING) {
                 heroesOfGwenPumpkinKingRespawnAt = firstSidequestAt;
             } else {
@@ -459,9 +464,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private int castleKingHealthForOpponents(int kingTeam) {
         int opponentCount = (int) teams.values().stream().filter(team -> team == 1 - kingTeam).count();
-        int scaledPlayers = Math.min(CASTLE_KING_HEALTH_REFERENCE_PLAYERS, opponentCount);
-        return Math.max(1, (int) Math.ceil(CASTLE_KING_HEALTH * scaledPlayers
-                / (double) CASTLE_KING_HEALTH_REFERENCE_PLAYERS));
+        return ArcadePortRules.castleAssaultKingHealthForOpponents(opponentCount);
     }
 
     boolean isCastleAssaultLateJoinLocked() {
@@ -618,9 +621,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private double heroesOfGwenTowerMaxHealth(int owner, boolean first) {
-        int baseHealth = first ? MOBA_OUTER_TOWER_HEALTH : MOBA_INNER_TOWER_HEALTH;
         int attackers = Math.max(1, heroesOfGwenOpponentCount(owner));
-        return Math.max(1.0D, Math.ceil(baseHealth * attackers / (double) MOBA_TOWER_REFERENCE_TEAM_SIZE));
+        return ArcadePortRules.heroesOfGwenTowerMaximumHealth(first, attackers);
     }
 
     private void refreshHeroesOfGwenTowerHealthForOpponentTeam(int team) {
@@ -639,13 +641,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private void spawnHeroesOfGwenMinionWave(int team) {
         if (!minionWavePending) return;
         long now = System.currentTimeMillis();
-        if (minionsSpawnedInWave[team] >= ArcadePortRules.HEROES_OF_GWEN_MINIONS_PER_WAVE
+        if (minionsSpawnedInWave[team] >= GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_MINIONS_PER_WAVE", ArcadePortRules.HEROES_OF_GWEN_MINIONS_PER_WAVE)
                 || now < nextMinionSpawnAt[team]) return;
         List<Location> path = heroesOfGwenMinionPath(team);
         if (path.isEmpty()) {
             plugin.getLogger().warning("Heroes of Gwen cannot spawn the " + teamName(team)
                     + " minion wave: the source map has no minion route or base marker.");
-            minionsSpawnedInWave[team] = ArcadePortRules.HEROES_OF_GWEN_MINIONS_PER_WAVE;
+            minionsSpawnedInWave[team] = GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_MINIONS_PER_WAVE", ArcadePortRules.HEROES_OF_GWEN_MINIONS_PER_WAVE);
             return;
         }
         int waveIndex = minionsSpawnedInWave[team]++;
@@ -664,8 +666,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
         if (minion instanceof Ageable ageable) ageable.setBaby();
         var health = minion.getAttribute(Attribute.MAX_HEALTH);
-        if (health != null) health.setBaseValue(MOBA_MINION_HEALTH);
-        minion.setHealth(MOBA_MINION_HEALTH);
+        double minionHealth = ArcadePortRules.heroesOfGwenMinionHealth();
+        if (health != null) health.setBaseValue(minionHealth);
+        minion.setHealth(minionHealth);
         minion.setAI(false);
         minion.setAware(false);
         minion.setSilent(true);
@@ -752,7 +755,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         TowerState enemyTower = towers.getOrDefault(1 - team, List.of()).stream()
                 .filter(tower -> !tower.dead && canDamageMobaTower(tower, team))
                 .filter(tower -> minion.getLocation().distanceSquared(tower.location)
-                        <= MOBA_MINION_SOURCE_TARGET_RANGE_SQUARED)
+                        <= ArcadePortRules.heroesOfGwenMinionTargetRangeSquared())
                 .min(java.util.Comparator.comparingInt(tower -> tower.first ? 0 : 1))
                 .orElse(null);
         if (enemyTower != null) return enemyTower.guardian;
@@ -761,7 +764,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 .filter(other -> heroesOfGwenMinionTeams.getOrDefault(other.getUniqueId(), -1) == 1 - team)
                 .filter(other -> other.getWorld() == world
                         && other.getLocation().distanceSquared(minion.getLocation())
-                                <= MOBA_MINION_SOURCE_TARGET_RANGE_SQUARED)
+                                <= ArcadePortRules.heroesOfGwenMinionTargetRangeSquared())
                 .min(java.util.Comparator
                         .comparingDouble((Mob other) -> other.getHealth())
                         .thenComparingDouble(other -> other.getLocation().distanceSquared(minion.getLocation())))
@@ -770,22 +773,25 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         Wither enemyWither = withers.get(1 - team);
         return enemyWither != null && enemyWither.isValid()
                 && minion.getLocation().distanceSquared(enemyWither.getLocation())
-                        <= MOBA_MINION_SOURCE_TARGET_RANGE_SQUARED ? enemyWither : null;
+                        <= ArcadePortRules.heroesOfGwenMinionTargetRangeSquared() ? enemyWither : null;
     }
 
     private void updateHeroesOfGwenMinions(long now) {
         if (game != ArcadePortGame.HEROES_OF_GWEN || stopped) return;
-        if (now >= nextMinionWaveAt) {
+        boolean wavesEnabled = hooks.debugFeatureEnabledForActiveSession("minion-waves");
+        if (wavesEnabled && now >= nextMinionWaveAt) {
             java.util.Arrays.fill(minionsSpawnedInWave, 0);
             nextMinionSpawnAt[0] = now;
             nextMinionSpawnAt[1] = now;
             minionWavePending = true;
-            nextMinionWaveAt = now + MOBA_MINION_WAVE_INTERVAL;
+            nextMinionWaveAt = now + mobaMinionWaveInterval();
         }
-        spawnHeroesOfGwenMinionWave(0);
-        spawnHeroesOfGwenMinionWave(1);
-        if (minionsSpawnedInWave[0] >= ArcadePortRules.HEROES_OF_GWEN_MINIONS_PER_WAVE
-                && minionsSpawnedInWave[1] >= ArcadePortRules.HEROES_OF_GWEN_MINIONS_PER_WAVE) {
+        if (wavesEnabled) {
+            spawnHeroesOfGwenMinionWave(0);
+            spawnHeroesOfGwenMinionWave(1);
+        }
+        if (minionsSpawnedInWave[0] >= GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_MINIONS_PER_WAVE", ArcadePortRules.HEROES_OF_GWEN_MINIONS_PER_WAVE)
+                && minionsSpawnedInWave[1] >= GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_MINIONS_PER_WAVE", ArcadePortRules.HEROES_OF_GWEN_MINIONS_PER_WAVE)) {
             minionWavePending = false;
         }
         List<Mob> minions = liveHeroesOfGwenMinions();
@@ -818,25 +824,25 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 }
             }
         }
-        if (now >= nextMinionCombatAt) {
-            nextMinionCombatAt = now + MOBA_MINION_COMBAT_INTERVAL;
+        if (hooks.debugFeatureEnabledForActiveSession("minion-combat") && now >= nextMinionCombatAt) {
+            nextMinionCombatAt = now + mobaMinionCombatInterval();
             for (Mob attacker : minions) {
                 int team = heroesOfGwenMinionTeams.getOrDefault(attacker.getUniqueId(), -1);
                 if (team < 0) continue;
                 for (Mob victim : minions) {
                     if (heroesOfGwenMinionTeams.getOrDefault(victim.getUniqueId(), -1) != 1 - team
                             || attacker.getLocation().distanceSquared(victim.getLocation()) > 16.0D) continue;
-                    victim.damage(MOBA_MINION_DAMAGE, attacker);
+                    victim.damage(ArcadePortRules.heroesOfGwenMinionDamage(false), attacker);
                 }
                 for (TowerState tower : towers.getOrDefault(1 - team, List.of())) {
                     if (!canDamageMobaTower(tower, team) || tower.crystal == null || !tower.crystal.isValid()
                             || attacker.getLocation().distanceSquared(tower.crystal.getLocation()) > 16.0D) continue;
-                    damageMobaTower(tower, MOBA_MINION_TOWER_DAMAGE, null);
+                    damageMobaTower(tower, ArcadePortRules.heroesOfGwenMinionDamage(true), null);
                 }
                 Wither enemyWither = withers.get(1 - team);
                 if (enemyWither != null && enemyWither.isValid()
                         && attacker.getLocation().distanceSquared(enemyWither.getLocation()) <= 16.0D) {
-                    enemyWither.damage(MOBA_MINION_DAMAGE, attacker);
+                    enemyWither.damage(ArcadePortRules.heroesOfGwenMinionDamage(false), attacker);
                 }
             }
         }
@@ -882,6 +888,40 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         event.setDroppedExp(0);
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onHeroesOfGwenHealthPotionConsume(PlayerItemConsumeEvent event) {
+        Player player = event.getPlayer();
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN
+                || !activePlayers.contains(player.getUniqueId())) return;
+        ItemStack consumed = event.getItem();
+        if (consumed.getType() != Material.POTION || !consumed.hasItemMeta()) return;
+        Integer entryIndex = consumed.getItemMeta().getPersistentDataContainer()
+                .get(shopItemKey, PersistentDataType.INTEGER);
+        if (entryIndex == null || entryIndex < 0 || entryIndex >= storeEntries.size()) return;
+        String name = storeEntries.get(entryIndex).name;
+        boolean large;
+        if ("Small Health Potion".equals(name)) large = false;
+        else if ("Large Health Potion".equals(name)) large = true;
+        else return;
+
+        event.setCancelled(true);
+        var maxHealth = player.getAttribute(Attribute.MAX_HEALTH);
+        if (maxHealth != null) {
+            player.setHealth(ArcadePortRules.heroesOfGwenHealthPotionResult(
+                    player.getHealth(), maxHealth.getValue(), large));
+        }
+        ItemStack held = event.getHand() == EquipmentSlot.OFF_HAND
+                ? player.getInventory().getItemInOffHand() : player.getInventory().getItemInMainHand();
+        if (held.getAmount() <= 1) {
+            held = new ItemStack(Material.GLASS_BOTTLE);
+        } else {
+            held.setAmount(held.getAmount() - 1);
+            player.getInventory().addItem(new ItemStack(Material.GLASS_BOTTLE));
+        }
+        if (event.getHand() == EquipmentSlot.OFF_HAND) player.getInventory().setItemInOffHand(held);
+        else player.getInventory().setItemInMainHand(held);
+    }
+
     private void spawnMobaWither(int team, Location location) {
         Wither wither = world.spawn(location, Wither.class);
         var maxHealth = wither.getAttribute(Attribute.MAX_HEALTH);
@@ -918,7 +958,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                     Math.atan2(point.getZ() - centerZ, point.getX() - centerX)));
         }
         witherBoundaries.put(team, boundary);
-        witherNextEarthquakeAt.put(team, System.currentTimeMillis() + ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_INTERVAL_MILLIS);
+        witherNextEarthquakeAt.put(team, System.currentTimeMillis() + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_WITHER_EARTHQUAKE_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_INTERVAL_MILLIS));
     }
 
     /**
@@ -1057,6 +1097,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private void updateHeroesOfGwenOvertime(long now) {
         if (heroesOfGwenOvertime || game != ArcadePortGame.HEROES_OF_GWEN
+                || !hooks.debugFeatureEnabledForActiveSession("overtime")
                 || !ArcadePortRules.heroesOfGwenOvertimeHasStarted(heroesOfGwenLiveStartedAt, now)) return;
         heroesOfGwenOvertime = true;
         for (int team = 0; team < 2; team++) {
@@ -1092,7 +1133,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             target = path.get(currentIndex);
         }
         // The source overtime AI advances through the first half of the lane at 2 ticks/block.
-        moveWitherDirectly(wither, target, ArcadePortRules.HEROES_OF_GWEN_OVERTIME_WITHER_SPEED);
+        moveWitherDirectly(wither, target, GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_OVERTIME_WITHER_SPEED", ArcadePortRules.HEROES_OF_GWEN_OVERTIME_WITHER_SPEED));
         updateWitherTeamHud(team, wither, now);
     }
 
@@ -1124,13 +1165,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
             Location goal = target == null ? home : target.getLocation();
             moveWitherDirectly(wither, goal, target == null
-                    ? ArcadePortRules.HEROES_OF_GWEN_WITHER_HOME_SPEED : ArcadePortRules.HEROES_OF_GWEN_WITHER_TARGET_SPEED);
+                    ? GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_WITHER_HOME_SPEED", ArcadePortRules.HEROES_OF_GWEN_WITHER_HOME_SPEED) : GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_WITHER_TARGET_SPEED", ArcadePortRules.HEROES_OF_GWEN_WITHER_TARGET_SPEED));
             updateWitherTeamHud(team, wither, now);
             if (target != null) {
                 long nextAttack = witherNextEarthquakeAt.getOrDefault(team, now);
                 if (now >= nextAttack) {
                     earthquakeWither(team, wither);
-                    witherNextEarthquakeAt.put(team, now + ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_INTERVAL_MILLIS);
+                    witherNextEarthquakeAt.put(team, now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_WITHER_EARTHQUAKE_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_INTERVAL_MILLIS));
                 }
             }
         }
@@ -1175,8 +1216,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private void earthquakeWither(int team, Wither wither) {
         Location center = wither.getLocation();
-        for (Entity entity : world.getNearbyEntities(center, ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS,
-                ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS, ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS)) {
+        for (Entity entity : world.getNearbyEntities(center, GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS", ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS),
+                GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS", ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS), GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS", ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS))) {
             if (!(entity instanceof LivingEntity target) || target.equals(wither)
                     || !target.isValid() || target.isDead()) continue;
             boolean activeTarget = !(target instanceof Player player)
@@ -1185,7 +1226,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                     team, heroesOfGwenEntityTeam(target), activeTarget)) continue;
             double distance = Math.min(center.distance(target.getLocation()),
                     center.distance(target.getEyeLocation()));
-            if (distance >= ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS) continue;
+            if (distance >= GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS", ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS)) continue;
             double damage = ArcadePortRules.heroesOfGwenWitherEarthquakeDamage(distance);
             if (target instanceof Player player) {
                 if (player.getHealth() <= damage) {
@@ -1202,7 +1243,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             }
         }
 
-        int radius = (int) ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS;
+        int radius = (int) GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS", ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS);
         int minY = Math.max(world.getMinHeight(), center.getBlockY() - radius);
         int maxY = Math.min(world.getMaxHeight() - 1, center.getBlockY() + radius);
         for (int x = center.getBlockX() - radius; x <= center.getBlockX() + radius; x++) {
@@ -1500,7 +1541,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             for (int by = y - 2; by <= y + 2; by++) {
                 for (int bz = z - radius; bz <= z + radius; bz++) {
                     Block block = world.getBlockAt(bx, by, bz);
-                    if (block.getLocation().distanceSquared(center) > MOBA_CAPTURE_POINT_RANGE_SQUARED) continue;
+                    if (block.getLocation().distanceSquared(center) > ArcadePortRules.heroesOfGwenCapturePointRangeSquared()) continue;
                     if (block.equals(center.getBlock().getRelative(BlockFace.DOWN))) continue;
                     String material = block.getType().name();
                     if (material.equals("WOOL") || material.endsWith("_WOOL")) result.add(block);
@@ -1556,14 +1597,14 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         king.setRemoveWhenFarAway(false);
         king.setCanPickupItems(false);
         var maximumHealth = king.getAttribute(Attribute.MAX_HEALTH);
-        if (maximumHealth != null) maximumHealth.setBaseValue(ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_HEALTH);
-        king.setHealth(ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_HEALTH);
+        if (maximumHealth != null) maximumHealth.setBaseValue(GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_PUMPKIN_KING_HEALTH", ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_HEALTH));
+        king.setHealth(GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_PUMPKIN_KING_HEALTH", ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_HEALTH));
         king.getEquipment().setHelmet(new ItemStack(Material.PUMPKIN));
         king.getEquipment().setItemInMainHand(new ItemStack(Material.STONE_SWORD));
         king.getEquipment().setHelmetDropChance(0.0F);
         king.getEquipment().setItemInMainHandDropChance(0.0F);
         king.setCustomName(ChatColor.DARK_RED + "Pumpkin King " + ChatColor.RED + "❤ "
-                + ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_HEALTH);
+                + GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_PUMPKIN_KING_HEALTH", ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_HEALTH));
         king.setCustomNameVisible(true);
         heroesOfGwenPumpkinKing = king;
         heroesOfGwenPumpkinKingHome = spawns.get(0).clone();
@@ -1639,30 +1680,30 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         heroesOfGwenPumpkinKingTarget = target == null ? null : target.getUniqueId();
         Location goal = target == null ? heroesOfGwenPumpkinKingHome : target.getLocation();
         moveHeroesOfGwenPumpkinKing(goal,
-                target == null ? ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_HOME_SPEED
-                        : ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_TARGET_SPEED);
+                target == null ? GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_PUMPKIN_KING_HOME_SPEED", ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_HOME_SPEED)
+                        : GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_PUMPKIN_KING_TARGET_SPEED", ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_TARGET_SPEED));
         king.setCustomName(ChatColor.DARK_RED + "Pumpkin King " + ChatColor.RED + "❤ "
                 + (int) Math.ceil(king.getHealth()));
 
         if (now < heroesOfGwenPumpkinKingNextAttackAt) return;
         heroesOfGwenPumpkinKingNextAttackAt = now
-                + ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_ATTACK_INTERVAL_MILLIS;
+                + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_PUMPKIN_KING_ATTACK_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_ATTACK_INTERVAL_MILLIS);
         if (target == null) {
             king.setHealth(Math.min(king.getMaxHealth(),
-                    king.getHealth() + ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_OUT_OF_COMBAT_HEAL));
+                    king.getHealth() + GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_PUMPKIN_KING_OUT_OF_COMBAT_HEAL", ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_OUT_OF_COMBAT_HEAL)));
             return;
         }
         if (king.getLocation().distanceSquared(target.getLocation())
-                < ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_DIRECT_RANGE_SQUARED) {
-            target.damage(ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_DIRECT_DAMAGE, king);
+                < GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_PUMPKIN_KING_DIRECT_RANGE_SQUARED", ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_DIRECT_RANGE_SQUARED)) {
+            target.damage(GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_PUMPKIN_KING_DIRECT_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_DIRECT_DAMAGE), king);
         }
-        double radius = ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_AREA_RADIUS;
+        double radius = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_PUMPKIN_KING_AREA_RADIUS", ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_AREA_RADIUS);
         for (Entity nearby : world.getNearbyEntities(king.getLocation(), radius, radius, radius)) {
             if (!(nearby instanceof LivingEntity victim) || victim.equals(king)
                     || !victim.isValid() || victim.isDead()
                     || victim.getLocation().distanceSquared(king.getLocation()) > radius * radius) continue;
             if (victim instanceof Player player && !activePlayers.contains(player.getUniqueId())) continue;
-            victim.damage(ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_AREA_DAMAGE, king);
+            victim.damage(GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_PUMPKIN_KING_AREA_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_AREA_DAMAGE), king);
             Vector knockback = victim.getLocation().toVector().subtract(king.getLocation().toVector());
             if (knockback.lengthSquared() > 0.001D) {
                 victim.setVelocity(knockback.normalize().setY(1.0D));
@@ -1691,13 +1732,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
         if (spawned == 0) {
             heroesOfGwenSidequestNextStartAt = now
-                    + ArcadePortRules.HEROES_OF_GWEN_SIDEQUEST_INITIAL_DELAY_MILLIS;
+                    + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_SIDEQUEST_INITIAL_DELAY_MILLIS", ArcadePortRules.HEROES_OF_GWEN_SIDEQUEST_INITIAL_DELAY_MILLIS);
             return;
         }
         heroesOfGwenMonochromeEndsAt = now
-                + ArcadePortRules.HEROES_OF_GWEN_MONOCHROME_SKELETONS_DURATION_MILLIS;
+                + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_MONOCHROME_SKELETONS_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_MONOCHROME_SKELETONS_DURATION_MILLIS);
         heroesOfGwenSidequestNextStartAt = now
-                + ArcadePortRules.HEROES_OF_GWEN_SIDEQUEST_INITIAL_DELAY_MILLIS;
+                + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_SIDEQUEST_INITIAL_DELAY_MILLIS", ArcadePortRules.HEROES_OF_GWEN_SIDEQUEST_INITIAL_DELAY_MILLIS);
         announce(ChatColor.RED + "Wither Skeletons have spawned! "
                 + ChatColor.GRAY + "Your team has 30 seconds to defeat more than the opposing team.");
         for (Player player : onlinePlayers()) {
@@ -1725,13 +1766,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private void grantHeroesOfGwenPumpkinKingBuff(int team) {
         long expiresAt = System.currentTimeMillis()
-                + ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_BUFF_DURATION_MILLIS;
+                + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_PUMPKIN_KING_BUFF_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_BUFF_DURATION_MILLIS);
         for (Player player : activeMatchPlayers()) {
             if (teams.getOrDefault(player.getUniqueId(), -1) != team) continue;
             heroesOfGwenPumpkinBuffEndsAt.put(player.getUniqueId(), expiresAt);
             player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION,
-                    (int) (ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_BUFF_DURATION_MILLIS / 50L),
-                    ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_REGENERATION_AMPLIFIER,
+                    (int) (GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_PUMPKIN_KING_BUFF_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_BUFF_DURATION_MILLIS) / 50L),
+                    GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_PUMPKIN_KING_REGENERATION_AMPLIFIER", ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_REGENERATION_AMPLIFIER),
                     false, true, true));
             player.playSound(player.getLocation(), Sound.BLOCK_PORTAL_TRAVEL, 1.0F, 0.5F);
             world.spawnParticle(Particle.LAVA, player.getLocation().clone().add(0.0D, 1.0D, 0.0D),
@@ -1743,8 +1784,117 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     void tick(long now) {
         if (stopped || !ready) return;
+        for (Player player : players.values()) ArcadeCollisionRules.disable(player);
         if (game == ArcadePortGame.CASTLE_ASSAULT) tickCastleAssault(now);
         else if (game == ArcadePortGame.HEROES_OF_GWEN) tickHeroesOfGwen(now);
+    }
+
+    boolean debugSpawnObjectiveTnt(Player tester) {
+        if (stopped || !ready || game != ArcadePortGame.CASTLE_ASSAULT || tester == null
+                || !tester.isOnline() || !activePlayers.contains(tester.getUniqueId())
+                || !debugFeatureEnabled(tester, "objective-tnt")
+                || objectiveItem != null && objectiveItem.isValid() || objectiveCarrier != null) return false;
+        objectiveRespawnAt = 0L;
+        spawnObjectiveTnt();
+        return objectiveItem != null && objectiveItem.isValid();
+    }
+
+    boolean debugDestroyEnemyCrystal(Player tester) {
+        if (stopped || !ready || game != ArcadePortGame.CASTLE_ASSAULT || tester == null
+                || !tester.isOnline() || !activePlayers.contains(tester.getUniqueId())
+                || !debugFeatureEnabled(tester, "crystal-damage")) return false;
+        int team = teams.getOrDefault(tester.getUniqueId(), -1);
+        KingState enemyKing = kings.get(1 - team);
+        if (team < 0 || enemyKing == null) return false;
+        for (EnderCrystal crystal : new ArrayList<>(enemyKing.crystals)) {
+            if (crystal == null || !crystal.isValid()) continue;
+            int before = enemyKing.activeCrystals();
+            destroyCastleCrystal(enemyKing, crystal, tester);
+            return enemyKing.activeCrystals() < before;
+        }
+        return false;
+    }
+
+    boolean debugDamageEnemyKing(Player tester) {
+        if (stopped || !ready || game != ArcadePortGame.CASTLE_ASSAULT || tester == null
+                || !tester.isOnline() || !activePlayers.contains(tester.getUniqueId())
+                || !debugFeatureEnabled(tester, "king-damage")) return false;
+        int team = teams.getOrDefault(tester.getUniqueId(), -1);
+        KingState enemyKing = kings.get(1 - team);
+        if (team < 0 || enemyKing == null || enemyKing.activeCrystals() > 0 || enemyKing.health <= 0) return false;
+        int before = enemyKing.health;
+        damageCastleKing(enemyKing, Math.min(50, before), tester);
+        return enemyKing.health < before;
+    }
+
+    boolean debugStartHeroesOfGwenMinionWave(Player tester) {
+        if (stopped || !ready || game != ArcadePortGame.HEROES_OF_GWEN || tester == null
+                || !tester.isOnline() || !activePlayers.contains(tester.getUniqueId())) return false;
+        int before = heroesOfGwenMinionTeams.size();
+        long now = System.currentTimeMillis();
+        java.util.Arrays.fill(minionsSpawnedInWave, 0);
+        nextMinionSpawnAt[0] = now;
+        nextMinionSpawnAt[1] = now;
+        minionWavePending = true;
+        nextMinionWaveAt = now + mobaMinionWaveInterval();
+        updateHeroesOfGwenMinions(now);
+        return heroesOfGwenMinionTeams.size() > before;
+    }
+
+    boolean debugUseHeldHeroesOfGwenAbility(Player tester) {
+        if (stopped || !ready || game != ArcadePortGame.HEROES_OF_GWEN || tester == null
+                || !tester.isOnline() || !activePlayers.contains(tester.getUniqueId())) return false;
+        ItemStack held = tester.getInventory().getItemInMainHand();
+        String hero = selectedHeroesOfGwen.get(tester.getUniqueId());
+        if (held == null || held.getType().isAir() || hero == null) return false;
+        String skill = heroSkillId(held);
+        if ("anath".equals(hero) && held.getType() == Material.BLAZE_ROD) {
+            fireAnathFlameWand(tester);
+            return true;
+        }
+        if ("larissa".equals(hero) && held.getType() == Material.DIAMOND_HOE) {
+            fireLarissaAquaCannon(tester);
+            return true;
+        }
+        if (isRowenaBombardmentItem(held)) {
+            fireRowenaBombardmentShot(tester);
+            return true;
+        }
+        if (skill == null || !skill.startsWith(hero + ".")) return false;
+        activateHeroesOfGwenSkill(tester, skill);
+        return true;
+    }
+
+    boolean debugDamageNextHeroesOfGwenTower(Player tester) {
+        if (stopped || !ready || game != ArcadePortGame.HEROES_OF_GWEN || tester == null
+                || !tester.isOnline() || !activePlayers.contains(tester.getUniqueId())
+                || !hooks.debugFeatureEnabled(tester, "tower-damage")) return false;
+        int team = teams.getOrDefault(tester.getUniqueId(), -1);
+        if (team < 0) return false;
+        for (TowerState tower : towers.getOrDefault(1 - team, List.of())) {
+            if (tower.dead || !canDamageMobaTower(tower, team)) continue;
+            double before = tower.health;
+            damageMobaTower(tower, Math.min(50.0D, before), tester);
+            return tower.dead || tower.health < before;
+        }
+        return false;
+    }
+
+    boolean debugCaptureNextHeroesOfGwenPoint(Player tester) {
+        if (stopped || !ready || game != ArcadePortGame.HEROES_OF_GWEN || tester == null
+                || !tester.isOnline() || !activePlayers.contains(tester.getUniqueId())) return false;
+        int team = teams.getOrDefault(tester.getUniqueId(), -1);
+        if (team < 0) return false;
+        for (CapturePointState point : capturePoints) {
+            if (point.owner == team) continue;
+            setCapturePointOwner(point, team);
+            return point.owner == team;
+        }
+        return false;
+    }
+
+    private boolean debugFeatureEnabled(Player player, String feature) {
+        return player == null || !plugin.hasAdminAccess(player) || hooks.debugFeatureEnabled(player, feature);
     }
 
     private void tickCastleAssault(long now) {
@@ -1762,7 +1912,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             if (carrier == null || !carrier.isOnline()) {
                 objectiveCarrier = null;
                 objectiveCarryStartedAt = 0L;
-            } else if (now - objectiveCarryStartedAt >= CASTLE_NORMAL_TNT_DELAY
+            } else if (now - objectiveCarryStartedAt >= ArcadePortRules.castleAssaultCarrierFuseMillis()
                     || isAtEnemyCrystal(carrier)) {
                 detonateObjectiveTnt(carrier);
             } else {
@@ -1837,14 +1987,15 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private void updateObjectiveCarrierProgress(Player carrier, long now) {
         long elapsed = Math.max(0L, now - objectiveCarryStartedAt);
-        double progress = Math.min(1.0D, elapsed / (double) CASTLE_NORMAL_TNT_DELAY);
+        long carrierFuse = ArcadePortRules.castleAssaultCarrierFuseMillis();
+        double progress = Math.min(1.0D, elapsed / (double) carrierFuse);
         int filled = (int) Math.floor(progress * 24.0D);
         StringBuilder bar = new StringBuilder(ChatColor.GREEN.toString());
         for (int i = 0; i < 24; i++) {
             if (i == filled) bar.append(ChatColor.RED);
             bar.append('█');
         }
-        long secondsLeft = Math.max(0L, (CASTLE_NORMAL_TNT_DELAY - elapsed + 999L) / 1_000L);
+        long secondsLeft = Math.max(0L, (carrierFuse - elapsed + 999L) / 1_000L);
         carrier.sendActionBar(ChatColor.BOLD + "TNT Detonation " + ChatColor.RESET + bar
                 + ChatColor.RESET + " " + secondsLeft + "s");
         if (now >= objectiveCarrierLastEffectAt) {
@@ -1852,8 +2003,24 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             world.spawnParticle(Particle.FIREWORK, carrier.getEyeLocation(), 4, 0.12D, 0.12D, 0.12D, 0.01D);
             world.spawnParticle(Particle.DUST, carrier.getEyeLocation(), 4, 0.15D, 0.15D, 0.15D,
                     new Particle.DustOptions(burst, 1.0F));
+            renderCastleSiegeCosmetic(carrier.getLocation().add(0.0D, 1.1D, 0.0D),
+                    hooks.cosmeticOption(carrier, "siege-effects", "royal-gold"));
             objectiveCarrierLastEffectAt = now + 250L;
         }
+    }
+
+    private void renderCastleSiegeCosmetic(Location at, String style) {
+        if (at == null || at.getWorld() == null) return;
+        Color colour;
+        Particle accent;
+        switch (style == null ? "royal-gold" : style) {
+            case "void-siege" -> { colour = Color.PURPLE; accent = Particle.PORTAL; }
+            case "verdant-siege" -> { colour = Color.LIME; accent = Particle.HAPPY_VILLAGER; }
+            default -> { colour = Color.fromRGB(255, 190, 79); accent = Particle.ELECTRIC_SPARK; }
+        }
+        world.spawnParticle(Particle.DUST, at, 5, 0.18D, 0.18D, 0.18D,
+                new Particle.DustOptions(colour, 1.1F));
+        world.spawnParticle(accent, at, 3, 0.12D, 0.14D, 0.12D, 0.02D);
     }
 
     private void spawnObjectiveItem(Location spawn) {
@@ -1902,18 +2069,23 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void updateHeroesOfGwenHealthRegen(long now) {
+        if (!hooks.debugFeatureEnabledForActiveSession("health-regeneration")) {
+            heroesOfGwenNextHpRegenAt = now + GameDebugRuntimeOverrides.longValue(
+                    "HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS);
+            return;
+        }
         if (heroesOfGwenNextHpRegenAt <= 0L) {
-            heroesOfGwenNextHpRegenAt = now + ArcadePortRules.HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS;
+            heroesOfGwenNextHpRegenAt = now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS);
             return;
         }
         if (now < heroesOfGwenNextHpRegenAt) return;
         while (heroesOfGwenNextHpRegenAt <= now) {
-            heroesOfGwenNextHpRegenAt += ArcadePortRules.HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS;
+            heroesOfGwenNextHpRegenAt += GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS);
         }
         for (Player player : activeMatchPlayers()) {
             if (player.hasPotionEffect(PotionEffectType.WITHER)) continue;
             double regen = ArcadePortRules.heroesOfGwenStoreHpRegenAmount(
-                    ArcadePortRules.HEROES_OF_GWEN_BASE_HP_REGEN_PER_INTERVAL,
+                    GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BASE_HP_REGEN_PER_INTERVAL", ArcadePortRules.HEROES_OF_GWEN_BASE_HP_REGEN_PER_INTERVAL),
                     heroesOfGwenOwnedStoreItemNames(player));
             player.setHealth(Math.min(player.getMaxHealth(), player.getHealth() + regen));
         }
@@ -1928,21 +2100,21 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         updateAnathMeteorZones(now);
         updateHeroesOfGwenMinions(now);
         recordMobaTowerEntries(now);
-        if (now >= nextGoldAt) {
-            for (Player player : activeMatchPlayers()) addGold(player, MOBA_BASE_GOLD, "Passive gold");
+        if (hooks.debugFeatureEnabledForActiveSession("gold-income") && now >= nextGoldAt) {
+            for (Player player : activeMatchPlayers()) addGold(player, mobaBaseGold(), "Passive gold");
             for (CapturePointState point : capturePoints) {
                 if (point.owner < 0) continue;
                 for (Player player : activeMatchPlayers()) {
                     if (teams.getOrDefault(player.getUniqueId(), -1) == point.owner) {
-                        addGold(player, MOBA_CAPTURE_GOLD, "Captured beacon");
+                        addGold(player, mobaCaptureGold(), "Captured beacon");
                     }
                 }
             }
-            nextGoldAt = now + MOBA_PASSIVE_GOLD_INTERVAL;
+            nextGoldAt = now + mobaPassiveGoldInterval();
         }
-        if (now >= nextCapturePointUpdateAt) {
+        if (hooks.debugFeatureEnabledForActiveSession("beacon-captures") && now >= nextCapturePointUpdateAt) {
             updateCapturePoints();
-            nextCapturePointUpdateAt = now + MOBA_CAPTURE_UPDATE_INTERVAL;
+            nextCapturePointUpdateAt = now + mobaCaptureUpdateInterval();
         }
         // Two originally-neutral beacons cannot be owned for the entire match.
         // Measure a genuine uninterrupted simultaneous hold instead.
@@ -1957,7 +2129,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
         if (now >= nextStructureUpdateAt) {
             updateMobaTowers();
-            nextStructureUpdateAt = now + MOBA_TOWER_UPDATE_INTERVAL;
+            nextStructureUpdateAt = now + mobaTowerUpdateInterval();
         }
         checkTeamDeparture();
     }
@@ -2118,6 +2290,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 || !(event.getEntity() instanceof Player player) || !players.containsKey(player.getUniqueId())) return;
         if (objectiveCarrier != null) {
             event.setCancelled(true);
+            return;
+        }
+        if (!debugFeatureEnabled(player, "objective-tnt")) {
+            event.setCancelled(true);
+            player.sendActionBar(ChatColor.RED + "Objective TNT is disabled in your debug profile.");
             return;
         }
         event.setCancelled(true);
@@ -2445,10 +2622,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         player.setAllowFlight(false);
         if (!isHeroSkillReady(player, "hattori.double_jump")) return;
         setHeroSkillCooldown(player, "hattori.double_jump",
-                ArcadePortRules.HEROES_OF_GWEN_HATTORI_DOUBLE_JUMP_COOLDOWN_MILLIS);
+                GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_HATTORI_DOUBLE_JUMP_COOLDOWN_MILLIS", ArcadePortRules.HEROES_OF_GWEN_HATTORI_DOUBLE_JUMP_COOLDOWN_MILLIS));
         Vector velocity = player.getVelocity();
         player.setVelocity(new Vector(velocity.getX() * 0.2D,
-                ArcadePortRules.HEROES_OF_GWEN_HATTORI_DOUBLE_JUMP_POWER,
+                GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_HATTORI_DOUBLE_JUMP_POWER", ArcadePortRules.HEROES_OF_GWEN_HATTORI_DOUBLE_JUMP_POWER),
                 velocity.getZ() * 0.2D));
         world.spawnParticle(Particle.FLAME, player.getLocation().clone().add(0.0D, 0.8D, 0.0D),
                 16, 0.35D, 0.2D, 0.35D, 0.04D);
@@ -2517,7 +2694,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             if (next <= 0) {
                 rowenaLightArrowsRemaining.remove(player.getUniqueId());
                 setHeroSkillCooldown(player, "rowena.light_arrows",
-                        ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROWS_COOLDOWN_MILLIS);
+                        GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_ROWENA_LIGHT_ARROWS_COOLDOWN_MILLIS", ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROWS_COOLDOWN_MILLIS));
                 giveHeroesOfGwenSkillItem(player, 1, "rowena.light_arrows", Material.GOLD_NUGGET,
                         "Light Arrows", "Infuse your next five arrows. They pass through blocks and deal high damage.");
             } else {
@@ -2605,7 +2782,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         int livingWolves = liveBardolfWolves(attacker.getUniqueId()).size();
         if (livingWolves > 0) {
             event.setDamage(event.getDamage()
-                    + livingWolves * ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_DAMAGE_PER_WOLF);
+                    + livingWolves * GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BARDOLF_FULL_MOON_DAMAGE_PER_WOLF", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_DAMAGE_PER_WOLF));
         }
     }
 
@@ -2647,7 +2824,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (attacker == null || !activePlayers.contains(attacker.getUniqueId())) return;
         long expiresAt = heroesOfGwenPumpkinBuffEndsAt.getOrDefault(attacker.getUniqueId(), 0L);
         if (expiresAt > System.currentTimeMillis()) {
-            event.setDamage(event.getDamage() * ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_DAMAGE_MULTIPLIER);
+            event.setDamage(event.getDamage() * GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_PUMPKIN_KING_DAMAGE_MULTIPLIER", ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_DAMAGE_MULTIPLIER));
         }
     }
 
@@ -2674,7 +2851,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             heroesOfGwenPumpkinKingTarget = null;
             heroesOfGwenPumpkinKingNextAttackAt = 0L;
             heroesOfGwenPumpkinKingRespawnAt = System.currentTimeMillis()
-                    + ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_RESPAWN_DELAY_MILLIS;
+                    + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_PUMPKIN_KING_RESPAWN_DELAY_MILLIS", ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_RESPAWN_DELAY_MILLIS);
             entities.remove(event.getEntity());
             Player killer = event.getEntity().getKiller();
             int team = killer != null && activePlayers.contains(killer.getUniqueId())
@@ -2817,7 +2994,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         // HPManager's source baseline kill heal is a direct setHealth operation;
         // only MobaKillHealEffect bonuses go through the item heal event callbacks.
         double baseHeal = killer.getMaxHealth()
-                * ArcadePortRules.HEROES_OF_GWEN_BASE_KILL_HEAL_FACTOR;
+                * GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BASE_KILL_HEAL_FACTOR", ArcadePortRules.HEROES_OF_GWEN_BASE_KILL_HEAL_FACTOR);
         killer.setHealth(Math.min(killer.getMaxHealth(), killer.getHealth() + baseHeal));
         double itemHeal = 0.0D;
         for (String itemName : heroesOfGwenOwnedStoreItemNames(killer)) {
@@ -2911,7 +3088,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                     && teams.getOrDefault(owner.getUniqueId(), -1) != teams.getOrDefault(target.getUniqueId(), -2)
                     && activePlayers.contains(target.getUniqueId())) {
                 event.setDamage(heroesOfGwenStoreAbilityDamage(owner, target,
-                        ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_FIREBALL_DAMAGE));
+                        GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ANATH_METEOR_FIREBALL_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_FIREBALL_DAMAGE)));
                 target.setFireTicks(Math.max(target.getFireTicks(), 40));
             } else event.setCancelled(true);
             return;
@@ -2946,7 +3123,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 && held.hasItemMeta() && held.getItemMeta().hasDisplayName()
                 && held.getItemMeta().getDisplayName().contains("ENDER BLADE")) {
             event.setDamage(event.getDamage()
-                    + ArcadePortRules.HEROES_OF_GWEN_HATTORI_ENDER_BLADE_DAMAGE_BONUS);
+                    + GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_HATTORI_ENDER_BLADE_DAMAGE_BONUS", ArcadePortRules.HEROES_OF_GWEN_HATTORI_ENDER_BLADE_DAMAGE_BONUS));
         }
     }
 
@@ -2988,7 +3165,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         int power = bow == null ? 0 : bow.getEnchantmentLevel(Enchantment.POWER);
         double damageAtCenter = ArcadePortRules.heroesOfGwenDevonTntArrowDamage(power);
         int ownerTeam = teams.getOrDefault(owner.getUniqueId(), -1);
-        double radius = ArcadePortRules.HEROES_OF_GWEN_DEVON_TNT_EXPLOSION_RADIUS;
+        double radius = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_DEVON_TNT_EXPLOSION_RADIUS", ArcadePortRules.HEROES_OF_GWEN_DEVON_TNT_EXPLOSION_RADIUS);
         for (Entity entity : world.getNearbyEntities(center, radius, radius, radius)) {
             if (!(entity instanceof LivingEntity target) || target.equals(owner)
                     || !target.isValid() || target.isDead()) continue;
@@ -3002,7 +3179,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             TowerState tower = towerFor(target);
             if (tower != null) {
                 if (tower.owner != ownerTeam && canDamageMobaTower(tower, ownerTeam)
-                        && owner.getLocation().distanceSquared(tower.location) <= MOBA_TOWER_RANGE_SQUARED) {
+                        && owner.getLocation().distanceSquared(tower.location) <= ArcadePortRules.heroesOfGwenTowerRangeSquared()) {
                     damageMobaTower(tower, damage, owner);
                 }
             } else if (target instanceof Wither wither) {
@@ -3045,9 +3222,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         else held.setAmount(held.getAmount() - 1);
         Location spawn = player.getEyeLocation().add(player.getLocation().getDirection());
         TNTPrimed tnt = world.spawn(spawn, TNTPrimed.class);
-        tnt.setFuseTicks(60);
+        tnt.setFuseTicks(ArcadePortRules.castleAssaultTntFuseTicks());
         tnt.setYield(0.0F);
-        tnt.setVelocity(player.getLocation().getDirection().normalize().multiply(0.5D).add(new Vector(0, 0.1D, 0)));
+        tnt.setVelocity(ArcadePortRules.castleAssaultTntThrowVelocity(player.getLocation().getDirection()));
         tnt.getPersistentDataContainer().set(thrownTntOwnerKey, PersistentDataType.STRING, player.getUniqueId().toString());
         entities.add(tnt);
     }
@@ -3072,7 +3249,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private double castleTntRadius(Player owner) {
         String kit = castleAssaultPlayerKits.get(owner.getUniqueId());
-        return 4.0D + ("demolitionist".equals(kit) ? 3.0D : 0.0D);
+        return ArcadePortRules.castleAssaultTntRadius(kit);
     }
 
     private void refillCastleArcherArrows(long now) {
@@ -3087,12 +3264,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             for (ItemStack item : player.getInventory().getContents()) {
                 if (isCastleFletchedArrow(item)) amount += item.getAmount();
             }
-            if (amount < ArcadePortRules.CASTLE_ASSAULT_ARCHER_MAX_ARROWS) {
+            if (ArcadePortRules.castleAssaultCanRefillArrows(amount)) {
                 player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrow",
                         "Replenished by the Archer kit."));
                 player.updateInventory();
             }
-            castleArcherNextArrowAt.put(id, now + ArcadePortRules.CASTLE_ASSAULT_ARCHER_REFILL_MILLIS);
+            castleArcherNextArrowAt.put(id, now + ArcadePortRules.castleAssaultArcherRefillMillis());
         }
     }
 
@@ -3107,13 +3284,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             for (ItemStack item : player.getInventory().getContents()) {
                 if (item != null && item.getType() == Material.TNT) current += item.getAmount();
             }
-            if (current < ArcadePortRules.CASTLE_ASSAULT_DEMOLITIONIST_MAX_TNT) {
+            if (ArcadePortRules.castleAssaultCanRefillTnt(current)) {
                 player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT",
                         "Replenished by the Demolitionist kit."));
                 player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 1.0F, 1.0F);
                 player.updateInventory();
             }
-            castleDemolitionistNextTntAt.put(id, now + ArcadePortRules.CASTLE_ASSAULT_DEMOLITIONIST_TNT_REFILL_MILLIS);
+            castleDemolitionistNextTntAt.put(id, now + ArcadePortRules.castleAssaultDemolitionistRefillMillis());
         }
     }
 
@@ -3144,7 +3321,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             if (!target.equals(owner) && teams.getOrDefault(target.getUniqueId(), -2) == attackingTeam) continue;
             double distance = target.getLocation().distance(center);
             if (distance > radius) continue;
-            double damage = 10.0D * Math.max(0.0D, 1.0D - distance / radius);
+            double damage = ArcadePortRules.castleAssaultTntDamage(distance, radius);
             damage *= ArcadePortRules.castleAssaultBlastDamageMultiplier(castleBlastProtectionEpf(target));
             if (damage <= 0.0D) continue;
             if (target.getHealth() <= damage) {
@@ -3155,8 +3332,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             if (direction.lengthSquared() > 0.001D) {
                 double knockback = ArcadePortRules.castleAssaultBlastKnockbackMultiplier(
                         castleHighestBlastProtection(target));
-                target.setVelocity(direction.normalize().multiply(0.8D * knockback)
-                        .setY(0.35D * knockback));
+                target.setVelocity(direction.normalize().multiply(0.8D * knockback
+                                * ArcadePortRules.castleAssaultTntKnockbackMultiplier())
+                        .setY(ArcadePortRules.castleAssaultTntVerticalKnockback()
+                                * knockback * ArcadePortRules.castleAssaultTntKnockbackMultiplier()));
             }
         }
         if (!objective) return;
@@ -3168,14 +3347,18 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             if (expressDelivery) awardCastleAssaultAchievement(owner.getUniqueId(), "express-delivery");
         }
         if (enemyKing.activeCrystals() == 0 && enemyKing.entity != null
-                && enemyKing.location.distance(center) <= radius) damageCastleKing(enemyKing, 50, owner);
+                && enemyKing.location.distance(center) <= radius) damageCastleKing(enemyKing,
+                ArcadePortRules.castleAssaultTntKingDamage(), owner);
     }
 
     private void destroyCastleCrystal(KingState king, EnderCrystal crystal, Player attacker) {
+        if (!debugFeatureEnabled(attacker, "crystal-damage")) return;
         if (!king.crystals.remove(crystal)) return;
         Location crystalLocation = crystal.getLocation().clone();
         world.spawnParticle(Particle.EXPLOSION_EMITTER, crystalLocation, 1);
         world.spawnParticle(Particle.CLOUD, crystalLocation, 30, 0.65D, 0.65D, 0.65D, 0.08D);
+        renderCastleSiegeCosmetic(crystalLocation,
+                hooks.cosmeticOption(attacker, "siege-effects", "royal-gold"));
         world.playSound(crystalLocation, Sound.ENTITY_GENERIC_EXPLODE, 1.3F, 0.9F);
         entities.remove(crystal);
         crystal.remove();
@@ -3190,6 +3373,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void damageCastleKing(KingState king, double damage, Player attacker) {
+        if (!debugFeatureEnabled(attacker, "king-damage")) return;
         if (king.activeCrystals() > 0 || king.health <= 0) return;
         king.health = Math.max(0, king.health - (int) Math.ceil(damage));
         if (king.entity != null && king.entity.isValid()) {
@@ -3212,7 +3396,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             int redPlayers = 0;
             int bluePlayers = 0;
             for (Player player : activeMatchPlayers()) {
-                if (player.getLocation().distanceSquared(point.center) > MOBA_CAPTURE_POINT_RANGE_SQUARED) continue;
+                if (player.getLocation().distanceSquared(point.center) > ArcadePortRules.heroesOfGwenCapturePointRangeSquared()) continue;
                 int team = teams.getOrDefault(player.getUniqueId(), -1);
                 if (team == 0) redPlayers++;
                 else if (team == 1) bluePlayers++;
@@ -3263,7 +3447,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         setCapturePointBeacon(point, owner);
         for (Player player : activeMatchPlayers()) {
             if (teams.getOrDefault(player.getUniqueId(), -1) == owner) {
-                addGold(player, MOBA_CAPTURE_REWARD, "Capturing " + point.name);
+                addGold(player, mobaCaptureReward(), "Capturing " + point.name);
             }
         }
         announce(ChatColor.GOLD + teamName(owner) + " captured the " + point.colour + " " + point.name + " Beacon!");
@@ -3312,14 +3496,14 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 Set<UUID> inRange = new HashSet<>();
                 for (Mob minion : minions) {
                     if (heroesOfGwenMinionTeams.getOrDefault(minion.getUniqueId(), -1) != 1 - owner
-                            || minion.getLocation().distanceSquared(tower.location) > MOBA_TOWER_RANGE_SQUARED) continue;
+                            || minion.getLocation().distanceSquared(tower.location) > ArcadePortRules.heroesOfGwenTowerRangeSquared()) continue;
                     UUID id = minion.getUniqueId();
                     inRange.add(id);
                     tower.targetEnteredAt.putIfAbsent(id, now);
                 }
                 for (Player player : matchPlayers) {
                     if (teams.getOrDefault(player.getUniqueId(), -1) != 1 - owner
-                            || player.getLocation().distanceSquared(tower.location) > MOBA_TOWER_RANGE_SQUARED) continue;
+                            || player.getLocation().distanceSquared(tower.location) > ArcadePortRules.heroesOfGwenTowerRangeSquared()) continue;
                     UUID id = player.getUniqueId();
                     inRange.add(id);
                     tower.targetEnteredAt.putIfAbsent(id, now);
@@ -3338,7 +3522,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 UUID targetId = target == null ? null : target.getUniqueId();
                 if (!java.util.Objects.equals(tower.currentTarget, targetId)) {
                     tower.currentTarget = targetId;
-                    tower.nextDamage = MOBA_TOWER_DAMAGE;
+                    tower.nextDamage = ArcadePortRules.heroesOfGwenTowerDamage();
                 }
                 if (target instanceof Mob minion) {
                     // Source MinionWave halves incoming custom Tower damage for minions.
@@ -3353,8 +3537,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 if (target != null) tower.nextDamage += 1.0D;
                 for (Player teammate : activeMatchPlayers()) {
                     if (teams.getOrDefault(teammate.getUniqueId(), -1) != owner
-                            || teammate.getLocation().distanceSquared(tower.location) > MOBA_TOWER_RANGE_SQUARED) continue;
-                    teammate.setHealth(Math.min(teammate.getMaxHealth(), teammate.getHealth() + MOBA_TOWER_HEAL));
+                            || teammate.getLocation().distanceSquared(tower.location) > ArcadePortRules.heroesOfGwenTowerRangeSquared()) continue;
+                    teammate.setHealth(Math.min(teammate.getMaxHealth(), teammate.getHealth() + ArcadePortRules.heroesOfGwenTowerHeal()));
                 }
             }
         }
@@ -3435,7 +3619,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             }
             Player attacker = resolveAttacker(byEntity);
             if (attacker == null || teams.getOrDefault(attacker.getUniqueId(), -1) == tower.owner) return;
-            if (attacker.getLocation().distanceSquared(tower.location) > MOBA_TOWER_RANGE_SQUARED) {
+            if (!hooks.debugFeatureEnabled(attacker, "tower-damage")) return;
+            if (attacker.getLocation().distanceSquared(tower.location) > ArcadePortRules.heroesOfGwenTowerRangeSquared()) {
                 attacker.sendMessage(ChatColor.RED + "You must enter the tower's 10-block range to damage it.");
                 return;
             }
@@ -3543,7 +3728,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private Player nearestEnemy(Location origin, int owner) {
         Player best = null;
-        double distance = MOBA_TOWER_RANGE_SQUARED;
+        double distance = ArcadePortRules.heroesOfGwenTowerRangeSquared();
         for (Player player : activeMatchPlayers()) {
             if (teams.getOrDefault(player.getUniqueId(), -1) == owner) continue;
             double candidate = player.getLocation().distanceSquared(origin);
@@ -3746,11 +3931,15 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         PotionEffectType.INSTANT_HEALTH, 1, 1), true);
                 case "Power Potion" -> potionMeta.addCustomEffect(new PotionEffect(
                         PotionEffectType.STRENGTH,
-                        (int) (ArcadePortRules.HEROES_OF_GWEN_POWER_POTION_DURATION_MILLIS / 50L), 0), true);
+                        (int) (GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_POWER_POTION_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_POWER_POTION_DURATION_MILLIS) / 50L), 0), true);
                 case "Speed Potion" -> potionMeta.addCustomEffect(new PotionEffect(
                         PotionEffectType.SPEED,
-                        (int) (ArcadePortRules.HEROES_OF_GWEN_SPEED_POTION_DURATION_MILLIS / 50L), 0), true);
+                        (int) (GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_SPEED_POTION_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_SPEED_POTION_DURATION_MILLIS) / 50L), 0), true);
                 default -> { }
+            }
+            if ("Small Health Potion".equals(entry.name) || "Large Health Potion".equals(entry.name)) {
+                rewardMeta.getPersistentDataContainer().set(shopItemKey, PersistentDataType.INTEGER,
+                        storeEntries.indexOf(entry));
             }
         }
         reward.setItemMeta(rewardMeta);
@@ -4306,14 +4495,15 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void giveCastleKillStreakReward(Player player, String kit, int streak) {
-        if (streak < 2 || streak > 8 || streak % 2 != 0) return;
+        int rewardTier = ArcadePortRules.castleAssaultKillStreakRewardTier(streak);
+        if (rewardTier == 0) return;
         switch (kit) {
             case "alchemist" -> {
-                if (streak == 2) player.getInventory().addItem(castlePotion(Material.SPLASH_POTION,
+                if (rewardTier == 1) player.getInventory().addItem(castlePotion(Material.SPLASH_POTION,
                         PotionEffectType.SLOWNESS, 90 * 20, 0, "Splash Slowness Potion"));
-                else if (streak == 4) player.getInventory().addItem(castlePotion(Material.SPLASH_POTION,
+                else if (rewardTier == 2) player.getInventory().addItem(castlePotion(Material.SPLASH_POTION,
                         PotionEffectType.WEAKNESS, 90 * 20, 0, "Splash Weakness Potion"));
-                else if (streak == 6) player.getInventory().addItem(castlePotion(Material.SPLASH_POTION,
+                else if (rewardTier == 3) player.getInventory().addItem(castlePotion(Material.SPLASH_POTION,
                         PotionEffectType.INSTANT_DAMAGE, 1, 1, "Splash Harming II Potion"),
                         castlePotion(Material.SPLASH_POTION, PotionEffectType.INSTANT_DAMAGE, 1, 1,
                                 "Splash Harming II Potion"),
@@ -4325,36 +4515,36 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         PotionEffectType.REGENERATION, 10 * 20, 2, "Regeneration III Potion"));
             }
             case "archer" -> {
-                if (streak == 2) player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrows", "Kill-streak reward.", 8));
-                else if (streak == 4) player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrows", "Kill-streak reward.", 12));
-                else if (streak == 6) player.getInventory().addItem(castleEnchantedBook(Enchantment.PUNCH, 1, "Punch I"));
+                if (rewardTier == 1) player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrows", "Kill-streak reward.", 8));
+                else if (rewardTier == 2) player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrows", "Kill-streak reward.", 12));
+                else if (rewardTier == 3) player.getInventory().addItem(castleEnchantedBook(Enchantment.PUNCH, 1, "Punch I"));
                 else {
                     player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrows", "Kill-streak reward.", 32),
                             castleEnchantedBook(Enchantment.FLAME, 1, "Flame I"));
                 }
             }
             case "demolitionist" -> {
-                if (streak == 2) player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Kill-streak reward.", 2));
-                else if (streak == 4) player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Kill-streak reward.", 3));
-                else if (streak == 6) player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Kill-streak reward.", 4));
+                if (rewardTier == 1) player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Kill-streak reward.", 2));
+                else if (rewardTier == 2) player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Kill-streak reward.", 3));
+                else if (rewardTier == 3) player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Kill-streak reward.", 4));
                 else player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Kill-streak reward.", 5),
                         castleFlintAndSteel(30, true));
             }
             case "tank" -> {
-                if (streak == 2) player.getInventory().addItem(namedItem(Material.GOLDEN_APPLE,
+                if (rewardTier == 1) player.getInventory().addItem(namedItem(Material.GOLDEN_APPLE,
                         ChatColor.LIGHT_PURPLE + "Golden Applegate", "Kill-streak reward."));
-                else if (streak == 4) player.getInventory().addItem(castlePotion(Material.POTION,
+                else if (rewardTier == 2) player.getInventory().addItem(castlePotion(Material.POTION,
                         PotionEffectType.REGENERATION, 22 * 20, 1, "Regeneration II Potion"));
-                else if (streak == 6) player.getInventory().addItem(castlePotion(Material.POTION,
+                else if (rewardTier == 3) player.getInventory().addItem(castlePotion(Material.POTION,
                         PotionEffectType.RESISTANCE, 90 * 20, 0, "Resistance Potion"));
                 else player.getInventory().addItem(castleEnchantedBook(Enchantment.THORNS, 2, "Thorns II"));
             }
             default -> {
-                if (streak == 2) player.getInventory().addItem(namedItem(Material.GOLDEN_APPLE,
+                if (rewardTier == 1) player.getInventory().addItem(namedItem(Material.GOLDEN_APPLE,
                         ChatColor.LIGHT_PURPLE + "Golden Applegate", "Kill-streak reward."));
-                else if (streak == 4) player.getInventory().addItem(castlePotion(Material.SPLASH_POTION,
+                else if (rewardTier == 2) player.getInventory().addItem(castlePotion(Material.SPLASH_POTION,
                         PotionEffectType.INSTANT_HEALTH, 1, 1, "Splash Healing II Potion"));
-                else if (streak == 6) player.getInventory().addItem(castlePotion(Material.POTION,
+                else if (rewardTier == 3) player.getInventory().addItem(castlePotion(Material.POTION,
                         PotionEffectType.SPEED, 90 * 20, 1, "Speed II Potion"));
                 else player.getInventory().addItem(castleEnchantedBook(Enchantment.FIRE_ASPECT, 1, "Fire Aspect I"));
             }
@@ -4373,12 +4563,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         long kitAppliedAt = System.currentTimeMillis();
         if ("archer".equals(kit)) {
             castleArcherNextArrowAt.put(player.getUniqueId(),
-                    kitAppliedAt + ArcadePortRules.CASTLE_ASSAULT_ARCHER_REFILL_MILLIS);
+                    kitAppliedAt + GameDebugRuntimeOverrides.longValue("CASTLE_ASSAULT_ARCHER_REFILL_MILLIS", ArcadePortRules.CASTLE_ASSAULT_ARCHER_REFILL_MILLIS));
         } else {
             castleArcherNextArrowAt.remove(player.getUniqueId());
         }
         if (isCastleTntKit(kit)) {
-            castleDemolitionistNextTntAt.put(player.getUniqueId(), kitAppliedAt + ArcadePortRules.CASTLE_ASSAULT_DEMOLITIONIST_TNT_REFILL_MILLIS);
+            castleDemolitionistNextTntAt.put(player.getUniqueId(), kitAppliedAt + GameDebugRuntimeOverrides.longValue("CASTLE_ASSAULT_DEMOLITIONIST_TNT_REFILL_MILLIS", ArcadePortRules.CASTLE_ASSAULT_DEMOLITIONIST_TNT_REFILL_MILLIS));
         } else {
             castleDemolitionistNextTntAt.remove(player.getUniqueId());
         }
@@ -4557,9 +4747,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         "Meteor Shower", "Throw to mark a 10-block radius for 7 seconds. 60-second cooldown.");
                 player.getInventory().setItem(7, namedItem(Material.BLAZE_POWDER,
                         ChatColor.GOLD + "Embers", "Flame Wand ammunition; one charge replenishes every second."));
-                player.getInventory().getItem(7).setAmount(ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_CAPACITY);
+                player.getInventory().getItem(7).setAmount(GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_CAPACITY", ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_CAPACITY));
                 heroAmmoNextAt.put(id, System.currentTimeMillis()
-                        + ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_RELOAD_MILLIS);
+                        + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_RELOAD_MILLIS", ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_RELOAD_MILLIS));
             }
             case "ivy" -> {
                 player.getInventory().setItem(0, namedItem(Material.WOODEN_SWORD,
@@ -4607,9 +4797,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 player.getInventory().setItem(7, namedItem(Material.ARROW,
                         ChatColor.YELLOW + "Fletched Arrow", "Replenished every two seconds; maximum two."));
                 player.getInventory().getItem(7).setAmount(
-                        ArcadePortRules.HEROES_OF_GWEN_ROWENA_FLETCHER_MAX_ARROWS + heroesOfGwenStoreBonusAmmo(player));
+                        GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_ROWENA_FLETCHER_MAX_ARROWS", ArcadePortRules.HEROES_OF_GWEN_ROWENA_FLETCHER_MAX_ARROWS) + heroesOfGwenStoreBonusAmmo(player));
                 heroAmmoNextAt.put(id, System.currentTimeMillis()
-                        + ArcadePortRules.HEROES_OF_GWEN_ROWENA_FLETCHER_RELOAD_MILLIS);
+                        + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_ROWENA_FLETCHER_RELOAD_MILLIS", ArcadePortRules.HEROES_OF_GWEN_ROWENA_FLETCHER_RELOAD_MILLIS));
             }
             case "bardolf" -> {
                 player.getInventory().setItem(0, namedItem(Material.WOODEN_SWORD,
@@ -4637,7 +4827,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 player.getInventory().setItem(7, namedItem(Material.LAPIS_LAZULI,
                         ChatColor.AQUA + "Water Stone", "Aqua Cannon ammunition; one charge replenishes every 3 seconds."));
                 heroAmmoNextAt.put(id, System.currentTimeMillis()
-                        + ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_AMMO_RELOAD_MILLIS);
+                        + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_LARISSA_WATER_AMMO_RELOAD_MILLIS", ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_AMMO_RELOAD_MILLIS));
             }
             case "devon" -> {
                 ItemStack bow = new ItemStack(Material.BOW);
@@ -4734,6 +4924,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private void activateHeroesOfGwenSkill(Player player, String skill) {
         if (player == null || !player.isOnline() || !activePlayers.contains(player.getUniqueId())) return;
+        int separator = skill == null ? -1 : skill.indexOf('.');
+        if (separator > 0 && !debugFeatureEnabled(player, "hero-" + skill.substring(0, separator) + "-abilities")) {
+            player.sendActionBar(ChatColor.RED + "This hero's abilities are disabled in your debug profile.");
+            return;
+        }
         if (!isHeroSkillReady(player, skill)) {
             long remain = heroSkillReadyAt.getOrDefault(player.getUniqueId(), Map.of())
                     .getOrDefault(skill, 0L) - System.currentTimeMillis();
@@ -4745,9 +4940,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         switch (skill) {
             case "hattori.shuriken" -> {
                 setHeroSkillCooldown(player, skill,
-                        ArcadePortRules.HEROES_OF_GWEN_HATTORI_SHURIKEN_COOLDOWN_MILLIS);
-                for (int i = 0; i < ArcadePortRules.HEROES_OF_GWEN_HATTORI_SHURIKEN_COUNT; i++) {
-                    final long delay = i * ArcadePortRules.HEROES_OF_GWEN_HATTORI_SHURIKEN_SPACING_TICKS;
+                        GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_HATTORI_SHURIKEN_COOLDOWN_MILLIS", ArcadePortRules.HEROES_OF_GWEN_HATTORI_SHURIKEN_COOLDOWN_MILLIS));
+                for (int i = 0; i < GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_HATTORI_SHURIKEN_COUNT", ArcadePortRules.HEROES_OF_GWEN_HATTORI_SHURIKEN_COUNT); i++) {
+                    final long delay = i * GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_HATTORI_SHURIKEN_SPACING_TICKS", ArcadePortRules.HEROES_OF_GWEN_HATTORI_SHURIKEN_SPACING_TICKS);
                     Bukkit.getScheduler().runTaskLater(plugin, () -> {
                         if (!player.isOnline() || !activePlayers.contains(id)) return;
                         Snowball snowball = player.launchProjectile(Snowball.class);
@@ -4758,7 +4953,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             }
             case "hattori.ninja_dash" -> {
                 setHeroSkillCooldown(player, skill,
-                        ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_COOLDOWN_MILLIS);
+                        GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_HATTORI_NINJA_DASH_COOLDOWN_MILLIS", ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_COOLDOWN_MILLIS));
                 performHattoriDash(player);
             }
             case "hattori.ender_blade" -> {
@@ -4772,26 +4967,26 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 player.getInventory().setItem(0, enderBlade);
                 player.getInventory().setHeldItemSlot(0);
                 heroEnderBladeEndsAt.put(id, System.currentTimeMillis()
-                        + ArcadePortRules.HEROES_OF_GWEN_HATTORI_ENDER_BLADE_ACTIVE_MILLIS);
+                        + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_HATTORI_ENDER_BLADE_ACTIVE_MILLIS", ArcadePortRules.HEROES_OF_GWEN_HATTORI_ENDER_BLADE_ACTIVE_MILLIS));
                 setHeroSkillCooldown(player, skill,
-                        ArcadePortRules.HEROES_OF_GWEN_HATTORI_ENDER_BLADE_REUSE_DELAY_MILLIS);
+                        GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_HATTORI_ENDER_BLADE_REUSE_DELAY_MILLIS", ArcadePortRules.HEROES_OF_GWEN_HATTORI_ENDER_BLADE_REUSE_DELAY_MILLIS));
                 player.sendMessage(ChatColor.LIGHT_PURPLE + "Hattori activated Ender Blade!");
                 player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 0.8F);
             }
             case "devon.tnt_infusion" -> {
-                heroTntArrowCharges.put(id, ArcadePortRules.HEROES_OF_GWEN_DEVON_TNT_ARROW_COUNT);
+                heroTntArrowCharges.put(id, GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_DEVON_TNT_ARROW_COUNT", ArcadePortRules.HEROES_OF_GWEN_DEVON_TNT_ARROW_COUNT));
                 ItemStack skillItem = player.getInventory().getItem(1);
-                if (skillItem != null) skillItem.setAmount(ArcadePortRules.HEROES_OF_GWEN_DEVON_TNT_ARROW_COUNT);
+                if (skillItem != null) skillItem.setAmount(GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_DEVON_TNT_ARROW_COUNT", ArcadePortRules.HEROES_OF_GWEN_DEVON_TNT_ARROW_COUNT));
                 player.sendMessage(ChatColor.GOLD + "Your next three arrows are infused with TNT.");
                 player.playSound(player.getLocation(), Sound.ENTITY_TNT_PRIMED, 0.8F, 1.2F);
             }
             case "devon.hunters_boost" -> {
-                setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_DEVON_HUNTERS_BOOST_COOLDOWN_MILLIS);
+                setHeroSkillCooldown(player, skill, GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_DEVON_HUNTERS_BOOST_COOLDOWN_MILLIS", ArcadePortRules.HEROES_OF_GWEN_DEVON_HUNTERS_BOOST_COOLDOWN_MILLIS));
                 player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,
-                        (int) (ArcadePortRules.HEROES_OF_GWEN_DEVON_HUNTERS_BOOST_DURATION_MILLIS / 50L),
+                        (int) (GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_DEVON_HUNTERS_BOOST_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_DEVON_HUNTERS_BOOST_DURATION_MILLIS) / 50L),
                         1, true, true, true));
                 player.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST,
-                        (int) (ArcadePortRules.HEROES_OF_GWEN_DEVON_HUNTERS_BOOST_DURATION_MILLIS / 50L),
+                        (int) (GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_DEVON_HUNTERS_BOOST_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_DEVON_HUNTERS_BOOST_DURATION_MILLIS) / 50L),
                         0, true, true, true));
                 player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.8F, 1.5F);
             }
@@ -4844,13 +5039,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         ember.setPickupDelay(Integer.MAX_VALUE);
         ember.setGravity(false);
         ember.setVelocity(direction.clone().multiply(
-                ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_PROJECTILE_SPEED));
+                GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ANATH_FLAME_WAND_PROJECTILE_SPEED", ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_PROJECTILE_SPEED)));
         entities.add(ember);
         anathFlameEmbers.put(ember.getUniqueId(), new AnathFlameEmberState(
                 id, ember.getLocation().clone(), direction,
                 System.currentTimeMillis() + 3_000L));
         setHeroSkillCooldown(player, skill,
-                ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_INTERVAL_MILLIS);
+                GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_INTERVAL_MILLIS));
         player.playSound(player.getLocation(), Sound.ITEM_FIRECHARGE_USE, 0.65F, 1.4F);
         player.sendActionBar(ChatColor.GOLD + "Embers: "
                 + Math.max(0, ammo.getAmount()));
@@ -4870,7 +5065,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         Location origin = player.getLocation().clone().add(direction.clone());
         anathBurnBeams.put(id, new AnathBurnBeamState(origin, direction, System.currentTimeMillis()));
         setHeroSkillCooldown(player, skill,
-                ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_COOLDOWN_MILLIS);
+                GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_ANATH_BURN_BEAM_COOLDOWN_MILLIS", ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_COOLDOWN_MILLIS));
         player.playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 1.0F, 0.65F);
         player.sendActionBar(ChatColor.GOLD + "Burn Beam!");
     }
@@ -4881,14 +5076,14 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 || anathFlameDashEndsAt.containsKey(id)) return;
         long now = System.currentTimeMillis();
         anathFlameDashEndsAt.put(id, now
-                + ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_DURATION_MILLIS);
+                + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_ANATH_FLAME_DASH_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_DURATION_MILLIS));
         setHeroSkillCooldown(player, "anath.flame_dash",
-                ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_COOLDOWN_MILLIS);
+                GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_ANATH_FLAME_DASH_COOLDOWN_MILLIS", ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_COOLDOWN_MILLIS));
         Vector direction = player.getLocation().getDirection();
         direction.setY(0.0D);
         if (direction.lengthSquared() < 0.001D) direction = new Vector(0.0D, 0.0D, 1.0D);
         player.setVelocity(direction.normalize()
-                .multiply(ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_SPEED));
+                .multiply(GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ANATH_FLAME_DASH_SPEED", ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_SPEED)));
         player.playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 1.0F, 1.1F);
     }
 
@@ -4901,8 +5096,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             if (!(entity instanceof Item ember) || !ember.isValid()
                     || now >= state.expiresAt
                     || ember.getLocation().distanceSquared(state.origin)
-                            >= ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_MAX_RANGE
-                                    * ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_MAX_RANGE) {
+                            >= GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ANATH_FLAME_WAND_MAX_RANGE", ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_MAX_RANGE)
+                                    * GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ANATH_FLAME_WAND_MAX_RANGE", ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_MAX_RANGE)) {
                 removeAnathEmber(entityId);
                 continue;
             }
@@ -4912,21 +5107,21 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 continue;
             }
             ember.setVelocity(state.direction.clone()
-                    .multiply(ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_PROJECTILE_SPEED));
+                    .multiply(GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ANATH_FLAME_WAND_PROJECTILE_SPEED", ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_PROJECTILE_SPEED)));
             Location point = ember.getLocation();
             world.spawnParticle(Particle.FLAME, point, 3, 0.08D, 0.08D, 0.08D, 0.015D);
             world.spawnParticle(Particle.SMOKE, point, 1, 0.03D, 0.03D, 0.03D, 0.005D);
             int ownerTeam = teams.getOrDefault(state.ownerId, -1);
-            double radius = ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_HIT_RADIUS;
+            double radius = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ANATH_FLAME_WAND_HIT_RADIUS", ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_HIT_RADIUS);
             boolean hit = false;
             for (Entity target : world.getNearbyEntities(point, radius, radius, radius)) {
                 if (target.equals(ember) || target.equals(owner) || !target.isValid()) continue;
                 TowerState tower = towerFor(target);
                 if (tower != null) {
                     if (tower.owner != ownerTeam && canDamageMobaTower(tower, ownerTeam)
-                            && owner.getLocation().distanceSquared(tower.location) <= MOBA_TOWER_RANGE_SQUARED) {
+                            && owner.getLocation().distanceSquared(tower.location) <= ArcadePortRules.heroesOfGwenTowerRangeSquared()) {
                         damageMobaTower(tower,
-                                ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE, owner);
+                                GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE), owner);
                         hit = true;
                         break;
                     }
@@ -4935,17 +5130,17 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 Integer minionTeam = heroesOfGwenMinionTeams.get(target.getUniqueId());
                 if (minionTeam != null && target instanceof Mob minion) {
                     if (minionTeam == ownerTeam) continue;
-                    damageHeroesOfGwenAbility(minion, owner, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE);
+                    damageHeroesOfGwenAbility(minion, owner, GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE));
                     minion.setFireTicks(Math.max(minion.getFireTicks(),
-                            ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_TICKS));
+                            GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_TICKS", ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_TICKS)));
                     hit = true;
                     break;
                 }
                 if (target instanceof Player victim && activePlayers.contains(victim.getUniqueId())) {
                     if (teams.getOrDefault(victim.getUniqueId(), -1) == ownerTeam) continue;
-                    damageHeroesOfGwenAbility(victim, owner, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE);
+                    damageHeroesOfGwenAbility(victim, owner, GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE));
                     victim.setFireTicks(Math.max(victim.getFireTicks(),
-                            ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_TICKS));
+                            GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_TICKS", ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_TICKS)));
                     hit = true;
                     break;
                 }
@@ -4954,12 +5149,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                             .filter(witherEntry -> witherEntry.getValue().equals(wither))
                             .map(Map.Entry::getKey).findFirst().orElse(null);
                     if (enemyTeam == null || enemyTeam == ownerTeam) continue;
-                    double damage = ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE;
+                    double damage = GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE);
                     if (damageHeroesOfGwenWither(owner, enemyTeam, damage,
                             "enemy Wither defeated by Anath's Flame Wand")) {
                         if (stopped) return;
                         wither.setFireTicks(Math.max(wither.getFireTicks(),
-                                ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_TICKS));
+                                GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_TICKS", ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_TICKS)));
                         hit = true;
                         break;
                     }
@@ -4983,9 +5178,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                     ignored -> new HashMap<>());
             int team = teams.getOrDefault(ownerId, -1);
             boolean finished = false;
-            for (int step = 0; step < ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_STEPS_PER_TICK; step++) {
-                state.distance += ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_STEP;
-                if (state.distance > ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_RANGE) {
+            for (int step = 0; step < GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_ANATH_BURN_BEAM_STEPS_PER_TICK", ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_STEPS_PER_TICK); step++) {
+                state.distance += GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ANATH_BURN_BEAM_STEP", ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_STEP);
+                if (state.distance > GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ANATH_BURN_BEAM_RANGE", ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_RANGE)) {
                     finished = true;
                     break;
                 }
@@ -4997,7 +5192,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 if (Math.random() < 0.1D) {
                     world.playSound(center, Sound.ENTITY_GHAST_SHOOT, 0.45F, 0.7F);
                 }
-                double radius = ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_HIT_RADIUS;
+                double radius = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ANATH_BURN_BEAM_HIT_RADIUS", ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_HIT_RADIUS);
                 for (Entity entity : world.getNearbyEntities(center, radius, radius, radius)) {
                     if (!(entity instanceof LivingEntity target) || target.equals(owner)
                             || !target.isValid() || target.isDead()
@@ -5007,12 +5202,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                     int targetTeam = heroesOfGwenEntityTeam(target);
                     if (targetTeam >= 0 && targetTeam == team) continue;
                     targetCooldowns.put(target.getUniqueId(),
-                            now + ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_TARGET_RECHARGE_MILLIS);
+                            now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_ANATH_BURN_BEAM_TARGET_RECHARGE_MILLIS", ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_TARGET_RECHARGE_MILLIS));
                     TowerState tower = towerFor(target);
                     if (tower != null) {
                         if (tower.owner != team && canDamageMobaTower(tower, team)
-                                && owner.getLocation().distanceSquared(tower.location) <= MOBA_TOWER_RANGE_SQUARED) {
-                            damageMobaTower(tower, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE, owner);
+                                && owner.getLocation().distanceSquared(tower.location) <= ArcadePortRules.heroesOfGwenTowerRangeSquared()) {
+                            damageMobaTower(tower, GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE), owner);
                         }
                     } else if (target instanceof Wither wither) {
                         Integer enemyTeam = withers.entrySet().stream()
@@ -5020,12 +5215,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                                 .map(Map.Entry::getKey).findFirst().orElse(null);
                         if (enemyTeam != null && enemyTeam != team) {
                             damageHeroesOfGwenWither(owner, enemyTeam,
-                                    ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE,
+                                    GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE),
                                     "enemy Wither defeated by Anath's Burn Beam");
                             if (stopped) return;
                         }
                     } else {
-                        damageHeroesOfGwenAbility(target, owner, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE);
+                        damageHeroesOfGwenAbility(target, owner, GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE));
                     }
                     world.playSound(target.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 0.35F, 0.8F);
                 }
@@ -5047,7 +5242,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             direction.setY(0.0D);
             if (direction.lengthSquared() > 0.001D) {
                 player.setVelocity(direction.normalize()
-                        .multiply(ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_SPEED));
+                        .multiply(GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ANATH_FLAME_DASH_SPEED", ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_SPEED)));
             }
             Block ground = player.getLocation().getBlock();
             int safety = 0;
@@ -5060,7 +5255,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 if (fireBlock.isPassable() && !anathFireTrailBlocks.containsKey(fireBlock)) {
                     anathFireTrailBlocks.put(fireBlock, new AnathFireTrailState(
                             fireBlock.getBlockData().clone(),
-                            now + ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_FIRE_DELAY_MILLIS));
+                            now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_ANATH_FLAME_DASH_FIRE_DELAY_MILLIS", ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_FIRE_DELAY_MILLIS)));
                 }
             }
         }
@@ -5073,7 +5268,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 if (block.isPassable()) {
                     block.setType(Material.FIRE, false);
                     state.placed = true;
-                    state.expiresAt = now + ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_FIRE_DURATION_MILLIS;
+                    state.expiresAt = now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_ANATH_FLAME_DASH_FIRE_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_FIRE_DURATION_MILLIS);
                 } else {
                     anathFireTrailBlocks.remove(block);
                 }
@@ -5088,13 +5283,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             Player player = players.get(id);
             if (player == null || !player.isOnline()) continue;
             long nextAmmo = heroAmmoNextAt.getOrDefault(id,
-                    now + ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_RELOAD_MILLIS);
+                    now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_RELOAD_MILLIS", ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_RELOAD_MILLIS));
             if (now >= nextAmmo) {
                 ItemStack ammo = player.getInventory().getItem(7);
                 int count = ammo != null && ammo.getType() == Material.BLAZE_POWDER
                         && ammo.hasItemMeta() && ammo.getItemMeta().hasDisplayName()
                         && ammo.getItemMeta().getDisplayName().contains("Embers") ? ammo.getAmount() : 0;
-                if (count < ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_CAPACITY) {
+                if (count < GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_CAPACITY", ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_CAPACITY)) {
                     if (count <= 0) {
                         player.getInventory().setItem(7, namedItem(Material.BLAZE_POWDER,
                                 ChatColor.GOLD + "Embers", "Flame Wand ammunition."));
@@ -5104,7 +5299,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                     player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.45F, 1.4F);
                 }
                 heroAmmoNextAt.put(id, now + heroesOfGwenStoreAdjustedCooldown(
-                        player, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_RELOAD_MILLIS, true));
+                        player, GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_RELOAD_MILLIS", ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_RELOAD_MILLIS), true));
             }
         }
     }
@@ -5140,7 +5335,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         projectile.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(1.2D));
         markHeroProjectile(projectile, player, "anath.meteor");
         entities.add(projectile);
-        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_COOLDOWN_MILLIS);
+        setHeroSkillCooldown(player, skill, GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_ANATH_METEOR_COOLDOWN_MILLIS", ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_COOLDOWN_MILLIS));
         player.playSound(player.getLocation(), Sound.ENTITY_GHAST_SHOOT, 0.9F, 0.9F);
         player.sendActionBar(ChatColor.GOLD + "Meteor Shower launched!");
     }
@@ -5149,7 +5344,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (owner == null || center == null || center.getWorld() != world) return;
         AnathMeteorZone zone = new AnathMeteorZone(owner.getUniqueId(),
                 teams.getOrDefault(owner.getUniqueId(), -1), center,
-                now + ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_DURATION_MILLIS, now);
+                now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_ANATH_METEOR_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_DURATION_MILLIS), now);
         anathMeteorZones.add(zone);
         world.playSound(center, Sound.ENTITY_GENERIC_EXPLODE, 0.9F, 0.65F);
         playerMeteorMarker(zone, owner);
@@ -5161,9 +5356,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         for (int angle = 0; angle < 360; angle += 6) {
             double radians = Math.toRadians(angle);
             Location point = zone.center.clone().add(
-                    Math.cos(radians) * ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_RADIUS,
+                    Math.cos(radians) * GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ANATH_METEOR_RADIUS", ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_RADIUS),
                     0.15D,
-                    Math.sin(radians) * ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_RADIUS);
+                    Math.sin(radians) * GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ANATH_METEOR_RADIUS", ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_RADIUS));
             world.spawnParticle(Particle.DUST, point, 1, 0.0D, 0.0D, 0.0D, 0.0D, dust);
         }
         world.spawnParticle(Particle.FLAME, zone.center, 24, 0.8D, 0.15D, 0.8D, 0.02D);
@@ -5188,21 +5383,21 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 for (int i = 0; i < 5; i++) {
                     double angle = ThreadLocalRandom.current().nextDouble(0.0D, Math.PI * 2.0D);
                     double radius = ThreadLocalRandom.current().nextDouble(0.0D,
-                            ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_RADIUS);
+                            GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ANATH_METEOR_RADIUS", ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_RADIUS));
                     Location sky = zone.center.clone().add(Math.cos(angle) * radius, 12.0D,
                             Math.sin(angle) * radius);
                     world.spawnParticle(Particle.FLAME, sky, 2, 0.2D, 0.1D, 0.2D, 0.02D);
                 }
             }
             if (now >= zone.nextBurnAt) {
-                zone.nextBurnAt = now + ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_BURN_INTERVAL_MILLIS;
+                zone.nextBurnAt = now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_ANATH_METEOR_BURN_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_BURN_INTERVAL_MILLIS);
                 for (Player target : activeMatchPlayers()) {
                     if (teams.getOrDefault(target.getUniqueId(), -1) == zone.team
                             || !ArcadePortRules.heroesOfGwenAnathMeteorContainsDistance(
                                     target.getLocation().distance(zone.center))) continue;
                     target.setFireTicks(Math.max(target.getFireTicks(), 30));
                     applyAnathMeteorPlayerDamage(owner, target,
-                            ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_BURN_DAMAGE);
+                            GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ANATH_METEOR_BURN_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_BURN_DAMAGE));
                     if (!activePlayers.contains(target.getUniqueId())) continue;
                     if (owner.getGameMode() == org.bukkit.GameMode.SURVIVAL) {
                         Vector knockback = target.getLocation().toVector().subtract(zone.center.toVector());
@@ -5225,7 +5420,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                             || !ArcadePortRules.heroesOfGwenAnathMeteorContainsDistance(
                                     target.getLocation().distance(zone.center))) continue;
                     applyAnathMeteorPlayerDamage(owner, target,
-                            ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_PULSE_DAMAGE);
+                            GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ANATH_METEOR_PULSE_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_PULSE_DAMAGE));
                     if (!activePlayers.contains(target.getUniqueId())) continue;
                 }
                 for (Map.Entry<Integer, Wither> entry : withers.entrySet()) {
@@ -5234,7 +5429,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                                     entry.getValue().getLocation().distance(zone.center))) continue;
                     Wither wither = entry.getValue();
                     damageHeroesOfGwenWither(owner, entry.getKey(),
-                            ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_PULSE_DAMAGE,
+                            GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ANATH_METEOR_PULSE_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_PULSE_DAMAGE),
                             "enemy Wither defeated by Meteor Shower");
                     if (stopped) return;
                 }
@@ -5273,12 +5468,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         Vector direction = player.getLocation().getDirection().normalize();
         Location destination = player.getLocation().clone();
         Set<UUID> hit = new HashSet<>();
-        double range = ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_RANGE;
+        double range = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_HATTORI_NINJA_DASH_RANGE", ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_RANGE);
         int team = teams.getOrDefault(player.getUniqueId(), -1);
         for (double distance = 0.4D; distance <= range; distance += 0.4D) {
             Location point = origin.clone().add(direction.clone().multiply(distance));
             world.spawnParticle(Particle.CRIT, point, 3, 0.12D, 0.12D, 0.12D, 0.01D);
-            double radius = ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_COLLISION_RADIUS;
+            double radius = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_HATTORI_NINJA_DASH_COLLISION_RADIUS", ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_COLLISION_RADIUS);
             for (Entity entity : world.getNearbyEntities(point, radius, radius, radius)) {
                 if (!(entity instanceof LivingEntity target) || target.equals(player)
                         || !target.isValid() || target.isDead()
@@ -5290,9 +5485,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 TowerState tower = towerFor(target);
                 if (tower != null) {
                     if (tower.owner != team && canDamageMobaTower(tower, team)
-                            && player.getLocation().distanceSquared(tower.location) <= MOBA_TOWER_RANGE_SQUARED) {
+                            && player.getLocation().distanceSquared(tower.location) <= ArcadePortRules.heroesOfGwenTowerRangeSquared()) {
                         damageMobaTower(tower,
-                                ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_DAMAGE, player);
+                                GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_HATTORI_NINJA_DASH_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_DAMAGE), player);
                     }
                 } else if (target instanceof Wither wither) {
                     Integer enemyTeam = withers.entrySet().stream()
@@ -5300,12 +5495,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                             .map(Map.Entry::getKey).findFirst().orElse(null);
                     if (enemyTeam != null && enemyTeam != team) {
                         damageHeroesOfGwenWither(player, enemyTeam,
-                                ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_DAMAGE,
+                                GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_HATTORI_NINJA_DASH_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_DAMAGE),
                                 "enemy Wither defeated by Hattori's Ninja Dash");
                         if (stopped) return;
                     }
                 } else {
-                    damageHeroesOfGwenAbility(target, player, ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_DAMAGE);
+                    damageHeroesOfGwenAbility(target, player, GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_HATTORI_NINJA_DASH_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_DAMAGE));
                 }
             }
             if (!point.getBlock().isPassable() && distance > 1.0D) break;
@@ -5337,9 +5532,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             ammo.setAmount(ammo.getAmount() + 1);
         }
         heroInfinityEndsAt.put(id, System.currentTimeMillis()
-                + ArcadePortRules.HEROES_OF_GWEN_DEVON_INFINITY_ACTIVE_MILLIS);
+                + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_DEVON_INFINITY_ACTIVE_MILLIS", ArcadePortRules.HEROES_OF_GWEN_DEVON_INFINITY_ACTIVE_MILLIS));
         setHeroSkillCooldown(player, "devon.infinity",
-                ArcadePortRules.HEROES_OF_GWEN_DEVON_INFINITY_REUSE_DELAY_MILLIS);
+                GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_DEVON_INFINITY_REUSE_DELAY_MILLIS", ArcadePortRules.HEROES_OF_GWEN_DEVON_INFINITY_REUSE_DELAY_MILLIS));
         player.sendMessage(ChatColor.LIGHT_PURPLE + "Infinity activated: homing arrows and Wither for seven seconds.");
         player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 0.8F);
     }
@@ -5355,14 +5550,14 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
         if (ammo.getAmount() == 1) player.getInventory().setItem(7, null);
         else ammo.setAmount(ammo.getAmount() - 1);
-        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_INTERVAL_MILLIS);
+        setHeroSkillCooldown(player, skill, GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_LARISSA_AQUA_CANNON_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_INTERVAL_MILLIS));
 
         Vector direction = player.getLocation().getDirection().normalize();
         Location start = player.getLocation().clone().add(0.0D, 1.7D, 0.0D);
         Location impact = start.clone();
         int team = teams.getOrDefault(player.getUniqueId(), -1);
         boolean hit = false;
-        for (double distance = 0.2D; distance <= ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_RANGE;
+        for (double distance = 0.2D; distance <= GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_LARISSA_AQUA_CANNON_RANGE", ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_RANGE);
                 distance += 0.2D) {
             Location point = start.clone().add(direction.clone().multiply(distance));
             impact = point;
@@ -5374,8 +5569,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 if (tower != null) {
                     if (tower.owner != team && canDamageMobaTower(tower, team)
                             && player.getLocation().distanceSquared(tower.location)
-                                    <= MOBA_TOWER_RANGE_SQUARED) {
-                        damageMobaTower(tower, ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE, player);
+                                    <= ArcadePortRules.heroesOfGwenTowerRangeSquared()) {
+                        damageMobaTower(tower, GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE), player);
                         hit = true;
                         break;
                     }
@@ -5384,7 +5579,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 Integer minionTeam = heroesOfGwenMinionTeams.get(entity.getUniqueId());
                 if (minionTeam != null) {
                     if (minionTeam != team && entity instanceof Mob minion) {
-                        damageHeroesOfGwenAbility(minion, player, ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE);
+                        damageHeroesOfGwenAbility(minion, player, GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE));
                         hit = true;
                         break;
                     }
@@ -5393,7 +5588,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 if (entity instanceof Player target && !target.equals(player)
                         && activePlayers.contains(target.getUniqueId())) {
                     if (teams.getOrDefault(target.getUniqueId(), -1) == team) continue;
-                    damageHeroesOfGwenAbility(target, player, ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE);
+                    damageHeroesOfGwenAbility(target, player, GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE));
                     hit = true;
                     break;
                 }
@@ -5403,7 +5598,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                             .map(Map.Entry::getKey).findFirst().orElse(null);
                     if (enemyTeam != null && enemyTeam != team
                             && damageHeroesOfGwenWither(player, enemyTeam,
-                                    ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE,
+                                    GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE),
                                     "enemy Wither defeated by Larissa's Aqua Cannon")) {
                         hit = true;
                         break;
@@ -5424,7 +5619,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         projectile.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(1.15D));
         markHeroProjectile(projectile, player, skill);
         entities.add(projectile);
-        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_COOLDOWN_MILLIS);
+        setHeroSkillCooldown(player, skill, GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_COOLDOWN_MILLIS", ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_COOLDOWN_MILLIS));
         player.playSound(player.getLocation(), Sound.ENTITY_SPLASH_POTION_THROW, 0.8F, 1.0F);
         player.sendActionBar(ChatColor.AQUA + "Dancing Fountain!");
     }
@@ -5434,7 +5629,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         int team = teams.getOrDefault(owner.getUniqueId(), -1);
         if (team < 0) return;
         larissaFountainZones.add(new LarissaFountainZone(owner.getUniqueId(), team, center,
-                now + ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DURATION_MILLIS, now));
+                now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DURATION_MILLIS), now));
         world.playSound(center, Sound.BLOCK_WATER_AMBIENT, 0.9F, 1.1F);
         world.spawnParticle(Particle.SPLASH, center.clone().add(0.0D, 0.5D, 0.0D),
                 24, 0.6D, 0.25D, 0.6D, 0.12D);
@@ -5444,9 +5639,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         String skill = "larissa.water_dash";
         if (!isHeroSkillReady(player, skill)) return;
         long now = System.currentTimeMillis();
-        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_DASH_COOLDOWN_MILLIS);
+        setHeroSkillCooldown(player, skill, GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_LARISSA_WATER_DASH_COOLDOWN_MILLIS", ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_DASH_COOLDOWN_MILLIS));
         larissaWaterDashEndsAt.put(player.getUniqueId(),
-                now + ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_DASH_DURATION_MILLIS);
+                now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_LARISSA_WATER_DASH_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_DASH_DURATION_MILLIS));
         player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_SPLASH, 0.8F, 1.25F);
     }
 
@@ -5454,15 +5649,15 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         String skill = "larissa.storm_blessing";
         if (!isHeroSkillReady(player, skill)) return;
         long now = System.currentTimeMillis();
-        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_REUSE_DELAY_MILLIS);
-        long endsAt = now + ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_DURATION_MILLIS;
+        setHeroSkillCooldown(player, skill, GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_LARISSA_STORM_BLESSING_REUSE_DELAY_MILLIS", ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_REUSE_DELAY_MILLIS));
+        long endsAt = now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_LARISSA_STORM_BLESSING_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_DURATION_MILLIS);
         larissaStormBlessingEndsAt.put(player.getUniqueId(), endsAt);
         larissaStormBlessingNextHealAt.put(player.getUniqueId(),
-                now + ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_INTERVAL_MILLIS);
+                now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_INTERVAL_MILLIS));
         for (Player teammate : activeMatchPlayers()) {
             if (teams.getOrDefault(teammate.getUniqueId(), -1) == teams.getOrDefault(player.getUniqueId(), -2)) {
                 teammate.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,
-                        (int) (ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_DURATION_MILLIS / 50L),
+                        (int) (GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_LARISSA_STORM_BLESSING_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_DURATION_MILLIS) / 50L),
                         0, true, true, true));
             }
         }
@@ -5486,18 +5681,18 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             }
             if (now >= zone.nextPulseAt) {
                 for (Entity entity : world.getNearbyEntities(zone.center,
-                        ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS,
-                        ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS,
-                        ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS)) {
+                        GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS", ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS),
+                        GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS", ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS),
+                        GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS", ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS))) {
                     if (zone.center.distanceSquared(entity.getLocation())
-                            > ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS
-                                    * ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS) continue;
+                            > GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS", ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS)
+                                    * GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS", ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS)) continue;
                     if (entity instanceof Player target && activePlayers.contains(target.getUniqueId())) {
                         if (teams.getOrDefault(target.getUniqueId(), -1) == zone.team) {
-                            healHeroesOfGwenAbility(owner, target, ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_HEAL_PER_SECOND);
+                            healHeroesOfGwenAbility(owner, target, GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_HEAL_PER_SECOND", ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_HEAL_PER_SECOND));
                         } else {
                             damageHeroesOfGwenAbility(target, owner,
-                                    ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DAMAGE_PER_SECOND);
+                                    GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DAMAGE_PER_SECOND", ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DAMAGE_PER_SECOND));
                         }
                         continue;
                     }
@@ -5507,7 +5702,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                                 .map(Map.Entry::getKey).findFirst().orElse(null);
                         if (enemyTeam != null && enemyTeam != zone.team) {
                             damageHeroesOfGwenWither(owner, enemyTeam,
-                                    ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DAMAGE_PER_SECOND,
+                                    GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DAMAGE_PER_SECOND", ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DAMAGE_PER_SECOND),
                                     "enemy Wither defeated by Larissa's Dancing Fountain");
                             if (stopped) return;
                         }
@@ -5519,14 +5714,14 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                             var maxHealth = minion.getAttribute(Attribute.MAX_HEALTH);
                             double maximum = maxHealth == null ? 20.0D : maxHealth.getValue();
                             minion.setHealth(Math.min(maximum, minion.getHealth()
-                                    + ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_HEAL_PER_SECOND));
+                                    + GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_HEAL_PER_SECOND", ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_HEAL_PER_SECOND)));
                         } else {
                             damageHeroesOfGwenAbility(minion, owner,
-                                    ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DAMAGE_PER_SECOND);
+                                    GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DAMAGE_PER_SECOND", ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DAMAGE_PER_SECOND));
                         }
                     }
                 }
-                zone.nextPulseAt = now + ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_PULSE_INTERVAL_MILLIS;
+                zone.nextPulseAt = now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_PULSE_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_PULSE_INTERVAL_MILLIS);
             }
             if (now >= zone.nextVisualAt) {
                 Color colour = zone.team == 0 ? Color.fromRGB(255, 70, 70) : Color.fromRGB(70, 165, 255);
@@ -5534,8 +5729,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 for (int angle = 0; angle < 360; angle += 15) {
                     double radians = Math.toRadians(angle);
                     Location edge = zone.center.clone().add(
-                            Math.cos(radians) * ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS,
-                            0.12D, Math.sin(radians) * ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS);
+                            Math.cos(radians) * GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS", ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS),
+                            0.12D, Math.sin(radians) * GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS", ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS));
                     world.spawnParticle(Particle.DUST, edge, 1, 0.0D, 0.0D, 0.0D, 0.0D, dust);
                 }
                 world.spawnParticle(Particle.SPLASH, zone.center.clone().add(0.0D, 0.45D, 0.0D),
@@ -5584,13 +5779,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 int team = teams.getOrDefault(id, -1);
                 for (Player teammate : activeMatchPlayers()) {
                     if (teams.getOrDefault(teammate.getUniqueId(), -1) != team) continue;
-                    healHeroesOfGwenAbility(owner, teammate, ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_PER_SECOND);
+                    healHeroesOfGwenAbility(owner, teammate, GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_PER_SECOND", ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_PER_SECOND));
                     Location visual = teammate.getLocation().clone().add(0.0D, 2.4D, 0.0D);
                     world.spawnParticle(Particle.CLOUD, visual, 6, 0.35D, 0.2D, 0.35D, 0.01D);
                     world.spawnParticle(Particle.DRIPPING_WATER, visual, 3, 0.3D, 0.15D, 0.3D, 0.03D);
                 }
                 larissaStormBlessingNextHealAt.put(id,
-                        now + ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_INTERVAL_MILLIS);
+                        now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_INTERVAL_MILLIS));
             }
         }
     }
@@ -5651,7 +5846,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             return;
         }
         List<Wolf> pack = liveBardolfWolves(ownerId);
-        if (pack.size() >= ArcadePortRules.HEROES_OF_GWEN_BARDOLF_MAX_WOLVES) {
+        if (pack.size() >= GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_BARDOLF_MAX_WOLVES", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_MAX_WOLVES)) {
             player.sendActionBar(ChatColor.RED + "Your pack is already at its five-wolf limit.");
             return;
         }
@@ -5659,8 +5854,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
         Wolf wolf = world.spawn(player.getLocation(), Wolf.class);
         var maxHealth = wolf.getAttribute(Attribute.MAX_HEALTH);
-        if (maxHealth != null) maxHealth.setBaseValue(ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_HEALTH);
-        wolf.setHealth(ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_HEALTH);
+        if (maxHealth != null) maxHealth.setBaseValue(GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BARDOLF_WOLF_HEALTH", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_HEALTH));
+        wolf.setHealth(GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BARDOLF_WOLF_HEALTH", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_HEALTH));
         wolf.setTamed(true);
         wolf.setOwner(player);
         wolf.setCollarColor(teams.getOrDefault(ownerId, 0) == 0 ? DyeColor.RED : DyeColor.BLUE);
@@ -5671,17 +5866,17 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         pack.add(wolf);
         entities.add(wolf);
         setHeroSkillCooldown(player, "bardolf.summon_wolf",
-                ArcadePortRules.HEROES_OF_GWEN_BARDOLF_SUMMON_COOLDOWN_MILLIS);
+                GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_BARDOLF_SUMMON_COOLDOWN_MILLIS", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_SUMMON_COOLDOWN_MILLIS));
         player.playSound(player.getLocation(), Sound.ENTITY_WOLF_AMBIENT, 0.9F, 1.2F);
         player.sendActionBar(ChatColor.GREEN + "Wolf summoned (" + pack.size() + "/"
-                + ArcadePortRules.HEROES_OF_GWEN_BARDOLF_MAX_WOLVES + ").");
+                + GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_BARDOLF_MAX_WOLVES", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_MAX_WOLVES) + ").");
         updateBardolfSummonItem(player, pack.size());
     }
 
     private void updateBardolfSummonItem(Player player, int count) {
         ItemStack item = player.getInventory().getItem(1);
         if (item == null || !"bardolf.summon_wolf".equals(heroSkillId(item))) return;
-        item.setAmount(Math.max(1, Math.min(ArcadePortRules.HEROES_OF_GWEN_BARDOLF_MAX_WOLVES, count)));
+        item.setAmount(Math.max(1, Math.min(GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_BARDOLF_MAX_WOLVES", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_MAX_WOLVES), count)));
     }
 
     private void activateBardolfPounce(Player player) {
@@ -5689,14 +5884,14 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (!isHeroSkillReady(player, skill)) return;
         UUID ownerId = player.getUniqueId();
         Vector direction = player.getLocation().getDirection();
-        direction.setY(Math.max(ArcadePortRules.HEROES_OF_GWEN_BARDOLF_POUNCE_MINIMUM_VERTICAL_VELOCITY,
+        direction.setY(Math.max(GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BARDOLF_POUNCE_MINIMUM_VERTICAL_VELOCITY", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_POUNCE_MINIMUM_VERTICAL_VELOCITY),
                 direction.getY()));
-        direction.multiply(ArcadePortRules.HEROES_OF_GWEN_BARDOLF_POUNCE_VELOCITY_MULTIPLIER);
+        direction.multiply(GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BARDOLF_POUNCE_VELOCITY_MULTIPLIER", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_POUNCE_VELOCITY_MULTIPLIER));
         Location target = player.getLocation().clone();
         bardolfPounces.put(ownerId, new BardolfPounceState(target, direction,
-                System.currentTimeMillis() + ArcadePortRules.HEROES_OF_GWEN_BARDOLF_POUNCE_OVERRIDE_MILLIS));
+                System.currentTimeMillis() + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_BARDOLF_POUNCE_OVERRIDE_MILLIS", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_POUNCE_OVERRIDE_MILLIS)));
         player.setVelocity(direction.clone());
-        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_POUNCE_COOLDOWN_MILLIS);
+        setHeroSkillCooldown(player, skill, GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_BARDOLF_POUNCE_COOLDOWN_MILLIS", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_POUNCE_COOLDOWN_MILLIS));
         player.playSound(player.getLocation(), Sound.ENTITY_WOLF_AMBIENT, 1.0F, 1.0F);
         world.spawnParticle(Particle.CLOUD, player.getLocation().clone().add(0.0D, 0.6D, 0.0D),
                 15, 0.5D, 0.5D, 0.5D, 0.1D);
@@ -5711,19 +5906,19 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         List<Wolf> pack = liveBardolfWolves(ownerId);
         float originalSpeed = player.getWalkSpeed();
         bardolfOriginalWalkSpeeds.put(ownerId, originalSpeed);
-        double increase = pack.size() * ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_SPEED_PER_WOLF;
+        double increase = pack.size() * GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BARDOLF_FULL_MOON_SPEED_PER_WOLF", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_SPEED_PER_WOLF);
         player.setWalkSpeed((float) Math.min(1.0D, originalSpeed + increase));
         bardolfFullMoonEndsAt.put(ownerId,
-                now + ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_DURATION_MILLIS);
+                now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_BARDOLF_FULL_MOON_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_DURATION_MILLIS));
         setHeroSkillCooldown(player, "bardolf.full_moon",
-                ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_REUSE_DELAY_MILLIS);
+                GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_BARDOLF_FULL_MOON_REUSE_DELAY_MILLIS", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_REUSE_DELAY_MILLIS));
         world.setTime(18_000L);
         world.strikeLightningEffect(player.getLocation());
 
         for (Wolf wolf : pack) {
             var maxHealth = wolf.getAttribute(Attribute.MAX_HEALTH);
-            if (maxHealth != null) maxHealth.setBaseValue(ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_WOLF_HEALTH);
-            wolf.setHealth(ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_WOLF_HEALTH);
+            if (maxHealth != null) maxHealth.setBaseValue(GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BARDOLF_FULL_MOON_WOLF_HEALTH", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_WOLF_HEALTH));
+            wolf.setHealth(GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BARDOLF_FULL_MOON_WOLF_HEALTH", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_WOLF_HEALTH));
             wolf.setTamed(false);
             wolf.setAngry(true);
             wolf.getWorld().playSound(wolf.getLocation(), Sound.ENTITY_WOLF_GROWL, 1.0F, 1.0F);
@@ -5807,13 +6002,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 UUID wolfId = wolf.getUniqueId();
                 if (pounce != null && !pounce.leapedWolfIds.contains(wolfId)) {
                     if (wolf.getLocation().distanceSquared(pounce.target) <=
-                            ArcadePortRules.HEROES_OF_GWEN_BARDOLF_POUNCE_TRIGGER_DISTANCE_SQUARED) {
+                            GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BARDOLF_POUNCE_TRIGGER_DISTANCE_SQUARED", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_POUNCE_TRIGGER_DISTANCE_SQUARED)) {
                         pounce.leapedWolfIds.add(wolfId);
                         wolf.setVelocity(pounce.direction.clone());
                         wolf.getWorld().playSound(wolf.getLocation(), Sound.ENTITY_WOLF_WHINE, 1.0F, 1.5F);
                         continue;
                     }
-                    moveBardolfWolf(wolf, pounce.target, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_FOLLOW_SPEED);
+                    moveBardolfWolf(wolf, pounce.target, GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BARDOLF_WOLF_FOLLOW_SPEED", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_FOLLOW_SPEED));
                     continue;
                 }
 
@@ -5830,29 +6025,29 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
                 if (target != null) {
                     moveBardolfWolf(wolf, target.getLocation(),
-                            fullMoon ? ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_ULTIMATE_SPEED
-                                    : ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_FOLLOW_SPEED);
+                            fullMoon ? GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BARDOLF_WOLF_ULTIMATE_SPEED", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_ULTIMATE_SPEED)
+                                    : GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BARDOLF_WOLF_FOLLOW_SPEED", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_FOLLOW_SPEED));
                     if (wolf.getLocation().distanceSquared(target.getLocation())
-                            <= ArcadePortRules.HEROES_OF_GWEN_BARDOLF_ATTACK_DISTANCE_SQUARED) {
+                            <= GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BARDOLF_ATTACK_DISTANCE_SQUARED", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_ATTACK_DISTANCE_SQUARED)) {
                         Map<UUID, Long> lastAttacks = bardolfLastWolfAttackAt.computeIfAbsent(ownerId,
                                 ignored -> new HashMap<>());
                         long nextAllowed = lastAttacks.getOrDefault(target.getUniqueId(), 0L);
                         if (now >= nextAllowed) {
                             lastAttacks.put(target.getUniqueId(),
-                                    now + ArcadePortRules.HEROES_OF_GWEN_BARDOLF_ATTACK_INTERVAL_MILLIS);
-                            damageHeroesOfGwenAbility(target, owner, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_ATTACK_DAMAGE);
+                                    now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_BARDOLF_ATTACK_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_ATTACK_INTERVAL_MILLIS));
+                            damageHeroesOfGwenAbility(target, owner, GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BARDOLF_WOLF_ATTACK_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_ATTACK_DAMAGE));
                         }
                     }
                     continue;
                 }
 
                 double ownerDistance = wolf.getLocation().distanceSquared(owner.getLocation());
-                if (ownerDistance > ArcadePortRules.HEROES_OF_GWEN_BARDOLF_OWNER_TELEPORT_DISTANCE_SQUARED) {
+                if (ownerDistance > GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BARDOLF_OWNER_TELEPORT_DISTANCE_SQUARED", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_OWNER_TELEPORT_DISTANCE_SQUARED)) {
                     wolf.teleport(owner.getLocation());
-                } else if (ownerDistance > ArcadePortRules.HEROES_OF_GWEN_BARDOLF_OWNER_FOLLOW_MIN_DISTANCE_SQUARED) {
+                } else if (ownerDistance > GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BARDOLF_OWNER_FOLLOW_MIN_DISTANCE_SQUARED", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_OWNER_FOLLOW_MIN_DISTANCE_SQUARED)) {
                     moveBardolfWolf(wolf, owner.getLocation(),
-                            fullMoon ? ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_ULTIMATE_SPEED
-                                    : ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_FOLLOW_SPEED);
+                            fullMoon ? GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BARDOLF_WOLF_ULTIMATE_SPEED", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_ULTIMATE_SPEED)
+                                    : GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BARDOLF_WOLF_FOLLOW_SPEED", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_FOLLOW_SPEED));
                 }
             }
         }
@@ -5883,7 +6078,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         Vector direction = player.getLocation().getDirection().normalize();
         ivyHooks.put(ownerId, new IvyHookState(origin, direction, System.currentTimeMillis()));
         setHeroSkillCooldown(player, "ivy.vine_pull",
-                ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_COOLDOWN_MILLIS);
+                GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_IVY_VINE_PULL_COOLDOWN_MILLIS", ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_COOLDOWN_MILLIS));
         player.playSound(player.getLocation(), Sound.BLOCK_GRASS_BREAK, 1.0F, 1.2F);
     }
 
@@ -5891,10 +6086,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         String skill = "ivy.floral_leap";
         if (!isHeroSkillReady(player, skill) || ivyFloralLeaps.containsKey(player.getUniqueId())) return;
         Vector direction = player.getLocation().getDirection();
-        direction.setY(ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_VERTICAL_VELOCITY);
+        direction.setY(GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_IVY_FLORAL_LEAP_VERTICAL_VELOCITY", ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_VERTICAL_VELOCITY));
         player.setVelocity(direction);
         ivyFloralLeaps.put(player.getUniqueId(), new IvyFloralLeapState(System.currentTimeMillis()));
-        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_COOLDOWN_MILLIS);
+        setHeroSkillCooldown(player, skill, GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_IVY_FLORAL_LEAP_COOLDOWN_MILLIS", ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_COOLDOWN_MILLIS));
         player.playSound(player.getLocation(), Sound.BLOCK_GRASS_BREAK, 1.0F, 1.0F);
         world.spawnParticle(Particle.CLOUD, player.getLocation().clone().add(0.0D, 1.0D, 0.0D),
                 20, 0.5D, 0.5D, 0.5D, 0.08D);
@@ -5906,9 +6101,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         Location floorCenter = player.getLocation().clone().subtract(0.0D, 1.0D, 0.0D);
         int team = teams.getOrDefault(ownerId, 0);
         IvyThornWallState state = new IvyThornWallState(player.getLocation().clone(),
-                System.currentTimeMillis() + ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_DURATION_MILLIS);
+                System.currentTimeMillis() + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_IVY_THORN_WALL_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_DURATION_MILLIS));
         Material floorMaterial = team == 0 ? Material.RED_TERRACOTTA : Material.BLUE_TERRACOTTA;
-        int radius = ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_BLOCK_RADIUS;
+        int radius = GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_IVY_THORN_WALL_BLOCK_RADIUS", ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_BLOCK_RADIUS);
 
         for (int x = -radius; x <= radius; x++) {
             for (int z = -radius; z <= radius; z++) {
@@ -5931,7 +6126,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
         ivyThornWalls.put(ownerId, state);
         setHeroSkillCooldown(player, "ivy.thorn_wall",
-                ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_COOLDOWN_MILLIS);
+                GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_IVY_THORN_WALL_COOLDOWN_MILLIS", ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_COOLDOWN_MILLIS));
         world.playSound(player.getLocation(), Sound.BLOCK_GRASS_PLACE, 1.0F, 0.8F);
         player.sendMessage(ChatColor.GREEN + "Thorn Wall surrounds you!");
     }
@@ -5943,7 +6138,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             IvyHookState state = entry.getValue();
             if (owner == null || !owner.isOnline() || !activePlayers.contains(ownerId)
                     || !"ivy".equals(selectedHeroesOfGwen.get(ownerId))
-                    || now - state.startedAt >= ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_MAX_PULL_MILLIS) {
+                    || now - state.startedAt >= GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_IVY_VINE_PULL_MAX_PULL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_MAX_PULL_MILLIS)) {
                 ivyHooks.remove(ownerId);
                 continue;
             }
@@ -5952,7 +6147,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 if (target == null || !target.isOnline() || !activePlayers.contains(state.targetId)
                         || target.isDead()
                         || owner.getLocation().distanceSquared(target.getLocation())
-                                < ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_STOP_DISTANCE_SQUARED) {
+                                < GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_IVY_VINE_PULL_STOP_DISTANCE_SQUARED", ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_STOP_DISTANCE_SQUARED)) {
                     if (target != null && target.isOnline()) target.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
                     ivyHooks.remove(ownerId);
                     continue;
@@ -5968,15 +6163,15 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             }
 
             for (int step = 0; step < 10; step++) {
-                state.distance += ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_BEAM_STEP;
-                if (state.distance >= ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_RANGE) {
+                state.distance += GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_IVY_VINE_PULL_BEAM_STEP", ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_BEAM_STEP);
+                if (state.distance >= GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_IVY_VINE_PULL_RANGE", ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_RANGE)) {
                     ivyHooks.remove(ownerId);
                     break;
                 }
                 Location point = state.origin.clone().add(
                         state.direction.clone().multiply(state.distance)).subtract(0.0D, 1.2D, 0.0D);
                 world.spawnParticle(Particle.HAPPY_VILLAGER, point, 1, 0.0D, 0.0D, 0.0D, 0.0D);
-                double radius = ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_HIT_RADIUS;
+                double radius = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_IVY_VINE_PULL_HIT_RADIUS", ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_HIT_RADIUS);
                 for (Entity entity : world.getNearbyEntities(point, radius, radius, radius)) {
                     if (!(entity instanceof LivingEntity target) || target.equals(owner)
                             || !target.isValid() || target.isDead()
@@ -5987,15 +6182,15 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                     if (target instanceof Player victim) {
                         state.targetId = victim.getUniqueId();
                         victim.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,
-                                ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_SLOW_TICKS,
-                                ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_SLOW_AMPLIFIER,
+                                GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_IVY_VINE_PULL_SLOW_TICKS", ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_SLOW_TICKS),
+                                GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_IVY_VINE_PULL_SLOW_AMPLIFIER", ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_SLOW_AMPLIFIER),
                                 false, false, true));
                         victim.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
-                        damageHeroesOfGwenAbility(victim, owner, ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_PLAYER_DAMAGE);
+                        damageHeroesOfGwenAbility(victim, owner, GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_IVY_VINE_PULL_PLAYER_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_PLAYER_DAMAGE));
                         victim.sendMessage(ChatColor.GREEN + owner.getName() + " has hooked you!");
                         break;
                     }
-                    damageHeroesOfGwenAbility(target, owner, ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_MINION_DAMAGE);
+                    damageHeroesOfGwenAbility(target, owner, GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_IVY_VINE_PULL_MINION_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_MINION_DAMAGE));
                 }
                 if (state.targetId != null) break;
             }
@@ -6012,16 +6207,16 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 continue;
             }
             if (!state.landed) {
-                if (now - state.launchedAt < ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_MINIMUM_FLIGHT_MILLIS
+                if (now - state.launchedAt < GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_IVY_FLORAL_LEAP_MINIMUM_FLIGHT_MILLIS", ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_MINIMUM_FLIGHT_MILLIS)
                         || !owner.isOnGround()) continue;
                 state.landed = true;
                 state.center = owner.getLocation().clone();
-                state.endsAt = now + ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_BED_DURATION_MILLIS;
-                state.nextDamageAt = now + ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE_INTERVAL_MILLIS;
+                state.endsAt = now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_IVY_FLORAL_LEAP_BED_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_BED_DURATION_MILLIS);
+                state.nextDamageAt = now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE_INTERVAL_MILLIS);
                 Material[] flowers = {Material.POPPY, Material.BLUE_ORCHID, Material.ALLIUM,
                         Material.AZURE_BLUET, Material.RED_TULIP, Material.ORANGE_TULIP,
                         Material.WHITE_TULIP, Material.PINK_TULIP};
-                int radius = ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_FLOWER_RADIUS;
+                int radius = GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_IVY_FLORAL_LEAP_FLOWER_RADIUS", ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_FLOWER_RADIUS);
                 for (int x = -radius; x <= radius; x++) {
                     for (int z = -radius; z <= radius; z++) {
                         if (x * x + z * z > radius * radius) continue;
@@ -6044,7 +6239,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 continue;
             }
             if (now >= state.nextDamageAt) {
-                double radius = ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE_RADIUS;
+                double radius = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE_RADIUS", ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE_RADIUS);
                 int team = teams.getOrDefault(ownerId, -1);
                 for (Entity entity : world.getNearbyEntities(state.center, radius, radius, radius)) {
                     if (!(entity instanceof LivingEntity target) || target.equals(owner)
@@ -6053,12 +6248,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                             || heroesOfGwenEntityTeam(target) == team
                             || (target instanceof Player victim && !activePlayers.contains(victim.getUniqueId()))) continue;
                     target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,
-                            ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_SLOW_TICKS,
-                            ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_SLOW_AMPLIFIER,
+                            GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_IVY_FLORAL_LEAP_SLOW_TICKS", ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_SLOW_TICKS),
+                            GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_IVY_FLORAL_LEAP_SLOW_AMPLIFIER", ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_SLOW_AMPLIFIER),
                             false, false, true));
-                    damageHeroesOfGwenAbility(target, owner, ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE);
+                    damageHeroesOfGwenAbility(target, owner, GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE));
                 }
-                state.nextDamageAt = now + ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE_INTERVAL_MILLIS;
+                state.nextDamageAt = now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE_INTERVAL_MILLIS);
             }
             for (int i = 0; i < 8; i++) {
                 Location particle = state.center.clone().add(
@@ -6079,31 +6274,31 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 ivyThornWalls.remove(ownerId);
                 continue;
             }
-            double radius = ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_BLOCK_RADIUS;
+            double radius = GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_IVY_THORN_WALL_BLOCK_RADIUS", ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_BLOCK_RADIUS);
             int team = teams.getOrDefault(ownerId, -1);
             for (Player target : players.values()) {
                 if (!target.isOnline() || !activePlayers.contains(target.getUniqueId())
                         || target.getLocation().distanceSquared(state.center) > radius * radius) continue;
                 if (teams.getOrDefault(target.getUniqueId(), -2) == team) {
                     target.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION,
-                            (int) ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ALLY_REGEN_TICKS,
-                            ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ALLY_REGEN_AMPLIFIER,
+                            (int) GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_IVY_THORN_WALL_ALLY_REGEN_TICKS", ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ALLY_REGEN_TICKS),
+                            GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_IVY_THORN_WALL_ALLY_REGEN_AMPLIFIER", ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ALLY_REGEN_AMPLIFIER),
                             false, false, true));
                     continue;
                 }
                 long nextRoot = state.nextRootAt.getOrDefault(target.getUniqueId(), 0L);
                 if (now >= nextRoot) {
                     target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,
-                            (int) (ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_ROOT_MILLIS / 50L),
+                            (int) (GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_ROOT_MILLIS", ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_ROOT_MILLIS) / 50L),
                             10, true, true, true));
                     state.nextRootAt.put(target.getUniqueId(),
-                            now + ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_ROOT_RECHARGE_MILLIS);
+                            now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_ROOT_RECHARGE_MILLIS", ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_ROOT_RECHARGE_MILLIS));
                 } else {
                     long nextDamage = state.nextDamageAt.getOrDefault(target.getUniqueId(), 0L);
                     if (now >= nextDamage) {
-                        damageHeroesOfGwenAbility(target, owner, ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_DAMAGE);
+                        damageHeroesOfGwenAbility(target, owner, GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_DAMAGE));
                         state.nextDamageAt.put(target.getUniqueId(),
-                                now + ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_DAMAGE_RECHARGE_MILLIS);
+                                now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_DAMAGE_RECHARGE_MILLIS", ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_DAMAGE_RECHARGE_MILLIS));
                     }
                 }
             }
@@ -6155,10 +6350,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private void activateRowenaLightArrows(Player player) {
         UUID id = player.getUniqueId();
         if (!isHeroSkillReady(player, "rowena.light_arrows")) return;
-        rowenaLightArrowsRemaining.put(id, ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_COUNT);
+        rowenaLightArrowsRemaining.put(id, GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_COUNT", ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_COUNT));
         ItemStack item = player.getInventory().getItem(1);
         if (item != null && "rowena.light_arrows".equals(heroSkillId(item))) {
-            item.setAmount(ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_COUNT);
+            item.setAmount(GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_COUNT", ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_COUNT));
         }
         player.sendMessage(ChatColor.GOLD + "Your next five arrows are Light Arrows.");
         player.playSound(player.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 0.8F, 1.5F);
@@ -6169,8 +6364,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (!isHeroSkillReady(player, skill)) return;
         long now = System.currentTimeMillis();
         rowenaCombatSlideEndsAt.put(player.getUniqueId(),
-                now + ArcadePortRules.HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_DURATION_MILLIS);
-        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_COOLDOWN_MILLIS);
+                now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_DURATION_MILLIS));
+        setHeroSkillCooldown(player, skill, GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_COOLDOWN_MILLIS", ArcadePortRules.HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_COOLDOWN_MILLIS));
         player.getWorld().playSound(player.getLocation(), Sound.ENTITY_BAT_TAKEOFF, 1.0F, 1.0F);
         world.spawnParticle(Particle.CLOUD, player.getLocation().clone().add(0.0D, 1.0D, 0.0D),
                 20, 0.5D, 0.5D, 0.5D, 0.001D);
@@ -6180,7 +6375,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         UUID id = player.getUniqueId();
         if (rowenaBombardments.containsKey(id) || !isHeroSkillReady(player, "rowena.bombardment")) return;
         Location flightLocation = player.getLocation().clone()
-                .add(0.0D, ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_ASCENT_BLOCKS, 0.0D);
+                .add(0.0D, GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ROWENA_BOMBARDMENT_ASCENT_BLOCKS", ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_ASCENT_BLOCKS), 0.0D);
         Block anchorBlock = flightLocation.getBlock().getRelative(BlockFace.DOWN);
         BlockData originalBlock = anchorBlock.getBlockData().clone();
         ItemStack originalBow = player.getInventory().getItem(0) == null
@@ -6190,8 +6385,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         anchorBlock.setType(Material.BARRIER, false);
         RowenaBombardmentState state = new RowenaBombardmentState(anchorBlock, originalBlock,
                 originalBow, System.currentTimeMillis()
-                        + ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_DURATION_MILLIS,
-                ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_SHOTS);
+                        + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_ROWENA_BOMBARDMENT_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_DURATION_MILLIS),
+                GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_ROWENA_BOMBARDMENT_SHOTS", ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_SHOTS));
         rowenaBombardments.put(id, state);
         player.getInventory().setItem(0, rowenaBombardmentActiveItem());
         player.getInventory().setHeldItemSlot(0);
@@ -6210,15 +6405,15 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         Map<UUID, Long> nextHitAt = rowenaLightArrowNextHitAt.computeIfAbsent(player.getUniqueId(),
                 ignored -> new HashMap<>());
 
-        for (double distance = ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_STEP;
-                distance <= ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_RANGE;
-                distance += ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_STEP) {
+        for (double distance = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_STEP", ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_STEP);
+                distance <= GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_RANGE", ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_RANGE);
+                distance += GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_STEP", ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_STEP)) {
             Location point = origin.clone().add(direction.clone().multiply(distance));
             world.spawnParticle(Particle.FIREWORK, point, 1, 0.0D, 0.0D, 0.0D, 0.0D);
             for (Entity entity : world.getNearbyEntities(point,
-                    ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_HIT_RADIUS,
-                    ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_HIT_RADIUS,
-                    ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_HIT_RADIUS)) {
+                    GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_HIT_RADIUS", ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_HIT_RADIUS),
+                    GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_HIT_RADIUS", ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_HIT_RADIUS),
+                    GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_HIT_RADIUS", ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_HIT_RADIUS))) {
                 if (!(entity instanceof LivingEntity target) || target.equals(player) || target.isDead()
                         || !target.isValid()) continue;
                 int targetTeam = heroesOfGwenEntityTeam(target);
@@ -6228,12 +6423,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         bardolfOwnerId(wolf), -2) == team) continue;
                 if (nextHitAt.getOrDefault(target.getUniqueId(), 0L) > System.currentTimeMillis()) continue;
                 nextHitAt.put(target.getUniqueId(), System.currentTimeMillis()
-                        + ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_TARGET_RECHARGE_MILLIS);
+                        + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_TARGET_RECHARGE_MILLIS", ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_TARGET_RECHARGE_MILLIS));
 
                 TowerState tower = towerFor(target);
                 if (tower != null) {
                     if (tower.owner != team && canDamageMobaTower(tower, team)
-                            && player.getLocation().distanceSquared(tower.location) <= MOBA_TOWER_RANGE_SQUARED) {
+                            && player.getLocation().distanceSquared(tower.location) <= ArcadePortRules.heroesOfGwenTowerRangeSquared()) {
                         damageMobaTower(tower, damage, player);
                     }
                     continue;
@@ -6265,9 +6460,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         Location origin = player.getEyeLocation().clone();
         Vector direction = player.getLocation().getDirection().normalize();
         Location destination = origin.clone();
-        for (double distance = ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_STEP;
-                distance <= ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_RANGE;
-                distance += ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_STEP) {
+        for (double distance = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_STEP", ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_STEP);
+                distance <= GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ROWENA_BOMBARDMENT_RANGE", ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_RANGE);
+                distance += GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_STEP", ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_STEP)) {
             Location point = origin.clone().add(direction.clone().multiply(distance));
             destination = point;
             if (!point.getBlock().isPassable()) break;
@@ -6277,7 +6472,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         world.playSound(destination, Sound.ENTITY_GENERIC_EXPLODE, 1.0F, 0.8F);
         world.spawnParticle(Particle.EXPLOSION, destination, 2, 0.2D, 0.2D, 0.2D, 0.02D);
         int team = teams.getOrDefault(id, -1);
-        double radius = ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_BLAST_RADIUS;
+        double radius = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ROWENA_BOMBARDMENT_BLAST_RADIUS", ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_BLAST_RADIUS);
         for (Entity entity : world.getNearbyEntities(destination, radius, radius, radius)) {
             if (!(entity instanceof LivingEntity target) || target.equals(player) || !target.isValid()
                     || target.isDead() || destination.distanceSquared(target.getLocation()) > radius * radius) continue;
@@ -6287,7 +6482,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             TowerState tower = towerFor(target);
             if (tower != null) {
                 if (tower.owner != team && canDamageMobaTower(tower, team)
-                        && player.getLocation().distanceSquared(tower.location) <= MOBA_TOWER_RANGE_SQUARED) {
+                        && player.getLocation().distanceSquared(tower.location) <= ArcadePortRules.heroesOfGwenTowerRangeSquared()) {
                     damageMobaTower(tower, damage, player);
                 }
             } else if (target instanceof Wither wither) {
@@ -6330,7 +6525,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 player.updateInventory();
                 if (applyCooldown) {
                     setHeroSkillCooldown(player, "rowena.bombardment",
-                            ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_REUSE_DELAY_MILLIS);
+                            GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_ROWENA_BOMBARDMENT_REUSE_DELAY_MILLIS", ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_REUSE_DELAY_MILLIS));
                 }
             }
         }
@@ -6357,7 +6552,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             direction.setY(0.0D);
             if (direction.lengthSquared() > 0.001D) {
                 player.setVelocity(direction.normalize().multiply(
-                        ArcadePortRules.HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_SPEED));
+                        GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_SPEED", ArcadePortRules.HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_SPEED)));
             }
             world.spawnParticle(Particle.CLOUD, player.getLocation().clone().add(0.0D, 0.8D, 0.0D),
                     4, 0.3D, 0.2D, 0.3D, 0.01D);
@@ -6381,9 +6576,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private void activateDanaPulseHeal(Player player) {
         String skill = "dana.pulse_heal";
         if (!isHeroSkillReady(player, skill)) return;
-        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_DANA_PULSE_HEAL_COOLDOWN_MILLIS);
+        setHeroSkillCooldown(player, skill, GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_DANA_PULSE_HEAL_COOLDOWN_MILLIS", ArcadePortRules.HEROES_OF_GWEN_DANA_PULSE_HEAL_COOLDOWN_MILLIS));
         int team = teams.getOrDefault(player.getUniqueId(), -1);
-        double radius = ArcadePortRules.HEROES_OF_GWEN_DANA_PULSE_HEAL_RADIUS;
+        double radius = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_DANA_PULSE_HEAL_RADIUS", ArcadePortRules.HEROES_OF_GWEN_DANA_PULSE_HEAL_RADIUS);
         for (Entity entity : world.getNearbyEntities(player.getLocation(), radius, radius, radius)) {
             if (!(entity instanceof LivingEntity target) || !target.isValid() || target.isDead()
                     || player.getLocation().distanceSquared(target.getLocation()) > radius * radius
@@ -6391,8 +6586,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             var maximumHealth = target.getAttribute(Attribute.MAX_HEALTH);
             if (maximumHealth == null) continue;
             double amount = target.equals(player)
-                    ? ArcadePortRules.HEROES_OF_GWEN_DANA_PULSE_HEAL_SELF
-                    : ArcadePortRules.HEROES_OF_GWEN_DANA_PULSE_HEAL_ALLY;
+                    ? GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_DANA_PULSE_HEAL_SELF", ArcadePortRules.HEROES_OF_GWEN_DANA_PULSE_HEAL_SELF)
+                    : GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_DANA_PULSE_HEAL_ALLY", ArcadePortRules.HEROES_OF_GWEN_DANA_PULSE_HEAL_ALLY);
             healHeroesOfGwenAbility(player, target, amount);
             world.spawnParticle(Particle.HAPPY_VILLAGER,
                     target.getLocation().clone().add(0.0D, 1.0D, 0.0D),
@@ -6413,9 +6608,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (!isHeroSkillReady(player, skill)) return;
         long now = System.currentTimeMillis();
         danaKnockUpEndsAt.put(player.getUniqueId(),
-                now + ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_DURATION_MILLIS);
+                now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_DANA_KNOCK_UP_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_DURATION_MILLIS));
         danaKnockUpNextHitAt.put(player.getUniqueId(), new HashMap<>());
-        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_COOLDOWN_MILLIS);
+        setHeroSkillCooldown(player, skill, GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_DANA_KNOCK_UP_COOLDOWN_MILLIS", ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_COOLDOWN_MILLIS));
         player.playSound(player.getLocation(), Sound.ENTITY_BLAZE_HURT, 1.5F, 0.4F);
     }
 
@@ -6423,7 +6618,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         UUID id = player.getUniqueId();
         if (danaRallies.containsKey(id) || !isHeroSkillReady(player, "dana.rally")) return;
         Vector leap = player.getLocation().getDirection();
-        leap.setY(ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_JUMP_VERTICAL_VELOCITY);
+        leap.setY(GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_DANA_RALLY_JUMP_VERTICAL_VELOCITY", ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_JUMP_VERTICAL_VELOCITY));
         player.setVelocity(leap);
         danaRallies.put(id, new DanaRallyState(System.currentTimeMillis()));
         player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1.0F, 0.8F);
@@ -6434,9 +6629,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private void landDanaRally(Player player, DanaRallyState state, long now) {
         state.landed = true;
         state.center = player.getLocation().clone();
-        state.endsAt = now + ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_BANNER_DURATION_MILLIS;
+        state.endsAt = now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_DANA_RALLY_BANNER_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_BANNER_DURATION_MILLIS);
         state.nextHealAt = now + 1_000L;
-        setHeroSkillCooldown(player, "dana.rally", ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_REUSE_DELAY_MILLIS);
+        setHeroSkillCooldown(player, "dana.rally", GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_DANA_RALLY_REUSE_DELAY_MILLIS", ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_REUSE_DELAY_MILLIS));
 
         Block bannerBlock = state.center.getBlock();
         state.bannerBlock = bannerBlock;
@@ -6448,7 +6643,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
 
         int team = teams.getOrDefault(player.getUniqueId(), -1);
-        double damageRadius = ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_LANDING_DAMAGE_RADIUS;
+        double damageRadius = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_DANA_RALLY_LANDING_DAMAGE_RADIUS", ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_LANDING_DAMAGE_RADIUS);
         for (Entity entity : world.getNearbyEntities(state.center, damageRadius, damageRadius, damageRadius)) {
             if (!(entity instanceof LivingEntity target) || target.equals(player)
                     || !target.isValid() || target.isDead()
@@ -6458,11 +6653,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             TowerState tower = towerFor(target);
             if (tower != null) {
                 if (tower.owner != team && canDamageMobaTower(tower, team)
-                        && player.getLocation().distanceSquared(tower.location) <= MOBA_TOWER_RANGE_SQUARED) {
-                    damageMobaTower(tower, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_LANDING_DAMAGE, player);
+                        && player.getLocation().distanceSquared(tower.location) <= ArcadePortRules.heroesOfGwenTowerRangeSquared()) {
+                    damageMobaTower(tower, GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_DANA_RALLY_LANDING_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_LANDING_DAMAGE), player);
                 }
             } else {
-                damageHeroesOfGwenAbility(target, player, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_LANDING_DAMAGE);
+                damageHeroesOfGwenAbility(target, player, GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_DANA_RALLY_LANDING_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_LANDING_DAMAGE));
             }
         }
         player.sendMessage(ChatColor.GOLD + "Rally banner planted! Allies nearby are healed.");
@@ -6487,13 +6682,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             direction.setY(0.0D);
             if (direction.lengthSquared() > 0.001D) {
                 player.setVelocity(direction.normalize()
-                        .multiply(ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_SPEED));
+                        .multiply(GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_DANA_KNOCK_UP_SPEED", ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_SPEED)));
             }
             world.spawnParticle(Particle.CLOUD, player.getLocation().clone().add(0.0D, 1.0D, 0.0D),
                     6, 0.5D, 0.35D, 0.5D, 0.04D);
 
             Map<UUID, Long> nextHitAt = danaKnockUpNextHitAt.computeIfAbsent(id, ignored -> new HashMap<>());
-            double radius = ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_COLLISION_RADIUS;
+            double radius = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_DANA_KNOCK_UP_COLLISION_RADIUS", ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_COLLISION_RADIUS);
             int attackerTeam = teams.getOrDefault(id, -1);
             for (Entity entity : world.getNearbyEntities(player.getLocation(), radius, radius, radius)) {
                 if (!(entity instanceof LivingEntity target) || target.equals(player)
@@ -6503,16 +6698,16 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         || nextHitAt.getOrDefault(target.getUniqueId(), 0L) > now) continue;
                 if (target instanceof Player targetPlayer && !activePlayers.contains(targetPlayer.getUniqueId())) continue;
                 nextHitAt.put(target.getUniqueId(),
-                        now + ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_TARGET_RECHARGE_MILLIS);
+                        now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_DANA_KNOCK_UP_TARGET_RECHARGE_MILLIS", ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_TARGET_RECHARGE_MILLIS));
                 if (target instanceof Player) {
-                    damageHeroesOfGwenAbility(target, player, ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_PLAYER_DAMAGE);
+                    damageHeroesOfGwenAbility(target, player, GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_DANA_KNOCK_UP_PLAYER_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_PLAYER_DAMAGE));
                     target.setVelocity(new Vector(Math.random() / 2.0D - 0.25D,
-                            ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_PLAYER_LIFT,
+                            GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_DANA_KNOCK_UP_PLAYER_LIFT", ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_PLAYER_LIFT),
                             Math.random() / 2.0D - 0.25D));
                 } else {
-                    damageHeroesOfGwenAbility(target, player, ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_MINION_DAMAGE);
+                    damageHeroesOfGwenAbility(target, player, GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_DANA_KNOCK_UP_MINION_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_MINION_DAMAGE));
                     target.setVelocity(new Vector(Math.random() - 0.5D,
-                            ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_MINION_LIFT,
+                            GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_DANA_KNOCK_UP_MINION_LIFT", ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_MINION_LIFT),
                             Math.random() - 0.5D));
                 }
                 target.getWorld().playSound(target.getLocation(), Sound.ENTITY_IRON_GOLEM_HURT, 1.0F, 0.5F);
@@ -6529,7 +6724,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 continue;
             }
             if (!state.landed) {
-                if (now - state.launchedAt >= ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_MINIMUM_FLIGHT_MILLIS
+                if (now - state.launchedAt >= GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_DANA_RALLY_MINIMUM_FLIGHT_MILLIS", ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_MINIMUM_FLIGHT_MILLIS)
                         && player.isOnGround()) {
                     landDanaRally(player, state, now);
                 }
@@ -6540,12 +6735,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 continue;
             }
             if (now >= state.nextHealAt) {
-                double radius = ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_HEAL_RADIUS;
+                double radius = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_DANA_RALLY_HEAL_RADIUS", ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_HEAL_RADIUS);
                 int team = teams.getOrDefault(id, -1);
                 for (Player teammate : activeMatchPlayers()) {
                     if (teams.getOrDefault(teammate.getUniqueId(), -2) != team
                             || teammate.getLocation().distanceSquared(state.center) > radius * radius) continue;
-                    healHeroesOfGwenAbility(player, teammate, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_HEAL_PER_SECOND);
+                    healHeroesOfGwenAbility(player, teammate, GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_DANA_RALLY_HEAL_PER_SECOND", ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_HEAL_PER_SECOND));
                     world.spawnParticle(Particle.HAPPY_VILLAGER,
                             teammate.getLocation().clone().add(0.0D, 1.0D, 0.0D),
                             4, 0.3D, 0.35D, 0.3D, 0.04D);
@@ -6555,8 +6750,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             for (int angle = 0; angle < 360; angle += 30) {
                 double radians = Math.toRadians(angle);
                 Location particle = state.center.clone().add(
-                        Math.cos(radians) * ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_HEAL_RADIUS,
-                        0.35D, Math.sin(radians) * ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_HEAL_RADIUS);
+                        Math.cos(radians) * GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_DANA_RALLY_HEAL_RADIUS", ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_HEAL_RADIUS),
+                        0.35D, Math.sin(radians) * GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_DANA_RALLY_HEAL_RADIUS", ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_HEAL_RADIUS));
                 world.spawnParticle(Particle.HAPPY_VILLAGER, particle, 1, 0.0D, 0.0D, 0.0D, 0.01D);
             }
         }
@@ -6581,7 +6776,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         UUID ownerId = player.getUniqueId();
         if (!isHeroSkillReady(player, "biff.tether")
                 || !biffTetherTargets.getOrDefault(ownerId, List.of()).isEmpty()) return;
-        double radius = ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_RANGE;
+        double radius = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BIFF_TETHER_RANGE", ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_RANGE);
         int team = teams.getOrDefault(ownerId, -1);
         List<BiffTetherTarget> targets = new ArrayList<>();
         for (Entity entity : world.getNearbyEntities(player.getLocation(), radius, radius, radius)) {
@@ -6591,8 +6786,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                     || player.getLocation().distanceSquared(target.getLocation()) > radius * radius) continue;
             target.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
             target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,
-                    (int) (ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_SLOW_DURATION_MILLIS / 50L),
-                    ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_SLOW_AMPLIFIER, true, true, true));
+                    (int) (GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_BIFF_TETHER_SLOW_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_SLOW_DURATION_MILLIS) / 50L),
+                    GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_BIFF_TETHER_SLOW_AMPLIFIER", ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_SLOW_AMPLIFIER), true, true, true));
             target.sendMessage(ChatColor.RED + player.getName() + " has tethered you!");
             target.playSound(target.getLocation(), Sound.BLOCK_IRON_DOOR_CLOSE, 1.0F, 1.0F);
             targets.add(new BiffTetherTarget(target.getUniqueId(), System.currentTimeMillis()));
@@ -6602,7 +6797,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             return;
         }
         biffTetherTargets.put(ownerId, targets);
-        setHeroSkillCooldown(player, "biff.tether", ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_REUSE_DELAY_MILLIS);
+        setHeroSkillCooldown(player, "biff.tether", GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_BIFF_TETHER_REUSE_DELAY_MILLIS", ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_REUSE_DELAY_MILLIS));
         player.playSound(player.getLocation(), Sound.BLOCK_IRON_DOOR_CLOSE, 1.0F, 1.0F);
         player.sendMessage(ChatColor.GOLD + "Tethered " + targets.size() + " enemy hero(es).");
     }
@@ -6611,10 +6806,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         String skill = "biff.battle_leap";
         if (!isHeroSkillReady(player, skill) || biffBattleLeapStartedAt.containsKey(player.getUniqueId())) return;
         Vector direction = player.getLocation().getDirection();
-        direction.setY(ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_VERTICAL_VELOCITY);
+        direction.setY(GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BIFF_BATTLE_LEAP_VERTICAL_VELOCITY", ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_VERTICAL_VELOCITY));
         player.setVelocity(direction);
         biffBattleLeapStartedAt.put(player.getUniqueId(), System.currentTimeMillis());
-        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_COOLDOWN_MILLIS);
+        setHeroSkillCooldown(player, skill, GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_BIFF_BATTLE_LEAP_COOLDOWN_MILLIS", ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_COOLDOWN_MILLIS));
         player.playSound(player.getLocation(), Sound.ENTITY_IRON_GOLEM_ATTACK, 1.0F, 1.0F);
         world.spawnParticle(Particle.CLOUD, player.getLocation().clone().add(0.0D, 0.6D, 0.0D),
                 15, 0.5D, 0.5D, 0.5D, 0.08D);
@@ -6628,7 +6823,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (maxHealth != null) maxHealth.setBaseValue(20.0D);
         horse.setHealth(20.0D);
         horse.setTamed(true);
-        horse.setJumpStrength(ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_JUMP_STRENGTH);
+        horse.setJumpStrength(GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_JUMP_STRENGTH", ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_JUMP_STRENGTH));
         horse.setInvulnerable(true);
         horse.setRemoveWhenFarAway(false);
         horse.getInventory().setArmor(new ItemStack(Material.IRON_HORSE_ARMOR));
@@ -6639,9 +6834,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         entities.add(horse);
         horse.addPassenger(player);
         biffHorses.put(ownerId, new BiffHorseState(horse,
-                System.currentTimeMillis() + ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_DURATION_MILLIS));
+                System.currentTimeMillis() + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_DURATION_MILLIS)));
         setHeroSkillCooldown(player, "biff.cavalry_charge",
-                ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_REUSE_DELAY_MILLIS);
+                GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_REUSE_DELAY_MILLIS", ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_REUSE_DELAY_MILLIS));
         world.strikeLightningEffect(horse.getLocation());
         world.spawnParticle(Particle.CLOUD, horse.getLocation().clone().add(0.0D, 1.0D, 0.0D),
                 35, 0.8D, 0.8D, 0.8D, 0.08D);
@@ -6661,11 +6856,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 if (owner == null || !owner.isOnline() || !activePlayers.contains(ownerId)
                         || target == null || !target.isOnline() || !activePlayers.contains(tether.targetId)
                         || !"biff".equals(selectedHeroesOfGwen.get(ownerId))
-                        || now - tether.startedAt >= ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_ACTIVE_MILLIS
+                        || now - tether.startedAt >= GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_BIFF_TETHER_ACTIVE_MILLIS", ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_ACTIVE_MILLIS)
                         || owner.getLocation().distanceSquared(target.getLocation())
-                                >= ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_BREAK_DISTANCE_SQUARED
+                                >= GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BIFF_TETHER_BREAK_DISTANCE_SQUARED", ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_BREAK_DISTANCE_SQUARED)
                         || owner.getLocation().distanceSquared(target.getLocation())
-                                <= ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_PULL_STOP_DISTANCE_SQUARED) {
+                                <= GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BIFF_TETHER_PULL_STOP_DISTANCE_SQUARED", ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_PULL_STOP_DISTANCE_SQUARED)) {
                     if (target != null && target.isOnline()) target.removePotionEffect(PotionEffectType.SLOWNESS);
                     iterator.remove();
                     continue;
@@ -6688,9 +6883,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 biffBattleLeapStartedAt.remove(id);
                 continue;
             }
-            if (now - entry.getValue() < ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_MINIMUM_FLIGHT_MILLIS
+            if (now - entry.getValue() < GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_BIFF_BATTLE_LEAP_MINIMUM_FLIGHT_MILLIS", ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_MINIMUM_FLIGHT_MILLIS)
                     || !player.isOnGround()) continue;
-            double radius = ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_LANDING_RADIUS;
+            double radius = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BIFF_BATTLE_LEAP_LANDING_RADIUS", ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_LANDING_RADIUS);
             int team = teams.getOrDefault(id, -1);
             for (Entity entity : world.getNearbyEntities(player.getLocation(), radius, radius, radius)) {
                 if (!(entity instanceof LivingEntity target) || target.equals(player)
@@ -6701,15 +6896,15 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 TowerState tower = towerFor(target);
                 if (tower != null) {
                     if (tower.owner != team && canDamageMobaTower(tower, team)
-                            && player.getLocation().distanceSquared(tower.location) <= MOBA_TOWER_RANGE_SQUARED) {
-                        damageMobaTower(tower, ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_DAMAGE, player);
+                            && player.getLocation().distanceSquared(tower.location) <= ArcadePortRules.heroesOfGwenTowerRangeSquared()) {
+                        damageMobaTower(tower, GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BIFF_BATTLE_LEAP_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_DAMAGE), player);
                     }
                 } else {
-                    damageHeroesOfGwenAbility(target, player, ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_DAMAGE);
+                    damageHeroesOfGwenAbility(target, player, GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BIFF_BATTLE_LEAP_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_DAMAGE));
                 }
                 target.setVelocity(new Vector(0.0D,
-                        ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_MINIMUM_KNOCK_UP
-                                + Math.random() * ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_RANDOM_KNOCK_UP,
+                        GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BIFF_BATTLE_LEAP_MINIMUM_KNOCK_UP", ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_MINIMUM_KNOCK_UP)
+                                + Math.random() * GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BIFF_BATTLE_LEAP_RANDOM_KNOCK_UP", ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_RANDOM_KNOCK_UP),
                         0.0D));
                 world.spawnParticle(Particle.CLOUD, target.getLocation().clone().add(0.0D, 0.7D, 0.0D),
                         12, 0.45D, 0.45D, 0.45D, 0.08D);
@@ -6731,17 +6926,17 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 removeBiffHorse(ownerId);
                 continue;
             }
-            double radius = ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_RADIUS;
+            double radius = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_RADIUS", ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_RADIUS);
             for (Player target : players.values()) {
                 if (!target.isOnline() || !activePlayers.contains(target.getUniqueId())
                         || teams.getOrDefault(target.getUniqueId(), -2) == teams.getOrDefault(ownerId, -1)
                         || horse.getLocation().distanceSquared(target.getLocation()) > radius * radius
                         || state.nextRootAt.getOrDefault(target.getUniqueId(), 0L) > now) continue;
                 state.nextRootAt.put(target.getUniqueId(),
-                        now + ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_ROOT_RECHARGE_MILLIS);
-                damageHeroesOfGwenAbility(target, owner, ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_DAMAGE);
+                        now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_ROOT_RECHARGE_MILLIS", ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_ROOT_RECHARGE_MILLIS));
+                damageHeroesOfGwenAbility(target, owner, GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_DAMAGE", ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_DAMAGE));
                 target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,
-                        (int) (ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_ROOT_DURATION_MILLIS / 50L),
+                        (int) (GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_ROOT_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_ROOT_DURATION_MILLIS) / 50L),
                         10, true, true, true));
                 owner.sendActionBar(ChatColor.GOLD + "Cavalry hit " + target.getName() + "!");
             }
@@ -6837,14 +7032,14 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             }
             if ("larissa".equals(hunterHero)) {
                 long nextWaterStone = heroAmmoNextAt.getOrDefault(id,
-                        now + ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_AMMO_RELOAD_MILLIS);
+                        now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_LARISSA_WATER_AMMO_RELOAD_MILLIS", ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_AMMO_RELOAD_MILLIS));
                 if (now >= nextWaterStone) {
                     ItemStack waterStone = player.getInventory().getItem(7);
                     int amount = waterStone != null && waterStone.getType() == Material.LAPIS_LAZULI
                             && waterStone.hasItemMeta() && waterStone.getItemMeta().hasDisplayName()
                             && waterStone.getItemMeta().getDisplayName().contains("Water Stone")
                             ? waterStone.getAmount() : 0;
-                    if (amount < ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_AMMO_CAPACITY) {
+                    if (amount < GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_LARISSA_WATER_AMMO_CAPACITY", ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_AMMO_CAPACITY)) {
                         if (amount <= 0) {
                             player.getInventory().setItem(7, namedItem(Material.LAPIS_LAZULI,
                                     ChatColor.AQUA + "Water Stone", "Aqua Cannon ammunition."));
@@ -6852,7 +7047,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.45F, 1.5F);
                     }
                     heroAmmoNextAt.put(id, now + heroesOfGwenStoreAdjustedCooldown(
-                            player, ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_AMMO_RELOAD_MILLIS, true));
+                            player, GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_LARISSA_WATER_AMMO_RELOAD_MILLIS", ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_AMMO_RELOAD_MILLIS), true));
                 }
             }
             int fletcherCapacity = ArcadePortRules.heroesOfGwenFletcherMaxArrows(hunterHero)
@@ -6885,8 +7080,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                                     && teams.getOrDefault(candidate.getUniqueId(), -1)
                                             != teams.getOrDefault(id, -2)
                                     && candidate.getLocation().distanceSquared(arrow.getLocation())
-                                            <= ArcadePortRules.HEROES_OF_GWEN_DEVON_INFINITY_HOMING_RANGE
-                                                    * ArcadePortRules.HEROES_OF_GWEN_DEVON_INFINITY_HOMING_RANGE)
+                                            <= GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_DEVON_INFINITY_HOMING_RANGE", ArcadePortRules.HEROES_OF_GWEN_DEVON_INFINITY_HOMING_RANGE)
+                                                    * GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_DEVON_INFINITY_HOMING_RANGE", ArcadePortRules.HEROES_OF_GWEN_DEVON_INFINITY_HOMING_RANGE))
                             .min(java.util.Comparator.comparingDouble(candidate ->
                                     candidate.getLocation().distanceSquared(arrow.getLocation())))
                             .orElse(null);
@@ -7222,7 +7417,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             this.team = team;
             this.center = center.clone();
             this.expiresAt = expiresAt;
-            this.nextPulseAt = now + ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_PULSE_INTERVAL_MILLIS;
+            this.nextPulseAt = now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_PULSE_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_PULSE_INTERVAL_MILLIS);
             this.nextVisualAt = now;
         }
     }
@@ -7255,7 +7450,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         final EnderCrystal crystal;
         final Map<UUID, Long> targetEnteredAt = new HashMap<>();
         UUID currentTarget;
-        double nextDamage = MOBA_TOWER_DAMAGE;
+        double nextDamage = ArcadePortRules.heroesOfGwenTowerDamage();
         double health;
         double maxHealth;
         boolean dead;

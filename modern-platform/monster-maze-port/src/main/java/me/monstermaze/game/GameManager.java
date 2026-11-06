@@ -11,6 +11,7 @@ import me.monstermaze.stats.StatTracker;
 import me.monstermaze.util.GameScoreboard;
 import me.monstermaze.util.PlayerFeedback;
 import me.monstermaze.util.TextUtil;
+import au.com.testplex.arcadeports.GameDebugRuntimeOverrides;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import org.bukkit.Particle;
@@ -126,6 +127,30 @@ public class GameManager implements Listener {
     public boolean isRunning() { return state != GameState.IDLE && state != GameState.ENDING; }
     public boolean isLive() { return state == GameState.LIVE; }
     public int getStage() { return curSafe; }
+    public static boolean canDebugAdvancePhase(GameState state, boolean hasCurrentSafePad) {
+        return state == GameState.LIVE && hasCurrentSafePad;
+    }
+    /** Debug control: safely move participants through the current safe-pad transition. */
+    public boolean debugAdvancePhase() {
+        if (!canDebugAdvancePhase(state, safePad != null)) return false;
+        for (Player player : getAlivePlayers()) {
+            padLockIns.add(player.getUniqueId());
+            teleportToSafePadCenter(player);
+        }
+        if (nextSafePad == null) spawnSafePad();
+        phaseTimer = 1;
+        return true;
+    }
+    public static boolean canDebugSpawnMonsterWave(GameState state, boolean hasSafePad, boolean testerAlive) {
+        return state == GameState.LIVE && hasSafePad && testerAlive;
+    }
+    /** Tester-only event bridge; adds the selected mode's normal safe-pad monster wave. */
+    public boolean debugSpawnMonsterWave(Player tester) {
+        if (!canDebugSpawnMonsterWave(state, safePad != null,
+                tester != null && getAlivePlayers().contains(tester))) return false;
+        monsterManager.spawnMore(Math.max(1, getMode().additionalMonstersPerSafePad()));
+        return true;
+    }
     public void recordFirstSafePad(UUID playerId) { plugin.recordFirstSafePad(playerId); }
     public void recordAchievement(UUID playerId, String achievementId) { plugin.recordAchievement(playerId, achievementId); }
     public void noteFirstPad(Player player) { if (player != null) firstPadPlayers.add(player.getUniqueId()); }
@@ -531,7 +556,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
     /** Build next pad (preview). */
     public void spawnSafePad() {
         Location next = mazeGenerator.randomPadLocation(avoidPadLocations());
-        nextSafePad = new SafePad(next, qolEnabled());
+        nextSafePad = new SafePad(next, qolEnabled(), getMode());
         mazeGenerator.disablePadArea(next);
 
         // Remove mobs standing on the new pad
@@ -787,7 +812,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
 
     /** Record this player's highest stage reached for the active mode+pattern (persisted). */
     private void recordPB(Player player) {
-        if (player == null || plugin.getHostPlugin().isTestPlayer(player)) return;
+        if (plugin.isDebugRound() || player == null || plugin.getHostPlugin().isTestPlayer(player)) return;
         int pattern = getPatternIndex();
         if (pattern < 0) return;
         String kit = null;

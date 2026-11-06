@@ -1,5 +1,6 @@
 package au.com.testplex.wizards;
 
+import au.com.testplex.arcadeports.GameDebugRuntimeOverrides;
 import org.bukkit.Material;
 
 import java.util.List;
@@ -7,6 +8,12 @@ import java.util.List;
 public final class WizardsRules {
     public static final float BASE_MANA_PER_SECOND = 2.5F;
     public static final float SOUL_STAR_MANA_PER_SECOND = 0.2F;
+    public static final double MANA_REGEN_MULTIPLIER = 1.0D;
+    public static final double SPELL_MANA_COST_MULTIPLIER = 1.0D;
+    public static final double SPELL_COOLDOWN_MULTIPLIER = 1.0D;
+    public static final double SPELL_DAMAGE_MULTIPLIER = 1.0D;
+    public static final double SPELL_HEAL_MULTIPLIER = 1.0D;
+    public static final double PROJECTILE_SPEED_MULTIPLIER = 1.0D;
     public static final int WAND_SLOT_COUNT = 5;
     public static final int MAGE_RANDOM_STARTER_SPELL_COUNT = 2;
     public static final int MAGE_STARTER_SPELL_SELECTION_ATTEMPTS = 100;
@@ -24,7 +31,48 @@ public final class WizardsRules {
 
     public static float manaPerSecond(WizardsKit kit, int soulStars) {
         if (kit == null) throw new IllegalArgumentException("kit is required");
-        return kit.manaPerSecond() + Math.max(0, soulStars) * SOUL_STAR_MANA_PER_SECOND;
+        return (kitManaPerSecond(kit) + Math.max(0, soulStars) * GameDebugRuntimeOverrides.floatValue(
+                "WIZARDS_SOUL_STAR_MANA_PER_SECOND", SOUL_STAR_MANA_PER_SECOND))
+                * (float) boundedMultiplier("WIZARDS_MANA_REGEN_MULTIPLIER", MANA_REGEN_MULTIPLIER);
+    }
+
+    private static float kitManaPerSecond(WizardsKit kit) {
+        return boundedFloat("WIZARDS_KIT_" + kit.name() + "_MANA_PER_SECOND", kit.manaPerSecond(), 0.0F, 50.0F);
+    }
+
+    public static double spellManaCostMultiplier() {
+        return boundedMultiplier("WIZARDS_SPELL_MANA_COST_MULTIPLIER", SPELL_MANA_COST_MULTIPLIER);
+    }
+
+    public static double spellManaCostMultiplier(WizardsSpell spell) {
+        if (spell == null) return spellManaCostMultiplier();
+        return spellManaCostMultiplier() * boundedMultiplier(spellDebugKey(spell, "MANA_COST"), 1.0D);
+    }
+
+    public static double spellCooldownMultiplier() {
+        return boundedMultiplier("WIZARDS_SPELL_COOLDOWN_MULTIPLIER", SPELL_COOLDOWN_MULTIPLIER);
+    }
+
+    public static double spellCooldownMultiplier(WizardsSpell spell) {
+        if (spell == null) return spellCooldownMultiplier();
+        return spellCooldownMultiplier() * boundedMultiplier(spellDebugKey(spell, "COOLDOWN"), 1.0D);
+    }
+
+    private static String spellDebugKey(WizardsSpell spell, String suffix) {
+        return "WIZARDS_SPELL_" + spell.name() + "_" + suffix + "_MULTIPLIER";
+    }
+
+    private static double boundedMultiplier(String key, double intended) {
+        double value = GameDebugRuntimeOverrides.doubleValue(key, intended);
+        return Double.isFinite(value) ? Math.max(0.0D, Math.min(5.0D, value)) : intended;
+    }
+
+    private static double spellDamageMultiplier() {
+        return boundedMultiplier("WIZARDS_SPELL_DAMAGE_MULTIPLIER", SPELL_DAMAGE_MULTIPLIER);
+    }
+
+    private static double spellHealMultiplier() {
+        return boundedMultiplier("WIZARDS_SPELL_HEAL_MULTIPLIER", SPELL_HEAL_MULTIPLIER);
     }
 
     public static float initialMana() { return 0.0F; }
@@ -87,56 +135,66 @@ public final class WizardsRules {
     }
 
     public static double trapRuneDamage(int spellLevel) {
-        return Math.max(0, spellLevel) * 2.0D + 3.0D;
+        return (Math.max(0, spellLevel) * 2.0D + 3.0D) * spellDamageMultiplier();
     }
 
     public static double spectralArrowDamage(int spellLevel, double travelledBlocks) {
         if (!Double.isFinite(travelledBlocks) || travelledBlocks < 0) return 0.0D;
         int level = Math.max(1, Math.min(3, spellLevel));
-        return 3.0D + travelledBlocks / (7.0D - level);
+        return (3.0D + travelledBlocks / (7.0D - level)) * spellDamageMultiplier();
     }
 
     public static double manaBoltDamage(int spellLevel) {
-        return Math.max(0, spellLevel) + 2.0D;
+        return (Math.max(0, spellLevel) + 2.0D) * spellDamageMultiplier();
     }
 
     public static double fireballDamage(int spellLevel) {
-        return Math.max(0, spellLevel) + 3.0D;
+        return (Math.max(0, spellLevel) + 3.0D) * spellDamageMultiplier();
     }
 
     public static double lightningStrikeDamage(int spellLevel) {
-        return Math.max(0, spellLevel) * 2.0D + 2.0D;
+        return (Math.max(0, spellLevel) * 2.0D + 2.0D) * spellDamageMultiplier();
     }
 
     public static double healAmount(int spellLevel) {
-        return Math.max(0, spellLevel) / 2.0D + 1.5D;
+        return (Math.max(0, spellLevel) / 2.0D + 1.5D) * spellHealMultiplier();
     }
 
     public static double rainbowBeamDamage(int spellLevel, double travelledBlocks) {
         if (!Double.isFinite(travelledBlocks) || travelledBlocks < 0) return 0.0D;
         return Math.max(0.0D, Math.max(0, spellLevel) + 2.0D
-                - Math.max(0.0D, travelledBlocks - 30.0D) * 0.2D);
+                - Math.max(0.0D, travelledBlocks - 30.0D) * 0.2D) * spellDamageMultiplier();
     }
 
     public static double rumbleDamage(int spellLevel) {
-        return Math.max(0, spellLevel) + 2.0D;
+        return (Math.max(0, spellLevel) + 2.0D) * spellDamageMultiplier();
     }
 
     public static double rumbleExplosionDamage(int spellLevel) {
-        return Math.max(0, spellLevel) / 4.0D;
+        return Math.max(0, spellLevel) / 4.0D * spellDamageMultiplier();
     }
 
-    public static double manaBoltVelocity() { return 0.3D; }
-    public static double fireballVelocity() { return 0.14D; }
+    public static double manaBoltVelocity() {
+        return 0.3D * boundedMultiplier("WIZARDS_PROJECTILE_SPEED_MULTIPLIER", PROJECTILE_SPEED_MULTIPLIER);
+    }
+    public static double fireballVelocity() {
+        return 0.14D * boundedMultiplier("WIZARDS_PROJECTILE_SPEED_MULTIPLIER", PROJECTILE_SPEED_MULTIPLIER);
+    }
 
     public static float maximumMana(WizardsKit kit) {
         if (kit == null) throw new IllegalArgumentException("kit is required");
-        return kit.maximumMana();
+        return boundedFloat("WIZARDS_KIT_" + kit.name() + "_MAX_MANA", kit.maximumMana(), 1.0F, 1_000.0F);
     }
 
     public static int startingWands(WizardsKit kit) {
         if (kit == null) throw new IllegalArgumentException("kit is required");
-        return kit.startingWands();
+        return Math.max(1, Math.min(9, GameDebugRuntimeOverrides.intValue(
+                "WIZARDS_KIT_" + kit.name() + "_STARTING_WANDS", kit.startingWands())));
+    }
+
+    private static float boundedFloat(String key, float intended, float minimum, float maximum) {
+        float value = GameDebugRuntimeOverrides.floatValue(key, intended);
+        return Float.isFinite(value) ? Math.max(minimum, Math.min(maximum, value)) : intended;
     }
 
     public static int nextSpellLevel(int currentLevel, int maximumLevel) {
@@ -149,7 +207,12 @@ public final class WizardsRules {
     }
 
     public static boolean canGainWand(int currentWands) {
-        return currentWands >= 0 && currentWands < WAND_SLOT_COUNT;
+        return currentWands >= 0 && currentWands < maxWandSlots();
+    }
+
+    public static int maxWandSlots() {
+        return Math.max(1, Math.min(9,
+                GameDebugRuntimeOverrides.intValue("WIZARDS_WAND_SLOT_COUNT", WAND_SLOT_COUNT)));
     }
 
     public static float addMana(float current, float amount, float maximum) {
@@ -165,8 +228,16 @@ public final class WizardsRules {
     }
 
     public static int nextEndgameStrikeInterval(int currentMillis) {
-        return Math.max(ENDGAME_MIN_STRIKE_MILLIS,
-                currentMillis - ENDGAME_STRIKE_REDUCTION_PER_TICK_MILLIS);
+        int minimum = GameDebugRuntimeOverrides.intValue("WIZARDS_ENDGAME_MIN_STRIKE_MILLIS",
+                ENDGAME_MIN_STRIKE_MILLIS);
+        int reduction = GameDebugRuntimeOverrides.intValue("WIZARDS_ENDGAME_STRIKE_REDUCTION_PER_TICK_MILLIS",
+                ENDGAME_STRIKE_REDUCTION_PER_TICK_MILLIS);
+        return Math.max(minimum, currentMillis - reduction);
+    }
+
+    /** Debug sessions must not write match counters to the persistent local-stats store. */
+    public static boolean shouldRecordProgress(boolean debugRound) {
+        return !debugRound;
     }
 
     public static double endgameDamage(double size, double distance) {

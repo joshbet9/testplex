@@ -1,12 +1,59 @@
 package au.com.testplex.arcadeports;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class CastleAssaultHeroesOfGwenMixedVariantTest {
+
+    @AfterEach
+    void clearProfileOverrides() {
+        GameDebugRuntimeOverrides.clear();
+    }
+
+    @Test
+    void heroesGameplayHelpersConsumeProfilesAndResetToTheirSourceDefaults() {
+        assertFalse(ArcadePortRules.heroesOfGwenOvertimeHasStarted(1_000L, 900_999L));
+        assertTrue(ArcadePortRules.heroesOfGwenOvertimeHasStarted(1_000L, 901_000L));
+        assertEquals(1, ArcadePortRules.heroesOfGwenOvertimeNextTargetIndex(0, 3, 15.99D));
+        assertEquals(2.0D, ArcadePortRules.heroesOfGwenWitherEarthquakeDamage(ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS), 0.00001D);
+        assertEquals(3, ArcadePortRules.heroesOfGwenFletcherMaxArrows("devon"));
+        assertEquals(3_000L, ArcadePortRules.heroesOfGwenFletcherReloadMillis("devon"));
+        assertEquals(10.0D, ArcadePortRules.heroesOfGwenDevonTntArrowDamage(0), 0.00001D);
+        assertEquals(7.5D, ArcadePortRules.heroesOfGwenRowenaBowDamage(2), 0.00001D);
+        assertEquals(15.0D, ArcadePortRules.heroesOfGwenRowenaBombardmentDamage(2), 0.00001D);
+
+        GameDebugRuntimeOverrides.activate(Map.ofEntries(
+                Map.entry("HEROES_OF_GWEN_OVERTIME_DELAY_MILLIS", 2_000L),
+                Map.entry("HEROES_OF_GWEN_OVERTIME_PATH_ADVANCE_DISTANCE_SQUARED", 25.0D),
+                Map.entry("HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS", 10.0D),
+                Map.entry("HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE", 8.0D),
+                Map.entry("HEROES_OF_GWEN_DEVON_FLETCHER_MAX_ARROWS", 7),
+                Map.entry("HEROES_OF_GWEN_DEVON_FLETCHER_RELOAD_MILLIS", 1_500L),
+                Map.entry("HEROES_OF_GWEN_DEVON_TNT_BOW_BASE_DAMAGE", 3.0D),
+                Map.entry("HEROES_OF_GWEN_DEVON_TNT_BOW_POWER_DAMAGE_PER_LEVEL", 0.5D),
+                Map.entry("HEROES_OF_GWEN_ROWENA_BOW_BASE_DAMAGE", 8.0D),
+                Map.entry("HEROES_OF_GWEN_ROWENA_BOW_POWER_DAMAGE_PER_LEVEL", 0.5D),
+                Map.entry("HEROES_OF_GWEN_ROWENA_BOMBARDMENT_DAMAGE_FACTOR", 3.0D)));
+        assertTrue(ArcadePortRules.heroesOfGwenOvertimeHasStarted(1_000L, 3_000L));
+        assertEquals(1, ArcadePortRules.heroesOfGwenOvertimeNextTargetIndex(0, 3, 24.99D));
+        assertEquals(4.0D, ArcadePortRules.heroesOfGwenWitherEarthquakeDamage(10.0D), 0.00001D);
+        assertEquals(7, ArcadePortRules.heroesOfGwenFletcherMaxArrows("devon"));
+        assertEquals(1_500L, ArcadePortRules.heroesOfGwenFletcherReloadMillis("devon"));
+        assertEquals(8.0D, ArcadePortRules.heroesOfGwenDevonTntArrowDamage(0), 0.00001D);
+        assertEquals(16.0D, ArcadePortRules.heroesOfGwenRowenaBowDamage(2), 0.00001D);
+        assertEquals(48.0D, ArcadePortRules.heroesOfGwenRowenaBombardmentDamage(2), 0.00001D);
+
+        GameDebugRuntimeOverrides.clear();
+        assertFalse(ArcadePortRules.heroesOfGwenOvertimeHasStarted(1_000L, 3_000L));
+        assertEquals(10.0D, ArcadePortRules.heroesOfGwenDevonTntArrowDamage(0), 0.00001D);
+        assertEquals(7.5D, ArcadePortRules.heroesOfGwenRowenaBowDamage(2), 0.00001D);
+        assertEquals(15.0D, ArcadePortRules.heroesOfGwenRowenaBombardmentDamage(2), 0.00001D);
+    }
     @Test
     void allFiveCastleAssaultKitsAndAliasesNormalizeToCanonicalIds() {
         assertEquals("alchemist", ArcadePortRules.normalizeCastleAssaultKit("Alchemist"));

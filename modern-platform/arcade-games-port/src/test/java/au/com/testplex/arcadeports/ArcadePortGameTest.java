@@ -151,7 +151,7 @@ class ArcadePortGameTest {
 
 
     @Test void exposesTheMechanicsGamesAndIntegratedModules() {
-        assertEquals(31, ArcadePortGame.values().length);
+        assertEquals(32, ArcadePortGame.values().length);
         Set<String> ids = new HashSet<>();
         for (ArcadePortGame game : ArcadePortGame.values()) {
             assertTrue(ids.add(game.id()), "duplicate game id: " + game.id());
@@ -172,6 +172,7 @@ class ArcadePortGameTest {
         assertEquals(ArcadePortGame.PLEXBALL, ArcadePortGame.fromId("plexball"));
         assertEquals(ArcadePortGame.CAMERA_SHY, ArcadePortGame.fromId("camera-shy"));
         assertEquals(ArcadePortGame.SUPER_SPLOOR, ArcadePortGame.fromId("super-sploor"));
+        assertEquals(ArcadePortGame.SPEED_BUILDERS, ArcadePortGame.fromId("speed-builders"));
         assertEquals("Plexball", ArcadePortGame.PLEXBALL.displayName());
         java.util.List<String> enabled = java.util.List.of("death-tag", "plexball", "spleef", "super-sploor", "dragons", "runner", "camera-shy");
         assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.PLEXBALL.id(), enabled),
@@ -247,6 +248,9 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldRemoveMicroBarrier(9_999L));
         assertTrue(ArcadePortRules.shouldRemoveMicroBarrier(10_000L));
         assertTrue(ArcadePortRules.shouldRemoveMicroBarrier(12_000L));
+        assertFalse(ArcadePortRules.shouldRemoveMicroBarrier(499L, 500L));
+        assertTrue(ArcadePortRules.shouldRemoveMicroBarrier(500L, 500L));
+        assertTrue(ArcadePortRules.shouldRemoveMicroBarrier(0L, 0L));
     }
 
     @Test void microBattlesBarrierHeightTracksSourceIslandY() {
@@ -2833,18 +2837,20 @@ class ArcadePortGameTest {
         assertEquals("RED", ArcadePortRules.gladiatorsArenaMarkerGroup(4));
     }
 
-    @Test void drawMyThingRoundDurationScalesToTheFiveMinuteBudgetAboveTenPlayers() {
-        assertEquals(30_000L, ArcadePortRules.drawMyThingRoundMillis(1));
-        assertEquals(30_000L, ArcadePortRules.drawMyThingRoundMillis(10));
-        assertEquals(24_545L, ArcadePortRules.drawMyThingRoundMillis(11));
-        assertEquals(22_250L, ArcadePortRules.drawMyThingRoundMillis(12));
-        assertEquals(15_937L, ArcadePortRules.drawMyThingRoundMillis(16));
+    @Test void drawMyThingRoundDurationFitsTheThreeHundredTwentySecondGameLimit() {
+        assertEquals(40_000L, ArcadePortRules.drawMyThingRoundMillis(1));
+        assertEquals(40_000L, ArcadePortRules.drawMyThingRoundMillis(8));
+        assertEquals(35_555L, ArcadePortRules.drawMyThingRoundMillis(9));
+        assertEquals(32_000L, ArcadePortRules.drawMyThingRoundMillis(10));
+        assertEquals(20_000L, ArcadePortRules.drawMyThingRoundMillis(16));
+        assertEquals(0L, ArcadePortRules.DRAW_MY_THING_INTERMISSION_MILLIS,
+                "Intermissions must not push the complete drawing schedule past 320 seconds");
 
-        for (int players = 11; players <= 64; players++) {
-            long drawingMillis = players * ArcadePortRules.drawMyThingRoundMillis(players);
-            long intermissionMillis = (players - 1L) * ArcadePortRules.DRAW_MY_THING_INTERMISSION_MILLIS;
-            assertTrue(drawingMillis + intermissionMillis <= ArcadePortRules.DRAW_MY_THING_GAME_MILLIS,
-                    "DMT schedule exceeds five minutes for " + players + " players");
+        for (int players = 1; players <= 64; players++) {
+            long fullMatchMillis = players * ArcadePortRules.drawMyThingRoundMillis(players)
+                    + Math.max(0, players - 1) * ArcadePortRules.DRAW_MY_THING_INTERMISSION_MILLIS;
+            assertTrue(fullMatchMillis <= ArcadePortRules.DRAW_MY_THING_GAME_MILLIS,
+                    "DMT schedule exceeds 320 seconds for " + players + " players");
         }
     }
 

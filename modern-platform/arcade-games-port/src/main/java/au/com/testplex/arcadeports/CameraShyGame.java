@@ -86,18 +86,6 @@ public final class CameraShyGame implements Listener {
     private static final int HALF_CELLS = MAZE_CELLS / 2;
     private static final int FLOOR_Y = 64;
     private static final int QUEUE_WINDOW_TICKS = 100;
-    private static final long SPOTLIGHT_INTERVAL_MILLIS = 55_000L;
-    private static final long DECOY_FLASH_LIFETIME_MILLIS = 6_000L;
-    private static final long SMOKE_LIFETIME_MILLIS = 4_500L;
-    private static final long PURSUIT_ESCAPE_MILLIS = 2_000L;
-    private static final double PURSUIT_ESCAPE_DISTANCE = 8.0D;
-    private static final double SPOTTER_RANGE = 18.0D;
-    private static final double PHOTO_LENS_MIN_DOT = 0.94D;
-    private static final long ABILITY_SMOKE_COOLDOWN = 25_000L;
-    private static final long ABILITY_DECOY_COOLDOWN = 25_000L;
-    private static final long ABILITY_RUNNER_COOLDOWN = 20_000L;
-    private static final long ABILITY_SPOTTER_COOLDOWN = 25_000L;
-    private static final long ABILITY_UNDERSTUDY_COOLDOWN = 30_000L;
 
     private enum Phase { IDLE, STARTING, LIVE, ENDING }
     public enum Kit {
@@ -329,7 +317,7 @@ public final class CameraShyGame implements Listener {
         }
     }
 
-    private final JavaPlugin plugin;
+    private final ArcadeMechanicsModernPlugin plugin;
     private final ArcadePortManager manager;
     private final AbilityCooldownProgress cooldownProgress;
     private final ArcadeTestPlayerManager testPlayers;
@@ -403,7 +391,7 @@ public final class CameraShyGame implements Listener {
     private List<Player> pendingHumans = List.of();
     private int startWaitTicks;
 
-    public CameraShyGame(JavaPlugin plugin, ArcadePortManager manager) {
+    public CameraShyGame(ArcadeMechanicsModernPlugin plugin, ArcadePortManager manager) {
         this.plugin = plugin;
         this.manager = manager;
         this.cooldownProgress = AbilityCooldownProgress.forPlugin(plugin);
@@ -438,11 +426,41 @@ public final class CameraShyGame implements Listener {
 
     public boolean isActive() { return phase == Phase.STARTING || phase == Phase.LIVE || phase == Phase.ENDING; }
 
+    boolean isLiveParticipant(Player player) {
+        return phase == Phase.LIVE && player != null && players.containsKey(player.getUniqueId())
+                && alive.contains(player.getUniqueId()) && player.getWorld() == arena;
+    }
+
     public String status() {
         if (phase == Phase.IDLE) return "idle";
         if (phase == Phase.STARTING) return "starting; queued=" + pendingHumans.size() + " humans";
         long remaining = Math.max(0L, (endsAt - System.currentTimeMillis()) / 1000L);
         return "live; alive=" + alive.size() + "/" + players.size() + "; time=" + remaining + "s";
+    }
+
+    /** Debug control: finish the active timed round through the normal timeout path. */
+    public boolean debugAdvancePhase() {
+        long advanced = CameraShyRules.debugRoundDeadline(phase == Phase.LIVE,
+                System.currentTimeMillis(), endsAt);
+        if (advanced == endsAt) return false;
+        endsAt = advanced;
+        return true;
+    }
+
+    /** Debug control: exercise the real camera flash/photo checks for an active participant. */
+    public boolean debugTakePhoto(Player player) {
+        if (!isAliveParticipant(player)) return false;
+        triggerPhoto(player);
+        return true;
+    }
+
+    /** Debug control: invoke the selected kit's ordinary ability and cooldown path. */
+    public boolean debugUseSelectedKitAbility(Player player) {
+        if (!isAliveParticipant(player)) return false;
+        Kit kit = Kit.fromId(selectedKits.get(player.getUniqueId()));
+        if (kit == null) return false;
+        activateAbility(player, kit);
+        return true;
     }
 
     public int queuedCount() {
@@ -472,7 +490,7 @@ public final class CameraShyGame implements Listener {
             player.sendMessage(ChatColor.YELLOW + "You are already queued for Snap.");
             return;
         }
-        if (queue.size() >= CameraShyRules.MAX_PLAYERS) {
+        if (queue.size() >= GameDebugRuntimeOverrides.intValue("CAMERA_SHY_MAX_PLAYERS", CameraShyRules.MAX_PLAYERS)) {
             player.sendMessage(ChatColor.RED + "Snap is full (16/16).");
             return;
         }
@@ -542,7 +560,7 @@ public final class CameraShyGame implements Listener {
     public void startFromLobby(org.bukkit.command.CommandSender sender, Collection<Player> lobbyPlayers) {
         if (lobbyPlayers != null) {
             for (Player player : lobbyPlayers) {
-                if (player != null && player.isOnline() && queue.size() < CameraShyRules.MAX_PLAYERS) {
+                if (player != null && player.isOnline() && queue.size() < GameDebugRuntimeOverrides.intValue("CAMERA_SHY_MAX_PLAYERS", CameraShyRules.MAX_PLAYERS)) {
                     if (!queue.containsKey(player.getUniqueId())) {
                         queue.put(player.getUniqueId(), player);
                         String kit = plugin.getConfig().getString("camera-shy-kit-preferences." + player.getUniqueId(), "smoke-artist");
@@ -568,7 +586,7 @@ public final class CameraShyGame implements Listener {
             return;
         }
         List<Player> humansInQueue = queue.values().stream().filter(p -> p != null && p.isOnline())
-                .limit(CameraShyRules.MAX_PLAYERS).toList();
+                .limit(GameDebugRuntimeOverrides.intValue("CAMERA_SHY_MAX_PLAYERS", CameraShyRules.MAX_PLAYERS)).toList();
         if (humansInQueue.isEmpty()) {
             sender.sendMessage(ChatColor.YELLOW + "No players are queued for Snap. Use /arcadeport join snap.");
             return;
@@ -638,13 +656,14 @@ public final class CameraShyGame implements Listener {
                 abortStart("The Snap maze world could not be loaded.");
                 return;
             }
-            int missing = CameraShyRules.MAX_PLAYERS - pendingHumans.size();
+            int missing = Math.min(manager.configuredTestBotCount(ArcadePortGame.CAMERA_SHY),
+                    GameDebugRuntimeOverrides.intValue("CAMERA_SHY_MAX_PLAYERS", CameraShyRules.MAX_PLAYERS) - pendingHumans.size());
             if (missing <= 0) {
                 startMatch(pendingHumans, List.of());
                 return;
             }
             if (!testPlayers.isAvailableForDamageablePlayers()) {
-                if (pendingHumans.size() >= CameraShyRules.MIN_PLAYERS) {
+                if (pendingHumans.size() >= GameDebugRuntimeOverrides.intValue("CAMERA_SHY_MIN_PLAYERS", CameraShyRules.MIN_PLAYERS)) {
                     plugin.getLogger().warning("Snap is starting without AFK test players: FakePlayerPlugin is unavailable.");
                     startMatch(pendingHumans, List.of());
                 } else {
@@ -661,8 +680,11 @@ public final class CameraShyGame implements Listener {
                 }
                 if (result.succeeded()) {
                     List<Player> botsReady = new ArrayList<>(result.players());
+                    for (int index = 0; index < botsReady.size(); index++) {
+                        manager.applyConfiguredTestBotLoadout(ArcadePortGame.CAMERA_SHY, index, botsReady.get(index));
+                    }
                     startMatch(pendingHumans, botsReady);
-                } else if (pendingHumans.size() >= CameraShyRules.MIN_PLAYERS) {
+                } else if (pendingHumans.size() >= GameDebugRuntimeOverrides.intValue("CAMERA_SHY_MIN_PLAYERS", CameraShyRules.MIN_PLAYERS)) {
                     plugin.getLogger().warning("Snap test-player fill failed; starting with humans only: " + result.error());
                     startMatch(pendingHumans, List.of());
                 } else {
@@ -710,15 +732,16 @@ public final class CameraShyGame implements Listener {
 
         List<Player> all = new ArrayList<>(humansInMatch);
         all.addAll(testBots);
-        if (all.size() < CameraShyRules.MIN_PLAYERS) {
+        if (all.size() < GameDebugRuntimeOverrides.intValue("CAMERA_SHY_MIN_PLAYERS", CameraShyRules.MIN_PLAYERS)) {
             abortStart("Snap needs at least four total players.");
             return;
         }
         Collections.shuffle(all, random);
         List<Location> spawns = mazeSpawnLocations();
         startedAt = System.currentTimeMillis();
-        endsAt = startedAt + CameraShyRules.MATCH_SECONDS * 1_000L;
-        nextSpotlightAt = startedAt + SPOTLIGHT_INTERVAL_MILLIS;
+        endsAt = startedAt + GameDebugRuntimeOverrides.intValue("CAMERA_SHY_MATCH_SECONDS", CameraShyRules.MATCH_SECONDS) * 1_000L;
+        nextSpotlightAt = startedAt + CameraShyRules.longSetting("SPOTLIGHT_INTERVAL_MILLIS",
+                CameraShyRules.SPOTLIGHT_INTERVAL_MILLIS);
         finalSnapshot = false;
 
         try {
@@ -767,7 +790,9 @@ public final class CameraShyGame implements Listener {
                         ChatColor.YELLOW + "Right-click to scope • Press F to take a photo", 5, 60, 10);
                 player.sendMessage(ChatColor.GRAY + "Hold your spyglass to aim. Press " + ChatColor.AQUA + "F"
                         + ChatColor.GRAY + " to take the photograph.");
-                player.sendMessage(ChatColor.GRAY + "Five photographs eliminate a player. Exposure never decays.");
+                player.sendMessage(ChatColor.GRAY.toString() + CameraShyRules.intSetting("PHOTOS_TO_ELIMINATE",
+                        CameraShyRules.PHOTOS_TO_ELIMINATE)
+                        + " photographs eliminate a player. Exposure never decays.");
             }
         }
         plugin.getLogger().info("Snap started with " + humans.size() + " humans and " + bots.size() + " AFK test players.");
@@ -924,6 +949,7 @@ public final class CameraShyGame implements Listener {
     private void tick() {
         serverTick++;
         if (phase == Phase.IDLE) return;
+        for (Player player : players.values()) disablePlayerCollision(player);
         if (phase == Phase.STARTING) return;
         if (phase != Phase.LIVE) return;
 
@@ -964,6 +990,15 @@ public final class CameraShyGame implements Listener {
         }
     }
 
+    private static void disablePlayerCollision(Player player) {
+        if (player == null || !player.isOnline()) return;
+        player.setCollidable(false);
+        for (org.bukkit.scoreboard.Team team : player.getScoreboard().getTeams()) {
+            team.setOption(org.bukkit.scoreboard.Team.Option.COLLISION_RULE,
+                    org.bukkit.scoreboard.Team.OptionStatus.NEVER);
+        }
+    }
+
     private void removeOfflinePlayers() {
         for (UUID id : new ArrayList<>(alive)) {
             Player player = players.get(id);
@@ -998,7 +1033,7 @@ public final class CameraShyGame implements Listener {
                 bar.setTitle(ChatColor.GOLD + "SNAP " + ChatColor.WHITE + time
                         + ChatColor.GRAY + " | " + ChatColor.RED + exposures.getOrDefault(id, 0) + "/5");
                 bar.setProgress(Math.max(0.0D, Math.min(1.0D, (double) (endsAt - now)
-                        / (CameraShyRules.MATCH_SECONDS * 1_000.0D))));
+                        / (GameDebugRuntimeOverrides.intValue("CAMERA_SHY_MATCH_SECONDS", CameraShyRules.MATCH_SECONDS) * 1_000.0D))));
             }
         }
     }
@@ -1022,7 +1057,12 @@ public final class CameraShyGame implements Listener {
         if (phase != Phase.LIVE || !isAliveParticipant(player)) return;
         if (player.getInventory().getItemInMainHand().getType() != Material.SPYGLASS) return;
         event.setCancelled(true);
+        triggerPhoto(player);
+    }
+
+    private void triggerPhoto(Player player) {
         emitCameraFlash(player.getLocation());
+        manager.showAbilityActivationCosmetic(player, ArcadePortGame.CAMERA_SHY);
         if (!isUsingSpyglass(player)) {
             player.sendActionBar(Component.text("Right-click and hold the spyglass before pressing F to take a photo."));
             return;
@@ -1138,8 +1178,8 @@ public final class CameraShyGame implements Listener {
     private void takePhoto(Player shooter) {
         UUID shooterId = shooter.getUniqueId();
         long now = System.currentTimeMillis();
-        long cooldown = finalSnapshot ? CameraShyRules.FINAL_SNAPSHOT_COOLDOWN_MILLIS
-                : CameraShyRules.PHOTO_COOLDOWN_MILLIS;
+        long cooldown = finalSnapshot ? GameDebugRuntimeOverrides.longValue("CAMERA_SHY_FINAL_SNAPSHOT_COOLDOWN_MILLIS", CameraShyRules.FINAL_SNAPSHOT_COOLDOWN_MILLIS)
+                : GameDebugRuntimeOverrides.longValue("CAMERA_SHY_PHOTO_COOLDOWN_MILLIS", CameraShyRules.PHOTO_COOLDOWN_MILLIS);
         if (runnerUntil.getOrDefault(shooterId, 0L) > now) {
             shooter.sendActionBar(Component.text("You cannot take a photograph during Adrenaline Rush."));
             return;
@@ -1149,14 +1189,14 @@ public final class CameraShyGame implements Listener {
             return;
         }
         RayTraceResult decoyTrace = arena.rayTraceEntities(shooter.getEyeLocation(),
-                shooter.getEyeLocation().getDirection(), CameraShyRules.CAMERA_RANGE_BLOCKS, 0.25D,
+                shooter.getEyeLocation().getDirection(), GameDebugRuntimeOverrides.doubleValue("CAMERA_SHY_CAMERA_RANGE_BLOCKS", CameraShyRules.CAMERA_RANGE_BLOCKS), 0.25D,
                 entity -> entity instanceof ArmorStand stand
                         && stand.getPersistentDataContainer().has(decoyStandKey, PersistentDataType.BYTE));
         if (decoyTrace != null && decoyTrace.getHitEntity() instanceof ArmorStand stand
                 && shooter.hasLineOfSight(stand)
                 && !isBlockedBySmoke(shooter.getEyeLocation(), stand.getLocation())) {
             cameraReadyAt.put(shooterId, now + cooldown);
-            cooldownProgress.start(shooter, "Camera", cooldown);
+            cooldownProgress.start(shooter, "Camera", cooldown, ArcadePortGame.CAMERA_SHY);
             takeUnderstudyPhoto(shooter, stand);
             return;
         }
@@ -1168,9 +1208,10 @@ public final class CameraShyGame implements Listener {
             return;
         }
         cameraReadyAt.put(shooterId, now + cooldown);
-        cooldownProgress.start(shooter, "Camera", cooldown);
+        cooldownProgress.start(shooter, "Camera", cooldown, ArcadePortGame.CAMERA_SHY);
         for (Player photographed : targets) registerPhoto(shooter, photographed, now);
-        if (targets.size() >= 2 && humans.contains(shooterId)) award(shooterId, "group-portrait");
+        if (targets.size() >= CameraShyRules.intSetting("GROUP_PHOTO_MIN_TARGETS",
+                CameraShyRules.GROUP_PHOTO_MIN_TARGETS) && humans.contains(shooterId)) award(shooterId, "group-portrait");
         shooter.playSound(shooter.getLocation(), Sound.ITEM_SPYGLASS_USE, 1.0F, 1.35F);
         shooter.sendActionBar(Component.text("SNAP! " + targets.size() + " player(s) photographed."));
     }
@@ -1186,13 +1227,13 @@ public final class CameraShyGame implements Listener {
         Vector direction = shooter.getEyeLocation().getDirection();
         Location eye = shooter.getEyeLocation();
         List<Player> targets = new ArrayList<>();
-        for (Entity entity : arena.getNearbyEntities(eye, CameraShyRules.CAMERA_RANGE_BLOCKS,
-                CameraShyRules.CAMERA_RANGE_BLOCKS, CameraShyRules.CAMERA_RANGE_BLOCKS)) {
+        for (Entity entity : arena.getNearbyEntities(eye, GameDebugRuntimeOverrides.doubleValue("CAMERA_SHY_CAMERA_RANGE_BLOCKS", CameraShyRules.CAMERA_RANGE_BLOCKS),
+                GameDebugRuntimeOverrides.doubleValue("CAMERA_SHY_CAMERA_RANGE_BLOCKS", CameraShyRules.CAMERA_RANGE_BLOCKS), GameDebugRuntimeOverrides.doubleValue("CAMERA_SHY_CAMERA_RANGE_BLOCKS", CameraShyRules.CAMERA_RANGE_BLOCKS))) {
             if (!(entity instanceof Player candidate) || !isEligiblePlayerTarget(shooter, candidate)) continue;
             Location targetEye = candidate.getEyeLocation();
             Vector toTarget = targetEye.toVector().subtract(eye.toVector());
-            if (toTarget.length() > CameraShyRules.CAMERA_RANGE_BLOCKS
-                    || !CameraShyRules.insidePhotoCone(direction, toTarget, PHOTO_LENS_MIN_DOT)
+            if (toTarget.length() > GameDebugRuntimeOverrides.doubleValue("CAMERA_SHY_CAMERA_RANGE_BLOCKS", CameraShyRules.CAMERA_RANGE_BLOCKS)
+                    || !CameraShyRules.insidePhotoCone(direction, toTarget, CameraShyRules.photoLensMinDot())
                     || !CameraShyRules.mayPhotograph(now, cameraReadyAt.getOrDefault(shooterId, 0L),
                             protectedUntil.getOrDefault(candidate.getUniqueId(), 0L))
                     || !shooter.hasLineOfSight(candidate)
@@ -1206,12 +1247,12 @@ public final class CameraShyGame implements Listener {
     private boolean hasPhotoTargetInLens(Player shooter) {
         Vector direction = shooter.getEyeLocation().getDirection();
         Location eye = shooter.getEyeLocation();
-        for (Entity entity : arena.getNearbyEntities(eye, CameraShyRules.CAMERA_RANGE_BLOCKS,
-                CameraShyRules.CAMERA_RANGE_BLOCKS, CameraShyRules.CAMERA_RANGE_BLOCKS)) {
+        for (Entity entity : arena.getNearbyEntities(eye, GameDebugRuntimeOverrides.doubleValue("CAMERA_SHY_CAMERA_RANGE_BLOCKS", CameraShyRules.CAMERA_RANGE_BLOCKS),
+                GameDebugRuntimeOverrides.doubleValue("CAMERA_SHY_CAMERA_RANGE_BLOCKS", CameraShyRules.CAMERA_RANGE_BLOCKS), GameDebugRuntimeOverrides.doubleValue("CAMERA_SHY_CAMERA_RANGE_BLOCKS", CameraShyRules.CAMERA_RANGE_BLOCKS))) {
             if (!(entity instanceof Player candidate) || !isEligiblePlayerTarget(shooter, candidate)) continue;
             Vector toTarget = candidate.getEyeLocation().toVector().subtract(eye.toVector());
-            if (toTarget.length() <= CameraShyRules.CAMERA_RANGE_BLOCKS
-                    && CameraShyRules.insidePhotoCone(direction, toTarget, PHOTO_LENS_MIN_DOT)
+            if (toTarget.length() <= GameDebugRuntimeOverrides.doubleValue("CAMERA_SHY_CAMERA_RANGE_BLOCKS", CameraShyRules.CAMERA_RANGE_BLOCKS)
+                    && CameraShyRules.insidePhotoCone(direction, toTarget, CameraShyRules.photoLensMinDot())
                     && shooter.hasLineOfSight(candidate)
                     && !isBlockedBySmoke(eye, candidate.getEyeLocation())) return true;
         }
@@ -1225,7 +1266,7 @@ public final class CameraShyGame implements Listener {
         int count = photos.merge(shooterId, 1, Integer::sum);
         uniquePhotos.computeIfAbsent(shooterId, ignored -> new LinkedHashSet<>()).add(targetId);
         photographedBy.computeIfAbsent(targetId, ignored -> new LinkedHashSet<>()).add(shooterId);
-        protectedUntil.put(targetId, now + CameraShyRules.EXPOSURE_PROTECTION_MILLIS);
+        protectedUntil.put(targetId, now + GameDebugRuntimeOverrides.longValue("CAMERA_SHY_EXPOSURE_PROTECTION_MILLIS", CameraShyRules.EXPOSURE_PROTECTION_MILLIS));
         pursuits.computeIfAbsent(targetId, ignored -> new HashMap<>()).put(shooterId, new Pursuit(shooterId));
 
         if (humans.contains(shooterId)) {
@@ -1236,16 +1277,20 @@ public final class CameraShyGame implements Listener {
             UUID previousTarget = lastPhotoTarget.get(shooterId);
             if (previousTarget != null && !previousTarget.equals(targetId)
                     && CameraShyRules.withinWindow(now, previous == null ? -1L : previous,
-                            CameraShyRules.DOUBLE_TAKE_WINDOW_MILLIS)) {
+                            GameDebugRuntimeOverrides.longValue("CAMERA_SHY_DOUBLE_TAKE_WINDOW_MILLIS", CameraShyRules.DOUBLE_TAKE_WINDOW_MILLIS))) {
                 award(shooterId, "double-take");
             }
             lastPhotoAt.put(shooterId, now);
             lastPhotoTarget.put(shooterId, targetId);
-            if (uniquePhotos.getOrDefault(shooterId, Set.of()).size() >= 5) award(shooterId, "paparazzi");
+            if (uniquePhotos.getOrDefault(shooterId, Set.of()).size() >= CameraShyRules.intSetting(
+                    "PAPARAZZI_UNIQUE_PHOTOS_REQUIRED", CameraShyRules.PAPARAZZI_UNIQUE_PHOTOS_REQUIRED)) {
+                award(shooterId, "paparazzi");
+            }
             if (humans.contains(targetId) && spotterMarks.getOrDefault(shooterId, Map.of()).getOrDefault(targetId, 0L) > now) {
                 Set<UUID> spotted = spotterPhotoTargets.computeIfAbsent(shooterId, ignored -> new HashSet<>());
                 spotted.add(targetId);
-                if (spotted.size() >= 3) award(shooterId, "private-investigator");
+                if (spotted.size() >= CameraShyRules.intSetting("PRIVATE_INVESTIGATOR_TARGETS_REQUIRED",
+                        CameraShyRules.PRIVATE_INVESTIGATOR_TARGETS_REQUIRED)) award(shooterId, "private-investigator");
             }
         }
 
@@ -1256,7 +1301,8 @@ public final class CameraShyGame implements Listener {
         shooter.sendMessage(ChatColor.GREEN + "Photographed " + target.getName() + " (" + exposure + "/5).");
 
         if (humans.contains(targetId)) {
-            if (exposure == 4) fourExposureSince.put(targetId, now);
+            if (exposure == CameraShyRules.intSetting("STAGE_FRIGHT_EXPOSURES",
+                    CameraShyRules.STAGE_FRIGHT_EXPOSURES)) fourExposureSince.put(targetId, now);
             if (exposure < 4) fourExposureSince.remove(targetId);
         }
         if (CameraShyRules.eliminatedAt(exposure)) {
@@ -1270,7 +1316,9 @@ public final class CameraShyGame implements Listener {
         if (!alive.remove(targetId)) return;
         target.setGameMode(GameMode.SPECTATOR);
         target.teleport(new Location(arena, 0.5D, FLOOR_Y + 18.0D, 0.5D));
-        target.sendTitle(ChatColor.DARK_RED + "ELIMINATED", ChatColor.GRAY + "Five photographs. Your match is over.", 5, 45, 10);
+        target.sendTitle(ChatColor.DARK_RED + "ELIMINATED", ChatColor.GRAY.toString()
+                + CameraShyRules.intSetting("PHOTOS_TO_ELIMINATE", CameraShyRules.PHOTOS_TO_ELIMINATE)
+                + " photographs. Your match is over.", 5, 45, 10);
         target.playSound(target.getLocation(), Sound.ENTITY_WITHER_DEATH, 0.65F, 1.5F);
         removePlayerPresentation(targetId);
         clearSpotlight(targetId);
@@ -1280,15 +1328,21 @@ public final class CameraShyGame implements Listener {
         eliminations.merge(killerId, 1, Integer::sum);
         Long previous = lastEliminationAt.get(killerId);
         int streak = previous != null && CameraShyRules.withinWindow(now, previous,
-                CameraShyRules.DOUBLE_ELIMINATION_WINDOW_MILLIS)
+                GameDebugRuntimeOverrides.longValue("CAMERA_SHY_DOUBLE_ELIMINATION_WINDOW_MILLIS", CameraShyRules.DOUBLE_ELIMINATION_WINDOW_MILLIS))
                 ? eliminationStreaks.getOrDefault(killerId, 1) + 1 : 1;
         eliminationStreaks.put(killerId, streak);
         lastEliminationAt.put(killerId, now);
-        if (streak >= 2 && humans.contains(killerId)) award(killerId, "double-elimination");
+        if (streak >= CameraShyRules.intSetting("DOUBLE_ELIMINATION_STREAK_REQUIRED",
+                CameraShyRules.DOUBLE_ELIMINATION_STREAK_REQUIRED) && humans.contains(killerId)) {
+            award(killerId, "double-elimination");
+        }
 
         if (photographedBy.getOrDefault(killerId, Set.of()).contains(targetId)) {
             int revenge = revengeMatchCounts.merge(killerId, 1, Integer::sum);
-            if (revenge >= 3 && humans.contains(killerId)) award(killerId, "revenge-is-sweet");
+            if (revenge >= CameraShyRules.intSetting("REVENGE_KILLS_REQUIRED",
+                    CameraShyRules.REVENGE_KILLS_REQUIRED) && humans.contains(killerId)) {
+                award(killerId, "revenge-is-sweet");
+            }
         }
 
         if (humans.contains(killerId)) {
@@ -1331,7 +1385,8 @@ public final class CameraShyGame implements Listener {
         for (UUID id : alive) {
             Player player = players.get(id);
             if (player != null && player.isOnline() && player.getWorld() == world
-                    && player.getLocation().distanceSquared(location) <= 24.0D * 24.0D) {
+                    && player.getLocation().distanceSquared(location) <= Math.pow(CameraShyRules.doubleSetting(
+                            "CAMERA_RANGE_BLOCKS", CameraShyRules.CAMERA_RANGE_BLOCKS), 2.0D)) {
                 player.playSound(location, Sound.ITEM_SPYGLASS_USE, 0.5F, 0.75F);
             }
         }
@@ -1342,11 +1397,11 @@ public final class CameraShyGame implements Listener {
         UUID id = player.getUniqueId();
         long now = System.currentTimeMillis();
         long cooldown = switch (kit) {
-            case SMOKE_ARTIST -> ABILITY_SMOKE_COOLDOWN;
-            case DECOY -> ABILITY_DECOY_COOLDOWN;
-            case RUNNER -> ABILITY_RUNNER_COOLDOWN;
-            case SPOTTER -> ABILITY_SPOTTER_COOLDOWN;
-            case UNDERSTUDY -> ABILITY_UNDERSTUDY_COOLDOWN;
+            case SMOKE_ARTIST -> CameraShyRules.longSetting("SMOKE_ABILITY_COOLDOWN_MILLIS", CameraShyRules.SMOKE_ABILITY_COOLDOWN_MILLIS);
+            case DECOY -> CameraShyRules.longSetting("DECOY_ABILITY_COOLDOWN_MILLIS", CameraShyRules.DECOY_ABILITY_COOLDOWN_MILLIS);
+            case RUNNER -> CameraShyRules.longSetting("RUNNER_ABILITY_COOLDOWN_MILLIS", CameraShyRules.RUNNER_ABILITY_COOLDOWN_MILLIS);
+            case SPOTTER -> CameraShyRules.longSetting("SPOTTER_ABILITY_COOLDOWN_MILLIS", CameraShyRules.SPOTTER_ABILITY_COOLDOWN_MILLIS);
+            case UNDERSTUDY -> CameraShyRules.longSetting("UNDERSTUDY_ABILITY_COOLDOWN_MILLIS", CameraShyRules.UNDERSTUDY_ABILITY_COOLDOWN_MILLIS);
         };
         if (now < abilityReadyAt.getOrDefault(id, 0L)) {
             long seconds = Math.max(1L, (abilityReadyAt.get(id) - now + 999L) / 1_000L);
@@ -1354,30 +1409,39 @@ public final class CameraShyGame implements Listener {
             return;
         }
         abilityReadyAt.put(id, now + cooldown);
-        cooldownProgress.start(player, kit.name().replace('_', ' '), cooldown);
+        cooldownProgress.start(player, kit.name().replace('_', ' '), cooldown, ArcadePortGame.CAMERA_SHY);
         switch (kit) {
             case SMOKE_ARTIST -> {
                 Location center = player.getLocation().clone().add(0.0D, 1.0D, 0.0D);
-                smokeClouds.add(new SmokeCloud(id, center, now + SMOKE_LIFETIME_MILLIS));
-                smokeUsedUntil.put(id, now + 7_000L);
+                smokeClouds.add(new SmokeCloud(id, center, now + CameraShyRules.longSetting(
+                        "SMOKE_LIFETIME_MILLIS", CameraShyRules.SMOKE_LIFETIME_MILLIS)));
+                smokeUsedUntil.put(id, now + CameraShyRules.longSetting("SMOKE_ESCAPE_CREDIT_WINDOW_MILLIS",
+                        CameraShyRules.SMOKE_ESCAPE_CREDIT_WINDOW_MILLIS));
                 player.getWorld().spawnParticle(Particle.CLOUD, center, 65, 1.4D, 1.0D, 1.4D, 0.025D);
                 player.getWorld().spawnParticle(Particle.SMOKE, center, 55, 1.2D, 0.9D, 1.2D, 0.025D);
                 player.playSound(player.getLocation(), Sound.BLOCK_FIRE_EXTINGUISH, 0.9F, 0.7F);
                 player.sendMessage(ChatColor.GRAY + "Smoke screen deployed. Break the photographer's line of sight!");
             }
             case DECOY -> {
-                Location fake = player.getLocation().clone().add(player.getLocation().getDirection().normalize().multiply(7.0D));
+                Location fake = player.getLocation().clone().add(player.getLocation().getDirection().normalize()
+                        .multiply(CameraShyRules.doubleSetting("DECOY_FORWARD_OFFSET_BLOCKS", CameraShyRules.DECOY_FORWARD_OFFSET_BLOCKS)));
                 fake.setY(player.getLocation().getY() + 0.8D);
-                fakeFlashes.add(new FakeFlash(id, fake, now + DECOY_FLASH_LIFETIME_MILLIS));
+                fakeFlashes.add(new FakeFlash(id, fake, now + CameraShyRules.longSetting(
+                        "DECOY_FLASH_LIFETIME_MILLIS", CameraShyRules.DECOY_FLASH_LIFETIME_MILLIS)));
                 fake.getWorld().spawnParticle(Particle.FLASH, fake, 1);
                 fake.getWorld().spawnParticle(Particle.ELECTRIC_SPARK, fake, 16, 0.35D, 0.35D, 0.35D, 0.02D);
                 fake.getWorld().playSound(fake, Sound.ITEM_SPYGLASS_USE, 1.0F, 1.0F);
                 player.sendMessage(ChatColor.LIGHT_PURPLE + "Fake snapshot deployed. Make someone investigate it!");
             }
             case RUNNER -> {
-                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 60, 1, false, true, true));
-                runnerUntil.put(id, now + 3_000L);
-                runnerUsedUntil.put(id, now + 10_000L);
+                long duration = CameraShyRules.longSetting("RUNNER_ABILITY_DURATION_MILLIS",
+                        CameraShyRules.RUNNER_ABILITY_DURATION_MILLIS);
+                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,
+                        Math.max(1, (int) (duration / 50L)), CameraShyRules.intSetting(
+                                "RUNNER_SPEED_AMPLIFIER", CameraShyRules.RUNNER_SPEED_AMPLIFIER), false, true, true));
+                runnerUntil.put(id, now + duration);
+                runnerUsedUntil.put(id, now + CameraShyRules.longSetting("RUNNER_ACHIEVEMENT_WINDOW_MILLIS",
+                        CameraShyRules.RUNNER_ACHIEVEMENT_WINDOW_MILLIS));
                 player.sendMessage(ChatColor.GREEN + "Adrenaline Rush! You cannot take photographs while sprinting.");
             }
             case SPOTTER -> {
@@ -1387,15 +1451,18 @@ public final class CameraShyGame implements Listener {
                     Player target = players.get(otherId);
                     if (target == null || !target.isOnline()) continue;
                     double distance = player.getEyeLocation().distance(target.getEyeLocation());
-                    if (distance <= SPOTTER_RANGE && player.hasLineOfSight(target)
+                    if (distance <= CameraShyRules.doubleSetting("SPOTTER_RANGE_BLOCKS", CameraShyRules.SPOTTER_RANGE_BLOCKS)
+                            && player.hasLineOfSight(target)
                             && !isBlockedBySmoke(player.getEyeLocation(), target.getEyeLocation())) {
                         detected.add(target);
-                        spotterMarks.computeIfAbsent(id, ignored -> new HashMap<>()).put(otherId, now + 15_000L);
+                        spotterMarks.computeIfAbsent(id, ignored -> new HashMap<>()).put(otherId, now
+                                + CameraShyRules.longSetting("SPOTTER_MARK_DURATION_MILLIS", CameraShyRules.SPOTTER_MARK_DURATION_MILLIS));
                         player.spawnParticle(Particle.HAPPY_VILLAGER, target.getLocation().add(0.0D, 1.5D, 0.0D),
                                 8, 0.2D, 0.4D, 0.2D, 0.01D);
                     }
                 }
-                if (detected.isEmpty()) player.sendMessage(ChatColor.YELLOW + "Flash Finder found nobody in clear sight within 18 blocks.");
+                if (detected.isEmpty()) player.sendMessage(ChatColor.YELLOW + "Flash Finder found nobody in clear sight within "
+                        + CameraShyRules.doubleSetting("SPOTTER_RANGE_BLOCKS", CameraShyRules.SPOTTER_RANGE_BLOCKS) + " blocks.");
                 else player.sendMessage(ChatColor.AQUA + "Flash Finder detected " + detected.size()
                         + " nearby opponent(s). Their markers are visible only to you.");
                 player.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 1.0F, 1.7F);
@@ -1403,7 +1470,9 @@ public final class CameraShyGame implements Listener {
             case UNDERSTUDY -> {
                 ArmorStand old = understudyStands.remove(id);
                 if (old != null && old.isValid()) old.remove();
-                Location at = player.getLocation().clone().add(player.getLocation().getDirection().normalize().multiply(1.6D));
+                Location at = player.getLocation().clone().add(player.getLocation().getDirection().normalize()
+                        .multiply(CameraShyRules.doubleSetting("UNDERSTUDY_FORWARD_OFFSET_BLOCKS",
+                                CameraShyRules.UNDERSTUDY_FORWARD_OFFSET_BLOCKS)));
                 at.setY(player.getLocation().getY());
                 ArmorStand stand = arena.spawn(at, ArmorStand.class);
                 stand.setVisible(true);
@@ -1475,7 +1544,9 @@ public final class CameraShyGame implements Listener {
         for (SmokeCloud cloud : smokeClouds) {
             if (cloud.expiresAt > now && cloud.center.getWorld() == from.getWorld()
                     && CameraShyRules.smokeBelongsTo(cloud.owner, requiredOwner)
-                    && CameraShyRules.segmentIntersectsSphere(start, end, cloud.center.toVector(), 2.4D)) return true;
+                    && CameraShyRules.segmentIntersectsSphere(start, end, cloud.center.toVector(),
+                            CameraShyRules.doubleSetting("SMOKE_OCCLUSION_RADIUS_BLOCKS",
+                                    CameraShyRules.SMOKE_OCCLUSION_RADIUS_BLOCKS))) return true;
         }
         return false;
     }
@@ -1486,6 +1557,8 @@ public final class CameraShyGame implements Listener {
         for (UUID id : alive) {
             Player shooter = players.get(id);
             if (shooter == null || !shooter.isOnline() || !isUsingSpyglass(shooter)) continue;
+            if (plugin.hasAdminAccess(shooter) && !plugin.isArcadeDebugFeatureEnabled(shooter,
+                    ArcadePortGame.CAMERA_SHY, "photo-outlines", true)) continue;
             aimingSince.putIfAbsent(id, now);
             for (Player target : playersInPhotoLens(shooter, now)) {
                 UUID targetId = target.getUniqueId();
@@ -1500,7 +1573,8 @@ public final class CameraShyGame implements Listener {
             FocusKey key = entry.getKey();
             if (focusSeenThisTick.contains(key)) continue;
             FocusAttempt attempt = entry.getValue();
-            if (serverTick - attempt.startedTick < 10L) {
+            if (serverTick - attempt.startedTick < CameraShyRules.intSetting("OUT_OF_FOCUS_WINDOW_TICKS",
+                    CameraShyRules.OUT_OF_FOCUS_WINDOW_TICKS)) {
                 focusAttempts.remove(key);
                 continue;
             }
@@ -1510,7 +1584,9 @@ public final class CameraShyGame implements Listener {
                     && alive.contains(key.shooter()) && alive.contains(key.target())
                     && shooter.getWorld() == arena && target.getWorld() == arena
                     && (!shooter.hasLineOfSight(target)
-                    || target.getLocation().distanceSquared(attempt.targetOrigin) >= 16.0D)) {
+                    || target.getLocation().distanceSquared(attempt.targetOrigin) >= Math.pow(
+                            CameraShyRules.doubleSetting("OUT_OF_FOCUS_MOVEMENT_DISTANCE_BLOCKS",
+                                    CameraShyRules.OUT_OF_FOCUS_MOVEMENT_DISTANCE_BLOCKS), 2.0D))) {
                 if (humans.contains(key.target())) award(key.target(), "out-of-focus");
             }
             focusAttempts.remove(key);
@@ -1568,8 +1644,10 @@ public final class CameraShyGame implements Listener {
                         && isBlockedBySmoke(victim.getEyeLocation(), pursuer.getEyeLocation());
                 boolean ownSmokeObscured = sameWorld
                         && isBlockedBySmokeOwnedBy(victim.getEyeLocation(), pursuer.getEyeLocation(), victimId);
+                double cameraRange = CameraShyRules.doubleSetting("CAMERA_RANGE_BLOCKS",
+                        CameraShyRules.CAMERA_RANGE_BLOCKS);
                 boolean withinPursuitRange = sameWorld
-                        && victim.getLocation().distanceSquared(pursuer.getLocation()) <= 24.0D * 24.0D;
+                        && victim.getLocation().distanceSquared(pursuer.getLocation()) <= cameraRange * cameraRange;
                 boolean visible = sameWorld && alive.contains(pursuerId)
                         && withinPursuitRange && victim.hasLineOfSight(pursuer) && !smokeObscured;
                 if (visible) {
@@ -1585,16 +1663,21 @@ public final class CameraShyGame implements Listener {
                 }
                 boolean escaped = pursuer == null || !pursuer.isOnline() || !alive.contains(pursuerId)
                         || victim.getWorld() != pursuer.getWorld()
-                        || victim.getLocation().distanceSquared(pursuer.getLocation()) >= PURSUIT_ESCAPE_DISTANCE * PURSUIT_ESCAPE_DISTANCE;
-                if (escaped && now - pursuit.lostSightSince >= PURSUIT_ESCAPE_MILLIS) {
+                        || victim.getLocation().distanceSquared(pursuer.getLocation()) >= Math.pow(
+                                CameraShyRules.doubleSetting("PURSUIT_ESCAPE_DISTANCE_BLOCKS",
+                                        CameraShyRules.PURSUIT_ESCAPE_DISTANCE_BLOCKS), 2.0D);
+                if (escaped && now - pursuit.lostSightSince >= CameraShyRules.longSetting(
+                        "PURSUIT_ESCAPE_MILLIS", CameraShyRules.PURSUIT_ESCAPE_MILLIS)) {
                     victimEntry.getValue().remove(pursuerId);
                     if (humans.contains(victimId)) {
                         int escapes = encounterEscapes.merge(victimId, 1, Integer::sum);
-                        if (escapes >= 3) award(victimId, "now-you-see-me");
+                        if (escapes >= CameraShyRules.intSetting("ESCAPE_STREAK_REQUIRED",
+                                CameraShyRules.ESCAPE_STREAK_REQUIRED)) award(victimId, "now-you-see-me");
                         if (runnerUsedUntil.getOrDefault(victimId, 0L) > now) award(victimId, "catch-me-if-you-can");
                         if (pursuit.lostSightDueToSmoke) {
                             int smoke = smokeEscapes.merge(victimId, 1, Integer::sum);
-                            if (smoke >= 3) award(victimId, "smoke-and-mirrors");
+                            if (smoke >= CameraShyRules.intSetting("SMOKE_ESCAPE_STREAK_REQUIRED",
+                                    CameraShyRules.SMOKE_ESCAPE_STREAK_REQUIRED)) award(victimId, "smoke-and-mirrors");
                         }
                     }
                 }
@@ -1614,17 +1697,23 @@ public final class CameraShyGame implements Listener {
                 Player player = players.get(id);
                 if (player == null || !player.isOnline() || player.getWorld() != flash.location.getWorld()) continue;
                 double distanceSquared = player.getLocation().distanceSquared(flash.location);
-                boolean approached = distanceSquared <= 4.0D * 4.0D;
+                boolean approached = distanceSquared <= Math.pow(CameraShyRules.doubleSetting(
+                        "DECOY_APPROACH_RANGE_BLOCKS", CameraShyRules.DECOY_APPROACH_RANGE_BLOCKS), 2.0D);
                 Vector toward = flash.location.toVector().subtract(player.getEyeLocation().toVector());
                 boolean lookedAt = toward.lengthSquared() > 0.01D
-                        && player.getEyeLocation().getDirection().normalize().dot(toward.normalize()) >= 0.70D
-                        && distanceSquared <= 11.0D * 11.0D
+                        && player.getEyeLocation().getDirection().normalize().dot(toward.normalize())
+                                >= CameraShyRules.doubleSetting("DECOY_LOOK_MIN_DOT", CameraShyRules.DECOY_LOOK_MIN_DOT)
+                        && distanceSquared <= Math.pow(CameraShyRules.doubleSetting(
+                                "DECOY_LOOK_RANGE_BLOCKS", CameraShyRules.DECOY_LOOK_RANGE_BLOCKS), 2.0D)
                         && hasClearSightToLocation(player, flash.location);
                 if (approached || lookedAt) {
                     flash.fooled.add(id);
                     if (humans.contains(flash.owner)) {
                         Set<UUID> fooledTargets = decoyFooledOpponents.computeIfAbsent(flash.owner, ignored -> new HashSet<>());
-                        if (fooledTargets.add(id) && fooledTargets.size() >= 3) award(flash.owner, "false-alarm");
+                        if (fooledTargets.add(id) && fooledTargets.size() >= CameraShyRules.intSetting(
+                                "FALSE_ALARM_TARGETS_REQUIRED", CameraShyRules.FALSE_ALARM_TARGETS_REQUIRED)) {
+                            award(flash.owner, "false-alarm");
+                        }
                         Player owner = Bukkit.getPlayer(flash.owner);
                         if (owner != null) owner.sendMessage(ChatColor.LIGHT_PURPLE + "Your fake flash fooled " + player.getName() + "!");
                     }
@@ -1649,7 +1738,8 @@ public final class CameraShyGame implements Listener {
 
     private void updateSpotlight(long now) {
         if (now < nextSpotlightAt) return;
-        nextSpotlightAt = now + SPOTLIGHT_INTERVAL_MILLIS;
+        nextSpotlightAt = now + CameraShyRules.longSetting("SPOTLIGHT_INTERVAL_MILLIS",
+                CameraShyRules.SPOTLIGHT_INTERVAL_MILLIS);
         List<UUID> candidates = alive.stream()
                 .filter(id -> {
                     Player candidate = players.get(id);
@@ -1666,7 +1756,8 @@ public final class CameraShyGame implements Listener {
         broadcastMatch(ChatColor.GOLD + "DIRECTOR'S SPOTLIGHT: " + ChatColor.YELLOW + target.getName()
                 + ChatColor.GRAY + " has been caught in the light!");
         spotlightOriginalGlow.put(selected, photoOutlineOriginalGlow.getOrDefault(selected, target.isGlowing()));
-        spotlightGlowUntil.put(selected, now + 3_000L);
+        spotlightGlowUntil.put(selected, now + CameraShyRules.longSetting("SPOTLIGHT_GLOW_DURATION_MILLIS",
+                CameraShyRules.SPOTLIGHT_GLOW_DURATION_MILLIS));
         target.setGlowing(true);
         arena.spawnParticle(Particle.FLASH, target.getLocation().add(0.0D, 1.0D, 0.0D), 1);
         for (UUID humanId : humans) {
@@ -1689,11 +1780,13 @@ public final class CameraShyGame implements Listener {
 
     private void updateStageFright(long now) {
         for (UUID id : new ArrayList<>(fourExposureSince.keySet())) {
-            if (!alive.contains(id) || exposures.getOrDefault(id, 0) != 4) {
+            if (!alive.contains(id) || exposures.getOrDefault(id, 0) != CameraShyRules.intSetting(
+                    "STAGE_FRIGHT_EXPOSURES", CameraShyRules.STAGE_FRIGHT_EXPOSURES)) {
                 fourExposureSince.remove(id);
                 continue;
             }
-            if (now - fourExposureSince.get(id) >= 60_000L && humans.contains(id)) {
+            if (now - fourExposureSince.get(id) >= CameraShyRules.longSetting("STAGE_FRIGHT_DURATION_MILLIS",
+                    CameraShyRules.STAGE_FRIGHT_DURATION_MILLIS) && humans.contains(id)) {
                 award(id, "stage-fright");
                 fourExposureSince.remove(id);
             }
@@ -1795,6 +1888,7 @@ public final class CameraShyGame implements Listener {
         selectedKits.keySet().removeIf(id -> !Bukkit.getOfflinePlayer(id).hasPlayedBefore());
         pendingHumans = List.of();
         finalSnapshot = false;
+        GameDebugRuntimeOverrides.clear();
         broadcastQueue(ChatColor.GRAY + "Snap is ready for another queue.");
     }
 
@@ -1855,6 +1949,7 @@ public final class CameraShyGame implements Listener {
     }
 
     private void recordMatchProgress(UUID winnerId) {
+        if (GameDebugRuntimeOverrides.isDebugSession()) return;
         for (UUID id : humans) {
             String path = "local-stats." + id + ".camera-shy.";
             int matchPhotos = photos.getOrDefault(id, 0);
@@ -1878,10 +1973,13 @@ public final class CameraShyGame implements Listener {
                 plugin.getConfig().set(path + "wins", totalWins);
                 int streak = CameraShyRules.consecutiveWinsAfter(plugin.getConfig().getInt(path + "consecutive-wins", 0), true);
                 plugin.getConfig().set(path + "consecutive-wins", streak);
-                if (streak >= 3) award(id, "untouchable");
+                if (streak >= CameraShyRules.intSetting("UNTOUCHABLE_WINS_REQUIRED",
+                        CameraShyRules.UNTOUCHABLE_WINS_REQUIRED)) award(id, "untouchable");
                 if (exposures.getOrDefault(id, 0) == 0) award(id, "camera-shy");
-                if (exposures.getOrDefault(id, 0) == 4) award(id, "narrow-escape");
-                if (matchPhotos >= 10) award(id, "picture-perfect");
+                if (exposures.getOrDefault(id, 0) == CameraShyRules.intSetting("NARROW_ESCAPE_EXPOSURES",
+                        CameraShyRules.NARROW_ESCAPE_EXPOSURES)) award(id, "narrow-escape");
+                if (matchPhotos >= CameraShyRules.intSetting("PICTURE_PERFECT_PHOTOS_REQUIRED",
+                        CameraShyRules.PICTURE_PERFECT_PHOTOS_REQUIRED)) award(id, "picture-perfect");
             } else {
                 plugin.getConfig().set(path + "consecutive-wins", 0);
             }
@@ -1908,7 +2006,12 @@ public final class CameraShyGame implements Listener {
     }
 
     private void award(UUID id, String achievementId) {
+        if (GameDebugRuntimeOverrides.isDebugSession()) return;
         if (id == null || !humans.contains(id)) return;
+        String name = CameraShyProgressCatalog.achievements().stream()
+                .filter(achievement -> achievement.id().equals(achievementId))
+                .map(CameraShyProgressCatalog.Achievement::name).findFirst().orElse(achievementId);
+        if (manager.previewDebugAchievement(id, ArcadePortGame.CAMERA_SHY, name)) return;
         String key = "local-achievements." + id + ".camera-shy." + achievementId;
         if (plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
@@ -2074,10 +2177,10 @@ public final class CameraShyGame implements Listener {
         for (Location candidate : locations) {
             if (separated.stream().allMatch(existing -> existing.distanceSquared(candidate) >= 12.0D * 12.0D)) {
                 separated.add(candidate);
-                if (separated.size() >= CameraShyRules.MAX_PLAYERS) break;
+                if (separated.size() >= GameDebugRuntimeOverrides.intValue("CAMERA_SHY_MAX_PLAYERS", CameraShyRules.MAX_PLAYERS)) break;
             }
         }
-        if (separated.size() < CameraShyRules.MAX_PLAYERS) return locations.subList(0, CameraShyRules.MAX_PLAYERS);
+        if (separated.size() < GameDebugRuntimeOverrides.intValue("CAMERA_SHY_MAX_PLAYERS", CameraShyRules.MAX_PLAYERS)) return locations.subList(0, GameDebugRuntimeOverrides.intValue("CAMERA_SHY_MAX_PLAYERS", CameraShyRules.MAX_PLAYERS));
         return separated;
     }
 }

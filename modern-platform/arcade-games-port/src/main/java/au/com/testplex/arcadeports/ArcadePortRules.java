@@ -16,11 +16,132 @@ import java.util.UUID;
 public final class ArcadePortRules {
     /** Reborn's normal Castle Assault objective TNT pickup-to-respawn delay. */
     public static final long CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS = 60_000L;
+    public static final int CASTLE_ASSAULT_KING_HEALTH_BASE = 600;
+    public static final int CASTLE_ASSAULT_KING_HEALTH_REFERENCE_PLAYERS = 15;
+    public static final long CASTLE_ASSAULT_CARRIER_FUSE_MILLIS = 60_000L;
+    public static final int CASTLE_ASSAULT_TNT_FUSE_TICKS = 60;
+    public static final double CASTLE_ASSAULT_TNT_THROW_SPEED = 0.5D;
+    public static final double CASTLE_ASSAULT_TNT_THROW_VERTICAL_SPEED = 0.1D;
+    public static final double CASTLE_ASSAULT_TNT_BASE_RADIUS = 4.0D;
+    public static final double CASTLE_ASSAULT_TNT_DEMOLITIONIST_RADIUS_BONUS = 3.0D;
+    public static final double CASTLE_ASSAULT_TNT_MAX_DAMAGE = 10.0D;
+    public static final double CASTLE_ASSAULT_TNT_KNOCKBACK_MULTIPLIER = 1.0D;
+    public static final double CASTLE_ASSAULT_TNT_VERTICAL_KNOCKBACK = 0.35D;
+    public static final int CASTLE_ASSAULT_TNT_KING_DAMAGE = 50;
+    public static final int CASTLE_ASSAULT_KILLSTREAK_TIER_1_KILLS = 2;
+    public static final int CASTLE_ASSAULT_KILLSTREAK_TIER_2_KILLS = 4;
+    public static final int CASTLE_ASSAULT_KILLSTREAK_TIER_3_KILLS = 6;
+    public static final int CASTLE_ASSAULT_KILLSTREAK_TIER_4_KILLS = 8;
+
+    public static int castleAssaultKillStreakRewardTier(int streak) {
+        if (streak < 1) return 0;
+        int first = Math.max(1, Math.min(997, GameDebugRuntimeOverrides.intValue(
+                "CASTLE_ASSAULT_KILLSTREAK_TIER_1_KILLS", CASTLE_ASSAULT_KILLSTREAK_TIER_1_KILLS)));
+        int second = Math.max(first + 1, Math.min(998, GameDebugRuntimeOverrides.intValue(
+                "CASTLE_ASSAULT_KILLSTREAK_TIER_2_KILLS", CASTLE_ASSAULT_KILLSTREAK_TIER_2_KILLS)));
+        int third = Math.max(second + 1, Math.min(999, GameDebugRuntimeOverrides.intValue(
+                "CASTLE_ASSAULT_KILLSTREAK_TIER_3_KILLS", CASTLE_ASSAULT_KILLSTREAK_TIER_3_KILLS)));
+        int fourth = Math.max(third + 1, Math.min(1_000, GameDebugRuntimeOverrides.intValue(
+                "CASTLE_ASSAULT_KILLSTREAK_TIER_4_KILLS", CASTLE_ASSAULT_KILLSTREAK_TIER_4_KILLS)));
+        if (streak == first) return 1;
+        if (streak == second) return 2;
+        if (streak == third) return 3;
+        if (streak == fourth) return 4;
+        return 0;
+    }
+
+    public static int castleAssaultKingHealthForOpponents(int opponentCount) {
+        int reference = Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "CASTLE_ASSAULT_KING_HEALTH_REFERENCE_PLAYERS", CASTLE_ASSAULT_KING_HEALTH_REFERENCE_PLAYERS));
+        int base = Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "CASTLE_ASSAULT_KING_HEALTH_BASE", CASTLE_ASSAULT_KING_HEALTH_BASE));
+        return Math.max(1, (int) Math.ceil(base * Math.min(reference, Math.max(0, opponentCount))
+                / (double) reference));
+    }
+
+    public static double castleAssaultTntRadius(String kit) {
+        double base = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "CASTLE_ASSAULT_TNT_BASE_RADIUS", CASTLE_ASSAULT_TNT_BASE_RADIUS));
+        double bonus = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "CASTLE_ASSAULT_TNT_DEMOLITIONIST_RADIUS_BONUS", CASTLE_ASSAULT_TNT_DEMOLITIONIST_RADIUS_BONUS));
+        return base + ("demolitionist".equalsIgnoreCase(kit == null ? "" : kit) ? bonus : 0.0D);
+    }
+
+    public static double castleAssaultTntDamage(double distance, double radius) {
+        if (!Double.isFinite(distance) || !Double.isFinite(radius) || distance < 0.0D || radius <= 0.0D) return 0.0D;
+        double maximum = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "CASTLE_ASSAULT_TNT_MAX_DAMAGE", CASTLE_ASSAULT_TNT_MAX_DAMAGE));
+        return maximum * Math.max(0.0D, 1.0D - distance / radius);
+    }
+
+    public static double castleAssaultTntKnockbackMultiplier() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "CASTLE_ASSAULT_TNT_KNOCKBACK_MULTIPLIER", CASTLE_ASSAULT_TNT_KNOCKBACK_MULTIPLIER));
+    }
+
+    public static long castleAssaultCarrierFuseMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "CASTLE_ASSAULT_CARRIER_FUSE_MILLIS", CASTLE_ASSAULT_CARRIER_FUSE_MILLIS));
+    }
+
+    public static int castleAssaultTntFuseTicks() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "CASTLE_ASSAULT_TNT_FUSE_TICKS", CASTLE_ASSAULT_TNT_FUSE_TICKS));
+    }
+
+    public static Vector castleAssaultTntThrowVelocity(Vector direction) {
+        Vector velocity = direction == null ? new Vector() : direction.clone();
+        if (velocity.lengthSquared() > 0.0D) velocity.normalize();
+        double horizontalSpeed = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "CASTLE_ASSAULT_TNT_THROW_SPEED", CASTLE_ASSAULT_TNT_THROW_SPEED));
+        double verticalSpeed = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "CASTLE_ASSAULT_TNT_THROW_VERTICAL_SPEED", CASTLE_ASSAULT_TNT_THROW_VERTICAL_SPEED));
+        return velocity.multiply(horizontalSpeed).add(new Vector(0.0D, verticalSpeed, 0.0D));
+    }
+
+    public static double castleAssaultTntVerticalKnockback() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "CASTLE_ASSAULT_TNT_VERTICAL_KNOCKBACK", CASTLE_ASSAULT_TNT_VERTICAL_KNOCKBACK));
+    }
+
+    public static int castleAssaultTntKingDamage() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "CASTLE_ASSAULT_TNT_KING_DAMAGE", CASTLE_ASSAULT_TNT_KING_DAMAGE));
+    }
+
+    public static int castleAssaultArcherArrowCap() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "CASTLE_ASSAULT_ARCHER_MAX_ARROWS", CASTLE_ASSAULT_ARCHER_MAX_ARROWS));
+    }
+
+    public static long castleAssaultArcherRefillMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "CASTLE_ASSAULT_ARCHER_REFILL_MILLIS", CASTLE_ASSAULT_ARCHER_REFILL_MILLIS));
+    }
+
+    public static boolean castleAssaultCanRefillArrows(int currentArrows) {
+        return Math.max(0, currentArrows) < castleAssaultArcherArrowCap();
+    }
+
+    public static int castleAssaultDemolitionistTntCap() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "CASTLE_ASSAULT_DEMOLITIONIST_MAX_TNT", CASTLE_ASSAULT_DEMOLITIONIST_MAX_TNT));
+    }
+
+    public static long castleAssaultDemolitionistRefillMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "CASTLE_ASSAULT_DEMOLITIONIST_TNT_REFILL_MILLIS", CASTLE_ASSAULT_DEMOLITIONIST_TNT_REFILL_MILLIS));
+    }
+
+    public static boolean castleAssaultCanRefillTnt(int currentTnt) {
+        return Math.max(0, currentTnt) < castleAssaultDemolitionistTntCap();
+    }
 
     /** Mixed Arcade halves the wait between objective TNT spawns. */
     public static long castleAssaultObjectiveTntRespawnMillis(boolean mixedArcadeVariant) {
-        return mixedArcadeVariant ? CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS / 2L
-                : CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS;
+        long delay = Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS", CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS));
+        return mixedArcadeVariant ? delay / 2L : delay;
     }
 
     /** Heroes of Gwen's Mixed Arcade store prices are half their standard cost. */
@@ -34,29 +155,124 @@ public final class ArcadePortRules {
         return !mixedArcadeVariant || !middleTower;
     }
 
-    public static final long DRAW_MY_THING_GAME_MILLIS = 300_000L;
-    public static final long DRAW_MY_THING_BASE_ROUND_MILLIS = 30_000L;
-    public static final long DRAW_MY_THING_INTERMISSION_MILLIS = 3_000L;
-    public static final int DRAW_MY_THING_FULL_ROUND_PLAYER_LIMIT = 10;
+    public static final long DRAW_MY_THING_GAME_MILLIS = 320_000L;
+    public static final long DRAW_MY_THING_BASE_ROUND_MILLIS = 40_000L;
+    /** Turns start back-to-back so the drawing budget stays within the match timer. */
+    public static final long DRAW_MY_THING_INTERMISSION_MILLIS = 0L;
+    public static final int DRAW_MY_THING_FULL_ROUND_PLAYER_LIMIT = 8;
+    public static final double DRAW_MY_THING_HINT_REVEAL_DURATION_MULTIPLIER = 1.75D;
+    public static final double DRAW_MY_THING_MAX_HINTED_LETTER_FRACTION = 1.0D;
+    public static final int DRAW_MY_THING_BRUSH_RADIUS_BLOCKS = 1;
+    public static final long DRAW_MY_THING_GUESS_COOLDOWN_MILLIS = 0L;
+    public static final boolean DRAW_MY_THING_END_AFTER_ALL_GUESSED = true;
+    public static final int DRAW_MY_THING_MAX_GUESSES = 10;
+    public static final int DRAW_MY_THING_FIRST_GUESS_POINTS = 3;
+    public static final int DRAW_MY_THING_LATER_GUESS_POINTS = 1;
+    public static final int DRAW_MY_THING_DRAWER_FIRST_GUESS_POINTS = 2;
+    public static final int DRAW_MY_THING_COMEBACK_SCORE_GAP = 10;
     public static final int MASTER_BUILDERS_MAX_BUILDERS = 16;
+    public static final long MASTER_BUILDERS_TOTAL_MILLIS = 300_000L;
+    public static final long MASTER_BUILDERS_VOTE_MILLIS = 8_000L;
+    public static final long MASTER_BUILDERS_REVIEW_MILLIS = 8_000L;
+    public static final int MASTER_BUILDERS_MAX_RATING = 6;
+    /** Zero selects a random theme; 1..16 select the matching source theme. */
+    public static final int MASTER_BUILDERS_THEME_OVERRIDE = 0;
 
     /**
-     * Keeps the classic 30-second drawing turn for lobbies of ten or fewer.
-     * Larger lobbies divide the five-minute game budget across every player's
-     * turn and the three-second gaps between turns.
+     * Divides the five-minute-twenty-second match timer across each participant's
+     * turn, capped at forty seconds. DMT has no intermission, so all full turns fit
+     * within the same 320-second match budget.
      */
     public static long drawMyThingRoundMillis(int playerCount) {
-        if (playerCount <= DRAW_MY_THING_FULL_ROUND_PLAYER_LIMIT) {
-            return DRAW_MY_THING_BASE_ROUND_MILLIS;
-        }
         long turns = Math.max(1L, playerCount);
-        long intermissions = (turns - 1L) * DRAW_MY_THING_INTERMISSION_MILLIS;
-        long drawingBudget = Math.max(1L, DRAW_MY_THING_GAME_MILLIS - intermissions);
-        return Math.max(1L, drawingBudget / turns);
+        long totalMillis = Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "DRAW_MY_THING_GAME_MILLIS", DRAW_MY_THING_GAME_MILLIS));
+        long baseRoundMillis = Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "DRAW_MY_THING_BASE_ROUND_MILLIS", DRAW_MY_THING_BASE_ROUND_MILLIS));
+        long budgetPerTurn = totalMillis / turns;
+        return Math.max(1L, Math.min(baseRoundMillis, budgetPerTurn));
+    }
+
+    public static long drawMyThingIntermissionMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue("DRAW_MY_THING_INTERMISSION_MILLIS",
+                DRAW_MY_THING_INTERMISSION_MILLIS));
+    }
+
+    public static double drawMyThingHintRevealDurationMultiplier() {
+        return Math.max(0.1D, GameDebugRuntimeOverrides.doubleValue(
+                "DRAW_MY_THING_HINT_REVEAL_DURATION_MULTIPLIER",
+                DRAW_MY_THING_HINT_REVEAL_DURATION_MULTIPLIER));
+    }
+
+    public static int drawMyThingHintRevealCount(long elapsedMillis, long roundDurationMillis, int letterCount) {
+        if (letterCount <= 0 || roundDurationMillis <= 0L || elapsedMillis <= 0L) return 0;
+        double scaledDuration = roundDurationMillis * drawMyThingHintRevealDurationMultiplier();
+        int desired = (int) Math.floor(Math.max(0L, elapsedMillis) * letterCount / scaledDuration);
+        int maximum = (int) Math.floor(letterCount * Math.max(0.0D, Math.min(1.0D,
+                GameDebugRuntimeOverrides.doubleValue("DRAW_MY_THING_MAX_HINTED_LETTER_FRACTION",
+                        DRAW_MY_THING_MAX_HINTED_LETTER_FRACTION))));
+        return Math.max(0, Math.min(maximum, desired));
+    }
+
+    public static int drawMyThingBrushRadiusBlocks() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue("DRAW_MY_THING_BRUSH_RADIUS_BLOCKS",
+                DRAW_MY_THING_BRUSH_RADIUS_BLOCKS));
+    }
+
+    public static long drawMyThingGuessCooldownMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue("DRAW_MY_THING_GUESS_COOLDOWN_MILLIS",
+                DRAW_MY_THING_GUESS_COOLDOWN_MILLIS));
+    }
+
+    public static boolean drawMyThingCanSubmitGuess(long lastGuessAtMillis, long nowMillis) {
+        return lastGuessAtMillis <= 0L || nowMillis - lastGuessAtMillis >= drawMyThingGuessCooldownMillis();
+    }
+
+    public static boolean drawMyThingEndAfterAllGuessed() {
+        return GameDebugRuntimeOverrides.booleanValue("DRAW_MY_THING_END_AFTER_ALL_GUESSED",
+                DRAW_MY_THING_END_AFTER_ALL_GUESSED);
+    }
+
+    public static int drawMyThingMaxGuesses() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue("DRAW_MY_THING_MAX_GUESSES",
+                DRAW_MY_THING_MAX_GUESSES));
+    }
+
+    public static int drawMyThingGuesserPoints(boolean firstGuesser) {
+        return firstGuesser ? drawMyThingFirstGuesserPoints() : drawMyThingLaterGuesserPoints();
+    }
+
+    private static int drawMyThingFirstGuesserPoints() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue("DRAW_MY_THING_FIRST_GUESS_POINTS",
+                DRAW_MY_THING_FIRST_GUESS_POINTS));
+    }
+
+    private static int drawMyThingLaterGuesserPoints() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue("DRAW_MY_THING_LATER_GUESS_POINTS",
+                DRAW_MY_THING_LATER_GUESS_POINTS));
+    }
+
+    public static int drawMyThingDrawerFirstGuessPoints() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue("DRAW_MY_THING_DRAWER_FIRST_GUESS_POINTS",
+                DRAW_MY_THING_DRAWER_FIRST_GUESS_POINTS));
+    }
+
+    public static int drawMyThingComebackScoreGap() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue("DRAW_MY_THING_COMEBACK_SCORE_GAP",
+                DRAW_MY_THING_COMEBACK_SCORE_GAP));
     }
 
     public static boolean supportsMasterBuildersPlayerCount(int playerCount) {
-        return playerCount >= 1 && playerCount <= MASTER_BUILDERS_MAX_BUILDERS;
+        return supportsMasterBuildersPlayerCount(playerCount, masterBuildersMaxBuilders());
+    }
+
+    public static int masterBuildersMaxBuilders() {
+        return Math.max(1, Math.min(MASTER_BUILDERS_MAX_BUILDERS, GameDebugRuntimeOverrides.intValue(
+                "MASTER_BUILDERS_MAX_BUILDERS", MASTER_BUILDERS_MAX_BUILDERS)));
+    }
+
+    public static boolean supportsMasterBuildersPlayerCount(int playerCount, int maximumBuilders) {
+        return playerCount >= 1 && playerCount <= Math.max(1, Math.min(MASTER_BUILDERS_MAX_BUILDERS, maximumBuilders));
     }
 
     public static double masterBuildersPlotCenterX(int plotIndex) {
@@ -68,7 +284,49 @@ public final class ArcadePortRules {
         int plot = Math.floorMod(plotIndex, MASTER_BUILDERS_MAX_BUILDERS);
         return -24.0D + (plot / 4) * 16.0D + 0.5D;
     }
+
+    public static long masterBuildersTotalMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "MASTER_BUILDERS_TOTAL_MILLIS", MASTER_BUILDERS_TOTAL_MILLIS));
+    }
+
+    public static long masterBuildersReviewMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "MASTER_BUILDERS_REVIEW_MILLIS", MASTER_BUILDERS_REVIEW_MILLIS));
+    }
+
+    public static long masterBuildersVoteMillis() {
+        return Math.min(masterBuildersReviewMillis(), Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "MASTER_BUILDERS_VOTE_MILLIS", MASTER_BUILDERS_VOTE_MILLIS)));
+    }
+
+    public static int masterBuildersMaxRating() {
+        return Math.max(1, Math.min(MASTER_BUILDERS_MAX_RATING, GameDebugRuntimeOverrides.intValue(
+                "MASTER_BUILDERS_MAX_RATING", MASTER_BUILDERS_MAX_RATING)));
+    }
+
+    public static int masterBuildersThemeIndex(int randomThemeIndex) {
+        int selected = GameDebugRuntimeOverrides.intValue(
+                "MASTER_BUILDERS_THEME_OVERRIDE", MASTER_BUILDERS_THEME_OVERRIDE);
+        if (selected == 0) return Math.max(1, Math.min(16, randomThemeIndex));
+        return Math.max(1, Math.min(16, selected));
+    }
+
+    public static int masterBuildersRatingScore(org.bukkit.Material material) {
+        int score = switch (material) {
+            case RED_CONCRETE -> 1;
+            case ORANGE_CONCRETE -> 2;
+            case YELLOW_CONCRETE -> 3;
+            case LIME_CONCRETE -> 4;
+            case LIGHT_BLUE_CONCRETE -> 5;
+            case PURPLE_CONCRETE -> 6;
+            default -> 0;
+        };
+        return score <= masterBuildersMaxRating() ? score : 0;
+    }
     public static final long DEATH_TAG_CHASER_PROMOTION_INTERVAL_MILLIS = 30_000L;
+    public static final double DEATH_TAG_CHASER_DAMAGE = 4.0D;
+    public static final double DEATH_TAG_ALPHA_CHASER_DAMAGE = 6.0D;
     /** DeathTag inherits the 20-minute timeout from the legacy Arcade Game base class. */
     public static final long DEATH_TAG_GAME_TIMEOUT_MILLIS = 1_200_000L;
     public static final int DEATH_TAG_FORCED_CHASER_REWARD_GEMS = 10;
@@ -81,6 +339,36 @@ public final class ArcadePortRules {
     public static final int DEATH_TAG_ARCHER_MAX_ARROWS = 2;
     public static final double DEATH_TAG_ARCHER_ARROW_KNOCKBACK_POWER = 3.0D;
     public static final long DEATH_TAG_TRAITOR_KNOCKBACK_COOLDOWN_MILLIS = 400L;
+    public static final long DEATH_TAG_CHASER_HIT_COOLDOWN_MILLIS = 1_500L;
+    public static final double DEATH_TAG_RUNNER_BASHER_DAMAGE = 6.0D;
+    public static final double DEATH_TAG_RUNNER_TRAITOR_DAMAGE = 6.0D;
+    public static final double DEATH_TAG_RUNNER_DEFAULT_DAMAGE = 1.0D;
+    public static final double DEATH_TAG_RUNNER_ARCHER_PROJECTILE_DAMAGE = 4.0D;
+    public static final double DEATH_TAG_IRON_SKIN_DAMAGE_REDUCTION = 2.0D;
+    public static final double DEATH_TAG_ALPHA_IRON_SKIN_DAMAGE_REDUCTION = 4.0D;
+    public static final double DEATH_TAG_MELEE_KNOCKBACK_DAMPING = 0.5D;
+    public static final double DEATH_TAG_MELEE_KNOCKBACK_HORIZONTAL = 0.4D;
+    public static final double DEATH_TAG_MELEE_KNOCKBACK_VERTICAL = 0.36D;
+    public static final double DEATH_TAG_TRAITOR_KNOCKBACK_HORIZONTAL = 0.8D;
+    public static final double DEATH_TAG_TRAITOR_KNOCKBACK_VERTICAL = 0.1D;
+    public static final long DEATH_TAG_TURTLE_STACK_RESET_MILLIS = 5_000L;
+    public static final int DEATH_TAG_TURTLE_MAX_STACKS = 3;
+    public static final long DEATH_TAG_TURTLE_EFFECT_DURATION_TICKS = 60L;
+    public static final int DEATH_TAG_TURTLE_HITS_PER_WIND_CHARGE = 3;
+    public static final long DEATH_TAG_TRICKSTER_FIREWORKS_COOLDOWN_MILLIS = 30_000L;
+    public static final long DEATH_TAG_RESPAWN_GRACE_MILLIS = 2_500L;
+    public static final long DEATH_TAG_TRAITOR_ASSIST_WINDOW_MILLIS = 8_000L;
+    public static final int DEATH_TAG_STATUE_AREA_SIZE_BLOCKS = 5;
+    public static final long DEATH_TAG_STATUE_REQUIRED_TIME_MILLIS = 180_000L;
+    public static final int DEATH_TAG_GALLOWS_ASSISTS = 3;
+    public static final int DEATH_TAG_ULTIMATE_CHASER_KILLS = 8;
+    public static final int DEATH_TAG_HASTY_HUNTER_KILLS = 3;
+    public static final long DEATH_TAG_HASTY_HUNTER_WINDOW_MILLIS = 60_000L;
+    public static final double DEATH_TAG_RESILIENT_RUNNER_HEARTS = 250.0D;
+    public static final int DEATH_TAG_CATCH_ME_DISTANCE_BLOCKS = 10_000;
+    public static final int DEATH_TAG_TURTLE_SHELL_HITS = 3;
+    public static final int DEATH_TAG_DEATH_PROOF_WINS = 50;
+    public static final int DEATH_TAG_COME_AT_ME_BRO_KILLS = 2;
     public static final int EVOLUTION_WIN_LEVEL = 5;
     public static final double DRAGON_ESCAPE_FINISH_X = 0.5D;
     public static final double DRAGON_ESCAPE_FINISH_Y = 64.0D;
@@ -121,9 +409,21 @@ public final class ArcadePortRules {
     public static final int RUNNER_MAX_FROSTBALLS = 16;
     public static final int RUNNER_FROSTBALL_SLOW_TICKS = 40;
     public static final int RUNNER_FROSTBALL_SLOW_AMPLIFIER = 2;
+    public static final double RUNNER_LEAP_HORIZONTAL_SPEED = 1.2D;
+    public static final double RUNNER_LEAP_VERTICAL_SPEED = 1.2D;
+    public static final double RUNNER_QUICKSHOT_PROJECTILE_SPEED = 1.2D;
+    public static final long RUNNER_SWITCH_GRACE_MILLIS = 750L;
     public static final double RUNNER_STEPS_ACHIEVEMENT_BLOCKS = 400.0D;
     public static final int RUNNER_HOP_ACHIEVEMENT_JUMPS = 100;
     public static final long RUNNER_FLASH_ACHIEVEMENT_MAX_WIN_MILLIS = 90_000L;
+    public static final int RUNNER_FROSTBALL_ASSISTS_ACHIEVEMENT_COUNT = 5;
+    public static final int RUNNER_ARCHER_ASSISTS_ACHIEVEMENT_COUNT = 5;
+    public static final double RUNNER_FAILED_UPWARDS_MAX_HEALTH = 6.0D;
+    public static final double RUNNER_SPECIAL_PLAY_MIN_FALL_DISTANCE = 20.0D;
+    public static final double RUNNER_SPECIAL_PLAY_MAX_DOWNWARD_VELOCITY = 0.25D;
+    public static final double RUNNER_SPECIAL_PLAY_GROUND_DISTANCE = 3.0D;
+    public static final long RUNNER_DIVE_EARLY_WINDOW_MILLIS = 3_000L;
+    public static final double RUNNER_DIVE_DROP_BLOCKS = 2.0D;
     private static final java.util.List<String> RUNNER_TRAIL_COLOURS = java.util.List.of(
             "cyan", "white", "orange", "magenta", "light-blue", "yellow", "lime",
             "pink", "gray", "light-gray", "purple", "blue", "brown", "green", "black");
@@ -139,15 +439,54 @@ public final class ArcadePortRules {
 
     /** The source wording is "over 400", so the threshold is strictly greater than 400. */
     public static boolean shouldAwardRunnerSteps(double walkedBlocks) {
-        return Double.isFinite(walkedBlocks) && walkedBlocks > RUNNER_STEPS_ACHIEVEMENT_BLOCKS;
+        double threshold = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "RUNNER_STEPS_ACHIEVEMENT_BLOCKS", RUNNER_STEPS_ACHIEVEMENT_BLOCKS));
+        return Double.isFinite(walkedBlocks) && walkedBlocks > threshold;
     }
 
     public static boolean shouldAwardRunnerHopToIt(int jumps) {
-        return jumps >= RUNNER_HOP_ACHIEVEMENT_JUMPS;
+        return jumps >= Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "RUNNER_HOP_ACHIEVEMENT_JUMPS", RUNNER_HOP_ACHIEVEMENT_JUMPS));
     }
 
     public static boolean shouldAwardRunnerFlash(long elapsedMillis, boolean won) {
-        return won && elapsedMillis >= 0L && elapsedMillis <= RUNNER_FLASH_ACHIEVEMENT_MAX_WIN_MILLIS;
+        return won && elapsedMillis >= 0L && elapsedMillis <= Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "RUNNER_FLASH_ACHIEVEMENT_MAX_WIN_MILLIS", RUNNER_FLASH_ACHIEVEMENT_MAX_WIN_MILLIS));
+    }
+
+    public static int runnerFrostballAssistAchievementCount() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue("RUNNER_FROSTBALL_ASSISTS_ACHIEVEMENT_COUNT",
+                RUNNER_FROSTBALL_ASSISTS_ACHIEVEMENT_COUNT));
+    }
+
+    public static int runnerArcherAssistAchievementCount() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue("RUNNER_ARCHER_ASSISTS_ACHIEVEMENT_COUNT",
+                RUNNER_ARCHER_ASSISTS_ACHIEVEMENT_COUNT));
+    }
+
+    public static double runnerSpecialPlayGroundDistance() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "RUNNER_SPECIAL_PLAY_GROUND_DISTANCE", RUNNER_SPECIAL_PLAY_GROUND_DISTANCE));
+    }
+
+    public static double runnerFailedUpwardsMaxHealth() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "RUNNER_FAILED_UPWARDS_MAX_HEALTH", RUNNER_FAILED_UPWARDS_MAX_HEALTH));
+    }
+
+    public static boolean isRunnerSpecialPlayFall(double fallDistance, double verticalVelocity, boolean groundNearby) {
+        return fallDistance >= Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "RUNNER_SPECIAL_PLAY_MIN_FALL_DISTANCE", RUNNER_SPECIAL_PLAY_MIN_FALL_DISTANCE))
+                && verticalVelocity < -Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                        "RUNNER_SPECIAL_PLAY_MAX_DOWNWARD_VELOCITY", RUNNER_SPECIAL_PLAY_MAX_DOWNWARD_VELOCITY))
+                && groundNearby;
+    }
+
+    public static boolean isRunnerEarlyDive(long elapsedMillis, double currentY, double startY) {
+        return elapsedMillis <= Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "RUNNER_DIVE_EARLY_WINDOW_MILLIS", RUNNER_DIVE_EARLY_WINDOW_MILLIS))
+                && currentY < startY - Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                        "RUNNER_DIVE_DROP_BLOCKS", RUNNER_DIVE_DROP_BLOCKS));
     }
 
     /** Use red as the source-compatible default and as the fallback for map clashes. */
@@ -217,11 +556,22 @@ public final class ArcadePortRules {
 
     public static final int BACON_METER_MAX = 100;
     public static final int BACON_METER_MIN_ABILITY = 50;
+    public static final int BACON_METER_GAIN_NORMAL_HIT = 5;
+    public static final int BACON_METER_GAIN_CRITICAL_HIT = 10;
+    public static final double BACON_METER_POPULATION_SCALE = 14.0D;
+    public static final int BACON_CHRIS_ABILITY_METER_COST = 50;
+    public static final int BACON_CRISPY_SHOT_COUNT = 3;
+    public static final double BACON_CRISPY_SHOT_SPREAD_RADIANS = 0.13D;
+    public static final double BACON_CRISPY_SHOT_VELOCITY = 1.0D;
     /** Per attacker-victim throttle, allowing the classic ten hits per second. */
     public static final long BACON_HIT_COOLDOWN_MILLIS = 100L;
     public static final long BACON_CRISPY_DASH_DURATION_MILLIS = 250L;
     public static final double BACON_CRISPY_DASH_SPEED = 1.0D;
     public static final long BACON_CRISPY_DASH_FIRE_MILLIS = 3_000L;
+    public static final long BACON_CRISPY_BURN_DURATION_MILLIS = 5_000L;
+    public static final double BACON_CRISPY_DASH_HIT_RADIUS_SQUARED = 2.25D;
+    public static final double BACON_CRISPY_FIRE_CONTACT_RADIUS_SQUARED = 2.25D;
+    public static final int BACON_CRISPY_IMPACT_FIRE_BLOCKS = 3;
     public static final long BACON_TIMED_HIT_SPAM_WINDOW_MILLIS = 250L;
     public static final long BACON_TIMED_HIT_GOOD_MIN_MILLIS = 500L;
     public static final long BACON_TIMED_HIT_GOOD_MAX_MILLIS = 900L;
@@ -232,16 +582,31 @@ public final class ArcadePortRules {
     /** The Pig kit's damage meter controls its invincibility window, capped at five seconds. */
     public static final long BACON_PIG_INVINCIBILITY_MIN_MILLIS = 500L;
     public static final long BACON_PIG_INVINCIBILITY_MAX_MILLIS = 5_000L;
+    public static final double BACON_BODY_SLAM_METER_BASE_MULTIPLIER = 0.5D;
+    public static final double BACON_BODY_SLAM_METER_CHARGE_SCALE = 200.0D;
+    public static final double BACON_BLAST_METER_BASE_MULTIPLIER = 0.5D;
+    public static final double BACON_BLAST_METER_CHARGE_SCALE = 1.5D;
 
     public static boolean isBaconInvincibilityActive(long nowMillis, long invincibleUntilMillis) {
         return invincibleUntilMillis > 0L && nowMillis < invincibleUntilMillis;
     }
     public static final long BACON_FLASH_FRIED_MAX_WIN_MILLIS = 60_000L;
     public static final long BOMB_LOBBERS_ASSIST_WINDOW_MILLIS = 10_000L;
+    public static final boolean BOMB_LOBBERS_POWERUP_SPAWNING_ENABLED = true;
     public static final long BOMB_LOBBERS_POWERUP_FIRST_SPAWN_DELAY_MILLIS = 10_000L;
     public static final double BOMB_LOBBERS_SUPER_TNT_EXPLOSION_RADIUS = 10.0D;
     public static final double BOMB_LOBBERS_SUPER_TNT_MAX_DAMAGE = 65.0D;
+    public static final double BOMB_LOBBERS_DIRECT_HIT_DAMAGE = 10.0D;
+    public static final double BOMB_LOBBERS_SUPER_TNT_DIRECT_HIT_DAMAGE = 15.0D;
+    public static final long BOMB_LOBBERS_POWERUP_SPAWN_MIN_DELAY_MILLIS = 20_000L;
+    public static final long BOMB_LOBBERS_POWERUP_SPAWN_MAX_DELAY_MILLIS = 100_000L;
+    public static final long BOMB_LOBBERS_POWERUP_RETRY_DELAY_MILLIS = 10_000L;
     public static final int BOMB_LOBBERS_POWERUP_SPEED_DURATION_TICKS = 240;
+
+    public static boolean bombLobbersPowerupsEnabled() {
+        return GameDebugRuntimeOverrides.booleanValue(
+                "BOMB_LOBBERS_POWERUP_SPAWNING_ENABLED", BOMB_LOBBERS_POWERUP_SPAWNING_ENABLED);
+    }
     public static final int BOMB_LOBBERS_ULTIMATE_KILLER_KILLS = 5;
     public static final int BOMB_LOBBERS_TWO_BIRDS_KILLS = 2;
     public static final int BOMB_LOBBERS_TEAM_PLAYER_ASSISTS = 5;
@@ -253,18 +618,79 @@ public final class ArcadePortRules {
     public static final int BACON_BRAWL_KING_OF_BACON_WINS = 15;
 
     public static boolean shouldAwardBaconKingOfBacon(int totalWins) {
-        return totalWins >= BACON_BRAWL_KING_OF_BACON_WINS;
+        return totalWins >= GameDebugRuntimeOverrides.intValue("BACON_BRAWL_KING_OF_BACON_WINS", BACON_BRAWL_KING_OF_BACON_WINS);
+    }
+
+    public static boolean shouldRecordBaconBrawlAchievements(boolean debugRound,
+                                                              boolean announcedWin,
+                                                              boolean hasWinner) {
+        return !debugRound && announcedWin && hasWinner;
     }
     public static int baconMeterGainForHit(boolean critical, int alivePlayers) {
         int alive = Math.max(1, Math.min(16, alivePlayers));
-        double scale = 1.0D + (16 - alive) / 14.0D;
-        int base = critical ? 10 : 5;
+        double scale = 1.0D + (16 - alive) / Math.max(1.0D, GameDebugRuntimeOverrides.doubleValue(
+                "BACON_METER_POPULATION_SCALE", BACON_METER_POPULATION_SCALE));
+        int base = critical
+                ? GameDebugRuntimeOverrides.intValue("BACON_METER_GAIN_CRITICAL_HIT", BACON_METER_GAIN_CRITICAL_HIT)
+                : GameDebugRuntimeOverrides.intValue("BACON_METER_GAIN_NORMAL_HIT", BACON_METER_GAIN_NORMAL_HIT);
         return (int) Math.ceil(base * scale);
     }
 
     public static int nextBaconMeter(int current, boolean critical, int alivePlayers) {
-        int charge = Math.max(0, Math.min(BACON_METER_MAX, current));
-        return Math.min(BACON_METER_MAX, charge + baconMeterGainForHit(critical, alivePlayers));
+        int max = Math.max(1, GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", BACON_METER_MAX));
+        int charge = Math.max(0, Math.min(max, current));
+        return Math.min(max, charge + baconMeterGainForHit(critical, alivePlayers));
+    }
+
+    public static long baconCrispyBurnDurationMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "BACON_CRISPY_BURN_DURATION_MILLIS", BACON_CRISPY_BURN_DURATION_MILLIS));
+    }
+
+    public static double baconCrispyDashHitRadiusSquared() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "BACON_CRISPY_DASH_HIT_RADIUS_SQUARED", BACON_CRISPY_DASH_HIT_RADIUS_SQUARED));
+    }
+
+    public static double baconCrispyFireContactRadiusSquared() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "BACON_CRISPY_FIRE_CONTACT_RADIUS_SQUARED", BACON_CRISPY_FIRE_CONTACT_RADIUS_SQUARED));
+    }
+
+    public static int baconCrispyImpactFireBlocks() {
+        return Math.max(1, Math.min(9, GameDebugRuntimeOverrides.intValue(
+                "BACON_CRISPY_IMPACT_FIRE_BLOCKS", BACON_CRISPY_IMPACT_FIRE_BLOCKS)));
+    }
+
+    public static int baconChrisAbilityMeterCost() {
+        int maxMeter = Math.max(1, GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", BACON_METER_MAX));
+        return Math.max(0, Math.min(maxMeter, GameDebugRuntimeOverrides.intValue(
+                "BACON_CHRIS_ABILITY_METER_COST", BACON_CHRIS_ABILITY_METER_COST)));
+    }
+
+    public static int baconCrispyShotCount() {
+        return Math.max(1, Math.min(9, GameDebugRuntimeOverrides.intValue(
+                "BACON_CRISPY_SHOT_COUNT", BACON_CRISPY_SHOT_COUNT)));
+    }
+
+    public static double baconCrispyShotYawOffset(int shotIndex) {
+        int count = baconCrispyShotCount();
+        int index = Math.max(0, Math.min(count - 1, shotIndex));
+        return (index - (count - 1) / 2.0D) * baconCrispyShotSpreadRadians();
+    }
+
+    public static double baconCrispyShotSpreadRadians() {
+        double spread = GameDebugRuntimeOverrides.doubleValue(
+                "BACON_CRISPY_SHOT_SPREAD_RADIANS", BACON_CRISPY_SHOT_SPREAD_RADIANS);
+        return Double.isFinite(spread) ? Math.max(0.0D, Math.min(0.6D, spread))
+                : BACON_CRISPY_SHOT_SPREAD_RADIANS;
+    }
+
+    public static double baconCrispyShotVelocity() {
+        double speed = GameDebugRuntimeOverrides.doubleValue(
+                "BACON_CRISPY_SHOT_VELOCITY", BACON_CRISPY_SHOT_VELOCITY);
+        return Double.isFinite(speed) ? Math.max(0.1D, Math.min(3.0D, speed))
+                : BACON_CRISPY_SHOT_VELOCITY;
     }
 
     /** Keep the Bacon Brawl sidebar within Minecraft's 15-row limit without merging names. */
@@ -285,22 +711,25 @@ public final class ArcadePortRules {
     }
 
     public static boolean canUseBaconMeterAbility(int percent) {
-        return percent >= BACON_METER_MIN_ABILITY;
+        return percent >= GameDebugRuntimeOverrides.intValue("BACON_METER_MIN_ABILITY", BACON_METER_MIN_ABILITY);
     }
 
     /** Lower charge still permits the ability; higher charge increases its knockback. */
     public static double baconBodySlamMeterMultiplier(int percent) {
-        int charge = Math.max(0, Math.min(BACON_METER_MAX, percent));
-        return 0.5D + charge / 200.0D;
+        int max = Math.max(1, GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", BACON_METER_MAX));
+        int charge = Math.max(0, Math.min(max, percent));
+        return GameDebugRuntimeOverrides.doubleValue("BACON_BODY_SLAM_METER_BASE_MULTIPLIER", BACON_BODY_SLAM_METER_BASE_MULTIPLIER)
+                + charge / Math.max(1.0D, GameDebugRuntimeOverrides.doubleValue("BACON_BODY_SLAM_METER_CHARGE_SCALE", BACON_BODY_SLAM_METER_CHARGE_SCALE));
     }
 
     /** Meter-powered Pig Cloak and Brutus Bacon abilities share a charge-scaled duration. */
     public static long baconAbilityDurationMillis(int percent) {
-        int charge = Math.max(0, Math.min(BACON_METER_MAX, percent));
+        int max = Math.max(1, GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", BACON_METER_MAX));
+        int charge = Math.max(0, Math.min(max, percent));
         if (!canUseBaconMeterAbility(charge)) return 0L;
-        return BACON_PIG_INVINCIBILITY_MIN_MILLIS
-                + Math.round((BACON_PIG_INVINCIBILITY_MAX_MILLIS
-                        - BACON_PIG_INVINCIBILITY_MIN_MILLIS) * charge / (double) BACON_METER_MAX);
+        long min = GameDebugRuntimeOverrides.longValue("BACON_PIG_INVINCIBILITY_MIN_MILLIS", BACON_PIG_INVINCIBILITY_MIN_MILLIS);
+        long maxDuration = Math.max(min, GameDebugRuntimeOverrides.longValue("BACON_PIG_INVINCIBILITY_MAX_MILLIS", BACON_PIG_INVINCIBILITY_MAX_MILLIS));
+        return min + Math.round((maxDuration - min) * charge / (double) max);
     }
 
     /** Retained as a compatibility alias for earlier tests and callers. */
@@ -315,8 +744,8 @@ public final class ArcadePortRules {
     }
 
     public static boolean isBaconTimedCritical(long intervalMillis, double knockbackMultiplier) {
-        return intervalMillis >= baconTimingWindowMillis(BACON_TIMED_HIT_GOOD_MIN_MILLIS, knockbackMultiplier)
-                && intervalMillis <= baconTimingWindowMillis(BACON_TIMED_HIT_GOOD_MAX_MILLIS, knockbackMultiplier);
+        return intervalMillis >= baconTimingWindowMillis(GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_GOOD_MIN_MILLIS", BACON_TIMED_HIT_GOOD_MIN_MILLIS), knockbackMultiplier)
+                && intervalMillis <= baconTimingWindowMillis(GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_GOOD_MAX_MILLIS", BACON_TIMED_HIT_GOOD_MAX_MILLIS), knockbackMultiplier);
     }
 
     public static boolean isBaconTimedCritical(long intervalMillis) {
@@ -330,18 +759,20 @@ public final class ArcadePortRules {
 
     /** Mama Piggles spends meter to set Bacon Blast launch and impact power. */
     public static double baconBlastPowerMultiplier(int percent) {
-        int charge = Math.max(0, Math.min(BACON_METER_MAX, percent));
-        return 0.5D + 1.5D * charge / BACON_METER_MAX;
+        int max = Math.max(1, GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", BACON_METER_MAX));
+        int charge = Math.max(0, Math.min(max, percent));
+        return GameDebugRuntimeOverrides.doubleValue("BACON_BLAST_METER_BASE_MULTIPLIER", BACON_BLAST_METER_BASE_MULTIPLIER)
+                + GameDebugRuntimeOverrides.doubleValue("BACON_BLAST_METER_CHARGE_SCALE", BACON_BLAST_METER_CHARGE_SCALE) * charge / max;
     }
 
     /** Spamming within the same short click window weakens hits; well-timed hits are rewarded. */
     public static double baconTimedHitKnockbackMultiplier(long intervalMillis, double knockbackMultiplier) {
-        long spam = baconTimingWindowMillis(BACON_TIMED_HIT_SPAM_WINDOW_MILLIS, knockbackMultiplier);
-        long goodMin = baconTimingWindowMillis(BACON_TIMED_HIT_GOOD_MIN_MILLIS, knockbackMultiplier);
-        long goodMax = baconTimingWindowMillis(BACON_TIMED_HIT_GOOD_MAX_MILLIS, knockbackMultiplier);
-        long okMin = baconTimingWindowMillis(BACON_TIMED_HIT_OK_MIN_MILLIS, knockbackMultiplier);
-        long okMax = baconTimingWindowMillis(BACON_TIMED_HIT_OK_MAX_MILLIS, knockbackMultiplier);
-        long lateMax = baconTimingWindowMillis(BACON_TIMED_HIT_LATE_MAX_MILLIS, knockbackMultiplier);
+        long spam = baconTimingWindowMillis(GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_SPAM_WINDOW_MILLIS", BACON_TIMED_HIT_SPAM_WINDOW_MILLIS), knockbackMultiplier);
+        long goodMin = baconTimingWindowMillis(GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_GOOD_MIN_MILLIS", BACON_TIMED_HIT_GOOD_MIN_MILLIS), knockbackMultiplier);
+        long goodMax = baconTimingWindowMillis(GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_GOOD_MAX_MILLIS", BACON_TIMED_HIT_GOOD_MAX_MILLIS), knockbackMultiplier);
+        long okMin = baconTimingWindowMillis(GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_OK_MIN_MILLIS", BACON_TIMED_HIT_OK_MIN_MILLIS), knockbackMultiplier);
+        long okMax = baconTimingWindowMillis(GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_OK_MAX_MILLIS", BACON_TIMED_HIT_OK_MAX_MILLIS), knockbackMultiplier);
+        long lateMax = baconTimingWindowMillis(GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_LATE_MAX_MILLIS", BACON_TIMED_HIT_LATE_MAX_MILLIS), knockbackMultiplier);
         if (intervalMillis < 0L) return 1.0D;
         if (intervalMillis <= spam) return 0.65D;
         if (intervalMillis >= goodMin && intervalMillis <= goodMax) return 1.6D;
@@ -362,7 +793,7 @@ public final class ArcadePortRules {
             double distanceSquared, boolean hasLineOfSight) {
         return activeBaconRound && attackerAlive && targetAlive && !selfHit
                 && Double.isFinite(distanceSquared) && distanceSquared >= 0.0D
-                && distanceSquared <= BACON_AVATAR_MAX_ATTACK_DISTANCE_SQUARED
+                && distanceSquared <= GameDebugRuntimeOverrides.doubleValue("BACON_AVATAR_MAX_ATTACK_DISTANCE_SQUARED", BACON_AVATAR_MAX_ATTACK_DISTANCE_SQUARED)
                 && hasLineOfSight;
     }
 
@@ -379,11 +810,11 @@ public final class ArcadePortRules {
     }
 
     public static boolean shouldAwardBaconPigsInBlankets(int killsThisGame) {
-        return killsThisGame >= BACON_BRAWL_PIGS_IN_BLANKETS_KILLS;
+        return killsThisGame >= GameDebugRuntimeOverrides.intValue("BACON_BRAWL_PIGS_IN_BLANKETS_KILLS", BACON_BRAWL_PIGS_IN_BLANKETS_KILLS);
     }
 
     public static boolean shouldAwardBaconFlashFried(long roundMillis) {
-        return roundMillis >= 0L && roundMillis <= BACON_FLASH_FRIED_MAX_WIN_MILLIS;
+        return roundMillis >= 0L && roundMillis <= GameDebugRuntimeOverrides.longValue("BACON_FLASH_FRIED_MAX_WIN_MILLIS", BACON_FLASH_FRIED_MAX_WIN_MILLIS);
     }
 
     public static boolean shouldAwardBaconRawPork(boolean usedAbilityThisGame) {
@@ -391,14 +822,14 @@ public final class ArcadePortRules {
     }
 
     public static boolean shouldAwardBaconThreeForOne(int bodySlamKills) {
-        return bodySlamKills >= BACON_THREE_FOR_ONE_BODY_SLAM_KILLS;
+        return bodySlamKills >= GameDebugRuntimeOverrides.intValue("BACON_THREE_FOR_ONE_BODY_SLAM_KILLS", BACON_THREE_FOR_ONE_BODY_SLAM_KILLS);
     }
 
     public static boolean shouldAwardBombLobbersUltimateKiller(int killsThisGame) {
-        return killsThisGame >= BOMB_LOBBERS_ULTIMATE_KILLER_KILLS;
+        return killsThisGame >= GameDebugRuntimeOverrides.intValue("BOMB_LOBBERS_ULTIMATE_KILLER_KILLS", BOMB_LOBBERS_ULTIMATE_KILLER_KILLS);
     }
     public static boolean shouldAwardBombLobbersTwoBirdsOneStone(int killsFromOneTnt) {
-        return killsFromOneTnt >= BOMB_LOBBERS_TWO_BIRDS_KILLS;
+        return killsFromOneTnt >= GameDebugRuntimeOverrides.intValue("BOMB_LOBBERS_TWO_BIRDS_KILLS", BOMB_LOBBERS_TWO_BIRDS_KILLS);
     }
     /** Counts kills by a single Super Explosive or Fiery TNT activation, not a game-wide tally. */
     public static boolean shouldAwardBombLobbersOver9000(String tntPowerupType, int killsFromOneTnt) {
@@ -413,13 +844,13 @@ public final class ArcadePortRules {
         return creditedKill ? Math.min(64, current + 1) : current;
     }
     public static boolean shouldAwardBombLobbersTeamPlayer(int assistsThisGame) {
-        return assistsThisGame >= BOMB_LOBBERS_TEAM_PLAYER_ASSISTS;
+        return assistsThisGame >= GameDebugRuntimeOverrides.intValue("BOMB_LOBBERS_TEAM_PLAYER_ASSISTS", BOMB_LOBBERS_TEAM_PLAYER_ASSISTS);
     }
     public static boolean shouldAwardBombLobbersDoubleJump(boolean won, boolean aliveAtFinish, boolean usedDoubleJump) {
         return won && aliveAtFinish && !usedDoubleJump;
     }
     public static boolean shouldAwardBombLobbersMasterBomber(int winsAfterCurrentGame) {
-        return winsAfterCurrentGame >= BOMB_LOBBERS_MASTER_BOMBER_WINS;
+        return winsAfterCurrentGame >= GameDebugRuntimeOverrides.intValue("BOMB_LOBBERS_MASTER_BOMBER_WINS", BOMB_LOBBERS_MASTER_BOMBER_WINS);
     }
     public static String bombLobbersAchievementConfigKey(java.util.UUID playerId, String achievementSlug) {
         if (playerId == null || achievementSlug == null || !achievementSlug.matches("[a-z0-9-]+")) return "";
@@ -467,7 +898,7 @@ public final class ArcadePortRules {
             boolean isArenaFallOrWaterKnockout) {
         return isArenaFallOrWaterKnockout && lastHitAtMillis > 0L
                 && nowMillis >= lastHitAtMillis
-                && nowMillis - lastHitAtMillis <= BACON_FALL_KILL_CREDIT_WINDOW_MILLIS;
+                && nowMillis - lastHitAtMillis <= GameDebugRuntimeOverrides.longValue("BACON_FALL_KILL_CREDIT_WINDOW_MILLIS", BACON_FALL_KILL_CREDIT_WINDOW_MILLIS);
     }
 
     /** Reborn Bacon Brawl has no fixed timer; SoloGame ends when at most one player remains alive. */
@@ -483,6 +914,11 @@ public final class ArcadePortRules {
     public static final int BACON_HUNGER_DRAIN_PER_INTERVAL = 2;
     public static final int BACON_HUNGER_RESTORE_PER_HIT = 2;
     public static final float BACON_SATURATION_ON_FOOD_CHANGE = 5.0F;
+
+    public static float baconSaturationOnFoodChange() {
+        return Math.max(0.0F, Math.min(20.0F, GameDebugRuntimeOverrides.floatValue(
+                "BACON_SATURATION_ON_FOOD_CHANGE", BACON_SATURATION_ON_FOOD_CHANGE)));
+    }
     public static final double BACON_STARVATION_DAMAGE = 4.0D;
     /** Ordinary Bacon Brawl hits use knockback; health loss is reserved for arena/environment hazards. */
     public static final boolean BACON_BRAWL_HITS_DAMAGE_HEALTH = false;
@@ -503,7 +939,7 @@ public final class ArcadePortRules {
 
     public static boolean isBaconBlastNearPlayer(double distanceSquared) {
         return Double.isFinite(distanceSquared) && distanceSquared >= 0.0D
-                && distanceSquared <= BACON_BLAST_PLAYER_COLLISION_RADIUS_SQUARED;
+                && distanceSquared <= GameDebugRuntimeOverrides.doubleValue("BACON_BLAST_PLAYER_COLLISION_RADIUS_SQUARED", BACON_BLAST_PLAYER_COLLISION_RADIUS_SQUARED);
     }
 
     /**
@@ -517,14 +953,15 @@ public final class ArcadePortRules {
                 || !Double.isFinite(segmentLength) || segmentLength < 0.0D) return false;
         if (!Double.isFinite(blockFraction) || blockFraction < 0.0D) return true;
         if (blockFraction > 1.0D || segmentLength <= 1.0E-6D) return false;
-        double playerNearEdge = playerFraction
-                - Math.sqrt(BACON_BLAST_PLAYER_COLLISION_RADIUS_SQUARED) / segmentLength;
+        double collisionRadiusSquared = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "BACON_BLAST_PLAYER_COLLISION_RADIUS_SQUARED", BACON_BLAST_PLAYER_COLLISION_RADIUS_SQUARED));
+        double playerNearEdge = playerFraction - Math.sqrt(collisionRadiusSquared) / segmentLength;
         return playerNearEdge <= blockFraction;
     }
 
     public static boolean shouldExpireBaconBlast(long nowMillis, long createdAtMillis, boolean touchingBlock) {
         return touchingBlock || createdAtMillis <= 0L || nowMillis < createdAtMillis
-                || nowMillis - createdAtMillis >= BACON_BLAST_MAX_FLIGHT_MILLIS;
+                || nowMillis - createdAtMillis >= GameDebugRuntimeOverrides.longValue("BACON_BLAST_MAX_FLIGHT_MILLIS", BACON_BLAST_MAX_FLIGHT_MILLIS);
     }
     /** Reborn's inherited Game.GameTimeout is 20 minutes. */
     public static final long BOMB_LOBBERS_ROUND_MILLIS = 1_200_000L;
@@ -546,11 +983,13 @@ public final class ArcadePortRules {
     }
 
     public static long nextBombLobbersSpectatorTeleportAt(long nowMillis) {
-        if (nowMillis < 0L) return BOMB_LOBBERS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS;
-        if (nowMillis > Long.MAX_VALUE - BOMB_LOBBERS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS) {
+        long cooldown = Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "BOMB_LOBBERS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS", BOMB_LOBBERS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS));
+        if (nowMillis < 0L) return cooldown;
+        if (nowMillis > Long.MAX_VALUE - cooldown) {
             return Long.MAX_VALUE;
         }
-        return nowMillis + BOMB_LOBBERS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS;
+        return nowMillis + cooldown;
     }
 
     /** Reborn's Waller perk uses a 100 ms Recharge gate between wall placements. */
@@ -566,6 +1005,7 @@ public final class ArcadePortRules {
     public static final double BOMB_LOBBERS_EXPLOSION_RADIUS = BOMB_LOBBERS_EXPLOSION_SIZE * 2.0D;
     public static final double BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE = 50.0D;
     public static final long SPLEEF_HUNGER_DRAIN_INTERVAL_MILLIS = 4_000L;
+    public static final boolean SPLEEF_HUNGER_DRAIN_ENABLED = true;
     public static final int SPLEEF_HUNGER_DRAIN_PER_INTERVAL = 2;
     public static final long SPLEEF_HUNGER_RESTORE_COOLDOWN_MILLIS = 50L;
     public static final long SPLEEF_ARCHER_ARROW_INTERVAL_MILLIS = 2_000L;
@@ -577,6 +1017,41 @@ public final class ArcadePortRules {
     public static final double SPLEEF_DEFAULT_KNOCKBACK = 0.3D;
     public static final double SPLEEF_BRAWLER_KNOCKBACK = 0.6D;
     public static final long SPLEEF_SMASHER_COOLDOWN_MILLIS = 250L;
+    public static final int SPLEEF_SMASHER_RADIUS_BLOCKS = 1;
+    public static final int SPLEEF_HUNGER_RESTORE_PER_HIT = 1;
+    public static final double SPLEEF_LEAP_FORWARD_POWER = 1.2D;
+    public static final double SPLEEF_LEAP_VERTICAL_ADD = 0.2D;
+    public static final double SPLEEF_LEAP_VERTICAL_CAP = 1.2D;
+    public static final double SPLEEF_LEAP_GROUND_BONUS = 0.2D;
+    public static final double SPLEEF_KNOCKBACK_VERTICAL_BASE = 0.1D;
+    public static final double SPLEEF_KNOCKBACK_GROUND_BONUS = 0.2D;
+    public static final double SPLEEF_KNOCKBACK_VERTICAL_CAP = 10.0D;
+    public static final double SPLEEF_ARROW_CLEAR_RADIUS_BASE_BLOCKS = 0.5D;
+    public static final double SPLEEF_ARROW_CLEAR_RADIUS_SPEED_DIVISOR = 1.6D;
+    public static final double SPLEEF_ARROW_CLEAR_RADIUS_CAP_BLOCKS = 3.0D;
+    public static final int SPLEEF_PROJECTILE_CLEAR_RADIUS_MIN_BLOCKS = 1;
+    public static final int SPLEEF_PROJECTILE_CLEAR_RADIUS_MAX_BLOCKS = 3;
+    public static final int SPLEEF_PROJECTILE_IMPACT_SEARCH_RADIUS_BLOCKS = 1;
+    public static final double SPLEEF_ARCHER_ARROW_SPEED_MULTIPLIER = 1.0D;
+    public static final double SPLEEF_SNOWBALL_SPEED_MULTIPLIER = 1.0D;
+    public static final double SPLEEF_GUST_SPEED_MULTIPLIER = 1.0D;
+
+    record SpleefBlockOffset(int x, int y, int z) { }
+
+    public static java.util.List<SpleefBlockOffset> spleefSmasherOffsets() {
+        int radius = Math.max(0, Math.min(8, GameDebugRuntimeOverrides.intValue(
+                "SPLEEF_SMASHER_RADIUS_BLOCKS", SPLEEF_SMASHER_RADIUS_BLOCKS)));
+        java.util.List<SpleefBlockOffset> offsets = new java.util.ArrayList<>(radius * 6);
+        for (int distance = 1; distance <= radius; distance++) {
+            offsets.add(new SpleefBlockOffset(distance, 0, 0));
+            offsets.add(new SpleefBlockOffset(-distance, 0, 0));
+            offsets.add(new SpleefBlockOffset(0, distance, 0));
+            offsets.add(new SpleefBlockOffset(0, -distance, 0));
+            offsets.add(new SpleefBlockOffset(0, 0, distance));
+            offsets.add(new SpleefBlockOffset(0, 0, -distance));
+        }
+        return java.util.List.copyOf(offsets);
+    }
 
     /** Reborn PerkLeap: forward power 1.2, Y +0.2, max Y 1.2, plus a 0.2 ground boost. */
     public static Vector spleefLeapVelocity(Vector facing, boolean grounded) {
@@ -584,9 +1059,47 @@ public final class ArcadePortRules {
                 || !Double.isFinite(facing.getZ()) || facing.lengthSquared() <= 1.0E-12D) {
             return new Vector(0.0D, 0.0D, 0.0D);
         }
-        Vector velocity = facing.clone().normalize().multiply(1.2D);
-        velocity.setY(Math.min(1.2D, velocity.getY() + 0.2D + (grounded ? 0.2D : 0.0D)));
+        Vector velocity = facing.clone().normalize().multiply(Math.max(0.0D, Math.min(5.0D,
+                GameDebugRuntimeOverrides.doubleValue("SPLEEF_LEAP_FORWARD_POWER", SPLEEF_LEAP_FORWARD_POWER))));
+        double verticalAdd = GameDebugRuntimeOverrides.doubleValue(
+                "SPLEEF_LEAP_VERTICAL_ADD", SPLEEF_LEAP_VERTICAL_ADD);
+        double verticalCap = GameDebugRuntimeOverrides.doubleValue(
+                "SPLEEF_LEAP_VERTICAL_CAP", SPLEEF_LEAP_VERTICAL_CAP);
+        double groundedBonus = GameDebugRuntimeOverrides.doubleValue(
+                "SPLEEF_LEAP_GROUND_BONUS", SPLEEF_LEAP_GROUND_BONUS);
+        velocity.setY(Math.min(Math.max(0.0D, Math.min(5.0D, verticalCap)), velocity.getY()
+                + Math.max(0.0D, Math.min(5.0D, verticalAdd))
+                + (grounded ? Math.max(0.0D, Math.min(5.0D, groundedBonus)) : 0.0D)));
         return velocity;
+    }
+
+    public static Vector spleefKnockbackVelocity(Vector direction, boolean targetGrounded, double power) {
+        if (direction == null || !Double.isFinite(power) || direction.lengthSquared() <= 1.0E-12D) {
+            return new Vector();
+        }
+        Vector velocity = direction.clone().normalize().multiply(Math.max(0.0D, Math.min(8.0D, power)));
+        double base = GameDebugRuntimeOverrides.doubleValue(
+                "SPLEEF_KNOCKBACK_VERTICAL_BASE", SPLEEF_KNOCKBACK_VERTICAL_BASE);
+        double groundedBonus = GameDebugRuntimeOverrides.doubleValue(
+                "SPLEEF_KNOCKBACK_GROUND_BONUS", SPLEEF_KNOCKBACK_GROUND_BONUS);
+        double cap = GameDebugRuntimeOverrides.doubleValue(
+                "SPLEEF_KNOCKBACK_VERTICAL_CAP", SPLEEF_KNOCKBACK_VERTICAL_CAP);
+        velocity.setY(Math.min(Math.max(0.0D, Math.min(12.0D, cap)), velocity.getY()
+                + Math.max(0.0D, Math.min(5.0D, base))
+                + (targetGrounded ? Math.max(0.0D, Math.min(5.0D, groundedBonus)) : 0.0D)));
+        return velocity;
+    }
+
+    public static double spleefArrowClearRadius(double velocity) {
+        double base = GameDebugRuntimeOverrides.doubleValue(
+                "SPLEEF_ARROW_CLEAR_RADIUS_BASE_BLOCKS", SPLEEF_ARROW_CLEAR_RADIUS_BASE_BLOCKS);
+        double divisor = GameDebugRuntimeOverrides.doubleValue(
+                "SPLEEF_ARROW_CLEAR_RADIUS_SPEED_DIVISOR", SPLEEF_ARROW_CLEAR_RADIUS_SPEED_DIVISOR);
+        double cap = GameDebugRuntimeOverrides.doubleValue(
+                "SPLEEF_ARROW_CLEAR_RADIUS_CAP_BLOCKS", SPLEEF_ARROW_CLEAR_RADIUS_CAP_BLOCKS);
+        if (!Double.isFinite(velocity) || !Double.isFinite(base) || !Double.isFinite(divisor)
+                || !Double.isFinite(cap) || divisor <= 0.0D) return SPLEEF_ARROW_CLEAR_RADIUS_CAP_BLOCKS;
+        return Math.max(0.0D, Math.min(Math.max(0.0D, cap), Math.max(0.0D, base) + Math.max(0.0D, velocity) / divisor));
     }
     public static final long TURF_WARS_GAME_TIMEOUT_MILLIS = 900_000L;
     public static final long TURF_WARS_INITIAL_BUILD_PHASE_MILLIS = 40_000L;
@@ -619,11 +1132,25 @@ public final class ArcadePortRules {
     public static final long TURF_WARS_MIXED_ARCADE_BUILD_PHASE_MILLIS = 10_000L;
     public static final long TURF_WARS_MIXED_ARCADE_COMBAT_PHASE_MILLIS = 45_000L;
     public static final int TURF_WARS_MIXED_ARCADE_TURF_ADVANCE_BLOCKS = 2;
+    public static final int TURF_WARS_LINES_PER_KILL_MULTIPLIER = 1;
+    public static final int TURF_WARS_COMEBACK_REMAINING_LINES = 5;
+    public static final double TURF_WARS_COMBAT_BOUNDARY_DAMAGE = 2.0D;
+    public static final double TURF_WARS_BUILD_BOUNDARY_DAMAGE = 500.0D;
+    public static final double TURF_WARS_TERRITORY_KNOCKBACK_HORIZONTAL = 2.0D;
+    public static final double TURF_WARS_TERRITORY_KNOCKBACK_VERTICAL = 0.8D;
+    public static final double TURF_WARS_BARRAGE_ARROW_SPEED = 3.0D;
+    public static final double TURF_WARS_BARRAGE_ARROW_SPREAD = 0.05D;
     public static final long MICRO_BATTLES_CHEAT_WINDOW_MILLIS = 4_000L;
     public static final long MICRO_BATTLES_BARRIER_DURATION_MILLIS = 10_000L;
+    public static final boolean MICRO_BATTLES_CRUMBLE_ENABLED = true;
     public static final int MICRO_BATTLES_CRUMBLE_BLOCKS_PER_TICK = 3;
     public static final int MICRO_BATTLES_CRUMBLE_SCAN_INTERVAL_TICKS = 2;
     public static final int DRAGONS_MAX_DRAGONS = 5;
+    public static final boolean DRAGONS_SPAWNING_ENABLED = true;
+    public static final boolean DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED = true;
+    public static final double DRAGONS_AUTONOMOUS_FLIGHT_SPEED = 0.32D;
+    public static final double DRAGONS_TAMER_FLIGHT_SPEED = 0.42D;
+    public static final double DRAGONS_TURN_RATE = 0.12D;
     /** UpdateType.SEC_05: Reborn adds one dragon every five seconds. */
     public static final long DRAGONS_SPAWN_INTERVAL_MILLIS = 5_000L;
     /** UpdateType.FASTEST is the source dragon-target/contact update cadence. */
@@ -657,16 +1184,58 @@ public final class ArcadePortRules {
     public static final long DRAGONS_BARRAGE_INTERVAL_MILLIS = 200L;
     public static final long DRAGONS_BARRAGE_INITIAL_CHARGE_MILLIS = 1_000L;
     public static final long DRAGONS_COWARD_LEAP_COOLDOWN_MILLIS = 8_000L;
+    public static final long DRAGONS_DODGEMS_QUIET_MILLIS = 60_000L;
+    public static final double DRAGONS_COWARD_LEAP_HORIZONTAL_SPEED = 1.2D;
+    public static final double DRAGONS_COWARD_LEAP_FACING_Y_BONUS = 0.2D;
+    public static final double DRAGONS_COWARD_LEAP_MAX_Y = 1.0D;
+    public static final double DRAGONS_COWARD_LEAP_GROUNDED_Y_BONUS = 0.2D;
+    public static final double DRAGONS_CONTACT_HORIZONTAL_KNOCKBACK = 1.0D;
+    public static final double DRAGONS_CONTACT_VERTICAL_BONUS = 0.6D;
+    public static final double DRAGONS_CONTACT_MAX_Y = 2.0D;
+    public static final double DRAGONS_CONTACT_GROUNDED_Y_BONUS = 0.2D;
+    public static final double DRAGONS_TAMER_VERTICAL_FLIGHT_FACTOR = 0.30D;
+    public static final double DRAGONS_TAMER_VERTICAL_FLIGHT_CAP = 0.14D;
+    public static final double DRAGONS_TAMER_LOOKAHEAD_BLOCKS = 12.0D;
+    public static final double DRAGONS_RETARGET_ALTITUDE_Y = 10.0D;
+    public static final double DRAGONS_RETARGET_DISTANCE_SQUARED = 36.0D;
+    public static final double DRAGONS_SPARKLER_MIN_ATTRACT_Y = 4.0D;
+    public static final double DRAGONS_GLIDER_HORIZONTAL_SPEED = 0.72D;
+    public static final double DRAGONS_GLIDER_VERTICAL_BASE = 0.12D;
+    public static final double DRAGONS_GLIDER_MIN_VERTICAL = 0.08D;
+    public static final double DRAGONS_GLIDER_MAX_VERTICAL = 0.42D;
+    public static final double DRAGONS_FROST_LAUNCH_Y = 0.5D;
+    public static final double DRAGONS_FROST_PATH_STEP = 0.2D;
+    public static final double DRAGONS_BARRAGE_ARROW_SPEED = 3.0D;
+    public static final double DRAGONS_BARRAGE_ARROW_SPREAD = 0.1D;
+    public static final double DRAGONS_FLIGHT_VERTICAL_BIAS = 0.04D;
+    public static final double DRAGONS_FLIGHT_MIN_VERTICAL_SPEED = -0.08D;
+    public static final double DRAGONS_FLIGHT_MAX_VERTICAL_SPEED = 0.16D;
+    public static final double DRAGONS_COWARD_LEAP_DANGER_FALL_BLOCKS = 6.0D;
+    public static final double DRAGONS_FALL_DAMAGE_REDUCTION = 1.0D;
     public static final long MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS = 20_000L;
     public static final int MICRO_BATTLES_FLETCHER_MAX_ARROWS = 3;
     public static final long MICRO_BATTLES_SPEEDSTER_MAX_GAME_MILLIS = 90_000L;
     public static final long MICRO_BATTLES_DASHER_JUMP_COOLDOWN_MILLIS = 15_000L;
+    public static final double MICRO_BATTLES_DASHER_JUMP_HORIZONTAL_SPEED = 0.45D;
+    public static final double MICRO_BATTLES_DASHER_JUMP_VERTICAL_SPEED = 0.55D;
     public static final double MICRO_BATTLES_BORDER_PARTICLE_DISTANCE = 3.0D;
     public static final int MICRO_BATTLES_BORDER_PARTICLE_INTERVAL_TICKS = 4;
     public static final int MICRO_BATTLES_BORDER_PARTICLE_VERTICAL_POINTS = 3;
     public static final int MICRO_BATTLES_ANNIHILATION_KILLS = 8;
     public static final String MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR = "light-blue";
     public static final long MICRO_BATTLES_COMBAT_LOG_EXPIRE_MILLIS = 15_000L;
+
+    public static Vector microBattlesDasherJumpVelocity(Vector facing) {
+        Vector velocity = facing == null ? new Vector() : facing.clone();
+        velocity.setY(0.0D);
+        if (velocity.lengthSquared() > 0.0001D) {
+            velocity.normalize().multiply(GameDebugRuntimeOverrides.doubleValue(
+                    "MICRO_BATTLES_DASHER_JUMP_HORIZONTAL_SPEED", MICRO_BATTLES_DASHER_JUMP_HORIZONTAL_SPEED));
+        }
+        velocity.setY(GameDebugRuntimeOverrides.doubleValue(
+                "MICRO_BATTLES_DASHER_JUMP_VERTICAL_SPEED", MICRO_BATTLES_DASHER_JUMP_VERTICAL_SPEED));
+        return velocity;
+    }
 
     private ArcadePortRules() {
     }
@@ -687,7 +1256,8 @@ public final class ArcadePortRules {
 
     /** Source-style periodic TNT recharge; throwing a mine does not reset this timer. */
     public static long dragonEscapeNextTntChargeAt(long thrownAtMillis) {
-        return thrownAtMillis + DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS;
+        return thrownAtMillis + Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS", DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS));
     }
 
     /** Ragebaiter only credits a fall within seven seconds of the actual mine launch. */
@@ -698,7 +1268,9 @@ public final class ArcadePortRules {
     }
 
     public static boolean isDragonEscapeDiggerOpeningLocked(long elapsedMillis) {
-        return elapsedMillis < DRAGON_ESCAPE_DIGGER_OPENING_LOCKOUT_MILLIS;
+        long lockout = Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "DRAGON_ESCAPE_DIGGER_OPENING_LOCKOUT_MILLIS", DRAGON_ESCAPE_DIGGER_OPENING_LOCKOUT_MILLIS));
+        return elapsedMillis < lockout;
     }
 
     public static boolean shouldAllowDragonEscapeDigger(long nowMillis, long nextUseAtMillis) {
@@ -706,17 +1278,21 @@ public final class ArcadePortRules {
     }
 
     public static boolean shouldPreventDragonEscapeDigger(double distanceToBlockCenter, double distanceAboveBlock) {
+        double radius = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "DRAGON_ESCAPE_DIGGER_NEARBY_PLAYER_RADIUS", DRAGON_ESCAPE_DIGGER_NEARBY_PLAYER_RADIUS));
         return (Double.isFinite(distanceToBlockCenter)
                 && distanceToBlockCenter >= 0.0D
-                && distanceToBlockCenter < DRAGON_ESCAPE_DIGGER_NEARBY_PLAYER_RADIUS)
+                && distanceToBlockCenter < radius)
                 || (Double.isFinite(distanceAboveBlock)
                 && distanceAboveBlock >= 0.0D
-                && distanceAboveBlock < DRAGON_ESCAPE_DIGGER_NEARBY_PLAYER_RADIUS);
+                && distanceAboveBlock < radius);
     }
 
     public static boolean isDragonEscapeWarpGraceActive(long nowMillis, long warpedAtMillis) {
+        long graceMillis = Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "DRAGON_ESCAPE_WARPER_GRACE_MILLIS", DRAGON_ESCAPE_WARPER_GRACE_MILLIS));
         return warpedAtMillis >= 0L && nowMillis >= warpedAtMillis
-                && nowMillis - warpedAtMillis < DRAGON_ESCAPE_WARPER_GRACE_MILLIS;
+                && nowMillis - warpedAtMillis < graceMillis;
     }
 
     /**
@@ -743,17 +1319,25 @@ public final class ArcadePortRules {
 
     public static boolean shouldTriggerDragonEscapeDisruptor(
             int itemAgeTicks, double distanceToTarget, boolean sameOwner) {
-        return !sameOwner && itemAgeTicks >= DRAGON_ESCAPE_DISRUPTOR_ARM_TICKS
+        int armTicks = Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "DRAGON_ESCAPE_DISRUPTOR_ARM_TICKS", DRAGON_ESCAPE_DISRUPTOR_ARM_TICKS));
+        double triggerRadius = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS", DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS));
+        return !sameOwner && itemAgeTicks >= armTicks
                 && Double.isFinite(distanceToTarget) && distanceToTarget >= 0.0D
-                && distanceToTarget <= DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS;
+                && distanceToTarget <= triggerRadius;
     }
 
     public static int dragonEscapeLeapUses(String kit) {
-        return switch (normalizeDragonEscapeKit(kit) == null ? "" : normalizeDragonEscapeKit(kit)) {
-            case "jumper" -> 4;
-            case "disruptor" -> 3;
+        String normalized = normalizeDragonEscapeKit(kit);
+        return switch (normalized == null ? "" : normalized) {
+            case "jumper" -> Math.max(0, GameDebugRuntimeOverrides.intValue(
+                    "DRAGON_ESCAPE_JUMPER_LEAP_USES", DRAGON_ESCAPE_JUMPER_LEAP_USES));
+            case "disruptor" -> Math.max(0, GameDebugRuntimeOverrides.intValue(
+                    "DRAGON_ESCAPE_DISRUPTOR_LEAP_USES", DRAGON_ESCAPE_DISRUPTOR_LEAP_USES));
             case "builder" -> 3;
-            case "warper" -> 2;
+            case "warper" -> Math.max(0, GameDebugRuntimeOverrides.intValue(
+                    "DRAGON_ESCAPE_WARPER_LEAP_USES", DRAGON_ESCAPE_WARPER_LEAP_USES));
             default -> 0;
         };
     }
@@ -774,6 +1358,11 @@ public final class ArcadePortRules {
     public static final long DRAGON_ESCAPE_LEAP_RECHARGE_MILLIS = 8_000L;
     public static final long DRAGON_ESCAPE_SCORE_UPDATE_MILLIS = 500L;
     public static final int DRAGON_ESCAPE_DISRUPTOR_ARM_TICKS = 40;
+    public static final int DRAGON_ESCAPE_JUMPER_LEAP_USES = 4;
+    public static final int DRAGON_ESCAPE_DISRUPTOR_LEAP_USES = 3;
+    public static final int DRAGON_ESCAPE_WARPER_LEAP_USES = 2;
+    public static final double DRAGON_ESCAPE_LEAP_FACING_Y_BONUS = 0.2D;
+    public static final double DRAGON_ESCAPE_LEAP_GROUNDED_Y_BONUS = 0.2D;
 
     /** A conservative one-way allowance, never an unbounded high-ping platform extension. */
     public static long dragonEscapeBuilderBlockLifetimeMillis(int pingMillis) {
@@ -796,14 +1385,19 @@ public final class ArcadePortRules {
     }
 
     public static long nextDragonEscapeScoreUpdateAt(long nowMillis) {
-        return nowMillis + DRAGON_ESCAPE_SCORE_UPDATE_MILLIS;
+        return nowMillis + Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "DRAGON_ESCAPE_SCORE_UPDATE_MILLIS", DRAGON_ESCAPE_SCORE_UPDATE_MILLIS));
     }
 
     /** Reborn applies the 0.2 lift, caps Y, then adds a further 0.2 when grounded. */
     public static double dragonEscapeLeapVerticalVelocity(double normalizedFacingY, boolean grounded) {
         if (!Double.isFinite(normalizedFacingY)) normalizedFacingY = 0.0D;
-        double y = Math.min(1.0D, normalizedFacingY + 0.2D);
-        if (grounded) y += 0.2D;
+        double facingBonus = GameDebugRuntimeOverrides.doubleValue(
+                "DRAGON_ESCAPE_LEAP_FACING_Y_BONUS", DRAGON_ESCAPE_LEAP_FACING_Y_BONUS);
+        double groundedBonus = GameDebugRuntimeOverrides.doubleValue(
+                "DRAGON_ESCAPE_LEAP_GROUNDED_Y_BONUS", DRAGON_ESCAPE_LEAP_GROUNDED_Y_BONUS);
+        double y = Math.min(1.0D, normalizedFacingY + facingBonus);
+        if (grounded) y += groundedBonus;
         return y;
     }
 
@@ -813,6 +1407,56 @@ public final class ArcadePortRules {
     }
     public static final double DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS = 2.0D;
     public static final double DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y = 0.5D;
+    public static final int DRAGON_ESCAPE_DEFEATER_WINS = 50;
+    public static final int DRAGON_ESCAPE_MAP_WINS_FOR_ACHIEVEMENT = 5;
+    public static final double DRAGON_ESCAPE_STRATS_GAP_BLOCKS = 40.0D;
+    public static final int DRAGON_ESCAPE_RAGEBAITER_KILLS = 3;
+    public static final long DRAGON_ESCAPE_RAGEBAITER_KILL_WINDOW_MILLIS = 12_000L;
+
+    public static int dragonEscapeDefeaterWins() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "DRAGON_ESCAPE_DEFEATER_WINS", DRAGON_ESCAPE_DEFEATER_WINS));
+    }
+
+    public static boolean shouldAwardDragonEscapeDefeater(int lifetimeWins) {
+        return lifetimeWins >= dragonEscapeDefeaterWins();
+    }
+
+    public static int dragonEscapeMapWinsForAchievement() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "DRAGON_ESCAPE_MAP_WINS_FOR_ACHIEVEMENT", DRAGON_ESCAPE_MAP_WINS_FOR_ACHIEVEMENT));
+    }
+
+    public static boolean shouldAwardDragonEscapeMapMaster(int mapWins) {
+        return mapWins >= dragonEscapeMapWinsForAchievement();
+    }
+
+    public static double dragonEscapeStratsGapBlocks() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "DRAGON_ESCAPE_STRATS_GAP_BLOCKS", DRAGON_ESCAPE_STRATS_GAP_BLOCKS));
+    }
+
+    public static boolean shouldAwardDragonEscapeStrats(double distanceAhead) {
+        return Double.isFinite(distanceAhead) && distanceAhead >= dragonEscapeStratsGapBlocks();
+    }
+
+    public static int dragonEscapeRagebaiterKills() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "DRAGON_ESCAPE_RAGEBAITER_KILLS", DRAGON_ESCAPE_RAGEBAITER_KILLS));
+    }
+
+    public static long dragonEscapeRagebaiterKillWindowMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "DRAGON_ESCAPE_RAGEBAITER_KILL_WINDOW_MILLIS", DRAGON_ESCAPE_RAGEBAITER_KILL_WINDOW_MILLIS));
+    }
+
+    public static boolean dragonEscapeRagebaiterKillWithinWindow(long elapsedMillis) {
+        return elapsedMillis >= 0L && elapsedMillis <= dragonEscapeRagebaiterKillWindowMillis();
+    }
+
+    public static boolean shouldAwardDragonEscapeRagebaiter(int qualifyingKills) {
+        return qualifyingKills >= dragonEscapeRagebaiterKills();
+    }
 
     public static String normalizeDragonsKit(String requested) {
         if (requested == null) return null;
@@ -843,7 +1487,8 @@ public final class ArcadePortRules {
     }
 
     public static boolean shouldAwardDragonsSurviveFiveMinutes(long liveElapsedMillis) {
-        return liveElapsedMillis >= DRAGONS_SURVIVE_FIVE_MINUTES_MILLIS;
+        return liveElapsedMillis >= GameDebugRuntimeOverrides.longValue(
+                "DRAGONS_SURVIVE_FIVE_MINUTES_MILLIS", DRAGONS_SURVIVE_FIVE_MINUTES_MILLIS);
     }
 
     public static int nextDragonsWinStreak(int previousStreak, boolean won) {
@@ -851,11 +1496,17 @@ public final class ArcadePortRules {
     }
 
     public static boolean shouldAwardDragonsWinStreak(int streak) {
-        return streak >= DRAGONS_WIN_STREAK_ACHIEVEMENT;
+        return streak >= GameDebugRuntimeOverrides.intValue(
+                "DRAGONS_WIN_STREAK_ACHIEVEMENT", DRAGONS_WIN_STREAK_ACHIEVEMENT);
     }
 
     public static boolean shouldAwardDragonsNoDamageWin(boolean won, boolean tookDamage) {
         return won && !tookDamage;
+    }
+
+    public static boolean shouldAwardDragonsDodgems(long millisSinceContact) {
+        return millisSinceContact >= GameDebugRuntimeOverrides.longValue(
+                "DRAGONS_DODGEMS_QUIET_MILLIS", DRAGONS_DODGEMS_QUIET_MILLIS);
     }
 
     public static boolean shouldCancelDragonsPvp(boolean directPlayerDamager, boolean playerProjectileShooter) {
@@ -894,10 +1545,17 @@ public final class ArcadePortRules {
                 || !Double.isFinite(facing.getZ()) || facing.lengthSquared() <= 1.0E-12D) {
             return new Vector();
         }
-        Vector velocity = facing.clone().normalize().multiply(1.2D);
-        velocity.setY(velocity.getY() + 0.2D);
-        if (velocity.getY() > 1.0D) velocity.setY(1.0D);
-        if (grounded) velocity.setY(velocity.getY() + 0.2D);
+        Vector velocity = facing.clone().normalize().multiply(GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_COWARD_LEAP_HORIZONTAL_SPEED", DRAGONS_COWARD_LEAP_HORIZONTAL_SPEED));
+        velocity.setY(velocity.getY() + GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_COWARD_LEAP_FACING_Y_BONUS", DRAGONS_COWARD_LEAP_FACING_Y_BONUS));
+        if (velocity.getY() > GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_COWARD_LEAP_MAX_Y", DRAGONS_COWARD_LEAP_MAX_Y)) {
+            velocity.setY(GameDebugRuntimeOverrides.doubleValue(
+                    "DRAGONS_COWARD_LEAP_MAX_Y", DRAGONS_COWARD_LEAP_MAX_Y));
+        }
+        if (grounded) velocity.setY(velocity.getY() + GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_COWARD_LEAP_GROUNDED_Y_BONUS", DRAGONS_COWARD_LEAP_GROUNDED_Y_BONUS));
         return velocity;
     }
 
@@ -907,15 +1565,95 @@ public final class ArcadePortRules {
                 || !Double.isFinite(trajectory.getZ()) || trajectory.lengthSquared() <= 1.0E-12D) {
             return new Vector();
         }
-        Vector velocity = trajectory.clone().normalize();
-        velocity.setY(velocity.getY() + 0.6D);
-        if (velocity.getY() > 2.0D) velocity.setY(2.0D);
-        if (grounded) velocity.setY(velocity.getY() + 0.2D);
+        Vector velocity = trajectory.clone().normalize().multiply(GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_CONTACT_HORIZONTAL_KNOCKBACK", DRAGONS_CONTACT_HORIZONTAL_KNOCKBACK));
+        velocity.setY(velocity.getY() + GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_CONTACT_VERTICAL_BONUS", DRAGONS_CONTACT_VERTICAL_BONUS));
+        if (velocity.getY() > GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_CONTACT_MAX_Y", DRAGONS_CONTACT_MAX_Y)) {
+            velocity.setY(GameDebugRuntimeOverrides.doubleValue("DRAGONS_CONTACT_MAX_Y", DRAGONS_CONTACT_MAX_Y));
+        }
+        if (grounded) velocity.setY(velocity.getY() + GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_CONTACT_GROUNDED_Y_BONUS", DRAGONS_CONTACT_GROUNDED_Y_BONUS));
         return velocity;
     }
 
+    public static Vector turnDragonHeading(Vector heading, Vector targetDirection, double turnRate) {
+        Vector result = heading == null ? new Vector() : heading.clone();
+        if (targetDirection != null && targetDirection.lengthSquared() > 1.0E-6D) {
+            Vector desired = targetDirection.clone().normalize();
+            double boundedTurnRate = Math.max(0.0D, Math.min(1.0D, turnRate));
+            result.add(desired.subtract(result.clone()).multiply(boundedTurnRate));
+        }
+        if (result.lengthSquared() < 1.0E-6D) return new Vector(0.0D, 0.0D, 1.0D);
+        return result.normalize();
+    }
+
+    public static Vector autonomousDragonFlight(Vector heading, double speed) {
+        if (heading == null || heading.lengthSquared() < 1.0E-6D) heading = new Vector(0.0D, 0.0D, 1.0D);
+        Vector flight = heading.clone().normalize().multiply(Math.max(0.0D, speed));
+        double y = flight.getY() + GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_FLIGHT_VERTICAL_BIAS", DRAGONS_FLIGHT_VERTICAL_BIAS);
+        double minY = GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_FLIGHT_MIN_VERTICAL_SPEED", DRAGONS_FLIGHT_MIN_VERTICAL_SPEED);
+        double maxY = GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_FLIGHT_MAX_VERTICAL_SPEED", DRAGONS_FLIGHT_MAX_VERTICAL_SPEED);
+        flight.setY(Math.max(Math.min(minY, maxY), Math.min(Math.max(minY, maxY), y)));
+        return flight;
+    }
+
     public static boolean shouldDragonSparklerAttract(double y, boolean inLiquid) {
-        return y >= 4.0D && !inLiquid;
+        return y >= GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_SPARKLER_MIN_ATTRACT_Y", DRAGONS_SPARKLER_MIN_ATTRACT_Y) && !inLiquid;
+    }
+
+    public static double dragonsTamerVerticalVelocity(double facingY) {
+        double cap = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_TAMER_VERTICAL_FLIGHT_CAP", DRAGONS_TAMER_VERTICAL_FLIGHT_CAP));
+        double scaled = facingY * GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_TAMER_VERTICAL_FLIGHT_FACTOR", DRAGONS_TAMER_VERTICAL_FLIGHT_FACTOR);
+        return Math.max(-cap, Math.min(cap, scaled));
+    }
+
+    public static boolean shouldRetargetDragon(double dragonY, double distanceSquared, boolean hasTarget) {
+        return dragonY < GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_RETARGET_ALTITUDE_Y", DRAGONS_RETARGET_ALTITUDE_Y)
+                || !hasTarget || distanceSquared <= GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_RETARGET_DISTANCE_SQUARED", DRAGONS_RETARGET_DISTANCE_SQUARED);
+    }
+
+    public static Vector dragonsGliderVelocity(Vector facing) {
+        if (facing == null || facing.lengthSquared() <= 1.0E-12D) return new Vector();
+        Vector velocity = facing.clone().normalize().multiply(GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_GLIDER_HORIZONTAL_SPEED", DRAGONS_GLIDER_HORIZONTAL_SPEED));
+        double minY = GameDebugRuntimeOverrides.doubleValue("DRAGONS_GLIDER_MIN_VERTICAL", DRAGONS_GLIDER_MIN_VERTICAL);
+        double maxY = GameDebugRuntimeOverrides.doubleValue("DRAGONS_GLIDER_MAX_VERTICAL", DRAGONS_GLIDER_MAX_VERTICAL);
+        double y = velocity.getY() + GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_GLIDER_VERTICAL_BASE", DRAGONS_GLIDER_VERTICAL_BASE);
+        velocity.setY(Math.max(Math.min(minY, maxY), Math.min(Math.max(minY, maxY), y)));
+        return velocity;
+    }
+
+    public static Vector dragonsBarrageArrowVelocity(Vector facing, Vector jitter) {
+        if (facing == null) return new Vector();
+        Vector velocity = facing.clone();
+        if (jitter != null) velocity.add(jitter);
+        return velocity.multiply(GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_BARRAGE_ARROW_SPEED", DRAGONS_BARRAGE_ARROW_SPEED));
+    }
+
+    public static double dragonsBarrageJitterComponent(double randomValue) {
+        return (randomValue - 0.5D) * GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_BARRAGE_ARROW_SPREAD", DRAGONS_BARRAGE_ARROW_SPREAD);
+    }
+
+    public static double dragonsFrostInitialLift() {
+        return GameDebugRuntimeOverrides.doubleValue("DRAGONS_FROST_LAUNCH_Y", DRAGONS_FROST_LAUNCH_Y);
+    }
+
+    public static double dragonsFrostPathStep() {
+        return Math.max(0.01D, GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_FROST_PATH_STEP", DRAGONS_FROST_PATH_STEP));
     }
 
     public static boolean canUseDragonSpectatorTeleport(long nowMillis, long nextAllowedMillis) {
@@ -924,21 +1662,27 @@ public final class ArcadePortRules {
 
 
     public static boolean shouldSpawnTestDragon(int currentCount, long now, long nextSpawnAt) {
-        return currentCount < DRAGONS_MAX_DRAGONS && now >= nextSpawnAt;
+        return currentCount < Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "DRAGONS_MAX_DRAGONS", DRAGONS_MAX_DRAGONS)) && now >= nextSpawnAt;
     }
 
     public static boolean shouldReplenishDragonSparkler(long now, long nextSpawnAt, int currentCount) {
-        return now >= nextSpawnAt && currentCount < DRAGONS_MAX_SPARKLERS;
+        int maxSparklers = Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "DRAGONS_MAX_SPARKLERS", DRAGONS_MAX_SPARKLERS));
+        return now >= nextSpawnAt && currentCount < maxSparklers;
     }
 
     public static boolean shouldExpireDragonSparkler(int livedTicks, double y, boolean inLiquid) {
         // PerkSparkler removes at >100 ticks. Dragons skips a low/submerged lure for targeting
         // but it remains alive until the perk's lifetime cleanup.
-        return livedTicks > DRAGONS_SPARKLER_LIFETIME_TICKS;
+        int lifetime = Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "DRAGONS_SPARKLER_LIFETIME_TICKS", DRAGONS_SPARKLER_LIFETIME_TICKS));
+        return livedTicks > lifetime;
     }
 
     public static double dragonFallDamageAfterReduction(double damage) {
-        return Math.max(0.0D, damage - 1.0D);
+        return Math.max(0.0D, damage - GameDebugRuntimeOverrides.doubleValue(
+                "DRAGONS_FALL_DAMAGE_REDUCTION", DRAGONS_FALL_DAMAGE_REDUCTION));
     }
 
     public static String normalizeMicroBattlesKit(String requested) {
@@ -982,7 +1726,11 @@ public final class ArcadePortRules {
     }
 
     public static boolean shouldRemoveMicroBarrier(long elapsedMillis) {
-        return elapsedMillis >= MICRO_BATTLES_BARRIER_DURATION_MILLIS;
+        return shouldRemoveMicroBarrier(elapsedMillis, MICRO_BATTLES_BARRIER_DURATION_MILLIS);
+    }
+
+    public static boolean shouldRemoveMicroBarrier(long elapsedMillis, long durationMillis) {
+        return elapsedMillis >= Math.max(0L, durationMillis);
     }
 
     /** Only the kits retained from the selected source ruleset are exposed. */
@@ -1133,7 +1881,21 @@ public final class ArcadePortRules {
     /** Number of 0.2-block trail samples including the previous position. */
     public static int bombLobbersTrailSampleCount(double segmentLength) {
         if (!Double.isFinite(segmentLength) || segmentLength < 0.0D) return 0;
-        return (int) Math.floor(segmentLength / BOMB_LOBBERS_TRAIL_SAMPLE_SPACING) + 1;
+        double spacing = GameDebugRuntimeOverrides.doubleValue(
+                "BOMB_LOBBERS_TRAIL_SAMPLE_SPACING", BOMB_LOBBERS_TRAIL_SAMPLE_SPACING);
+        if (!Double.isFinite(spacing) || spacing <= 0.0D) spacing = BOMB_LOBBERS_TRAIL_SAMPLE_SPACING;
+        return (int) Math.floor(segmentLength / spacing) + 1;
+    }
+
+    public static boolean bombLobbersCanCarryMoreTnt(int currentTnt) {
+        int maximum = Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "BOMB_LOBBERS_MAX_CARRIED", BOMB_LOBBERS_MAX_CARRIED));
+        return Math.max(0, currentTnt) < maximum;
+    }
+
+    public static int bombLobbersPowerupSpeedDurationTicks() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "BOMB_LOBBERS_POWERUP_SPEED_DURATION_TICKS", BOMB_LOBBERS_POWERUP_SPEED_DURATION_TICKS));
     }
 
     /** True for the metal armour supplied by the Armorer kit.
@@ -1164,18 +1926,30 @@ public final class ArcadePortRules {
         return 2;
     }
 
+    public static long bombLobbersPowerupSpawnDelayMillis(long randomValue) {
+        long min = Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "BOMB_LOBBERS_POWERUP_SPAWN_MIN_DELAY_MILLIS", BOMB_LOBBERS_POWERUP_SPAWN_MIN_DELAY_MILLIS));
+        long max = Math.max(min, GameDebugRuntimeOverrides.longValue(
+                "BOMB_LOBBERS_POWERUP_SPAWN_MAX_DELAY_MILLIS", BOMB_LOBBERS_POWERUP_SPAWN_MAX_DELAY_MILLIS));
+        return min + Math.floorMod(randomValue, max - min + 1L);
+    }
+
     public static double bombLobbersExplosionRadius(String powerupType) {
         return "super-tnt".equalsIgnoreCase(powerupType)
-                ? BOMB_LOBBERS_SUPER_TNT_EXPLOSION_RADIUS : BOMB_LOBBERS_EXPLOSION_RADIUS;
+                ? GameDebugRuntimeOverrides.doubleValue("BOMB_LOBBERS_SUPER_TNT_EXPLOSION_RADIUS", BOMB_LOBBERS_SUPER_TNT_EXPLOSION_RADIUS)
+                : GameDebugRuntimeOverrides.doubleValue("BOMB_LOBBERS_EXPLOSION_RADIUS", BOMB_LOBBERS_EXPLOSION_RADIUS);
     }
 
     public static double bombLobbersExplosionMaxDamage(String powerupType) {
         return "super-tnt".equalsIgnoreCase(powerupType)
-                ? BOMB_LOBBERS_SUPER_TNT_MAX_DAMAGE : BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE;
+                ? GameDebugRuntimeOverrides.doubleValue("BOMB_LOBBERS_SUPER_TNT_MAX_DAMAGE", BOMB_LOBBERS_SUPER_TNT_MAX_DAMAGE)
+                : GameDebugRuntimeOverrides.doubleValue("BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE", BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE);
     }
 
     public static double bombLobbersDirectHitDamage(String powerupType) {
-        return "super-tnt".equalsIgnoreCase(powerupType) ? 15.0D : 10.0D;
+        return "super-tnt".equalsIgnoreCase(powerupType)
+                ? GameDebugRuntimeOverrides.doubleValue("BOMB_LOBBERS_SUPER_TNT_DIRECT_HIT_DAMAGE", BOMB_LOBBERS_SUPER_TNT_DIRECT_HIT_DAMAGE)
+                : GameDebugRuntimeOverrides.doubleValue("BOMB_LOBBERS_DIRECT_HIT_DAMAGE", BOMB_LOBBERS_DIRECT_HIT_DAMAGE);
     }
 
     public static boolean bombLobbersTntIgnites(String powerupType) {
@@ -1223,9 +1997,10 @@ public final class ArcadePortRules {
     public static final long BOMB_LOBBERS_DOUBLE_JUMP_RECHARGE_MILLIS = 50L;
 
     public static long nextBombLobbersDoubleJumpReadyAt(long nowMillis) {
-        if (nowMillis < 0L) return BOMB_LOBBERS_DOUBLE_JUMP_RECHARGE_MILLIS;
-        if (nowMillis > Long.MAX_VALUE - BOMB_LOBBERS_DOUBLE_JUMP_RECHARGE_MILLIS) return Long.MAX_VALUE;
-        return nowMillis + BOMB_LOBBERS_DOUBLE_JUMP_RECHARGE_MILLIS;
+        long cooldown = Math.max(0L, GameDebugRuntimeOverrides.longValue("BOMB_LOBBERS_DOUBLE_JUMP_RECHARGE_MILLIS", BOMB_LOBBERS_DOUBLE_JUMP_RECHARGE_MILLIS));
+        if (nowMillis < 0L) return cooldown;
+        if (nowMillis > Long.MAX_VALUE - cooldown) return Long.MAX_VALUE;
+        return nowMillis + cooldown;
     }
 
     /** Mirrors UtilAction.velocity for PerkDoubleJump's view vector, Y cap, and optional ground boost. */
@@ -1298,8 +2073,8 @@ public final class ArcadePortRules {
     }
 
     public static boolean shouldPrimeBombLobbersBomb(long ageMillis, boolean touchingSolidBlock) {
-        return ageMillis >= BOMB_LOBBERS_MAX_FLIGHT_MILLIS
-                || (ageMillis >= BOMB_LOBBERS_WALL_CONTACT_DELAY_MILLIS && touchingSolidBlock);
+        return ageMillis >= GameDebugRuntimeOverrides.longValue("BOMB_LOBBERS_MAX_FLIGHT_MILLIS", BOMB_LOBBERS_MAX_FLIGHT_MILLIS)
+                || (ageMillis >= GameDebugRuntimeOverrides.longValue("BOMB_LOBBERS_WALL_CONTACT_DELAY_MILLIS", BOMB_LOBBERS_WALL_CONTACT_DELAY_MILLIS) && touchingSolidBlock);
     }
 
     /** High lobs reach terrain after the three-second grace period and explode on contact. */
@@ -1318,9 +2093,10 @@ public final class ArcadePortRules {
     }
 
     public static long nextBombLobbersWallerReadyAt(long nowMillis) {
-        if (nowMillis < 0L) return BOMB_LOBBERS_WALLER_COOLDOWN_MILLIS;
-        if (nowMillis > Long.MAX_VALUE - BOMB_LOBBERS_WALLER_COOLDOWN_MILLIS) return Long.MAX_VALUE;
-        return nowMillis + BOMB_LOBBERS_WALLER_COOLDOWN_MILLIS;
+        long cooldown = Math.max(0L, GameDebugRuntimeOverrides.longValue("BOMB_LOBBERS_WALLER_COOLDOWN_MILLIS", BOMB_LOBBERS_WALLER_COOLDOWN_MILLIS));
+        if (nowMillis < 0L) return cooldown;
+        if (nowMillis > Long.MAX_VALUE - cooldown) return Long.MAX_VALUE;
+        return nowMillis + cooldown;
     }
 
     /** Reborn's Waller faces the adjacent block using getFace(playerYaw + 180F). */
@@ -1337,7 +2113,7 @@ public final class ArcadePortRules {
      */
     public static double bombLobbersBlastDamage(double distanceToTarget, double exposure) {
         return bombLobbersBlastDamage(distanceToTarget, exposure,
-                BOMB_LOBBERS_EXPLOSION_RADIUS, BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE);
+                bombLobbersExplosionRadius(null), bombLobbersExplosionMaxDamage(null));
     }
 
     public static double bombLobbersBlastDamage(double distanceToTarget, double exposure,
@@ -1413,9 +2189,9 @@ public final class ArcadePortRules {
         }
         org.bukkit.util.Vector startVector = start.toVector();
         org.bukkit.util.BoundingBox hitBox = targetBox.clone().expand(
-                BOMB_LOBBERS_DIRECT_HIT_BOX_GROW,
-                BOMB_LOBBERS_DIRECT_HIT_BOX_GROW,
-                BOMB_LOBBERS_DIRECT_HIT_BOX_GROW);
+                Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue("BOMB_LOBBERS_DIRECT_HIT_BOX_GROW", BOMB_LOBBERS_DIRECT_HIT_BOX_GROW)),
+                Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue("BOMB_LOBBERS_DIRECT_HIT_BOX_GROW", BOMB_LOBBERS_DIRECT_HIT_BOX_GROW)),
+                Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue("BOMB_LOBBERS_DIRECT_HIT_BOX_GROW", BOMB_LOBBERS_DIRECT_HIT_BOX_GROW)));
         org.bukkit.util.Vector segment = end.toVector().subtract(startVector);
         double length = segment.length();
         if (!Double.isFinite(length)) return Double.POSITIVE_INFINITY;
@@ -1542,7 +2318,25 @@ public final class ArcadePortRules {
     }
 
     public static boolean shouldDropRunnerBlock(long elapsedMillis) {
-        return elapsedMillis >= RUNNER_BLOCK_DECAY_MILLIS;
+        long decayMillis = Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "RUNNER_BLOCK_DECAY_MILLIS", RUNNER_BLOCK_DECAY_MILLIS));
+        return elapsedMillis >= decayMillis;
+    }
+
+    public static double runnerLeapHorizontalSpeed() {
+        return GameDebugRuntimeOverrides.doubleValue("RUNNER_LEAP_HORIZONTAL_SPEED", RUNNER_LEAP_HORIZONTAL_SPEED);
+    }
+
+    public static double runnerLeapVerticalSpeed() {
+        return GameDebugRuntimeOverrides.doubleValue("RUNNER_LEAP_VERTICAL_SPEED", RUNNER_LEAP_VERTICAL_SPEED);
+    }
+
+    public static double runnerQuickshotProjectileSpeed() {
+        return GameDebugRuntimeOverrides.doubleValue("RUNNER_QUICKSHOT_PROJECTILE_SPEED", RUNNER_QUICKSHOT_PROJECTILE_SPEED);
+    }
+
+    public static long runnerSwitchGraceMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue("RUNNER_SWITCH_GRACE_MILLIS", RUNNER_SWITCH_GRACE_MILLIS));
     }
 
     public static String normalizeDeathTagRunnerKit(String requested) {
@@ -1578,8 +2372,44 @@ public final class ArcadePortRules {
 
     public static int spleefProjectileClearRadius(boolean arrow, double velocity) {
         if (!arrow) return 1;
-        double safeVelocity = Math.max(0.0D, velocity);
-        return Math.max(1, Math.min(3, (int) Math.ceil(0.5D + safeVelocity / 1.6D)));
+        double radius = spleefArrowClearRadius(velocity);
+        int minimum = Math.max(0, Math.min(4, GameDebugRuntimeOverrides.intValue(
+                "SPLEEF_PROJECTILE_CLEAR_RADIUS_MIN_BLOCKS", SPLEEF_PROJECTILE_CLEAR_RADIUS_MIN_BLOCKS)));
+        int maximum = Math.max(minimum, Math.min(8, GameDebugRuntimeOverrides.intValue(
+                "SPLEEF_PROJECTILE_CLEAR_RADIUS_MAX_BLOCKS", SPLEEF_PROJECTILE_CLEAR_RADIUS_MAX_BLOCKS)));
+        return Math.max(minimum, Math.min(maximum, (int) Math.ceil(radius)));
+    }
+
+    public static int spleefProjectileImpactSearchRadius() {
+        return Math.max(0, Math.min(4, GameDebugRuntimeOverrides.intValue(
+                "SPLEEF_PROJECTILE_IMPACT_SEARCH_RADIUS_BLOCKS", SPLEEF_PROJECTILE_IMPACT_SEARCH_RADIUS_BLOCKS)));
+    }
+
+    public static double spleefProjectileSpeedMultiplier(String kit) {
+        String key = switch (kit == null ? "" : kit.toLowerCase(java.util.Locale.ROOT)) {
+            case "archer" -> "SPLEEF_ARCHER_ARROW_SPEED_MULTIPLIER";
+            case "snowballer" -> "SPLEEF_SNOWBALL_SPEED_MULTIPLIER";
+            case "gust" -> "SPLEEF_GUST_SPEED_MULTIPLIER";
+            default -> null;
+        };
+        double fallback = switch (kit == null ? "" : kit.toLowerCase(java.util.Locale.ROOT)) {
+            case "archer" -> SPLEEF_ARCHER_ARROW_SPEED_MULTIPLIER;
+            case "snowballer" -> SPLEEF_SNOWBALL_SPEED_MULTIPLIER;
+            case "gust" -> SPLEEF_GUST_SPEED_MULTIPLIER;
+            default -> 1.0D;
+        };
+        double multiplier = key == null ? fallback : GameDebugRuntimeOverrides.doubleValue(key, fallback);
+        return Double.isFinite(multiplier) ? Math.max(0.1D, Math.min(4.0D, multiplier)) : fallback;
+    }
+
+    public static double spleefProjectileImpactRadius(boolean arrow, double velocity) {
+        return arrow ? spleefArrowClearRadius(velocity) : 1.0D;
+    }
+
+    public static int spleefHungerAfterHit(int currentFoodLevel) {
+        int restore = Math.max(0, Math.min(20, GameDebugRuntimeOverrides.intValue(
+                "SPLEEF_HUNGER_RESTORE_PER_HIT", SPLEEF_HUNGER_RESTORE_PER_HIT)));
+        return Math.max(0, Math.min(20, currentFoodLevel + restore));
     }
 
     public static final long EVOLUTION_RESPAWN_TICKS = 80L;
@@ -1588,20 +2418,30 @@ public final class ArcadePortRules {
     public static final double EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER = 0.75D;
     public static double evolutionChargePerTick(int killsThisLife, boolean quickEvolver) {
         double normal = evolutionChargePerTick(killsThisLife);
-        return quickEvolver ? normal / EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER : normal;
+        double multiplier = Math.max(0.05D, GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER", EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER));
+        return quickEvolver ? normal / multiplier : normal;
     }
     public static long evolutionFormChangeTicks(boolean quickEvolver) {
-        return quickEvolver ? (long) Math.ceil(EVOLUTION_FORM_CHANGE_TICKS * EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER)
-                : EVOLUTION_FORM_CHANGE_TICKS;
+        long base = Math.max(1L, GameDebugRuntimeOverrides.longValue("EVOLUTION_FORM_CHANGE_TICKS", EVOLUTION_FORM_CHANGE_TICKS));
+        double multiplier = Math.max(0.05D, GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER", EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER));
+        return quickEvolver ? (long) Math.ceil(base * multiplier) : base;
     }
     public static long evolutionTotalAnimationTicks(boolean quickEvolver) {
-        return quickEvolver ? (long) Math.ceil(EVOLUTION_TOTAL_ANIMATION_TICKS * EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER)
-                : EVOLUTION_TOTAL_ANIMATION_TICKS;
+        long base = Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "EVOLUTION_TOTAL_ANIMATION_TICKS", EVOLUTION_TOTAL_ANIMATION_TICKS));
+        double multiplier = Math.max(0.05D, GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER", EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER));
+        return quickEvolver ? (long) Math.ceil(base * multiplier) : base;
     }
     public static boolean shouldAwardEvolutionWrongKitChamp(int attemptedLevel, boolean quickEvolverSelected,
             boolean currentlyEvolving, long elapsedTicks) {
-        return !quickEvolverSelected && currentlyEvolving && attemptedLevel == EVOLUTION_WIN_LEVEL - 1
-                && elapsedTicks >= evolutionFormChangeTicks(true) && elapsedTicks < EVOLUTION_FORM_CHANGE_TICKS;
+        long baseFormTicks = Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "EVOLUTION_FORM_CHANGE_TICKS", EVOLUTION_FORM_CHANGE_TICKS));
+        int winningLevel = Math.max(1, GameDebugRuntimeOverrides.intValue("EVOLUTION_WIN_LEVEL", EVOLUTION_WIN_LEVEL));
+        return !quickEvolverSelected && currentlyEvolving && attemptedLevel == winningLevel - 1
+                && elapsedTicks >= evolutionFormChangeTicks(true) && elapsedTicks < baseFormTicks;
     }
     public static final int EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION = 2;
     public static final long EVOLUTION_PITY_CLOCK_MILLIS = 90_000L;
@@ -1621,27 +2461,89 @@ public final class ArcadePortRules {
     public static final double EVOLUTION_CHICKEN_DOUBLE_JUMP_HORIZONTAL = 0.6D;
     public static final double EVOLUTION_CHICKEN_DOUBLE_JUMP_VERTICAL = 0.6D;
     public static final double EVOLUTION_EGG_DAMAGE = 2.0D;
+    public static final double EVOLUTION_BLAZE_SPREAD_RADIANS = 0.07D;
+    public static final long EVOLUTION_WATER_DAMAGE_INTERVAL_MILLIS = 250L;
+    public static final double EVOLUTION_WATER_DAMAGE = 1.0D;
+    public static final long EVOLUTION_GOLEM_SLAM_IMPACT_DELAY_MILLIS = 1_000L;
+    public static final double EVOLUTION_GOLEM_SLAM_DAMAGE_FLOOR = 0.5D;
+    public static final long EVOLUTION_SLIME_SLAM_MAX_DURATION_MILLIS = 1_000L;
+    public static final long EVOLUTION_SLIME_SLAM_MIN_AIRTIME_MILLIS = 100L;
+
+    public static double evolutionEggDamage() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_EGG_DAMAGE", EVOLUTION_EGG_DAMAGE));
+    }
     public static final long EVOLUTION_SULPHUR_BOMB_COOLDOWN_MILLIS = 3_000L;
     public static final double EVOLUTION_SULPHUR_BOMB_SPEED = 1.2D;
     public static final double EVOLUTION_SULPHUR_BOMB_RADIUS = 2.5D;
     public static final double EVOLUTION_SULPHUR_BOMB_DAMAGE = 4.0D;
+    public static final double EVOLUTION_CHARGE_BASE_PER_TICK = 0.012D;
+    public static final double EVOLUTION_CHARGE_PER_EXTRA_KILL = 0.003D;
+    public static final double EVOLUTION_CHARGE_MAX_PER_TICK = 0.022D;
+    public static final double EVOLUTION_CREEPER_MAX_HEALTH = 28.0D;
+    public static final double EVOLUTION_GOLEM_MAX_HEALTH = 40.0D;
+    public static final double EVOLUTION_BLAZE_MAX_HEALTH = 36.0D;
+    public static final double EVOLUTION_SLIME_MAX_HEALTH = 22.0D;
+    public static final double EVOLUTION_CHICKEN_MAX_HEALTH = 16.0D;
+    public static final double EVOLUTION_CREEPER_MELEE_DAMAGE = 4.0D;
+    public static final double EVOLUTION_GOLEM_MELEE_DAMAGE = 6.0D;
+    public static final double EVOLUTION_BLAZE_MELEE_DAMAGE = 5.0D;
+    public static final double EVOLUTION_SLIME_MELEE_DAMAGE = 4.0D;
+    public static final double EVOLUTION_CHICKEN_MELEE_DAMAGE = 3.0D;
+    public static final double EVOLUTION_CREEPER_FALL_DAMAGE_MULTIPLIER = 1.0D;
+    public static final double EVOLUTION_GOLEM_FALL_DAMAGE_MULTIPLIER = 1.0D;
+    public static final double EVOLUTION_BLAZE_FALL_DAMAGE_MULTIPLIER = 0.0D;
+    public static final double EVOLUTION_SLIME_FALL_DAMAGE_MULTIPLIER = 0.5D;
+    public static final double EVOLUTION_CHICKEN_FALL_DAMAGE_MULTIPLIER = 0.0D;
+    public static final double EVOLUTION_GOLEM_SLAM_LAUNCH_SPEED = 1.0D;
+    public static final double EVOLUTION_GOLEM_SLAM_KNOCKBACK = 2.4D;
+    public static final double EVOLUTION_SLIME_SLAM_LAUNCH_HORIZONTAL = 1.6D;
+    public static final double EVOLUTION_SLIME_SLAM_LAUNCH_VERTICAL = 0.4D;
+    public static final double EVOLUTION_SLIME_SLAM_KNOCKBACK = 2.0D;
+    public static final double EVOLUTION_CHICKEN_EGG_SPEED = 1.35D;
 
     public static int nextEvolutionLevel(int currentLevel, boolean wonEvolve) {
-        int safeLevel = Math.max(0, Math.min(EVOLUTION_WIN_LEVEL, currentLevel));
-        return wonEvolve ? Math.min(EVOLUTION_WIN_LEVEL, safeLevel + 1) : safeLevel;
+        int winningLevel = Math.max(1, GameDebugRuntimeOverrides.intValue("EVOLUTION_WIN_LEVEL", EVOLUTION_WIN_LEVEL));
+        int safeLevel = Math.max(0, Math.min(winningLevel, currentLevel));
+        return wonEvolve ? Math.min(winningLevel, safeLevel + 1) : safeLevel;
     }
 
     public static double evolutionMaxHealth(int level) {
-        return switch (Math.max(0, Math.min(4, level))) {
-            case 0 -> 40.0D; case 1 -> 36.0D; case 2 -> 28.0D;
-            case 3 -> 22.0D; default -> 16.0D;
+        int stage = Math.max(0, Math.min(4, level));
+        String key = switch (stage) {
+            case 0 -> "EVOLUTION_GOLEM_MAX_HEALTH";
+            case 1 -> "EVOLUTION_BLAZE_MAX_HEALTH";
+            case 2 -> "EVOLUTION_CREEPER_MAX_HEALTH";
+            case 3 -> "EVOLUTION_SLIME_MAX_HEALTH";
+            default -> "EVOLUTION_CHICKEN_MAX_HEALTH";
         };
+        double fallback = switch (stage) {
+            case 0 -> EVOLUTION_GOLEM_MAX_HEALTH;
+            case 1 -> EVOLUTION_BLAZE_MAX_HEALTH;
+            case 2 -> EVOLUTION_CREEPER_MAX_HEALTH;
+            case 3 -> EVOLUTION_SLIME_MAX_HEALTH;
+            default -> EVOLUTION_CHICKEN_MAX_HEALTH;
+        };
+        return Math.max(1.0D, GameDebugRuntimeOverrides.doubleValue(key, fallback));
     }
 
     public static double evolutionMeleeDamage(int level) {
-        return switch (Math.max(0, Math.min(4, level))) {
-            case 0 -> 6.0D; case 1 -> 5.0D; case 2, 3 -> 4.0D; default -> 3.0D;
+        int stage = Math.max(0, Math.min(4, level));
+        String key = switch (stage) {
+            case 0 -> "EVOLUTION_GOLEM_MELEE_DAMAGE";
+            case 1 -> "EVOLUTION_BLAZE_MELEE_DAMAGE";
+            case 2 -> "EVOLUTION_CREEPER_MELEE_DAMAGE";
+            case 3 -> "EVOLUTION_SLIME_MELEE_DAMAGE";
+            default -> "EVOLUTION_CHICKEN_MELEE_DAMAGE";
         };
+        double fallback = switch (stage) {
+            case 0 -> EVOLUTION_GOLEM_MELEE_DAMAGE;
+            case 1 -> EVOLUTION_BLAZE_MELEE_DAMAGE;
+            case 2 -> EVOLUTION_CREEPER_MELEE_DAMAGE;
+            case 3 -> EVOLUTION_SLIME_MELEE_DAMAGE;
+            default -> EVOLUTION_CHICKEN_MELEE_DAMAGE;
+        };
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(key, fallback));
     }
 
     /**
@@ -1650,16 +2552,72 @@ public final class ArcadePortRules {
      * Iron Golem and Creeper retain normal fall damage.
      */
     public static double evolutionFallDamageMultiplier(int level) {
-        return switch (Math.max(0, Math.min(4, level))) {
-            case 1, 4 -> 0.0D;
-            case 3 -> 0.5D;
-            default -> 1.0D;
+        int stage = Math.max(0, Math.min(4, level));
+        String key = switch (stage) {
+            case 0 -> "EVOLUTION_GOLEM_FALL_DAMAGE_MULTIPLIER";
+            case 1 -> "EVOLUTION_BLAZE_FALL_DAMAGE_MULTIPLIER";
+            case 2 -> "EVOLUTION_CREEPER_FALL_DAMAGE_MULTIPLIER";
+            case 3 -> "EVOLUTION_SLIME_FALL_DAMAGE_MULTIPLIER";
+            default -> "EVOLUTION_CHICKEN_FALL_DAMAGE_MULTIPLIER";
         };
+        double fallback = switch (stage) {
+            case 0 -> EVOLUTION_GOLEM_FALL_DAMAGE_MULTIPLIER;
+            case 1 -> EVOLUTION_BLAZE_FALL_DAMAGE_MULTIPLIER;
+            case 2 -> EVOLUTION_CREEPER_FALL_DAMAGE_MULTIPLIER;
+            case 3 -> EVOLUTION_SLIME_FALL_DAMAGE_MULTIPLIER;
+            default -> EVOLUTION_CHICKEN_FALL_DAMAGE_MULTIPLIER;
+        };
+        return Math.max(0.0D, Math.min(1.0D, GameDebugRuntimeOverrides.doubleValue(key, fallback)));
     }
 
     public static double evolutionChargePerTick(int killsThisLife) {
         int extraKills = Math.max(0, killsThisLife - 1);
-        return Math.min(0.022D, 0.012D + 0.003D * extraKills);
+        double base = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_CHARGE_BASE_PER_TICK", EVOLUTION_CHARGE_BASE_PER_TICK));
+        double perKill = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_CHARGE_PER_EXTRA_KILL", EVOLUTION_CHARGE_PER_EXTRA_KILL));
+        double maximum = Math.max(base, GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_CHARGE_MAX_PER_TICK", EVOLUTION_CHARGE_MAX_PER_TICK));
+        return Math.min(maximum, base + perKill * extraKills);
+    }
+
+    public static long evolutionWaterDamageIntervalMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue("EVOLUTION_WATER_DAMAGE_INTERVAL_MILLIS",
+                EVOLUTION_WATER_DAMAGE_INTERVAL_MILLIS));
+    }
+
+    public static double evolutionWaterDamage() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue("EVOLUTION_WATER_DAMAGE", EVOLUTION_WATER_DAMAGE));
+    }
+
+    public static long evolutionGolemSlamImpactDelayMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue("EVOLUTION_GOLEM_SLAM_IMPACT_DELAY_MILLIS",
+                EVOLUTION_GOLEM_SLAM_IMPACT_DELAY_MILLIS));
+    }
+
+    public static double evolutionGolemSlamDamageAtDistance(double distance) {
+        double radius = Math.max(0.1D, GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_GOLEM_SLAM_RADIUS", EVOLUTION_GOLEM_SLAM_RADIUS));
+        double baseDamage = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_GOLEM_SLAM_DAMAGE", EVOLUTION_GOLEM_SLAM_DAMAGE));
+        double damageFloor = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_GOLEM_SLAM_DAMAGE_FLOOR", EVOLUTION_GOLEM_SLAM_DAMAGE_FLOOR));
+        return baseDamage * (1.0D - Math.max(0.0D, distance) / radius) + damageFloor;
+    }
+
+    public static long evolutionSlimeSlamMaxDurationMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue("EVOLUTION_SLIME_SLAM_MAX_DURATION_MILLIS",
+                EVOLUTION_SLIME_SLAM_MAX_DURATION_MILLIS));
+    }
+
+    public static long evolutionSlimeSlamMinAirtimeMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue("EVOLUTION_SLIME_SLAM_MIN_AIRTIME_MILLIS",
+                EVOLUTION_SLIME_SLAM_MIN_AIRTIME_MILLIS));
+    }
+
+    public static double evolutionBlazeSpreadRadians() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_BLAZE_SPREAD_RADIANS", EVOLUTION_BLAZE_SPREAD_RADIANS));
     }
 
     public static final long BACON_BLAST_KILL_COMBO_WINDOW_MILLIS = 5_000L;
@@ -1671,7 +2629,8 @@ public final class ArcadePortRules {
         if (directBlastKill) return true;
         return killerId != null && killerId.equals(comboOwnerId)
                 && lastComboHitAtMillis > 0L && nowMillis >= lastComboHitAtMillis
-                && nowMillis - lastComboHitAtMillis <= BACON_BLAST_KILL_COMBO_WINDOW_MILLIS;
+                && nowMillis - lastComboHitAtMillis <= GameDebugRuntimeOverrides.longValue(
+                        "BACON_BLAST_KILL_COMBO_WINDOW_MILLIS", BACON_BLAST_KILL_COMBO_WINDOW_MILLIS);
     }
 
     public static long evolutionPityRemainingMillis(long pityDeadline, long now) {
@@ -1688,7 +2647,9 @@ public final class ArcadePortRules {
     }
 
     public static int nextEvolutionOverkillKillCount(int killsSinceLastEvolution) {
-        return Math.min(EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION,
+        int required = Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION", EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION));
+        return Math.min(required,
                 Math.max(0, killsSinceLastEvolution) + 1);
     }
 
@@ -1701,19 +2662,29 @@ public final class ArcadePortRules {
     }
 
     public static long nextEvolutionSulphurBombReadyAt(long now) {
-        return now + EVOLUTION_SULPHUR_BOMB_COOLDOWN_MILLIS;
+        long cooldown = Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "EVOLUTION_SULPHUR_BOMB_COOLDOWN_MILLIS", EVOLUTION_SULPHUR_BOMB_COOLDOWN_MILLIS));
+        return now + cooldown;
     }
 
     public static boolean isEvolutionSulphurBombInRange(double distance) {
-        return Double.isFinite(distance) && distance >= 0.0D && distance <= EVOLUTION_SULPHUR_BOMB_RADIUS;
+        double radius = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_SULPHUR_BOMB_RADIUS", EVOLUTION_SULPHUR_BOMB_RADIUS));
+        return Double.isFinite(distance) && distance >= 0.0D && distance <= radius;
     }
 
     public static boolean evolutionOverkillRequirementMet(int killsBeforeEvolution) {
-        return killsBeforeEvolution >= EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION;
+        return killsBeforeEvolution >= evolutionOverkillKillsRequired();
+    }
+
+    public static int evolutionOverkillKillsRequired() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION", EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION));
     }
 
     public static boolean isEvolutionWinnerLevel(int level) {
-        return level >= EVOLUTION_WIN_LEVEL;
+        int target = Math.max(1, GameDebugRuntimeOverrides.intValue("EVOLUTION_WIN_LEVEL", EVOLUTION_WIN_LEVEL));
+        return level >= target;
     }
 
     public static int sheepQuestLeadingTeam(int redSheep, int blueSheep) {
@@ -1765,6 +2736,117 @@ public final class ArcadePortRules {
     public static final long SHEEP_QUEST_PICKUP_COOLDOWN_MILLIS = 500L;
     public static final double SHEEP_QUEST_PICKUP_RADIUS = 2.5D;
     public static final long SHEEP_QUEST_BESERKER_JUMP_COOLDOWN_MILLIS = 8_000L;
+    public static final long SHEEP_QUEST_BESERKER_LEAP_WINDOW_MILLIS = 3_000L;
+    public static final double SHEEP_QUEST_BESERKER_LEAP_HORIZONTAL_SPEED = 0.9D;
+    public static final double SHEEP_QUEST_BESERKER_LEAP_VERTICAL_ADD = 0.4D;
+    public static final double SHEEP_QUEST_BESERKER_LEAP_VERTICAL_MIN = 0.65D;
+    public static final double SHEEP_QUEST_BESERKER_LEAP_VERTICAL_MAX = 1.0D;
+    public static final double SHEEP_QUEST_BRUTE_THROW_SPEED = 1.4D;
+    public static final double SHEEP_QUEST_BRUTE_THROW_VERTICAL_MIN = 0.3D;
+    public static final double SHEEP_QUEST_BRUTE_THROW_VERTICAL_MAX = 0.8D;
+    public static final double SHEEP_QUEST_BRUTE_THROW_VERTICAL_PITCH_SCALE = 0.25D;
+    public static final double SHEEP_QUEST_THROW_HIT_RADIUS = 1.2D;
+    public static final long SHEEP_QUEST_THROW_ENTITY_LIFETIME_MILLIS = 5_000L;
+    public static final double SHEEP_QUEST_THROW_KNOCKBACK = 1.2D;
+    public static final double SHEEP_QUEST_THROW_VERTICAL_KNOCKBACK = 0.4D;
+    public static final double SHEEP_QUEST_THROW_BOUNCE_MULTIPLIER = -0.2D;
+    public static final double SHEEP_QUEST_THROW_BOUNCE_VERTICAL = 0.3D;
+    public static final double SHEEP_QUEST_CAPTURE_RADIUS_BLOCKS = 4.5D;
+    public static final double SHEEP_QUEST_HOME_SPEED = 1.2D;
+    public static final double SHEEP_QUEST_OWNED_SHEEP_SPEED = 1.2D;
+    public static final double SHEEP_QUEST_PEN_ROAM_SPEED = 0.8D;
+    public static final double SHEEP_QUEST_HOME_RETURN_DISTANCE_BLOCKS = 14.0D;
+    public static final int SHEEP_QUEST_CARRY_SLOWNESS_TICKS = 60;
+    public static final int SHEEP_QUEST_SHEPHERD_SLOWNESS_SHEEP_PER_LEVEL = 2;
+    public static final int SHEEP_QUEST_SHEPHERD_SLOWNESS_MAX_AMPLIFIER = 127;
+    public static final long SHEEP_QUEST_HIT_DROP_COOLDOWN_MILLIS = 1_000L;
+    public static final int SHEEP_QUEST_CAPTURE_SCORE = 1;
+    public static final int SHEEP_QUEST_SOLO_CARRY_KILL_THRESHOLD = 3;
+    public static final int SHEEP_QUEST_THIEF_ACHIEVEMENT_COUNT = 300;
+    public static final int SHEEP_QUEST_ANIMAL_RESCUE_ACHIEVEMENT_COUNT = 300;
+    public static final int SHEEP_QUEST_HUNGRY_HUNGRY_HIPPO_WINS = 50;
+    public static final int SHEEP_QUEST_SELFISH_TEAM_SHEEP_THRESHOLD = 12;
+    public static final int SHEEP_QUEST_ARCHER_ACHIEVEMENT_KILLS_PER_TARGET = 5;
+    public static final long SHEEP_QUEST_ARCHER_MOVEMENT_CREDIT_WINDOW_MILLIS = 5_000L;
+    public static double sheepQuestBruteThrowHorizontalSpeed() {
+        return GameDebugRuntimeOverrides.doubleValue("SHEEP_QUEST_BRUTE_THROW_SPEED", SHEEP_QUEST_BRUTE_THROW_SPEED);
+    }
+    public static double sheepQuestBruteThrowVerticalSpeed(double directionY) {
+        double minimum = GameDebugRuntimeOverrides.doubleValue(
+                "SHEEP_QUEST_BRUTE_THROW_VERTICAL_MIN", SHEEP_QUEST_BRUTE_THROW_VERTICAL_MIN);
+        double maximum = GameDebugRuntimeOverrides.doubleValue(
+                "SHEEP_QUEST_BRUTE_THROW_VERTICAL_MAX", SHEEP_QUEST_BRUTE_THROW_VERTICAL_MAX);
+        double pitchScale = GameDebugRuntimeOverrides.doubleValue(
+                "SHEEP_QUEST_BRUTE_THROW_VERTICAL_PITCH_SCALE", SHEEP_QUEST_BRUTE_THROW_VERTICAL_PITCH_SCALE);
+        return Math.max(minimum, Math.min(maximum, minimum + directionY * pitchScale));
+    }
+    public static double sheepQuestBerserkerHorizontalSpeed() {
+        return GameDebugRuntimeOverrides.doubleValue(
+                "SHEEP_QUEST_BESERKER_LEAP_HORIZONTAL_SPEED", SHEEP_QUEST_BESERKER_LEAP_HORIZONTAL_SPEED);
+    }
+    public static double sheepQuestBerserkerVerticalSpeed(double directionY) {
+        double minimum = GameDebugRuntimeOverrides.doubleValue(
+                "SHEEP_QUEST_BESERKER_LEAP_VERTICAL_MIN", SHEEP_QUEST_BESERKER_LEAP_VERTICAL_MIN);
+        double maximum = GameDebugRuntimeOverrides.doubleValue(
+                "SHEEP_QUEST_BESERKER_LEAP_VERTICAL_MAX", SHEEP_QUEST_BESERKER_LEAP_VERTICAL_MAX);
+        double add = GameDebugRuntimeOverrides.doubleValue(
+                "SHEEP_QUEST_BESERKER_LEAP_VERTICAL_ADD", SHEEP_QUEST_BESERKER_LEAP_VERTICAL_ADD);
+        return Math.max(minimum, Math.min(maximum, directionY + add));
+    }
+    public static double sheepQuestCaptureRadiusSquared() {
+        double radius = GameDebugRuntimeOverrides.doubleValue(
+                "SHEEP_QUEST_CAPTURE_RADIUS_BLOCKS", SHEEP_QUEST_CAPTURE_RADIUS_BLOCKS);
+        return radius * radius;
+    }
+    public static double sheepQuestThrowHitRadiusSquared() {
+        double radius = GameDebugRuntimeOverrides.doubleValue("SHEEP_QUEST_THROW_HIT_RADIUS", SHEEP_QUEST_THROW_HIT_RADIUS);
+        return radius * radius;
+    }
+    public static int sheepQuestShepherdSlownessAmplifier(int carriedCount) {
+        if (carriedCount <= 0) return -1;
+        int sheepPerLevel = Math.max(1, Math.min(64, GameDebugRuntimeOverrides.intValue(
+                "SHEEP_QUEST_SHEPHERD_SLOWNESS_SHEEP_PER_LEVEL", SHEEP_QUEST_SHEPHERD_SLOWNESS_SHEEP_PER_LEVEL)));
+        int maximum = Math.max(0, Math.min(127, GameDebugRuntimeOverrides.intValue(
+                "SHEEP_QUEST_SHEPHERD_SLOWNESS_MAX_AMPLIFIER", SHEEP_QUEST_SHEPHERD_SLOWNESS_MAX_AMPLIFIER)));
+        return Math.min(maximum, (carriedCount - 1) / sheepPerLevel);
+    }
+    public static int sheepQuestCaptureScore() {
+        return Math.max(0, Math.min(100, GameDebugRuntimeOverrides.intValue(
+                "SHEEP_QUEST_CAPTURE_SCORE", SHEEP_QUEST_CAPTURE_SCORE)));
+    }
+    public static int sheepQuestSoloCarryKillThreshold() {
+        return Math.max(0, Math.min(100, GameDebugRuntimeOverrides.intValue(
+                "SHEEP_QUEST_SOLO_CARRY_KILL_THRESHOLD", SHEEP_QUEST_SOLO_CARRY_KILL_THRESHOLD)));
+    }
+    public static boolean sheepQuestSoloCarryQualified(int kills) {
+        return kills >= sheepQuestSoloCarryKillThreshold();
+    }
+    public static boolean sheepQuestThiefAchievementReached(int count) {
+        return count >= GameDebugRuntimeOverrides.intValue(
+                "SHEEP_QUEST_THIEF_ACHIEVEMENT_COUNT", SHEEP_QUEST_THIEF_ACHIEVEMENT_COUNT);
+    }
+    public static boolean sheepQuestAnimalRescueAchievementReached(int count) {
+        return count >= GameDebugRuntimeOverrides.intValue(
+                "SHEEP_QUEST_ANIMAL_RESCUE_ACHIEVEMENT_COUNT", SHEEP_QUEST_ANIMAL_RESCUE_ACHIEVEMENT_COUNT);
+    }
+    public static boolean sheepQuestHungryHungryHippoAchievementReached(int wins) {
+        return wins >= GameDebugRuntimeOverrides.intValue(
+                "SHEEP_QUEST_HUNGRY_HUNGRY_HIPPO_WINS", SHEEP_QUEST_HUNGRY_HUNGRY_HIPPO_WINS);
+    }
+    public static boolean sheepQuestSelfishAchievementReached(int teamSheep) {
+        return teamSheep > GameDebugRuntimeOverrides.intValue(
+                "SHEEP_QUEST_SELFISH_TEAM_SHEEP_THRESHOLD", SHEEP_QUEST_SELFISH_TEAM_SHEEP_THRESHOLD);
+    }
+    public static boolean sheepQuestArcherAchievementReached(int killsPerTarget) {
+        return killsPerTarget >= GameDebugRuntimeOverrides.intValue(
+                "SHEEP_QUEST_ARCHER_ACHIEVEMENT_KILLS_PER_TARGET",
+                SHEEP_QUEST_ARCHER_ACHIEVEMENT_KILLS_PER_TARGET);
+    }
+    public static boolean sheepQuestMovementCreditIsRecent(long nowMillis, long lastMovementMillis) {
+        return nowMillis >= lastMovementMillis && nowMillis - lastMovementMillis <= GameDebugRuntimeOverrides.longValue(
+                "SHEEP_QUEST_ARCHER_MOVEMENT_CREDIT_WINDOW_MILLIS",
+                SHEEP_QUEST_ARCHER_MOVEMENT_CREDIT_WINDOW_MILLIS);
+    }
     public static final long SHEEP_QUEST_OVERTIME_ANNOUNCE_INTERVAL_MILLIS = 10_000L;
     public static final long SHEEP_QUEST_ARCHER_FLETCHER_INTERVAL_MILLIS = 2_000L;
     public static final int SHEEP_QUEST_ARCHER_MAX_ARROWS = 5;
@@ -1807,13 +2889,17 @@ public final class ArcadePortRules {
     }
 
     public static boolean canCarryAnotherSheep(int carriedCount) {
-        return carriedCount >= 0 && carriedCount < SHEEP_QUEST_MAX_CARRY;
+        int maxCarry = Math.max(0, Math.min(64, GameDebugRuntimeOverrides.intValue(
+                "SHEEP_QUEST_MAX_CARRY", SHEEP_QUEST_MAX_CARRY)));
+        return carriedCount >= 0 && carriedCount < maxCarry;
     }
 
     /** Source Sheep Quest slows carriers progressively, up to the three-sheep limit. */
     public static int sheepQuestCarrySlownessAmplifier(int carriedCount) {
         if (carriedCount <= 0) return -1;
-        return Math.min(SHEEP_QUEST_MAX_CARRY - 1, carriedCount - 1);
+        int maxCarry = Math.max(1, Math.min(64, GameDebugRuntimeOverrides.intValue(
+                "SHEEP_QUEST_MAX_CARRY", SHEEP_QUEST_MAX_CARRY)));
+        return Math.min(maxCarry - 1, carriedCount - 1);
     }
 
 
@@ -1821,6 +2907,36 @@ public final class ArcadePortRules {
     public static final long PAINTBALL_GAME_TIMEOUT_MILLIS = 1_200_000L;
     public static final long PAINTBALL_WATER_BOMB_COOLDOWN_MILLIS = 250L;
     public static final double PAINTBALL_SAVE_ME_RADIUS = 3.0D;
+    public static final long PAINTBALL_RIFLE_RELOAD_MILLIS = 500L;
+    public static final long PAINTBALL_SNIPER_RELOAD_MILLIS = 1_000L;
+    public static final long PAINTBALL_SHOTGUN_RELOAD_MILLIS = 1_400L;
+    public static final int PAINTBALL_SHOTGUN_PELLETS = 8;
+    public static final double PAINTBALL_SHOTGUN_SPREAD = 0.2D;
+    public static final double PAINTBALL_MACHINE_GUN_SPREAD = 0.125D;
+    public static final double PAINTBALL_RIFLE_PROJECTILE_SPEED = 2.0D;
+    public static final double PAINTBALL_MACHINE_GUN_PROJECTILE_SPEED = 1.6D;
+    public static final double PAINTBALL_SHOTGUN_PROJECTILE_SPEED = 1.0D;
+    public static final double PAINTBALL_SNIPER_ARROW_SPEED = 15.0D;
+    public static final double PAINTBALL_SNIPER_SCOPE_CHARGE_PER_TICK = 0.03332D;
+    public static final int PAINTBALL_RIFLE_PAINT_PER_HIT = 3;
+    public static final int PAINTBALL_SHOTGUN_PAINT_PER_HIT = 1;
+    public static final int PAINTBALL_MACHINE_GUN_PAINT_PER_HIT = 1;
+    public static final int PAINTBALL_SNIPER_BASE_PAINT = 1;
+    public static final double PAINTBALL_SNIPER_SCOPE_CHARGE_PER_EXTRA_PAINT = 0.3D;
+    public static final int PAINTBALL_SNIPER_MAX_EXTRA_PAINT = 3;
+    public static final long PAINTBALL_KIT_SPEED_REFRESH_TICKS = 80L;
+    public static final int PAINTBALL_KIT_SPEED_DURATION_TICKS = 160;
+    public static final int PAINTBALL_RIFLE_SPEED_AMPLIFIER = 0;
+    public static final int PAINTBALL_SHOTGUN_SPEED_AMPLIFIER = 1;
+    public static final int PAINTBALL_SNIPER_SCOPE_SLOWNESS_AMPLIFIER = 8;
+    public static final int PAINTBALL_SNIPER_SCOPE_SLOWNESS_TICKS = 40;
+    public static final double PAINTBALL_KNOCKBACK_MULTIPLIER = 1.0D;
+    public static final long PAINTBALL_SPEEDRUNNER_MAX_MILLIS = 30_000L;
+    public static final int PAINTBALL_FLAWLESS_MIN_STARTERS = 4;
+    public static final int PAINTBALL_KILLING_SPREE_KILLS = 4;
+    public static final int PAINTBALL_LAST_STAND_KILLS = 3;
+    public static final int PAINTBALL_SHARE_YOUR_SCREEN_SHOTS = 3;
+    public static final long PAINTBALL_GROUND_STARE_MILLIS = 20_000L;
 
     /** Reborn orders its teams Frost/AQUA first, then Nether/RED. */
     public static boolean isPaintballRedTeam(int team) {
@@ -1847,23 +2963,38 @@ public final class ArcadePortRules {
 
     /** Source win trackers award Speedrunner only when the winning team finishes within 30 seconds. */
     public static boolean shouldAwardPaintballSpeedrunner(long elapsedMillis, boolean won) {
-        return won && elapsedMillis >= 0L && elapsedMillis < 30_000L;
+        return won && elapsedMillis >= 0L && elapsedMillis < Math.max(0L,
+                GameDebugRuntimeOverrides.longValue("PAINTBALL_SPEEDRUNNER_MAX_MILLIS", PAINTBALL_SPEEDRUNNER_MAX_MILLIS));
     }
 
     /** Flawless Victory requires at least four starters and no player lost from the winning team. */
     public static boolean shouldAwardPaintballFlawlessVictory(
             int startingTeamPlayers, int survivingTeamPlayers, boolean won) {
-        return won && startingTeamPlayers >= 4 && survivingTeamPlayers == startingTeamPlayers;
+        return won && startingTeamPlayers >= Math.max(1,
+                GameDebugRuntimeOverrides.intValue("PAINTBALL_FLAWLESS_MIN_STARTERS", PAINTBALL_FLAWLESS_MIN_STARTERS))
+                && survivingTeamPlayers == startingTeamPlayers;
     }
 
     /** Killing Spree starts at the fourth kill in a five-second chain. */
     public static boolean shouldAwardPaintballKillingSpree(int consecutiveKills) {
-        return consecutiveKills >= 4;
+        return consecutiveKills >= Math.max(1,
+                GameDebugRuntimeOverrides.intValue("PAINTBALL_KILLING_SPREE_KILLS", PAINTBALL_KILLING_SPREE_KILLS));
     }
 
     /** Last Stand starts awarding at the third kill while only one teammate remains alive. */
     public static boolean shouldAwardPaintballLastStand(int soloKills) {
-        return soloKills >= 3;
+        return soloKills >= Math.max(1,
+                GameDebugRuntimeOverrides.intValue("PAINTBALL_LAST_STAND_KILLS", PAINTBALL_LAST_STAND_KILLS));
+    }
+
+    public static int paintballShareYourScreenShots() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "PAINTBALL_SHARE_YOUR_SCREEN_SHOTS", PAINTBALL_SHARE_YOUR_SCREEN_SHOTS));
+    }
+
+    public static long paintballGroundStareMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "PAINTBALL_GROUND_STARE_MILLIS", PAINTBALL_GROUND_STARE_MILLIS));
     }
 
     /** Reborn's Machine Gun fires on an 80 ms gate; this slower heat gain allows 48 shots per full bar. */
@@ -1874,24 +3005,34 @@ public final class ArcadePortRules {
     public static final double PAINTBALL_MACHINE_GUN_COOL_PER_TICK = 0.020D;
 
     public static double paintballMachineGunHeatPerShot() {
-        return PAINTBALL_MACHINE_GUN_MAX_HEAT / PAINTBALL_MACHINE_GUN_SHOTS_PER_HEAT_CYCLE;
+        double maxHeat = Math.max(0.001D, GameDebugRuntimeOverrides.doubleValue(
+                "PAINTBALL_MACHINE_GUN_MAX_HEAT", PAINTBALL_MACHINE_GUN_MAX_HEAT));
+        int shots = Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "PAINTBALL_MACHINE_GUN_SHOTS_PER_HEAT_CYCLE", PAINTBALL_MACHINE_GUN_SHOTS_PER_HEAT_CYCLE));
+        return maxHeat / shots;
     }
 
     public static boolean canFirePaintballMachineGun(double currentHeat) {
         if (!Double.isFinite(currentHeat)) return false;
-        double heat = Math.max(0.0D, Math.min(PAINTBALL_MACHINE_GUN_MAX_HEAT, currentHeat));
-        return heat < PAINTBALL_MACHINE_GUN_MAX_HEAT - paintballMachineGunHeatPerShot() * 0.5D;
+        double maxHeat = Math.max(0.001D, GameDebugRuntimeOverrides.doubleValue(
+                "PAINTBALL_MACHINE_GUN_MAX_HEAT", PAINTBALL_MACHINE_GUN_MAX_HEAT));
+        double heat = Math.max(0.0D, Math.min(maxHeat, currentHeat));
+        return heat < maxHeat - paintballMachineGunHeatPerShot() * 0.5D;
     }
 
     public static double paintballMachineGunHeatAfterShot(double currentHeat) {
         double heat = Double.isFinite(currentHeat)
                 ? Math.max(0.0D, currentHeat) : PAINTBALL_MACHINE_GUN_MAX_HEAT;
-        return Math.min(PAINTBALL_MACHINE_GUN_MAX_HEAT, heat + paintballMachineGunHeatPerShot());
+        double maxHeat = Math.max(0.001D, GameDebugRuntimeOverrides.doubleValue(
+                "PAINTBALL_MACHINE_GUN_MAX_HEAT", PAINTBALL_MACHINE_GUN_MAX_HEAT));
+        return Math.min(maxHeat, heat + paintballMachineGunHeatPerShot());
     }
 
     public static double coolPaintballMachineGunHeat(double currentHeat) {
         double heat = Double.isFinite(currentHeat) ? Math.max(0.0D, currentHeat) : 0.0D;
-        return Math.max(0.0D, heat - PAINTBALL_MACHINE_GUN_COOL_PER_TICK);
+        double coolPerTick = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "PAINTBALL_MACHINE_GUN_COOL_PER_TICK", PAINTBALL_MACHINE_GUN_COOL_PER_TICK));
+        return Math.max(0.0D, heat - coolPerTick);
     }
 
     /** The selected held-item model changes for everyone; projectile physics are not affected. */
@@ -1909,8 +3050,14 @@ public final class ArcadePortRules {
     }
 
     public static boolean shouldPaintballWaterBombAffectPlayer(double distanceSquared, boolean sameTeam) {
+        double radius = paintballSaveMeRadius();
         return sameTeam && distanceSquared >= 0.0D
-                && distanceSquared <= PAINTBALL_SAVE_ME_RADIUS * PAINTBALL_SAVE_ME_RADIUS;
+                && distanceSquared <= radius * radius;
+    }
+
+    public static double paintballSaveMeRadius() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "PAINTBALL_SAVE_ME_RADIUS", PAINTBALL_SAVE_ME_RADIUS));
     }
 
     public static int paintballPiecesAfterHit(int remainingPieces, int paintAmount) {
@@ -1928,22 +3075,203 @@ public final class ArcadePortRules {
     /** Mirrors Reborn's per-kit armour-paint counts and the Sniper scope damage gauge. */
     public static int paintballPaintAmount(String kit, boolean arrow, double scopeCharge) {
         String safeKit = kit == null ? "rifle" : kit.toLowerCase(java.util.Locale.ROOT);
-        if ("rifle".equals(safeKit)) return 3;
+        if ("rifle".equals(safeKit)) return Math.max(0, Math.min(4, GameDebugRuntimeOverrides.intValue(
+                "PAINTBALL_RIFLE_PAINT_PER_HIT", PAINTBALL_RIFLE_PAINT_PER_HIT)));
+        if ("shotgun".equals(safeKit)) return Math.max(0, Math.min(4, GameDebugRuntimeOverrides.intValue(
+                "PAINTBALL_SHOTGUN_PAINT_PER_HIT", PAINTBALL_SHOTGUN_PAINT_PER_HIT)));
+        if ("machine-gun".equals(safeKit)) return Math.max(0, Math.min(4, GameDebugRuntimeOverrides.intValue(
+                "PAINTBALL_MACHINE_GUN_PAINT_PER_HIT", PAINTBALL_MACHINE_GUN_PAINT_PER_HIT)));
         if ("sniper".equals(safeKit) && arrow) return paintballSniperPaintDamage(scopeCharge);
         return 1;
     }
 
     public static int paintballSniperPaintDamage(double scopeCharge) {
         double charge = Math.max(0.0D, Math.min(0.999D, scopeCharge));
-        return 1 + (int) Math.floor(charge * 10.0D / 3.0D);
+        int base = Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "PAINTBALL_SNIPER_BASE_PAINT", PAINTBALL_SNIPER_BASE_PAINT));
+        double step = Math.max(0.001D, GameDebugRuntimeOverrides.doubleValue(
+                "PAINTBALL_SNIPER_SCOPE_CHARGE_PER_EXTRA_PAINT", PAINTBALL_SNIPER_SCOPE_CHARGE_PER_EXTRA_PAINT));
+        int maximumBonus = Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "PAINTBALL_SNIPER_MAX_EXTRA_PAINT", PAINTBALL_SNIPER_MAX_EXTRA_PAINT));
+        return Math.min(4, base + Math.min(maximumBonus, (int) Math.floor(charge / step)));
+    }
+
+    public static long paintballReloadMillis(String kit) {
+        return switch (kit == null ? "rifle" : kit.toLowerCase(java.util.Locale.ROOT)) {
+            case "sniper" -> GameDebugRuntimeOverrides.longValue("PAINTBALL_SNIPER_RELOAD_MILLIS", PAINTBALL_SNIPER_RELOAD_MILLIS);
+            case "shotgun" -> GameDebugRuntimeOverrides.longValue("PAINTBALL_SHOTGUN_RELOAD_MILLIS", PAINTBALL_SHOTGUN_RELOAD_MILLIS);
+            case "machine-gun" -> GameDebugRuntimeOverrides.longValue("PAINTBALL_MACHINE_GUN_FIRE_COOLDOWN_MILLIS", PAINTBALL_MACHINE_GUN_FIRE_COOLDOWN_MILLIS);
+            default -> GameDebugRuntimeOverrides.longValue("PAINTBALL_RIFLE_RELOAD_MILLIS", PAINTBALL_RIFLE_RELOAD_MILLIS);
+        };
+    }
+
+    public static int paintballShotCount(String kit) {
+        return "shotgun".equalsIgnoreCase(kit == null ? "" : kit)
+                ? Math.max(1, GameDebugRuntimeOverrides.intValue("PAINTBALL_SHOTGUN_PELLETS", PAINTBALL_SHOTGUN_PELLETS))
+                : 1;
+    }
+
+    public static double paintballShotSpread(String kit) {
+        return "shotgun".equalsIgnoreCase(kit == null ? "" : kit)
+                ? Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue("PAINTBALL_SHOTGUN_SPREAD", PAINTBALL_SHOTGUN_SPREAD))
+                : "machine-gun".equalsIgnoreCase(kit == null ? "" : kit)
+                    ? Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue("PAINTBALL_MACHINE_GUN_SPREAD", PAINTBALL_MACHINE_GUN_SPREAD))
+                    : 0.0D;
+    }
+
+    public static double paintballProjectileSpeedMultiplier(String kit) {
+        return "rifle".equalsIgnoreCase(kit == null ? "" : kit)
+                ? GameDebugRuntimeOverrides.doubleValue("PAINTBALL_RIFLE_PROJECTILE_SPEED", PAINTBALL_RIFLE_PROJECTILE_SPEED)
+                : "shotgun".equalsIgnoreCase(kit == null ? "" : kit)
+                    ? GameDebugRuntimeOverrides.doubleValue("PAINTBALL_SHOTGUN_PROJECTILE_SPEED", PAINTBALL_SHOTGUN_PROJECTILE_SPEED)
+                : "machine-gun".equalsIgnoreCase(kit == null ? "" : kit)
+                    ? GameDebugRuntimeOverrides.doubleValue("PAINTBALL_MACHINE_GUN_PROJECTILE_SPEED", PAINTBALL_MACHINE_GUN_PROJECTILE_SPEED)
+                    : 1.0D;
+    }
+
+    public static double paintballSniperArrowSpeed() {
+        return GameDebugRuntimeOverrides.doubleValue("PAINTBALL_SNIPER_ARROW_SPEED", PAINTBALL_SNIPER_ARROW_SPEED);
+    }
+
+    public static double paintballSniperChargePerTick() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "PAINTBALL_SNIPER_SCOPE_CHARGE_PER_TICK", PAINTBALL_SNIPER_SCOPE_CHARGE_PER_TICK));
+    }
+
+    public static double paintballKnockbackStrength() {
+        double multiplier = Math.max(0.0D, Math.min(3.0D, GameDebugRuntimeOverrides.doubleValue(
+                "PAINTBALL_KNOCKBACK_MULTIPLIER", PAINTBALL_KNOCKBACK_MULTIPLIER)));
+        return Math.log10(2.0D) * 2.0D * multiplier;
+    }
+
+    public static int paintballSniperSlownessTicks() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "PAINTBALL_SNIPER_SCOPE_SLOWNESS_TICKS", PAINTBALL_SNIPER_SCOPE_SLOWNESS_TICKS));
+    }
+
+    public static int paintballSniperSlownessAmplifier() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "PAINTBALL_SNIPER_SCOPE_SLOWNESS_AMPLIFIER", PAINTBALL_SNIPER_SCOPE_SLOWNESS_AMPLIFIER));
+    }
+
+    public static long paintballKitSpeedRefreshTicks() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "PAINTBALL_KIT_SPEED_REFRESH_TICKS", PAINTBALL_KIT_SPEED_REFRESH_TICKS));
+    }
+
+    public static int paintballKitSpeedDurationTicks() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "PAINTBALL_KIT_SPEED_DURATION_TICKS", PAINTBALL_KIT_SPEED_DURATION_TICKS));
+    }
+
+    public static int paintballKitSpeedAmplifier(String kit) {
+        return Math.max(0, "shotgun".equalsIgnoreCase(kit == null ? "" : kit)
+                ? GameDebugRuntimeOverrides.intValue("PAINTBALL_SHOTGUN_SPEED_AMPLIFIER", PAINTBALL_SHOTGUN_SPEED_AMPLIFIER)
+                : GameDebugRuntimeOverrides.intValue("PAINTBALL_RIFLE_SPEED_AMPLIFIER", PAINTBALL_RIFLE_SPEED_AMPLIFIER));
     }
 
 
 
     public static final long GLADIATOR_ROUND_COUNTDOWN_MILLIS = 5_000L;
+    public static final long GLADIATOR_VOTE_MILLIS = 15_000L;
+    public static final long GLADIATOR_ARENA_TRANSITION_MILLIS = 15_000L;
+    /** -1 preserves lobby-size-based source tier selection; 0 through 3 force an arena tier for testing. */
+    public static final int GLADIATOR_STARTING_TIER_OVERRIDE = -1;
+    /** Mode indices follow GladiatorsMode: Normal, Rodless, Bowless, Modern, Pot. */
+    public static final boolean GLADIATOR_FORCE_MODE_ENABLED = false;
+    public static final int GLADIATOR_MODE_OVERRIDE = 0;
     public static final long GLADIATOR_POISON_DELAY_MILLIS = 60_000L;
     public static final long GLADIATOR_POISON_INTERVAL_MILLIS = 1_000L;
     public static final double GLADIATOR_POISON_DAMAGE = 1.0D;
+    public static final int GLADIATOR_MELEE_NO_DAMAGE_TICKS = 10;
+    public static final int GLADIATOR_PROJECTILE_NO_DAMAGE_TICKS = 8;
+    public static final int GLADIATOR_ENVIRONMENTAL_NO_DAMAGE_TICKS = 10;
+    public static final double GLADIATOR_PVP_DAMAGE_MULTIPLIER = 1.0D;
+    public static final double GLADIATOR_MELEE_KNOCKBACK_HORIZONTAL = 0.32D;
+    public static final double GLADIATOR_MELEE_KNOCKBACK_VERTICAL = 0.12D;
+    public static final double GLADIATOR_PROJECTILE_KNOCKBACK_HORIZONTAL = 0.18D;
+    public static final double GLADIATOR_PROJECTILE_KNOCKBACK_VERTICAL = 0.06D;
+    public static final int GLADIATOR_TIER_0_ARROWS = 3;
+    public static final int GLADIATOR_TIER_1_ARROWS = 5;
+    public static final int GLADIATOR_TIER_2_ARROWS = 7;
+    public static final int GLADIATOR_TIER_3_ARROWS = 10;
+    public static final double GLADIATOR_POTION_HEALING = 4.0D;
+    public static final double GLADIATOR_POTION_SPLASH_RADIUS = 4.0D;
+    public static final int GLADIATOR_POTION_COUNT = 5;
+
+    public static long gladiatorsVoteMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue("GLADIATOR_VOTE_MILLIS", GLADIATOR_VOTE_MILLIS));
+    }
+
+    public static long gladiatorsArenaTransitionMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "GLADIATOR_ARENA_TRANSITION_MILLIS", GLADIATOR_ARENA_TRANSITION_MILLIS));
+    }
+
+    public static int gladiatorsModeOverrideIndex() {
+        return Math.max(0, Math.min(4, GameDebugRuntimeOverrides.intValue(
+                "GLADIATOR_MODE_OVERRIDE", GLADIATOR_MODE_OVERRIDE)));
+    }
+
+    public static boolean gladiatorsForceModeEnabled() {
+        return GameDebugRuntimeOverrides.booleanValue("GLADIATOR_FORCE_MODE_ENABLED", GLADIATOR_FORCE_MODE_ENABLED);
+    }
+
+    public static int gladiatorsPotionCount() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue("GLADIATOR_POTION_COUNT", GLADIATOR_POTION_COUNT));
+    }
+
+    public static int gladiatorsArrowCount(int tier) {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue(switch (Math.max(0, Math.min(3, tier))) {
+            case 1 -> "GLADIATOR_TIER_1_ARROWS";
+            case 2 -> "GLADIATOR_TIER_2_ARROWS";
+            case 3 -> "GLADIATOR_TIER_3_ARROWS";
+            default -> "GLADIATOR_TIER_0_ARROWS";
+        }, switch (Math.max(0, Math.min(3, tier))) {
+            case 1 -> GLADIATOR_TIER_1_ARROWS;
+            case 2 -> GLADIATOR_TIER_2_ARROWS;
+            case 3 -> GLADIATOR_TIER_3_ARROWS;
+            default -> GLADIATOR_TIER_0_ARROWS;
+        }));
+    }
+
+    public static int gladiatorsNoDamageTicks(boolean projectile) {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue(projectile
+                ? "GLADIATOR_PROJECTILE_NO_DAMAGE_TICKS" : "GLADIATOR_MELEE_NO_DAMAGE_TICKS",
+                projectile ? GLADIATOR_PROJECTILE_NO_DAMAGE_TICKS : GLADIATOR_MELEE_NO_DAMAGE_TICKS));
+    }
+
+    public static int gladiatorsEnvironmentalNoDamageTicks() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue("GLADIATOR_ENVIRONMENTAL_NO_DAMAGE_TICKS",
+                GLADIATOR_ENVIRONMENTAL_NO_DAMAGE_TICKS));
+    }
+
+    public static double gladiatorsPvpDamage(double damage) {
+        return Math.max(0.0D, damage * Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "GLADIATOR_PVP_DAMAGE_MULTIPLIER", GLADIATOR_PVP_DAMAGE_MULTIPLIER)));
+    }
+
+    public static double gladiatorsKnockbackHorizontal(boolean projectile) {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(projectile
+                ? "GLADIATOR_PROJECTILE_KNOCKBACK_HORIZONTAL" : "GLADIATOR_MELEE_KNOCKBACK_HORIZONTAL",
+                projectile ? GLADIATOR_PROJECTILE_KNOCKBACK_HORIZONTAL : GLADIATOR_MELEE_KNOCKBACK_HORIZONTAL));
+    }
+
+    public static double gladiatorsKnockbackVertical(boolean projectile) {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(projectile
+                ? "GLADIATOR_PROJECTILE_KNOCKBACK_VERTICAL" : "GLADIATOR_MELEE_KNOCKBACK_VERTICAL",
+                projectile ? GLADIATOR_PROJECTILE_KNOCKBACK_VERTICAL : GLADIATOR_MELEE_KNOCKBACK_VERTICAL));
+    }
+
+    public static double gladiatorsPotionHealing() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue("GLADIATOR_POTION_HEALING",
+                GLADIATOR_POTION_HEALING));
+    }
+
+    public static double gladiatorsPotionSplashRadius() {
+        return Math.max(0.1D, GameDebugRuntimeOverrides.doubleValue("GLADIATOR_POTION_SPLASH_RADIUS",
+                GLADIATOR_POTION_SPLASH_RADIUS));
+    }
 
     public static boolean canGladiatorsFight(long nowMillis, long fightStartsAt,
             int attackerPair, int targetPair, boolean pairResolved) {
@@ -1953,7 +3281,8 @@ public final class ArcadePortRules {
 
     public static boolean shouldGladiatorPoison(long nowMillis, long roundStartedAt,
             boolean pairResolved, int playersStillFighting) {
-        return nowMillis >= roundStartedAt + GLADIATOR_POISON_DELAY_MILLIS
+        return nowMillis >= roundStartedAt + GameDebugRuntimeOverrides.longValue(
+                "GLADIATOR_POISON_DELAY_MILLIS", GLADIATOR_POISON_DELAY_MILLIS)
                 && !pairResolved && playersStillFighting >= 2;
     }
 
@@ -1975,14 +3304,17 @@ public final class ArcadePortRules {
     public static final long BACON_BRAWL_ENDGAME_ESCALATION_DELAY_MILLIS = 20_000L;
 
     public static long nextBaconKnockbackInterval(int completedEscalations, int alivePlayers) {
-        if (completedEscalations < 0 || completedEscalations >= BACON_BRAWL_MAX_KNOCKBACK_ESCALATIONS) {
+        long initial = GameDebugRuntimeOverrides.longValue("BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS", BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS);
+        long step = Math.max(1L, GameDebugRuntimeOverrides.longValue("BACON_KNOCKBACK_INTERVAL_STEP_MILLIS", BACON_KNOCKBACK_INTERVAL_STEP_MILLIS));
+        long minimum = Math.max(0L, GameDebugRuntimeOverrides.longValue("BACON_MIN_KNOCKBACK_INTERVAL_MILLIS", BACON_MIN_KNOCKBACK_INTERVAL_MILLIS));
+        int maxEscalations = (int) Math.max(1L, (initial + step - 1L) / step);
+        if (completedEscalations < 0 || completedEscalations >= maxEscalations) {
             return 0L;
         }
-        long sourceInterval = Math.max(BACON_MIN_KNOCKBACK_INTERVAL_MILLIS,
-                BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS
-                        - completedEscalations * BACON_KNOCKBACK_INTERVAL_STEP_MILLIS);
+        long sourceInterval = Math.max(minimum, initial - completedEscalations * step);
         if (alivePlayers <= 2) {
-            return Math.min(sourceInterval, BACON_BRAWL_ENDGAME_ESCALATION_DELAY_MILLIS);
+            return Math.min(sourceInterval, GameDebugRuntimeOverrides.longValue(
+                    "BACON_BRAWL_ENDGAME_ESCALATION_DELAY_MILLIS", BACON_BRAWL_ENDGAME_ESCALATION_DELAY_MILLIS));
         }
         return sourceInterval;
     }
@@ -2003,7 +3335,13 @@ public final class ArcadePortRules {
 
     public static boolean shouldPunishMicroIslandExit(long elapsedMillis, double ownDistanceSquared,
             double nearestOtherDistanceSquared) {
-        return elapsedMillis >= 0L && elapsedMillis < MICRO_BATTLES_CHEAT_WINDOW_MILLIS
+        return shouldPunishMicroIslandExit(elapsedMillis, ownDistanceSquared, nearestOtherDistanceSquared,
+                MICRO_BATTLES_CHEAT_WINDOW_MILLIS);
+    }
+
+    public static boolean shouldPunishMicroIslandExit(long elapsedMillis, double ownDistanceSquared,
+            double nearestOtherDistanceSquared, long cheatWindowMillis) {
+        return elapsedMillis >= 0L && elapsedMillis < Math.max(0L, cheatWindowMillis)
                 && nearestOtherDistanceSquared < ownDistanceSquared;
     }
 
@@ -2061,11 +3399,13 @@ public final class ArcadePortRules {
 
     /** The source game finishes near its final map waypoint, not anywhere on a Z plane. */
     public static boolean isDragonEscapeFinishReached(double x, double y, double z) {
-        double dx = x - DRAGON_ESCAPE_FINISH_X;
-        double dy = y - DRAGON_ESCAPE_FINISH_Y;
-        double dz = z - DRAGON_ESCAPE_FINISH_Z;
+        double dx = x - GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_FINISH_X", DRAGON_ESCAPE_FINISH_X);
+        double dy = y - GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_FINISH_Y", DRAGON_ESCAPE_FINISH_Y);
+        double dz = z - GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_FINISH_Z", DRAGON_ESCAPE_FINISH_Z);
+        double radius = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "DRAGON_ESCAPE_FINISH_RADIUS", DRAGON_ESCAPE_FINISH_RADIUS));
         return dx * dx + dy * dy + dz * dz
-                < DRAGON_ESCAPE_FINISH_RADIUS * DRAGON_ESCAPE_FINISH_RADIUS;
+                < radius * radius;
     }
 
     /** Reborn kills runners once Douglas's route progress has overtaken theirs. */
@@ -2104,8 +3444,10 @@ public final class ArcadePortRules {
 
     /** Avoid rechecking the same destruction sphere every server tick. */
     public static boolean isDragonEscapeBlockInsideDestructionRadius(double distanceSquared) {
+        double radius = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "DRAGON_ESCAPE_BLOCK_RADIUS", DRAGON_ESCAPE_BLOCK_RADIUS));
         return Double.isFinite(distanceSquared) && distanceSquared >= 0.0D
-                && distanceSquared <= DRAGON_ESCAPE_BLOCK_RADIUS * DRAGON_ESCAPE_BLOCK_RADIUS;
+                && distanceSquared <= radius * radius;
     }
 
     public static boolean shouldProcessDragonEscapeDestruction(double distanceSquared, boolean hasPreviousCenter) {
@@ -2156,7 +3498,12 @@ public final class ArcadePortRules {
     }
 
     public static boolean isDuplicateDragonEscapeWaypoint(double distance) {
-        return isDuplicateDragonEscapeWaypoint(distance, DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE);
+        return isDuplicateDragonEscapeWaypoint(distance, dragonEscapeDuplicateWaypointDistance());
+    }
+
+    public static double dragonEscapeDuplicateWaypointDistance() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE", DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE));
     }
 
     public static boolean isDuplicateDragonEscapeWaypoint(double distance, double threshold) {
@@ -2199,12 +3546,14 @@ public final class ArcadePortRules {
     }
 
     public static final long QUIVER_RESPAWN_DELAY_TICKS = 20L;
+    public static final boolean QUIVER_LEAPER_DOUBLE_JUMP_ENABLED = true;
     public static final long QUIVER_GROUND_POUND_COOLDOWN_MILLIS = 10_000L;
     public static final long QUIVER_NINJA_VANISH_MILLIS = 1_200L;
     public static final long QUIVER_SPECTATOR_TELEPORT_COOLDOWN_MILLIS = 3_000L;
     public static final int QUIVER_SWORD_SLOT = 0;
     public static final int QUIVER_BOW_SLOT = 1;
     public static final int QUIVER_ARROW_SLOT = 2;
+    public static final int QUIVER_SCORE_TO_WIN = 20;
     /** Original Quiver checks that a chain-arrow impact is within one block of a player. */
     public static final double QUIVER_REBOUND_MAX_IMPACT_DISTANCE_SQUARED = 1.0D;
     /** The requested modern Enchanter change is two rebounds, instead of the source's one. */
@@ -2212,30 +3561,56 @@ public final class ArcadePortRules {
     public static final double QUIVER_REBOUND_MAX_DISTANCE_SQUARED = 64.0D;
     /** Original Quiver labels 20 consecutive kills without dying as a Perfect Run. */
     public static final int QUIVER_PERFECT_RUN_KILL_STREAK = 20;
+    public static final long QUIVER_SPEEDRUNNER_MAX_WIN_MILLIS = 90_000L;
+    public static final int QUIVER_FIST_PUNCH_ACHIEVEMENT_KILLS = 3;
+    public static final double QUIVER_BRAWLER_WEAPON_DAMAGE = 7.0D;
+    public static final double QUIVER_SLAM_SHOT_WEAPON_DAMAGE = 5.5D;
+    public static final double QUIVER_NINJA_WEAPON_DAMAGE = 4.0D;
+    public static final double QUIVER_DEFAULT_WEAPON_DAMAGE = 5.0D;
+    public static final double QUIVER_BRAWLER_PUNCH_DAMAGE = 2.0D;
+    public static final double QUIVER_DEFAULT_PUNCH_DAMAGE = 1.0D;
+    public static final double QUIVER_BRAWLER_HEALTH_PER_KILL = 2.0D;
+    public static final double QUIVER_GROUND_POUND_RADIUS_BLOCKS = 8.0D;
+    public static final double QUIVER_GROUND_POUND_HORIZONTAL_STRENGTH = 0.8D;
+    public static final double QUIVER_GROUND_POUND_VERTICAL_BASE = 0.8D;
+    public static final double QUIVER_GROUND_POUND_VERTICAL_PROXIMITY = 1.0D;
+    public static final double QUIVER_REBOUND_BASE_POWER = 0.8D;
+    public static final double QUIVER_REBOUND_POWER_PER_BLOCK = 1.0D / 30.0D;
+    public static final double QUIVER_REBOUND_MAX_POWER = 1.2D;
+    public static final double QUIVER_REBOUND_VERTICAL_ARC_PER_BLOCK = 0.01D;
+    public static final double QUIVER_LEAPER_JUMP_HORIZONTAL = 0.9D;
+    public static final double QUIVER_LEAPER_JUMP_VERTICAL_ADD = 0.35D;
+    public static final double QUIVER_LEAPER_JUMP_VERTICAL_MIN = 0.55D;
+    public static final double QUIVER_LEAPER_JUMP_VERTICAL_MAX = 0.9D;
 
     public static boolean isQuiverPerfectRun(int killStreak) {
-        return killStreak >= QUIVER_PERFECT_RUN_KILL_STREAK;
+        return killStreak >= GameDebugRuntimeOverrides.intValue(
+                "QUIVER_PERFECT_RUN_KILL_STREAK", QUIVER_PERFECT_RUN_KILL_STREAK);
     }
 
     public static boolean isQuiverSpeedrunnerWin(long elapsedMillis) {
-        return elapsedMillis >= 0L && elapsedMillis < 90_000L;
+        return elapsedMillis >= 0L && elapsedMillis < GameDebugRuntimeOverrides.longValue(
+                "QUIVER_SPEEDRUNNER_MAX_WIN_MILLIS", QUIVER_SPEEDRUNNER_MAX_WIN_MILLIS);
     }
 
     public static boolean shouldAwardQuiverFistPunchKills(int kills) {
-        return kills >= 3;
+        return kills >= GameDebugRuntimeOverrides.intValue(
+                "QUIVER_FIST_PUNCH_ACHIEVEMENT_KILLS", QUIVER_FIST_PUNCH_ACHIEVEMENT_KILLS);
     }
 
     public static double quiverBrawlerHealthAfterKill(double health, double maxHealth) {
         if (!Double.isFinite(health) || !Double.isFinite(maxHealth) || maxHealth <= 0.0D) return 0.0D;
-        return Math.min(maxHealth, Math.max(0.0D, health) + 2.0D);
+        return Math.min(maxHealth, Math.max(0.0D, health) + GameDebugRuntimeOverrides.doubleValue(
+                "QUIVER_BRAWLER_HEALTH_PER_KILL", QUIVER_BRAWLER_HEALTH_PER_KILL));
     }
 
     public static boolean isQuiverKillstreakAnnouncement(int killStreak) {
         return killStreak == 3 || killStreak == 5 || killStreak == 7 || killStreak == 9
-                || killStreak == 11 || killStreak == 13 || killStreak == QUIVER_PERFECT_RUN_KILL_STREAK;
+                || killStreak == 11 || killStreak == 13 || isQuiverPerfectRun(killStreak);
     }
 
     public static String quiverKillstreakTitle(int killStreak) {
+        if (isQuiverPerfectRun(killStreak)) return "PERFECT RUN";
         return switch (killStreak) {
             case 3 -> "TRIPLE KILL";
             case 5 -> "MEGA KILL";
@@ -2243,16 +3618,17 @@ public final class ArcadePortRules {
             case 9 -> "ULTRA KILL";
             case 11 -> "UNSTOPPABLE";
             case 13 -> "GODLIKE";
-            case QUIVER_PERFECT_RUN_KILL_STREAK -> "PERFECT RUN";
             default -> null;
         };
     }
 
     public static boolean isQuiverReboundImpactInRange(double bodyDistanceSquared, double eyeDistanceSquared) {
+        double maxDistanceSquared = GameDebugRuntimeOverrides.doubleValue(
+                "QUIVER_REBOUND_MAX_IMPACT_DISTANCE_SQUARED", QUIVER_REBOUND_MAX_IMPACT_DISTANCE_SQUARED);
         boolean bodyNear = Double.isFinite(bodyDistanceSquared) && bodyDistanceSquared >= 0.0D
-                && bodyDistanceSquared <= QUIVER_REBOUND_MAX_IMPACT_DISTANCE_SQUARED;
+                && bodyDistanceSquared <= maxDistanceSquared;
         boolean eyesNear = Double.isFinite(eyeDistanceSquared) && eyeDistanceSquared >= 0.0D
-                && eyeDistanceSquared <= QUIVER_REBOUND_MAX_IMPACT_DISTANCE_SQUARED;
+                && eyeDistanceSquared <= maxDistanceSquared;
         return bodyNear || eyesNear;
     }
 
@@ -2299,7 +3675,8 @@ public final class ArcadePortRules {
     }
 
     public static long nextQuiverSpectatorTeleportAt(long now) {
-        return now + QUIVER_SPECTATOR_TELEPORT_COOLDOWN_MILLIS;
+        return now + GameDebugRuntimeOverrides.longValue("QUIVER_SPECTATOR_TELEPORT_COOLDOWN_MILLIS",
+                QUIVER_SPECTATOR_TELEPORT_COOLDOWN_MILLIS);
     }
 
     /** Only the old stained-glass materials are breakable in the source Quiver maps. */
@@ -2318,7 +3695,44 @@ public final class ArcadePortRules {
     /** Reborn's Ground Pound scales horizontal knockback from 0 at range to 0.8 at point-blank. */
     public static double quiverGroundPoundHorizontalMultiplier(double distance) {
         if (!Double.isFinite(distance)) return 0.0D;
-        return Math.max(0.0D, Math.min(1.0D, (8.0D - distance) / 8.0D));
+        double radius = Math.max(0.1D, GameDebugRuntimeOverrides.doubleValue(
+                "QUIVER_GROUND_POUND_RADIUS_BLOCKS", QUIVER_GROUND_POUND_RADIUS_BLOCKS));
+        return Math.max(0.0D, Math.min(1.0D, (radius - distance) / radius));
+    }
+
+    public static double quiverGroundPoundRadiusBlocks() {
+        return Math.max(0.1D, GameDebugRuntimeOverrides.doubleValue(
+                "QUIVER_GROUND_POUND_RADIUS_BLOCKS", QUIVER_GROUND_POUND_RADIUS_BLOCKS));
+    }
+
+    public static org.bukkit.util.Vector quiverLeaperJumpVelocity(org.bukkit.util.Vector lookDirection) {
+        if (lookDirection == null || lookDirection.lengthSquared() < 0.001D) return null;
+        double horizontal = GameDebugRuntimeOverrides.doubleValue(
+                "QUIVER_LEAPER_JUMP_HORIZONTAL", QUIVER_LEAPER_JUMP_HORIZONTAL);
+        double verticalAdd = GameDebugRuntimeOverrides.doubleValue(
+                "QUIVER_LEAPER_JUMP_VERTICAL_ADD", QUIVER_LEAPER_JUMP_VERTICAL_ADD);
+        double verticalMin = GameDebugRuntimeOverrides.doubleValue(
+                "QUIVER_LEAPER_JUMP_VERTICAL_MIN", QUIVER_LEAPER_JUMP_VERTICAL_MIN);
+        double verticalMax = GameDebugRuntimeOverrides.doubleValue(
+                "QUIVER_LEAPER_JUMP_VERTICAL_MAX", QUIVER_LEAPER_JUMP_VERTICAL_MAX);
+        org.bukkit.util.Vector velocity = lookDirection.clone().normalize().multiply(Math.max(0.0D, horizontal));
+        velocity.setY(Math.max(Math.max(0.0D, verticalMin), Math.min(Math.max(verticalMin, verticalMax),
+                velocity.getY() + verticalAdd)));
+        return velocity;
+    }
+
+    public static org.bukkit.util.Vector quiverGroundPoundVelocity(
+            org.bukkit.util.Vector direction, double distance) {
+        if (direction == null || !Double.isFinite(distance) || direction.lengthSquared() < 0.001D) return null;
+        double proximity = quiverGroundPoundHorizontalMultiplier(distance);
+        double horizontal = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "QUIVER_GROUND_POUND_HORIZONTAL_STRENGTH", QUIVER_GROUND_POUND_HORIZONTAL_STRENGTH));
+        double verticalBase = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "QUIVER_GROUND_POUND_VERTICAL_BASE", QUIVER_GROUND_POUND_VERTICAL_BASE));
+        double verticalProximity = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "QUIVER_GROUND_POUND_VERTICAL_PROXIMITY", QUIVER_GROUND_POUND_VERTICAL_PROXIMITY));
+        return direction.clone().setY(0.0D).normalize().multiply(horizontal * proximity)
+                .setY(verticalBase + verticalProximity * proximity);
     }
 
     public static double quiverMeleeDamage(String kit) {
@@ -2329,25 +3743,32 @@ public final class ArcadePortRules {
     public static double quiverMeleeDamage(String kit, boolean holdingKitWeapon) {
         String value = normalizeQuiverKit(kit);
         if (value == null) value = "leaper";
-        if (!holdingKitWeapon) return "brawler".equals(value) ? 2.0D : 1.0D;
+        if (!holdingKitWeapon) return "brawler".equals(value)
+                ? GameDebugRuntimeOverrides.doubleValue("QUIVER_BRAWLER_PUNCH_DAMAGE", QUIVER_BRAWLER_PUNCH_DAMAGE)
+                : GameDebugRuntimeOverrides.doubleValue("QUIVER_DEFAULT_PUNCH_DAMAGE", QUIVER_DEFAULT_PUNCH_DAMAGE);
         return switch (value) {
-            case "brawler" -> 7.0D;
-            case "slam-shot" -> 5.5D;
-            case "ninja" -> 4.0D;
-            default -> 5.0D;
+            case "brawler" -> GameDebugRuntimeOverrides.doubleValue("QUIVER_BRAWLER_WEAPON_DAMAGE", QUIVER_BRAWLER_WEAPON_DAMAGE);
+            case "slam-shot" -> GameDebugRuntimeOverrides.doubleValue("QUIVER_SLAM_SHOT_WEAPON_DAMAGE", QUIVER_SLAM_SHOT_WEAPON_DAMAGE);
+            case "ninja" -> GameDebugRuntimeOverrides.doubleValue("QUIVER_NINJA_WEAPON_DAMAGE", QUIVER_NINJA_WEAPON_DAMAGE);
+            default -> GameDebugRuntimeOverrides.doubleValue("QUIVER_DEFAULT_WEAPON_DAMAGE", QUIVER_DEFAULT_WEAPON_DAMAGE);
         };
     }
 
     /** Reborn's Chain Arrows gain speed with travel distance, capped at 1.2. */
     public static double quiverReboundPower(double targetDistance) {
-        if (!Double.isFinite(targetDistance)) return 0.8D;
-        return Math.min(1.2D, 0.8D + Math.max(0.0D, targetDistance) / 30.0D);
+        double base = GameDebugRuntimeOverrides.doubleValue("QUIVER_REBOUND_BASE_POWER", QUIVER_REBOUND_BASE_POWER);
+        double perBlock = GameDebugRuntimeOverrides.doubleValue("QUIVER_REBOUND_POWER_PER_BLOCK", QUIVER_REBOUND_POWER_PER_BLOCK);
+        double maximum = GameDebugRuntimeOverrides.doubleValue("QUIVER_REBOUND_MAX_POWER", QUIVER_REBOUND_MAX_POWER);
+        if (!Double.isFinite(targetDistance)) return Math.max(0.0D, base);
+        return Math.min(Math.max(0.0D, maximum), Math.max(0.0D, base)
+                + Math.max(0.0D, targetDistance) * Math.max(0.0D, perBlock));
     }
 
     /** Reborn adds a small upward arc proportional to the distance between rebound targets. */
     public static double quiverReboundVerticalArc(double targetDistance) {
         if (!Double.isFinite(targetDistance)) return 0.0D;
-        return Math.max(0.0D, targetDistance) / 100.0D;
+        return Math.max(0.0D, targetDistance) * GameDebugRuntimeOverrides.doubleValue(
+                "QUIVER_REBOUND_VERTICAL_ARC_PER_BLOCK", QUIVER_REBOUND_VERTICAL_ARC_PER_BLOCK);
     }
 
     /** Resolve a saved Quiver arrow-flight cosmetic, including the catalogue's default. */
@@ -2372,7 +3793,11 @@ public final class ArcadePortRules {
     }
 
     public static boolean isQuiverWinnerScoreReached(int kills) {
-        return kills >= 20;
+        return kills >= Math.max(1, GameDebugRuntimeOverrides.intValue("QUIVER_SCORE_TO_WIN", QUIVER_SCORE_TO_WIN));
+    }
+
+    public static int quiverScoreToWin() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue("QUIVER_SCORE_TO_WIN", QUIVER_SCORE_TO_WIN));
     }
 
     public static boolean shouldFinishWhenNobodyIsAlive(int alivePlayers, int respawningPlayers) {
@@ -2380,8 +3805,122 @@ public final class ArcadePortRules {
     }
 
     public static int requiredDeathTagChasers(long elapsedMillis) {
-        return elapsedMillis < 0L ? 1
-                : 1 + (int) (elapsedMillis / DEATH_TAG_CHASER_PROMOTION_INTERVAL_MILLIS);
+        long interval = deathTagChaserPromotionIntervalMillis();
+        return elapsedMillis < 0L ? 1 : 1 + (int) (elapsedMillis / interval);
+    }
+
+    public static long deathTagChaserPromotionIntervalMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "DEATH_TAG_CHASER_PROMOTION_INTERVAL_MILLIS", DEATH_TAG_CHASER_PROMOTION_INTERVAL_MILLIS));
+    }
+
+    public static long deathTagGameTimeoutMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "DEATH_TAG_GAME_TIMEOUT_MILLIS", DEATH_TAG_GAME_TIMEOUT_MILLIS));
+    }
+
+    public static long deathTagRespawnGraceMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "DEATH_TAG_RESPAWN_GRACE_MILLIS", DEATH_TAG_RESPAWN_GRACE_MILLIS));
+    }
+
+    public static int deathTagArcherMaxArrows() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "DEATH_TAG_ARCHER_MAX_ARROWS", DEATH_TAG_ARCHER_MAX_ARROWS));
+    }
+
+    public static long deathTagArcherArrowIntervalMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "DEATH_TAG_ARCHER_ARROW_INTERVAL_MILLIS", DEATH_TAG_ARCHER_ARROW_INTERVAL_MILLIS));
+    }
+
+    public static boolean deathTagCanRefillArcherArrows(int currentArrows) {
+        return Math.max(0, currentArrows) < deathTagArcherMaxArrows();
+    }
+
+    public static int deathTagForcedChaserRewardGems() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "DEATH_TAG_FORCED_CHASER_REWARD_GEMS", DEATH_TAG_FORCED_CHASER_REWARD_GEMS));
+    }
+
+    public static int deathTagPlacementRewardGems(int place) {
+        String key = switch (place) {
+            case 1 -> "DEATH_TAG_FIRST_PLACE_REWARD_GEMS";
+            case 2 -> "DEATH_TAG_SECOND_PLACE_REWARD_GEMS";
+            case 3 -> "DEATH_TAG_THIRD_PLACE_REWARD_GEMS";
+            default -> null;
+        };
+        int fallback = switch (place) {
+            case 1 -> DEATH_TAG_FIRST_PLACE_REWARD_GEMS;
+            case 2 -> DEATH_TAG_SECOND_PLACE_REWARD_GEMS;
+            case 3 -> DEATH_TAG_THIRD_PLACE_REWARD_GEMS;
+            default -> 0;
+        };
+        return key == null ? 0 : Math.max(0, GameDebugRuntimeOverrides.intValue(key, fallback));
+    }
+
+    public static int deathTagParticipationRewardGems() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "DEATH_TAG_PARTICIPATION_REWARD_GEMS", DEATH_TAG_PARTICIPATION_REWARD_GEMS));
+    }
+
+    public static long deathTagTraitorAssistWindowMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "DEATH_TAG_TRAITOR_ASSIST_WINDOW_MILLIS", DEATH_TAG_TRAITOR_ASSIST_WINDOW_MILLIS));
+    }
+
+    public static int deathTagStatueAreaSizeBlocks() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "DEATH_TAG_STATUE_AREA_SIZE_BLOCKS", DEATH_TAG_STATUE_AREA_SIZE_BLOCKS));
+    }
+
+    public static String deathTagStatueAreaKey(int blockX, int blockZ) {
+        int size = deathTagStatueAreaSizeBlocks();
+        return Math.floorDiv(blockX, size) + ":" + Math.floorDiv(blockZ, size);
+    }
+
+    public static long deathTagStatueRequiredTimeMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "DEATH_TAG_STATUE_REQUIRED_TIME_MILLIS", DEATH_TAG_STATUE_REQUIRED_TIME_MILLIS));
+    }
+
+    public static int deathTagGallowsAssists() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue("DEATH_TAG_GALLOWS_ASSISTS", DEATH_TAG_GALLOWS_ASSISTS));
+    }
+
+    public static int deathTagUltimateChaserKills() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "DEATH_TAG_ULTIMATE_CHASER_KILLS", DEATH_TAG_ULTIMATE_CHASER_KILLS));
+    }
+
+    public static int deathTagHastyHunterKills() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "DEATH_TAG_HASTY_HUNTER_KILLS", DEATH_TAG_HASTY_HUNTER_KILLS));
+    }
+
+    public static long deathTagHastyHunterWindowMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "DEATH_TAG_HASTY_HUNTER_WINDOW_MILLIS", DEATH_TAG_HASTY_HUNTER_WINDOW_MILLIS));
+    }
+
+    public static double deathTagResilientRunnerHearts() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "DEATH_TAG_RESILIENT_RUNNER_HEARTS", DEATH_TAG_RESILIENT_RUNNER_HEARTS));
+    }
+
+    public static int deathTagCatchMeDistanceBlocks() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "DEATH_TAG_CATCH_ME_DISTANCE_BLOCKS", DEATH_TAG_CATCH_ME_DISTANCE_BLOCKS));
+    }
+
+    public static int deathTagTurtleShellHits() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "DEATH_TAG_TURTLE_SHELL_HITS", DEATH_TAG_TURTLE_SHELL_HITS));
+    }
+
+    public static int deathTagDeathProofWins() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "DEATH_TAG_DEATH_PROOF_WINS", DEATH_TAG_DEATH_PROOF_WINS));
     }
 
     public static boolean shouldSpreadDeathTag(boolean attackerTagged, boolean targetTagged) {
@@ -2394,24 +3933,46 @@ public final class ArcadePortRules {
 
     /** ComeAtMeBro starts awarding one stat per additional Chaser kill after the second kill. */
     public static boolean shouldAwardDeathTagComeAtMeBro(int chaserKillsByPlayer) {
-        return chaserKillsByPlayer >= 2;
+        return chaserKillsByPlayer >= Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "DEATH_TAG_COME_AT_ME_BRO_KILLS", DEATH_TAG_COME_AT_ME_BRO_KILLS));
     }
 
     public static double deathTagChaserDamage(boolean alphaChaser) {
-        return alphaChaser ? 6.0D : 4.0D;
+        return alphaChaser
+                ? GameDebugRuntimeOverrides.doubleValue("DEATH_TAG_ALPHA_CHASER_DAMAGE", DEATH_TAG_ALPHA_CHASER_DAMAGE)
+                : GameDebugRuntimeOverrides.doubleValue("DEATH_TAG_CHASER_DAMAGE", DEATH_TAG_CHASER_DAMAGE);
+    }
+
+    public static long deathTagSoloChaserHitCooldownMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "DEATH_TAG_CHASER_HIT_COOLDOWN_MILLIS", DEATH_TAG_CHASER_HIT_COOLDOWN_MILLIS));
     }
 
     public static double deathTagRunnerDamage(String runnerKit, boolean projectile) {
         String kit = runnerKit == null ? "basher" : runnerKit.toLowerCase(java.util.Locale.ROOT);
-        if (projectile) return "archer".equals(kit) ? 4.0D : 0.0D;
+        if (projectile) return "archer".equals(kit)
+                ? GameDebugRuntimeOverrides.doubleValue("DEATH_TAG_RUNNER_ARCHER_PROJECTILE_DAMAGE",
+                        DEATH_TAG_RUNNER_ARCHER_PROJECTILE_DAMAGE) : 0.0D;
         // Only Basher and Traitor replace the default unarmed hit with weapon damage.
-        return "basher".equals(kit) || "traitor".equals(kit) ? 6.0D : 1.0D;
+        if ("basher".equals(kit)) return GameDebugRuntimeOverrides.doubleValue(
+                "DEATH_TAG_RUNNER_BASHER_DAMAGE", DEATH_TAG_RUNNER_BASHER_DAMAGE);
+        if ("traitor".equals(kit)) return GameDebugRuntimeOverrides.doubleValue(
+                "DEATH_TAG_RUNNER_TRAITOR_DAMAGE", DEATH_TAG_RUNNER_TRAITOR_DAMAGE);
+        if ("archer".equals(kit)) return GameDebugRuntimeOverrides.doubleValue(
+                "DEATH_TAG_RUNNER_DEFAULT_DAMAGE", DEATH_TAG_RUNNER_DEFAULT_DAMAGE);
+        return GameDebugRuntimeOverrides.doubleValue("DEATH_TAG_RUNNER_DEFAULT_DAMAGE",
+                DEATH_TAG_RUNNER_DEFAULT_DAMAGE);
     }
 
     /** Iron Skin in Reborn subtracts a flat 2 or 4 damage from attacks greater than 1. */
     public static double deathTagDamageAfterIronSkin(double damage, boolean alphaChaser) {
         if (damage <= 1.0D) return damage;
-        return Math.max(0.0D, damage - (alphaChaser ? 4.0D : 2.0D));
+        double reduction = alphaChaser
+                ? GameDebugRuntimeOverrides.doubleValue("DEATH_TAG_ALPHA_IRON_SKIN_DAMAGE_REDUCTION",
+                        DEATH_TAG_ALPHA_IRON_SKIN_DAMAGE_REDUCTION)
+                : GameDebugRuntimeOverrides.doubleValue("DEATH_TAG_IRON_SKIN_DAMAGE_REDUCTION",
+                        DEATH_TAG_IRON_SKIN_DAMAGE_REDUCTION);
+        return Math.max(0.0D, damage - Math.max(0.0D, reduction));
     }
 
     /** The legacy Iron Skin perk does not reduce fire-tick or one-point-and-lower damage. */
@@ -2422,6 +3983,24 @@ public final class ArcadePortRules {
 
     public static double deathTagKnockbackMultiplier(boolean alphaChaser) {
         return alphaChaser ? 0.5D : 1.0D;
+    }
+
+    public static org.bukkit.util.Vector deathTagDefaultMeleeKnockback(
+            org.bukkit.util.Vector currentVelocity, org.bukkit.util.Vector horizontalDirection, boolean alphaTarget) {
+        if (currentVelocity == null || horizontalDirection == null || !Double.isFinite(currentVelocity.lengthSquared())
+                || !Double.isFinite(horizontalDirection.lengthSquared()) || horizontalDirection.lengthSquared() < 0.001D) {
+            return null;
+        }
+        double multiplier = deathTagKnockbackMultiplier(alphaTarget);
+        double damping = GameDebugRuntimeOverrides.doubleValue("DEATH_TAG_MELEE_KNOCKBACK_DAMPING",
+                DEATH_TAG_MELEE_KNOCKBACK_DAMPING);
+        double horizontal = GameDebugRuntimeOverrides.doubleValue("DEATH_TAG_MELEE_KNOCKBACK_HORIZONTAL",
+                DEATH_TAG_MELEE_KNOCKBACK_HORIZONTAL);
+        double vertical = GameDebugRuntimeOverrides.doubleValue("DEATH_TAG_MELEE_KNOCKBACK_VERTICAL",
+                DEATH_TAG_MELEE_KNOCKBACK_VERTICAL);
+        return currentVelocity.clone().multiply(Math.max(0.0D, damping))
+                .add(horizontalDirection.clone().setY(0.0D).normalize().multiply(Math.max(0.0D, horizontal) * multiplier))
+                .setY(Math.max(currentVelocity.getY() * Math.max(0.0D, damping), Math.max(0.0D, vertical) * multiplier));
     }
 
     /** Original Death Tag lights switch between gold blocks and white wool each second. */
@@ -2454,12 +4033,42 @@ public final class ArcadePortRules {
 
     /** Archer arrows have 300% of normal knockback; Alpha Chasers take half knockback. */
     public static double deathTagArcherArrowKnockbackMultiplier(boolean alphaChaser) {
-        return DEATH_TAG_ARCHER_ARROW_KNOCKBACK_POWER * deathTagKnockbackMultiplier(alphaChaser);
+        double power = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "DEATH_TAG_ARCHER_ARROW_KNOCKBACK_POWER", DEATH_TAG_ARCHER_ARROW_KNOCKBACK_POWER));
+        return power * deathTagKnockbackMultiplier(alphaChaser);
     }
 
     /** Reborn's Traitor knockback perk has a per-target 400 ms recharge. */
     public static boolean deathTagTraitorKnockbackReady(long nowMillis, long lastUseMillis) {
-        return lastUseMillis <= 0L || nowMillis - lastUseMillis >= DEATH_TAG_TRAITOR_KNOCKBACK_COOLDOWN_MILLIS;
+        long cooldown = Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "DEATH_TAG_TRAITOR_KNOCKBACK_COOLDOWN_MILLIS", DEATH_TAG_TRAITOR_KNOCKBACK_COOLDOWN_MILLIS));
+        return lastUseMillis <= 0L || nowMillis - lastUseMillis >= cooldown;
+    }
+
+    public static long deathTagTurtleStackResetMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue("DEATH_TAG_TURTLE_STACK_RESET_MILLIS",
+                DEATH_TAG_TURTLE_STACK_RESET_MILLIS));
+    }
+
+    public static int deathTagTurtleMaxStacks() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue("DEATH_TAG_TURTLE_MAX_STACKS",
+                DEATH_TAG_TURTLE_MAX_STACKS));
+    }
+
+    public static long deathTagTurtleEffectDurationTicks() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue("DEATH_TAG_TURTLE_EFFECT_DURATION_TICKS",
+                DEATH_TAG_TURTLE_EFFECT_DURATION_TICKS));
+    }
+
+    public static int deathTagTurtleHitsPerWindCharge() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue("DEATH_TAG_TURTLE_HITS_PER_WIND_CHARGE",
+                DEATH_TAG_TURTLE_HITS_PER_WIND_CHARGE));
+    }
+
+    public static long deathTagTricksterFireworksCooldownMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "DEATH_TAG_TRICKSTER_FIREWORKS_COOLDOWN_MILLIS",
+                DEATH_TAG_TRICKSTER_FIREWORKS_COOLDOWN_MILLIS));
     }
 
     /**
@@ -2484,7 +4093,8 @@ public final class ArcadePortRules {
 
     /** Source DeathTag.GetKillsGems pays for a Runner kill, never for a Chaser kill. */
     public static int deathTagKillRewardGems(boolean killedRunner) {
-        return killedRunner ? DEATH_TAG_RUNNER_KILL_REWARD_GEMS : 0;
+        return killedRunner ? Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "DEATH_TAG_RUNNER_KILL_REWARD_GEMS", DEATH_TAG_RUNNER_KILL_REWARD_GEMS)) : 0;
     }
 
     /** The source Death Tag game only awards winning placement to surviving Runners. */
@@ -2531,44 +4141,98 @@ public final class ArcadePortRules {
     }
 
     public static int turfWarsConstructorMax(String kit) {
-        return switch (normalizeTurfWarsKit(kit) == null ? "marksman" : normalizeTurfWarsKit(kit)) {
+        String normalized = normalizeTurfWarsKit(kit) == null ? "marksman" : normalizeTurfWarsKit(kit);
+        String key = switch (normalized) {
+            case "infiltrator" -> "TURF_WARS_INFILTRATOR_MAX_WOOL";
+            case "shredder" -> "TURF_WARS_SHREDDER_MAX_WOOL";
+            case "fortifier" -> "TURF_WARS_FORTIFIER_MAX_WOOL";
+            default -> "TURF_WARS_MARKSMAN_MAX_WOOL";
+        };
+        int fallback = switch (normalized) {
             case "infiltrator" -> TURF_WARS_INFILTRATOR_MAX_WOOL;
             case "shredder" -> TURF_WARS_SHREDDER_MAX_WOOL;
             case "fortifier" -> TURF_WARS_FORTIFIER_MAX_WOOL;
             default -> TURF_WARS_MARKSMAN_MAX_WOOL;
         };
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(key, fallback));
+    }
+
+    public static long turfWarsInfiltratorSlowIntervalMillis(boolean killTrigger) {
+        String key = killTrigger
+                ? "TURF_WARS_INFIlTRATOR_KILL_SLOW_INTERVAL_MILLIS"
+                : "TURF_WARS_INFIlTRATOR_SLOW_INTERVAL_MILLIS";
+        long fallback = killTrigger
+                ? TURF_WARS_INFIlTRATOR_KILL_SLOW_INTERVAL_MILLIS
+                : TURF_WARS_INFIlTRATOR_SLOW_INTERVAL_MILLIS;
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue(key, fallback));
     }
 
     public static int turfWarsArrowMax(String kit) {
-        return switch (normalizeTurfWarsKit(kit) == null ? "marksman" : normalizeTurfWarsKit(kit)) {
+        String normalized = normalizeTurfWarsKit(kit) == null ? "marksman" : normalizeTurfWarsKit(kit);
+        String key = normalized.equals("infiltrator") ? "TURF_WARS_INFILTRATOR_MAX_ARROWS"
+                : normalized.equals("shredder") ? "TURF_WARS_SHREDDER_MAX_ARROWS" : "TURF_WARS_MARKSMAN_MAX_ARROWS";
+        int fallback = switch (normalized) {
             case "infiltrator" -> TURF_WARS_INFILTRATOR_MAX_ARROWS;
             case "shredder" -> TURF_WARS_SHREDDER_MAX_ARROWS;
             default -> TURF_WARS_MARKSMAN_MAX_ARROWS;
         };
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(key, fallback));
     }
 
     public static long turfWarsArrowIntervalMillis(String kit) {
-        return switch (normalizeTurfWarsKit(kit) == null ? "marksman" : normalizeTurfWarsKit(kit)) {
+        String normalized = normalizeTurfWarsKit(kit) == null ? "marksman" : normalizeTurfWarsKit(kit);
+        String key = switch (normalized) {
+            case "infiltrator" -> "TURF_WARS_INFILTRATOR_ARROW_INTERVAL_MILLIS";
+            case "shredder" -> "TURF_WARS_SHREDDER_ARROW_INTERVAL_MILLIS";
+            default -> "TURF_WARS_MARKSMAN_ARROW_INTERVAL_MILLIS";
+        };
+        long fallback = switch (normalized) {
             case "infiltrator" -> TURF_WARS_INFILTRATOR_ARROW_INTERVAL_MILLIS;
             case "shredder" -> TURF_WARS_SHREDDER_ARROW_INTERVAL_MILLIS;
             default -> TURF_WARS_MARKSMAN_ARROW_INTERVAL_MILLIS;
         };
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(key, fallback));
     }
 
     /** The source drains two hearts at a time during combat and is lethal outside combat. */
     public static double turfWarsSpawnBoundaryDamage(boolean combatPhase) {
-        return combatPhase ? 2.0D : 500.0D;
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(combatPhase
+                ? "TURF_WARS_COMBAT_BOUNDARY_DAMAGE" : "TURF_WARS_BUILD_BOUNDARY_DAMAGE",
+                combatPhase ? TURF_WARS_COMBAT_BOUNDARY_DAMAGE : TURF_WARS_BUILD_BOUNDARY_DAMAGE));
     }
 
     /** Reborn's Comeback tracker remembers a team once its remaining line count reaches five. */
     public static boolean turfWarsShouldTrackComeback(int remainingLines) {
-        return remainingLines <= 5;
+        return remainingLines <= Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "TURF_WARS_COMEBACK_REMAINING_LINES", TURF_WARS_COMEBACK_REMAINING_LINES));
     }
 
     /** Reborn advances one line for the first combat round, two for the second, etc. */
     public static int turfWarsLinesPerKill(int combatRoundsStarted, boolean mixedArcadeVariant) {
         int sourceLines = Math.max(1, combatRoundsStarted);
-        return sourceLines * (mixedArcadeVariant ? 2 : 1);
+        int multiplier = Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "TURF_WARS_LINES_PER_KILL_MULTIPLIER", TURF_WARS_LINES_PER_KILL_MULTIPLIER));
+        return sourceLines * (mixedArcadeVariant ? 2 : 1) * multiplier;
+    }
+
+    public static double turfWarsTerritoryKnockbackHorizontal() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue("TURF_WARS_TERRITORY_KNOCKBACK_HORIZONTAL",
+                TURF_WARS_TERRITORY_KNOCKBACK_HORIZONTAL));
+    }
+
+    public static double turfWarsTerritoryKnockbackVertical() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue("TURF_WARS_TERRITORY_KNOCKBACK_VERTICAL",
+                TURF_WARS_TERRITORY_KNOCKBACK_VERTICAL));
+    }
+
+    public static double turfWarsBarrageArrowSpeed() {
+        return Math.max(0.1D, GameDebugRuntimeOverrides.doubleValue("TURF_WARS_BARRAGE_ARROW_SPEED",
+                TURF_WARS_BARRAGE_ARROW_SPEED));
+    }
+
+    public static double turfWarsBarrageArrowSpread() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue("TURF_WARS_BARRAGE_ARROW_SPREAD",
+                TURF_WARS_BARRAGE_ARROW_SPREAD));
     }
 
     /** Source axis vector points from the blue marker back toward the red marker. */
@@ -2605,24 +4269,41 @@ public final class ArcadePortRules {
     public static double turfWarsHitDamage(String kit, boolean projectile, boolean ironSword) {
         if (projectile) {
             return "shredder".equals(normalizeTurfWarsKit(kit))
-                    ? TURF_WARS_SHREDDER_ARROW_DAMAGE : 500.0D;
+                    ? GameDebugRuntimeOverrides.doubleValue(
+                            "TURF_WARS_SHREDDER_ARROW_DAMAGE", TURF_WARS_SHREDDER_ARROW_DAMAGE) : 500.0D;
         }
-        return ironSword ? TURF_WARS_IRON_SWORD_DAMAGE : TURF_WARS_MELEE_DAMAGE;
+        return ironSword
+                ? GameDebugRuntimeOverrides.doubleValue("TURF_WARS_IRON_SWORD_DAMAGE", TURF_WARS_IRON_SWORD_DAMAGE)
+                : GameDebugRuntimeOverrides.doubleValue("TURF_WARS_MELEE_DAMAGE", TURF_WARS_MELEE_DAMAGE);
     }
 
     public static long turfWarsInitialBuildPhaseMillis(boolean mixedArcadeVariant) {
-        return mixedArcadeVariant ? TURF_WARS_MIXED_ARCADE_INITIAL_BUILD_PHASE_MILLIS
-                : TURF_WARS_INITIAL_BUILD_PHASE_MILLIS;
+        if (mixedArcadeVariant) {
+            return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                    "TURF_WARS_MIXED_ARCADE_INITIAL_BUILD_PHASE_MILLIS",
+                    TURF_WARS_MIXED_ARCADE_INITIAL_BUILD_PHASE_MILLIS));
+        }
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue("TURF_WARS_INITIAL_BUILD_PHASE_MILLIS",
+                TURF_WARS_INITIAL_BUILD_PHASE_MILLIS));
     }
 
     public static long turfWarsBuildPhaseMillis(boolean mixedArcadeVariant) {
-        return mixedArcadeVariant ? TURF_WARS_MIXED_ARCADE_BUILD_PHASE_MILLIS
-                : TURF_WARS_BUILD_PHASE_MILLIS;
+        if (mixedArcadeVariant) {
+            return Math.max(1L, GameDebugRuntimeOverrides.longValue("TURF_WARS_MIXED_ARCADE_BUILD_PHASE_MILLIS",
+                    TURF_WARS_MIXED_ARCADE_BUILD_PHASE_MILLIS));
+        }
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue("TURF_WARS_BUILD_PHASE_MILLIS",
+                TURF_WARS_BUILD_PHASE_MILLIS));
     }
 
     public static long turfWarsCombatPhaseMillis(boolean mixedArcadeVariant) {
-        return mixedArcadeVariant ? TURF_WARS_MIXED_ARCADE_COMBAT_PHASE_MILLIS
-                : TURF_WARS_COMBAT_PHASE_MILLIS;
+        if (mixedArcadeVariant) {
+            return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                    "TURF_WARS_MIXED_ARCADE_COMBAT_PHASE_MILLIS",
+                    TURF_WARS_MIXED_ARCADE_COMBAT_PHASE_MILLIS));
+        }
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue("TURF_WARS_COMBAT_PHASE_MILLIS",
+                TURF_WARS_COMBAT_PHASE_MILLIS));
     }
 
     public static int advanceTurfFrontline(int currentFrontline, int teamId) {
@@ -2631,7 +4312,8 @@ public final class ArcadePortRules {
 
     public static int advanceTurfFrontline(int currentFrontline, int teamId, boolean mixedArcadeVariant) {
         return advanceTurfFrontline(currentFrontline, teamId, mixedArcadeVariant
-                ? TURF_WARS_MIXED_ARCADE_TURF_ADVANCE_BLOCKS : 1);
+                ? GameDebugRuntimeOverrides.intValue("TURF_WARS_MIXED_ARCADE_TURF_ADVANCE_BLOCKS",
+                        TURF_WARS_MIXED_ARCADE_TURF_ADVANCE_BLOCKS) : 1);
     }
 
     public static int advanceTurfFrontline(int currentFrontline, int teamId, int blocks) {
@@ -2666,6 +4348,9 @@ public final class ArcadePortRules {
      * Tier index is GREEN=0, YELLOW=1, ORANGE=2, RED=3.
      */
     public static int gladiatorsStartingTierForPlayers(int players) {
+        int overrideTier = GameDebugRuntimeOverrides.intValue("GLADIATOR_STARTING_TIER_OVERRIDE",
+                GLADIATOR_STARTING_TIER_OVERRIDE);
+        if (overrideTier >= 0) return Math.min(3, overrideTier);
         if (players <= 2) return 3;
         if (players <= 4) return 2;
         if (players <= 8) return 1;
@@ -2897,6 +4582,20 @@ public final class ArcadePortRules {
     public static final double HEROES_OF_GWEN_WITHER_HOME_SPEED = 6.0D;
     public static final double HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS = 8.0D;
     public static final double HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE = 4.0D;
+    public static final int HEROES_OF_GWEN_TOWER_REFERENCE_TEAM_SIZE = 9;
+    public static final int HEROES_OF_GWEN_OUTER_TOWER_HEALTH = 500;
+    public static final int HEROES_OF_GWEN_INNER_TOWER_HEALTH = 1_000;
+    public static final long HEROES_OF_GWEN_TOWER_UPDATE_INTERVAL_MILLIS = 1_000L;
+    public static final double HEROES_OF_GWEN_TOWER_RANGE_SQUARED = 100.0D;
+    public static final double HEROES_OF_GWEN_TOWER_DAMAGE = 3.0D;
+    public static final double HEROES_OF_GWEN_TOWER_HEAL = 2.6D;
+    public static final long HEROES_OF_GWEN_CAPTURE_UPDATE_INTERVAL_MILLIS = 1_000L;
+    public static final double HEROES_OF_GWEN_CAPTURE_POINT_RANGE_SQUARED = 25.0D;
+    public static final double HEROES_OF_GWEN_MINION_HEALTH = 10.0D;
+    public static final double HEROES_OF_GWEN_MINION_DAMAGE = 0.2D;
+    public static final double HEROES_OF_GWEN_MINION_TOWER_DAMAGE = 0.4D;
+    public static final double HEROES_OF_GWEN_MINION_SOURCE_TARGET_RANGE_SQUARED = 100.0D;
+    public static final long HEROES_OF_GWEN_MINION_COMBAT_INTERVAL_MILLIS = 500L;
 
     // Source Moba Heroes Valley / Monochrome mid-match sidequests.
     public static final long HEROES_OF_GWEN_SIDEQUEST_INITIAL_DELAY_MILLIS = 300_000L;
@@ -2919,6 +4618,21 @@ public final class ArcadePortRules {
     public static final double HEROES_OF_GWEN_OVERTIME_PATH_ADVANCE_DISTANCE_SQUARED = 16.0D;
     public static final int HEROES_OF_GWEN_SMALL_HEALTH_POTION_HEAL_HP = 4;
     public static final int HEROES_OF_GWEN_LARGE_HEALTH_POTION_HEAL_HP = 8;
+
+    public static int heroesOfGwenHealthPotionHealHp(boolean largePotion) {
+        int configured = largePotion
+                ? GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_LARGE_HEALTH_POTION_HEAL_HP",
+                        HEROES_OF_GWEN_LARGE_HEALTH_POTION_HEAL_HP)
+                : GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_SMALL_HEALTH_POTION_HEAL_HP",
+                        HEROES_OF_GWEN_SMALL_HEALTH_POTION_HEAL_HP);
+        return Math.max(0, Math.min(40, configured));
+    }
+
+    public static double heroesOfGwenHealthPotionResult(double currentHealth, double maximumHealth,
+                                                        boolean largePotion) {
+        return Math.max(0.0D, Math.min(maximumHealth,
+                currentHealth + heroesOfGwenHealthPotionHealHp(largePotion)));
+    }
     public static final long HEROES_OF_GWEN_POWER_POTION_DURATION_MILLIS = 90_000L;
     public static final long HEROES_OF_GWEN_SPEED_POTION_DURATION_MILLIS = 180_000L;
 
@@ -3199,7 +4913,8 @@ public final class ArcadePortRules {
     /** Source OvertimeManager starts after 15 minutes of Live play. */
     public static boolean heroesOfGwenOvertimeHasStarted(long liveStartedAt, long now) {
         return liveStartedAt > 0L && now >= liveStartedAt
-                && now - liveStartedAt >= HEROES_OF_GWEN_OVERTIME_DELAY_MILLIS;
+                && now - liveStartedAt >= GameDebugRuntimeOverrides.longValue(
+                        "HEROES_OF_GWEN_OVERTIME_DELAY_MILLIS", HEROES_OF_GWEN_OVERTIME_DELAY_MILLIS);
     }
 
     /** Source OvertimeAI follows only the first half of the ordered blue-to-red minion path. */
@@ -3212,7 +4927,9 @@ public final class ArcadePortRules {
             double distanceSquaredToTarget) {
         if (pathSize <= 0) return -1;
         int bounded = Math.max(0, Math.min(currentIndex, pathSize - 1));
-        return distanceSquaredToTarget < HEROES_OF_GWEN_OVERTIME_PATH_ADVANCE_DISTANCE_SQUARED
+        return distanceSquaredToTarget < GameDebugRuntimeOverrides.doubleValue(
+                "HEROES_OF_GWEN_OVERTIME_PATH_ADVANCE_DISTANCE_SQUARED",
+                HEROES_OF_GWEN_OVERTIME_PATH_ADVANCE_DISTANCE_SQUARED)
                 && bounded < pathSize - 1 ? bounded + 1 : bounded;
     }
 
@@ -3223,10 +4940,70 @@ public final class ArcadePortRules {
 
     /** Source Earthquake damage scales with the radius proximity value (1 - distance / radius). */
     public static double heroesOfGwenWitherEarthquakeDamage(double distanceFromBoss) {
+        double radius = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS",
+                HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS);
         double proximity = 1.0D - Math.max(0.0D, Math.min(
-                HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS, distanceFromBoss))
-                / HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS;
-        return HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE * (proximity + 0.5D);
+                radius, distanceFromBoss)) / Math.max(0.001D, radius);
+        return GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE",
+                HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE) * (proximity + 0.5D);
+    }
+
+    public static double heroesOfGwenTowerMaximumHealth(boolean outerTower, int opposingPlayers) {
+        int base = outerTower
+                ? GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_OUTER_TOWER_HEALTH", HEROES_OF_GWEN_OUTER_TOWER_HEALTH)
+                : GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_INNER_TOWER_HEALTH", HEROES_OF_GWEN_INNER_TOWER_HEALTH);
+        int referencePlayers = Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "HEROES_OF_GWEN_TOWER_REFERENCE_TEAM_SIZE", HEROES_OF_GWEN_TOWER_REFERENCE_TEAM_SIZE));
+        return Math.max(1.0D, Math.ceil(Math.max(1, base) * Math.max(1, opposingPlayers) / (double) referencePlayers));
+    }
+
+    public static double heroesOfGwenTowerDamage() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "HEROES_OF_GWEN_TOWER_DAMAGE", HEROES_OF_GWEN_TOWER_DAMAGE));
+    }
+
+    public static double heroesOfGwenTowerHeal() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "HEROES_OF_GWEN_TOWER_HEAL", HEROES_OF_GWEN_TOWER_HEAL));
+    }
+
+    public static double heroesOfGwenTowerRangeSquared() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "HEROES_OF_GWEN_TOWER_RANGE_SQUARED", HEROES_OF_GWEN_TOWER_RANGE_SQUARED));
+    }
+
+    public static double heroesOfGwenCapturePointRangeSquared() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "HEROES_OF_GWEN_CAPTURE_POINT_RANGE_SQUARED", HEROES_OF_GWEN_CAPTURE_POINT_RANGE_SQUARED));
+    }
+
+    public static long heroesOfGwenCaptureUpdateIntervalMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "HEROES_OF_GWEN_CAPTURE_UPDATE_INTERVAL_MILLIS", HEROES_OF_GWEN_CAPTURE_UPDATE_INTERVAL_MILLIS));
+    }
+
+    public static long heroesOfGwenMinionCombatIntervalMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "HEROES_OF_GWEN_MINION_COMBAT_INTERVAL_MILLIS", HEROES_OF_GWEN_MINION_COMBAT_INTERVAL_MILLIS));
+    }
+
+    public static double heroesOfGwenMinionHealth() {
+        return Math.max(1.0D, GameDebugRuntimeOverrides.doubleValue(
+                "HEROES_OF_GWEN_MINION_HEALTH", HEROES_OF_GWEN_MINION_HEALTH));
+    }
+
+    public static double heroesOfGwenMinionDamage(boolean towerTarget) {
+        double damage = towerTarget
+                ? GameDebugRuntimeOverrides.doubleValue(
+                        "HEROES_OF_GWEN_MINION_TOWER_DAMAGE", HEROES_OF_GWEN_MINION_TOWER_DAMAGE)
+                : GameDebugRuntimeOverrides.doubleValue(
+                        "HEROES_OF_GWEN_MINION_DAMAGE", HEROES_OF_GWEN_MINION_DAMAGE);
+        return Math.max(0.0D, damage);
+    }
+
+    public static double heroesOfGwenMinionTargetRangeSquared() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "HEROES_OF_GWEN_MINION_SOURCE_TARGET_RANGE_SQUARED", HEROES_OF_GWEN_MINION_SOURCE_TARGET_RANGE_SQUARED));
     }
 
     /** Reborn caps blast protection EPF at 20 before applying its TNT damage multiplier. */
@@ -3301,9 +5078,15 @@ public final class ArcadePortRules {
 
     public static boolean shouldShowMicroBattlesBorderParticles(double playerX, double playerZ,
             double centerX, double centerZ, double borderSize) {
+        return shouldShowMicroBattlesBorderParticles(playerX, playerZ, centerX, centerZ, borderSize,
+                MICRO_BATTLES_BORDER_PARTICLE_DISTANCE);
+    }
+
+    public static boolean shouldShowMicroBattlesBorderParticles(double playerX, double playerZ,
+            double centerX, double centerZ, double borderSize, double particleDistance) {
         double distance = microBattlesDistanceToBorder(playerX, playerZ, centerX, centerZ, borderSize);
         return Double.isFinite(distance) && distance >= 0.0D
-                && distance <= MICRO_BATTLES_BORDER_PARTICLE_DISTANCE;
+                && Double.isFinite(particleDistance) && distance <= Math.max(0.0D, particleDistance);
     }
 
     /** Normalise the 16 supported stained-glass and dust colour names. */
@@ -3448,14 +5231,18 @@ public final class ArcadePortRules {
     public static final long HEROES_OF_GWEN_ROWENA_FLETCHER_RELOAD_MILLIS = 2_000L;
 
     public static int heroesOfGwenFletcherMaxArrows(String hero) {
-        if ("devon".equalsIgnoreCase(hero)) return HEROES_OF_GWEN_DEVON_FLETCHER_MAX_ARROWS;
-        if ("rowena".equalsIgnoreCase(hero)) return HEROES_OF_GWEN_ROWENA_FLETCHER_MAX_ARROWS;
+        if ("devon".equalsIgnoreCase(hero)) return Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "HEROES_OF_GWEN_DEVON_FLETCHER_MAX_ARROWS", HEROES_OF_GWEN_DEVON_FLETCHER_MAX_ARROWS));
+        if ("rowena".equalsIgnoreCase(hero)) return Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "HEROES_OF_GWEN_ROWENA_FLETCHER_MAX_ARROWS", HEROES_OF_GWEN_ROWENA_FLETCHER_MAX_ARROWS));
         return 0;
     }
 
     public static long heroesOfGwenFletcherReloadMillis(String hero) {
-        if ("devon".equalsIgnoreCase(hero)) return HEROES_OF_GWEN_DEVON_FLETCHER_RELOAD_MILLIS;
-        if ("rowena".equalsIgnoreCase(hero)) return HEROES_OF_GWEN_ROWENA_FLETCHER_RELOAD_MILLIS;
+        if ("devon".equalsIgnoreCase(hero)) return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "HEROES_OF_GWEN_DEVON_FLETCHER_RELOAD_MILLIS", HEROES_OF_GWEN_DEVON_FLETCHER_RELOAD_MILLIS));
+        if ("rowena".equalsIgnoreCase(hero)) return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "HEROES_OF_GWEN_ROWENA_FLETCHER_RELOAD_MILLIS", HEROES_OF_GWEN_ROWENA_FLETCHER_RELOAD_MILLIS));
         return 0L;
     }
 
@@ -3634,17 +5421,27 @@ public final class ArcadePortRules {
 
     /** Matches MobaUtil.scaleDamageWithBow(bow, 5) used by Devon's TNT Arrows. */
     public static double heroesOfGwenDevonTntArrowDamage(int powerLevel) {
-        double scaled = HEROES_OF_GWEN_DEVON_TNT_BOW_BASE_DAMAGE + 5.0D;
-        return scaled * (1.0D + Math.max(0, powerLevel) * 0.25D);
+        double baseDamage = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_DEVON_TNT_BOW_BASE_DAMAGE",
+                HEROES_OF_GWEN_DEVON_TNT_BOW_BASE_DAMAGE);
+        double powerScale = GameDebugRuntimeOverrides.doubleValue(
+                "HEROES_OF_GWEN_DEVON_TNT_BOW_POWER_DAMAGE_PER_LEVEL",
+                HEROES_OF_GWEN_DEVON_TNT_BOW_POWER_DAMAGE_PER_LEVEL);
+        return (baseDamage + 5.0D) * (1.0D + Math.max(0, powerLevel) * powerScale);
     }
+
+    public static final double HEROES_OF_GWEN_DEVON_TNT_BOW_POWER_DAMAGE_PER_LEVEL = 0.25D;
 
     public static final double HEROES_OF_GWEN_ROWENA_BOW_BASE_DAMAGE = 5.0D;
     public static final double HEROES_OF_GWEN_ROWENA_BOW_POWER_DAMAGE_PER_LEVEL = 0.25D;
 
     /** Mirrors MobaUtil.scaleDamageWithBow(item, 0) in the archived Java source. */
     public static double heroesOfGwenRowenaBowDamage(int powerLevel) {
-        return HEROES_OF_GWEN_ROWENA_BOW_BASE_DAMAGE
-                * (1.0D + Math.max(0, powerLevel) * HEROES_OF_GWEN_ROWENA_BOW_POWER_DAMAGE_PER_LEVEL);
+        double baseDamage = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ROWENA_BOW_BASE_DAMAGE",
+                HEROES_OF_GWEN_ROWENA_BOW_BASE_DAMAGE);
+        double powerScale = GameDebugRuntimeOverrides.doubleValue(
+                "HEROES_OF_GWEN_ROWENA_BOW_POWER_DAMAGE_PER_LEVEL",
+                HEROES_OF_GWEN_ROWENA_BOW_POWER_DAMAGE_PER_LEVEL);
+        return baseDamage * (1.0D + Math.max(0, powerLevel) * powerScale);
     }
 
     /** Light Arrows use scaled bow damage minus one point. */
@@ -3655,12 +5452,15 @@ public final class ArcadePortRules {
     /** Bombardment multiplies the same scaled bow damage by two. */
     public static double heroesOfGwenRowenaBombardmentDamage(int powerLevel) {
         return heroesOfGwenRowenaBowDamage(powerLevel)
-                * HEROES_OF_GWEN_ROWENA_BOMBARDMENT_DAMAGE_FACTOR;
+                * GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ROWENA_BOMBARDMENT_DAMAGE_FACTOR",
+                        HEROES_OF_GWEN_ROWENA_BOMBARDMENT_DAMAGE_FACTOR);
     }
 
     public static boolean heroesOfGwenAnathMeteorContainsDistance(double distance) {
+        double radius = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ANATH_METEOR_RADIUS",
+                HEROES_OF_GWEN_ANATH_METEOR_RADIUS);
         return Double.isFinite(distance) && distance >= 0.0D
-                && distance <= HEROES_OF_GWEN_ANATH_METEOR_RADIUS;
+                && distance <= Math.max(0.0D, radius);
     }
 
     // Heroes of Gwen: source-derived lane minion and economy timings.
@@ -3681,7 +5481,11 @@ public final class ArcadePortRules {
 
     // Additional source-derived Micro Battles achievements and contribution rules.
     public static boolean shouldAwardMicroBattlesAnnihilation(int killsThisGame) {
-        return killsThisGame == MICRO_BATTLES_ANNIHILATION_KILLS;
+        return shouldAwardMicroBattlesAnnihilation(killsThisGame, MICRO_BATTLES_ANNIHILATION_KILLS);
+    }
+
+    public static boolean shouldAwardMicroBattlesAnnihilation(int killsThisGame, int requiredKills) {
+        return requiredKills > 0 && killsThisGame == requiredKills;
     }
 
     public static boolean shouldAwardMicroBattlesLastTwo(int aliveTeams) {
@@ -3690,8 +5494,14 @@ public final class ArcadePortRules {
 
 
     public static boolean isMicroBattlesCombatContributionFresh(long nowMillis, long lastDamageAtMillis) {
+        return isMicroBattlesCombatContributionFresh(nowMillis, lastDamageAtMillis,
+                MICRO_BATTLES_COMBAT_LOG_EXPIRE_MILLIS);
+    }
+
+    public static boolean isMicroBattlesCombatContributionFresh(long nowMillis, long lastDamageAtMillis,
+            long expiryMillis) {
         return nowMillis >= lastDamageAtMillis
-                && nowMillis - lastDamageAtMillis < MICRO_BATTLES_COMBAT_LOG_EXPIRE_MILLIS;
+                && nowMillis - lastDamageAtMillis < Math.max(0L, expiryMillis);
     }
 
 }

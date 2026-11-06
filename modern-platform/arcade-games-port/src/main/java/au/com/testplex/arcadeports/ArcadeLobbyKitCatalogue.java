@@ -147,6 +147,24 @@ final class ArcadeLobbyKitCatalogue {
                             Unlock.GEM, Zombie.class, Material.IRON_SWORD),
                     choice("shepherd", "Shepherd", Material.SHEARS,
                             Unlock.ACHIEVEMENT, Villager.class, Material.SHEARS));
+            case SNAKE -> List.of(
+                    choice("speed", "Speed", Material.FEATHER,
+                            Unlock.FREE, Zombie.class, Material.FEATHER),
+                    choice("reverse", "Reverse", Material.COOKIE,
+                            Unlock.FREE, Zombie.class, Material.COOKIE),
+                    choice("invulnerable", "Invulnerable", Material.NETHER_STAR,
+                            Unlock.FREE, Zombie.class, Material.NETHER_STAR));
+            case WIZARDS -> List.of(
+                    choice("wizard", "Wizard", Material.BLAZE_ROD,
+                            Unlock.FREE, Villager.class, Material.BLAZE_ROD),
+                    choice("mage", "Mage", Material.BOOK,
+                            Unlock.FREE, Villager.class, Material.BOOK),
+                    choice("sorcerer", "Sorcerer", Material.ENDER_PEARL,
+                            Unlock.FREE, Villager.class, Material.ENDER_PEARL),
+                    choice("mystic", "Mystic", Material.AMETHYST_SHARD,
+                            Unlock.FREE, Villager.class, Material.AMETHYST_SHARD),
+                    choice("witch-doctor", "Witch Doctor", Material.POTION,
+                            Unlock.FREE, Villager.class, Material.POTION));
             case MONSTER_MAZE, MONSTER_MAZE_SPEED, MONSTER_MAZE_MODERN -> List.of(
                     choice("jumper", "Jumper", Material.FEATHER,
                             Unlock.FREE, Skeleton.class, Material.FEATHER),

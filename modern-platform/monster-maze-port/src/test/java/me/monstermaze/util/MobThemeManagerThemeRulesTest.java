@@ -4,6 +4,8 @@ import org.bukkit.Material;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
+import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -58,5 +60,15 @@ class MobThemeManagerThemeRulesTest {
         assertEquals("Map Default", MobThemeManager.displayName("map_default"));
         assertEquals("Random Mob", MobThemeManager.displayName("random"));
         assertEquals("Zombie Pigman", MobThemeManager.displayName("zombie_pigman"));
+    }
+
+    @Test
+    void selectorCyclesOnlyCosmeticMenuEnabledThemes() {
+        List<String> enabled = MobThemeManager.allowedThemes(Set.of("map_default", "axolotl", "frog"));
+
+        assertEquals(List.of("map_default", "axolotl", "frog"), enabled);
+        assertEquals("axolotl", MobThemeManager.nextTheme("map_default", enabled));
+        assertEquals("map_default", MobThemeManager.nextTheme("frog", enabled));
+        assertEquals(List.of("map_default"), MobThemeManager.allowedThemes(Set.of()));
     }
 }

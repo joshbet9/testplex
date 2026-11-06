@@ -68,8 +68,8 @@ class MonsterMazePortContractTest {
     }
 
     @Test void shipsSafeIsolatedTestDefaults() throws Exception {
-        try (InputStream input = getClass().getClassLoader().getResourceAsStream("config.yml")) {
-            assertNotNull(input, "config.yml must be packaged with MonsterMazeModern.jar");
+        try (InputStream input = getClass().getClassLoader().getResourceAsStream("monster-maze/config.yml")) {
+            assertNotNull(input, "config.yml must be packaged in ArcadeMechanicsModern.jar's monster-maze resource namespace");
             YamlConfiguration config = YamlConfiguration.loadConfiguration(
                     new InputStreamReader(input, StandardCharsets.UTF_8));
             assertTrue(config.getBoolean("test-mode", false),
@@ -82,8 +82,8 @@ class MonsterMazePortContractTest {
     }
 
     @Test void configuredMapsUseTheSevenSourceWorldFoldersProvisionedByDeployment() throws Exception {
-        try (InputStream input = getClass().getClassLoader().getResourceAsStream("maps.yml")) {
-            assertNotNull(input, "maps.yml must be packaged with MonsterMazeModern.jar");
+        try (InputStream input = getClass().getClassLoader().getResourceAsStream("monster-maze/maps.yml")) {
+            assertNotNull(input, "maps.yml must be packaged in ArcadeMechanicsModern.jar's monster-maze resource namespace");
             YamlConfiguration maps = YamlConfiguration.loadConfiguration(
                     new InputStreamReader(input, StandardCharsets.UTF_8));
             Set<String> mapNames = maps.getKeys(false);

@@ -21,31 +21,71 @@ public final class HoopsRemasteredRules {
     public static final double SHOT_AIM_TOLERANCE = 2.25D;
     public static final double LAYUP_DISTANCE = 6.0D;
     public static final double DUNK_DISTANCE = 4.5D;
+    public static final int COMEBACK_SCORE_GAP = 10;
+    public static final long STEAL_COOLDOWN_MILLIS = 3_000L;
+    public static final double BALL_GRAVITY = 0.045D;
+    public static final double BALL_WALL_BOUNCE = 0.45D;
+    public static final double BALL_FLOOR_BOUNCE = 0.48D;
+    public static final double BALL_FLOOR_BOUNCE_FRICTION = 0.82D;
+    public static final double BALL_FLOOR_FRICTION = 0.75D;
+    public static final double BALL_MOVEMENT_FRICTION = 0.65D;
+    public static final double POSSESSION_MOVEMENT_DAMPING = 0.65D;
+    public static final int BALL_MAX_BOUNCES = 7;
+    public static final long BALL_LOOSE_LIMIT_MILLIS = 12_000L;
+    public static final long BALL_RECLAIM_MILLIS = 15_000L;
+    public static final double PASS_SPEED = 1.35D;
+    public static final double PASS_VERTICAL_SPEED = 0.22D;
+    public static final double PASS_FLIGHT_TICKS_PER_BLOCK = 1.45D;
+    public static final int PASS_MIN_FLIGHT_TICKS = 4;
+    public static final int PASS_MAX_FLIGHT_TICKS = 20;
+    public static final double PASS_MIN_DISTANCE = 2.0D;
+    public static final double PASS_MAX_DISTANCE = 24.0D;
+    public static final double PASS_AIM_DOT = 0.45D;
+    public static final double BLOCK_KNOCKBACK_HORIZONTAL = 0.6D;
+    public static final double BLOCK_KNOCKBACK_VERTICAL = 0.35D;
+    public static final double HOPS_HORIZONTAL = 0.48D;
+    public static final double HOPS_VERTICAL = 0.78D;
+    public static final double SHOT_DUNK_FLIGHT_TICKS_PER_BLOCK = 1.35D;
+    public static final double SHOT_LAYUP_FLIGHT_TICKS_PER_BLOCK = 1.2D;
+    public static final double SHOT_NORMAL_FLIGHT_TICKS_PER_BLOCK = 1.05D;
+    public static final int SHOT_DUNK_MIN_FLIGHT_TICKS = 5;
+    public static final int SHOT_DUNK_MAX_FLIGHT_TICKS = 8;
+    public static final int SHOT_LAYUP_MIN_FLIGHT_TICKS = 7;
+    public static final int SHOT_LAYUP_MAX_FLIGHT_TICKS = 11;
+    public static final int SHOT_NORMAL_MIN_FLIGHT_TICKS = 8;
+    public static final int SHOT_NORMAL_MAX_FLIGHT_TICKS = 22;
+    public static final double BALL_CATCH_RADIUS_SQUARED = 2.25D;
+    public static final double SHOT_LAUNCH_PROTECTION_DISTANCE_SQUARED = 2.25D;
+    public static final double BLOCK_AIM_DOT = 0.25D;
+    public static final double STEAL_AIM_DOT = 0.20D;
 
     private HoopsRemasteredRules() { }
 
     public static boolean supportsPlayerCount(int players) {
-        return players >= MIN_PLAYERS && players <= MAX_PLAYERS;
+        return players >= GameDebugRuntimeOverrides.intValue("HOOPS_MIN_PLAYERS", MIN_PLAYERS)
+                && players <= GameDebugRuntimeOverrides.intValue("HOOPS_MAX_PLAYERS", MAX_PLAYERS);
     }
 
     public static int scoreValue(double releaseDistance) {
-        return Double.isFinite(releaseDistance) && releaseDistance >= THREE_POINT_DISTANCE ? 3 : 2;
+        return Double.isFinite(releaseDistance) && releaseDistance >= GameDebugRuntimeOverrides.doubleValue(
+                "HOOPS_THREE_POINT_DISTANCE", THREE_POINT_DISTANCE) ? 3 : 2;
     }
 
     /** A team wins immediately when its score reaches or passes 21. */
     public static boolean isAimedAtHoop(boolean inFront, double missDistance) {
-        return inFront && Double.isFinite(missDistance) && missDistance <= SHOT_AIM_TOLERANCE;
+        return inFront && Double.isFinite(missDistance) && missDistance <= GameDebugRuntimeOverrides.doubleValue(
+                "HOOPS_SHOT_AIM_TOLERANCE", SHOT_AIM_TOLERANCE);
     }
 
     public static boolean isLayupEligible(boolean grounded, double hoopDistance, boolean aimedAtHoop) {
         return grounded && aimedAtHoop && Double.isFinite(hoopDistance)
-                && hoopDistance <= LAYUP_DISTANCE;
+                && hoopDistance <= GameDebugRuntimeOverrides.doubleValue("HOOPS_LAYUP_DISTANCE", LAYUP_DISTANCE);
     }
 
     public static boolean isDunkEligible(boolean airborne, boolean rising,
             double hoopDistance, boolean aimedAtHoop) {
         return airborne && rising && aimedAtHoop && Double.isFinite(hoopDistance)
-                && hoopDistance <= DUNK_DISTANCE;
+                && hoopDistance <= GameDebugRuntimeOverrides.doubleValue("HOOPS_DUNK_DISTANCE", DUNK_DISTANCE);
     }
 
     public static final double RIM_SCORING_RADIUS = 1.15D;
@@ -69,7 +109,8 @@ public final class HoopsRemasteredRules {
     }
 
     public static boolean hasReachedTargetScore(int red, int blue) {
-        return red >= TARGET_SCORE || blue >= TARGET_SCORE;
+        int targetScore = GameDebugRuntimeOverrides.intValue("HOOPS_TARGET_SCORE", TARGET_SCORE);
+        return red >= targetScore || blue >= targetScore;
     }
 
     /** Regulation is tied when the five-minute buzzer sounds. */
@@ -88,11 +129,35 @@ public final class HoopsRemasteredRules {
     }
 
     public static boolean isBuzzerBeater(long remainingMillis) {
-        return remainingMillis >= 0L && remainingMillis <= BUZZER_WINDOW_MILLIS;
+        return remainingMillis >= 0L && remainingMillis <= GameDebugRuntimeOverrides.longValue(
+                "HOOPS_BUZZER_WINDOW_MILLIS", BUZZER_WINDOW_MILLIS);
     }
 
     public static boolean isClutchTime(long remainingMillis) {
-        return remainingMillis >= 0L && remainingMillis <= CLUTCH_WINDOW_MILLIS;
+        return remainingMillis >= 0L && remainingMillis <= GameDebugRuntimeOverrides.longValue(
+                "HOOPS_CLUTCH_WINDOW_MILLIS", CLUTCH_WINDOW_MILLIS);
+    }
+
+    public static boolean isWithinBallCatchRadius(double distanceSquared) {
+        double radiusSquared = GameDebugRuntimeOverrides.doubleValue(
+                "HOOPS_BALL_CATCH_RADIUS_SQUARED", BALL_CATCH_RADIUS_SQUARED);
+        return Double.isFinite(distanceSquared) && distanceSquared >= 0.0D && distanceSquared <= radiusSquared;
+    }
+
+    public static boolean isShooterInsideLaunchProtection(double distanceSquared) {
+        double protectionSquared = GameDebugRuntimeOverrides.doubleValue(
+                "HOOPS_SHOT_LAUNCH_PROTECTION_DISTANCE_SQUARED", SHOT_LAUNCH_PROTECTION_DISTANCE_SQUARED);
+        return Double.isFinite(distanceSquared) && distanceSquared >= 0.0D && distanceSquared < protectionSquared;
+    }
+
+    public static boolean isFacingBallForBlock(double facingDot) {
+        return Double.isFinite(facingDot) && facingDot >= GameDebugRuntimeOverrides.doubleValue(
+                "HOOPS_BLOCK_AIM_DOT", BLOCK_AIM_DOT);
+    }
+
+    public static boolean isFacingHolderForSteal(double facingDot) {
+        return Double.isFinite(facingDot) && facingDot >= GameDebugRuntimeOverrides.doubleValue(
+                "HOOPS_STEAL_AIM_DOT", STEAL_AIM_DOT);
     }
 
     public static boolean isHopsReady(long now, long readyAt) {
@@ -100,11 +165,13 @@ public final class HoopsRemasteredRules {
     }
 
     public static boolean isAssistEligible(long now, long lastPassAt) {
-        return lastPassAt > 0L && now >= lastPassAt && now - lastPassAt <= ASSIST_WINDOW_MILLIS;
+        return lastPassAt > 0L && now >= lastPassAt && now - lastPassAt <= GameDebugRuntimeOverrides.longValue(
+                "HOOPS_ASSIST_WINDOW_MILLIS", ASSIST_WINDOW_MILLIS);
     }
 
     public static boolean isComebackEligible(int ownScore, int opponentScore) {
-        return opponentScore - ownScore >= 10;
+        return opponentScore - ownScore >= GameDebugRuntimeOverrides.intValue(
+                "HOOPS_COMEBACK_SCORE_GAP", COMEBACK_SCORE_GAP);
     }
 
     public static boolean isDoubleDouble(int points, int assists, int rebounds, int blocks, int steals) {

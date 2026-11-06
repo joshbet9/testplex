@@ -2,9 +2,15 @@ package au.com.testplex.arcadeports;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.Map;
+import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 class SuperSploorRulesTest {
+    @AfterEach
+    void clearRuntimeOverrides() { GameDebugRuntimeOverrides.clear(); }
+
     @Test
     void inkIsBoundedAndCannotBeSpentBelowZero() {
         assertEquals(0, SuperSploorRules.clampInk(-10));
@@ -122,6 +128,65 @@ class SuperSploorRulesTest {
     }
 
     @Test
+    void profileOverridesChangeProductionInkChargerSpecialAndMarkRulesThenRestoreDefaults() {
+        assertEquals(4, SuperSploorRules.primaryInkCost("roller"));
+        assertEquals(550L, SuperSploorRules.primaryIntervalMillis("roller"));
+        assertEquals(30, SuperSploorRules.secondaryInkCost("roller"));
+        assertEquals(4_000L, SuperSploorRules.secondaryCooldownMillis());
+        GameDebugRuntimeOverrides.activate(Map.ofEntries(
+                Map.entry("SUPER_SPLOOR_MAX_INK", 120),
+                Map.entry("SUPER_SPLOOR_INK_PER_PRIMARY_SHOT", 5),
+                Map.entry("SUPER_SPLOOR_PRIMARY_SHOT_INTERVAL_MILLIS", 100L),
+                Map.entry("SUPER_SPLOOR_NORMAL_INK_REGEN_PER_SECOND", 9),
+                Map.entry("SUPER_SPLOOR_INK_REGEN_INTERVAL_MILLIS", 500L),
+                Map.entry("SUPER_SPLOOR_MAX_PAINT_MARKS", 2),
+                Map.entry("SUPER_SPLOOR_MARK_RECOVERY_DELAY_MILLIS", 3_000L),
+                Map.entry("SUPER_SPLOOR_CHARGER_FULL_CHARGE_MILLIS", 450L),
+                Map.entry("SUPER_SPLOOR_CHARGER_MIN_INK_COST", 2),
+                Map.entry("SUPER_SPLOOR_CHARGER_MAX_INK_COST", 12),
+                Map.entry("SUPER_SPLOOR_CHARGER_MIN_SPEED", 0.5D),
+                Map.entry("SUPER_SPLOOR_CHARGER_MAX_SPEED", 1.5D),
+                Map.entry("SUPER_SPLOOR_SPECIAL_CHARGE_PER_TERRITORY_UNIT", 2.0D),
+                Map.entry("SUPER_SPLOOR_SPECIAL_CHARGE_PER_SPLAT", 10.0D),
+                Map.entry("SUPER_SPLOOR_SPECIAL_CHARGE_REQUIRED", 50.0D),
+                Map.entry("SUPER_SPLOOR_DODGE_ROLL_MAX_CHARGES", 3),
+                Map.entry("SUPER_SPLOOR_ROLLER_PRIMARY_INK_COST", 8),
+                Map.entry("SUPER_SPLOOR_ROLLER_PRIMARY_INTERVAL_MILLIS", 300L),
+                Map.entry("SUPER_SPLOOR_ROLLER_SECONDARY_INK_COST", 40),
+                Map.entry("SUPER_SPLOOR_SECONDARY_COOLDOWN_MILLIS", 2_000L)));
+
+        assertEquals(120, SuperSploorRules.clampInk(150));
+        assertTrue(SuperSploorRules.canFire(5, 100L, 0L));
+        assertEquals(59, SuperSploorRules.nextInkAfterRegeneration(50, 1, false));
+        assertTrue(SuperSploorRules.canRegenerateInk(10_500L, 10_000L, false, false));
+        assertEquals(2, SuperSploorRules.markCountAfterHit(1));
+        assertTrue(SuperSploorRules.isSplatted(2));
+        assertFalse(SuperSploorRules.canRecoverMark(12_999L, 10_000L, 12_999L, true, 2));
+        assertEquals(0.5D, SuperSploorRules.chargerChargeFraction(225L), 0.0001D);
+        assertEquals(12, SuperSploorRules.chargerInkCost(1.0D));
+        assertEquals(1.0D, SuperSploorRules.chargerProjectileSpeed(0.5D), 0.0001D);
+        assertEquals(30.0D, SuperSploorRules.nextSpecialCharge(10.0D, 10, false), 0.0001D);
+        assertTrue(SuperSploorRules.canUseSpecial(50.0D));
+        assertEquals(50.0D, SuperSploorRules.specialChargeAfterSplat(40.0D), 0.0001D);
+        assertEquals(3, SuperSploorRules.nextDodgeRollCharge(2));
+        assertEquals(8, SuperSploorRules.primaryInkCost("roller"));
+        assertEquals(300L, SuperSploorRules.primaryIntervalMillis("roller"));
+        assertEquals(40, SuperSploorRules.secondaryInkCost("roller"));
+        assertEquals(2_000L, SuperSploorRules.secondaryCooldownMillis());
+
+        GameDebugRuntimeOverrides.clear();
+        assertEquals(100, SuperSploorRules.clampInk(150));
+        assertEquals(56, SuperSploorRules.nextInkAfterRegeneration(50, 1, false));
+        assertEquals(4, SuperSploorRules.markCountAfterHit(3));
+        assertEquals(10, SuperSploorRules.chargerInkCost(0.2D));
+        assertEquals(100.0D, SuperSploorRules.nextSpecialCharge(99.0D, 50, false), 0.0001D);
+        assertEquals(4, SuperSploorRules.primaryInkCost("roller"));
+        assertEquals(550L, SuperSploorRules.primaryIntervalMillis("roller"));
+        assertEquals(30, SuperSploorRules.secondaryInkCost("roller"));
+        assertEquals(4_000L, SuperSploorRules.secondaryCooldownMillis());
+    }
+
+    @Test
     void overtimeRequiresAOnePercentLeadAndSquidTravelRejectsTeleports() {
         assertEquals(10, SuperSploorRules.overtimeLeadThreshold(1_000));
         assertEquals(2, SuperSploorRules.overtimeLeadThreshold(150));
@@ -133,5 +198,72 @@ class SuperSploorRulesTest {
         assertTrue(SuperSploorRules.shouldCountSquidTravel(1.5, false));
         assertFalse(SuperSploorRules.shouldCountSquidTravel(200, false));
         assertFalse(SuperSploorRules.shouldCountSquidTravel(1.5, true));
+    }
+
+    @Test
+    void abilityTuningChangesProductionTimingsRangesAndResetsToSourceDefaults() {
+        assertEquals(4_000L, SuperSploorRules.debugLong("ROLLER_STAMPEDE_DURATION_MILLIS", SuperSploorRules.ROLLER_STAMPEDE_DURATION_MILLIS));
+        assertEquals(3.2D, SuperSploorRules.debugDouble("ROLLER_STAMPEDE_HIT_REACH_BLOCKS", SuperSploorRules.ROLLER_STAMPEDE_HIT_REACH_BLOCKS));
+        assertEquals(1_400L, SuperSploorRules.debugLong("DUALIES_SUCTION_BOMB_FUSE_MILLIS", SuperSploorRules.DUALIES_SUCTION_BOMB_FUSE_MILLIS));
+        assertEquals(56, SuperSploorRules.debugInt("CHARGER_PRISM_BEAM_STEPS", SuperSploorRules.CHARGER_PRISM_BEAM_STEPS));
+        GameDebugRuntimeOverrides.activate(Map.ofEntries(
+                Map.entry("SUPER_SPLOOR_ROLLER_STAMPEDE_DURATION_MILLIS", 6_000L),
+                Map.entry("SUPER_SPLOOR_ROLLER_STAMPEDE_HIT_REACH_BLOCKS", 6.0D),
+                Map.entry("SUPER_SPLOOR_DUALIES_SUCTION_BOMB_FUSE_MILLIS", 500L),
+                Map.entry("SUPER_SPLOOR_CHARGER_PRISM_BEAM_STEPS", 80),
+                Map.entry("SUPER_SPLOOR_CHARGER_TRACKER_RADIUS_BLOCKS", 24.0D),
+                Map.entry("SUPER_SPLOOR_LOBBER_PAINTSTORM_PULSES", 6),
+                Map.entry("SUPER_SPLOOR_DUALIES_PRIMARY_PROJECTILES", 4),
+                Map.entry("SUPER_SPLOOR_LOBBER_PRIMARY_PROJECTILE_SPEED", 1.8D),
+                Map.entry("SUPER_SPLOOR_ROLLER_PRIMARY_PAINT_STEPS", 8)));
+        assertEquals(6_000L, SuperSploorRules.debugLong("ROLLER_STAMPEDE_DURATION_MILLIS", SuperSploorRules.ROLLER_STAMPEDE_DURATION_MILLIS));
+        assertEquals(6.0D, SuperSploorRules.debugDouble("ROLLER_STAMPEDE_HIT_REACH_BLOCKS", SuperSploorRules.ROLLER_STAMPEDE_HIT_REACH_BLOCKS));
+        assertEquals(500L, SuperSploorRules.debugLong("DUALIES_SUCTION_BOMB_FUSE_MILLIS", SuperSploorRules.DUALIES_SUCTION_BOMB_FUSE_MILLIS));
+        assertEquals(80, SuperSploorRules.debugInt("CHARGER_PRISM_BEAM_STEPS", SuperSploorRules.CHARGER_PRISM_BEAM_STEPS));
+        assertEquals(24.0D, SuperSploorRules.debugDouble("CHARGER_TRACKER_RADIUS_BLOCKS", SuperSploorRules.CHARGER_TRACKER_RADIUS_BLOCKS));
+        assertEquals(6, SuperSploorRules.debugInt("LOBBER_PAINTSTORM_PULSES", SuperSploorRules.LOBBER_PAINTSTORM_PULSES));
+        assertEquals(4, SuperSploorRules.debugInt("DUALIES_PRIMARY_PROJECTILES", SuperSploorRules.DUALIES_PRIMARY_PROJECTILES));
+        assertEquals(1.8D, SuperSploorRules.debugDouble("LOBBER_PRIMARY_PROJECTILE_SPEED", SuperSploorRules.LOBBER_PRIMARY_PROJECTILE_SPEED));
+        assertEquals(8, SuperSploorRules.debugInt("ROLLER_PRIMARY_PAINT_STEPS", SuperSploorRules.ROLLER_PRIMARY_PAINT_STEPS));
+        GameDebugRuntimeOverrides.clear();
+        assertEquals(4_000L, SuperSploorRules.debugLong("ROLLER_STAMPEDE_DURATION_MILLIS", SuperSploorRules.ROLLER_STAMPEDE_DURATION_MILLIS));
+        assertEquals(3.2D, SuperSploorRules.debugDouble("ROLLER_STAMPEDE_HIT_REACH_BLOCKS", SuperSploorRules.ROLLER_STAMPEDE_HIT_REACH_BLOCKS));
+        assertEquals(1_400L, SuperSploorRules.debugLong("DUALIES_SUCTION_BOMB_FUSE_MILLIS", SuperSploorRules.DUALIES_SUCTION_BOMB_FUSE_MILLIS));
+        assertEquals(56, SuperSploorRules.debugInt("CHARGER_PRISM_BEAM_STEPS", SuperSploorRules.CHARGER_PRISM_BEAM_STEPS));
+    }
+
+    @Test
+    void overtimePercentAndInkRegenerationIntervalAreLiveProfileValues() {
+        assertEquals(10, SuperSploorRules.overtimeLeadThreshold(1_000));
+        assertFalse(SuperSploorRules.canRegenerateInk(10_499L, 10_000L, false, false));
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "SUPER_SPLOOR_OVERTIME_LEAD_PERCENT", 2.0D,
+                "SUPER_SPLOOR_INK_REGEN_INTERVAL_MILLIS", 500L));
+        assertEquals(20, SuperSploorRules.overtimeLeadThreshold(1_000));
+        assertTrue(SuperSploorRules.canRegenerateInk(10_500L, 10_000L, false, false));
+        assertTrue(GameDebugVariableCatalog.appliesImmediately(GameDebugVariableCatalog.variable(
+                ArcadePortGame.SUPER_SPLOOR, "SUPER_SPLOOR_INK_REGEN_INTERVAL_MILLIS")));
+        GameDebugRuntimeOverrides.clear();
+        assertEquals(10, SuperSploorRules.overtimeLeadThreshold(1_000));
+        assertFalse(SuperSploorRules.canRegenerateInk(10_500L, 10_000L, false, false));
+    }
+
+    @Test
+    void liveFeatureSwitchesAreProfileBackedAndDefaultToEnabled() {
+        assertTrue(GameDebugRuntimeOverrides.booleanValue("SUPER_SPLOOR_SQUID_MODE_ENABLED", SuperSploorRules.SQUID_MODE_ENABLED));
+        assertTrue(GameDebugRuntimeOverrides.booleanValue("SUPER_SPLOOR_INK_REGEN_ENABLED", SuperSploorRules.INK_REGEN_ENABLED));
+        assertTrue(GameDebugRuntimeOverrides.booleanValue("SUPER_SPLOOR_SECONDARIES_ENABLED", SuperSploorRules.SECONDARIES_ENABLED));
+        assertTrue(GameDebugRuntimeOverrides.booleanValue("SUPER_SPLOOR_SPECIALS_ENABLED", SuperSploorRules.SPECIALS_ENABLED));
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "SUPER_SPLOOR_SQUID_MODE_ENABLED", false,
+                "SUPER_SPLOOR_INK_REGEN_ENABLED", false,
+                "SUPER_SPLOOR_SECONDARIES_ENABLED", false,
+                "SUPER_SPLOOR_SPECIALS_ENABLED", false));
+        assertFalse(GameDebugRuntimeOverrides.booleanValue("SUPER_SPLOOR_SQUID_MODE_ENABLED", SuperSploorRules.SQUID_MODE_ENABLED));
+        assertFalse(GameDebugRuntimeOverrides.booleanValue("SUPER_SPLOOR_INK_REGEN_ENABLED", SuperSploorRules.INK_REGEN_ENABLED));
+        assertFalse(GameDebugRuntimeOverrides.booleanValue("SUPER_SPLOOR_SECONDARIES_ENABLED", SuperSploorRules.SECONDARIES_ENABLED));
+        assertFalse(GameDebugRuntimeOverrides.booleanValue("SUPER_SPLOOR_SPECIALS_ENABLED", SuperSploorRules.SPECIALS_ENABLED));
+        GameDebugRuntimeOverrides.clear();
+        assertTrue(GameDebugRuntimeOverrides.booleanValue("SUPER_SPLOOR_SQUID_MODE_ENABLED", SuperSploorRules.SQUID_MODE_ENABLED));
     }
 }

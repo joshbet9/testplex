@@ -1,10 +1,12 @@
 package me.monstermaze.game;
 
+import au.com.testplex.arcadeports.GameDebugRuntimeOverrides;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Proxy;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -31,6 +33,21 @@ class SafePadFootprintTest {
         assertFalse(SafePad.isWithinFootprint(center, 63, sameCoordinatesElsewhere));
         assertFalse(SafePad.isWithinFootprint(null, 63, sameCoordinatesElsewhere));
         assertFalse(SafePad.isWithinFootprint(center, 63, null));
+    }
+
+    @Test
+    void debugCaptureRadiusChangesSafePadEligibilityAndClearsBackToFiveByFiveDefault() {
+        World world = testWorld();
+        Location center = new Location(world, 100.5D, 64.0D, -40.5D);
+        Location nearEdge = new Location(world, 102.0D, 64.0D, -40.5D);
+        try {
+            assertTrue(SafePad.isWithinFootprint(center, 63, nearEdge, MazeMode.ORIGINAL));
+            GameDebugRuntimeOverrides.activate(Map.of("MONSTER_MAZE_SAFE_PAD_CAPTURE_RADIUS_BLOCKS", 1.0D));
+            assertFalse(SafePad.isWithinFootprint(center, 63, nearEdge, MazeMode.ORIGINAL));
+        } finally {
+            GameDebugRuntimeOverrides.clear();
+        }
+        assertTrue(SafePad.isWithinFootprint(center, 63, nearEdge, MazeMode.ORIGINAL));
     }
 
     private static World testWorld() {

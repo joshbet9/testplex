@@ -1007,10 +1007,16 @@ public final class HoopsPaperSmoke extends JavaPlugin {
             ItemStack[] items = player.getInventory().getStorageContents();
             for (int slot = 0; slot < items.length; slot++) {
                 ItemStack item = items[slot];
-                if (slot == 4) {
+                if (slot == 3) {
+                    if (item == null || item.getType() != Material.FIREWORK_ROCKET) return false;
+                } else if (slot == 4) {
                     if (item == null || item.getType() != Material.CHEST) return false;
+                } else if (slot == 5) {
+                    if (item == null || item.getType() != Material.IRON_GOLEM_SPAWN_EGG) return false;
                 } else if (slot == 6) {
                     if (item == null || item.getType() != Material.WRITABLE_BOOK) return false;
+                } else if (slot == 7) {
+                    if (item == null || item.getType() != Material.COMPARATOR) return false;
                 } else if (slot == 8) {
                     if (item == null || item.getType() != Material.GLISTERING_MELON_SLICE) return false;
                 } else if (item != null && !item.getType().isAir()) {
