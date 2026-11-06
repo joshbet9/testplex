@@ -133,11 +133,30 @@ class ArcadeProgressCatalogTest {
         String[] games = {"bacon-brawl", "bomb-lobbers", "death-tag", "dragon-escape", "dragons",
                 "evolution", "gladiators", "micro-battles", "monster-maze", "one-in-the-quiver",
                 "paintball", "runner", "sheep-quest", "snake", "spleef", "turf-wars"};
-        int[] achievementCounts = {5, 4, 4, 4, 3, 5, 4, 6, 9, 8, 5, 7, 8, 6, 7, 9};
+        int[] achievementCounts = {5, 4, 4, 4, 3, 14, 4, 6, 9, 8, 5, 7, 8, 6, 7, 9};
         for (int i = 0; i < games.length; i++) {
             assertTrue(ArcadeProgressCatalog.milestones(games[i]).size() >= 2, games[i]);
             assertTrue(ArcadeProgressCatalog.achievements(games[i]).size() >= achievementCounts[i], games[i]);
         }
+    }
+
+    @Test
+    void evolutionHasFourteenApprovedAchievementsAndNoRemovedEntries() {
+        var achievements = ArcadeProgressCatalog.achievements("evolution");
+        assertEquals(14, achievements.size());
+        assertEquals(14, achievements.stream().map(ArcadeProgressCatalog.Achievement::id).distinct().count());
+        for (String id : List.of("perfect-game", "stealth-mastah", "rampage", "melee-monster",
+                "overkill", "wrong-kit-champ", "second-wind", "pity-party", "quick-change-artist",
+                "groundbreaker", "bounce-house", "eggspert", "blood-harvest", "pity-the-ancient")) {
+            assertTrue(achievements.stream().anyMatch(achievement -> achievement.id().equals(id)), id);
+        }
+        for (String removed : List.of("expert-evolver", "ability-assassin", "no-evolve-5-u")) {
+            assertFalse(achievements.stream().anyMatch(achievement -> achievement.id().equals(removed)), removed);
+        }
+        assertTrue(ArcadeProgressCatalog.milestones("evolution").stream()
+                .anyMatch(milestone -> milestone.id().equals("wins") && milestone.maximum() == 250));
+        assertTrue(ArcadeProgressCatalog.milestones("evolution").stream()
+                .anyMatch(milestone -> milestone.id().equals("kills") && milestone.maximum() == 2000));
     }
 
     @Test

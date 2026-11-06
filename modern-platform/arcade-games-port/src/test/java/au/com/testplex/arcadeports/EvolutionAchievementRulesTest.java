@@ -28,4 +28,57 @@ class EvolutionAchievementRulesTest {
         assertEquals("wrong-kit-champ", EvolutionAchievement.WRONG_KIT_CHAMP.slug());
         assertEquals("Wrong Kit Champ", EvolutionAchievement.WRONG_KIT_CHAMP.displayName());
     }
+
+    @Test void approvedKitModifiersChangeTheProductionTimersByTheChosenAmounts() {
+        assertEquals(72_000L, EvolutionAchievementRules.neanderthalPityClock(90_000L));
+        assertEquals(18_750L, EvolutionAchievementRules.neanderthalPityReduction(15_000L));
+        assertEquals(9_375L, EvolutionAchievementRules.neanderthalPityReduction(7_500L));
+        assertEquals(4_690L, EvolutionAchievementRules.darwinistCooldown(7_000L));
+        assertEquals(3_350L, EvolutionAchievementRules.darwinistCooldown(5_000L));
+    }
+
+    @Test void achievementPredicatesRequireTheApprovedWinAndGameplayConditions() {
+        assertTrue(EvolutionAchievementRules.shouldAwardOverkill(true, true));
+        assertFalse(EvolutionAchievementRules.shouldAwardOverkill(false, true));
+        assertFalse(EvolutionAchievementRules.shouldAwardOverkill(true, false));
+
+        assertTrue(EvolutionAchievementRules.shouldAwardSecondWind(true, 60.0D));
+        assertFalse(EvolutionAchievementRules.shouldAwardSecondWind(true, 59.99D));
+        assertFalse(EvolutionAchievementRules.shouldAwardSecondWind(false, 100.0D));
+
+        assertTrue(EvolutionAchievementRules.shouldAwardPityParty(true, 2));
+        assertFalse(EvolutionAchievementRules.shouldAwardPityParty(false, 5));
+        assertFalse(EvolutionAchievementRules.shouldAwardPityParty(true, 1));
+
+        assertTrue(EvolutionAchievementRules.shouldAwardQuickChangeArtist(true, true, true, 4));
+        assertFalse(EvolutionAchievementRules.shouldAwardQuickChangeArtist(true, true, false, 5));
+        assertFalse(EvolutionAchievementRules.shouldAwardQuickChangeArtist(true, false, true, 5));
+        assertFalse(EvolutionAchievementRules.shouldAwardQuickChangeArtist(true, true, true, 3));
+
+        assertTrue(EvolutionAchievementRules.shouldAwardPityTheAncient(true, true, 5));
+        assertFalse(EvolutionAchievementRules.shouldAwardPityTheAncient(false, true, 5));
+        assertFalse(EvolutionAchievementRules.shouldAwardPityTheAncient(true, true, 4));
+    }
+
+    @Test void abilityAchievementsUseDistinctHitsCorrectKitAndTheSameLife() {
+        assertFalse(EvolutionAchievementRules.shouldAwardGroundbreaker(2));
+        assertTrue(EvolutionAchievementRules.shouldAwardGroundbreaker(3));
+        assertFalse(EvolutionAchievementRules.shouldAwardBounceHouse(2));
+        assertTrue(EvolutionAchievementRules.shouldAwardBounceHouse(3));
+        assertTrue(EvolutionAchievementRules.qualifiesBloodHarvestKill(5.0D, 20.0D, 20.0D, 3));
+        assertFalse(EvolutionAchievementRules.qualifiesBloodHarvestKill(6.0D, 20.0D, 20.0D, 3));
+        assertFalse(EvolutionAchievementRules.qualifiesBloodHarvestKill(5.0D, 20.0D, 19.0D, 3));
+        assertFalse(EvolutionAchievementRules.qualifiesBloodHarvestKill(5.0D, 20.0D, 20.0D, 2));
+        assertTrue(EvolutionAchievementRules.shouldAwardEggspert(true, true, true));
+        assertFalse(EvolutionAchievementRules.shouldAwardEggspert(false, true, true));
+        assertFalse(EvolutionAchievementRules.shouldAwardEggspert(true, false, true));
+        assertFalse(EvolutionAchievementRules.shouldAwardEggspert(true, true, false));
+    }
+
+    @Test void wrongKitChampIsLimitedToDarwinistInTheFinalTransformationWindow() {
+        assertTrue(EvolutionAchievementRules.shouldAwardWrongKitChamp("darwinist", 4, true, 33));
+        assertFalse(EvolutionAchievementRules.shouldAwardWrongKitChamp("quick-evolver", 4, true, 40));
+        assertFalse(EvolutionAchievementRules.shouldAwardWrongKitChamp("darwinist", 3, true, 40));
+        assertFalse(EvolutionAchievementRules.shouldAwardWrongKitChamp("darwinist", 4, false, 40));
+    }
 }

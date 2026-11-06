@@ -18,4 +18,9 @@ class ArcadeAchievementProgressTest {
         assertNull(ArcadeAchievementProgress.counter("bomb-lobbers", "ultimate-killer"));
         assertNull(ArcadeAchievementProgress.counter("camera-shy", "double-elimination"));
     }
+
+    @Test void removedEvolutionAchievementsDoNotExposeObsoleteLifetimeProgress() {
+        assertNull(ArcadeAchievementProgress.counter("evolution", "expert-evolver"));
+        assertNull(ArcadeAchievementProgress.counter("evolution", "no-evolve-5-u"));
+    }
 }
