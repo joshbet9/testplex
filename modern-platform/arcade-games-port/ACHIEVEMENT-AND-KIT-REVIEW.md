@@ -12,8 +12,8 @@ Builder/Disruptor draft PR so the gameplay work can be tested independently.
   family even though it is not a value of `ArcadePortGame`.
 - There are **30 game families** represented across four catalogues: `ArcadeProgressCatalog`,
   `PlexballAchievement`, `CameraShyProgressCatalog`, and `SuperSploorProgressCatalog`.
-- The current catalogue contains **257 declared achievements** (including the four approved Bacon Brawl additions and the approved Bomb Lobbers Constructor achievement). The 30-family minimum is 420.
-- **170 further additions** would fill all under-target catalogues, resulting in **427 total active
+- The current catalogue contains **265 declared achievements** (including the four approved Bacon Brawl additions and the approved Bomb Lobbers Constructor achievement). The 30-family minimum is 420.
+- **162 further additions** would fill all under-target catalogues, resulting in **427 total active
   achievements** if the existing definitions are retained: Snap has 20 and Super Sploor 15.
   **No existing achievements are to be archived, deleted, or retired.** This supersedes the
   earlier exact-14/archiving proposal following the user's decision.
@@ -26,7 +26,7 @@ Builder/Disruptor draft PR so the gameplay work can be tested independently.
 | --- | ---: | ---: | ---: |
 | Bacon Brawl | 14 | 0 | 0 |
 | Bomb Lobbers | 14 | 0 | 0 |
-| Castle Assault | 6 | 8 | 0 |
+| Castle Assault | 14 | 0 | 0 |
 | Death Tag | 10 | 4 | 0 |
 | Dragon Escape | 9 | 5 | 0 |
 | Dragons | 11 | 3 | 0 |
@@ -54,7 +54,7 @@ Builder/Disruptor draft PR so the gameplay work can be tested independently.
 | Turf Wars | 9 | 5 | 0 |
 | Wither Assault | 8 | 6 | 0 |
 | Wizards | 6 | 8 | 0 |
-| **Total** | **257** | **170** | **7** |
+| **Total** | **265** | **162** | **7** |
 
 ## Suggested review methodology
 
@@ -96,9 +96,9 @@ Builder/Disruptor draft PR so the gameplay work can be tested independently.
   toolset, or an achievement prestige cosmetic. Introducing a kit is a gameplay-design
   decision, not merely a lobby metadata change.
 
-### Decisions needed before the remaining 170-achievement proposal pass
+### Decisions needed before the remaining 162-achievement proposal pass
 
-**Bomb Lobbers is the current A–Z review target.** Its 14th achievement is
+**Bomb Lobbers was signed off; Castle Assault is the current A–Z review target.** Its 14th achievement is
 `not-on-my-watch` (intercept three distinct enemy TNT projectiles with Constructor's
 placed defenses in a single game). Constructor replaces Waller; the obsolete Pitcher
 kit is removed; Jumper is now Acrobat. Legacy Jumper/Waller identifiers remain input
@@ -109,7 +109,7 @@ Constructor's **four approved prerequisites** are `two-birds-one-stone`,
 changing kits mid-match). Previously earned Blast Proof records are preserved.
 The server is not live and no player has unlocked Waller, so Constructor needs no grandfathered Waller entitlement. The legacy Waller kit-name alias may remain for configuration compatibility, but it does not bypass the four approved achievements.
 
-1. **Individual unlock predicates:** Approve the actual prerequisite achievement IDs
+Castle Assault's original six challenges are preserved. The eight approved additions are Bad Chemistry (Alchemist), Pin Cushion (Archer), TNT-rrific (Demolitionist), Golden Boy (Fighter), Immovable Object (Tank), Express Delivery (objective TNT crystal within 15 seconds), Royal Guard (three defenses near King), and Against All Odds (win with no friendly crystals). Clutchness is now **King health below 10**, and Multiplicative needs **at least five kills and double the next-highest teammate**. Multiplicative, Blasphemous, and Moral Exercise now allow eligible players from either team to earn them. All five existing kits remain free; this pass creates no Castle Assault purple kit.\n\n1. **Individual unlock predicates:** Approve the actual prerequisite achievement IDs
    for each purple kit, using an obtainable signature feat, curated bundle or stable
    mastery set. Confirm how existing unlocks are grandfathered.
 2. **Kitless games:** Should *every* game gain gameplay-changing purple-kit mechanics, or
