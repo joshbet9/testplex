@@ -36,7 +36,7 @@ The original map archive is packaged at `maps/bomb-lobbers.zip`.
 - [ ] Constructor: weaker double jump, persistent selector, left-click cycles Platforms → Walls → Stairs, right-click **a block** to build the selected geometry. Verify no block is overwritten or placed inside a player and teardown restores original blocks.
 - [ ] TNT regeneration: all three kits receive one TNT every 8→4 seconds as the match ages, with three carried maximum.
 - [ ] Verify Pitcher no longer appears in selection and saved legacy Jumper/Waller preferences map safely to Acrobat/Constructor.
-- [ ] Constructor's six-achievement unlock: review the exact six prerequisites with Josh before merging; confirm previously earned unlocks are handled intentionally.
+- [ ] Constructor's four approved prerequisites: Two birds, one stone; What's a double jump?; Blast Proof; Jelly Skin. Confirm previous Waller access is handled intentionally.
 
 ### Arena hazards and match flow
 
@@ -54,7 +54,7 @@ The original map archive is packaged at `maps/bomb-lobbers.zip`.
 - [ ] What's a double jump?: win alive without double-jumping.
 - [ ] The MVP: win alone against at least three opponents.
 - [ ] Master Bomber: 30 wins.
-- [ ] Blast Proof and Jelly Skin retain their existing triggers.
+- [ ] Blast Proof: complete five **separate wins as Armorer** (track across games; don't count a mid-match switch); previously earned flags remain unlocked. Jelly Skin retains its existing trigger.
 - [ ] Not On My Watch: as Constructor, block three **distinct enemy TNT** with structures in one game; friendly TNT and repeated contacts with one projectile do not count.
 - [ ] Technical: a close-range TNT only awards its own actual killing blow, with no stale credit for a later, different TNT.
 - [ ] Over 9000: a 1v3 powerup-only comeback includes an actual power-up use in the clutch.

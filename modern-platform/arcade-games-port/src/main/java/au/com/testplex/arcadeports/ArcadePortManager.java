@@ -1546,6 +1546,10 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session != null && session.type == ArcadePortGame.BOMB_LOBBERS
                 && session.players.containsKey(player.getUniqueId()) && session.alive.contains(player.getUniqueId())) {
+            // Changing kits after the round starts must not grant Armorer-only win credit.
+            if (!kit.equals(session.bombLobbersKits.get(player.getUniqueId()))) {
+                session.bombArmorerWinEligible.remove(player.getUniqueId());
+            }
             session.bombLobbersKits.put(player.getUniqueId(), kit);
             session.bombConstructorModes.put(player.getUniqueId(), "platforms");
             giveKit(session, player);
@@ -4150,6 +4154,9 @@ public final class ArcadePortManager implements Listener {
                 session.bombLobbersKits.put(bombId, validKitForMatch(bombId, type,
                         java.util.Objects.requireNonNullElse(ArcadePortRules.normalizeBombLobbersKit(
                                 bombLobbersKitPreferences.getOrDefault(bombId, "acrobat")), "acrobat"), "acrobat"));
+                if ("armorer".equals(session.bombLobbersKits.get(bombId))) {
+                    session.bombArmorerWinEligible.add(bombId);
+                }
                 session.bombConstructorModes.put(bombId, "platforms");
                 session.bombDoubleJumpAvailable.add(bombId);
                 session.bombPowerupClutchEligible.add(bombId);
@@ -18969,9 +18976,12 @@ public final class ArcadePortManager implements Listener {
                     && session.bombPowerupClutchUsed.contains(winnerId)) {
                 awardCatalogAchievement(winningPlayer, "bomb-lobbers", "over-9000");
             }
-            if ("armorer".equals(session.bombLobbersKits.getOrDefault(winnerId, "acrobat"))) {
+            if (session.bombArmorerWinEligible.contains(winnerId)
+                    && "armorer".equals(session.bombLobbersKits.getOrDefault(winnerId, "acrobat"))
+                    && ArcadePortRules.shouldAwardBombLobbersBlastProof(plugin.getConfig().getInt(
+                            localStatsPath(winnerId, "bomb-lobbers") + "kit-wins.armorer", 0))) {
                 awardBombLobbersAchievement(winningPlayer, BombLobbersAchievement.BLAST_PROOF.configKey(winnerId),
-                        "Blast Proof — won as the Armorer.");
+                        "Blast Proof — won 5 games as Armorer.");
             }
             if (!session.bombPlayersDamaged.contains(winnerId)) {
                 awardBombLobbersAchievement(winningPlayer, BombLobbersAchievement.JELLY_SKIN.configKey(winnerId),
@@ -19483,6 +19493,12 @@ public final class ArcadePortManager implements Listener {
             if (won) {
                 int lifetimeWins = plugin.getConfig().getInt(path + "wins", 0) + 1;
                 plugin.getConfig().set(path + "wins", lifetimeWins);
+                if (session.type == ArcadePortGame.BOMB_LOBBERS
+                        && ArcadePortRules.shouldCountBombLobbersArmorerWin(true,
+                                session.bombArmorerWinEligible.contains(id), session.bombLobbersKits.get(id))) {
+                    String armorerWins = path + "kit-wins.armorer";
+                    plugin.getConfig().set(armorerWins, plugin.getConfig().getInt(armorerWins, 0) + 1);
+                }
                 if (session.type == ArcadePortGame.MICRO_BATTLES
                         && System.currentTimeMillis() - session.startedAt
                                 < ArcadePortRules.MICRO_BATTLES_SPEEDSTER_MAX_GAME_MILLIS) {
@@ -28772,6 +28788,8 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> bombDirectHitResolved = new HashSet<>();
         final Map<Integer, Location> bombTeamSpawnCentres = new HashMap<>();
         final Map<UUID, String> bombLobbersKits = new HashMap<>();
+        /** Eligible only if Armorer was selected at match start and never swapped out. */
+        final Set<UUID> bombArmorerWinEligible = new HashSet<>();
         /** One-tick IDs for late native damage events emitted after EntityExplodeEvent. */
         final Set<UUID> bombNativeDamageSuppressed = new HashSet<>();
         final Map<UUID, String> bombConstructorModes = new HashMap<>();

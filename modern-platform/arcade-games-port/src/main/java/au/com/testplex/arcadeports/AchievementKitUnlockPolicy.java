@@ -82,9 +82,9 @@ final class AchievementKitUnlockPolicy {
         add(rules, "bacon-brawl", "brutus-bacon", "Brutus Bacon", "king-of-bacon", "pigs-in-blankets");
         // Both prerequisites are obtainable without first owning Chris P. Bacon.
         add(rules, "bacon-brawl", "chris-p-bacon", "Chris P. Bacon", "flash-fried", "raw-pork");
-        // Six accessible prerequisites; Josh will review the exact selection before merge.
-        add(rules, "bomb-lobbers", "constructor", "Constructor", "ultimate-killer", "two-birds-one-stone",
-                "team-player", "whats-a-double-jump", "blast-proof", "jelly-skin");
+        // Reviewed four-achievement Constructor gate; all four can be earned without the kit.
+        add(rules, "bomb-lobbers", "constructor", "Constructor", "two-birds-one-stone",
+                "whats-a-double-jump", "blast-proof", "jelly-skin");
         add(rules, "death-tag", "runner-turtle", "Turtle", "turtle-shell");
         add(rules, "death-tag", "runner-trickster", "Trickster", "smoke-and-mirrors");
         add(rules, "dragon-escape", "digger", "Digger", "to-hell-and-back", "paralympics");

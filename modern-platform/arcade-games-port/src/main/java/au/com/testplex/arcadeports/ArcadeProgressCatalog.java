@@ -56,7 +56,7 @@ public final class ArcadeProgressCatalog {
                     a("team-player", "Team player!", "Get 5 assists in one game."),
                     a("whats-a-double-jump", "What's a double jump?", "Win as Acrobat without using your double jump."),
                     a("the-mvp", "The MVP", "Win a 1v3 clutch as the last living member of your team."),
-                    a("blast-proof", "Blast Proof", "Win a game as the Armorer."),
+                    a("blast-proof", "Blast Proof", "Win 5 games as Armorer."),
                     a("jelly-skin", "Jelly Skin", "Win a game without taking damage."),
                     a("master-bomber", "Master Bomber", "Win 30 Bomb Lobbers games."),
                     a("wonderkid", "Wonderkid", "Get 3 kills in one game without any of your TNT exploding early after hitting a block."),

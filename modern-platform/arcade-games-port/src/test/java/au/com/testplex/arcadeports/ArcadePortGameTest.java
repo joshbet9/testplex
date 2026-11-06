@@ -1126,6 +1126,18 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.bombConstructorBlockedEnemyTnt(-1, 0));
     }
 
+    @Test void bombLobbersBlastProofRequiresFiveCompletedArmorerWins() {
+        assertFalse(ArcadePortRules.shouldAwardBombLobbersBlastProof(0));
+        assertFalse(ArcadePortRules.shouldAwardBombLobbersBlastProof(1));
+        assertFalse(ArcadePortRules.shouldAwardBombLobbersBlastProof(4));
+        assertTrue(ArcadePortRules.shouldAwardBombLobbersBlastProof(5));
+        assertTrue(ArcadePortRules.shouldAwardBombLobbersBlastProof(6));
+        assertTrue(ArcadePortRules.shouldCountBombLobbersArmorerWin(true, true, "armorer"));
+        assertFalse(ArcadePortRules.shouldCountBombLobbersArmorerWin(false, true, "armorer"));
+        assertFalse(ArcadePortRules.shouldCountBombLobbersArmorerWin(true, false, "armorer"));
+        assertFalse(ArcadePortRules.shouldCountBombLobbersArmorerWin(true, true, "acrobat"));
+    }
+
     @Test void bombLobbersWallerRespectsSourceShortPlacementCooldown() {
         assertEquals(100L, ArcadePortRules.BOMB_LOBBERS_WALLER_COOLDOWN_MILLIS);
         assertTrue(ArcadePortRules.isBombLobbersWallerReady(1_000L, 0L));

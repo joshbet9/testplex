@@ -1077,6 +1077,17 @@ public final class ArcadePortRules {
         return areBombLobbersEnemies(constructorTeam, throwerTeam);
     }
 
+    /** Blast Proof is a lifetime Armorer-kit win count, not a single team victory. */
+    public static boolean shouldAwardBombLobbersBlastProof(int completedArmorerWins) {
+        return completedArmorerWins >= 5;
+    }
+
+    public static boolean shouldCountBombLobbersArmorerWin(boolean matchWon,
+            boolean playedAsArmorerSinceStart, String finishingKit) {
+        return matchWon && playedAsArmorerSinceStart
+                && "armorer".equals(normalizeBombLobbersKit(finishingKit));
+    }
+
     /** Acrobat and Constructor inherit TeamArmorModule's team-coloured leather set. */
     public static boolean bombLobbersKitUsesTeamArmor(String kit) {
         String normalized = normalizeBombLobbersKit(kit);

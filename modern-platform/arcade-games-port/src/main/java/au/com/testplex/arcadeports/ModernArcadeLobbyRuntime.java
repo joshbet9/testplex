@@ -685,7 +685,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     lore.removeIf(line -> line != null && (ChatColor.stripColor(line).equals("Click to select")
                             || ChatColor.stripColor(line).equals("Locked")));
                     lore.add(" ");
-                    if (constructor) lore.add(ChatColor.RED + "Requires 6 Achievements to unlock.");
+                    if (constructor) lore.add(ChatColor.RED + "Requires 4 Achievements to unlock.");
                     else {
                         lore.add(ChatColor.GOLD + "Achievement Kit");
                         lore.add(ChatColor.GRAY + manager.achievementKitUnlockDescription(selectedGame, choice.id));

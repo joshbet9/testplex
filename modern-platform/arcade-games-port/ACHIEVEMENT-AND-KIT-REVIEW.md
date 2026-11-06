@@ -103,9 +103,11 @@ Builder/Disruptor draft PR so the gameplay work can be tested independently.
 placed defenses in a single game). Constructor replaces Waller; the obsolete Pitcher
 kit is removed; Jumper is now Acrobat. Legacy Jumper/Waller identifiers remain input
 aliases so existing saved kit preferences migrate without erasing achievements.
-Constructor's six proposed prerequisite achievements are a **review candidate**:
-`ultimate-killer`, `two-birds-one-stone`, `team-player`, `whats-a-double-jump`,
-`blast-proof`, and `jelly-skin`. Confirm all six and grandfathering before merging.
+Constructor's **four approved prerequisites** are `two-birds-one-stone`,
+`whats-a-double-jump`, `blast-proof`, and `jelly-skin`. Blast Proof now means
+**five separate wins as Armorer**, tracked per kit (and cannot be farmed by
+changing kits mid-match). Previously earned Blast Proof records are preserved.
+Only the treatment of previously unlocked Waller-kit access remains to discuss.
 
 1. **Individual unlock predicates:** Approve the actual prerequisite achievement IDs
    for each purple kit, using an obtainable signature feat, curated bundle or stable
