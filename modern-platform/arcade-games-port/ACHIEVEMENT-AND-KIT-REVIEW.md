@@ -100,6 +100,47 @@ Builder/Disruptor draft PR so the gameplay work can be tested independently.
 4. **Existing achievements:** Should genuine originals always be retained, unless mechanically
    impossible, even if they produce a less uniform difficulty spread?
 
+### Concrete suggestion for the seven above-cap achievements
+
+**Do not delete award flags or remove definitions yet.** The Snap and Super Sploor runtimes
+have actual award paths for these existing achievements.
+
+If exactly 14 *active* achievements is the priority, a first shortlist for moving out of
+the active completion pool is:
+
+| Game | Candidate to archive as legacy/bonus | Why review it first |
+| --- | --- | --- |
+| Snap | Out of Focus | Near-miss variation rather than a specific kit mastery task |
+| Snap | Now You See Me | Overlaps the escape-focused Smoke Artist/Runner challenges |
+| Snap | Double Take | Additional rapid-photography variation |
+| Snap | Close Encounter | Standalone shot-distance task |
+| Snap | Long Distance Photography | Standalone shot-distance task |
+| Snap | Candid Camera | Standalone target-state shot task |
+| Super Sploor | First Splash | Automatic first-match participation rather than a mastery achievement |
+
+These are **discussion candidates, not final selections**. Another legitimate option is to
+retain 14 *core* achievements plus a separate non-core legacy/bonus collection; that does not
+produce an exact 14-total count, but retains each challenge's visibility and honour.
+Whichever path is chosen, earned progress should remain readable, and the unlock denominator
+for purple kits should be explicit.
+
+## Dragon Escape Adventure-mode acceptance
+
+- Runners enter Dragon Escape in **Adventure** mode, including after rejoining/respawning.
+- Jumper, Disruptor, Builder and Warper abilities work on right-click regardless of a block
+  target; Digger left-clicks break approved course blocks through the server and give the
+  recovered item even though Adventure suppresses native breaking.
+- Digger right-clicks a course block with recovered materials to place that block on its
+  selected face, consuming exactly one item and keeping its existing 120-second restore.
+- Builder right-clicks the target block face or air to create one temporary brick, with no
+  vanilla Adventure placement permission, one active block, two stored charges maximum,
+  8-second replenishment, a bounded ping-adjusted lifetime and early removal after use.
+- Rejected placements cannot consume items; placement cannot appear inside a racer; old
+  blocks are restored at expiry and at session end; changing game modes must not permit
+  permanent course edits.
+- Validate these behaviours with real Paper multiplayer clients; unit-level checks alone
+  do not prove Adventure-mode input delivery or parkour collision timing.
+
 ## Implementation staging
 
 - **In this initial draft:** Dragon Escape Builder gameplay, source-accurate Disruptor

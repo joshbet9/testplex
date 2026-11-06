@@ -13936,6 +13936,9 @@ public final class ArcadePortManager implements Listener {
         if (!isDragonEscapeDiggerBlockAllowed(block.getType())
                 || !isDragonEscapeDiggerBuildLocationAllowed(session, block)
                 || block.getState() instanceof org.bukkit.block.Container) return;
+        // Temporary Builder platforms are not recoverable Digger material.
+        if (session.dragonEscapeBuilderBricks.values().stream()
+                .anyMatch(brick -> brick.original.getBlock().equals(block))) return;
 
         Location center = block.getLocation().add(0.5D, 0.5D, 0.5D);
         Location above = block.getLocation().add(0.5D, 1.0D, 0.5D);
@@ -13984,6 +13987,30 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
+    }
+
+    /** Adventure mode cannot rely on vanilla block placement for Digger's recovered blocks. */
+    private void placeDragonEscapeDiggerBlock(Session session, Player player, Block clicked, BlockFace face) {
+        if (clicked == null || face == null || face == BlockFace.SELF) return;
+        UUID id = player.getUniqueId();
+        if (active != session || !session.alive.contains(id)
+                || !"digger".equals(session.dragonEscapeKits.get(id))) return;
+        ItemStack held = player.getInventory().getItemInMainHand();
+        if (held == null || !isDragonEscapeDiggerBlockAllowed(held.getType())) return;
+        Block target = clicked.getRelative(face);
+        if (target.getWorld() != session.world || !target.isEmpty()
+                || !isDragonEscapeDiggerBuildLocationAllowed(session, target)) return;
+        org.bukkit.util.BoundingBox box = new org.bukkit.util.BoundingBox(
+                target.getX(), target.getY(), target.getZ(),
+                target.getX() + 1, target.getY() + 1, target.getZ() + 1);
+        for (Player racer : alivePlayers(session)) {
+            if (racer.getWorld() == session.world && racer.getBoundingBox().overlaps(box)) return;
+        }
+        BlockState previous = target.getState();
+        target.setType(held.getType(), false);
+        scheduleDragonEscapeBlockRestore(session, previous, target.getBlockData().clone());
+        consumeHeld(player);
+        player.playSound(target.getLocation(), Sound.BLOCK_STONE_PLACE, 0.65F, 1.1F);
     }
 
     private void scheduleDragonEscapeBlockRestore(Session session, BlockState previousState, BlockData expectedCurrent) {
@@ -20866,7 +20893,7 @@ public final class ArcadePortManager implements Listener {
 
     private GameMode arcadePlayerGameMode(ArcadePortGame type) {
         if (type == ArcadePortGame.MASTER_BUILDERS) return GameMode.CREATIVE;
-        if (type == ArcadePortGame.BACON_BRAWL || type == ArcadePortGame.DEATH_TAG
+        if (type == ArcadePortGame.DRAGON_ESCAPE || type == ArcadePortGame.BACON_BRAWL || type == ArcadePortGame.DEATH_TAG
                 || type == ArcadePortGame.DRAGONS || type == ArcadePortGame.DRAW_MY_THING
                 || type == ArcadePortGame.SNEAKY_ASSASSINS || type == ArcadePortGame.SUPER_SPLOOR) {
             return GameMode.ADVENTURE;
@@ -23498,6 +23525,24 @@ public final class ArcadePortManager implements Listener {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Session session = active;
         if (session == null) return;
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE
+                && session.alive.contains(event.getPlayer().getUniqueId())
+                && "digger".equals(session.dragonEscapeKits.get(event.getPlayer().getUniqueId()))) {
+            ItemStack diggerItem = event.getItem();
+            if (event.getAction() == Action.LEFT_CLICK_BLOCK
+                    && diggerItem != null && diggerItem.getType() == Material.DIAMOND_PICKAXE) {
+                event.setCancelled(true);
+                useDragonEscapeDigger(session, event.getPlayer(), event.getClickedBlock());
+                return;
+            }
+            if (event.getAction() == Action.RIGHT_CLICK_BLOCK && diggerItem != null
+                    && isDragonEscapeDiggerBlockAllowed(diggerItem.getType())) {
+                event.setCancelled(true);
+                placeDragonEscapeDiggerBlock(session, event.getPlayer(),
+                        event.getClickedBlock(), event.getBlockFace());
+                return;
+            }
+        }
         if (session.type == ArcadePortGame.DRAGONS
                 && session.dragonTamerControls.containsKey(event.getPlayer().getUniqueId())) {
             event.setCancelled(true);
