@@ -247,6 +247,9 @@ final class GameDebugVariableCatalog {
                 || name.equals("TURF_WARS_BARRAGE_ARROW_SPREAD")) return 0.0D;
         if (name.equals("PERFECT_SCORE_PERCENT")) return 1.0D;
         if (name.equals("RUNNER_MAX_FROSTBALLS")) return 0.0D;
+        if (name.equals("RUNNER_STEPS_ACHIEVEMENT_BLOCKS")
+                || name.equals("RUNNER_HOP_ACHIEVEMENT_JUMPS")
+                || name.equals("RUNNER_FLASH_ACHIEVEMENT_MAX_WIN_MILLIS")) return 0.0D;
         if (name.equals("SHEEP_QUEST_MAX_CARRY")) return 0.0D;
         if (name.startsWith("RUNNER_") && name.endsWith("_MILLIS")) return 0.0D;
         if (name.startsWith("RUNNER_") && name.endsWith("_TICKS")) return 0.0D;
@@ -357,6 +360,9 @@ final class GameDebugVariableCatalog {
         if (name.equals("RUNNER_LEAP_COOLDOWN_MILLIS")
                 || name.equals("RUNNER_QUICKSHOT_COOLDOWN_MILLIS")) return 120_000.0D;
         if (name.equals("RUNNER_MAX_FROSTBALLS")) return 64.0D;
+        if (name.equals("RUNNER_STEPS_ACHIEVEMENT_BLOCKS")) return 100_000.0D;
+        if (name.equals("RUNNER_HOP_ACHIEVEMENT_JUMPS")) return 1_000.0D;
+        if (name.equals("RUNNER_FLASH_ACHIEVEMENT_MAX_WIN_MILLIS")) return 600_000.0D;
         if (name.equals("RUNNER_FROSTBALL_SLOW_TICKS")) return 1_200.0D;
         if (name.equals("RUNNER_FROSTBALL_SLOW_AMPLIFIER")) return 10.0D;
         if (name.startsWith("SHEEP_QUEST_") && name.endsWith("_MILLIS")) return 120_000.0D;
@@ -496,6 +502,8 @@ final class GameDebugVariableCatalog {
         if (name.startsWith("SKY_WARS_") && name.endsWith("_MILLIS")) return 100.0D;
         if (name.startsWith("RUNNER_") && name.endsWith("_SPEED")) return 0.1D;
         if (name.equals("RUNNER_SWITCH_GRACE_MILLIS")) return 50.0D;
+        if (name.equals("RUNNER_STEPS_ACHIEVEMENT_BLOCKS")) return 100.0D;
+        if (name.equals("RUNNER_HOP_ACHIEVEMENT_JUMPS")) return 5.0D;
         if (name.startsWith("SHEEP_QUEST_") && name.endsWith("_MILLIS")) return 100.0D;
         if (name.startsWith("SHEEP_QUEST_") && (name.endsWith("_SPEED") || name.endsWith("_RADIUS")
                 || name.endsWith("_BLOCKS") || name.endsWith("_KNOCKBACK"))) return 0.1D;

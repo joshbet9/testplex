@@ -242,15 +242,19 @@ public final class ArcadePortRules {
 
     /** The source wording is "over 400", so the threshold is strictly greater than 400. */
     public static boolean shouldAwardRunnerSteps(double walkedBlocks) {
-        return Double.isFinite(walkedBlocks) && walkedBlocks > RUNNER_STEPS_ACHIEVEMENT_BLOCKS;
+        double threshold = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "RUNNER_STEPS_ACHIEVEMENT_BLOCKS", RUNNER_STEPS_ACHIEVEMENT_BLOCKS));
+        return Double.isFinite(walkedBlocks) && walkedBlocks > threshold;
     }
 
     public static boolean shouldAwardRunnerHopToIt(int jumps) {
-        return jumps >= RUNNER_HOP_ACHIEVEMENT_JUMPS;
+        return jumps >= Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "RUNNER_HOP_ACHIEVEMENT_JUMPS", RUNNER_HOP_ACHIEVEMENT_JUMPS));
     }
 
     public static boolean shouldAwardRunnerFlash(long elapsedMillis, boolean won) {
-        return won && elapsedMillis >= 0L && elapsedMillis <= RUNNER_FLASH_ACHIEVEMENT_MAX_WIN_MILLIS;
+        return won && elapsedMillis >= 0L && elapsedMillis <= Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "RUNNER_FLASH_ACHIEVEMENT_MAX_WIN_MILLIS", RUNNER_FLASH_ACHIEVEMENT_MAX_WIN_MILLIS));
     }
 
     /** Use red as the source-compatible default and as the fallback for map clashes. */
