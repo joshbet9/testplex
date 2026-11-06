@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class AchievementKitUnlockPolicyTest {
     @Test void everyReviewedAchievementKitHasStableEarnableRequirements() {
-        assertEquals(19, AchievementKitUnlockPolicy.all().size());
+        assertEquals(20, AchievementKitUnlockPolicy.all().size());
         for (AchievementKitUnlockPolicy.Rule rule : AchievementKitUnlockPolicy.all()) {
             assertFalse(rule.requirements().isEmpty(), rule.kitId());
             assertEquals(rule.requirements().size(), Set.copyOf(rule.requirements()).size(), rule.kitId());
@@ -34,14 +34,13 @@ class AchievementKitUnlockPolicyTest {
         }
     }
 
-    @Test void allReviewRulesCoverPurpleCatalogueExceptRemovedChrisBacon() {
+    @Test void allReviewedRulesCoverEveryPurpleCatalogueKitIncludingChrisBacon() {
         int purple = 0;
         for (ArcadePortGame game : ArcadePortGame.values()) {
             for (ArcadeLobbyKitCatalogue.KitChoice choice : ArcadeLobbyKitCatalogue.forGame(game, java.util.List.of())) {
                 if (choice.unlock != ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT) continue;
                 if (game.isMonsterMaze() && game != ArcadePortGame.MONSTER_MAZE) continue;
                 purple++;
-                if ("chris-p-bacon".equals(choice.id)) continue;
                 assertNotNull(AchievementKitUnlockPolicy.find(game, choice.id), game.id() + ":" + choice.id);
             }
         }
@@ -56,6 +55,11 @@ class AchievementKitUnlockPolicyTest {
         earned.add("paralympics");
         assertTrue(digger.unlocked(earned::contains));
         assertFalse(digger.requirements().contains("learn-to-code"));
+        var chris = AchievementKitUnlockPolicy.find(ArcadePortGame.BACON_BRAWL, "chris-p-bacon");
+        assertEquals(java.util.List.of("flash-fried", "raw-pork"), chris.requirements());
+        assertFalse(chris.unlocked(Set.of("flash-fried")::contains));
+        assertTrue(chris.unlocked(Set.of("flash-fried", "raw-pork")::contains));
+        assertFalse(chris.requirements().contains("extra-crispy"));
     }
 
     @Test void runnerMasteryIsFrozenAndKitExclusiveRequirementsAreNotCircular() {

@@ -6,7 +6,8 @@
 
 | Area | Progress and remaining checks |
 | --- | --- |
-| Purple kit entitlements | Reviewed prerequisites for **19** active designs are declared and checked at lobby selection, shared match setup, and affected specialist selectors. **Chris P. Bacon is retained as a redesigned achievement kit**; its prerequisite still needs Josh's selection, so its purple entitlement is not yet obtainable. Test every command/NPC/direct-kit route in Paper; Monster Maze external kit manager still needs a direct bypass check. |
+| Purple kit entitlements | Reviewed prerequisites for **20** existing purple designs are declared and checked at lobby selection, shared match setup, and affected specialist selectors. **Chris P. Bacon** is retained and unlocks from `flash-fried` + `raw-pork`, as Josh approved. Test every command/NPC/direct-kit route in Paper; Monster Maze external kit manager still needs a direct bypass check. |
+| Bacon Brawl | All four additional approved achievements have event-derived detectors: Iron Hog **8** spaced guard blocks per game; Extra Crispy **5** distinct ignited opponents per game; Variety Pack tracks a win with all five kits across games; Quadruple Serving tracks **4** credited knock-off KOs with a **new 10-second window per kill**. Existing 10 awards/records are retained; test live multiplayer edge cases. |
 | Kit display / `/stats` | Locked-kit progress and required feats appear in kit menus. Hovering over a prerequisite achievement now adds a gold **Unlocks:** line naming the kit. The separate `/stats` layout PR owns positioning, rarity sorting and 14-achievements-per-page pagination. |
 | Sheep Quest | All six formerly unawarded catalogue IDs now have event-derived conditions and unit tests; team winners credited together. Needs multiplayer timing and carry/kill attribution playtests. |
 | Speed Builders | All four formerly unawarded IDs now have conditions using cumulative time tie-break and final-round precision. Needs 16-player mirrored-arena verification and test-player exclusion validation. |
@@ -18,7 +19,7 @@
 
 ## Agreed constraints
 
-- Keep all **252 existing achievements** and their earned records, including Snap's 20 and Super Sploor's 15. Add 175 carefully designed achievements to bring each of 30 game families to **at least 14**, with 14 per `/stats` page; never archive the seven above-14 achievements.
+- Keep all **252 original achievements** and their earned records, including Snap's 20 and Super Sploor's 15. Bacon Brawl's four approved additions raise the current total to **256**; **171** further carefully designed achievements remain to bring each of 30 game families to **at least 14**, with 14 per `/stats` page; never archive the seven above-14 achievements.
 - Achievement-kit unlock rules must be **specific to each game and kit**. A purple NPC, an unlock requirement, and an ability must correspond to the same authoritative entitlement at selection, save, match start, and respawn.
 - No award can require using the locked kit to earn the kit. Do not automatically increase a legacy kit's unlock requirement just because the game gets seven more achievements. Do not rewrite completed achievements or milestone history.
 - All proposed awards require a detector and dedicated tests; live rarity calculation must exclude bot/test accounts and ineligible games.
@@ -35,7 +36,7 @@
 | P1 | `ArcadePortManager.awardCatalogAchievement` does not itself check `testPlayers.isTestPlayer`; several specialist awarders and stats writers do. An unguarded caller can therefore persist a test player's achievement. | Enforce eligible-real-player checks in **every shared award entry point**, with a separate clearly marked simulation/debug route that cannot count toward actual progression or rarity. |
 | P1 | Runner Switcher currently requires **all seven catalogued Runner awards plus three legacy `test-achievements.runner` entries**. Adding seven more catalogue achievements would silently make Switcher much harder to earn. Its lobby lore says only “every Runner achievement.” | Freeze the intended stable unlock set or explicitly approve a redesigned mastery criterion. Expose the exact progress as `N / M` in the lobby and stats. |
 | P1 | Existing kit selection rules are scattered: Runner/Spleef/Micro Battles/Turf Wars have local predicates, Death Tag/Sheep Quest/Wither Assault use the shared map, and Snap/Plexball/Super Sploor and other purple options have no achievement check in the inspected `selectKit` methods. | Test **all input routes** (NPC click, kit menu, command, reconnect, future round, live-game swap) and replace scattered checks with the shared entitlement service. |
-| P2 | **Chris P. Bacon** was formerly treated as removed in the audit, but Josh confirmed the redesigned kit must stay. Its catalogue and ability remain; a specific achievement gate still needs selection. | Keep the redesigned kit and its history intact, then agree on an earnable gate without circular prerequisites. |
+| P2 | **Chris P. Bacon** was formerly treated as removed in the audit, but Josh confirmed the redesigned kit must stay. Its catalogue and ability remain, and `flash-fried` + `raw-pork` are now its approved gate. | Keep the redesigned kit and its history intact; exercise both prerequisites through GUI, command and next-match guards. |
 | P2 | Several games maintain more than one achievement-facing view or data set. Runner has three legacy awards outside its seven-entry catalogue; Sneaky Assassins additionally displays an unrelated `the-masters-master` 1/1 counter. Dragon Escape has its own stats branch. | Unify the *visible* catalogue and history without dropping valid legacy records. The separate `/stats` PR owns layout, dynamic rarity sorting and pagination; this PR supplies canonical records and detector tests. |
 
 ### Exact IDs without an observed awarding call
@@ -58,7 +59,7 @@ These IDs are declared in `ArcadeProgressCatalog` but have no literal runtime aw
 
 | Game family | Existing | + | Purple achievement kits in lobby | Current detection / kit audit |
 | --- | ---: | ---: | --- | --- |
-| Bacon Brawl | 10 | 4 | Brutus Bacon, Chris P. Bacon | Brutus now has a named two-achievement entitlement. **Chris P. Bacon remains an active kit** with unlock prerequisites pending review. Got em’ recovery-knockback timing, Mama Piggles blast combo accounting and GOAT Sty wording are under repair in this PR; require a themed achievement for each existing kit. |
+| Bacon Brawl | 14 | 0 | Brutus Bacon, Chris P. Bacon | Four new approved detectors: Iron Hog (8 guards), Extra Crispy (5 unique ignitions), Variety Pack (wins with all 5 kits), Quadruple Serving (4 knock-off KOs, refreshing 10 seconds after each). Both purple kits have specific noncircular unlocks. Got em’ recovery timing and Mama Piggles blast combo attribution are repaired; needs live-player validation. |
 | Bomb Lobbers | 13 | 1 | Waller | Award candidates via enum and catalogue; **Waller has no mapped entitlement**; verify TNT kill/assist accounting. |
 | Castle Assault | 6 | 8 | None | Six award candidates in `CastleAssaultHeroesOfGwenRuntime`; propose one side-grade kit only after balancing with existing five. |
 | Death Tag | 10 | 4 | Turtle, Trickster | Both have named shared unlocks (`turtle-shell`, `smoke-and-mirrors`); verify no bypass from menu save or live selection. |
@@ -106,7 +107,7 @@ This table is a discussion starter. It deliberately favours accomplishments that
 | Game / kit | Proposed prerequisite(s) | Reason / risk to resolve |
 | --- | --- | --- |
 | Bacon Brawl — Brutus Bacon | `king-of-bacon` + `pigs-in-blankets` | Basic mastery and a high-kill match; neither needs Brutus. |
-| Bacon Brawl — Chris P. Bacon | **Specific selection pending** | Josh confirmed Chris P. Bacon's redesigned kit is staying. Choose a reachable, kit-independent prerequisite during Bacon Brawl's A–Z review; do not automatically gate it behind a Chris-specific achievement. |
+| Bacon Brawl — Chris P. Bacon | `flash-fried` + `raw-pork` (**approved**) | Both earned without Chris; his new `extra-crispy` achievement is intentionally **not** a prerequisite, avoiding a circular lock. |
 | Bomb Lobbers — Waller | `blast-proof` + `jelly-skin` | Armour mastery plus a flawless match, possible with existing kits. |
 | Death Tag — Turtle | `turtle-shell` (*retain*) | Existing obtainable runner-chaser challenge. |
 | Death Tag — Trickster | `smoke-and-mirrors` (*retain*) | Existing runner win challenge. |
@@ -126,7 +127,7 @@ This table is a discussion starter. It deliberately favours accomplishments that
 | Plexball — Skyguard | `sticky-gloves-three` + `sweet-spot-75m` | Catching and batting skill, both possible before Skyguard. Resolve separate save backend. |
 | Snap — Understudy | `camera-shy` + `double-take` | Survival and quick photos achievable with starting kits; **not `method-actor`**, which requires Understudy. |
 
-Before approving a kit, record `game`, `kit`, `mechanics`, `predicate version`, `prerequisite achievement IDs`, `can-earn-with-base-kit`, `persistence adapter`, `on-join/selection/rejoin guard`, `test cases`, and `unlock UI lore`. The missing 175-achievement proposal must include exact trigger events/state resets, not just descriptions.
+Before approving a kit, record `game`, `kit`, `mechanics`, `predicate version`, `prerequisite achievement IDs`, `can-earn-with-base-kit`, `persistence adapter`, `on-join/selection/rejoin guard`, `test cases`, and `unlock UI lore`. The remaining 171-achievement proposal must include exact trigger events/state resets, not just descriptions.
 
 ## Acceptance tests required before implementation is called complete
 

@@ -446,6 +446,15 @@ public final class ArcadePortRules {
                 || value.contains("drown");
     }
 
+    /** Knock-offs leave the arena; ordinary fire damage is not a Quadruple Serving kill. */
+    public static boolean isBaconKnockOffReason(String reason) {
+        if (reason == null) return false;
+        String value = reason.toLowerCase(java.util.Locale.ROOT).replace('_', ' ').trim();
+        return value.contains("fell") || value.contains("fall") || value.contains("void")
+                || value.contains("water") || value.contains("lava")
+                || value.contains("hot floor") || value.contains("magma") || value.contains("drown");
+    }
+
     public static boolean shouldCreditBaconFallKill(long nowMillis, long lastHitAtMillis,
             boolean isArenaFallOrWaterKnockout) {
         return isArenaFallOrWaterKnockout && lastHitAtMillis > 0L

@@ -1478,6 +1478,11 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isBaconArenaKnockoutReason("starved"));
         assertFalse(ArcadePortRules.isBaconArenaKnockoutReason("melee"));
         assertFalse(ArcadePortRules.isBaconArenaKnockoutReason(null));
+        assertTrue(ArcadePortRules.isBaconKnockOffReason("fell into the void"));
+        assertTrue(ArcadePortRules.isBaconKnockOffReason("was lost to the water"));
+        assertTrue(ArcadePortRules.isBaconKnockOffReason("lava"));
+        assertFalse(ArcadePortRules.isBaconKnockOffReason("fire"));
+        assertFalse(ArcadePortRules.isBaconKnockOffReason("starved"));
     }
 
     @Test void baconBrawlCreditsRecentKnockbackForFallAndWaterKillsOnly() {

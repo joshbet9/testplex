@@ -12424,6 +12424,14 @@ public final class ArcadePortManager implements Listener {
         if (owner == null || !owner.isOnline() || target == null || !target.isOnline()) return;
         UUID targetId = target.getUniqueId();
         UUID ownerId = owner.getUniqueId();
+        if ("chris-p-bacon".equals(session.baconKits.getOrDefault(ownerId, ""))
+                && session.alive.contains(ownerId) && session.alive.contains(targetId)
+                && !testPlayers.isTestPlayer(target)) {
+            int unique = session.baconAchievements.recordCrispyIgnition(ownerId, targetId);
+            if (unique == BaconBrawlAchievementTracker.EXTRA_CRISPY_UNIQUE_IGNITIONS) {
+                awardCatalogAchievement(owner, "bacon-brawl", "extra-crispy");
+            }
+        }
         target.setFireTicks(Math.max(target.getFireTicks(), 100));
         target.getWorld().spawnParticle(Particle.FLAME,
                 target.getLocation().add(0.0D, 0.9D, 0.0D), 18,
@@ -12773,6 +12781,13 @@ public final class ArcadePortManager implements Listener {
         boolean backstab = isBaconBrawlBackstab(target, attacker);
         boolean brutusBackstab = isBaconBrutusBackstab(target, attacker);
         if (ArcadePortRules.shouldBaconBrutusGuardHit(brutusActive, brutusBackstab)) {
+            // Count genuine blocked player attacks, not repeated packets or bot hits.
+            if (!testPlayers.isTestPlayer(attacker)) {
+                int blocked = session.baconAchievements.recordBlockedHit(targetId, attackerId, now);
+                if (blocked == BaconBrawlAchievementTracker.IRON_HOG_BLOCKS) {
+                    awardCatalogAchievement(target, "bacon-brawl", "iron-hog");
+                }
+            }
             target.getWorld().spawnParticle(Particle.TOTEM_OF_UNDYING,
                     target.getLocation().add(0.0D, 1.0D, 0.0D), 10, 0.35D, 0.45D, 0.35D, 0.01D);
             target.getWorld().spawnParticle(Particle.CRIT,
@@ -16260,7 +16275,12 @@ public final class ArcadePortManager implements Listener {
             String lastHitSource = session.baconLastHitSource.get(playerId);
             BaconBlastCombo blastCombo = session.baconBlastCombosByVictim.remove(playerId);
             UUID recoveryInterrupterId = session.baconSlamRecoveries.knockout(playerId,
-                    ArcadePortRules.isBaconArenaKnockoutReason(reason), !player.isOnGround());
+                    ArcadePortRules.isBaconKnockOffReason(reason), !player.isOnGround());
+            long knockoutAt = System.currentTimeMillis();
+            boolean creditedKnockOff = ArcadePortRules.shouldCreditBaconFallKill(
+                    knockoutAt, session.baconLastDamagedAt.getOrDefault(playerId, 0L),
+                    ArcadePortRules.isBaconKnockOffReason(reason));
+            UUID knockoutCreditOwner = session.baconLastDamager.get(playerId);
             if (killer != null) {
                 String kit = session.baconKits.getOrDefault(killer.getUniqueId(), "el-muchacho-pigo");
                 boolean cloakedBackstab = "pig".equals(kit)
@@ -16316,6 +16336,11 @@ public final class ArcadePortManager implements Listener {
                     plugin.saveConfig();
                 }
                 killer.sendMessage(ChatColor.GREEN + "Bacon Brawl kill! " + kills + " kills.");
+                int servingStreak = session.baconAchievements.recordElimination(
+                        killerId, creditedKnockOff && killerId.equals(knockoutCreditOwner), knockoutAt);
+                if (servingStreak == BaconBrawlAchievementTracker.QUADRUPLE_SERVING_KNOCKOUTS) {
+                    awardCatalogAchievement(killer, "bacon-brawl", "quadruple-serving");
+                }
                 if (ArcadePortRules.shouldAwardBaconPigsInBlankets(kills)
                         && session.baconPigsInBlanketsAwarded.add(killer.getUniqueId())) {
                     awardBaconAchievement(killer,
@@ -18682,6 +18707,7 @@ public final class ArcadePortManager implements Listener {
         session.baconLastHitSource.clear();
         session.baconBlastCombosByVictim.clear();
         session.baconSlamRecoveries.clearAll();
+        session.baconAchievements.clearAll();
         session.baconMeters.clear();
         session.baconAbilitiesUsed.clear();
         session.baconBrutusUntil.clear();
@@ -18780,6 +18806,23 @@ public final class ArcadePortManager implements Listener {
     private void recordBaconBrawlAchievements(Session session, Player winner) {
         if (session == null || winner == null) return;
         UUID id = winner.getUniqueId();
+        if (ArcadeTestPlayerManager.shouldPersistProgression(id, testPlayers.isTestPlayer(id))) {
+            String kit = session.baconKits.getOrDefault(id, "el-muchacho-pigo");
+            if (BaconBrawlAchievementTracker.ALL_KITS.contains(kit)) {
+                String winsPath = localStatsPath(id, "bacon-brawl") + "kit-wins.";
+                plugin.getConfig().set(winsPath + kit, true);
+                Set<String> wonKits = new HashSet<>();
+                for (String possibleKit : BaconBrawlAchievementTracker.ALL_KITS) {
+                    if (plugin.getConfig().getBoolean(winsPath + possibleKit, false)) {
+                        wonKits.add(possibleKit);
+                    }
+                }
+                plugin.saveConfig();
+                if (BaconBrawlAchievementTracker.hasWonEveryKit(wonKits)) {
+                    awardCatalogAchievement(winner, "bacon-brawl", "variety-pack");
+                }
+            }
+        }
         int totalWins = plugin.getConfig().getInt(localStatsPath(id, ArcadePortGame.BACON_BRAWL.id()) + "wins", 0);
         if (ArcadePortRules.shouldAwardBaconKingOfBacon(totalWins)) {
             awardBaconAchievement(winner, BaconBrawlAchievement.KING_OF_BACON.configKey(id),
@@ -28605,6 +28648,7 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> baconGoatStyEligible = new HashSet<>();
         final Set<UUID> baconStarvationDamaged = new HashSet<>();
         final BaconSlamRecoveryTracker baconSlamRecoveries = new BaconSlamRecoveryTracker();
+        final BaconBrawlAchievementTracker baconAchievements = new BaconBrawlAchievementTracker();
         final Map<UUID, UUID> baconBabyPigs = new HashMap<>();
         final Map<UUID, Item> baconBlastItems = new HashMap<>();
         final Set<UUID> baconCrispyProjectiles = new HashSet<>();

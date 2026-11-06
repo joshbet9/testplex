@@ -41,7 +41,11 @@ public final class ArcadeProgressCatalog {
                     a("pork-on-fork", "Get Some Pork on Your Fork", "Win a game without a kill."),
                     a("mama-camera", "Mama Get the Camera", "As Mama Piggles, get 4 kills from Bacon Blast or its kill combo."),
                     a("got-em", "Got em’", "Knock a player off the arena after they use an airborne Body Slam to recover, before they touch the ground."),
-                    a("hamished", "Hamished", "Win while taking starvation damage."))),
+                    a("hamished", "Hamished", "Win while taking starvation damage."),
+                    a("iron-hog", "Iron Hog", "As Brutus Bacon, block 8 enemy attacks with Brutus Guard in one game."),
+                    a("extra-crispy", "Extra Crispy", "As Chris P. Bacon, ignite 5 different opponents with Crispy Bacon projectiles or dash in one game."),
+                    a("variety-pack", "Variety Pack", "Win at least one Bacon Brawl game using each of the 5 kits."),
+                    a("quadruple-serving", "Quadruple Serving", "Get 4 consecutive knock-off kills, with at most 10 seconds between each kill."))),
             Map.entry("skywars", List.of(
                     a("death-bomber", "Death Bomber", "Kill 3 players with Throwable TNT in one game."),
                     a("no-chest", "No Chest", "Win without opening a chest."),

@@ -12,8 +12,8 @@ Builder/Disruptor draft PR so the gameplay work can be tested independently.
   family even though it is not a value of `ArcadePortGame`.
 - There are **30 game families** represented across four catalogues: `ArcadeProgressCatalog`,
   `PlexballAchievement`, `CameraShyProgressCatalog`, and `SuperSploorProgressCatalog`.
-- The snapshot below contains **252 declared achievements**. The 30-family minimum is 420.
-- **175 additions** would fill all under-target catalogues, resulting in **427 total active
+- The current catalogue contains **256 declared achievements** (including the four approved Bacon Brawl additions). The 30-family minimum is 420.
+- **171 further additions** would fill all under-target catalogues, resulting in **427 total active
   achievements** if the existing definitions are retained: Snap has 20 and Super Sploor 15.
   **No existing achievements are to be archived, deleted, or retired.** This supersedes the
   earlier exact-14/archiving proposal following the user's decision.
@@ -24,7 +24,7 @@ Builder/Disruptor draft PR so the gameplay work can be tested independently.
 
 | Game family | Declared | To add for minimum 14 | Already above 14 |
 | --- | ---: | ---: | ---: |
-| Bacon Brawl | 10 | 4 | 0 |
+| Bacon Brawl | 14 | 0 | 0 |
 | Bomb Lobbers | 13 | 1 | 0 |
 | Castle Assault | 6 | 8 | 0 |
 | Death Tag | 10 | 4 | 0 |
@@ -54,7 +54,7 @@ Builder/Disruptor draft PR so the gameplay work can be tested independently.
 | Turf Wars | 9 | 5 | 0 |
 | Wither Assault | 8 | 6 | 0 |
 | Wizards | 6 | 8 | 0 |
-| **Total** | **252** | **175** | **7** |
+| **Total** | **256** | **171** | **7** |
 
 ## Suggested review methodology
 
@@ -88,14 +88,15 @@ Builder/Disruptor draft PR so the gameplay work can be tested independently.
   feat bundle, or a stable mastery set according to each kit's role. Prevent
   circular prerequisites and avoid silently moving the goalposts when the
   catalogue expands. Milestones remain separate. See
-  `ACHIEVEMENT-IMPLEMENTATION-AUDIT.md` for the source-backed audit and draft
-  kit-specific examples. No unlock-rule change is implemented yet.
+  `ACHIEVEMENT-IMPLEMENTATION-AUDIT.md` for the source-backed audit and
+  kit-specific examples. Bacon Brawl's Chris P. Bacon gate is now approved and
+  implemented; other games' remaining design decisions still require review.
 - For kitless/fixed-role games (for example, Hoops, Draw My Thing, Master Builders, or
   Gladiators), decide separately whether to introduce an actual gameplay kit, a side-grade
   toolset, or an achievement prestige cosmetic. Introducing a kit is a gameplay-design
   decision, not merely a lobby metadata change.
 
-### Decisions needed before the 175-achievement proposal pass
+### Decisions needed before the remaining 171-achievement proposal pass
 
 1. **Individual unlock predicates:** Approve the actual prerequisite achievement IDs
    for each purple kit, using an obtainable signature feat, curated bundle or stable

@@ -11,6 +11,20 @@ import org.junit.jupiter.api.Test;
 
 class ArcadeProgressCatalogTest {
     @Test
+    void baconBrawlHasFourteenAchievementsAndOneSpecificToEveryKit() {
+        assertEquals(14, ArcadeProgressCatalog.achievements("bacon-brawl").size());
+        assertTrue(hasAchievement("bacon-brawl", "three-for-one", "Three for One!"));
+        assertTrue(hasAchievement("bacon-brawl", "mama-camera", "Mama Get the Camera"));
+        assertTrue(hasAchievement("bacon-brawl", "goat-sty", "GOAT Sty"));
+        assertTrue(hasAchievement("bacon-brawl", "iron-hog", "Iron Hog"));
+        assertTrue(hasAchievement("bacon-brawl", "extra-crispy", "Extra Crispy"));
+        assertTrue(hasAchievement("bacon-brawl", "variety-pack", "Variety Pack"));
+        assertTrue(hasAchievement("bacon-brawl", "quadruple-serving", "Quadruple Serving"));
+        assertEquals(14, ArcadeProgressCatalog.achievements("bacon-brawl").stream()
+                .map(ArcadeProgressCatalog.Achievement::id).distinct().count());
+    }
+
+    @Test
     void monsterMazeUsesTheRequestedMilestoneThresholds() {
         assertArrayEquals(new long[] {25, 50, 100, 250}, stages("monster-maze", "wins"));
         assertArrayEquals(new long[] {100, 250, 500, 1000}, stages("monster-maze", "first-safe-pads"));
