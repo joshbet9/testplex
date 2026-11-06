@@ -3054,8 +3054,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             damage *= ArcadePortRules.castleAssaultBlastDamageMultiplier(castleBlastProtectionEpf(target));
             if (damage <= 0.0D) continue;
             if (target.getHealth() <= damage) {
-                recordCastleKill(owner, target, objective,
-                        !objective && "demolitionist".equals(castleAssaultPlayerKits.get(owner.getUniqueId())));
+                recordCastleKill(owner, target, objective, !objective);
                 hooks.eliminate(target, owner, "was caught in a Castle Assault TNT blast");
             } else target.setHealth(target.getHealth() - damage);
             Vector direction = target.getLocation().toVector().subtract(center.toVector());
@@ -3983,14 +3982,74 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void recordCastleKill(Player killer, Player victim, boolean objectiveTnt) {
+        recordCastleKill(killer, victim, objectiveTnt, false);
+    }
+
+    private void recordCastleKill(Player killer, Player victim, boolean objectiveTnt, boolean thrownTnt) {
         if (killer == null || victim == null || killer.equals(victim)) return;
         UUID victimId = victim.getUniqueId();
         if (!castleCreditedVictims.add(victimId)) return;
         UUID killerId = killer.getUniqueId();
-        if (teams.getOrDefault(killerId, -1) < 0
-                || teams.getOrDefault(killerId, -1) == teams.getOrDefault(victimId, -2)) return;
-        castleKillsByPlayer.merge(killerId, 1, Integer::sum);
-        if (objectiveTnt) castleTntHolderKillsByPlayer.merge(killerId, 1, Integer::sum);
+        int killerTeam = teams.getOrDefault(killerId, -1);
+        if (killerTeam < 0 || killerTeam == teams.getOrDefault(victimId, -2)) return;
+        String kit = castleAssaultPlayerKits.getOrDefault(killerId, "fighter");
+        int kills = castleKillsByPlayer.merge(killerId, 1, Integer::sum);
+
+        if (objectiveTnt) {
+            int objectiveKills = castleTntHolderKillsByPlayer.merge(killerId, 1, Integer::sum);
+            if (objectiveKills >= 5) awardCastleAssaultAchievement(killerId, "moral-exercise");
+        }
+        if (thrownTnt && "demolitionist".equals(kit)) {
+            int tntKills = castleDemolitionistTntKills.merge(killerId, 1, Integer::sum);
+            if (ArcadePortRules.shouldAwardCastleAssaultTntRrific(tntKills)) {
+                awardCastleAssaultAchievement(killerId, "tnt-rrific");
+            }
+        }
+
+        // Count only lethal bow shots from an Archer, not a prior arrow followed by a TNT kill.
+        if (!objectiveTnt && !thrownTnt && "archer".equals(kit)
+                && victim.getLastDamageCause() instanceof EntityDamageByEntityEvent lastDamage
+                && lastDamage.getDamager() instanceof Arrow arrow
+                && arrow.getShooter() instanceof Player shooter && shooter.getUniqueId().equals(killerId)) {
+            int bowKills = castleArcherBowKills.merge(killerId, 1, Integer::sum);
+            if (ArcadePortRules.shouldAwardCastleAssaultPinCushion(bowKills)) {
+                awardCastleAssaultAchievement(killerId, "pin-cushion");
+            }
+        }
+
+        Map<UUID, Long> debuffSources = castleAlchemistDebuffExpires.remove(victimId);
+        if ("alchemist".equals(kit) && debuffSources != null
+                && debuffSources.getOrDefault(killerId, 0L) >= System.currentTimeMillis()
+                && (victim.hasPotionEffect(PotionEffectType.SLOWNESS)
+                        || victim.hasPotionEffect(PotionEffectType.WEAKNESS))) {
+            int debuffKills = castleAlchemistDebuffKills.merge(killerId, 1, Integer::sum);
+            if (ArcadePortRules.shouldAwardCastleAssaultBadChemistry(debuffKills)) {
+                awardCastleAssaultAchievement(killerId, "bad-chemistry");
+            }
+        }
+
+        KingState friendlyKing = kings.get(killerTeam);
+        if (friendlyKing != null && victim.getWorld() == friendlyKing.location.getWorld()
+                && victim.getLocation().distanceSquared(friendlyKing.location)
+                        <= ArcadePortRules.CASTLE_ASSAULT_ROYAL_GUARD_RANGE
+                                * ArcadePortRules.CASTLE_ASSAULT_ROYAL_GUARD_RANGE) {
+            int defenseKills = castleRoyalGuardKills.merge(killerId, 1, Integer::sum);
+            if (ArcadePortRules.shouldAwardCastleAssaultRoyalGuard(defenseKills)) {
+                awardCastleAssaultAchievement(killerId, "royal-guard");
+            }
+        }
+
+        if ("fighter".equals(kit)) {
+            int lifeKills = castleFighterKillsThisLife.merge(killerId, 1, Integer::sum);
+            if (ArcadePortRules.shouldAwardCastleAssaultGoldenBoy(
+                    castleFighterAppleConsumedThisLife.contains(killerId), lifeKills)) {
+                awardCastleAssaultAchievement(killerId, "golden-boy");
+            }
+        }
+        if ("tank".equals(kit) && ArcadePortRules.shouldAwardCastleAssaultImmovableObject(
+                castleTankHitsThisLife.getOrDefault(killerId, 0))) {
+            awardCastleAssaultAchievement(killerId, "immovable-object");
+        }
     }
 
     private void recordCastleAssaultResult(int winningTeam) {
@@ -4000,32 +4059,57 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         String basePath = "local-stats.";
         for (Map.Entry<UUID, Integer> entry : teams.entrySet()) {
             UUID playerId = entry.getKey();
-            if (entry.getValue() != winningTeam) {
-                plugin.getConfig().set(basePath + playerId + ".castle-assault.win-streak", 0);
-                continue;
-            }
+            int playerTeam = entry.getValue();
+            boolean won = playerTeam == winningTeam;
             String statsPath = basePath + playerId + ".castle-assault.";
-            int streak = plugin.getConfig().getInt(statsPath + "win-streak", 0) + 1;
-            plugin.getConfig().set(statsPath + "win-streak", streak);
             int kills = castleKillsByPlayer.getOrDefault(playerId, 0);
             int nextHighest = teams.entrySet().stream()
-                    .filter(other -> other.getValue() == winningTeam && !other.getKey().equals(playerId))
+                    .filter(other -> other.getValue() == playerTeam && !other.getKey().equals(playerId))
                     .mapToInt(other -> castleKillsByPlayer.getOrDefault(other.getKey(), 0))
                     .max().orElse(0);
-            if (castleFinalKingHitByPlayer.contains(playerId)) {
-                awardCastleAssaultAchievement(playerId, "one-man-army");
-            }
-            if (winningKing != null && winningKing.health < 50) {
-                awardCastleAssaultAchievement(playerId, "clutchness");
-            }
+
+            // These achievements do not require winning, so evaluate both teams.
             if (kills >= 8 && !castleRodUsed.contains(playerId)) {
                 awardCastleAssaultAchievement(playerId, "blasphemous");
             }
-            if (kills > 0 && kills >= nextHighest * 2) {
+            if (ArcadePortRules.shouldAwardCastleAssaultMultiplicative(kills, nextHighest)) {
                 awardCastleAssaultAchievement(playerId, "multiplicative");
             }
             if (castleTntHolderKillsByPlayer.getOrDefault(playerId, 0) >= 5) {
                 awardCastleAssaultAchievement(playerId, "moral-exercise");
+            }
+            if (ArcadePortRules.shouldAwardCastleAssaultBadChemistry(
+                    castleAlchemistDebuffKills.getOrDefault(playerId, 0))) {
+                awardCastleAssaultAchievement(playerId, "bad-chemistry");
+            }
+            if (ArcadePortRules.shouldAwardCastleAssaultPinCushion(
+                    castleArcherBowKills.getOrDefault(playerId, 0))) {
+                awardCastleAssaultAchievement(playerId, "pin-cushion");
+            }
+            if (ArcadePortRules.shouldAwardCastleAssaultTntRrific(
+                    castleDemolitionistTntKills.getOrDefault(playerId, 0))) {
+                awardCastleAssaultAchievement(playerId, "tnt-rrific");
+            }
+            if (ArcadePortRules.shouldAwardCastleAssaultRoyalGuard(
+                    castleRoyalGuardKills.getOrDefault(playerId, 0))) {
+                awardCastleAssaultAchievement(playerId, "royal-guard");
+            }
+
+            if (!won) {
+                plugin.getConfig().set(statsPath + "win-streak", 0);
+                continue;
+            }
+            int streak = plugin.getConfig().getInt(statsPath + "win-streak", 0) + 1;
+            plugin.getConfig().set(statsPath + "win-streak", streak);
+            if (castleFinalKingHitByPlayer.contains(playerId)) {
+                awardCastleAssaultAchievement(playerId, "one-man-army");
+            }
+            if (winningKing != null && ArcadePortRules.shouldAwardCastleAssaultClutchness(winningKing.health)) {
+                awardCastleAssaultAchievement(playerId, "clutchness");
+            }
+            if (winningKing != null && ArcadePortRules.shouldAwardCastleAssaultAgainstAllOdds(
+                    winningKing.activeCrystals())) {
+                awardCastleAssaultAchievement(playerId, "against-all-odds");
             }
             if (streak >= 3) awardCastleAssaultAchievement(playerId, "remember-the-days");
         }
