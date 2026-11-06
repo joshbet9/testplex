@@ -18030,7 +18030,8 @@ public final class ArcadePortManager implements Listener {
                 killer.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 60, 0, false, false, true));
                 killer.setHealth(Math.min(killer.getMaxHealth(), killer.getHealth() + killer.getMaxHealth() / 2.0D));
                 killer.sendMessage(ChatColor.GREEN + "Kill registered (" + lifeKills
-                        + " this life; " + killsSinceEvolution + "/2 Overkill kills before your next evolution). "
+                        + " this life; " + killsSinceEvolution + "/" + ArcadePortRules.evolutionOverkillKillsRequired()
+                        + " Overkill kills before your next evolution). "
                         + "Hold sneak while grounded to evolve.");
                 killer.playSound(killer.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.8F, 1.1F);
             }
@@ -18613,7 +18614,8 @@ public final class ArcadePortManager implements Listener {
                 if (target != null && session.evolutionSlimeSlamActive.remove(id)) {
                     session.evolutionSlimeSlamStartedAt.remove(id);
                     hitEvolutionAbilityTarget(session, player, target,
-                            GameDebugRuntimeOverrides.doubleValue("EVOLUTION_SLIME_SLAM_DAMAGE", ArcadePortRules.EVOLUTION_SLIME_SLAM_DAMAGE), 2.0D, "Slime Slam");
+                            GameDebugRuntimeOverrides.doubleValue("EVOLUTION_SLIME_SLAM_DAMAGE", ArcadePortRules.EVOLUTION_SLIME_SLAM_DAMAGE),
+                            GameDebugRuntimeOverrides.doubleValue("EVOLUTION_SLIME_SLAM_KNOCKBACK", ArcadePortRules.EVOLUTION_SLIME_SLAM_KNOCKBACK), "Slime Slam");
                     session.world.spawnParticle(Particle.ITEM_SLIME, player.getLocation(), 18, 0.5D, 0.5D, 0.5D, 0.1D);
                     session.world.playSound(player.getLocation(), Sound.ENTITY_SLIME_ATTACK, 1.0F, 1.0F);
                 }
@@ -18648,7 +18650,8 @@ public final class ArcadePortManager implements Listener {
             if (distance > GameDebugRuntimeOverrides.doubleValue("EVOLUTION_GOLEM_SLAM_RADIUS", ArcadePortRules.EVOLUTION_GOLEM_SLAM_RADIUS)) continue;
             double damage = GameDebugRuntimeOverrides.doubleValue("EVOLUTION_GOLEM_SLAM_DAMAGE", ArcadePortRules.EVOLUTION_GOLEM_SLAM_DAMAGE)
                     * (1.0D - distance / GameDebugRuntimeOverrides.doubleValue("EVOLUTION_GOLEM_SLAM_RADIUS", ArcadePortRules.EVOLUTION_GOLEM_SLAM_RADIUS)) + 0.5D;
-            hitEvolutionAbilityTarget(session, player, target, damage, 2.4D, "Seismic Slam");
+            hitEvolutionAbilityTarget(session, player, target, damage, GameDebugRuntimeOverrides.doubleValue(
+                    "EVOLUTION_GOLEM_SLAM_KNOCKBACK", ArcadePortRules.EVOLUTION_GOLEM_SLAM_KNOCKBACK), "Seismic Slam");
             if (active != session) return;
         }
     }
@@ -18691,7 +18694,8 @@ public final class ArcadePortManager implements Listener {
         Vector direction = player.getLocation().getDirection();
         if (direction.getY() < 0.0D) direction.setY(-direction.getY());
         if (direction.lengthSquared() < 0.001D) direction = new Vector(0.0D, 0.5D, 1.0D);
-        player.setVelocity(direction.normalize().multiply(1.0D));
+        player.setVelocity(direction.normalize().multiply(GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_GOLEM_SLAM_LAUNCH_SPEED", ArcadePortRules.EVOLUTION_GOLEM_SLAM_LAUNCH_SPEED)));
         session.evolutionGolemSlamStartedAt.put(id, now);
         player.sendMessage(ChatColor.GREEN + "Seismic Slam!");
         player.playSound(player.getLocation(), Sound.ENTITY_IRON_GOLEM_ATTACK, 0.9F, 0.8F);
@@ -18729,8 +18733,10 @@ public final class ArcadePortManager implements Listener {
         cooldownProgress.start(player, "Slime Slam", GameDebugRuntimeOverrides.longValue("EVOLUTION_SLIME_SLAM_COOLDOWN_MILLIS", ArcadePortRules.EVOLUTION_SLIME_SLAM_COOLDOWN_MILLIS));
         session.evolutionSlimeSlamStartedAt.put(id, now);
         session.evolutionSlimeSlamActive.add(id);
-        Vector velocity = player.getLocation().getDirection().multiply(1.6D);
-        velocity.setY(0.4D);
+        Vector velocity = player.getLocation().getDirection().multiply(GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_SLIME_SLAM_LAUNCH_HORIZONTAL", ArcadePortRules.EVOLUTION_SLIME_SLAM_LAUNCH_HORIZONTAL));
+        velocity.setY(GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_SLIME_SLAM_LAUNCH_VERTICAL", ArcadePortRules.EVOLUTION_SLIME_SLAM_LAUNCH_VERTICAL));
         player.setVelocity(velocity);
         player.getWorld().spawnParticle(Particle.ITEM_SLIME, player.getLocation(), 8, 0.4D, 0.4D, 0.4D, 0.1D);
         player.playSound(player.getLocation(), Sound.ENTITY_SLIME_JUMP, 1.0F, 1.0F);
@@ -18745,7 +18751,8 @@ public final class ArcadePortManager implements Listener {
         consumeOne(player, Material.EGG);
         session.evolutionAbilitiesUsed.add(player.getUniqueId());
         Egg egg = player.launchProjectile(Egg.class);
-        egg.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(1.35D));
+        egg.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_CHICKEN_EGG_SPEED", ArcadePortRules.EVOLUTION_CHICKEN_EGG_SPEED)));
         session.entities.add(egg);
         player.playSound(player.getLocation(), Sound.ENTITY_EGG_THROW, 0.9F, 1.0F);
     }

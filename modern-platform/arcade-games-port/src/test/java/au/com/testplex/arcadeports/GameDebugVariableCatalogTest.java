@@ -242,8 +242,11 @@ class GameDebugVariableCatalogTest {
                         && key.startsWith("SKY_WARS_")
                         && (productionSources.contains("GameDebugRuntimeOverrides.longValue(key, fallback)")
                                 || productionSources.contains("GameDebugRuntimeOverrides.intValue(key, fallback)"));
+                boolean dynamicEvolutionConsumer = game == ArcadePortGame.EVOLUTION
+                        && key.startsWith("EVOLUTION_")
+                        && productionSources.contains("GameDebugRuntimeOverrides.doubleValue(key, fallback)");
                 assertTrue(literalConsumers.contains(key) || dynamicMazeConsumer || dynamicSneakyConsumer
-                                || dynamicTurfWarsConsumer || dynamicSkyWarsConsumer,
+                                || dynamicTurfWarsConsumer || dynamicSkyWarsConsumer || dynamicEvolutionConsumer,
                         game.id() + " exposes " + key + " without a gameplay consumer");
             }
         }

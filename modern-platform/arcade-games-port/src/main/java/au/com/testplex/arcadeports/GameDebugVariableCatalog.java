@@ -209,6 +209,9 @@ final class GameDebugVariableCatalog {
 
     private static double minimum(String name, double defaultValue, Kind kind) {
         if (kind == Kind.BOOLEAN) return 0.0D;
+        if (name.contains("_FALL_DAMAGE_MULTIPLIER") || name.startsWith("EVOLUTION_CHARGE_")) return 0.0D;
+        if (name.contains("_MAX_HEALTH")) return 1.0D;
+        if (name.contains("_MELEE_DAMAGE")) return 0.0D;
         if (name.equals("HOOPS_MIN_PLAYERS")) return 2.0D;
         if (name.equals("HOOPS_MAX_PLAYERS")) return 2.0D;
         if (name.equals("CASTLE_ASSAULT_KING_HEALTH_BASE")
@@ -261,6 +264,14 @@ final class GameDebugVariableCatalog {
 
     private static double maximum(String name, Kind kind, double defaultValue) {
         if (kind == Kind.BOOLEAN) return 1.0D;
+        if (name.contains("_FALL_DAMAGE_MULTIPLIER")) return 1.0D;
+        if (name.contains("_MAX_HEALTH")) return 80.0D;
+        if (name.contains("_MELEE_DAMAGE")) return 40.0D;
+        if (name.startsWith("EVOLUTION_CHARGE_")) return 0.2D;
+        if (name.startsWith("PAINTBALL_") && name.endsWith("_KNOCKBACK_MULTIPLIER")) return 3.0D;
+        if (name.contains("_KNOCKBACK")) return 8.0D;
+        if (name.contains("_LAUNCH_SPEED") || name.contains("_LAUNCH_HORIZONTAL")) return 8.0D;
+        if (name.contains("_LAUNCH_VERTICAL") || name.endsWith("_EGG_SPEED")) return 5.0D;
         if (name.equals("HOOPS_MIN_PLAYERS") || name.equals("HOOPS_MAX_PLAYERS")) return 16.0D;
         if (name.equals("CASTLE_ASSAULT_KING_HEALTH_BASE")) return 5_000.0D;
         if (name.equals("CASTLE_ASSAULT_KING_HEALTH_REFERENCE_PLAYERS")) return 64.0D;
@@ -350,6 +361,8 @@ final class GameDebugVariableCatalog {
 
     private static double step(String name, double defaultValue, Kind kind) {
         if (kind == Kind.BOOLEAN) return 1.0D;
+        if (name.startsWith("EVOLUTION_CHARGE_")) return 0.001D;
+        if (name.contains("_FALL_DAMAGE_MULTIPLIER")) return 0.05D;
         if (name.endsWith("_MILLIS")) return defaultValue >= 10_000.0D ? 1_000.0D : defaultValue >= 1_000.0D ? 100.0D : 25.0D;
         if (name.endsWith("_TICKS")) return defaultValue >= 100.0D ? 20.0D : 1.0D;
         if (kind == Kind.INTEGER || Math.abs(defaultValue) >= 10.0D) return 1.0D;

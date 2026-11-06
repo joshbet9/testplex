@@ -1724,6 +1724,30 @@ public final class ArcadePortRules {
     public static final double EVOLUTION_SULPHUR_BOMB_SPEED = 1.2D;
     public static final double EVOLUTION_SULPHUR_BOMB_RADIUS = 2.5D;
     public static final double EVOLUTION_SULPHUR_BOMB_DAMAGE = 4.0D;
+    public static final double EVOLUTION_CHARGE_BASE_PER_TICK = 0.012D;
+    public static final double EVOLUTION_CHARGE_PER_EXTRA_KILL = 0.003D;
+    public static final double EVOLUTION_CHARGE_MAX_PER_TICK = 0.022D;
+    public static final double EVOLUTION_CREEPER_MAX_HEALTH = 28.0D;
+    public static final double EVOLUTION_GOLEM_MAX_HEALTH = 40.0D;
+    public static final double EVOLUTION_BLAZE_MAX_HEALTH = 36.0D;
+    public static final double EVOLUTION_SLIME_MAX_HEALTH = 22.0D;
+    public static final double EVOLUTION_CHICKEN_MAX_HEALTH = 16.0D;
+    public static final double EVOLUTION_CREEPER_MELEE_DAMAGE = 4.0D;
+    public static final double EVOLUTION_GOLEM_MELEE_DAMAGE = 6.0D;
+    public static final double EVOLUTION_BLAZE_MELEE_DAMAGE = 5.0D;
+    public static final double EVOLUTION_SLIME_MELEE_DAMAGE = 4.0D;
+    public static final double EVOLUTION_CHICKEN_MELEE_DAMAGE = 3.0D;
+    public static final double EVOLUTION_CREEPER_FALL_DAMAGE_MULTIPLIER = 1.0D;
+    public static final double EVOLUTION_GOLEM_FALL_DAMAGE_MULTIPLIER = 1.0D;
+    public static final double EVOLUTION_BLAZE_FALL_DAMAGE_MULTIPLIER = 0.0D;
+    public static final double EVOLUTION_SLIME_FALL_DAMAGE_MULTIPLIER = 0.5D;
+    public static final double EVOLUTION_CHICKEN_FALL_DAMAGE_MULTIPLIER = 0.0D;
+    public static final double EVOLUTION_GOLEM_SLAM_LAUNCH_SPEED = 1.0D;
+    public static final double EVOLUTION_GOLEM_SLAM_KNOCKBACK = 2.4D;
+    public static final double EVOLUTION_SLIME_SLAM_LAUNCH_HORIZONTAL = 1.6D;
+    public static final double EVOLUTION_SLIME_SLAM_LAUNCH_VERTICAL = 0.4D;
+    public static final double EVOLUTION_SLIME_SLAM_KNOCKBACK = 2.0D;
+    public static final double EVOLUTION_CHICKEN_EGG_SPEED = 1.35D;
 
     public static int nextEvolutionLevel(int currentLevel, boolean wonEvolve) {
         int winningLevel = Math.max(1, GameDebugRuntimeOverrides.intValue("EVOLUTION_WIN_LEVEL", EVOLUTION_WIN_LEVEL));
@@ -1732,16 +1756,41 @@ public final class ArcadePortRules {
     }
 
     public static double evolutionMaxHealth(int level) {
-        return switch (Math.max(0, Math.min(4, level))) {
-            case 0 -> 40.0D; case 1 -> 36.0D; case 2 -> 28.0D;
-            case 3 -> 22.0D; default -> 16.0D;
+        int stage = Math.max(0, Math.min(4, level));
+        String key = switch (stage) {
+            case 0 -> "EVOLUTION_GOLEM_MAX_HEALTH";
+            case 1 -> "EVOLUTION_BLAZE_MAX_HEALTH";
+            case 2 -> "EVOLUTION_CREEPER_MAX_HEALTH";
+            case 3 -> "EVOLUTION_SLIME_MAX_HEALTH";
+            default -> "EVOLUTION_CHICKEN_MAX_HEALTH";
         };
+        double fallback = switch (stage) {
+            case 0 -> EVOLUTION_GOLEM_MAX_HEALTH;
+            case 1 -> EVOLUTION_BLAZE_MAX_HEALTH;
+            case 2 -> EVOLUTION_CREEPER_MAX_HEALTH;
+            case 3 -> EVOLUTION_SLIME_MAX_HEALTH;
+            default -> EVOLUTION_CHICKEN_MAX_HEALTH;
+        };
+        return Math.max(1.0D, GameDebugRuntimeOverrides.doubleValue(key, fallback));
     }
 
     public static double evolutionMeleeDamage(int level) {
-        return switch (Math.max(0, Math.min(4, level))) {
-            case 0 -> 6.0D; case 1 -> 5.0D; case 2, 3 -> 4.0D; default -> 3.0D;
+        int stage = Math.max(0, Math.min(4, level));
+        String key = switch (stage) {
+            case 0 -> "EVOLUTION_GOLEM_MELEE_DAMAGE";
+            case 1 -> "EVOLUTION_BLAZE_MELEE_DAMAGE";
+            case 2 -> "EVOLUTION_CREEPER_MELEE_DAMAGE";
+            case 3 -> "EVOLUTION_SLIME_MELEE_DAMAGE";
+            default -> "EVOLUTION_CHICKEN_MELEE_DAMAGE";
         };
+        double fallback = switch (stage) {
+            case 0 -> EVOLUTION_GOLEM_MELEE_DAMAGE;
+            case 1 -> EVOLUTION_BLAZE_MELEE_DAMAGE;
+            case 2 -> EVOLUTION_CREEPER_MELEE_DAMAGE;
+            case 3 -> EVOLUTION_SLIME_MELEE_DAMAGE;
+            default -> EVOLUTION_CHICKEN_MELEE_DAMAGE;
+        };
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(key, fallback));
     }
 
     /**
@@ -1750,16 +1799,33 @@ public final class ArcadePortRules {
      * Iron Golem and Creeper retain normal fall damage.
      */
     public static double evolutionFallDamageMultiplier(int level) {
-        return switch (Math.max(0, Math.min(4, level))) {
-            case 1, 4 -> 0.0D;
-            case 3 -> 0.5D;
-            default -> 1.0D;
+        int stage = Math.max(0, Math.min(4, level));
+        String key = switch (stage) {
+            case 0 -> "EVOLUTION_GOLEM_FALL_DAMAGE_MULTIPLIER";
+            case 1 -> "EVOLUTION_BLAZE_FALL_DAMAGE_MULTIPLIER";
+            case 2 -> "EVOLUTION_CREEPER_FALL_DAMAGE_MULTIPLIER";
+            case 3 -> "EVOLUTION_SLIME_FALL_DAMAGE_MULTIPLIER";
+            default -> "EVOLUTION_CHICKEN_FALL_DAMAGE_MULTIPLIER";
         };
+        double fallback = switch (stage) {
+            case 0 -> EVOLUTION_GOLEM_FALL_DAMAGE_MULTIPLIER;
+            case 1 -> EVOLUTION_BLAZE_FALL_DAMAGE_MULTIPLIER;
+            case 2 -> EVOLUTION_CREEPER_FALL_DAMAGE_MULTIPLIER;
+            case 3 -> EVOLUTION_SLIME_FALL_DAMAGE_MULTIPLIER;
+            default -> EVOLUTION_CHICKEN_FALL_DAMAGE_MULTIPLIER;
+        };
+        return Math.max(0.0D, Math.min(1.0D, GameDebugRuntimeOverrides.doubleValue(key, fallback)));
     }
 
     public static double evolutionChargePerTick(int killsThisLife) {
         int extraKills = Math.max(0, killsThisLife - 1);
-        return Math.min(0.022D, 0.012D + 0.003D * extraKills);
+        double base = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_CHARGE_BASE_PER_TICK", EVOLUTION_CHARGE_BASE_PER_TICK));
+        double perKill = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_CHARGE_PER_EXTRA_KILL", EVOLUTION_CHARGE_PER_EXTRA_KILL));
+        double maximum = Math.max(base, GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_CHARGE_MAX_PER_TICK", EVOLUTION_CHARGE_MAX_PER_TICK));
+        return Math.min(maximum, base + perKill * extraKills);
     }
 
     public static final long BACON_BLAST_KILL_COMBO_WINDOW_MILLIS = 5_000L;
@@ -1789,7 +1855,9 @@ public final class ArcadePortRules {
     }
 
     public static int nextEvolutionOverkillKillCount(int killsSinceLastEvolution) {
-        return Math.min(EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION,
+        int required = Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION", EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION));
+        return Math.min(required,
                 Math.max(0, killsSinceLastEvolution) + 1);
     }
 
@@ -1814,9 +1882,12 @@ public final class ArcadePortRules {
     }
 
     public static boolean evolutionOverkillRequirementMet(int killsBeforeEvolution) {
-        int required = Math.max(1, GameDebugRuntimeOverrides.intValue(
+        return killsBeforeEvolution >= evolutionOverkillKillsRequired();
+    }
+
+    public static int evolutionOverkillKillsRequired() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
                 "EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION", EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION));
-        return killsBeforeEvolution >= required;
     }
 
     public static boolean isEvolutionWinnerLevel(int level) {
