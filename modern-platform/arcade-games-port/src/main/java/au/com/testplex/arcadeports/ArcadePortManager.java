@@ -26367,7 +26367,7 @@ public final class ArcadePortManager implements Listener {
                     "MILK_THE_COW_SCORE_PER_MILK", MilkCowRules.SCORE_PER_MILK), "Milk drunk");
         }
         if (active != session) return;
-        player.setHealth(Math.min(player.getMaxHealth(), player.getHealth() + 2.0D));
+        player.setHealth(Math.min(player.getMaxHealth(), player.getHealth() + MilkCowRules.farmerHealPerMilkHp()));
         player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_BURP, 1.0F, 1.0F);
     }
 
@@ -26994,11 +26994,13 @@ public final class ArcadePortManager implements Listener {
                 if (cowPlayer.isSprinting()) {
                     if (food <= 0) cowPlayer.setSprinting(false);
                     else cowPlayer.setFoodLevel(food - 1);
-                    cowPlayer.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 4, 1, false, false, false));
+                    cowPlayer.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,
+                            MilkCowRules.cowSprintSpeedDurationTicks(), MilkCowRules.cowSprintSpeedAmplifier(),
+                            false, false, false));
                 } else if (food < 20) {
                     cowPlayer.setFoodLevel(food + 1);
                 }
-                session.milkChargeHungerAt.put(id, now + 250L);
+                session.milkChargeHungerAt.put(id, now + MilkCowRules.cowChargeHungerIntervalMillis());
             }
         }
         List<Player> farmers = alivePlayers(session).stream()
@@ -27013,26 +27015,29 @@ public final class ArcadePortManager implements Listener {
             if (plugin.hasAdminAccess(cowPlayer)
                     && !debugFeatureEnabled(cowPlayer.getUniqueId(), ArcadePortGame.MILK_THE_COW, "cow-charge", true)) continue;
             Location forward = cowPlayer.getLocation().clone().add(cowPlayer.getLocation().getDirection().setY(0).normalize());
-            for (Entity nearby : session.world.getNearbyEntities(forward, 2.0D, 1.6D, 2.0D)) {
+            double chargeRadius = MilkCowRules.cowChargeTargetRadiusBlocks();
+            for (Entity nearby : session.world.getNearbyEntities(forward, chargeRadius,
+                    MilkCowRules.cowChargeTargetHeightBlocks(), chargeRadius)) {
                 if (!(nearby instanceof Player target) || session.teams.getOrDefault(target.getUniqueId(), 1) != 0
                         || !session.alive.contains(target.getUniqueId())) continue;
                 String key = cowPlayer.getUniqueId() + ":" + target.getUniqueId();
                 long ready = session.milkChargeCooldowns.getOrDefault(key, 0L);
                 if (now < ready) continue;
-                session.milkChargeCooldowns.put(key, now + 500L);
+                session.milkChargeCooldowns.put(key, now + MilkCowRules.cowChargeTargetCooldownMillis());
                 for (ItemStack stack : target.getInventory().getContents()) {
                     if (stack != null && stack.getType() == Material.MILK_BUCKET) stack.setType(Material.BUCKET);
                 }
-                damageMilkCowFarmer(session, target, cowPlayer, 3.0D);
+                damageMilkCowFarmer(session, target, cowPlayer, MilkCowRules.cowChargeDamage());
                 Vector push = target.getLocation().toVector().subtract(cowPlayer.getLocation().toVector());
                 push.setY(0.45D);
                 if (push.lengthSquared() > 0.001D) {
                     Vector chargeDirection = cowPlayer.getLocation().getDirection().clone();
                     chargeDirection.setY(0.0D);
                     chargeDirection.add(push.clone().setY(0.0D)).setY(0.0D);
-                    double chargeScale = Math.max(0.0D, 1.0D - target.getLocation().distance(forward) / 2.0D);
-                    Vector chargeVelocity = chargeDirection.normalize().multiply(1.0D + 0.8D * chargeScale);
-                    chargeVelocity.setY(0.8D + 0.4D * chargeScale);
+                    MilkCowRules.ChargeKnockback chargeKnockback = MilkCowRules.cowChargeKnockbackAtDistance(
+                            target.getLocation().distance(forward));
+                    Vector chargeVelocity = chargeDirection.normalize().multiply(chargeKnockback.horizontal());
+                    chargeVelocity.setY(chargeKnockback.vertical());
                     target.setVelocity(chargeVelocity);
                 }
                 cowPlayer.getWorld().playSound(cowPlayer.getLocation(), Sound.ENTITY_COW_HURT, 0.7F, 1.1F);
@@ -27094,21 +27099,22 @@ public final class ArcadePortManager implements Listener {
             session.milkCowHerd.clear();
             return;
         }
-        session.milkNextHerdUpdateAt = now + 1_000L;
+        session.milkNextHerdUpdateAt = now + MilkCowRules.herdUpdateIntervalMillis();
         Location target = cowPlayer.getLocation();
         session.milkCowHerd.removeIf(cow -> cow == null || !cow.isValid());
         for (Cow cow : session.milkCowHerd) {
             Vector direction = target.toVector().subtract(cow.getLocation().toVector());
             direction.setY(Math.max(-0.08D, Math.min(0.12D, direction.getY())));
-            if (direction.lengthSquared() > 2.25D) cow.setVelocity(direction.normalize().multiply(
+            if (direction.lengthSquared() > MilkCowRules.herdFollowMinDistanceSquared()) cow.setVelocity(direction.normalize().multiply(
                     GameDebugRuntimeOverrides.doubleValue("MILK_THE_COW_HERD_MOVE_SPEED",
                             MilkCowRules.HERD_MOVE_SPEED)));
         }
         while (session.milkCowHerd.size() < GameDebugRuntimeOverrides.intValue(
                 "MILK_THE_COW_HERD_SIZE", MilkCowRules.HERD_SIZE)) {
+            double spawnRadius = MilkCowRules.herdSpawnRadiusBlocks();
             Location spawn = target.clone().add(
-                    ThreadLocalRandom.current().nextDouble(-2.5D, 2.5D), 0.0D,
-                    ThreadLocalRandom.current().nextDouble(-2.5D, 2.5D));
+                    ThreadLocalRandom.current().nextDouble(-spawnRadius, spawnRadius), 0.0D,
+                    ThreadLocalRandom.current().nextDouble(-spawnRadius, spawnRadius));
             Cow cow = session.world.spawn(spawn, Cow.class);
             cow.setRemoveWhenFarAway(false);
             session.milkCowHerd.add(cow);
@@ -27152,7 +27158,7 @@ public final class ArcadePortManager implements Listener {
                     "MILK_THE_COW_SCORE_LOST_ON_DEATH", MilkCowRules.SCORE_LOST_ON_DEATH), "Farmer defeated");
             if (active != session) return;
             if (attacker != null && session.teams.getOrDefault(attacker.getUniqueId(), -1) == 1) {
-                incrementMilkCowScore(session, attacker, 1, "Farmer defeated");
+                incrementMilkCowScore(session, attacker, MilkCowRules.scorePerCowKill(), "Farmer defeated");
                 if (active != session) return;
             }
             Location respawn = session.milkRespawnSpawns.getOrDefault(

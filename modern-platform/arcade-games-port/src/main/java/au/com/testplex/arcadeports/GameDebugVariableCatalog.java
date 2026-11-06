@@ -239,6 +239,15 @@ final class GameDebugVariableCatalog {
         if (name.equals("DEATH_TAG_TURTLE_MAX_STACKS")
                 || name.equals("DEATH_TAG_TURTLE_EFFECT_DURATION_TICKS")
                 || name.equals("DEATH_TAG_TURTLE_HITS_PER_WIND_CHARGE")) return 1.0D;
+        if (name.equals("COW_CHARGE_TARGET_RADIUS_BLOCKS")
+                || name.equals("COW_CHARGE_TARGET_HEIGHT_BLOCKS")
+                || name.equals("HERD_SPAWN_RADIUS_BLOCKS")) return 0.1D;
+        if (name.equals("COW_CHARGE_HUNGER_INTERVAL_MILLIS")
+                || name.equals("HERD_UPDATE_INTERVAL_MILLIS")
+                || name.equals("COW_SPRINT_SPEED_DURATION_TICKS")) return 1.0D;
+        if (name.equals("COW_CHARGE_TARGET_COOLDOWN_MILLIS")) return 0.0D;
+        if (name.equals("HERD_FOLLOW_MIN_DISTANCE_SQUARED")) return 0.0D;
+        if (name.equals("COW_SPRINT_SPEED_AMPLIFIER") || name.equals("SCORE_PER_COW_KILL")) return 0.0D;
         if (name.startsWith("GLADIATOR_TIER_") && name.endsWith("_ARROWS")) return 0.0D;
         if (name.equals("GLADIATOR_POTION_HEALING")
                 || name.equals("GLADIATOR_MELEE_KNOCKBACK_HORIZONTAL")
@@ -378,6 +387,19 @@ final class GameDebugVariableCatalog {
         if (name.equals("DEATH_TAG_TURTLE_MAX_STACKS")) return 10.0D;
         if (name.equals("DEATH_TAG_TURTLE_EFFECT_DURATION_TICKS")) return 1_200.0D;
         if (name.equals("DEATH_TAG_TURTLE_HITS_PER_WIND_CHARGE")) return 100.0D;
+        if (name.equals("COW_CHARGE_HUNGER_INTERVAL_MILLIS")
+                || name.equals("HERD_UPDATE_INTERVAL_MILLIS")
+                || name.equals("COW_CHARGE_TARGET_COOLDOWN_MILLIS")) return 120_000.0D;
+        if (name.equals("COW_CHARGE_TARGET_RADIUS_BLOCKS")
+                || name.equals("COW_CHARGE_TARGET_HEIGHT_BLOCKS")
+                || name.equals("HERD_SPAWN_RADIUS_BLOCKS")) return 64.0D;
+        if (name.equals("COW_CHARGE_DAMAGE")) return 40.0D;
+        if (name.startsWith("COW_CHARGE_KNOCKBACK_") || name.startsWith("COW_CHARGE_VERTICAL_")) return 8.0D;
+        if (name.equals("HERD_FOLLOW_MIN_DISTANCE_SQUARED")) return 4_096.0D;
+        if (name.equals("FARMER_HEAL_PER_MILK_HP")) return 40.0D;
+        if (name.equals("COW_SPRINT_SPEED_DURATION_TICKS")) return 1_200.0D;
+        if (name.equals("COW_SPRINT_SPEED_AMPLIFIER")) return 10.0D;
+        if (name.equals("SCORE_PER_COW_KILL")) return 64.0D;
         if (Set.of("MANA_REGEN_MULTIPLIER", "PROJECTILE_SPEED_MULTIPLIER", "SPELL_COOLDOWN_MULTIPLIER",
                 "SPELL_DAMAGE_MULTIPLIER", "SPELL_HEAL_MULTIPLIER", "SPELL_MANA_COST_MULTIPLIER")
                 .contains(name)) return 5.0D;

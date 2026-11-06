@@ -162,6 +162,22 @@ class GameDebugVariableCatalogTest {
         assertGameRange(ArcadePortGame.DEATH_TAG, "DEATH_TAG_TRICKSTER_FIREWORKS_COOLDOWN_MILLIS", 0.0D, 600_000.0D);
     }
 
+    @Test
+    void milkTheCowChargeAndHerdControlsHaveBoundedRanges() {
+        assertGameRange(ArcadePortGame.MILK_THE_COW, "MILK_THE_COW_COW_CHARGE_HUNGER_INTERVAL_MILLIS", 1.0D, 120_000.0D);
+        assertGameRange(ArcadePortGame.MILK_THE_COW, "MILK_THE_COW_COW_CHARGE_TARGET_RADIUS_BLOCKS", 0.1D, 64.0D);
+        assertGameRange(ArcadePortGame.MILK_THE_COW, "MILK_THE_COW_COW_CHARGE_TARGET_HEIGHT_BLOCKS", 0.1D, 64.0D);
+        assertGameRange(ArcadePortGame.MILK_THE_COW, "MILK_THE_COW_COW_CHARGE_TARGET_COOLDOWN_MILLIS", 0.0D, 120_000.0D);
+        assertGameRange(ArcadePortGame.MILK_THE_COW, "MILK_THE_COW_COW_CHARGE_DAMAGE", 0.0D, 40.0D);
+        assertGameRange(ArcadePortGame.MILK_THE_COW, "MILK_THE_COW_COW_SPRINT_SPEED_DURATION_TICKS", 1.0D, 1_200.0D);
+        assertGameRange(ArcadePortGame.MILK_THE_COW, "MILK_THE_COW_COW_SPRINT_SPEED_AMPLIFIER", 0.0D, 10.0D);
+        assertGameRange(ArcadePortGame.MILK_THE_COW, "MILK_THE_COW_SCORE_PER_COW_KILL", 0.0D, 64.0D);
+        assertGameRange(ArcadePortGame.MILK_THE_COW, "MILK_THE_COW_HERD_UPDATE_INTERVAL_MILLIS", 1.0D, 120_000.0D);
+        assertGameRange(ArcadePortGame.MILK_THE_COW, "MILK_THE_COW_HERD_FOLLOW_MIN_DISTANCE_SQUARED", 0.0D, 4_096.0D);
+        assertGameRange(ArcadePortGame.MILK_THE_COW, "MILK_THE_COW_HERD_SPAWN_RADIUS_BLOCKS", 0.1D, 64.0D);
+        assertGameRange(ArcadePortGame.MILK_THE_COW, "MILK_THE_COW_FARMER_HEAL_PER_MILK_HP", 0.0D, 40.0D);
+    }
+
     private static void assertRange(String key, double minimum, double maximum) {
         assertGameRange(ArcadePortGame.TURF_WARS, key, minimum, maximum);
     }
