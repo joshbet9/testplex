@@ -22,7 +22,9 @@ final class GameDebugVariableCatalog {
             "DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED",
             "MICRO_BATTLES_CRUMBLE_ENABLED",
             "QUIVER_LEAPER_DOUBLE_JUMP_ENABLED",
-            "SPLEEF_HUNGER_DRAIN_ENABLED");
+            "SPLEEF_HUNGER_DRAIN_ENABLED",
+            "SPEED_BUILDERS_DOUBLE_JUMP_ENABLED",
+            "SPEED_BUILDERS_PERFECT_BUILD_TIME_TIEBREAK_ENABLED");
     private static final Set<String> LIVE_SNEAKY_NUMERIC_RULES = Set.of(
             "SNEAKY_ASSASSINS_POWERUP_KILL_WINDOW_MILLIS", "SNEAKY_ASSASSINS_NEXT_POWERUP_DELAY_MILLIS",
             "SNEAKY_ASSASSINS_MAX_ACTIVE_POWERUPS", "SNEAKY_ASSASSINS_MASTER_ASSASSIN_POWERUPS_REQUIRED",
@@ -167,7 +169,9 @@ final class GameDebugVariableCatalog {
         if (game == ArcadePortGame.SPEED_BUILDERS) {
             return Set.of("DEFAULT_VIEW_SECONDS", "DEFAULT_BUILD_SECONDS", "MIN_BUILD_SECONDS",
                     "MAX_BUILD_SECONDS", "INTERMISSION_SECONDS", "DEFAULT_MATCH_ROUNDS",
-                    "TEMPLATE_MOBS_ENABLED", "PERFECT_SCORE_PERCENT")
+                    "TEMPLATE_MOBS_ENABLED", "PERFECT_SCORE_PERCENT", "FINAL_RESULTS_SECONDS",
+                    "BUILD_TIME_DECREASE_PER_ROUND_SECONDS", "PERFECT_BUILD_TIME_TIEBREAK_ENABLED",
+                    "DOUBLE_JUMP_VERTICAL_VELOCITY", "DOUBLE_JUMP_ENABLED")
                     .contains(name);
         }
         if (game == ArcadePortGame.WIZARDS) {
@@ -450,6 +454,9 @@ final class GameDebugVariableCatalog {
                 || name.equals("TURF_WARS_BARRAGE_ARROW_SPEED")
                 || name.equals("TURF_WARS_BARRAGE_ARROW_SPREAD")) return 0.0D;
         if (name.equals("PERFECT_SCORE_PERCENT")) return 1.0D;
+        if (name.equals("BUILD_TIME_DECREASE_PER_ROUND_SECONDS")
+                || name.equals("FINAL_RESULTS_SECONDS")) return 0.0D;
+        if (name.equals("DOUBLE_JUMP_VERTICAL_VELOCITY")) return 0.1D;
         if (name.equals("RUNNER_MAX_FROSTBALLS")) return 0.0D;
         if (name.equals("RUNNER_STEPS_ACHIEVEMENT_BLOCKS")
                 || name.equals("RUNNER_HOP_ACHIEVEMENT_JUMPS")
@@ -669,6 +676,9 @@ final class GameDebugVariableCatalog {
         if (name.equals("PAINTBALL_FLAWLESS_MIN_STARTERS") || name.equals("PAINTBALL_KILLING_SPREE_KILLS")
                 || name.equals("PAINTBALL_LAST_STAND_KILLS") || name.equals("PAINTBALL_SHARE_YOUR_SCREEN_SHOTS")) return 100.0D;
         if (name.equals("PERFECT_SCORE_PERCENT")) return 100.0D;
+        if (name.equals("BUILD_TIME_DECREASE_PER_ROUND_SECONDS")) return 30.0D;
+        if (name.equals("FINAL_RESULTS_SECONDS")) return 60.0D;
+        if (name.equals("DOUBLE_JUMP_VERTICAL_VELOCITY")) return 2.5D;
         if (name.equals("HEROES_OF_GWEN_OVERTIME_DELAY_MILLIS")) return 3_600_000.0D;
         if (name.equals("HEROES_OF_GWEN_OVERTIME_PATH_ADVANCE_DISTANCE_SQUARED")) return 256.0D;
         if (name.equals("HEROES_OF_GWEN_DEVON_TNT_BOW_BASE_DAMAGE")

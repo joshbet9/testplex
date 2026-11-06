@@ -82,7 +82,6 @@ public final class SpeedBuildersGame implements Listener {
     private static final String MIRROR_WORLD_NAME = "arcadeport_source_speedbuilders_v2";
     private static final String SOURCE_MAP_RESOURCE = "source-maps/Speed Builders/SpeedBuilders_Shroomland_Lake.zip";
     private static final int DEFAULT_MATCH_ROUNDS = SpeedBuildersRules.DEFAULT_MATCH_ROUNDS;
-    private static final int FINAL_RESULTS_SECONDS = 5;
     private static final long NORMAL_QUEUE_TICKS = 100L;
     private static final long QUICK_QUEUE_TICKS = 40L;
 
@@ -810,7 +809,7 @@ public final class SpeedBuildersGame implements Listener {
         round++;
         buildSeconds = currentTemplate.timing().buildSeconds(buildTimeTracker);
         // Reborn computes the next round's time before decrementing the tracker.
-        if (round > 1) buildTimeTracker = Math.max(1, buildTimeTracker - 1);
+        if (round > 1) buildTimeTracker = SpeedBuildersRules.nextBuildTimeTracker(buildTimeTracker);
         phase = Phase.VIEWING;
         phaseDeadlineTick = tick + GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_DEFAULT_VIEW_SECONDS", SpeedBuildersRules.DEFAULT_VIEW_SECONDS) * 20L;
 
@@ -897,9 +896,9 @@ public final class SpeedBuildersGame implements Listener {
         Bukkit.broadcastMessage(ChatColor.YELLOW + "Round " + round + "/" + matchRoundLimit
                 + " complete. Scores are calculated automatically; every builder remains in the game.");
         phase = round >= matchRoundLimit ? Phase.RESULTS : Phase.INTERMISSION;
-        phaseDeadlineTick = tick + (phase == Phase.RESULTS
-                ? FINAL_RESULTS_SECONDS * 20L
-                : GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_INTERMISSION_SECONDS", SpeedBuildersRules.INTERMISSION_SECONDS) * 20L);
+        phaseDeadlineTick = tick + SpeedBuildersRules.intermissionOrResultsTicks(phase == Phase.RESULTS,
+                GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_INTERMISSION_SECONDS",
+                        SpeedBuildersRules.INTERMISSION_SECONDS));
         refreshHud();
     }
 
@@ -913,15 +912,16 @@ public final class SpeedBuildersGame implements Listener {
         }
         Map<String, Integer> totals = new LinkedHashMap<>();
         Map<String, Long> eligibleBuildTimes = new LinkedHashMap<>();
+        boolean timeTiebreakEnabled = SpeedBuildersRules.perfectBuildTimeTiebreakEnabled();
         for (PlayerState state : builders) {
             String id = state.player.getUniqueId().toString();
             totals.put(id, state.totalPoints);
-            if (state.perfectedEveryBuild && state.perfectBuilds == matchRoundLimit) {
+            if (timeTiebreakEnabled && state.perfectedEveryBuild && state.perfectBuilds == matchRoundLimit) {
                 eligibleBuildTimes.put(id, state.totalBuildTimeTicks);
             }
         }
         Set<String> winnerIds = new LinkedHashSet<>(
-                SpeedBuildersRules.winnersByScoreThenBuildTime(totals, eligibleBuildTimes));
+                SpeedBuildersRules.winnersByConfiguredTieBreak(totals, eligibleBuildTimes));
         List<PlayerState> winners = builders.stream()
                 .filter(state -> winnerIds.contains(state.player.getUniqueId().toString()))
                 .sorted(java.util.Comparator.comparing(state -> state.player.getName(),
@@ -929,23 +929,27 @@ public final class SpeedBuildersGame implements Listener {
                 .toList();
         String scoreboard = builders.stream()
                 .sorted(java.util.Comparator.comparingInt((PlayerState state) -> state.totalPoints).reversed()
-                        .thenComparing((PlayerState state) ->
-                                !(state.perfectedEveryBuild && state.perfectBuilds == matchRoundLimit))
-                        .thenComparingLong(state -> state.perfectedEveryBuild
+                        .thenComparing(state -> timeTiebreakEnabled
+                                && !(state.perfectedEveryBuild && state.perfectBuilds == matchRoundLimit))
+                        .thenComparingLong(state -> timeTiebreakEnabled && state.perfectedEveryBuild
                                 && state.perfectBuilds == matchRoundLimit
                                 ? state.totalBuildTimeTicks : Long.MAX_VALUE)
                         .thenComparing(state -> state.player.getName(), String.CASE_INSENSITIVE_ORDER))
                 .map(state -> {
                     String result = state.player.getName() + " " + state.totalPoints + " pts";
-                    if (state.perfectedEveryBuild && state.perfectBuilds == matchRoundLimit) {
+                    if (timeTiebreakEnabled && state.perfectedEveryBuild && state.perfectBuilds == matchRoundLimit) {
                         result += " / " + formatBuildTime(state.totalBuildTimeTicks);
                     }
                     return result;
                 })
                 .collect(java.util.stream.Collectors.joining(ChatColor.GRAY + " · " + ChatColor.WHITE));
-        Bukkit.broadcastMessage(ChatColor.GOLD + "Final Speed Builders scores (build time shown only for players who perfected every build): "
+        Bukkit.broadcastMessage(ChatColor.GOLD + (timeTiebreakEnabled
+                ? "Final Speed Builders scores (build time shown only for players who perfected every build): "
+                : "Final Speed Builders scores (accuracy only): ")
                 + ChatColor.WHITE + scoreboard);
-        finishMatchWithWinners(winners, "Highest cumulative accuracy; only players who perfected every build qualify for the cumulative-time tie-break.");
+        finishMatchWithWinners(winners, timeTiebreakEnabled
+                ? "Highest cumulative accuracy; only players who perfected every build qualify for the cumulative-time tie-break."
+                : "Highest cumulative accuracy; build-time tie-break is disabled.");
     }
 
     private String formatBuildTime(long ticks) {
@@ -1359,12 +1363,19 @@ public final class SpeedBuildersGame implements Listener {
         PlayerState state = players.get(event.getPlayer().getUniqueId());
         if (state == null || (phase != Phase.BUILDING && phase != Phase.VIEWING)
                 || state.perfect) return;
+        if (!SpeedBuildersRules.doubleJumpEnabled()) {
+            event.setCancelled(true);
+            event.getPlayer().setAllowFlight(false);
+            event.getPlayer().setFlying(false);
+            return;
+        }
         event.setCancelled(true);
         Player player = event.getPlayer();
         player.setAllowFlight(false);
         player.setFlying(false);
         player.playSound(player.getEyeLocation(), org.bukkit.Sound.ENTITY_GHAST_SHOOT, 1.0F, 1.0F);
-        player.setVelocity(new org.bukkit.util.Vector(0.0D, 1.0D, 0.0D));
+        player.setVelocity(new org.bukkit.util.Vector(0.0D,
+                SpeedBuildersRules.doubleJumpVerticalVelocity(), 0.0D));
     }
 
     private boolean isWithinPlot(Plot plot, Block block) {
@@ -1579,7 +1590,7 @@ public final class SpeedBuildersGame implements Listener {
     private void checkPerfectBuild(PlayerState state) {
         if (phase != Phase.BUILDING || state.perfect || !state.player.isOnline()) return;
         int score = score(state);
-        if (score == currentTemplate.expectedScore()) {
+        if (SpeedBuildersRules.meetsPerfectScore(score, currentTemplate.expectedScore())) {
             markPerfectBuild(state);
             if (activePlayers().stream().allMatch(player -> player.perfect)) finishBuildingPhase();
         }

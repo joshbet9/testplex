@@ -763,6 +763,19 @@ class GameDebugVariableCatalogTest {
         assertNotNull(perfect);
         assertEquals(1.0D, perfect.minimum());
         assertEquals(100.0D, perfect.maximum());
+        assertGameRange(ArcadePortGame.SPEED_BUILDERS,
+                "SPEED_BUILDERS_BUILD_TIME_DECREASE_PER_ROUND_SECONDS", 0.0D, 30.0D);
+        assertGameRange(ArcadePortGame.SPEED_BUILDERS, "SPEED_BUILDERS_FINAL_RESULTS_SECONDS", 0.0D, 60.0D);
+        assertGameRange(ArcadePortGame.SPEED_BUILDERS,
+                "SPEED_BUILDERS_DOUBLE_JUMP_VERTICAL_VELOCITY", 0.1D, 2.5D);
+        assertNotNull(GameDebugVariableCatalog.variable(ArcadePortGame.SPEED_BUILDERS,
+                "SPEED_BUILDERS_PERFECT_BUILD_TIME_TIEBREAK_ENABLED"));
+        assertTrue(GameDebugVariableCatalog.appliesImmediately(GameDebugVariableCatalog.variable(
+                ArcadePortGame.SPEED_BUILDERS, "SPEED_BUILDERS_DOUBLE_JUMP_ENABLED")));
+        assertTrue(GameDebugVariableCatalog.appliesImmediately(GameDebugVariableCatalog.variable(
+                ArcadePortGame.SPEED_BUILDERS, "SPEED_BUILDERS_PERFECT_BUILD_TIME_TIEBREAK_ENABLED")));
+        assertFalse(GameDebugVariableCatalog.appliesImmediately(GameDebugVariableCatalog.variable(
+                ArcadePortGame.SPEED_BUILDERS, "SPEED_BUILDERS_BUILD_TIME_DECREASE_PER_ROUND_SECONDS")));
     }
 
     @Test

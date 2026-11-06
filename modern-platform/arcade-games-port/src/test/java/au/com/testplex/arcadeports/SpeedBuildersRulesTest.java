@@ -93,6 +93,46 @@ class SpeedBuildersRulesTest {
     }
 
     @Test
+    void profileControlsTuneDifficultyPhaseTimingTieBreakAndDoubleJumpThenReset() {
+        assertEquals(1, SpeedBuildersRules.buildTimeDecreasePerRoundSeconds());
+        assertEquals(39, SpeedBuildersRules.nextBuildTimeTracker(40));
+        assertEquals(5, SpeedBuildersRules.finalResultsSeconds());
+        assertEquals(100L, SpeedBuildersRules.intermissionOrResultsTicks(true, 3));
+        assertEquals(60L, SpeedBuildersRules.intermissionOrResultsTicks(false, 3));
+        assertTrue(SpeedBuildersRules.perfectBuildTimeTiebreakEnabled());
+        assertTrue(SpeedBuildersRules.doubleJumpEnabled());
+        assertEquals(1.0D, SpeedBuildersRules.doubleJumpVerticalVelocity());
+
+        Map<String, Integer> tiedScores = Map.of("fast", 100, "slow", 100);
+        Map<String, Long> times = Map.of("fast", 20L, "slow", 40L);
+        assertEquals(List.of("fast"), SpeedBuildersRules.winnersByConfiguredTieBreak(tiedScores, times));
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "SPEED_BUILDERS_BUILD_TIME_DECREASE_PER_ROUND_SECONDS", 3,
+                "SPEED_BUILDERS_FINAL_RESULTS_SECONDS", 0,
+                "SPEED_BUILDERS_PERFECT_BUILD_TIME_TIEBREAK_ENABLED", false,
+                "SPEED_BUILDERS_DOUBLE_JUMP_ENABLED", false,
+                "SPEED_BUILDERS_DOUBLE_JUMP_VERTICAL_VELOCITY", 2.0D));
+        assertEquals(3, SpeedBuildersRules.buildTimeDecreasePerRoundSeconds());
+        assertEquals(37, SpeedBuildersRules.nextBuildTimeTracker(40));
+        assertEquals(0, SpeedBuildersRules.finalResultsSeconds());
+        assertEquals(0L, SpeedBuildersRules.intermissionOrResultsTicks(true, 3));
+        assertFalse(SpeedBuildersRules.perfectBuildTimeTiebreakEnabled());
+        assertFalse(SpeedBuildersRules.doubleJumpEnabled());
+        assertEquals(2.0D, SpeedBuildersRules.doubleJumpVerticalVelocity());
+        assertEquals(List.of("fast", "slow"), SpeedBuildersRules.winnersByConfiguredTieBreak(tiedScores, times));
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertEquals(1, SpeedBuildersRules.buildTimeDecreasePerRoundSeconds());
+        assertEquals(39, SpeedBuildersRules.nextBuildTimeTracker(40));
+        assertEquals(5, SpeedBuildersRules.finalResultsSeconds());
+        assertEquals(100L, SpeedBuildersRules.intermissionOrResultsTicks(true, 3));
+        assertTrue(SpeedBuildersRules.perfectBuildTimeTiebreakEnabled());
+        assertTrue(SpeedBuildersRules.doubleJumpEnabled());
+        assertEquals(1.0D, SpeedBuildersRules.doubleJumpVerticalVelocity());
+    }
+
+    @Test
     void templateCellsCannotEscapeTheSevenBlockBuildVolume() {
         assertThrows(IllegalArgumentException.class,
                 () -> new SpeedBuildersRules.Cell(7, 0, 0, Material.STONE));
