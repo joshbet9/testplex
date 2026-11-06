@@ -3975,7 +3975,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         for (Player player : activeMatchPlayers()) {
             UUID id = player.getUniqueId();
             if (teams.getOrDefault(id, -1) != winningTeam) continue;
-            if (plugin.isTestPlayer(player)) continue;
+            if (isTestPlayer(player)) continue;
             Set<String> finalHits = heroesOfGwenFinalObjectiveHits.getOrDefault(id, Set.of());
             long towerFinalHits = finalHits.stream().filter(value -> value.startsWith("tower:")).distinct().count();
             boolean finalBossHit = finalHits.stream().anyMatch(value -> value.startsWith("boss:"));
@@ -4008,8 +4008,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         hooks.finish(firstPlayerOnTeam(winningTeam), winningTeam, reason == null ? "Heroes of Gwen finished" : reason);
     }
 
+    private boolean isTestPlayer(Player player) {
+        return plugin instanceof ArcadeMechanicsModernPlugin modern && modern.isTestPlayer(player);
+    }
+
     private void awardHeroesOfGwenAchievement(Player player, String achievementId) {
-        if (player == null || plugin.isTestPlayer(player) || achievementId == null || achievementId.isBlank()) return;
+        if (player == null || isTestPlayer(player) || achievementId == null || achievementId.isBlank()) return;
         UUID playerId = player.getUniqueId();
         String key = "local-achievements." + playerId + ".heroes-of-gwen." + achievementId;
         if (plugin.getConfig().getBoolean(key, false)) return;

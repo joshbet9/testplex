@@ -652,13 +652,10 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     it = item(choice.icon, ChatColor.YELLOW + choice.name,
                             ChatColor.GRAY + "Choose this kit for your next Snap round.",
                             selected ? ChatColor.GOLD + "Currently selected" : ChatColor.GREEN + "Click to select");
-                } else if (choice.unlock == ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT
-                        && ArcadePortManager.achievementKitUnlock(selectedGame, choice.id) != null) {
-                    String achievement = ArcadePortManager.achievementKitUnlock(selectedGame, choice.id);
-                    boolean unlocked = plugin.getConfig().getBoolean("local-achievements."
-                            + p.getUniqueId() + "." + selectedGame.id() + "." + achievement, false);
+                } else if (choice.unlock == ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT) {
+                    boolean unlocked = manager.hasAchievementKitUnlocked(p.getUniqueId(), selectedGame, choice.id);
                     it = item(choice.icon, ChatColor.YELLOW + choice.name,
-                            ChatColor.GRAY + "Unlock with " + ArcadePortManager.titleCaseAchievement(achievement) + ".",
+                            ChatColor.GRAY + manager.achievementKitUnlockDescription(selectedGame, choice.id),
                             ChatColor.GRAY + achievementKitSummary(choice.id),
                             unlocked ? ChatColor.GREEN + "Click to select" : ChatColor.RED + "Locked");
                 } else {
