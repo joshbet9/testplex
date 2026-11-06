@@ -52,6 +52,7 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DEATH_TAG), "DEATH_TAG_CHASER_DAMAGE");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DEATH_TAG), "DEATH_TAG_ALPHA_CHASER_DAMAGE");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DEATH_TAG), "DEATH_TAG_RUNNER_BASHER_DAMAGE");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DEATH_TAG), "DEATH_TAG_RUNNER_KILL_REWARD_GEMS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DEATH_TAG), "DEATH_TAG_IRON_SKIN_DAMAGE_REDUCTION");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DEATH_TAG), "DEATH_TAG_MELEE_KNOCKBACK_HORIZONTAL");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.CAMERA_SHY), "CAMERA_SHY_MATCH_SECONDS");
@@ -139,6 +140,11 @@ class GameDebugVariableCatalogTest {
         assertGameRange(ArcadePortGame.HEROES_OF_GWEN, "HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE", 0.0D, 40.0D);
         assertGameRange(ArcadePortGame.HEROES_OF_GWEN, "HEROES_OF_GWEN_DEVON_TNT_BOW_BASE_DAMAGE", 0.0D, 100.0D);
         assertGameRange(ArcadePortGame.HEROES_OF_GWEN, "HEROES_OF_GWEN_ROWENA_BOMBARDMENT_DAMAGE_FACTOR", 0.0D, 8.0D);
+    }
+
+    @Test
+    void deathTagKillRewardSliderHasBoundedValues() {
+        assertGameRange(ArcadePortGame.DEATH_TAG, "DEATH_TAG_RUNNER_KILL_REWARD_GEMS", 0.0D, 64.0D);
     }
 
     private static void assertRange(String key, double minimum, double maximum) {

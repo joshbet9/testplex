@@ -3062,7 +3062,8 @@ public final class ArcadePortRules {
 
     /** Source DeathTag.GetKillsGems pays for a Runner kill, never for a Chaser kill. */
     public static int deathTagKillRewardGems(boolean killedRunner) {
-        return killedRunner ? DEATH_TAG_RUNNER_KILL_REWARD_GEMS : 0;
+        return killedRunner ? Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "DEATH_TAG_RUNNER_KILL_REWARD_GEMS", DEATH_TAG_RUNNER_KILL_REWARD_GEMS)) : 0;
     }
 
     /** The source Death Tag game only awards winning placement to surviving Runners. */

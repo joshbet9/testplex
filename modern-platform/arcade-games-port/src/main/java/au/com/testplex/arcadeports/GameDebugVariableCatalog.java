@@ -219,6 +219,7 @@ final class GameDebugVariableCatalog {
         if (name.equals("CASTLE_ASSAULT_TNT_THROW_SPEED")
                 || name.equals("CASTLE_ASSAULT_TNT_THROW_VERTICAL_SPEED")) return 0.0D;
         if (name.equals("PAINTBALL_SHOTGUN_PELLETS")) return 1.0D;
+        if (name.equals("DEATH_TAG_RUNNER_KILL_REWARD_GEMS")) return 0.0D;
         if (name.startsWith("GLADIATOR_TIER_") && name.endsWith("_ARROWS")) return 0.0D;
         if (name.equals("GLADIATOR_POTION_HEALING")
                 || name.equals("GLADIATOR_MELEE_KNOCKBACK_HORIZONTAL")
@@ -416,6 +417,7 @@ final class GameDebugVariableCatalog {
         if (name.equals("METAL_MAGNET_PULL_BASE")) return 4.0D;
         if (name.equals("METAL_MAGNET_PULL_PER_ARMOR")) return 2.0D;
         if (name.equals("PAINTBALL_SHOTGUN_PELLETS")) return 32.0D;
+        if (name.equals("DEATH_TAG_RUNNER_KILL_REWARD_GEMS")) return 64.0D;
         if (name.endsWith("_PAINT_PER_HIT") || name.endsWith("_SNIPER_BASE_PAINT")
                 || name.endsWith("_SNIPER_MAX_EXTRA_PAINT")) return 4.0D;
         if (name.endsWith("_SPREAD")) return 1.0D;
