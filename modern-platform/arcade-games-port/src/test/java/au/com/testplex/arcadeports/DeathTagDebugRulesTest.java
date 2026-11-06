@@ -15,6 +15,34 @@ class DeathTagDebugRulesTest {
     }
 
     @Test
+    void turtleAndTricksterTuningChangesAbilitiesAndResetsToSourceDefaults() {
+        assertEquals(5_000L, ArcadePortRules.deathTagTurtleStackResetMillis());
+        assertEquals(3, ArcadePortRules.deathTagTurtleMaxStacks());
+        assertEquals(60L, ArcadePortRules.deathTagTurtleEffectDurationTicks());
+        assertEquals(3, ArcadePortRules.deathTagTurtleHitsPerWindCharge());
+        assertEquals(30_000L, ArcadePortRules.deathTagTricksterFireworksCooldownMillis());
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "DEATH_TAG_TURTLE_STACK_RESET_MILLIS", 8_000L,
+                "DEATH_TAG_TURTLE_MAX_STACKS", 5,
+                "DEATH_TAG_TURTLE_EFFECT_DURATION_TICKS", 100L,
+                "DEATH_TAG_TURTLE_HITS_PER_WIND_CHARGE", 2,
+                "DEATH_TAG_TRICKSTER_FIREWORKS_COOLDOWN_MILLIS", 12_000L));
+        assertEquals(8_000L, ArcadePortRules.deathTagTurtleStackResetMillis());
+        assertEquals(5, ArcadePortRules.deathTagTurtleMaxStacks());
+        assertEquals(100L, ArcadePortRules.deathTagTurtleEffectDurationTicks());
+        assertEquals(2, ArcadePortRules.deathTagTurtleHitsPerWindCharge());
+        assertEquals(12_000L, ArcadePortRules.deathTagTricksterFireworksCooldownMillis());
+
+        GameDebugRuntimeOverrides.clear();
+        assertEquals(5_000L, ArcadePortRules.deathTagTurtleStackResetMillis());
+        assertEquals(3, ArcadePortRules.deathTagTurtleMaxStacks());
+        assertEquals(60L, ArcadePortRules.deathTagTurtleEffectDurationTicks());
+        assertEquals(3, ArcadePortRules.deathTagTurtleHitsPerWindCharge());
+        assertEquals(30_000L, ArcadePortRules.deathTagTricksterFireworksCooldownMillis());
+    }
+
+    @Test
     void runnerDamageAndIronSkinReductionAreProfileBacked() {
         assertEquals(6.0D, ArcadePortRules.deathTagRunnerDamage("basher", false));
         assertEquals(6.0D, ArcadePortRules.deathTagRunnerDamage("traitor", false));

@@ -8019,12 +8019,15 @@ public final class ArcadePortManager implements Listener {
 
         long now = System.currentTimeMillis();
         long lastHit = session.deathTagTurtleLastHitAt.getOrDefault(chaserId, 0L);
-        int stack = now - lastHit > 5_000L ? 1
-                : Math.min(3, session.deathTagTurtleStacksByChaser.getOrDefault(chaserId, 0) + 1);
+        long stackResetMillis = ArcadePortRules.deathTagTurtleStackResetMillis();
+        int stack = now - lastHit > stackResetMillis ? 1
+                : Math.min(ArcadePortRules.deathTagTurtleMaxStacks(),
+                        session.deathTagTurtleStacksByChaser.getOrDefault(chaserId, 0) + 1);
         session.deathTagTurtleStacksByChaser.put(chaserId, stack);
         session.deathTagTurtleLastHitAt.put(chaserId, now);
-        chaser.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60, stack - 1, false, true, true), true);
-        chaser.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, 60, stack - 1, false, true, true), true);
+        long effectTicks = ArcadePortRules.deathTagTurtleEffectDurationTicks();
+        chaser.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, (int) effectTicks, stack - 1, false, true, true), true);
+        chaser.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, (int) effectTicks, stack - 1, false, true, true), true);
         Mob disguise = session.deathTagDisguises.get(chaserId);
         if (disguise != null && disguise.isValid() && disguise.getEquipment() != null) {
             disguise.getEquipment().setHelmet(new ItemStack(Material.TURTLE_HELMET));
@@ -8034,12 +8037,13 @@ public final class ArcadePortManager implements Listener {
                         || session.deathTagTurtleLastHitAt.getOrDefault(chaserId, 0L) != now) return;
                 var equipment = disguise.getEquipment();
                 if (equipment != null) equipment.setHelmet(null);
-            }, 60L);
+            }, effectTicks);
         }
         runner.playSound(runner.getLocation(), Sound.ITEM_ARMOR_EQUIP_TURTLE, 0.8F, 1.2F);
         int charges = session.deathTagTurtleWindCharges.merge(runnerId, 1, Integer::sum);
-        if (charges >= 3) {
-            session.deathTagTurtleWindCharges.put(runnerId, charges - 3);
+        int hitsPerWindCharge = ArcadePortRules.deathTagTurtleHitsPerWindCharge();
+        if (charges >= hitsPerWindCharge) {
+            session.deathTagTurtleWindCharges.put(runnerId, charges - hitsPerWindCharge);
             ItemStack windCharge = namedItem(Material.WIND_CHARGE, "Turtle Wind Charge",
                     "Hit Chasers to earn more charges.");
             Map<Integer, ItemStack> overflow = runner.getInventory().addItem(windCharge);
@@ -8109,8 +8113,9 @@ public final class ArcadePortManager implements Listener {
             firework.setFireworkMeta(meta);
             launched++;
         }
-        session.deathTagTricksterFireworksReadyAt.put(id, now + 30_000L);
-        cooldownProgress.start(runner, "Runner Distraction", 30_000L);
+        long cooldownMillis = ArcadePortRules.deathTagTricksterFireworksCooldownMillis();
+        session.deathTagTricksterFireworksReadyAt.put(id, now + cooldownMillis);
+        cooldownProgress.start(runner, "Runner Distraction", cooldownMillis);
         runner.sendMessage(ChatColor.LIGHT_PURPLE + "Runner Distraction set off " + launched + " fireworks.");
         runner.getWorld().playSound(runner.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 0.9F, 1.25F);
     }

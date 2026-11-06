@@ -201,6 +201,11 @@ public final class ArcadePortRules {
     public static final double DEATH_TAG_MELEE_KNOCKBACK_VERTICAL = 0.36D;
     public static final double DEATH_TAG_TRAITOR_KNOCKBACK_HORIZONTAL = 0.8D;
     public static final double DEATH_TAG_TRAITOR_KNOCKBACK_VERTICAL = 0.1D;
+    public static final long DEATH_TAG_TURTLE_STACK_RESET_MILLIS = 5_000L;
+    public static final int DEATH_TAG_TURTLE_MAX_STACKS = 3;
+    public static final long DEATH_TAG_TURTLE_EFFECT_DURATION_TICKS = 60L;
+    public static final int DEATH_TAG_TURTLE_HITS_PER_WIND_CHARGE = 3;
+    public static final long DEATH_TAG_TRICKSTER_FIREWORKS_COOLDOWN_MILLIS = 30_000L;
     public static final int EVOLUTION_WIN_LEVEL = 5;
     public static final double DRAGON_ESCAPE_FINISH_X = 0.5D;
     public static final double DRAGON_ESCAPE_FINISH_Y = 64.0D;
@@ -3091,6 +3096,32 @@ public final class ArcadePortRules {
         long cooldown = Math.max(0L, GameDebugRuntimeOverrides.longValue(
                 "DEATH_TAG_TRAITOR_KNOCKBACK_COOLDOWN_MILLIS", DEATH_TAG_TRAITOR_KNOCKBACK_COOLDOWN_MILLIS));
         return lastUseMillis <= 0L || nowMillis - lastUseMillis >= cooldown;
+    }
+
+    public static long deathTagTurtleStackResetMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue("DEATH_TAG_TURTLE_STACK_RESET_MILLIS",
+                DEATH_TAG_TURTLE_STACK_RESET_MILLIS));
+    }
+
+    public static int deathTagTurtleMaxStacks() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue("DEATH_TAG_TURTLE_MAX_STACKS",
+                DEATH_TAG_TURTLE_MAX_STACKS));
+    }
+
+    public static long deathTagTurtleEffectDurationTicks() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue("DEATH_TAG_TURTLE_EFFECT_DURATION_TICKS",
+                DEATH_TAG_TURTLE_EFFECT_DURATION_TICKS));
+    }
+
+    public static int deathTagTurtleHitsPerWindCharge() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue("DEATH_TAG_TURTLE_HITS_PER_WIND_CHARGE",
+                DEATH_TAG_TURTLE_HITS_PER_WIND_CHARGE));
+    }
+
+    public static long deathTagTricksterFireworksCooldownMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "DEATH_TAG_TRICKSTER_FIREWORKS_COOLDOWN_MILLIS",
+                DEATH_TAG_TRICKSTER_FIREWORKS_COOLDOWN_MILLIS));
     }
 
     /**

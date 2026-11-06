@@ -153,6 +153,15 @@ class GameDebugVariableCatalogTest {
         assertGameRange(ArcadePortGame.DEATH_TAG, "DEATH_TAG_RUNNER_KILL_REWARD_GEMS", 0.0D, 64.0D);
     }
 
+    @Test
+    void deathTagTurtleAndTricksterControlsHaveBoundedRanges() {
+        assertGameRange(ArcadePortGame.DEATH_TAG, "DEATH_TAG_TURTLE_STACK_RESET_MILLIS", 0.0D, 600_000.0D);
+        assertGameRange(ArcadePortGame.DEATH_TAG, "DEATH_TAG_TURTLE_MAX_STACKS", 1.0D, 10.0D);
+        assertGameRange(ArcadePortGame.DEATH_TAG, "DEATH_TAG_TURTLE_EFFECT_DURATION_TICKS", 1.0D, 1_200.0D);
+        assertGameRange(ArcadePortGame.DEATH_TAG, "DEATH_TAG_TURTLE_HITS_PER_WIND_CHARGE", 1.0D, 100.0D);
+        assertGameRange(ArcadePortGame.DEATH_TAG, "DEATH_TAG_TRICKSTER_FIREWORKS_COOLDOWN_MILLIS", 0.0D, 600_000.0D);
+    }
+
     private static void assertRange(String key, double minimum, double maximum) {
         assertGameRange(ArcadePortGame.TURF_WARS, key, minimum, maximum);
     }

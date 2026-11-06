@@ -233,7 +233,12 @@ final class GameDebugVariableCatalog {
         if (name.equals("CASTLE_ASSAULT_TNT_THROW_SPEED")
                 || name.equals("CASTLE_ASSAULT_TNT_THROW_VERTICAL_SPEED")) return 0.0D;
         if (name.equals("PAINTBALL_SHOTGUN_PELLETS")) return 1.0D;
-        if (name.equals("DEATH_TAG_RUNNER_KILL_REWARD_GEMS")) return 0.0D;
+        if (name.equals("DEATH_TAG_RUNNER_KILL_REWARD_GEMS")
+                || name.equals("DEATH_TAG_TURTLE_STACK_RESET_MILLIS")
+                || name.equals("DEATH_TAG_TRICKSTER_FIREWORKS_COOLDOWN_MILLIS")) return 0.0D;
+        if (name.equals("DEATH_TAG_TURTLE_MAX_STACKS")
+                || name.equals("DEATH_TAG_TURTLE_EFFECT_DURATION_TICKS")
+                || name.equals("DEATH_TAG_TURTLE_HITS_PER_WIND_CHARGE")) return 1.0D;
         if (name.startsWith("GLADIATOR_TIER_") && name.endsWith("_ARROWS")) return 0.0D;
         if (name.equals("GLADIATOR_POTION_HEALING")
                 || name.equals("GLADIATOR_MELEE_KNOCKBACK_HORIZONTAL")
@@ -368,6 +373,11 @@ final class GameDebugVariableCatalog {
         if (name.equals("HEROES_OF_GWEN_SMALL_HEALTH_POTION_HEAL_HP")
                 || name.equals("HEROES_OF_GWEN_LARGE_HEALTH_POTION_HEAL_HP")) return 40.0D;
         if (name.equals("SPLEEF_SMASHER_RADIUS_BLOCKS")) return 8.0D;
+        if (name.equals("DEATH_TAG_TURTLE_STACK_RESET_MILLIS")
+                || name.equals("DEATH_TAG_TRICKSTER_FIREWORKS_COOLDOWN_MILLIS")) return 600_000.0D;
+        if (name.equals("DEATH_TAG_TURTLE_MAX_STACKS")) return 10.0D;
+        if (name.equals("DEATH_TAG_TURTLE_EFFECT_DURATION_TICKS")) return 1_200.0D;
+        if (name.equals("DEATH_TAG_TURTLE_HITS_PER_WIND_CHARGE")) return 100.0D;
         if (Set.of("MANA_REGEN_MULTIPLIER", "PROJECTILE_SPEED_MULTIPLIER", "SPELL_COOLDOWN_MULTIPLIER",
                 "SPELL_DAMAGE_MULTIPLIER", "SPELL_HEAL_MULTIPLIER", "SPELL_MANA_COST_MULTIPLIER")
                 .contains(name)) return 5.0D;
