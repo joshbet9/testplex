@@ -699,8 +699,10 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
             // Their progress is persisted here because they are removed from states
             // before the match-wide finish pass can record it.
             state.alive = false;
-            WizardsProgressStore.increment(plugin.getConfig(), id, "kills", state.kills);
-            WizardsProgressStore.increment(plugin.getConfig(), id, "spells-bound", state.spellsBound);
+            if (!plugin.isTestPlayer(id)) {
+                WizardsProgressStore.increment(plugin.getConfig(), id, "kills", state.kills);
+                WizardsProgressStore.increment(plugin.getConfig(), id, "spells-bound", state.spellsBound);
+            }
             plugin.saveConfig();
             removeManaBar(id);
             if (arcadeManaged) plugin.returnWizardsParticipantToLobby(player);
@@ -2859,9 +2861,9 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         org.bukkit.configuration.file.FileConfiguration config = plugin.getConfig();
         for (Map.Entry<UUID, WizardState> entry : states.entrySet()) {
             WizardState state = entry.getValue();
+            if (plugin.isTestPlayer(entry.getKey())) continue;
             WizardsProgressStore.increment(config, entry.getKey(), "kills", state.kills);
             WizardsProgressStore.increment(config, entry.getKey(), "spells-bound", state.spellsBound);
-            if (plugin.isTestPlayer(entry.getKey())) continue;
             boolean won = winner != null && winner.getUniqueId().equals(entry.getKey());
             if (WizardsAchievementRules.noSpellVictory(won, state.successfulCasts)) {
                 awardWizardsAchievement(entry.getKey(), "youre-a-wizard-harry");
