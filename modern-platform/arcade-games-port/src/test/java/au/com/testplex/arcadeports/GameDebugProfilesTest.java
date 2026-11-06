@@ -48,6 +48,43 @@ class GameDebugProfilesTest {
     }
 
     @Test
+    void profileLifecycleRejectsReservedCollisionsAndCapacityAndPreservesCopiedBotSetup() {
+        GameDebugProfiles profiles = new GameDebugProfiles(directory.resolve("profile-edge-cases.yml").toFile(), ignored -> { });
+        UUID tester = UUID.randomUUID();
+        ArcadePortGame game = ArcadePortGame.PLEXBALL;
+
+        assertNull(profiles.create(tester, game, ""));
+        assertNull(profiles.create(tester, game, GameDebugProfiles.DEFAULT_PROFILE));
+        assertNull(profiles.renameSelected(tester, game, "renamed-default"));
+        assertEquals("flight-check", profiles.create(tester, game, "Flight Check"));
+        profiles.setVariable(tester, game, "PLEXBALL_BALL_MAX_FLIGHT_TICKS", 120.0D);
+        profiles.setFeature(tester, game, "batting", false);
+        profiles.setTestBotCount(tester, game, 4);
+        profiles.setTestBotTeam(tester, game, 0, 1);
+        profiles.setTestBotKit(tester, game, 0, "slugger");
+        profiles.setTestBotCosmetic(tester, game, 0, "impact-effects", "prism");
+
+        assertNull(profiles.duplicate(tester, game, "Flight Check"));
+        assertEquals("flight-check-copy", profiles.duplicate(tester, game, "Flight Check Copy"));
+        assertEquals(120.0D, profiles.variable(tester, game, "PLEXBALL_BALL_MAX_FLIGHT_TICKS"));
+        assertFalse(profiles.feature(tester, game, "batting", true));
+        assertEquals(4, profiles.testBotCount(tester, game, 0));
+        assertEquals(1, profiles.testBotTeam(tester, game, 0, -1));
+        assertEquals("slugger", profiles.testBotKit(tester, game, 0, ""));
+        assertEquals("prism", profiles.testBotCosmetic(tester, game, 0, "impact-effects", ""));
+
+        assertTrue(profiles.delete(tester, game, "flight-check-copy"));
+        assertEquals(GameDebugProfiles.DEFAULT_PROFILE, profiles.selected(tester, game));
+        assertFalse(profiles.delete(tester, game, GameDebugProfiles.DEFAULT_PROFILE));
+
+        for (int index = 0; index < 10; index++) {
+            assertNotNull(profiles.create(tester, game, "profile-" + index));
+        }
+        assertEquals(12, profiles.profiles(tester, game).size());
+        assertNull(profiles.create(tester, game, "too-many"));
+    }
+
+    @Test
     void profileValuesBotLoadoutsAndResetAreIsolatedBetweenTestersAndGames() {
         GameDebugProfiles profiles = new GameDebugProfiles(directory.resolve("tester-isolation.yml").toFile(), ignored -> { });
         UUID firstTester = UUID.randomUUID();

@@ -7,6 +7,7 @@ This checklist tracks implemented controls, not menu/catalog presence alone. A g
 - [x] Debug access uses the existing authorised admin/tester check.
 - [x] Profiles and test-bot loadouts are stored separately in `debug-profiles.yml`, outside normal game settings and player stats.
 - [x] Named profiles support create, duplicate, rename, load, save and delete; the default profile cannot be deleted.
+- [x] Profile lifecycle edge tests reject blank/reserved/duplicate names and profile-cap overflow, prevent renaming or deleting Default, return to Default when deleting the selected profile, and verify duplicated profiles preserve variables, feature switches and complete bot loadouts.
 - [x] Automated coverage saves an isolated bot count, team, kit and cosmetic selection for every game and verifies new named profiles do not inherit another profile's roster.
 - [x] Automated coverage verifies common feature switches persist, reset and remain isolated across profiles for every game.
 - [x] Reset to Defaults removes only the selected profile's overrides.
