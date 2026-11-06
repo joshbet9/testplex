@@ -32,6 +32,7 @@ final class EvolutionDebugRulesTest {
         assertEquals(0.012D, ArcadePortRules.evolutionChargePerTick(1));
         assertEquals(0.018D, ArcadePortRules.evolutionChargePerTick(3), 0.0000001D);
         assertEquals(2, ArcadePortRules.evolutionOverkillKillsRequired());
+        assertEquals(2.0D, ArcadePortRules.evolutionEggDamage());
     }
 
     @Test void profileOverridesChangeFormCombatChargeAndOverkillProgressionThenReset() {
@@ -42,13 +43,15 @@ final class EvolutionDebugRulesTest {
                 "EVOLUTION_CHARGE_BASE_PER_TICK", 0.02D,
                 "EVOLUTION_CHARGE_PER_EXTRA_KILL", 0.005D,
                 "EVOLUTION_CHARGE_MAX_PER_TICK", 0.04D,
-                "EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION", 3));
+                "EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION", 3,
+                "EVOLUTION_EGG_DAMAGE", 5.0D));
 
         assertEquals(50.0D, ArcadePortRules.evolutionMaxHealth(0));
         assertEquals(9.0D, ArcadePortRules.evolutionMeleeDamage(1));
         assertEquals(0.75D, ArcadePortRules.evolutionFallDamageMultiplier(1));
         assertEquals(0.03D, ArcadePortRules.evolutionChargePerTick(3));
         assertEquals(3, ArcadePortRules.evolutionOverkillKillsRequired());
+        assertEquals(5.0D, ArcadePortRules.evolutionEggDamage());
         assertEquals(3, ArcadePortRules.nextEvolutionOverkillKillCount(2));
         assertTrue(ArcadePortRules.evolutionOverkillRequirementMet(3));
         assertFalse(ArcadePortRules.evolutionOverkillRequirementMet(2));
@@ -60,6 +63,7 @@ final class EvolutionDebugRulesTest {
         assertEquals(0.018D, ArcadePortRules.evolutionChargePerTick(3), 0.0000001D);
         assertEquals(2, ArcadePortRules.nextEvolutionOverkillKillCount(9));
         assertEquals(2, ArcadePortRules.evolutionOverkillKillsRequired());
+        assertEquals(2.0D, ArcadePortRules.evolutionEggDamage());
         assertTrue(GameDebugRuntimeOverrides.isDebugSession());
     }
 
@@ -70,9 +74,12 @@ final class EvolutionDebugRulesTest {
                 ArcadePortGame.EVOLUTION, "EVOLUTION_BLAZE_FALL_DAMAGE_MULTIPLIER");
         GameDebugVariableCatalog.Variable charge = GameDebugVariableCatalog.variable(
                 ArcadePortGame.EVOLUTION, "EVOLUTION_CHARGE_BASE_PER_TICK");
+        GameDebugVariableCatalog.Variable eggDamage = GameDebugVariableCatalog.variable(
+                ArcadePortGame.EVOLUTION, "EVOLUTION_EGG_DAMAGE");
         assertNotNull(health);
         assertNotNull(fall);
         assertNotNull(charge);
+        assertNotNull(eggDamage);
         assertEquals(1.0D, health.minimum());
         assertEquals(80.0D, health.maximum());
         assertEquals(0.0D, fall.minimum());

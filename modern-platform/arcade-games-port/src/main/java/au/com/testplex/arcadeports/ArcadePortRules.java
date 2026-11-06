@@ -1753,6 +1753,11 @@ public final class ArcadePortRules {
     public static final double EVOLUTION_CHICKEN_DOUBLE_JUMP_HORIZONTAL = 0.6D;
     public static final double EVOLUTION_CHICKEN_DOUBLE_JUMP_VERTICAL = 0.6D;
     public static final double EVOLUTION_EGG_DAMAGE = 2.0D;
+
+    public static double evolutionEggDamage() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "EVOLUTION_EGG_DAMAGE", EVOLUTION_EGG_DAMAGE));
+    }
     public static final long EVOLUTION_SULPHUR_BOMB_COOLDOWN_MILLIS = 3_000L;
     public static final double EVOLUTION_SULPHUR_BOMB_SPEED = 1.2D;
     public static final double EVOLUTION_SULPHUR_BOMB_RADIUS = 2.5D;

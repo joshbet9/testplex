@@ -24069,6 +24069,16 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.EVOLUTION
                 && event.getEntity() instanceof Player evolutionPlayer
                 && session.alive.contains(evolutionPlayer.getUniqueId())) {
+            if (event instanceof EntityDamageByEntityEvent eggDamage
+                    && eggDamage.getDamager() instanceof Egg egg
+                    && egg.getShooter() instanceof Player chicken
+                    && !chicken.getUniqueId().equals(evolutionPlayer.getUniqueId())
+                    && session.alive.contains(chicken.getUniqueId())
+                    && session.evolutionLevels.getOrDefault(chicken.getUniqueId(), 0) == 4) {
+                // The source Chicken kit adds two damage to its egg hits. The profile
+                // value keeps that behavior adjustable for authorized test sessions.
+                eggDamage.setDamage(ArcadePortRules.evolutionEggDamage());
+            }
             if (session.evolutionCharge.containsKey(evolutionPlayer.getUniqueId())) {
                 session.evolutionDamageWhileCharging.add(evolutionPlayer.getUniqueId());
             }
