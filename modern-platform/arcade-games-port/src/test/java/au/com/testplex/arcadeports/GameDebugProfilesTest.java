@@ -48,6 +48,44 @@ class GameDebugProfilesTest {
     }
 
     @Test
+    void profileValuesBotLoadoutsAndResetAreIsolatedBetweenTestersAndGames() {
+        GameDebugProfiles profiles = new GameDebugProfiles(directory.resolve("tester-isolation.yml").toFile(), ignored -> { });
+        UUID firstTester = UUID.randomUUID();
+        UUID secondTester = UUID.randomUUID();
+
+        profiles.setVariable(firstTester, ArcadePortGame.BACON_BRAWL, "BACON_1_8_HIT_DELAY_MILLIS", 200.0D);
+        profiles.setTestBotCount(firstTester, ArcadePortGame.BACON_BRAWL, 5);
+        profiles.setTestBotKit(firstTester, ArcadePortGame.BACON_BRAWL, 0, "mama-piggles");
+        assertEquals("experiment", profiles.create(firstTester, ArcadePortGame.BACON_BRAWL, "experiment"));
+        profiles.setVariable(firstTester, ArcadePortGame.BACON_BRAWL, "BACON_1_8_HIT_DELAY_MILLIS", 100.0D);
+        profiles.setTestBotCount(firstTester, ArcadePortGame.BACON_BRAWL, 2);
+        assertEquals("experiment", profiles.create(secondTester, ArcadePortGame.BACON_BRAWL, "experiment"));
+        profiles.setVariable(secondTester, ArcadePortGame.BACON_BRAWL, "BACON_1_8_HIT_DELAY_MILLIS", 300.0D);
+        profiles.setTestBotCount(secondTester, ArcadePortGame.BACON_BRAWL, 3);
+
+        assertEquals(100.0D, profiles.variable(firstTester, ArcadePortGame.BACON_BRAWL,
+                "BACON_1_8_HIT_DELAY_MILLIS"));
+        assertEquals(2, profiles.testBotCount(firstTester, ArcadePortGame.BACON_BRAWL, 0));
+        assertEquals(300.0D, profiles.variable(secondTester, ArcadePortGame.BACON_BRAWL,
+                "BACON_1_8_HIT_DELAY_MILLIS"));
+        assertEquals(3, profiles.testBotCount(secondTester, ArcadePortGame.BACON_BRAWL, 0));
+        assertNull(profiles.variable(firstTester, ArcadePortGame.RUNNER, "BACON_1_8_HIT_DELAY_MILLIS"));
+
+        assertTrue(profiles.select(firstTester, ArcadePortGame.BACON_BRAWL, GameDebugProfiles.DEFAULT_PROFILE));
+        assertEquals(200.0D, profiles.variable(firstTester, ArcadePortGame.BACON_BRAWL,
+                "BACON_1_8_HIT_DELAY_MILLIS"));
+        assertEquals(5, profiles.testBotCount(firstTester, ArcadePortGame.BACON_BRAWL, 0));
+        assertEquals("mama-piggles", profiles.testBotKit(firstTester, ArcadePortGame.BACON_BRAWL, 0, ""));
+        assertTrue(profiles.select(firstTester, ArcadePortGame.BACON_BRAWL, "experiment"));
+        profiles.resetSelected(firstTester, ArcadePortGame.BACON_BRAWL);
+        assertNull(profiles.variable(firstTester, ArcadePortGame.BACON_BRAWL, "BACON_1_8_HIT_DELAY_MILLIS"));
+        assertEquals(0, profiles.testBotCount(firstTester, ArcadePortGame.BACON_BRAWL, 0));
+        assertEquals(300.0D, profiles.variable(secondTester, ArcadePortGame.BACON_BRAWL,
+                "BACON_1_8_HIT_DELAY_MILLIS"));
+        assertEquals(3, profiles.testBotCount(secondTester, ArcadePortGame.BACON_BRAWL, 0));
+    }
+
+    @Test
     void resetRestoresSelectedProfileDefaultsWithoutDeletingOtherProfiles() {
         GameDebugProfiles profiles = new GameDebugProfiles(directory.resolve("profiles.yml").toFile(), ignored -> { });
         UUID tester = UUID.randomUUID();
