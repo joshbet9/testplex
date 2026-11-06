@@ -28547,13 +28547,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private long nextBombLobbersPowerupDelayMillis() {
-        // One paired Red/Blue drop wave at a uniformly random 20-100 second interval (60-second mean).
-        long minimum = Math.max(1L, GameDebugRuntimeOverrides.longValue("BOMB_LOBBERS_POWERUP_SPAWN_MIN_DELAY_MILLIS",
-                ArcadePortRules.BOMB_LOBBERS_POWERUP_SPAWN_MIN_DELAY_MILLIS));
-        long maximum = Math.max(minimum, GameDebugRuntimeOverrides.longValue("BOMB_LOBBERS_POWERUP_SPAWN_MAX_DELAY_MILLIS",
-                ArcadePortRules.BOMB_LOBBERS_POWERUP_SPAWN_MAX_DELAY_MILLIS));
-        return maximum == Long.MAX_VALUE ? minimum + ThreadLocalRandom.current().nextLong(maximum - minimum)
-                : ThreadLocalRandom.current().nextLong(minimum, maximum + 1L);
+        // The same bounded interval is used for the first wave and subsequent paired waves.
+        return ArcadePortRules.bombLobbersPowerupSpawnDelayMillis(ThreadLocalRandom.current().nextLong());
     }
 
     private void updateBombLobbersPowerups(Session session, long now) {
@@ -28756,11 +28751,12 @@ public final class ArcadePortManager implements Listener {
                 || !"speed-boost".equals(bombLobbersPowerupType(held))) return;
         activateBombLobbersPowerup(session, bombLobbersPowerupTeam(held));
         consumeHeld(player);
-        player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,
-                GameDebugRuntimeOverrides.intValue("BOMB_LOBBERS_POWERUP_SPEED_DURATION_TICKS", ArcadePortRules.BOMB_LOBBERS_POWERUP_SPEED_DURATION_TICKS), 1, false, true));
+        int speedDurationTicks = ArcadePortRules.bombLobbersPowerupSpeedDurationTicks();
+        player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, speedDurationTicks, 1, false, true));
         player.getWorld().spawnParticle(Particle.CLOUD,
                 player.getLocation().add(0.0D, 1.0D, 0.0D), 16, 0.35D, 0.5D, 0.35D, 0.04D);
-        player.sendMessage(ChatColor.GREEN + "Speed Boost! " + ChatColor.WHITE + "Speed II for 12 seconds.");
+        player.sendMessage(ChatColor.GREEN + "Speed Boost! " + ChatColor.WHITE + "Speed II for "
+                + Math.max(1, (speedDurationTicks + 19) / 20) + " seconds.");
     }
 
     private void updateBombLobbers(Session session) {
@@ -28796,7 +28792,7 @@ public final class ArcadePortManager implements Listener {
             long nextGrant = session.bombNextCraftAt.computeIfAbsent(id,
                     ignored -> ArcadePortRules.bombLobbersFirstCraftReadyAt(now));
             if (now >= nextGrant) {
-                if (inventoryCount(player, Material.TNT) < GameDebugRuntimeOverrides.intValue("BOMB_LOBBERS_MAX_CARRIED", ArcadePortRules.BOMB_LOBBERS_MAX_CARRIED)) {
+                if (ArcadePortRules.bombLobbersCanCarryMoreTnt(inventoryCount(player, Material.TNT))) {
                     player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT",
                             "Click to throw at enemy players.", 1));
                 }

@@ -61,4 +61,62 @@ class BombLobbersDebugRulesTest {
         assertEquals(4_000L, ArcadePortRules.nextBombLobbersDoubleJumpReadyAt(3_950L));
         assertFalse(ArcadePortRules.shouldAwardBombLobbersUltimateKiller(3));
     }
+
+    @Test
+    void powerupWaveScheduleUsesConfiguredInclusiveBoundsAndResets() {
+        assertEquals(20_000L, ArcadePortRules.bombLobbersPowerupSpawnDelayMillis(0L));
+        assertEquals(100_000L, ArcadePortRules.bombLobbersPowerupSpawnDelayMillis(80_000L));
+        assertEquals(100_000L, ArcadePortRules.bombLobbersPowerupSpawnDelayMillis(-1L));
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "BOMB_LOBBERS_POWERUP_SPAWN_MIN_DELAY_MILLIS", 1_000L,
+                "BOMB_LOBBERS_POWERUP_SPAWN_MAX_DELAY_MILLIS", 2_000L));
+        assertEquals(1_000L, ArcadePortRules.bombLobbersPowerupSpawnDelayMillis(0L));
+        assertEquals(2_000L, ArcadePortRules.bombLobbersPowerupSpawnDelayMillis(1_000L));
+        assertEquals(2_000L, ArcadePortRules.bombLobbersPowerupSpawnDelayMillis(-1L));
+
+        GameDebugRuntimeOverrides.clear();
+        assertEquals(20_000L, ArcadePortRules.bombLobbersPowerupSpawnDelayMillis(0L));
+        assertEquals(100_000L, ArcadePortRules.bombLobbersPowerupSpawnDelayMillis(80_000L));
+    }
+
+    @Test
+    void directHitCollisionBoxGrowthChangesTheActualSweptHitResultAndResets() {
+        var box = new org.bukkit.util.BoundingBox(-0.3D, 0.0D, -0.3D, 0.3D, 1.8D, 0.3D);
+        var start = new org.bukkit.Location(null, -3.0D, 2.5D, 1.2D);
+        var end = new org.bukkit.Location(null, 3.0D, 2.5D, 1.2D);
+        assertTrue(Double.isFinite(ArcadePortRules.bombLobbersDirectHitDistanceSquared(start, end, box)));
+
+        GameDebugRuntimeOverrides.activate(Map.of("BOMB_LOBBERS_DIRECT_HIT_BOX_GROW", 0.0D));
+        assertTrue(Double.isInfinite(ArcadePortRules.bombLobbersDirectHitDistanceSquared(start, end, box)));
+
+        GameDebugRuntimeOverrides.activate(Map.of("BOMB_LOBBERS_DIRECT_HIT_BOX_GROW", 1.0D));
+        assertTrue(Double.isFinite(ArcadePortRules.bombLobbersDirectHitDistanceSquared(start, end, box)));
+
+        GameDebugRuntimeOverrides.clear();
+        assertTrue(Double.isFinite(ArcadePortRules.bombLobbersDirectHitDistanceSquared(start, end, box)));
+    }
+
+    @Test
+    void trailSpacingCarryCapAndSpeedBoostDurationChangeRealRuleResults() {
+        assertEquals(6, ArcadePortRules.bombLobbersTrailSampleCount(1.0D));
+        assertTrue(ArcadePortRules.bombLobbersCanCarryMoreTnt(2));
+        assertFalse(ArcadePortRules.bombLobbersCanCarryMoreTnt(3));
+        assertEquals(240, ArcadePortRules.bombLobbersPowerupSpeedDurationTicks());
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "BOMB_LOBBERS_TRAIL_SAMPLE_SPACING", 0.1D,
+                "BOMB_LOBBERS_MAX_CARRIED", 1,
+                "BOMB_LOBBERS_POWERUP_SPEED_DURATION_TICKS", 100));
+        assertEquals(11, ArcadePortRules.bombLobbersTrailSampleCount(1.0D));
+        assertTrue(ArcadePortRules.bombLobbersCanCarryMoreTnt(0));
+        assertFalse(ArcadePortRules.bombLobbersCanCarryMoreTnt(1));
+        assertEquals(100, ArcadePortRules.bombLobbersPowerupSpeedDurationTicks());
+
+        GameDebugRuntimeOverrides.clear();
+        assertEquals(6, ArcadePortRules.bombLobbersTrailSampleCount(1.0D));
+        assertTrue(ArcadePortRules.bombLobbersCanCarryMoreTnt(2));
+        assertFalse(ArcadePortRules.bombLobbersCanCarryMoreTnt(3));
+        assertEquals(240, ArcadePortRules.bombLobbersPowerupSpeedDurationTicks());
+    }
 }

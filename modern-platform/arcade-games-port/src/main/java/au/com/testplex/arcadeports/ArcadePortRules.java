@@ -1365,7 +1365,21 @@ public final class ArcadePortRules {
     /** Number of 0.2-block trail samples including the previous position. */
     public static int bombLobbersTrailSampleCount(double segmentLength) {
         if (!Double.isFinite(segmentLength) || segmentLength < 0.0D) return 0;
-        return (int) Math.floor(segmentLength / BOMB_LOBBERS_TRAIL_SAMPLE_SPACING) + 1;
+        double spacing = GameDebugRuntimeOverrides.doubleValue(
+                "BOMB_LOBBERS_TRAIL_SAMPLE_SPACING", BOMB_LOBBERS_TRAIL_SAMPLE_SPACING);
+        if (!Double.isFinite(spacing) || spacing <= 0.0D) spacing = BOMB_LOBBERS_TRAIL_SAMPLE_SPACING;
+        return (int) Math.floor(segmentLength / spacing) + 1;
+    }
+
+    public static boolean bombLobbersCanCarryMoreTnt(int currentTnt) {
+        int maximum = Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "BOMB_LOBBERS_MAX_CARRIED", BOMB_LOBBERS_MAX_CARRIED));
+        return Math.max(0, currentTnt) < maximum;
+    }
+
+    public static int bombLobbersPowerupSpeedDurationTicks() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "BOMB_LOBBERS_POWERUP_SPEED_DURATION_TICKS", BOMB_LOBBERS_POWERUP_SPEED_DURATION_TICKS));
     }
 
     /** True for the metal armour supplied directly by the source Armorer/Pitcher kits.
