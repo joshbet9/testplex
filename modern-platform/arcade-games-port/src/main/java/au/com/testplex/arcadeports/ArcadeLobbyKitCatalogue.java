@@ -69,7 +69,7 @@ final class ArcadeLobbyKitCatalogue {
                             Unlock.FREE, Pig.class, null),
                     choice("mama-piggles", "Mama Piggles", Material.COOKED_PORKCHOP,
                             Unlock.GEM, Pig.class, null),
-                    choice("pig", "Pig Cloak", Material.PHANTOM_MEMBRANE,
+                    choice("pig", "Pig", Material.PHANTOM_MEMBRANE,
                             Unlock.GEM, Sheep.class, null, DyeColor.PINK),
                     choice("brutus-bacon", "Brutus Bacon", Material.SHIELD,
                             Unlock.ACHIEVEMENT, Pig.class, null),
