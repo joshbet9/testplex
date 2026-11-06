@@ -105,7 +105,7 @@ kit is removed; Jumper is now Acrobat. Legacy Jumper/Waller identifiers remain i
 aliases so existing saved kit preferences migrate without erasing achievements.
 Constructor's **four approved prerequisites** are `two-birds-one-stone`,
 `whats-a-double-jump`, `blast-proof`, and `jelly-skin`. Blast Proof now means
-**five separate wins as Armorer**, tracked per kit (and cannot be farmed by
+**ten separate wins as Armorer**, tracked per kit (and cannot be farmed by
 changing kits mid-match). Previously earned Blast Proof records are preserved.
 The server is not live and no player has unlocked Waller, so Constructor needs no grandfathered Waller entitlement. The legacy Waller kit-name alias may remain for configuration compatibility, but it does not bypass the four approved achievements.
 
