@@ -222,6 +222,10 @@ final class GameDebugVariableCatalog {
 
     private static double minimum(String name, double defaultValue, Kind kind) {
         if (kind == Kind.BOOLEAN) return 0.0D;
+        if (name.equals("RUNNER_DIVE_EARLY_WINDOW_MILLIS") || name.equals("RUNNER_DIVE_DROP_BLOCKS")
+                || name.startsWith("RUNNER_SPECIAL_PLAY_")) return 0.0D;
+        if (name.equals("RUNNER_ARCHER_ASSISTS_ACHIEVEMENT_COUNT")
+                || name.equals("RUNNER_FROSTBALL_ASSISTS_ACHIEVEMENT_COUNT")) return 1.0D;
         if (name.startsWith("PLEXBALL_TIMING_") && name.endsWith("_MAX_TICKS")) return 0.0D;
         if (name.startsWith("PLEXBALL_BATTING_") || name.startsWith("PLEXBALL_TIMING_POWER_")
                 || name.endsWith("_BATTING_POWER") || name.endsWith("_TIMING_PERFECT_POWER")
@@ -459,6 +463,7 @@ final class GameDebugVariableCatalog {
         if (name.equals("PLEXBALL_TECHNICIAN_TIMING_BONUS_TICKS")) return 40.0D;
         if (name.equals("PLEXBALL_INTRO_TICKS") || name.equals("PLEXBALL_TURN_BREAK_TICKS")) return 600.0D;
         if (name.contains("_FALL_DAMAGE_MULTIPLIER")) return 1.0D;
+        if (name.equals("RUNNER_FAILED_UPWARDS_MAX_HEALTH")) return 20.0D;
         if (name.equals("TURF_WARS_TERRITORY_KNOCKBACK_VERTICAL")) return 5.0D;
         if (name.contains("_MAX_HEALTH")) return 80.0D;
         if (name.contains("_MELEE_DAMAGE")) return 40.0D;
@@ -590,6 +595,14 @@ final class GameDebugVariableCatalog {
         if (name.equals("RUNNER_LEAP_COOLDOWN_MILLIS")
                 || name.equals("RUNNER_QUICKSHOT_COOLDOWN_MILLIS")) return 120_000.0D;
         if (name.equals("RUNNER_MAX_FROSTBALLS")) return 64.0D;
+        if (name.equals("RUNNER_ARCHER_ASSISTS_ACHIEVEMENT_COUNT")
+                || name.equals("RUNNER_FROSTBALL_ASSISTS_ACHIEVEMENT_COUNT")) return 100.0D;
+        if (name.equals("RUNNER_FAILED_UPWARDS_MAX_HEALTH")) return 20.0D;
+        if (name.equals("RUNNER_SPECIAL_PLAY_MIN_FALL_DISTANCE")) return 100.0D;
+        if (name.equals("RUNNER_SPECIAL_PLAY_GROUND_DISTANCE")) return 16.0D;
+        if (name.equals("RUNNER_SPECIAL_PLAY_MAX_DOWNWARD_VELOCITY")) return 5.0D;
+        if (name.equals("RUNNER_DIVE_DROP_BLOCKS")) return 64.0D;
+        if (name.equals("RUNNER_DIVE_EARLY_WINDOW_MILLIS")) return 600_000.0D;
         if (name.equals("RUNNER_STEPS_ACHIEVEMENT_BLOCKS")) return 100_000.0D;
         if (name.equals("RUNNER_HOP_ACHIEVEMENT_JUMPS")) return 1_000.0D;
         if (name.equals("RUNNER_FLASH_ACHIEVEMENT_MAX_WIN_MILLIS")) return 600_000.0D;

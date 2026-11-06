@@ -43,10 +43,54 @@ class RunnerDebugRulesTest {
         assertBounded("RUNNER_QUICKSHOT_PROJECTILE_SPEED", 0.0D, 4.0D);
         assertBounded("RUNNER_SWITCH_GRACE_MILLIS", 0.0D, 5_000.0D);
         assertBounded("RUNNER_FROSTBALL_SLOW_TICKS", 0.0D, 1_200.0D);
+        assertBounded("RUNNER_FROSTBALL_INTERVAL_MILLIS", 0.0D, 10_000.0D);
+        assertBounded("RUNNER_FROSTBALL_SLOW_AMPLIFIER", 0.0D, 10.0D);
         assertBounded("RUNNER_MAX_FROSTBALLS", 0.0D, 64.0D);
+        assertBounded("RUNNER_LEAP_COOLDOWN_MILLIS", 0.0D, 120_000.0D);
+        assertBounded("RUNNER_QUICKSHOT_COOLDOWN_MILLIS", 0.0D, 120_000.0D);
         assertBounded("RUNNER_STEPS_ACHIEVEMENT_BLOCKS", 0.0D, 100_000.0D);
         assertBounded("RUNNER_HOP_ACHIEVEMENT_JUMPS", 0.0D, 1_000.0D);
         assertBounded("RUNNER_FLASH_ACHIEVEMENT_MAX_WIN_MILLIS", 0.0D, 600_000.0D);
+        assertBounded("RUNNER_FROSTBALL_ASSISTS_ACHIEVEMENT_COUNT", 1.0D, 100.0D);
+        assertBounded("RUNNER_ARCHER_ASSISTS_ACHIEVEMENT_COUNT", 1.0D, 100.0D);
+        assertBounded("RUNNER_FAILED_UPWARDS_MAX_HEALTH", 1.0D, 20.0D);
+        assertBounded("RUNNER_SPECIAL_PLAY_MIN_FALL_DISTANCE", 0.0D, 100.0D);
+        assertBounded("RUNNER_SPECIAL_PLAY_GROUND_DISTANCE", 0.0D, 16.0D);
+        assertBounded("RUNNER_SPECIAL_PLAY_MAX_DOWNWARD_VELOCITY", 0.0D, 5.0D);
+        assertBounded("RUNNER_DIVE_EARLY_WINDOW_MILLIS", 0.0D, 600_000.0D);
+        assertBounded("RUNNER_DIVE_DROP_BLOCKS", 0.0D, 64.0D);
+    }
+
+    @Test void runnerAchievementHelpersUseProfileThresholdsAndRestoreSourceConditions() {
+        assertEquals(5, ArcadePortRules.runnerFrostballAssistAchievementCount());
+        assertEquals(5, ArcadePortRules.runnerArcherAssistAchievementCount());
+        assertEquals(6.0D, ArcadePortRules.runnerFailedUpwardsMaxHealth());
+        assertFalse(ArcadePortRules.isRunnerSpecialPlayFall(19.0D, -1.0D, true));
+        assertTrue(ArcadePortRules.isRunnerSpecialPlayFall(20.0D, -0.26D, true));
+        assertFalse(ArcadePortRules.isRunnerSpecialPlayFall(20.0D, -0.25D, true));
+        assertFalse(ArcadePortRules.isRunnerSpecialPlayFall(20.0D, -1.0D, false));
+        assertTrue(ArcadePortRules.isRunnerEarlyDive(3_000L, 97.9D, 100.0D));
+        assertFalse(ArcadePortRules.isRunnerEarlyDive(3_001L, 97.9D, 100.0D));
+        assertFalse(ArcadePortRules.isRunnerEarlyDive(1_000L, 98.0D, 100.0D));
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "RUNNER_FROSTBALL_ASSISTS_ACHIEVEMENT_COUNT", 2,
+                "RUNNER_ARCHER_ASSISTS_ACHIEVEMENT_COUNT", 3,
+                "RUNNER_FAILED_UPWARDS_MAX_HEALTH", 10.0D,
+                "RUNNER_SPECIAL_PLAY_MIN_FALL_DISTANCE", 5.0D,
+                "RUNNER_SPECIAL_PLAY_MAX_DOWNWARD_VELOCITY", 0.1D,
+                "RUNNER_DIVE_EARLY_WINDOW_MILLIS", 5_000L,
+                "RUNNER_DIVE_DROP_BLOCKS", 1.0D));
+        assertEquals(2, ArcadePortRules.runnerFrostballAssistAchievementCount());
+        assertEquals(3, ArcadePortRules.runnerArcherAssistAchievementCount());
+        assertEquals(10.0D, ArcadePortRules.runnerFailedUpwardsMaxHealth());
+        assertTrue(ArcadePortRules.isRunnerSpecialPlayFall(5.0D, -0.11D, true));
+        assertTrue(ArcadePortRules.isRunnerEarlyDive(5_000L, 98.9D, 100.0D));
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertEquals(5, ArcadePortRules.runnerFrostballAssistAchievementCount());
+        assertEquals(6.0D, ArcadePortRules.runnerFailedUpwardsMaxHealth());
+        assertFalse(ArcadePortRules.isRunnerSpecialPlayFall(5.0D, -0.11D, true));
     }
 
     @Test void achievementThresholdsChangeTheirActualAwardPredicatesAndReset() {

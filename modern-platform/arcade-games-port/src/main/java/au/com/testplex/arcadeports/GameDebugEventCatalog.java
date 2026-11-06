@@ -142,6 +142,10 @@ final class GameDebugEventCatalog {
             new Event("damage-king", "Damage Enemy King", Material.ZOMBIE_HEAD,
                     "Apply normal King damage after both enemy crystals are destroyed if your profile allows it."));
     private static final List<Event> RUNNER = List.of(
+            new Event("use-kit-ability", "Test Selected Kit", Material.IRON_AXE,
+                    "Use Leaper, Archer or Switcher through the normal cooldown, projectile or swap path; Frosty refills its normal snowball supply."),
+            new Event("grant-frostballs", "Grant Frosty Snowballs", Material.SNOWBALL,
+                    "Fill the selected Frosty kit to its configured supply cap to test live projectile hits."),
             new Event("use-position-swap", "Test Position Swap", Material.ENDER_EYE,
                     "Use the selected Switcher kit's normal random eligible-player swap and landing protection."));
     private static final List<Event> MONSTER_MAZE = List.of(

@@ -1070,6 +1070,30 @@ public final class ArcadePortManager implements Listener {
             triggered = useRunnerPositionSwap(session, tester, System.currentTimeMillis());
             if (triggered) GameDebugRuntimeOverrides.markDebugSession();
         }
+        if (type == ArcadePortGame.RUNNER && "grant-frostballs".equals(eventId)) {
+            triggered = grantRunnerFrostballs(session, tester);
+            if (triggered) GameDebugRuntimeOverrides.markDebugSession();
+        }
+        if (type == ArcadePortGame.RUNNER && "use-kit-ability".equals(eventId)) {
+            long now = System.currentTimeMillis();
+            String kit = session.runnerKits.getOrDefault(tester.getUniqueId(), "leaper");
+            switch (kit) {
+                case "leaper" -> {
+                    long readyAt = session.runnerLeapReadyAt.getOrDefault(tester.getUniqueId(), 0L);
+                    useRunnerLeap(session, tester, now);
+                    triggered = now >= readyAt && session.runnerLeapReadyAt.getOrDefault(tester.getUniqueId(), 0L) > now;
+                }
+                case "archer" -> {
+                    long readyAt = session.runnerQuickshotReadyAt.getOrDefault(tester.getUniqueId(), 0L);
+                    useRunnerQuickshot(session, tester, now);
+                    triggered = now >= readyAt && session.runnerQuickshotReadyAt.getOrDefault(tester.getUniqueId(), 0L) > now;
+                }
+                case "switcher" -> triggered = useRunnerPositionSwap(session, tester, now);
+                case "frosty" -> triggered = grantRunnerFrostballs(session, tester);
+                default -> { }
+            }
+            if (triggered) GameDebugRuntimeOverrides.markDebugSession();
+        }
         if (type.isMonsterMaze() && "spawn-monster-wave".equals(eventId)) {
             me.monstermaze.MonsterMazePlugin maze = plugin.getMonsterMazeModule();
             triggered = maze != null && maze.getGameManager() != null
@@ -20484,12 +20508,19 @@ public final class ArcadePortManager implements Listener {
         long elapsed = Math.max(0L, System.currentTimeMillis() - session.startedAt);
         if (winner != null) {
             UUID id = winner.getUniqueId();
-            if (session.runnerFrostballAssists.getOrDefault(id, 0) >= 5) awardCatalogAchievement(winner, "runner", "nsfm");
-            if (session.runnerArcherAssists.getOrDefault(id, 0) >= 5) awardCatalogAchievement(winner, "runner", "made-it-work");
+            if (session.runnerFrostballAssists.getOrDefault(id, 0) >= ArcadePortRules.runnerFrostballAssistAchievementCount()) {
+                awardCatalogAchievement(winner, "runner", "nsfm");
+            }
+            if (session.runnerArcherAssists.getOrDefault(id, 0) >= ArcadePortRules.runnerArcherAssistAchievementCount()) {
+                awardCatalogAchievement(winner, "runner", "made-it-work");
+            }
             if (session.runnerIceCandidates.contains(id)) awardCatalogAchievement(winner, "runner", "ice-in-my-veins");
             if (session.runnerSpecialPlayCandidates.contains(id)) awardCatalogAchievement(winner, "runner", "special-play");
             if (session.runnerDiveCandidates.contains(id)) awardCatalogAchievement(winner, "runner", "took-a-dive");
-            if (session.runnerFailedUpwardsHealth.getOrDefault(id, 20.0D) < 6.0D) awardCatalogAchievement(winner, "runner", "failed-upwards");
+            if (session.runnerFailedUpwardsHealth.getOrDefault(id, 20.0D)
+                    < ArcadePortRules.runnerFailedUpwardsMaxHealth()) {
+                awardCatalogAchievement(winner, "runner", "failed-upwards");
+            }
         }
         if (winner != null && ArcadePortRules.shouldAwardRunnerFlash(elapsed, true)) {
             UUID winnerId = winner.getUniqueId();
@@ -23205,8 +23236,8 @@ public final class ArcadePortManager implements Listener {
                     || current.getY() <= session.world.getMinHeight() + 2.0D)) {
                 session.runnerIceCandidates.add(playerId);
             }
-            if (System.currentTimeMillis() - session.startedAt <= 3_000L
-                    && current.getY() < session.runnerStartY.getOrDefault(playerId, event.getFrom().getY()) - 2.0D) {
+            if (ArcadePortRules.isRunnerEarlyDive(System.currentTimeMillis() - session.startedAt,
+                    current.getY(), session.runnerStartY.getOrDefault(playerId, event.getFrom().getY()))) {
                 session.runnerDiveCandidates.add(playerId);
             }
         }
@@ -23804,6 +23835,20 @@ public final class ArcadePortManager implements Listener {
 
     }
 
+    private boolean grantRunnerFrostballs(Session session, Player player) {
+        if (session == null || player == null || session.type != ArcadePortGame.RUNNER
+                || !session.alive.contains(player.getUniqueId())
+                || !"frosty".equals(session.runnerKits.getOrDefault(player.getUniqueId(), "leaper"))
+                || !isDebugAbilityAllowed(player, ArcadePortGame.RUNNER, "frosty")) return false;
+        int cap = Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "RUNNER_MAX_FROSTBALLS", ArcadePortRules.RUNNER_MAX_FROSTBALLS));
+        int current = inventoryCount(player, Material.SNOWBALL);
+        int toGrant = Math.min(cap - current, Material.SNOWBALL.getMaxStackSize());
+        if (toGrant <= 0) return false;
+        player.getInventory().addItem(namedItem(Material.SNOWBALL, "Snowball", "Frost Balls slow opponents.", toGrant));
+        return inventoryCount(player, Material.SNOWBALL) > current;
+    }
+
     private void useRunnerLeap(Session session, Player player, long now) {
         if (!isDebugAbilityAllowed(player, ArcadePortGame.RUNNER, "leaper")) return;
         UUID id = player.getUniqueId();
@@ -23812,9 +23857,9 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "Leap ready in " + Math.max(1L, (readyAt - now + 999L) / 1000L) + "s.");
             return;
         }
-        if (player.getFallDistance() >= 20.0F && player.getVelocity().getY() < -0.25D
-                && player.getWorld().rayTraceBlocks(player.getLocation(), new Vector(0.0D, -1.0D, 0.0D),
-                        3.0D) != null) {
+        if (ArcadePortRules.isRunnerSpecialPlayFall(player.getFallDistance(), player.getVelocity().getY(),
+                player.getWorld().rayTraceBlocks(player.getLocation(), new Vector(0.0D, -1.0D, 0.0D),
+                        ArcadePortRules.runnerSpecialPlayGroundDistance()) != null)) {
             session.runnerSpecialPlayCandidates.add(id);
         }
         session.runnerLeapReadyAt.put(id, now + GameDebugRuntimeOverrides.longValue("RUNNER_LEAP_COOLDOWN_MILLIS", ArcadePortRules.RUNNER_LEAP_COOLDOWN_MILLIS));

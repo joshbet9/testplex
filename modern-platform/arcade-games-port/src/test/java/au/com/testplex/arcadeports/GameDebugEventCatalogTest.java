@@ -1030,6 +1030,12 @@ class GameDebugEventCatalogTest {
         }
         assertTrue(manager.contains("boolean debugTriggerEvent(Player tester, ArcadePortGame type, String eventId)"));
         assertTrue(manager.contains("triggered = useRunnerPositionSwap(session, tester, System.currentTimeMillis())"));
+        assertEquals(List.of("use-kit-ability", "grant-frostballs", "use-position-swap", "refresh-kit"),
+                GameDebugEventCatalog.events(ArcadePortGame.RUNNER).stream()
+                        .map(GameDebugEventCatalog.Event::id).toList());
+        assertTrue(manager.contains("case \"frosty\" -> triggered = grantRunnerFrostballs(session, tester)"));
+        assertTrue(manager.contains("private boolean grantRunnerFrostballs(Session session, Player player)"));
+        assertTrue(manager.contains("RUNNER_MAX_FROSTBALLS"));
     }
 
     @Test

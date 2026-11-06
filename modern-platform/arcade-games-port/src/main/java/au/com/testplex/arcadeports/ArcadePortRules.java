@@ -383,6 +383,14 @@ public final class ArcadePortRules {
     public static final double RUNNER_STEPS_ACHIEVEMENT_BLOCKS = 400.0D;
     public static final int RUNNER_HOP_ACHIEVEMENT_JUMPS = 100;
     public static final long RUNNER_FLASH_ACHIEVEMENT_MAX_WIN_MILLIS = 90_000L;
+    public static final int RUNNER_FROSTBALL_ASSISTS_ACHIEVEMENT_COUNT = 5;
+    public static final int RUNNER_ARCHER_ASSISTS_ACHIEVEMENT_COUNT = 5;
+    public static final double RUNNER_FAILED_UPWARDS_MAX_HEALTH = 6.0D;
+    public static final double RUNNER_SPECIAL_PLAY_MIN_FALL_DISTANCE = 20.0D;
+    public static final double RUNNER_SPECIAL_PLAY_MAX_DOWNWARD_VELOCITY = 0.25D;
+    public static final double RUNNER_SPECIAL_PLAY_GROUND_DISTANCE = 3.0D;
+    public static final long RUNNER_DIVE_EARLY_WINDOW_MILLIS = 3_000L;
+    public static final double RUNNER_DIVE_DROP_BLOCKS = 2.0D;
     private static final java.util.List<String> RUNNER_TRAIL_COLOURS = java.util.List.of(
             "cyan", "white", "orange", "magenta", "light-blue", "yellow", "lime",
             "pink", "gray", "light-gray", "purple", "blue", "brown", "green", "black");
@@ -411,6 +419,41 @@ public final class ArcadePortRules {
     public static boolean shouldAwardRunnerFlash(long elapsedMillis, boolean won) {
         return won && elapsedMillis >= 0L && elapsedMillis <= Math.max(0L, GameDebugRuntimeOverrides.longValue(
                 "RUNNER_FLASH_ACHIEVEMENT_MAX_WIN_MILLIS", RUNNER_FLASH_ACHIEVEMENT_MAX_WIN_MILLIS));
+    }
+
+    public static int runnerFrostballAssistAchievementCount() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue("RUNNER_FROSTBALL_ASSISTS_ACHIEVEMENT_COUNT",
+                RUNNER_FROSTBALL_ASSISTS_ACHIEVEMENT_COUNT));
+    }
+
+    public static int runnerArcherAssistAchievementCount() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue("RUNNER_ARCHER_ASSISTS_ACHIEVEMENT_COUNT",
+                RUNNER_ARCHER_ASSISTS_ACHIEVEMENT_COUNT));
+    }
+
+    public static double runnerSpecialPlayGroundDistance() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "RUNNER_SPECIAL_PLAY_GROUND_DISTANCE", RUNNER_SPECIAL_PLAY_GROUND_DISTANCE));
+    }
+
+    public static double runnerFailedUpwardsMaxHealth() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "RUNNER_FAILED_UPWARDS_MAX_HEALTH", RUNNER_FAILED_UPWARDS_MAX_HEALTH));
+    }
+
+    public static boolean isRunnerSpecialPlayFall(double fallDistance, double verticalVelocity, boolean groundNearby) {
+        return fallDistance >= Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "RUNNER_SPECIAL_PLAY_MIN_FALL_DISTANCE", RUNNER_SPECIAL_PLAY_MIN_FALL_DISTANCE))
+                && verticalVelocity < -Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                        "RUNNER_SPECIAL_PLAY_MAX_DOWNWARD_VELOCITY", RUNNER_SPECIAL_PLAY_MAX_DOWNWARD_VELOCITY))
+                && groundNearby;
+    }
+
+    public static boolean isRunnerEarlyDive(long elapsedMillis, double currentY, double startY) {
+        return elapsedMillis <= Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "RUNNER_DIVE_EARLY_WINDOW_MILLIS", RUNNER_DIVE_EARLY_WINDOW_MILLIS))
+                && currentY < startY - Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                        "RUNNER_DIVE_DROP_BLOCKS", RUNNER_DIVE_DROP_BLOCKS));
     }
 
     /** Use red as the source-compatible default and as the fallback for map clashes. */
