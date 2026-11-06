@@ -55,7 +55,9 @@ final class GameDebugEventCatalog {
             new Event("shoot-ball", "Take a Shot", Material.MAGMA_CREAM,
                     "If you currently have possession, release a normal shot using your current aim and position."),
             new Event("try-steal", "Try to Steal Ball", Material.IRON_SWORD,
-                    "Attempt a steal from the current ball holder using normal range, facing, cooldown, and team checks."));
+                    "Attempt a steal from the current ball holder using normal range, facing, cooldown, and team checks."),
+            new Event("drop-rebound-ball", "Test a Rebound", Material.SLIME_BALL,
+                    "Drop a short missed-shot arc so you can recover the ball through normal rebound play."));
     private static final List<Event> MASTER_BUILDERS = List.of(
             new Event("reset-own-plot", "Clear Own Plot", Material.TNT,
                     "Clear your active plot interior so you can test another build without ending the round."));

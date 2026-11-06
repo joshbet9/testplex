@@ -1288,9 +1288,31 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             features.put("combat-damage", new DebugFeature("combat-damage", "Duel combat damage", Material.IRON_SWORD,
                     "Allow this tester to deal and receive Gladiators duel damage.", true));
         }
+        if (game == ArcadePortGame.HOOPS_REMASTERED) {
+            features.put("passing", new DebugFeature("passing", "Passing", Material.SNOWBALL,
+                    "Allow this tester to pass the ball using normal aim and teammate selection.", true));
+            features.put("blocking", new DebugFeature("blocking", "Shot blocks", Material.SHIELD,
+                    "Allow this tester to contest and block opposing shots.", true));
+            features.put("rebounding", new DebugFeature("rebounding", "Rebounds", Material.SLIME_BALL,
+                    "Allow this tester to recover missed shots and earn rebounds.", true));
+            features.put("hops", new DebugFeature("hops", "Hops ability", Material.FEATHER,
+                    "Allow this tester's normal Hops movement ability.", true));
+        }
         if (game == ArcadePortGame.HEROES_OF_GWEN) {
             features.put("tower-damage", new DebugFeature("tower-damage", "Tower damage", Material.IRON_PICKAXE,
                     "Allow this tester's attacks to damage enemy Heroes towers.", true));
+            features.put("minion-waves", new DebugFeature("minion-waves", "Minion waves", Material.ZOMBIE_HEAD,
+                    "Spawn the normal lane minion waves.", true));
+            features.put("minion-combat", new DebugFeature("minion-combat", "Minion combat", Material.IRON_SWORD,
+                    "Allow lane minions to fight enemy minions, towers and Withers.", true));
+            features.put("beacon-captures", new DebugFeature("beacon-captures", "Beacon captures", Material.BEACON,
+                    "Allow players to capture and change ownership of beacons.", true));
+            features.put("health-regeneration", new DebugFeature("health-regeneration", "Health regeneration", Material.GOLDEN_APPLE,
+                    "Apply the normal Heroes health regeneration ticks.", true));
+            features.put("gold-income", new DebugFeature("gold-income", "Gold income", Material.GOLD_INGOT,
+                    "Award passive and owned-beacon gold on the normal interval.", true));
+            features.put("overtime", new DebugFeature("overtime", "Overtime", Material.WITHER_SKELETON_SKULL,
+                    "Start the normal moving-Wither overtime when its timer expires.", true));
             for (String hero : List.of("hattori", "bardolf", "devon", "rowena", "anath", "larissa", "dana", "biff", "ivy")) {
                 String key = "hero-" + hero + "-abilities";
                 features.put(key, new DebugFeature(key, pretty(hero) + " abilities", Material.BLAZE_POWDER,
@@ -1539,6 +1561,10 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                         && ("objective-tnt".equals(key) || "crystal-damage".equals(key) || "king-damage".equals(key)))
                 || (game == ArcadePortGame.HEROES_OF_GWEN && key.startsWith("hero-") && key.endsWith("-abilities"))
                 || (game == ArcadePortGame.HEROES_OF_GWEN && "tower-damage".equals(key))
+                || (game == ArcadePortGame.HEROES_OF_GWEN && Set.of("minion-waves", "minion-combat",
+                        "beacon-captures", "health-regeneration", "gold-income", "overtime").contains(key))
+                || (game == ArcadePortGame.HOOPS_REMASTERED
+                        && Set.of("passing", "blocking", "rebounding", "hops").contains(key))
                 || (game == ArcadePortGame.DRAW_MY_THING
                         && ("canvas-tools".equals(key) || "palette-selection".equals(key)
                                 || "guess-submission".equals(key) || "timed-hints".equals(key)

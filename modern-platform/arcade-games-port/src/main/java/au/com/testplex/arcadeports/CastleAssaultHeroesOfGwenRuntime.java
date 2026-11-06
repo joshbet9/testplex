@@ -108,6 +108,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         void heroSelected(Player player, String hero);
         String cosmeticOption(Player player, String lineId, String fallback);
         boolean debugFeatureEnabled(Player player, String feature);
+        boolean debugFeatureEnabledForActiveSession(String feature);
     }
 
     private static final int MOBA_TOWER_REFERENCE_TEAM_SIZE = 9;
@@ -768,15 +769,18 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private void updateHeroesOfGwenMinions(long now) {
         if (game != ArcadePortGame.HEROES_OF_GWEN || stopped) return;
-        if (now >= nextMinionWaveAt) {
+        boolean wavesEnabled = hooks.debugFeatureEnabledForActiveSession("minion-waves");
+        if (wavesEnabled && now >= nextMinionWaveAt) {
             java.util.Arrays.fill(minionsSpawnedInWave, 0);
             nextMinionSpawnAt[0] = now;
             nextMinionSpawnAt[1] = now;
             minionWavePending = true;
             nextMinionWaveAt = now + mobaMinionWaveInterval();
         }
-        spawnHeroesOfGwenMinionWave(0);
-        spawnHeroesOfGwenMinionWave(1);
+        if (wavesEnabled) {
+            spawnHeroesOfGwenMinionWave(0);
+            spawnHeroesOfGwenMinionWave(1);
+        }
         if (minionsSpawnedInWave[0] >= GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_MINIONS_PER_WAVE", ArcadePortRules.HEROES_OF_GWEN_MINIONS_PER_WAVE)
                 && minionsSpawnedInWave[1] >= GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_MINIONS_PER_WAVE", ArcadePortRules.HEROES_OF_GWEN_MINIONS_PER_WAVE)) {
             minionWavePending = false;
@@ -811,7 +815,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 }
             }
         }
-        if (now >= nextMinionCombatAt) {
+        if (hooks.debugFeatureEnabledForActiveSession("minion-combat") && now >= nextMinionCombatAt) {
             nextMinionCombatAt = now + MOBA_MINION_COMBAT_INTERVAL;
             for (Mob attacker : minions) {
                 int team = heroesOfGwenMinionTeams.getOrDefault(attacker.getUniqueId(), -1);
@@ -1084,6 +1088,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private void updateHeroesOfGwenOvertime(long now) {
         if (heroesOfGwenOvertime || game != ArcadePortGame.HEROES_OF_GWEN
+                || !hooks.debugFeatureEnabledForActiveSession("overtime")
                 || !ArcadePortRules.heroesOfGwenOvertimeHasStarted(heroesOfGwenLiveStartedAt, now)) return;
         heroesOfGwenOvertime = true;
         for (int team = 0; team < 2; team++) {
@@ -2031,6 +2036,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void updateHeroesOfGwenHealthRegen(long now) {
+        if (!hooks.debugFeatureEnabledForActiveSession("health-regeneration")) {
+            heroesOfGwenNextHpRegenAt = now + GameDebugRuntimeOverrides.longValue(
+                    "HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS);
+            return;
+        }
         if (heroesOfGwenNextHpRegenAt <= 0L) {
             heroesOfGwenNextHpRegenAt = now + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS);
             return;
@@ -2057,7 +2067,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         updateAnathMeteorZones(now);
         updateHeroesOfGwenMinions(now);
         recordMobaTowerEntries(now);
-        if (now >= nextGoldAt) {
+        if (hooks.debugFeatureEnabledForActiveSession("gold-income") && now >= nextGoldAt) {
             for (Player player : activeMatchPlayers()) addGold(player, mobaBaseGold(), "Passive gold");
             for (CapturePointState point : capturePoints) {
                 if (point.owner < 0) continue;
@@ -2069,7 +2079,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             }
             nextGoldAt = now + mobaPassiveGoldInterval();
         }
-        if (now >= nextCapturePointUpdateAt) {
+        if (hooks.debugFeatureEnabledForActiveSession("beacon-captures") && now >= nextCapturePointUpdateAt) {
             updateCapturePoints();
             nextCapturePointUpdateAt = now + MOBA_CAPTURE_UPDATE_INTERVAL;
         }

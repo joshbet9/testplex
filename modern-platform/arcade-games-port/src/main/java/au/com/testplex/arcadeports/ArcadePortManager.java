@@ -1190,6 +1190,10 @@ public final class ArcadePortManager implements Listener {
             triggered = hoops.debugAttemptSteal(tester);
             if (triggered) GameDebugRuntimeOverrides.markDebugSession();
         }
+        if (type == ArcadePortGame.HOOPS_REMASTERED && "drop-rebound-ball".equals(eventId) && hoops != null) {
+            triggered = hoops.debugDropBallForRebound(tester);
+            if (triggered) GameDebugRuntimeOverrides.markDebugSession();
+        }
         if (type == ArcadePortGame.MASTER_BUILDERS && "reset-own-plot".equals(eventId)
                 && session.masterBuilderPhase == MasterBuildersPhase.BUILDING) {
             Integer plot = session.masterBuilderPlots.get(tester.getUniqueId());
@@ -5346,6 +5350,11 @@ public final class ArcadePortManager implements Listener {
                         @Override
                         public boolean debugFeatureEnabled(Player player, String feature) {
                             return ArcadePortManager.this.debugFeatureEnabled(player.getUniqueId(), type, feature, true);
+                        }
+
+                        @Override
+                        public boolean debugFeatureEnabledForActiveSession(String feature) {
+                            return ArcadePortManager.this.debugFeatureEnabledForActiveSession(type, feature);
                         }
                     });
             if (!session.variantRuntime.isReady()) {

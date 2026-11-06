@@ -603,6 +603,7 @@ public final class HoopsRemasteredRuntime implements Listener {
             Location catchPoint = player.getLocation().clone().add(0.0D, 1.0D, 0.0D);
             if (catchPoint.distanceSquared(ball.location) > 2.25D) continue;
             boolean rebound = ball.reboundEligible;
+            if (rebound && !debugFeatureEnabled(player, "rebounding")) continue;
             UUID previousTeam = ball.lastToucher;
             int previousPossessionTeam = rebound && ball.shooterId != null
                     ? current.teams.getOrDefault(ball.shooterId, -1)
@@ -761,6 +762,10 @@ public final class HoopsRemasteredRuntime implements Listener {
     }
 
     private void pass(Match current, Player passer) {
+        if (!debugFeatureEnabled(passer, "passing")) {
+            passer.sendActionBar(ChatColor.RED + "Passing is disabled in your debug profile.");
+            return;
+        }
         Player receiver = alivePlayers(current).stream()
                 .filter(player -> !player.equals(passer)
                         && current.teams.getOrDefault(player.getUniqueId(), -1)
@@ -870,6 +875,10 @@ public final class HoopsRemasteredRuntime implements Listener {
     }
 
     private void blockShot(Match current, Player defender) {
+        if (!debugFeatureEnabled(defender, "blocking")) {
+            defender.sendActionBar(ChatColor.RED + "Shot blocks are disabled in your debug profile.");
+            return;
+        }
         Ball ball = current.ball;
         if (ball == null || ball.mode != BallMode.SHOT
                 || current.teams.getOrDefault(ball.shooterId, -1) == current.teams.getOrDefault(defender.getUniqueId(), -2)
@@ -1289,6 +1298,24 @@ public final class HoopsRemasteredRuntime implements Listener {
         return attacker.getUniqueId().equals(current.holderId);
     }
 
+    /** Drop a short normal shot arc so a tester can exercise the live rebound recovery path. */
+    public boolean debugDropBallForRebound(Player tester) {
+        Match current = match;
+        if (current == null || current.ending || tester == null || !tester.isOnline()
+                || tester.getWorld() != current.world || !current.players.containsKey(tester.getUniqueId())
+                || !debugFeatureEnabled(tester, "rebounding")) return false;
+        Player previousHolder = current.holderId == null ? null : current.players.get(current.holderId);
+        if (previousHolder != null) clearBallItem(previousHolder);
+        current.holderId = null;
+        Location drop = tester.getLocation().clone().add(0.0D, 3.0D, 0.0D);
+        spawnLooseBall(current, drop, new Vector(0.0D, 0.12D, 0.0D), BallMode.SHOT,
+                tester.getUniqueId(), null, 1 - current.teams.getOrDefault(tester.getUniqueId(), 0));
+        current.shotClockEndsAt = System.currentTimeMillis()
+                + GameDebugRuntimeOverrides.longValue("HOOPS_SHOT_CLOCK_MILLIS", HoopsRemasteredRules.SHOT_CLOCK_MILLIS);
+        tester.sendMessage(ChatColor.YELLOW + "Rebound test ball is live. Recover it through normal play.");
+        return true;
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onToggleFlight(PlayerToggleFlightEvent event) {
         Match current = match;
@@ -1297,6 +1324,10 @@ public final class HoopsRemasteredRuntime implements Listener {
                 || player.getWorld() != current.world) return;
         event.setCancelled(true);
         player.setFlying(false);
+        if (!debugFeatureEnabled(player, "hops")) {
+            player.sendActionBar(ChatColor.RED + "Hops is disabled in your debug profile.");
+            return;
+        }
         long now = System.currentTimeMillis();
         long readyAt = current.hopsReadyAt.getOrDefault(player.getUniqueId(), 0L);
         if (now < readyAt) {

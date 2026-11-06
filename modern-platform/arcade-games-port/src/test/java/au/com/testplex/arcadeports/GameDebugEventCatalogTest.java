@@ -45,7 +45,7 @@ class GameDebugEventCatalogTest {
         assertEquals(List.of("begin-evolution", "make-pity-ready", "refresh-kit"),
                 GameDebugEventCatalog.events(ArcadePortGame.EVOLUTION).stream()
                         .map(GameDebugEventCatalog.Event::id).toList());
-        assertEquals(List.of("shoot-ball", "try-steal"),
+        assertEquals(List.of("shoot-ball", "try-steal", "drop-rebound-ball"),
                 GameDebugEventCatalog.events(ArcadePortGame.HOOPS_REMASTERED).stream()
                         .map(GameDebugEventCatalog.Event::id).toList());
         assertEquals("roll-item", GameDebugEventCatalog.events(ArcadePortGame.SNAKE).getFirst().id());
@@ -1360,6 +1360,67 @@ class GameDebugEventCatalogTest {
         assertTrue(runtime.contains("damageMobaTower(tower, Math.min(50.0D, before), tester)"));
         assertTrue(runtime.contains("boolean debugCaptureNextHeroesOfGwenPoint(Player tester)"));
         assertTrue(runtime.contains("setCapturePointOwner(point, team)"));
+    }
+
+    @Test
+    void heroesOfGwenObjectiveAndRoundSystemsHaveLiveProfileSwitches() throws IOException {
+        Path runtimePath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "CastleAssaultHeroesOfGwenRuntime.java");
+        Path lobbyPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ModernArcadeLobbyRuntime.java");
+        Path managerPath = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports",
+                "ArcadePortManager.java");
+        if (!Files.isRegularFile(runtimePath)) {
+            Path base = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au", "com",
+                    "testplex", "arcadeports");
+            runtimePath = base.resolve("CastleAssaultHeroesOfGwenRuntime.java");
+            lobbyPath = base.resolve("ModernArcadeLobbyRuntime.java");
+            managerPath = base.resolve("ArcadePortManager.java");
+        }
+        String runtime = Files.readString(runtimePath);
+        String lobby = Files.readString(lobbyPath);
+        String manager = Files.readString(managerPath);
+        for (String feature : List.of("minion-waves", "minion-combat", "beacon-captures",
+                "health-regeneration", "gold-income", "overtime")) {
+            assertTrue(lobby.contains("features.put(\"" + feature + "\""), feature + " is available in the Heroes menu");
+            assertTrue(runtime.contains("debugFeatureEnabledForActiveSession(\"" + feature + "\")"),
+                    feature + " gates its production round system");
+        }
+        assertTrue(lobby.contains("\"minion-waves\", \"minion-combat\",")
+                        && lobby.contains("\"beacon-captures\", \"health-regeneration\", \"gold-income\", \"overtime\").contains(key)"),
+                "Heroes round-system switches apply immediately when changed");
+        assertTrue(manager.contains("debugFeatureEnabledForActiveSession(type, feature)"),
+                "round switches resolve from the active game's selected profile");
+    }
+
+    @Test
+    void hoopsDebugActionsAndFeatureSwitchesReachPossessionAndReboundGameplay() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        Path testRoot = Path.of("src", "test", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au", "com",
+                    "testplex", "arcadeports");
+            testRoot = Path.of("modern-platform", "arcade-games-port", "src", "test", "java", "au", "com",
+                    "testplex", "arcadeports");
+        }
+        String runtime = Files.readString(sourceRoot.resolve("HoopsRemasteredRuntime.java"));
+        String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String events = Files.readString(sourceRoot.resolve("GameDebugEventCatalog.java"));
+        String rules = Files.readString(testRoot.resolve("HoopsRemasteredRulesTest.java"));
+        for (String feature : List.of("passing", "blocking", "rebounding", "hops")) {
+            assertTrue(lobby.contains("features.put(\"" + feature + "\""), feature + " appears in the Hoops menu");
+            assertTrue(runtime.contains("debugFeatureEnabled(" + (feature.equals("passing") ? "passer" :
+                    feature.equals("blocking") ? "defender" : feature.equals("hops") ? "player" : "player")
+                    + ", \"" + feature + "\")"), feature + " gates its production action");
+        }
+        assertTrue(runtime.contains("spawnLooseBall(current, drop, new Vector(0.0D, 0.12D, 0.0D), BallMode.SHOT,")
+                        && runtime.contains("tester.getUniqueId(), null, 1 - current.teams.getOrDefault"),
+                "The rebound tool creates a normal shot-mode ball with rebound eligibility.");
+        assertTrue(events.contains("new Event(\"drop-rebound-ball\""));
+        assertTrue(manager.contains("\"drop-rebound-ball\".equals(eventId)"));
+        assertTrue(manager.contains("hoops.debugDropBallForRebound(tester)"));
+        assertTrue(rules.contains("offensiveReboundsHaveAShorterShotClockThanDefensiveRebounds"));
     }
 
     @Test
