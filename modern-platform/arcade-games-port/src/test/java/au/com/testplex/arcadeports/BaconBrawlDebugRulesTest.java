@@ -50,6 +50,29 @@ class BaconBrawlDebugRulesTest {
         assertEquals(5.0F, ArcadePortRules.baconSaturationOnFoodChange());
     }
 
+    @Test void crispyFireDurationAndImpactFootprintAreTunableAndRestoreDefaults() {
+        assertEquals(5_000L, ArcadePortRules.baconCrispyBurnDurationMillis());
+        assertEquals(2.25D, ArcadePortRules.baconCrispyDashHitRadiusSquared());
+        assertEquals(2.25D, ArcadePortRules.baconCrispyFireContactRadiusSquared());
+        assertEquals(3, ArcadePortRules.baconCrispyImpactFireBlocks());
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "BACON_CRISPY_BURN_DURATION_MILLIS", 8_000L,
+                "BACON_CRISPY_DASH_HIT_RADIUS_SQUARED", 9.0D,
+                "BACON_CRISPY_FIRE_CONTACT_RADIUS_SQUARED", 4.0D,
+                "BACON_CRISPY_IMPACT_FIRE_BLOCKS", 5));
+        assertEquals(8_000L, ArcadePortRules.baconCrispyBurnDurationMillis());
+        assertEquals(9.0D, ArcadePortRules.baconCrispyDashHitRadiusSquared());
+        assertEquals(4.0D, ArcadePortRules.baconCrispyFireContactRadiusSquared());
+        assertEquals(5, ArcadePortRules.baconCrispyImpactFireBlocks());
+
+        GameDebugRuntimeOverrides.clear();
+        assertEquals(5_000L, ArcadePortRules.baconCrispyBurnDurationMillis());
+        assertEquals(2.25D, ArcadePortRules.baconCrispyDashHitRadiusSquared());
+        assertEquals(2.25D, ArcadePortRules.baconCrispyFireContactRadiusSquared());
+        assertEquals(3, ArcadePortRules.baconCrispyImpactFireBlocks());
+    }
+
     @Test void combatTimingReachAndBlastCollisionUseLiveRuleValues() {
         assertEquals(0.65D, ArcadePortRules.baconTimedHitKnockbackMultiplier(200L), 0.00001D);
         assertFalse(ArcadePortRules.shouldAcceptBaconAvatarPacketHit(true, true, true, false, 13.0D, true));

@@ -239,6 +239,10 @@ final class GameDebugVariableCatalog {
         if (name.equals("DEATH_TAG_TURTLE_MAX_STACKS")
                 || name.equals("DEATH_TAG_TURTLE_EFFECT_DURATION_TICKS")
                 || name.equals("DEATH_TAG_TURTLE_HITS_PER_WIND_CHARGE")) return 1.0D;
+        if (name.equals("BACON_CRISPY_BURN_DURATION_MILLIS")
+                || name.equals("BACON_CRISPY_DASH_HIT_RADIUS_SQUARED")
+                || name.equals("BACON_CRISPY_FIRE_CONTACT_RADIUS_SQUARED")) return 0.0D;
+        if (name.equals("BACON_CRISPY_IMPACT_FIRE_BLOCKS")) return 1.0D;
         if (name.equals("COW_CHARGE_TARGET_RADIUS_BLOCKS")
                 || name.equals("COW_CHARGE_TARGET_HEIGHT_BLOCKS")
                 || name.equals("HERD_SPAWN_RADIUS_BLOCKS")) return 0.1D;
@@ -391,6 +395,10 @@ final class GameDebugVariableCatalog {
         if (name.equals("DEATH_TAG_TURTLE_MAX_STACKS")) return 10.0D;
         if (name.equals("DEATH_TAG_TURTLE_EFFECT_DURATION_TICKS")) return 1_200.0D;
         if (name.equals("DEATH_TAG_TURTLE_HITS_PER_WIND_CHARGE")) return 100.0D;
+        if (name.equals("BACON_CRISPY_BURN_DURATION_MILLIS")) return 60_000.0D;
+        if (name.equals("BACON_CRISPY_DASH_HIT_RADIUS_SQUARED")
+                || name.equals("BACON_CRISPY_FIRE_CONTACT_RADIUS_SQUARED")) return 64.0D;
+        if (name.equals("BACON_CRISPY_IMPACT_FIRE_BLOCKS")) return 9.0D;
         if (name.equals("COW_CHARGE_HUNGER_INTERVAL_MILLIS")
                 || name.equals("HERD_UPDATE_INTERVAL_MILLIS")
                 || name.equals("COW_CHARGE_TARGET_COOLDOWN_MILLIS")) return 120_000.0D;

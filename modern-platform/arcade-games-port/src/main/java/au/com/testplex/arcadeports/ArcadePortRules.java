@@ -378,6 +378,10 @@ public final class ArcadePortRules {
     public static final long BACON_CRISPY_DASH_DURATION_MILLIS = 250L;
     public static final double BACON_CRISPY_DASH_SPEED = 1.0D;
     public static final long BACON_CRISPY_DASH_FIRE_MILLIS = 3_000L;
+    public static final long BACON_CRISPY_BURN_DURATION_MILLIS = 5_000L;
+    public static final double BACON_CRISPY_DASH_HIT_RADIUS_SQUARED = 2.25D;
+    public static final double BACON_CRISPY_FIRE_CONTACT_RADIUS_SQUARED = 2.25D;
+    public static final int BACON_CRISPY_IMPACT_FIRE_BLOCKS = 3;
     public static final long BACON_TIMED_HIT_SPAM_WINDOW_MILLIS = 250L;
     public static final long BACON_TIMED_HIT_GOOD_MIN_MILLIS = 500L;
     public static final long BACON_TIMED_HIT_GOOD_MAX_MILLIS = 900L;
@@ -440,6 +444,26 @@ public final class ArcadePortRules {
         int max = Math.max(1, GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", BACON_METER_MAX));
         int charge = Math.max(0, Math.min(max, current));
         return Math.min(max, charge + baconMeterGainForHit(critical, alivePlayers));
+    }
+
+    public static long baconCrispyBurnDurationMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "BACON_CRISPY_BURN_DURATION_MILLIS", BACON_CRISPY_BURN_DURATION_MILLIS));
+    }
+
+    public static double baconCrispyDashHitRadiusSquared() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "BACON_CRISPY_DASH_HIT_RADIUS_SQUARED", BACON_CRISPY_DASH_HIT_RADIUS_SQUARED));
+    }
+
+    public static double baconCrispyFireContactRadiusSquared() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "BACON_CRISPY_FIRE_CONTACT_RADIUS_SQUARED", BACON_CRISPY_FIRE_CONTACT_RADIUS_SQUARED));
+    }
+
+    public static int baconCrispyImpactFireBlocks() {
+        return Math.max(1, Math.min(9, GameDebugRuntimeOverrides.intValue(
+                "BACON_CRISPY_IMPACT_FIRE_BLOCKS", BACON_CRISPY_IMPACT_FIRE_BLOCKS)));
     }
 
     /** Keep the Bacon Brawl sidebar within Minecraft's 15-row limit without merging names. */

@@ -163,6 +163,14 @@ class GameDebugVariableCatalogTest {
     }
 
     @Test
+    void baconCrispyAbilityControlsHaveBoundedRanges() {
+        assertGameRange(ArcadePortGame.BACON_BRAWL, "BACON_CRISPY_BURN_DURATION_MILLIS", 0.0D, 60_000.0D);
+        assertGameRange(ArcadePortGame.BACON_BRAWL, "BACON_CRISPY_DASH_HIT_RADIUS_SQUARED", 0.0D, 64.0D);
+        assertGameRange(ArcadePortGame.BACON_BRAWL, "BACON_CRISPY_FIRE_CONTACT_RADIUS_SQUARED", 0.0D, 64.0D);
+        assertGameRange(ArcadePortGame.BACON_BRAWL, "BACON_CRISPY_IMPACT_FIRE_BLOCKS", 1.0D, 9.0D);
+    }
+
+    @Test
     void milkTheCowChargeAndHerdControlsHaveBoundedRanges() {
         assertGameRange(ArcadePortGame.MILK_THE_COW, "MILK_THE_COW_COW_CHARGE_HUNGER_INTERVAL_MILLIS", 1.0D, 120_000.0D);
         assertGameRange(ArcadePortGame.MILK_THE_COW, "MILK_THE_COW_COW_CHARGE_TARGET_RADIUS_BLOCKS", 0.1D, 64.0D);

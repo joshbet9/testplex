@@ -13923,18 +13923,20 @@ public final class ArcadePortManager implements Listener {
         UUID targetId = target.getUniqueId();
         UUID ownerId = owner.getUniqueId();
         boolean wasBurning = isBaconPlayerBurning(session, target);
-        target.setFireTicks(Math.max(target.getFireTicks(), 100));
+        int burnTicks = (int) Math.min(Integer.MAX_VALUE,
+                (ArcadePortRules.baconCrispyBurnDurationMillis() + 49L) / 50L);
+        target.setFireTicks(Math.max(target.getFireTicks(), burnTicks));
         target.getWorld().spawnParticle(Particle.FLAME,
                 target.getLocation().add(0.0D, 0.9D, 0.0D), 18,
                 0.25D, 0.45D, 0.25D, 0.02D);
         LivingEntity avatar = baconPlayerAvatar(session, target.getUniqueId());
         if (avatar != null) {
-            avatar.setFireTicks(Math.max(avatar.getFireTicks(), 100));
+            avatar.setFireTicks(Math.max(avatar.getFireTicks(), burnTicks));
             avatar.getWorld().spawnParticle(Particle.FLAME,
                     avatar.getLocation().add(0.0D, 0.8D, 0.0D), 18,
                     0.25D, 0.45D, 0.25D, 0.02D);
         }
-        session.baconCrispyFlamedUntil.put(targetId, now + 5_000L);
+        session.baconCrispyFlamedUntil.put(targetId, now + ArcadePortRules.baconCrispyBurnDurationMillis());
         session.baconLastDamager.put(targetId, ownerId);
         session.baconLastDamagedAt.put(targetId, now);
         session.baconLastHitSource.put(targetId, "crispy-bacon");
@@ -14135,7 +14137,8 @@ public final class ArcadePortManager implements Listener {
         flame.getWorld().spawnParticle(Particle.FLAME, flame, 5, 0.16D, 0.08D, 0.16D, 0.005D);
         placeBaconDashFireBlock(session, flame, id);
         for (Player target : alivePlayers(session)) {
-            if (target.equals(player) || target.getLocation().distanceSquared(flame) > 2.25D) continue;
+            if (target.equals(player) || target.getLocation().distanceSquared(flame)
+                    > ArcadePortRules.baconCrispyDashHitRadiusSquared()) continue;
             igniteCrispyBaconTarget(session, player, target, now);
         }
     }
@@ -14188,7 +14191,8 @@ public final class ArcadePortManager implements Listener {
                 block.getLocation().add(0.5D, 0.5D, 0.5D).distanceSquared(impact)));
         int placed = 0;
         for (Block candidate : candidates) {
-            if (placeBaconDashFireBlock(session, candidate.getLocation(), ownerId) && ++placed >= 3) break;
+            if (placeBaconDashFireBlock(session, candidate.getLocation(), ownerId)
+                    && ++placed >= ArcadePortRules.baconCrispyImpactFireBlocks()) break;
         }
     }
 
@@ -14204,7 +14208,8 @@ public final class ArcadePortManager implements Listener {
                     for (Player target : alivePlayers(session)) {
                         if (target.getUniqueId().equals(state.ownerId)
                                 || isBaconPlayerBurning(session, target)
-                                || target.getLocation().distanceSquared(fireCenter) > 2.25D) continue;
+                                || target.getLocation().distanceSquared(fireCenter)
+                                        > ArcadePortRules.baconCrispyFireContactRadiusSquared()) continue;
                         igniteCrispyBaconTarget(session, owner, target, now);
                     }
                 }
