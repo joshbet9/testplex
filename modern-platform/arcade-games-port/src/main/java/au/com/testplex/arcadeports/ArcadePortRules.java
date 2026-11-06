@@ -28,6 +28,27 @@ public final class ArcadePortRules {
     public static final double CASTLE_ASSAULT_TNT_KNOCKBACK_MULTIPLIER = 1.0D;
     public static final double CASTLE_ASSAULT_TNT_VERTICAL_KNOCKBACK = 0.35D;
     public static final int CASTLE_ASSAULT_TNT_KING_DAMAGE = 50;
+    public static final int CASTLE_ASSAULT_KILLSTREAK_TIER_1_KILLS = 2;
+    public static final int CASTLE_ASSAULT_KILLSTREAK_TIER_2_KILLS = 4;
+    public static final int CASTLE_ASSAULT_KILLSTREAK_TIER_3_KILLS = 6;
+    public static final int CASTLE_ASSAULT_KILLSTREAK_TIER_4_KILLS = 8;
+
+    public static int castleAssaultKillStreakRewardTier(int streak) {
+        if (streak < 1) return 0;
+        int first = Math.max(1, Math.min(997, GameDebugRuntimeOverrides.intValue(
+                "CASTLE_ASSAULT_KILLSTREAK_TIER_1_KILLS", CASTLE_ASSAULT_KILLSTREAK_TIER_1_KILLS)));
+        int second = Math.max(first + 1, Math.min(998, GameDebugRuntimeOverrides.intValue(
+                "CASTLE_ASSAULT_KILLSTREAK_TIER_2_KILLS", CASTLE_ASSAULT_KILLSTREAK_TIER_2_KILLS)));
+        int third = Math.max(second + 1, Math.min(999, GameDebugRuntimeOverrides.intValue(
+                "CASTLE_ASSAULT_KILLSTREAK_TIER_3_KILLS", CASTLE_ASSAULT_KILLSTREAK_TIER_3_KILLS)));
+        int fourth = Math.max(third + 1, Math.min(1_000, GameDebugRuntimeOverrides.intValue(
+                "CASTLE_ASSAULT_KILLSTREAK_TIER_4_KILLS", CASTLE_ASSAULT_KILLSTREAK_TIER_4_KILLS)));
+        if (streak == first) return 1;
+        if (streak == second) return 2;
+        if (streak == third) return 3;
+        if (streak == fourth) return 4;
+        return 0;
+    }
 
     public static int castleAssaultKingHealthForOpponents(int opponentCount) {
         int reference = Math.max(1, GameDebugRuntimeOverrides.intValue(

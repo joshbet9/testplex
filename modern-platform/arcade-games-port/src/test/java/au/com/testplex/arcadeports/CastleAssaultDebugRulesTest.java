@@ -59,5 +59,34 @@ final class CastleAssaultDebugRulesTest {
                 "CASTLE_ASSAULT_TNT_MAX_DAMAGE"));
         assertNotNull(GameDebugVariableCatalog.variable(ArcadePortGame.CASTLE_ASSAULT,
                 "CASTLE_ASSAULT_TNT_FUSE_TICKS"));
+        for (int tier = 1; tier <= 4; tier++) {
+            GameDebugVariableCatalog.Variable threshold = GameDebugVariableCatalog.variable(
+                    ArcadePortGame.CASTLE_ASSAULT, "CASTLE_ASSAULT_KILLSTREAK_TIER_" + tier + "_KILLS");
+            assertNotNull(threshold);
+            assertEquals(1.0D, threshold.minimum());
+            assertEquals(1_000.0D, threshold.maximum());
+        }
+    }
+
+    @Test void killStreakRewardThresholdsFollowProfilesAndResetToSourceSchedule() {
+        assertEquals(1, ArcadePortRules.castleAssaultKillStreakRewardTier(2));
+        assertEquals(2, ArcadePortRules.castleAssaultKillStreakRewardTier(4));
+        assertEquals(3, ArcadePortRules.castleAssaultKillStreakRewardTier(6));
+        assertEquals(4, ArcadePortRules.castleAssaultKillStreakRewardTier(8));
+        assertEquals(0, ArcadePortRules.castleAssaultKillStreakRewardTier(5));
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "CASTLE_ASSAULT_KILLSTREAK_TIER_1_KILLS", 1,
+                "CASTLE_ASSAULT_KILLSTREAK_TIER_2_KILLS", 3,
+                "CASTLE_ASSAULT_KILLSTREAK_TIER_3_KILLS", 5,
+                "CASTLE_ASSAULT_KILLSTREAK_TIER_4_KILLS", 7));
+        assertEquals(1, ArcadePortRules.castleAssaultKillStreakRewardTier(1));
+        assertEquals(2, ArcadePortRules.castleAssaultKillStreakRewardTier(3));
+        assertEquals(3, ArcadePortRules.castleAssaultKillStreakRewardTier(5));
+        assertEquals(4, ArcadePortRules.castleAssaultKillStreakRewardTier(7));
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertEquals(1, ArcadePortRules.castleAssaultKillStreakRewardTier(2));
+        assertEquals(0, ArcadePortRules.castleAssaultKillStreakRewardTier(1));
     }
 }

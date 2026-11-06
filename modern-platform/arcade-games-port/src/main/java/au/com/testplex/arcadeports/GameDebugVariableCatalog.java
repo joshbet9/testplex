@@ -229,6 +229,7 @@ final class GameDebugVariableCatalog {
         if (name.equals("HOOPS_MAX_PLAYERS")) return 2.0D;
         if (name.equals("CASTLE_ASSAULT_KING_HEALTH_BASE")
                 || name.equals("CASTLE_ASSAULT_KING_HEALTH_REFERENCE_PLAYERS")) return 1.0D;
+        if (name.startsWith("CASTLE_ASSAULT_KILLSTREAK_TIER_")) return 1.0D;
         if (name.equals("CASTLE_ASSAULT_TNT_THROW_SPEED")
                 || name.equals("CASTLE_ASSAULT_TNT_THROW_VERTICAL_SPEED")) return 0.0D;
         if (name.equals("PAINTBALL_SHOTGUN_PELLETS")) return 1.0D;
@@ -438,6 +439,7 @@ final class GameDebugVariableCatalog {
         if (name.equals("DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y")) return 5.0D;
         if (name.equals("CASTLE_ASSAULT_KING_HEALTH_BASE")) return 5_000.0D;
         if (name.equals("CASTLE_ASSAULT_KING_HEALTH_REFERENCE_PLAYERS")) return 64.0D;
+        if (name.startsWith("CASTLE_ASSAULT_KILLSTREAK_TIER_")) return 1_000.0D;
         if (name.equals("CASTLE_ASSAULT_CARRIER_FUSE_MILLIS")) return 600_000.0D;
         if (name.equals("CASTLE_ASSAULT_TNT_FUSE_TICKS")) return 1_200.0D;
         if (name.equals("CASTLE_ASSAULT_TNT_BASE_RADIUS")

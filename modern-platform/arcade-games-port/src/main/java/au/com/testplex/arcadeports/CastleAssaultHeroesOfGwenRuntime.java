@@ -4190,14 +4190,15 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void giveCastleKillStreakReward(Player player, String kit, int streak) {
-        if (streak < 2 || streak > 8 || streak % 2 != 0) return;
+        int rewardTier = ArcadePortRules.castleAssaultKillStreakRewardTier(streak);
+        if (rewardTier == 0) return;
         switch (kit) {
             case "alchemist" -> {
-                if (streak == 2) player.getInventory().addItem(castlePotion(Material.SPLASH_POTION,
+                if (rewardTier == 1) player.getInventory().addItem(castlePotion(Material.SPLASH_POTION,
                         PotionEffectType.SLOWNESS, 90 * 20, 0, "Splash Slowness Potion"));
-                else if (streak == 4) player.getInventory().addItem(castlePotion(Material.SPLASH_POTION,
+                else if (rewardTier == 2) player.getInventory().addItem(castlePotion(Material.SPLASH_POTION,
                         PotionEffectType.WEAKNESS, 90 * 20, 0, "Splash Weakness Potion"));
-                else if (streak == 6) player.getInventory().addItem(castlePotion(Material.SPLASH_POTION,
+                else if (rewardTier == 3) player.getInventory().addItem(castlePotion(Material.SPLASH_POTION,
                         PotionEffectType.INSTANT_DAMAGE, 1, 1, "Splash Harming II Potion"),
                         castlePotion(Material.SPLASH_POTION, PotionEffectType.INSTANT_DAMAGE, 1, 1,
                                 "Splash Harming II Potion"),
@@ -4209,36 +4210,36 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         PotionEffectType.REGENERATION, 10 * 20, 2, "Regeneration III Potion"));
             }
             case "archer" -> {
-                if (streak == 2) player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrows", "Kill-streak reward.", 8));
-                else if (streak == 4) player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrows", "Kill-streak reward.", 12));
-                else if (streak == 6) player.getInventory().addItem(castleEnchantedBook(Enchantment.PUNCH, 1, "Punch I"));
+                if (rewardTier == 1) player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrows", "Kill-streak reward.", 8));
+                else if (rewardTier == 2) player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrows", "Kill-streak reward.", 12));
+                else if (rewardTier == 3) player.getInventory().addItem(castleEnchantedBook(Enchantment.PUNCH, 1, "Punch I"));
                 else {
                     player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrows", "Kill-streak reward.", 32),
                             castleEnchantedBook(Enchantment.FLAME, 1, "Flame I"));
                 }
             }
             case "demolitionist" -> {
-                if (streak == 2) player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Kill-streak reward.", 2));
-                else if (streak == 4) player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Kill-streak reward.", 3));
-                else if (streak == 6) player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Kill-streak reward.", 4));
+                if (rewardTier == 1) player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Kill-streak reward.", 2));
+                else if (rewardTier == 2) player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Kill-streak reward.", 3));
+                else if (rewardTier == 3) player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Kill-streak reward.", 4));
                 else player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Kill-streak reward.", 5),
                         castleFlintAndSteel(30, true));
             }
             case "tank" -> {
-                if (streak == 2) player.getInventory().addItem(namedItem(Material.GOLDEN_APPLE,
+                if (rewardTier == 1) player.getInventory().addItem(namedItem(Material.GOLDEN_APPLE,
                         ChatColor.LIGHT_PURPLE + "Golden Applegate", "Kill-streak reward."));
-                else if (streak == 4) player.getInventory().addItem(castlePotion(Material.POTION,
+                else if (rewardTier == 2) player.getInventory().addItem(castlePotion(Material.POTION,
                         PotionEffectType.REGENERATION, 22 * 20, 1, "Regeneration II Potion"));
-                else if (streak == 6) player.getInventory().addItem(castlePotion(Material.POTION,
+                else if (rewardTier == 3) player.getInventory().addItem(castlePotion(Material.POTION,
                         PotionEffectType.RESISTANCE, 90 * 20, 0, "Resistance Potion"));
                 else player.getInventory().addItem(castleEnchantedBook(Enchantment.THORNS, 2, "Thorns II"));
             }
             default -> {
-                if (streak == 2) player.getInventory().addItem(namedItem(Material.GOLDEN_APPLE,
+                if (rewardTier == 1) player.getInventory().addItem(namedItem(Material.GOLDEN_APPLE,
                         ChatColor.LIGHT_PURPLE + "Golden Applegate", "Kill-streak reward."));
-                else if (streak == 4) player.getInventory().addItem(castlePotion(Material.SPLASH_POTION,
+                else if (rewardTier == 2) player.getInventory().addItem(castlePotion(Material.SPLASH_POTION,
                         PotionEffectType.INSTANT_HEALTH, 1, 1, "Splash Healing II Potion"));
-                else if (streak == 6) player.getInventory().addItem(castlePotion(Material.POTION,
+                else if (rewardTier == 3) player.getInventory().addItem(castlePotion(Material.POTION,
                         PotionEffectType.SPEED, 90 * 20, 1, "Speed II Potion"));
                 else player.getInventory().addItem(castleEnchantedBook(Enchantment.FIRE_ASPECT, 1, "Fire Aspect I"));
             }
