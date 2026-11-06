@@ -11546,6 +11546,7 @@ public final class ArcadePortManager implements Listener {
                 Material lower = feet.getType();
                 Material upper = feet.getRelative(BlockFace.UP).getType();
                 if (lower != Material.WATER && upper != Material.WATER) continue;
+                session.dragonEscapeDamageTaken.add(id);
                 if (player.getHealth() <= damage) {
                     eliminate(session, player, null, "was lost to the water");
                     if (active != session) return;
@@ -13680,6 +13681,13 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         session.dragonEscapeLeaped.add(id);
+        if ("jumper".equals(session.dragonEscapeKits.getOrDefault(id, "jumper")) && remaining == 1
+                && !player.isOnGround() && player.getVelocity().getY() < 0.0D) {
+            Location lastSafe = session.dragonEscapeSafeLocations.get(id);
+            if (lastSafe != null && lastSafe.getY() - player.getLocation().getY() >= 8.0D) {
+                session.dragonEscapeLastLeapAwaitingLanding.add(id);
+            }
+        }
         remaining--;
         session.dragonEscapeLeapUsesRemaining.put(id, remaining);
         session.dragonEscapeLeapReadyAt.put(id, now + ArcadePortRules.DRAGON_ESCAPE_LEAP_RECHARGE_MILLIS);
@@ -13881,7 +13889,13 @@ public final class ArcadePortManager implements Listener {
                     && owner.getLocation().getX() < block.getX() + 1.3D
                     && owner.getLocation().getZ() > block.getZ() - 0.3D
                     && owner.getLocation().getZ() < block.getZ() + 1.3D;
-            if (standingOnBrick) brick.used = true;
+            if (standingOnBrick) {
+                brick.used = true;
+                if (session.alive.contains(entry.getKey())) {
+                    session.dragonEscapeBuilderFootholds.computeIfAbsent(
+                            entry.getKey(), ignored -> new HashSet<>()).add(brick);
+                }
+            }
             if (ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(now, brick.expiresAt,
                     brick.used, standingOnBrick, session.alive.contains(entry.getKey()))
                     || block.getType() != Material.BRICKS) {
@@ -13907,7 +13921,20 @@ public final class ArcadePortManager implements Listener {
     private void updateDragonEscapeSafeLocations(Session session) {
         for (Player player : alivePlayers(session)) {
             if (player.isOnGround()) {
-                session.dragonEscapeSafeLocations.put(player.getUniqueId(), player.getLocation().clone());
+                UUID id = player.getUniqueId();
+                session.dragonEscapeSafeLocations.put(id, player.getLocation().clone());
+                if (session.dragonEscapeLastLeapAwaitingLanding.remove(id)) {
+                    session.dragonEscapeLastLeapRecovered.add(id);
+                }
+                List<Block> pillar = session.dragonEscapeDiggerPillar.get(id);
+                if (pillar != null && pillar.size() >= 6) {
+                    Block top = pillar.get(pillar.size() - 1);
+                    Location feet = player.getLocation();
+                    if (feet.getBlockX() == top.getX() && feet.getBlockZ() == top.getZ()
+                            && Math.abs(feet.getY() - (top.getY() + 1.0D)) < 0.2D) {
+                        session.dragonEscapeDiggerPillarCompleted.add(id);
+                    }
+                }
             }
         }
     }
@@ -14160,8 +14187,17 @@ public final class ArcadePortManager implements Listener {
         BlockState previous = target.getState();
         target.setType(held.getType(), false);
         scheduleDragonEscapeBlockRestore(session, previous, target.getBlockData().clone());
+        trackDragonEscapeDiggerPillar(session, id, target);
         consumeHeld(player);
         player.playSound(target.getLocation(), Sound.BLOCK_STONE_PLACE, 0.65F, 1.1F);
+    }
+
+    private void trackDragonEscapeDiggerPillar(Session session, UUID id, Block target) {
+        List<Block> pillar = session.dragonEscapeDiggerPillar.computeIfAbsent(id, ignored -> new ArrayList<>());
+        Block last = pillar.isEmpty() ? null : pillar.get(pillar.size() - 1);
+        if (last == null || last.getX() != target.getX() || last.getZ() != target.getZ()
+                || last.getY() + 1 != target.getY()) pillar.clear();
+        pillar.add(target);
     }
 
     private void scheduleDragonEscapeBlockRestore(Session session, BlockState previousState, BlockData expectedCurrent) {
@@ -14395,6 +14431,9 @@ public final class ArcadePortManager implements Listener {
         String path = dragonEscapePbPath(id, session.dragonEscapeMapResource);
         if (path.isEmpty()) return;
         long existing = plugin.getConfig().getLong(path + "time-ms", -1L);
+        if (existing > 0L && existing - elapsed >= 10_000L && isDragonEscapeGhostEnabled(id)) {
+            awardCatalogAchievement(player, "dragon-escape", "beat-the-clock");
+        }
         if (existing > 0L && Math.abs(existing - elapsed) <= 50L) {
             awardCatalogAchievement(player, "dragon-escape", "twinning-this-halloween");
         }
@@ -16217,7 +16256,8 @@ public final class ArcadePortManager implements Listener {
             UUID mineOwnerId = session.dragonEscapeMineLaunchedBy.remove(victimId);
             long launchedAt = session.dragonEscapeMineLaunchedAt.getOrDefault(victimId, 0L);
             session.dragonEscapeMineLaunchedAt.remove(victimId);
-            if (mineOwnerId != null && System.currentTimeMillis() - launchedAt <= 12_000L) {
+            if (mineOwnerId != null && ArcadePortRules.shouldCreditDragonEscapeRagebaiter(
+                    System.currentTimeMillis(), launchedAt, reason)) {
                 int mineKills = session.dragonEscapeDisruptorKills.merge(mineOwnerId, 1, Integer::sum);
                 Player mineOwner = session.players.get(mineOwnerId);
                 if (mineKills >= 3 && mineOwner != null) {
@@ -19066,10 +19106,32 @@ public final class ArcadePortManager implements Listener {
             awardCatalogAchievement(winner, "dragon-escape", "strats");
         }
         if ("digger".equals(session.dragonEscapeKits.getOrDefault(id, "jumper"))
-                && session.dragonEscapeDiggerUsesRemaining.getOrDefault(id,
-                        ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES) == 0
-                && !session.dragonEscapeDiggerRanThroughBrokenBlock.contains(id)) {
+                && session.dragonEscapeDiggerPillarCompleted.contains(id)) {
             awardCatalogAchievement(winner, "dragon-escape", "learn-to-code");
+        }
+        if ("jumper".equals(session.dragonEscapeKits.getOrDefault(id, "jumper"))
+                && session.dragonEscapeLastLeapRecovered.contains(id)) {
+            awardCatalogAchievement(winner, "dragon-escape", "last-leap");
+        }
+        if ("builder".equals(session.dragonEscapeKits.getOrDefault(id, "jumper"))
+                && session.dragonEscapeBuilderFootholds.getOrDefault(id, Set.of()).size() >= 3) {
+            awardCatalogAchievement(winner, "dragon-escape", "brick-by-brick");
+        }
+        Location dragon = session.dragonEscapeDragonLocation;
+        if (dragon != null && dragon.getWorld() == winner.getWorld()
+                && dragon.distanceSquared(winner.getLocation()) <= 25.0D) {
+            Vector dragonToWinner = winner.getLocation().toVector().subtract(dragon.toVector());
+            Vector courseForward = session.dragonEscapeWaypoints.size() >= 2
+                    ? session.dragonEscapeWaypoints.get(session.dragonEscapeWaypoints.size() - 1).toVector()
+                            .subtract(session.dragonEscapeWaypoints.get(session.dragonEscapeWaypoints.size() - 2).toVector())
+                    : new Vector(0.0D, 0.0D, 1.0D);
+            if (courseForward.lengthSquared() > 0.0D
+                    && dragonToWinner.dot(courseForward.normalize()) >= 0.0D) {
+                awardCatalogAchievement(winner, "dragon-escape", "hot-on-your-heels");
+            }
+        }
+        if (!session.dragonEscapeDamageTaken.contains(id)) {
+            awardCatalogAchievement(winner, "dragon-escape", "untouchable");
         }
     }
 
@@ -20536,16 +20598,21 @@ public final class ArcadePortManager implements Listener {
         List<ArcadeProgressCatalog.Milestone> milestones = ArcadeProgressCatalog.milestones(gameId);
         int slot = 20 - milestones.size() / 2;
         for (ArcadeProgressCatalog.Milestone milestone : milestones) {
-            long value = milestone.value(plugin.getConfig(), targetId, gameId);
-            long[] stages = milestone.stages();
+            ArcadeProgressCatalog.Progress progress = milestone.progress(plugin, targetId, gameId);
+            long value = progress.value();
+            long[] stages = progress.stages();
             int completed = 0;
             for (long stage : stages) if (value >= stage) completed++;
-            long next = completed < stages.length ? stages[completed] : milestone.maximum();
+            long next = completed < stages.length ? stages[completed] : progress.maximum();
             List<String> lore = new ArrayList<>();
             lore.add(" ");
             lore.add(ChatColor.GRAY + "Progress: " + ChatColor.WHITE + formatMilestoneValue(value, milestone.unit())
-                    + ChatColor.GRAY + " / " + ChatColor.WHITE + formatMilestoneValue(milestone.maximum(), milestone.unit()));
+                    + ChatColor.GRAY + " / " + ChatColor.WHITE + formatMilestoneValue(progress.maximum(), milestone.unit()));
             lore.add(ChatColor.LIGHT_PURPLE + "Stages completed: " + completed + "/" + stages.length);
+            if ("world-tour".equals(milestone.id())) {
+                lore.add(ChatColor.GRAY + "Complete every map currently in the Dragon Escape rotation.");
+                lore.add(ChatColor.DARK_GRAY + "Map additions/removals update progress automatically.");
+            }
             if (completed < stages.length) {
                 lore.add(ChatColor.YELLOW + "Next stage: " + ChatColor.WHITE + formatMilestoneValue(next, milestone.unit()));
                 lore.add(milestoneProgressBar(value, next));
@@ -20917,7 +20984,7 @@ public final class ArcadePortManager implements Listener {
                     .anyMatch(line -> line.toLowerCase(java.util.Locale.ROOT).startsWith(metricName + ":"));
             if (alreadyListed) continue;
             lore.add(ChatColor.GRAY + milestone.name() + ": " + ChatColor.WHITE
-                    + formatMilestoneValue(milestone.value(plugin.getConfig(), targetId, statsGameId), milestone.unit()));
+                    + formatMilestoneValue(milestone.progress(plugin, targetId, statsGameId).value(), milestone.unit()));
         }
         if (!compact) lore.add(ChatColor.DARK_GRAY + "Stats recorded by the isolated test server.");
         else lore.add(ChatColor.RESET + "Click for more details!");
@@ -22865,6 +22932,7 @@ public final class ArcadePortManager implements Listener {
                 // Preserve vanilla fall damage while the shared handler cancels the
                 // native event to keep all Arcade damage in one consistent path.
                 if (incomingDamage > 0.0D) {
+                    session.dragonEscapeDamageTaken.add(target.getUniqueId());
                     target.playEffect(EntityEffect.HURT);
                     target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.9F, 0.85F);
                     target.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
@@ -22927,6 +22995,9 @@ public final class ArcadePortManager implements Listener {
                             && projectile.getShooter() instanceof Player);
             if (!playerCausedDamage && incomingDamage > 0.0D
                     && session.alive.contains(target.getUniqueId())) {
+                if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
+                    session.dragonEscapeDamageTaken.add(target.getUniqueId());
+                }
                 target.playEffect(EntityEffect.HURT);
                 target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.9F, 0.85F);
                 target.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
@@ -25760,6 +25831,7 @@ public final class ArcadePortManager implements Listener {
                 BlockState replacedState = event.getBlockReplacedState();
                 BlockData placedData = placed.getBlockData().clone();
                 scheduleDragonEscapeBlockRestore(session, replacedState, placedData);
+                trackDragonEscapeDiggerPillar(session, player.getUniqueId(), placed);
             }
             return;
         }
@@ -28547,6 +28619,12 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> evolutionOverkillEligible = new HashSet<>();
         final Set<UUID> dragonEscapeStratsEligible = new HashSet<>();
         final Set<UUID> dragonEscapeDiggerRanThroughBrokenBlock = new HashSet<>();
+        final Map<UUID, List<Block>> dragonEscapeDiggerPillar = new HashMap<>();
+        final Set<UUID> dragonEscapeDiggerPillarCompleted = new HashSet<>();
+        final Set<UUID> dragonEscapeLastLeapAwaitingLanding = new HashSet<>();
+        final Set<UUID> dragonEscapeLastLeapRecovered = new HashSet<>();
+        final Map<UUID, Set<DragonEscapeBuilderBrick>> dragonEscapeBuilderFootholds = new HashMap<>();
+        final Set<UUID> dragonEscapeDamageTaken = new HashSet<>();
         final Map<UUID, Integer> dragonEscapeDisruptorKills = new HashMap<>();
         final Map<UUID, UUID> dragonEscapeMineLaunchedBy = new HashMap<>();
         final Map<UUID, Long> dragonEscapeMineLaunchedAt = new HashMap<>();

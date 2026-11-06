@@ -6,10 +6,66 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.UUID;
+import java.util.List;
+import java.util.Set;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.junit.jupiter.api.Test;
 
 class ArcadeProgressCatalogTest {
+    @Test
+    void dragonEscapeHasFourteenAchievementsAndWorldTourIsADynamicMilestone() {
+        var achievements = ArcadeProgressCatalog.achievements("dragon-escape");
+        assertEquals(14, achievements.size());
+        assertEquals(14, achievements.stream().map(ArcadeProgressCatalog.Achievement::id).distinct().count());
+        assertFalse(achievements.stream().anyMatch(entry -> entry.id().equals("world-tour")));
+        for (String id : List.of("ragebaiter", "learn-to-code", "last-leap", "brick-by-brick",
+                "beat-the-clock", "hot-on-your-heels", "untouchable")) {
+            assertTrue(achievements.stream().anyMatch(entry -> entry.id().equals(id)), id);
+        }
+        assertTrue(achievements.stream().anyMatch(entry -> entry.id().equals("ragebaiter")
+                && entry.name().equals("Ragebaiter") && entry.requirement().contains("7 seconds")));
+        assertTrue(achievements.stream().anyMatch(entry -> entry.id().equals("last-leap")
+                && entry.requirement().contains("8 blocks")));
+        assertTrue(achievements.stream().anyMatch(entry -> entry.id().equals("learn-to-code")
+                && entry.requirement().contains("six consecutive blocks")));
+        assertTrue(ArcadeProgressCatalog.milestones("dragon-escape").stream()
+                .anyMatch(milestone -> milestone.id().equals("world-tour") && milestone.name().equals("World Tour")));
+    }
+
+    @Test
+    void worldTourTracksTheCurrentRotationWithoutForgettingPreviouslyCompletedMaps() {
+        var initial = ArcadeProgressCatalog.worldTourProgress(
+                List.of("map-a", "map-b", "map-c", "map-d"), Set.of("map-a", "map-c"));
+        assertEquals(2, initial.value());
+        assertEquals(4, initial.maximum());
+        assertArrayEquals(new long[] {1, 2, 3, 4}, initial.stages());
+
+        var added = ArcadeProgressCatalog.worldTourProgress(
+                List.of("map-a", "map-b", "map-c", "map-d", "map-e"), Set.of("map-a", "map-c"));
+        assertEquals(2, added.value());
+        assertEquals(5, added.maximum());
+        assertArrayEquals(new long[] {2, 3, 4, 5}, added.stages());
+
+        var removed = ArcadeProgressCatalog.worldTourProgress(
+                List.of("map-a", "map-c", "map-c"), Set.of("map-a", "map-c", "map-z"));
+        assertEquals(2, removed.value());
+        assertEquals(2, removed.maximum());
+        assertArrayEquals(new long[] {1, 2}, removed.stages());
+
+        var none = ArcadeProgressCatalog.worldTourProgress(List.of(), Set.of());
+        assertEquals(0, none.value());
+        assertEquals(1, none.maximum()); // No maps must never appear mastered.
+    }
+
+    @Test
+    void ragebaiterRequiresAnActualFallWithinSevenSecondsOfMineLaunch() {
+        assertTrue(ArcadePortRules.shouldCreditDragonEscapeRagebaiter(15_000L, 8_000L, "fell into the void"));
+        assertFalse(ArcadePortRules.shouldCreditDragonEscapeRagebaiter(15_001L, 8_000L, "fell into the void"));
+        assertFalse(ArcadePortRules.shouldCreditDragonEscapeRagebaiter(14_000L, 8_000L, "was caught by Douglas"));
+        assertFalse(ArcadePortRules.shouldCreditDragonEscapeRagebaiter(14_000L, 0L, "fell"));
+        assertFalse(ArcadePortRules.shouldCreditDragonEscapeRagebaiter(7_999L, 8_000L, "fell"));
+    }
+
     @Test
     void deathTagHasFourteenReviewedAchievementsAndNoCircularKitUnlocks() {
         var achievements = ArcadeProgressCatalog.achievements("death-tag");

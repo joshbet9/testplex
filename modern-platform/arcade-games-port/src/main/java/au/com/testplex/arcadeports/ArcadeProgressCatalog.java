@@ -2,8 +2,10 @@ package au.com.testplex.arcadeports;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.plugin.java.JavaPlugin;
 
 /** Local Testplex Arcade achievements and long-term milestone tracks. */
 public final class ArcadeProgressCatalog {
@@ -28,6 +30,36 @@ public final class ArcadeProgressCatalog {
             String path = "local-stats." + playerId + "." + gameId + ".";
             return Math.max(0L, config.getLong(path + statKey, 0L));
         }
+
+        /** Dynamic tracks are derived from live content, not a stale stored target. */
+        public Progress progress(JavaPlugin plugin, UUID playerId, String gameId) {
+            if ("dragon-escape".equals(gameId) && "world-tour".equals(id)) {
+                List<SourceMapCatalog.MapArchive> maps = SourceMapCatalog.mapsFor(plugin, ArcadePortGame.DRAGON_ESCAPE);
+                Set<String> completed = maps.stream().map(SourceMapCatalog.MapArchive::resource).filter(resource -> {
+                    String key = ArcadePortRules.dragonEscapeMapStorageKey(resource);
+                    return !key.isEmpty() && plugin.getConfig().getLong(
+                            "dragon-escape-pb." + playerId + "." + key + ".time-ms", -1L) > 0L;
+                }).collect(java.util.stream.Collectors.toSet());
+                return worldTourProgress(maps.stream().map(SourceMapCatalog.MapArchive::resource).toList(), completed);
+            }
+            return new Progress(value(plugin.getConfig(), playerId, gameId), maximum, stages());
+        }
+    }
+
+    public record Progress(long value, long maximum, long[] stages) { }
+
+    /** A change to the selectable map pool immediately changes World Tour's target and progress. */
+    static Progress worldTourProgress(List<String> rotation, Set<String> completed) {
+        Set<String> playable = new java.util.HashSet<>(rotation);
+        playable.removeIf(resource -> resource == null || resource.isBlank());
+        if (playable.isEmpty()) return new Progress(0L, 1L, new long[] {1L});
+        long total = playable.size();
+        long value = playable.stream().filter(completed::contains).count();
+        java.util.TreeSet<Long> thresholds = new java.util.TreeSet<>();
+        for (int fraction = 1; fraction <= 4; fraction++) {
+            thresholds.add((total * fraction + 3L) / 4L);
+        }
+        return new Progress(value, total, thresholds.stream().mapToLong(Long::longValue).toArray());
     }
 
     private static final Map<String, List<Achievement>> ACHIEVEMENTS = Map.ofEntries(
@@ -87,9 +119,14 @@ public final class ArcadeProgressCatalog {
                     a("to-hell-and-back", "To Hell and Back", "Finish Through Hell 5 times."),
                     a("plundered", "Plundered", "Finish Pirate Bay 5 times."),
                     a("strats", "Strats", "As Warper, warp to a leader at least 40 blocks ahead and win."),
-                    a("ragebaiter", "Ragebaiter", "Kill 3 players with Disruptor TNT in one game."),
+                    a("ragebaiter", "Ragebaiter", "Cause 3 opponents to fall within 7 seconds of launching them with Disruptor TNT, in one game."),
                     a("twinning-this-halloween", "Twinning This Halloween?", "Tie a race with your ghost."),
-                    a("learn-to-code", "Learn to Code", "As Digger, use all breaks in a winning race without running through a broken block."))),
+                    a("learn-to-code", "Learn to Code", "As Digger, pillar straight up six consecutive blocks and win the race."),
+                    a("last-leap", "Last Leap", "As Jumper, use your final Leap after falling at least 8 blocks, recover onto the course, and win."),
+                    a("brick-by-brick", "Brick by Brick", "As Builder, use 3 different temporary Builder bricks as footholds in one winning race."),
+                    a("beat-the-clock", "Beat the Clock", "With your PB ghost enabled, beat your previous best time by at least 10 seconds."),
+                    a("hot-on-your-heels", "Hot on Your Heels", "Finish a race with Douglas within 5 blocks behind you."),
+                    a("untouchable", "Untouchable", "Win a Dragon Escape race without taking any damage."))),
             Map.entry("dragons", List.of(
                     a("win-three-in-a-row", "Win 3 in a row", "Win three completed Dragons games consecutively."),
                     a("survive-five-minutes", "Survive 5 minutes", "Stay alive in a Dragons match for at least five minutes."),
@@ -290,7 +327,7 @@ public final class ArcadeProgressCatalog {
             Map.entry("bacon-brawl", List.of(m("wins", "Wins", "wins", 250, "wins"), m("kills", "Kills", "kills", 1000, "kills"))),
             Map.entry("bomb-lobbers", List.of(m("wins", "Wins", "wins", 500, "wins"), m("kills", "Kills", "kills", 1000, "kills"))),
             Map.entry("death-tag", List.of(m("kills", "Kills", "kills", 500, "kills"), m("chaser-wins", "Chaser Wins", "chaser-wins", 125, "wins"), m("runner-wins", "Runner Wins", "runner-wins", 125, "wins"))),
-            Map.entry("dragon-escape", List.of(m("wins", "Wins", "wins", 2000, "wins"), m("courses", "Course Completes", "course-completes", 3000, "courses"), m("distance", "Blocks Travelled", "blocks-travelled", 750000, "blocks"))),
+            Map.entry("dragon-escape", List.of(m("wins", "Wins", "wins", 2000, "wins"), m("courses", "Course Completes", "course-completes", 3000, "courses"), m("distance", "Blocks Travelled", "blocks-travelled", 750000, "blocks"), m("world-tour", "World Tour", "world-tour", 1, "maps"))),
             Map.entry("dragons", List.of(m("survival", "Survive", "survival-millis", 36_000_000, "milliseconds"), m("wins", "Wins", "wins", 250, "wins"))),
             Map.entry("evolution", List.of(m("wins", "Wins", "wins", 250, "wins"), m("kills", "Kills", "kills", 2000, "kills"))),
             Map.entry("gladiators", List.of(m("wins", "Wins", "wins", 250, "wins"), m("kills", "Kills", "kills", 1000, "kills"), m("brawler", "Brawler", "brawler", 3, "kills"), m("precision", "Precision", "precision", 1, "wins"), m("swift-kill", "Swift Kill", "swift-kill", 15, "first bloods"), m("loser-bracket-wins", "Loser Bracket Wins", "loser-bracket-wins", 100, "wins"))),

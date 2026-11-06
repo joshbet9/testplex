@@ -690,6 +690,13 @@ public final class ArcadePortRules {
         return thrownAtMillis + DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS;
     }
 
+    /** Ragebaiter only credits a fall within seven seconds of the actual mine launch. */
+    public static boolean shouldCreditDragonEscapeRagebaiter(long nowMillis, long launchedAtMillis, String reason) {
+        return reason != null && reason.toLowerCase(java.util.Locale.ROOT).contains("fell")
+                && launchedAtMillis > 0L && nowMillis >= launchedAtMillis
+                && nowMillis - launchedAtMillis <= 7_000L;
+    }
+
     public static boolean isDragonEscapeDiggerOpeningLocked(long elapsedMillis) {
         return elapsedMillis < DRAGON_ESCAPE_DIGGER_OPENING_LOCKOUT_MILLIS;
     }
