@@ -400,6 +400,14 @@ public final class ArcadePortRules {
     public static boolean shouldAwardBombLobbersTwoBirdsOneStone(int killsFromOneTnt) {
         return killsFromOneTnt >= BOMB_LOBBERS_TWO_BIRDS_KILLS;
     }
+    /** Counts kills by a single Super Explosive or Fiery TNT activation, not a game-wide tally. */
+    public static boolean shouldAwardBombLobbersOver9000(String tntPowerupType, int killsFromOneTnt) {
+        return ("super-tnt".equals(tntPowerupType) || "fiery-tnt".equals(tntPowerupType))
+                && killsFromOneTnt >= 3;
+    }
+    public static boolean bombLobbersTechnicalThrowWithinRange(double distanceInBlocks) {
+        return Double.isFinite(distanceInBlocks) && distanceInBlocks < 10.0D;
+    }
     public static int nextBombLobbersTntKillCount(int currentKills, boolean creditedKill) {
         int current = Math.max(0, currentKills);
         return creditedKill ? Math.min(64, current + 1) : current;
@@ -1079,7 +1087,7 @@ public final class ArcadePortRules {
 
     /** Blast Proof is a lifetime Armorer-kit win count, not a single team victory. */
     public static boolean shouldAwardBombLobbersBlastProof(int completedArmorerWins) {
-        return completedArmorerWins >= 5;
+        return completedArmorerWins >= 10;
     }
 
     public static boolean shouldCountBombLobbersArmorerWin(boolean matchWon,
