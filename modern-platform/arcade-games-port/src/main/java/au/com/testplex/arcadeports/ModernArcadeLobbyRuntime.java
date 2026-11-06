@@ -1386,6 +1386,14 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 features.put(weaponKey, new DebugFeature(weaponKey, "Weapon: " + humanizeDebugKey(kit), Material.ENDER_PEARL,
                         "Allow this tester to fire the selected " + humanizeDebugKey(kit) + " weapon.", true));
             }
+            features.put("water-bombs", new DebugFeature("water-bombs", "Water Bombs", Material.SPLASH_POTION,
+                    "Allow the tester to launch the normal water bomb projectile.", true));
+            features.put("save-me-marker", new DebugFeature("save-me-marker", "Save Me markers", Material.ARMOR_STAND,
+                    "Create this tester's normal marker after elimination so a teammate can revive them.", true));
+            features.put("water-bomb-revives", new DebugFeature("water-bomb-revives", "Water Bomb revives", Material.TOTEM_OF_UNDYING,
+                    "Allow this tester's Water Bomb to revive eligible teammates at their markers.", true));
+            features.put("water-bomb-cleanse", new DebugFeature("water-bomb-cleanse", "Water Bomb cleanse", Material.WATER_BUCKET,
+                    "Allow this tester's Water Bomb to restore living teammates' paint and armour.", true));
         }
         if (game == ArcadePortGame.SPLEEF) {
             features.put("block-breaking", new DebugFeature("block-breaking", "Block breaking", Material.IRON_SHOVEL,
@@ -1590,7 +1598,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 || (game == ArcadePortGame.DRAGONS && key.startsWith("ability-"))
                 || (game == ArcadePortGame.ONE_IN_THE_QUIVER && key.startsWith("ability-"))
                 || (game == ArcadePortGame.PAINTBALL
-                        && ("ignore-reload".equals(key) || key.startsWith("weapon-")))
+                        && (Set.of("ignore-reload", "water-bombs", "save-me-marker", "water-bomb-revives",
+                                "water-bomb-cleanse").contains(key) || key.startsWith("weapon-")))
                 || (game == ArcadePortGame.SPLEEF && key.startsWith("ability-"))
                 || (game == ArcadePortGame.SPLEEF && "block-breaking".equals(key))
                 || (game == ArcadePortGame.RUNNER && key.startsWith("ability-"))

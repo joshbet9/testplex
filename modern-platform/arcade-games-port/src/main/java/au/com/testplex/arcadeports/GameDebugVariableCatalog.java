@@ -222,6 +222,10 @@ final class GameDebugVariableCatalog {
 
     private static double minimum(String name, double defaultValue, Kind kind) {
         if (kind == Kind.BOOLEAN) return 0.0D;
+        if (name.equals("PAINTBALL_SPEEDRUNNER_MAX_MILLIS")
+                || name.equals("PAINTBALL_GROUND_STARE_MILLIS")) return 0.0D;
+        if (name.equals("PAINTBALL_FLAWLESS_MIN_STARTERS") || name.equals("PAINTBALL_KILLING_SPREE_KILLS")
+                || name.equals("PAINTBALL_LAST_STAND_KILLS") || name.equals("PAINTBALL_SHARE_YOUR_SCREEN_SHOTS")) return 1.0D;
         if (name.startsWith("COW_BOMB_") || name.startsWith("BODY_SLAM_")
                 || name.equals("ASSIST_CREDIT_WINDOW_MILLIS")) {
             if (name.equals("COW_BOMB_LIFETIME_MILLIS")) return 1.0D;
@@ -454,6 +458,10 @@ final class GameDebugVariableCatalog {
         if (name.contains("_LAUNCH_VERTICAL") || name.endsWith("_EGG_SPEED")) return 5.0D;
         if (name.equals("HOOPS_MIN_PLAYERS") || name.equals("HOOPS_MAX_PLAYERS")) return 16.0D;
         if (name.equals("QUIVER_SCORE_TO_WIN")) return 200.0D;
+        if (name.equals("PAINTBALL_SPEEDRUNNER_MAX_MILLIS")
+                || name.equals("PAINTBALL_GROUND_STARE_MILLIS")) return 600_000.0D;
+        if (name.equals("PAINTBALL_FLAWLESS_MIN_STARTERS") || name.equals("PAINTBALL_KILLING_SPREE_KILLS")
+                || name.equals("PAINTBALL_LAST_STAND_KILLS") || name.equals("PAINTBALL_SHARE_YOUR_SCREEN_SHOTS")) return 100.0D;
         if (name.equals("PERFECT_SCORE_PERCENT")) return 100.0D;
         if (name.equals("HEROES_OF_GWEN_OVERTIME_DELAY_MILLIS")) return 3_600_000.0D;
         if (name.equals("HEROES_OF_GWEN_OVERTIME_PATH_ADVANCE_DISTANCE_SQUARED")) return 256.0D;

@@ -67,6 +67,31 @@ final class PaintballDebugRulesTest {
         assertTrue(GameDebugRuntimeOverrides.isDebugSession());
     }
 
+    @Test void profileOverridesChangeAchievementConditionsAndResetThem() {
+        GameDebugRuntimeOverrides.activate(java.util.Map.of(
+                "PAINTBALL_SPEEDRUNNER_MAX_MILLIS", 60_000L,
+                "PAINTBALL_FLAWLESS_MIN_STARTERS", 2,
+                "PAINTBALL_KILLING_SPREE_KILLS", 2,
+                "PAINTBALL_LAST_STAND_KILLS", 1,
+                "PAINTBALL_SHARE_YOUR_SCREEN_SHOTS", 1,
+                "PAINTBALL_GROUND_STARE_MILLIS", 1_000L));
+
+        assertTrue(ArcadePortRules.shouldAwardPaintballSpeedrunner(45_000L, true));
+        assertTrue(ArcadePortRules.shouldAwardPaintballFlawlessVictory(2, 2, true));
+        assertTrue(ArcadePortRules.shouldAwardPaintballKillingSpree(2));
+        assertTrue(ArcadePortRules.shouldAwardPaintballLastStand(1));
+        assertEquals(1, ArcadePortRules.paintballShareYourScreenShots());
+        assertEquals(1_000L, ArcadePortRules.paintballGroundStareMillis());
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertFalse(ArcadePortRules.shouldAwardPaintballSpeedrunner(45_000L, true));
+        assertFalse(ArcadePortRules.shouldAwardPaintballFlawlessVictory(2, 2, true));
+        assertFalse(ArcadePortRules.shouldAwardPaintballKillingSpree(2));
+        assertFalse(ArcadePortRules.shouldAwardPaintballLastStand(1));
+        assertEquals(3, ArcadePortRules.paintballShareYourScreenShots());
+        assertEquals(20_000L, ArcadePortRules.paintballGroundStareMillis());
+    }
+
     @Test void meaningfulPaintballTuningIsExposedWithBoundedProfileRanges() {
         GameDebugVariableCatalog.Variable reload = GameDebugVariableCatalog.variable(
                 ArcadePortGame.PAINTBALL, "PAINTBALL_RIFLE_RELOAD_MILLIS");
@@ -74,15 +99,25 @@ final class PaintballDebugRulesTest {
                 ArcadePortGame.PAINTBALL, "PAINTBALL_SHOTGUN_PELLETS");
         GameDebugVariableCatalog.Variable knockback = GameDebugVariableCatalog.variable(
                 ArcadePortGame.PAINTBALL, "PAINTBALL_KNOCKBACK_MULTIPLIER");
+        GameDebugVariableCatalog.Variable abilityThreshold = GameDebugVariableCatalog.variable(
+                ArcadePortGame.PAINTBALL, "PAINTBALL_KILLING_SPREE_KILLS");
+        GameDebugVariableCatalog.Variable stareMillis = GameDebugVariableCatalog.variable(
+                ArcadePortGame.PAINTBALL, "PAINTBALL_GROUND_STARE_MILLIS");
         assertNotNull(reload);
         assertNotNull(pellets);
         assertNotNull(knockback);
+        assertNotNull(abilityThreshold);
+        assertNotNull(stareMillis);
         assertEquals(1.0D, reload.minimum());
         assertEquals(10_000.0D, reload.maximum());
         assertEquals(1.0D, pellets.minimum());
         assertEquals(32.0D, pellets.maximum());
         assertEquals(0.0D, knockback.minimum());
         assertEquals(3.0D, knockback.maximum());
+        assertEquals(1.0D, abilityThreshold.minimum());
+        assertEquals(100.0D, abilityThreshold.maximum());
+        assertEquals(0.0D, stareMillis.minimum());
+        assertEquals(600_000.0D, stareMillis.maximum());
         assertNotEquals(reload.defaultValue(), GameDebugVariableCatalog.clamp(reload, 250.0D));
     }
 }

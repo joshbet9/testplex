@@ -58,7 +58,7 @@ class GameDebugEventCatalogTest {
         assertEquals(List.of("refill-arrow", "use-kit-ability", "test-bot-kill", "refresh-kit"),
                 GameDebugEventCatalog.events(ArcadePortGame.ONE_IN_THE_QUIVER).stream()
                         .map(GameDebugEventCatalog.Event::id).toList());
-        assertEquals(List.of("restore-armour", "fire-shot", "refresh-kit"),
+        assertEquals(List.of("restore-armour", "fire-shot", "throw-water-bomb", "refresh-kit"),
                 GameDebugEventCatalog.events(ArcadePortGame.PAINTBALL).stream()
                         .map(GameDebugEventCatalog.Event::id).toList());
         assertEquals(List.of("promote-self", "use-kit-ability", "refresh-kit"),
@@ -173,6 +173,28 @@ class GameDebugEventCatalogTest {
                 "the event must share reload, heat, projectile, and cosmetic behavior with regular firing");
         assertTrue(manager.contains("session.paintballShotOwners.size() > projectilesBefore"));
         assertTrue(manager.contains("if (triggered) GameDebugRuntimeOverrides.markDebugSession()"));
+    }
+
+    @Test
+    void paintballWaterBombEventUsesNormalProjectilePathAndFeatureGates() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String runtime = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
+        assertTrue(manager.contains("if (type == ArcadePortGame.PAINTBALL && \"throw-water-bomb\".equals(eventId))"));
+        assertTrue(manager.contains("private boolean throwPaintballWaterBomb(Session session, Player player"));
+        assertTrue(manager.contains("player.launchProjectile(ThrownPotion.class)"));
+        assertTrue(manager.contains("session.paintballWaterBombs.add(potion.getUniqueId())"));
+        assertTrue(manager.contains("\"water-bombs\", true)"));
+        assertTrue(manager.contains("\"water-bomb-revives\", true)"));
+        assertTrue(manager.contains("\"water-bomb-cleanse\", true)"));
+        assertTrue(manager.contains("\"save-me-marker\", true)"));
+        assertTrue(runtime.contains("features.put(\"water-bombs\""));
+        assertTrue(runtime.contains("features.put(\"water-bomb-revives\""));
+        assertTrue(runtime.contains("features.put(\"water-bomb-cleanse\""));
     }
 
     @Test

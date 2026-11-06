@@ -78,7 +78,9 @@ final class GameDebugEventCatalog {
             new Event("restore-armour", "Restore Paintball Armour", Material.LEATHER_CHESTPLATE,
                     "Restore your normal four armour pieces using the selected team's colours."),
             new Event("fire-shot", "Fire Selected Weapon", Material.SNOWBALL,
-                    "Fire your selected Paintball weapon through its ordinary ammo, cooldown, heat, and projectile path."));
+                    "Fire your selected Paintball weapon through its ordinary ammo, cooldown, heat, and projectile path."),
+            new Event("throw-water-bomb", "Throw Water Bomb", Material.SPLASH_POTION,
+                    "Launch the selected tester's normal Water Bomb projectile to test teammate cleansing and revives."));
     private static final List<Event> DEATH_TAG = List.of(
             new Event("promote-self", "Promote Self to Chaser", Material.SKELETON_SKULL,
                     "Run the normal Runner-to-Chaser conversion on yourself."),

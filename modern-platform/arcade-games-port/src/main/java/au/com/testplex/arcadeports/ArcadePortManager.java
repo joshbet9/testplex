@@ -1292,6 +1292,10 @@ public final class ArcadePortManager implements Listener {
             setPaintballArmor(session, tester);
             triggered = true;
         }
+        if (type == ArcadePortGame.PAINTBALL && "throw-water-bomb".equals(eventId)) {
+            triggered = throwPaintballWaterBomb(session, tester, System.currentTimeMillis(), false);
+            if (triggered) GameDebugRuntimeOverrides.markDebugSession();
+        }
         if (type == ArcadePortGame.PAINTBALL && "fire-shot".equals(eventId)) {
             UUID testerId = tester.getUniqueId();
             String kit = session.paintballKits.getOrDefault(testerId, "rifle");
@@ -11394,7 +11398,7 @@ public final class ArcadePortManager implements Listener {
     private void recordPaintballAchievements(Session session, Player winner) {
         UUID id = winner.getUniqueId();
         if ("rifle".equals(session.paintballKits.getOrDefault(id, "rifle"))
-                && session.paintballRifleShots.getOrDefault(id, 0) >= 3
+                && session.paintballRifleShots.getOrDefault(id, 0) >= ArcadePortRules.paintballShareYourScreenShots()
                 && !session.paintballRifleMissed.contains(id)) {
             awardCatalogAchievement(winner, "paintball", "share-your-screen");
         }
@@ -11415,7 +11419,7 @@ public final class ArcadePortManager implements Listener {
             UUID id = last.getUniqueId();
             if (last.getLocation().getPitch() >= 75.0F) {
                 long since = session.paintballGroundStareSince.computeIfAbsent(id, ignored -> now);
-                if (now - since >= 20_000L) {
+                if (now - since >= ArcadePortRules.paintballGroundStareMillis()) {
                     awardCatalogAchievement(last, "paintball", "how-does-he-know");
                 }
             } else {
@@ -11797,6 +11801,8 @@ public final class ArcadePortManager implements Listener {
 
 
     private ArmorStand spawnPaintballSaveMeMarker(Session session, Player player, Player killer) {
+        if (player == null || session == null || active != session || session.type != ArcadePortGame.PAINTBALL
+                || !debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.PAINTBALL, "save-me-marker", true)) return null;
         Location location = player.getLocation().clone();
         ArmorStand marker = session.world.spawn(location, ArmorStand.class);
         marker.setArms(true);
@@ -11855,16 +11861,22 @@ public final class ArcadePortManager implements Listener {
         UUID throwerId = thrower.getUniqueId();
         int throwerTeam = session.teams.getOrDefault(throwerId, -1);
         if (throwerTeam < 0) return;
+        boolean reviveMarkers = debugFeatureEnabled(throwerId, ArcadePortGame.PAINTBALL,
+                "water-bomb-revives", true);
+        boolean paintCleanse = debugFeatureEnabled(throwerId, ArcadePortGame.PAINTBALL,
+                "water-bomb-cleanse", true);
 
         List<UUID> revive = new ArrayList<>();
-        for (Map.Entry<UUID, ArmorStand> entry : new ArrayList<>(session.paintballSaveMeMarkers.entrySet())) {
+        for (Map.Entry<UUID, ArmorStand> entry : reviveMarkers
+                ? new ArrayList<>(session.paintballSaveMeMarkers.entrySet()) : List.<Map.Entry<UUID, ArmorStand>>of()) {
             UUID targetId = entry.getKey();
             ArmorStand marker = entry.getValue();
             if (marker == null || !marker.isValid()) {
                 removePaintballSaveMeMarker(session, targetId);
                 continue;
             }
-            if (session.teams.getOrDefault(targetId, -2) != throwerTeam) continue;
+            if (session.teams.getOrDefault(targetId, -2) != throwerTeam
+                    || !debugFeatureEnabled(targetId, ArcadePortGame.PAINTBALL, "save-me-marker", true)) continue;
             if (marker.getLocation().clone().add(0.0D, 1.0D, 0.0D).distanceSquared(impact)
                     <= ArcadePortRules.paintballSaveMeRadius() * ArcadePortRules.paintballSaveMeRadius()) {
                 revive.add(targetId);
@@ -11900,7 +11912,7 @@ public final class ArcadePortManager implements Listener {
             session.lastLocations.put(targetId, respawn.clone());
         }
 
-        for (Player teammate : alivePlayers(session)) {
+        for (Player teammate : paintCleanse ? alivePlayers(session) : List.<Player>of()) {
             if (session.teams.getOrDefault(teammate.getUniqueId(), -2) != throwerTeam) continue;
             if (!ArcadePortRules.shouldPaintballWaterBombAffectPlayer(
                     teammate.getLocation().distanceSquared(impact), true)) continue;
@@ -11914,6 +11926,29 @@ public final class ArcadePortManager implements Listener {
         thrower.playSound(impact, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8F, 1.25F);
         impact.getWorld().spawnParticle(Particle.SPLASH, impact, 24, 0.5D, 0.35D, 0.5D, 0.04D);
         checkRoundEnd(session);
+    }
+
+    private boolean throwPaintballWaterBomb(Session session, Player player, long now, boolean consumeHeldItem) {
+        if (session == null || player == null || active != session || session.type != ArcadePortGame.PAINTBALL
+                || !session.alive.contains(player.getUniqueId())) return false;
+        UUID id = player.getUniqueId();
+        if (!debugFeatureEnabled(id, ArcadePortGame.PAINTBALL, "water-bombs", true)) {
+            player.sendActionBar(ChatColor.RED + "Water Bombs are disabled in your debug profile.");
+            return false;
+        }
+        long cooldown = GameDebugRuntimeOverrides.longValue("PAINTBALL_WATER_BOMB_COOLDOWN_MILLIS",
+                ArcadePortRules.PAINTBALL_WATER_BOMB_COOLDOWN_MILLIS);
+        long last = session.paintballWaterBombLastThrowAt.getOrDefault(id, 0L);
+        if (now - last < cooldown) return false;
+        session.paintballWaterBombLastThrowAt.put(id, now);
+        if (consumeHeldItem) consumeHeld(player);
+        ThrownPotion potion = player.launchProjectile(ThrownPotion.class);
+        potion.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(0.8D));
+        session.entities.add(potion);
+        session.paintballWaterBombs.add(potion.getUniqueId());
+        player.playSound(player.getLocation(), Sound.ENTITY_EGG_THROW, 0.8F, 1.0F);
+        player.sendMessage(ChatColor.AQUA + "Water Bomb thrown!");
+        return true;
     }
 
     /** Match Reborn's CustomDamageEvent.AddKnockback("Paintball", 2) impulse. */
@@ -26168,18 +26203,7 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.PAINTBALL) {
             if (isPaintballWaterBomb(heldItem)) {
                 event.setCancelled(true);
-                UUID id = player.getUniqueId();
-                long now = System.currentTimeMillis();
-                long last = session.paintballWaterBombLastThrowAt.getOrDefault(id, 0L);
-                if (now - last < GameDebugRuntimeOverrides.longValue("PAINTBALL_WATER_BOMB_COOLDOWN_MILLIS", ArcadePortRules.PAINTBALL_WATER_BOMB_COOLDOWN_MILLIS)) return;
-                session.paintballWaterBombLastThrowAt.put(id, now);
-                consumeHeld(player);
-                ThrownPotion potion = player.launchProjectile(ThrownPotion.class);
-                potion.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(0.8D));
-                session.entities.add(potion);
-                session.paintballWaterBombs.add(potion.getUniqueId());
-                player.playSound(player.getLocation(), Sound.ENTITY_EGG_THROW, 0.8F, 1.0F);
-                player.sendMessage(ChatColor.AQUA + "Water Bomb thrown!");
+                throwPaintballWaterBomb(session, player, System.currentTimeMillis(), true);
                 return;
             }
             String kit = paintballKitForItem(heldItem);

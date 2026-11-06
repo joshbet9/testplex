@@ -2608,6 +2608,12 @@ public final class ArcadePortRules {
     public static final int PAINTBALL_SNIPER_SCOPE_SLOWNESS_AMPLIFIER = 8;
     public static final int PAINTBALL_SNIPER_SCOPE_SLOWNESS_TICKS = 40;
     public static final double PAINTBALL_KNOCKBACK_MULTIPLIER = 1.0D;
+    public static final long PAINTBALL_SPEEDRUNNER_MAX_MILLIS = 30_000L;
+    public static final int PAINTBALL_FLAWLESS_MIN_STARTERS = 4;
+    public static final int PAINTBALL_KILLING_SPREE_KILLS = 4;
+    public static final int PAINTBALL_LAST_STAND_KILLS = 3;
+    public static final int PAINTBALL_SHARE_YOUR_SCREEN_SHOTS = 3;
+    public static final long PAINTBALL_GROUND_STARE_MILLIS = 20_000L;
 
     /** Reborn orders its teams Frost/AQUA first, then Nether/RED. */
     public static boolean isPaintballRedTeam(int team) {
@@ -2634,23 +2640,38 @@ public final class ArcadePortRules {
 
     /** Source win trackers award Speedrunner only when the winning team finishes within 30 seconds. */
     public static boolean shouldAwardPaintballSpeedrunner(long elapsedMillis, boolean won) {
-        return won && elapsedMillis >= 0L && elapsedMillis < 30_000L;
+        return won && elapsedMillis >= 0L && elapsedMillis < Math.max(0L,
+                GameDebugRuntimeOverrides.longValue("PAINTBALL_SPEEDRUNNER_MAX_MILLIS", PAINTBALL_SPEEDRUNNER_MAX_MILLIS));
     }
 
     /** Flawless Victory requires at least four starters and no player lost from the winning team. */
     public static boolean shouldAwardPaintballFlawlessVictory(
             int startingTeamPlayers, int survivingTeamPlayers, boolean won) {
-        return won && startingTeamPlayers >= 4 && survivingTeamPlayers == startingTeamPlayers;
+        return won && startingTeamPlayers >= Math.max(1,
+                GameDebugRuntimeOverrides.intValue("PAINTBALL_FLAWLESS_MIN_STARTERS", PAINTBALL_FLAWLESS_MIN_STARTERS))
+                && survivingTeamPlayers == startingTeamPlayers;
     }
 
     /** Killing Spree starts at the fourth kill in a five-second chain. */
     public static boolean shouldAwardPaintballKillingSpree(int consecutiveKills) {
-        return consecutiveKills >= 4;
+        return consecutiveKills >= Math.max(1,
+                GameDebugRuntimeOverrides.intValue("PAINTBALL_KILLING_SPREE_KILLS", PAINTBALL_KILLING_SPREE_KILLS));
     }
 
     /** Last Stand starts awarding at the third kill while only one teammate remains alive. */
     public static boolean shouldAwardPaintballLastStand(int soloKills) {
-        return soloKills >= 3;
+        return soloKills >= Math.max(1,
+                GameDebugRuntimeOverrides.intValue("PAINTBALL_LAST_STAND_KILLS", PAINTBALL_LAST_STAND_KILLS));
+    }
+
+    public static int paintballShareYourScreenShots() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "PAINTBALL_SHARE_YOUR_SCREEN_SHOTS", PAINTBALL_SHARE_YOUR_SCREEN_SHOTS));
+    }
+
+    public static long paintballGroundStareMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "PAINTBALL_GROUND_STARE_MILLIS", PAINTBALL_GROUND_STARE_MILLIS));
     }
 
     /** Reborn's Machine Gun fires on an 80 ms gate; this slower heat gain allows 48 shots per full bar. */
