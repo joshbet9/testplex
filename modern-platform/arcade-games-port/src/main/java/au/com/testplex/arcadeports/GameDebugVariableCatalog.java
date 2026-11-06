@@ -199,6 +199,10 @@ final class GameDebugVariableCatalog {
 
     private static double minimum(String name, double defaultValue, Kind kind) {
         if (kind == Kind.BOOLEAN) return 0.0D;
+        if (name.equals("CASTLE_ASSAULT_KING_HEALTH_BASE")
+                || name.equals("CASTLE_ASSAULT_KING_HEALTH_REFERENCE_PLAYERS")) return 1.0D;
+        if (name.equals("CASTLE_ASSAULT_TNT_THROW_SPEED")
+                || name.equals("CASTLE_ASSAULT_TNT_THROW_VERTICAL_SPEED")) return 0.0D;
         if (name.equals("PAINTBALL_SHOTGUN_PELLETS")) return 1.0D;
         if (name.startsWith("PAINTBALL_") && name.endsWith("_MILLIS")) return 1.0D;
         if (name.startsWith("PAINTBALL_") && (name.endsWith("_SPREAD") || name.endsWith("_SPEED")
@@ -245,6 +249,18 @@ final class GameDebugVariableCatalog {
 
     private static double maximum(String name, Kind kind, double defaultValue) {
         if (kind == Kind.BOOLEAN) return 1.0D;
+        if (name.equals("CASTLE_ASSAULT_KING_HEALTH_BASE")) return 5_000.0D;
+        if (name.equals("CASTLE_ASSAULT_KING_HEALTH_REFERENCE_PLAYERS")) return 64.0D;
+        if (name.equals("CASTLE_ASSAULT_CARRIER_FUSE_MILLIS")) return 600_000.0D;
+        if (name.equals("CASTLE_ASSAULT_TNT_FUSE_TICKS")) return 1_200.0D;
+        if (name.equals("CASTLE_ASSAULT_TNT_BASE_RADIUS")
+                || name.equals("CASTLE_ASSAULT_TNT_DEMOLITIONIST_RADIUS_BONUS")) return 32.0D;
+        if (name.equals("CASTLE_ASSAULT_TNT_THROW_SPEED")) return 4.0D;
+        if (name.equals("CASTLE_ASSAULT_TNT_THROW_VERTICAL_SPEED")) return 2.0D;
+        if (name.equals("CASTLE_ASSAULT_TNT_MAX_DAMAGE")) return 40.0D;
+        if (name.equals("CASTLE_ASSAULT_TNT_KNOCKBACK_MULTIPLIER")) return 3.0D;
+        if (name.equals("CASTLE_ASSAULT_TNT_VERTICAL_KNOCKBACK")) return 2.0D;
+        if (name.equals("CASTLE_ASSAULT_TNT_KING_DAMAGE")) return 500.0D;
         if (name.startsWith("PAINTBALL_") && name.endsWith("_MILLIS")) return 10_000.0D;
         if (name.equals("PAINTBALL_SHOTGUN_PELLETS")) return 32.0D;
         if (name.endsWith("_PAINT_PER_HIT") || name.endsWith("_SNIPER_BASE_PAINT")

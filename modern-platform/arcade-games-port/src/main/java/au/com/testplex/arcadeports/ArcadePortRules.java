@@ -16,6 +16,52 @@ import java.util.UUID;
 public final class ArcadePortRules {
     /** Reborn's normal Castle Assault objective TNT pickup-to-respawn delay. */
     public static final long CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS = 60_000L;
+    public static final int CASTLE_ASSAULT_KING_HEALTH_BASE = 600;
+    public static final int CASTLE_ASSAULT_KING_HEALTH_REFERENCE_PLAYERS = 15;
+    public static final long CASTLE_ASSAULT_CARRIER_FUSE_MILLIS = 60_000L;
+    public static final int CASTLE_ASSAULT_TNT_FUSE_TICKS = 60;
+    public static final double CASTLE_ASSAULT_TNT_THROW_SPEED = 0.5D;
+    public static final double CASTLE_ASSAULT_TNT_THROW_VERTICAL_SPEED = 0.1D;
+    public static final double CASTLE_ASSAULT_TNT_BASE_RADIUS = 4.0D;
+    public static final double CASTLE_ASSAULT_TNT_DEMOLITIONIST_RADIUS_BONUS = 3.0D;
+    public static final double CASTLE_ASSAULT_TNT_MAX_DAMAGE = 10.0D;
+    public static final double CASTLE_ASSAULT_TNT_KNOCKBACK_MULTIPLIER = 1.0D;
+    public static final double CASTLE_ASSAULT_TNT_VERTICAL_KNOCKBACK = 0.35D;
+    public static final int CASTLE_ASSAULT_TNT_KING_DAMAGE = 50;
+
+    public static int castleAssaultKingHealthForOpponents(int opponentCount) {
+        int reference = Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "CASTLE_ASSAULT_KING_HEALTH_REFERENCE_PLAYERS", CASTLE_ASSAULT_KING_HEALTH_REFERENCE_PLAYERS));
+        int base = Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "CASTLE_ASSAULT_KING_HEALTH_BASE", CASTLE_ASSAULT_KING_HEALTH_BASE));
+        return Math.max(1, (int) Math.ceil(base * Math.min(reference, Math.max(0, opponentCount))
+                / (double) reference));
+    }
+
+    public static double castleAssaultTntRadius(String kit) {
+        double base = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "CASTLE_ASSAULT_TNT_BASE_RADIUS", CASTLE_ASSAULT_TNT_BASE_RADIUS));
+        double bonus = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "CASTLE_ASSAULT_TNT_DEMOLITIONIST_RADIUS_BONUS", CASTLE_ASSAULT_TNT_DEMOLITIONIST_RADIUS_BONUS));
+        return base + ("demolitionist".equalsIgnoreCase(kit == null ? "" : kit) ? bonus : 0.0D);
+    }
+
+    public static double castleAssaultTntDamage(double distance, double radius) {
+        if (!Double.isFinite(distance) || !Double.isFinite(radius) || distance < 0.0D || radius <= 0.0D) return 0.0D;
+        double maximum = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "CASTLE_ASSAULT_TNT_MAX_DAMAGE", CASTLE_ASSAULT_TNT_MAX_DAMAGE));
+        return maximum * Math.max(0.0D, 1.0D - distance / radius);
+    }
+
+    public static double castleAssaultTntKnockbackMultiplier() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "CASTLE_ASSAULT_TNT_KNOCKBACK_MULTIPLIER", CASTLE_ASSAULT_TNT_KNOCKBACK_MULTIPLIER));
+    }
+
+    public static long castleAssaultCarrierFuseMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "CASTLE_ASSAULT_CARRIER_FUSE_MILLIS", CASTLE_ASSAULT_CARRIER_FUSE_MILLIS));
+    }
 
     /** Mixed Arcade halves the wait between objective TNT spawns. */
     public static long castleAssaultObjectiveTntRespawnMillis(boolean mixedArcadeVariant) {

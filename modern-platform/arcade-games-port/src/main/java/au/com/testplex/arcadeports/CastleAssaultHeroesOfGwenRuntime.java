@@ -108,13 +108,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         boolean debugFeatureEnabled(Player player, String feature);
     }
 
-    private static final int CASTLE_KING_HEALTH = 600;
-    private static final int CASTLE_KING_HEALTH_REFERENCE_PLAYERS = 15;
     private static final int MOBA_TOWER_REFERENCE_TEAM_SIZE = 9;
     private static final int MOBA_OUTER_TOWER_HEALTH = 500;
     private static final int MOBA_INNER_TOWER_HEALTH = 1_000;
     private static final int CASTLE_CRYSTAL_COUNT = 2;
-    private static final long CASTLE_NORMAL_TNT_DELAY = 60_000L;
     private static long mobaPassiveGoldInterval() {
         return GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_GOLD_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_GOLD_INTERVAL_MILLIS);
     }
@@ -455,9 +452,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private int castleKingHealthForOpponents(int kingTeam) {
         int opponentCount = (int) teams.values().stream().filter(team -> team == 1 - kingTeam).count();
-        int scaledPlayers = Math.min(CASTLE_KING_HEALTH_REFERENCE_PLAYERS, opponentCount);
-        return Math.max(1, (int) Math.ceil(CASTLE_KING_HEALTH * scaledPlayers
-                / (double) CASTLE_KING_HEALTH_REFERENCE_PLAYERS));
+        return ArcadePortRules.castleAssaultKingHealthForOpponents(opponentCount);
     }
 
     boolean isCastleAssaultLateJoinLocked() {
@@ -1843,7 +1838,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             if (carrier == null || !carrier.isOnline()) {
                 objectiveCarrier = null;
                 objectiveCarryStartedAt = 0L;
-            } else if (now - objectiveCarryStartedAt >= CASTLE_NORMAL_TNT_DELAY
+            } else if (now - objectiveCarryStartedAt >= ArcadePortRules.castleAssaultCarrierFuseMillis()
                     || isAtEnemyCrystal(carrier)) {
                 detonateObjectiveTnt(carrier);
             } else {
@@ -1918,14 +1913,15 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private void updateObjectiveCarrierProgress(Player carrier, long now) {
         long elapsed = Math.max(0L, now - objectiveCarryStartedAt);
-        double progress = Math.min(1.0D, elapsed / (double) CASTLE_NORMAL_TNT_DELAY);
+        long carrierFuse = ArcadePortRules.castleAssaultCarrierFuseMillis();
+        double progress = Math.min(1.0D, elapsed / (double) carrierFuse);
         int filled = (int) Math.floor(progress * 24.0D);
         StringBuilder bar = new StringBuilder(ChatColor.GREEN.toString());
         for (int i = 0; i < 24; i++) {
             if (i == filled) bar.append(ChatColor.RED);
             bar.append('█');
         }
-        long secondsLeft = Math.max(0L, (CASTLE_NORMAL_TNT_DELAY - elapsed + 999L) / 1_000L);
+        long secondsLeft = Math.max(0L, (carrierFuse - elapsed + 999L) / 1_000L);
         carrier.sendActionBar(ChatColor.BOLD + "TNT Detonation " + ChatColor.RESET + bar
                 + ChatColor.RESET + " " + secondsLeft + "s");
         if (now >= objectiveCarrierLastEffectAt) {
@@ -2985,9 +2981,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         else held.setAmount(held.getAmount() - 1);
         Location spawn = player.getEyeLocation().add(player.getLocation().getDirection());
         TNTPrimed tnt = world.spawn(spawn, TNTPrimed.class);
-        tnt.setFuseTicks(60);
+        tnt.setFuseTicks(Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "CASTLE_ASSAULT_TNT_FUSE_TICKS", ArcadePortRules.CASTLE_ASSAULT_TNT_FUSE_TICKS)));
         tnt.setYield(0.0F);
-        tnt.setVelocity(player.getLocation().getDirection().normalize().multiply(0.5D).add(new Vector(0, 0.1D, 0)));
+        tnt.setVelocity(player.getLocation().getDirection().normalize().multiply(Math.max(0.0D,
+                GameDebugRuntimeOverrides.doubleValue("CASTLE_ASSAULT_TNT_THROW_SPEED", ArcadePortRules.CASTLE_ASSAULT_TNT_THROW_SPEED)))
+                .add(new Vector(0, Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                        "CASTLE_ASSAULT_TNT_THROW_VERTICAL_SPEED", ArcadePortRules.CASTLE_ASSAULT_TNT_THROW_VERTICAL_SPEED)), 0)));
         tnt.getPersistentDataContainer().set(thrownTntOwnerKey, PersistentDataType.STRING, player.getUniqueId().toString());
         entities.add(tnt);
     }
@@ -3012,7 +3012,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private double castleTntRadius(Player owner) {
         String kit = castleAssaultPlayerKits.get(owner.getUniqueId());
-        return 4.0D + ("demolitionist".equals(kit) ? 3.0D : 0.0D);
+        return ArcadePortRules.castleAssaultTntRadius(kit);
     }
 
     private void refillCastleArcherArrows(long now) {
@@ -3084,7 +3084,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             if (!target.equals(owner) && teams.getOrDefault(target.getUniqueId(), -2) == attackingTeam) continue;
             double distance = target.getLocation().distance(center);
             if (distance > radius) continue;
-            double damage = 10.0D * Math.max(0.0D, 1.0D - distance / radius);
+            double damage = ArcadePortRules.castleAssaultTntDamage(distance, radius);
             damage *= ArcadePortRules.castleAssaultBlastDamageMultiplier(castleBlastProtectionEpf(target));
             if (damage <= 0.0D) continue;
             if (target.getHealth() <= damage) {
@@ -3095,8 +3095,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             if (direction.lengthSquared() > 0.001D) {
                 double knockback = ArcadePortRules.castleAssaultBlastKnockbackMultiplier(
                         castleHighestBlastProtection(target));
-                target.setVelocity(direction.normalize().multiply(0.8D * knockback)
-                        .setY(0.35D * knockback));
+                target.setVelocity(direction.normalize().multiply(0.8D * knockback
+                                * ArcadePortRules.castleAssaultTntKnockbackMultiplier())
+                        .setY(GameDebugRuntimeOverrides.doubleValue("CASTLE_ASSAULT_TNT_VERTICAL_KNOCKBACK",
+                                ArcadePortRules.CASTLE_ASSAULT_TNT_VERTICAL_KNOCKBACK)
+                                * knockback * ArcadePortRules.castleAssaultTntKnockbackMultiplier()));
             }
         }
         if (!objective) return;
@@ -3107,7 +3110,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             destroyCastleCrystal(enemyKing, crystal, owner);
         }
         if (enemyKing.activeCrystals() == 0 && enemyKing.entity != null
-                && enemyKing.location.distance(center) <= radius) damageCastleKing(enemyKing, 50, owner);
+                && enemyKing.location.distance(center) <= radius) damageCastleKing(enemyKing,
+                GameDebugRuntimeOverrides.intValue("CASTLE_ASSAULT_TNT_KING_DAMAGE", ArcadePortRules.CASTLE_ASSAULT_TNT_KING_DAMAGE), owner);
     }
 
     private void destroyCastleCrystal(KingState king, EnderCrystal crystal, Player attacker) {
