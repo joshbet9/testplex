@@ -7072,11 +7072,11 @@ public final class ArcadePortManager implements Listener {
             case NORMAL -> {
                 player.getInventory().addItem(new ItemStack(Material.FISHING_ROD));
                 player.getInventory().addItem(new ItemStack(Material.BOW),
-                        new ItemStack(Material.ARROW, new int[]{3, 5, 7, 10}[tier]));
+                        new ItemStack(Material.ARROW, ArcadePortRules.gladiatorsArrowCount(tier)));
             }
             case RODLESS -> {
                 player.getInventory().addItem(new ItemStack(Material.BOW),
-                        new ItemStack(Material.ARROW, new int[]{3, 5, 7, 10}[tier]));
+                        new ItemStack(Material.ARROW, ArcadePortRules.gladiatorsArrowCount(tier)));
             }
             case BOWLESS -> player.getInventory().addItem(new ItemStack(Material.FISHING_ROD));
             case MODERN -> {
@@ -18175,7 +18175,7 @@ public final class ArcadePortManager implements Listener {
                 targetPair == null ? -2 : targetPair,
                 attackerPair != null && session.gladiatorResolvedPairs.contains(attackerPair))) return;
         if (target.getNoDamageTicks() > 0) return;
-        target.setNoDamageTicks(projectile ? 8 : 10);
+        target.setNoDamageTicks(ArcadePortRules.gladiatorsNoDamageTicks(projectile));
         session.gladiatorRoundDamageTaken.merge(targetId, damage, Double::sum);
         if (target.getHealth() <= damage) {
             session.gladiatorLethalMargin.put(targetId, target.getHealth() - damage);
@@ -18190,7 +18190,8 @@ public final class ArcadePortManager implements Listener {
         Vector push = target.getLocation().toVector().subtract(attacker.getLocation().toVector()).setY(0.0D);
         if (push.lengthSquared() > 0.001D) {
             target.setVelocity(target.getVelocity().add(push.normalize()
-                    .multiply(projectile ? 0.18D : 0.32D).setY(projectile ? 0.06D : 0.12D)));
+                    .multiply(ArcadePortRules.gladiatorsKnockbackHorizontal(projectile))
+                    .setY(ArcadePortRules.gladiatorsKnockbackVertical(projectile))));
         }
 
         Player creditedKiller = attacker == null ? recentMicroBattlesKiller(session, target.getUniqueId()) : attacker;
@@ -24982,12 +24983,13 @@ public final class ArcadePortManager implements Listener {
         if (pair == null || session.gladiatorResolvedPairs.contains(pair)) return;
         event.setCancelled(true);
         Location splash = potion.getLocation();
-        for (Entity entity : splash.getWorld().getNearbyEntities(splash, 4.0D, 4.0D, 4.0D)) {
+        double radius = ArcadePortRules.gladiatorsPotionSplashRadius();
+        for (Entity entity : splash.getWorld().getNearbyEntities(splash, radius, radius, radius)) {
             if (!(entity instanceof Player target) || !session.alive.contains(target.getUniqueId())
                     || !Integer.valueOf(pair).equals(session.gladiatorPairs.get(target.getUniqueId()))) continue;
             double distance = splash.distance(target.getLocation());
-            double intensity = Math.max(0.0D, 1.0D - distance / 4.0D);
-            double healing = 4.0D * intensity;
+            double intensity = Math.max(0.0D, 1.0D - distance / radius);
+            double healing = ArcadePortRules.gladiatorsPotionHealing() * intensity;
             if (healing <= 0.0D) continue;
             target.setHealth(Math.min(target.getMaxHealth(), target.getHealth() + healing));
             target.getWorld().spawnParticle(Particle.HEART,

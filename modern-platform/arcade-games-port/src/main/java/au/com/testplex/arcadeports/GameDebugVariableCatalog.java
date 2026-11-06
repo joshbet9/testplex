@@ -219,6 +219,15 @@ final class GameDebugVariableCatalog {
         if (name.equals("CASTLE_ASSAULT_TNT_THROW_SPEED")
                 || name.equals("CASTLE_ASSAULT_TNT_THROW_VERTICAL_SPEED")) return 0.0D;
         if (name.equals("PAINTBALL_SHOTGUN_PELLETS")) return 1.0D;
+        if (name.startsWith("GLADIATOR_TIER_") && name.endsWith("_ARROWS")) return 0.0D;
+        if (name.equals("GLADIATOR_POTION_HEALING")
+                || name.equals("GLADIATOR_MELEE_KNOCKBACK_HORIZONTAL")
+                || name.equals("GLADIATOR_MELEE_KNOCKBACK_VERTICAL")
+                || name.equals("GLADIATOR_PROJECTILE_KNOCKBACK_HORIZONTAL")
+                || name.equals("GLADIATOR_PROJECTILE_KNOCKBACK_VERTICAL")) return 0.0D;
+        if (name.equals("GLADIATOR_POTION_SPLASH_RADIUS")) return 0.1D;
+        if (name.equals("GLADIATOR_MELEE_NO_DAMAGE_TICKS")
+                || name.equals("GLADIATOR_PROJECTILE_NO_DAMAGE_TICKS")) return 0.0D;
         if (name.equals("TURF_WARS_LINES_PER_KILL_MULTIPLIER")) return 1.0D;
         if (name.equals("TURF_WARS_COMBAT_BOUNDARY_DAMAGE")
                 || name.equals("TURF_WARS_BUILD_BOUNDARY_DAMAGE")
@@ -299,12 +308,21 @@ final class GameDebugVariableCatalog {
         if (name.contains("_MAX_HEALTH")) return 80.0D;
         if (name.contains("_MELEE_DAMAGE")) return 40.0D;
         if (name.startsWith("EVOLUTION_CHARGE_")) return 0.2D;
+        if (name.equals("GLADIATOR_MELEE_KNOCKBACK_HORIZONTAL")
+                || name.equals("GLADIATOR_PROJECTILE_KNOCKBACK_HORIZONTAL")) return 3.0D;
+        if (name.equals("GLADIATOR_MELEE_KNOCKBACK_VERTICAL")
+                || name.equals("GLADIATOR_PROJECTILE_KNOCKBACK_VERTICAL")) return 2.0D;
         if (name.startsWith("PAINTBALL_") && name.endsWith("_KNOCKBACK_MULTIPLIER")) return 3.0D;
         if (name.contains("_KNOCKBACK")) return 8.0D;
         if (name.contains("_LAUNCH_SPEED") || name.contains("_LAUNCH_HORIZONTAL")) return 8.0D;
         if (name.contains("_LAUNCH_VERTICAL") || name.endsWith("_EGG_SPEED")) return 5.0D;
         if (name.equals("HOOPS_MIN_PLAYERS") || name.equals("HOOPS_MAX_PLAYERS")) return 16.0D;
         if (name.equals("PERFECT_SCORE_PERCENT")) return 100.0D;
+        if (name.startsWith("GLADIATOR_TIER_") && name.endsWith("_ARROWS")) return 64.0D;
+        if (name.equals("GLADIATOR_POTION_HEALING")) return 20.0D;
+        if (name.equals("GLADIATOR_POTION_SPLASH_RADIUS")) return 16.0D;
+        if (name.equals("GLADIATOR_MELEE_NO_DAMAGE_TICKS")
+                || name.equals("GLADIATOR_PROJECTILE_NO_DAMAGE_TICKS")) return 40.0D;
         if (name.equals("TURF_WARS_LINES_PER_KILL_MULTIPLIER")) return 8.0D;
         if (name.equals("TURF_WARS_COMBAT_BOUNDARY_DAMAGE")) return 40.0D;
         if (name.equals("TURF_WARS_BUILD_BOUNDARY_DAMAGE")) return 500.0D;

@@ -2337,6 +2337,60 @@ public final class ArcadePortRules {
     public static final long GLADIATOR_POISON_DELAY_MILLIS = 60_000L;
     public static final long GLADIATOR_POISON_INTERVAL_MILLIS = 1_000L;
     public static final double GLADIATOR_POISON_DAMAGE = 1.0D;
+    public static final int GLADIATOR_MELEE_NO_DAMAGE_TICKS = 10;
+    public static final int GLADIATOR_PROJECTILE_NO_DAMAGE_TICKS = 8;
+    public static final double GLADIATOR_MELEE_KNOCKBACK_HORIZONTAL = 0.32D;
+    public static final double GLADIATOR_MELEE_KNOCKBACK_VERTICAL = 0.12D;
+    public static final double GLADIATOR_PROJECTILE_KNOCKBACK_HORIZONTAL = 0.18D;
+    public static final double GLADIATOR_PROJECTILE_KNOCKBACK_VERTICAL = 0.06D;
+    public static final int GLADIATOR_TIER_0_ARROWS = 3;
+    public static final int GLADIATOR_TIER_1_ARROWS = 5;
+    public static final int GLADIATOR_TIER_2_ARROWS = 7;
+    public static final int GLADIATOR_TIER_3_ARROWS = 10;
+    public static final double GLADIATOR_POTION_HEALING = 4.0D;
+    public static final double GLADIATOR_POTION_SPLASH_RADIUS = 4.0D;
+
+    public static int gladiatorsArrowCount(int tier) {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue(switch (Math.max(0, Math.min(3, tier))) {
+            case 1 -> "GLADIATOR_TIER_1_ARROWS";
+            case 2 -> "GLADIATOR_TIER_2_ARROWS";
+            case 3 -> "GLADIATOR_TIER_3_ARROWS";
+            default -> "GLADIATOR_TIER_0_ARROWS";
+        }, switch (Math.max(0, Math.min(3, tier))) {
+            case 1 -> GLADIATOR_TIER_1_ARROWS;
+            case 2 -> GLADIATOR_TIER_2_ARROWS;
+            case 3 -> GLADIATOR_TIER_3_ARROWS;
+            default -> GLADIATOR_TIER_0_ARROWS;
+        }));
+    }
+
+    public static int gladiatorsNoDamageTicks(boolean projectile) {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue(projectile
+                ? "GLADIATOR_PROJECTILE_NO_DAMAGE_TICKS" : "GLADIATOR_MELEE_NO_DAMAGE_TICKS",
+                projectile ? GLADIATOR_PROJECTILE_NO_DAMAGE_TICKS : GLADIATOR_MELEE_NO_DAMAGE_TICKS));
+    }
+
+    public static double gladiatorsKnockbackHorizontal(boolean projectile) {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(projectile
+                ? "GLADIATOR_PROJECTILE_KNOCKBACK_HORIZONTAL" : "GLADIATOR_MELEE_KNOCKBACK_HORIZONTAL",
+                projectile ? GLADIATOR_PROJECTILE_KNOCKBACK_HORIZONTAL : GLADIATOR_MELEE_KNOCKBACK_HORIZONTAL));
+    }
+
+    public static double gladiatorsKnockbackVertical(boolean projectile) {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(projectile
+                ? "GLADIATOR_PROJECTILE_KNOCKBACK_VERTICAL" : "GLADIATOR_MELEE_KNOCKBACK_VERTICAL",
+                projectile ? GLADIATOR_PROJECTILE_KNOCKBACK_VERTICAL : GLADIATOR_MELEE_KNOCKBACK_VERTICAL));
+    }
+
+    public static double gladiatorsPotionHealing() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue("GLADIATOR_POTION_HEALING",
+                GLADIATOR_POTION_HEALING));
+    }
+
+    public static double gladiatorsPotionSplashRadius() {
+        return Math.max(0.1D, GameDebugRuntimeOverrides.doubleValue("GLADIATOR_POTION_SPLASH_RADIUS",
+                GLADIATOR_POTION_SPLASH_RADIUS));
+    }
 
     public static boolean canGladiatorsFight(long nowMillis, long fightStartsAt,
             int attackerPair, int targetPair, boolean pairResolved) {
@@ -2346,7 +2400,8 @@ public final class ArcadePortRules {
 
     public static boolean shouldGladiatorPoison(long nowMillis, long roundStartedAt,
             boolean pairResolved, int playersStillFighting) {
-        return nowMillis >= roundStartedAt + GLADIATOR_POISON_DELAY_MILLIS
+        return nowMillis >= roundStartedAt + GameDebugRuntimeOverrides.longValue(
+                "GLADIATOR_POISON_DELAY_MILLIS", GLADIATOR_POISON_DELAY_MILLIS)
                 && !pairResolved && playersStillFighting >= 2;
     }
 

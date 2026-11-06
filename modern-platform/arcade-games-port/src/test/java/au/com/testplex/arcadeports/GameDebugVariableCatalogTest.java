@@ -52,6 +52,10 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DEATH_TAG), "DEATH_TAG_MELEE_KNOCKBACK_HORIZONTAL");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.CAMERA_SHY), "CAMERA_SHY_MATCH_SECONDS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.HOOPS_REMASTERED), "HOOPS_TARGET_SCORE");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.GLADIATORS), "GLADIATOR_MELEE_NO_DAMAGE_TICKS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.GLADIATORS), "GLADIATOR_PROJECTILE_NO_DAMAGE_TICKS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.GLADIATORS), "GLADIATOR_TIER_3_ARROWS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.GLADIATORS), "GLADIATOR_POTION_HEALING");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.TURF_WARS), "TURF_WARS_LINES_PER_KILL_MULTIPLIER");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.TURF_WARS), "TURF_WARS_COMBAT_BOUNDARY_DAMAGE");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.TURF_WARS), "TURF_WARS_BUILD_BOUNDARY_DAMAGE");
@@ -114,8 +118,22 @@ class GameDebugVariableCatalogTest {
         assertRange("TURF_WARS_BARRAGE_ARROW_SPREAD", 0.0D, 1.0D);
     }
 
+    @Test
+    void gladiatorsControlsHaveSafeRanges() {
+        assertGameRange(ArcadePortGame.GLADIATORS, "GLADIATOR_MELEE_NO_DAMAGE_TICKS", 0.0D, 40.0D);
+        assertGameRange(ArcadePortGame.GLADIATORS, "GLADIATOR_PROJECTILE_NO_DAMAGE_TICKS", 0.0D, 40.0D);
+        assertGameRange(ArcadePortGame.GLADIATORS, "GLADIATOR_MELEE_KNOCKBACK_HORIZONTAL", 0.0D, 3.0D);
+        assertGameRange(ArcadePortGame.GLADIATORS, "GLADIATOR_TIER_3_ARROWS", 0.0D, 64.0D);
+        assertGameRange(ArcadePortGame.GLADIATORS, "GLADIATOR_POTION_HEALING", 0.0D, 20.0D);
+        assertGameRange(ArcadePortGame.GLADIATORS, "GLADIATOR_POTION_SPLASH_RADIUS", 0.1D, 16.0D);
+    }
+
     private static void assertRange(String key, double minimum, double maximum) {
-        GameDebugVariableCatalog.Variable variable = GameDebugVariableCatalog.variable(ArcadePortGame.TURF_WARS, key);
+        assertGameRange(ArcadePortGame.TURF_WARS, key, minimum, maximum);
+    }
+
+    private static void assertGameRange(ArcadePortGame game, String key, double minimum, double maximum) {
+        GameDebugVariableCatalog.Variable variable = GameDebugVariableCatalog.variable(game, key);
         assertNotNull(variable, key + " must be exposed to the Turf Wars debug menu");
         assertEquals(minimum, variable.minimum());
         assertEquals(maximum, variable.maximum());
@@ -275,8 +293,22 @@ class GameDebugVariableCatalogTest {
                 boolean dynamicEvolutionConsumer = game == ArcadePortGame.EVOLUTION
                         && key.startsWith("EVOLUTION_")
                         && productionSources.contains("GameDebugRuntimeOverrides.doubleValue(key, fallback)");
+                boolean dynamicGladiatorConsumer = game == ArcadePortGame.GLADIATORS
+                        && ((key.startsWith("GLADIATOR_TIER_") && key.endsWith("_ARROWS")
+                                && productionSources.contains("ArcadePortRules.gladiatorsArrowCount(tier)"))
+                            || (key.equals("GLADIATOR_MELEE_NO_DAMAGE_TICKS")
+                                || key.equals("GLADIATOR_PROJECTILE_NO_DAMAGE_TICKS"))
+                                && productionSources.contains("ArcadePortRules.gladiatorsNoDamageTicks(projectile)")
+                            || (key.endsWith("KNOCKBACK_HORIZONTAL") || key.endsWith("KNOCKBACK_VERTICAL"))
+                                && productionSources.contains("ArcadePortRules.gladiatorsKnockbackHorizontal(projectile)")
+                                && productionSources.contains("ArcadePortRules.gladiatorsKnockbackVertical(projectile)")
+                            || key.equals("GLADIATOR_POTION_HEALING")
+                                && productionSources.contains("ArcadePortRules.gladiatorsPotionHealing()")
+                            || key.equals("GLADIATOR_POTION_SPLASH_RADIUS")
+                                && productionSources.contains("ArcadePortRules.gladiatorsPotionSplashRadius()"));
                 assertTrue(literalConsumers.contains(key) || dynamicMazeConsumer || dynamicSneakyConsumer
-                                || dynamicTurfWarsConsumer || dynamicSkyWarsConsumer || dynamicEvolutionConsumer,
+                                || dynamicTurfWarsConsumer || dynamicSkyWarsConsumer || dynamicEvolutionConsumer
+                                || dynamicGladiatorConsumer,
                         game.id() + " exposes " + key + " without a gameplay consumer");
             }
         }
