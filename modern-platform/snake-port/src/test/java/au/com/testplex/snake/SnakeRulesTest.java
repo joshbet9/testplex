@@ -1,6 +1,8 @@
 package au.com.testplex.snake;
 
 import org.junit.jupiter.api.Test;
+import au.com.testplex.arcadeports.GameDebugRuntimeOverrides;
+import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SnakeRulesTest {
@@ -81,7 +83,7 @@ class SnakeRulesTest {
         assertFalse(SnakeRules.isTailCollision(1.44D));
         assertFalse(SnakeRules.isTailCollision(Double.POSITIVE_INFINITY));
         assertEquals(2.0D, SnakeRules.FOOD_PICKUP_RADIUS, 0.000001D);
-        assertEquals(1.2D, SnakeRules.SNAKE_TAIL_COLLISION_RADIUS, 0.000001D);
+        assertEquals(1.2D, SnakeRules.TAIL_COLLISION_RADIUS, 0.000001D);
     }
 
     @Test void tailSegmentsUseTheSourceOneBlockSpacing() {
@@ -125,8 +127,79 @@ class SnakeRulesTest {
     }
 
     @Test void driftTurnRateIsBounded() {
+        GameDebugRuntimeOverrides.clear();
         assertEquals(Math.toRadians(8.0D), SnakeRules.clampTurnRadians(1.2D), 0.000001D);
         assertEquals(-Math.toRadians(8.0D), SnakeRules.clampTurnRadians(-1.2D), 0.000001D);
+    }
+
+    @Test void debugProfileOverridesChangeSnakeGameplayAndResetToSourceDefaults() {
+        GameDebugRuntimeOverrides.clear();
+        double sourceSpeed = SnakeRules.movementSpeed(90, false);
+        assertEquals(0.3D, sourceSpeed, 0.000001D);
+        assertEquals(30, SnakeRules.rouletteDurationSecondsForHit(99));
+        assertTrue(SnakeRules.isTailCollision(1.0D));
+        assertFalse(SnakeRules.isTailCollision(1.5D));
+        assertTrue(SnakeRules.shouldEliminateForIdle(4.0D, 2_000L));
+
+        GameDebugRuntimeOverrides.activate(Map.ofEntries(
+                Map.entry("SNAKE_MOVEMENT_GROWTH_CAP", 0.2D),
+                Map.entry("SNAKE_MOVEMENT_SPEED_BOOST_MULTIPLIER", 2.0D),
+                Map.entry("SNAKE_ROULETTE_HIT_7_PLUS_SECONDS", 45),
+                Map.entry("SNAKE_ROULETTE_HIT_5_SECONDS", 12),
+                Map.entry("SNAKE_TAIL_COLLISION_RADIUS", 2.0D),
+                Map.entry("SNAKE_FOOD_PICKUP_RADIUS", 1.0D),
+                Map.entry("SNAKE_FOOD_SPAWN_RADIUS", 23.0D),
+                Map.entry("SNAKE_START_SPAWN_RADIUS_BLOCKS", 3.0D),
+                Map.entry("SNAKE_IDLE_TIMEOUT_MILLIS", 5_000L),
+                Map.entry("SNAKE_IDLE_MOVEMENT_DISTANCE_SQUARED", 9.0D),
+                Map.entry("SNAKE_TURN_LAG_DEGREES_PER_TICK", 2.0D),
+                Map.entry("SNAKE_DRIFT_MAX_TURN_DEGREES", 2.0D),
+                Map.entry("SNAKE_SPEED_ABILITY_DURATION_MILLIS", 4_000L),
+                Map.entry("SNAKE_KIT_ABILITY_COOLDOWN_MILLIS", 500L),
+                Map.entry("SNAKE_SPEED_ABILITY_CHARGES", 8),
+                Map.entry("SNAKE_FOOD_GROWTH_SEGMENTS", 4),
+                Map.entry("SNAKE_HAZARD_SPAWN_BASE_DISTANCE", 10),
+                Map.entry("SNAKE_HAZARD_SPAWN_DISTANCE_STEP", 3),
+                Map.entry("SNAKE_HAZARD_SPAWN_DISTANCE_VARIANTS", 2),
+                Map.entry("SNAKE_CANNIBAL_KILLS_REQUIRED", 2),
+                Map.entry("SNAKE_BUSTED_STREAK_REQUIRED", 4)));
+        assertEquals(0.24D, SnakeRules.movementSpeed(90, false), 0.000001D);
+        assertEquals(0.36D, SnakeRules.movementSpeed(90, true), 0.000001D);
+        assertEquals(45, SnakeRules.rouletteDurationSecondsForHit(99));
+        assertEquals(12, SnakeRules.rouletteDurationSecondsForHit(5));
+        assertTrue(SnakeRules.isTailCollision(3.9D));
+        assertTrue(SnakeRules.isFoodCollected(0.9D));
+        assertFalse(SnakeRules.isFoodCollected(1.0D));
+        assertEquals(11.5D, SnakeRules.foodSpawnDistance(0.25D), 0.000001D);
+        assertEquals(3.0D, SnakeRules.startSpawnRadiusBlocks());
+        assertFalse(SnakeRules.shouldEliminateForIdle(4.0D, 2_000L));
+        assertFalse(SnakeRules.hasMovedForIdleCheck(8.0D));
+        assertEquals(13.0D, SnakeRules.hazardSpawnDistance(1));
+        assertEquals(10.0D, SnakeRules.hazardSpawnDistance(2));
+        assertTrue(SnakeRules.shouldAwardCannibal(2));
+        assertTrue(SnakeRules.shouldAwardBusted(4));
+        assertEquals(Math.toRadians(2.0D), SnakeRules.clampTurnRadians(1.2D), 0.000001D);
+        assertEquals(4_000L, SnakeRules.speedAbilityDurationMillis());
+        assertEquals(500L, SnakeRules.kitAbilityCooldownMillis());
+        assertEquals(8, SnakeRules.speedAbilityCharges());
+        assertEquals(4, SnakeRules.foodGrowthSegments());
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertEquals(0.3D, SnakeRules.movementSpeed(90, false), 0.000001D);
+        assertEquals(30, SnakeRules.rouletteDurationSecondsForHit(99));
+        assertEquals(15, SnakeRules.rouletteDurationSecondsForHit(5));
+        assertTrue(SnakeRules.isTailCollision(1.0D));
+        assertTrue(SnakeRules.isFoodCollected(3.99D));
+        assertEquals(46.0D, SnakeRules.foodSpawnDistance(1.0D), 0.000001D);
+        assertEquals(1.5D, SnakeRules.startSpawnRadiusBlocks());
+        assertEquals(2_000L, SnakeRules.idleTimeoutMillis());
+        assertEquals(12.0D, SnakeRules.hazardSpawnDistance(0));
+        assertFalse(SnakeRules.shouldAwardCannibal(2));
+        assertEquals(3, SnakeRules.bustedStreakRequired());
+        assertEquals(2_000L, SnakeRules.speedAbilityDurationMillis());
+        assertEquals(1_000L, SnakeRules.kitAbilityCooldownMillis());
+        assertEquals(5, SnakeRules.speedAbilityCharges());
+        GameDebugRuntimeOverrides.clear();
     }
 
     @Test void magmaCubeSpawnSearchUsesTheSourceGoldenAngleDistancePattern() {
@@ -209,6 +282,7 @@ class SnakeRulesTest {
     }
 
     @Test void snakeAchievementRulesRequireExactRouletteAndAbilityEvidence() {
+        GameDebugRuntimeOverrides.clear();
         assertEquals(1, SnakeRules.nextSameRouletteEffectCount(false, 8));
         assertEquals(2, SnakeRules.nextSameRouletteEffectCount(true, 1));
         assertTrue(SnakeRules.shouldAwardBusted(3));

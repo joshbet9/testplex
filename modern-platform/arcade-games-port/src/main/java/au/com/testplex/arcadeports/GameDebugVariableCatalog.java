@@ -222,6 +222,23 @@ final class GameDebugVariableCatalog {
 
     private static double minimum(String name, double defaultValue, Kind kind) {
         if (kind == Kind.BOOLEAN) return 0.0D;
+        if (Set.of("SPEED_REFERENCE_LENGTH", "FOOD_SPAWN_ATTEMPTS", "CANNIBAL_KILLS_REQUIRED",
+                "CHOO_CHOO_LENGTH_REQUIRED", "SLIMY_SHEEP_REQUIRED", "ROULETTE_HIT_1_SECONDS",
+                "ROULETTE_HIT_2_SECONDS", "ROULETTE_HIT_3_SECONDS", "ROULETTE_HIT_4_SECONDS",
+                "ROULETTE_HIT_5_SECONDS", "ROULETTE_HIT_6_SECONDS", "ROULETTE_HIT_7_PLUS_SECONDS",
+                "ROULETTE_ANIMATION_INTERVAL_TICKS", "HAZARD_SPAWN_ATTEMPTS",
+                "HAZARD_SPAWN_DISTANCE_VARIANTS", "HAZARD_MAX_CUBE_SIZE",
+                "HAZARD_STEERING_INTERVAL_TICKS").contains(name)) return 1.0D;
+        if (name.equals("IDLE_MOVEMENT_DISTANCE_SQUARED") || name.equals("HAZARD_SPAWN_BASE_DISTANCE") || name.equals("HAZARD_SPAWN_DISTANCE_STEP")
+                || name.equals("HAZARD_CLEARANCE_BLOCKS") || name.equals("EDGE_STAY_MARGIN_BLOCKS")
+                || name.equals("SELF_TAIL_SAFE_SEGMENTS") || name.equals("PASSIVE_GROWTH_SEGMENTS")
+                || name.equals("ROULETTE_ANIMATION_STEPS") || name.equals("MAX_HAZARDS")
+                || name.endsWith("ABILITY_CHARGES")) return 0.0D;
+        if (name.startsWith("ROULETTE_HIT_") && name.endsWith("_SECONDS")) return 1.0D;
+        if (name.equals("TURN_LAG_DEGREES_PER_TICK") || name.equals("OVERSHOOT_TURN_MULTIPLIER")
+                || name.equals("WEAK_TURN_THRESHOLD_DEGREES") || name.equals("WEAK_TURN_DEGREES_PER_TICK")
+                || name.equals("DRIFT_MAX_TURN_DEGREES") || name.startsWith("MOVEMENT_")) return 0.0D;
+        if (name.startsWith("SNAKE_") && name.endsWith("_RADIUS")) return 0.0D;
         if (name.equals("RUNNER_DIVE_EARLY_WINDOW_MILLIS") || name.equals("RUNNER_DIVE_DROP_BLOCKS")
                 || name.startsWith("RUNNER_SPECIAL_PLAY_")) return 0.0D;
         if (name.equals("RUNNER_ARCHER_ASSISTS_ACHIEVEMENT_COUNT")
@@ -462,6 +479,40 @@ final class GameDebugVariableCatalog {
 
     private static double maximum(String name, Kind kind, double defaultValue) {
         if (kind == Kind.BOOLEAN) return 1.0D;
+        if (Set.of("IDLE_TIMEOUT_MILLIS", "PREPARE_COUNTDOWN_MILLIS", "FOOD_SPAWN_INTERVAL_MILLIS",
+                "GROWTH_INTERVAL_MILLIS", "FIRST_HAZARD_DELAY_MILLIS", "HAZARD_INTERVAL_MILLIS",
+                "HAZARD_RETRY_MILLIS", "SPEED_ABILITY_DURATION_MILLIS", "REVERSE_ABILITY_DURATION_MILLIS",
+                "INVULNERABLE_ABILITY_DURATION_MILLIS", "KIT_ABILITY_COOLDOWN_MILLIS").contains(name)) {
+            return 600_000.0D;
+        }
+        if (name.equals("SPEED_REFERENCE_LENGTH") || name.equals("CHOO_CHOO_LENGTH_REQUIRED")) return 10_000.0D;
+        if (name.equals("FOOD_SPAWN_RADIUS")) return 256.0D;
+        if (name.equals("FOOD_PICKUP_RADIUS") || name.equals("TAIL_COLLISION_RADIUS")) return 16.0D;
+        if (name.equals("START_SPAWN_RADIUS_BLOCKS")) return 16.0D;
+        if (name.equals("IDLE_MOVEMENT_DISTANCE_SQUARED")) return 256.0D;
+        if (name.equals("SEGMENT_SPACING") || name.equals("BODY_FOLLOW_SPACING")) return 8.0D;
+        if (name.equals("MOVEMENT_SOURCE_BASE_MULTIPLIER") || name.equals("MOVEMENT_GROWTH_CAP")
+                || name.equals("MOVEMENT_SPEED_BOOST_MULTIPLIER")) return 8.0D;
+        if (name.equals("MOVEMENT_CONVERSION_SCALE")) return 2.0D;
+        if (name.equals("MOVEMENT_CONVERSION_BASE")) return 8.0D;
+        if (name.equals("OVERSHOOT_TURN_MULTIPLIER")) return 4.0D;
+        if (name.endsWith("_DEGREES_PER_TICK") || name.endsWith("_TURN_DEGREES")
+                || name.equals("WEAK_TURN_THRESHOLD_DEGREES")) return 180.0D;
+        if (name.equals("FOOD_SPAWN_ATTEMPTS") || name.equals("HAZARD_SPAWN_ATTEMPTS")) return 1_000.0D;
+        if (name.equals("HAZARD_SPAWN_BASE_DISTANCE") || name.equals("HAZARD_SPAWN_DISTANCE_STEP")
+                || name.equals("HAZARD_SPAWN_DISTANCE_VARIANTS") || name.equals("HAZARD_CLEARANCE_BLOCKS")) return 128.0D;
+        if (name.equals("HAZARD_MAX_CUBE_SIZE")) return 16.0D;
+        if (name.equals("HAZARD_STEERING_SPEED")) return 8.0D;
+        if (name.equals("HAZARD_CONTACT_RADIUS")) return 32.0D;
+        if (name.equals("MAX_HAZARDS")) return 64.0D;
+        if (name.equals("ROULETTE_ANIMATION_STEPS")) return 100.0D;
+        if (name.equals("ROULETTE_ANIMATION_INTERVAL_TICKS")) return 100.0D;
+        if (name.equals("BUSTED_STREAK_REQUIRED")) return 100.0D;
+        if (name.equals("EDGE_STAY_MARGIN_BLOCKS")) return 128.0D;
+        if (name.endsWith("ABILITY_CHARGES")) return 64.0D;
+        if (name.equals("PASSIVE_GROWTH_SEGMENTS") || name.equals("FOOD_GROWTH_SEGMENTS")) return 64.0D;
+        if (name.equals("SELF_TAIL_SAFE_SEGMENTS")) return 32.0D;
+        if (name.equals("CANNIBAL_KILLS_REQUIRED") || name.equals("SLIMY_SHEEP_REQUIRED")) return 1_000.0D;
         if (name.startsWith("PLEXBALL_TIMING_POWER_") || name.startsWith("PLEXBALL_TIMING_")
                 && name.endsWith("_POWER")) return 1.0D;
         if (name.startsWith("PLEXBALL_TIMING_") && name.endsWith("_MAX_TICKS")) return 200.0D;
@@ -817,6 +868,15 @@ final class GameDebugVariableCatalog {
 
     private static double step(String name, double defaultValue, Kind kind) {
         if (kind == Kind.BOOLEAN) return 1.0D;
+        if ((name.endsWith("_RADIUS") || name.endsWith("_SPACING"))
+                && (kind == Kind.INTEGER || kind == Kind.LONG)) return 1.0D;
+        if (name.startsWith("ROULETTE_HIT_") && name.endsWith("_SECONDS")) return 1.0D;
+        if (name.endsWith("_DEGREES_PER_TICK") || name.endsWith("_TURN_DEGREES")
+                || name.equals("WEAK_TURN_THRESHOLD_DEGREES")) return 1.0D;
+        if (name.equals("MOVEMENT_SOURCE_BASE_MULTIPLIER") || name.equals("MOVEMENT_GROWTH_CAP")
+                || name.equals("MOVEMENT_SPEED_BOOST_MULTIPLIER") || name.equals("MOVEMENT_CONVERSION_SCALE")
+                || name.equals("MOVEMENT_CONVERSION_BASE") || name.equals("OVERSHOOT_TURN_MULTIPLIER")
+                || name.endsWith("_RADIUS") || name.endsWith("_SPACING")) return 0.05D;
         if (name.equals("BACON_CHRIS_ABILITY_METER_COST")) return 5.0D;
         if (name.equals("BACON_CRISPY_SHOT_COUNT")) return 1.0D;
         if (name.equals("BACON_CRISPY_SHOT_SPREAD_RADIANS")) return 0.01D;

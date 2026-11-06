@@ -84,8 +84,6 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
     private static final String SPECTATE_MENU_TITLE = "Spectator Menu";
     private static final String KIT_MENU_TITLE = "Snake Kits";
     private static final int HOTBAR_ROULETTE_SLOT = 8;
-    private static final int ROULETTE_STEPS = 12;
-    private static final double SOURCE_BODY_FOLLOW_SPACING = 1.4D;
 
     private final ArcadeMechanicsModernPlugin plugin;
     private final Map<UUID, Player> queue = new LinkedHashMap<>();
@@ -252,8 +250,7 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
         startingPlayerCount = players.size();
         long now = System.currentTimeMillis();
         startedAt = now;
-        liveAt = now + GameDebugRuntimeOverrides.longValue("SNAKE_PREPARE_COUNTDOWN_MILLIS",
-                SnakeRules.PREPARE_COUNTDOWN_MILLIS);
+        liveAt = now + SnakeRules.prepareCountdownMillis();
         lastAnnouncedCountdownSecond = -1;
         nextFoodAt = Long.MAX_VALUE;
         nextGrowAt = Long.MAX_VALUE;
@@ -271,7 +268,8 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
             Location spawn = sourceSpawns.get(spawnIndex).clone();
             if (i >= sourceSpawns.size()) {
                 double angle = (Math.PI * 2.0D * i) / Math.max(1, players.size());
-                spawn.add(Math.cos(angle) * 1.5D, 0.0D, Math.sin(angle) * 1.5D);
+                double spawnRadius = SnakeRules.startSpawnRadiusBlocks();
+                spawn.add(Math.cos(angle) * spawnRadius, 0.0D, Math.sin(angle) * spawnRadius);
             }
             String kit = plugin.getConfig().getString("snake-kits." + player.getUniqueId(),
                     plugin.getConfig().getString("kits." + player.getUniqueId(), "speed"));
@@ -308,10 +306,12 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
         setupMatchScoreboard();
 
         announce(ChatColor.YELLOW + "Map: " + SnakeMapCatalog.displayName(mapResource));
-        announce(ChatColor.GOLD + "Snake preparation: stay on your starting pad. The round begins in 9 seconds.");
+        announce(ChatColor.GOLD + "Snake preparation: stay on your starting pad. The round begins in "
+                + (SnakeRules.prepareCountdownMillis() / 1_000L) + " seconds.");
         if (startingPlayerCount == 1) announce(ChatColor.GRAY + "Solo mechanics test: the round stays live until /snake stop or you leave.");
         sender.sendMessage(ChatColor.GREEN + "Preparing Snake with " + players.size()
-                + (players.size() == 1 ? " player." : " players.") + " Live begins in 9 seconds.");
+                + (players.size() == 1 ? " player." : " players.") + " Live begins in "
+                + (SnakeRules.prepareCountdownMillis() / 1_000L) + " seconds.");
     }
 
     public void openKitMenu(Player player) {
@@ -321,11 +321,14 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
         }
         Inventory inventory = Bukkit.createInventory(null, 27, KIT_MENU_TITLE);
         addKitMenuItem(inventory, 11, "speed", Material.FEATHER,
-                ChatColor.YELLOW + "Speed", "5 feathers", "Two seconds of increased movement speed.");
+                ChatColor.YELLOW + "Speed", SnakeRules.speedAbilityCharges() + " feathers",
+                SnakeRules.speedAbilityDurationMillis() / 1_000L + " seconds of increased movement speed.");
         addKitMenuItem(inventory, 13, "reverse", Material.COOKIE,
-                ChatColor.LIGHT_PURPLE + "Reverser", "3 cookies", "Reverse the direction of your Snake for two seconds.");
+                ChatColor.LIGHT_PURPLE + "Reverser", SnakeRules.reverseAbilityCharges() + " cookies",
+                "Reverse your Snake for " + SnakeRules.reverseAbilityDurationMillis() / 1_000L + " seconds.");
         addKitMenuItem(inventory, 15, "invulnerable", Material.NETHER_STAR,
-                ChatColor.AQUA + "Super Snake", "2 nether stars", "Ignore tail collisions for two seconds.");
+                ChatColor.AQUA + "Super Snake", SnakeRules.invulnerableAbilityCharges() + " nether stars",
+                "Ignore tail collisions for " + SnakeRules.invulnerableAbilityDurationMillis() / 1_000L + " seconds.");
         player.openInventory(inventory);
     }
 
@@ -640,20 +643,18 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
 
         if (now >= nextFoodAt) {
             spawnFood();
-            nextFoodAt = now + 1_000L;
+            nextFoodAt = now + SnakeRules.foodSpawnIntervalMillis();
         }
         if (now >= nextGrowAt) {
             for (SnakeState state : snakes.values()) {
-                if (state.alive && state.player.isOnline()) grow(state, 1);
+                if (state.alive && state.player.isOnline()) grow(state, SnakeRules.passiveGrowthSegments());
             }
-            nextGrowAt = now + 1_000L;
+            nextGrowAt = now + SnakeRules.growthIntervalMillis();
         }
         if (GameDebugRuntimeOverrides.booleanValue("magma-hazards", true)) {
-            if (now >= nextHazardAt && hazards.size() < GameDebugRuntimeOverrides.intValue("SNAKE_MAX_HAZARDS",
-                    SnakeRules.MAX_HAZARDS)) {
+            if (now >= nextHazardAt && hazards.size() < SnakeRules.maxHazards()) {
                 boolean spawned = spawnHazard();
-                nextHazardAt = now + (spawned ? GameDebugRuntimeOverrides.longValue("SNAKE_HAZARD_INTERVAL_MILLIS",
-                        SnakeRules.HAZARD_INTERVAL_MILLIS) : 5_000L);
+                nextHazardAt = now + (spawned ? SnakeRules.hazardIntervalMillis() : SnakeRules.hazardRetryMillis());
             }
         } else if (!hazards.isEmpty()) {
             for (MagmaCube hazard : new ArrayList<>(hazards)) {
@@ -704,10 +705,9 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
         if (!running || live) return;
         live = true;
         startedAt = now;
-        nextFoodAt = now + 1_000L;
-        nextGrowAt = now + 1_000L;
-        nextHazardAt = now + GameDebugRuntimeOverrides.longValue("SNAKE_FIRST_HAZARD_DELAY_MILLIS",
-                SnakeRules.FIRST_HAZARD_DELAY_MILLIS);
+        nextFoodAt = now + SnakeRules.foodSpawnIntervalMillis();
+        nextGrowAt = now + SnakeRules.growthIntervalMillis();
+        nextHazardAt = now + SnakeRules.firstHazardDelayMillis();
         // The 9-second PrepareFreeze period is not counted as player inactivity.
         for (SnakeState state : snakes.values()) {
             if (!state.alive || state.segments.isEmpty()) continue;
@@ -748,8 +748,7 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
         while (state.path.size() > maxPathPoints) state.path.removeLast();
         moveBodyAlongPath(state);
         player.setExp((float) Math.min(0.9999D,
-                (double) state.segments.size() / GameDebugRuntimeOverrides.intValue(
-                        "SNAKE_SPEED_REFERENCE_LENGTH", SnakeRules.SPEED_REFERENCE_LENGTH)));
+                (double) state.segments.size() / SnakeRules.speedReferenceLength()));
     }
 
     private void moveBodyAlongPath(SnakeState state) {
@@ -758,7 +757,7 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
         int cursor = 0;
         double distance = 0.0D;
         for (int i = 1; i < state.segments.size(); i++) {
-            double target = i * SOURCE_BODY_FOLLOW_SPACING;
+            double target = i * SnakeRules.bodyFollowSpacing();
             while (cursor < points.size() - 1 && distance < target) {
                 Location current = points.get(cursor);
                 Location next = points.get(cursor + 1);
@@ -778,14 +777,17 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
 
         if (debuff == ControlDebuff.TURN_LAG) {
             float delta = SnakeRules.wrapYaw(rawYaw - state.laggedYaw);
-            state.laggedYaw += clamp(delta, -6.0F, 6.0F);
+            float lagLimit = (float) SnakeRules.turnLagDegreesPerTick();
+            state.laggedYaw += clamp(delta, -lagLimit, lagLimit);
             effectiveYaw = state.laggedYaw;
         } else if (debuff == ControlDebuff.OVERSHOOT) {
-            effectiveYaw = rawYaw + SnakeRules.wrapYaw(rawYaw - previousYaw) * 0.35F;
+            effectiveYaw = rawYaw + SnakeRules.wrapYaw(rawYaw - previousYaw)
+                    * (float) SnakeRules.overshootTurnMultiplier();
         } else if (debuff == ControlDebuff.WEAK_SHARP_TURN) {
             float remaining = SnakeRules.wrapYaw(rawYaw - state.laggedYaw);
-            if (Math.abs(remaining) > 15.0F) {
-                state.laggedYaw += clamp(remaining, -4.0F, 4.0F);
+            if (Math.abs(remaining) > SnakeRules.weakTurnThresholdDegrees()) {
+                float turnLimit = (float) SnakeRules.weakTurnDegreesPerTick();
+                state.laggedYaw += clamp(remaining, -turnLimit, turnLimit);
                 effectiveYaw = state.laggedYaw;
             } else {
                 state.laggedYaw = rawYaw;
@@ -819,8 +821,7 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
         Location origin = mapData.foodSpawnOrigin();
         if (origin == null || origin.getWorld() != arena) return;
         double baseY = origin.getY();
-        for (int attempt = 0; attempt < GameDebugRuntimeOverrides.intValue("SNAKE_FOOD_SPAWN_ATTEMPTS",
-                SnakeRules.FOOD_SPAWN_ATTEMPTS); attempt++) {
+        for (int attempt = 0; attempt < SnakeRules.foodSpawnAttempts(); attempt++) {
             double angle = ThreadLocalRandom.current().nextDouble(0.0D, Math.PI * 2.0D);
             double distance = SnakeRules.foodSpawnDistance(ThreadLocalRandom.current().nextDouble());
             int blockX = origin.getBlockX() + (int) Math.round(Math.cos(angle) * distance);
@@ -862,7 +863,7 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
             for (SnakeState state : snakes.values()) {
                 if (!state.alive || !state.player.isOnline()) continue;
                 if (SnakeRules.isFoodCollected(slime.getLocation().distanceSquared(state.player.getLocation()))) {
-                    grow(state, 2, true);
+                    grow(state, SnakeRules.foodGrowthSegments(), true);
                     state.slimesEaten++;
                     stats.recordSlime(state.player, state.slimesEaten);
                     Bukkit.getPluginManager().callEvent(new SlimeUpgradeEvent(state.player));
@@ -891,8 +892,7 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
                     ? state.segments.get(state.segments.size() - 2).getLocation().toVector() : null;
             Vector extension = SnakeRules.tailExtensionDirection(
                     previous, last.getLocation().toVector(), state.player.getLocation().getDirection());
-            loc.add(extension.multiply(GameDebugRuntimeOverrides.doubleValue("SNAKE_SEGMENT_SPACING",
-                    SnakeRules.SEGMENT_SPACING)));
+            loc.add(extension.multiply(SnakeRules.segmentSpacing()));
             Sheep body = spawnSegment(loc, state.color);
             // Reborn calls UtilEnt.ghost(tail, true, false) for appended segments:
             // keep them visible, but remove their entity collision. The initial head remains collidable.
@@ -932,7 +932,7 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
         }
 
         MagmaCube cube = arena.spawn(spawn, MagmaCube.class);
-        cube.setSize(Math.min(4, hazards.size() + 1));
+        cube.setSize(Math.min(SnakeRules.hazardMaxCubeSize(), hazards.size() + 1));
         cube.setCustomName(ChatColor.RED + "Snake Hazard");
         cube.setCustomNameVisible(false);
         // Keep the source magma cube's native hop/gravity; only its target-seeking
@@ -944,8 +944,7 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
         hazards.add(cube);
         announce(ChatColor.RED + "" + ChatColor.BOLD + "MAGMA CUBE! " + ChatColor.GRAY
                 + "A size " + cube.getSize() + " hazard has spawned in the arena ("
-                + hazards.size() + "/" + GameDebugRuntimeOverrides.intValue("SNAKE_MAX_HAZARDS",
-                        SnakeRules.MAX_HAZARDS) + ").");
+                + hazards.size() + "/" + SnakeRules.maxHazards() + ").");
         for (SnakeState state : alive) {
             state.player.playSound(state.player.getLocation(), Sound.ENTITY_MAGMA_CUBE_JUMP, 0.8F, 0.8F);
         }
@@ -965,8 +964,7 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
         Location playerLocation = target.getLocation();
         double startAngle = ThreadLocalRandom.current().nextDouble(0.0D, Math.PI * 2.0D);
         int baseY = playerLocation.getBlockY();
-        for (int attempt = 0; attempt < GameDebugRuntimeOverrides.intValue("SNAKE_HAZARD_SPAWN_ATTEMPTS",
-                SnakeRules.HAZARD_SPAWN_ATTEMPTS); attempt++) {
+        for (int attempt = 0; attempt < SnakeRules.hazardSpawnAttempts(); attempt++) {
             double angle = startAngle + attempt * 2.399963229728653D;
             double distance = SnakeRules.hazardSpawnDistance(attempt);
             double x = playerLocation.getX() + Math.cos(angle) * distance;
@@ -984,7 +982,7 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
                 Block ground = arena.getBlockAt(blockX, y - 1, blockZ);
                 if (!ground.getType().isSolid()) continue;
                 boolean clear = true;
-                for (int offset = 0; offset <= 4; offset++) {
+                for (int offset = 0; offset <= SnakeRules.hazardClearanceBlocks(); offset++) {
                     Block space = arena.getBlockAt(blockX, y + offset, blockZ);
                     if (!space.getType().isAir()) {
                         clear = false;
@@ -1012,8 +1010,7 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
             for (SnakeState state : snakes.values()) {
                 if (!state.alive || !state.player.isOnline()) continue;
                 double distance = cube.getLocation().distanceSquared(state.player.getLocation());
-                double contactRadius = GameDebugRuntimeOverrides.doubleValue("SNAKE_HAZARD_CONTACT_RADIUS",
-                        SnakeRules.HAZARD_CONTACT_RADIUS);
+                double contactRadius = SnakeRules.hazardContactRadius();
                 if (distance < contactRadius * contactRadius) {
                     if (!SnakeRules.shouldConsumeHazardOnContact(state.rouletteActive)) {
                         // Reborn leaves this cube in the arena while the current roll finishes.
@@ -1031,13 +1028,11 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
                     nearest = state;
                 }
             }
-            if (nearest != null && tick % GameDebugRuntimeOverrides.intValue(
-                    "SNAKE_HAZARD_STEERING_INTERVAL_TICKS", SnakeRules.HAZARD_STEERING_INTERVAL_TICKS) == 0) {
+            if (nearest != null && tick % SnakeRules.hazardSteeringIntervalTicks() == 0) {
                 Vector direction = nearest.player.getLocation().toVector().subtract(cube.getLocation().toVector());
                 direction.setY(0.0D);
                 if (direction.lengthSquared() > 1.0E-6D) {
-                    Vector velocity = direction.normalize().multiply(GameDebugRuntimeOverrides.doubleValue(
-                            "SNAKE_HAZARD_STEERING_SPEED", SnakeRules.HAZARD_STEERING_SPEED));
+                    Vector velocity = direction.normalize().multiply(SnakeRules.hazardSteeringSpeed());
                     velocity.setY(cube.getVelocity().getY());
                     cube.setVelocity(velocity);
                 }
@@ -1074,7 +1069,7 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
                     cancel();
                     return;
                 }
-                if (step < ROULETTE_STEPS) {
+                if (step < SnakeRules.rouletteAnimationSteps()) {
                     ControlDebuff preview = outcomes[ThreadLocalRandom.current().nextInt(outcomes.length)];
                     player.getInventory().setItem(HOTBAR_ROULETTE_SLOT, rouletteItem(preview));
                     player.updateInventory();
@@ -1098,7 +1093,7 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
                 cancel();
             }
         };
-        state.rouletteTask = animation.runTaskTimer(plugin, 0L, 2L);
+        state.rouletteTask = animation.runTaskTimer(plugin, 0L, SnakeRules.rouletteAnimationIntervalTicks());
     }
 
     private ItemStack rouletteItem(ControlDebuff effect) {
@@ -1155,7 +1150,7 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
                         && otherState != playerState
                         && !GameDebugRuntimeOverrides.booleanValue("opponent-collisions", true)) continue;
                 for (int i = 0; i < otherState.segments.size(); i++) {
-                    if (otherState == playerState && i < 3) continue;
+                    if (otherState == playerState && i < SnakeRules.selfTailSafeSegments()) continue;
                     Sheep segment = otherState.segments.get(i);
                     if (!segment.isValid()) continue;
                     if (SnakeRules.isTailCollision(head.distanceSquared(segment.getLocation()))) {
@@ -1305,9 +1300,9 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
 
     private void grantKit(Player player, String kit) {
         switch (kit) {
-            case "reverse": player.getInventory().addItem(new ItemStack(Material.COOKIE, 3)); break;
-            case "invulnerable": player.getInventory().addItem(new ItemStack(Material.NETHER_STAR, 2)); break;
-            default: player.getInventory().addItem(new ItemStack(Material.FEATHER, 5)); break;
+            case "reverse": player.getInventory().addItem(new ItemStack(Material.COOKIE, SnakeRules.reverseAbilityCharges())); break;
+            case "invulnerable": player.getInventory().addItem(new ItemStack(Material.NETHER_STAR, SnakeRules.invulnerableAbilityCharges())); break;
+            default: player.getInventory().addItem(new ItemStack(Material.FEATHER, SnakeRules.speedAbilityCharges())); break;
         }
     }
 
@@ -1317,8 +1312,8 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
 
     private boolean isWithinTenBlocksOfMapEdge(Location location) {
         if (location == null || mapData == null || location.getWorld() != arena) return false;
-        double clampedX = mapData.clampX(location.getX(), 10.0D);
-        double clampedZ = mapData.clampZ(location.getZ(), 10.0D);
+        double clampedX = mapData.clampX(location.getX(), SnakeRules.edgeStayMarginBlocks());
+        double clampedZ = mapData.clampZ(location.getZ(), SnakeRules.edgeStayMarginBlocks());
         return SnakeRules.isWithinTenBlocksOfMapEdge(
                 location.getX(), location.getZ(), clampedX, clampedZ);
     }
@@ -1507,8 +1502,8 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
         state.abilityUsed = true;
 
         if (material == Material.FEATHER && "speed".equals(state.kit)) {
-            state.speedUntil = now + 2_000L;
-            state.abilityCooldownUntil = now + 1_000L;
+            state.speedUntil = now + SnakeRules.speedAbilityDurationMillis();
+            state.abilityCooldownUntil = now + SnakeRules.kitAbilityCooldownMillis();
             event.getPlayer().sendMessage(ChatColor.YELLOW + "Speed boost!");
         } else if (material == Material.COOKIE && "reverse".equals(state.kit)) {
             event.getPlayer().leaveVehicle();
@@ -1520,12 +1515,12 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
             if (!state.segments.isEmpty()) {
                 state.segments.get(0).addPassenger(event.getPlayer());
             }
-            state.reverseUntil = now + 2_000L;
-            state.abilityCooldownUntil = now + 1_000L;
+            state.reverseUntil = now + SnakeRules.reverseAbilityDurationMillis();
+            state.abilityCooldownUntil = now + SnakeRules.kitAbilityCooldownMillis();
             event.getPlayer().sendMessage(ChatColor.LIGHT_PURPLE + "Reverse!");
         } else if (material == Material.NETHER_STAR && "invulnerable".equals(state.kit)) {
-            state.invulnerableUntil = now + 2_000L;
-            state.abilityCooldownUntil = now + 1_000L;
+            state.invulnerableUntil = now + SnakeRules.invulnerableAbilityDurationMillis();
+            state.abilityCooldownUntil = now + SnakeRules.kitAbilityCooldownMillis();
             event.getPlayer().sendMessage(ChatColor.AQUA + "Super Snake: tail collisions ignored briefly.");
             updateSnakeAppearance(state, now + 1L);
         }

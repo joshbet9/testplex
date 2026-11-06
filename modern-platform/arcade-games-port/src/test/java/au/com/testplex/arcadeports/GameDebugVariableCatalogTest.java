@@ -87,6 +87,12 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAGONS), "DRAGONS_SURVIVE_FIVE_MINUTES_MILLIS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAGONS), "DRAGONS_WIN_STREAK_ACHIEVEMENT");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNAKE), "SNAKE_HAZARD_STEERING_SPEED");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNAKE), "SNAKE_MOVEMENT_GROWTH_CAP");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNAKE), "SNAKE_ROULETTE_HIT_7_PLUS_SECONDS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNAKE), "SNAKE_SPEED_ABILITY_DURATION_MILLIS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNAKE), "SNAKE_TAIL_COLLISION_RADIUS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNAKE), "SNAKE_HAZARD_CLEARANCE_BLOCKS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNAKE), "SNAKE_START_SPAWN_RADIUS_BLOCKS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.ONE_IN_THE_QUIVER), "QUIVER_LEAPER_DOUBLE_JUMP_ENABLED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.ONE_IN_THE_QUIVER), "QUIVER_BRAWLER_WEAPON_DAMAGE");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.ONE_IN_THE_QUIVER), "QUIVER_GROUND_POUND_RADIUS_BLOCKS");
@@ -458,9 +464,13 @@ class GameDebugVariableCatalogTest {
                         && productionSources.contains("private static String key(String suffix)")
                         && productionSources.contains("return \"MILK_THE_COW_\" + suffix")
                         && productionSources.contains("GameDebugRuntimeOverrides.longValue(key(suffix), fallback)");
+                boolean dynamicSnakeConsumer = game == ArcadePortGame.SNAKE
+                        && productionSources.contains("\"SNAKE_\" + key")
+                        && productionSources.contains("GameDebugRuntimeOverrides.");
                 assertTrue(literalConsumers.contains(key) || dynamicMazeConsumer || dynamicSneakyConsumer
                                 || dynamicMilkCowConsumer || dynamicTurfWarsConsumer || dynamicSkyWarsConsumer || dynamicEvolutionConsumer
-                                || dynamicGladiatorConsumer || dynamicWizardsConsumer || dynamicDeathTagRewardConsumer,
+                                || dynamicGladiatorConsumer || dynamicWizardsConsumer || dynamicDeathTagRewardConsumer
+                                || dynamicSnakeConsumer,
                         game.id() + " exposes " + key + " without a gameplay consumer");
             }
         }
