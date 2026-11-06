@@ -15,8 +15,9 @@ class DeathTagAchievementTrackerTest {
         assertTrue(tracker.recordChaserKillForHastyHunter(chaser, 40_000));
         assertFalse(tracker.recordChaserKillForHastyHunter(chaser, 100_000));
         assertFalse(tracker.recordChaserKillForHastyHunter(chaser, 120_000));
-        assertFalse(tracker.recordChaserKillForHastyHunter(chaser, 149_000));
-        assertTrue(tracker.recordChaserKillForHastyHunter(chaser, 152_000));
+        assertFalse(tracker.recordChaserKillForHastyHunter(chaser, 151_000));
+        assertFalse(tracker.recordChaserKillForHastyHunter(chaser, 152_000));
+        assertTrue(tracker.recordChaserKillForHastyHunter(chaser, 153_000));
     }
 
     @Test
