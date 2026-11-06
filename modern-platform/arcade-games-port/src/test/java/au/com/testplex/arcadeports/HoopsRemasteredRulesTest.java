@@ -1,11 +1,14 @@
 package au.com.testplex.arcadeports;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 import java.util.HashSet;
 import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 class HoopsRemasteredRulesTest {
+    @AfterEach void resetDebugOverrides() { GameDebugRuntimeOverrides.clear(); }
+
     @Test void supportsTwoTeamLobbiesUpToSixteenPlayers() {
         assertFalse(HoopsRemasteredRules.supportsPlayerCount(1));
         assertTrue(HoopsRemasteredRules.supportsPlayerCount(2));
@@ -154,5 +157,52 @@ class HoopsRemasteredRulesTest {
         assertEquals("1:01", HoopsRemasteredRules.formatClock(60_001));
         assertEquals("0:01", HoopsRemasteredRules.formatClock(1));
         assertEquals("0:00", HoopsRemasteredRules.formatClock(0));
+    }
+
+    @Test void debugProfileChangesAimScoringAndProgressionPredicatesAndResetRestoresDefaults() {
+        GameDebugRuntimeOverrides.activate(java.util.Map.of(
+                "HOOPS_THREE_POINT_DISTANCE", 15.0D,
+                "HOOPS_SHOT_AIM_TOLERANCE", 1.0D,
+                "HOOPS_LAYUP_DISTANCE", 4.0D,
+                "HOOPS_DUNK_DISTANCE", 3.0D,
+                "HOOPS_ASSIST_WINDOW_MILLIS", 2_000L,
+                "HOOPS_BUZZER_WINDOW_MILLIS", 1_000L,
+                "HOOPS_COMEBACK_SCORE_GAP", 5,
+                "HOOPS_MIN_PLAYERS", 4,
+                "HOOPS_MAX_PLAYERS", 8));
+
+        assertEquals(2, HoopsRemasteredRules.scoreValue(14.0D));
+        assertEquals(3, HoopsRemasteredRules.scoreValue(15.0D));
+        assertFalse(HoopsRemasteredRules.isAimedAtHoop(true, 1.1D));
+        assertTrue(HoopsRemasteredRules.isAimedAtHoop(true, 1.0D));
+        assertFalse(HoopsRemasteredRules.isLayupEligible(true, 5.0D, true));
+        assertTrue(HoopsRemasteredRules.isLayupEligible(true, 4.0D, true));
+        assertFalse(HoopsRemasteredRules.isDunkEligible(true, true, 4.0D, true));
+        assertTrue(HoopsRemasteredRules.isDunkEligible(true, true, 3.0D, true));
+        assertTrue(HoopsRemasteredRules.isAssistEligible(4_000L, 2_000L));
+        assertFalse(HoopsRemasteredRules.isAssistEligible(4_001L, 2_000L));
+        assertFalse(HoopsRemasteredRules.isBuzzerBeater(1_001L));
+        assertTrue(HoopsRemasteredRules.isComebackEligible(10, 15));
+        assertFalse(HoopsRemasteredRules.supportsPlayerCount(3));
+        assertTrue(HoopsRemasteredRules.supportsPlayerCount(8));
+        assertFalse(HoopsRemasteredRules.supportsPlayerCount(9));
+        assertEquals(8, HoopsRemasteredRuntime.boundedFlightTicks(12.0D, 1.5D, 4, 20));
+        assertEquals(12, HoopsRemasteredRuntime.boundedFlightTicks(12.0D, 1.0D, 4, 20));
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertEquals(3, HoopsRemasteredRules.scoreValue(12.5D));
+        assertTrue(HoopsRemasteredRules.isAimedAtHoop(true, 2.25D));
+        assertTrue(HoopsRemasteredRules.supportsPlayerCount(2));
+        assertTrue(HoopsRemasteredRules.supportsPlayerCount(16));
+        assertEquals(8, HoopsRemasteredRuntime.boundedFlightTicks(12.0D, 1.5D, 4, 20));
+        assertTrue(GameDebugRuntimeOverrides.isDebugSession());
+    }
+
+    @Test void deepHoopsTuningIsExposedInPerGameProfileMenu() {
+        assertNotNull(GameDebugVariableCatalog.variable(ArcadePortGame.HOOPS_REMASTERED, "HOOPS_BALL_GRAVITY"));
+        assertNotNull(GameDebugVariableCatalog.variable(ArcadePortGame.HOOPS_REMASTERED, "HOOPS_PASS_SPEED"));
+        assertNotNull(GameDebugVariableCatalog.variable(ArcadePortGame.HOOPS_REMASTERED, "HOOPS_SHOT_AIM_TOLERANCE"));
+        assertNotNull(GameDebugVariableCatalog.variable(ArcadePortGame.HOOPS_REMASTERED, "HOOPS_STEAL_COOLDOWN_MILLIS"));
+        assertNotNull(GameDebugVariableCatalog.variable(ArcadePortGame.HOOPS_REMASTERED, "HOOPS_MAX_PLAYERS"));
     }
 }

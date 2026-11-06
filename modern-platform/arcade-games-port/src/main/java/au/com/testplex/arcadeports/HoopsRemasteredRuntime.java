@@ -75,7 +75,6 @@ public final class HoopsRemasteredRuntime implements Listener {
     private static final double LEFT_HOOP_X = -20.0D;
     private static final double RIGHT_HOOP_X = 20.0D;
     private static final double HOOP_Y = 66.2D;
-    private static final double BALL_GRAVITY = 0.045D;
     private static final String GAME_ID = "hoops-remastered";
     private static final String[] STAT_KEYS = {"points", "assists", "rebounds", "blocks", "steals"};
 
@@ -527,7 +526,8 @@ public final class HoopsRemasteredRuntime implements Listener {
             ball.warnedDisplayRecoveryFailure = false;
         }
         Location previous = ball.location.clone();
-        ball.velocity.setY(ball.velocity.getY() - BALL_GRAVITY);
+        ball.velocity.setY(ball.velocity.getY() - GameDebugRuntimeOverrides.doubleValue(
+                "HOOPS_BALL_GRAVITY", HoopsRemasteredRules.BALL_GRAVITY));
         ball.location.add(ball.velocity);
         if (ball.mode == BallMode.SHOT && crossesHoop(ball, previous, ball.location)) {
             scoreBasket(current, ball, now);
@@ -537,32 +537,37 @@ public final class HoopsRemasteredRuntime implements Listener {
         boolean openRimHardware = ball.mode == BallMode.SHOT && isOpenRimHardware(ball, nextBlock);
         if (!nextBlock.isPassable() && !openRimHardware && ball.location.getY() > FLOOR_Y + 1.0D) {
             ball.location.subtract(ball.velocity);
-            ball.velocity.setX(-ball.velocity.getX() * 0.45D);
-            ball.velocity.setZ(-ball.velocity.getZ() * 0.45D);
-            ball.velocity.setY(Math.max(0.16D, Math.abs(ball.velocity.getY()) * 0.45D));
+            double wallBounce = GameDebugRuntimeOverrides.doubleValue("HOOPS_BALL_WALL_BOUNCE", HoopsRemasteredRules.BALL_WALL_BOUNCE);
+            ball.velocity.setX(-ball.velocity.getX() * wallBounce);
+            ball.velocity.setZ(-ball.velocity.getZ() * wallBounce);
+            ball.velocity.setY(Math.max(0.16D, Math.abs(ball.velocity.getY()) * wallBounce));
             ball.mode = BallMode.LOOSE;
             ball.bounces++;
         }
         if (ball.location.getY() <= FLOOR_Y + 0.22D) {
             ball.location.setY(FLOOR_Y + 0.22D);
             if (Math.abs(ball.velocity.getY()) > 0.14D) {
-                ball.velocity.setY(Math.abs(ball.velocity.getY()) * 0.48D);
-                ball.velocity.setX(ball.velocity.getX() * 0.82D);
-                ball.velocity.setZ(ball.velocity.getZ() * 0.82D);
+                ball.velocity.setY(Math.abs(ball.velocity.getY()) * GameDebugRuntimeOverrides.doubleValue(
+                        "HOOPS_BALL_FLOOR_BOUNCE", HoopsRemasteredRules.BALL_FLOOR_BOUNCE));
+                double friction = GameDebugRuntimeOverrides.doubleValue("HOOPS_BALL_FLOOR_BOUNCE_FRICTION", HoopsRemasteredRules.BALL_FLOOR_BOUNCE_FRICTION);
+                ball.velocity.setX(ball.velocity.getX() * friction);
+                ball.velocity.setZ(ball.velocity.getZ() * friction);
             } else {
                 ball.velocity.setY(0.0D);
-                ball.velocity.setX(ball.velocity.getX() * 0.75D);
-                ball.velocity.setZ(ball.velocity.getZ() * 0.75D);
+                double friction = GameDebugRuntimeOverrides.doubleValue("HOOPS_BALL_FLOOR_FRICTION", HoopsRemasteredRules.BALL_FLOOR_FRICTION);
+                ball.velocity.setX(ball.velocity.getX() * friction);
+                ball.velocity.setZ(ball.velocity.getZ() * friction);
             }
             ball.mode = BallMode.LOOSE;
             ball.bounces++;
         }
         if (ball.location.getX() < -24.5D || ball.location.getX() > 24.5D
                 || ball.location.getZ() < -14.5D || ball.location.getZ() > 14.5D
-                || now - ball.createdAt > 12_000L || ball.bounces > 7) {
+                || now - ball.createdAt > GameDebugRuntimeOverrides.longValue("HOOPS_BALL_LOOSE_LIMIT_MILLIS", HoopsRemasteredRules.BALL_LOOSE_LIMIT_MILLIS)
+                || ball.bounces > GameDebugRuntimeOverrides.intValue("HOOPS_BALL_MAX_BOUNCES", HoopsRemasteredRules.BALL_MAX_BOUNCES)) {
             ball.mode = BallMode.LOOSE;
-            ball.velocity.multiply(0.65D);
-            if (now - ball.createdAt > 15_000L) {
+            ball.velocity.multiply(GameDebugRuntimeOverrides.doubleValue("HOOPS_BALL_MOVEMENT_FRICTION", HoopsRemasteredRules.BALL_MOVEMENT_FRICTION));
+            if (now - ball.createdAt > GameDebugRuntimeOverrides.longValue("HOOPS_BALL_RECLAIM_MILLIS", HoopsRemasteredRules.BALL_RECLAIM_MILLIS)) {
                 Player inbound = nearestPlayer(current, ball.location);
                 if (inbound != null) givePossession(current, inbound, true);
                 else removeBall(current);
@@ -750,7 +755,8 @@ public final class HoopsRemasteredRuntime implements Listener {
         current.holderId = player.getUniqueId();
         player.getInventory().setItem(0, basketballItem());
         player.getInventory().setHeldItemSlot(0);
-        player.setVelocity(player.getVelocity().multiply(0.65D));
+        player.setVelocity(player.getVelocity().multiply(GameDebugRuntimeOverrides.doubleValue(
+                "HOOPS_POSSESSION_MOVEMENT_DAMPING", HoopsRemasteredRules.POSSESSION_MOVEMENT_DAMPING)));
         player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.6F, 1.6F);
     }
 
@@ -765,12 +771,18 @@ public final class HoopsRemasteredRuntime implements Listener {
         Vector velocity;
         if (receiver != null) {
             Vector delta = receiver.getEyeLocation().toVector().subtract(passer.getEyeLocation().toVector());
-            int flightTicks = (int) Math.max(4L, Math.min(20L, Math.round(delta.length() / 1.45D)));
+            int flightTicks = boundedFlightTicks(delta.length(), GameDebugRuntimeOverrides.doubleValue(
+                    "HOOPS_PASS_FLIGHT_TICKS_PER_BLOCK", HoopsRemasteredRules.PASS_FLIGHT_TICKS_PER_BLOCK),
+                    GameDebugRuntimeOverrides.intValue("HOOPS_PASS_MIN_FLIGHT_TICKS", HoopsRemasteredRules.PASS_MIN_FLIGHT_TICKS),
+                    GameDebugRuntimeOverrides.intValue("HOOPS_PASS_MAX_FLIGHT_TICKS", HoopsRemasteredRules.PASS_MAX_FLIGHT_TICKS));
             velocity = new Vector(delta.getX() / flightTicks,
-                    (delta.getY() + BALL_GRAVITY * flightTicks * (flightTicks + 1.0D) / 2.0D) / flightTicks,
+                    (delta.getY() + GameDebugRuntimeOverrides.doubleValue("HOOPS_BALL_GRAVITY", HoopsRemasteredRules.BALL_GRAVITY)
+                            * flightTicks * (flightTicks + 1.0D) / 2.0D) / flightTicks,
                     delta.getZ() / flightTicks);
         } else {
-            velocity = passer.getEyeLocation().getDirection().normalize().multiply(1.35D).setY(0.22D);
+            velocity = passer.getEyeLocation().getDirection().normalize().multiply(GameDebugRuntimeOverrides.doubleValue(
+                    "HOOPS_PASS_SPEED", HoopsRemasteredRules.PASS_SPEED)).setY(GameDebugRuntimeOverrides.doubleValue(
+                    "HOOPS_PASS_VERTICAL_SPEED", HoopsRemasteredRules.PASS_VERTICAL_SPEED));
         }
         removePossession(current, passer);
         spawnLooseBall(current, passer.getEyeLocation(), velocity, BallMode.PASS,
@@ -783,10 +795,19 @@ public final class HoopsRemasteredRuntime implements Listener {
 
     private boolean inPassLane(Player passer, Player receiver) {
         double distance = passer.getLocation().distance(receiver.getLocation());
-        if (distance < 2.0D || distance > 24.0D || !passer.hasLineOfSight(receiver)) return false;
+        if (distance < GameDebugRuntimeOverrides.doubleValue("HOOPS_PASS_MIN_DISTANCE", HoopsRemasteredRules.PASS_MIN_DISTANCE)
+                || distance > GameDebugRuntimeOverrides.doubleValue("HOOPS_PASS_MAX_DISTANCE", HoopsRemasteredRules.PASS_MAX_DISTANCE)
+                || !passer.hasLineOfSight(receiver)) return false;
         Vector direction = passer.getEyeLocation().getDirection().normalize();
         Vector toReceiver = receiver.getLocation().toVector().subtract(passer.getEyeLocation().toVector()).normalize();
-        return direction.dot(toReceiver) >= 0.45D;
+        return direction.dot(toReceiver) >= GameDebugRuntimeOverrides.doubleValue("HOOPS_PASS_AIM_DOT", HoopsRemasteredRules.PASS_AIM_DOT);
+    }
+
+    static int boundedFlightTicks(double distance, double ticksPerBlock, int minimum, int maximum) {
+        int min = Math.max(1, Math.min(minimum, maximum));
+        int max = Math.max(min, maximum);
+        return (int) Math.max(min, Math.min(max,
+                Math.round(distance / Math.max(0.05D, ticksPerBlock))));
     }
 
     private void shoot(Match current, Player shooter) {
@@ -815,13 +836,17 @@ public final class HoopsRemasteredRuntime implements Listener {
         double horizontal = Math.max(1.0D, Math.sqrt(
                 Math.pow(target.getX() - eye.getX(), 2.0D) + Math.pow(target.getZ() - eye.getZ(), 2.0D)));
         int flightTicks = dunk
-                ? (int) Math.max(5L, Math.min(8L, Math.round(horizontal / 1.35D)))
+                ? boundedFlightTicks(horizontal, GameDebugRuntimeOverrides.doubleValue(
+                        "HOOPS_SHOT_DUNK_FLIGHT_TICKS_PER_BLOCK", HoopsRemasteredRules.SHOT_DUNK_FLIGHT_TICKS_PER_BLOCK), 5, 8)
                 : layup
-                        ? (int) Math.max(7L, Math.min(11L, Math.round(horizontal / 1.2D)))
-                        : (int) Math.max(8L, Math.min(22L, Math.round(horizontal / 1.05D)));
+                        ? boundedFlightTicks(horizontal, GameDebugRuntimeOverrides.doubleValue(
+                                "HOOPS_SHOT_LAYUP_FLIGHT_TICKS_PER_BLOCK", HoopsRemasteredRules.SHOT_LAYUP_FLIGHT_TICKS_PER_BLOCK), 7, 11)
+                        : boundedFlightTicks(horizontal, GameDebugRuntimeOverrides.doubleValue(
+                                "HOOPS_SHOT_NORMAL_FLIGHT_TICKS_PER_BLOCK", HoopsRemasteredRules.SHOT_NORMAL_FLIGHT_TICKS_PER_BLOCK), 8, 22);
         Vector velocity = new Vector(
                 (target.getX() - eye.getX()) / flightTicks,
-                (target.getY() - eye.getY() + BALL_GRAVITY * flightTicks * (flightTicks + 1.0D) / 2.0D) / flightTicks,
+                (target.getY() - eye.getY() + GameDebugRuntimeOverrides.doubleValue("HOOPS_BALL_GRAVITY", HoopsRemasteredRules.BALL_GRAVITY)
+                        * flightTicks * (flightTicks + 1.0D) / 2.0D) / flightTicks,
                 (target.getZ() - eye.getZ()) / flightTicks);
         double releaseDistance = Math.sqrt(Math.pow(hoopX - shooter.getLocation().getX(), 2.0D)
                 + Math.pow(shooter.getLocation().getZ(), 2.0D));
@@ -864,7 +889,9 @@ public final class HoopsRemasteredRuntime implements Listener {
         if (stats == null) return;
         current.blockReadyAt.put(defender.getUniqueId(), now + GameDebugRuntimeOverrides.longValue("HOOPS_BLOCK_COOLDOWN_MILLIS", HoopsRemasteredRules.BLOCK_COOLDOWN_MILLIS));
         cooldownProgress.start(defender, "Block", GameDebugRuntimeOverrides.longValue("HOOPS_BLOCK_COOLDOWN_MILLIS", HoopsRemasteredRules.BLOCK_COOLDOWN_MILLIS));
-        ball.velocity.add(defender.getLocation().getDirection().normalize().multiply(0.6D).setY(0.35D));
+        ball.velocity.add(defender.getLocation().getDirection().normalize().multiply(GameDebugRuntimeOverrides.doubleValue(
+                "HOOPS_BLOCK_KNOCKBACK_HORIZONTAL", HoopsRemasteredRules.BLOCK_KNOCKBACK_HORIZONTAL)).setY(
+                GameDebugRuntimeOverrides.doubleValue("HOOPS_BLOCK_KNOCKBACK_VERTICAL", HoopsRemasteredRules.BLOCK_KNOCKBACK_VERTICAL)));
         ball.mode = BallMode.LOOSE;
         ball.lastToucher = defender.getUniqueId();
         stats.blocks++;
@@ -889,8 +916,9 @@ public final class HoopsRemasteredRuntime implements Listener {
                 > GameDebugRuntimeOverrides.doubleValue("HOOPS_STEAL_RADIUS", HoopsRemasteredRules.STEAL_RADIUS) * GameDebugRuntimeOverrides.doubleValue("HOOPS_STEAL_RADIUS", HoopsRemasteredRules.STEAL_RADIUS)
                 || !attacker.hasLineOfSight(target) || toHolder.lengthSquared() < 0.001D
                 || attacker.getEyeLocation().getDirection().normalize().dot(toHolder.normalize()) < 0.20D) return;
-        current.stealReadyAt.put(attacker.getUniqueId(), now + 3_000L);
-        cooldownProgress.start(attacker, "Steal", 3_000L);
+        long stealCooldown = GameDebugRuntimeOverrides.longValue("HOOPS_STEAL_COOLDOWN_MILLIS", HoopsRemasteredRules.STEAL_COOLDOWN_MILLIS);
+        current.stealReadyAt.put(attacker.getUniqueId(), now + stealCooldown);
+        cooldownProgress.start(attacker, "Steal", stealCooldown);
         current.playerStats.get(attacker.getUniqueId()).steals++;
         current.lastPasserId = null;
         current.shotClockEndsAt = now + GameDebugRuntimeOverrides.longValue("HOOPS_SHOT_CLOCK_MILLIS", HoopsRemasteredRules.SHOT_CLOCK_MILLIS);
@@ -1277,9 +1305,11 @@ public final class HoopsRemasteredRuntime implements Listener {
             return;
         }
         Vector direction = player.getLocation().getDirection().setY(0.0D);
-        if (direction.lengthSquared() > 0.001D) direction.normalize().multiply(0.48D);
+        if (direction.lengthSquared() > 0.001D) direction.normalize().multiply(GameDebugRuntimeOverrides.doubleValue(
+                "HOOPS_HOPS_HORIZONTAL", HoopsRemasteredRules.HOPS_HORIZONTAL));
         player.setAllowFlight(false);
-        player.setVelocity(new Vector(direction.getX(), 0.78D, direction.getZ()));
+        player.setVelocity(new Vector(direction.getX(), GameDebugRuntimeOverrides.doubleValue(
+                "HOOPS_HOPS_VERTICAL", HoopsRemasteredRules.HOPS_VERTICAL), direction.getZ()));
         current.hopsReadyAt.put(player.getUniqueId(), now + GameDebugRuntimeOverrides.longValue("HOOPS_HOPS_COOLDOWN_MILLIS", HoopsRemasteredRules.HOPS_COOLDOWN_MILLIS));
         cooldownProgress.start(player, "Hops", GameDebugRuntimeOverrides.longValue("HOOPS_HOPS_COOLDOWN_MILLIS", HoopsRemasteredRules.HOPS_COOLDOWN_MILLIS));
         player.getWorld().spawnParticle(org.bukkit.Particle.CLOUD,

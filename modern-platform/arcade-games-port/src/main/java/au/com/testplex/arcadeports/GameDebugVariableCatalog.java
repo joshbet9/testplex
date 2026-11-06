@@ -139,7 +139,17 @@ final class GameDebugVariableCatalog {
         if (game == ArcadePortGame.HOOPS_REMASTERED) return Set.of("TARGET_SCORE", "REGULATION_MILLIS",
                 "SHOT_CLOCK_MILLIS", "HOPS_COOLDOWN_MILLIS", "OFFENSIVE_REBOUND_SHOT_CLOCK_MILLIS",
                 "THREE_POINT_DISTANCE", "STEAL_RADIUS", "BLOCK_RADIUS", "BLOCK_COOLDOWN_MILLIS",
-                "RIM_SCORING_RADIUS", "CLUTCH_WINDOW_MILLIS").contains(name);
+                "RIM_SCORING_RADIUS", "CLUTCH_WINDOW_MILLIS", "MIN_PLAYERS", "MAX_PLAYERS",
+                "ASSIST_WINDOW_MILLIS", "BUZZER_WINDOW_MILLIS", "SHOT_AIM_TOLERANCE", "LAYUP_DISTANCE",
+                "DUNK_DISTANCE", "COMEBACK_SCORE_GAP", "STEAL_COOLDOWN_MILLIS", "BALL_GRAVITY",
+                "BALL_WALL_BOUNCE", "BALL_FLOOR_BOUNCE", "BALL_FLOOR_FRICTION",
+                "BALL_FLOOR_BOUNCE_FRICTION", "BALL_MOVEMENT_FRICTION", "BALL_MAX_BOUNCES",
+                "BALL_LOOSE_LIMIT_MILLIS", "BALL_RECLAIM_MILLIS", "PASS_SPEED", "PASS_VERTICAL_SPEED",
+                "PASS_FLIGHT_TICKS_PER_BLOCK", "PASS_MIN_FLIGHT_TICKS", "PASS_MAX_FLIGHT_TICKS",
+                "PASS_MIN_DISTANCE", "PASS_MAX_DISTANCE", "PASS_AIM_DOT", "BLOCK_KNOCKBACK_HORIZONTAL",
+                "BLOCK_KNOCKBACK_VERTICAL", "HOPS_HORIZONTAL", "HOPS_VERTICAL",
+                "SHOT_DUNK_FLIGHT_TICKS_PER_BLOCK", "SHOT_LAYUP_FLIGHT_TICKS_PER_BLOCK",
+                "SHOT_NORMAL_FLIGHT_TICKS_PER_BLOCK", "POSSESSION_MOVEMENT_DAMPING").contains(name);
         if (game == ArcadePortGame.SNEAKY_ASSASSINS) return SneakyAssassinsRules.debuggableRule(name);
         if (game.isMonsterMaze()) {
             return Set.of("MOB_MOVE_SPEED", "BODY_RUSH_DURATION_MILLIS", "CRYO_COOLDOWN_MILLIS",
@@ -199,6 +209,8 @@ final class GameDebugVariableCatalog {
 
     private static double minimum(String name, double defaultValue, Kind kind) {
         if (kind == Kind.BOOLEAN) return 0.0D;
+        if (name.equals("HOOPS_MIN_PLAYERS")) return 2.0D;
+        if (name.equals("HOOPS_MAX_PLAYERS")) return 2.0D;
         if (name.equals("CASTLE_ASSAULT_KING_HEALTH_BASE")
                 || name.equals("CASTLE_ASSAULT_KING_HEALTH_REFERENCE_PLAYERS")) return 1.0D;
         if (name.equals("CASTLE_ASSAULT_TNT_THROW_SPEED")
@@ -249,6 +261,7 @@ final class GameDebugVariableCatalog {
 
     private static double maximum(String name, Kind kind, double defaultValue) {
         if (kind == Kind.BOOLEAN) return 1.0D;
+        if (name.equals("HOOPS_MIN_PLAYERS") || name.equals("HOOPS_MAX_PLAYERS")) return 16.0D;
         if (name.equals("CASTLE_ASSAULT_KING_HEALTH_BASE")) return 5_000.0D;
         if (name.equals("CASTLE_ASSAULT_KING_HEALTH_REFERENCE_PLAYERS")) return 64.0D;
         if (name.equals("CASTLE_ASSAULT_CARRIER_FUSE_MILLIS")) return 600_000.0D;
