@@ -4159,7 +4159,6 @@ public final class ArcadePortManager implements Listener {
                 }
                 session.bombConstructorModes.put(bombId, "platforms");
                 session.bombDoubleJumpAvailable.add(bombId);
-                session.bombPowerupClutchEligible.add(bombId);
             }
             if (type == ArcadePortGame.MICRO_BATTLES) {
                 UUID microId = player.getUniqueId();
@@ -18555,7 +18554,6 @@ public final class ArcadePortManager implements Listener {
         }
         session.bombOwners.clear();
         session.bombPostDeathKills.clear();
-        session.bombPowerupClutchUsed.clear();
         for (Map.Entry<Block, BlockData> entry : session.bombConstructorOriginals.entrySet()) {
             Block block = entry.getKey();
             if (block != null && block.getWorld() == session.world) {
@@ -18970,18 +18968,12 @@ public final class ArcadePortManager implements Listener {
                 awardBombLobbersAchievement(winningPlayer, BombLobbersAchievement.THE_MVP.configKey(winnerId),
                         "The MVP — won after surviving alone against at least 3 opponents.");
             }
-            if (bombLobbersAliveTeammates(session, winnerId) == 1
-                    && session.bombMvpPressurePlayers.contains(winnerId)
-                    && session.bombPowerupClutchEligible.contains(winnerId)
-                    && session.bombPowerupClutchUsed.contains(winnerId)) {
-                awardCatalogAchievement(winningPlayer, "bomb-lobbers", "over-9000");
-            }
             if (session.bombArmorerWinEligible.contains(winnerId)
                     && "armorer".equals(session.bombLobbersKits.getOrDefault(winnerId, "acrobat"))
                     && ArcadePortRules.shouldAwardBombLobbersBlastProof(plugin.getConfig().getInt(
                             localStatsPath(winnerId, "bomb-lobbers") + "kit-wins.armorer", 0))) {
                 awardBombLobbersAchievement(winningPlayer, BombLobbersAchievement.BLAST_PROOF.configKey(winnerId),
-                        "Blast Proof — won 5 games as Armorer.");
+                        "Blast Proof — won 10 games as Armorer.");
             }
             if (!session.bombPlayersDamaged.contains(winnerId)) {
                 awardBombLobbersAchievement(winningPlayer, BombLobbersAchievement.JELLY_SKIN.configKey(winnerId),
@@ -26847,9 +26839,6 @@ public final class ArcadePortManager implements Listener {
                 || !session.alive.contains(player.getUniqueId())
                 || !"speed-boost".equals(bombLobbersPowerupType(held))) return;
         activateBombLobbersPowerup(session, bombLobbersPowerupTeam(held));
-        if (session.bombMvpPressurePlayers.contains(player.getUniqueId())) {
-            session.bombPowerupClutchUsed.add(player.getUniqueId());
-        }
         consumeHeld(player);
         player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,
                 ArcadePortRules.BOMB_LOBBERS_POWERUP_SPEED_DURATION_TICKS, 1, false, true));
@@ -27037,6 +27026,10 @@ public final class ArcadePortManager implements Listener {
                             && owner != null && owner.isOnline() && session.players.containsKey(ownerId)) {
                         awardBombLobbersAchievement(owner, BombLobbersAchievement.TWO_BIRDS_ONE_STONE.configKey(ownerId),
                                 "Two birds, one stone — killed 2 players with one TNT.");
+                    }
+                    if (ArcadePortRules.shouldAwardBombLobbersOver9000(directHitPowerup, killsFromThisTnt)
+                            && owner != null && owner.isOnline() && session.players.containsKey(ownerId)) {
+                        awardCatalogAchievement(owner, "bomb-lobbers", "over-9000");
                     }
                     eliminate(session, target, owner != null && owner.isOnline() && session.players.containsKey(ownerId)
                             ? owner : null, "was directly hit by TNT");
@@ -27247,9 +27240,6 @@ public final class ArcadePortManager implements Listener {
         ItemStack held = player.getInventory().getItemInMainHand();
         if (!"wind-charge".equals(bombLobbersPowerupType(held))) return;
         activateBombLobbersPowerup(session, bombLobbersPowerupTeam(held));
-        if (session.bombMvpPressurePlayers.contains(player.getUniqueId())) {
-            session.bombPowerupClutchUsed.add(player.getUniqueId());
-        }
         consumeHeld(player);
         Snowball gust = player.launchProjectile(Snowball.class);
         gust.setItem(new ItemStack(Material.WIND_CHARGE));
@@ -27336,12 +27326,6 @@ public final class ArcadePortManager implements Listener {
         String powerupType = bombLobbersPowerupType(held);
         if (powerupType == null) powerupType = "normal";
         if (!"normal".equals(powerupType)) activateBombLobbersPowerup(session, bombLobbersPowerupTeam(held));
-        if (session.bombMvpPressurePlayers.contains(ownerId) && "normal".equals(powerupType)) {
-            session.bombPowerupClutchEligible.remove(ownerId);
-        }
-        if (session.bombMvpPressurePlayers.contains(ownerId) && !"normal".equals(powerupType)) {
-            session.bombPowerupClutchUsed.add(ownerId);
-        }
         session.bombLastThrowAt.put(ownerId, now);
         if (!testPlayers.isTestPlayer(ownerId)) {
             String throwsPath = localStatsPath(ownerId, "bomb-lobbers") + "thrown";
@@ -27367,7 +27351,7 @@ public final class ArcadePortManager implements Listener {
                             session.teams.getOrDefault(candidateId, -2))) continue;
             Player candidate = session.players.get(candidateId);
             if (candidate != null && candidate.isOnline() && candidate.getWorld() == session.world
-                    && candidate.getLocation().distance(spawn) < 20.0D) closeTargets.add(candidateId);
+                    && ArcadePortRules.bombLobbersTechnicalThrowWithinRange(candidate.getLocation().distance(spawn))) closeTargets.add(candidateId);
         }
         session.bombCloseRangeTargets.put(bomb.getUniqueId(), closeTargets);
         session.bombCreatedAt.put(bomb.getUniqueId(), now);
@@ -27915,6 +27899,9 @@ public final class ArcadePortManager implements Listener {
                                         BombLobbersAchievement.TWO_BIRDS_ONE_STONE.configKey(ownerId),
                                         "Two birds, one stone — killed 2 players with one TNT.");
                             }
+                            if (ArcadePortRules.shouldAwardBombLobbersOver9000(bombPowerupType, killsFromThisTnt)) {
+                                awardCatalogAchievement(owner, "bomb-lobbers", "over-9000");
+                            }
                         }
                         eliminate(session, target, owner != null && owner.isOnline() && session.players.containsKey(ownerId)
                                 ? owner : null, "was caught in a TNT blast");
@@ -28410,7 +28397,6 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Integer> scores = new HashMap<>();
         final Map<UUID, BaconBlastCombo> baconBlastCombosByVictim = new HashMap<>();
         final Map<UUID, Integer> bombPostDeathKills = new HashMap<>();
-        final Set<UUID> bombPowerupClutchUsed = new HashSet<>();
         final List<UUID> drawTurnOrder = new ArrayList<>();
         final Map<UUID, Location> drawStartLocations = new HashMap<>();
         final Set<Block> drawCanvasBlocks = new HashSet<>();
@@ -28801,7 +28787,6 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> bombDoubleJumpUsed = new HashSet<>();
         final Map<UUID, Integer> bombDoubleJumpCounts = new HashMap<>();
         final Set<UUID> bombImmediateImpactThrowers = new HashSet<>();
-        final Set<UUID> bombPowerupClutchEligible = new HashSet<>();
         final Map<UUID, Set<UUID>> bombCloseRangeTargets = new HashMap<>();
         final Set<UUID> bombMvpPressurePlayers = new HashSet<>();
         final Set<UUID> bombPlayersDamaged = new HashSet<>();
