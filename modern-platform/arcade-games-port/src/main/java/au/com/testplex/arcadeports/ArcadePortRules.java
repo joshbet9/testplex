@@ -3771,7 +3771,8 @@ public final class ArcadePortRules {
     /** Source OvertimeManager starts after 15 minutes of Live play. */
     public static boolean heroesOfGwenOvertimeHasStarted(long liveStartedAt, long now) {
         return liveStartedAt > 0L && now >= liveStartedAt
-                && now - liveStartedAt >= HEROES_OF_GWEN_OVERTIME_DELAY_MILLIS;
+                && now - liveStartedAt >= GameDebugRuntimeOverrides.longValue(
+                        "HEROES_OF_GWEN_OVERTIME_DELAY_MILLIS", HEROES_OF_GWEN_OVERTIME_DELAY_MILLIS);
     }
 
     /** Source OvertimeAI follows only the first half of the ordered blue-to-red minion path. */
@@ -3784,7 +3785,9 @@ public final class ArcadePortRules {
             double distanceSquaredToTarget) {
         if (pathSize <= 0) return -1;
         int bounded = Math.max(0, Math.min(currentIndex, pathSize - 1));
-        return distanceSquaredToTarget < HEROES_OF_GWEN_OVERTIME_PATH_ADVANCE_DISTANCE_SQUARED
+        return distanceSquaredToTarget < GameDebugRuntimeOverrides.doubleValue(
+                "HEROES_OF_GWEN_OVERTIME_PATH_ADVANCE_DISTANCE_SQUARED",
+                HEROES_OF_GWEN_OVERTIME_PATH_ADVANCE_DISTANCE_SQUARED)
                 && bounded < pathSize - 1 ? bounded + 1 : bounded;
     }
 
@@ -3795,10 +3798,12 @@ public final class ArcadePortRules {
 
     /** Source Earthquake damage scales with the radius proximity value (1 - distance / radius). */
     public static double heroesOfGwenWitherEarthquakeDamage(double distanceFromBoss) {
+        double radius = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS",
+                HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS);
         double proximity = 1.0D - Math.max(0.0D, Math.min(
-                HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS, distanceFromBoss))
-                / HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS;
-        return HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE * (proximity + 0.5D);
+                radius, distanceFromBoss)) / Math.max(0.001D, radius);
+        return GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE",
+                HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE) * (proximity + 0.5D);
     }
 
     /** Reborn caps blast protection EPF at 20 before applying its TNT damage multiplier. */
@@ -4026,14 +4031,18 @@ public final class ArcadePortRules {
     public static final long HEROES_OF_GWEN_ROWENA_FLETCHER_RELOAD_MILLIS = 2_000L;
 
     public static int heroesOfGwenFletcherMaxArrows(String hero) {
-        if ("devon".equalsIgnoreCase(hero)) return HEROES_OF_GWEN_DEVON_FLETCHER_MAX_ARROWS;
-        if ("rowena".equalsIgnoreCase(hero)) return HEROES_OF_GWEN_ROWENA_FLETCHER_MAX_ARROWS;
+        if ("devon".equalsIgnoreCase(hero)) return Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "HEROES_OF_GWEN_DEVON_FLETCHER_MAX_ARROWS", HEROES_OF_GWEN_DEVON_FLETCHER_MAX_ARROWS));
+        if ("rowena".equalsIgnoreCase(hero)) return Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "HEROES_OF_GWEN_ROWENA_FLETCHER_MAX_ARROWS", HEROES_OF_GWEN_ROWENA_FLETCHER_MAX_ARROWS));
         return 0;
     }
 
     public static long heroesOfGwenFletcherReloadMillis(String hero) {
-        if ("devon".equalsIgnoreCase(hero)) return HEROES_OF_GWEN_DEVON_FLETCHER_RELOAD_MILLIS;
-        if ("rowena".equalsIgnoreCase(hero)) return HEROES_OF_GWEN_ROWENA_FLETCHER_RELOAD_MILLIS;
+        if ("devon".equalsIgnoreCase(hero)) return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "HEROES_OF_GWEN_DEVON_FLETCHER_RELOAD_MILLIS", HEROES_OF_GWEN_DEVON_FLETCHER_RELOAD_MILLIS));
+        if ("rowena".equalsIgnoreCase(hero)) return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "HEROES_OF_GWEN_ROWENA_FLETCHER_RELOAD_MILLIS", HEROES_OF_GWEN_ROWENA_FLETCHER_RELOAD_MILLIS));
         return 0L;
     }
 
@@ -4212,17 +4221,27 @@ public final class ArcadePortRules {
 
     /** Matches MobaUtil.scaleDamageWithBow(bow, 5) used by Devon's TNT Arrows. */
     public static double heroesOfGwenDevonTntArrowDamage(int powerLevel) {
-        double scaled = HEROES_OF_GWEN_DEVON_TNT_BOW_BASE_DAMAGE + 5.0D;
-        return scaled * (1.0D + Math.max(0, powerLevel) * 0.25D);
+        double baseDamage = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_DEVON_TNT_BOW_BASE_DAMAGE",
+                HEROES_OF_GWEN_DEVON_TNT_BOW_BASE_DAMAGE);
+        double powerScale = GameDebugRuntimeOverrides.doubleValue(
+                "HEROES_OF_GWEN_DEVON_TNT_BOW_POWER_DAMAGE_PER_LEVEL",
+                HEROES_OF_GWEN_DEVON_TNT_BOW_POWER_DAMAGE_PER_LEVEL);
+        return (baseDamage + 5.0D) * (1.0D + Math.max(0, powerLevel) * powerScale);
     }
+
+    public static final double HEROES_OF_GWEN_DEVON_TNT_BOW_POWER_DAMAGE_PER_LEVEL = 0.25D;
 
     public static final double HEROES_OF_GWEN_ROWENA_BOW_BASE_DAMAGE = 5.0D;
     public static final double HEROES_OF_GWEN_ROWENA_BOW_POWER_DAMAGE_PER_LEVEL = 0.25D;
 
     /** Mirrors MobaUtil.scaleDamageWithBow(item, 0) in the archived Java source. */
     public static double heroesOfGwenRowenaBowDamage(int powerLevel) {
-        return HEROES_OF_GWEN_ROWENA_BOW_BASE_DAMAGE
-                * (1.0D + Math.max(0, powerLevel) * HEROES_OF_GWEN_ROWENA_BOW_POWER_DAMAGE_PER_LEVEL);
+        double baseDamage = GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ROWENA_BOW_BASE_DAMAGE",
+                HEROES_OF_GWEN_ROWENA_BOW_BASE_DAMAGE);
+        double powerScale = GameDebugRuntimeOverrides.doubleValue(
+                "HEROES_OF_GWEN_ROWENA_BOW_POWER_DAMAGE_PER_LEVEL",
+                HEROES_OF_GWEN_ROWENA_BOW_POWER_DAMAGE_PER_LEVEL);
+        return baseDamage * (1.0D + Math.max(0, powerLevel) * powerScale);
     }
 
     /** Light Arrows use scaled bow damage minus one point. */
@@ -4233,7 +4252,8 @@ public final class ArcadePortRules {
     /** Bombardment multiplies the same scaled bow damage by two. */
     public static double heroesOfGwenRowenaBombardmentDamage(int powerLevel) {
         return heroesOfGwenRowenaBowDamage(powerLevel)
-                * HEROES_OF_GWEN_ROWENA_BOMBARDMENT_DAMAGE_FACTOR;
+                * GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_ROWENA_BOMBARDMENT_DAMAGE_FACTOR",
+                        HEROES_OF_GWEN_ROWENA_BOMBARDMENT_DAMAGE_FACTOR);
     }
 
     public static boolean heroesOfGwenAnathMeteorContainsDistance(double distance) {

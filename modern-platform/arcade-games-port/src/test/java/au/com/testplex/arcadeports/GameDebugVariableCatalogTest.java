@@ -44,6 +44,10 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAW_MY_THING), "DRAW_MY_THING_FIRST_GUESS_POINTS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAW_MY_THING), "DRAW_MY_THING_LATER_GUESS_POINTS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.HEROES_OF_GWEN), "HEROES_OF_GWEN_MINIONS_PER_WAVE");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.HEROES_OF_GWEN), "HEROES_OF_GWEN_OVERTIME_DELAY_MILLIS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.HEROES_OF_GWEN), "HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.HEROES_OF_GWEN), "HEROES_OF_GWEN_DEVON_FLETCHER_MAX_ARROWS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.HEROES_OF_GWEN), "HEROES_OF_GWEN_ROWENA_BOMBARDMENT_DAMAGE_FACTOR");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SPLEEF), "SPLEEF_HUNGER_DRAIN_INTERVAL_MILLIS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DEATH_TAG), "DEATH_TAG_CHASER_DAMAGE");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DEATH_TAG), "DEATH_TAG_ALPHA_CHASER_DAMAGE");
@@ -126,6 +130,15 @@ class GameDebugVariableCatalogTest {
         assertGameRange(ArcadePortGame.GLADIATORS, "GLADIATOR_TIER_3_ARROWS", 0.0D, 64.0D);
         assertGameRange(ArcadePortGame.GLADIATORS, "GLADIATOR_POTION_HEALING", 0.0D, 20.0D);
         assertGameRange(ArcadePortGame.GLADIATORS, "GLADIATOR_POTION_SPLASH_RADIUS", 0.1D, 16.0D);
+    }
+
+    @Test
+    void heroesOfGwenControlsHaveMechanicSafeRanges() {
+        assertGameRange(ArcadePortGame.HEROES_OF_GWEN, "HEROES_OF_GWEN_OVERTIME_DELAY_MILLIS", 1.0D, 3_600_000.0D);
+        assertGameRange(ArcadePortGame.HEROES_OF_GWEN, "HEROES_OF_GWEN_OVERTIME_PATH_ADVANCE_DISTANCE_SQUARED", 0.0D, 256.0D);
+        assertGameRange(ArcadePortGame.HEROES_OF_GWEN, "HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE", 0.0D, 40.0D);
+        assertGameRange(ArcadePortGame.HEROES_OF_GWEN, "HEROES_OF_GWEN_DEVON_TNT_BOW_BASE_DAMAGE", 0.0D, 100.0D);
+        assertGameRange(ArcadePortGame.HEROES_OF_GWEN, "HEROES_OF_GWEN_ROWENA_BOMBARDMENT_DAMAGE_FACTOR", 0.0D, 8.0D);
     }
 
     private static void assertRange(String key, double minimum, double maximum) {
