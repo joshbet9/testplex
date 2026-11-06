@@ -105,4 +105,127 @@ class DeathTagDebugRulesTest {
         GameDebugRuntimeOverrides.clear();
         assertEquals(4, ArcadePortRules.deathTagKillRewardGems(true));
     }
+
+    @Test
+    void chaserPromotionArcherReplenishAndRespawnGraceFollowProfileAndReset() {
+        assertEquals(30_000L, ArcadePortRules.deathTagChaserPromotionIntervalMillis());
+        assertEquals(1, ArcadePortRules.requiredDeathTagChasers(0L));
+        assertEquals(3, ArcadePortRules.requiredDeathTagChasers(60_000L));
+        assertEquals(1_200_000L, ArcadePortRules.deathTagGameTimeoutMillis());
+        assertEquals(2_500L, ArcadePortRules.deathTagRespawnGraceMillis());
+        assertEquals(2_000L, ArcadePortRules.deathTagArcherArrowIntervalMillis());
+        assertEquals(2, ArcadePortRules.deathTagArcherMaxArrows());
+        assertTrue(ArcadePortRules.deathTagCanRefillArcherArrows(1));
+        assertFalse(ArcadePortRules.deathTagCanRefillArcherArrows(2));
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "DEATH_TAG_CHASER_PROMOTION_INTERVAL_MILLIS", 10_000L,
+                "DEATH_TAG_GAME_TIMEOUT_MILLIS", 300_000L,
+                "DEATH_TAG_RESPAWN_GRACE_MILLIS", 1_000L,
+                "DEATH_TAG_ARCHER_ARROW_INTERVAL_MILLIS", 500L,
+                "DEATH_TAG_ARCHER_MAX_ARROWS", 4));
+        assertEquals(10_000L, ArcadePortRules.deathTagChaserPromotionIntervalMillis());
+        assertEquals(7, ArcadePortRules.requiredDeathTagChasers(60_000L));
+        assertEquals(300_000L, ArcadePortRules.deathTagGameTimeoutMillis());
+        assertEquals(1_000L, ArcadePortRules.deathTagRespawnGraceMillis());
+        assertEquals(500L, ArcadePortRules.deathTagArcherArrowIntervalMillis());
+        assertEquals(4, ArcadePortRules.deathTagArcherMaxArrows());
+        assertTrue(ArcadePortRules.deathTagCanRefillArcherArrows(3));
+        assertFalse(ArcadePortRules.deathTagCanRefillArcherArrows(4));
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertEquals(30_000L, ArcadePortRules.deathTagChaserPromotionIntervalMillis());
+        assertEquals(3, ArcadePortRules.requiredDeathTagChasers(60_000L));
+        assertEquals(1_200_000L, ArcadePortRules.deathTagGameTimeoutMillis());
+        assertEquals(2_500L, ArcadePortRules.deathTagRespawnGraceMillis());
+        assertTrue(ArcadePortRules.deathTagCanRefillArcherArrows(1));
+        assertFalse(ArcadePortRules.deathTagCanRefillArcherArrows(2));
+    }
+
+    @Test
+    void placementAndParticipationRewardsAreTunableAndRestore() {
+        assertEquals(10, ArcadePortRules.deathTagForcedChaserRewardGems());
+        assertEquals(15, ArcadePortRules.deathTagPlacementRewardGems(1));
+        assertEquals(10, ArcadePortRules.deathTagPlacementRewardGems(2));
+        assertEquals(5, ArcadePortRules.deathTagPlacementRewardGems(3));
+        assertEquals(0, ArcadePortRules.deathTagPlacementRewardGems(4));
+        assertEquals(10, ArcadePortRules.deathTagParticipationRewardGems());
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "DEATH_TAG_FORCED_CHASER_REWARD_GEMS", 2,
+                "DEATH_TAG_FIRST_PLACE_REWARD_GEMS", 30,
+                "DEATH_TAG_SECOND_PLACE_REWARD_GEMS", 20,
+                "DEATH_TAG_THIRD_PLACE_REWARD_GEMS", 10,
+                "DEATH_TAG_PARTICIPATION_REWARD_GEMS", 1));
+        assertEquals(2, ArcadePortRules.deathTagForcedChaserRewardGems());
+        assertEquals(30, ArcadePortRules.deathTagPlacementRewardGems(1));
+        assertEquals(20, ArcadePortRules.deathTagPlacementRewardGems(2));
+        assertEquals(10, ArcadePortRules.deathTagPlacementRewardGems(3));
+        assertEquals(1, ArcadePortRules.deathTagParticipationRewardGems());
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertEquals(10, ArcadePortRules.deathTagForcedChaserRewardGems());
+        assertEquals(15, ArcadePortRules.deathTagPlacementRewardGems(1));
+        assertEquals(10, ArcadePortRules.deathTagPlacementRewardGems(2));
+        assertEquals(5, ArcadePortRules.deathTagPlacementRewardGems(3));
+        assertEquals(10, ArcadePortRules.deathTagParticipationRewardGems());
+    }
+
+    @Test
+    void achievementProgressionThresholdsCanBeShortenedForTestingAndReset() {
+        assertEquals("-1:-1", ArcadePortRules.deathTagStatueAreaKey(-1, -1));
+        assertEquals(5, ArcadePortRules.deathTagStatueAreaSizeBlocks());
+        assertEquals(180_000L, ArcadePortRules.deathTagStatueRequiredTimeMillis());
+        assertEquals(3, ArcadePortRules.deathTagGallowsAssists());
+        assertEquals(8, ArcadePortRules.deathTagUltimateChaserKills());
+        assertEquals(3, ArcadePortRules.deathTagHastyHunterKills());
+        assertEquals(60_000L, ArcadePortRules.deathTagHastyHunterWindowMillis());
+        assertEquals(250.0D, ArcadePortRules.deathTagResilientRunnerHearts());
+        assertEquals(10_000, ArcadePortRules.deathTagCatchMeDistanceBlocks());
+        assertEquals(3, ArcadePortRules.deathTagTurtleShellHits());
+        assertEquals(50, ArcadePortRules.deathTagDeathProofWins());
+        assertTrue(ArcadePortRules.shouldAwardDeathTagComeAtMeBro(2));
+
+        GameDebugRuntimeOverrides.activate(Map.ofEntries(
+                Map.entry("DEATH_TAG_STATUE_AREA_SIZE_BLOCKS", 10),
+                Map.entry("DEATH_TAG_STATUE_REQUIRED_TIME_MILLIS", 2_000L),
+                Map.entry("DEATH_TAG_GALLOWS_ASSISTS", 1),
+                Map.entry("DEATH_TAG_ULTIMATE_CHASER_KILLS", 2),
+                Map.entry("DEATH_TAG_HASTY_HUNTER_KILLS", 2),
+                Map.entry("DEATH_TAG_HASTY_HUNTER_WINDOW_MILLIS", 5_000L),
+                Map.entry("DEATH_TAG_RESILIENT_RUNNER_HEARTS", 10.0D),
+                Map.entry("DEATH_TAG_CATCH_ME_DISTANCE_BLOCKS", 100),
+                Map.entry("DEATH_TAG_TURTLE_SHELL_HITS", 1),
+                Map.entry("DEATH_TAG_DEATH_PROOF_WINS", 2),
+                Map.entry("DEATH_TAG_COME_AT_ME_BRO_KILLS", 1),
+                Map.entry("DEATH_TAG_TRAITOR_ASSIST_WINDOW_MILLIS", 1_000L)));
+        assertEquals("0:-1", ArcadePortRules.deathTagStatueAreaKey(9, -1));
+        assertEquals(10, ArcadePortRules.deathTagStatueAreaSizeBlocks());
+        assertEquals(2_000L, ArcadePortRules.deathTagStatueRequiredTimeMillis());
+        assertEquals(1, ArcadePortRules.deathTagGallowsAssists());
+        assertEquals(2, ArcadePortRules.deathTagUltimateChaserKills());
+        assertEquals(2, ArcadePortRules.deathTagHastyHunterKills());
+        assertEquals(5_000L, ArcadePortRules.deathTagHastyHunterWindowMillis());
+        assertEquals(10.0D, ArcadePortRules.deathTagResilientRunnerHearts());
+        assertEquals(100, ArcadePortRules.deathTagCatchMeDistanceBlocks());
+        assertEquals(1, ArcadePortRules.deathTagTurtleShellHits());
+        assertEquals(2, ArcadePortRules.deathTagDeathProofWins());
+        assertTrue(ArcadePortRules.shouldAwardDeathTagComeAtMeBro(1));
+        assertEquals(1_000L, ArcadePortRules.deathTagTraitorAssistWindowMillis());
+
+        GameDebugRuntimeOverrides.resetActiveValues();
+        assertEquals("1:-1", ArcadePortRules.deathTagStatueAreaKey(9, -1));
+        assertEquals(5, ArcadePortRules.deathTagStatueAreaSizeBlocks());
+        assertEquals(180_000L, ArcadePortRules.deathTagStatueRequiredTimeMillis());
+        assertEquals(3, ArcadePortRules.deathTagGallowsAssists());
+        assertEquals(8, ArcadePortRules.deathTagUltimateChaserKills());
+        assertEquals(3, ArcadePortRules.deathTagHastyHunterKills());
+        assertEquals(60_000L, ArcadePortRules.deathTagHastyHunterWindowMillis());
+        assertEquals(250.0D, ArcadePortRules.deathTagResilientRunnerHearts());
+        assertEquals(10_000, ArcadePortRules.deathTagCatchMeDistanceBlocks());
+        assertEquals(3, ArcadePortRules.deathTagTurtleShellHits());
+        assertEquals(50, ArcadePortRules.deathTagDeathProofWins());
+        assertFalse(ArcadePortRules.shouldAwardDeathTagComeAtMeBro(1));
+        assertEquals(8_000L, ArcadePortRules.deathTagTraitorAssistWindowMillis());
+    }
 }

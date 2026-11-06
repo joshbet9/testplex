@@ -426,9 +426,14 @@ class GameDebugVariableCatalogTest {
                         && key.startsWith("WIZARDS_") && key.endsWith("_MULTIPLIER")
                         && productionSources.contains(key)
                         && productionSources.contains("boundedMultiplier(");
+                boolean dynamicDeathTagRewardConsumer = game == ArcadePortGame.DEATH_TAG
+                        && Set.of("DEATH_TAG_FIRST_PLACE_REWARD_GEMS", "DEATH_TAG_SECOND_PLACE_REWARD_GEMS",
+                                "DEATH_TAG_THIRD_PLACE_REWARD_GEMS")
+                                .contains(key)
+                        && productionSources.contains("ArcadePortRules.deathTagPlacementRewardGems(");
                 assertTrue(literalConsumers.contains(key) || dynamicMazeConsumer || dynamicSneakyConsumer
                                 || dynamicTurfWarsConsumer || dynamicSkyWarsConsumer || dynamicEvolutionConsumer
-                                || dynamicGladiatorConsumer || dynamicWizardsConsumer,
+                                || dynamicGladiatorConsumer || dynamicWizardsConsumer || dynamicDeathTagRewardConsumer,
                         game.id() + " exposes " + key + " without a gameplay consumer");
             }
         }

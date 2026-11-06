@@ -278,6 +278,19 @@ public final class ArcadePortRules {
     public static final long DEATH_TAG_TURTLE_EFFECT_DURATION_TICKS = 60L;
     public static final int DEATH_TAG_TURTLE_HITS_PER_WIND_CHARGE = 3;
     public static final long DEATH_TAG_TRICKSTER_FIREWORKS_COOLDOWN_MILLIS = 30_000L;
+    public static final long DEATH_TAG_RESPAWN_GRACE_MILLIS = 2_500L;
+    public static final long DEATH_TAG_TRAITOR_ASSIST_WINDOW_MILLIS = 8_000L;
+    public static final int DEATH_TAG_STATUE_AREA_SIZE_BLOCKS = 5;
+    public static final long DEATH_TAG_STATUE_REQUIRED_TIME_MILLIS = 180_000L;
+    public static final int DEATH_TAG_GALLOWS_ASSISTS = 3;
+    public static final int DEATH_TAG_ULTIMATE_CHASER_KILLS = 8;
+    public static final int DEATH_TAG_HASTY_HUNTER_KILLS = 3;
+    public static final long DEATH_TAG_HASTY_HUNTER_WINDOW_MILLIS = 60_000L;
+    public static final double DEATH_TAG_RESILIENT_RUNNER_HEARTS = 250.0D;
+    public static final int DEATH_TAG_CATCH_ME_DISTANCE_BLOCKS = 10_000;
+    public static final int DEATH_TAG_TURTLE_SHELL_HITS = 3;
+    public static final int DEATH_TAG_DEATH_PROOF_WINS = 50;
+    public static final int DEATH_TAG_COME_AT_ME_BRO_KILLS = 2;
     public static final int EVOLUTION_WIN_LEVEL = 5;
     public static final double DRAGON_ESCAPE_FINISH_X = 0.5D;
     public static final double DRAGON_ESCAPE_FINISH_Y = 64.0D;
@@ -3122,9 +3135,122 @@ public final class ArcadePortRules {
     }
 
     public static int requiredDeathTagChasers(long elapsedMillis) {
-        long interval = Math.max(1L, GameDebugRuntimeOverrides.longValue(
-                "DEATH_TAG_CHASER_PROMOTION_INTERVAL_MILLIS", DEATH_TAG_CHASER_PROMOTION_INTERVAL_MILLIS));
+        long interval = deathTagChaserPromotionIntervalMillis();
         return elapsedMillis < 0L ? 1 : 1 + (int) (elapsedMillis / interval);
+    }
+
+    public static long deathTagChaserPromotionIntervalMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "DEATH_TAG_CHASER_PROMOTION_INTERVAL_MILLIS", DEATH_TAG_CHASER_PROMOTION_INTERVAL_MILLIS));
+    }
+
+    public static long deathTagGameTimeoutMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "DEATH_TAG_GAME_TIMEOUT_MILLIS", DEATH_TAG_GAME_TIMEOUT_MILLIS));
+    }
+
+    public static long deathTagRespawnGraceMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "DEATH_TAG_RESPAWN_GRACE_MILLIS", DEATH_TAG_RESPAWN_GRACE_MILLIS));
+    }
+
+    public static int deathTagArcherMaxArrows() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "DEATH_TAG_ARCHER_MAX_ARROWS", DEATH_TAG_ARCHER_MAX_ARROWS));
+    }
+
+    public static long deathTagArcherArrowIntervalMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "DEATH_TAG_ARCHER_ARROW_INTERVAL_MILLIS", DEATH_TAG_ARCHER_ARROW_INTERVAL_MILLIS));
+    }
+
+    public static boolean deathTagCanRefillArcherArrows(int currentArrows) {
+        return Math.max(0, currentArrows) < deathTagArcherMaxArrows();
+    }
+
+    public static int deathTagForcedChaserRewardGems() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "DEATH_TAG_FORCED_CHASER_REWARD_GEMS", DEATH_TAG_FORCED_CHASER_REWARD_GEMS));
+    }
+
+    public static int deathTagPlacementRewardGems(int place) {
+        String key = switch (place) {
+            case 1 -> "DEATH_TAG_FIRST_PLACE_REWARD_GEMS";
+            case 2 -> "DEATH_TAG_SECOND_PLACE_REWARD_GEMS";
+            case 3 -> "DEATH_TAG_THIRD_PLACE_REWARD_GEMS";
+            default -> null;
+        };
+        int fallback = switch (place) {
+            case 1 -> DEATH_TAG_FIRST_PLACE_REWARD_GEMS;
+            case 2 -> DEATH_TAG_SECOND_PLACE_REWARD_GEMS;
+            case 3 -> DEATH_TAG_THIRD_PLACE_REWARD_GEMS;
+            default -> 0;
+        };
+        return key == null ? 0 : Math.max(0, GameDebugRuntimeOverrides.intValue(key, fallback));
+    }
+
+    public static int deathTagParticipationRewardGems() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "DEATH_TAG_PARTICIPATION_REWARD_GEMS", DEATH_TAG_PARTICIPATION_REWARD_GEMS));
+    }
+
+    public static long deathTagTraitorAssistWindowMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "DEATH_TAG_TRAITOR_ASSIST_WINDOW_MILLIS", DEATH_TAG_TRAITOR_ASSIST_WINDOW_MILLIS));
+    }
+
+    public static int deathTagStatueAreaSizeBlocks() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "DEATH_TAG_STATUE_AREA_SIZE_BLOCKS", DEATH_TAG_STATUE_AREA_SIZE_BLOCKS));
+    }
+
+    public static String deathTagStatueAreaKey(int blockX, int blockZ) {
+        int size = deathTagStatueAreaSizeBlocks();
+        return Math.floorDiv(blockX, size) + ":" + Math.floorDiv(blockZ, size);
+    }
+
+    public static long deathTagStatueRequiredTimeMillis() {
+        return Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                "DEATH_TAG_STATUE_REQUIRED_TIME_MILLIS", DEATH_TAG_STATUE_REQUIRED_TIME_MILLIS));
+    }
+
+    public static int deathTagGallowsAssists() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue("DEATH_TAG_GALLOWS_ASSISTS", DEATH_TAG_GALLOWS_ASSISTS));
+    }
+
+    public static int deathTagUltimateChaserKills() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "DEATH_TAG_ULTIMATE_CHASER_KILLS", DEATH_TAG_ULTIMATE_CHASER_KILLS));
+    }
+
+    public static int deathTagHastyHunterKills() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "DEATH_TAG_HASTY_HUNTER_KILLS", DEATH_TAG_HASTY_HUNTER_KILLS));
+    }
+
+    public static long deathTagHastyHunterWindowMillis() {
+        return Math.max(1L, GameDebugRuntimeOverrides.longValue(
+                "DEATH_TAG_HASTY_HUNTER_WINDOW_MILLIS", DEATH_TAG_HASTY_HUNTER_WINDOW_MILLIS));
+    }
+
+    public static double deathTagResilientRunnerHearts() {
+        return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
+                "DEATH_TAG_RESILIENT_RUNNER_HEARTS", DEATH_TAG_RESILIENT_RUNNER_HEARTS));
+    }
+
+    public static int deathTagCatchMeDistanceBlocks() {
+        return Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "DEATH_TAG_CATCH_ME_DISTANCE_BLOCKS", DEATH_TAG_CATCH_ME_DISTANCE_BLOCKS));
+    }
+
+    public static int deathTagTurtleShellHits() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "DEATH_TAG_TURTLE_SHELL_HITS", DEATH_TAG_TURTLE_SHELL_HITS));
+    }
+
+    public static int deathTagDeathProofWins() {
+        return Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "DEATH_TAG_DEATH_PROOF_WINS", DEATH_TAG_DEATH_PROOF_WINS));
     }
 
     public static boolean shouldSpreadDeathTag(boolean attackerTagged, boolean targetTagged) {
@@ -3137,7 +3263,8 @@ public final class ArcadePortRules {
 
     /** ComeAtMeBro starts awarding one stat per additional Chaser kill after the second kill. */
     public static boolean shouldAwardDeathTagComeAtMeBro(int chaserKillsByPlayer) {
-        return chaserKillsByPlayer >= 2;
+        return chaserKillsByPlayer >= Math.max(1, GameDebugRuntimeOverrides.intValue(
+                "DEATH_TAG_COME_AT_ME_BRO_KILLS", DEATH_TAG_COME_AT_ME_BRO_KILLS));
     }
 
     public static double deathTagChaserDamage(boolean alphaChaser) {

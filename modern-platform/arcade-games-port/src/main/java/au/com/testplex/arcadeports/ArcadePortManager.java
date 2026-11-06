@@ -4773,7 +4773,7 @@ public final class ArcadePortManager implements Listener {
                 ? 0L : now + (type == ArcadePortGame.SHEEP_QUEST ? GameDebugRuntimeOverrides.longValue("SHEEP_QUEST_ROUND_MILLIS", ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS)
                 : type == ArcadePortGame.GLADIATORS ? 0L
                 : type == ArcadePortGame.BOMB_LOBBERS ? GameDebugRuntimeOverrides.longValue("BOMB_LOBBERS_ROUND_MILLIS", ArcadePortRules.BOMB_LOBBERS_ROUND_MILLIS)
-                : type == ArcadePortGame.DEATH_TAG ? GameDebugRuntimeOverrides.longValue("DEATH_TAG_GAME_TIMEOUT_MILLIS", ArcadePortRules.DEATH_TAG_GAME_TIMEOUT_MILLIS)
+                : type == ArcadePortGame.DEATH_TAG ? ArcadePortRules.deathTagGameTimeoutMillis()
                 : type == ArcadePortGame.TURF_WARS ? GameDebugRuntimeOverrides.longValue("TURF_WARS_GAME_TIMEOUT_MILLIS", ArcadePortRules.TURF_WARS_GAME_TIMEOUT_MILLIS)
                 : type == ArcadePortGame.HEROES_OF_GWEN ? 1_200_000L
                 : type == ArcadePortGame.PAINTBALL ? GameDebugRuntimeOverrides.longValue("PAINTBALL_GAME_TIMEOUT_MILLIS", ArcadePortRules.PAINTBALL_GAME_TIMEOUT_MILLIS)
@@ -5123,10 +5123,6 @@ public final class ArcadePortManager implements Listener {
                 session.deathTagStatueArea.put(player.getUniqueId(), deathTagStatueArea(spawn));
                 session.deathTagStatueSince.put(player.getUniqueId(), now);
             }
-            if (type == ArcadePortGame.DEATH_TAG) {
-                session.deathTagStatueArea.put(player.getUniqueId(), deathTagStatueArea(spawn));
-                session.deathTagStatueSince.put(player.getUniqueId(), now);
-            }
             if (type == ArcadePortGame.MICRO_BATTLES) {
                 UUID microId = player.getUniqueId();
                 Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -5199,7 +5195,7 @@ public final class ArcadePortManager implements Listener {
                 // the initial Alpha is an OUT Runner placement and receives the forced bonus.
                 session.deathTagRunnerPlacementOrder.add(initialChaserId);
                 awardDeathTagTestGems(session, initialChaserId,
-                        GameDebugRuntimeOverrides.intValue("DEATH_TAG_FORCED_CHASER_REWARD_GEMS", ArcadePortRules.DEATH_TAG_FORCED_CHASER_REWARD_GEMS), "Forced Chaser");
+                        ArcadePortRules.deathTagForcedChaserRewardGems(), "Forced Chaser");
                 session.world.strikeLightningEffect(chaser.getLocation());
                 announce(session, ChatColor.GREEN + chaser.getName() + ChatColor.GRAY
                         + " has become an " + ChatColor.RED + "Alpha Chaser" + ChatColor.GRAY + ".");
@@ -7835,10 +7831,10 @@ public final class ArcadePortManager implements Listener {
                     && (!plugin.hasAdminAccess(player) || debugFeatureEnabled(player.getUniqueId(),
                             ArcadePortGame.DEATH_TAG, "ability-archer", true))) {
                 Long lastArrow = session.deathTagLastArrowAt.get(player.getUniqueId());
-                if (lastArrow == null || now - lastArrow >= GameDebugRuntimeOverrides.longValue("DEATH_TAG_ARCHER_ARROW_INTERVAL_MILLIS", ArcadePortRules.DEATH_TAG_ARCHER_ARROW_INTERVAL_MILLIS)) {
+                if (lastArrow == null || now - lastArrow >= ArcadePortRules.deathTagArcherArrowIntervalMillis()) {
                     session.deathTagLastArrowAt.put(player.getUniqueId(), now);
                     int arrows = inventoryCount(player, Material.ARROW);
-                    if (arrows < GameDebugRuntimeOverrides.intValue("DEATH_TAG_ARCHER_MAX_ARROWS", ArcadePortRules.DEATH_TAG_ARCHER_MAX_ARROWS)) {
+                    if (ArcadePortRules.deathTagCanRefillArcherArrows(arrows)) {
                         player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrow", "Replenished by the Archer kit."));
                         player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.6F, 1.3F);
                     }
@@ -7911,11 +7907,14 @@ public final class ArcadePortManager implements Listener {
         UUID convertedPlayerId = player.getUniqueId();
         UUID traitorId = session.deathTagLastTraitorHit.get(convertedPlayerId);
         long traitorHitAt = session.deathTagLastTraitorHitAt.getOrDefault(convertedPlayerId, 0L);
-        if (!forcedAlpha && traitorId != null && System.currentTimeMillis() - traitorHitAt <= 8_000L
+        if (!forcedAlpha && traitorId != null && System.currentTimeMillis() - traitorHitAt
+                <= ArcadePortRules.deathTagTraitorAssistWindowMillis()
                 && "traitor".equals(session.deathTagRunnerKits.get(traitorId))) {
             int assists = session.deathTagTraitorAssists.merge(traitorId, 1, Integer::sum);
             Player traitor = session.players.get(traitorId);
-            if (assists >= 3 && traitor != null) awardCatalogAchievement(traitor, "death-tag", "gallows");
+            if (assists >= ArcadePortRules.deathTagGallowsAssists() && traitor != null) {
+                awardCatalogAchievement(traitor, "death-tag", "gallows");
+            }
         }
         session.deathTagLastTraitorHit.remove(convertedPlayerId);
         session.deathTagLastTraitorHitAt.remove(convertedPlayerId);
@@ -7930,7 +7929,7 @@ public final class ArcadePortManager implements Listener {
         session.tagged.add(convertedPlayerId);
         if (forcedAlpha) {
             awardDeathTagTestGems(session, convertedPlayerId,
-                    GameDebugRuntimeOverrides.intValue("DEATH_TAG_FORCED_CHASER_REWARD_GEMS", ArcadePortRules.DEATH_TAG_FORCED_CHASER_REWARD_GEMS), "Forced Chaser");
+                    ArcadePortRules.deathTagForcedChaserRewardGems(), "Forced Chaser");
         }
         if (forcedAlpha) session.alphaChasers.add(player.getUniqueId());
         else session.alphaChasers.remove(player.getUniqueId());
@@ -7939,7 +7938,8 @@ public final class ArcadePortManager implements Listener {
             recordDeathTagRunnerKill(session, killer);
         }
         if (player.isOnline()) {
-            session.deathTagRespawnGraceUntil.put(convertedPlayerId, System.currentTimeMillis() + 2_500L);
+            session.deathTagRespawnGraceUntil.put(convertedPlayerId,
+                    System.currentTimeMillis() + ArcadePortRules.deathTagRespawnGraceMillis());
             // Preserve in-place conversion on safe ground, but do not strand a new
             // Chaser in lava, void or a blocked source-map marker.
             if (!isSafeDeathTagRespawnSpawn(player.getLocation())) {
@@ -8002,20 +8002,27 @@ public final class ArcadePortManager implements Listener {
         if (session == null || killer == null || !killer.isOnline()) return;
         UUID id = killer.getUniqueId();
         int runnerKills = session.deathTagRunnerKillsByPlayer.merge(id, 1, Integer::sum);
-        if (runnerKills >= 8) awardCatalogAchievement(killer, "death-tag", "ultimate-chaser");
+        if (runnerKills >= ArcadePortRules.deathTagUltimateChaserKills()) {
+            awardCatalogAchievement(killer, "death-tag", "ultimate-chaser");
+        }
 
         long now = System.currentTimeMillis();
         List<Long> recentKills = session.deathTagRunnerKillTimes.computeIfAbsent(id, ignored -> new ArrayList<>());
-        recentKills.removeIf(killAt -> now - killAt > 60_000L);
+        long hastyHunterWindow = ArcadePortRules.deathTagHastyHunterWindowMillis();
+        recentKills.removeIf(killAt -> now - killAt > hastyHunterWindow);
         recentKills.add(now);
-        if (recentKills.size() >= 3) awardCatalogAchievement(killer, "death-tag", "hasty-hunter");
+        if (recentKills.size() >= ArcadePortRules.deathTagHastyHunterKills()) {
+            awardCatalogAchievement(killer, "death-tag", "hasty-hunter");
+        }
     }
 
     private void recordDeathTagTurtleHit(Session session, Player runner, Player chaser) {
         UUID runnerId = runner.getUniqueId();
         UUID chaserId = chaser.getUniqueId();
         int hits = session.deathTagTurtleHitsByRunner.merge(runnerId, 1, Integer::sum);
-        if (hits >= 3) awardCatalogAchievement(runner, "death-tag", "turtle-shell");
+        if (hits >= ArcadePortRules.deathTagTurtleShellHits()) {
+            awardCatalogAchievement(runner, "death-tag", "turtle-shell");
+        }
 
         long now = System.currentTimeMillis();
         long lastHit = session.deathTagTurtleLastHitAt.getOrDefault(chaserId, 0L);
@@ -8226,7 +8233,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         session.deathTagDeathsByPlayer.merge(playerId, 1, Integer::sum);
-        session.deathTagRespawnGraceUntil.put(playerId, now + 2_500L);
+        session.deathTagRespawnGraceUntil.put(playerId, now + ArcadePortRules.deathTagRespawnGraceMillis());
         player.teleport(spawn);
         player.leaveVehicle();
         player.setGameMode(GameMode.ADVENTURE);
@@ -20690,7 +20697,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private String deathTagStatueArea(Location location) {
-        return Math.floorDiv(location.getBlockX(), 5) + ":" + Math.floorDiv(location.getBlockZ(), 5);
+        return ArcadePortRules.deathTagStatueAreaKey(location.getBlockX(), location.getBlockZ());
     }
 
 
@@ -20805,9 +20812,9 @@ public final class ArcadePortManager implements Listener {
         }
 
         int[] placementRewards = {
-                GameDebugRuntimeOverrides.intValue("DEATH_TAG_FIRST_PLACE_REWARD_GEMS", ArcadePortRules.DEATH_TAG_FIRST_PLACE_REWARD_GEMS),
-                GameDebugRuntimeOverrides.intValue("DEATH_TAG_SECOND_PLACE_REWARD_GEMS", ArcadePortRules.DEATH_TAG_SECOND_PLACE_REWARD_GEMS),
-                GameDebugRuntimeOverrides.intValue("DEATH_TAG_THIRD_PLACE_REWARD_GEMS", ArcadePortRules.DEATH_TAG_THIRD_PLACE_REWARD_GEMS)
+                ArcadePortRules.deathTagPlacementRewardGems(1),
+                ArcadePortRules.deathTagPlacementRewardGems(2),
+                ArcadePortRules.deathTagPlacementRewardGems(3)
         };
         String[] placementNames = {"1st Place", "2nd Place", "3rd Place"};
         for (int i = 0; i < Math.min(placements.size(), placementRewards.length); i++) {
@@ -20817,7 +20824,7 @@ public final class ArcadePortManager implements Listener {
             Player player = participant.getValue();
             if (player != null && player.isOnline()) {
                 awardDeathTagTestGems(session, participant.getKey(),
-                        GameDebugRuntimeOverrides.intValue("DEATH_TAG_PARTICIPATION_REWARD_GEMS", ArcadePortRules.DEATH_TAG_PARTICIPATION_REWARD_GEMS), "Participation");
+                        ArcadePortRules.deathTagParticipationRewardGems(), "Participation");
             }
         }
         plugin.saveConfig();
@@ -21076,13 +21083,16 @@ public final class ArcadePortManager implements Listener {
                             "Speedster — win Micro Battles in under 1:30.");
                 }
                 if (session.type == ArcadePortGame.DEATH_TAG) {
-                    if (lifetimeWins >= 50) {
+                    if (lifetimeWins >= ArcadePortRules.deathTagDeathProofWins()) {
                         awardCatalogAchievement(entry.getValue(), "death-tag", "death-proof");
                     }
                     String roleWins = session.tagged.contains(id) ? "chaser-wins" : "runner-wins";
                     plugin.getConfig().set(path + roleWins, plugin.getConfig().getInt(path + roleWins, 0) + 1);
                     long statueSince = session.deathTagStatueSince.getOrDefault(id, Long.MAX_VALUE);
-                    if (System.currentTimeMillis() - statueSince >= 180_000L) awardCatalogAchievement(entry.getValue(), "death-tag", "statue");
+                    if (System.currentTimeMillis() - statueSince
+                            >= ArcadePortRules.deathTagStatueRequiredTimeMillis()) {
+                        awardCatalogAchievement(entry.getValue(), "death-tag", "statue");
+                    }
                 }
                 if (session.type == ArcadePortGame.MILK_THE_COW) {
                     String roleWins = session.teams.getOrDefault(id, 0) == 1 ? "cow-wins" : "human-wins";
@@ -21198,7 +21208,7 @@ public final class ArcadePortManager implements Listener {
                 long runDistance = Math.max(0L, Math.round(session.deathTagRunDistanceByPlayer.getOrDefault(id, 0.0D)));
                 long totalRunDistance = plugin.getConfig().getLong(path + "run-distance", 0L) + runDistance;
                 plugin.getConfig().set(path + "run-distance", totalRunDistance);
-                if (totalRunDistance >= 10_000L) {
+                if (totalRunDistance >= ArcadePortRules.deathTagCatchMeDistanceBlocks()) {
                     awardCatalogAchievement(entry.getValue(), "death-tag", "catch-me-if-you-can");
                 }
 
@@ -21207,7 +21217,7 @@ public final class ArcadePortManager implements Listener {
                 double totalRegeneratedHearts = plugin.getConfig().getDouble(path + "basher-hearts-regenerated", 0.0D)
                         + regeneratedHearts;
                 plugin.getConfig().set(path + "basher-hearts-regenerated", totalRegeneratedHearts);
-                if (totalRegeneratedHearts >= 250.0D) {
+                if (totalRegeneratedHearts >= ArcadePortRules.deathTagResilientRunnerHearts()) {
                     awardCatalogAchievement(entry.getValue(), "death-tag", "resilient-runner");
                 }
             }
@@ -25441,7 +25451,8 @@ public final class ArcadePortManager implements Listener {
         session.deathTagBasherHeartsRegenerated.merge(playerId, hearts, Double::sum);
         String path = localStatsPath(playerId, ArcadePortGame.DEATH_TAG.id());
         if (plugin.getConfig().getDouble(path + "basher-hearts-regenerated", 0.0D)
-                + session.deathTagBasherHeartsRegenerated.getOrDefault(playerId, 0.0D) >= 250.0D) {
+                + session.deathTagBasherHeartsRegenerated.getOrDefault(playerId, 0.0D)
+                >= ArcadePortRules.deathTagResilientRunnerHearts()) {
             awardCatalogAchievement(player, "death-tag", "resilient-runner");
         }
     }
