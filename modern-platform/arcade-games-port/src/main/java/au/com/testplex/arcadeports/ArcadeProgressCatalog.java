@@ -59,7 +59,7 @@ public final class ArcadeProgressCatalog {
                     a("blast-proof", "Blast Proof", "Win 10 games as Armorer."),
                     a("jelly-skin", "Jelly Skin", "Win a game without taking damage."),
                     a("master-bomber", "Master Bomber", "Win 30 Bomb Lobbers games."),
-                    a("wonderkid", "Wonderkid", "Get 3 kills in one game without any of your TNT exploding early after hitting a block."),
+                    a("wonderkid", "Wonderkid", "Get 3 kills in one game from high-lob TNT that explodes immediately on impact."),
                     a("technical", "Technical", "Kill a player with TNT thrown from less than 10 blocks away."),
                     a("calma", "Calma", "Double-jump 100 times in one game."),
                     a("over-9000", "Over 9000", "Get 3 kills with one power-up TNT."),
