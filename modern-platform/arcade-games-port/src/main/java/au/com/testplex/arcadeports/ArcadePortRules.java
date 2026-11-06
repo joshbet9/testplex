@@ -831,6 +831,14 @@ public final class ArcadePortRules {
     public static boolean shouldAwardBombLobbersTwoBirdsOneStone(int killsFromOneTnt) {
         return killsFromOneTnt >= GameDebugRuntimeOverrides.intValue("BOMB_LOBBERS_TWO_BIRDS_KILLS", BOMB_LOBBERS_TWO_BIRDS_KILLS);
     }
+    /** Counts kills by a single Super Explosive or Fiery TNT activation, not a game-wide tally. */
+    public static boolean shouldAwardBombLobbersOver9000(String tntPowerupType, int killsFromOneTnt) {
+        return ("super-tnt".equals(tntPowerupType) || "fiery-tnt".equals(tntPowerupType))
+                && killsFromOneTnt >= 3;
+    }
+    public static boolean bombLobbersTechnicalThrowWithinRange(double distanceInBlocks) {
+        return Double.isFinite(distanceInBlocks) && distanceInBlocks < 10.0D;
+    }
     public static int nextBombLobbersTntKillCount(int currentKills, boolean creditedKill) {
         int current = Math.max(0, currentKills);
         return creditedKill ? Math.min(64, current + 1) : current;
@@ -875,6 +883,15 @@ public final class ArcadePortRules {
                 || value.contains("lava") || value.contains("fire")
                 || value.contains("hot floor") || value.contains("magma")
                 || value.contains("drown");
+    }
+
+    /** Knock-offs leave the arena; ordinary fire damage is not a Quadruple Serving kill. */
+    public static boolean isBaconKnockOffReason(String reason) {
+        if (reason == null) return false;
+        String value = reason.toLowerCase(java.util.Locale.ROOT).replace('_', ' ').trim();
+        return value.contains("fell") || value.contains("fall") || value.contains("void")
+                || value.contains("water") || value.contains("lava")
+                || value.contains("hot floor") || value.contains("magma") || value.contains("drown");
     }
 
     public static boolean shouldCreditBaconFallKill(long nowMillis, long lastHitAtMillis,
@@ -1230,16 +1247,24 @@ public final class ArcadePortRules {
         return switch (value) {
             case "jumper" -> "jumper";
             case "disruptor" -> "disruptor";
+            case "builder" -> "builder";
             case "warper" -> "warper";
             case "digger" -> "digger";
             default -> null;
         };
     }
 
-    /** A Disruptor mine starts its own recharge window when it is thrown. */
+    /** Source-style periodic TNT recharge; throwing a mine does not reset this timer. */
     public static long dragonEscapeNextTntChargeAt(long thrownAtMillis) {
         return thrownAtMillis + Math.max(0L, GameDebugRuntimeOverrides.longValue(
                 "DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS", DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS));
+    }
+
+    /** Ragebaiter only credits a fall within seven seconds of the actual mine launch. */
+    public static boolean shouldCreditDragonEscapeRagebaiter(long nowMillis, long launchedAtMillis, String reason) {
+        return reason != null && reason.toLowerCase(java.util.Locale.ROOT).contains("fell")
+                && launchedAtMillis > 0L && nowMillis >= launchedAtMillis
+                && nowMillis - launchedAtMillis <= 7_000L;
     }
 
     public static boolean isDragonEscapeDiggerOpeningLocked(long elapsedMillis) {
@@ -1310,6 +1335,7 @@ public final class ArcadePortRules {
                     "DRAGON_ESCAPE_JUMPER_LEAP_USES", DRAGON_ESCAPE_JUMPER_LEAP_USES));
             case "disruptor" -> Math.max(0, GameDebugRuntimeOverrides.intValue(
                     "DRAGON_ESCAPE_DISRUPTOR_LEAP_USES", DRAGON_ESCAPE_DISRUPTOR_LEAP_USES));
+            case "builder" -> 3;
             case "warper" -> Math.max(0, GameDebugRuntimeOverrides.intValue(
                     "DRAGON_ESCAPE_WARPER_LEAP_USES", DRAGON_ESCAPE_WARPER_LEAP_USES));
             default -> 0;
@@ -1325,6 +1351,10 @@ public final class ArcadePortRules {
     public static final long DRAGON_ESCAPE_WATER_DAMAGE_INTERVAL_MILLIS = 500L;
     public static final int DRAGON_ESCAPE_DISRUPTOR_MAX_TNT = 2;
     public static final long DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS = 8_000L;
+    public static final int DRAGON_ESCAPE_BUILDER_MAX_BRICKS = 2;
+    public static final long DRAGON_ESCAPE_BUILDER_RECHARGE_MILLIS = 8_000L;
+    public static final long DRAGON_ESCAPE_BUILDER_BLOCK_LIFETIME_MILLIS = 500L;
+    public static final long DRAGON_ESCAPE_BUILDER_MAX_PING_COMPENSATION_MILLIS = 250L;
     public static final long DRAGON_ESCAPE_LEAP_RECHARGE_MILLIS = 8_000L;
     public static final long DRAGON_ESCAPE_SCORE_UPDATE_MILLIS = 500L;
     public static final int DRAGON_ESCAPE_DISRUPTOR_ARM_TICKS = 40;
@@ -1333,6 +1363,18 @@ public final class ArcadePortRules {
     public static final int DRAGON_ESCAPE_WARPER_LEAP_USES = 2;
     public static final double DRAGON_ESCAPE_LEAP_FACING_Y_BONUS = 0.2D;
     public static final double DRAGON_ESCAPE_LEAP_GROUNDED_Y_BONUS = 0.2D;
+
+    /** A conservative one-way allowance, never an unbounded high-ping platform extension. */
+    public static long dragonEscapeBuilderBlockLifetimeMillis(int pingMillis) {
+        return DRAGON_ESCAPE_BUILDER_BLOCK_LIFETIME_MILLIS
+                + Math.min(DRAGON_ESCAPE_BUILDER_MAX_PING_COMPENSATION_MILLIS,
+                        Math.max(0, pingMillis) / 2L);
+    }
+
+    public static boolean shouldRemoveDragonEscapeBuilderBrick(
+            long now, long expiresAt, boolean hasBeenUsed, boolean stillStandingOnIt, boolean ownerAlive) {
+        return now >= expiresAt || !ownerAlive || (hasBeenUsed && !stillStandingOnIt);
+    }
 
     public static boolean shouldAllowDragonEscapeKitChange(boolean activeRaceParticipant) {
         return !activeRaceParticipant;
@@ -1753,18 +1795,66 @@ public final class ArcadePortRules {
         if (requested == null) return null;
         String value = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
         return switch (value) {
-            case "jumper" -> "jumper";
+            case "acrobat", "jumper" -> "acrobat";
             case "armorer", "armourer" -> "armorer";
-            case "pitcher" -> "pitcher";
-            case "waller" -> "waller";
+            case "constructor", "waller" -> "constructor";
             default -> null;
         };
     }
 
-    /** Jumper and Waller inherit TeamArmorModule's team-coloured leather set. */
+    /** Relative to the block clicked by Constructor: forward, sideways, height. */
+    public record BombConstructorOffset(int forward, int sideways, int height) {}
+
+    public static String nextBombConstructorMode(String current) {
+        return switch (current == null ? "" : current.toLowerCase(java.util.Locale.ROOT)) {
+            case "platforms" -> "walls";
+            case "walls" -> "stairs";
+            default -> "platforms";
+        };
+    }
+
+    public static List<BombConstructorOffset> bombConstructorOffsets(String mode) {
+        List<BombConstructorOffset> blocks = new ArrayList<>();
+        switch (mode == null ? "" : mode.toLowerCase(java.util.Locale.ROOT)) {
+            case "platforms" -> {
+                for (int forward = 1; forward <= 3; forward++)
+                    for (int sideways = -2; sideways <= 2; sideways++)
+                        blocks.add(new BombConstructorOffset(forward, sideways, 0));
+            }
+            case "walls" -> {
+                for (int sideways = -2; sideways <= 2; sideways++)
+                    for (int height = 0; height < 3; height++)
+                        blocks.add(new BombConstructorOffset(1, sideways, height));
+            }
+            case "stairs" -> {
+                for (int forward = 1; forward <= 3; forward++)
+                    for (int sideways = -1; sideways <= 1; sideways++)
+                        blocks.add(new BombConstructorOffset(forward, sideways, forward - 1));
+            }
+            default -> throw new IllegalArgumentException("Unknown Constructor mode: " + mode);
+        }
+        return List.copyOf(blocks);
+    }
+
+    public static boolean bombConstructorBlockedEnemyTnt(int constructorTeam, int throwerTeam) {
+        return areBombLobbersEnemies(constructorTeam, throwerTeam);
+    }
+
+    /** Blast Proof is a lifetime Armorer-kit win count, not a single team victory. */
+    public static boolean shouldAwardBombLobbersBlastProof(int completedArmorerWins) {
+        return completedArmorerWins >= 10;
+    }
+
+    public static boolean shouldCountBombLobbersArmorerWin(boolean matchWon,
+            boolean playedAsArmorerSinceStart, String finishingKit) {
+        return matchWon && playedAsArmorerSinceStart
+                && "armorer".equals(normalizeBombLobbersKit(finishingKit));
+    }
+
+    /** Acrobat and Constructor inherit TeamArmorModule's team-coloured leather set. */
     public static boolean bombLobbersKitUsesTeamArmor(String kit) {
         String normalized = normalizeBombLobbersKit(kit);
-        return "jumper".equals(normalized) || "waller".equals(normalized);
+        return "acrobat".equals(normalized) || "constructor".equals(normalized);
     }
 
     /** Reborn's two Bomb Lobbers sides use red and aqua team colours for their trails/gear. */
@@ -1808,12 +1898,12 @@ public final class ArcadePortRules {
                 "BOMB_LOBBERS_POWERUP_SPEED_DURATION_TICKS", BOMB_LOBBERS_POWERUP_SPEED_DURATION_TICKS));
     }
 
-    /** True for the metal armour supplied directly by the source Armorer/Pitcher kits.
+    /** True for the metal armour supplied by the Armorer kit.
      * Jumper/Waller instead inherit the separate team-coloured leather armour module.
      */
     public static boolean bombLobbersKitUsesArmor(String kit) {
         String normalized = normalizeBombLobbersKit(kit);
-        return "armorer".equals(normalized) || "pitcher".equals(normalized);
+        return "armorer".equals(normalized);
     }
 
     /** Reborn's default DamagePvP flag is enabled for Bomb Lobbers; only live participants may damage another participant. */
@@ -1985,6 +2075,16 @@ public final class ArcadePortRules {
     public static boolean shouldPrimeBombLobbersBomb(long ageMillis, boolean touchingSolidBlock) {
         return ageMillis >= GameDebugRuntimeOverrides.longValue("BOMB_LOBBERS_MAX_FLIGHT_MILLIS", BOMB_LOBBERS_MAX_FLIGHT_MILLIS)
                 || (ageMillis >= GameDebugRuntimeOverrides.longValue("BOMB_LOBBERS_WALL_CONTACT_DELAY_MILLIS", BOMB_LOBBERS_WALL_CONTACT_DELAY_MILLIS) && touchingSolidBlock);
+    }
+
+    /** High lobs reach terrain after the three-second grace period and explode on contact. */
+    public static boolean isBombLobbersImpactDetonation(long ageMillis, boolean touchingBlock) {
+        return touchingBlock && ageMillis >= BOMB_LOBBERS_WALL_CONTACT_DELAY_MILLIS
+                && ageMillis < BOMB_LOBBERS_MAX_FLIGHT_MILLIS;
+    }
+
+    public static boolean shouldAwardBombLobbersWonderkid(int impactExplosionKillsThisMatch) {
+        return impactExplosionKillsThisMatch >= 3;
     }
 
     /** Whether a Waller can place a wall at this time, including the source's short Recharge gate. */
@@ -4409,6 +4509,73 @@ public final class ArcadePortRules {
     public static final int CASTLE_ASSAULT_ARCHER_MAX_ARROWS = 10;
     public static final long CASTLE_ASSAULT_DEMOLITIONIST_TNT_REFILL_MILLIS = 10_000L;
     public static final int CASTLE_ASSAULT_DEMOLITIONIST_MAX_TNT = 2;
+    public static final long CASTLE_ASSAULT_EXPRESS_DELIVERY_MILLIS = 15_000L;
+    public static final double CASTLE_ASSAULT_ROYAL_GUARD_RANGE = 15.0D;
+    public static final double CASTLE_ASSAULT_KIT_PASSIVE_MULTIPLIER = 1.25D;
+
+    /** Only Alchemist splash potions originating from Castle Assault chests receive this bonus. */
+    public static boolean shouldBoostCastleChestSplashPotion(boolean alchemist, boolean castleChestOrigin) {
+        return alchemist && castleChestOrigin;
+    }
+
+    public static int castleAssaultBoostedChestPotionDuration(int normalDurationTicks) {
+        if (normalDurationTicks <= 0) return normalDurationTicks;
+        return (int) Math.min(Integer.MAX_VALUE,
+                Math.ceil(normalDurationTicks * CASTLE_ASSAULT_KIT_PASSIVE_MULTIPLIER));
+    }
+
+    public static double castleAssaultChestPotionInstantBonus(double normalInstantAmount) {
+        if (!Double.isFinite(normalInstantAmount) || normalInstantAmount <= 0.0D) return 0.0D;
+        return normalInstantAmount * (CASTLE_ASSAULT_KIT_PASSIVE_MULTIPLIER - 1.0D);
+    }
+
+    public static double castleAssaultArcherArrowDamage(double normalDamage) {
+        if (!Double.isFinite(normalDamage) || normalDamage <= 0.0D) return normalDamage;
+        return normalDamage * CASTLE_ASSAULT_KIT_PASSIVE_MULTIPLIER;
+    }
+
+    public static boolean shouldAwardCastleAssaultClutchness(int winningKingHealth) {
+        return winningKingHealth > 0 && winningKingHealth < 10;
+    }
+
+    public static boolean shouldAwardCastleAssaultMultiplicative(int playerKills, int nextHighestTeammateKills) {
+        return playerKills >= 5 && nextHighestTeammateKills >= 0
+                && (long) playerKills >= 2L * nextHighestTeammateKills;
+    }
+
+    public static boolean shouldAwardCastleAssaultBadChemistry(int attributedDebuffKills) {
+        return attributedDebuffKills >= 2;
+    }
+
+    public static boolean shouldAwardCastleAssaultPinCushion(int bowKills) {
+        return bowKills >= 5;
+    }
+
+    public static boolean shouldAwardCastleAssaultTntRrific(int demolitionistTntKills) {
+        return demolitionistTntKills >= 3;
+    }
+
+    public static boolean shouldAwardCastleAssaultGoldenBoy(boolean consumedGoldenApplegateThisLife,
+            int killsThisLife) {
+        return consumedGoldenApplegateThisLife && killsThisLife >= 5;
+    }
+
+    public static boolean shouldAwardCastleAssaultImmovableObject(int survivedEnemyHitsThisLife) {
+        return survivedEnemyHitsThisLife >= 10;
+    }
+
+    public static boolean isCastleAssaultExpressDelivery(long pickupAtMillis, long detonationAtMillis) {
+        return pickupAtMillis > 0L && detonationAtMillis >= pickupAtMillis
+                && detonationAtMillis - pickupAtMillis <= CASTLE_ASSAULT_EXPRESS_DELIVERY_MILLIS;
+    }
+
+    public static boolean shouldAwardCastleAssaultRoyalGuard(int kingDefenseKills) {
+        return kingDefenseKills >= 3;
+    }
+
+    public static boolean shouldAwardCastleAssaultAgainstAllOdds(int survivingFriendlyCrystals) {
+        return survivingFriendlyCrystals == 0;
+    }
 
     public static final long HEROES_OF_GWEN_WITHER_EARTHQUAKE_INTERVAL_MILLIS = 4_000L;
     public static final double HEROES_OF_GWEN_WITHER_TARGET_SPEED = 4.0D;

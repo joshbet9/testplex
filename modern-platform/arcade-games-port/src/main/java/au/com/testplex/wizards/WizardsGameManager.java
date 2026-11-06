@@ -5,6 +5,7 @@ import au.com.testplex.arcadeports.ArcadeMechanicsModernPlugin;
 import au.com.testplex.arcadeports.ArcadeGameModule;
 import au.com.testplex.arcadeports.ArcadePortGame;
 import au.com.testplex.arcadeports.GameDebugRuntimeOverrides;
+import au.com.testplex.arcadeports.ArcadeProgressCatalog;
 import au.com.testplex.arcadeports.SourceMapCatalog;
 
 import org.bukkit.Bukkit;
@@ -79,6 +80,7 @@ import org.bukkit.scoreboard.ScoreboardManager;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -698,7 +700,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
             // Their progress is persisted here because they are removed from states
             // before the match-wide finish pass can record it.
             state.alive = false;
-            if (WizardsRules.shouldRecordProgress(plugin.isArcadeDebugRound())) {
+            if (!plugin.isTestPlayer(id) && WizardsRules.shouldRecordProgress(plugin.isArcadeDebugRound())) {
                 WizardsProgressStore.increment(plugin.getConfig(), id, "kills", state.kills);
                 WizardsProgressStore.increment(plugin.getConfig(), id, "spells-bound", state.spellsBound);
                 plugin.saveConfig();
@@ -1953,6 +1955,10 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
                     player, au.com.testplex.arcadeports.ArcadePortGame.WIZARDS, spell.displayName());
         }
 
+        // Count casts only after the spell's effect has actually been accepted.
+        state.successfulCasts++;
+        state.allCastsAtMaximum &= level == spell.maximumLevel();
+        state.castFamilies.add(spell.category());
         state.mana -= manaCost;
         int cooldown = spell.cooldownSeconds(level, state.cooldownModifier);
         state.cooldowns.put(spell, now + cooldown * 1000L);
@@ -2911,8 +2917,23 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         org.bukkit.configuration.file.FileConfiguration config = plugin.getConfig();
         for (Map.Entry<UUID, WizardState> entry : states.entrySet()) {
             WizardState state = entry.getValue();
+            if (plugin.isTestPlayer(entry.getKey())) continue;
             WizardsProgressStore.increment(config, entry.getKey(), "kills", state.kills);
             WizardsProgressStore.increment(config, entry.getKey(), "spells-bound", state.spellsBound);
+            boolean won = winner != null && winner.getUniqueId().equals(entry.getKey());
+            if (WizardsAchievementRules.noSpellVictory(won, state.successfulCasts)) {
+                awardWizardsAchievement(entry.getKey(), "youre-a-wizard-harry");
+            }
+            if (WizardsAchievementRules.maxLevelOnlyVictory(
+                    won, state.successfulCasts, state.allCastsAtMaximum)) {
+                awardWizardsAchievement(entry.getKey(), "strong-willed-small-minded");
+            }
+            if (WizardsAchievementRules.sixKillDefeat(won, state.kills)) {
+                awardWizardsAchievement(entry.getKey(), "ding-dong");
+            }
+            if (WizardsAchievementRules.singleFamilyVictory(won, state.castFamilies.size())) {
+                awardWizardsAchievement(entry.getKey(), "one-trick-wizard");
+            }
         }
         // A shared Arcade session records the win (and games-played) in its common
         // finish path. Only the legacy unmanaged controller records wins itself.
@@ -2921,6 +2942,17 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
             WizardsProgressStore.increment(config, winner.getUniqueId(), "wins", 1L);
         }
         plugin.saveConfig();
+    }
+
+    private void awardWizardsAchievement(UUID playerId, String achievementId) {
+        if (playerId == null || plugin.isTestPlayer(playerId)
+                || ArcadeProgressCatalog.achievements("wizards").stream()
+                        .noneMatch(achievement -> achievement.id().equals(achievementId))) return;
+        String key = "local-achievements." + playerId + ".wizards." + achievementId;
+        if (plugin.getConfig().getBoolean(key, false)) return;
+        plugin.getConfig().set(key, true);
+        Player player = Bukkit.getPlayer(playerId);
+        if (player != null) player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + achievementId);
     }
 
     private void restoreTemporaryPlayer(Player player, UUID id) {
@@ -3058,6 +3090,9 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         private int soulStars;
         private int kills;
         private int spellsBound;
+        private int successfulCasts;
+        private boolean allCastsAtMaximum = true;
+        private final EnumSet<WizardsSpell.Category> castFamilies = EnumSet.noneOf(WizardsSpell.Category.class);
         private float cooldownModifier = 1.0F;
         private boolean alive = true;
 

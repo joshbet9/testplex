@@ -319,63 +319,60 @@ public final class PlexballGame implements Listener {
     /** Open the local Plexball career page used by /stats plexball. */
     public void openStats(Player player) {
         if (player == null || !player.isOnline()) return;
-        UUID id = player.getUniqueId();
-        PlayerProgress profile = readProgress(id);
-        Inventory inventory = Bukkit.createInventory(null, 54, STATS_MENU_TITLE);
-        ItemStack filler = progressItem(Material.BLACK_STAINED_GLASS_PANE, " ", List.of());
-        for (int slot = 0; slot < inventory.getSize(); slot++) inventory.setItem(slot, filler);
+        ArcadePortManager manager = plugin.getArcadePortManager();
+        if (manager != null) manager.openGameStats(player, player.getUniqueId(), player.getName(), "plexball", 0);
+    }
 
-        inventory.setItem(4, progressItem(Material.BOOK, ChatColor.GOLD + "Career Summary", List.of(
-                ChatColor.GRAY + "Matches: " + ChatColor.WHITE + profile.matches,
+    /** Read-only progression access for the same shared GUI used by every other Arcade game. */
+    public boolean hasAchievement(UUID playerId, PlexballAchievement achievement) {
+        return playerId != null && progressionData.getBoolean(achievement.configPath(playerId), false);
+    }
+
+    /** Genuine career counters available for /stats achievement progress. */
+    public long achievementProgressValue(UUID playerId, String achievementId) {
+        if (playerId == null || achievementId == null) return -1L;
+        PlayerProgress progress = readProgress(playerId);
+        return switch (achievementId) {
+            case "perfect-contact-three" -> progress.perfectHits;
+            case "champion-five-win-streak" -> progress.bestWinStreak;
+            default -> -1L;
+        };
+    }
+
+    public long milestoneValue(UUID playerId, PlexballMilestone milestone) {
+        if (playerId == null) return 0L;
+        long value = Math.max(0L, readProgress(playerId).value(milestone.metric()));
+        return progressionData.getBoolean(milestone.configPath(playerId), false)
+                ? Math.max(value, milestone.target()) : value;
+    }
+
+    public java.util.Set<UUID> recordedPlayers() {
+        java.util.Set<UUID> players = new java.util.HashSet<>();
+        var section = progressionData.getConfigurationSection("players");
+        if (section == null) return players;
+        for (String key : section.getKeys(false)) {
+            try {
+                UUID id = UUID.fromString(key);
+                if (progressionData.getLong("players." + id + ".matches", 0L) > 0L) players.add(id);
+            } catch (IllegalArgumentException ignored) { }
+        }
+        return players;
+    }
+
+    public List<String> statsSummary(UUID playerId) {
+        PlayerProgress profile = readProgress(playerId);
+        return List.of(ChatColor.GRAY + "Matches: " + ChatColor.WHITE + profile.matches,
                 ChatColor.GRAY + "Wins: " + ChatColor.WHITE + profile.wins,
-                ChatColor.GRAY + "Win streak: " + ChatColor.GOLD + profile.currentWinStreak
-                        + ChatColor.GRAY + " (best " + ChatColor.GOLD + profile.bestWinStreak + ChatColor.GRAY + ")",
+                ChatColor.GRAY + "Win streak: " + ChatColor.WHITE + profile.currentWinStreak
+                        + ChatColor.GRAY + " (best " + profile.bestWinStreak + ")",
                 ChatColor.GRAY + "At-bats: " + ChatColor.WHITE + profile.atBats,
-                ChatColor.GRAY + "Uncaught distance: " + ChatColor.GREEN
+                ChatColor.GRAY + "Uncaught distance: " + ChatColor.WHITE
                         + formatMilestoneValue(PlexballMilestone.Metric.DISTANCE_TENTHS, profile.totalDistanceTenths),
-                ChatColor.GRAY + "Best hit: " + ChatColor.GREEN
+                ChatColor.GRAY + "Best hit: " + ChatColor.WHITE
                         + String.format(java.util.Locale.ROOT, "%.1fm", profile.bestDistanceTenths / 10.0D),
-                ChatColor.GRAY + "Catches: " + ChatColor.AQUA + profile.catches,
-                ChatColor.GRAY + "Home runs: " + ChatColor.GOLD + profile.homeRuns,
-                ChatColor.GRAY + "Perfect contacts: " + ChatColor.LIGHT_PURPLE + profile.perfectHits)));
-
-        inventory.setItem(9, progressItem(Material.PAPER,
-                ChatColor.YELLOW + "" + ChatColor.BOLD + "ACHIEVEMENTS", List.of(
-                        ChatColor.GRAY + "One-time challenges earned through play.")));
-        PlexballAchievement[] achievements = PlexballAchievement.values();
-        for (int index = 0; index < achievements.length; index++) {
-            PlexballAchievement achievement = achievements[index];
-            boolean unlocked = progressionData.getBoolean(achievement.configPath(id), false);
-            List<String> lore = new ArrayList<>();
-            lore.add(ChatColor.GRAY + achievement.requirement());
-            lore.add(unlocked ? ChatColor.GREEN + "UNLOCKED" : ChatColor.RED + "LOCKED");
-            inventory.setItem(10 + index, progressItem(
-                    unlocked ? achievement.icon() : Material.GRAY_DYE,
-                    (unlocked ? ChatColor.GREEN : ChatColor.WHITE) + achievement.displayName(), lore));
-        }
-
-        inventory.setItem(27, progressItem(Material.WRITABLE_BOOK,
-                ChatColor.AQUA + "" + ChatColor.BOLD + "CAREER MILESTONES", List.of(
-                        ChatColor.GRAY + "Cumulative progress across all Plexball matches.")));
-        for (int index = 0; index < PlexballMilestone.values().length; index++) {
-            PlexballMilestone milestone = PlexballMilestone.values()[index];
-            long current = profile.value(milestone.metric());
-            boolean unlocked = progressionData.getBoolean(milestone.configPath(id), false);
-            int percent = PlexballProgressionRules.milestoneProgressPercent(current, milestone.target());
-            List<String> lore = new ArrayList<>();
-            lore.add(ChatColor.GRAY + milestone.metric().displayName());
-            lore.add(ChatColor.WHITE.toString() + formatMilestoneValue(milestone.metric(), current)
-                    + ChatColor.GRAY + " / " + ChatColor.WHITE + milestone.targetLabel());
-            lore.add(progressBar(percent));
-            lore.add(unlocked ? ChatColor.GREEN + "COMPLETED"
-                    : ChatColor.YELLOW.toString() + percent + "% complete");
-            inventory.setItem(28 + index, progressItem(
-                    unlocked ? Material.EMERALD : milestoneIcon(milestone.metric()),
-                    (unlocked ? ChatColor.GREEN : ChatColor.WHITE) + milestone.displayName(), lore));
-        }
-        inventory.setItem(53, progressItem(Material.BARRIER, ChatColor.RED + "Close",
-                List.of(ChatColor.GRAY + "Click to close this page.")));
-        player.openInventory(inventory);
+                ChatColor.GRAY + "Catches: " + ChatColor.WHITE + profile.catches,
+                ChatColor.GRAY + "Home runs: " + ChatColor.WHITE + profile.homeRuns,
+                ChatColor.GRAY + "Perfect contacts: " + ChatColor.WHITE + profile.perfectHits);
     }
 
     public void openKitMenu(Player player) {
@@ -383,7 +380,7 @@ public final class PlexballGame implements Listener {
         Inventory inventory = Bukkit.createInventory(null, 27, KIT_MENU_TITLE);
         ItemStack filler = progressItem(Material.BLACK_STAINED_GLASS_PANE, " ", List.of());
         for (int slot = 0; slot < inventory.getSize(); slot++) inventory.setItem(slot, filler);
-        Kit selected = selectedKits.getOrDefault(player.getUniqueId(), Kit.TECHNICIAN);
+        Kit selected = playableKit(player.getUniqueId());
         inventory.setItem(4, progressItem(Material.BOOK, ChatColor.AQUA + "Choose your Plexball kit", List.of(
                 ChatColor.GRAY + "Each kit has a distinct batting style and fielding ability.",
                 ChatColor.GRAY + "Your selection is saved for your next match.")));
@@ -396,7 +393,15 @@ public final class PlexballGame implements Listener {
             List<String> lore = new ArrayList<>();
             lore.add(ChatColor.GRAY + describeKit(kit));
             lore.add(ChatColor.GRAY + "Ability: " + ChatColor.AQUA + kit.abilityName());
-            lore.add(active ? ChatColor.GREEN + "CURRENT KIT" : ChatColor.YELLOW + "Click to select");
+            boolean skyguardUnlocked = kit != Kit.SKYGUARD || AchievementKitUnlockPolicy
+                    .find(ArcadePortGame.PLEXBALL, "skyguard")
+                    .unlocked(id -> hasAchievement(player.getUniqueId(), id));
+            if (kit == Kit.SKYGUARD) {
+                lore.add(ChatColor.GOLD + "Achievement Kit");
+                lore.add(ChatColor.GRAY + "Requires Sticky Gloves and Sweet Spot.");
+            }
+            lore.add(!skyguardUnlocked ? ChatColor.RED + "LOCKED"
+                    : active ? ChatColor.GREEN + "CURRENT KIT" : ChatColor.YELLOW + "Click to select");
             inventory.setItem(slots[index], progressItem(kit.abilityItem,
                     (active ? ChatColor.GREEN : ChatColor.WHITE) + kit.displayName(), lore));
         }
@@ -454,6 +459,13 @@ public final class PlexballGame implements Listener {
     public boolean selectKit(Player player, String id) {
         Kit kit = Kit.fromId(id);
         if (kit == null) return false;
+        if (kit == Kit.SKYGUARD) {
+            AchievementKitUnlockPolicy.Rule rule = AchievementKitUnlockPolicy.find(ArcadePortGame.PLEXBALL, "skyguard");
+            if (rule == null || !rule.unlocked(achievement -> hasAchievement(player.getUniqueId(), achievement))) {
+                player.sendMessage(ChatColor.RED + "Skyguard is locked. Earn Sticky Gloves and Sweet Spot first.");
+                return false;
+            }
+        }
         if (isActive() && matchPlayers.contains(player.getUniqueId())) {
             player.sendMessage(ChatColor.RED + "Your Plexball kit is locked for this match.");
             return true;
@@ -463,6 +475,24 @@ public final class PlexballGame implements Listener {
         player.sendMessage(ChatColor.GREEN + "Plexball kit selected: " + ChatColor.GOLD + kit.displayName()
                 + ChatColor.GRAY + " — " + kit.abilityName() + ".");
         return true;
+    }
+
+    /** Read the authoritative Plexball profile, not the main Arcade config. */
+    public boolean hasAchievement(UUID playerId, String achievementSlug) {
+        if (playerId == null || achievementSlug == null) return false;
+        for (PlexballAchievement achievement : PlexballAchievement.values()) {
+            if (achievement.slug().equals(achievementSlug)) {
+                return progressionData.getBoolean(achievement.configPath(playerId), false);
+            }
+        }
+        return false;
+    }
+
+    private Kit playableKit(UUID playerId) {
+        Kit saved = selectedKits.getOrDefault(playerId, Kit.TECHNICIAN);
+        if (saved != Kit.SKYGUARD) return saved;
+        AchievementKitUnlockPolicy.Rule rule = AchievementKitUnlockPolicy.find(ArcadePortGame.PLEXBALL, "skyguard");
+        return rule != null && rule.unlocked(id -> hasAchievement(playerId, id)) ? saved : Kit.TECHNICIAN;
     }
 
     /** Arena creation is invoked by ArcadePortManager before it creates the global Session. */
@@ -511,7 +541,7 @@ public final class PlexballGame implements Listener {
             if (i == 0) teleportToBatter(player);
             else teleportToField(player, i);
             player.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "PLEXBALL"
-                    + ChatColor.GRAY + " — " + selectedKits.getOrDefault(id, Kit.TECHNICIAN).displayName());
+                    + ChatColor.GRAY + " — " + playableKit(id).displayName());
             player.sendMessage(ChatColor.YELLOW + "You get one 10-second batting turn. Everyone else fields.");
             player.sendMessage(ChatColor.GRAY + "View achievements and career milestones any time with /stats.");
             applyPlayerScoreboard(player);
@@ -1099,7 +1129,7 @@ public final class PlexballGame implements Listener {
             if (id.equals(batterId)) continue;
             Player fielder = Bukkit.getPlayer(id);
             if (fielder == null || !fielder.isOnline()) continue;
-            Kit kit = selectedKits.getOrDefault(id, Kit.TECHNICIAN);
+            Kit kit = playableKit(id);
             fielder.sendActionBar(Component.text("FIELDING  |  Watch batter  |  On contact: [1] glove  [2] "
                     + kit.abilityName()));
         }
@@ -1264,7 +1294,7 @@ public final class PlexballGame implements Listener {
             PlayerResult ownResult = results.getOrDefault(viewer.getUniqueId(), new PlayerResult());
             lines.add(ChatColor.GREEN + "Best hit: " + formatDistance(ownResult.bestDistance));
             lines.add(ChatColor.AQUA + "Catches: " + ownResult.catches);
-            Kit kit = selectedKits.getOrDefault(viewer.getUniqueId(), Kit.TECHNICIAN);
+            Kit kit = playableKit(viewer.getUniqueId());
             lines.add(ChatColor.LIGHT_PURPLE + "Kit: " + kit.displayName());
             lines.add(ChatColor.LIGHT_PURPLE + "Ability: " + kit.abilityName());
             lines.add(ChatColor.DARK_GRAY + "----------------");
@@ -1378,7 +1408,7 @@ public final class PlexballGame implements Listener {
                 if (id.equals(batterId)) continue;
                 Player fielder = Bukkit.getPlayer(id);
                 if (fielder != null && fielder.isOnline()) {
-                    Kit kit = selectedKits.getOrDefault(id, Kit.TECHNICIAN);
+                    Kit kit = playableKit(id);
                     String catchHint = catchUsedThisBall.contains(id) ? "Catch used"
                             : (catchAttempts.containsKey(id) ? "Catch window active" : "[1] Right-click glove");
                     String abilityHint = abilityUsedThisBall.contains(id) ? "Ability used"
@@ -1493,7 +1523,7 @@ public final class PlexballGame implements Listener {
         Vector forward = new Vector(-Math.sin(yawRadians), 0.0D, Math.cos(yawRadians)).normalize();
         Vector right = new Vector(Math.cos(yawRadians), 0.0D, Math.sin(yawRadians)).normalize();
         double contactSide = PlexballRules.clamp(normal.dot(right), -1.0D, 1.0D);
-        Kit kit = selectedKits.getOrDefault(player.getUniqueId(), Kit.TECHNICIAN);
+        Kit kit = playableKit(player.getUniqueId());
 
         int gradedTimingDistance = kit == Kit.TECHNICIAN
                 ? Math.max(0, timingDistance - PlexballRules.technicianTimingBonusTicks()) : timingDistance;
@@ -1599,7 +1629,7 @@ public final class PlexballGame implements Listener {
             player.sendActionBar(Component.text("Kit abilities are disabled in your debug profile."));
             return;
         }
-        Kit kit = selectedKits.getOrDefault(id, Kit.TECHNICIAN);
+        Kit kit = playableKit(id);
         if (!debugFeatureEnabled(player, "ability-" + kit.id())) {
             player.sendActionBar(Component.text(kit.displayName() + " abilities are disabled in your debug profile."));
             return;
@@ -1732,7 +1762,7 @@ public final class PlexballGame implements Listener {
 
     private void giveFieldingItems(Player player) {
         player.getInventory().clear();
-        Kit kit = selectedKits.getOrDefault(player.getUniqueId(), Kit.TECHNICIAN);
+        Kit kit = playableKit(player.getUniqueId());
         player.getInventory().setItem(0, namedItem(Material.LEATHER, ChatColor.GREEN + "Catcher's Glove",
                 "Right-click to attempt one timed catch.", "glove"));
         player.getInventory().setItem(1, namedItem(kit.abilityItem, ChatColor.AQUA + kit.abilityName,
@@ -1965,6 +1995,9 @@ public final class PlexballGame implements Listener {
         if (GameDebugRuntimeOverrides.isDebugSession()) return;
         Set<UUID> winnerIds = winners == null ? Set.of() : new HashSet<>(winners);
         for (UUID id : participants) {
+            ArcadePortManager arcade = plugin.getArcadePortManager();
+            if (!ArcadeTestPlayerManager.shouldPersistProgression(id,
+                    arcade != null && arcade.isTestPlayer(id))) continue;
             PlayerResult match = results.getOrDefault(id, new PlayerResult());
             String root = "players." + id + ".";
             PlayerProgress before = readProgress(id);
@@ -2044,8 +2077,6 @@ public final class PlexballGame implements Listener {
     private void notifyProgressUnlock(UUID id, String kind, String name, String detail) {
         Player player = Bukkit.getPlayer(id);
         if (player == null || !player.isOnline()) return;
-        player.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + kind + " UNLOCKED "
-                + ChatColor.YELLOW + name + ChatColor.GRAY + " — " + detail);
         player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.8F, 1.0F);
     }
 

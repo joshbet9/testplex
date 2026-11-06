@@ -68,6 +68,50 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     }
 
     @Test
+    void castleAssaultPassivesAreExactAndSourceBound() {
+        assertFalse(ArcadePortRules.shouldBoostCastleChestSplashPotion(true, false));
+        assertFalse(ArcadePortRules.shouldBoostCastleChestSplashPotion(false, true));
+        assertTrue(ArcadePortRules.shouldBoostCastleChestSplashPotion(true, true));
+        assertEquals(550, ArcadePortRules.castleAssaultBoostedChestPotionDuration(440));
+        assertEquals(275, ArcadePortRules.castleAssaultBoostedChestPotionDuration(220));
+        assertEquals(2, ArcadePortRules.castleAssaultBoostedChestPotionDuration(1));
+        assertEquals(0, ArcadePortRules.castleAssaultBoostedChestPotionDuration(0));
+        assertEquals(1.5D, ArcadePortRules.castleAssaultChestPotionInstantBonus(6.0D), 0.0001D);
+        assertEquals(0.0D, ArcadePortRules.castleAssaultChestPotionInstantBonus(-1.0D));
+        assertEquals(12.5D, ArcadePortRules.castleAssaultArcherArrowDamage(10.0D), 0.0001D);
+        assertEquals(0.0D, ArcadePortRules.castleAssaultArcherArrowDamage(0.0D));
+    }
+
+    @Test
+    void castleAssaultApprovedAchievementThresholds() {
+        assertFalse(ArcadePortRules.shouldAwardCastleAssaultClutchness(10));
+        assertTrue(ArcadePortRules.shouldAwardCastleAssaultClutchness(9));
+        assertFalse(ArcadePortRules.shouldAwardCastleAssaultClutchness(0));
+        assertFalse(ArcadePortRules.shouldAwardCastleAssaultMultiplicative(4, 0));
+        assertTrue(ArcadePortRules.shouldAwardCastleAssaultMultiplicative(5, 2));
+        assertFalse(ArcadePortRules.shouldAwardCastleAssaultMultiplicative(5, 3));
+        assertTrue(ArcadePortRules.shouldAwardCastleAssaultMultiplicative(10, 5));
+        assertFalse(ArcadePortRules.shouldAwardCastleAssaultBadChemistry(1));
+        assertTrue(ArcadePortRules.shouldAwardCastleAssaultBadChemistry(2));
+        assertFalse(ArcadePortRules.shouldAwardCastleAssaultPinCushion(4));
+        assertTrue(ArcadePortRules.shouldAwardCastleAssaultPinCushion(5));
+        assertFalse(ArcadePortRules.shouldAwardCastleAssaultTntRrific(2));
+        assertTrue(ArcadePortRules.shouldAwardCastleAssaultTntRrific(3));
+        assertFalse(ArcadePortRules.shouldAwardCastleAssaultGoldenBoy(false, 5));
+        assertFalse(ArcadePortRules.shouldAwardCastleAssaultGoldenBoy(true, 4));
+        assertTrue(ArcadePortRules.shouldAwardCastleAssaultGoldenBoy(true, 5));
+        assertFalse(ArcadePortRules.shouldAwardCastleAssaultImmovableObject(9));
+        assertTrue(ArcadePortRules.shouldAwardCastleAssaultImmovableObject(10));
+        assertFalse(ArcadePortRules.isCastleAssaultExpressDelivery(1_000L, 16_001L));
+        assertTrue(ArcadePortRules.isCastleAssaultExpressDelivery(1_000L, 16_000L));
+        assertFalse(ArcadePortRules.isCastleAssaultExpressDelivery(0L, 3_000L));
+        assertFalse(ArcadePortRules.shouldAwardCastleAssaultRoyalGuard(2));
+        assertTrue(ArcadePortRules.shouldAwardCastleAssaultRoyalGuard(3));
+        assertFalse(ArcadePortRules.shouldAwardCastleAssaultAgainstAllOdds(1));
+        assertTrue(ArcadePortRules.shouldAwardCastleAssaultAgainstAllOdds(0));
+    }
+
+    @Test
     void castleAssaultMixedArcadeHalvesObjectiveTntRespawnDelay() {
         assertEquals(60_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(false));
         assertEquals(30_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(true));

@@ -146,6 +146,10 @@ final class SneakyAssassinsMechanics {
             player.sendMessage(ChatColor.YELLOW + "Sneaky Assassins kits: escape-artist, assassin, briber, revealer.");
             return;
         }
+        if ("briber".equals(kit) && !briberUnlocked(player.getUniqueId())) {
+            player.sendMessage(ChatColor.RED + "Briber requires Prosecutor and Idiot achievements.");
+            return;
+        }
         if (players.containsKey(player.getUniqueId())) {
             player.sendMessage(ChatColor.YELLOW + "Sneaky Assassins kits are locked once the round starts.");
             return;
@@ -155,7 +159,15 @@ final class SneakyAssassinsMechanics {
     }
 
     String selectedKit(UUID playerId) {
-        return kitPreferences.getOrDefault(playerId, "escape-artist");
+        String kit = kitPreferences.getOrDefault(playerId, "escape-artist");
+        return "briber".equals(kit) && !briberUnlocked(playerId) ? "escape-artist" : kit;
+    }
+
+    private boolean briberUnlocked(UUID playerId) {
+        if (playerId == null) return false;
+        AchievementKitUnlockPolicy.Rule rule = AchievementKitUnlockPolicy.find(ArcadePortGame.SNEAKY_ASSASSINS, "briber");
+        return rule != null && rule.unlocked(id -> plugin.getConfig().getBoolean(
+                "local-achievements." + playerId + ".sneaky-assassins." + id, false));
     }
 
     boolean debugUseSelectedKitAbility(Player tester) {
@@ -1327,7 +1339,6 @@ final class SneakyAssassinsMechanics {
         if (plugin.getConfig().getBoolean(path, false)) return;
         plugin.getConfig().set(path, true);
         plugin.saveConfig();
-        player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + ChatColor.YELLOW + displayName);
         player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.8F, 1.15F);
     }
 
@@ -1373,7 +1384,6 @@ final class SneakyAssassinsMechanics {
         if (plugin.getConfig().getBoolean(path, false)) return;
         plugin.getConfig().set(path, true);
         plugin.saveConfig();
-        player.sendMessage(ChatColor.GOLD + "Achievement unlocked: The Master's Master — defeat an assassin with 4+ power-ups while you have none.");
     }
 
     private void announce(String message) {

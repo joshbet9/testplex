@@ -1386,10 +1386,8 @@ class GameDebugEventCatalogTest {
         String manager = Files.readString(managerPath);
         String runtime = Files.readString(runtimePath);
         assertTrue(runtime.contains("\"double-jump\", \"Double jump\""));
-        assertTrue(runtime.contains("\"pitch-adjustment\", \"TNT pitch control\""));
-        assertTrue(runtime.contains("\"block-wall\", \"Waller block wall\""));
-        assertTrue(manager.contains("debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.BOMB_LOBBERS, \"pitch-adjustment\", true)"));
-        assertTrue(manager.contains("debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.BOMB_LOBBERS, \"block-wall\", true)"));
+        assertTrue(runtime.contains("\"constructor-build\", \"Constructor defenses\""));
+        assertTrue(manager.contains("\"constructor-build\", true)"));
         assertTrue(manager.contains("debugFeatureEnabled(id, ArcadePortGame.BOMB_LOBBERS, \"double-jump\", true)"));
     }
 
