@@ -21,4 +21,11 @@ class ArcadeStatsRarityTest {
         assertEquals("12.5% (1/8 players)", ArcadeStatsRarity.percent(1, 8));
         assertEquals("100.0% (8/8 players)", ArcadeStatsRarity.percent(9, 8));
     }
+
+    @Test
+    void completionPercentIsIndependentOfSampleRarityAndSafeForEmptyCatalogues() {
+        assertEquals("56.3%", ArcadeStatsRarity.completionPercent(9, 16));
+        assertEquals("100.0%", ArcadeStatsRarity.completionPercent(15, 14));
+        assertEquals("N/A", ArcadeStatsRarity.completionPercent(0, 0));
+    }
 }

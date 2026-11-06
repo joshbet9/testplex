@@ -17,6 +17,11 @@ final class ArcadeStatsRarity {
                 Math.min(eligible, Math.max(0, unlocked)), eligible);
     }
 
+    static String completionPercent(long earned, long total) {
+        if (total <= 0) return "N/A";
+        return String.format(Locale.ROOT, "%.1f%%", Math.max(0, Math.min(earned, total)) * 100.0D / total);
+    }
+
     /** Lowest unlock count first (rarest/hardest), with original catalogue order for ties. */
     static <T> List<T> hardestFirst(List<T> original, ToIntFunction<T> unlockedCount) {
         List<T> ordered = new ArrayList<>(original);

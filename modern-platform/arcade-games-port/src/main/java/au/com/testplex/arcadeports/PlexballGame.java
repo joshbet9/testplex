@@ -292,6 +292,17 @@ public final class PlexballGame implements Listener {
         return playerId != null && progressionData.getBoolean(achievement.configPath(playerId), false);
     }
 
+    /** Genuine career counters available for /stats achievement progress. */
+    public long achievementProgressValue(UUID playerId, String achievementId) {
+        if (playerId == null || achievementId == null) return -1L;
+        PlayerProgress progress = readProgress(playerId);
+        return switch (achievementId) {
+            case "perfect-contact-three" -> progress.perfectHits;
+            case "champion-five-win-streak" -> progress.bestWinStreak;
+            default -> -1L;
+        };
+    }
+
     public long milestoneValue(UUID playerId, PlexballMilestone milestone) {
         if (playerId == null) return 0L;
         long value = Math.max(0L, readProgress(playerId).value(milestone.metric()));

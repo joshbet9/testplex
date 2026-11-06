@@ -19399,13 +19399,16 @@ public final class ArcadePortManager implements Listener {
         private final UUID targetId;
         private final String targetName;
         private final String categoryId;
+        private final int achievementPage;
         private Inventory inventory;
 
-        private StatsMenuHolder(StatsPage page, UUID targetId, String targetName, String categoryId) {
+        private StatsMenuHolder(StatsPage page, UUID targetId, String targetName,
+                                String categoryId, int achievementPage) {
             this.page = page;
             this.targetId = targetId;
             this.targetName = targetName;
             this.categoryId = categoryId;
+            this.achievementPage = Math.max(0, achievementPage);
         }
 
         @Override
@@ -19568,7 +19571,12 @@ public final class ArcadePortManager implements Listener {
 
     private Inventory createStatsInventory(StatsPage page, UUID targetId, String targetName,
                                            String title, String categoryId) {
-        StatsMenuHolder holder = new StatsMenuHolder(page, targetId, targetName, categoryId);
+        return createStatsInventory(page, targetId, targetName, title, categoryId, 0);
+    }
+
+    private Inventory createStatsInventory(StatsPage page, UUID targetId, String targetName,
+                                           String title, String categoryId, int achievementPage) {
+        StatsMenuHolder holder = new StatsMenuHolder(page, targetId, targetName, categoryId, achievementPage);
         Inventory inventory = Bukkit.createInventory(holder, 54, title);
         holder.inventory = inventory;
         return inventory;
@@ -19809,6 +19817,75 @@ public final class ArcadePortManager implements Listener {
         return count;
     }
 
+    /**
+     * Return progress only for achievements backed by a genuine saved counter.
+     * A career kill total cannot substitute for a single-match achievement.
+     */
+    private String statsAchievementProgress(UUID id, String gameId, StatsAchievement achievement,
+                                            boolean unlocked) {
+        double progress;
+        long target;
+        String unit;
+        if ("plexball".equals(gameId)) {
+            PlexballGame plexball = plugin.getPlexballGame();
+            if (plexball == null) return null;
+            switch (achievement.id()) {
+                case "perfect-contact-three" -> { target = 3; unit = "perfect contacts"; }
+                case "champion-five-win-streak" -> { target = 5; unit = "best win streak"; }
+                default -> { return null; }
+            }
+            progress = plexball.achievementProgressValue(id, achievement.id());
+            if (progress < 0) return null;
+        } else {
+            ArcadeAchievementProgress.Counter counter = ArcadeAchievementProgress.counter(gameId, achievement.id());
+            if (counter == null) return null;
+            target = counter.target();
+            unit = counter.unit();
+            progress = Math.max(0.0D, plugin.getConfig().getDouble(
+                    localStatsPath(id, statsCatalogId(gameId)) + counter.statKey(), 0.0D));
+        }
+        // A migrated unlock can predate its local stats counter. Do not claim
+        // the earned achievement is incomplete just because the counter reset.
+        if (unlocked && progress < target) return ChatColor.GREEN + "Progress: Complete (previously earned)";
+        String amount = "hearts".equals(unit)
+                ? String.format(java.util.Locale.ROOT, "%.1f", Math.min(progress, target))
+                : Long.toString(Math.min((long) progress, target));
+        double percentage = Math.min(100.0D, progress * 100.0D / target);
+        return ChatColor.YELLOW + "Progress: " + ChatColor.WHITE + amount + "/" + target
+                + " " + unit + String.format(java.util.Locale.ROOT, " (%.1f%%)", percentage);
+    }
+
+    /** Read-only kit requirement tooltip, without changing another PR's kit enforcement. */
+    List<String> achievementKitRequirementLore(UUID playerId, ArcadePortGame game,
+                                               ArcadeLobbyKitCatalogue.KitChoice kit) {
+        if (game == null || kit == null || kit.unlock != ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT)
+            return List.of();
+        ArcadeAchievementKitRequirements.Requirement requirement =
+                ArcadeAchievementKitRequirements.find(game.id(), kit.id);
+        if (requirement == null) return List.of(ChatColor.LIGHT_PURPLE + "Achievement kit",
+                ChatColor.GRAY + "Unlock requirements under audit.",
+                ChatColor.DARK_GRAY + "Current selection rules are unchanged.");
+        List<StatsAchievement> available = statsAchievements(game.id());
+        List<StatsAchievement> required = requirement.allAchievements()
+                ? available : available.stream().filter(a -> requirement.achievementIds().contains(a.id())).toList();
+        if (required.isEmpty() || (!requirement.allAchievements()
+                && required.size() != requirement.achievementIds().size()))
+            return List.of(ChatColor.GRAY + "Unlock requirements awaiting catalogue review.");
+        long complete = required.stream().filter(a -> statsAchievementUnlocked(playerId, game.id(), a)).count();
+        List<String> lore = new ArrayList<>();
+        lore.add(ChatColor.LIGHT_PURPLE + (requirement.allAchievements()
+                ? "Requires all achievements:" : "Required achievements:"));
+        for (StatsAchievement achievement : required) {
+            boolean earned = statsAchievementUnlocked(playerId, game.id(), achievement);
+            lore.add((earned ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.name());
+        }
+        lore.add(ChatColor.GOLD + "Requirements: " + ChatColor.WHITE + complete + "/" + required.size());
+        lore.add(complete == required.size()
+                ? ChatColor.GREEN + "Requirements completed"
+                : ChatColor.YELLOW + "Complete " + (required.size() - complete) + " more to qualify");
+        return lore;
+    }
+
     /** Opens the single Mineplex-style /stats achievements view, including Plexball and Snap. */
     public void openGameStats(Player viewer, UUID targetId, String targetName, String gameId, int requestedPage) {
         if (viewer == null || gameId == null || ArcadeGameDirectory.find(gameId) == null) return;
@@ -19822,7 +19899,7 @@ public final class ArcadePortManager implements Listener {
         int page = ArcadeStatsLayout.clampPage(requestedPage, sorted.size(), ArcadeStatsLayout.ACHIEVEMENTS_PER_PAGE);
         int pageCount = ArcadeStatsLayout.pages(sorted.size(), ArcadeStatsLayout.ACHIEVEMENTS_PER_PAGE);
         Inventory inventory = createStatsInventory(StatsPage.GAME, targetId, targetName,
-                displayName + " Achievements", gameId);
+                displayName + " Achievements", gameId, page);
         inventory.setItem(ArcadeStatsLayout.BACK, statsItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back",
                 List.of(ChatColor.GRAY + "Return to Arcade games."), "back-arcade", null, null));
         List<String> summary = new ArrayList<>("plexball".equals(gameId) && plugin.getPlexballGame() != null
@@ -19834,9 +19911,17 @@ public final class ArcadePortManager implements Listener {
                     || plain.startsWith("Click for more details!"));
         });
         summary.add(" ");
-        summary.add(ChatColor.YELLOW + "Achievements unlocked: " + ChatColor.WHITE
-                + catalog.stream().filter(a -> statsAchievementUnlocked(targetId, gameId, a)).count()
-                + "/" + catalog.size());
+        long earnedAchievements = catalog.stream().filter(a -> statsAchievementUnlocked(targetId, gameId, a)).count();
+        summary.add(ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE
+                + earnedAchievements + "/" + catalog.size() + " ("
+                + ArcadeStatsRarity.completionPercent(earnedAchievements, catalog.size()) + ")");
+        List<StatsMilestone> milestones = statsMilestones(gameId);
+        long totalTiers = milestones.stream().mapToLong(m -> m.stages().length).sum();
+        long earnedTiers = milestones.stream().mapToLong(m -> java.util.Arrays.stream(m.stages())
+                .filter(t -> m.value().applyAsLong(targetId) >= t).count()).sum();
+        summary.add(ChatColor.LIGHT_PURPLE + "Milestone tiers: " + ChatColor.WHITE
+                + earnedTiers + "/" + totalTiers + " ("
+                + ArcadeStatsRarity.completionPercent(earnedTiers, totalTiers) + ")");
         summary.add(ChatColor.GRAY + "Page " + (page + 1) + "/" + pageCount);
         inventory.setItem(ArcadeStatsLayout.GAME_LOGO, statsSummaryItem(
                 ArcadeGameDirectory.find(gameId).icon(), ChatColor.BOLD + displayName + " Stats", summary));
@@ -19847,20 +19932,33 @@ public final class ArcadePortManager implements Listener {
         for (int index = 0; index < visible.size(); index++) {
             StatsAchievement achievement = visible.get(index);
             boolean unlocked = statsAchievementUnlocked(targetId, gameId, achievement);
-            inventory.setItem(slots.get(index), statsItem(
+            List<String> lore = new ArrayList<>();
+            lore.add(" ");
+            lore.add(ChatColor.GRAY + achievement.requirement());
+            String progressLine = statsAchievementProgress(targetId, gameId, achievement, unlocked);
+            if (progressLine != null) lore.add(progressLine);
+            lore.add(" ");
+            lore.add(unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked");
+            lore.add(ChatColor.GOLD + "Players unlocked: " + ChatColor.WHITE
+                    + ArcadeStatsRarity.percent(unlockCounts.get(achievement), eligible.size()));
+            if (eligible.size() > 0 && eligible.size() < 10)
+                lore.add(ChatColor.DARK_GRAY + "Small sample: local human participants only.");
+            ItemStack item = statsItem(
                     unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
                     (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.name(),
-                    List.of(" ", ChatColor.GRAY + achievement.requirement(), " ",
-                            unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked",
-                            ChatColor.GOLD + "Players unlocked: " + ChatColor.WHITE
-                                    + ArcadeStatsRarity.percent(unlockCounts.get(achievement), eligible.size())),
-                    "noop", null, gameId));
+                    lore, "noop", null, gameId);
+            if (unlocked) {
+                ItemMeta meta = item.getItemMeta();
+                meta.setEnchantmentGlintOverride(true);
+                item.setItemMeta(meta);
+            }
+            inventory.setItem(slots.get(index), item);
         }
         if (catalog.isEmpty()) inventory.setItem(22, statsItem(Material.BARRIER,
                 ChatColor.GRAY + "No Achievements Configured",
                 List.of(ChatColor.GRAY + "This game has no registered achievements yet."), "noop", null, gameId));
         List<String> footer = new ArrayList<>();
-        if (!statsMilestones(gameId).isEmpty()) footer.add("milestones");
+        if (!milestones.isEmpty()) footer.add("milestones");
         if ("dragon-escape".equals(gameId) || "monster-maze".equals(gameId)) footer.add("personal-bests");
         List<Integer> footerSlots = ArcadeStatsLayout.footerSlots(footer.size());
         for (int i = 0; i < footer.size(); i++) {
@@ -19883,6 +19981,11 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void openGameMilestones(Player viewer, UUID targetId, String targetName, String gameId, int requestedPage) {
+        openGameMilestones(viewer, targetId, targetName, gameId, requestedPage, 0);
+    }
+
+    private void openGameMilestones(Player viewer, UUID targetId, String targetName, String gameId,
+                                    int requestedPage, int returnAchievementPage) {
         if (viewer == null || gameId == null || ArcadeGameDirectory.find(gameId) == null) return;
         List<StatsMilestone> tracks = statsMilestones(gameId);
         List<StatsMilestoneSlice> slices = new ArrayList<>();
@@ -19905,7 +20008,7 @@ public final class ArcadePortManager implements Listener {
         List<Integer> columns = ArcadeStatsLayout.milestoneColumns(visible.size());
         List<UUID> eligible = statsEligiblePlayers(gameId);
         Inventory inventory = createStatsInventory(StatsPage.MILESTONES, targetId, targetName,
-                statsGameName(gameId) + " Milestones", gameId);
+                statsGameName(gameId) + " Milestones", gameId, returnAchievementPage);
         inventory.setItem(ArcadeStatsLayout.BACK, statsItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back",
                 List.of(ChatColor.GRAY + "Return to Arcade games."), "back-arcade", null, null));
         for (int index = 0; index < visible.size(); index++) {
@@ -19943,7 +20046,7 @@ public final class ArcadePortManager implements Listener {
         if (tracks.isEmpty()) inventory.setItem(22, statsItem(Material.BARRIER,
                 ChatColor.GRAY + "No Milestones Configured", List.of(), "noop", null, gameId));
         inventory.setItem(49, statsItem(Material.DIAMOND, ChatColor.AQUA + "Achievements",
-                List.of(ChatColor.GRAY + "Return to this game's achievements."),
+                List.of(ChatColor.GRAY + "Return to achievement page " + (returnAchievementPage + 1) + "."),
                 "open-game-achievements", null, gameId));
         if (page > 0) inventory.setItem(ArcadeStatsLayout.PREVIOUS,
                 statsItem(Material.ARROW, ChatColor.YELLOW + "← Previous Page", List.of(),
@@ -19981,9 +20084,10 @@ public final class ArcadePortManager implements Listener {
     }
 
     /** All three selectable Testplex modes, each with three genuine per-kit pattern PBs. */
-    private void openMonsterMazePersonalBests(Player viewer, UUID targetId, String targetName) {
+    private void openMonsterMazePersonalBests(Player viewer, UUID targetId, String targetName,
+                                             int returnAchievementPage) {
         Inventory inventory = createStatsInventory(StatsPage.MONSTER_MAZE_PBS, targetId, targetName,
-                "Monster Maze Personal Bests", "monster-maze");
+                "Monster Maze Personal Bests", "monster-maze", returnAchievementPage);
         var leaderboard = monsterMazeModule == null ? null : monsterMazeModule.getLeaderboards();
         me.monstermaze.game.MazeMode[] modes = {me.monstermaze.game.MazeMode.ORIGINAL,
                 me.monstermaze.game.MazeMode.SPEED, me.monstermaze.game.MazeMode.MODERN};
@@ -20010,7 +20114,8 @@ public final class ArcadePortManager implements Listener {
         viewer.openInventory(inventory);
     }
 
-    private void openMonsterMazeKitBests(Player viewer, UUID targetId, String targetName, String selection) {
+    private void openMonsterMazeKitBests(Player viewer, UUID targetId, String targetName, String selection,
+                                        int returnAchievementPage) {
         if (selection == null || !selection.matches("[0-2]:[0-2]")) return;
         int modeIndex = selection.charAt(0) - '0';
         int pattern = selection.charAt(2) - '0';
@@ -20018,7 +20123,7 @@ public final class ArcadePortManager implements Listener {
                 me.monstermaze.game.MazeMode.SPEED, me.monstermaze.game.MazeMode.MODERN};
         var mode = modes[modeIndex];
         Inventory inventory = createStatsInventory(StatsPage.MONSTER_MAZE_KITS, targetId, targetName,
-                mode.id + " Pattern " + (pattern + 1) + " PBs", "monster-maze");
+                mode.id + " Pattern " + (pattern + 1) + " PBs", "monster-maze", returnAchievementPage);
         var leaderboard = monsterMazeModule == null ? null : monsterMazeModule.getLeaderboards();
         List<me.monstermaze.kit.KitType> kits = me.monstermaze.kit.KitType.available(mode);
         List<Integer> columns = ArcadeStatsLayout.columns(kits.size());
@@ -20038,9 +20143,10 @@ public final class ArcadePortManager implements Listener {
         viewer.openInventory(inventory);
     }
 
-    private void openDragonEscapePersonalBests(Player viewer, UUID targetId, String targetName) {
+    private void openDragonEscapePersonalBests(Player viewer, UUID targetId, String targetName,
+                                               int returnAchievementPage) {
         Inventory inventory = createStatsInventory(StatsPage.DRAGON_ESCAPE_MAPS, targetId, targetName,
-                targetName + "'s Dragon Escape PBs", "dragon-escape");
+                targetName + "'s Dragon Escape PBs", "dragon-escape", returnAchievementPage);
         List<SourceMapCatalog.MapArchive> maps = SourceMapCatalog.mapsFor(plugin, ArcadePortGame.DRAGON_ESCAPE);
         int slot = 9;
         for (SourceMapCatalog.MapArchive map : maps) {
@@ -20073,9 +20179,10 @@ public final class ArcadePortManager implements Listener {
         viewer.openInventory(inventory);
     }
 
-    private void openDragonEscapeBeaconColours(Player viewer, UUID targetId, String targetName) {
+    private void openDragonEscapeBeaconColours(Player viewer, UUID targetId, String targetName,
+                                               int returnAchievementPage) {
         Inventory inventory = createStatsInventory(StatsPage.DRAGON_ESCAPE_COLOURS, targetId, targetName,
-                targetName + "'s Beacon Colours", "dragon-escape");
+                targetName + "'s Beacon Colours", "dragon-escape", returnAchievementPage);
         String selected = dragonEscapeBeaconColor(targetId);
         Map<String, Material> icons = Map.ofEntries(
                 Map.entry("white", Material.WHITE_DYE), Map.entry("red", Material.RED_DYE),
@@ -25640,28 +25747,39 @@ public final class ArcadePortManager implements Listener {
                 case "open-category" -> openStatsCategory(player, holder.targetId, holder.targetName,
                         category == null ? "global" : category);
                 case "open-game" -> openStatsGame(player, holder.targetId, holder.targetName, gameId);
-                case "open-game-achievements" -> openStatsGame(player, holder.targetId, holder.targetName, gameId, false);
-                case "open-game-milestones" -> openStatsGame(player, holder.targetId, holder.targetName, gameId, true);
+                case "open-game-achievements" -> openGameStats(player, holder.targetId, holder.targetName,
+                        gameId, holder.achievementPage);
+                case "open-game-milestones" -> openGameMilestones(player, holder.targetId, holder.targetName,
+                        gameId, 0, holder.achievementPage);
                 case "open-game-page", "open-milestones-page" -> {
                     int page = 0;
                     try { page = Integer.parseInt(category == null ? "0" : category); }
                     catch (NumberFormatException ignored) { }
                     if ("open-game-page".equals(action))
                         openGameStats(player, holder.targetId, holder.targetName, gameId, page);
-                    else openGameMilestones(player, holder.targetId, holder.targetName, gameId, page);
+                    else openGameMilestones(player, holder.targetId, holder.targetName,
+                            gameId, page, holder.achievementPage);
                 }
-                case "open-dragon-escape-pbs" -> openDragonEscapePersonalBests(player, holder.targetId, holder.targetName);
-                case "open-maze-pbs" -> openMonsterMazePersonalBests(player, holder.targetId, holder.targetName);
-                case "open-maze-kits" -> openMonsterMazeKitBests(player, holder.targetId, holder.targetName, category);
-                case "back-maze" -> openStatsGame(player, holder.targetId, holder.targetName, "monster-maze");
-                case "back-maze-pbs" -> openMonsterMazePersonalBests(player, holder.targetId, holder.targetName);
-                case "open-dragon-escape-colours" -> openDragonEscapeBeaconColours(player, holder.targetId, holder.targetName);
+                case "open-dragon-escape-pbs" -> openDragonEscapePersonalBests(player, holder.targetId,
+                        holder.targetName, holder.achievementPage);
+                case "open-maze-pbs" -> openMonsterMazePersonalBests(player, holder.targetId,
+                        holder.targetName, holder.achievementPage);
+                case "open-maze-kits" -> openMonsterMazeKitBests(player, holder.targetId,
+                        holder.targetName, category, holder.achievementPage);
+                case "back-maze" -> openGameStats(player, holder.targetId, holder.targetName,
+                        "monster-maze", holder.achievementPage);
+                case "back-maze-pbs" -> openMonsterMazePersonalBests(player, holder.targetId,
+                        holder.targetName, holder.achievementPage);
+                case "open-dragon-escape-colours" -> openDragonEscapeBeaconColours(player, holder.targetId,
+                        holder.targetName, holder.achievementPage);
                 case "toggle-dragon-ghost" -> {
                     setDragonEscapeGhost(player, "toggle");
                     if (holder.page == StatsPage.DRAGON_ESCAPE_MAPS) {
-                        openDragonEscapePersonalBests(player, holder.targetId, holder.targetName);
+                        openDragonEscapePersonalBests(player, holder.targetId, holder.targetName,
+                                holder.achievementPage);
                     } else {
-                        openStatsGame(player, holder.targetId, holder.targetName, "dragon-escape");
+                        openGameStats(player, holder.targetId, holder.targetName,
+                                "dragon-escape", holder.achievementPage);
                     }
                 }
                 case "choose-dragon-color" -> {
@@ -25669,10 +25787,12 @@ public final class ArcadePortManager implements Listener {
                         player.sendMessage(ChatColor.RED + "You can only change your own Dragon Escape beacon colour.");
                     } else {
                         setDragonEscapeBeaconColor(player, category);
-                        openDragonEscapeBeaconColours(player, holder.targetId, holder.targetName);
+                        openDragonEscapeBeaconColours(player, holder.targetId, holder.targetName,
+                                holder.achievementPage);
                     }
                 }
-                case "back-dragon-escape" -> openStatsGame(player, holder.targetId, holder.targetName, "dragon-escape");
+                case "back-dragon-escape" -> openGameStats(player, holder.targetId, holder.targetName,
+                        "dragon-escape", holder.achievementPage);
                 case "back-main" -> openStatsMain(player, holder.targetId, holder.targetName);
                 case "back-arcade" -> openStatsArcade(player, holder.targetId, holder.targetName);
                 case "back-category" -> openStatsMain(player, holder.targetId, holder.targetName);
