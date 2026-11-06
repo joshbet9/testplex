@@ -249,6 +249,8 @@ final class GameDebugVariableCatalog {
                 || name.equals("HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE")) return 0.0D;
         if (name.equals("HEROES_OF_GWEN_DEVON_FLETCHER_MAX_ARROWS")
                 || name.equals("HEROES_OF_GWEN_ROWENA_FLETCHER_MAX_ARROWS")) return 0.0D;
+        if (name.equals("HEROES_OF_GWEN_SMALL_HEALTH_POTION_HEAL_HP")
+                || name.equals("HEROES_OF_GWEN_LARGE_HEALTH_POTION_HEAL_HP")) return 0.0D;
         if (name.equals("TURF_WARS_COMBAT_BOUNDARY_DAMAGE")
                 || name.equals("TURF_WARS_BUILD_BOUNDARY_DAMAGE")
                 || name.equals("TURF_WARS_TERRITORY_KNOCKBACK_HORIZONTAL")
@@ -355,6 +357,8 @@ final class GameDebugVariableCatalog {
         if (name.equals("HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE")) return 40.0D;
         if (name.equals("HEROES_OF_GWEN_DEVON_FLETCHER_MAX_ARROWS")
                 || name.equals("HEROES_OF_GWEN_ROWENA_FLETCHER_MAX_ARROWS")) return 64.0D;
+        if (name.equals("HEROES_OF_GWEN_SMALL_HEALTH_POTION_HEAL_HP")
+                || name.equals("HEROES_OF_GWEN_LARGE_HEALTH_POTION_HEAL_HP")) return 40.0D;
         if (name.startsWith("GLADIATOR_TIER_") && name.endsWith("_ARROWS")) return 64.0D;
         if (name.equals("GLADIATOR_POTION_HEALING")) return 20.0D;
         if (name.equals("GLADIATOR_POTION_SPLASH_RADIUS")) return 16.0D;

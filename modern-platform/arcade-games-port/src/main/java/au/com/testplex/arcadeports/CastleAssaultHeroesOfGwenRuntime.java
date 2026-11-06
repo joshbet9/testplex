@@ -57,6 +57,7 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerToggleFlightEvent;
@@ -67,6 +68,7 @@ import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -871,6 +873,40 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         entities.remove(event.getEntity());
         event.getDrops().clear();
         event.setDroppedExp(0);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onHeroesOfGwenHealthPotionConsume(PlayerItemConsumeEvent event) {
+        Player player = event.getPlayer();
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN
+                || !activePlayers.contains(player.getUniqueId())) return;
+        ItemStack consumed = event.getItem();
+        if (consumed.getType() != Material.POTION || !consumed.hasItemMeta()) return;
+        Integer entryIndex = consumed.getItemMeta().getPersistentDataContainer()
+                .get(shopItemKey, PersistentDataType.INTEGER);
+        if (entryIndex == null || entryIndex < 0 || entryIndex >= storeEntries.size()) return;
+        String name = storeEntries.get(entryIndex).name;
+        boolean large;
+        if ("Small Health Potion".equals(name)) large = false;
+        else if ("Large Health Potion".equals(name)) large = true;
+        else return;
+
+        event.setCancelled(true);
+        var maxHealth = player.getAttribute(Attribute.MAX_HEALTH);
+        if (maxHealth != null) {
+            player.setHealth(ArcadePortRules.heroesOfGwenHealthPotionResult(
+                    player.getHealth(), maxHealth.getValue(), large));
+        }
+        ItemStack held = event.getHand() == EquipmentSlot.OFF_HAND
+                ? player.getInventory().getItemInOffHand() : player.getInventory().getItemInMainHand();
+        if (held.getAmount() <= 1) {
+            held = new ItemStack(Material.GLASS_BOTTLE);
+        } else {
+            held.setAmount(held.getAmount() - 1);
+            player.getInventory().addItem(new ItemStack(Material.GLASS_BOTTLE));
+        }
+        if (event.getHand() == EquipmentSlot.OFF_HAND) player.getInventory().setItemInOffHand(held);
+        else player.getInventory().setItemInMainHand(held);
     }
 
     private void spawnMobaWither(int team, Location location) {
@@ -3699,6 +3735,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         PotionEffectType.SPEED,
                         (int) (GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_SPEED_POTION_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_SPEED_POTION_DURATION_MILLIS) / 50L), 0), true);
                 default -> { }
+            }
+            if ("Small Health Potion".equals(entry.name) || "Large Health Potion".equals(entry.name)) {
+                rewardMeta.getPersistentDataContainer().set(shopItemKey, PersistentDataType.INTEGER,
+                        storeEntries.indexOf(entry));
             }
         }
         reward.setItemMeta(rewardMeta);

@@ -3516,6 +3516,21 @@ public final class ArcadePortRules {
     public static final double HEROES_OF_GWEN_OVERTIME_PATH_ADVANCE_DISTANCE_SQUARED = 16.0D;
     public static final int HEROES_OF_GWEN_SMALL_HEALTH_POTION_HEAL_HP = 4;
     public static final int HEROES_OF_GWEN_LARGE_HEALTH_POTION_HEAL_HP = 8;
+
+    public static int heroesOfGwenHealthPotionHealHp(boolean largePotion) {
+        int configured = largePotion
+                ? GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_LARGE_HEALTH_POTION_HEAL_HP",
+                        HEROES_OF_GWEN_LARGE_HEALTH_POTION_HEAL_HP)
+                : GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_SMALL_HEALTH_POTION_HEAL_HP",
+                        HEROES_OF_GWEN_SMALL_HEALTH_POTION_HEAL_HP);
+        return Math.max(0, Math.min(40, configured));
+    }
+
+    public static double heroesOfGwenHealthPotionResult(double currentHealth, double maximumHealth,
+                                                        boolean largePotion) {
+        return Math.max(0.0D, Math.min(maximumHealth,
+                currentHealth + heroesOfGwenHealthPotionHealHp(largePotion)));
+    }
     public static final long HEROES_OF_GWEN_POWER_POTION_DURATION_MILLIS = 90_000L;
     public static final long HEROES_OF_GWEN_SPEED_POTION_DURATION_MILLIS = 180_000L;
 
