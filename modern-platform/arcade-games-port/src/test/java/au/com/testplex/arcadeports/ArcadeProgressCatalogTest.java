@@ -25,6 +25,20 @@ class ArcadeProgressCatalogTest {
     }
 
     @Test
+    void baconBrawlApprovedWordingMatchesTheActualDetectors() {
+        var achievements = ArcadeProgressCatalog.achievements("bacon-brawl");
+        assertEquals("Win as Pig with at least one kill. Every kill must come from a melee backstab while Cloak is active.",
+                achievements.stream().filter(entry -> entry.id().equals("goat-sty"))
+                        .findFirst().orElseThrow().requirement());
+        assertEquals("Hit a player after they activate Body Slam while airborne, and have them be knocked off the arena before they land.",
+                achievements.stream().filter(entry -> entry.id().equals("got-em"))
+                        .findFirst().orElseThrow().requirement());
+        assertEquals("Get 4 consecutive kills, each within 10 seconds of the previous kill.",
+                achievements.stream().filter(entry -> entry.id().equals("quadruple-serving"))
+                        .findFirst().orElseThrow().requirement());
+    }
+
+    @Test
     void monsterMazeUsesTheRequestedMilestoneThresholds() {
         assertArrayEquals(new long[] {25, 50, 100, 250}, stages("monster-maze", "wins"));
         assertArrayEquals(new long[] {100, 250, 500, 1000}, stages("monster-maze", "first-safe-pads"));
