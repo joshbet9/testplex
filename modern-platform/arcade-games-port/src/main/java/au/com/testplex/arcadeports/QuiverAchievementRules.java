@@ -22,4 +22,32 @@ public final class QuiverAchievementRules {
     public static boolean shouldAwardSharpshooter(int arrowsShot, int arrowsHit) {
         return arrowsShot == 8 && arrowsHit == 8;
     }
+
+    public static boolean shouldAwardDoubleTake(boolean leaper, boolean arrowShotDuringDoubleJump) {
+        return leaper && arrowShotDuringDoubleJump;
+    }
+
+    public static boolean shouldAwardIronResolve(boolean brawler, int meleeKills) {
+        return brawler && meleeKills >= 10;
+    }
+
+    public static boolean shouldAwardSlamDunk(boolean slamShot, int killsFromOnePound) {
+        return slamShot && killsFromOnePound >= 2;
+    }
+
+    public static boolean shouldAwardNinjaVanish(boolean ninja, boolean vanishWasActive, int killsDuringVanish) {
+        return ninja && vanishWasActive && killsDuringVanish >= 3;
+    }
+
+    public static boolean shouldAwardReboundRemarkable(boolean enchanter, int reboundArrowKills) {
+        return enchanter && reboundArrowKills >= 3;
+    }
+
+    public static boolean shouldAwardQuiverJuggler(boolean won, int bowKills, int meleeKills) {
+        return won && bowKills >= 10 && meleeKills >= 10;
+    }
+
+    public static boolean shouldAwardPhoenixRising(boolean died, boolean won, int winningLifeStreak) {
+        return died && won && winningLifeStreak >= 15;
+    }
 }

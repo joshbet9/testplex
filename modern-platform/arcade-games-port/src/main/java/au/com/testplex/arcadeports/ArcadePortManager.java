@@ -2355,6 +2355,9 @@ public final class ArcadePortManager implements Listener {
     }
 
     private boolean hasAchievementForKit(UUID playerId, String gameId, String achievementId) {
+        if ("one-in-the-quiver".equals(gameId) && "the-perfect-game".equals(achievementId)
+                && plugin.getConfig().getBoolean("local-achievements." + playerId
+                        + ".one-in-the-quiver.perfectionist", false)) return true;
         if (achievementId.startsWith("legacy-runner:")) return plugin.getConfig().getBoolean(
                 runnerAchievementKey(playerId, achievementId.substring("legacy-runner:".length())), false);
         if ("plexball".equals(gameId)) {
@@ -2644,7 +2647,7 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         String kit = ArcadePortRules.normalizeQuiverKit(requestedKit);
         if (kit == null) {
-            player.sendMessage(ChatColor.YELLOW + "One in the Quiver kits: leaper, brawler, enchanter, slam-shot, ninja.");
+            player.sendMessage(ChatColor.YELLOW + "One in the Quiver kits: jumper, brawler, enchanter, slam-shot, ninja.");
             return;
         }
         if (!permitKitSelection(player, ArcadePortGame.ONE_IN_THE_QUIVER, kit)) return;
@@ -9097,7 +9100,7 @@ public final class ArcadePortManager implements Listener {
                 String kit = session.spleefKits.getOrDefault(player.getUniqueId(), "snowballer");
                 switch (kit) {
                     case "brawler":
-                        player.getInventory().addItem(namedItem(Material.IRON_AXE, "Leaper Axe",
+                        player.getInventory().addItem(namedItem(Material.IRON_AXE, "Jumper Axe",
                                 "Right-click to leap (30-second cooldown). Damaging a floor block also breaks its neighbours."));
                         break;
                     case "gust":
@@ -10476,12 +10479,18 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         session.quiverGroundPoundReadyAt.put(id, now + GameDebugRuntimeOverrides.longValue("QUIVER_GROUND_POUND_COOLDOWN_MILLIS", ArcadePortRules.QUIVER_GROUND_POUND_COOLDOWN_MILLIS));
+        UUID poundId = UUID.randomUUID();
+        session.quiverGroundPoundVictims.put(poundId, new HashSet<>());
+        session.quiverGroundPoundActivation.put(id, poundId);
         cooldownProgress.start(player, "Ground Pound", GameDebugRuntimeOverrides.longValue("QUIVER_GROUND_POUND_COOLDOWN_MILLIS", ArcadePortRules.QUIVER_GROUND_POUND_COOLDOWN_MILLIS));
         double radius = ArcadePortRules.quiverGroundPoundRadiusBlocks();
         for (Player target : alivePlayers(session)) {
             if (target.equals(player)) continue;
             double distance = target.getLocation().distance(player.getLocation());
             if (distance > radius) continue;
+            session.quiverGroundPoundMarks.put(target.getUniqueId(), poundId);
+            session.quiverGroundPoundOwners.put(target.getUniqueId(), id);
+            session.quiverGroundPoundMarkedAt.put(target.getUniqueId(), now);
             Vector direction = target.getLocation().toVector().subtract(player.getLocation().toVector());
             direction.setY(0.0D); // Reborn uses a 2D trajectory for horizontal knockback.
             if (direction.lengthSquared() < 0.001D) {
@@ -10515,9 +10524,20 @@ public final class ArcadePortManager implements Listener {
         // the kit weapon's sword/shovel damage must not leak into bare-hand or bow-punch hits.
         double damage = ArcadePortRules.quiverMeleeDamage(kit, holdingKitWeapon);
         if (ArcadePortRules.shouldRemoveQuiverInvisibilityOnHit(true, "ninja".equals(kit))) {
+            if (session.quiverCloakedUntil.getOrDefault(attacker.getUniqueId(), 0L) > System.currentTimeMillis()) {
+                session.quiverPendingNinjaVanishKillers.add(attacker.getUniqueId());
+            }
             clearQuiverCloak(session, attacker.getUniqueId());
         }
         if (target.getHealth() <= damage) {
+            UUID attackerId = attacker.getUniqueId();
+            session.quiverMeleeKills.merge(attackerId, 1, Integer::sum);
+            int brawlerMeleeKills = "brawler".equals(kit)
+                    ? session.quiverBrawlerMeleeKills.merge(attackerId, 1, Integer::sum)
+                    : session.quiverBrawlerMeleeKills.getOrDefault(attackerId, 0);
+            if (QuiverAchievementRules.shouldAwardIronResolve("brawler".equals(kit), brawlerMeleeKills)) {
+                awardCatalogAchievement(attacker, "one-in-the-quiver", "iron-resolve");
+            }
             if (heldType.isAir() || heldType == Material.BOW) {
                 int fistKills = session.quiverFistKills.merge(attacker.getUniqueId(), 1, Integer::sum);
                 if (ArcadePortRules.shouldAwardQuiverFistPunchKills(fistKills)) {
@@ -11513,6 +11533,8 @@ public final class ArcadePortManager implements Listener {
         session.paintballShotOwners.put(shotId, playerId);
         session.paintballShotKits.put(shotId, kit);
         session.paintballShotHits.put(shotId, 0);
+        session.paintballShotLocations.put(shotId, player.getLocation().clone());
+        if ("sniper".equals(kit) && player.isSneaking()) session.paintballShotWasScoped.add(shotId);
         if ("rifle".equals(kit)) session.paintballRifleShots.merge(playerId, 1, Integer::sum);
         if ("machine-gun".equals(kit) && !ignoreReload) {
             player.setExp((float) ArcadePortRules.paintballMachineGunHeatAfterShot(player.getExp()));
@@ -11562,13 +11584,22 @@ public final class ArcadePortManager implements Listener {
     }
 
 
-    private void recordPaintballShotHit(Session session, Projectile projectile) {
+    private void recordPaintballShotHit(Session session, Projectile projectile, Player target) {
         UUID projectileId = projectile.getUniqueId();
         UUID shotId = session.paintballProjectileShotIds.remove(projectileId);
         UUID ownerId = shotId == null ? null : session.paintballShotOwners.get(shotId);
         String kit = shotId == null ? null : session.paintballShotKits.get(shotId);
         if (ownerId == null || kit == null) return;
         int hits = session.paintballShotHits.merge(shotId, 1, Integer::sum);
+        if ("sniper".equals(kit) && session.paintballShotWasScoped.contains(shotId)
+                && session.paintballShotLocations.getOrDefault(shotId, target.getLocation())
+                        .distanceSquared(target.getLocation()) >= 900.0D) {
+            Set<UUID> targets = session.paintballSniperLongRangeHits.computeIfAbsent(ownerId, ignored -> new HashSet<>());
+            targets.add(target.getUniqueId());
+            if (PaintballAchievementRules.sniperLongRange(targets)) {
+                awardCatalogAchievement(ownerId, "paintball", "eagle-eye");
+            }
+        }
         if ("shotgun".equals(kit) && hits >= 6) awardCatalogAchievement(ownerId, "paintball", "spray-can");
         if ("machine-gun".equals(kit)) {
             int streak = session.paintballMachineGunHitStreak.merge(ownerId, 1, Integer::sum);
@@ -11595,12 +11626,37 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void recordPaintballAchievements(Session session, Player winner) {
-        UUID id = winner.getUniqueId();
-        if ("rifle".equals(session.paintballKits.getOrDefault(id, "rifle"))
-                && session.paintballRifleShots.getOrDefault(id, 0) >= ArcadePortRules.paintballShareYourScreenShots()
-                && !session.paintballRifleMissed.contains(id)) {
-            awardCatalogAchievement(winner, "paintball", "share-your-screen");
+        int winningTeam = session.teams.getOrDefault(winner.getUniqueId(), -1);
+        long duration = Math.max(0L, System.currentTimeMillis() - session.startedAt);
+        List<Player> winningPlayers = session.participantIds.stream().map(session.players::get)
+                .filter(java.util.Objects::nonNull).filter(Player::isOnline)
+                .filter(player -> session.teams.getOrDefault(player.getUniqueId(), -2) == winningTeam).toList();
+        for (Player player : winningPlayers) {
+            UUID id = player.getUniqueId();
+            if ("rifle".equals(session.paintballKits.getOrDefault(id, "rifle"))
+                    && session.paintballRifleShots.getOrDefault(id, 0) >= ArcadePortRules.paintballShareYourScreenShots()
+                    && !session.paintballRifleMissed.contains(id)) {
+                awardCatalogAchievement(player, "paintball", "share-your-screen");
+            }
+            int teammatesLost = winningTeam < 0 ? Integer.MAX_VALUE : (int) session.participantIds.stream()
+                    .filter(teammate -> session.teams.getOrDefault(teammate, -2) == winningTeam)
+                    .filter(teammate -> session.paintballDeaths.getOrDefault(teammate, 0) > 0).count();
+            if (PaintballAchievementRules.flawlessVictory(winningTeam >= 0, teammatesLost)) {
+                awardCatalogAchievement(player, "paintball", "flawless-victory");
+            }
+            if (PaintballAchievementRules.speedrunner(true, duration)) awardCatalogAchievement(player, "paintball", "speedrunner");
+            if (PaintballAchievementRules.secondWind(true,
+                    session.paintballSoloRevivedTeammates.getOrDefault(id, Set.of()))) {
+                awardCatalogAchievement(player, "paintball", "second-wind");
+            }
+            Set<String> wins = new HashSet<>(plugin.getConfig().getStringList("paintball-kit-wins." + id));
+            wins.add(session.paintballKits.getOrDefault(id, "rifle"));
+            plugin.getConfig().set("paintball-kit-wins." + id, wins.stream().sorted().toList());
+            if (PaintballAchievementRules.fourColourArsenal(wins)) {
+                awardCatalogAchievement(player, "paintball", "four-colour-arsenal");
+            }
         }
+        plugin.saveConfig();
     }
 
     private void updatePaintballKitState(Session session, long now) {
@@ -12087,6 +12143,8 @@ public final class ArcadePortManager implements Listener {
             Player target = session.players.get(targetId);
             ArmorStand marker = session.paintballSaveMeMarkers.get(targetId);
             Location respawn = marker == null ? session.paintballSaveMeLocations.get(targetId) : marker.getLocation().clone();
+            long livingTeamMatesBeforeRevive = session.alive.stream()
+                    .filter(id -> session.teams.getOrDefault(id, -2) == throwerTeam).count();
             removePaintballSaveMeMarker(session, targetId);
             if (target == null || !target.isOnline() || respawn == null) continue;
             session.respawning.remove(targetId);
@@ -12104,6 +12162,15 @@ public final class ArcadePortManager implements Listener {
             target.setSaturation(20.0F);
             session.paintPiecesRemaining.put(targetId, 4);
             session.paintballRevives.merge(throwerId, 1, Integer::sum);
+            if (PaintballAchievementRules.medic(session.paintballRevives.getOrDefault(throwerId, 0))) {
+                awardCatalogAchievement(thrower, "paintball", "medic");
+            }
+            if (PaintballAchievementRules.rescueRelay(session.paintballRevives.getOrDefault(throwerId, 0))) {
+                awardCatalogAchievement(thrower, "paintball", "rescue-relay");
+            }
+            if (PaintballAchievementRules.soloBeforeRevive(livingTeamMatesBeforeRevive)) {
+                session.paintballSoloRevivedTeammates.computeIfAbsent(throwerId, ignored -> new HashSet<>()).add(targetId);
+            }
             givePaintballKit(session, target, session.paintballKits.getOrDefault(targetId, "rifle"));
             target.sendMessage(ChatColor.GREEN + "You were revived by " + thrower.getName() + "!");
             thrower.sendMessage(ChatColor.GREEN + "Revived " + target.getName() + "!");
@@ -18183,8 +18250,10 @@ public final class ArcadePortManager implements Listener {
                 ? 1 : session.paintballRecentKills.getOrDefault(killerId, 0) + 1;
         session.paintballRecentKills.put(killerId, streak);
         session.paintballLastKillAt.put(killerId, now);
-        if (ArcadePortRules.shouldAwardPaintballKillingSpree(streak)) {
+        if (ArcadePortRules.shouldAwardPaintballKillingSpree(streak)
+                && PaintballAchievementRules.killingSpree(streak)) {
             session.paintballKillingSpreeAwards.merge(killerId, 1, Integer::sum);
+            awardCatalogAchievement(killer, "paintball", "killing-spree");
         }
         session.paintballRecentKills.remove(victimId);
         session.paintballLastKillAt.remove(victimId);
@@ -18193,8 +18262,10 @@ public final class ArcadePortManager implements Listener {
                 .filter(id -> session.teams.getOrDefault(id, -2) == team).count();
         if (teammatesAlive == 1) {
             int soloKills = session.paintballLastStandKills.merge(killerId, 1, Integer::sum);
-            if (ArcadePortRules.shouldAwardPaintballLastStand(soloKills)) {
+            if (ArcadePortRules.shouldAwardPaintballLastStand(soloKills)
+                    && PaintballAchievementRules.lastStand(soloKills)) {
                 session.paintballLastStandAwards.merge(killerId, 1, Integer::sum);
+                awardCatalogAchievement(killer, "paintball", "last-stand");
             }
         }
     }
@@ -19952,6 +20023,41 @@ public final class ArcadePortManager implements Listener {
             awardCatalogAchievement(attackerId, "one-in-the-quiver", "heads");
         }
         int streak = session.quiverKillStreaks.merge(attackerId, 1, Integer::sum);
+        if (session.quiverPendingBowKillers.remove(attackerId)) {
+            session.quiverBowKills.merge(attackerId, 1, Integer::sum);
+        }
+        if (QuiverAchievementRules.shouldAwardDoubleTake("leaper".equals(
+                session.quiverKits.getOrDefault(attackerId, "leaper")),
+                session.quiverPendingDoubleJumpKillers.remove(attackerId))) {
+            awardCatalogAchievement(attackerId, "one-in-the-quiver", "double-take");
+        }
+        boolean reboundKill = session.quiverPendingReboundKillers.remove(attackerId);
+        int reboundKills = session.quiverReboundKills.getOrDefault(attackerId, 0) + (reboundKill ? 1 : 0);
+        if (reboundKill) session.quiverReboundKills.put(attackerId, reboundKills);
+        if (QuiverAchievementRules.shouldAwardReboundRemarkable("enchanter".equals(
+                session.quiverKits.getOrDefault(attackerId, "leaper")), reboundKills)) {
+            awardCatalogAchievement(attackerId, "one-in-the-quiver", "rebound-remarkable");
+        }
+        boolean ninjaVanishKill = session.quiverPendingNinjaVanishKillers.remove(attackerId);
+        int ninjaVanishKills = session.quiverNinjaVanishKills.getOrDefault(attackerId, 0)
+                + (ninjaVanishKill ? 1 : 0);
+        if (ninjaVanishKill) session.quiverNinjaVanishKills.put(attackerId, ninjaVanishKills);
+        if (QuiverAchievementRules.shouldAwardNinjaVanish("ninja".equals(
+                session.quiverKits.getOrDefault(attackerId, "leaper")), ninjaVanishKill, ninjaVanishKills)) {
+            awardCatalogAchievement(attackerId, "one-in-the-quiver", "vanishing-act");
+        }
+        UUID poundId = session.quiverGroundPoundMarks.remove(targetId);
+        UUID poundOwner = session.quiverGroundPoundOwners.remove(targetId);
+        Long poundAt = session.quiverGroundPoundMarkedAt.remove(targetId);
+        Set<UUID> poundVictims = poundId == null ? null : session.quiverGroundPoundVictims.get(poundId);
+        if (poundId != null && attackerId.equals(poundOwner) && poundAt != null
+                && System.currentTimeMillis() - poundAt <= 8_000L && poundVictims != null) {
+            poundVictims.add(targetId);
+            if (QuiverAchievementRules.shouldAwardSlamDunk("slam-shot".equals(
+                    session.quiverKits.getOrDefault(attackerId, "leaper")), poundVictims.size())) {
+                awardCatalogAchievement(attackerId, "one-in-the-quiver", "slam-dunk");
+            }
+        }
         if (QuiverAchievementRules.countsSeparateTwoKillStreak(streak)) {
             session.quiverTwoKillStreaks.merge(attackerId, 1, Integer::sum);
         }
@@ -19981,6 +20087,15 @@ public final class ArcadePortManager implements Listener {
         }
 
         int kills = session.scores.merge(attackerId, 1, Integer::sum);
+        if (QuiverAchievementRules.shouldAwardPhoenixRising(session.quiverDeaths.contains(attackerId),
+                kills >= ArcadePortRules.quiverScoreToWin(), streak)) {
+            awardCatalogAchievement(attackerId, "one-in-the-quiver", "phoenix-rising");
+        }
+        if (QuiverAchievementRules.shouldAwardQuiverJuggler(kills >= ArcadePortRules.quiverScoreToWin(),
+                session.quiverBowKills.getOrDefault(attackerId, 0),
+                session.quiverMeleeKills.getOrDefault(attackerId, 0))) {
+            awardCatalogAchievement(attackerId, "one-in-the-quiver", "quiver-juggler");
+        }
         if (ArcadePortRules.quiverRegrantsArrowAfterKill()) {
             // Reborn adds one arrow for each kill; multiple melee kills can bank arrows.
             attacker.getInventory().addItem(allowQuiverGlassBreaks(namedItem(Material.ARROW,
@@ -20155,10 +20270,6 @@ public final class ArcadePortManager implements Listener {
     private void recordQuiverAchievements(Session session, Player winner) {
         if (winner == null) return;
         UUID id = winner.getUniqueId();
-        if (!session.quiverDeaths.contains(id)) {
-            awardQuiverAchievement(winner, QuiverAchievement.PERFECTIONIST,
-                    "Perfectionist — won a game without dying.");
-        }
         if (ArcadePortRules.isQuiverSpeedrunnerWin(System.currentTimeMillis() - session.startedAt)) {
             awardQuiverAchievement(winner, QuiverAchievement.SPEEDRUNNER,
                     "Speedrunner — won a game in under 1:30.");
@@ -20199,7 +20310,7 @@ public final class ArcadePortManager implements Listener {
             handlePlayerHit(session, shooter, target, "bomb hit");
         } else if (session.type == ArcadePortGame.PAINTBALL) {
             if (!session.paintballPlayerHits.add(projectile.getUniqueId())) return;
-            recordPaintballShotHit(session, projectile);
+            recordPaintballShotHit(session, projectile, target);
             paintPaintballBlockImpact(session, projectile);
             int paintAmount = session.paintProjectileDamage.getOrDefault(projectile.getUniqueId(), 1);
             session.paintProjectileDamage.remove(projectile.getUniqueId());
@@ -20267,6 +20378,16 @@ public final class ArcadePortManager implements Listener {
         } else if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER) {
             boolean highArcArrow = session.quiverHighArcArrows.remove(projectile.getUniqueId());
             if (highArcArrow) session.quiverPendingHighArcKillers.add(shooter.getUniqueId());
+            if (session.quiverDoubleJumpArrows.remove(projectile.getUniqueId())) {
+                session.quiverPendingDoubleJumpKillers.add(shooter.getUniqueId());
+            }
+            if (session.quiverArrowBounces.containsKey(projectile.getUniqueId())) {
+                session.quiverPendingReboundKillers.add(shooter.getUniqueId());
+            }
+            if (session.quiverCloakedUntil.getOrDefault(shooter.getUniqueId(), 0L) > System.currentTimeMillis()) {
+                session.quiverPendingNinjaVanishKillers.add(shooter.getUniqueId());
+            }
+            session.quiverPendingBowKillers.add(shooter.getUniqueId());
             try {
                 tryQuiverRebound(session, projectile, shooter,
                         projectile.getLocation().clone().add(projectile.getVelocity()));
@@ -25662,6 +25783,9 @@ public final class ArcadePortManager implements Listener {
         session.quiverUsedBow.add(player.getUniqueId());
         if (!(event.getProjectile() instanceof Arrow arrow)) return;
         session.quiverArrowsShot.merge(player.getUniqueId(), 1, Integer::sum);
+        if (session.quiverLeapAwaitingLanding.contains(player.getUniqueId())) {
+            session.quiverDoubleJumpArrows.add(arrow.getUniqueId());
+        }
         // Track every Quiver arrow so all remaining projectiles are cleaned up at round end.
         session.entities.add(arrow);
         session.quiverArrowFlightStyles.put(arrow.getUniqueId(), quiverArrowFlightCosmetic(player.getUniqueId()));
@@ -31415,6 +31539,11 @@ public final class ArcadePortManager implements Listener {
         final Map<Block, BlockData> paintballOriginalBlocks = new HashMap<>();
         final Map<UUID, Integer> paintballDeaths = new HashMap<>();
         final Map<UUID, Integer> paintballRevives = new HashMap<>();
+        final Map<UUID, Set<UUID>> paintballSoloRevivedTeammates = new HashMap<>();
+        final Map<UUID, Set<UUID>> paintballSniperLongRangeHits = new HashMap<>();
+        final Set<UUID> paintballShotWasScoped = new HashSet<>();
+        final Map<UUID, Location> paintballShotLocations = new HashMap<>();
+        final Map<UUID, Set<String>> paintballCareerKitWins = new HashMap<>();
         final Map<UUID, Integer> paintballRecentKills = new HashMap<>();
         final Map<UUID, Long> paintballLastKillAt = new HashMap<>();
         final Map<UUID, Integer> paintballKillingSpreeAwards = new HashMap<>();
@@ -31887,6 +32016,22 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, String> quiverArrowFlightStyles = new HashMap<>();
         final Map<UUID, Integer> quiverKillStreaks = new HashMap<>();
         final Map<UUID, Integer> quiverFistKills = new HashMap<>();
+        final Map<UUID, Integer> quiverBowKills = new HashMap<>();
+        final Map<UUID, Integer> quiverMeleeKills = new HashMap<>();
+        final Map<UUID, Integer> quiverBrawlerMeleeKills = new HashMap<>();
+        final Map<UUID, Integer> quiverNinjaVanishKills = new HashMap<>();
+        final Map<UUID, Integer> quiverReboundKills = new HashMap<>();
+        final Map<UUID, Integer> quiverGroundPoundKills = new HashMap<>();
+        final Map<UUID, UUID> quiverGroundPoundActivation = new HashMap<>();
+        final Map<UUID, UUID> quiverGroundPoundMarks = new HashMap<>();
+        final Map<UUID, UUID> quiverGroundPoundOwners = new HashMap<>();
+        final Map<UUID, Long> quiverGroundPoundMarkedAt = new HashMap<>();
+        final Map<UUID, Set<UUID>> quiverGroundPoundVictims = new HashMap<>();
+        final Set<UUID> quiverDoubleJumpArrows = new HashSet<>();
+        final Set<UUID> quiverPendingDoubleJumpKillers = new HashSet<>();
+        final Set<UUID> quiverPendingReboundKillers = new HashSet<>();
+        final Set<UUID> quiverPendingBowKillers = new HashSet<>();
+        final Set<UUID> quiverPendingNinjaVanishKillers = new HashSet<>();
         final Map<UUID, Integer> quiverArrowsShot = new HashMap<>();
         final Map<UUID, Integer> quiverArrowsHit = new HashMap<>();
         final Set<UUID> quiverDeaths = new HashSet<>();

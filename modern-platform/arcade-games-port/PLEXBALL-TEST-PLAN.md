@@ -23,7 +23,9 @@ Plexball supports two to sixteen total participants. The shared Arcade manager f
 
 ## Achievements
 
-Achievements are one-time challenges, unlocked from completed match results and saved per player UUID.
+Achievements are one-time challenges saved per player UUID. Event-only catches and hits unlock at
+their qualifying event; composite challenges that require a win are checked when the match result
+is finalized.
 
 | Achievement | Requirement |
 | --- | --- |
@@ -31,11 +33,16 @@ Achievements are one-time challenges, unlocked from completed match results and 
 | Warning Track | Land an uncaught hit of at least 95 metres. |
 | Out of the Park | Hit a fair 100-metre home run. |
 | Perfect Contact | Record three top-grade contacts across your Plexball career. |
-| Sticky Gloves | Make at least three successful catches in one match. |
+| Sticky Gloves | Make three successful catches in a row in one match. |
 | Golden Glove | Make at least five successful catches in one match. |
 | All-Rounder | Make a catch and land an uncaught hit of at least 75 metres in one match. |
 | Clutch Performer | Win a match after hitting at least two home runs in sudden death. |
 | Champion | Win five Plexball matches in a row. |
+| Walk-Off Power Dive | As Slugger, hit the fair home run that wins the match while Power Dive is active. |
+| Sure Hands | As Technician, catch three consecutive balls with Sure Hands and win the match. |
+| Bend It In | As Curve Artist, land three fair curved hits in one match and win. |
+| First to Home | As Sprinter, activate Burst and hit two home runs in one match, then win. |
+| High Point | As Skyguard, catch three balls at least two blocks above their release height and win. |
 
 Unlocks send a player notification and challenge-complete sound. They are local Testplex progression only; no production Mineplex currency, XP, title or cosmetic reward is granted.
 Raised achievement requirements use versioned internal unlock keys, so an unlock earned under an earlier, easier requirement does not automatically satisfy the harder challenge. The 300-catch Wall of Leather milestone likewise has its own versioned key.

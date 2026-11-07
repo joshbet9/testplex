@@ -92,7 +92,7 @@ final class AchievementKitUnlockPolicy {
         add(rules, "sheep-quest", "shepherd", "Shepherd", "cheeky");
         add(rules, "monster-maze", "repulsor", "Repulsor", "blizzard", "stampede");
         add(rules, "monster-maze", "maverick", "Maverick", "pilot");
-        add(rules, "one-in-the-quiver", "quiver-ninja", "Ninja", "sharpshooter", "perfectionist");
+        add(rules, "one-in-the-quiver", "quiver-ninja", "Ninja", "sharpshooter", "the-perfect-game");
         add(rules, "paintball", "sniper", "Sniper", "share-your-screen");
         add(rules, "wither-assault", "warden", "Warden", "savior");
         add(rules, "sneaky-assassins", "briber", "Briber", "prosecutor", "idiot");

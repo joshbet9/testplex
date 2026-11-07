@@ -20,6 +20,15 @@ class ArcadeLobbyKitCatalogueTest {
     }
 
     @Test
+    void oneInTheQuiverShowsJumperWhileKeepingItsStableKitId() {
+        ArcadeLobbyKitCatalogue.KitChoice jumper =
+                ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.ONE_IN_THE_QUIVER, List.of()).stream()
+                        .filter(choice -> choice.id.equals("quiver-leaper")).findFirst().orElseThrow();
+        assertEquals("Jumper", jumper.name);
+        assertEquals("quiver-leaper", jumper.id);
+    }
+
+    @Test
     void preservesTheReviewedBombLobbersKitOrder() {
         assertEquals(List.of("acrobat", "armorer", "constructor"),
                 ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.BOMB_LOBBERS, List.of()).stream()

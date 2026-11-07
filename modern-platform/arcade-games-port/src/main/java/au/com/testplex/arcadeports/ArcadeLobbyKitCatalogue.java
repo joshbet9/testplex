@@ -177,7 +177,7 @@ final class ArcadeLobbyKitCatalogue {
                     choice("maverick", "Maverick", Material.ARROW,
                             Unlock.ACHIEVEMENT, Skeleton.class, Material.BOW));
             case ONE_IN_THE_QUIVER -> List.of(
-                    choice("quiver-leaper", "Leaper", Material.RABBIT_FOOT,
+                    choice("quiver-leaper", "Jumper", Material.RABBIT_FOOT,
                             Unlock.FREE, Zombie.class, Material.STONE_SWORD),
                     choice("quiver-brawler", "Brawler", Material.IRON_SWORD,
                             Unlock.GEM, Zombie.class, Material.IRON_SWORD),

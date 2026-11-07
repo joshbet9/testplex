@@ -192,7 +192,11 @@ class ArcadeProgressCatalogTest {
     @Test
     void newAchievementCatalogContainsAllRequestedNames() {
         assertTrue(hasAchievement("one-in-the-quiver", "the-perfect-game", "The Perfect Game"));
-        assertTrue(hasAchievement("one-in-the-quiver", "perfectionist", "Perfectionist"));
+        assertFalse(ArcadeProgressCatalog.achievements("one-in-the-quiver").stream()
+                .anyMatch(achievement -> achievement.id().equals("perfectionist")));
+        assertTrue(hasAchievement("one-in-the-quiver", "phoenix-rising", "Phoenix Rising"));
+        assertEquals(14, ArcadeProgressCatalog.achievements("one-in-the-quiver").size());
+        assertEquals(14, ArcadeProgressCatalog.achievements("paintball").size());
         assertTrue(hasAchievement("one-in-the-quiver", "sharpshooter", "Sharpshooter"));
         assertTrue(hasAchievement("one-in-the-quiver", "heads", "HEADS!"));
         assertTrue(hasAchievement("paintball", "aura", "AURA"));

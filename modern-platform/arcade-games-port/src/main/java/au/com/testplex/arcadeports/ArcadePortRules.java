@@ -2356,7 +2356,7 @@ public final class ArcadePortRules {
         if (kit.startsWith("runnerkit-")) kit = kit.substring("runnerkit-".length());
         else if (kit.startsWith("runner-")) kit = kit.substring("runner-".length());
         return switch (kit) {
-            case "leaper" -> "leaper";
+            case "leaper", "jumper" -> "leaper";
             case "archer" -> "archer";
             case "frosty" -> "frosty";
             case "switcher" -> "switcher";
