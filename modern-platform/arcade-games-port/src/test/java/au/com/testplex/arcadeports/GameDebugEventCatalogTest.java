@@ -792,7 +792,7 @@ class GameDebugEventCatalogTest {
         }
         String source = Files.readString(sourceRoot.resolve("SpeedBuildersGame.java"));
         int start = source.indexOf("private void markPerfectBuild(PlayerState state)");
-        int end = source.indexOf("private void checkPerfectBuild(", start);
+        int end = source.indexOf("private void awardAchievement(", start);
         assertTrue(start >= 0 && end > start);
         String method = source.substring(start, end);
         int guard = method.indexOf("if (!GameDebugRuntimeOverrides.isDebugSession())");
