@@ -1,5 +1,1 @@
 blank_issues_enabled: false
-contact_links:
-  - name: Tester server connection help
-    url: https://github.com/joshbet9/testplex/discussions
-    about: Ask setup questions or get help connecting to the tester server.
