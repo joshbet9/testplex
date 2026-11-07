@@ -2271,7 +2271,8 @@ public final class ArcadePortManager implements Listener {
             if (lobbyGame == ArcadePortGame.SHEEP_QUEST && !value.startsWith("monster-maze-")) {
                 String sheepKit = ArcadePortRules.normalizeSheepQuestKit(value);
                 if (sheepKit == null) {
-                    player.sendMessage(ChatColor.YELLOW + "Sheep Quest kits: Beserker, Archer or Brute.");
+                    player.sendMessage(ChatColor.YELLOW + "Sheep Quest kits: "
+                            + ArcadeLobbyKitCatalogue.helpNames(ArcadePortGame.SHEEP_QUEST) + ".");
                     return;
                 }
                 sheepQuestKitPreferences.put(player.getUniqueId(), sheepKit);
@@ -2496,7 +2497,8 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         String kit = WitherAssaultRules.normalizeHumanKit(requestedKit);
         if (kit == null) {
-            player.sendMessage(ChatColor.YELLOW + "Wither Assault Human kits: Archer, Medic, Editor or Warden.");
+            player.sendMessage(ChatColor.YELLOW + "Wither Assault Human kits: "
+                    + ArcadeLobbyKitCatalogue.helpNames(ArcadePortGame.WITHER_ASSAULT) + ".");
             return;
         }
         if (!permitKitSelection(player, ArcadePortGame.WITHER_ASSAULT, kit)) return;
@@ -2523,7 +2525,8 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         String kit = normalizeSuperSploorKit(requestedKit);
         if (kit == null) {
-            player.sendMessage(ChatColor.YELLOW + "Super Sploor kits: sprayer, roller, charger, lobber, dualies.");
+            player.sendMessage(ChatColor.YELLOW + "Super Sploor kits: "
+                    + ArcadeLobbyKitCatalogue.helpNames(ArcadePortGame.SUPER_SPLOOR) + ".");
             return;
         }
         if ("dualies".equals(kit) && !hasAchievementKitUnlocked(player.getUniqueId(), ArcadePortGame.SUPER_SPLOOR, kit)) {
@@ -2558,7 +2561,8 @@ public final class ArcadePortManager implements Listener {
         if (player == null || requestedKit == null) return;
         String kit = requestedKit.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
         if (!Set.of("ice", "fire", "air", "metal", "earth").contains(kit)) {
-            player.sendMessage(ChatColor.YELLOW + "SkyWars kits: ice, fire, air, metal or earth.");
+            player.sendMessage(ChatColor.YELLOW + "SkyWars kits: "
+                    + ArcadeLobbyKitCatalogue.helpNames(ArcadePortGame.SKY_WARS) + ".");
             return;
         }
         skyWarsKitPreferences.put(player.getUniqueId(), kit);
@@ -2575,7 +2579,8 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         String kit = ArcadePortRules.normalizeBombLobbersKit(requestedKit);
         if (kit == null) {
-            player.sendMessage(ChatColor.YELLOW + "Bomb Lobbers kits: Acrobat, Armorer, Constructor.");
+            player.sendMessage(ChatColor.YELLOW + "Bomb Lobbers kits: "
+                    + ArcadeLobbyKitCatalogue.helpNames(ArcadePortGame.BOMB_LOBBERS) + ".");
             return;
         }
         if (!permitKitSelection(player, ArcadePortGame.BOMB_LOBBERS, kit)) return;
@@ -2598,7 +2603,8 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         String kit = ArcadePortRules.normalizeBaconBrawlKit(requestedKit);
         if (kit == null) {
-            player.sendMessage(ChatColor.YELLOW + "Bacon Brawl kits: El Muchacho Pigo, Mama Piggles, Pig, Brutus Bacon, Chris P Bacon.");
+            player.sendMessage(ChatColor.YELLOW + "Bacon Brawl kits: "
+                    + ArcadeLobbyKitCatalogue.helpNames(ArcadePortGame.BACON_BRAWL) + ".");
             return;
         }
         if (!permitKitSelection(player, ArcadePortGame.BACON_BRAWL, kit)) return;
@@ -2623,7 +2629,8 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         String kit = ArcadePortRules.normalizeSpleefKit(requestedKit);
         if (kit == null) {
-            player.sendMessage(ChatColor.YELLOW + "Spleef kits: snowballer, brawler, archer, gust (achievement kit).");
+            player.sendMessage(ChatColor.YELLOW + "Spleef kits: "
+                    + ArcadeLobbyKitCatalogue.helpNames(ArcadePortGame.SPLEEF) + ".");
             return;
         }
         if ("gust".equals(kit) && !testPlayers.isTestPlayer(player.getUniqueId())
@@ -2656,8 +2663,8 @@ public final class ArcadePortManager implements Listener {
         if (kit.equals("evolution-quick-evolver")) kit = "quick-evolver";
         if (kit.equals("evolution-standard") || kit.equals("standard-evolution")) kit = "darwinist";
         if (!Set.of("quick-evolver", "darwinist", "health-harvester", "neanderthal").contains(kit)) {
-            player.sendMessage(ChatColor.YELLOW
-                    + "Evolution kits: Darwinist, Quick Evolver, Health Harvester or Neanderthal.");
+            player.sendMessage(ChatColor.YELLOW + "Evolution kits: "
+                    + ArcadeLobbyKitCatalogue.helpNames(ArcadePortGame.EVOLUTION) + ".");
             return;
         }
         UUID playerId = player.getUniqueId();
@@ -2703,7 +2710,8 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         String kit = ArcadePortRules.normalizeMicroBattlesKit(requestedKit);
         if (kit == null) {
-            player.sendMessage(ChatColor.YELLOW + "Micro Battles kits: archer, worker, fighter, dasher (unlocked by Speedster).");
+            player.sendMessage(ChatColor.YELLOW + "Micro Battles kits: "
+                    + ArcadeLobbyKitCatalogue.helpNames(ArcadePortGame.MICRO_BATTLES) + ".");
             return;
         }
         UUID playerId = player.getUniqueId();
@@ -2735,7 +2743,8 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         String kit = ArcadePortRules.normalizeQuiverKit(requestedKit);
         if (kit == null) {
-            player.sendMessage(ChatColor.YELLOW + "One in the Quiver kits: jumper, brawler, enchanter, slam-shot, ninja.");
+            player.sendMessage(ChatColor.YELLOW + "One in the Quiver kits: "
+                    + ArcadeLobbyKitCatalogue.helpNames(ArcadePortGame.ONE_IN_THE_QUIVER) + ".");
             return;
         }
         if (!permitKitSelection(player, ArcadePortGame.ONE_IN_THE_QUIVER, kit)) return;
@@ -2748,7 +2757,8 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         String kit = ArcadePortRules.normalizeDragonsKit(requestedKit);
         if (kit == null) {
-            player.sendMessage(ChatColor.YELLOW + "Dragons kits: coward, marksman, pyrotechnic, frost, glider, tamer.");
+            player.sendMessage(ChatColor.YELLOW + "Dragons kits: "
+                    + ArcadeLobbyKitCatalogue.helpNames(ArcadePortGame.DRAGONS) + ".");
             return;
         }
         if (!permitKitSelection(player, ArcadePortGame.DRAGONS, kit)) return;
@@ -2768,7 +2778,8 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         String kit = ArcadePortRules.normalizeDragonEscapeKit(requestedKit);
         if (kit == null) {
-            player.sendMessage(ChatColor.YELLOW + "Dragon Escape kits: jumper, disruptor, builder, warper, digger.");
+            player.sendMessage(ChatColor.YELLOW + "Dragon Escape kits: "
+                    + ArcadeLobbyKitCatalogue.helpNames(ArcadePortGame.DRAGON_ESCAPE) + ".");
             return;
         }
         if (!permitKitSelection(player, ArcadePortGame.DRAGON_ESCAPE, kit)) return;
@@ -2788,7 +2799,9 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         String kit = ArcadePortRules.normalizeRunnerKit(requestedKit);
         if (kit == null) {
-            player.sendMessage(ChatColor.YELLOW + "Runner kits: jumper, archer, frosty, switcher. Use runnerkit-archer outside a Runner test.");
+            player.sendMessage(ChatColor.YELLOW + "Runner kits: "
+                    + ArcadeLobbyKitCatalogue.helpNames(ArcadePortGame.RUNNER)
+                    + ". Use runnerkit-archer outside a Runner test.");
             return;
         }
         UUID id = player.getUniqueId();
@@ -2817,7 +2830,8 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         String kit = ArcadePortRules.normalizeCastleAssaultKit(requestedKit);
         if (kit == null) {
-            player.sendMessage(ChatColor.YELLOW + "Castle Assault kits: alchemist, archer, demolitionist, fighter, tank.");
+            player.sendMessage(ChatColor.YELLOW + "Castle Assault kits: "
+                    + ArcadeLobbyKitCatalogue.helpNames(ArcadePortGame.CASTLE_ASSAULT) + ".");
             return;
         }
         UUID id = player.getUniqueId();
@@ -2837,7 +2851,8 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         String hero = ArcadePortRules.normalizeHeroesOfGwenHero(requestedHero);
         if (hero == null) {
-            player.sendMessage(ChatColor.YELLOW + "Heroes of Gwen heroes: Hattori, Devon, Anath, Dana, Biff, Larissa, Bardolf, Rowena, Ivy.");
+            player.sendMessage(ChatColor.YELLOW + "Heroes of Gwen heroes: "
+                    + ArcadeLobbyKitCatalogue.helpNames(ArcadePortGame.HEROES_OF_GWEN) + ".");
             return;
         }
         UUID id = player.getUniqueId();
@@ -2859,7 +2874,8 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         String kit = ArcadePortRules.normalizeDeathTagRunnerKit(requestedKit);
         if (kit == null) {
-            player.sendMessage(ChatColor.YELLOW + "Death Tag runner kits: basher, archer, traitor, null.");
+            player.sendMessage(ChatColor.YELLOW + "Death Tag runner kits: "
+                    + ArcadeLobbyKitCatalogue.helpNames(ArcadePortGame.DEATH_TAG) + ".");
             return;
         }
         if (!permitKitSelection(player, ArcadePortGame.DEATH_TAG, kit)) return;
@@ -3188,7 +3204,8 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         String kit = ArcadePortRules.normalizeTurfWarsKit(requestedKit);
         if (kit == null) {
-            player.sendMessage(ChatColor.YELLOW + "Turf Wars kits: marksman, infiltrator, shredder, fortifier.");
+            player.sendMessage(ChatColor.YELLOW + "Turf Wars kits: "
+                    + ArcadeLobbyKitCatalogue.helpNames(ArcadePortGame.TURF_WARS) + ".");
             return;
         }
         UUID id = player.getUniqueId();
@@ -3221,7 +3238,8 @@ public final class ArcadePortManager implements Listener {
         String kit = requestedKit == null ? "" : requestedKit.toLowerCase(java.util.Locale.ROOT)
                 .replace('_', '-').replace(' ', '-');
         if (!Set.of("rifle", "sniper", "shotgun", "machine-gun", "machinegun").contains(kit)) {
-            player.sendMessage(ChatColor.YELLOW + "Paintball kits: rifle, sniper, shotgun, machine-gun.");
+            player.sendMessage(ChatColor.YELLOW + "Paintball kits: "
+                    + ArcadeLobbyKitCatalogue.helpNames(ArcadePortGame.PAINTBALL) + ".");
             return;
         }
         if ("machinegun".equals(kit)) kit = "machine-gun";

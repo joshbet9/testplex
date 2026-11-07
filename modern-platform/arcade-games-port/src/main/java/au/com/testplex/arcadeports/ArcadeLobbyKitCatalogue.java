@@ -29,6 +29,18 @@ final class ArcadeLobbyKitCatalogue {
     private ArcadeLobbyKitCatalogue() {
     }
 
+    /** Command help uses the same kit names/order as the lobby station, including future additions. */
+    static String helpNames(ArcadePortGame game) {
+        List<String> names = new java.util.ArrayList<>(forGame(game, List.of()).stream()
+                .map(choice -> (game == ArcadePortGame.DEATH_TAG && choice.name.startsWith("Runner ")
+                        ? choice.name.substring("Runner ".length()) : choice.name)
+                        + (choice.unlock == Unlock.ACHIEVEMENT ? " (achievement kit)" : ""))
+                .toList());
+        // NullKit is a source Death Tag command-only option, not a lobby NPC kit.
+        if (game == ArcadePortGame.DEATH_TAG) names.add("Null (legacy command-only)");
+        return String.join(", ", names);
+    }
+
     static List<KitChoice> forGame(ArcadePortGame game, List<String> hiddenKitIds) {
         return forGame(game, hiddenKitIds, List.of());
     }
