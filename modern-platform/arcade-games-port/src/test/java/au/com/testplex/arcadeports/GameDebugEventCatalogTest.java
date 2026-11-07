@@ -779,7 +779,8 @@ class GameDebugEventCatalogTest {
         int award = runtime.indexOf("private void award(Match current, UUID id, Player player", persist);
         assertTrue(persist >= 0 && award > persist);
         assertTrue(runtime.substring(persist, award).contains("if (GameDebugRuntimeOverrides.isDebugSession()) return;"));
-        int awardGuard = runtime.indexOf("if (GameDebugRuntimeOverrides.isDebugSession()) return;", award);
+        assertTrue(runtime.substring(persist, award).contains("if (plugin.isTestPlayer(id)) continue;"));
+        int awardGuard = runtime.indexOf("if (GameDebugRuntimeOverrides.isDebugSession() || plugin.isTestPlayer(id)) return;", award);
         assertTrue(awardGuard > award);
     }
 

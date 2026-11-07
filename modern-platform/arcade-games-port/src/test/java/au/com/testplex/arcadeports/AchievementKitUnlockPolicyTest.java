@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class AchievementKitUnlockPolicyTest {
     @Test void everyReviewedAchievementKitHasStableEarnableRequirements() {
-        assertEquals(20, AchievementKitUnlockPolicy.all().size());
+        assertEquals(22, AchievementKitUnlockPolicy.all().size());
         for (AchievementKitUnlockPolicy.Rule rule : AchievementKitUnlockPolicy.all()) {
             assertFalse(rule.requirements().isEmpty(), rule.kitId());
             assertEquals(rule.requirements().size(), Set.copyOf(rule.requirements()).size(), rule.kitId());
@@ -44,7 +44,7 @@ class AchievementKitUnlockPolicyTest {
                 assertNotNull(AchievementKitUnlockPolicy.find(game, choice.id), game.id() + ":" + choice.id);
             }
         }
-        assertEquals(20, purple);
+        assertEquals(22, purple);
     }
 
     @Test void combinationsRequireEverySpecificAchievement() {
@@ -83,5 +83,11 @@ class AchievementKitUnlockPolicyTest {
         assertEquals(java.util.List.of("smoke-and-mirrors"), trickster.requirements());
         assertFalse(turtle.requirements().contains("shell-shock"));
         assertFalse(trickster.requirements().contains("sleight-of-hand"));
+        var healthHarvester = AchievementKitUnlockPolicy.find(ArcadePortGame.EVOLUTION, "health-harvester");
+        var neanderthal = AchievementKitUnlockPolicy.find(ArcadePortGame.EVOLUTION, "neanderthal");
+        assertEquals(java.util.List.of("second-wind"), healthHarvester.requirements());
+        assertEquals(java.util.List.of("pity-party"), neanderthal.requirements());
+        assertFalse(healthHarvester.requirements().contains("blood-harvest"));
+        assertFalse(neanderthal.requirements().contains("pity-the-ancient"));
     }
 }

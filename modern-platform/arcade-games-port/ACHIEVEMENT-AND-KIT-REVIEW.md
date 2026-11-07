@@ -12,8 +12,8 @@ and Death Tag requirements are implemented on this draft branch.
   family even though it is not a value of `ArcadePortGame`.
 - There are **30 game families** represented across four catalogues: `ArcadeProgressCatalog`,
   `PlexballAchievement`, `CameraShyProgressCatalog`, and `SuperSploorProgressCatalog`.
-- The current catalogue contains **269 declared achievements** (including the four approved Death Tag additions). The 30-family minimum is 420.
-- **158 further additions** would fill all under-target catalogues, resulting in **427 total active
+- The current catalogue contains **276 declared achievements**. The 30-family minimum is 420.
+- **151 further additions** would fill all under-target catalogues, resulting in **427 total active
   achievements** if the existing definitions are retained: Snap has 20 and Super Sploor 15.
   **No existing achievements are to be archived, deleted, or retired.** This supersedes the
   earlier exact-14/archiving proposal following the user's decision.
@@ -37,7 +37,7 @@ and Death Tag requirements are implemented on this draft branch.
 | Hoops Remastered | 9 | 5 | 0 |
 | Master Builders | 4 | 10 | 0 |
 | Micro Battles | 9 | 5 | 0 |
-| Milk the Cow | 7 | 7 | 0 |
+| Milk the Cow | 14 | 0 | 0 |
 | Monster Maze (all modes) | 9 | 5 | 0 |
 | One in the Quiver | 8 | 6 | 0 |
 | Paintball | 5 | 9 | 0 |
@@ -54,7 +54,7 @@ and Death Tag requirements are implemented on this draft branch.
 | Turf Wars | 9 | 5 | 0 |
 | Wither Assault | 8 | 6 | 0 |
 | Wizards | 6 | 8 | 0 |
-| **Total** | **269** | **158** | **7** |
+| **Total** | **276** | **151** | **7** |
 
 ## Suggested review methodology
 

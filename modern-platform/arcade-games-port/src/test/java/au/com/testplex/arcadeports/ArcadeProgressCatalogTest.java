@@ -133,13 +133,14 @@ class ArcadeProgressCatalogTest {
         String[] games = {"bacon-brawl", "bomb-lobbers", "death-tag", "dragon-escape", "dragons",
                 "evolution", "gladiators", "micro-battles", "monster-maze", "one-in-the-quiver",
                 "paintball", "runner", "sheep-quest", "snake", "spleef", "turf-wars"};
-        int[] achievementCounts = {5, 4, 4, 4, 3, 5, 14, 6, 9, 8, 5, 7, 8, 6, 7, 9};
+        int[] achievementCounts = {5, 4, 4, 4, 3, 14, 14, 6, 9, 8, 5, 7, 8, 6, 7, 9};
         for (int i = 0; i < games.length; i++) {
             assertTrue(ArcadeProgressCatalog.milestones(games[i]).size() >= 2, games[i]);
             assertTrue(ArcadeProgressCatalog.achievements(games[i]).size() >= achievementCounts[i], games[i]);
         }
     }
 
+        int[] achievementCounts = {5, 4, 4, 4, 3, 5, 14, 6, 9, 8, 5, 7, 8, 6, 7, 9};
     @Test
     void gladiatorsKeepsBrawlerAndPrecisionAsAchievementsButNotMilestones() {
         var achievements = ArcadeProgressCatalog.achievements("gladiators");
@@ -157,6 +158,25 @@ class ArcadeProgressCatalogTest {
                 && achievement.requirement().contains("timed critical")));
         assertFalse(ArcadeProgressCatalog.milestones("gladiators").stream()
                 .anyMatch(milestone -> milestone.id().equals("brawler") || milestone.id().equals("precision")));
+    }
+
+    @Test
+    void evolutionHasFourteenApprovedAchievementsAndNoRemovedEntries() {
+        var achievements = ArcadeProgressCatalog.achievements("evolution");
+        assertEquals(14, achievements.size());
+        assertEquals(14, achievements.stream().map(ArcadeProgressCatalog.Achievement::id).distinct().count());
+        for (String id : List.of("perfect-game", "stealth-mastah", "rampage", "melee-monster",
+                "overkill", "wrong-kit-champ", "second-wind", "pity-party", "quick-change-artist",
+                "groundbreaker", "bounce-house", "eggspert", "blood-harvest", "pity-the-ancient")) {
+            assertTrue(achievements.stream().anyMatch(achievement -> achievement.id().equals(id)), id);
+        }
+        for (String removed : List.of("expert-evolver", "ability-assassin", "no-evolve-5-u")) {
+            assertFalse(achievements.stream().anyMatch(achievement -> achievement.id().equals(removed)), removed);
+        }
+        assertTrue(ArcadeProgressCatalog.milestones("evolution").stream()
+                .anyMatch(milestone -> milestone.id().equals("wins") && milestone.maximum() == 250));
+        assertTrue(ArcadeProgressCatalog.milestones("evolution").stream()
+                .anyMatch(milestone -> milestone.id().equals("kills") && milestone.maximum() == 2000));
     }
 
     @Test
@@ -267,14 +287,42 @@ class ArcadeProgressCatalogTest {
         assertTrue(hasAchievement("wizards", "trifecta", "Trifecta"));
         assertTrue(hasAchievement("wither-assault", "savior", "Savior"));
         assertTrue(hasAchievement("hoops-remastered", "quintuple-double", "Quintuple Double"));
+        assertTrue(hasAchievement("hoops-remastered", "skywalker", "Skywalker"));
+        assertTrue(hasAchievement("hoops-remastered", "alley-oop", "Alley-Oop"));
+        assertTrue(hasAchievement("hoops-remastered", "pickpockets-payback", "Pickpocket’s Payback"));
+        assertTrue(hasAchievement("hoops-remastered", "swat-team", "Swat Team"));
+        assertTrue(hasAchievement("hoops-remastered", "logo-launcher", "Logo Launcher"));
         assertTrue(hasAchievement("milk-the-cow", "got-the-chops", "Got the Chops"));
-        assertTrue(hasAchievement("draw-my-thing", "for-the-people", "For the people"));
+        assertTrue(hasAchievement("draw-my-thing", "for-the-people", "For the People"));
         assertTrue(hasAchievement("master-builders", "architect", "Architect"));
+        assertEquals(14, ArcadeProgressCatalog.achievements("master-builders").size());
+        for (String achievement : List.of("block-party", "minimalist-masterpiece", "second-draft",
+                "touching-the-sky", "critics-darling", "unanimous-ovation", "mixed-reviews",
+                "kingmaker", "fair-critic", "golden-eye")) {
+            assertTrue(ArcadeProgressCatalog.achievements("master-builders").stream()
+                    .anyMatch(value -> value.id().equals(achievement)), "Missing Master Builders achievement: " + achievement);
+        }
         assertTrue(hasAchievement("heroes-of-gwen", "know-your-enemy", "Know Your Enemy"));
         assertTrue(hasAchievement("castle-assault", "moral-exercise", "Moral Exercise"));
         assertTrue(hasAchievement("skywars", "death-bomber", "Death Bomber"));
         assertTrue(hasAchievement("skywars", "no-chest", "No Chest"));
         assertTrue(hasAchievement("skywars", "no-armor", "No Armor"));
+    }
+
+    @Test
+    void drawMyThingHasTheApprovedFourteenAchievements() {
+        Set<String> ids = ArcadeProgressCatalog.achievements("draw-my-thing").stream()
+                .map(ArcadeProgressCatalog.Achievement::id)
+                .collect(java.util.stream.Collectors.toSet());
+        assertEquals(14, ids.size());
+        assertEquals(Set.of("pixel-linguist", "why-cant-we-have-nice-things", "doubted-but-not-in-doubt",
+                "triple-threat", "for-the-people", "minimalist-masterpiece", "spray-and-pray",
+                "line-in-the-sand", "perfectly-round", "clean-slate", "last-second-sketch", "two-hats",
+                "read-between-the-lines", "third-times-the-charm"), ids);
+        assertFalse(ids.contains("art-hipster"));
+        assertFalse(ids.contains("mr-squiggle"));
+        assertFalse(ids.contains("keen-eye"));
+        assertFalse(ids.contains("pure-luck"));
     }
 
     @Test
@@ -290,6 +338,23 @@ class ArcadeProgressCatalogTest {
         assertTrue(hasAchievement("castle-assault", "against-all-odds", "Against All Odds"));
         assertTrue(ArcadeProgressCatalog.achievements("castle-assault").stream()
                 .anyMatch(a -> a.id().equals("clutchness") && a.requirement().contains("less than 10 health")));
+    }
+
+    @Test
+    void milkTheCowHasFourteenAchievementsWithTheApprovedNewChallenges() {
+        var achievements = ArcadeProgressCatalog.achievements("milk-the-cow");
+        assertEquals(14, achievements.size());
+        assertEquals(14, achievements.stream().map(ArcadeProgressCatalog.Achievement::id).distinct().count());
+        for (String id : List.of("pure-skill", "pinger", "milk-high-club", "perfect-game",
+                "slaughterhouse", "stop-stop-hes-already-dead", "got-the-chops", "last-drop",
+                "whole-herd", "udderly-explosive", "seismic-stampede", "the-full-moo",
+                "stampede", "spilt-milk")) {
+            assertTrue(achievements.stream().anyMatch(entry -> entry.id().equals(id)), id);
+        }
+        assertTrue(achievements.stream().anyMatch(entry -> entry.id().equals("stampede")
+                && entry.requirement().contains("five different Farmers")
+                && entry.requirement().contains("three credited eliminations")));
+        assertFalse(ArcadeProgressCatalog.milestones("milk-the-cow").isEmpty());
     }
 
     @Test
@@ -314,6 +379,22 @@ class ArcadeProgressCatalogTest {
         assertMilestone("castle-assault", "crystals-destroyed", "crystals-destroyed", 250, new long[] {25, 63, 125, 250});
     }
 
+    @Test
+    void heroesOfGwenHasFifteenAchievementsAndEverySelectableHeroHasSpecificCoverage() {
+        var achievements = ArcadeProgressCatalog.achievements("heroes-of-gwen");
+        assertEquals(15, achievements.size());
+        assertTrue(achievements.stream().anyMatch(a -> a.id().equals("rowena-bombardment")
+                && a.name().equals("Bombardment!")
+                && a.requirement().contains("As Rowena")
+                && a.requirement().contains("Light Arrows")
+                && a.requirement().contains("minion damage is allowed")));
+        for (String hero : new String[] {"Hattori", "Bardolf", "Devon", "Rowena", "Anath",
+                "Larissa", "Dana", "Biff", "Ivy"}) {
+            assertTrue(achievements.stream().anyMatch(a -> a.requirement().startsWith("As " + hero + ",")),
+                    "Missing hero-specific achievement for " + hero);
+        }
+    }
+
     private void assertMilestone(String game, String id, String statKey, long maximum, long[] stages) {
         var milestone = ArcadeProgressCatalog.milestones(game).stream()
                 .filter(entry -> entry.id().equals(id))
@@ -332,5 +413,21 @@ class ArcadeProgressCatalogTest {
         return ArcadeProgressCatalog.milestones(gameId).stream()
                 .filter(milestone -> milestone.id().equals(id))
                 .findFirst().orElseThrow().stages();
+    }
+    @Test
+    void microBattlesHasFourteenAchievementsWithoutRestoringMicroChampion() {
+        var achievements = ArcadeProgressCatalog.achievements("micro-battles");
+        assertEquals(14, achievements.size());
+        assertEquals(14, achievements.stream().map(ArcadeProgressCatalog.Achievement::id).distinct().count());
+        assertEquals(achievements.stream().map(ArcadeProgressCatalog.Achievement::id).collect(java.util.stream.Collectors.toSet()),
+                java.util.Arrays.stream(MicroBattlesAchievement.values()).map(MicroBattlesAchievement::slug)
+                        .collect(java.util.stream.Collectors.toSet()));
+        for (String id : List.of("air-mail", "needle-threader", "shift-supervisor",
+                "no-room-to-build", "last-breath")) {
+            assertTrue(achievements.stream().anyMatch(entry -> entry.id().equals(id)), id);
+        }
+        assertFalse(achievements.stream().anyMatch(entry -> entry.id().equals("micro-champion")));
+        assertEquals(1500, ArcadeProgressCatalog.milestones("micro-battles").stream()
+                .filter(entry -> entry.id().equals("wins")).findFirst().orElseThrow().maximum());
     }
 }

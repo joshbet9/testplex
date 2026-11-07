@@ -12,3 +12,18 @@ Milk the Cow is now READY_FOR_TEST in the shared controlled queue. It uses the o
 6. Confirm wins, role wins, kills, assists and buckets digested persist; disconnect/reconnect, repeated rounds and teardown must restore the lobby without leaving herd/disguise entities.
 
 Milk the Cow is available for controlled testing after the packaged BobsFarm archive passes CI. The two-human and multi-human round must still be exercised on Paper 26.3 before declaring live gameplay acceptance.
+
+## Achievement verification
+
+- [ ] Preserve all seven existing achievements and their current detectors: Pure Skill, Pinger, Milk High Club, Perfect Game, Slaughterhouse, Stop Stop He's Already Dead and Got the Chops.
+- [ ] The Last Drop is awarded immediately for the winning milk drink when the Farmer has at most one heart before drinking.
+- [ ] Whole Herd requires a winning Farmer to have obtained milk from three distinct Cow players.
+- [ ] Udderly Explosive requires one Cow Bomb to hit three distinct Farmers and directly eliminate at least one.
+- [ ] Seismic Stampede requires one Body Slam to hit three distinct Farmers and directly eliminate at least one.
+- [ ] The Full Moo requires the same Cow to hit one Farmer with Cow Bomb, Body Slam and Cow Charge, then receive elimination credit against that Farmer.
+- [ ] Stampede! requires one uninterrupted sprint-charge sequence to hit five distinct Farmers and earn three credited eliminations.
+- [ ] Spilt Milk requires three separate Cow Charge events to empty milk buckets while the Farmer is one point below the win target, followed by losing the naturally completed game.
+- [ ] The catalogue contains exactly 14 distinct achievement IDs; existing milestone thresholds remain unchanged.
+- [ ] Bot progression and debug-round achievements are not persisted.
+
+Automated tests cover the new achievement conditions and negative cases, catalog count and IDs, and thresholds. Paper 26.3 acceptance remains required for real event ordering, charge-sequence boundaries, multi-target ability behavior, score flow and persistence.

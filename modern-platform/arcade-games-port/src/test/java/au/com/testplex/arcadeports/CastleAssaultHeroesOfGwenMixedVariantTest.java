@@ -10,6 +10,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class CastleAssaultHeroesOfGwenMixedVariantTest {
 
+    @Test
+    void goldMineRequiresTwoUninterruptedMinutesOfBeaconControl() {
+        assertEquals(120_000L, ArcadePortRules.HEROES_OF_GWEN_GOLD_MINE_HOLD_MILLIS);
+        assertFalse(ArcadePortRules.heroesOfGwenGoldMineReady(119_999L));
+        assertTrue(ArcadePortRules.heroesOfGwenGoldMineReady(120_000L));
+        assertTrue(ArcadePortRules.heroesOfGwenGoldMineReady(180_000L));
+    }
+
     @AfterEach
     void clearProfileOverrides() {
         GameDebugRuntimeOverrides.clear();
