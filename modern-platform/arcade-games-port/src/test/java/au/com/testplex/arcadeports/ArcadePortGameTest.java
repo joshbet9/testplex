@@ -2034,7 +2034,8 @@ class ArcadePortGameTest {
     @Test void evolutionAchievementSetIncludesOverkillAndWrongKitChamp() {
         assertEquals(2, EvolutionAchievement.values().length);
         assertEquals("Overkill", EvolutionAchievement.OVERKILL.displayName());
-        assertEquals("Get 2 kills before each evolution.", EvolutionAchievement.OVERKILL.requirement());
+        assertEquals("Win after getting at least 2 credited kills before each evolution.",
+                EvolutionAchievement.OVERKILL.requirement());
         assertEquals("Wrong Kit Champ", EvolutionAchievement.WRONG_KIT_CHAMP.displayName());
         assertEquals("wrong-kit-champ", EvolutionAchievement.WRONG_KIT_CHAMP.slug());
         assertEquals("local-achievements.00000000-0000-0000-0000-000000000001.evolution.wrong-kit-champ",
