@@ -185,7 +185,7 @@ jobs:
 
           arcade_config="$(unzip -p "$arcade_jar" config.yml)"
           enabled_ids="$(awk '/^enabled-games:/{in_list=1;next} in_list && /^[^ ]/{exit} in_list && /^  - /{print $2}' <<< "$arcade_config" | paste -sd, -)"
-          [[ "$enabled_ids" == "death-tag,one-in-the-quiver,bomb-lobbers,bacon-brawl,castle-assault,gladiators,micro-battles,milk-the-cow,paintball,plexball,spleef,super-sploor,dragon-escape,dragons,runner,sheep-quest,turf-wars,camera-shy,monster-maze,monster-maze-speed,monster-maze-modern,snake,draw-my-thing,master-builders,skywars,wither-assault,sneaky-assassins,speed-builders,heroes-of-gwen,hoops-remastered,wizards" ]] || {
+          [[ "$enabled_ids" == "death-tag,one-in-the-quiver,bomb-lobbers,bacon-brawl,castle-assault,gladiators,micro-battles,milk-the-cow,paintball,plexball,spleef,super-sploor,dragon-escape,dragons,evolution,runner,sheep-quest,turf-wars,camera-shy,monster-maze,monster-maze-speed,monster-maze-modern,snake,draw-my-thing,master-builders,skywars,wither-assault,sneaky-assassins,speed-builders,heroes-of-gwen,hoops-remastered,wizards" ]] || {
             echo "Only the explicitly reviewed acceptance queue may be enabled. Found: [$enabled_ids]" >&2
             exit 1
           }
@@ -247,7 +247,7 @@ jobs:
               wither-assault) map_folders=(); echo "Wither Assault uses a generated arena; original Industrial West, Labyrinth and Sky Ruins archives are absent." ;;
               sneaky-assassins) map_folders=(); echo "Sneaky Assassins uses a generated town; original map and NPC patrol-route archives are absent." ;;
               speed-builders) map_folders=("Speed Builders") ;;
-              evolution) map_folders=(); echo "Evolution uses its generated test arena; no legacy source map archive folder exists." ;;
+              evolution) map_folders=("Evolution") ;;
               *) echo "No legacy map parity policy is defined for enabled game [$game_id]." >&2; exit 1 ;;
             esac
             for map_folder in "${map_folders[@]}"; do
@@ -316,12 +316,12 @@ jobs:
             echo
             echo "- Runtime/API baseline: Java 25 / Paper 26.3"
             echo "- Separate from legacy Java 8 build and deployment"
-            echo "- Catalogue: 32 Arcade selectable IDs (32 READY_FOR_TEST, 0 MECHANICS_IN_PROGRESS), with Evolution excluded from the 31 enabled selections (29 distinct enabled titles)"
+            echo "- Catalogue: 32 Arcade selectable IDs (32 READY_FOR_TEST, 0 MECHANICS_IN_PROGRESS), all enabled across 30 distinct titles"
             echo "- Built artifacts: TestplexModernArcade.jar and ArcadeMechanicsModern.jar; all games run through the shared Arcade plugin (including Snake, Wizards and Monster Maze)"
             echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
             echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
-            echo "- Gameplay ports: 31 selections enabled across 29 distinct games, including one Heroes of Gwen Arcade entry, one Hoops Remastered entry and one Wizards Arcade entry; Evolution is withheld pending separate source-map clearance"
-            echo "- Playable allow-list: Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Castle Assault, Gladiators, Micro Battles, Milk the Cow, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons, Runner, Sheep Quest, Turf Wars, Snap, Monster Maze (Original), Monster Maze (Speed), Monster Maze (Modern), Snake, Draw My Thing, Master Builders, SkyWars Mixed, Wither Assault, Sneaky Assassins, Speed Builders, Heroes of Gwen, Hoops Remastered and Wizards"
+            echo "- Gameplay ports: 32 selections enabled across 30 distinct games, including Evolution, Heroes of Gwen Arcade, Hoops Remastered and Wizards Arcade"
+            echo "- Playable allow-list: Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Castle Assault, Gladiators, Micro Battles, Milk the Cow, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons, Evolution, Runner, Sheep Quest, Turf Wars, Snap, Monster Maze (Original), Monster Maze (Speed), Monster Maze (Modern), Snake, Draw My Thing, Master Builders, SkyWars Mixed, Wither Assault, Sneaky Assassins, Speed Builders, Heroes of Gwen, Hoops Remastered and Wizards"
             echo "- Deployment: successful pushes to feat/testplex-modern-26.3-platform automatically deploy through the isolated modern Hyper-V workflow"
           } >> "$GITHUB_STEP_SUMMARY"
 
