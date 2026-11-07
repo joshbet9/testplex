@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class AchievementKitUnlockPolicyTest {
     @Test void everyReviewedAchievementKitHasStableEarnableRequirements() {
-        assertEquals(21, AchievementKitUnlockPolicy.all().size());
+        assertEquals(23, AchievementKitUnlockPolicy.all().size());
         for (AchievementKitUnlockPolicy.Rule rule : AchievementKitUnlockPolicy.all()) {
             assertFalse(rule.requirements().isEmpty(), rule.kitId());
             assertEquals(rule.requirements().size(), Set.copyOf(rule.requirements()).size(), rule.kitId());
@@ -44,7 +44,7 @@ class AchievementKitUnlockPolicyTest {
                 assertNotNull(AchievementKitUnlockPolicy.find(game, choice.id), game.id() + ":" + choice.id);
             }
         }
-        assertEquals(21, purple);
+        assertEquals(23, purple);
     }
 
     @Test void combinationsRequireEverySpecificAchievement() {
@@ -83,8 +83,11 @@ class AchievementKitUnlockPolicyTest {
         assertEquals(java.util.List.of("smoke-and-mirrors"), trickster.requirements());
         assertFalse(turtle.requirements().contains("shell-shock"));
         assertFalse(trickster.requirements().contains("sleight-of-hand"));
-        var tamer = AchievementKitUnlockPolicy.find(ArcadePortGame.DRAGONS, "tamer");
-        assertEquals(java.util.List.of("dragon-tamer"), tamer.requirements());
-        assertFalse(tamer.requirements().contains("dragon-whisperer"));
+        var healthHarvester = AchievementKitUnlockPolicy.find(ArcadePortGame.EVOLUTION, "health-harvester");
+        var neanderthal = AchievementKitUnlockPolicy.find(ArcadePortGame.EVOLUTION, "neanderthal");
+        assertEquals(java.util.List.of("second-wind"), healthHarvester.requirements());
+        assertEquals(java.util.List.of("pity-party"), neanderthal.requirements());
+        assertFalse(healthHarvester.requirements().contains("blood-harvest"));
+        assertFalse(neanderthal.requirements().contains("pity-the-ancient"));
     }
 }

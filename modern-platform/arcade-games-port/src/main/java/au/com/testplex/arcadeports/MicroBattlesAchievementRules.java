@@ -12,6 +12,11 @@ public final class MicroBattlesAchievementRules {
     public static final double SNIPER_MIN_FALL_DISTANCE = 8.0D;
     public static final int SNIPER_REQUIRED_OPPOSING_TEAMS = 3;
     public static final int MICRO_BATTLES_KING_KILLS = 3;
+    public static final int LAST_TWO_REQUIRED_TEAM_SWEEP = 1;
+    public static final int SHIFT_SUPERVISOR_REQUIRED_BLOCKS = 30;
+    public static final double NEEDLE_THREADER_MIN_DISTANCE = 25.0D;
+    public static final double AIR_MAIL_MIN_GAP_DISTANCE = 6.0D;
+    public static final double LAST_BREATH_MAX_HEALTH = 2.0D;
 
     private MicroBattlesAchievementRules() { }
 
@@ -62,5 +67,48 @@ public final class MicroBattlesAchievementRules {
 
     public static boolean hasKnockedEveryOpposingTeam(int distinctTeamsKnocked) {
         return distinctTeamsKnocked >= SNIPER_REQUIRED_OPPOSING_TEAMS;
+    }
+
+    public static boolean shouldAwardPhew(int borderBlocksPlaced, boolean diedToBorder) {
+        return !diedToBorder && borderBlocksPlaced >= BORDER_BUILD_REQUIRED_BLOCKS;
+    }
+
+    public static boolean shouldAwardMoshPitPlayroom(int assists) {
+        return assists >= 8;
+    }
+
+    public static boolean shouldAwardLastTwo(int opponentsAtSnapshot, int opponentsPersonallyEliminated,
+            boolean winner, boolean survived) {
+        return winner && survived && opponentsAtSnapshot >= LAST_TWO_REQUIRED_TEAM_SWEEP
+                && opponentsPersonallyEliminated >= opponentsAtSnapshot;
+    }
+
+    public static boolean shouldAwardBuiltForThis(boolean wasSavedByFighter, boolean wonFinalDuel) {
+        return wasSavedByFighter && wonFinalDuel;
+    }
+
+    public static boolean shouldAwardShiftSupervisor(int blocksBroken, int blocksPlaced, boolean wonAsWorker) {
+        return wonAsWorker && blocksBroken >= SHIFT_SUPERVISOR_REQUIRED_BLOCKS
+                && blocksPlaced >= SHIFT_SUPERVISOR_REQUIRED_BLOCKS;
+    }
+
+    public static boolean shouldAwardNoRoomToBuild(int blocksPlaced, boolean won) {
+        return won && blocksPlaced == 0;
+    }
+
+    public static boolean shouldAwardLastBreath(double health, boolean finalDuelWinner) {
+        return finalDuelWinner && Double.isFinite(health) && health > 0.0D
+                && health <= LAST_BREATH_MAX_HEALTH;
+    }
+
+    public static boolean isNeedleThreaderDistance(double shotDistance) {
+        return Double.isFinite(shotDistance) && shotDistance >= NEEDLE_THREADER_MIN_DISTANCE;
+    }
+
+    public static boolean isAirMailLanding(double horizontalDistance, int startingTeam, int landingTeam,
+            boolean landedOnSolidGround) {
+        return Double.isFinite(horizontalDistance) && horizontalDistance >= AIR_MAIL_MIN_GAP_DISTANCE
+                && startingTeam >= 0 && landingTeam >= 0 && startingTeam != landingTeam
+                && landedOnSolidGround;
     }
 }

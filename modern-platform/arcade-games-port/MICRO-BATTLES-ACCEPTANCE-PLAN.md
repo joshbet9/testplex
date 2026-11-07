@@ -56,10 +56,25 @@ Choose a kit before joining or starting:
 ## Achievements and stats
 
 - [ ] Annihilation is awarded at eight kills in one game, not seven or nine.
-- [ ] Last Two is awarded once when exactly two teams remain and only to eligible living human players.
+- [ ] Last Two snapshots the opponents when two teams remain and is awarded only to a winning player who personally eliminates every player on the other team.
+- [ ] PHEW! requires three blocks placed within two blocks of the border during one round, without dying to the border.
+- [ ] Micro Battles King is credited only when a block placed by the player knocks a jumping opponent into lava or water and the player earns three kills.
+- [ ] Mosh-Pit Playroom is awarded immediately on the eighth assist in one round.
+- [ ] Built for This requires Fighter's Iron Skin to prevent an otherwise lethal hit during the final duel, followed by winning that duel.
+- [ ] Speedster is awarded for a win in under 90 seconds and unlocks Dasher without an achievement dependency loop.
+- [ ] Sniper Dawg retains its source-style requirement to knock a player from every opposing team off a skybase in one round.
+- [ ] Gravedigger requires a melee kill with the shovel.
+- [ ] Air Mail requires Dasher's jump to cross a six-block horizontal gap, land on solid ground on an enemy island, and then eliminate an enemy there.
+- [ ] Needle Threader requires an Archer arrow kill from at least 25 blocks between launch and target.
+- [ ] Shift Supervisor requires Worker to break and place at least 30 blocks each, then win.
+- [ ] No Room to Build requires winning without placing any blocks.
+- [ ] Last Breath requires winning the final 1v1 with no more than one heart remaining.
+- [ ] The catalogue contains exactly 14 distinct Micro Battles achievements, matches the runtime achievement IDs, and does not restore Micro Champion.
 - [ ] Test-roster players do not persist achievements or progress.
 - [ ] Both achievement entries appear in `/stats` → Micro Battles and persist after reconnecting.
 - [ ] Team wins, kills, deaths, assists and round results are recorded once, including timeout draws.
+
+Automated rules tests cover achievement thresholds and negative cases; the catalogue test checks the exact count, IDs, removed Micro Champion entry, and unchanged 1,500-win milestone. Paper 26.3 acceptance is still required for real round event ordering, gap landing classification, map-edge placement, kill attribution, and persistence.
 
 ## Exit criteria
 

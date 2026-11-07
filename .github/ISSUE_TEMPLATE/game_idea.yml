@@ -1,0 +1,75 @@
+name: Testplex game idea
+description: Suggest a gameplay, balance, polish, or tester-tool improvement.
+title: "[Idea] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        <!-- testplex-feedback:type=idea -->
+        Ideas and discussion are public. Do not include private account or server details.
+  - type: dropdown
+    id: game
+    attributes:
+      label: Game
+      options:
+        - Bacon Brawl
+        - Bomb Lobbers
+        - Castle Assault
+        - Death Tag
+        - Dragon Escape
+        - Dragons
+        - Draw My Thing
+        - Evolution
+        - Gladiators
+        - Heroes of GWEN
+        - Hoops
+        - Master Builders
+        - Micro Battles
+        - Milk the Cow
+        - Monster Maze (Original)
+        - Monster Maze (Speed)
+        - Monster Maze (Modern)
+        - One in the Quiver
+        - Paintball
+        - Plexball
+        - Runner
+        - Sheep Quest
+        - SkyWars
+        - Snake
+        - Snap
+        - Sneaky Assassins
+        - Speed Builders
+        - Spleef
+        - Super Sploor
+        - Turf Wars
+        - Wither Assault
+        - Wizards
+        - Shared lobby or global
+    validations:
+      required: true
+  - type: input
+    id: summary
+    attributes:
+      label: Short idea
+    validations:
+      required: true
+  - type: textarea
+    id: player_problem
+    attributes:
+      label: What player problem or opportunity does this address?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: How should it work?
+      description: Describe the player-visible behavior and any useful edge cases.
+    validations:
+      required: true
+  - type: textarea
+    id: parity
+    attributes:
+      label: Source-game reference (optional)
+      description: If this is a parity change, describe the 1.8 behavior or link a clip.
+    validations:
+      required: false
