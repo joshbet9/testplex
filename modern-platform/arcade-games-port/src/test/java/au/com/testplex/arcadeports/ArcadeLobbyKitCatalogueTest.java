@@ -6,9 +6,24 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ArcadeLobbyKitCatalogueTest {
+    @Test
+    void bobRossIsPreservedAsReferenceOnlyAndCannotBeSelected() {
+        assertEquals(List.of("hattori", "devon", "anath", "dana", "biff", "larissa",
+                        "bardolf", "rowena", "ivy"),
+                ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.HEROES_OF_GWEN, List.of()).stream()
+                        .map(choice -> choice.id).toList());
+        assertNull(ArcadePortRules.normalizeHeroesOfGwenHero("Bob Ross"));
+        assertNull(ArcadePortRules.normalizeHeroesOfGwenHero("bob-ross"));
+        assertTrue(java.nio.file.Files.exists(java.nio.file.Path.of(
+                "HEROES-OF-GWEN-BOB-ROSS-REFERENCE.md"))
+                || java.nio.file.Files.exists(java.nio.file.Path.of(
+                        "modern-platform/arcade-games-port/HEROES-OF-GWEN-BOB-ROSS-REFERENCE.md")));
+    }
+
     @Test
     void deathTagKeepsItsStableKitIdsAndUsesTheApprovedRunnerNames() {
         List<ArcadeLobbyKitCatalogue.KitChoice> kits =
@@ -73,7 +88,9 @@ class ArcadeLobbyKitCatalogueTest {
                 choices.stream().map(choice -> choice.id).toList());
         assertEquals(ArcadeLobbyKitCatalogue.Unlock.FREE, choices.get(0).unlock);
         assertTrue(choices.subList(1, choices.size()).stream()
+                .filter(choice -> !choice.id.equals("tamer"))
                 .allMatch(choice -> choice.unlock == ArcadeLobbyKitCatalogue.Unlock.GEM));
+        assertEquals(ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT, choices.get(5).unlock);
     }
 
     @Test

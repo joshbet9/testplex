@@ -56,8 +56,7 @@ final class ArcadeLobbyKitCatalogue {
                     choice("larissa", "Larissa", Material.WATER_BUCKET, Unlock.FREE, Villager.class, Material.WATER_BUCKET),
                     choice("bardolf", "Bardolf", Material.STONE_SWORD, Unlock.FREE, Villager.class, Material.STONE_SWORD),
                     choice("rowena", "Rowena", Material.CROSSBOW, Unlock.FREE, Villager.class, Material.CROSSBOW),
-                    choice("ivy", "Ivy", Material.SHIELD, Unlock.FREE, Villager.class, Material.SHIELD),
-                    choice("bob-ross", "Bob Ross", Material.PAINTING, Unlock.FREE, Villager.class, Material.PAINTING));
+                    choice("ivy", "Ivy", Material.SHIELD, Unlock.FREE, Villager.class, Material.SHIELD));
             case SKY_WARS -> List.of(
                     choice("ice", "Ice", Material.ICE, Unlock.FREE, Skeleton.class, Material.ICE),
                     choice("fire", "Fire", Material.BLAZE_POWDER, Unlock.FREE, Skeleton.class, Material.BLAZE_POWDER),
@@ -123,12 +122,16 @@ final class ArcadeLobbyKitCatalogue {
                     choice("glider", "Glider", Material.ELYTRA,
                             Unlock.GEM, Zombie.class, Material.ELYTRA),
                     choice("tamer", "Tamer", Material.END_CRYSTAL,
-                            Unlock.GEM, Zombie.class, Material.END_CRYSTAL));
+                            Unlock.ACHIEVEMENT, Zombie.class, Material.END_CRYSTAL));
             case EVOLUTION -> List.of(
-                    choice("standard-evolution", "Standard Evolution", Material.DRAGON_EGG,
+                    choice("darwinist", "Darwinist", Material.DRAGON_EGG,
                             Unlock.FREE, Zombie.class, Material.IRON_INGOT),
                     choice("quick-evolver", "Quick Evolver", Material.CLOCK,
-                            Unlock.FREE, Zombie.class, Material.GOLDEN_APPLE));
+                            Unlock.FREE, Zombie.class, Material.GOLDEN_APPLE),
+                    choice("health-harvester", "Health Harvester", Material.GOLDEN_APPLE,
+                            Unlock.ACHIEVEMENT, Zombie.class, Material.GOLDEN_APPLE),
+                    choice("neanderthal", "Neanderthal", Material.STONE_AXE,
+                            Unlock.ACHIEVEMENT, Zombie.class, Material.STONE_AXE));
             case MICRO_BATTLES -> List.of(
                     choice("micro-archer", "Archer", Material.BOW,
                             Unlock.FREE, Zombie.class, Material.BOW),
@@ -145,8 +148,8 @@ final class ArcadeLobbyKitCatalogue {
                             Unlock.GEM, Skeleton.class, Material.BOW),
                     choice("brute", "Brute", Material.IRON_SWORD,
                             Unlock.GEM, Zombie.class, Material.IRON_SWORD),
-                    choice("shepherd", "Shepherd", Material.SHEARS,
-                            Unlock.ACHIEVEMENT, Villager.class, Material.SHEARS));
+                    choice("shepherd", "Shepherd", Material.WOODEN_SPEAR,
+                            Unlock.ACHIEVEMENT, Villager.class, Material.WOODEN_SPEAR));
             case SNAKE -> List.of(
                     choice("speed", "Speed", Material.FEATHER,
                             Unlock.FREE, Zombie.class, Material.FEATHER),

@@ -62,6 +62,13 @@ class ArcadePortGameTest {
         assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
                 ArcadePortGame.BACON_BRAWL, "maps/bacon-brawl.zip"),
                 "Pre-map-selector configurations using the legacy default resource remain valid");
+        assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
+                ArcadePortGame.DEATH_TAG, "maps/death-tag.zip"));
+        assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
+                ArcadePortGame.SHEEP_QUEST, "maps/sheep-quest.zip"));
+        assertFalse(SourceMapCatalog.resourcePathBelongsToGame(
+                ArcadePortGame.DEATH_TAG, "maps/sheep-quest.zip"),
+                "Legacy bundles must remain scoped to their owning game");
 
         assertFalse(SourceMapCatalog.resourcePathBelongsToGame(
                 ArcadePortGame.SKY_WARS, "source-maps/Bacon Brawl/BaconBrawl_Castle.zip"),
@@ -74,6 +81,13 @@ class ArcadePortGameTest {
         assertFalse(SourceMapCatalog.resourcePathBelongsToGame(
                 ArcadePortGame.BACON_BRAWL, "source-maps/Bacon Brawl/not-a-map.txt"));
         assertFalse(SourceMapCatalog.resourcePathBelongsToGame(ArcadePortGame.BACON_BRAWL, null));
+    }
+
+    @Test void skyWarsMixedQueueIsAlsoAdmittedByTheGameStarter() {
+        assertTrue(ArcadePortManager.supportsMixedArcadeVariant(ArcadePortGame.SKY_WARS));
+        assertTrue(ArcadePortManager.supportsMixedArcadeVariant(ArcadePortGame.CASTLE_ASSAULT));
+        assertTrue(ArcadePortManager.supportsMixedArcadeVariant(ArcadePortGame.TURF_WARS));
+        assertFalse(ArcadePortManager.supportsMixedArcadeVariant(ArcadePortGame.EVOLUTION));
     }
 
     @Test void sourceMapResetTargetsPaper263MigratedDimensionFolder() {
@@ -2034,7 +2048,8 @@ class ArcadePortGameTest {
     @Test void evolutionAchievementSetIncludesOverkillAndWrongKitChamp() {
         assertEquals(2, EvolutionAchievement.values().length);
         assertEquals("Overkill", EvolutionAchievement.OVERKILL.displayName());
-        assertEquals("Get 2 kills before each evolution.", EvolutionAchievement.OVERKILL.requirement());
+        assertEquals("Win after getting at least 2 credited kills before each evolution.",
+                EvolutionAchievement.OVERKILL.requirement());
         assertEquals("Wrong Kit Champ", EvolutionAchievement.WRONG_KIT_CHAMP.displayName());
         assertEquals("wrong-kit-champ", EvolutionAchievement.WRONG_KIT_CHAMP.slug());
         assertEquals("local-achievements.00000000-0000-0000-0000-000000000001.evolution.wrong-kit-champ",
@@ -2694,8 +2709,10 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(10, 64, -3, 10, 64, -4));
     }
 
-    @Test void sheepQuestPlayerHitsDropSheepAndDealDamage() {
-        assertEquals(4.0D, ArcadePortRules.SHEEP_QUEST_PLAYER_HIT_DAMAGE, 0.00001D);
+    @Test void sheepQuestPlayerHitsUseLegacyWeaponDamageInsteadOfFixedDebugDamage() {
+        assertEquals(4.0D, ArcadePortRules.sheepQuestLegacyMeleeDamage("WOODEN_SWORD", false, Double.NaN), 0.00001D);
+        assertEquals(5.0D, ArcadePortRules.sheepQuestLegacyMeleeDamage("IRON_AXE", false, Double.NaN), 0.00001D);
+        assertEquals(6.0D, ArcadePortRules.sheepQuestLegacyMeleeDamage("IRON_SWORD", false, Double.NaN), 0.00001D);
     }
 
     @Test void turfWarsTerritoryUsesTheSourceSpawnFloorHeight() {

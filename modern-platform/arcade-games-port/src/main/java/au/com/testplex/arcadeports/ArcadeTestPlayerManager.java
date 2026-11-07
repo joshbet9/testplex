@@ -522,6 +522,21 @@ final class ArcadeTestPlayerManager {
         scheduleCleanup(api, handles, List.of(), null);
     }
 
+    /** Retire one AFK match fixture to let a human join an otherwise full live round. */
+    boolean retireMatchPlayer(UUID playerId, Runnable onRetired) {
+        if (shuttingDown || playerId == null || onRetired == null) return false;
+        Object handle = activeHandles.get(playerId);
+        if (handle == null || retiringHandles.containsKey(playerId)) return false;
+        try {
+            scheduleCleanup(api(), List.of(handle), List.of(), onRetired);
+            return true;
+        } catch (Exception exception) {
+            host.getLogger().warning("Could not retire AFK test player for a live human join: "
+                    + rootMessage(exception));
+            return false;
+        }
+    }
+
     private void scheduleCleanup(Object api, Collection<?> handles, Collection<UUID> orphanIds,
             Runnable completion) {
         if (completion != null) cleanupCallbacks.add(completion);
