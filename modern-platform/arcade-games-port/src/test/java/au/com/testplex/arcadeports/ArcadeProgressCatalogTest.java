@@ -164,7 +164,6 @@ class ArcadeProgressCatalogTest {
         assertTrue(hasAchievement("dragons", "win-three-in-a-row", "Win 3 in a row"));
         assertTrue(hasAchievement("dragons", "survive-five-minutes", "Survive 5 minutes"));
         assertTrue(hasAchievement("dragons", "no-damage-win", "Untouched"));
-        assertTrue(hasAchievement("dragons", "adept", "Adept"));
         assertTrue(hasAchievement("dragons", "sharpshooter", "Sharpshooter"));
         assertTrue(hasAchievement("dragons", "ultra", "Ultra"));
         assertTrue(hasAchievement("dragons", "survivors-guilt", "Survivor’s Guilt"));
@@ -172,7 +171,15 @@ class ArcadeProgressCatalogTest {
         assertTrue(hasAchievement("dragons", "dodgems", "Dodgems"));
         assertTrue(hasAchievement("dragons", "sticks-and-stones", "Sticks and stones"));
         assertTrue(hasAchievement("dragons", "mlg-pro", "MLG Pro"));
-        assertEquals(11, ArcadeProgressCatalog.achievements("dragons").size());
+        assertTrue(hasAchievement("dragons", "dragon-tamer", "Dragon Tamer"));
+        assertTrue(hasAchievement("dragons", "bridge-over-troubled-void", "Bridge Over Troubled Void"));
+        assertTrue(hasAchievement("dragons", "wing-it-to-win-it", "Wing It to Win It"));
+        assertTrue(hasAchievement("dragons", "dragon-whisperer", "Dragon Whisperer"));
+        assertFalse(ArcadeProgressCatalog.achievements("dragons").stream()
+                .anyMatch(achievement -> achievement.id().equals("sparklez")));
+        assertFalse(ArcadeProgressCatalog.achievements("dragons").stream()
+                .anyMatch(achievement -> achievement.id().equals("adept")));
+        assertEquals(14, ArcadeProgressCatalog.achievements("dragons").size());
     }
 
     @Test

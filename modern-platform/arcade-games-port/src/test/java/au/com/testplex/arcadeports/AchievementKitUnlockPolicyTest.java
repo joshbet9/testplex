@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class AchievementKitUnlockPolicyTest {
     @Test void everyReviewedAchievementKitHasStableEarnableRequirements() {
-        assertEquals(22, AchievementKitUnlockPolicy.all().size());
+        assertEquals(23, AchievementKitUnlockPolicy.all().size());
         for (AchievementKitUnlockPolicy.Rule rule : AchievementKitUnlockPolicy.all()) {
             assertFalse(rule.requirements().isEmpty(), rule.kitId());
             assertEquals(rule.requirements().size(), Set.copyOf(rule.requirements()).size(), rule.kitId());
@@ -44,7 +44,7 @@ class AchievementKitUnlockPolicyTest {
                 assertNotNull(AchievementKitUnlockPolicy.find(game, choice.id), game.id() + ":" + choice.id);
             }
         }
-        assertEquals(22, purple);
+        assertEquals(23, purple);
     }
 
     @Test void combinationsRequireEverySpecificAchievement() {

@@ -87,6 +87,7 @@ final class AchievementKitUnlockPolicy {
                 "whats-a-double-jump", "blast-proof", "jelly-skin");
         add(rules, "death-tag", "runner-turtle", "Runner Turtle", "lots-of-subject-matter");
         add(rules, "death-tag", "runner-trickster", "Runner Trickster", "smoke-and-mirrors");
+        add(rules, "dragons", "tamer", "Tamer", "dragon-tamer");
         add(rules, "dragon-escape", "digger", "Digger", "to-hell-and-back", "paralympics");
         add(rules, "evolution", "health-harvester", "Health Harvester", "second-wind");
         add(rules, "evolution", "neanderthal", "Neanderthal", "pity-party");

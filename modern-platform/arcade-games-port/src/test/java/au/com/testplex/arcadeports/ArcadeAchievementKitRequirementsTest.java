@@ -18,9 +18,13 @@ class ArcadeAchievementKitRequirementsTest {
         assertTrue(ArcadeAchievementKitRequirements.find("runner", "runnerkit-switcher").allAchievements());
     }
 
-    @Test void unauditedKitsDoNotReceiveInventedUnlockRequirements() {
-        assertNull(ArcadeAchievementKitRequirements.find("dragons", "tamer"));
+    @Test void tamerUsesItsReviewedOriginalAchievementUnlock() {
+        var tamer = ArcadeAchievementKitRequirements.find("dragons", "tamer");
+        assertNotNull(tamer);
+        assertEquals(java.util.List.of("dragon-tamer"), tamer.achievementIds());
         assertTrue(ArcadeAchievementKitRequirements.kitIdsForAchievement("dragons", "adept").isEmpty());
+        assertEquals(java.util.List.of("tamer"),
+                ArcadeAchievementKitRequirements.kitIdsForAchievement("dragons", "dragon-tamer"));
     }
 
     @Test void knownRewardsCanBeShownInAchievementTooltips() {

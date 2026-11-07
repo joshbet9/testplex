@@ -88,7 +88,9 @@ class ArcadeLobbyKitCatalogueTest {
                 choices.stream().map(choice -> choice.id).toList());
         assertEquals(ArcadeLobbyKitCatalogue.Unlock.FREE, choices.get(0).unlock);
         assertTrue(choices.subList(1, choices.size()).stream()
+                .filter(choice -> !choice.id.equals("tamer"))
                 .allMatch(choice -> choice.unlock == ArcadeLobbyKitCatalogue.Unlock.GEM));
+        assertEquals(ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT, choices.get(5).unlock);
     }
 
     @Test
