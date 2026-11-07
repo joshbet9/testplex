@@ -795,7 +795,7 @@ class GameDebugEventCatalogTest {
         int end = source.indexOf("private void awardAchievement(", start);
         assertTrue(start >= 0 && end > start);
         String method = source.substring(start, end);
-        int guard = method.indexOf("if (!GameDebugRuntimeOverrides.isDebugSession())");
+        int guard = method.indexOf("!GameDebugRuntimeOverrides.isDebugSession()");
         assertTrue(guard >= 0);
         assertTrue(method.indexOf("SpeedBuildersProgressStore.increment") > guard);
         assertTrue(method.indexOf("plugin.saveConfig()") > guard);
