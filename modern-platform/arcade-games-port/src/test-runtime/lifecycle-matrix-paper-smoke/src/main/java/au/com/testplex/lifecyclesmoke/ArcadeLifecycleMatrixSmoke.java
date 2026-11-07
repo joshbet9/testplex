@@ -10,6 +10,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.logging.Level;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.command.CommandSender;
@@ -78,7 +79,8 @@ public final class ArcadeLifecycleMatrixSmoke extends JavaPlugin {
                 default -> throw new IllegalStateException("Unknown lifecycle matrix phase: " + phase);
             }
         } catch (Exception exception) {
-            getLogger().warning("LIFECYCLE_MATRIX|EXCEPTION|" + currentId + "|" + exception);
+            getLogger().log(Level.WARNING, "LIFECYCLE_MATRIX|EXCEPTION|" + currentId
+                    + "|root=" + rootMessage(exception), exception);
             if (phase == 0) {
                 finishWithFailure("Could not initialise clients or Arcade integration: " + exception);
             } else {
@@ -108,7 +110,18 @@ public final class ArcadeLifecycleMatrixSmoke extends JavaPlugin {
                 + " enabled selections in the production catalogue; expected all 32 ready selections");
         if (!enabled.contains("evolution")) throw new IllegalStateException(
                 "Evolution must be enabled and covered by the full-game lifecycle matrix");
-        gameIds = List.copyOf(enabled);
+        String selectedGames = System.getenv("TESTPLEX_LIFECYCLE_GAMES");
+        if (selectedGames == null || selectedGames.isBlank()) {
+            gameIds = List.copyOf(enabled);
+        } else {
+            List<String> requested = java.util.Arrays.stream(selectedGames.split(","))
+                    .map(String::trim).filter(value -> !value.isEmpty()).toList();
+            if (requested.isEmpty() || requested.stream().anyMatch(id -> !enabled.contains(id))) {
+                throw new IllegalArgumentException("TESTPLEX_LIFECYCLE_GAMES must be a comma-separated subset "
+                        + "of enabled game IDs: " + selectedGames);
+            }
+            gameIds = List.copyOf(requested);
+        }
         // This disposable harness has four real clients and intentionally needs
         // no AFK roster. Speed Builders owns its bot-filling start path, unlike
         // the shared startQueuedInternal games below.
