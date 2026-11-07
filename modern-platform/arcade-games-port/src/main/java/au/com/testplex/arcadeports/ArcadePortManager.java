@@ -6595,6 +6595,13 @@ public final class ArcadePortManager implements Listener {
     private void recordGladiatorsWinnerAchievements(Session session, Player winner) {
         GladiatorsMode mode = GladiatorsMode.fromId(session.gladiatorMode);
         UUID id = winner.getUniqueId();
+        recordGladiatorsModeWin(winner, mode);
+        if (GladiatorsAchievementRules.qualifiesFullArsenalTournament(
+                mode == GladiatorsMode.NORMAL,
+                session.gladiatorFullArsenalDuelsFought.getOrDefault(id, 0),
+                session.gladiatorFullArsenalIncomplete.contains(id))) {
+            awardCatalogAchievement(winner, "gladiators", "full-arsenal");
+        }
         if (session.gladiatorLosses.getOrDefault(id, 0) > 0) {
             if (session.gladiatorLostRoundOneClose.contains(id)) {
                 awardCatalogAchievement(winner, "gladiators", "silky-seconds");
@@ -6614,6 +6621,36 @@ public final class ArcadePortManager implements Listener {
         if (arrowsShot >= 3 && arrowsShot == session.gladiatorArrowsHit.getOrDefault(id, 0)) {
             incrementGladiatorsLifetimeStat(winner, "precision", 1, 1, "precision");
         }
+    }
+
+    private void recordGladiatorsModeWin(Player winner, GladiatorsMode mode) {
+        if (winner == null || mode == null || GameDebugRuntimeOverrides.isDebugSession()
+                || testPlayers.isTestPlayer(winner)) return;
+        String path = localStatsPath(winner.getUniqueId(), ArcadePortGame.GLADIATORS.id());
+        String key = "mode-wins-" + mode.id();
+        plugin.getConfig().set(path + key, plugin.getConfig().getInt(path + key, 0) + 1);
+        plugin.saveConfig();
+        Set<String> wonModes = new HashSet<>();
+        for (GladiatorsMode candidate : GladiatorsMode.values()) {
+            if (plugin.getConfig().getInt(path + "mode-wins-" + candidate.id(), 0) > 0) {
+                wonModes.add(candidate.id());
+            }
+        }
+        if (GladiatorsAchievementRules.qualifiesAllModes(wonModes)) {
+            awardCatalogAchievement(winner, "gladiators", "all-modes");
+        }
+    }
+
+    private void recordGladiatorToolHit(Session session, Player attacker, Player target, int hitType) {
+        if (session == null || attacker == null || target == null || hitType == 0) return;
+        session.gladiatorBoutToolHits.merge(attacker.getUniqueId(), hitType,
+                GladiatorsAchievementRules::addHit);
+    }
+
+    private boolean isGladiatorTimedCritical(Player attacker) {
+        return GladiatorsAchievementRules.isTimedCritical(attacker.isOnGround(),
+                attacker.getFallDistance(), attacker.getVelocity().getY(), attacker.isInWater(),
+                attacker.hasPotionEffect(PotionEffectType.BLINDNESS), attacker.isInsideVehicle());
     }
 
     private void incrementGladiatorsLifetimeStat(Player player, String stat, int amount,
@@ -7277,8 +7314,6 @@ public final class ArcadePortManager implements Listener {
 
         session.gladiatorRoundDamageTaken.remove(firstId);
         session.gladiatorRoundDamageTaken.remove(secondId);
-        session.gladiatorLethalMargin.remove(firstId);
-        session.gladiatorLethalMargin.remove(secondId);
         session.gladiatorBoutArrowsUsed.remove(firstId);
         session.gladiatorBoutArrowsUsed.remove(secondId);
         session.gladiatorBoutPotionsUsed.remove(firstId);
@@ -7358,6 +7393,11 @@ public final class ArcadePortManager implements Listener {
         session.gladiatorFightStartsAtByPair.put(pair, fightStartsAt);
         session.gladiatorNextPoisonAtByPair.put(pair,
                 fightStartsAt + GameDebugRuntimeOverrides.longValue("GLADIATOR_POISON_DELAY_MILLIS", ArcadePortRules.GLADIATOR_POISON_DELAY_MILLIS));
+        for (UUID fighterId : List.of(firstId, secondId)) {
+            session.gladiatorFullArsenalDuelsFought.merge(fighterId, 1, Integer::sum);
+            session.gladiatorBoutToolHits.remove(fighterId);
+            session.gladiatorBoutTimedCritStreak.remove(fighterId);
+        }
 
         Player[] fighters = {first, second};
         for (int i = 0; i < fighters.length; i++) {
@@ -19324,10 +19364,30 @@ public final class ArcadePortManager implements Listener {
                 targetPair == null ? -2 : targetPair,
                 attackerPair != null && session.gladiatorResolvedPairs.contains(attackerPair))) return;
         if (target.getNoDamageTicks() > 0) return;
+        if (projectile) {
+            recordGladiatorToolHit(session, attacker, target, GladiatorsAchievementRules.BOW_HIT);
+            session.gladiatorBoutTimedCritStreak.remove(attackerId);
+        } else {
+            ItemStack held = attacker.getInventory().getItemInMainHand();
+            boolean swordHit = held != null && held.getType().name().endsWith("_SWORD");
+            if (swordHit) {
+                recordGladiatorToolHit(session, attacker, target, GladiatorsAchievementRules.SWORD_HIT);
+                if (GladiatorsMode.MODERN.id().equals(session.gladiatorMode)) {
+                    boolean timedCritical = isGladiatorTimedCritical(attacker);
+                    int streak = GladiatorsAchievementRules.nextTimedCriticalStreak(
+                            session.gladiatorBoutTimedCritStreak.getOrDefault(attackerId, 0),
+                            timedCritical, false);
+                    if (streak == 0) session.gladiatorBoutTimedCritStreak.remove(attackerId);
+                    else session.gladiatorBoutTimedCritStreak.put(attackerId, streak);
+                }
+            } else {
+                session.gladiatorBoutTimedCritStreak.remove(attackerId);
+            }
+        }
+        session.gladiatorBoutTimedCritStreak.remove(targetId);
         target.setNoDamageTicks(ArcadePortRules.gladiatorsNoDamageTicks(projectile));
         session.gladiatorRoundDamageTaken.merge(targetId, damage, Double::sum);
         if (target.getHealth() <= damage) {
-            session.gladiatorLethalMargin.put(targetId, target.getHealth() - damage);
             target.getWorld().playSound(target.getLocation(),
                     projectile ? Sound.ENTITY_ARROW_HIT_PLAYER : Sound.ENTITY_PLAYER_ATTACK_STRONG,
                     0.9F, 0.9F);
@@ -19361,7 +19421,6 @@ public final class ArcadePortManager implements Listener {
         target.setNoDamageTicks(ArcadePortRules.gladiatorsEnvironmentalNoDamageTicks());
         if (target.getHealth() <= damage) {
             session.gladiatorRoundDamageTaken.merge(target.getUniqueId(), damage, Double::sum);
-            session.gladiatorLethalMargin.put(target.getUniqueId(), target.getHealth() - damage);
             eliminate(session, target, null, reason);
             return;
         }
@@ -19392,8 +19451,30 @@ public final class ArcadePortManager implements Listener {
         boolean creditedPlayerKill = killer != null && killer.isOnline()
                 && killer.getUniqueId().equals(opponentId);
         if (!creditedPlayerKill) killer = opponent;
+        String normalizedReason = reason == null ? "" : reason.toLowerCase(java.util.Locale.ROOT);
+        boolean forfeit = normalizedReason.contains("disconnect") || normalizedReason.contains("quit")
+                || normalizedReason.contains("forfeit") || normalizedReason.contains("left the game");
+        if (opponentId != null) {
+            if (!GladiatorsAchievementRules.hasFullArsenal(
+                    session.gladiatorBoutToolHits.getOrDefault(victimId, 0))) {
+                session.gladiatorFullArsenalIncomplete.add(victimId);
+            }
+            if (!GladiatorsAchievementRules.hasFullArsenal(
+                    session.gladiatorBoutToolHits.getOrDefault(opponentId, 0))) {
+                session.gladiatorFullArsenalIncomplete.add(opponentId);
+            }
+        }
         if (killer != null && opponent != null) {
             UUID winnerId = killer.getUniqueId();
+            if (GladiatorsAchievementRules.qualifiesUntouchableDuelWin(true,
+                    session.gladiatorRoundDamageTaken.getOrDefault(winnerId, 0.0D), forfeit)) {
+                incrementGladiatorsLifetimeStat(killer, "untouchable", 1, 10, "untouchable");
+            }
+            if (!forfeit && GladiatorsAchievementRules.qualifiesBladeProtocol(
+                    GladiatorsMode.MODERN.id().equals(session.gladiatorMode), true,
+                    session.gladiatorBoutTimedCritStreak.getOrDefault(winnerId, 0))) {
+                awardCatalogAchievement(killer, "gladiators", "blade-protocol");
+            }
             GladiatorsMode mode = GladiatorsMode.fromId(session.gladiatorMode);
             if (mode == null) mode = GladiatorsMode.RODLESS;
             boolean exhaustedResources = switch (mode) {
@@ -19452,6 +19533,12 @@ public final class ArcadePortManager implements Listener {
 
         Integer bracketMatchId = session.gladiatorBracketMatchByPair.remove(pair);
         if (bracketMatchId != null && session.gladiatorBracket != null) {
+            GladiatorsBracket.MatchView completedMatch = session.gladiatorBracket.match(bracketMatchId);
+            if (killer != null && completedMatch != null
+                    && GladiatorsAchievementRules.qualifiesSecondWind(
+                            completedMatch.bracket() == GladiatorsBracket.Bracket.GRAND_FINAL_RESET)) {
+                awardCatalogAchievement(killer, "gladiators", "second-wind");
+            }
             session.gladiatorBracket.complete(bracketMatchId, killer.getUniqueId());
         }
         session.gladiatorResolvedPairs.add(pair);
@@ -19486,14 +19573,13 @@ public final class ArcadePortManager implements Listener {
 
         int losses = session.gladiatorLosses.merge(victimId, 1, Integer::sum);
         if (bracket == GLADIATOR_BRACKET_WINNERS && losses == 1) {
-            if (session.gladiatorLethalMargin.getOrDefault(victimId, Double.POSITIVE_INFINITY) <= 1.0D) {
+            if (killer != null && GladiatorsAchievementRules.qualifiesSilkySecondsLoss(killer.getHealth(), forfeit)) {
                 session.gladiatorLostRoundOneClose.add(victimId);
             }
             if (session.gladiatorRoundDamageTaken.getOrDefault(victimId, 0.0D) >= 10.0D) {
                 session.gladiatorLostRoundOneAfterTenDamage.add(victimId);
             }
         }
-        session.gladiatorLethalMargin.remove(victimId);
         session.gladiatorRoundDamageTaken.remove(victimId);
         victim.leaveVehicle();
         victim.setGameMode(GameMode.SPECTATOR);
@@ -19561,8 +19647,12 @@ public final class ArcadePortManager implements Listener {
                     break;
                 }
             }
+            session.gladiatorFullArsenalIncomplete.add(id);
+            if (opponentId != null) session.gladiatorFullArsenalIncomplete.add(opponentId);
             session.gladiatorResolvedPairs.add(pair);
             Integer bracketMatchId = session.gladiatorBracketMatchByPair.remove(pair);
+            GladiatorsBracket.MatchView forfeitedMatch = bracketMatchId == null || session.gladiatorBracket == null
+                    ? null : session.gladiatorBracket.match(bracketMatchId);
             if (bracketMatchId != null && session.gladiatorBracket != null && opponentId != null) {
                 session.gladiatorBracket.forfeit(bracketMatchId, id);
                 session.gladiatorLosses.put(id, 2);
@@ -19580,6 +19670,10 @@ public final class ArcadePortManager implements Listener {
                 if (bracket == GLADIATOR_BRACKET_FINAL) {
                     UUID champion = session.gladiatorBracket == null ? opponentId : session.gladiatorBracket.champion();
                     if (champion != null) {
+                        if (forfeitedMatch != null && champion.equals(opponentId)
+                                && forfeitedMatch.bracket() == GladiatorsBracket.Bracket.GRAND_FINAL_RESET) {
+                            awardCatalogAchievement(session.players.get(opponentId), "gladiators", "second-wind");
+                        }
                         session.alive.remove(id);
                         finish(session, session.players.get(champion), true);
                         return;
@@ -26574,7 +26668,9 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         Player player = event.getPlayer();
         if (session == null || session.type != ArcadePortGame.GLADIATORS
-                || player.getWorld() != session.world || event.getState() != PlayerFishEvent.State.FISHING) return;
+                || player.getWorld() != session.world
+                || (event.getState() != PlayerFishEvent.State.FISHING
+                        && event.getState() != PlayerFishEvent.State.CAUGHT_ENTITY)) return;
         Integer pair = session.gladiatorPairs.get(player.getUniqueId());
         GladiatorsMode mode = GladiatorsMode.fromId(session.gladiatorMode);
         long fightStartsAt = pair == null ? Long.MAX_VALUE
@@ -26585,11 +26681,20 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (System.currentTimeMillis() < fightStartsAt) {
-            event.setCancelled(true);
-            player.sendMessage(ChatColor.YELLOW + "Your duel has not started yet.");
+            if (event.getState() == PlayerFishEvent.State.FISHING) {
+                event.setCancelled(true);
+                player.sendMessage(ChatColor.YELLOW + "Your duel has not started yet.");
+            }
             return;
         }
-        if (!event.isCancelled()) session.gladiatorUsedRod.add(player.getUniqueId());
+        if (event.getState() == PlayerFishEvent.State.FISHING && !event.isCancelled()) {
+            session.gladiatorUsedRod.add(player.getUniqueId());
+        } else if (event.getState() == PlayerFishEvent.State.CAUGHT_ENTITY
+                && !event.isCancelled() && event.getCaught() instanceof Player target
+                && pair.equals(session.gladiatorPairs.get(target.getUniqueId()))
+                && session.alive.contains(target.getUniqueId())) {
+            recordGladiatorToolHit(session, player, target, GladiatorsAchievementRules.ROD_HIT);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
@@ -26631,7 +26736,13 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.GLADIATORS
                 && event.getEntity() instanceof Arrow gladiatorArrow) {
             UUID archer = session.gladiatorArrowOwners.remove(gladiatorArrow.getUniqueId());
-            if (archer != null) session.gladiatorArrowsHit.merge(archer, 1, Integer::sum);
+            if (archer != null && event.getHitEntity() instanceof Player target
+                    && GladiatorsAchievementRules.countsAsPrecisionArrowHit(true,
+                            Integer.valueOf(session.gladiatorPairs.getOrDefault(archer, -1))
+                                    .equals(session.gladiatorPairs.get(target.getUniqueId())),
+                            session.alive.contains(target.getUniqueId()))) {
+                session.gladiatorArrowsHit.merge(archer, 1, Integer::sum);
+            }
             return;
         }
 
@@ -32366,7 +32477,10 @@ public final class ArcadePortManager implements Listener {
         final List<String> gladiatorScoreboardEntries = new ArrayList<>();
         long gladiatorNextScoreboardAt;
         final Map<UUID, Double> gladiatorRoundDamageTaken = new HashMap<>();
-        final Map<UUID, Double> gladiatorLethalMargin = new HashMap<>();
+        final Map<UUID, Integer> gladiatorBoutToolHits = new HashMap<>();
+        final Set<UUID> gladiatorFullArsenalIncomplete = new HashSet<>();
+        final Map<UUID, Integer> gladiatorFullArsenalDuelsFought = new HashMap<>();
+        final Map<UUID, Integer> gladiatorBoutTimedCritStreak = new HashMap<>();
         final Map<UUID, Integer> gladiatorArrowsUsed = new HashMap<>();
         final Map<UUID, Integer> gladiatorPotionsUsed = new HashMap<>();
         final Map<UUID, Integer> gladiatorBoutArrowsUsed = new HashMap<>();
