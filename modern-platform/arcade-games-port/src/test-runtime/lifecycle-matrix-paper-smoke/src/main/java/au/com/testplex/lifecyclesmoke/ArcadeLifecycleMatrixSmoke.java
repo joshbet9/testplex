@@ -162,9 +162,13 @@ public final class ArcadeLifecycleMatrixSmoke extends JavaPlugin {
     private void awaitLive() throws Exception {
         Object active = invoke(manager, "activeDebugGame", new Class<?>[0]);
         Object session = field(manager, "active");
-        boolean correctGame = currentGame.equals(active);
         boolean live = false;
-        if (correctGame) {
+        if (currentId != null && currentId.startsWith("monster-maze")) {
+            // Monster Maze is an in-process module with its own lifecycle state.
+            // The shared manager's Session is intentionally not its source of truth.
+            Object module = invoke(arcade, "getMonsterMazeModule", new Class<?>[0]);
+            live = module != null && Boolean.TRUE.equals(invoke(module, "isGameRunning", new Class<?>[0]));
+        } else if (currentGame.equals(active)) {
             if ("plexball".equals(currentId)) {
                 // Plexball owns its own Live phase after the shared manager has
                 // captured snapshots; its shared Session.liveStarted is unused.
@@ -191,6 +195,11 @@ public final class ArcadeLifecycleMatrixSmoke extends JavaPlugin {
 
     private void awaitRestoration() throws Exception {
         boolean idle = invoke(manager, "activeDebugGame", new Class<?>[0]) == null;
+        if (currentId != null && currentId.startsWith("monster-maze")) {
+            Object module = invoke(arcade, "getMonsterMazeModule", new Class<?>[0]);
+            idle = idle && (module == null || !Boolean.TRUE.equals(
+                    invoke(module, "isGameRunning", new Class<?>[0])));
+        }
         boolean restored = baselines.stream().allMatch(Baseline::restored);
         if (idle && restored) {
             addResult("PASS", "Live/stop/restore");
