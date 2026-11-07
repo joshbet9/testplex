@@ -801,7 +801,9 @@ public final class HoopsPaperSmoke extends JavaPlugin {
             String path = "local-stats." + player.getUniqueId() + ".hoops-remastered.points";
             return player.getName() + "=" + ((JavaPlugin) arcade).getConfig().getInt(path, 0);
         }).collect(java.util.stream.Collectors.joining(","));
-        boolean debugSession = au.com.testplex.arcadeports.GameDebugRuntimeOverrides.isDebugSession();
+        Class<?> debugOverrides = Class.forName("au.com.testplex.arcadeports.GameDebugRuntimeOverrides", true,
+                arcade.getClass().getClassLoader());
+        boolean debugSession = Boolean.TRUE.equals(debugOverrides.getMethod("isDebugSession").invoke(null));
         require(persistedPoints == 2,
                 "lifetime points were not persisted for " + shooterId + ": expected 2, found "
                         + persistedPoints + ", in-match=" + inMatchPoints + ", debug-session=" + debugSession
