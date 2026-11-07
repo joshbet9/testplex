@@ -38,9 +38,9 @@ The four pen markers and the sheep-spawn marker are read from this map's `WorldC
 ### Player pickup, carrying and capture
 
 - [ ] Hold the Saddle and approach a valid sheep within 2.5 blocks; it should automatically join the player's passenger stack. Repeated pickups obey the 500 ms pickup cooldown.
-- [ ] Carry at most three sheep. A fourth pickup is rejected without losing or duplicating any sheep.
+- [ ] Ordinary kits carry at most three sheep; their fourth pickup is rejected without losing or duplicating any sheep. Achievement-kit Shepherd can carry more than three with no hard count limit.
 - [ ] Each carried sheep is represented by the correct wool item in the legacy hotbar slots and by the carry-count experience/progress indicator. Stale wool icons and carry slowdown must clear when sheep are dropped or captured.
-- [ ] Carry slowdown scales by sheep count (one, two, then three); verify the fourth-count boundary cannot apply a stronger effect.
+- [ ] Ordinary-kit carry slowdown scales by sheep count (one, two, then three); verify the fourth pickup remains blocked. Shepherd starts with Slowness I for 1–2 sheep, II for 3–4, III for 5–6, and continues increasing every two sheep.
 - [ ] Carrying a sheep into the team's exact pen block deposits it, increments the team's live pen count and clears the passenger chain. Check enemy sheep steals count toward the receiving team's score.
 - [ ] Keep the eight modern Sheep Quest achievements, and restore the four source achievements: Hungry Hungry Hippo (50 wins), Thief (300 source Thief stat increments on eligible pickups), Animal Rescue (300 enemy-carrier sheep drops) and Selfish (win with more than 12 sheep).
 - [ ] Pickup and capture effects/messages and the local `Thief` / `AnimalRescue` counters are credited to the correct player. Verify `Selfish` requires strictly more than 12 sheep.
@@ -49,6 +49,10 @@ The four pen markers and the sheep-spawn marker are read from this map's `WorldC
 
 - [ ] Switching hotbar slots, dying or dropping the held item releases the passenger stack; death also ejects any passenger player. The wool display, experience bar and slowdown reset without leaving orphaned passengers.
 - [ ] Damage to a player carrying sheep passes through the passenger chain to the carrier. A qualifying melee, projectile or custom hit drops the sheep and credits the opponent's animal-rescue event once.
+- [ ] Standard melee combat uses **1.8 base damage**, not a universal four-damage hit: Wooden Sword 4, Iron Axe 5, Iron Sword 6 HP. Falling criticals multiply sword/axe damage by 1.5; attack cooldown does not lower the legacy damage. The source leather-armour defence reduces incoming damage by 28%.
+- [ ] Archer arrows scale with impact speed (full-speed unmodified hit: six raw damage), with a legacy bounded critical bonus; barrage arrows use the same hit calculation. A valid lethal arrow still counts for Archer's achievement, and no hit is applied twice by the native event and projectile callback.
+- [ ] Shepherd's new unenchanted Wooden Spear has a three-damage base jab, the vanilla minimum-range drawback, and a charge capped at five raw damage (less than Brute's six-damage Iron Sword). Check hits at minimum/maximum range, low/high movement speed, and multi-target jabs; none may bypass friendly-fire protection or accidentally award multiple rescues for one victim.
+- [ ] The `SHEEP_QUEST_PLAYER_HIT_DAMAGE` debug-only override can still force fixed effective hit damage during authorised tests without affecting ordinary matches.
 - [ ] Suffocation damage is cancelled as in the source game. Normal combat remains active; hit, death, respawn and team-protection handling must follow the shared team lifecycle.
 - [ ] **Brute / Thrower:** right-click a living teammate to pick them up; dropping the held item throws the carried sheep or player with source launch velocity. A thrown player collision deals six damage and applies the source bounce/knockback; spectators and invalid targets are ignored.
 - [ ] The Brute's throw action must not be intercepted by the ordinary carrier-drop handler. A thrown sheep/player must not remain attached to the thrower or another entity after collision, chunk unload or round end.
@@ -58,6 +62,7 @@ The four pen markers and the sheep-spawn marker are read from this map's `WorldC
 - [ ] **Beserker** (preserve the source spelling/aliases): iron axe and Saddle; Double Jump uses 1.2 horizontal and vertical strength with an eight-second cooldown.
 - [ ] **Archer:** wooden sword, bow and Saddle; Fletcher replenishes arrows at the source two-second cadence up to five, and Barrage charges five arrows with a one-second initial delay, 250 ms charge cadence and 50 ms volley cadence.
 - [ ] **Brute:** iron sword and Saddle; Thrower supports teammate pickup and the drop-to-throw interaction above. Kit selection is available from the common kit station and `/arcadeport kit sheep-quest-<kit>`; kit changes cannot duplicate carried sheep or bypass ability cooldowns.
+- [ ] **Shepherd (Cheeky achievement):** Wooden Spear, Saddle and shears; unlimited sheep carrying with escalating Slowness. Switching from the Saddle to the spear must drop the carried stack before the attack, just like switching to any other hotbar slot. The lobby kit icon and NPC-held item show the spear.
 - [ ] Confirm kit gear and Saddle remain available after legitimate respawns and do not leak into the lobby.
 
 ### Scoring, timer and tie resolution

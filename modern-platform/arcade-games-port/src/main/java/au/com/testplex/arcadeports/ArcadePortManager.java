@@ -9163,7 +9163,7 @@ public final class ArcadePortManager implements Listener {
                         "Hold to pick up sheep and teammates. Drop an item to throw your passenger."));
             }
             case "shepherd" -> {
-                player.getInventory().setItem(0, new ItemStack(Material.WOODEN_SWORD));
+                player.getInventory().setItem(0, new ItemStack(Material.WOODEN_SPEAR));
                 player.getInventory().setItem(1, namedItem(Material.SADDLE, "Herding Saddle",
                         "Carry unlimited sheep. Slowness increases every two sheep."));
                 player.getInventory().setItem(2, new ItemStack(Material.SHEARS));
@@ -19665,6 +19665,17 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void handlePlayerHit(Session session, Player attacker, Player target, String source, int paintballAmount) {
+        handlePlayerHit(session, attacker, target, source, paintballAmount, Double.NaN);
+    }
+
+    private boolean sheepQuestCriticalMeleeHit(Player attacker) {
+        return attacker.getFallDistance() > 0.0F && !attacker.isOnGround()
+                && !attacker.isSprinting() && !attacker.isInsideVehicle()
+                && !attacker.isInWater() && !attacker.hasPotionEffect(PotionEffectType.BLINDNESS);
+    }
+
+    private void handlePlayerHit(Session session, Player attacker, Player target, String source,
+            int paintballAmount, double sourceDamage) {
         if (active != session || attacker.equals(target) || !session.alive.contains(attacker.getUniqueId())
                 || !session.alive.contains(target.getUniqueId())) return;
         if (session.type == ArcadePortGame.GLADIATORS
@@ -19818,7 +19829,21 @@ public final class ArcadePortManager implements Listener {
                 }
                 break;
             }
-            case SHEEP_QUEST:
+            case SHEEP_QUEST: {
+                double rawSheepQuestDamage = "sheep archer arrow".equals(source)
+                        ? (Double.isFinite(sourceDamage) ? Math.max(0.0D, sourceDamage) : 0.0D)
+                        : ArcadePortRules.sheepQuestLegacyMeleeDamage(
+                                attacker.getInventory().getItemInMainHand().getType().name(),
+                                sheepQuestCriticalMeleeHit(attacker), sourceDamage);
+                var sheepQuestArmour = target.getAttribute(Attribute.ARMOR);
+                double sheepQuestDamage = ArcadePortRules.sheepQuestLegacyDamageAfterArmour(
+                        rawSheepQuestDamage, sheepQuestArmour == null ? 0.0D : sheepQuestArmour.getValue());
+                // Existing debug profiles can still deliberately force a fixed effective hit.
+                double sheepQuestDebugDamage = GameDebugRuntimeOverrides.doubleValue(
+                        "SHEEP_QUEST_PLAYER_HIT_DAMAGE", Double.NaN);
+                if (Double.isFinite(sheepQuestDebugDamage) && sheepQuestDebugDamage >= 0.0D) {
+                    sheepQuestDamage = sheepQuestDebugDamage;
+                }
                 session.sheepQuestAttackersByVictim.computeIfAbsent(target.getUniqueId(),
                         ignored -> new HashSet<>()).add(attacker.getUniqueId());
                 if ("sheep archer arrow".equals(source)
@@ -19827,7 +19852,7 @@ public final class ArcadePortManager implements Listener {
                                 session.teams.getOrDefault(target.getUniqueId(), -1))
                         && ArcadePortRules.sheepQuestMovementCreditIsRecent(System.currentTimeMillis(),
                                 session.sheepQuestLastMoveAt.getOrDefault(target.getUniqueId(), 0L))
-                        && target.getHealth() <= GameDebugRuntimeOverrides.doubleValue("SHEEP_QUEST_PLAYER_HIT_DAMAGE", ArcadePortRules.SHEEP_QUEST_PLAYER_HIT_DAMAGE)) {
+                        && target.getHealth() <= sheepQuestDamage) {
                     Map<UUID, Integer> targets = session.sheepQuestArcherKills.computeIfAbsent(
                             attacker.getUniqueId(), ignored -> new HashMap<>());
                     if (ArcadePortRules.sheepQuestArcherAchievementReached(
@@ -19842,7 +19867,6 @@ public final class ArcadePortManager implements Listener {
                     recordSheepQuestStat(attacker.getUniqueId(), "animal-rescue");
                 }
                 dropSheepFromCarrier(session, target, "was hit");
-                double sheepQuestDamage = GameDebugRuntimeOverrides.doubleValue("SHEEP_QUEST_PLAYER_HIT_DAMAGE", ArcadePortRules.SHEEP_QUEST_PLAYER_HIT_DAMAGE);
                 if (target.getHealth() <= sheepQuestDamage) {
                     eliminate(session, target, attacker, "was defeated while carrying sheep");
                 } else {
@@ -19851,6 +19875,7 @@ public final class ArcadePortManager implements Listener {
                     target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
                 }
                 break;
+            }
             case ONE_IN_THE_QUIVER:
                 if ("arrow hit".equals(source)) scoreQuiverKill(session, attacker, target);
                 else handleQuiverMeleeHit(session, attacker, target);
@@ -20259,9 +20284,14 @@ public final class ArcadePortManager implements Listener {
             session.entities.remove(projectile);
             projectile.remove();
         } else if (session.type == ArcadePortGame.SHEEP_QUEST
-                && projectile instanceof Arrow
+                && projectile instanceof Arrow arrow
                 && session.sheepArcherTrackedArrows.remove(projectile.getUniqueId())) {
-            handlePlayerHit(session, shooter, target, "sheep archer arrow");
+            double speed = arrow.getVelocity().length();
+            int baseDamage = (int) Math.ceil(speed * 2.0D);
+            int bonus = arrow.isCritical() && baseDamage > 0
+                    ? ThreadLocalRandom.current().nextInt(baseDamage / 2 + 2) : 0;
+            handlePlayerHit(session, shooter, target, "sheep archer arrow", 1,
+                    ArcadePortRules.sheepQuestLegacyArrowDamage(speed, bonus));
             session.entities.remove(projectile);
             projectile.remove();
         } else if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER) {
@@ -25434,7 +25464,13 @@ public final class ArcadePortManager implements Listener {
                     session.deathTagProjectileDamage.put(projectile.getUniqueId(), incomingDamage);
                 }
                 if (damager instanceof Player attacker) {
-                    handlePlayerHit(session, attacker, target, "melee");
+                    if (session.type == ArcadePortGame.SHEEP_QUEST) {
+                        // Use native damage only for the 26.3 spear's charge strength.
+                        // All legacy axes and swords use their 1.8 values instead.
+                        handlePlayerHit(session, attacker, target, "melee", 1, event.getDamage());
+                    } else {
+                        handlePlayerHit(session, attacker, target, "melee");
+                    }
                 } else if (session.type == ArcadePortGame.DEATH_TAG && damager instanceof Zombie zombie
                         && session.entities.contains(zombie)) {
                     if (session.participantsAtStart <= 1) {
