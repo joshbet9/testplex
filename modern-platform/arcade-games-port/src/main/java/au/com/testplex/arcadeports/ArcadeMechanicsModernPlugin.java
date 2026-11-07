@@ -27,10 +27,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     // Includes shared catalogue games plus dedicated standalone test queues.
     private static final java.util.List<String> READY_FOR_TEST_GAME_IDS = java.util.List.of(
             "death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl",
-            "castle-assault", "gladiators", "micro-battles", "milk-the-cow", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "runner", "sheep-quest", "turf-wars", "camera-shy",
+            "castle-assault", "gladiators", "micro-battles", "milk-the-cow", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "evolution", "runner", "sheep-quest", "turf-wars", "camera-shy",
             "monster-maze", "monster-maze-speed", "monster-maze-modern", "snake", "draw-my-thing", "master-builders",
             "skywars", "wither-assault", "sneaky-assassins", "speed-builders", "heroes-of-gwen", "hoops-remastered", "wizards");
-    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-31-selectable-ids-20261102-v14";
+    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-32-selectable-ids-20261107-v15";
 
     @Override
     public void onEnable() {
