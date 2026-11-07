@@ -67,7 +67,7 @@ public final class HoopsPaperSmoke extends JavaPlugin {
     private UUID passPasserId;
     private UUID passReceiverId;
     private UUID firstShooterId;
-    private int expectedCareerPointsBeforeMatch;
+    private final Map<UUID, Integer> expectedCareerPointsBeforeMatch = new HashMap<>();
     private UUID blockerId;
     private int firstScoringTeam = -1;
     private int stage;
@@ -145,6 +145,9 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         for (int i = 0; i < players.size(); i++) {
             Player player = players.get(i);
             seedBaselineProfile(player, i);
+            String careerPath = "local-stats." + player.getUniqueId() + ".hoops-remastered.points";
+            expectedCareerPointsBeforeMatch.put(player.getUniqueId(),
+                    ((JavaPlugin) arcade).getConfig().getInt(careerPath, 0));
             baselines.put(player.getUniqueId(), Baseline.capture(player));
         }
         queueAndStart();
@@ -435,8 +438,9 @@ public final class HoopsPaperSmoke extends JavaPlugin {
             }).findFirst().orElseThrow();
             long firstPointsTier = ((long[]) method(pointsMilestone.getClass(), "stages")
                     .invoke(pointsMilestone))[0];
-            expectedCareerPointsBeforeMatch = Math.toIntExact(firstPointsTier);
-            arcadePlugin.getConfig().set(prefix + "points", expectedCareerPointsBeforeMatch);
+            int seededCareerPoints = Math.toIntExact(firstPointsTier);
+            expectedCareerPointsBeforeMatch.put(owner.getUniqueId(), seededCareerPoints);
+            arcadePlugin.getConfig().set(prefix + "points", seededCareerPoints);
             require(unlockChatCount() == 1, "midgame milestone tier did not announce in chat");
             require(unlockChatCount() == 0, "midgame notifications repeated without new progress");
             midgameUnlockChatChecked = true;
@@ -808,9 +812,10 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         boolean debugSession = Boolean.TRUE.equals(debugOverrides.getMethod("isDebugSession").invoke(null));
         require(inMatchPoints == 2,
                 "Hoops match points incorrect for " + shooterId + ": expected 2, found " + inMatchPoints);
-        require(persistedPoints == expectedCareerPointsBeforeMatch + 2,
+        int shooterPointsBeforeMatch = expectedCareerPointsBeforeMatch.getOrDefault(shooterId, 0);
+        require(persistedPoints == shooterPointsBeforeMatch + 2,
                 "lifetime points delta was not persisted for " + shooterId + ": baseline "
-                        + expectedCareerPointsBeforeMatch + " + 2, found "
+                        + shooterPointsBeforeMatch + " + 2, found "
                         + persistedPoints + ", in-match=" + inMatchPoints + ", debug-session=" + debugSession
                         + ", all-player-points={" + pointsByPlayer + "}");
         require(scores[winningTeam] >= 21, "final score did not reach 21");
