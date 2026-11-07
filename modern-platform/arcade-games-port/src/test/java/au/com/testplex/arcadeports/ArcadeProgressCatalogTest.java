@@ -267,6 +267,11 @@ class ArcadeProgressCatalogTest {
         assertTrue(hasAchievement("wizards", "trifecta", "Trifecta"));
         assertTrue(hasAchievement("wither-assault", "savior", "Savior"));
         assertTrue(hasAchievement("hoops-remastered", "quintuple-double", "Quintuple Double"));
+        assertTrue(hasAchievement("hoops-remastered", "skywalker", "Skywalker"));
+        assertTrue(hasAchievement("hoops-remastered", "alley-oop", "Alley-Oop"));
+        assertTrue(hasAchievement("hoops-remastered", "pickpockets-payback", "Pickpocket’s Payback"));
+        assertTrue(hasAchievement("hoops-remastered", "swat-team", "Swat Team"));
+        assertTrue(hasAchievement("hoops-remastered", "logo-launcher", "Logo Launcher"));
         assertTrue(hasAchievement("milk-the-cow", "got-the-chops", "Got the Chops"));
         assertTrue(hasAchievement("draw-my-thing", "for-the-people", "For the people"));
         assertTrue(hasAchievement("master-builders", "architect", "Architect"));
