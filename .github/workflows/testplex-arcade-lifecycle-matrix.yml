@@ -1,0 +1,71 @@
+name: Testplex all-game lifecycle matrix (opt-in)
+
+on:
+  workflow_dispatch:
+  # Run automatically only when the smoke harness itself is being reviewed.
+  # Other PRs keep the existing, faster unit + Hoops + Wizards acceptance gate.
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/testplex-arcade-lifecycle-matrix.yml"
+      - "modern-platform/arcade-games-port/scripts/run-lifecycle-matrix-paper-smoke.sh"
+      - "modern-platform/arcade-games-port/src/test-runtime/lifecycle-matrix-paper-smoke/**"
+
+permissions:
+  contents: read
+
+jobs:
+  lifecycle-matrix:
+    name: Four-client enabled-game lifecycle matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+          cache-dependency-path: |
+            modern-platform/pom.xml
+            modern-platform/arcade-games-port/pom.xml
+            modern-platform/arcade-games-port/src/test-runtime/lifecycle-matrix-paper-smoke/pom.xml
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install pinned protocol client
+        run: npm install --prefix "$RUNNER_TEMP/lifecycle-protocol" --no-save --no-package-lock --ignore-scripts --no-audit --no-fund "@wp2508/minecraft-protocol@1.69.6"
+
+      - name: Build Arcade plugin and run fast mechanics tests
+        run: mvn --batch-mode --no-transfer-progress -f modern-platform/arcade-games-port/pom.xml clean verify
+
+      - name: Build disposable lifecycle test plugin
+        run: mvn --batch-mode --no-transfer-progress -f modern-platform/arcade-games-port/src/test-runtime/lifecycle-matrix-paper-smoke/pom.xml clean package
+
+      - name: Run one-server all-enabled-game lifecycle matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash modern-platform/arcade-games-port/scripts/run-lifecycle-matrix-paper-smoke.sh \
+            modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar \
+            modern-platform/arcade-games-port/src/test-runtime/lifecycle-matrix-paper-smoke/target/ArcadeLifecycleMatrixSmoke.jar \
+            "$RUNNER_TEMP/arcade-lifecycle-matrix" \
+            "$RUNNER_TEMP/lifecycle-protocol/node_modules"
+
+      - name: Upload per-game results and Paper logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arcade-lifecycle-matrix-paper-26.3
+          path: |
+            ${{ runner.temp }}/arcade-lifecycle-matrix/plugins/ArcadeLifecycleMatrixSmoke/results.tsv
+            ${{ runner.temp }}/arcade-lifecycle-matrix/server.log
+            ${{ runner.temp }}/arcade-lifecycle-matrix/client-bots.log
+          if-no-files-found: ignore
+          retention-days: 14
