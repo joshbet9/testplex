@@ -1966,6 +1966,12 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         temporaryBlocks.remove(event.getBlock().getLocation());
     }
 
+    // Keep the original signature available for the Paper smoke harness and older callers.
+    private void castSpell(Player player, WizardState state, WizardsSpell spell, Entity target,
+                           Block clickedBlock) {
+        castSpell(player, state, spell, target, clickedBlock, -1);
+    }
+
     private void castSpell(Player player, WizardState state, WizardsSpell spell, Entity target,
                            Block clickedBlock, int wandSlot) {
         if (!plugin.isArcadeDebugFeatureEnabled(player,
