@@ -273,7 +273,7 @@ class ArcadeProgressCatalogTest {
         assertTrue(hasAchievement("hoops-remastered", "swat-team", "Swat Team"));
         assertTrue(hasAchievement("hoops-remastered", "logo-launcher", "Logo Launcher"));
         assertTrue(hasAchievement("milk-the-cow", "got-the-chops", "Got the Chops"));
-        assertTrue(hasAchievement("draw-my-thing", "for-the-people", "For the people"));
+        assertTrue(hasAchievement("draw-my-thing", "for-the-people", "For the People"));
         assertTrue(hasAchievement("master-builders", "architect", "Architect"));
         assertEquals(14, ArcadeProgressCatalog.achievements("master-builders").size());
         for (String achievement : List.of("block-party", "minimalist-masterpiece", "second-draft",
@@ -287,6 +287,22 @@ class ArcadeProgressCatalogTest {
         assertTrue(hasAchievement("skywars", "death-bomber", "Death Bomber"));
         assertTrue(hasAchievement("skywars", "no-chest", "No Chest"));
         assertTrue(hasAchievement("skywars", "no-armor", "No Armor"));
+    }
+
+    @Test
+    void drawMyThingHasTheApprovedFourteenAchievements() {
+        Set<String> ids = ArcadeProgressCatalog.achievements("draw-my-thing").stream()
+                .map(ArcadeProgressCatalog.Achievement::id)
+                .collect(java.util.stream.Collectors.toSet());
+        assertEquals(14, ids.size());
+        assertEquals(Set.of("pixel-linguist", "why-cant-we-have-nice-things", "doubted-but-not-in-doubt",
+                "triple-threat", "for-the-people", "minimalist-masterpiece", "spray-and-pray",
+                "line-in-the-sand", "perfectly-round", "clean-slate", "last-second-sketch", "two-hats",
+                "read-between-the-lines", "third-times-the-charm"), ids);
+        assertFalse(ids.contains("art-hipster"));
+        assertFalse(ids.contains("mr-squiggle"));
+        assertFalse(ids.contains("keen-eye"));
+        assertFalse(ids.contains("pure-luck"));
     }
 
     @Test

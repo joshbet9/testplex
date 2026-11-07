@@ -12543,7 +12543,10 @@ public final class ArcadePortManager implements Listener {
         resetDrawCanvas(session);
         session.drawCurrentDrawer=drawer.getUniqueId();
         session.drawWord=chooseDrawWord(session);
-        session.drawCorrectGuessers.clear();session.drawGuessAttempts.clear();session.drawRevealedLetters.clear();
+        session.drawCorrectGuessers.clear();session.drawHumanCorrectGuessers.clear();
+        session.drawGuessAttempts.clear();session.drawRevealedLetters.clear();
+        session.drawToolQualifications.clear();session.drawCleanSlateReady=false;
+        session.drawPaintedBlocksAtFirstGuess=-1;
         session.drawLastGuessAt.clear();
         session.drawRoundStartedAt=now;session.drawRoundEndsAt=now+session.drawRoundDurationMillis;session.drawNextRoundAt=0L;
         session.drawStartedPainting = false;
@@ -12584,14 +12587,18 @@ public final class ArcadePortManager implements Listener {
         // Disconnected guessers no longer block the all-guessed award.
         List<UUID> eligibleGuessers = session.players.keySet().stream()
                 .filter(id -> !id.equals(drawerId))
+                .filter(id -> !testPlayers.isTestPlayer(id))
                 .filter(id -> {
                     Player guesser = session.players.get(id);
                     return guesser != null && guesser.isOnline();
                 }).toList();
         if (!eligibleGuessers.isEmpty()
-                && session.drawCorrectGuessers.containsAll(eligibleGuessers)
-                && drawer != null && drawer.isOnline()) {
-            awardCatalogAchievement(drawer, "draw-my-thing", "for-the-people");
+                && session.drawCorrectGuessers.containsAll(eligibleGuessers)) {
+            awardCatalogAchievement(drawerId, "draw-my-thing", "for-the-people");
+        }
+        if (DrawMyThingAchievementRules.minimalistMasterpiece(
+                        session.drawPaintedBlocksAtFirstGuess, session.drawHumanCorrectGuessers.size())) {
+            awardCatalogAchievement(drawerId, "draw-my-thing", "minimalist-masterpiece");
         }
         for (UUID guesserId : eligibleGuessers) {
             int attempts = session.drawGuessAttempts.getOrDefault(guesserId, 0);
@@ -12702,7 +12709,39 @@ public final class ArcadePortManager implements Listener {
         if(guess.equals(answer)){
             boolean first=session.drawCorrectGuessers.isEmpty();
             session.drawCorrectGuessers.add(playerId);
-            session.scores.merge(playerId, ArcadePortRules.drawMyThingGuesserPoints(first), Integer::sum);
+            int guesserPoints = ArcadePortRules.drawMyThingGuesserPoints(first);
+            session.scores.merge(playerId, guesserPoints, Integer::sum);
+            session.drawGuesserPoints.merge(playerId, guesserPoints, Integer::sum);
+            boolean humanGuesser = !testPlayers.isTestPlayer(playerId);
+            if (humanGuesser) session.drawHumanCorrectGuessers.add(playerId);
+            if (first) session.drawPaintedBlocksAtFirstGuess = countDrawPaintedBlocks(session);
+            if (humanGuesser) {
+                long remaining = session.drawRoundEndsAt - now;
+                int totalLetters = (int) session.drawWord.chars().filter(ch -> ch != ' ').count();
+                if (DrawMyThingAchievementRules.lastSecondSketch(remaining)) {
+                    awardCatalogAchievement(player, "draw-my-thing", "last-second-sketch");
+                }
+                if (DrawMyThingAchievementRules.readBetweenTheLines(first, session.drawRevealedLetters.size())) {
+                    awardCatalogAchievement(player, "draw-my-thing", "read-between-the-lines");
+                }
+                if (DrawMyThingAchievementRules.thirdTimesTheCharm(used + 1,
+                        session.drawRevealedLetters.size(), totalLetters)) {
+                    awardCatalogAchievement(player, "draw-my-thing", "third-times-the-charm");
+                }
+                UUID drawerForAward = session.drawCurrentDrawer;
+                if (session.drawToolQualifications.contains("spray-and-pray")) {
+                    awardCatalogAchievement(drawerForAward, "draw-my-thing", "spray-and-pray");
+                }
+                if (session.drawToolQualifications.contains("line-in-the-sand")) {
+                    awardCatalogAchievement(drawerForAward, "draw-my-thing", "line-in-the-sand");
+                }
+                if (session.drawToolQualifications.contains("perfectly-round")) {
+                    awardCatalogAchievement(drawerForAward, "draw-my-thing", "perfectly-round");
+                }
+                if (session.drawCleanSlateReady && countDrawPaintedBlocks(session) >= 8) {
+                    awardCatalogAchievement(drawerForAward, "draw-my-thing", "clean-slate");
+                }
+            }
             if (GameDebugRuntimeOverrides.booleanValue("sound-feedback", true)) {
                 player.playSound(player.getLocation(), first ? Sound.ENTITY_PLAYER_LEVELUP
                         : Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8F, first ? 1.15F : 1.35F);
@@ -12754,8 +12793,11 @@ public final class ArcadePortManager implements Listener {
                     session.drawFastGuessRounds++;
                 }
                 Player d=session.players.get(session.drawCurrentDrawer);
-                if(d!=null&&d.isOnline())session.scores.merge(d.getUniqueId(),
-                        ArcadePortRules.drawMyThingDrawerFirstGuessPoints(),Integer::sum);
+                if(d!=null&&d.isOnline()) {
+                    int drawerPoints = ArcadePortRules.drawMyThingDrawerFirstGuessPoints();
+                    session.scores.merge(d.getUniqueId(), drawerPoints, Integer::sum);
+                    session.drawDrawerPoints.merge(d.getUniqueId(), drawerPoints, Integer::sum);
+                }
             } else {
                 session.drawFirstGuessStreaks.put(playerId, 0);
             }
@@ -12904,6 +12946,10 @@ public final class ArcadePortManager implements Listener {
         }
         UUID id = player.getUniqueId();
         Material colour = session.drawBrushColours.getOrDefault(id, Material.BLACK_WOOL);
+        Map<Block, Material> beforeTool = snapshotDrawCanvas(session);
+        if ("Clear Canvas".equals(tool) && countDrawPaintedBlocks(session) >= 8) {
+            session.drawCleanSlateReady = true;
+        }
         switch (tool) {
             case "Pencil" -> paintDrawBlock(session, player, target, false);
             case "Paint Brush" -> paintDrawBlock(session, player, target, true);
@@ -12954,6 +13000,7 @@ public final class ArcadePortManager implements Listener {
             }
             default -> { return; }
         }
+        recordDrawToolQualification(session, tool, beforeTool);
         if (!"Clear Canvas".equals(tool) && !"Paint Bucket".equals(tool)) {
             playDrawMyThingSound(session, Sound.BLOCK_FIRE_EXTINGUISH, 0.2F, 2.0F);
         }
@@ -12983,6 +13030,37 @@ public final class ArcadePortManager implements Listener {
 
     private void markDrawPainted(Session session) {
         session.drawStartedPainting = true;
+    }
+
+    private Map<Block, Material> snapshotDrawCanvas(Session session) {
+        Map<Block, Material> snapshot = new HashMap<>();
+        for (Block block : session.drawCanvasBlocks) snapshot.put(block, block.getType());
+        return snapshot;
+    }
+
+    private int countDrawPaintedBlocks(Session session) {
+        int count = 0;
+        for (Block block : session.drawCanvasBlocks) {
+            if (DrawMyThingAchievementRules.isPaintedBlock(block.getType())) count++;
+        }
+        return count;
+    }
+
+    private void recordDrawToolQualification(Session session, String tool, Map<Block, Material> before) {
+        Map<Block, Material> after = new HashMap<>();
+        for (Block block : session.drawCanvasBlocks) {
+            after.put(block, block.getType());
+        }
+        int changed = DrawMyThingAchievementRules.countChangedBlocks(before, after);
+        if (DrawMyThingAchievementRules.qualifiesToolUse(tool, changed)) {
+            String achievement = switch (tool) {
+                case "Spray Can" -> "spray-and-pray";
+                case "Line Tool" -> "line-in-the-sand";
+                case "Circle Tool" -> "perfectly-round";
+                default -> null;
+            };
+            if (achievement != null) session.drawToolQualifications.add(achievement);
+        }
     }
 
     @EventHandler(priority=EventPriority.LOWEST)
@@ -20913,6 +20991,11 @@ public final class ArcadePortManager implements Listener {
             }
             if (session.drawComebackCandidates.contains(winnerId)) {
                 awardCatalogAchievement(winner, "draw-my-thing", "doubted-but-not-in-doubt");
+            }
+            if (DrawMyThingAchievementRules.twoHats(
+                    session.drawDrawerPoints.getOrDefault(winnerId, 0),
+                    session.drawGuesserPoints.getOrDefault(winnerId, 0))) {
+                awardCatalogAchievement(winner, "draw-my-thing", "two-hats");
             }
         }
         if (announceWinner && session.type == ArcadePortGame.MILK_THE_COW && winner != null) {
@@ -31848,6 +31931,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Location> drawStartLocations = new HashMap<>();
         final Set<Block> drawCanvasBlocks = new HashSet<>();
         final Set<UUID> drawCorrectGuessers = new HashSet<>();
+        final Set<UUID> drawHumanCorrectGuessers = new HashSet<>();
         final Map<UUID, Integer> drawGuessAttempts = new HashMap<>();
         final Map<UUID, Long> drawLastGuessAt = new HashMap<>();
         final Set<Integer> drawRevealedLetters = new HashSet<>();
@@ -31859,6 +31943,9 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> drawLinguistFailed = new HashSet<>();
         final Map<UUID, Integer> drawLinguistPerfectRounds = new HashMap<>();
         final Map<UUID, Integer> drawFirstGuessStreaks = new HashMap<>();
+        final Map<UUID, Integer> drawDrawerPoints = new HashMap<>();
+        final Map<UUID, Integer> drawGuesserPoints = new HashMap<>();
+        final Set<String> drawToolQualifications = new HashSet<>();
         final Map<UUID, Long> drawMovementPromptSoundAt = new HashMap<>();
         final Set<UUID> drawComebackCandidates = new HashSet<>();
         int drawFastGuessRounds;
@@ -31867,6 +31954,8 @@ public final class ArcadePortManager implements Listener {
         String drawWord;
         Location drawDrawerLocation;
         boolean drawStartedPainting;
+        boolean drawCleanSlateReady;
+        int drawPaintedBlocksAtFirstGuess = -1;
         long drawRoundStartedAt;
         long drawRoundDurationMillis;
         long drawRoundEndsAt;
