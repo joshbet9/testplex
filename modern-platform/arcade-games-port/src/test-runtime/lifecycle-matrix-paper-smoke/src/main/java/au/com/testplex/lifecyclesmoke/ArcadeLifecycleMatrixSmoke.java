@@ -189,8 +189,23 @@ public final class ArcadeLifecycleMatrixSmoke extends JavaPlugin {
             elapsedTicks = 0;
             return;
         }
-        if (elapsedTicks >= LIVE_WAIT_TICKS) failCase("No Live transition within "
-                + (LIVE_WAIT_TICKS / 20) + " seconds; active=" + active);
+        if (elapsedTicks >= LIVE_WAIT_TICKS) {
+            String moduleState = "";
+            if (currentId != null && currentId.startsWith("monster-maze")) {
+                Object module = invoke(arcade, "getMonsterMazeModule", new Class<?>[0]);
+                Object gameManager = module == null ? null
+                        : invoke(module, "getGameManager", new Class<?>[0]);
+                moduleState = "; monsterMazeMode="
+                        + (module == null ? "missing" : invoke(module, "getMode", new Class<?>[0]))
+                        + "; monsterMazeRunning="
+                        + (module != null && Boolean.TRUE.equals(
+                                invoke(module, "isGameRunning", new Class<?>[0])))
+                        + "; monsterMazeState="
+                        + (gameManager == null ? "missing" : field(gameManager, "state"));
+            }
+            failCase("No Live transition within " + (LIVE_WAIT_TICKS / 20)
+                    + " seconds; active=" + active + moduleState);
+        }
     }
 
     private void awaitRestoration() throws Exception {
