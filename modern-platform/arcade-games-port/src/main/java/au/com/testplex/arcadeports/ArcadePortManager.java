@@ -22248,6 +22248,8 @@ public final class ArcadePortManager implements Listener {
                 }
                 if (session.type == ArcadePortGame.WITHER_ASSAULT) {
                     boolean humanWinner = session.teams.getOrDefault(id, -1) == 0;
+                    boolean witherWinner = session.teams.getOrDefault(id, -1) == 1;
+                    boolean aliveAtFinish = session.alive.contains(id);
                     String roleWins = humanWinner ? "human-wins" : "wither-wins";
                     plugin.getConfig().set(path + roleWins,
                             plugin.getConfig().getInt(path + roleWins, 0) + 1);
@@ -22270,6 +22272,34 @@ public final class ArcadePortManager implements Listener {
                     if (humanWinner && ArcadeProgressRules.shouldAwardWitherLucidDreams(
                             true, session.witherHumanDamaged.contains(id))) {
                         awardCatalogAchievement(entry.getValue(), "wither-assault", "lucid-dreams");
+                    }
+                    if (humanWinner && aliveAtFinish) {
+                        int distinctRevived = session.witherRevivedByPlayer.values().stream()
+                                .flatMap(Set::stream).collect(java.util.stream.Collectors.toSet()).size();
+                        int revivedAlive = (int) session.witherRevivedByPlayer.values().stream()
+                                .flatMap(Set::stream).distinct().filter(session.alive::contains).count();
+                        if (WitherAssaultAchievementRules.keepTheLight(true, distinctRevived, revivedAlive)) {
+                            awardCatalogAchievement(entry.getValue(), "wither-assault", "keep-the-light");
+                        }
+                        long livingHumans = session.alive.stream()
+                                .filter(playerId -> session.teams.getOrDefault(playerId, 1) == 0).count();
+                        if (WitherAssaultAchievementRules.oneBreathLeft(true, (int) livingHumans)) {
+                            awardCatalogAchievement(entry.getValue(), "wither-assault", "one-breath-left");
+                        }
+                        if (WitherAssaultAchievementRules.buildersRefuge(
+                                session.witherAssaultKits.getOrDefault(id, "archer"), true,
+                                session.witherEditorBlocksPlaced.getOrDefault(id, 0))) {
+                            awardCatalogAchievement(entry.getValue(), "wither-assault", "builders-refuge");
+                        }
+                        if (WitherAssaultAchievementRules.holdTheLine(
+                                session.witherAssaultKits.getOrDefault(id, "archer"), true,
+                                session.witherWardenBlockedSkulls.getOrDefault(id, Set.of()).size())) {
+                            awardCatalogAchievement(entry.getValue(), "wither-assault", "hold-the-line");
+                        }
+                    }
+                    if (witherWinner && WitherAssaultAchievementRules.boneBrigade(true,
+                            session.witherMinionEliminations.getOrDefault(id, 0))) {
+                        awardCatalogAchievement(entry.getValue(), "wither-assault", "bone-brigade");
                     }
                 }
                 if (session.type == ArcadePortGame.TURF_WARS
@@ -24241,6 +24271,15 @@ public final class ArcadePortManager implements Listener {
                 }
             }
         }
+        if (session.type == ArcadePortGame.WITHER_ASSAULT && session.alive.contains(playerId)
+                && event.getTo().getWorld() == session.world) {
+            if (session.teams.getOrDefault(playerId, 1) == 0
+                    && isWitherLabyrinthMap()
+                    && event.getTo().getBlockY() >= witherLabyrinthTopSurfaceY(session)) {
+                awardCatalogAchievement(player, "wither-assault", "eye-candy");
+            }
+            updateWitherEditorTunnelAchievements(session);
+        }
         if (session.type == ArcadePortGame.DRAW_MY_THING
                 && playerId.equals(session.drawCurrentDrawer) && !session.drawStartedPainting
                 && session.drawDrawerLocation != null
@@ -25644,6 +25683,7 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
             Player witherAttacker = null;
+            boolean minionHit = false;
             if (damager instanceof WitherSkull) return;
             if (damager instanceof Projectile projectile) {
                 if (projectile.getShooter() instanceof Player shooter
@@ -25653,6 +25693,7 @@ public final class ArcadePortManager implements Listener {
                 } else if (projectile.getShooter() instanceof Skeleton minion
                         && session.witherMinionOwners.containsKey(minion.getUniqueId())) {
                     witherAttacker = session.players.get(session.witherMinionOwners.get(minion.getUniqueId()));
+                    minionHit = true;
                 } else return;
                 if (projectile instanceof Arrow) {
                     event.setDamage(event.getDamage() * WitherAssaultRules.humanArrowDamageMultiplier());
@@ -25660,6 +25701,7 @@ public final class ArcadePortManager implements Listener {
             } else if (damager instanceof Skeleton minion
                     && session.witherMinionOwners.containsKey(minion.getUniqueId())) {
                 witherAttacker = session.players.get(session.witherMinionOwners.get(minion.getUniqueId()));
+                minionHit = true;
             } else if (damager instanceof Player) {
                 // The source Wither kit explicitly prevents Wither melee and team damage.
                 return;
@@ -25671,6 +25713,9 @@ public final class ArcadePortManager implements Listener {
                 session.witherHumanDamaged.add(witherTarget.getUniqueId());
                 if (witherTarget.getHealth() <= damage) {
                     playerOutWitherAssault(session, witherTarget, witherAttacker);
+                    if (minionHit && witherAttacker != null && witherAttacker.isOnline()) {
+                        session.witherMinionEliminations.merge(witherAttacker.getUniqueId(), 1, Integer::sum);
+                    }
                     if (active != session) return;
                     if (witherAttacker != null) witherAttacker.sendMessage(ChatColor.GREEN + "Human stunned: " + witherTarget.getName());
                 } else {
@@ -27914,6 +27959,7 @@ public final class ArcadePortManager implements Listener {
         }
         session.witherEditorBlocks.clear();
         session.witherEditorReplacedBlocks.clear();
+        session.witherEditorBlockOwners.clear();
     }
 
     private void disguiseMilkCowPlayer(Session session, Player player) {
@@ -28336,15 +28382,88 @@ public final class ArcadePortManager implements Listener {
                     closeWither.addPotionEffect(new PotionEffect(
                             PotionEffectType.BLINDNESS, WitherAssaultRules.smokeArrowBlindnessTicks(), 0, false, false, false));
                 }
+                Set<UUID> distinctTargets = session.witherSmokeArrowTargets
+                        .computeIfAbsent(arrowId, ignored -> new HashSet<>());
+                closeWithers.stream().map(Player::getUniqueId).forEach(distinctTargets::add);
+                if (WitherAssaultAchievementRules.smokeAndMirrors(distinctTargets.size())
+                        && smokeArrowOwner.isOnline()) {
+                    awardCatalogAchievement(smokeArrowOwner, "wither-assault", "smoke-and-mirrors");
+                }
                 arrow.getWorld().spawnParticle(Particle.EXPLOSION, arrow.getLocation(), 1);
                 arrow.remove();
                 session.entities.remove(arrow);
                 session.witherBlindArrows.remove(arrowId);
+                session.witherSmokeArrowTargets.remove(arrowId);
             } else {
                 arrow.getWorld().spawnParticle(Particle.LARGE_SMOKE, arrow.getLocation(), 1, 0, 0, 0, 0);
             }
         }
         updateWitherMinions(session, now);
+    }
+
+    private boolean isWitherLabyrinthMap() {
+        String selected = SourceMapCatalog.selectedResource(plugin, ArcadePortGame.WITHER_ASSAULT);
+        return selected != null && selected.toLowerCase(java.util.Locale.ROOT).contains("labyrinth");
+    }
+
+    private int witherLabyrinthTopSurfaceY(Session session) {
+        if (session.witherLabyrinthTopY != Integer.MIN_VALUE) return session.witherLabyrinthTopY;
+        int highestSurface = Integer.MIN_VALUE;
+        for (org.bukkit.Chunk chunk : session.world.getLoadedChunks()) {
+            int baseX = chunk.getX() << 4;
+            int baseZ = chunk.getZ() << 4;
+            for (int x = 0; x < 16; x++) {
+                for (int z = 0; z < 16; z++) {
+                    highestSurface = Math.max(highestSurface,
+                            session.world.getHighestBlockYAt(baseX + x, baseZ + z) + 1);
+                }
+            }
+        }
+        if (highestSurface == Integer.MIN_VALUE) highestSurface = session.world.getMinHeight() + 1;
+        session.witherLabyrinthTopY = highestSurface;
+        return highestSurface;
+    }
+
+    private void updateWitherEditorTunnelAchievements(Session session) {
+        for (Player editor : session.players.values()) {
+            if (editor == null || !editor.isOnline() || !session.alive.contains(editor.getUniqueId())
+                    || session.teams.getOrDefault(editor.getUniqueId(), 1) != 0
+                    || !"editor".equals(session.witherAssaultKits.getOrDefault(editor.getUniqueId(), "archer"))
+                    || !isWitherEditorTunnelPosition(session, editor.getLocation(), editor.getUniqueId())) continue;
+            Set<UUID> followers = session.witherEditorTunnelFollowers.computeIfAbsent(
+                    editor.getUniqueId(), ignored -> new HashSet<>());
+            for (Player teammate : session.players.values()) {
+                if (teammate == null || teammate.equals(editor) || !teammate.isOnline()
+                        || !session.alive.contains(teammate.getUniqueId())
+                        || session.teams.getOrDefault(teammate.getUniqueId(), 1) != 0
+                        || teammate.getWorld() != session.world
+                        || !isWitherEditorTunnelPosition(session, teammate.getLocation(), editor.getUniqueId())) continue;
+                followers.add(teammate.getUniqueId());
+            }
+            if (WitherAssaultAchievementRules.splitUp(followers.size())) {
+                awardCatalogAchievement(editor, "wither-assault", "split-up");
+            }
+        }
+    }
+
+    private boolean isWitherEditorTunnelPosition(Session session, Location location, UUID editorId) {
+        if (location == null || location.getWorld() != session.world) return false;
+        int x = location.getBlockX();
+        int y = location.getBlockY();
+        int z = location.getBlockZ();
+        int nearbyBlocks = 0;
+        boolean overhead = false;
+        for (Map.Entry<Block, UUID> entry : session.witherEditorBlockOwners.entrySet()) {
+            if (!editorId.equals(entry.getValue())) continue;
+            Block placed = entry.getKey();
+            if (!session.witherEditorBlocks.contains(placed) || placed.getType().isAir()) continue;
+            if (Math.abs(placed.getX() - x) > 2 || Math.abs(placed.getZ() - z) > 2
+                    || placed.getY() < y || placed.getY() > y + 3) continue;
+            nearbyBlocks++;
+            if (placed.getY() == y + 2 && Math.abs(placed.getX() - x) <= 1
+                    && Math.abs(placed.getZ() - z) <= 1) overhead = true;
+        }
+        return nearbyBlocks >= 5 && overhead;
     }
 
     private double randomSpread(double maximum) {
@@ -28991,6 +29110,7 @@ public final class ArcadePortManager implements Listener {
                 event.setDropItems(false);
                 event.setExpToDrop(0);
                 session.witherEditorBlocks.remove(block);
+                session.witherEditorBlockOwners.remove(block);
             }
             return;
         }
@@ -29153,6 +29273,8 @@ public final class ArcadePortManager implements Listener {
                 session.witherEditorBlocks.add(placed);
                 BlockData previous = event.getBlockReplacedState().getBlockData().clone();
                 session.witherEditorReplacedBlocks.putIfAbsent(placed, previous);
+                session.witherEditorBlockOwners.put(placed, editor.getUniqueId());
+                session.witherEditorBlocksPlaced.merge(editor.getUniqueId(), 1, Integer::sum);
             }
             return;
         }
@@ -31279,6 +31401,18 @@ public final class ArcadePortManager implements Listener {
                 double distance = target.getLocation().distance(blast);
                 double damage = WitherAssaultRules.skullDamageAtDistance(distance, ageScale);
                 if (damage <= 0.0D) continue;
+                if ("warden".equals(session.witherAssaultKits.getOrDefault(target.getUniqueId(), "archer"))
+                        && target.isBlocking()) {
+                    Vector towardBlast = blast.toVector().subtract(target.getEyeLocation().toVector()).normalize();
+                    if (target.getLocation().getDirection().normalize().dot(towardBlast) > 0.35D) {
+                        session.witherWardenBlockedSkulls.computeIfAbsent(
+                                target.getUniqueId(), ignored -> new HashSet<>()).add(skull.getUniqueId());
+                        target.getWorld().playSound(target.getLocation(), Sound.ITEM_SHIELD_BLOCK, 0.8F, 1.1F);
+                        target.getWorld().spawnParticle(Particle.CRIT, target.getLocation().add(0.0D, 1.0D, 0.0D),
+                                8, 0.25D, 0.35D, 0.25D, 0.08D);
+                        continue;
+                    }
+                }
                 double scale = Math.max(0.0D, 1.0D - distance / WitherAssaultRules.skullBlastRadiusBlocks());
                 Vector away = target.getEyeLocation().toVector().subtract(blast.toVector());
                 if (away.lengthSquared() < 0.001D) away = new Vector(0.0D, 1.0D, 0.0D);
@@ -32219,11 +32353,18 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, UUID> witherMinionOwners = new HashMap<>();
         final Map<UUID, Long> witherMinionCreatedAt = new HashMap<>();
         final Map<UUID, Long> witherMinionReadyAt = new HashMap<>();
+        final Map<UUID, Integer> witherMinionEliminations = new HashMap<>();
         final Map<UUID, Long> witherScentReadyAt = new HashMap<>();
         final Map<UUID, Long> witherLeapReadyAt = new HashMap<>();
         final Map<UUID, Long> witherMedicNextRefillAt = new HashMap<>();
         final Map<UUID, Long> witherFletcherNextAt = new HashMap<>();
         final Set<UUID> witherBlindArrows = new HashSet<>();
+        final Map<UUID, Set<UUID>> witherSmokeArrowTargets = new HashMap<>();
+        final Map<UUID, Integer> witherEditorBlocksPlaced = new HashMap<>();
+        final Map<Block, UUID> witherEditorBlockOwners = new HashMap<>();
+        final Map<UUID, Set<UUID>> witherEditorTunnelFollowers = new HashMap<>();
+        final Map<UUID, Set<UUID>> witherWardenBlockedSkulls = new HashMap<>();
+        int witherLabyrinthTopY = Integer.MIN_VALUE;
         final Set<UUID> witherFireArrows = new HashSet<>();
         final Set<UUID> witherFireStormActive = new HashSet<>();
         final Map<Block, BlockData> witherExplosionBlocks = new HashMap<>();

@@ -413,6 +413,30 @@ class ArcadeProgressCatalogTest {
         assertArrayEquals(stages, milestone.stages(), game + "/" + id + " stages");
     }
 
+    @Test
+    void witherAssaultAndWizardsApprovedAchievementCataloguesHaveFourteenEntries() {
+        var wither = ArcadeProgressCatalog.achievements("wither-assault");
+        assertEquals(14, wither.size());
+        for (String id : List.of("lucid-dreams", "eye-candy", "split-up", "savior", "tormentor",
+                "worst-wither-ever", "wither-world", "its-a-mans-world", "smoke-and-mirrors",
+                "builders-refuge", "hold-the-line", "bone-brigade", "keep-the-light", "one-breath-left")) {
+            assertTrue(wither.stream().anyMatch(achievement -> achievement.id().equals(id)), id);
+        }
+
+        var wizards = ArcadeProgressCatalog.achievements("wizards");
+        assertEquals(14, wizards.size());
+        assertEquals(14, wizards.stream().map(ArcadeProgressCatalog.Achievement::id).distinct().count());
+        assertEquals("Win 15 games of Wizards.", wizards.stream()
+                .filter(achievement -> achievement.id().equals("supreme-wizard"))
+                .findFirst().orElseThrow().requirement());
+        for (String id : List.of("youre-a-wizard-harry", "strong-willed-small-minded", "ding-dong",
+                "trifecta", "one-trick-wizard", "spell-it-out", "wand-standard",
+                "random-act-of-sorcery", "three-pronged-spell", "mystic-current",
+                "a-doctorate-in-disaster", "spellbook-curator", "the-final-word")) {
+            assertTrue(wizards.stream().anyMatch(achievement -> achievement.id().equals(id)), id);
+        }
+    }
+
     private boolean hasAchievement(String game, String id, String name) {
         return ArcadeProgressCatalog.achievements(game).stream()
                 .anyMatch(entry -> entry.id().equals(id) && entry.name().equals(name));

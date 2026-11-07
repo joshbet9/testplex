@@ -128,6 +128,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
     private final Map<UUID, SummonedWolfData> summonedWolves = new HashMap<>();
     private final Map<UUID, ManaBoltData> manaBolts = new HashMap<>();
     private final Map<UUID, Long> fallingProtection = new HashMap<>();
+    private final Map<UUID, RecentWizardsAttacker> recentWizardsAttackers = new HashMap<>();
     private final List<TrapRuneData> trapRunes = new ArrayList<>();
     private final List<BukkitTask> spellTasks = new ArrayList<>();
     private final Map<UUID, MeteorData> endgameMeteors = new HashMap<>();
@@ -556,6 +557,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         endgameSize = 1.5F;
         meteorSpeed = 0.05F;
         endgameMeteors.clear();
+        recentWizardsAttackers.clear();
         states.clear();
         for (int i = 0; i < entrants.size(); i++) {
             Player player = entrants.get(i);
@@ -591,6 +593,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
                 int rarityRoll = random.nextInt(10);
                 if (!WizardsRules.mageStarterSpellRollSucceeds(state.kit, rarityRoll, candidate.lootWeight())) continue;
                 state.known.put(candidate, 1);
+                state.mageBonusStarterSpells.add(candidate);
                 player.sendMessage(ChatColor.GOLD + "Wizards » " + categoryColour(candidate)
                         + candidate.displayName() + ChatColor.GRAY + " discovered as a Mage starter spell.");
                 break;
@@ -761,6 +764,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
             selectedKits.clear();
             queueDeadlineTick = -1L;
             states.clear();
+            recentWizardsAttackers.clear();
             return;
         }
         stopRequested = true;
@@ -817,7 +821,10 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
             Player player = Bukkit.getPlayer(entry.getKey());
             if (!state.alive || player == null || !player.isOnline()) continue;
 
-            state.mana = WizardsRules.addMana(state.mana, WizardsRules.manaPerSecond(state.kit, state.soulStars) / 20.0F, state.maximumMana);
+            float previousMana = state.mana;
+            state.mana = WizardsRules.addMana(state.mana,
+                    WizardsRules.manaPerSecond(state.kit, state.soulStars) / 20.0F, state.maximumMana);
+            state.passiveManaRegenerated += Math.max(0.0F, state.mana - previousMana);
             if (tick % 10 == 0) {
                 refreshManaBar(player, state);
                 updateWandLabels(player, state);
@@ -1277,7 +1284,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
             if (slot >= 0 && slot < state.wandCount && isWand(item)) {
                 event.setCancelled(true);
                 WizardsSpell spell = state.wands[slot];
-                if (spell != null) castSpell(player, state, spell, null, event.getClickedBlock());
+                if (spell != null) castSpell(player, state, spell, null, event.getClickedBlock(), slot);
             }
         }
     }
@@ -1302,13 +1309,14 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
             if (event.getClick().isLeftClick()) {
                 if (state.wands[heldSlot] != spell) state.spellsBound++;
                 state.wands[heldSlot] = spell;
+                state.boundSpells.add(spell);
                 player.sendMessage(ChatColor.BLUE + "Spell on wand set to " + categoryColour(spell) + spell.displayName());
                 player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8F, 1.2F);
                 updateWandLabels(player, state);
                 player.closeInventory();
             } else if (event.getClick().isRightClick()) {
                 player.closeInventory();
-                castSpell(player, state, spell, null, null);
+                castSpell(player, state, spell, null, null, -1);
             }
             return;
         }
@@ -1443,15 +1451,33 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
                 + "|caster=" + (caster == null ? "null" : caster.getUniqueId())
                 + "|health=" + before + "|damage=" + damage
                 + "|world=" + victim.getWorld().getName());
-        if (caster == null || !caster.isOnline()) {
-            victim.damage(damage);
-        } else {
-            UUID casterId = caster.getUniqueId();
-            spellDamageSources.add(casterId);
-            try {
+        WizardState casterState = caster == null ? null : states.get(caster.getUniqueId());
+        WizardsSpell previousSpell = casterState == null ? null : casterState.activeCastSpell;
+        int previousWandSlot = casterState == null ? -1 : casterState.activeCastWandSlot;
+        long previousCastId = casterState == null ? 0L : casterState.activeCastId;
+        if (casterState != null && casterState.activeCastSpell == null
+                && casterState.lastSuccessfulCastSpell != null
+                && System.currentTimeMillis() - casterState.lastSuccessfulCastAtMillis <= 30_000L) {
+            casterState.activeCastSpell = casterState.lastSuccessfulCastSpell;
+            casterState.activeCastWandSlot = casterState.lastSuccessfulCastWandSlot;
+            casterState.activeCastId = casterState.lastSuccessfulCastId;
+        }
+        UUID casterId = caster == null ? null : caster.getUniqueId();
+        try {
+            if (caster == null || !caster.isOnline()) {
+                victim.damage(damage);
+            } else {
+                spellDamageSources.add(casterId);
                 victim.damage(damage, caster);
-            } finally {
+            }
+        } finally {
+            if (casterId != null) {
                 spellDamageSources.remove(casterId);
+            }
+            if (casterState != null) {
+                casterState.activeCastSpell = previousSpell;
+                casterState.activeCastWandSlot = previousWandSlot;
+                casterState.activeCastId = previousCastId;
             }
         }
         plugin.getLogger().info("WIZARDS_SPELL_DAMAGE|END|victim=" + victim.getUniqueId()
@@ -1535,7 +1561,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         int slot = attacker.getInventory().getHeldItemSlot();
         if (slot >= 0 && slot < state.wandCount && isWand(attacker.getInventory().getItem(slot))) {
             WizardsSpell spell = state.wands[slot];
-            if (spell != null) castSpell(attacker, state, spell, event.getEntity(), null);
+            if (spell != null) castSpell(attacker, state, spell, event.getEntity(), null, slot);
         }
         // The original Mineplex rules cap all direct melee hits, not only hits
         // made while a bound wand is selected.
@@ -1778,6 +1804,30 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         WizardState killerState = killer == null ? null : states.get(killer.getUniqueId());
         if (killer != null && !killer.equals(player) && killerState != null && killerState.alive) {
             killerState.kills++;
+            if (killerState.activeCastSpell != null) {
+                killerState.spellKillCategories.add(killerState.activeCastSpell.category());
+                if (killerState.activeCastWandSlot >= 0 && killerState.activeCastWandSlot < 3) {
+                    killerState.sorcererKillWandSlots.add(killerState.activeCastWandSlot);
+                }
+                if (killerState.mageBonusStarterSpells.contains(killerState.activeCastSpell)) {
+                    awardWizardsAchievement(killer.getUniqueId(), "random-act-of-sorcery");
+                }
+                if (endgameStarted) killerState.spellEliminationDuringEndgame = true;
+                Set<UUID> victims = killerState.killsByCast.computeIfAbsent(
+                        killerState.activeCastId, ignored -> new HashSet<>());
+                victims.add(player.getUniqueId());
+                if (WizardsAchievementRules.threeKillsFromOneCast(victims.size())) {
+                    awardWizardsAchievement(killer.getUniqueId(), "trifecta");
+                }
+            }
+        }
+        if (state.activeCastSpell != null && (killer == null || killer.equals(player))) {
+            RecentWizardsAttacker recent = recentWizardsAttackers.get(player.getUniqueId());
+            if (recent != null && !recent.attackerId.equals(player.getUniqueId())
+                    && System.currentTimeMillis() - recent.atMillis <= 15_000L) {
+                WizardState attackerState = states.get(recent.attackerId);
+                if (attackerState != null) awardWizardsAchievement(recent.attackerId, "spell-it-out");
+            }
         }
         state.alive = false;
         plugin.markWizardsParticipantEliminated(player);
@@ -1916,7 +1966,8 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         temporaryBlocks.remove(event.getBlock().getLocation());
     }
 
-    private void castSpell(Player player, WizardState state, WizardsSpell spell, Entity target, Block clickedBlock) {
+    private void castSpell(Player player, WizardState state, WizardsSpell spell, Entity target,
+                           Block clickedBlock, int wandSlot) {
         if (!plugin.isArcadeDebugFeatureEnabled(player,
                 au.com.testplex.arcadeports.ArcadePortGame.WIZARDS, "spell-casting", true)) {
             player.sendMessage(ChatColor.YELLOW + "Spell casting is disabled for your debug profile.");
@@ -1946,7 +1997,24 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
             player.playSound(player.getLocation(), Sound.BLOCK_FIRE_EXTINGUISH, 0.7F, 0.7F);
             return;
         }
-        if (!applySpell(player, state, spell, level, target, clickedBlock)) return;
+        WizardsSpell previousActiveSpell = state.activeCastSpell;
+        int previousActiveWandSlot = state.activeCastWandSlot;
+        long previousActiveCastId = state.activeCastId;
+        state.activeCastSpell = spell;
+        state.activeCastWandSlot = wandSlot;
+        state.activeCastId = ++state.nextCastId;
+        long thisCastId = state.activeCastId;
+        boolean applied;
+        try {
+            applied = applySpell(player, state, spell, level, target, clickedBlock);
+        } finally {
+            state.activeCastSpell = previousActiveSpell;
+            state.activeCastWandSlot = previousActiveWandSlot;
+            state.activeCastId = previousActiveCastId;
+        }
+        if (!applied) {
+            return;
+        }
 
         // Spell effects are game cosmetics: keep the spell's existing mechanics and
         // impact visuals, then add the caster's style as a distinct accent.
@@ -1957,9 +2025,14 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
 
         // Count casts only after the spell's effect has actually been accepted.
         state.successfulCasts++;
+        state.lastSuccessfulCastSpell = spell;
+        state.lastSuccessfulCastWandSlot = wandSlot;
+        state.lastSuccessfulCastId = thisCastId;
+        state.lastSuccessfulCastAtMillis = now;
         state.allCastsAtMaximum &= level == spell.maximumLevel();
         state.castFamilies.add(spell.category());
         state.mana -= manaCost;
+        state.manaSpentWithoutElimination += manaCost;
         int cooldown = spell.cooldownSeconds(level, state.cooldownModifier);
         state.cooldowns.put(spell, now + cooldown * 1000L);
         cooldownProgress.start(player, spell.displayName(), cooldown * 1_000L);
@@ -1967,6 +2040,9 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         updateWandLabels(player, state);
         player.sendMessage(ChatColor.DARK_AQUA + spell.displayName() + ChatColor.GRAY + " cast • " +
                 ChatColor.AQUA + manaCost + " mana" + ChatColor.GRAY + " • " + cooldown + "s cooldown");
+        state.activeCastSpell = previousActiveSpell;
+        state.activeCastWandSlot = previousActiveWandSlot;
+        state.activeCastId = previousActiveCastId;
     }
 
     private boolean applySpell(Player caster, WizardState state, WizardsSpell spell, int level,
@@ -2891,6 +2967,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         snapshots.clear();
         clearMatchScoreboards();
         states.clear();
+        recentWizardsAttackers.clear();
         queue.clear();
         selectedKits.clear();
         queueDeadlineTick = -1L;
@@ -2934,6 +3011,39 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
             if (WizardsAchievementRules.singleFamilyVictory(won, state.castFamilies.size())) {
                 awardWizardsAchievement(entry.getKey(), "one-trick-wizard");
             }
+            if (WizardsAchievementRules.spellKillsAllCategories(won, state.spellKillCategories)
+                    && state.kit == WizardsKit.WIZARD) {
+                awardWizardsAchievement(entry.getKey(), "wand-standard");
+            }
+            if (WizardsAchievementRules.sorcererUsedEveryStartingWand(
+                    state.kit, won, state.sorcererKillWandSlots)) {
+                awardWizardsAchievement(entry.getKey(), "three-pronged-spell");
+            }
+            if (WizardsAchievementRules.mysticManaRegenerationVictory(
+                    state.kit, won, state.passiveManaRegenerated)) {
+                awardWizardsAchievement(entry.getKey(), "mystic-current");
+            }
+            if (WizardsAchievementRules.witchDoctorManaSpendVictory(
+                    state.kit, won, state.manaSpentWithoutElimination)) {
+                awardWizardsAchievement(entry.getKey(), "a-doctorate-in-disaster");
+            }
+            boolean completeCategoryBound = java.util.Arrays.stream(WizardsSpell.Category.values()).anyMatch(category ->
+                    WizardsSpell.implementedSpells().stream()
+                            .filter(spell -> spell.category() == category)
+                            .allMatch(state.boundSpells::contains));
+            if (WizardsAchievementRules.spellbookCurator(won, completeCategoryBound)) {
+                awardWizardsAchievement(entry.getKey(), "spellbook-curator");
+            }
+            if (WizardsAchievementRules.finalWord(won, state.spellEliminationDuringEndgame)) {
+                awardWizardsAchievement(entry.getKey(), "the-final-word");
+            }
+        }
+        if (winner != null && states.containsKey(winner.getUniqueId())) {
+            String winsPath = "local-stats." + winner.getUniqueId() + ".wizards.wins";
+            long lifetimeWinsAfterRound = config.getLong(winsPath, 0L) + 1L;
+            if (WizardsAchievementRules.supremeWizard((int) Math.min(Integer.MAX_VALUE, lifetimeWinsAfterRound))) {
+                awardWizardsAchievement(winner.getUniqueId(), "supreme-wizard");
+            }
         }
         // A shared Arcade session records the win (and games-played) in its common
         // finish path. Only the legacy unmanaged controller records wins itself.
@@ -2945,7 +3055,8 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
     }
 
     private void awardWizardsAchievement(UUID playerId, String achievementId) {
-        if (playerId == null || plugin.isTestPlayer(playerId)
+        if (playerId == null || plugin.isTestPlayer(playerId) || plugin.isArcadeDebugRound()
+                || GameDebugRuntimeOverrides.isDebugSession()
                 || ArcadeProgressCatalog.achievements("wizards").stream()
                         .noneMatch(achievement -> achievement.id().equals(achievementId))) return;
         String key = "local-achievements." + playerId + ".wizards." + achievementId;
@@ -2955,13 +3066,40 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         if (player != null) player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + achievementId);
     }
 
+    private static final class RecentWizardsAttacker {
+        private final UUID attackerId;
+        private final long atMillis;
+        private RecentWizardsAttacker(UUID attackerId, long atMillis) {
+            this.attackerId = attackerId;
+            this.atMillis = atMillis;
+        }
+    }
+
     private void restoreTemporaryPlayer(Player player, UUID id) {
         PlayerSnapshot snapshot = snapshots.remove(id);
         if (snapshot != null) snapshot.restore(player);
         states.remove(id);
+        recentWizardsAttackers.remove(id);
         removeManaBar(id);
         removeMatchScoreboard(id);
         checkWinner();
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void trackRecentWizardsAttacker(EntityDamageByEntityEvent event) {
+        if (!running || !(event.getEntity() instanceof Player victim)
+                || !states.containsKey(victim.getUniqueId())) return;
+        Player attacker = null;
+        if (event.getDamager() instanceof Player direct) attacker = direct;
+        else if (event.getDamager() instanceof Projectile projectile
+                && projectile.getShooter() instanceof Player shooter) attacker = shooter;
+        else if (event.getDamager() instanceof Wolf wolf) {
+            SummonedWolfData data = summonedWolves.get(wolf.getUniqueId());
+            if (data != null) attacker = Bukkit.getPlayer(data.owner);
+        }
+        if (attacker == null || attacker.equals(victim) || !states.containsKey(attacker.getUniqueId())) return;
+        recentWizardsAttackers.put(victim.getUniqueId(),
+                new RecentWizardsAttacker(attacker.getUniqueId(), System.currentTimeMillis()));
     }
 
     private void refillChests() {
@@ -3093,6 +3231,22 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         private int successfulCasts;
         private boolean allCastsAtMaximum = true;
         private final EnumSet<WizardsSpell.Category> castFamilies = EnumSet.noneOf(WizardsSpell.Category.class);
+        private final EnumSet<WizardsSpell.Category> spellKillCategories = EnumSet.noneOf(WizardsSpell.Category.class);
+        private final Set<WizardsSpell> mageBonusStarterSpells = new HashSet<>();
+        private final Set<WizardsSpell> boundSpells = new HashSet<>();
+        private final Set<Integer> sorcererKillWandSlots = new HashSet<>();
+        private final Map<Long, Set<UUID>> killsByCast = new HashMap<>();
+        private float passiveManaRegenerated;
+        private float manaSpentWithoutElimination;
+        private boolean spellEliminationDuringEndgame;
+        private WizardsSpell activeCastSpell;
+        private int activeCastWandSlot = -1;
+        private long activeCastId;
+        private long nextCastId;
+        private WizardsSpell lastSuccessfulCastSpell;
+        private int lastSuccessfulCastWandSlot = -1;
+        private long lastSuccessfulCastId;
+        private long lastSuccessfulCastAtMillis;
         private float cooldownModifier = 1.0F;
         private boolean alive = true;
 
