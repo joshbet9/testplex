@@ -1,7 +1,7 @@
 # The Arcade catalogue and controlled test queue grow as source-faithful games are promoted.
 # READY_FOR_TEST games are available together for the shared controlled test session.
-# The 31-ID enabled queue includes Wizards, Hoops Remastered and Heroes of Gwen.
-# Evolution remains catalogued but disabled pending its separate source-map clearance.
+# All 32 Arcade selections are enabled, representing 30 distinct titles.
+# Evolution's six recovered arenas use inferred test spawns until authored WorldConfig.dat is recovered.
 enabled-games:
   - death-tag
   - one-in-the-quiver
@@ -17,6 +17,7 @@ enabled-games:
   - super-sploor
   - dragon-escape
   - dragons
+  - evolution
   - runner
   - sheep-quest
   - turf-wars
