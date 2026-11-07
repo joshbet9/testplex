@@ -794,8 +794,18 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         require(((JavaPlugin) arcade).getConfig().getInt(passerPath + "assists", 0) == 1,
                 "lifetime assist was not persisted");
         int persistedPoints = ((JavaPlugin) arcade).getConfig().getInt(shooterPath + "points", 0);
+        @SuppressWarnings("unchecked")
+        Map<UUID, Object> playerStats = (Map<UUID, Object>) field(completedMatch, "playerStats");
+        int inMatchPoints = ((Number) field(playerStats.get(shooterId), "points")).intValue();
+        String pointsByPlayer = players.stream().map(player -> {
+            String path = "local-stats." + player.getUniqueId() + ".hoops-remastered.points";
+            return player.getName() + "=" + ((JavaPlugin) arcade).getConfig().getInt(path, 0);
+        }).collect(java.util.stream.Collectors.joining(","));
+        boolean debugSession = au.com.testplex.arcadeports.GameDebugRuntimeOverrides.isDebugSession();
         require(persistedPoints == 2,
-                "lifetime points were not persisted for " + shooterId + ": expected 2, found " + persistedPoints);
+                "lifetime points were not persisted for " + shooterId + ": expected 2, found "
+                        + persistedPoints + ", in-match=" + inMatchPoints + ", debug-session=" + debugSession
+                        + ", all-player-points={" + pointsByPlayer + "}");
         require(scores[winningTeam] >= 21, "final score did not reach 21");
     }
 
