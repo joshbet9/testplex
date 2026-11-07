@@ -101,7 +101,7 @@ public final class SneakyAssassinsPacketDisguiseBridge implements PacketListener
             // Player-only metadata indices have a different type/layout on Villagers.
             List<EntityData<?>> compatible = new ArrayList<>();
             for (EntityData<?> value : metadata.getEntityMetadata()) {
-                if (value.getIndex() <= 14) compatible.add(value);
+                if (isVillagerCompatibleMetadataIndex(value.getIndex())) compatible.add(value);
             }
             if (compatible.isEmpty()) {
                 event.setCancelled(true);
@@ -111,6 +111,13 @@ public final class SneakyAssassinsPacketDisguiseBridge implements PacketListener
                 event.markForReEncode(true);
             }
         }
+    }
+
+    static boolean isVillagerCompatibleMetadataIndex(int index) {
+        // Entity metadata indices 0-7 are the common Entity fields. Player-specific
+        // fields begin at 8 and may have unrelated Villager types/layouts, which
+        // makes forwarding them capable of disconnecting 26.3 clients.
+        return index >= 0 && index <= 7;
     }
 
     private void sendVillagerSpawn(Player viewer, int entityId, UUID playerId,
