@@ -5,7 +5,9 @@ import me.monstermaze.event.FirstToSafepadEvent;
 import me.monstermaze.event.MonsterBumpPlayerEvent;
 import me.monstermaze.event.SafepadBuildEvent;
 import me.monstermaze.game.GameManager;
+import me.monstermaze.game.MonsterMazeAchievementRules;
 import me.monstermaze.MonsterMazePlugin;
+import me.monstermaze.kit.KitType;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
@@ -32,6 +34,9 @@ public class StatTracker implements Listener {
     private final Set<UUID> spentJumpsOnStageOne = new HashSet<UUID>();
     private final Set<UUID> pilot = new HashSet<UUID>();          // land on pad within bump knock window
     private final Map<UUID, Long> bumpedAt = new HashMap<UUID, Long>(); // UUID -> bump time (ms)
+    private final Map<UUID, Integer> pilotStreaks = new HashMap<UUID, Integer>();
+    private final Map<UUID, Integer> lastPilotedStage = new HashMap<UUID, Integer>();
+    private final Map<UUID, Set<Integer>> maverickPilotedStages = new HashMap<UUID, Set<Integer>>();
     private boolean toughGiven = false;
 
     public StatTracker(GameManager game, MonsterMazePlugin plugin) {
@@ -47,6 +52,9 @@ public class StatTracker implements Listener {
         spentJumpsOnStageOne.clear();
         pilot.clear();
         bumpedAt.clear();
+        pilotStreaks.clear();
+        lastPilotedStage.clear();
+        maverickPilotedStages.clear();
         toughGiven = false;
     }
 
@@ -118,6 +126,18 @@ public class StatTracker implements Listener {
             pilot.add(id);
             player.sendMessage(ChatColor.AQUA + "Stat: Pilot (landed on pad after bump)");
         }
+        int stage = game.getStage();
+        int previousStage = lastPilotedStage.getOrDefault(id, 0);
+        int streak = MonsterMazeAchievementRules.nextPilotStreak(
+                pilotStreaks.getOrDefault(id, 0), previousStage, stage);
+        if (stage != previousStage) {
+            lastPilotedStage.put(id, stage);
+            pilotStreaks.put(id, streak);
+            if (MonsterMazeAchievementRules.shouldAwardPilot(streak)) game.recordAchievement(id, "pilot");
+        }
+        if (game.getKitManager().getKit(player) == KitType.MAVERICK) {
+            maverickPilotedStages.computeIfAbsent(id, ignored -> new HashSet<Integer>()).add(stage);
+        }
     }
 
     public void clearBump(Player player) {
@@ -130,6 +150,17 @@ public class StatTracker implements Listener {
         if (game.getKitManager().getKit(winner) == me.monstermaze.kit.KitType.BODY_BUILDER && !firstPads.containsKey(id)) game.recordAchievement(id, "blackout");
         if (firstPads.getOrDefault(id, 0) >= game.getStage()) game.recordAchievement(id, "perfect-run");
         if (firstPadOnStageOne.contains(id) && spentJumpsOnStageOne.contains(id)) game.recordAchievement(id, "jumpman");
+        if (MonsterMazeAchievementRules.shouldAwardNinja(true, hitByMonster.contains(id))) {
+            game.recordAchievement(id, "ninja");
+        }
+        if (MonsterMazeAchievementRules.shouldAwardHardMode(true, usedAbility.contains(id))) {
+            game.recordAchievement(id, "hard-mode");
+        }
+        if (MonsterMazeAchievementRules.shouldAwardTailwind(true,
+                game.getKitManager().getKit(winner) == KitType.MAVERICK,
+                maverickPilotedStages.get(id), game.getStage())) {
+            game.recordAchievement(id, "tailwind");
+        }
         if (!hitByMonster.contains(id))
             winner.sendMessage(ChatColor.GREEN + "Stat: Ninja (never hit by a monster)");
         if (!usedAbility.contains(id))
@@ -150,5 +181,8 @@ public class StatTracker implements Listener {
         pilot.remove(id);
         firstPadOnStageOne.remove(id);
         spentJumpsOnStageOne.remove(id);
+        pilotStreaks.remove(id);
+        lastPilotedStage.remove(id);
+        maverickPilotedStages.remove(id);
     }
 }

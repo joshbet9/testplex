@@ -73,7 +73,7 @@ These IDs are declared in `ArcadeProgressCatalog` but have no literal runtime aw
 | Master Builders | 4 | 10 | None | Four award candidates; avoid an achievement tool granting competitive votes/building advantage. Cosmetic prestige may fit. |
 | Micro Battles | 9 | 5 | Dasher | Local `speedster` award and in-selector Dasher guard exist; UI/shared map are not the same rule. Test award after a genuine sub-90-second win and no menu preference bypass. |
 | Milk the Cow | 14 | 0 | None | Fourteen catalogue entries; existing seven detectors retained and seven new event detectors added for Last Drop, Whole Herd, Cow Bomb, Body Slam, Full Moo, Stampede, and Spilt Milk. Automated predicate/catalog tests added; live Paper 26.3 acceptance remains outstanding. |
-| Monster Maze (Original/Speed/Modern) | 9 | 5 | Repulsor, Maverick | **Bridge** to Monster Maze; neither purple kit has a shared entitlement. Inspect its actual kit ability and award emitters before selecting requirements. |
+| Monster Maze (Original/Speed/Modern) | 14 | 0 | Repulsor, Maverick | Approved Ninja!, Hard Mode, Pilot, Tailwind and Social Distancing additions now use round events. Maverick unlocks from Pilot (three consecutive monster-bump landings); Repulsor requires Blizzard + Stampede. Out of the Cup, Photo Finish and Body Rush launch evidence are tied to distinct same-stage/mob events. Automated rule/catalog/policy tests added; live Paper 26.3 acceptance remains outstanding. |
 | One in the Quiver | 8 | 6 | Ninja | Award candidates through Quiver enum and catalogue; **Ninja has no entitlement**. |
 | Paintball | 5 | 9 | Sniper | All five award calls found; **Sniper has no entitlement**; choose an earnable Rifle/Shotgun challenge, not a Sniper-only one. |
 | Plexball | 9 | 5 | Skyguard | Nine specific award calls in `PlexballGame`, stored in **separate progression file**; no Skyguard entitlement. |
@@ -114,8 +114,8 @@ This table is a discussion starter. It deliberately favours accomplishments that
 | Dragon Escape — Digger | `to-hell-and-back` + `paralympics` | Course mastery without Leap, obtainable without Digger; **do not use Digger-only `learn-to-code`**. |
 | Micro Battles — Dasher | `speedster` (*retain*) | The one-game, under-90-second goal already named in its catalogue. |
 | Sheep Quest — Shepherd | `cheeky` (*retain if detector is fixed*) | Repair the missing award first; otherwise no legitimate player can unlock it. |
-| Monster Maze — Repulsor | `blizzard` + `stampede` | Demonstrate Cryo Blitz/Body Rush mastery, provided both source detectors are verified. |
-| Monster Maze — Maverick | `perfect-run` | All first-pad mastery using other Maze kits; confirm submode eligibility. |
+| Monster Maze — Repulsor | `blizzard` + `stampede` | Cryo Blitz and Body Rush mastery, both obtainable with GEM kits. |
+| Monster Maze — Maverick | `pilot` | Three consecutive monster-bump landings; available without Maverick, so the unlock is not circular. |
 | One in the Quiver — Ninja | `sharpshooter` + `perfectionist` | Accuracy and survival, neither requiring Ninja. |
 | Paintball — Sniper | `share-your-screen` | Accurate Rifle match to demonstrate precision before Sniper. |
 | Runner — Switcher | **Freeze existing 7 catalogue + 3 legacy IDs** (*retain pending review*) | Preserve today's all-achievements requirement and acquired unlocks; seven new proposals must not auto-tighten it. |
