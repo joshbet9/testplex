@@ -12,6 +12,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -909,6 +910,35 @@ public final class SourceMapCatalog {
         }
     }
 
+    /**
+     * Reborn archives were produced on Windows and can store Anvil region
+     * entries as {@code region\r.0.0.mca}. Normalize archive entry separators
+     * while retaining strict rejection of traversal and absolute paths.
+     * Resource selection paths are validated separately and remain unchanged.
+     */
+    static Path resolveArchiveEntryPath(Path staging, String entryName) throws IOException {
+        if (staging == null || entryName == null || entryName.isBlank()) {
+            throw new IOException("Empty or invalid map archive entry: " + entryName);
+        }
+        String canonical = entryName.replace('\\', '/');
+        if (canonical.startsWith("/") || (canonical.length() > 1
+                && Character.isLetter(canonical.charAt(0)) && canonical.charAt(1) == ':')) {
+            throw new IOException("Unsafe map archive entry: " + entryName);
+        }
+        for (String segment : canonical.split("/")) {
+            if (segment.equals("..")) throw new IOException("Unsafe map archive entry: " + entryName);
+        }
+        try {
+            Path output = staging.resolve(canonical).normalize();
+            if (output.equals(staging) || !output.startsWith(staging)) {
+                throw new IOException("Unsafe map archive entry: " + entryName);
+            }
+            return output;
+        } catch (InvalidPathException exception) {
+            throw new IOException("Invalid map archive entry: " + entryName, exception);
+        }
+    }
+
     /** Extract a source archive only when it belongs to the caller's expected folder pool. */
     public static boolean installResource(JavaPlugin plugin, String resource, String worldName, List<String> mapFolders) {
         boolean approvedFolder = resourcePathBelongsToFolders(mapFolders, resource);
@@ -1008,10 +1038,7 @@ public final class SourceMapCatalog {
                 try (ZipInputStream zip = new ZipInputStream(input)) {
                     ZipEntry entry;
                     while ((entry = zip.getNextEntry()) != null) {
-                        Path output = staging.resolve(entry.getName()).normalize();
-                        if (!output.startsWith(staging)) {
-                            throw new IOException("Unsafe archive entry: " + entry.getName());
-                        }
+                        Path output = resolveArchiveEntryPath(staging, entry.getName());
                         if (entry.isDirectory()) {
                             Files.createDirectories(output);
                         } else {
