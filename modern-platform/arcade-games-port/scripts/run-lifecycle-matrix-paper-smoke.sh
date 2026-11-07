@@ -165,8 +165,9 @@ echo "[lifecycle-matrix] PASS=$pass_count FAIL=$fail_count server_exit=$server_e
 if [[ "$fail_count" -ne 0 || "$pass_count" -lt 32 || "$summary" != *$'\tPASS' \
       || "$server_exit" -ne 0 || "$client_exit" -ne 0 ]] \
     || ! grep -Fq 'BOT_READY|PASS|count=4' "$client_log"; then
-  echo '[lifecycle-matrix] Acceptance failed; inspect the results and Paper log artifacts.' >&2
-  tail -n 180 "$server_log" >&2 || true
+  echo '[lifecycle-matrix] Acceptance failed; focused plugin diagnostics follow.' >&2
+  grep -E 'LIFECYCLE_MATRIX|ArcadeMechanicsModern|SneakyAssassins|\[ERROR\]|\[WARN\]|Exception|Caused by|Could not|Unable|Failed|failed' "$server_log" | tail -n 320 >&2 || true
+  echo '[lifecycle-matrix] Full server and client logs remain in the uploaded artifact.' >&2
   exit 1
 fi
 echo '[lifecycle-matrix] All enabled games entered and exited Live with four real clients.'
