@@ -197,7 +197,7 @@ final class ArcadeLobbyKitCatalogue {
                     choice("machine-gun", "Machine Gun", Material.DISPENSER,
                             Unlock.GEM, Zombie.class, Material.DIAMOND_HORSE_ARMOR));
             case RUNNER -> List.of(
-                    choice("runnerkit-leaper", "Leaper", Material.RABBIT_FOOT,
+                    choice("runnerkit-leaper", "Jumper", Material.RABBIT_FOOT,
                             Unlock.FREE, Skeleton.class, Material.IRON_AXE),
                     choice("runnerkit-archer", "Archer", Material.BOW,
                             Unlock.GEM, Skeleton.class, Material.BOW),

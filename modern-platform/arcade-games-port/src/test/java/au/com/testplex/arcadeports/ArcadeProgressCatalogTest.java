@@ -201,6 +201,14 @@ class ArcadeProgressCatalogTest {
         assertTrue(hasAchievement("one-in-the-quiver", "heads", "HEADS!"));
         assertTrue(hasAchievement("paintball", "aura", "AURA"));
         assertTrue(hasAchievement("runner", "special-play", "Special Play"));
+        assertEquals(14, ArcadeProgressCatalog.achievements("runner").size());
+        assertEquals(14, ArcadeProgressCatalog.achievements("sheep-quest").size());
+        assertTrue(hasAchievement("runner", "switcheroo", "Switcheroo"));
+        assertTrue(hasAchievement("runner", "long-leaper", "Long Leaper"));
+        assertTrue(hasAchievement("runner", "cold-front", "Cold Front"));
+        assertTrue(hasAchievement("runner", "deadeye", "Deadeye"));
+        assertTrue(hasAchievement("sheep-quest", "the-shepherds-flock", "The Shepherd's Flock"));
+        assertTrue(hasAchievement("sheep-quest", "clean-getaway", "Clean Getaway"));
         assertTrue(hasAchievement("sheep-quest", "baaaad-to-the-bone", "Baaaaad to the bone"));
         assertTrue(hasAchievement("death-tag", "death-proof", "Death Proof"));
         assertTrue(hasAchievement("death-tag", "come-at-me-bro", "Come At Me Bro!"));

@@ -1586,6 +1586,7 @@ class ArcadePortGameTest {
 
     @Test void runnerSourceKitsHaveDistinctCooldownsAndFrostBallRules() {
         assertEquals("leaper", ArcadePortRules.normalizeRunnerKit("Leaper"));
+        assertEquals("leaper", ArcadePortRules.normalizeRunnerKit("Jumper"));
         assertEquals("archer", ArcadePortRules.normalizeRunnerKit("runner-archer"));
         assertEquals("frosty", ArcadePortRules.normalizeRunnerKit("Frosty"));
         assertNull(ArcadePortRules.normalizeRunnerKit("unknown"));

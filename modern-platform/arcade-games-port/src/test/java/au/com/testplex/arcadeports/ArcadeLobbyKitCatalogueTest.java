@@ -29,6 +29,15 @@ class ArcadeLobbyKitCatalogueTest {
     }
 
     @Test
+    void runnerShowsJumperWhileKeepingItsStableKitId() {
+        ArcadeLobbyKitCatalogue.KitChoice jumper =
+                ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.RUNNER, List.of()).stream()
+                        .filter(choice -> choice.id.equals("runnerkit-leaper")).findFirst().orElseThrow();
+        assertEquals("Jumper", jumper.name);
+        assertEquals("runnerkit-leaper", jumper.id);
+    }
+
+    @Test
     void preservesTheReviewedBombLobbersKitOrder() {
         assertEquals(List.of("acrobat", "armorer", "constructor"),
                 ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.BOMB_LOBBERS, List.of()).stream()

@@ -27,9 +27,9 @@ final class ArcadeAchievementProgress {
             entry("dragons", "win-three-in-a-row", "win-streak", 3, "consecutive wins"),
             entry("evolution", "expert-evolver", "wins", 20, "wins"),
             entry("evolution", "no-evolve-5-u", "kills-while-evolving", 25, "kills"),
-            entry("sheep-quest", "hungry-hungry-hippo", "wins", 50, "wins"),
-            entry("sheep-quest", "thief", "thief", 300, "sheep"),
-            entry("sheep-quest", "animal-rescue", "animal-rescue", 300, "rescues")
+            entry("sheep-quest", "hungry-hungry-hippo", "wins", 20, "wins"),
+            entry("sheep-quest", "thief", "thief", 100, "sheep"),
+            entry("sheep-quest", "animal-rescue", "animal-rescue", 100, "rescues")
     );
 
     private static Map.Entry<String, Counter> entry(String game, String achievement,

@@ -12,9 +12,8 @@ import java.util.function.Predicate;
  * Reviewed achievement-kit prerequisites. Entries are stable IDs rather than a
  * moving count of catalogue achievements, so new challenges never revoke access.
  *
- * The original Runner set includes three awards that predate the shared catalogue.
- * Those are represented by the "legacy-runner:" prefix and read from their
- * historical test-achievements path by the caller.
+ * Runner's three older runtime awards retain their historical config keys while
+ * appearing in the shared catalogue, so earned progress survives the migration.
  */
 final class AchievementKitUnlockPolicy {
     record Rule(String gameId, String kitId, String displayName, List<String> requirements,
@@ -102,11 +101,8 @@ final class AchievementKitUnlockPolicy {
         add(rules, "plexball", "skyguard", "Skyguard", "sticky-gloves-three", "sweet-spot-75m");
         add(rules, "camera-shy", "snap-understudy", "Understudy", "camera-shy", "double-take");
 
-        rules.put("runner:runnerkit-switcher", new Rule("runner", "runnerkit-switcher", "Switcher",
-                List.of("nsfm", "ice-in-my-veins", "failed-upwards", "took-a-dive",
-                        "special-play", "made-it-work", "sore-feet",
-                        "legacy-runner:gettin-those-steps-in", "legacy-runner:hop-to-it", "legacy-runner:flash"),
-                true));
+        add(rules, "runner", "runnerkit-switcher", "Switcher",
+                "long-leaper", "cold-front", "deadeye");
         return Map.copyOf(rules);
     }
 

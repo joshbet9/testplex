@@ -68,10 +68,12 @@ class AchievementKitUnlockPolicyTest {
         assertFalse(chris.requirements().contains("extra-crispy"));
     }
 
-    @Test void runnerMasteryIsFrozenAndKitExclusiveRequirementsAreNotCircular() {
+    @Test void runnerSwitcherRequiresJumperFrostyAndArcherMasteryWithoutCircularUnlocks() {
         var runner = AchievementKitUnlockPolicy.find(ArcadePortGame.RUNNER, "runnerkit-switcher");
-        assertTrue(runner.originalAllAchievements());
-        assertEquals(10, runner.requirements().size());
+        assertFalse(runner.originalAllAchievements());
+        assertEquals(java.util.List.of("long-leaper", "cold-front", "deadeye"), runner.requirements());
+        assertFalse(runner.unlocked(Set.of("long-leaper", "cold-front")::contains));
+        assertTrue(runner.unlocked(Set.of("long-leaper", "cold-front", "deadeye")::contains));
         assertFalse(AchievementKitUnlockPolicy.find(ArcadePortGame.CAMERA_SHY, "snap-understudy")
                 .requirements().contains("method-actor"));
         assertFalse(AchievementKitUnlockPolicy.find(ArcadePortGame.SUPER_SPLOOR, "dualies")

@@ -43,8 +43,8 @@ and Death Tag requirements are implemented on this draft branch.
 | One in the Quiver | 7 | 7 | 0 |
 | Paintball | 5 | 9 | 0 |
 | Plexball | 9 | 5 | 0 |
-| Runner | 7 | 7 | 0 |
-| Sheep Quest | 12 | 2 | 0 |
+| Runner | 14 | 0 | 0 |
+| Sheep Quest | 14 | 0 | 0 |
 | SkyWars | 3 | 11 | 0 |
 | Snake | 9 | 5 | 0 |
 | Snap | 20 | 0 | 6 |
@@ -55,7 +55,7 @@ and Death Tag requirements are implemented on this draft branch.
 | Turf Wars | 9 | 5 | 0 |
 | Wither Assault | 8 | 6 | 0 |
 | Wizards | 6 | 8 | 0 |
-| **Total** | **301** | **119** | **7** |
+| **Total** | **303** | **117** | **7** |
 
 ## Suggested review methodology
 
