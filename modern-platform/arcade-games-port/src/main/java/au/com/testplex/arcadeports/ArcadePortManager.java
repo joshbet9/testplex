@@ -32801,10 +32801,19 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session != null && session.startupComplete && !session.liveStarted
                 && session.players.containsKey(event.getPlayer().getUniqueId())) {
-            event.setCancelled(true);
+            boolean enteringMonsterMazeArena = allowsMonsterMazeStartupTeleport(
+                    session.type,
+                    session.modulePhase,
+                    event.getTo() != null && event.getTo().getWorld() == session.world);
+            if (!enteringMonsterMazeArena) event.setCancelled(true);
         }
     }
 
+    static boolean allowsMonsterMazeStartupTeleport(
+            ArcadePortGame type, String modulePhase, boolean destinationIsArenaWorld) {
+        return type != null && type.isMonsterMaze()
+                && "STARTING".equals(modulePhase) && destinationIsArenaWorld;
+    }
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
     public void onPreparePlayerInteract(PlayerInteractEvent event) {
         cancelPrepareAction(event.getPlayer(), event);
