@@ -2695,8 +2695,10 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(10, 64, -3, 10, 64, -4));
     }
 
-    @Test void sheepQuestPlayerHitsDropSheepAndDealDamage() {
-        assertEquals(4.0D, ArcadePortRules.SHEEP_QUEST_PLAYER_HIT_DAMAGE, 0.00001D);
+    @Test void sheepQuestPlayerHitsUseLegacyWeaponDamageInsteadOfFixedDebugDamage() {
+        assertEquals(4.0D, ArcadePortRules.sheepQuestLegacyMeleeDamage("WOODEN_SWORD", false, Double.NaN), 0.00001D);
+        assertEquals(5.0D, ArcadePortRules.sheepQuestLegacyMeleeDamage("IRON_AXE", false, Double.NaN), 0.00001D);
+        assertEquals(6.0D, ArcadePortRules.sheepQuestLegacyMeleeDamage("IRON_SWORD", false, Double.NaN), 0.00001D);
     }
 
     @Test void turfWarsTerritoryUsesTheSourceSpawnFloorHeight() {

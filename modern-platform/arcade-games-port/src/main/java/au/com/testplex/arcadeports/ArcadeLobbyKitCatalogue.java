@@ -148,8 +148,8 @@ final class ArcadeLobbyKitCatalogue {
                             Unlock.GEM, Skeleton.class, Material.BOW),
                     choice("brute", "Brute", Material.IRON_SWORD,
                             Unlock.GEM, Zombie.class, Material.IRON_SWORD),
-                    choice("shepherd", "Shepherd", Material.SHEARS,
-                            Unlock.ACHIEVEMENT, Villager.class, Material.SHEARS));
+                    choice("shepherd", "Shepherd", Material.WOODEN_SPEAR,
+                            Unlock.ACHIEVEMENT, Villager.class, Material.WOODEN_SPEAR));
             case SNAKE -> List.of(
                     choice("speed", "Speed", Material.FEATHER,
                             Unlock.FREE, Zombie.class, Material.FEATHER),

@@ -2733,8 +2733,11 @@ public final class ArcadePortRules {
         return sheepBlockX == markerX && sheepFeetY == markerY && sheepBlockZ == markerZ;
     }
 
+    // Retained as an optional debug-profile override; normal hits use the 1.8 weapon table below.
     public static final double SHEEP_QUEST_PLAYER_HIT_DAMAGE = 4.0D;
     public static final double SHEEP_QUEST_THROWER_DAMAGE = 6.0D;
+    public static final double SHEEP_QUEST_SHEPHERD_SPEAR_JAB_DAMAGE = 3.0D;
+    public static final double SHEEP_QUEST_SHEPHERD_SPEAR_MAX_DAMAGE = 5.0D;
     public static final int SHEEP_QUEST_INITIAL_SHEEP = 4;
     public static final long SHEEP_QUEST_ROUND_MILLIS = 300_000L;
     public static final int SHEEP_QUEST_MAX_CARRY = 3;
@@ -2815,6 +2818,46 @@ public final class ArcadePortRules {
         int maximum = Math.max(0, Math.min(127, GameDebugRuntimeOverrides.intValue(
                 "SHEEP_QUEST_SHEPHERD_SLOWNESS_MAX_AMPLIFIER", SHEEP_QUEST_SHEPHERD_SLOWNESS_MAX_AMPLIFIER)));
         return Math.min(maximum, (carriedCount - 1) / sheepPerLevel);
+    }
+
+    /** Pre-1.9 melee damage: no modern attack-cooldown or modern axe damage scaling. */
+    public static double sheepQuestLegacyMeleeDamage(
+            String materialName, boolean criticalHit, double nativeSpearDamage) {
+        if (materialName == null) return 1.0D;
+        String material = materialName.toUpperCase(java.util.Locale.ROOT);
+        if ("WOODEN_SPEAR".equals(material)) {
+            // Spears did not exist in 1.8. Keep the modern charge's velocity-based
+            // damage, but cap it below an iron sword's legacy damage; jabs stay weaker.
+            double chargeDamage = Double.isFinite(nativeSpearDamage) ? nativeSpearDamage : 0.0D;
+            return Math.max(SHEEP_QUEST_SHEPHERD_SPEAR_JAB_DAMAGE,
+                    Math.min(SHEEP_QUEST_SHEPHERD_SPEAR_MAX_DAMAGE, chargeDamage));
+        }
+        double baseDamage = switch (material) {
+            case "WOODEN_SWORD", "GOLDEN_SWORD" -> 4.0D;
+            case "STONE_SWORD" -> 5.0D;
+            case "IRON_SWORD" -> 6.0D;
+            case "DIAMOND_SWORD" -> 7.0D;
+            case "WOODEN_AXE", "GOLDEN_AXE" -> 3.0D;
+            case "STONE_AXE" -> 4.0D;
+            case "IRON_AXE" -> 5.0D;
+            case "DIAMOND_AXE" -> 6.0D;
+            default -> 1.0D;
+        };
+        return baseDamage * (criticalHit ? 1.5D : 1.0D);
+    }
+
+    /** 1.8 arrow damage uses impact speed, with a bounded bonus for critical arrows. */
+    public static double sheepQuestLegacyArrowDamage(double impactSpeed, int criticalBonus) {
+        if (!Double.isFinite(impactSpeed) || impactSpeed <= 0.0D) return 0.0D;
+        int baseDamage = (int) Math.min(Integer.MAX_VALUE / 4.0D, Math.ceil(impactSpeed * 2.0D));
+        return baseDamage + Math.max(0, Math.min(criticalBonus, baseDamage / 2 + 1));
+    }
+
+    /** 1.8 armour absorbed four percent per defence point, unlike modern armour toughness. */
+    public static double sheepQuestLegacyDamageAfterArmour(double rawDamage, double armourPoints) {
+        if (!Double.isFinite(rawDamage) || rawDamage <= 0.0D) return 0.0D;
+        double armour = Double.isFinite(armourPoints) ? Math.max(0.0D, Math.min(20.0D, armourPoints)) : 0.0D;
+        return rawDamage * (25.0D - armour) / 25.0D;
     }
     public static int sheepQuestCaptureScore() {
         return Math.max(0, Math.min(100, GameDebugRuntimeOverrides.intValue(
