@@ -170,6 +170,8 @@ echo "[lifecycle-matrix] PASS=$pass_count FAIL=$fail_count expected=$expected_co
 if [[ "$fail_count" -ne 0 || "$pass_count" -ne "$expected_count" || "$summary" != *
   echo '[lifecycle-matrix] Acceptance failed; focused plugin diagnostics follow.' >&2
   grep -E 'LIFECYCLE_MATRIX|ArcadeMechanicsModern|SneakyAssassins|\[ERROR\]|\[WARN\]|Exception|Caused by|Could not|Unable|Failed|failed' "$server_log" | tail -n 320 >&2 || true
+  echo '[lifecycle-matrix] Monster Maze phase diagnostics:' >&2
+  grep -F 'LIFECYCLE_MATRIX|MONSTER_MAZE_TRACE|' "$server_log" >&2 || true
   echo '[lifecycle-matrix] Full server and client logs remain in the uploaded artifact.' >&2
   exit 1
 fi
