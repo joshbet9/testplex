@@ -251,6 +251,13 @@ class ArcadeProgressCatalogTest {
         assertTrue(hasAchievement("milk-the-cow", "got-the-chops", "Got the Chops"));
         assertTrue(hasAchievement("draw-my-thing", "for-the-people", "For the people"));
         assertTrue(hasAchievement("master-builders", "architect", "Architect"));
+        assertEquals(14, ArcadeProgressCatalog.achievements("master-builders").size());
+        for (String achievement : List.of("block-party", "minimalist-masterpiece", "second-draft",
+                "touching-the-sky", "critics-darling", "unanimous-ovation", "mixed-reviews",
+                "kingmaker", "fair-critic", "golden-eye")) {
+            assertTrue(ArcadeProgressCatalog.achievements("master-builders").stream()
+                    .anyMatch(value -> value.id().equals(achievement)), "Missing Master Builders achievement: " + achievement);
+        }
         assertTrue(hasAchievement("heroes-of-gwen", "know-your-enemy", "Know Your Enemy"));
         assertTrue(hasAchievement("castle-assault", "moral-exercise", "Moral Exercise"));
         assertTrue(hasAchievement("skywars", "death-bomber", "Death Bomber"));
