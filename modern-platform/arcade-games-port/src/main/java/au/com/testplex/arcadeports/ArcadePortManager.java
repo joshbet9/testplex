@@ -24884,6 +24884,15 @@ public final class ArcadePortManager implements Listener {
                 && plugin.getPlexballGame() != null) {
             plugin.getPlexballGame().stopForArcadeLifecycle(reason);
         }
+        // Stop Monster Maze while its players are still in the arena. Restoring
+        // them first fires world-change eliminations, which can transition the
+        // module into ENDING and schedule a stale completion for the next mode.
+        if (monsterMazeModule != null && monsterMazeModule.getGameManager() != null
+                && shouldStopMonsterMazeBeforeRestore(
+                        stopping == null ? null : stopping.type,
+                        monsterMazeModule.getGameManager().getState())) {
+            monsterMazeModule.getGameManager().forceStop();
+        }
         if (stopping != null) {
             try {
                 finish(stopping, null, false);
@@ -24900,10 +24909,6 @@ public final class ArcadePortManager implements Listener {
                 endingSnapshots.clear();
             }
         } else hoops.shutdown();
-        if (monsterMazeRunning() && monsterMazeModule != null
-                && monsterMazeModule.getGameManager() != null) {
-            monsterMazeModule.getGameManager().forceStop();
-        }
         if (monsterMazeModule != null) monsterMazeModule.clearActiveArcadeGame();
         if (!cameraShyWasActive && !speedBuildersWasActive) testPlayers.despawnSessionPlayers();
         // Camera Shy and Speed Builders own their AFK-roster restoration lifecycles.
@@ -24924,6 +24929,15 @@ public final class ArcadePortManager implements Listener {
         queues.clear();
         gladiatorLobbyVotes.clear();
         plugin.getLogger().info("Modern Arcade ports reset: " + reason);
+    }
+
+    static boolean shouldStopMonsterMazeBeforeRestore(
+            ArcadePortGame sessionType, me.monstermaze.game.GameState moduleState) {
+        if (moduleState == null) return false;
+        if (moduleState == me.monstermaze.game.GameState.STARTING
+                || moduleState == me.monstermaze.game.GameState.LIVE) return true;
+        return moduleState == me.monstermaze.game.GameState.ENDING
+                && sessionType != null && sessionType.isMonsterMaze();
     }
 
     public String status() {
