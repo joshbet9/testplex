@@ -67,6 +67,7 @@ public final class HoopsPaperSmoke extends JavaPlugin {
     private UUID passPasserId;
     private UUID passReceiverId;
     private UUID firstShooterId;
+    private int expectedCareerPointsBeforeMatch;
     private UUID blockerId;
     private int firstScoringTeam = -1;
     private int stage;
@@ -434,7 +435,8 @@ public final class HoopsPaperSmoke extends JavaPlugin {
             }).findFirst().orElseThrow();
             long firstPointsTier = ((long[]) method(pointsMilestone.getClass(), "stages")
                     .invoke(pointsMilestone))[0];
-            arcadePlugin.getConfig().set(prefix + "points", firstPointsTier);
+            expectedCareerPointsBeforeMatch = Math.toIntExact(firstPointsTier);
+            arcadePlugin.getConfig().set(prefix + "points", expectedCareerPointsBeforeMatch);
             require(unlockChatCount() == 1, "midgame milestone tier did not announce in chat");
             require(unlockChatCount() == 0, "midgame notifications repeated without new progress");
             midgameUnlockChatChecked = true;
@@ -804,8 +806,11 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         Class<?> debugOverrides = Class.forName("au.com.testplex.arcadeports.GameDebugRuntimeOverrides", true,
                 arcade.getClass().getClassLoader());
         boolean debugSession = Boolean.TRUE.equals(debugOverrides.getMethod("isDebugSession").invoke(null));
-        require(persistedPoints == 2,
-                "lifetime points were not persisted for " + shooterId + ": expected 2, found "
+        require(inMatchPoints == 2,
+                "Hoops match points incorrect for " + shooterId + ": expected 2, found " + inMatchPoints);
+        require(persistedPoints == expectedCareerPointsBeforeMatch + 2,
+                "lifetime points delta was not persisted for " + shooterId + ": baseline "
+                        + expectedCareerPointsBeforeMatch + " + 2, found "
                         + persistedPoints + ", in-match=" + inMatchPoints + ", debug-session=" + debugSession
                         + ", all-player-points={" + pointsByPlayer + "}");
         require(scores[winningTeam] >= 21, "final score did not reach 21");
