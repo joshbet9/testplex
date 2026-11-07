@@ -20508,6 +20508,16 @@ public final class ArcadePortManager implements Listener {
         }
         if (announceWinner && session.type == ArcadePortGame.MILK_THE_COW && winner != null) {
             UUID winnerId = winner.getUniqueId();
+            if (session.teams.getOrDefault(winnerId, 1) == 0
+                    && MilkCowAchievementRules.shouldAwardWholeHerd(
+                            session.milkCowSourcesByFarmer.getOrDefault(winnerId, Set.of()).size(), true)) {
+                awardCatalogAchievement(winner, "milk-the-cow", "whole-herd");
+            }
+            for (UUID candidateId : session.milkSpiltMilkCandidates) {
+                if (!candidateId.equals(winnerId)) {
+                    awardCatalogAchievement(candidateId, "milk-the-cow", "spilt-milk");
+                }
+            }
             if (ArcadeProgressRules.shouldAwardMilkCowPerfectGame(session.milkDeathCounts.getOrDefault(winnerId, 0))) {
                 awardCatalogAchievement(winner, "milk-the-cow", "perfect-game");
             }
@@ -26987,6 +26997,8 @@ public final class ArcadePortManager implements Listener {
             if (cowPlayer != null && session.teams.getOrDefault(cowPlayer.getUniqueId(), 0) == 1) {
                 event.setCancelled(true);
                 player.getInventory().setItemInMainHand(new ItemStack(Material.MILK_BUCKET));
+                session.milkCowSourcesByFarmer.computeIfAbsent(player.getUniqueId(), ignored -> new HashSet<>())
+                        .add(cowPlayer.getUniqueId());
                 player.playSound(player.getLocation(), Sound.ENTITY_COW_AMBIENT, 0.7F, 1.4F);
                 return;
             }
@@ -27180,6 +27192,14 @@ public final class ArcadePortManager implements Listener {
         }
         if (!plugin.hasAdminAccess(player)
                 || debugFeatureEnabled(drinkerId, ArcadePortGame.MILK_THE_COW, "milk-scoring", true)) {
+            int pointsPerMilk = GameDebugRuntimeOverrides.intValue(
+                    "MILK_THE_COW_SCORE_PER_MILK", MilkCowRules.SCORE_PER_MILK);
+            int score = session.scores.getOrDefault(drinkerId, 0);
+            int scoreToWin = GameDebugRuntimeOverrides.intValue(
+                    "MILK_THE_COW_SCORE_TO_WIN", MilkCowRules.SCORE_TO_WIN);
+            if (MilkCowAchievementRules.shouldAwardLastDrop(player.getHealth(), score, pointsPerMilk, scoreToWin)) {
+                awardCatalogAchievement(player, "milk-the-cow", "last-drop");
+            }
             incrementMilkCowScore(session, player, GameDebugRuntimeOverrides.intValue(
                     "MILK_THE_COW_SCORE_PER_MILK", MilkCowRules.SCORE_PER_MILK), "Milk drunk");
         }
@@ -27781,6 +27801,11 @@ public final class ArcadePortManager implements Listener {
         UUID id = player.getUniqueId();
         int score = MilkCowRules.scoreAfterChange(session.scores.getOrDefault(id, 0), change);
         session.scores.put(id, score);
+        int scoreToWin = GameDebugRuntimeOverrides.intValue(
+                "MILK_THE_COW_SCORE_TO_WIN", MilkCowRules.SCORE_TO_WIN);
+        if (score != scoreToWin - 1 && !session.milkSpiltMilkCandidates.contains(id)) {
+            session.milkNearWinBucketEmptyings.remove(id);
+        }
         int bestOpponentScore = session.scores.entrySet().stream()
                 .filter(entry -> !entry.getKey().equals(id))
                 .mapToInt(Map.Entry::getValue).max().orElse(0);
@@ -27848,9 +27873,18 @@ public final class ArcadePortManager implements Listener {
             cows = List.of(promoted);
         }
         for (Player cowPlayer : cows) {
-            if (!cowPlayer.isSprinting()) continue;
+            UUID cowId = cowPlayer.getUniqueId();
+            if (!cowPlayer.isSprinting()) {
+                session.milkCowChargeSequences.remove(cowId);
+                continue;
+            }
             if (plugin.hasAdminAccess(cowPlayer)
-                    && !debugFeatureEnabled(cowPlayer.getUniqueId(), ArcadePortGame.MILK_THE_COW, "cow-charge", true)) continue;
+                    && !debugFeatureEnabled(cowId, ArcadePortGame.MILK_THE_COW, "cow-charge", true)) {
+                session.milkCowChargeSequences.remove(cowId);
+                continue;
+            }
+            MilkCowChargeSequence chargeSequence = session.milkCowChargeSequences.computeIfAbsent(
+                    cowId, ignored -> new MilkCowChargeSequence());
             Location forward = cowPlayer.getLocation().clone().add(cowPlayer.getLocation().getDirection().setY(0).normalize());
             double chargeRadius = MilkCowRules.cowChargeTargetRadiusBlocks();
             for (Entity nearby : session.world.getNearbyEntities(forward, chargeRadius,
@@ -27861,10 +27895,29 @@ public final class ArcadePortManager implements Listener {
                 long ready = session.milkChargeCooldowns.getOrDefault(key, 0L);
                 if (now < ready) continue;
                 session.milkChargeCooldowns.put(key, now + MilkCowRules.cowChargeTargetCooldownMillis());
+                boolean emptiedMilkBucket = false;
                 for (ItemStack stack : target.getInventory().getContents()) {
-                    if (stack != null && stack.getType() == Material.MILK_BUCKET) stack.setType(Material.BUCKET);
+                    if (stack != null && stack.getType() == Material.MILK_BUCKET) {
+                        stack.setType(Material.BUCKET);
+                        emptiedMilkBucket = true;
+                    }
                 }
-                damageMilkCowFarmer(session, target, cowPlayer, MilkCowRules.cowChargeDamage());
+                if (emptiedMilkBucket) {
+                    UUID targetId = target.getUniqueId();
+                    int score = session.scores.getOrDefault(targetId, 0);
+                    int scoreToWin = GameDebugRuntimeOverrides.intValue(
+                            "MILK_THE_COW_SCORE_TO_WIN", MilkCowRules.SCORE_TO_WIN);
+                    if (score == scoreToWin - 1) {
+                        int emptyings = session.milkNearWinBucketEmptyings.merge(targetId, 1, Integer::sum);
+                        if (emptyings >= MilkCowAchievementRules.SPILT_MILK_REQUIRED_EMPTYINGS) {
+                            session.milkSpiltMilkCandidates.add(targetId);
+                        }
+                    } else {
+                        session.milkNearWinBucketEmptyings.remove(targetId);
+                    }
+                }
+                damageMilkCowFarmer(session, target, cowPlayer, MilkCowRules.cowChargeDamage(),
+                        "cow-charge", chargeSequence.id);
                 Vector push = target.getLocation().toVector().subtract(cowPlayer.getLocation().toVector());
                 push.setY(MilkCowRules.cowChargeImpactVertical());
                 if (push.lengthSquared() > 0.001D) {
@@ -27962,10 +28015,25 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void damageMilkCowFarmer(Session session, Player target, Player attacker, double damage) {
+        damageMilkCowFarmer(session, target, attacker, damage, null, null);
+    }
+
+    private void damageMilkCowFarmer(Session session, Player target, Player attacker, double damage,
+            String ability, UUID activationId) {
         if (active != session || target == null || !session.alive.contains(target.getUniqueId())
                 || session.teams.getOrDefault(target.getUniqueId(), 0) != 0 || damage <= 0.0D) return;
         UUID targetId = target.getUniqueId();
         UUID attackerId = attacker == null ? null : attacker.getUniqueId();
+        boolean lethalHit = target.getHealth() <= damage;
+        if (ability != null && attacker != null && session.teams.getOrDefault(attackerId, -1) == 1) {
+            recordMilkCowAbilityHit(session, attacker, target, ability, activationId, lethalHit);
+        }
+        if (lethalHit && attacker != null && session.teams.getOrDefault(attackerId, -1) == 1
+                && MilkCowAchievementRules.shouldAwardFullMoo(
+                        session.milkCowAbilityHitsByTarget.getOrDefault(targetId, Map.of())
+                                .get(attackerId), true)) {
+            awardCatalogAchievement(attacker, "milk-the-cow", "the-full-moo");
+        }
         long now = System.currentTimeMillis();
         Map<UUID, Long> contributors = session.milkDamageAtByTarget.computeIfAbsent(
                 targetId, ignored -> new HashMap<>());
@@ -27973,6 +28041,7 @@ public final class ArcadePortManager implements Listener {
             contributors.put(attackerId, now);
         }
         if (target.getHealth() <= damage) {
+            session.milkCowAbilityHitsByTarget.remove(targetId);
             session.milkDeathCounts.merge(targetId, 1, Integer::sum);
             if (attacker != null && session.teams.getOrDefault(attackerId, -1) == 1) {
                 session.milkKillsByPlayer.merge(attackerId, 1, Integer::sum);
@@ -28013,6 +28082,48 @@ public final class ArcadePortManager implements Listener {
         } else {
             target.setHealth(Math.max(1.0D, target.getHealth() - damage));
             playLegacyDamageFeedback(target);
+        }
+    }
+
+    private void recordMilkCowAbilityHit(Session session, Player cow, Player farmer, String ability,
+            UUID activationId, boolean lethalHit) {
+        UUID cowId = cow.getUniqueId();
+        UUID farmerId = farmer.getUniqueId();
+        Set<String> abilities = session.milkCowAbilityHitsByTarget
+                .computeIfAbsent(farmerId, ignored -> new HashMap<>())
+                .computeIfAbsent(cowId, ignored -> new HashSet<>());
+        abilities.add(ability);
+
+        if (activationId == null) return;
+        if ("cow-bomb".equals(ability)) {
+            Set<UUID> hitFarmers = session.milkCowBombTargetsByActivation
+                    .computeIfAbsent(activationId, ignored -> new HashSet<>());
+            hitFarmers.add(farmerId);
+            int eliminations = session.milkCowBombEliminationsByActivation.getOrDefault(activationId, 0);
+            if (lethalHit) eliminations = session.milkCowBombEliminationsByActivation.merge(
+                    activationId, 1, Integer::sum);
+            if (MilkCowAchievementRules.shouldAwardAreaAbility(hitFarmers.size(), eliminations)) {
+                awardCatalogAchievement(cow, "milk-the-cow", "udderly-explosive");
+            }
+        } else if ("body-slam".equals(ability)) {
+            Set<UUID> hitFarmers = session.milkBodySlamTargetsByActivation
+                    .computeIfAbsent(activationId, ignored -> new HashSet<>());
+            hitFarmers.add(farmerId);
+            int eliminations = session.milkBodySlamEliminationsByActivation.getOrDefault(activationId, 0);
+            if (lethalHit) eliminations = session.milkBodySlamEliminationsByActivation.merge(
+                    activationId, 1, Integer::sum);
+            if (MilkCowAchievementRules.shouldAwardAreaAbility(hitFarmers.size(), eliminations)) {
+                awardCatalogAchievement(cow, "milk-the-cow", "seismic-stampede");
+            }
+        } else if ("cow-charge".equals(ability)) {
+            MilkCowChargeSequence sequence = session.milkCowChargeSequences.get(cowId);
+            if (sequence == null || !sequence.id.equals(activationId)) return;
+            sequence.hitFarmers.add(farmerId);
+            if (lethalHit) sequence.creditedEliminations++;
+            if (MilkCowAchievementRules.shouldAwardStampede(
+                    sequence.hitFarmers.size(), sequence.creditedEliminations)) {
+                awardCatalogAchievement(cow, "milk-the-cow", "stampede");
+            }
         }
     }
 
@@ -28057,12 +28168,15 @@ public final class ArcadePortManager implements Listener {
         for (Entity nearby : centre.getWorld().getNearbyEntities(centre, contactRadius, contactRadius, contactRadius)) {
             if (!(nearby instanceof Player target) || session.teams.getOrDefault(target.getUniqueId(), 1) != 0
                     || !session.alive.contains(target.getUniqueId())) continue;
-            damageMilkCowFarmer(session, target, owner, MilkCowRules.cowBombDamage());
+            damageMilkCowFarmer(session, target, owner, MilkCowRules.cowBombDamage(),
+                    "cow-bomb", bomb.getUniqueId());
             Vector push = target.getLocation().toVector().subtract(centre.toVector());
             push.setY(MilkCowRules.cowBombKnockbackVertical());
             if (push.lengthSquared() > 0.001D) target.setVelocity(push.normalize().multiply(MilkCowRules.cowBombKnockback()));
             if (active != session) return;
         }
+        session.milkCowBombTargetsByActivation.remove(bomb.getUniqueId());
+        session.milkCowBombEliminationsByActivation.remove(bomb.getUniqueId());
     }
 
     private void startMilkCowBodySlam(Session session, Player player, long now) {
@@ -28076,6 +28190,7 @@ public final class ArcadePortManager implements Listener {
         session.milkBodySlamReadyAt.put(id, now + cooldown);
         cooldownProgress.start(player, "Body Slam", cooldown);
         session.milkBodySlamStartedAt.put(id, now);
+        session.milkBodySlamActivationByCow.put(id, UUID.randomUUID());
         Vector leap = player.getLocation().getDirection().normalize().multiply(MilkCowRules.bodySlamLaunchSpeed());
         leap.setY(Math.max(MilkCowRules.bodySlamMinLaunchVertical(),
                 Math.abs(leap.getY()) + MilkCowRules.bodySlamLaunchVerticalBonus()));
@@ -28084,6 +28199,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void resolveMilkCowBodySlam(Session session, Player player) {
+        UUID activationId = session.milkBodySlamActivationByCow.remove(player.getUniqueId());
+        if (activationId == null) return;
         Location centre = player.getLocation().clone();
         centre.getWorld().playSound(centre, Sound.ENTITY_GENERIC_EXPLODE, 0.8F, 0.65F);
         double radius = MilkCowRules.bodySlamRadiusBlocks();
@@ -28093,7 +28210,8 @@ public final class ArcadePortManager implements Listener {
                     || session.teams.getOrDefault(target.getUniqueId(), 1) != 0
                     || !session.alive.contains(target.getUniqueId())) continue;
             double distance = target.getLocation().distance(centre);
-            damageMilkCowFarmer(session, target, player, MilkCowRules.bodySlamDamageAtDistance(distance));
+            damageMilkCowFarmer(session, target, player, MilkCowRules.bodySlamDamageAtDistance(distance),
+                    "body-slam", activationId);
             Vector push = target.getLocation().toVector().subtract(centre.toVector());
             push.setY(MilkCowRules.bodySlamKnockbackVerticalAtDistance(distance));
             if (push.lengthSquared() > 0.001D) {
@@ -28101,6 +28219,8 @@ public final class ArcadePortManager implements Listener {
             }
             if (active != session) return;
         }
+        session.milkBodySlamTargetsByActivation.remove(activationId);
+        session.milkBodySlamEliminationsByActivation.remove(activationId);
     }
 
     private Location witherAssaultSpawn(Session session, Player player) {
@@ -31210,6 +31330,12 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private static final class MilkCowChargeSequence {
+        final UUID id = UUID.randomUUID();
+        final Set<UUID> hitFarmers = new HashSet<>();
+        int creditedEliminations;
+    }
+
     private static final class Session {
         final Map<Block, Long> evolutionWebs = new HashMap<>();
         SuperSploorEngine superSploorEngine;
@@ -31420,9 +31546,16 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Cow> milkCowBombs = new HashMap<>();
         final Map<UUID, Long> milkCowBombExpiresAt = new HashMap<>();
         final Map<UUID, UUID> milkCowBombOwners = new HashMap<>();
+        final Map<UUID, Set<UUID>> milkCowBombTargetsByActivation = new HashMap<>();
+        final Map<UUID, Integer> milkCowBombEliminationsByActivation = new HashMap<>();
         final Map<UUID, Long> milkBombReadyAt = new HashMap<>();
         final Map<UUID, Long> milkBodySlamStartedAt = new HashMap<>();
         final Map<UUID, Long> milkBodySlamReadyAt = new HashMap<>();
+        final Map<UUID, UUID> milkBodySlamActivationByCow = new HashMap<>();
+        final Map<UUID, Set<UUID>> milkBodySlamTargetsByActivation = new HashMap<>();
+        final Map<UUID, Integer> milkBodySlamEliminationsByActivation = new HashMap<>();
+        final Map<UUID, MilkCowChargeSequence> milkCowChargeSequences = new HashMap<>();
+        final Map<UUID, Map<UUID, Set<String>>> milkCowAbilityHitsByTarget = new HashMap<>();
         final Map<UUID, Cow> milkCowDisguises = new HashMap<>();
         final Map<UUID, Long> milkChargeHungerAt = new HashMap<>();
         final Map<UUID, Integer> milkDeathCounts = new HashMap<>();
@@ -31435,6 +31568,9 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Integer> milkAssistsByPlayer = new HashMap<>();
         final Map<UUID, Integer> milkAirborneKillsByPlayer = new HashMap<>();
         final Map<UUID, Integer> milkBucketsDigested = new HashMap<>();
+        final Map<UUID, Set<UUID>> milkCowSourcesByFarmer = new HashMap<>();
+        final Map<UUID, Integer> milkNearWinBucketEmptyings = new HashMap<>();
+        final Set<UUID> milkSpiltMilkCandidates = new HashSet<>();
         final Map<UUID, Map<UUID, Long>> milkDamageAtByTarget = new HashMap<>();
         UUID milkCurrentLeader;
         final Map<UUID, String> witherAssaultKits = new HashMap<>();

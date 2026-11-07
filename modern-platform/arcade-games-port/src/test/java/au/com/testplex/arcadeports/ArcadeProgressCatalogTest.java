@@ -274,6 +274,23 @@ class ArcadeProgressCatalogTest {
     }
 
     @Test
+    void milkTheCowHasFourteenAchievementsWithTheApprovedNewChallenges() {
+        var achievements = ArcadeProgressCatalog.achievements("milk-the-cow");
+        assertEquals(14, achievements.size());
+        assertEquals(14, achievements.stream().map(ArcadeProgressCatalog.Achievement::id).distinct().count());
+        for (String id : List.of("pure-skill", "pinger", "milk-high-club", "perfect-game",
+                "slaughterhouse", "stop-stop-hes-already-dead", "got-the-chops", "last-drop",
+                "whole-herd", "udderly-explosive", "seismic-stampede", "the-full-moo",
+                "stampede", "spilt-milk")) {
+            assertTrue(achievements.stream().anyMatch(entry -> entry.id().equals(id)), id);
+        }
+        assertTrue(achievements.stream().anyMatch(entry -> entry.id().equals("stampede")
+                && entry.requirement().contains("five different Farmers")
+                && entry.requirement().contains("three credited eliminations")));
+        assertFalse(ArcadeProgressCatalog.milestones("milk-the-cow").isEmpty());
+    }
+
+    @Test
     void secondMilestoneBatchUsesAllRequestedLifetimeTargets() {
         assertMilestone("sneaky-assassins", "kills", "kills", 1000, new long[] {100, 250, 500, 1000});
         assertMilestone("sneaky-assassins", "wins", "wins", 250, new long[] {25, 63, 125, 250});

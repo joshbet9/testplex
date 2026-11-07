@@ -72,7 +72,7 @@ These IDs are declared in `ArcadeProgressCatalog` but have no literal runtime aw
 | Hoops Remastered | 9 | 5 | None | Nine award candidates in `HoopsRemasteredRuntime`; fixed sporting role—consider prestige move effect or carefully balanced ability. |
 | Master Builders | 4 | 10 | None | Four award candidates; avoid an achievement tool granting competitive votes/building advantage. Cosmetic prestige may fit. |
 | Micro Battles | 9 | 5 | Dasher | Local `speedster` award and in-selector Dasher guard exist; UI/shared map are not the same rule. Test award after a genuine sub-90-second win and no menu preference bypass. |
-| Milk the Cow | 7 | 7 | None | Seven award candidates including `slaughterhouse`/`got-the-chops`; fixed asymmetric cow/human roles suggest a visual prestige reward. |
+| Milk the Cow | 14 | 0 | None | Fourteen catalogue entries; existing seven detectors retained and seven new event detectors added for Last Drop, Whole Herd, Cow Bomb, Body Slam, Full Moo, Stampede, and Spilt Milk. Automated predicate/catalog tests added; live Paper 26.3 acceptance remains outstanding. |
 | Monster Maze (Original/Speed/Modern) | 9 | 5 | Repulsor, Maverick | **Bridge** to Monster Maze; neither purple kit has a shared entitlement. Inspect its actual kit ability and award emitters before selecting requirements. |
 | One in the Quiver | 8 | 6 | Ninja | Award candidates through Quiver enum and catalogue; **Ninja has no entitlement**. |
 | Paintball | 5 | 9 | Sniper | All five award calls found; **Sniper has no entitlement**; choose an earnable Rifle/Shotgun challenge, not a Sniper-only one. |
