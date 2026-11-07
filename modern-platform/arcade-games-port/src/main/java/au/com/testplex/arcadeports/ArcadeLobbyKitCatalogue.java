@@ -217,7 +217,7 @@ final class ArcadeLobbyKitCatalogue {
             case SNEAKY_ASSASSINS -> List.of(
                     choice("escape-artist", "Escape Artist", Material.INK_SAC,
                             Unlock.FREE, Villager.class, Material.INK_SAC),
-                    choice("assassin", "Assassin", Material.BOW,
+                    choice("assassin", "Ranged Assassin", Material.BOW,
                             Unlock.GEM, Villager.class, Material.BOW),
                     choice("briber", "Briber", Material.EMERALD,
                             Unlock.ACHIEVEMENT, Villager.class, Material.EMERALD),

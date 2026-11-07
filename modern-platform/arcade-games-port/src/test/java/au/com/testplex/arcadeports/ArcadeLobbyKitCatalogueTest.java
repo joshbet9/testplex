@@ -125,6 +125,14 @@ class ArcadeLobbyKitCatalogueTest {
     }
 
     @Test
+    void sneakyAssassinsDisplaysTheRangedAssassinName() {
+        ArcadeLobbyKitCatalogue.KitChoice choice = ArcadeLobbyKitCatalogue
+                .forGame(ArcadePortGame.SNEAKY_ASSASSINS, List.of()).stream()
+                .filter(kit -> kit.id.equals("assassin")).findFirst().orElseThrow();
+        assertEquals("Ranged Assassin", choice.name);
+    }
+
+    @Test
     void gamesWithoutLobbyKitStationsExposeNoChoices() {
         assertTrue(ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.MILK_THE_COW, List.of()).isEmpty());
         assertTrue(ArcadeLobbyKitCatalogue.forGame(null, List.of()).isEmpty());

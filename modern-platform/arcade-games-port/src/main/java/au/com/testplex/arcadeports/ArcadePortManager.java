@@ -23511,9 +23511,11 @@ public final class ArcadePortManager implements Listener {
             lore.add(ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE + unlocked
                     + "/" + runnerAchievements.size());
         } else if ("sneaky-assassins".equals(gameId)) {
-            boolean unlocked = plugin.getConfig().getBoolean(
-                    "test-achievements.sneaky-assassins." + targetId + ".the-masters-master", false);
-            lore.add(ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE + (unlocked ? "1/1" : "0/1"));
+            List<ArcadeProgressCatalog.Achievement> achievements = ArcadeProgressCatalog.achievements("sneaky-assassins");
+            long unlocked = achievements.stream().filter(achievement -> statsAchievementUnlocked(
+                    targetId, "sneaky-assassins", new StatsAchievement(achievement.id(),
+                            achievement.name(), achievement.requirement()))).count();
+            lore.add(ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE + unlocked + "/" + achievements.size());
             String statPath = "local-stats." + targetId + ".sneaky-assassins.";
             lore.add(ChatColor.GRAY + "Master Assassin: " + plugin.getConfig().getInt(statPath + "master-assassin", 0));
             lore.add(ChatColor.GRAY + "I See You: " + plugin.getConfig().getInt(statPath + "i-see-you", 0));

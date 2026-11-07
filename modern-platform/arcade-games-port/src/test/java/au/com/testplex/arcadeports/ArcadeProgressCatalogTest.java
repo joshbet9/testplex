@@ -290,6 +290,29 @@ class ArcadeProgressCatalogTest {
     }
 
     @Test
+    void snapSneakyAssassinsAndSpeedBuildersApprovedCataloguesAreComplete() {
+        assertEquals(20, CameraShyProgressCatalog.achievements().size());
+        assertEquals(14, ArcadeProgressCatalog.achievements("sneaky-assassins").size());
+        assertEquals("Win 15 games of Sneaky Assassins.", ArcadeProgressCatalog.achievements("sneaky-assassins")
+                .stream().filter(a -> a.id().equals("so-so-sneaky")).findFirst().orElseThrow().requirement());
+        assertTrue(hasAchievement("sneaky-assassins", "master-assassin", "Master Assassin"));
+        assertTrue(hasAchievement("sneaky-assassins", "the-masters-master", "The Master’s Master"));
+        assertTrue(hasAchievement("sneaky-assassins", "incompetence", "Incompetence"));
+        assertTrue(hasAchievement("sneaky-assassins", "i-see-you", "I See You"));
+        assertTrue(ArcadeProgressCatalog.achievements("sneaky-assassins").stream()
+                .anyMatch(a -> a.id().equals("smoke-screen") && a.requirement().contains("three pursuits")));
+        assertTrue(ArcadeProgressCatalog.achievements("sneaky-assassins").stream()
+                .anyMatch(a -> a.id().equals("paid-in-full") && a.requirement().contains("final elimination")));
+        assertEquals(14, ArcadeProgressCatalog.achievements("speed-builders-arcade").size());
+        for (String id : List.of("speed-master", "dependable", "first-build", "perfectionist",
+                "speediest-builderizer", "first-impressions", "no-takebacks", "menagerie",
+                "palette-pro", "rapid-replica")) {
+            assertTrue(ArcadeProgressCatalog.achievements("speed-builders-arcade").stream()
+                    .anyMatch(achievement -> achievement.id().equals(id)), id);
+        }
+    }
+
+    @Test
     void castleAssaultHasFourteenAchievementsCoveringAllFiveKits() {
         assertEquals(14, ArcadeProgressCatalog.achievements("castle-assault").size());
         assertTrue(hasAchievement("castle-assault", "bad-chemistry", "Bad Chemistry"));
