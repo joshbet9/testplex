@@ -52,6 +52,12 @@ final class SneakyAssassinsRules {
     public static final int NPC_SPAWN_SEARCH_ATTEMPTS = 80;
     public static final int PROSECUTOR_DISTINCT_TARGETS_REQUIRED = 5;
     public static final int DUELS_OTHER_MASTERS_REQUIRED = 2;
+    public static final int SO_SO_SNEAKY_WINS_REQUIRED = 15;
+    public static final int MASTER_ASSASSIN_ACHIEVEMENTS_REQUIRED = 10;
+    public static final int INCOMPETENCE_NPCS_REQUIRED = 200;
+    public static final int I_SEE_YOU_REVEALS_REQUIRED = 50;
+    public static final int SMOKE_SCREEN_ESCAPES_REQUIRED = 3;
+    public static final int DEADEYE_BOW_KILLS_REQUIRED = 3;
     public static final int BASE_SMOKE_BOMBS = 1;
     public static final int ESCAPE_ARTIST_EXTRA_SMOKE_BOMBS = 2;
     public static final int ASSASSIN_STARTING_ARROWS = 32;
@@ -82,6 +88,32 @@ final class SneakyAssassinsRules {
     static boolean shouldAwardProsecutor(int distinctTargets) {
         return distinctTargets >= GameDebugRuntimeOverrides.intValue(
                 "SNEAKY_ASSASSINS_PROSECUTOR_DISTINCT_TARGETS_REQUIRED", PROSECUTOR_DISTINCT_TARGETS_REQUIRED);
+    }
+
+    static boolean shouldAwardSmokeScreen(String kit, int smokeEscapes) {
+        return "escape-artist".equals(kit) && smokeEscapes >= SMOKE_SCREEN_ESCAPES_REQUIRED;
+    }
+
+    static boolean smokePursuitWasEscaped(boolean pursuerStillEligible, boolean pursuerStillNearby) {
+        return pursuerStillEligible && !pursuerStillNearby;
+    }
+
+    static boolean shouldAwardDeadeye(String kit, int bowKills) {
+        return "assassin".equals(kit) && bowKills >= DEADEYE_BOW_KILLS_REQUIRED;
+    }
+
+    static boolean shouldAwardPaidInFull(boolean winner, boolean finalEliminationByBribedVillager) {
+        return winner && finalEliminationByBribedVillager;
+    }
+
+    static String achievementForLifetimeStat(String stat, int value) {
+        if (stat == null) return null;
+        return switch (stat) {
+            case "master-assassin" -> value >= MASTER_ASSASSIN_ACHIEVEMENTS_REQUIRED ? "master-assassin" : null;
+            case "incompetence" -> value >= INCOMPETENCE_NPCS_REQUIRED ? "incompetence" : null;
+            case "i-see-you" -> value >= I_SEE_YOU_REVEALS_REQUIRED ? "i-see-you" : null;
+            default -> null;
+        };
     }
 
     static boolean isPowerUpKillWindow(long nowMillis, long collectedAtMillis) {

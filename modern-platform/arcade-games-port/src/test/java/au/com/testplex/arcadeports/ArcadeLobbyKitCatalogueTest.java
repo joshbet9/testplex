@@ -35,6 +35,24 @@ class ArcadeLobbyKitCatalogueTest {
     }
 
     @Test
+    void oneInTheQuiverShowsJumperWhileKeepingItsStableKitId() {
+        ArcadeLobbyKitCatalogue.KitChoice jumper =
+                ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.ONE_IN_THE_QUIVER, List.of()).stream()
+                        .filter(choice -> choice.id.equals("quiver-leaper")).findFirst().orElseThrow();
+        assertEquals("Jumper", jumper.name);
+        assertEquals("quiver-leaper", jumper.id);
+    }
+
+    @Test
+    void runnerShowsJumperWhileKeepingItsStableKitId() {
+        ArcadeLobbyKitCatalogue.KitChoice jumper =
+                ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.RUNNER, List.of()).stream()
+                        .filter(choice -> choice.id.equals("runnerkit-leaper")).findFirst().orElseThrow();
+        assertEquals("Jumper", jumper.name);
+        assertEquals("runnerkit-leaper", jumper.id);
+    }
+
+    @Test
     void preservesTheReviewedBombLobbersKitOrder() {
         assertEquals(List.of("acrobat", "armorer", "constructor"),
                 ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.BOMB_LOBBERS, List.of()).stream()
@@ -121,6 +139,14 @@ class ArcadeLobbyKitCatalogueTest {
         assertEquals(ArcadeLobbyKitCatalogue.Unlock.GEM, choices.get(1).unlock);
         assertEquals(ArcadeLobbyKitCatalogue.Unlock.GEM, choices.get(2).unlock);
         assertEquals(ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT, choices.get(3).unlock);
+    }
+
+    @Test
+    void sneakyAssassinsDisplaysTheRangedAssassinName() {
+        ArcadeLobbyKitCatalogue.KitChoice choice = ArcadeLobbyKitCatalogue
+                .forGame(ArcadePortGame.SNEAKY_ASSASSINS, List.of()).stream()
+                .filter(kit -> kit.id.equals("assassin")).findFirst().orElseThrow();
+        assertEquals("Ranged Assassin", choice.name);
     }
 
     @Test

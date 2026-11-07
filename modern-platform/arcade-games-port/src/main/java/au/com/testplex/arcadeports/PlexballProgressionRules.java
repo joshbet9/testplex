@@ -35,8 +35,8 @@ public final class PlexballProgressionRules {
         return careerPerfectContacts >= PERFECT_CONTACTS_REQUIRED;
     }
 
-    public static boolean shouldAwardStickyGloves(int catchesInMatch) {
-        return catchesInMatch >= STICKY_GLOVES_CATCHES;
+    public static boolean shouldAwardStickyGloves(int bestConsecutiveCatchesInMatch) {
+        return bestConsecutiveCatchesInMatch >= STICKY_GLOVES_CATCHES;
     }
 
     public static boolean shouldAwardGoldenGlove(int catchesInMatch) {

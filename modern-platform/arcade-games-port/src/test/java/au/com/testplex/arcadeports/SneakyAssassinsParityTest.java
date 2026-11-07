@@ -12,6 +12,7 @@ class SneakyAssassinsParityTest {
         assertEquals("escape-artist", SneakyAssassinsMechanics.normalizeKit("Escape Artist"));
         assertEquals("escape-artist", SneakyAssassinsMechanics.normalizeKit("escape_artist"));
         assertEquals("assassin", SneakyAssassinsMechanics.normalizeKit("assassin"));
+        assertEquals("assassin", SneakyAssassinsMechanics.normalizeKit("Ranged Assassin"));
         assertEquals("briber", SneakyAssassinsMechanics.normalizeKit("BRIBER"));
         assertEquals("revealer", SneakyAssassinsMechanics.normalizeKit("revealer"));
         assertNull(SneakyAssassinsMechanics.normalizeKit("master-assassin"));
@@ -223,6 +224,28 @@ class SneakyAssassinsParityTest {
         assertEquals(12_000L, SneakyAssassinsRules.firstPowerUpDelayMillis());
         assertEquals(7_000L, SneakyAssassinsRules.nextPowerUpDelayMillis());
         assertEquals(2, SneakyAssassinsRules.maxActivePowerUps());
+    }
+
+    @Test void approvedAchievementConditionsUseExactGameEventsAndThresholds() {
+        assertFalse(SneakyAssassinsRules.shouldAwardSmokeScreen("escape-artist", 2));
+        assertTrue(SneakyAssassinsRules.shouldAwardSmokeScreen("escape-artist", 3));
+        assertFalse(SneakyAssassinsRules.shouldAwardSmokeScreen("briber", 3));
+        assertFalse(SneakyAssassinsRules.smokePursuitWasEscaped(false, false));
+        assertFalse(SneakyAssassinsRules.smokePursuitWasEscaped(true, true));
+        assertTrue(SneakyAssassinsRules.smokePursuitWasEscaped(true, false));
+        assertFalse(SneakyAssassinsRules.shouldAwardDeadeye("assassin", 2));
+        assertTrue(SneakyAssassinsRules.shouldAwardDeadeye("assassin", 3));
+        assertFalse(SneakyAssassinsRules.shouldAwardDeadeye("revealer", 3));
+        assertFalse(SneakyAssassinsRules.shouldAwardPaidInFull(true, false));
+        assertFalse(SneakyAssassinsRules.shouldAwardPaidInFull(false, true));
+        assertTrue(SneakyAssassinsRules.shouldAwardPaidInFull(true, true));
+        assertNull(SneakyAssassinsRules.achievementForLifetimeStat("incompetence", 199));
+        assertEquals("incompetence", SneakyAssassinsRules.achievementForLifetimeStat("incompetence", 200));
+        assertNull(SneakyAssassinsRules.achievementForLifetimeStat("i-see-you", 49));
+        assertEquals("i-see-you", SneakyAssassinsRules.achievementForLifetimeStat("i-see-you", 50));
+        assertNull(SneakyAssassinsRules.achievementForLifetimeStat("master-assassin", 9));
+        assertEquals("master-assassin", SneakyAssassinsRules.achievementForLifetimeStat("master-assassin", 10));
+        assertEquals(15, SneakyAssassinsRules.SO_SO_SNEAKY_WINS_REQUIRED);
     }
 
 }

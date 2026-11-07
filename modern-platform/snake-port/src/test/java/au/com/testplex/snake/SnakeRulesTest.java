@@ -276,6 +276,12 @@ class SnakeRulesTest {
         assertFalse(SnakeRules.shouldAwardSlimySheep(19));
     }
 
+    @Test void debugAndTestBotGamesCannotPersistSnakeProgression() {
+        assertFalse(SnakeRules.shouldPersistProgression(true, false));
+        assertFalse(SnakeRules.shouldPersistProgression(false, true));
+        assertTrue(SnakeRules.shouldPersistProgression(false, false));
+    }
+
     @Test void yawAndRadianWrappingKeepAnglesInExpectedRanges() {
         assertEquals(-170.0F, SnakeRules.wrapYaw(190.0F), 0.0001F);
         assertEquals(Math.PI / 2.0D, SnakeRules.wrapRadians(5.0D * Math.PI / 2.0D), 0.000001D);

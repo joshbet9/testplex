@@ -25,9 +25,9 @@ final class ArcadeAchievementProgress {
             entry("dragon-escape", "to-hell-and-back", "map-wins.through-hell", 5, "finishes"),
             entry("dragon-escape", "plundered", "map-wins.pirate-bay", 5, "finishes"),
             entry("dragons", "win-three-in-a-row", "win-streak", 3, "consecutive wins"),
-            entry("sheep-quest", "hungry-hungry-hippo", "wins", 50, "wins"),
-            entry("sheep-quest", "thief", "thief", 300, "sheep"),
-            entry("sheep-quest", "animal-rescue", "animal-rescue", 300, "rescues")
+            entry("sheep-quest", "hungry-hungry-hippo", "wins", 20, "wins"),
+            entry("sheep-quest", "thief", "thief", 100, "sheep"),
+            entry("sheep-quest", "animal-rescue", "animal-rescue", 100, "rescues")
     );
 
     private static Map.Entry<String, Counter> entry(String game, String achievement,

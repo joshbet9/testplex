@@ -12,11 +12,12 @@ and Death Tag requirements are implemented on this draft branch.
   family even though it is not a value of `ArcadePortGame`.
 - There are **30 game families** represented across four catalogues: `ArcadeProgressCatalog`,
   `PlexballAchievement`, `CameraShyProgressCatalog`, and `SuperSploorProgressCatalog`.
-- The current catalogue contains **281 declared achievements**. The 30-family minimum is 420.
-- **151 further additions** would fill all under-target catalogues, resulting in **427 total active
+- The current catalogue contains **301 declared achievements**. The 30-family minimum is 420.
+- **119 further additions** would fill all under-target catalogues, resulting in **427 total active
   achievements** if the existing definitions are retained: Snap has 20 and Super Sploor 15.
-  **No existing achievements are to be archived, deleted, or retired.** This supersedes the
-  earlier exact-14/archiving proposal following the user's decision.
+  Preserve existing achievements unless Josh explicitly approves a removal. The approved
+  One in the Quiver list removes duplicate Perfectionist while keeping its stored historical
+  unlock valid for Ninja's prerequisite.
 - Catalogue declarations are **not proof that award tracking is complete**. Every proposed or
   existing achievement must be cross-checked against the actual awarding events and persistence.
 
@@ -39,13 +40,13 @@ and Death Tag requirements are implemented on this draft branch.
 | Micro Battles | 9 | 5 | 0 |
 | Milk the Cow | 14 | 0 | 0 |
 | Monster Maze (all modes) | 14 | 0 | 0 |
-| One in the Quiver | 8 | 6 | 0 |
+| One in the Quiver | 7 | 7 | 0 |
 | Paintball | 5 | 9 | 0 |
 | Plexball | 9 | 5 | 0 |
-| Runner | 7 | 7 | 0 |
-| Sheep Quest | 12 | 2 | 0 |
-| SkyWars | 3 | 11 | 0 |
-| Snake | 9 | 5 | 0 |
+| Runner | 14 | 0 | 0 |
+| Sheep Quest | 14 | 0 | 0 |
+| SkyWars | 14 | 0 | 0 |
+| Snake | 14 | 0 | 0 |
 | Snap | 20 | 0 | 6 |
 | Sneaky Assassins | 6 | 8 | 0 |
 | Speed Builders (Arcade) | 4 | 10 | 0 |
@@ -54,7 +55,7 @@ and Death Tag requirements are implemented on this draft branch.
 | Turf Wars | 9 | 5 | 0 |
 | Wither Assault | 8 | 6 | 0 |
 | Wizards | 6 | 8 | 0 |
-| **Total** | **281** | **139** | **7** |
+| **Total** | **319** | **101** | **7** |
 
 ## Suggested review methodology
 

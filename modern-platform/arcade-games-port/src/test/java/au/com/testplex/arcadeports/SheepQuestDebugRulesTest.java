@@ -88,9 +88,11 @@ class SheepQuestDebugRulesTest {
     @Test void progressionAndAchievementConditionsUseProfileThresholdsAndResetToSourceValues() {
         assertFalse(ArcadePortRules.sheepQuestSoloCarryQualified(2));
         assertTrue(ArcadePortRules.sheepQuestSoloCarryQualified(3));
-        assertFalse(ArcadePortRules.sheepQuestThiefAchievementReached(299));
-        assertTrue(ArcadePortRules.sheepQuestAnimalRescueAchievementReached(300));
-        assertFalse(ArcadePortRules.sheepQuestHungryHungryHippoAchievementReached(49));
+        assertFalse(ArcadePortRules.sheepQuestThiefAchievementReached(99));
+        assertTrue(ArcadePortRules.sheepQuestThiefAchievementReached(100));
+        assertTrue(ArcadePortRules.sheepQuestAnimalRescueAchievementReached(100));
+        assertFalse(ArcadePortRules.sheepQuestHungryHungryHippoAchievementReached(19));
+        assertTrue(ArcadePortRules.sheepQuestHungryHungryHippoAchievementReached(20));
         assertTrue(ArcadePortRules.sheepQuestSelfishAchievementReached(13));
         assertFalse(ArcadePortRules.sheepQuestSelfishAchievementReached(12));
         assertFalse(ArcadePortRules.sheepQuestArcherAchievementReached(4));
@@ -116,7 +118,7 @@ class SheepQuestDebugRulesTest {
 
         GameDebugRuntimeOverrides.resetActiveValues();
         assertFalse(ArcadePortRules.sheepQuestSoloCarryQualified(2));
-        assertFalse(ArcadePortRules.sheepQuestThiefAchievementReached(299));
+        assertFalse(ArcadePortRules.sheepQuestThiefAchievementReached(99));
         assertFalse(ArcadePortRules.sheepQuestArcherAchievementReached(4));
         assertFalse(ArcadePortRules.sheepQuestMovementCreditIsRecent(10_001L, 5_000L));
     }

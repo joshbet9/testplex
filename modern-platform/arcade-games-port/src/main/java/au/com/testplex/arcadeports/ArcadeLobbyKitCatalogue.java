@@ -180,7 +180,7 @@ final class ArcadeLobbyKitCatalogue {
                     choice("maverick", "Maverick", Material.ARROW,
                             Unlock.ACHIEVEMENT, Skeleton.class, Material.BOW));
             case ONE_IN_THE_QUIVER -> List.of(
-                    choice("quiver-leaper", "Leaper", Material.RABBIT_FOOT,
+                    choice("quiver-leaper", "Jumper", Material.RABBIT_FOOT,
                             Unlock.FREE, Zombie.class, Material.STONE_SWORD),
                     choice("quiver-brawler", "Brawler", Material.IRON_SWORD,
                             Unlock.GEM, Zombie.class, Material.IRON_SWORD),
@@ -200,7 +200,7 @@ final class ArcadeLobbyKitCatalogue {
                     choice("machine-gun", "Machine Gun", Material.DISPENSER,
                             Unlock.GEM, Zombie.class, Material.DIAMOND_HORSE_ARMOR));
             case RUNNER -> List.of(
-                    choice("runnerkit-leaper", "Leaper", Material.RABBIT_FOOT,
+                    choice("runnerkit-leaper", "Jumper", Material.RABBIT_FOOT,
                             Unlock.FREE, Skeleton.class, Material.IRON_AXE),
                     choice("runnerkit-archer", "Archer", Material.BOW,
                             Unlock.GEM, Skeleton.class, Material.BOW),
@@ -220,7 +220,7 @@ final class ArcadeLobbyKitCatalogue {
             case SNEAKY_ASSASSINS -> List.of(
                     choice("escape-artist", "Escape Artist", Material.INK_SAC,
                             Unlock.FREE, Villager.class, Material.INK_SAC),
-                    choice("assassin", "Assassin", Material.BOW,
+                    choice("assassin", "Ranged Assassin", Material.BOW,
                             Unlock.GEM, Villager.class, Material.BOW),
                     choice("briber", "Briber", Material.EMERALD,
                             Unlock.ACHIEVEMENT, Villager.class, Material.EMERALD),

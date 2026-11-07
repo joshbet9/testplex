@@ -55,6 +55,21 @@ class PlexballProgressionRulesTest {
     }
 
     @Test
+    void kitAchievementsRequireTheWinningMatchAndTheirOwnAbilityCondition() {
+        assertFalse(PlexballAchievementRules.walkOffPowerDive(false, true));
+        assertTrue(PlexballAchievementRules.walkOffPowerDive(true, true));
+        assertFalse(PlexballAchievementRules.sureHands(true, true, 2));
+        assertTrue(PlexballAchievementRules.sureHands(true, true, 3));
+        assertFalse(PlexballAchievementRules.sureHands(true, false, 3));
+        assertFalse(PlexballAchievementRules.bendItIn(true, true, 2));
+        assertTrue(PlexballAchievementRules.bendItIn(true, true, 3));
+        assertFalse(PlexballAchievementRules.firstToHome(true, true, 1));
+        assertTrue(PlexballAchievementRules.firstToHome(true, true, 2));
+        assertFalse(PlexballAchievementRules.highPoint(true, true, 2));
+        assertTrue(PlexballAchievementRules.highPoint(true, true, 3));
+    }
+
+    @Test
     void milestoneProgressIsClampedAndHandlesZeroTargets() {
         assertEquals(0, PlexballProgressionRules.milestoneProgressPercent(0, 10));
         assertEquals(50, PlexballProgressionRules.milestoneProgressPercent(5, 10));
@@ -83,7 +98,7 @@ class PlexballProgressionRulesTest {
             assertFalse(achievement.configPath(UUID.randomUUID()).isBlank());
             assertNotNull(achievement.icon());
         }
-        assertEquals(9, achievementSlugs.size());
+        assertEquals(14, achievementSlugs.size());
         assertEquals("sweet-spot-75m", PlexballAchievement.SWEET_SPOT.slug());
         assertEquals("warning-track-95m", PlexballAchievement.WARNING_TRACK.slug());
         assertEquals("champion-five-win-streak", PlexballAchievement.CHAMPION.slug());

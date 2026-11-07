@@ -27,9 +27,18 @@ class SheepQuestAchievementRulesTest {
         assertFalse(SheepQuestAchievementRules.yeet(true, "beserker", 1, 1));
         assertTrue(SheepQuestAchievementRules.unconventional(true, "archer", false));
         assertFalse(SheepQuestAchievementRules.unconventional(true, "archer", true));
-        assertTrue(SheepQuestAchievementRules.soloCarry(true, 3, 2));
-        assertFalse(SheepQuestAchievementRules.soloCarry(true, 2, 2));
+        assertTrue(SheepQuestAchievementRules.soloCarry(3, 2));
+        assertFalse(SheepQuestAchievementRules.soloCarry(2, 2));
         assertTrue(SheepQuestAchievementRules.biggestLoser(false, 8));
         assertFalse(SheepQuestAchievementRules.biggestLoser(true, 8));
+    }
+
+    @Test void shepherdAndCleanGetawayRequireTheirWinAndKitConditions() {
+        assertTrue(SheepQuestAchievementRules.shepherdsFlock(true, "shepherd", 10));
+        assertFalse(SheepQuestAchievementRules.shepherdsFlock(true, "archer", 10));
+        assertFalse(SheepQuestAchievementRules.shepherdsFlock(false, "shepherd", 10));
+        assertTrue(SheepQuestAchievementRules.cleanGetaway(true, 5, false));
+        assertFalse(SheepQuestAchievementRules.cleanGetaway(true, 4, false));
+        assertFalse(SheepQuestAchievementRules.cleanGetaway(true, 5, true));
     }
 }

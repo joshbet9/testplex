@@ -10,6 +10,28 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SpeedBuildersRulesTest {
+    @Test
+    void approvedAchievementRulesRejectNearMissesAndRecogniseExactBuildEvents() {
+        assertFalse(SpeedBuildersRules.shouldAwardFirstImpressions(2));
+        assertTrue(SpeedBuildersRules.shouldAwardFirstImpressions(3));
+        assertFalse(SpeedBuildersRules.shouldAwardNoTakebacks(false, 0));
+        assertFalse(SpeedBuildersRules.shouldAwardNoTakebacks(true, 1));
+        assertTrue(SpeedBuildersRules.shouldAwardNoTakebacks(true, 0));
+        assertFalse(SpeedBuildersRules.shouldAwardMenagerie(true, 2));
+        assertTrue(SpeedBuildersRules.shouldAwardMenagerie(true, 3));
+        assertFalse(SpeedBuildersRules.shouldAwardPalettePro(true, 7));
+        assertTrue(SpeedBuildersRules.shouldAwardPalettePro(true, 8));
+        assertFalse(SpeedBuildersRules.shouldAwardRapidReplica(2));
+        assertTrue(SpeedBuildersRules.shouldAwardRapidReplica(3));
+        assertNull(SpeedBuildersRules.achievementForLifetimeProgress("wins", 9));
+        assertEquals("speed-master", SpeedBuildersRules.achievementForLifetimeProgress("wins", 10));
+        assertNull(SpeedBuildersRules.achievementForLifetimeProgress("perfect-builds", 49));
+        assertEquals("dependable", SpeedBuildersRules.achievementForLifetimeProgress("perfect-builds", 50));
+        assertNull(SpeedBuildersRules.achievementForLifetimeProgress("perfect-first", 9));
+        assertEquals("first-build", SpeedBuildersRules.achievementForLifetimeProgress("perfect-first", 10));
+        assertNull(SpeedBuildersRules.achievementForLifetimeProgress("unknown", 100));
+    }
+
     @AfterEach void clearDebugOverrides() { GameDebugRuntimeOverrides.clear(); }
 
     @Test

@@ -865,6 +865,7 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
                 if (SnakeRules.isFoodCollected(slime.getLocation().distanceSquared(state.player.getLocation()))) {
                     grow(state, SnakeRules.foodGrowthSegments(), true);
                     state.slimesEaten++;
+                    state.achievements.recordSlimeCollected();
                     stats.recordSlime(state.player, state.slimesEaten);
                     Bukkit.getPluginManager().callEvent(new SlimeUpgradeEvent(state.player));
                     stats.recordTailLength(state.player, state.segments.size());
@@ -1012,6 +1013,7 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
                 double distance = cube.getLocation().distanceSquared(state.player.getLocation());
                 double contactRadius = SnakeRules.hazardContactRadius();
                 if (distance < contactRadius * contactRadius) {
+                    state.achievements.recordMagmaCubeContact();
                     if (!SnakeRules.shouldConsumeHazardOnContact(state.rouletteActive)) {
                         // Reborn leaves this cube in the arena while the current roll finishes.
                         nearest = null;
@@ -1045,6 +1047,7 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
         Player player = state.player;
         ControlDebuff[] outcomes = ControlDebuff.values();
         ControlDebuff result = outcomes[ThreadLocalRandom.current().nextInt(outcomes.length)];
+        state.achievements.recordRouletteEffect(result.name());
         state.rouletteHits++;
         int duration = SnakeRules.rouletteDurationSecondsForHit(state.rouletteHits);
         boolean sameEffect = result == state.lastRouletteEffect;
@@ -1137,9 +1140,9 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
         for (SnakeState playerState : live) {
             if (plugin.hasAdminAccess(playerState.player)
                     && !GameDebugRuntimeOverrides.booleanValue("tail-collisions", true)) continue;
-            if (playerState.invulnerableUntil > System.currentTimeMillis()
-                    || playerState.reverseUntil > System.currentTimeMillis()
-                    || playerState.segments.isEmpty()) continue;
+            long now = System.currentTimeMillis();
+            boolean invulnerable = playerState.invulnerableUntil > now;
+            if (playerState.reverseUntil > now || playerState.segments.isEmpty()) continue;
             Location head = playerState.segments.get(0).getLocation();
             boolean hit = false;
             for (SnakeState otherState : live) {
@@ -1157,6 +1160,11 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
                         arena.spawnParticle(Particle.EXPLOSION,
                                 segment.getLocation().clone().add(0.0D, 1.0D, 0.0D), 1,
                                 0.0D, 0.0D, 0.0D, 0.0D);
+                        if (invulnerable) {
+                            playerState.achievements.recordInvulnerableTailCollision(segment.getUniqueId());
+                            hit = true;
+                            break;
+                        }
                         eliminate(playerState, otherState == playerState ? null : otherState.player,
                                 otherState == playerState ? "hit your own tail" : "hit " + otherState.player.getName() + "'s tail");
                         hit = true;
@@ -1179,6 +1187,8 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
                         killerState.reverseUntil, killerState.invulnerableUntil)) {
                     killerState.allKillsDuringAbility = false;
                 }
+                killerState.achievements.recordKill(state.player.getUniqueId(),
+                        killerState.speedUntil > killAt, killerState.reverseUntil > killAt);
                 stats.recordKill(killer, killerState.kills);
             }
         }
@@ -1253,6 +1263,11 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
                         stats.awardAchievement(playerId, "flawless");
                     }
                     if (state.edgeStayEligible) stats.awardAchievement(playerId, "bots-everywhere");
+                    if (state.achievements.earnedTailwind()) stats.awardAchievement(playerId, "tailwind");
+                    if (state.achievements.earnedOppositeDay()) stats.awardAchievement(playerId, "opposite-day");
+                    if (state.achievements.earnedUntouchasnake()) stats.awardAchievement(playerId, "untouchasnake");
+                    if (state.achievements.earnedLuckyCoil()) stats.awardAchievement(playerId, "lucky-coil");
+                    if (state.achievements.earnedLastCoilStanding()) stats.awardAchievement(playerId, "last-coil-standing");
                 }
                 stats.recordGameEnd(state.player.getUniqueId(), won, state.kills);
                 stats.publishToArcadeStats(state.player.getUniqueId(), won, state.kills, knockedOut);
@@ -1506,6 +1521,7 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
             state.abilityCooldownUntil = now + SnakeRules.kitAbilityCooldownMillis();
             event.getPlayer().sendMessage(ChatColor.YELLOW + "Speed boost!");
         } else if (material == Material.COOKIE && "reverse".equals(state.kit)) {
+            state.achievements.beginReverseActivation();
             event.getPlayer().leaveVehicle();
             Collections.reverse(state.segments);
             List<Location> reversedPath = new ArrayList<>();
@@ -1797,6 +1813,7 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
         boolean edgeStayEligible = true;
         ControlDebuff lastRouletteEffect;
         int sameRouletteEffectStreak;
+        final SnakeAchievementTracker achievements;
         ItemStack rouletteOriginalItem;
         BukkitTask rouletteTask;
 
@@ -1804,6 +1821,7 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
             this.player = player;
             this.snapshot = snapshot;
             this.kit = kit;
+            this.achievements = new SnakeAchievementTracker(kit);
             this.color = color;
             this.lastRawYaw = spawn.getYaw();
             this.laggedYaw = spawn.getYaw();
