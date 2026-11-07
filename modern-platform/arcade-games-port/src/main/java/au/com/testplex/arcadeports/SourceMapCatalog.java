@@ -25,6 +25,10 @@ import java.util.jar.JarFile;
 
 /** Loads archived Reborn world maps into isolated modern Arcade test worlds. */
 public final class SourceMapCatalog {
+    private static final String HEROES_OF_GWEN_AUTHORED_DEFAULT =
+            "source-maps/Heroes of GWEN/HOG_Heros_Valley.zip";
+    private static final String HEROES_OF_GWEN_INFERRED_OLD_DEFAULT =
+            "source-maps/Heroes of GWEN/HOG_Heroes Valley.zip";
     private static final java.util.Set<String> MONSTER_MAZE_WORLD_NAMES = java.util.Set.of(
             "mm_void", "mm_volcano", "mm_colombia", "mm_sandycoast", "mm_siberian",
             "mm_swampland", "mm_tesorohundido");
@@ -336,12 +340,30 @@ public final class SourceMapCatalog {
             }
             if (plugin.getResource(configured) != null) return configured;
         }
+        // The similarly named "Heroes Valley" downloader copy lacks the RED
+        // and BLUE wither-base markers required to start the game. Migrate that
+        // previous inferred default to the original authored "Heros Valley".
+        if (game == ArcadePortGame.HEROES_OF_GWEN
+                && HEROES_OF_GWEN_INFERRED_OLD_DEFAULT.equals(configured)
+                && resources.contains(HEROES_OF_GWEN_AUTHORED_DEFAULT)) {
+            return HEROES_OF_GWEN_AUTHORED_DEFAULT;
+        }
         if (isResourceForGame(plugin, game, configured)) return configured;
         for (String resource : resources) {
             if (mapNameFromResource(resource).equalsIgnoreCase(legacyName)) return resource;
         }
         if (legacy != null && plugin.getResource(legacy) != null) return legacy;
-        return resources.isEmpty() ? null : resources.get(0);
+        return defaultResourceFor(game, resources);
+    }
+
+    /** Keep authored Gwen base markers ahead of its incomplete downloader copy. */
+    static String defaultResourceFor(ArcadePortGame game, List<String> resources) {
+        if (resources == null || resources.isEmpty()) return null;
+        if (game == ArcadePortGame.HEROES_OF_GWEN
+                && resources.contains(HEROES_OF_GWEN_AUTHORED_DEFAULT)) {
+            return HEROES_OF_GWEN_AUTHORED_DEFAULT;
+        }
+        return resources.get(0);
     }
 
     /**
