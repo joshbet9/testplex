@@ -46,7 +46,7 @@ and Death Tag requirements are implemented on this draft branch.
 | Runner | 14 | 0 | 0 |
 | Sheep Quest | 14 | 0 | 0 |
 | SkyWars | 14 | 0 | 0 |
-| Snake | 9 | 5 | 0 |
+| Snake | 14 | 0 | 0 |
 | Snap | 20 | 0 | 6 |
 | Sneaky Assassins | 6 | 8 | 0 |
 | Speed Builders (Arcade) | 4 | 10 | 0 |
@@ -55,7 +55,7 @@ and Death Tag requirements are implemented on this draft branch.
 | Turf Wars | 9 | 5 | 0 |
 | Wither Assault | 8 | 6 | 0 |
 | Wizards | 6 | 8 | 0 |
-| **Total** | **314** | **106** | **7** |
+| **Total** | **319** | **101** | **7** |
 
 ## Suggested review methodology
 

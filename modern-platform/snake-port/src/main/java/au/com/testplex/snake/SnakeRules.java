@@ -247,6 +247,10 @@ public final class SnakeRules {
         return kills > 0 && allKillsDuringAbility;
     }
 
+    public static boolean shouldPersistProgression(boolean debugSession, boolean testPlayer) {
+        return !debugSession && !testPlayer;
+    }
+
     private SnakeRules() {}
 
     public static int rouletteDurationSecondsForHit(int hitCount) {

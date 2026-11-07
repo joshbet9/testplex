@@ -820,9 +820,12 @@ class GameDebugEventCatalogTest {
             int start = store.indexOf(signature);
             int end = store.indexOf("\n    }", start);
             assertTrue(start >= 0 && end > start, methodName + " exists");
-            assertTrue(store.substring(start, end).contains("GameDebugRuntimeOverrides.isDebugSession()"),
-                    methodName + " is isolated during debug rounds");
+            assertTrue(store.substring(start, end).contains("shouldPersist("),
+                    methodName + " uses the shared progression guard");
         }
+        assertTrue(store.contains("private boolean shouldPersist(UUID playerId)"));
+        assertTrue(store.contains("GameDebugRuntimeOverrides.isDebugSession()"));
+        assertTrue(store.contains("getMethod(\"isTestPlayer\", UUID.class)"));
     }
 
     @Test

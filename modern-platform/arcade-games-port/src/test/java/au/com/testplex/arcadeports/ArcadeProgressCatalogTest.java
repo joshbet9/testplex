@@ -133,7 +133,7 @@ class ArcadeProgressCatalogTest {
         String[] games = {"bacon-brawl", "bomb-lobbers", "death-tag", "dragon-escape", "dragons",
                 "evolution", "gladiators", "micro-battles", "monster-maze", "one-in-the-quiver",
                 "paintball", "runner", "sheep-quest", "snake", "spleef", "turf-wars"};
-        int[] achievementCounts = {5, 4, 4, 4, 3, 5, 4, 6, 14, 8, 5, 7, 8, 6, 7, 9};
+        int[] achievementCounts = {5, 4, 4, 4, 3, 5, 4, 6, 14, 8, 5, 7, 8, 11, 7, 9};
         for (int i = 0; i < games.length; i++) {
             assertTrue(ArcadeProgressCatalog.milestones(games[i]).size() >= 2, games[i]);
             assertTrue(ArcadeProgressCatalog.achievements(games[i]).size() >= achievementCounts[i], games[i]);
@@ -213,6 +213,13 @@ class ArcadeProgressCatalogTest {
         assertTrue(hasAchievement("death-tag", "death-proof", "Death Proof"));
         assertTrue(hasAchievement("death-tag", "come-at-me-bro", "Come At Me Bro!"));
         assertTrue(hasAchievement("snake", "busted", "Busted"));
+        assertTrue(hasAchievement("snake", "bots-everywhere", "Edge Dweller"));
+        assertTrue(hasAchievement("snake", "tailwind", "Tailwind"));
+        assertTrue(hasAchievement("snake", "opposite-day", "Opposite Day"));
+        assertTrue(hasAchievement("snake", "untouchasnake", "Untouchasnake"));
+        assertTrue(hasAchievement("snake", "lucky-coil", "Lucky Coil"));
+        assertTrue(hasAchievement("snake", "last-coil-standing", "Last Coil Standing"));
+        assertEquals(14, ArcadeProgressCatalog.achievements("snake").size());
         assertTrue(hasAchievement("spleef", "no-mods-in-here", "No Mods in Here"));
         assertTrue(hasAchievement("turf-wars", "fair-game", "Fair Game"));
     }

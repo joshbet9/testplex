@@ -248,7 +248,12 @@ public final class ArcadeProgressCatalog {
                     a("busted", "Busted", "Roll the same Magma Cube nerf 3 times in a row."),
                     a("one-of-the-ogs", "One of the OGs", "Win a game without using an ability."),
                     a("flawless", "Flawless", "Win with every kill earned while an ability is active."),
-                    a("bots-everywhere", "Bots Everywhere!", "Win while staying within 10 blocks of the map edge throughout the game."))),
+                    a("bots-everywhere", "Edge Dweller", "Win while staying within 10 blocks of the map edge throughout the game."),
+                    a("tailwind", "Tailwind", "As Speed, win after getting 3 kills while Speed Boost is active."),
+                    a("opposite-day", "Opposite Day", "As Reverse, eliminate 2 opponents during one Reverse activation and win."),
+                    a("untouchasnake", "Untouchasnake", "As Invulnerable, survive 3 tail collisions while Invulnerability is active and win."),
+                    a("lucky-coil", "Lucky Coil", "Win after rolling at least 4 different Magma Cube effects in one game."),
+                    a("last-coil-standing", "Last Coil Standing", "Win a game without collecting a slime or coming into contact with a Magma Cube."))),
 
             Map.entry("spleef", List.of(
                     a("praying-to-the-gods", "Praying to the Gods", "Win while falling into the void."),
