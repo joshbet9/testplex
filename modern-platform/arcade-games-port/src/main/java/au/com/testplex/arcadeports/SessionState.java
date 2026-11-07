@@ -426,7 +426,7 @@ class SessionState {
     final Map<UUID, Integer> sheepQuestLeapCaptures = new HashMap<>();
     final Map<UUID, Integer> sheepQuestNonLeapCaptures = new HashMap<>();
     final Map<UUID, Integer> sheepQuestCaptures = new HashMap<>();
-    final Map<UUID, Integer> sheepQuestSoloCarryCaptures = new HashMap<>();
+    final Map<UUID, Map<Integer, Integer>> sheepQuestSoloCarryCaptures = new HashMap<>();
     final Map<UUID, List<Long>> sheepQuestCaptureTimes = new HashMap<>();
     final Map<UUID, Integer> sheepQuestKills = new HashMap<>();
     final Map<UUID, Integer> sheepQuestUnassistedKills = new HashMap<>();
