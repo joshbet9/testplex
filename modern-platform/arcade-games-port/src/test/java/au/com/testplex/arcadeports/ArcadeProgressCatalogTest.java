@@ -221,7 +221,43 @@ class ArcadeProgressCatalogTest {
         assertTrue(hasAchievement("snake", "last-coil-standing", "Last Coil Standing"));
         assertEquals(14, ArcadeProgressCatalog.achievements("snake").size());
         assertTrue(hasAchievement("spleef", "no-mods-in-here", "No Mods in Here"));
+        assertTrue(hasAchievement("spleef", "spleef-king-or-queen", "Spleef King (or Queen)"));
+        assertTrue(hasAchievement("spleef", "demolitionist", "Demolitionist"));
+        assertEquals(14, ArcadeProgressCatalog.achievements("spleef").size());
         assertTrue(hasAchievement("turf-wars", "fair-game", "Fair Game"));
+        assertTrue(hasAchievement("turf-wars", "turf-master-3000", "Turf Master 3000"));
+        assertEquals(15, ArcadeProgressCatalog.achievements("turf-wars").size());
+    }
+
+    @Test
+    void spleefAchievementPredicatesRequireTheExactWinAndFinalKillConditions() {
+        assertEquals(15, SpleefAchievementRules.KING_OR_QUEEN_WINS);
+        assertEquals(20_000, SpleefAchievementRules.DEMOLITIONIST_BLOCKS);
+        assertTrue(SpleefAchievementRules.finalEliminationsMatch(List.of(false, true, true, true), 3));
+        assertFalse(SpleefAchievementRules.finalEliminationsMatch(List.of(true, false, true), 3));
+        assertFalse(SpleefAchievementRules.finalEliminationsMatch(List.of(true, true), 3));
+        assertTrue(SpleefAchievementRules.brawlersGambit("brawler", true, 5, true));
+        assertFalse(SpleefAchievementRules.brawlersGambit("brawler", true, 4, true));
+        assertFalse(SpleefAchievementRules.brawlersGambit("brawler", false, 8, true));
+        assertTrue(SpleefAchievementRules.thinIce(true, 5));
+        assertFalse(SpleefAchievementRules.thinIce(true, 6));
+        assertFalse(SpleefAchievementRules.thinIce(false, 2));
+    }
+
+    @Test
+    void turfWarsAchievementPredicatesUseTheApprovedThresholdsAndWinRequirements() {
+        assertEquals(50, TurfWarsAchievementRules.TURF_MASTER_WINS);
+        assertEquals(2_000, TurfWarsAchievementRules.SHREDDINATOR_BLOCKS);
+        assertTrue(TurfWarsAchievementRules.deadCentre("marksman", true, 20));
+        assertFalse(TurfWarsAchievementRules.deadCentre("marksman", true, 19));
+        assertFalse(TurfWarsAchievementRules.deadCentre("shredder", true, 50));
+        assertTrue(TurfWarsAchievementRules.keepYourFort("fortifier", true, 30));
+        assertFalse(TurfWarsAchievementRules.keepYourFort("fortifier", true, 29));
+        assertFalse(TurfWarsAchievementRules.keepYourFort("fortifier", false, 60));
+        assertTrue(TurfWarsAchievementRules.behindEnemyLines(true, 15));
+        assertFalse(TurfWarsAchievementRules.behindEnemyLines(true, 14));
+        assertTrue(TurfWarsAchievementRules.comeback(true, true));
+        assertFalse(TurfWarsAchievementRules.comeback(true, false));
     }
 
 

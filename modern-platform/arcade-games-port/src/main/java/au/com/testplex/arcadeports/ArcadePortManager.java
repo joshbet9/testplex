@@ -408,6 +408,10 @@ public final class ArcadePortManager implements Listener {
     private List<Location> baconSourceSpawnOverrides = List.of();
 
     private record PlayerDamageSnapshot(Session session, Player player, double healthAndAbsorption) {}
+    private record SpleefHit(UUID attackerId, String kind, boolean targetAirborne, long atMillis,
+            long brawlerSmashAtMillis, int brawlerSmashBlocks) { }
+    private record SpleefElimination(UUID victimId, UUID killerId, String kind,
+            boolean targetAirborne, boolean sameSmash, int smashBlocks) { }
 
     private final NamespacedKey statsActionKey;
     private final NamespacedKey statsCategoryKey;
@@ -2974,6 +2978,10 @@ public final class ArcadePortManager implements Listener {
                     while (now - state.lastSecondAt >= 1_000L) {
                         state.lastSecondAt += 1_000L;
                         state.seconds++;
+                        if (TurfWarsAchievementRules.behindEnemyLines(true, state.seconds)
+                                && session.turfBehindEnemyLinesAwarded.add(id)) {
+                            awardCatalogAchievement(player, "turf-wars", "behind-enemy-lines");
+                        }
                         if (state.seconds > 15 && !testPlayers.isTestPlayer(id)
                                 && !GameDebugRuntimeOverrides.isDebugSession()) {
                             String statPath = "local-stats." + id + ".turf-wars.behind-enemy-lines";
@@ -15050,6 +15058,97 @@ public final class ArcadePortManager implements Listener {
             int kills = session.scores.getOrDefault(id, 0);
             if (deaths > 0 && kills == deaths * 5) awardCatalogAchievement(id, "turf-wars", "why");
         }
+        if (winningTeam >= 0 && TurfWarsAchievementRules.comeback(true,
+                session.turfTeamsBelowSixLines.contains(winningTeam))) {
+            for (UUID id : session.players.keySet()) {
+                if (session.teams.getOrDefault(id, -1) == winningTeam) {
+                    awardCatalogAchievement(id, "turf-wars", "the-comeback");
+                }
+            }
+        }
+        if (winningTeam >= 0) {
+            for (UUID id : session.players.keySet()) {
+                if (session.teams.getOrDefault(id, -1) != winningTeam) continue;
+                String kit = session.turfWarsKits.getOrDefault(id, "marksman");
+                if (TurfWarsAchievementRules.deadCentre(kit, true,
+                        session.turfMarksmanBowKills.getOrDefault(id, 0))) {
+                    awardCatalogAchievement(id, "turf-wars", "dead-centre");
+                }
+                int intactFort = (int) session.turfPlacedBlockOwners.entrySet().stream()
+                        .filter(entry -> entry.getValue().equals(id))
+                        .filter(entry -> entry.getKey().getWorld() == session.world
+                                && entry.getKey().getType() == (winningTeam == 0
+                                        ? Material.RED_WOOL : Material.LIGHT_BLUE_WOOL)
+                                && turfWarsBlockTeam(session, entry.getKey()) == winningTeam)
+                        .count();
+                if (TurfWarsAchievementRules.keepYourFort(kit, true, intactFort)) {
+                    awardCatalogAchievement(id, "turf-wars", "keep-your-fort");
+                }
+            }
+        }
+    }
+
+    private int turfWarsBlockTeam(Session session, Block block) {
+        if (session == null || block == null || block.getWorld() != session.world) return -1;
+        Block ground = block;
+        int minY = Math.max(0, session.world.getMinHeight());
+        while (!isTurfWarsTerracotta(ground.getType()) && ground.getY() > minY) {
+            ground = ground.getRelative(BlockFace.DOWN);
+        }
+        return isTurfWarsTerracotta(ground.getType()) ? turfWarsTeamOnBlock(ground) : -1;
+    }
+
+    private void recordSpleefAchievements(Session session, Player winner) {
+        if (session == null || winner == null) return;
+        UUID winnerId = winner.getUniqueId();
+        String kit = session.spleefKits.getOrDefault(winnerId, "snowballer");
+        if (SpleefAchievementRules.brawlersGambit(kit, true,
+                session.spleefFinalSmashBlocks.getOrDefault(winnerId, 0),
+                !session.spleefEliminations.isEmpty()
+                        && session.spleefEliminations.get(session.spleefEliminations.size() - 1).killerId() != null
+                        && session.spleefEliminations.get(session.spleefEliminations.size() - 1).killerId().equals(winnerId)
+                        && session.spleefEliminations.get(session.spleefEliminations.size() - 1).sameSmash())) {
+            awardCatalogAchievement(winner, "spleef", "brawlers-gambit");
+        }
+        if (SpleefAchievementRules.finalEliminationsMatch(session.spleefEliminations.stream()
+                .map(elimination -> winnerId.equals(elimination.killerId())
+                        && "snowball".equals(elimination.kind())).toList(), 3)
+                && "snowballer".equals(kit)) {
+            awardCatalogAchievement(winner, "spleef", "snowballs-chance");
+        }
+        if (SpleefAchievementRules.finalEliminationsMatch(session.spleefEliminations.stream()
+                .map(elimination -> winnerId.equals(elimination.killerId())
+                        && "arrow".equals(elimination.kind()) && elimination.targetAirborne()).toList(), 3)
+                && "archer".equals(kit)) {
+            awardCatalogAchievement(winner, "spleef", "flight-risk");
+        }
+        if (SpleefAchievementRules.finalEliminationsMatch(session.spleefEliminations.stream()
+                .map(elimination -> winnerId.equals(elimination.killerId())
+                        && "wind-charge".equals(elimination.kind())).toList(), 2)
+                && "gust".equals(kit)) {
+            awardCatalogAchievement(winner, "spleef", "downburst");
+        }
+        if (SpleefAchievementRules.thinIce(true, countSpleefFloorBlocks(session, winner))) {
+            awardCatalogAchievement(winner, "spleef", "thin-ice");
+        }
+    }
+
+    private int countSpleefFloorBlocks(Session session, Player winner) {
+        if (session == null || winner == null || winner.getWorld() != session.world) return Integer.MAX_VALUE;
+        SourceMapCatalog.MapData map = sourceMapData.get(ArcadePortGame.SPLEEF.id());
+        int minX = map != null ? map.minX() : -40;
+        int maxX = map != null ? map.maxX() : 40;
+        int minZ = map != null ? map.minZ() : -40;
+        int maxZ = map != null ? map.maxZ() : 40;
+        int floorY = winner.getLocation().getBlockY() - 1;
+        int remaining = 0;
+        for (int x = minX; x <= maxX; x++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                Material type = session.world.getBlockAt(x, floorY, z).getType();
+                if (!type.isAir() && !isSpleefProtectedBlock(type)) remaining++;
+            }
+        }
+        return remaining;
     }
 
     private void updateTurfWarsPhase(Session session, long now) {
@@ -18435,6 +18534,23 @@ public final class ArcadePortManager implements Listener {
             killer = resolvedKiller[0];
             recordSkyWarsPlayerElimination(session, player, killer);
         }
+        if (session.type == ArcadePortGame.SPLEEF && killer == null && reason != null
+                && (reason.toLowerCase(java.util.Locale.ROOT).contains("fell")
+                    || reason.toLowerCase(java.util.Locale.ROOT).contains("void"))) {
+            SpleefHit smashHit = session.spleefBrawlerSmashVictims.get(player.getUniqueId());
+            SpleefHit directHit = session.spleefLastHit.get(player.getUniqueId());
+            long now = System.currentTimeMillis();
+            boolean recentSmash = smashHit != null && now - smashHit.atMillis() <= 8_000L;
+            boolean recentDirectHit = directHit != null && now - directHit.atMillis() <= 8_000L;
+            SpleefHit recentHit = recentSmash && (!recentDirectHit
+                    || smashHit.atMillis() >= directHit.atMillis()) ? smashHit : directHit;
+            if (recentHit != null && System.currentTimeMillis() - recentHit.atMillis() <= 8_000L
+                    && session.alive.contains(recentHit.attackerId())
+                    && (killer == null || killer.getUniqueId().equals(recentHit.attackerId()))) {
+                session.spleefLastHit.put(player.getUniqueId(), recentHit);
+                killer = session.players.get(recentHit.attackerId());
+            }
+        }
         broadcastSourceStyleDeathMessage(session, player, killer, reason);
         if (session.type == ArcadePortGame.DRAGON_ESCAPE && reason != null
                 && reason.toLowerCase(java.util.Locale.ROOT).contains("fell")) {
@@ -18813,6 +18929,25 @@ public final class ArcadePortManager implements Listener {
             session.dragonFrostBridgePathIndexes.remove(eliminatedId);
         }
         if (!session.alive.remove(eliminatedId)) return;
+        if (session.type == ArcadePortGame.SPLEEF) {
+            SpleefHit hit = session.spleefLastHit.get(eliminatedId);
+            UUID killerId = killer == null ? null : killer.getUniqueId();
+            String reasonText = reason == null ? "" : reason.toLowerCase(java.util.Locale.ROOT);
+            boolean fallElimination = reasonText.contains("fell") || reasonText.contains("void");
+            boolean sameSmash = hit != null && "brawler-smash".equals(hit.kind())
+                    && killerId != null && killerId.equals(hit.attackerId())
+                    && hit.brawlerSmashAtMillis() > 0L
+                    && System.currentTimeMillis() - hit.brawlerSmashAtMillis() <= 8_000L;
+            int smashBlocks = sameSmash ? hit.brawlerSmashBlocks() : 0;
+            if (sameSmash && smashBlocks >= 5) session.spleefFinalSmashBlocks.put(killerId, smashBlocks);
+            session.spleefEliminations.add(new SpleefElimination(eliminatedId, killerId,
+                    fallElimination && hit != null && killerId != null && killerId.equals(hit.attackerId())
+                            ? hit.kind() : "other",
+                    hit != null && killerId != null && killerId.equals(hit.attackerId())
+                            && hit.targetAirborne(), fallElimination && sameSmash, smashBlocks));
+            session.spleefLastHit.remove(eliminatedId);
+            session.spleefBrawlerSmashVictims.remove(eliminatedId);
+        }
         if (session.type == ArcadePortGame.DRAGONS) {
             session.dragonEliminationOrder.add(eliminatedId);
             awardDragonSurvivalGems(session, eliminatedId, System.currentTimeMillis());
@@ -19986,6 +20121,11 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.TURF_WARS && !session.turfCombat) return;
         if (session.type == ArcadePortGame.DRAGONS) return; // PvP is disabled; use Pyro against dragons.
         if (session.type == ArcadePortGame.SPLEEF) {
+            UUID attackerId = attacker.getUniqueId();
+            session.spleefLastHit.put(target.getUniqueId(), new SpleefHit(attackerId, "melee",
+                    !target.isOnGround(), System.currentTimeMillis(),
+                    session.spleefBrawlerBigSmashAt.getOrDefault(attackerId, 0L),
+                    session.spleefBrawlerSmashBlocks.getOrDefault(attackerId, 0)));
             handleSpleefKnockback(session, attacker, target);
             return;
         }
@@ -20084,7 +20224,7 @@ public final class ArcadePortManager implements Listener {
                 String kit = session.turfWarsKits.getOrDefault(attacker.getUniqueId(), "marksman");
                 double damage = ArcadePortRules.turfWarsHitDamage(
                         kit, !"melee".equals(source), ironSword);
-                applyTurfWarsHit(session, attacker, target, damage);
+                applyTurfWarsHit(session, attacker, target, damage, !"melee".equals(source));
                 break;
             }
             case EVOLUTION: {
@@ -20143,7 +20283,7 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    private void applyTurfWarsHit(Session session, Player attacker, Player target, double damage) {
+    private void applyTurfWarsHit(Session session, Player attacker, Player target, double damage, boolean bowHit) {
         if (active != session || !session.alive.contains(target.getUniqueId())
                 || !session.alive.contains(attacker.getUniqueId())) return;
         if (target.getHealth() > damage) {
@@ -20155,6 +20295,9 @@ public final class ArcadePortManager implements Listener {
             return;
         }
 
+        if (bowHit && "marksman".equals(session.turfWarsKits.getOrDefault(attacker.getUniqueId(), "marksman"))) {
+            session.turfMarksmanBowKills.merge(attacker.getUniqueId(), 1, Integer::sum);
+        }
         respawnTurfWarsPlayer(session, target, attacker,
                 "was defeated in Turf Wars", true);
     }
@@ -20541,6 +20684,14 @@ public final class ArcadePortManager implements Listener {
                 handlePlayerHit(session, shooter, target, "projectile hit");
             }
         } else if (session.type == ArcadePortGame.SPLEEF) {
+            String kind = projectile.getType().name().equals("SNOWBALL") ? "snowball"
+                    : projectile.getType().name().equals("ARROW") ? "arrow"
+                    : projectile.getType().name().equals("WIND_CHARGE") ? "wind-charge" : "projectile";
+            UUID attackerId = shooter.getUniqueId();
+            session.spleefLastHit.put(target.getUniqueId(), new SpleefHit(attackerId, kind,
+                    !target.isOnGround(), System.currentTimeMillis(),
+                    session.spleefBrawlerBigSmashAt.getOrDefault(attackerId, 0L),
+                    session.spleefBrawlerSmashBlocks.getOrDefault(attackerId, 0)));
             if (projectile instanceof Arrow) {
                 session.spleefArrowLastHitBy.put(target.getUniqueId(), shooter.getUniqueId());
                 session.spleefArrowLastHitAt.put(target.getUniqueId(), System.currentTimeMillis());
@@ -20928,6 +21079,7 @@ public final class ArcadePortManager implements Listener {
                 if (session.spleefStarvationPlayers.contains(winnerId)) awardCatalogAchievement(winner, "spleef", "block-drought");
                 if (session.spleefVoidFallPlayers.contains(winnerId)) awardCatalogAchievement(winner, "spleef", "praying-to-the-gods");
                 if (session.spleefArrowAssists.getOrDefault(winnerId, 0) >= 5) awardCatalogAchievement(winner, "spleef", "ranger");
+                recordSpleefAchievements(session, winner);
             } else if (session.alive.size() >= 2) {
                 Set<Integer> tiedScores = new HashSet<>();
                 for (UUID id : session.alive) tiedScores.add(session.scores.getOrDefault(id, 0));
@@ -21975,6 +22127,16 @@ public final class ArcadePortManager implements Listener {
             int score = Math.max(0, session.scores.getOrDefault(id, 0));
             plugin.getConfig().set(path + "score",
                     plugin.getConfig().getInt(path + "score", 0) + score);
+            if (session.type == ArcadePortGame.SPLEEF) {
+                int blocksBroken = session.spleefBlocksBroken.getOrDefault(id, 0);
+                if (blocksBroken > 0) {
+                    int lifetimeBlocks = plugin.getConfig().getInt(path + "blocks-broken", 0) + blocksBroken;
+                    plugin.getConfig().set(path + "blocks-broken", lifetimeBlocks);
+                    if (lifetimeBlocks >= SpleefAchievementRules.DEMOLITIONIST_BLOCKS) {
+                        awardCatalogAchievement(id, "spleef", "demolitionist");
+                    }
+                }
+            }
             if (!session.alive.contains(id) && ArcadePortRules.shouldRecordKnockoutsStat(session.type)) {
                 plugin.getConfig().set(path + "knockouts",
                         plugin.getConfig().getInt(path + "knockouts", 0) + 1);
@@ -22042,6 +22204,14 @@ public final class ArcadePortManager implements Listener {
             if (won) {
                 int lifetimeWins = plugin.getConfig().getInt(path + "wins", 0) + 1;
                 plugin.getConfig().set(path + "wins", lifetimeWins);
+                if (session.type == ArcadePortGame.SPLEEF
+                        && lifetimeWins >= SpleefAchievementRules.KING_OR_QUEEN_WINS) {
+                    awardCatalogAchievement(entry.getValue(), "spleef", "spleef-king-or-queen");
+                }
+                if (session.type == ArcadePortGame.TURF_WARS
+                        && lifetimeWins >= TurfWarsAchievementRules.TURF_MASTER_WINS) {
+                    awardCatalogAchievement(entry.getValue(), "turf-wars", "turf-master-3000");
+                }
                 if (session.type == ArcadePortGame.SKY_WARS
                         && SkyWarsAchievementRules.reached(lifetimeWins, SkyWarsAchievementRules.SKY_KING_WINS)) {
                     awardCatalogAchievement(entry.getValue(), "skywars", "sky-king");
@@ -24550,11 +24720,29 @@ public final class ArcadePortManager implements Listener {
                 session.spleefSmasherReadyAt.put(player.getUniqueId(),
                         now + GameDebugRuntimeOverrides.longValue("SPLEEF_SMASHER_COOLDOWN_MILLIS", ArcadePortRules.SPLEEF_SMASHER_COOLDOWN_MILLIS));
                 cooldownProgress.start(player, "Smasher", GameDebugRuntimeOverrides.longValue("SPLEEF_SMASHER_COOLDOWN_MILLIS", ArcadePortRules.SPLEEF_SMASHER_COOLDOWN_MILLIS));
+                Set<Block> smashBlocks = new HashSet<>();
+                for (ArcadePortRules.SpleefBlockOffset offset : ArcadePortRules.spleefSmasherOffsets()) {
+                    Block affected = block.getRelative(offset.x(), offset.y(), offset.z());
+                    if (!isSpleefProtectedBlock(affected.getType())) smashBlocks.add(affected);
+                }
+                if (!isSpleefProtectedBlock(block.getType())) smashBlocks.add(block);
                 for (ArcadePortRules.SpleefBlockOffset offset : ArcadePortRules.spleefSmasherOffsets()) {
                     fadeSpleefBlock(session, player, block.getRelative(
                             offset.x(), offset.y(), offset.z()), false);
                 }
                 fadeSpleefBlock(session, player, block, false);
+                if ("brawler".equals(kit)) {
+                    session.spleefBrawlerSmashBlocks.put(player.getUniqueId(), smashBlocks.size());
+                    session.spleefBrawlerBigSmashAt.put(player.getUniqueId(), now);
+                    Location smashCenter = block.getLocation().add(0.5D, 0.5D, 0.5D);
+                    for (Player target : alivePlayers(session)) {
+                        if (target.equals(player)
+                                || target.getLocation().distanceSquared(smashCenter) > 16.0D) continue;
+                        session.spleefBrawlerSmashVictims.put(target.getUniqueId(), new SpleefHit(
+                                player.getUniqueId(), "brawler-smash", !target.isOnGround(), now, now,
+                                smashBlocks.size()));
+                    }
+                }
             } else fadeSpleefBlock(session, player, block, false);
         } else fadeSpleefBlock(session, player, block, false);
         giveSpleefSnowball(session, player);
@@ -24811,7 +24999,14 @@ public final class ArcadePortManager implements Listener {
         if (isSpleefProtectedBlock(block.getType())) return;
         if (breaker != null) {
             UUID breakerId = breaker.getUniqueId();
-            session.spleefBlocksBroken.merge(breakerId, 1, Integer::sum);
+            int matchBlocks = session.spleefBlocksBroken.merge(breakerId, 1, Integer::sum);
+            if (ArcadeTestPlayerManager.shouldPersistProgression(breakerId, testPlayers.isTestPlayer(breakerId))) {
+                String progressPath = localStatsPath(breakerId, "spleef") + "blocks-broken";
+                if (plugin.getConfig().getInt(progressPath, 0) + matchBlocks
+                        >= SpleefAchievementRules.DEMOLITIONIST_BLOCKS) {
+                    awardCatalogAchievement(breaker, "spleef", "demolitionist");
+                }
+            }
             if (session.alive.size() == 2
                     && "brawler".equals(session.spleefKits.getOrDefault(breakerId, "snowballer"))
                     && breaker.getLocation().getBlock().getRelative(BlockFace.DOWN).equals(block)) {
@@ -26333,8 +26528,11 @@ public final class ArcadePortManager implements Listener {
                                     plugin.getConfig().getInt(base + "blocks-broken", 0) + 1);
                         }
                         if ("shredder".equals(session.turfWarsKits.getOrDefault(shooter.getUniqueId(), "marksman"))) {
-                            plugin.getConfig().set(base + "the-shreddinator",
-                                    plugin.getConfig().getInt(base + "the-shreddinator", 0) + 1);
+                            int shredded = plugin.getConfig().getInt(base + "the-shreddinator", 0) + 1;
+                            plugin.getConfig().set(base + "the-shreddinator", shredded);
+                            if (shredded >= TurfWarsAchievementRules.SHREDDINATOR_BLOCKS) {
+                                awardCatalogAchievement(shooter, "turf-wars", "the-shreddinator");
+                            }
                         }
                     }
                 }
@@ -28841,6 +29039,7 @@ public final class ArcadePortManager implements Listener {
                         || (team == 1 && broken == Material.LIGHT_BLUE_WOOL)) {
                     event.setDropItems(false);
                     event.setExpToDrop(0);
+                    session.turfPlacedBlockOwners.remove(event.getBlock());
                     if (!testPlayers.isTestPlayer(event.getPlayer())
                             && !GameDebugRuntimeOverrides.isDebugSession()) {
                         String base = "local-stats." + event.getPlayer().getUniqueId() + ".turf-wars.";
@@ -29058,6 +29257,9 @@ public final class ArcadePortManager implements Listener {
                 player.sendMessage(ChatColor.YELLOW + "You can only build on your own coloured turf, within five blocks of the clay.");
             } else {
                 event.setCancelled(false);
+                if ("fortifier".equals(session.turfWarsKits.getOrDefault(player.getUniqueId(), "marksman"))) {
+                    session.turfPlacedBlockOwners.put(placed, player.getUniqueId());
+                }
                 if (!testPlayers.isTestPlayer(player) && !GameDebugRuntimeOverrides.isDebugSession()) {
                     String base = "local-stats." + player.getUniqueId() + ".turf-wars.";
                     plugin.getConfig().set(base + "blocks-placed",
@@ -32267,11 +32469,20 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> spleefGustReadyAt = new HashMap<>();
         final Map<String, Long> spleefKnockbackAt = new HashMap<>();
         final Map<UUID, Integer> spleefBlocksBroken = new HashMap<>();
+        final Map<UUID, SpleefHit> spleefLastHit = new HashMap<>();
+        final Map<UUID, SpleefHit> spleefBrawlerSmashVictims = new HashMap<>();
+        final List<SpleefElimination> spleefEliminations = new ArrayList<>();
+        final Map<UUID, Long> spleefBrawlerBigSmashAt = new HashMap<>();
+        final Map<UUID, Integer> spleefBrawlerSmashBlocks = new HashMap<>();
+        final Map<UUID, Integer> spleefFinalSmashBlocks = new HashMap<>();
         final Map<UUID, Long> spleefSpectateNextTeleportAt = new HashMap<>();
         long spleefNextCompassUpdateAt;
         final Map<UUID, Long> spleefLastHungerGainAt = new HashMap<>();
         final Map<UUID, Long> spleefNextArrowAt = new HashMap<>();
         final Map<UUID, String> turfWarsKits = new HashMap<>();
+        final Map<UUID, Integer> turfMarksmanBowKills = new HashMap<>();
+        final Map<Block, UUID> turfPlacedBlockOwners = new HashMap<>();
+        final Set<UUID> turfBehindEnemyLinesAwarded = new HashSet<>();
         final Set<Integer> turfTeamsBelowSixLines = new HashSet<>();
         final Map<Integer, Location> turfTeamSpawnCentres = new HashMap<>();
         final Map<UUID, Long> turfConstructorNextAt = new HashMap<>();
