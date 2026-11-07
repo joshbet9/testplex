@@ -108,6 +108,7 @@ public final class SpeedBuildersGame implements Listener {
     private int buildTimeTracker = GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_DEFAULT_BUILD_SECONDS", SpeedBuildersRules.DEFAULT_BUILD_SECONDS);
     private long buildPhaseStartedTick;
     private boolean firstPerfectBuildAwarded;
+    private boolean firstPerfectThisRoundAwarded;
     private int buildSeconds = GameDebugRuntimeOverrides.intValue("SPEED_BUILDERS_DEFAULT_BUILD_SECONDS", SpeedBuildersRules.DEFAULT_BUILD_SECONDS);
     private Template currentTemplate;
     private String stopReason = "";
@@ -145,6 +146,7 @@ public final class SpeedBuildersGame implements Listener {
         GameDebugRuntimeOverrides.markDebugSession();
         state.blocksPlaced = 0;
         state.blocksBroken = 0;
+        state.roundBlocksBroken = 0;
         state.mobsBuilt = 0;
         state.score = 0;
         state.roundPoints = 0;
@@ -843,9 +845,11 @@ public final class SpeedBuildersGame implements Listener {
         phase = Phase.BUILDING;
         buildPhaseStartedTick = tick;
         phaseDeadlineTick = tick + buildSeconds * 20L;
+        firstPerfectThisRoundAwarded = false;
         for (PlayerState state : activePlayers()) {
             state.roundBuildTimeTicks = 0L;
             state.buildTimeRecorded = false;
+            state.roundBlocksBroken = 0;
             clearPlotBuildVolume(state.plot);
             removeMobs(state.mobs);
             giveTemplateBlocks(state.player, currentTemplate);
@@ -878,6 +882,7 @@ public final class SpeedBuildersGame implements Listener {
             } else if (!perfectBuild) {
                 state.perfect = false;
                 state.perfectedEveryBuild = false;
+                state.rapidPerfectStreak = 0;
                 state.roundBuildTimeTicks = 0L;
                 state.totalBuildTimeTicks = 0L;
             }
@@ -1006,9 +1011,11 @@ public final class SpeedBuildersGame implements Listener {
         }
         persistMatchProgress(winnerIds);
         for (PlayerState state : matchHistory) {
-            if (round > 0 && state.perfectBuilds == round) {
+            if (!GameDebugRuntimeOverrides.isDebugSession() && winnerIds.contains(state.player.getUniqueId())
+                    && round > 0 && state.perfectBuilds == round) {
                 SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(),
                         "perfectionist-wins", 1L);
+                awardAchievement(state.player.getUniqueId(), "perfectionist");
             }
         }
         plugin.saveConfig();
@@ -1038,9 +1045,10 @@ public final class SpeedBuildersGame implements Listener {
             SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "blocks-placed", state.blocksPlaced);
             SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "blocks-broken", state.blocksBroken);
             SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "mobs-built", state.mobsBuilt);
-            SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "perfect-builds", state.perfectBuilds);
             if (winnerIds.contains(playerId)) {
                 SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "wins", 1L);
+                maybeAwardLifetimeProgress(playerId, "wins", plugin.getConfig().getLong(
+                        "local-stats." + playerId + ".speed-builders-arcade.wins", 0L));
                 if (state.perfectBuilds <= 3) awardAchievement(playerId, "bad-builds");
                 if (state.finalRoundLastSecondPerfect) awardAchievement(playerId, "right-on-time");
             }
@@ -1055,7 +1063,6 @@ public final class SpeedBuildersGame implements Listener {
         SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "blocks-placed", state.blocksPlaced);
         SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "blocks-broken", state.blocksBroken);
         SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "mobs-built", state.mobsBuilt);
-        SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "perfect-builds", state.perfectBuilds);
         plugin.saveConfig();
     }
 
@@ -1570,6 +1577,7 @@ public final class SpeedBuildersGame implements Listener {
         block.setType(Material.AIR, false);
         if (otherHalf != null && otherHalf.getType() == material) otherHalf.setType(Material.AIR, false);
         state.blocksBroken++;
+        state.roundBlocksBroken++;
         Bukkit.getScheduler().runTask(plugin, () -> checkPerfectBuild(state));
     }
 
@@ -1590,13 +1598,46 @@ public final class SpeedBuildersGame implements Listener {
             state.finalRoundLastSecondPerfect = true;
         }
         long elapsedMillis = state.roundBuildTimeTicks * 50L;
-        if (!GameDebugRuntimeOverrides.isDebugSession()) {
-            if (!firstPerfectBuildAwarded) {
+        if (!firstPerfectThisRoundAwarded) {
+            firstPerfectThisRoundAwarded = true;
+            state.firstPerfectRounds++;
+            if (SpeedBuildersRules.shouldAwardFirstImpressions(state.firstPerfectRounds)) {
+                awardAchievement(state.player.getUniqueId(), "first-impressions");
+            }
+            if (!GameDebugRuntimeOverrides.isDebugSession() && !firstPerfectBuildAwarded) {
                 firstPerfectBuildAwarded = true;
                 SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(), "perfect-first", 1L);
+                maybeAwardLifetimeProgress(state.player.getUniqueId(), "perfect-first", plugin.getConfig().getLong(
+                        "local-stats." + state.player.getUniqueId() + ".speed-builders-arcade.perfect-first", 0L));
             }
+        }
+        if (SpeedBuildersRules.shouldAwardNoTakebacks(true, state.roundBlocksBroken)) {
+            awardAchievement(state.player.getUniqueId(), "no-takebacks");
+        }
+        if (SpeedBuildersRules.shouldAwardMenagerie(true, currentTemplate.mobs().size())) {
+            awardAchievement(state.player.getUniqueId(), "menagerie");
+        }
+        int distinctMaterials = (int) currentTemplate.cells().stream()
+                .map(SpeedBuildersRules.Cell::material).distinct().count();
+        if (SpeedBuildersRules.shouldAwardPalettePro(true, distinctMaterials)) {
+            awardAchievement(state.player.getUniqueId(), "palette-pro");
+        }
+        if (elapsedMillis < 10_000L) {
+            state.rapidPerfectStreak++;
+            if (SpeedBuildersRules.shouldAwardRapidReplica(state.rapidPerfectStreak)) {
+                awardAchievement(state.player.getUniqueId(), "rapid-replica");
+            }
+        } else {
+            state.rapidPerfectStreak = 0;
+        }
+        if (!GameDebugRuntimeOverrides.isDebugSession() && !plugin.isTestPlayer(state.player.getUniqueId())) {
+            SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(), "perfect-builds", 1L);
+            maybeAwardLifetimeProgress(state.player.getUniqueId(), "perfect-builds", plugin.getConfig().getLong(
+                    "local-stats." + state.player.getUniqueId() + ".speed-builders-arcade.perfect-builds", 0L));
             if (elapsedMillis < 10_000L) {
                 SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(), "speediest-builderizer", 1L);
+                maybeAwardLifetimeProgress(state.player.getUniqueId(), "speediest-builderizer", plugin.getConfig().getLong(
+                        "local-stats." + state.player.getUniqueId() + ".speed-builders-arcade.speediest-builderizer", 0L));
             }
             plugin.saveConfig();
         }
@@ -1610,7 +1651,7 @@ public final class SpeedBuildersGame implements Listener {
     }
 
     private void awardAchievement(UUID playerId, String achievementId) {
-        if (playerId == null || plugin.isTestPlayer(playerId)
+        if (playerId == null || plugin.isTestPlayer(playerId) || GameDebugRuntimeOverrides.isDebugSession()
                 || ArcadeProgressCatalog.achievements("speed-builders-arcade").stream()
                         .noneMatch(achievement -> achievement.id().equals(achievementId))) return;
         String path = "local-achievements." + playerId + ".speed-builders-arcade." + achievementId;
@@ -1618,9 +1659,17 @@ public final class SpeedBuildersGame implements Listener {
         plugin.getConfig().set(path, true);
         Player player = Bukkit.getPlayer(playerId);
         if (player != null && player.isOnline()) {
-            player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + achievementId.replace('-', ' '));
+            String achievementName = ArcadeProgressCatalog.achievements("speed-builders-arcade").stream()
+                    .filter(achievement -> achievement.id().equals(achievementId))
+                    .map(ArcadeProgressCatalog.Achievement::name).findFirst().orElse(achievementId);
+            player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + achievementName);
         }
         plugin.saveConfig();
+    }
+
+    private void maybeAwardLifetimeProgress(UUID playerId, String metric, long value) {
+        String achievement = SpeedBuildersRules.achievementForLifetimeProgress(metric, value);
+        if (achievement != null) awardAchievement(playerId, achievement);
     }
 
     private void checkPerfectBuild(PlayerState state) {
@@ -1888,6 +1937,9 @@ public final class SpeedBuildersGame implements Listener {
         private boolean buildTimeRecorded;
         private boolean perfectedEveryBuild = true;
         private int perfectBuilds;
+        private int firstPerfectRounds;
+        private int rapidPerfectStreak;
+        private int roundBlocksBroken;
         private boolean finalRoundLastSecondPerfect;
         private int blocksPlaced;
         private int blocksBroken;

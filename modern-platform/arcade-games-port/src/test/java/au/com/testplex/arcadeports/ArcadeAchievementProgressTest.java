@@ -12,6 +12,9 @@ class ArcadeAchievementProgressTest {
         assertEquals(30, masterBomber.target());
         assertEquals("map-wins.through-hell",
                 ArcadeAchievementProgress.counter("dragon-escape", "to-hell-and-back").statKey());
+        assertEquals(20, ArcadeAchievementProgress.counter("sheep-quest", "hungry-hungry-hippo").target());
+        assertEquals(100, ArcadeAchievementProgress.counter("sheep-quest", "thief").target());
+        assertEquals(100, ArcadeAchievementProgress.counter("sheep-quest", "animal-rescue").target());
     }
 
     @Test void OneMatchChallengesCannotBeFakedFromLifetimeTotals() {

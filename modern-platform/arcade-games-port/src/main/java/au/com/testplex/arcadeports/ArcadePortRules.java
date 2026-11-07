@@ -2362,7 +2362,7 @@ public final class ArcadePortRules {
         if (kit.startsWith("runnerkit-")) kit = kit.substring("runnerkit-".length());
         else if (kit.startsWith("runner-")) kit = kit.substring("runner-".length());
         return switch (kit) {
-            case "leaper" -> "leaper";
+            case "leaper", "jumper" -> "leaper";
             case "archer" -> "archer";
             case "frosty" -> "frosty";
             case "switcher" -> "switcher";
@@ -2771,9 +2771,9 @@ public final class ArcadePortRules {
     public static final long SHEEP_QUEST_HIT_DROP_COOLDOWN_MILLIS = 1_000L;
     public static final int SHEEP_QUEST_CAPTURE_SCORE = 1;
     public static final int SHEEP_QUEST_SOLO_CARRY_KILL_THRESHOLD = 3;
-    public static final int SHEEP_QUEST_THIEF_ACHIEVEMENT_COUNT = 300;
-    public static final int SHEEP_QUEST_ANIMAL_RESCUE_ACHIEVEMENT_COUNT = 300;
-    public static final int SHEEP_QUEST_HUNGRY_HUNGRY_HIPPO_WINS = 50;
+    public static final int SHEEP_QUEST_THIEF_ACHIEVEMENT_COUNT = 100;
+    public static final int SHEEP_QUEST_ANIMAL_RESCUE_ACHIEVEMENT_COUNT = 100;
+    public static final int SHEEP_QUEST_HUNGRY_HUNGRY_HIPPO_WINS = 20;
     public static final int SHEEP_QUEST_SELFISH_TEAM_SHEEP_THRESHOLD = 12;
     public static final int SHEEP_QUEST_ARCHER_ACHIEVEMENT_KILLS_PER_TARGET = 5;
     public static final long SHEEP_QUEST_ARCHER_MOVEMENT_CREDIT_WINDOW_MILLIS = 5_000L;
@@ -3701,7 +3701,7 @@ public final class ArcadePortRules {
         String kit = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
         if (kit.startsWith("quiver-")) kit = kit.substring("quiver-".length());
         return switch (kit) {
-            case "leaper" -> "leaper";
+            case "leaper", "jumper" -> "leaper";
             case "brawler" -> "brawler";
             case "enchanter" -> "enchanter";
             case "slam-shot", "slamshot", "slam-shooter" -> "slam-shot";

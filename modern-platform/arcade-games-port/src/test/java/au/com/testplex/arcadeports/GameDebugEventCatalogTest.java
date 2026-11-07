@@ -793,10 +793,10 @@ class GameDebugEventCatalogTest {
         }
         String source = Files.readString(sourceRoot.resolve("SpeedBuildersGame.java"));
         int start = source.indexOf("private void markPerfectBuild(PlayerState state)");
-        int end = source.indexOf("private void checkPerfectBuild(", start);
+        int end = source.indexOf("private void awardAchievement(", start);
         assertTrue(start >= 0 && end > start);
         String method = source.substring(start, end);
-        int guard = method.indexOf("if (!GameDebugRuntimeOverrides.isDebugSession())");
+        int guard = method.indexOf("!GameDebugRuntimeOverrides.isDebugSession()");
         assertTrue(guard >= 0);
         assertTrue(method.indexOf("SpeedBuildersProgressStore.increment") > guard);
         assertTrue(method.indexOf("plugin.saveConfig()") > guard);
@@ -821,9 +821,12 @@ class GameDebugEventCatalogTest {
             int start = store.indexOf(signature);
             int end = store.indexOf("\n    }", start);
             assertTrue(start >= 0 && end > start, methodName + " exists");
-            assertTrue(store.substring(start, end).contains("GameDebugRuntimeOverrides.isDebugSession()"),
-                    methodName + " is isolated during debug rounds");
+            assertTrue(store.substring(start, end).contains("shouldPersist("),
+                    methodName + " uses the shared progression guard");
         }
+        assertTrue(store.contains("private boolean shouldPersist(UUID playerId)"));
+        assertTrue(store.contains("GameDebugRuntimeOverrides.isDebugSession()"));
+        assertTrue(store.contains("getMethod(\"isTestPlayer\", UUID.class)"));
     }
 
     @Test

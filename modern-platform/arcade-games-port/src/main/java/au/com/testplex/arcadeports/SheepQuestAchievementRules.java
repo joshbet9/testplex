@@ -25,8 +25,16 @@ final class SheepQuestAchievementRules {
         return won && "archer".equals(kit) && !enteredOwnPen;
     }
 
-    static boolean soloCarry(boolean won, int unassistedKills, int stolenSheepAfterKills) {
-        return won && unassistedKills >= 3 && stolenSheepAfterKills >= 2;
+    static boolean soloCarry(int unassistedKillsFromPenTeam, int stolenSheepAfterKills) {
+        return unassistedKillsFromPenTeam >= 3 && stolenSheepAfterKills >= 2;
+    }
+
+    static boolean shepherdsFlock(boolean won, String kit, int maxCarried) {
+        return won && "shepherd".equals(kit) && maxCarried >= 10;
+    }
+
+    static boolean cleanGetaway(boolean won, int enemySheepPickedUp, boolean wasEliminated) {
+        return won && enemySheepPickedUp >= 5 && !wasEliminated;
     }
 
     static boolean biggestLoser(boolean won, int captures) {

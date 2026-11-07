@@ -98,9 +98,15 @@ final class SneakyAssassinsMechanics {
     private final Map<UUID, Long> masterCompassUpdateAt = new HashMap<>();
     private final Set<UUID> masterAssassins = new HashSet<>();
     private final Map<UUID, UUID> pendingCompassKills = new HashMap<>();
+    private final Map<UUID, UUID> pendingBowKills = new HashMap<>();
+    private final Map<UUID, UUID> pendingBribedVillagerKills = new HashMap<>();
     private final Set<UUID> rangedAssassinMeleeDamage = new HashSet<>();
     private final Set<UUID> escapeArtistSmokeUsed = new HashSet<>();
     private final Map<UUID, Set<UUID>> revealerTargets = new HashMap<>();
+    private final Map<UUID, Integer> escapeArtistSmokeEscapes = new HashMap<>();
+    private final Map<UUID, Integer> rangedAssassinBowKills = new HashMap<>();
+    private final Map<UUID, Map<UUID, Long>> pendingSmokePursuits = new HashMap<>();
+    private UUID lastEliminationByBribedVillagerOwner;
     private final Map<UUID, Long> lastPowerUpCollectedAt = new HashMap<>();
     private long nextPowerUpAt;
     private long nextGlobalRevealAt;
@@ -132,7 +138,7 @@ final class SneakyAssassinsMechanics {
         while (kit.contains("--")) kit = kit.replace("--", "-");
         return switch (kit) {
             case "escape", "escape-artist", "escapeartist" -> "escape-artist";
-            case "assassin", "archer" -> "assassin";
+            case "assassin", "archer", "ranged-assassin", "rangedassassin" -> "assassin";
             case "briber", "bribe" -> "briber";
             case "revealer", "reveal" -> "revealer";
             default -> null;
@@ -143,7 +149,7 @@ final class SneakyAssassinsMechanics {
         if (player == null) return;
         String kit = normalizeKit(requestedKit);
         if (kit == null) {
-            player.sendMessage(ChatColor.YELLOW + "Sneaky Assassins kits: escape-artist, assassin, briber, revealer.");
+            player.sendMessage(ChatColor.YELLOW + "Sneaky Assassins kits: escape-artist, ranged-assassin, briber, revealer.");
             return;
         }
         if ("briber".equals(kit) && !briberUnlocked(player.getUniqueId())) {
@@ -155,7 +161,8 @@ final class SneakyAssassinsMechanics {
             return;
         }
         kitPreferences.put(player.getUniqueId(), kit);
-        player.sendMessage(ChatColor.GREEN + "Sneaky Assassins kit set to " + kit.replace('-', ' ') + ".");
+        String kitName = "assassin".equals(kit) ? "Ranged Assassin" : kit.replace('-', ' ');
+        player.sendMessage(ChatColor.GREEN + "Sneaky Assassins kit set to " + kitName + ".");
     }
 
     String selectedKit(UUID playerId) {
@@ -284,7 +291,7 @@ final class SneakyAssassinsMechanics {
             case "assassin" -> {
                 player.getInventory().addItem(new ItemStack(Material.BOW), new ItemStack(Material.ARROW,
                         SneakyAssassinsRules.assassinStartingArrows()));
-                player.sendMessage(ChatColor.GRAY + "Assassin: bow, " + SneakyAssassinsRules.assassinStartingArrows()
+                player.sendMessage(ChatColor.GRAY + "Ranged Assassin: bow, " + SneakyAssassinsRules.assassinStartingArrows()
                         + " arrows and your smoke bomb.");
             }
             case "briber" -> {
@@ -369,6 +376,7 @@ final class SneakyAssassinsMechanics {
         long now = System.currentTimeMillis();
         updateDisguises(now);
         updateRevealCycle(now);
+        updateSmokePursuitEscapes(now);
         if (GameDebugRuntimeOverrides.booleanValue("npc-patrol", true)) updateNpcMovement(now);
         updateTownNpcCull(now);
         updatePowerUps(now);
@@ -804,7 +812,8 @@ final class SneakyAssassinsMechanics {
     }
 
     private void useSmokeBomb(Player player) {
-        if ("escape-artist".equals(selectedKit(player.getUniqueId()))) {
+        boolean escapeArtist = "escape-artist".equals(selectedKit(player.getUniqueId()));
+        if (escapeArtist) {
             escapeArtistSmokeUsed.add(player.getUniqueId());
         }
         long now = System.currentTimeMillis();
@@ -812,6 +821,17 @@ final class SneakyAssassinsMechanics {
         cloakUntil.put(player.getUniqueId(), now + SneakyAssassinsRules.smokeCloakDurationMillis());
         player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, (int) smokeTicks, 0, false, false, false));
         double smokeRadius = Math.sqrt(SneakyAssassinsRules.smokeRadiusSquared());
+        if (escapeArtist && isAlive.test(player.getUniqueId())) {
+            Map<UUID, Long> pursuers = new HashMap<>();
+            for (Player target : players.values()) {
+                if (target == null || !target.isOnline() || target.equals(player)
+                        || !isAlive.test(target.getUniqueId())) continue;
+                if (target.getLocation().distanceSquared(player.getLocation()) <= smokeRadius * smokeRadius) {
+                    pursuers.put(target.getUniqueId(), now + SneakyAssassinsRules.smokeBlindnessDurationMillis());
+                }
+            }
+            if (!pursuers.isEmpty()) pendingSmokePursuits.put(player.getUniqueId(), pursuers);
+        }
         for (Entity nearby : player.getNearbyEntities(smokeRadius, smokeRadius, smokeRadius)) {
             if (!(nearby instanceof LivingEntity living) || nearby.equals(player)) continue;
             if (nearby instanceof Player target && !isAlive.test(target.getUniqueId())) continue;
@@ -824,6 +844,39 @@ final class SneakyAssassinsMechanics {
                 26, 0.85D, 0.7D, 0.85D, 0.04D);
         player.getWorld().playSound(player.getLocation(), Sound.BLOCK_FIRE_EXTINGUISH, 1.2F, 0.65F);
         player.sendMessage(ChatColor.GREEN + "Smoke Bomb used!");
+    }
+
+    private void updateSmokePursuitEscapes(long now) {
+        for (Map.Entry<UUID, Map<UUID, Long>> entry : new ArrayList<>(pendingSmokePursuits.entrySet())) {
+            UUID runnerId = entry.getKey();
+            Player runner = players.get(runnerId);
+            if (runner == null || !runner.isOnline() || !isAlive.test(runnerId)) {
+                pendingSmokePursuits.remove(runnerId);
+                continue;
+            }
+            Map<UUID, Long> pursuers = entry.getValue();
+            boolean escapedPursuit = false;
+            for (Map.Entry<UUID, Long> pursuit : new ArrayList<>(pursuers.entrySet())) {
+                if (now < pursuit.getValue()) continue;
+                Player pursuer = players.get(pursuit.getKey());
+                boolean pursuerStillEligible = pursuer != null && pursuer.isOnline()
+                        && isAlive.test(pursuer.getUniqueId()) && pursuer.getWorld() == runner.getWorld();
+                boolean pursuerStillNearby = pursuerStillEligible
+                        && pursuer.getLocation().distanceSquared(runner.getLocation())
+                                <= SneakyAssassinsRules.smokeRadiusSquared();
+                if (SneakyAssassinsRules.smokePursuitWasEscaped(pursuerStillEligible, pursuerStillNearby)) {
+                    escapedPursuit = true;
+                }
+                pursuers.remove(pursuit.getKey());
+            }
+            if (escapedPursuit) {
+                int escapes = escapeArtistSmokeEscapes.merge(runnerId, 1, Integer::sum);
+                if (SneakyAssassinsRules.shouldAwardSmokeScreen(selectedKit(runnerId), escapes)) {
+                    awardAchievement(runner, "smoke-screen", "Smoke Screen");
+                }
+            }
+            if (pursuers.isEmpty()) pendingSmokePursuits.remove(runnerId);
+        }
     }
 
     private void throwRevealer(Player player) {
@@ -1033,7 +1086,9 @@ final class SneakyAssassinsMechanics {
             announce(ChatColor.YELLOW + player.getName() + " collected a bonus power-up!");
         } else if (SneakyAssassinsRules.becomesMasterAssassin(count)) {
             masterAssassins.add(id);
-            incrementLocalStat(id, "master-assassin");
+            int masterCount = incrementLocalStat(id, "master-assassin");
+            String achievement = SneakyAssassinsRules.achievementForLifetimeStat("master-assassin", masterCount);
+            if (achievement != null) awardAchievement(player, achievement, "Master Assassin");
             powerUpCounts.put(id, SneakyAssassinsRules.nextPowerUpCount(count));
             player.getInventory().addItem(createMasterCompass());
             player.sendMessage(ChatColor.GOLD + "You are now a Master Assassin! Your compass tracks the nearest player.");
@@ -1140,7 +1195,9 @@ final class SneakyAssassinsMechanics {
                     || target.getLocation().distanceSquared(impact) > SneakyAssassinsRules.revealRadiusSquared()) continue;
             long now = System.currentTimeMillis();
             if (revealUntil.getOrDefault(id, 0L) <= now && ownerId != null) {
-                incrementLocalStat(ownerId, "i-see-you");
+                int reveals = incrementLocalStat(ownerId, "i-see-you");
+                String achievement = SneakyAssassinsRules.achievementForLifetimeStat("i-see-you", reveals);
+                if (achievement != null && thrower != null) awardAchievement(thrower, achievement, "I See You");
             }
             if (ownerId != null) {
                 Set<UUID> distinctTargets = revealerTargets.computeIfAbsent(ownerId, ignored -> new HashSet<>());
@@ -1234,7 +1291,9 @@ final class SneakyAssassinsMechanics {
         event.setDroppedExp(0);
         Player killer = event.getEntity().getKiller();
         if (killer != null && players.containsKey(killer.getUniqueId())) {
-            incrementLocalStat(killer.getUniqueId(), "incompetence");
+            int npcKills = incrementLocalStat(killer.getUniqueId(), "incompetence");
+            String achievement = SneakyAssassinsRules.achievementForLifetimeStat("incompetence", npcKills);
+            if (achievement != null) awardAchievement(killer, achievement, "Incompetence");
         }
         bribes.remove(id);
         npcNextAttackAt.remove(id);
@@ -1261,6 +1320,9 @@ final class SneakyAssassinsMechanics {
         double damage = recordedDamage == null || recordedDamage <= 0.0D
                 ? SneakyAssassinsRules.projectileDamage(projectile.getVelocity().length())
                 : recordedDamage;
+        if ("assassin".equals(selectedKit(shooter.getUniqueId())) && target.getHealth() <= damage) {
+            pendingBowKills.put(target.getUniqueId(), shooter.getUniqueId());
+        }
         cloakUntil.remove(shooter.getUniqueId());
         shooter.removePotionEffect(PotionEffectType.INVISIBILITY);
         applyDamage(target, damage, shooter, "was defeated by " + shooter.getName());
@@ -1270,6 +1332,9 @@ final class SneakyAssassinsMechanics {
     private void applyDamage(Player target, double damage, Player attacker, String reason) {
         if (target == null || !target.isOnline() || !isAlive.test(target.getUniqueId()) || damage <= 0.0D) return;
         if (target.getHealth() <= damage) {
+            if ("was attacked by a bribed villager".equals(reason) && attacker != null) {
+                pendingBribedVillagerKills.put(target.getUniqueId(), attacker.getUniqueId());
+            }
             eliminator.eliminate(target, attacker, reason);
         } else {
             target.setNoDamageTicks(0);
@@ -1287,6 +1352,15 @@ final class SneakyAssassinsMechanics {
     void onKill(Player killer, Player victim) {
         if (killer == null || !killer.isOnline() || !players.containsKey(killer.getUniqueId())) return;
         UUID killerId = killer.getUniqueId();
+        UUID bowKiller = victim == null ? null : pendingBowKills.remove(victim.getUniqueId());
+        if (killerId.equals(bowKiller)) {
+            int bowKills = rangedAssassinBowKills.merge(killerId, 1, Integer::sum);
+            if (SneakyAssassinsRules.shouldAwardDeadeye(selectedKit(killerId), bowKills)) {
+                awardAchievement(killer, "deadeye", "Deadeye");
+            }
+        }
+        UUID bribedVillagerOwner = victim == null ? null : pendingBribedVillagerKills.remove(victim.getUniqueId());
+        lastEliminationByBribedVillagerOwner = killerId.equals(bribedVillagerOwner) ? killerId : null;
         UUID compassKiller = victim == null ? null : pendingCompassKills.remove(victim.getUniqueId());
         if (killerId.equals(compassKiller)) {
             awardAchievement(killer, "you-need-directions", "You Need Directions?");
@@ -1304,6 +1378,7 @@ final class SneakyAssassinsMechanics {
                         SneakyAssassinsRules.MASTERS_MASTER_POWERUPS_REQUIRED)) {
             incrementLocalStat(killer.getUniqueId(), "the-masters-master");
             unlockTheMastersMaster(killer);
+            awardAchievement(killer, "the-masters-master", "The Master’s Master");
         }
         var attribute = killer.getAttribute(Attribute.MAX_HEALTH);
         if (attribute != null) {
@@ -1318,6 +1393,16 @@ final class SneakyAssassinsMechanics {
     void finish(Player winner) {
         if (winner == null || !players.containsKey(winner.getUniqueId())) return;
         UUID winnerId = winner.getUniqueId();
+        if (!isTestPlayer.test(winnerId)) {
+            int wins = incrementLocalStat(winnerId, "wins");
+            if (wins >= SneakyAssassinsRules.SO_SO_SNEAKY_WINS_REQUIRED) {
+                awardAchievement(winner, "so-so-sneaky", "So So Sneaky");
+            }
+        }
+        if (SneakyAssassinsRules.shouldAwardPaidInFull(true,
+                winnerId.equals(lastEliminationByBribedVillagerOwner))) {
+            awardAchievement(winner, "paid-in-full", "Paid in Full");
+        }
         String kit = selectedKit(winnerId);
         if (SneakyAssassinsRules.shouldAwardNotSoSneaky(
                 kit, rangedAssassinMeleeDamage.contains(winnerId))) {
@@ -1371,19 +1456,34 @@ final class SneakyAssassinsMechanics {
         return "local-stats." + playerId + ".sneaky-assassins." + stat;
     }
 
-    private void incrementLocalStat(UUID playerId, String stat) {
-        if (playerId == null || isTestPlayer.test(playerId)) return;
+    private int incrementLocalStat(UUID playerId, String stat) {
+        if (playerId == null || isTestPlayer.test(playerId)) return 0;
         String path = localStatPath(playerId, stat);
-        plugin.getConfig().set(path, plugin.getConfig().getInt(path, 0) + 1);
+        int value = plugin.getConfig().getInt(path, 0) + 1;
+        plugin.getConfig().set(path, value);
         plugin.saveConfig();
+        String achievement = SneakyAssassinsRules.achievementForLifetimeStat(stat, value);
+        Player player = Bukkit.getPlayer(playerId);
+        if (achievement != null && player != null) {
+            String displayName = switch (stat) {
+                case "master-assassin" -> "Master Assassin";
+                case "incompetence" -> "Incompetence";
+                case "i-see-you" -> "I See You";
+                default -> achievement;
+            };
+            awardAchievement(player, achievement, displayName);
+        }
+        return value;
     }
 
     private void unlockTheMastersMaster(Player player) {
         if (player == null || isTestPlayer.test(player.getUniqueId())) return;
         String path = "test-achievements.sneaky-assassins." + player.getUniqueId() + ".the-masters-master";
-        if (plugin.getConfig().getBoolean(path, false)) return;
-        plugin.getConfig().set(path, true);
-        plugin.saveConfig();
+        if (!plugin.getConfig().getBoolean(path, false)) {
+            plugin.getConfig().set(path, true);
+            plugin.saveConfig();
+        }
+        awardAchievement(player, "the-masters-master", "The Master’s Master");
     }
 
     private void announce(String message) {
@@ -1393,6 +1493,7 @@ final class SneakyAssassinsMechanics {
     void onQuit(Player player) {
         if (player != null) {
             UUID id = player.getUniqueId();
+            pendingSmokePursuits.remove(id);
             removeDisguise(id);
             players.remove(id);
             powerUpCounts.remove(id);
@@ -1430,9 +1531,15 @@ final class SneakyAssassinsMechanics {
         for (UUID id : new ArrayList<>(revealerProjectiles.keySet())) removeRevealerProjectile(id);
         pendingProjectileDamage.clear();
         pendingCompassKills.clear();
+        pendingBowKills.clear();
+        pendingBribedVillagerKills.clear();
         rangedAssassinMeleeDamage.clear();
         escapeArtistSmokeUsed.clear();
         revealerTargets.clear();
+        escapeArtistSmokeEscapes.clear();
+        rangedAssassinBowKills.clear();
+        pendingSmokePursuits.clear();
+        lastEliminationByBribedVillagerOwner = null;
         lastPowerUpCollectedAt.clear();
         npcIds.clear();
         bribes.clear();

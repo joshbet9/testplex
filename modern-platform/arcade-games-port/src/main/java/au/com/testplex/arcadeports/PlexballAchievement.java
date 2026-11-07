@@ -15,7 +15,7 @@ public enum PlexballAchievement {
     PERFECT_CONTACT("perfect-contact-three", "Perfect Contact",
             "Record three top-grade contacts across your Plexball career.", Material.DIAMOND),
     STICKY_GLOVES("sticky-gloves-three", "Sticky Gloves",
-            "Make at least three successful catches in one match.", Material.LEATHER),
+            "Make three successful catches in a row in one match.", Material.LEATHER),
     GOLDEN_GLOVE("golden-glove-five", "Golden Glove",
             "Make at least five successful catches in one match.", Material.GOLDEN_CHESTPLATE),
     ALL_ROUNDER("all-rounder-75m", "All-Rounder",
@@ -23,7 +23,17 @@ public enum PlexballAchievement {
     CLUTCH_PERFORMER("clutch-double-homer", "Clutch Performer",
             "Win a match after hitting at least two home runs in sudden death.", Material.NETHER_STAR),
     CHAMPION("champion-five-win-streak", "Champion",
-            "Win five Plexball matches in a row.", Material.NETHER_STAR);
+            "Win five Plexball matches in a row.", Material.NETHER_STAR),
+    WALK_OFF_POWER_DIVE("walk-off-power-dive", "Walk-Off Power Dive",
+            "As Slugger, hit the fair home run that wins the match while Power Dive is active.", Material.DIAMOND_SWORD),
+    SURE_HANDS("sure-hands", "Sure Hands",
+            "As Technician, catch three consecutive balls with Sure Hands and win the match.", Material.SHIELD),
+    BEND_IT_IN("bend-it-in", "Bend It In",
+            "As Curve Artist, land three fair curved hits in one match and win.", Material.BOW),
+    FIRST_TO_HOME("first-to-home", "First to Home",
+            "As Sprinter, activate Burst and hit two home runs in one match, then win.", Material.RABBIT_FOOT),
+    HIGH_POINT("high-point", "High Point",
+            "As Skyguard, catch three balls at least two blocks above their release height and win.", Material.ELYTRA);
 
     private final String slug;
     private final String displayName;

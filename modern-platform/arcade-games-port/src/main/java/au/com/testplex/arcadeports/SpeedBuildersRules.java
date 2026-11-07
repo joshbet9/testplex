@@ -34,6 +34,28 @@ public final class SpeedBuildersRules {
 
     private SpeedBuildersRules() { }
 
+    static boolean shouldAwardFirstImpressions(int firstPerfectRounds) { return firstPerfectRounds >= 3; }
+    static boolean shouldAwardNoTakebacks(boolean perfect, int blocksBrokenThisRound) {
+        return perfect && blocksBrokenThisRound == 0;
+    }
+    static boolean shouldAwardMenagerie(boolean perfect, int expectedMobs) { return perfect && expectedMobs >= 3; }
+    static boolean shouldAwardPalettePro(boolean perfect, int distinctMaterials) {
+        return perfect && distinctMaterials >= 8;
+    }
+    static boolean shouldAwardRapidReplica(int consecutiveFastPerfectBuilds) {
+        return consecutiveFastPerfectBuilds >= 3;
+    }
+    static String achievementForLifetimeProgress(String metric, long value) {
+        if (metric == null) return null;
+        return switch (metric) {
+            case "wins" -> value >= 10L ? "speed-master" : null;
+            case "perfect-builds" -> value >= 50L ? "dependable" : null;
+            case "perfect-first" -> value >= 10L ? "first-build" : null;
+            case "speediest-builderizer" -> value > 0L ? "speediest-builderizer" : null;
+            default -> null;
+        };
+    }
+
     public static boolean canDebugResetOwnBuild(boolean authorised, boolean building,
             boolean participant, boolean alreadyPerfect, boolean hasTemplate) {
         return authorised && building && participant && !alreadyPerfect && hasTemplate;

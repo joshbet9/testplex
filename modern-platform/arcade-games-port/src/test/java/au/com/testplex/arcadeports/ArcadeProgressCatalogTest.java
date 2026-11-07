@@ -133,7 +133,7 @@ class ArcadeProgressCatalogTest {
         String[] games = {"bacon-brawl", "bomb-lobbers", "death-tag", "dragon-escape", "dragons",
                 "evolution", "gladiators", "micro-battles", "monster-maze", "one-in-the-quiver",
                 "paintball", "runner", "sheep-quest", "snake", "spleef", "turf-wars"};
-        int[] achievementCounts = {5, 4, 4, 4, 3, 14, 14, 6, 14, 8, 5, 7, 8, 6, 7, 9};
+        int[] achievementCounts = {5, 4, 4, 4, 3, 14, 14, 6, 14, 8, 5, 7, 8, 11, 7, 9};
         for (int i = 0; i < games.length; i++) {
             assertTrue(ArcadeProgressCatalog.milestones(games[i]).size() >= 2, games[i]);
             assertTrue(ArcadeProgressCatalog.achievements(games[i]).size() >= achievementCounts[i], games[i]);
@@ -238,17 +238,72 @@ class ArcadeProgressCatalogTest {
     @Test
     void newAchievementCatalogContainsAllRequestedNames() {
         assertTrue(hasAchievement("one-in-the-quiver", "the-perfect-game", "The Perfect Game"));
-        assertTrue(hasAchievement("one-in-the-quiver", "perfectionist", "Perfectionist"));
+        assertFalse(ArcadeProgressCatalog.achievements("one-in-the-quiver").stream()
+                .anyMatch(achievement -> achievement.id().equals("perfectionist")));
+        assertTrue(hasAchievement("one-in-the-quiver", "phoenix-rising", "Phoenix Rising"));
+        assertEquals(14, ArcadeProgressCatalog.achievements("one-in-the-quiver").size());
+        assertEquals(14, ArcadeProgressCatalog.achievements("paintball").size());
         assertTrue(hasAchievement("one-in-the-quiver", "sharpshooter", "Sharpshooter"));
         assertTrue(hasAchievement("one-in-the-quiver", "heads", "HEADS!"));
         assertTrue(hasAchievement("paintball", "aura", "AURA"));
         assertTrue(hasAchievement("runner", "special-play", "Special Play"));
+        assertEquals(14, ArcadeProgressCatalog.achievements("runner").size());
+        assertEquals(14, ArcadeProgressCatalog.achievements("sheep-quest").size());
+        assertTrue(hasAchievement("runner", "switcheroo", "Switcheroo"));
+        assertTrue(hasAchievement("runner", "long-leaper", "Long Leaper"));
+        assertTrue(hasAchievement("runner", "cold-front", "Cold Front"));
+        assertTrue(hasAchievement("runner", "deadeye", "Deadeye"));
+        assertTrue(hasAchievement("sheep-quest", "the-shepherds-flock", "The Shepherd's Flock"));
+        assertTrue(hasAchievement("sheep-quest", "clean-getaway", "Clean Getaway"));
         assertTrue(hasAchievement("sheep-quest", "baaaad-to-the-bone", "Baaaaad to the bone"));
         assertTrue(hasAchievement("death-tag", "death-proof", "Death Proof"));
         assertTrue(hasAchievement("death-tag", "come-at-me-bro", "Come At Me Bro!"));
         assertTrue(hasAchievement("snake", "busted", "Busted"));
+        assertTrue(hasAchievement("snake", "bots-everywhere", "Edge Dweller"));
+        assertTrue(hasAchievement("snake", "tailwind", "Tailwind"));
+        assertTrue(hasAchievement("snake", "opposite-day", "Opposite Day"));
+        assertTrue(hasAchievement("snake", "untouchasnake", "Untouchasnake"));
+        assertTrue(hasAchievement("snake", "lucky-coil", "Lucky Coil"));
+        assertTrue(hasAchievement("snake", "last-coil-standing", "Last Coil Standing"));
+        assertEquals(14, ArcadeProgressCatalog.achievements("snake").size());
         assertTrue(hasAchievement("spleef", "no-mods-in-here", "No Mods in Here"));
+        assertTrue(hasAchievement("spleef", "spleef-king-or-queen", "Spleef King (or Queen)"));
+        assertTrue(hasAchievement("spleef", "demolitionist", "Demolitionist"));
+        assertEquals(14, ArcadeProgressCatalog.achievements("spleef").size());
         assertTrue(hasAchievement("turf-wars", "fair-game", "Fair Game"));
+        assertTrue(hasAchievement("turf-wars", "turf-master-3000", "Turf Master 3000"));
+        assertEquals(15, ArcadeProgressCatalog.achievements("turf-wars").size());
+    }
+
+    @Test
+    void spleefAchievementPredicatesRequireTheExactWinAndFinalKillConditions() {
+        assertEquals(15, SpleefAchievementRules.KING_OR_QUEEN_WINS);
+        assertEquals(20_000, SpleefAchievementRules.DEMOLITIONIST_BLOCKS);
+        assertTrue(SpleefAchievementRules.finalEliminationsMatch(List.of(false, true, true, true), 3));
+        assertFalse(SpleefAchievementRules.finalEliminationsMatch(List.of(true, false, true), 3));
+        assertFalse(SpleefAchievementRules.finalEliminationsMatch(List.of(true, true), 3));
+        assertTrue(SpleefAchievementRules.brawlersGambit("brawler", true, 5, true));
+        assertFalse(SpleefAchievementRules.brawlersGambit("brawler", true, 4, true));
+        assertFalse(SpleefAchievementRules.brawlersGambit("brawler", false, 8, true));
+        assertTrue(SpleefAchievementRules.thinIce(true, 5));
+        assertFalse(SpleefAchievementRules.thinIce(true, 6));
+        assertFalse(SpleefAchievementRules.thinIce(false, 2));
+    }
+
+    @Test
+    void turfWarsAchievementPredicatesUseTheApprovedThresholdsAndWinRequirements() {
+        assertEquals(50, TurfWarsAchievementRules.TURF_MASTER_WINS);
+        assertEquals(2_000, TurfWarsAchievementRules.SHREDDINATOR_BLOCKS);
+        assertTrue(TurfWarsAchievementRules.deadCentre("marksman", true, 20));
+        assertFalse(TurfWarsAchievementRules.deadCentre("marksman", true, 19));
+        assertFalse(TurfWarsAchievementRules.deadCentre("shredder", true, 50));
+        assertTrue(TurfWarsAchievementRules.keepYourFort("fortifier", true, 30));
+        assertFalse(TurfWarsAchievementRules.keepYourFort("fortifier", true, 29));
+        assertFalse(TurfWarsAchievementRules.keepYourFort("fortifier", false, 60));
+        assertTrue(TurfWarsAchievementRules.behindEnemyLines(true, 15));
+        assertFalse(TurfWarsAchievementRules.behindEnemyLines(true, 14));
+        assertTrue(TurfWarsAchievementRules.comeback(true, true));
+        assertFalse(TurfWarsAchievementRules.comeback(true, false));
     }
 
 
@@ -311,9 +366,21 @@ class ArcadeProgressCatalogTest {
         }
         assertTrue(hasAchievement("heroes-of-gwen", "know-your-enemy", "Know Your Enemy"));
         assertTrue(hasAchievement("castle-assault", "moral-exercise", "Moral Exercise"));
-        assertTrue(hasAchievement("skywars", "death-bomber", "Death Bomber"));
-        assertTrue(hasAchievement("skywars", "no-chest", "No Chest"));
-        assertTrue(hasAchievement("skywars", "no-armor", "No Armor"));
+        assertTrue(hasAchievement("skywars", "death-bomber", "Master Bomber"));
+        assertTrue(hasAchievement("skywars", "no-chest", "Survivalist"));
+        assertTrue(hasAchievement("skywars", "no-armor", "Bare Minimum"));
+        assertTrue(hasAchievement("skywars", "sky-king", "Sky King"));
+        assertTrue(hasAchievement("skywars", "tnt-hoarder", "TNT Hoarder"));
+        assertTrue(hasAchievement("skywars", "left-for-dead", "Left for Dead"));
+        assertTrue(hasAchievement("skywars", "cold-blooded-killer", "Cold Blooded Killer"));
+        assertTrue(hasAchievement("skywars", "second-chance", "Second Chance"));
+        assertTrue(hasAchievement("skywars", "fire-sale", "Fire Sale"));
+        assertTrue(hasAchievement("skywars", "bridge-the-gap", "Bridge the Gap"));
+        assertTrue(hasAchievement("skywars", "dirt-cheap", "Dirt Cheap"));
+        assertTrue(hasAchievement("skywars", "scrap-magnet", "Scrap Magnet"));
+        assertTrue(hasAchievement("skywars", "double-demolition", "Double Demolition"));
+        assertTrue(hasAchievement("skywars", "high-ground", "High Ground"));
+        assertEquals(14, ArcadeProgressCatalog.achievements("skywars").size());
     }
 
     @Test
@@ -380,6 +447,8 @@ class ArcadeProgressCatalogTest {
         assertMilestone("hoops-remastered", "blocks", "blocks", 250, new long[] {25, 63, 125, 250});
         assertMilestone("milk-the-cow", "buckets-digested", "buckets-digested", 1500, new long[] {150, 375, 750, 1500});
         assertMilestone("skywars", "tnt-kills", "tnt-kills", 100, new long[] {10, 25, 50, 100});
+        assertFalse(ArcadeProgressCatalog.milestones("skywars").stream()
+                .anyMatch(milestone -> milestone.id().equals("tnt-pickups") || milestone.id().equals("zombie-kills")));
         assertMilestone("draw-my-thing", "first-guesses", "first-guesses", 500, new long[] {50, 125, 250, 500});
         assertMilestone("master-builders", "fair-votes", "fair-votes", 250, new long[] {25, 63, 125, 250});
         assertMilestone("heroes-of-gwen", "mage-wins", "mage-wins", 100, new long[] {10, 25, 50, 100});
@@ -409,6 +478,30 @@ class ArcadeProgressCatalogTest {
         assertEquals(statKey, milestone.statKey(), game + "/" + id + " stat key");
         assertEquals(maximum, milestone.maximum(), game + "/" + id + " maximum");
         assertArrayEquals(stages, milestone.stages(), game + "/" + id + " stages");
+    }
+
+    @Test
+    void witherAssaultAndWizardsApprovedAchievementCataloguesHaveFourteenEntries() {
+        var wither = ArcadeProgressCatalog.achievements("wither-assault");
+        assertEquals(14, wither.size());
+        for (String id : List.of("lucid-dreams", "eye-candy", "split-up", "savior", "tormentor",
+                "worst-wither-ever", "wither-world", "its-a-mans-world", "smoke-and-mirrors",
+                "builders-refuge", "hold-the-line", "bone-brigade", "keep-the-light", "one-breath-left")) {
+            assertTrue(wither.stream().anyMatch(achievement -> achievement.id().equals(id)), id);
+        }
+
+        var wizards = ArcadeProgressCatalog.achievements("wizards");
+        assertEquals(14, wizards.size());
+        assertEquals(14, wizards.stream().map(ArcadeProgressCatalog.Achievement::id).distinct().count());
+        assertEquals("Win 15 games of Wizards.", wizards.stream()
+                .filter(achievement -> achievement.id().equals("supreme-wizard"))
+                .findFirst().orElseThrow().requirement());
+        for (String id : List.of("youre-a-wizard-harry", "strong-willed-small-minded", "ding-dong",
+                "trifecta", "one-trick-wizard", "spell-it-out", "wand-standard",
+                "random-act-of-sorcery", "three-pronged-spell", "mystic-current",
+                "a-doctorate-in-disaster", "spellbook-curator", "the-final-word")) {
+            assertTrue(wizards.stream().anyMatch(achievement -> achievement.id().equals(id)), id);
+        }
     }
 
     private boolean hasAchievement(String game, String id, String name) {

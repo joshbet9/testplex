@@ -770,6 +770,7 @@ class ArcadePortGameTest {
 
     @Test void oneInTheQuiverSourceKitsAndMeleeDamageAreExplicit() {
         assertEquals("leaper", ArcadePortRules.normalizeQuiverKit("Leaper"));
+        assertEquals("leaper", ArcadePortRules.normalizeQuiverKit("Jumper"));
         assertEquals("brawler", ArcadePortRules.normalizeQuiverKit("quiver-brawler"));
         assertEquals("enchanter", ArcadePortRules.normalizeQuiverKit("Enchanter"));
         assertEquals("slam-shot", ArcadePortRules.normalizeQuiverKit("Slam Shot"));
@@ -812,11 +813,11 @@ class ArcadePortGameTest {
     }
 
     @Test void quiverAchievementSetMatchesTheUpdatedRequirements() {
-        assertEquals(8, QuiverAchievement.values().length);
+        assertEquals(14, QuiverAchievement.values().length);
         assertEquals("The Perfect Game", QuiverAchievement.THE_PERFECT_GAME.displayName());
         assertEquals("Achieve a Perfect Run killstreak in a game.",
                 QuiverAchievement.THE_PERFECT_GAME.requirement());
-        assertEquals("Win a game without dying.", QuiverAchievement.PERFECTIONIST.requirement());
+        assertEquals("After dying, win the game with a 15-kill streak.", QuiverAchievement.PHOENIX_RISING.requirement());
         assertEquals("Land 8 arrow hits without missing.", QuiverAchievement.SHARPSHOOTER.requirement());
         assertEquals("Win a game by getting 20 kills without using archery.",
                 QuiverAchievement.WHATS_A_BOW.requirement());
@@ -1599,6 +1600,7 @@ class ArcadePortGameTest {
 
     @Test void runnerSourceKitsHaveDistinctCooldownsAndFrostBallRules() {
         assertEquals("leaper", ArcadePortRules.normalizeRunnerKit("Leaper"));
+        assertEquals("leaper", ArcadePortRules.normalizeRunnerKit("Jumper"));
         assertEquals("archer", ArcadePortRules.normalizeRunnerKit("runner-archer"));
         assertEquals("frosty", ArcadePortRules.normalizeRunnerKit("Frosty"));
         assertNull(ArcadePortRules.normalizeRunnerKit("unknown"));

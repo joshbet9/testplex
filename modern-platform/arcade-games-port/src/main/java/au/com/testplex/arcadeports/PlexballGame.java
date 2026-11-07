@@ -207,12 +207,14 @@ public final class PlexballGame implements Listener {
     private static final class CatchAttempt {
         private final long endTick;
         private final double radius;
+        private final boolean sureHands;
         private long nextCheckTick;
 
-        private CatchAttempt(long startTick, int windowTicks, double radius) {
+        private CatchAttempt(long startTick, int windowTicks, double radius, boolean sureHands) {
             this.nextCheckTick = startTick;
             this.endTick = startTick + windowTicks;
             this.radius = radius;
+            this.sureHands = sureHands;
         }
     }
 
@@ -230,6 +232,15 @@ public final class PlexballGame implements Listener {
     private final Set<UUID> abilityUsedThisBall = new HashSet<>();
     private final Set<UUID> catchUsedThisBall = new HashSet<>();
     private final Set<UUID> sureHandsArmed = new HashSet<>();
+    private final Set<UUID> powerDiveUsedThisAtBat = new HashSet<>();
+    private final Map<UUID, Integer> sureHandsCatchStreak = new HashMap<>();
+    private final Set<UUID> sprinterBurstUsedThisAtBat = new HashSet<>();
+    private final Map<UUID, Integer> catchStreak = new HashMap<>();
+    private final Map<UUID, Integer> bestCatchStreak = new HashMap<>();
+    private final Map<UUID, Integer> curvedFairHits = new HashMap<>();
+    private final Map<UUID, Integer> sprinterBurstHomeRuns = new HashMap<>();
+    private final Map<UUID, Integer> skyguardHighCatches = new HashMap<>();
+    private final Set<UUID> walkOffPowerDiveCandidates = new HashSet<>();
     private final LinkedHashSet<UUID> homeRunPlayers = new LinkedHashSet<>();
     private final LinkedHashSet<UUID> finalists = new LinkedHashSet<>();
     private final LinkedHashSet<UUID> roundSurvivors = new LinkedHashSet<>();
@@ -512,6 +523,15 @@ public final class PlexballGame implements Listener {
         arena = world;
         matchPlayers.clear();
         results.clear();
+        sureHandsCatchStreak.clear();
+        sprinterBurstUsedThisAtBat.clear();
+        catchStreak.clear();
+        bestCatchStreak.clear();
+        curvedFairHits.clear();
+        sprinterBurstHomeRuns.clear();
+        skyguardHighCatches.clear();
+        walkOffPowerDiveCandidates.clear();
+        powerDiveUsedThisAtBat.clear();
         homeRunPlayers.clear();
         finalists.clear();
         roundSurvivors.clear();
@@ -667,6 +687,8 @@ public final class PlexballGame implements Listener {
     private void startNormalAtBat() {
         while (initialTurnIndex < matchPlayers.size()) {
             UUID candidate = matchPlayers.get(initialTurnIndex);
+            powerDiveUsedThisAtBat.remove(candidate);
+            sprinterBurstUsedThisAtBat.remove(candidate);
             Player player = Bukkit.getPlayer(candidate);
             if (player != null && player.isOnline()) {
                 startAtBat(candidate, false);
@@ -852,10 +874,20 @@ public final class PlexballGame implements Listener {
             broadcastMatch(ChatColor.RED + "CAUGHT! " + ChatColor.YELLOW + "The batting attempt is void.");
             showMatchResultTitle("CAUGHT!", "The hit is void  |  A fielder earns a catch");
         } else if (homeRun) {
+            if (powerDiveUsedThisAtBat.contains(battingPlayer)) walkOffPowerDiveCandidates.add(battingPlayer);
+            if (playableKit(battingPlayer) == Kit.SPRINTER && sprinterBurstUsedThisAtBat.contains(battingPlayer)) {
+                sprinterBurstHomeRuns.merge(battingPlayer, 1, Integer::sum);
+            }
             broadcastMatch(ChatColor.GOLD + "" + ChatColor.BOLD + "HOME RUN! "
                     + ChatColor.YELLOW + "100.0m");
             showMatchResultTitle("HOME RUN!", "100 metres  |  Playoff may follow");
         } else if (distance > 0.0D) {
+            if (playableKit(battingPlayer) == Kit.CURVE_ARTIST && curveAcceleration != 0.0D) {
+                curvedFairHits.merge(battingPlayer, 1, Integer::sum);
+            }
+            if (playableKit(battingPlayer) == Kit.CURVE_ARTIST && curveAcceleration != 0.0D) {
+                curvedFairHits.merge(battingPlayer, 1, Integer::sum);
+            }
             broadcastMatch(ChatColor.GREEN + "Uncaught hit: " + ChatColor.WHITE
                     + String.format(java.util.Locale.ROOT, "%.1fm", distance));
         }
@@ -1443,12 +1475,33 @@ public final class PlexballGame implements Listener {
                     Player catcher = Bukkit.getPlayer(catcherId);
                     PlayerResult result = results.get(catcherId);
                     if (result != null) result.catches++;
+                    if (attempt.sureHands) {
+                        sureHandsCatchStreak.merge(catcherId, 1, Integer::sum);
+                    } else {
+                        sureHandsCatchStreak.remove(catcherId);
+                    }
+                    int currentCatchStreak = catchStreak.merge(catcherId, 1, Integer::sum);
+                    bestCatchStreak.merge(catcherId, currentCatchStreak, Math::max);
+                    if (PlexballProgressionRules.shouldAwardStickyGloves(currentCatchStreak)) {
+                        unlockAchievement(catcherId, PlexballAchievement.STICKY_GLOVES);
+                    }
+                    if (playableKit(catcherId) == Kit.SKYGUARD) {
+                        PlayerFrame frame = frameAt(catcherId, checkTick);
+                        double releaseY = teeBallPosition == null ? FLOOR_Y + 1.0D : teeBallPosition.getY();
+                        if (frame != null && frame.feet().getY() - releaseY >= 2.0D) {
+                            skyguardHighCatches.merge(catcherId, 1, Integer::sum);
+                        }
+                    }
                     String name = catcher == null ? "A fielder" : catcher.getName();
                     resolveAttempt(0.0D, true, false, ChatColor.GREEN + name + " made the catch!");
                     return;
                 }
             }
-            if (attempt.nextCheckTick > attempt.endTick) catchAttempts.remove(catcherId);
+            if (attempt.nextCheckTick > attempt.endTick) {
+                catchAttempts.remove(catcherId);
+                sureHandsCatchStreak.remove(catcherId);
+                catchStreak.remove(catcherId);
+            }
         }
     }
 
@@ -1617,7 +1670,7 @@ public final class PlexballGame implements Listener {
         boolean sureHands = sureHandsArmed.remove(id);
         int window = GameDebugRuntimeOverrides.intValue("PLEXBALL_BASE_CATCH_WINDOW_TICKS", PlexballRules.BASE_CATCH_WINDOW_TICKS) + (sureHands ? 4 : 0);
         double radius = catchReach() + (sureHands ? 0.25D : 0.0D);
-        CatchAttempt attempt = new CatchAttempt(startTick, window, radius);
+        CatchAttempt attempt = new CatchAttempt(startTick, window, radius, sureHands);
         catchAttempts.put(id, attempt);
         player.sendActionBar(Component.text(sureHands ? "SURE HANDS — catch window extended" : "CATCH!"));
         checkCatchWindows();
@@ -1643,6 +1696,7 @@ public final class PlexballGame implements Listener {
         facing.normalize();
         switch (kit) {
             case SLUGGER -> {
+                powerDiveUsedThisAtBat.add(id);
                 player.setVelocity(facing.multiply(PlexballRules.sluggerDiveSpeed()).setY(0.12D));
                 player.sendActionBar(Component.text("POWER DIVE!"));
             }
@@ -1655,6 +1709,7 @@ public final class PlexballGame implements Listener {
                 player.sendActionBar(Component.text("READ FLIGHT — projected path revealed."));
             }
             case SPRINTER -> {
+                sprinterBurstUsedThisAtBat.add(id);
                 player.setVelocity(player.getVelocity().add(facing.multiply(PlexballRules.sprinterBurstSpeed())));
                 player.sendActionBar(Component.text("BURST!"));
             }
@@ -2037,7 +2092,7 @@ public final class PlexballGame implements Listener {
             if (PlexballProgressionRules.shouldAwardPerfectContact(profile.perfectHits)) {
                 unlockAchievement(id, PlexballAchievement.PERFECT_CONTACT);
             }
-            if (PlexballProgressionRules.shouldAwardStickyGloves(match.catches)) {
+            if (PlexballProgressionRules.shouldAwardStickyGloves(bestCatchStreak.getOrDefault(id, 0))) {
                 unlockAchievement(id, PlexballAchievement.STICKY_GLOVES);
             }
             if (PlexballProgressionRules.shouldAwardGoldenGlove(match.catches)) {
@@ -2052,6 +2107,25 @@ public final class PlexballGame implements Listener {
             }
             if (PlexballProgressionRules.shouldAwardClutchPerformer(won, match.suddenDeathHomeRuns)) {
                 unlockAchievement(id, PlexballAchievement.CLUTCH_PERFORMER);
+            }
+            if (PlexballAchievementRules.walkOffPowerDive(won, walkOffPowerDiveCandidates.contains(id))) {
+                unlockAchievement(id, PlexballAchievement.WALK_OFF_POWER_DIVE);
+            }
+            if (PlexballAchievementRules.sureHands(won, playableKit(id) == Kit.TECHNICIAN,
+                    sureHandsCatchStreak.getOrDefault(id, 0))) {
+                unlockAchievement(id, PlexballAchievement.SURE_HANDS);
+            }
+            if (PlexballAchievementRules.bendItIn(won, playableKit(id) == Kit.CURVE_ARTIST,
+                    curvedFairHits.getOrDefault(id, 0))) {
+                unlockAchievement(id, PlexballAchievement.BEND_IT_IN);
+            }
+            if (PlexballAchievementRules.firstToHome(won, playableKit(id) == Kit.SPRINTER,
+                    sprinterBurstHomeRuns.getOrDefault(id, 0))) {
+                unlockAchievement(id, PlexballAchievement.FIRST_TO_HOME);
+            }
+            if (PlexballAchievementRules.highPoint(won, playableKit(id) == Kit.SKYGUARD,
+                    skyguardHighCatches.getOrDefault(id, 0))) {
+                unlockAchievement(id, PlexballAchievement.HIGH_POINT);
             }
 
             for (PlexballMilestone milestone : PlexballMilestone.values()) {
