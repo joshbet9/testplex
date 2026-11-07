@@ -22153,7 +22153,7 @@ public final class ArcadePortManager implements Listener {
                         || player.getOpenInventory().getTopInventory().getHolder() instanceof GladiatorMenuHolder) {
                     player.closeInventory();
                 }
-                if (session.type == ArcadePortGame.SPLEEF) player.setCompassTarget(null);
+                // PlayerSnapshot restores a safe lobby compass target.
                 if (!announceWinner) {
                     snapshot.restore(player);
                     lobby.sendToLobby(player);
