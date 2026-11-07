@@ -2,6 +2,11 @@ name: Testplex all-game lifecycle matrix (opt-in)
 
 on:
   workflow_dispatch:
+    inputs:
+      games:
+        description: 'Optional comma-separated game IDs for focused diagnosis; leave blank for all 32 selections.'
+        required: false
+        type: string
   # Run automatically only when the smoke harness itself is being reviewed.
   # Other PRs keep the existing, faster unit + Hoops + Wizards acceptance gate.
   pull_request:
@@ -19,6 +24,8 @@ jobs:
     name: Four-client enabled-game lifecycle matrix
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    env:
+      TESTPLEX_LIFECYCLE_GAMES: ${{ inputs.games }}
     steps:
       - name: Check out source
         uses: actions/checkout@v4
