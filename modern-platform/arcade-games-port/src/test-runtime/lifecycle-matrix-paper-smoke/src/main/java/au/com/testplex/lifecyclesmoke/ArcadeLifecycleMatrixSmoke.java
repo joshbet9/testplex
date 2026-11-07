@@ -167,7 +167,12 @@ public final class ArcadeLifecycleMatrixSmoke extends JavaPlugin {
             // Monster Maze is an in-process module with its own lifecycle state.
             // The shared manager's Session is intentionally not its source of truth.
             Object module = invoke(arcade, "getMonsterMazeModule", new Class<?>[0]);
-            live = module != null && Boolean.TRUE.equals(invoke(module, "isGameRunning", new Class<?>[0]));
+            Object gameManager = module == null ? null
+                    : invoke(module, "getGameManager", new Class<?>[0]);
+            // isGameRunning includes STARTING. Require the actual LIVE phase before
+            // stopping, otherwise the test can cancel async generation/countdown and
+            // contaminate the following Monster Maze mode selection.
+            live = gameManager != null && "LIVE".equals(String.valueOf(field(gameManager, "state")));
         } else if (currentGame.equals(active)) {
             if ("plexball".equals(currentId)) {
                 // Plexball owns its own Live phase after the shared manager has
