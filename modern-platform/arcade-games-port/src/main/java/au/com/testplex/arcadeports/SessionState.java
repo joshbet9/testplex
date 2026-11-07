@@ -821,6 +821,9 @@ class SessionState {
     long turfPhaseEndsAt;
     int turfFrontlineX = -1;
     int turfInitialFrontlineX = -1;
+    // Match the legacy 40-block fallback arena bounds (-HALF_SIZE .. HALF_SIZE).
+    int turfFrontlineMinX = -20;
+    int turfFrontlineMaxXExclusive = 20;
     int turfFloorY = 63;
     long endsAt;
     int ticks;
