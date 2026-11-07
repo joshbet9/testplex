@@ -275,6 +275,13 @@ class ArcadeProgressCatalogTest {
         assertTrue(hasAchievement("milk-the-cow", "got-the-chops", "Got the Chops"));
         assertTrue(hasAchievement("draw-my-thing", "for-the-people", "For the people"));
         assertTrue(hasAchievement("master-builders", "architect", "Architect"));
+        assertEquals(14, ArcadeProgressCatalog.achievements("master-builders").size());
+        for (String achievement : List.of("block-party", "minimalist-masterpiece", "second-draft",
+                "touching-the-sky", "critics-darling", "unanimous-ovation", "mixed-reviews",
+                "kingmaker", "fair-critic", "golden-eye")) {
+            assertTrue(ArcadeProgressCatalog.achievements("master-builders").stream()
+                    .anyMatch(value -> value.id().equals(achievement)), "Missing Master Builders achievement: " + achievement);
+        }
         assertTrue(hasAchievement("heroes-of-gwen", "know-your-enemy", "Know Your Enemy"));
         assertTrue(hasAchievement("castle-assault", "moral-exercise", "Moral Exercise"));
         assertTrue(hasAchievement("skywars", "death-bomber", "Death Bomber"));
@@ -370,5 +377,21 @@ class ArcadeProgressCatalogTest {
         return ArcadeProgressCatalog.milestones(gameId).stream()
                 .filter(milestone -> milestone.id().equals(id))
                 .findFirst().orElseThrow().stages();
+    }
+    @Test
+    void microBattlesHasFourteenAchievementsWithoutRestoringMicroChampion() {
+        var achievements = ArcadeProgressCatalog.achievements("micro-battles");
+        assertEquals(14, achievements.size());
+        assertEquals(14, achievements.stream().map(ArcadeProgressCatalog.Achievement::id).distinct().count());
+        assertEquals(achievements.stream().map(ArcadeProgressCatalog.Achievement::id).collect(java.util.stream.Collectors.toSet()),
+                java.util.Arrays.stream(MicroBattlesAchievement.values()).map(MicroBattlesAchievement::slug)
+                        .collect(java.util.stream.Collectors.toSet()));
+        for (String id : List.of("air-mail", "needle-threader", "shift-supervisor",
+                "no-room-to-build", "last-breath")) {
+            assertTrue(achievements.stream().anyMatch(entry -> entry.id().equals(id)), id);
+        }
+        assertFalse(achievements.stream().anyMatch(entry -> entry.id().equals("micro-champion")));
+        assertEquals(1500, ArcadeProgressCatalog.milestones("micro-battles").stream()
+                .filter(entry -> entry.id().equals("wins")).findFirst().orElseThrow().maximum());
     }
 }

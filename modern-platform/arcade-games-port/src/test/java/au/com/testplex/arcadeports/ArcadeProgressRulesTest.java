@@ -1,6 +1,8 @@
 package au.com.testplex.arcadeports;
 
 import java.util.Set;
+import java.util.Map;
+import java.util.UUID;
 import org.bukkit.Material;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -44,6 +46,60 @@ class ArcadeProgressRulesTest {
         assertTrue(ArcadeProgressRules.shouldAwardMasterBuildersGreaterGood(430, 420, 400));
         assertFalse(ArcadeProgressRules.shouldAwardMasterBuildersGreaterGood(420, 420, 400));
         assertFalse(ArcadeProgressRules.shouldAwardMasterBuildersGreaterGood(430, 420, 430));
+    }
+
+    @Test void masterBuildersNewAchievementsUseFinalBuildAndVotingEvidence() {
+        UUID voter = UUID.randomUUID();
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        UUID third = UUID.randomUUID();
+        assertTrue(ArcadeProgressRules.shouldAwardMasterBuildersBlockParty(Set.of(
+                Material.STONE, Material.DIRT, Material.OAK_PLANKS, Material.GLASS,
+                Material.BRICKS, Material.SAND, Material.GRAVEL, Material.COBBLESTONE,
+                Material.IRON_BLOCK, Material.GOLD_BLOCK, Material.DIAMOND_BLOCK, Material.QUARTZ_BLOCK)));
+        assertFalse(ArcadeProgressRules.shouldAwardMasterBuildersBlockParty(Set.of(Material.STONE)));
+        assertTrue(ArcadeProgressRules.shouldAwardMasterBuildersMinimalist(32));
+        assertFalse(ArcadeProgressRules.shouldAwardMasterBuildersMinimalist(33));
+        assertTrue(ArcadeProgressRules.shouldAwardMasterBuildersSecondDraft(30));
+        assertFalse(ArcadeProgressRules.shouldAwardMasterBuildersSecondDraft(29));
+        assertTrue(ArcadeProgressRules.shouldAwardMasterBuildersTouchingTheSky(true));
+        assertFalse(ArcadeProgressRules.shouldAwardMasterBuildersTouchingTheSky(false));
+        assertTrue(ArcadeProgressRules.shouldAwardMasterBuildersCriticsDarling(5.0D));
+        assertFalse(ArcadeProgressRules.shouldAwardMasterBuildersCriticsDarling(4.999D));
+
+        Set<UUID> eligible = Set.of(voter, second, third);
+        assertTrue(ArcadeProgressRules.shouldAwardMasterBuildersUnanimousOvation(
+                Map.of(voter, 6, second, 6, third, 6), eligible));
+        assertFalse(ArcadeProgressRules.shouldAwardMasterBuildersUnanimousOvation(
+                Map.of(voter, 6, second, 5, third, 6), eligible));
+        assertTrue(ArcadeProgressRules.shouldAwardMasterBuildersMixedReviews(Map.of(voter, 1, second, 6)));
+        assertFalse(ArcadeProgressRules.shouldAwardMasterBuildersMixedReviews(Map.of(voter, 1, second, 4)));
+        assertTrue(ArcadeProgressRules.shouldAwardMasterBuildersKingmaker(500, 499, 499, 6));
+        assertFalse(ArcadeProgressRules.shouldAwardMasterBuildersKingmaker(500, 500, 499, 6));
+        assertTrue(ArcadeProgressRules.shouldRecordMasterBuildersFairVote(3));
+        assertFalse(ArcadeProgressRules.shouldRecordMasterBuildersFairVote(2));
+
+        Map<UUID, Map<UUID, Integer>> votes = Map.of(
+                first, Map.of(voter, 6), second, Map.of(voter, 4), third, Map.of(voter, 1));
+        Map<UUID, Double> averages = Map.of(first, 5.8D, second, 4.0D, third, 1.5D);
+        Map<UUID, Integer> rounded = Map.of(first, 580, second, 400, third, 150);
+        assertTrue(ArcadeProgressRules.shouldAwardMasterBuildersFairCritic(
+                voter, Set.of(first, second, third), votes, averages));
+        assertTrue(ArcadeProgressRules.shouldAwardMasterBuildersGoldenEye(
+                voter, Set.of(first, second, third), votes, rounded));
+        assertTrue(ArcadeProgressRules.shouldAwardMasterBuildersGoldenEye(voter,
+                Set.of(first, second, third), votes, Map.of(first, 500, second, 500, third, 150)),
+                "Standings tied after rounding do not require an invented order.");
+        assertFalse(ArcadeProgressRules.shouldAwardMasterBuildersGoldenEye(voter,
+                Set.of(first, second, third), Map.of(first, Map.of(voter, 6), second, Map.of(voter, 4)), rounded),
+                "The achievement requires a rating for every other build.");
+        assertFalse(ArcadeProgressRules.shouldAwardMasterBuildersGoldenEye(voter,
+                Set.of(first, second, third), Map.of(first, Map.of(voter, 1),
+                        second, Map.of(voter, 4), third, Map.of(voter, 6)), rounded));
+        assertFalse(ArcadeProgressRules.shouldAwardMasterBuildersFairCritic(voter,
+                Set.of(first, second, third), votes, Map.of(first, 3.0D, second, 4.0D, third, 1.5D)));
+        assertFalse(ArcadeProgressRules.shouldAwardMasterBuildersFairCritic(voter,
+                Set.of(voter), Map.of(), Map.of()), "A solo builder cannot earn a vote-based award without voting.");
     }
 
     @Test void milkTheCowAwardsUseLifetimeSafeInRoundConditions() {
