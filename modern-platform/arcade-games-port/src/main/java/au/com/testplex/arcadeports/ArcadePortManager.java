@@ -2767,7 +2767,7 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         String hero = ArcadePortRules.normalizeHeroesOfGwenHero(requestedHero);
         if (hero == null) {
-            player.sendMessage(ChatColor.YELLOW + "Heroes of Gwen heroes: Hattori, Devon, Anath, Dana, Biff, Larissa, Bardolf, Rowena, Ivy, Bob Ross.");
+            player.sendMessage(ChatColor.YELLOW + "Heroes of Gwen heroes: Hattori, Devon, Anath, Dana, Biff, Larissa, Bardolf, Rowena, Ivy.");
             return;
         }
         UUID id = player.getUniqueId();
