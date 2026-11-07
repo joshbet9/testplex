@@ -161,8 +161,20 @@ cat "$result_file"
 pass_count="$(grep -c '^PASS[[:space:]]' "$result_file" || true)"
 fail_count="$(grep -c '^FAIL[[:space:]]' "$result_file" || true)"
 summary="$(grep '^SUMMARY[[:space:]]' "$result_file" | tail -n 1)"
-echo "[lifecycle-matrix] PASS=$pass_count FAIL=$fail_count server_exit=$server_exit client_exit=$client_exit"
-if [[ "$fail_count" -ne 0 || "$pass_count" -lt 32 || "$summary" != *$'\tPASS' \
+requested_games="${TESTPLEX_LIFECYCLE_GAMES:-}"
+expected_count=32
+if [[ -n "$requested_games" ]]; then
+  expected_count="$(printf '%s' "$requested_games" | awk -F, '{print NF}')"
+fi
+echo "[lifecycle-matrix] PASS=$pass_count FAIL=$fail_count expected=$expected_count server_exit=$server_exit client_exit=$client_exit"
+if [[ "$fail_count" -ne 0 || "$pass_count" -ne "$expected_count" || "$summary" != *
+  echo '[lifecycle-matrix] Acceptance failed; focused plugin diagnostics follow.' >&2
+  grep -E 'LIFECYCLE_MATRIX|ArcadeMechanicsModern|SneakyAssassins|\[ERROR\]|\[WARN\]|Exception|Caused by|Could not|Unable|Failed|failed' "$server_log" | tail -n 320 >&2 || true
+  echo '[lifecycle-matrix] Full server and client logs remain in the uploaded artifact.' >&2
+  exit 1
+fi
+echo '[lifecycle-matrix] All enabled games entered and exited Live with four real clients.'
+\tPASS' \
       || "$server_exit" -ne 0 || "$client_exit" -ne 0 ]] \
     || ! grep -Fq 'BOT_READY|PASS|count=4' "$client_log"; then
   echo '[lifecycle-matrix] Acceptance failed; focused plugin diagnostics follow.' >&2
