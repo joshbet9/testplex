@@ -8,6 +8,7 @@ import me.monstermaze.event.MonsterBumpPlayerEvent;
 import me.monstermaze.game.GameManager;
 import me.monstermaze.game.MazeDebugRules;
 import me.monstermaze.game.GameState;
+import me.monstermaze.game.MonsterMazeAchievementRules;
 import me.monstermaze.game.MazeMode;
 import me.monstermaze.util.TextUtil;
 import me.monstermaze.util.UtilAction;
@@ -84,7 +85,8 @@ public class KitManager implements Listener {
      *  decrements one use, granting the player full bump immunity while the counter is > 0. */
     private final Map<UUID, Long> bodyRushUntil = new HashMap<UUID, Long>();
     private final Map<UUID, Long> bodyRushHitFeedback = new HashMap<UUID, Long>();
-    private final Map<UUID, Integer> bodyRushLaunches = new HashMap<UUID, Integer>();
+    private final Map<UUID, Set<UUID>> bodyRushLaunchedMonsters = new HashMap<UUID, Set<UUID>>();
+    private final Map<UUID, Set<UUID>> repulsorLaunchedMonsters = new HashMap<UUID, Set<UUID>>();
     private final Map<UUID, Long> cryoFrozenUntil = new HashMap<UUID, Long>();
 
     /** Slowballer "Cryo Blitz" secondary: last use timestamp (ms epoch). Q-drop freezes mobs
@@ -186,7 +188,8 @@ public class KitManager implements Listener {
         snowballConstructor.clear();
         bodyRushUntil.clear();
         bodyRushHitFeedback.clear();
-        bodyRushLaunches.clear();
+        bodyRushLaunchedMonsters.clear();
+        repulsorLaunchedMonsters.clear();
         cryoFrozenUntil.clear();
         cryoCooldown.clear();
         for (Entity e : launched.keySet()) {
@@ -194,6 +197,12 @@ public class KitManager implements Listener {
         }
         launched.clear();
         clearKitNameplates();
+    }
+
+    /** Clears per-game achievement evidence without changing selected kits or player state. */
+    public void resetAchievementTracking() {
+        bodyRushLaunchedMonsters.clear();
+        repulsorLaunchedMonsters.clear();
     }
 
     // -------------------- Give items (exact slots) --------------------
@@ -810,6 +819,14 @@ public class KitManager implements Listener {
             // Notify MonsterManager so path AI stops tracking if needed
             MonsterManager mm = game.getMonsterManager();
             if (mm != null) {
+                if (mm.isManagedMonster((LivingEntity) ent)) {
+                    Set<UUID> sentFlying = repulsorLaunchedMonsters.computeIfAbsent(
+                            player.getUniqueId(), ignored -> new HashSet<UUID>());
+                    sentFlying.add(ent.getUniqueId());
+                    if (MonsterMazeAchievementRules.shouldAwardRepulsor(sentFlying)) {
+                        game.recordAchievement(player.getUniqueId(), "social-distancing");
+                    }
+                }
                 mm.launch((LivingEntity) ent, ent.getVelocity());
             }
         }
@@ -911,14 +928,17 @@ public class KitManager implements Listener {
     }
 
     /** A real mob contact removes exactly 2 seconds from Body Rush. */
-    public int consumeBodyRushUse(Player player) {
+    public int consumeBodyRushUse(Player player, UUID monsterId) {
         UUID id=player.getUniqueId();
         long now=System.currentTimeMillis();
         Long until=bodyRushUntil.get(id);
         if (until==null || until.longValue()<=now) { bodyRushUntil.remove(id); return 0; }
-          long remaining = MazeDebugRules.bodyRushUntilAfterContact(game.getMode(), until.longValue());
-          if (MazeDebugRules.shouldAwardBodyRushAchievement(game.getMode(),
-                  bodyRushLaunches.merge(id, 1, Integer::sum))) game.recordAchievement(id, "stampede");
+        Set<UUID> launchedMonsters = bodyRushLaunchedMonsters.computeIfAbsent(id, ignored -> new HashSet<UUID>());
+        if (monsterId != null) launchedMonsters.add(monsterId);
+        if (MazeDebugRules.shouldAwardBodyRushAchievement(game.getMode(), launchedMonsters.size())) {
+            game.recordAchievement(id, "stampede");
+        }
+        long remaining = MazeDebugRules.bodyRushUntilAfterContact(game.getMode(), until.longValue());
         bodyRushHitFeedback.put(id,now+750L);
         bodyRushImpactVisual(player);
         if (remaining<=now) { bodyRushUntil.remove(id); return 0; }

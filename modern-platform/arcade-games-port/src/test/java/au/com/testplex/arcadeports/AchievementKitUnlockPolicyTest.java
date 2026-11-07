@@ -76,7 +76,10 @@ class AchievementKitUnlockPolicyTest {
                 .requirements().contains("method-actor"));
         assertFalse(AchievementKitUnlockPolicy.find(ArcadePortGame.SUPER_SPLOOR, "dualies")
                 .requirements().contains("master-of-the-palette"));
-        assertEquals(1, AchievementKitUnlockPolicy.unlockedBy("monster-maze-speed", "perfect-run").size());
+        assertEquals(0, AchievementKitUnlockPolicy.unlockedBy("monster-maze-speed", "perfect-run").size());
+        assertEquals(1, AchievementKitUnlockPolicy.unlockedBy("monster-maze-speed", "pilot").size());
+        assertEquals(java.util.List.of("pilot"),
+                AchievementKitUnlockPolicy.find(ArcadePortGame.MONSTER_MAZE, "maverick").requirements());
         var turtle = AchievementKitUnlockPolicy.find(ArcadePortGame.DEATH_TAG, "runner-turtle");
         var trickster = AchievementKitUnlockPolicy.find(ArcadePortGame.DEATH_TAG, "runner-trickster");
         assertEquals(java.util.List.of("lots-of-subject-matter"), turtle.requirements());

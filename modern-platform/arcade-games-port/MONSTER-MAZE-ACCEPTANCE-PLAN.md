@@ -27,7 +27,11 @@ Monster Maze is part of the 20-game controlled Testplex queue. Its gameplay is h
 ## Progression and regression
 
 - [ ] Verify first Safe Pad arrivals, highest stage and multiplayer wins persist in Testplex-local statistics.
-- [ ] Verify Jumpman, Just to Suffer, Blizzard, Stampede, Out of the Cup, Breakaway, Photo Finish, Blackout and Perfect Run unlock only from their intended in-round events.
+- [ ] Verify all 14 achievements unlock only from their intended in-round events: Jumpman, Just to Suffer, Blizzard, Out of the Cup, Blackout, Stampede, Perfect Run, Breakaway, Photo Finish, Ninja!, Hard Mode, Pilot, Tailwind and Social Distancing.
+- [ ] Verify Out of the Cup requires the shooter to be first to that stage's Safe Pad, slowball a rival during that same stage, and that rival to miss that pad.
+- [ ] Verify Photo Finish requires the winner to secure the Safe Pad in its final second with a nearby rival, that rival to miss the same pad, and the qualifying player to win the match.
+- [ ] Verify Pilot unlocks after three consecutive monster-bump landings; confirm it awards immediately and unlocks Maverick without requiring Maverick.
+- [ ] Verify Tailwind requires a Maverick win after piloting every stage; Social Distancing requires 20 distinct monsters launched by Repulsor in one match; Stampede counts 10 distinct monsters Body Rushed.
 - [ ] Confirm round-scoped counters reset between matches and no achievement is awarded by a stale event from a previous round.
 - [ ] Confirm all statistics and unlocks remain local to the isolated Testplex server; no production currency or rewards are issued.
 

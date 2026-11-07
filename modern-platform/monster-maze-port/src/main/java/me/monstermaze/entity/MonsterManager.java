@@ -19,6 +19,7 @@ import org.bukkit.block.BlockFace;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Entity;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 
@@ -337,7 +338,7 @@ public class MonsterManager {
                             MazeDebugRules.doubleValue(game.getMode(), "BODY_RUSH_Y_ADD", MazeDebugRules.BODY_RUSH_Y_ADD),
                             MazeDebugRules.doubleValue(game.getMode(), "BODY_RUSH_Y_MAX", MazeDebugRules.BODY_RUSH_Y_MAX), true);
                     launch(ent, ent.getVelocity());
-                    km.consumeBodyRushUse(player);
+                    km.consumeBodyRushUse(player, ent.getUniqueId());
                     player.getWorld().playSound(ent.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_HURT, 1.2f, 0.8f);
                     break;
                 }
@@ -422,6 +423,10 @@ public class MonsterManager {
 
     public Iterable<LivingEntity> getMonsters() {
         return ents.keySet();
+    }
+
+    public boolean isManagedMonster(Entity entity) {
+        return entity instanceof LivingEntity living && ents.containsKey(living);
     }
 
     public void freeze(LivingEntity ent, long thawAt) {

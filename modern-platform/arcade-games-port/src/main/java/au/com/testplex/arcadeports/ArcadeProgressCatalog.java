@@ -377,11 +377,16 @@ public final class ArcadeProgressCatalog {
                     a("just-to-suffer", "Just to Suffer", "Use a jump on a one-block gap."),
                     a("blizzard", "Blizzard", "Freeze 10 mobs in one Cryo Blitz."),
                     a("out-of-the-cup", "Out of the cup", "Reach a safe pad first, then slowball an opponent who misses that pad."),
-                    a("blackout", "Blackout", "As Body Builder, win without reaching a first safe pad."),
-                    a("stampede", "Stampede", "Send 10 mobs flying with Body Rush in one game."),
-                    a("perfect-run", "Perfect Run", "Win after reaching every first safe pad."),
+                    a("blackout", "Blackout", "As Body Builder, win without ever being first to a Safe Pad."),
+                    a("stampede", "Stampede", "Send 10 different mobs flying with Body Rush in one game."),
+                    a("perfect-run", "Perfect Run", "Win after being first to reach every Safe Pad in the game."),
                     a("breakaway", "Breakaway", "Reach a safe pad first while the closest player is more than 30 blocks away."),
-                    a("photo-finish", "Photo Finish", "Win on the final second with an opponent within 3 blocks."))));
+                    a("photo-finish", "Photo Finish", "Reach a Safe Pad in its final second with an opponent within 3 blocks; they must miss that pad, and you must win."),
+                    a("ninja", "Ninja!", "Win a multiplayer game without being hit by a monster."),
+                    a("hard-mode", "Hard Mode", "Win without using a kit ability."),
+                    a("pilot", "Pilot", "Land on three consecutive Safe Pads after being launched by a monster."),
+                    a("tailwind", "Tailwind", "As Maverick, win after piloting every stage."),
+                    a("social-distancing", "Social Distancing", "As Repulsor, send 20 different monsters flying in one game."))));
 
     private static final Map<String, List<Milestone>> MILESTONES = Map.ofEntries(
             Map.entry("bacon-brawl", List.of(m("wins", "Wins", "wins", 250, "wins"), m("kills", "Kills", "kills", 1000, "kills"))),

@@ -106,8 +106,10 @@ public class GameManager implements Listener {
     private int lastLevel = -1;
     private final Map<UUID, Location> lastCompassTargets = new HashMap<UUID, Location>();
     private final Set<UUID> firstPadPlayers = new HashSet<UUID>();
-    private final Map<UUID, Set<UUID>> outOfCupTargets = new HashMap<UUID, Set<UUID>>();
+    private final Map<UUID, Integer> firstPadStageByPlayer = new HashMap<UUID, Integer>();
+    private final Map<Integer, Map<UUID, Set<UUID>>> outOfCupTargetsByStage = new HashMap<Integer, Map<UUID, Set<UUID>>>();
     private final Set<UUID> photoFinishCandidates = new HashSet<UUID>();
+    private final Map<UUID, Set<UUID>> photoFinishRivalsThisPhase = new HashMap<UUID, Set<UUID>>();
 
     public GameManager(MonsterMazePlugin plugin) {
         this.plugin = plugin;
@@ -153,12 +155,25 @@ public class GameManager implements Listener {
     }
     public void recordFirstSafePad(UUID playerId) { plugin.recordFirstSafePad(playerId); }
     public void recordAchievement(UUID playerId, String achievementId) { plugin.recordAchievement(playerId, achievementId); }
-    public void noteFirstPad(Player player) { if (player != null) firstPadPlayers.add(player.getUniqueId()); }
-    public void noteOutOfCupSlowball(Player shooter, Player target) {
-        if (shooter == null || target == null || !firstPadPlayers.contains(shooter.getUniqueId())) return;
-        outOfCupTargets.computeIfAbsent(shooter.getUniqueId(), ignored -> new HashSet<UUID>()).add(target.getUniqueId());
+    public void noteFirstPad(Player player) {
+        if (player == null) return;
+        UUID id = player.getUniqueId();
+        firstPadPlayers.add(id);
+        firstPadStageByPlayer.put(id, curSafe);
     }
-    public void notePhotoFinish(Player player) { if (player != null) photoFinishCandidates.add(player.getUniqueId()); }
+    public void noteOutOfCupSlowball(Player shooter, Player target) {
+        if (shooter == null || target == null || !firstPadPlayers.contains(shooter.getUniqueId())
+                || !alive.contains(shooter.getUniqueId()) || !alive.contains(target.getUniqueId())
+                || firstPadStageByPlayer.getOrDefault(shooter.getUniqueId(), 0) != curSafe) return;
+        outOfCupTargetsByStage.computeIfAbsent(curSafe, ignored -> new HashMap<UUID, Set<UUID>>())
+                .computeIfAbsent(shooter.getUniqueId(), ignored -> new HashSet<UUID>())
+                .add(target.getUniqueId());
+    }
+    public void notePhotoFinish(Player player, Player nearbyRival) {
+        if (player == null || nearbyRival == null || player.equals(nearbyRival)) return;
+        photoFinishRivalsThisPhase.computeIfAbsent(player.getUniqueId(), ignored -> new HashSet<UUID>())
+                .add(nearbyRival.getUniqueId());
+    }
     /** One missing maze-path cell directly below an airborne player, with path on opposing sides. */
     public boolean isOverOneBlockGap(Player player) {
         if (player == null || center == null || player.getWorld() != center.getWorld()) return false;
@@ -297,8 +312,11 @@ public void startGame(Location preferCenter, int requestedPattern) {
         soloMode = false;
         stats.reset();
         firstPadPlayers.clear();
-        outOfCupTargets.clear();
+        firstPadStageByPlayer.clear();
+        outOfCupTargetsByStage.clear();
         photoFinishCandidates.clear();
+        photoFinishRivalsThisPhase.clear();
+        kitManager.resetAchievementTracking();
 
         // Freeze the participant list before generation so late entrants are not reset or counted.
         final List<Player> startingPlayers = testplexManagedRound && pendingTestplexParticipants != null
@@ -613,13 +631,37 @@ public void startGame(Location preferCenter, int requestedPattern) {
         }
 
         if (phaseTimer == 0) {
-            for (Player p : getAlivePlayers()) {
+            List<Player> playersAtPadDeadline = getAlivePlayers();
+            for (Player p : playersAtPadDeadline) {
                 boolean onPad = safePad != null && safePad.isOn(p) && p.isOnGround();
                 if (onPad) padLockIns.add(p.getUniqueId());
+            }
+            Set<UUID> missedThisPad = new HashSet<UUID>();
+            for (Player p : playersAtPadDeadline) {
+                if (!padLockIns.contains(p.getUniqueId())) missedThisPad.add(p.getUniqueId());
+            }
+            Map<UUID, Set<UUID>> outOfCupTargets = outOfCupTargetsByStage.remove(curSafe);
+            if (outOfCupTargets != null) {
+                for (Map.Entry<UUID, Set<UUID>> entry : outOfCupTargets.entrySet()) {
+                    int firstStage = firstPadStageByPlayer.getOrDefault(entry.getKey(), 0);
+                    if (entry.getValue().stream().anyMatch(missedThisPad::contains)
+                            && MonsterMazeAchievementRules.shouldAwardOutOfTheCup(firstStage, curSafe, true)) {
+                        recordAchievement(entry.getKey(), "out-of-the-cup");
+                    }
+                }
+            }
+            for (Map.Entry<UUID, Set<UUID>> entry : photoFinishRivalsThisPhase.entrySet()) {
+                if (alive.contains(entry.getKey())
+                        && MonsterMazeAchievementRules.shouldAwardPhotoFinish(
+                                padLockIns.contains(entry.getKey()), entry.getValue(), padLockIns)) {
+                    photoFinishCandidates.add(entry.getKey());
+                }
+            }
+            for (Player p : playersAtPadDeadline) {
                 boolean secured = padLockIns.contains(p.getUniqueId());
 
                 if (secured) {
-                    if (!onPad) teleportToSafePadCenter(p);
+                    if (safePad == null || !safePad.isOn(p)) teleportToSafePadCenter(p);
                     TextUtil.title(p, "", ChatColor.YELLOW + "" + ChatColor.BOLD + "Get to the Next Safe Pad!", 5, 40, 5);
                 } else {
                     TextUtil.title(p, "", ChatColor.RED + "" + ChatColor.BOLD + "You weren't on the Safe Pad!", 5, 40, 5);
@@ -632,6 +674,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
             stopSafePad();
             playersOnPad.clear();
             padLockIns.clear();
+            photoFinishRivalsThisPhase.clear();
             firstClaimedThisPhase = false;
 
             phaseTimerStart = stageTimer(curSafe + 1);
@@ -661,11 +704,11 @@ public void startGame(Location preferCenter, int requestedPattern) {
             boolean grounded = p.isOnGround();
 
             if (onPad && grounded && phaseTimer <= 1) {
-                boolean rivalNearby = false;
                 for (Player rival : getAlivePlayers()) {
-                    if (!rival.equals(p) && rival.getLocation().distance(p.getLocation()) <= 3.0D) { rivalNearby = true; break; }
+                    if (!rival.equals(p) && rival.getLocation().distance(p.getLocation()) <= 3.0D) {
+                        notePhotoFinish(p, rival);
+                    }
                 }
-                if (rivalNearby) notePhotoFinish(p);
             }
             if (onPad && grounded) padLockIns.add(id);
             if (!onPad || !grounded) {
@@ -882,10 +925,9 @@ public void startGame(Location preferCenter, int requestedPattern) {
                 // Record winner's PB BEFORE setting state to ENDING
                 recordPB(winner);
                 plugin.recordWin(winner.getUniqueId(), curSafe);
-                if (photoFinishCandidates.contains(winner.getUniqueId())) recordAchievement(winner.getUniqueId(), "photo-finish");
-                Set<UUID> targets = outOfCupTargets.getOrDefault(winner.getUniqueId(), Collections.emptySet());
-                if (targets.stream().anyMatch(targetId -> roundParticipants.contains(targetId) && !alive.contains(targetId))) {
-                    recordAchievement(winner.getUniqueId(), "out-of-the-cup");
+                if (MonsterMazeAchievementRules.winnerEarnedPhotoFinish(
+                        true, winner.getUniqueId(), photoFinishCandidates)) {
+                    recordAchievement(winner.getUniqueId(), "photo-finish");
                 }
                 broadcast(ChatColor.GOLD + "" + ChatColor.BOLD + winner.getName()
                         + " wins Monster Maze! (Stage " + curSafe + ")");
