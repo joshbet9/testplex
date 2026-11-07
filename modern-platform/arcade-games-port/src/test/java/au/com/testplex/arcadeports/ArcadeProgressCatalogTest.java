@@ -265,9 +265,21 @@ class ArcadeProgressCatalogTest {
         assertTrue(hasAchievement("master-builders", "architect", "Architect"));
         assertTrue(hasAchievement("heroes-of-gwen", "know-your-enemy", "Know Your Enemy"));
         assertTrue(hasAchievement("castle-assault", "moral-exercise", "Moral Exercise"));
-        assertTrue(hasAchievement("skywars", "death-bomber", "Death Bomber"));
-        assertTrue(hasAchievement("skywars", "no-chest", "No Chest"));
-        assertTrue(hasAchievement("skywars", "no-armor", "No Armor"));
+        assertTrue(hasAchievement("skywars", "death-bomber", "Master Bomber"));
+        assertTrue(hasAchievement("skywars", "no-chest", "Survivalist"));
+        assertTrue(hasAchievement("skywars", "no-armor", "Bare Minimum"));
+        assertTrue(hasAchievement("skywars", "sky-king", "Sky King"));
+        assertTrue(hasAchievement("skywars", "tnt-hoarder", "TNT Hoarder"));
+        assertTrue(hasAchievement("skywars", "left-for-dead", "Left for Dead"));
+        assertTrue(hasAchievement("skywars", "cold-blooded-killer", "Cold Blooded Killer"));
+        assertTrue(hasAchievement("skywars", "second-chance", "Second Chance"));
+        assertTrue(hasAchievement("skywars", "fire-sale", "Fire Sale"));
+        assertTrue(hasAchievement("skywars", "bridge-the-gap", "Bridge the Gap"));
+        assertTrue(hasAchievement("skywars", "dirt-cheap", "Dirt Cheap"));
+        assertTrue(hasAchievement("skywars", "scrap-magnet", "Scrap Magnet"));
+        assertTrue(hasAchievement("skywars", "double-demolition", "Double Demolition"));
+        assertTrue(hasAchievement("skywars", "high-ground", "High Ground"));
+        assertEquals(14, ArcadeProgressCatalog.achievements("skywars").size());
     }
 
     @Test
@@ -318,6 +330,8 @@ class ArcadeProgressCatalogTest {
         assertMilestone("hoops-remastered", "blocks", "blocks", 250, new long[] {25, 63, 125, 250});
         assertMilestone("milk-the-cow", "buckets-digested", "buckets-digested", 1500, new long[] {150, 375, 750, 1500});
         assertMilestone("skywars", "tnt-kills", "tnt-kills", 100, new long[] {10, 25, 50, 100});
+        assertFalse(ArcadeProgressCatalog.milestones("skywars").stream()
+                .anyMatch(milestone -> milestone.id().equals("tnt-pickups") || milestone.id().equals("zombie-kills")));
         assertMilestone("draw-my-thing", "first-guesses", "first-guesses", 500, new long[] {50, 125, 250, 500});
         assertMilestone("master-builders", "fair-votes", "fair-votes", 250, new long[] {25, 63, 125, 250});
         assertMilestone("heroes-of-gwen", "mage-wins", "mage-wins", 100, new long[] {10, 25, 50, 100});
