@@ -358,6 +358,8 @@ public final class ArcadePortManager implements Listener {
     private final Set<String> sourceMapWorlds = new HashSet<>();
     private final Map<String, SourceMapCatalog.MapData> sourceMapData = new HashMap<>();
     private final Map<UUID, PlayerSnapshot> pendingRestore = new HashMap<>();
+    private final Set<UUID> pendingMidGameJoiningHumans = new HashSet<>();
+    private final Set<UUID> retiringMidGameTestPlayers = new HashSet<>();
     private final Map<EntityDamageEvent, PlayerDamageSnapshot> playerDamageSnapshots = new IdentityHashMap<>();
     private final Map<UUID, Long> lastPlayerDamageFeedbackAt = new HashMap<>();
     private final Map<UUID, String> paintballKitPreferences = new HashMap<>();
@@ -3312,11 +3314,54 @@ public final class ArcadePortManager implements Listener {
 
 
     private boolean supportsMidGameTeamJoin(ArcadePortGame type) {
-        return type == ArcadePortGame.CASTLE_ASSAULT
-                || type == ArcadePortGame.HEROES_OF_GWEN
-                || type == ArcadePortGame.SUPER_SPLOOR
-                || type == ArcadePortGame.TURF_WARS
-                || type == ArcadePortGame.SHEEP_QUEST;
+        return ArcadeLiveJoinRules.supports(type);
+    }
+
+    /** Enforce the 16-player ceiling without letting the AFK test roster block real late joiners. */
+    private boolean readyForMidGameTeamJoin(Session session, Player player) {
+        UUID playerId = player.getUniqueId();
+        if (session.players.containsKey(playerId)) return true; // Existing-member message is handled by the caller.
+        if (pendingMidGameJoiningHumans.contains(playerId)) {
+            player.sendMessage(ChatColor.YELLOW + "A test-player slot is already being prepared for you.");
+            return false;
+        }
+        List<UUID> replaceableBots = session.players.keySet().stream()
+                .filter(testPlayers::isManagedTestPlayer)
+                .filter(id -> !retiringMidGameTestPlayers.contains(id))
+                .toList();
+        switch (ArcadeLiveJoinRules.admission(session.liveStarted && session.startupComplete,
+                session.players.size(), replaceableBots.size())) {
+            case WAIT_FOR_LIVE -> {
+                player.sendMessage(ChatColor.YELLOW + "Wait until the Prepare countdown finishes to join this round.");
+                return false;
+            }
+            case FULL -> {
+                player.sendMessage(ChatColor.RED + "This live round is full (16/16 players).");
+                return false;
+            }
+            case READY -> { return true; }
+            case REPLACE_TEST_PLAYER -> {
+                UUID botId = replaceableBots.get(0);
+                pendingMidGameJoiningHumans.add(playerId);
+                retiringMidGameTestPlayers.add(botId);
+                boolean accepted = testPlayers.retireMatchPlayer(botId, () -> {
+                    retiringMidGameTestPlayers.remove(botId);
+                    pendingMidGameJoiningHumans.remove(playerId);
+                    if (active != session || !player.isOnline() || session.players.containsKey(playerId)) return;
+                    if (session.type == ArcadePortGame.TURF_WARS) joinActiveTurfWars(session, player);
+                    else joinActiveRespawningTeamGame(session, player);
+                });
+                if (!accepted) {
+                    pendingMidGameJoiningHumans.remove(playerId);
+                    retiringMidGameTestPlayers.remove(botId);
+                    player.sendMessage(ChatColor.RED + "Could not prepare a test-player slot. Please try joining again.");
+                } else {
+                    player.sendMessage(ChatColor.YELLOW + "Making room by retiring an AFK test player. Joining shortly...");
+                }
+                return false;
+            }
+        }
+        return false;
     }
 
     private int liveTeamCount(ArcadePortGame type) {
@@ -3338,6 +3383,7 @@ public final class ArcadePortManager implements Listener {
                     + "Castle Assault late joining closes after both sentry crystals on a side are destroyed.");
             return;
         }
+        if (!readyForMidGameTeamJoin(session, player)) return;
 
         int teamCount = liveTeamCount(session.type);
         int[] counts = new int[teamCount];
@@ -3361,6 +3407,7 @@ public final class ArcadePortManager implements Listener {
         if (pending != null) pending.restore(player);
         lobby.ensurePlayerInLobby(player);
         session.snapshots.put(id, new PlayerSnapshot(player));
+        applyLegacyAttackSpeed(player);
         session.players.put(id, player);
         session.alive.add(id);
         session.respawning.remove(id);
@@ -3369,8 +3416,11 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.SHEEP_QUEST) {
             String saved = plugin.getConfig().getString("lobby-kit-preferences." + id + ".sheep-quest", "beserker");
             String normalized = ArcadePortRules.normalizeSheepQuestKit(saved);
-            session.sheepQuestKits.put(id, sheepQuestKitPreferences.getOrDefault(id,
-                    normalized == null ? "beserker" : normalized));
+            String requested = sheepQuestKitPreferences.getOrDefault(id,
+                    normalized == null ? "beserker" : normalized);
+            String chosen = ArcadePortRules.normalizeSheepQuestKit(requested);
+            session.sheepQuestKits.put(id, validKitForMatch(id, session.type,
+                    chosen == null ? "beserker" : chosen, "beserker"));
             session.sheepBerserkerReadyAt.put(id, System.currentTimeMillis());
             session.sheepFletcherNextArrowAt.put(id, System.currentTimeMillis());
         }
@@ -3406,7 +3456,10 @@ public final class ArcadePortManager implements Listener {
         player.setLevel(0);
         player.getInventory().clear();
         if (session.type == ArcadePortGame.SUPER_SPLOOR) {
-            String kit = superSploorKitPreferences.getOrDefault(id, "roller");
+            String requested = normalizeSuperSploorKit(superSploorKitPreferences.getOrDefault(id,
+                    plugin.getConfig().getString("lobby-kit-preferences." + id + ".super-sploor", "sprayer")));
+            String kit = validKitForMatch(id, session.type,
+                    requested == null ? "sprayer" : requested, "sprayer");
             if (!superSploor.onMidGamePlayerJoined(player, team, spawn, kit)) {
                 session.players.remove(id);
                 session.alive.remove(id);
@@ -3429,9 +3482,8 @@ public final class ArcadePortManager implements Listener {
         for (LinkedHashMap<UUID, Player> existingQueue : queues.values()) existingQueue.remove(id);
         applySessionTeamTabTeams(session);
         checkRoundEnd(session);
-        String teamName = team == 0 ? ChatColor.RED + "Red" : team == 1 ? ChatColor.AQUA + "Blue"
-                : ChatColor.LIGHT_PURPLE + "Team " + (team + 1);
-        ChatColor teamColor = team == 0 ? ChatColor.RED : team == 1 ? ChatColor.AQUA : ChatColor.LIGHT_PURPLE;
+        ChatColor teamColor = ArcadeLiveJoinRules.teamColour(session.type, team);
+        String teamName = teamColor + ArcadeLiveJoinRules.teamName(session.type, team);
         player.sendMessage(ChatColor.GREEN + "You joined the live " + session.type.displayName() + " round on "
                 + teamName + ChatColor.GREEN + " team.");
         announce(session, teamColor + player.getName() + ChatColor.YELLOW + " joined the team mid-round.");
@@ -3484,6 +3536,7 @@ public final class ArcadePortManager implements Listener {
                     : "You have already been eliminated and cannot rejoin this round."));
             return;
         }
+        if (!readyForMidGameTeamJoin(session, player)) return;
 
         // Count current round participants, not stale team entries left by players who disconnected.
         int teamZero = (int) session.players.keySet().stream()
@@ -3519,8 +3572,10 @@ public final class ArcadePortManager implements Listener {
         session.participantsAtStart++;
 
         long now = System.currentTimeMillis();
-        String kit = turfWarsKitPreferences.getOrDefault(id, "marksman");
-        session.turfWarsKits.put(id, kit);
+        String requested = ArcadePortRules.normalizeTurfWarsKit(
+                turfWarsKitPreferences.getOrDefault(id, "marksman"));
+        session.turfWarsKits.put(id, validKitForMatch(id, session.type,
+                requested == null ? "marksman" : requested, "marksman"));
         session.turfConstructorNextAt.put(id, now);
         session.turfArrowNextAt.put(id, now);
         session.turfKnockbackNextAt.put(id, now);
@@ -3537,6 +3592,10 @@ public final class ArcadePortManager implements Listener {
         player.setFoodLevel(20);
         player.setSaturation(20.0F);
         player.setFireTicks(0);
+        player.setVelocity(new Vector());
+        player.setInvulnerable(false);
+        player.setCollidable(false);
+        player.setWalkSpeed(0.2F);
         player.setExp(0.0F);
         player.setLevel(0);
         player.getInventory().clear();
