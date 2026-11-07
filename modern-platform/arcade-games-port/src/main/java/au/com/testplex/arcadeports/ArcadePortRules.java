@@ -2356,7 +2356,7 @@ public final class ArcadePortRules {
         if (kit.startsWith("runnerkit-")) kit = kit.substring("runnerkit-".length());
         else if (kit.startsWith("runner-")) kit = kit.substring("runner-".length());
         return switch (kit) {
-            case "leaper", "jumper" -> "leaper";
+            case "leaper" -> "leaper";
             case "archer" -> "archer";
             case "frosty" -> "frosty";
             case "switcher" -> "switcher";
@@ -3652,7 +3652,7 @@ public final class ArcadePortRules {
         String kit = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
         if (kit.startsWith("quiver-")) kit = kit.substring("quiver-".length());
         return switch (kit) {
-            case "leaper" -> "leaper";
+            case "leaper", "jumper" -> "leaper";
             case "brawler" -> "brawler";
             case "enchanter" -> "enchanter";
             case "slam-shot", "slamshot", "slam-shooter" -> "slam-shot";
