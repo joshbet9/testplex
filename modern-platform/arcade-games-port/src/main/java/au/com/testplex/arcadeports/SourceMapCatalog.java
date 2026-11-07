@@ -844,9 +844,12 @@ public final class SourceMapCatalog {
 
     /** Extract a game's selected source archive into its dedicated, isolated test world. */
     public static boolean install(JavaPlugin plugin, ArcadePortGame game, String worldName) {
-        List<String> folders = mapFoldersFor(game);
         String resource = selectedResource(plugin, game);
-        if (!resourcePathBelongsToFolders(folders, resource)) {
+        // The map picker accepts both original source-maps/<folder> archives and
+        // the game's one explicitly whitelisted legacy maps/<game>.zip resource.
+        // Installation must enforce the same per-game rule as selection, or a
+        // valid Death Tag / Sheep Quest default becomes impossible to launch.
+        if (!resourcePathBelongsToGame(game, resource)) {
             plugin.getLogger().severe("Refusing to install a source map outside the approved folder pool for "
                     + (game == null ? "unknown game" : game.displayName()) + ": " + resource);
             return false;

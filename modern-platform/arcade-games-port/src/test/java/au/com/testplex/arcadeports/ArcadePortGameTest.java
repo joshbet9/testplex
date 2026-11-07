@@ -62,6 +62,13 @@ class ArcadePortGameTest {
         assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
                 ArcadePortGame.BACON_BRAWL, "maps/bacon-brawl.zip"),
                 "Pre-map-selector configurations using the legacy default resource remain valid");
+        assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
+                ArcadePortGame.DEATH_TAG, "maps/death-tag.zip"));
+        assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
+                ArcadePortGame.SHEEP_QUEST, "maps/sheep-quest.zip"));
+        assertFalse(SourceMapCatalog.resourcePathBelongsToGame(
+                ArcadePortGame.DEATH_TAG, "maps/sheep-quest.zip"),
+                "Legacy bundles must remain scoped to their owning game");
 
         assertFalse(SourceMapCatalog.resourcePathBelongsToGame(
                 ArcadePortGame.SKY_WARS, "source-maps/Bacon Brawl/BaconBrawl_Castle.zip"),
@@ -74,6 +81,13 @@ class ArcadePortGameTest {
         assertFalse(SourceMapCatalog.resourcePathBelongsToGame(
                 ArcadePortGame.BACON_BRAWL, "source-maps/Bacon Brawl/not-a-map.txt"));
         assertFalse(SourceMapCatalog.resourcePathBelongsToGame(ArcadePortGame.BACON_BRAWL, null));
+    }
+
+    @Test void skyWarsMixedQueueIsAlsoAdmittedByTheGameStarter() {
+        assertTrue(ArcadePortManager.supportsMixedArcadeVariant(ArcadePortGame.SKY_WARS));
+        assertTrue(ArcadePortManager.supportsMixedArcadeVariant(ArcadePortGame.CASTLE_ASSAULT));
+        assertTrue(ArcadePortManager.supportsMixedArcadeVariant(ArcadePortGame.TURF_WARS));
+        assertFalse(ArcadePortManager.supportsMixedArcadeVariant(ArcadePortGame.EVOLUTION));
     }
 
     @Test void sourceMapResetTargetsPaper263MigratedDimensionFolder() {

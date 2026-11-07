@@ -1724,9 +1724,10 @@ public final class ArcadePortManager implements Listener {
         return teamCountForGame(type) > 0;
     }
 
-    private static boolean supportsMixedArcadeVariant(ArcadePortGame type) {
+    static boolean supportsMixedArcadeVariant(ArcadePortGame type) {
         return type == ArcadePortGame.TURF_WARS
-                || type == ArcadePortGame.CASTLE_ASSAULT;
+                || type == ArcadePortGame.CASTLE_ASSAULT
+                || type == ArcadePortGame.SKY_WARS;
     }
 
     private static String queueKey(ArcadePortGame type, boolean mixedArcadeVariant) {
@@ -3289,7 +3290,7 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.RED + "Unknown game id. Use /arcadeport help for the available IDs.");
             return;
         }
-        if (mixedArcadeVariant && type != ArcadePortGame.SKY_WARS && !supportsMixedArcadeVariant(type)) {
+        if (mixedArcadeVariant && !supportsMixedArcadeVariant(type)) {
             player.sendMessage(ChatColor.RED + "That Mixed Arcade variant is not available for this game.");
             return;
         }
@@ -3690,7 +3691,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (mixedArcadeVariant && !supportsMixedArcadeVariant(type)) {
-            sender.sendMessage(ChatColor.RED + "Mixed Arcade variants are only available for Turf Wars and Castle Assault.");
+            sender.sendMessage(ChatColor.RED + "Mixed Arcade variants are only available for Turf Wars, Castle Assault and SkyWars.");
             return;
         }
         if (type == null) {
@@ -4597,7 +4598,7 @@ public final class ArcadePortManager implements Listener {
         }
         cancelAutomaticRotationVote();
         if (mixedArcadeVariant && !supportsMixedArcadeVariant(type)) {
-            sender.sendMessage(ChatColor.RED + "Mixed Arcade variants are only available for Turf Wars and Castle Assault.");
+            sender.sendMessage(ChatColor.RED + "Mixed Arcade variants are only available for Turf Wars, Castle Assault and SkyWars.");
             return;
         }
         if (type == null) {
