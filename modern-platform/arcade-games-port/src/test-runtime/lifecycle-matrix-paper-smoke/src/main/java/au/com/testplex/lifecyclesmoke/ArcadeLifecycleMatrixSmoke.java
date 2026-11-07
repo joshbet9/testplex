@@ -40,6 +40,7 @@ public final class ArcadeLifecycleMatrixSmoke extends JavaPlugin {
     private Class<?> gameClass;
     private Object currentGame;
     private String currentId;
+    private String lastMonsterMazeTrace = "";
     private int index;
     private int phase;
     private int elapsedTicks;
@@ -147,6 +148,7 @@ public final class ArcadeLifecycleMatrixSmoke extends JavaPlugin {
             return;
         }
         startedAt = System.nanoTime();
+        lastMonsterMazeTrace = "";
         // SkyWars is intentionally available only through its Mixed Arcade
         // 16-player selection, not the standard queue variant.
         boolean mixedArcadeVariant = "skywars".equals(currentId);
@@ -185,6 +187,30 @@ public final class ArcadeLifecycleMatrixSmoke extends JavaPlugin {
             // isGameRunning includes STARTING. Require the actual LIVE phase before
             // stopping, otherwise the test can cancel async generation/countdown and
             // contaminate the following Monster Maze mode selection.
+            if (gameManager != null) {
+                Object state = field(gameManager, "state");
+                Object alive = field(gameManager, "alive");
+                Object roundParticipants = field(gameManager, "roundParticipants");
+                Object pending = field(gameManager, "pendingTestplexParticipants");
+                Object center = field(gameManager, "center");
+                int aliveCount = alive instanceof java.util.Collection<?> values ? values.size() : -1;
+                int participantCount = roundParticipants instanceof java.util.Collection<?> values ? values.size() : -1;
+                int pendingCount = pending instanceof java.util.Collection<?> values ? values.size() : -1;
+                String playerStates = players.stream().map(player -> player.getName() + ":"
+                        + player.getGameMode() + "@" + player.getWorld().getName())
+                        .collect(java.util.stream.Collectors.joining(","));
+                String trace = "phase=" + state + ",alive=" + aliveCount + ",participants="
+                        + participantCount + ",pending=" + pendingCount + ",managed="
+                        + field(gameManager, "testplexManagedRound") + ",center="
+                        + (center instanceof org.bukkit.Location location && location.getWorld() != null
+                                ? location.getWorld().getName() + "@" + location.getBlockX() + ","
+                                        + location.getBlockY() + "," + location.getBlockZ() : center)
+                        + ",players=" + playerStates;
+                if (!trace.equals(lastMonsterMazeTrace)) {
+                    getLogger().info("LIFECYCLE_MATRIX|MONSTER_MAZE_TRACE|" + currentId + "|" + trace);
+                    lastMonsterMazeTrace = trace;
+                }
+            }
             live = gameManager != null && "LIVE".equals(String.valueOf(field(gameManager, "state")));
         } else if (currentGame.equals(active)) {
             if ("plexball".equals(currentId)) {
@@ -219,7 +245,8 @@ public final class ArcadeLifecycleMatrixSmoke extends JavaPlugin {
                         + (module != null && Boolean.TRUE.equals(
                                 invoke(module, "isGameRunning", new Class<?>[0])))
                         + "; monsterMazeState="
-                        + (gameManager == null ? "missing" : field(gameManager, "state"));
+                        + (gameManager == null ? "missing" : field(gameManager, "state"))
+                    + "; lastTrace=" + lastMonsterMazeTrace;
             }
             failCase("No Live transition within " + (LIVE_WAIT_TICKS / 20)
                     + " seconds; active=" + active + moduleState);
