@@ -159,14 +159,19 @@ public final class ArcadeProgressCatalog {
                     a("man-of-integrity", "Man of Integrity", "Win without using a fishing rod when it was available."))),
             Map.entry("micro-battles", List.of(
                     a("annihilation", "Annihilation", "Get 8 kills in one Micro Battles game."),
-                    a("last-two", "Last Two", "Be alive when exactly two teams remain."),
-                    a("phew", "PHEW!", "Build up to the border without dying to it."),
+                    a("last-two", "Last Two", "Be alive when two teams remain, eliminate every player on the other team, and win."),
+                    a("phew", "PHEW!", "Place 3 blocks within 2 blocks of the border in one game without dying to it."),
                     a("micro-battles-king", "Micro Battles King", "Use a placed block to knock a jumper into lava/water and get 3 kills."),
                     a("mosh-pit-playroom", "Mosh-Pit Playroom", "Get 8 assists in one game."),
-                    a("built-for-this", "Built for This", "As Fighter, win the final 1v1 where another kit would have lost."),
+                    a("built-for-this", "Built for This", "As Fighter, win the final 1v1 after Iron Skin prevents a lethal hit."),
                     a("speedster", "Speedster", "Win a Micro Battles game in under 1:30. Unlocks the Dasher kit."),
                     a("sniper-dawg", "Sniper Dawg", "As Archer, knock a player from every team off a skybase in one game."),
-                    a("gravedigger", "Gravedigger", "Get a melee kill with a shovel."))),
+                    a("gravedigger", "Gravedigger", "Get a melee kill with a shovel."),
+                    a("air-mail", "Air Mail", "As Dasher, double-jump across a gap, land on an enemy island, and eliminate an enemy there."),
+                    a("needle-threader", "Needle Threader", "As Archer, eliminate an opponent with an arrow from at least 25 blocks away."),
+                    a("shift-supervisor", "Shift Supervisor", "As Worker, break 30 blocks, place 30 blocks, and win the game."),
+                    a("no-room-to-build", "No Room to Build", "Win a game without placing any blocks."),
+                    a("last-breath", "Last Breath", "Win the final 1v1 with 1 heart or less."))),
 
             Map.entry("one-in-the-quiver", List.of(
                     a("the-perfect-game", "The Perfect Game", "Achieve a Perfect Run killstreak in a game."),

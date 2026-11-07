@@ -321,4 +321,20 @@ class ArcadeProgressCatalogTest {
                 .filter(milestone -> milestone.id().equals(id))
                 .findFirst().orElseThrow().stages();
     }
+    @Test
+    void microBattlesHasFourteenAchievementsWithoutRestoringMicroChampion() {
+        var achievements = ArcadeProgressCatalog.achievements("micro-battles");
+        assertEquals(14, achievements.size());
+        assertEquals(14, achievements.stream().map(ArcadeProgressCatalog.Achievement::id).distinct().count());
+        assertEquals(achievements.stream().map(ArcadeProgressCatalog.Achievement::id).collect(java.util.stream.Collectors.toSet()),
+                java.util.Arrays.stream(MicroBattlesAchievement.values()).map(MicroBattlesAchievement::slug)
+                        .collect(java.util.stream.Collectors.toSet()));
+        for (String id : List.of("air-mail", "needle-threader", "shift-supervisor",
+                "no-room-to-build", "last-breath")) {
+            assertTrue(achievements.stream().anyMatch(entry -> entry.id().equals(id)), id);
+        }
+        assertFalse(achievements.stream().anyMatch(entry -> entry.id().equals("micro-champion")));
+        assertEquals(1500, ArcadeProgressCatalog.milestones("micro-battles").stream()
+                .filter(entry -> entry.id().equals("wins")).findFirst().orElseThrow().maximum());
+    }
 }
