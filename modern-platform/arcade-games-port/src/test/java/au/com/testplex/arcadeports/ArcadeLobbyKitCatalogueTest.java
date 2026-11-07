@@ -25,6 +25,24 @@ class ArcadeLobbyKitCatalogueTest {
     }
 
     @Test
+    void commandHelpReflectsTheFullCatalogueAndLegacyDeathTagNullOption() {
+        assertEquals("Berserker, Archer, Brute, Shepherd (achievement kit)",
+                ArcadeLobbyKitCatalogue.helpNames(ArcadePortGame.SHEEP_QUEST));
+        assertEquals("Basher, Archer, Traitor, Turtle (achievement kit), "
+                        + "Trickster (achievement kit), Null (legacy command-only)",
+                ArcadeLobbyKitCatalogue.helpNames(ArcadePortGame.DEATH_TAG));
+        for (ArcadePortGame game : ArcadePortGame.values()) {
+            String help = ArcadeLobbyKitCatalogue.helpNames(game);
+            for (ArcadeLobbyKitCatalogue.KitChoice choice : ArcadeLobbyKitCatalogue.forGame(game, List.of())) {
+                String display = game == ArcadePortGame.DEATH_TAG && choice.name.startsWith("Runner ")
+                        ? choice.name.substring("Runner ".length()) : choice.name;
+                assertTrue(help.contains(display), game.id() + " omitted " + choice.id);
+            }
+        }
+        assertEquals("", ArcadeLobbyKitCatalogue.helpNames(ArcadePortGame.MILK_THE_COW));
+    }
+
+    @Test
     void deathTagKeepsItsStableKitIdsAndUsesTheApprovedRunnerNames() {
         List<ArcadeLobbyKitCatalogue.KitChoice> kits =
                 ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.DEATH_TAG, List.of());
