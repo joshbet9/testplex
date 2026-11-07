@@ -89,7 +89,7 @@ final class PlayerSnapshot {
         p.setFireTicks(fireTicks);
         var attackSpeedAttribute = p.getAttribute(Attribute.ATTACK_SPEED);
         if (attackSpeedAttribute != null) attackSpeedAttribute.setBaseValue(attackSpeedBase);
-        p.setCompassTarget(compassTarget == null ? null : compassTarget.clone());
+        p.setCompassTarget(compassTargetForRestore(compassTarget, p.getWorld().getSpawnLocation()));
         p.setCollidable(collidable);
         p.setInvulnerable(invulnerable);
         p.setScoreboard(scoreboard);
@@ -102,6 +102,11 @@ final class PlayerSnapshot {
         p.setAbsorptionAmount(absorption);
         if (allowFlight) p.setFlying(flying);
     }
+    static Location compassTargetForRestore(Location savedTarget, Location fallback) {
+        Location target = savedTarget == null ? fallback : savedTarget;
+        return target == null ? null : target.clone();
+    }
+
     private static ItemStack[] cloneItems(ItemStack[] items) {
         ItemStack[] copy = new ItemStack[items.length];
         for (int i=0;i<items.length;i++) copy[i] = items[i] == null ? null : items[i].clone();
