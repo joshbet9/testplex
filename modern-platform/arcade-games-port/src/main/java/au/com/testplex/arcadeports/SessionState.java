@@ -420,6 +420,8 @@ class SessionState {
     final Map<Sheep, Location> sheepLastMovementLocations = new HashMap<>();
     final Map<Sheep, Long> sheepLastMovementAt = new HashMap<>();
     final Map<UUID, String> sheepQuestKits = new HashMap<>();
+    /** Maximum simultaneous carries, needed by the per-game Sheep Quest controller. */
+    final Map<UUID, Integer> sheepQuestMaxCarried = new HashMap<>();
     final Map<UUID, Long> sheepNextPickupAt = new HashMap<>();
     final Map<UUID, Long> sheepBerserkerReadyAt = new HashMap<>();
     final Map<UUID, Long> sheepBerserkerLeapUntil = new HashMap<>();
