@@ -1,6 +1,8 @@
 package au.com.testplex.arcadeports;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Predicate;
 import org.bukkit.ChatColor;
 import org.bukkit.Color;
@@ -12,6 +14,7 @@ import org.bukkit.WorldBorder;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 
 /** Micro Battles' per-player world-border cue, invoked from the existing match tick. */
@@ -106,5 +109,68 @@ final class MicroBattlesManager implements ArcadeMatchController {
         return item != null && item.hasItemMeta()
                 && "hotbar".equals(item.getItemMeta().getPersistentDataContainer()
                         .get(itemKey, PersistentDataType.STRING));
+    }
+
+    boolean isTrackingCompass(ItemStack item) {
+        return item != null && item.getType() == Material.COMPASS && item.hasItemMeta()
+                && item.getItemMeta().hasDisplayName()
+                && "Tracking Compass".equals(ChatColor.stripColor(item.getItemMeta().getDisplayName()));
+    }
+
+    void giveTrackingCompass(Player player) {
+        if (player == null || !player.isOnline()) return;
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (isTrackingCompass(item)) return;
+        }
+        ItemStack compass = new ItemStack(Material.COMPASS);
+        ItemMeta meta = compass.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(ChatColor.GREEN + "" + ChatColor.BOLD + "Tracking Compass");
+            meta.setLore(List.of(ChatColor.GRAY + "Left-click to teleport to the nearest opponent.",
+                    ChatColor.GRAY + "Right-click to choose an opponent."));
+            compass.setItemMeta(meta);
+        }
+        player.getInventory().addItem(compass);
+    }
+
+    Player nearestSpectatorTarget(SessionState session, Player spectator) {
+        if (session == null || spectator == null) return null;
+        int spectatorTeam = session.teams.getOrDefault(spectator.getUniqueId(), -1);
+        return alivePlayers(session).stream()
+                .filter(target -> !target.getUniqueId().equals(spectator.getUniqueId()))
+                .filter(target -> session.teams.getOrDefault(target.getUniqueId(), -1) != spectatorTeam)
+                .min(java.util.Comparator.comparingDouble(target ->
+                        target.getLocation().distanceSquared(spectator.getLocation())))
+                .orElse(null);
+    }
+
+    void updateSpectatorCompass(SessionState session) {
+        if (session == null || session.ticks % 4 != 0) return;
+        for (Player player : session.players.values()) {
+            if (player == null || !player.isOnline() || session.alive.contains(player.getUniqueId())) continue;
+            giveTrackingCompass(player);
+            Player target = nearestSpectatorTarget(session, player);
+            if (target != null) {
+                player.setCompassTarget(target.getLocation());
+                if (isTrackingCompass(player.getInventory().getItemInMainHand())) {
+                    double distance = Math.sqrt(player.getLocation().distanceSquared(target.getLocation()));
+                    double height = target.getLocation().getY() - player.getLocation().getY();
+                    player.sendActionBar(ChatColor.WHITE + "Nearest Target: "
+                            + teamChatColor(session.teams.getOrDefault(target.getUniqueId(), -1))
+                            + target.getName() + ChatColor.WHITE + " | Distance: "
+                            + String.format(java.util.Locale.ROOT, "%.1f", distance)
+                            + " | Height: " + String.format(java.util.Locale.ROOT, "%+.1f", height));
+                }
+            }
+        }
+    }
+
+    private List<Player> alivePlayers(SessionState session) {
+        List<Player> players = new ArrayList<>();
+        for (UUID id : session.alive) {
+            Player player = session.players.get(id);
+            if (player != null && player.isOnline()) players.add(player);
+        }
+        return players;
     }
 }
