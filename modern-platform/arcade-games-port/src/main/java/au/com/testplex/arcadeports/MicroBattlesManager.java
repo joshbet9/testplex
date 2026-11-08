@@ -2,11 +2,17 @@ package au.com.testplex.arcadeports;
 
 import java.util.List;
 import java.util.function.Predicate;
+import org.bukkit.ChatColor;
 import org.bukkit.Color;
 import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.WorldBorder;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.LeatherArmorMeta;
+import org.bukkit.persistence.PersistentDataType;
 
 /** Micro Battles' per-player world-border cue, invoked from the existing match tick. */
 final class MicroBattlesManager implements ArcadeMatchController {
@@ -49,5 +55,56 @@ final class MicroBattlesManager implements ArcadeMatchController {
                 session.world.spawnParticle(Particle.DUST, cue, 2, 0.015D, 0.025D, 0.015D, 0.0D, dust);
             }
         }
+    }
+
+    ItemStack teamArmorPiece(Material material, Color colour, ChatColor chatColor, NamespacedKey itemKey) {
+        ItemStack item = new ItemStack(material);
+        if (item.getItemMeta() instanceof LeatherArmorMeta meta) {
+            meta.setColor(colour);
+            meta.setDisplayName(chatColor + "" + ChatColor.BOLD + "Team Armor");
+            meta.setUnbreakable(true);
+            meta.getPersistentDataContainer().set(itemKey, PersistentDataType.STRING, "armour");
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    Color teamDyeColor(int team) {
+        return switch (team) {
+            case 0 -> Color.RED;
+            case 1 -> Color.AQUA;
+            case 2 -> Color.LIME;
+            default -> Color.YELLOW;
+        };
+    }
+
+    ChatColor teamChatColor(int team) {
+        return switch (team) {
+            case 0 -> ChatColor.RED;
+            case 1 -> ChatColor.AQUA;
+            case 2 -> ChatColor.GREEN;
+            default -> ChatColor.YELLOW;
+        };
+    }
+
+    String teamName(int team) {
+        return switch (team) {
+            case 0 -> "Red";
+            case 1 -> "Blue";
+            case 2 -> "Green";
+            default -> "Yellow";
+        };
+    }
+
+    boolean isTeamLockedItem(ItemStack item, NamespacedKey itemKey) {
+        return item != null && item.hasItemMeta()
+                && item.getItemMeta().getPersistentDataContainer().has(itemKey, PersistentDataType.STRING);
+    }
+
+    /** Reborn locks the slot-eight badge, but allows ordinary armour to be dropped. */
+    boolean isTeamBadgeItem(ItemStack item, NamespacedKey itemKey) {
+        return item != null && item.hasItemMeta()
+                && "hotbar".equals(item.getItemMeta().getPersistentDataContainer()
+                        .get(itemKey, PersistentDataType.STRING));
     }
 }
