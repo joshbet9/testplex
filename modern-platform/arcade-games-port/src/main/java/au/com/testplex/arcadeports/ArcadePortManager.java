@@ -17391,7 +17391,7 @@ public final class ArcadePortManager implements Listener {
                     player.getInventory().clear();
                     player.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
                             "Points to the nearest survivor. Left-click to spectate them."));
-                    dragonsController.updateSpectatorCompasses(session, System.currentTimeMillis());
+                    dragonsController.updateSpectatorCompasses(session, System.currentTimeMillis(), dragonsSpectatorActions);
                 }
             }
             player.sendMessage(ChatColor.RED + "Eliminated: " + reason + ".");
