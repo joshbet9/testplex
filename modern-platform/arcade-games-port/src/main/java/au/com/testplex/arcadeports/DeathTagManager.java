@@ -3,6 +3,7 @@ package au.com.testplex.arcadeports;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Supplier;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -50,7 +51,10 @@ final class DeathTagManager implements ArcadeMatchController {
                 && !isRespawnHazard(ground.getType());
     }
 
-    /** Search authored terrain only; never construct replacement platforms. */
+    /**
+     * Legacy spawn markers can be blocked or misaligned with a platform. Search
+     * authored collision-free terrain only; never construct replacement platforms.
+     */
     Location findSafeRespawnNearby(Location base, SourceMapCatalog.MapData mapData) {
         if (base == null || base.getWorld() == null) return null;
         World world = base.getWorld();
@@ -76,6 +80,41 @@ final class DeathTagManager implements ArcadeMatchController {
             }
         }
         return null;
+    }
+
+    /** Select the safest distant authored spawn, then search existing terrain for a valid fallback. */
+    Location selectChaserRespawn(SessionState session, Player player, SourceMapCatalog.MapData mapData,
+            Supplier<Location> defaultSpawn) {
+        if (session == null || player == null || session.world == null) return null;
+        if (mapData != null && !mapData.spawnLocations().isEmpty()) {
+            List<Player> activePlayers = alivePlayers(session).stream()
+                    .filter(other -> !other.getUniqueId().equals(player.getUniqueId())).toList();
+            List<Location> safeSpawns = mapData.spawnLocations().stream()
+                    .filter(candidate -> isSafeRespawnSpawn(candidate, mapData)).toList();
+            if (!safeSpawns.isEmpty()) {
+                return safeSpawns.stream().max(java.util.Comparator.comparingDouble(candidate ->
+                        activePlayers.isEmpty() ? Double.POSITIVE_INFINITY
+                                : activePlayers.stream().mapToDouble(other ->
+                                        candidate.distanceSquared(other.getLocation())).min()
+                                        .orElse(Double.POSITIVE_INFINITY))).orElseThrow().clone();
+            }
+            // Resolve invalid legacy marker heights against actual source terrain.
+            for (Location base : mapData.spawnLocations()) {
+                Location nearby = findSafeRespawnNearby(base, mapData);
+                if (nearby != null) return nearby;
+            }
+        }
+        // Lazily resolve the shared lobby spawn only after authored spawns are exhausted.
+        Location fallback = defaultSpawn == null ? null : defaultSpawn.get();
+        if (isSafeRespawnSpawn(fallback, mapData)) return fallback;
+        Location nearbyFallback = findSafeRespawnNearby(fallback, mapData);
+        if (nearbyFallback != null) return nearbyFallback;
+        Location worldSpawn = session.world.getSpawnLocation();
+        if (isSafeRespawnSpawn(worldSpawn, mapData)) return worldSpawn;
+        Location nearbyWorldSpawn = findSafeRespawnNearby(worldSpawn, mapData);
+        if (nearbyWorldSpawn != null) return nearbyWorldSpawn;
+        if (isSafeRespawnSpawn(player.getLocation(), mapData)) return player.getLocation().clone();
+        return findSafeRespawnNearby(player.getLocation(), mapData);
     }
 
     @Override public void onPrepare(SessionState session, List<Player> participants) {
