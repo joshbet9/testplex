@@ -14395,22 +14395,11 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    private boolean baconBlastTouchingAdjacentSolidBlock(Location location) {
-        Block center = location.getBlock();
-        for (BlockFace face : new BlockFace[] {
-                BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST,
-                BlockFace.UP, BlockFace.DOWN }) {
-            Block adjacent = center.getRelative(face);
-            if (adjacent.getType().isSolid() && !adjacent.isLiquid()) return true;
-        }
-        return false;
-    }
-
     private void updateBaconBlastProjectiles(Session session, long now) {
         for (UUID blastId : new ArrayList<>(session.baconBlastItems.keySet())) {
             Item bacon = session.baconBlastItems.get(blastId);
             if (bacon == null || !bacon.isValid() || bacon.getWorld() != session.world) {
-                removeBaconBlastItem(session, blastId);
+                baconController.removeBaconBlastItem(session, blastId);
                 continue;
             }
 
@@ -14444,9 +14433,9 @@ public final class ArcadePortManager implements Listener {
             if (blockFraction >= 0.0D && !playerFirst) {
                 Location blockImpact = previous.clone().add(
                         current.toVector().subtract(previous.toVector()).multiply(blockFraction));
-                spawnBaconBlastImpact(session, blockImpact, blastId, !crispy, true);
+                baconController.spawnBaconBlastImpact(session, blockImpact, blastId, !crispy, true);
                 if (crispy && ownerId != null) placeCrispyBaconImpactFirePatch(session, blockImpact, ownerId);
-                removeBaconBlastItem(session, blastId);
+                baconController.removeBaconBlastItem(session, blastId);
                 continue;
             }
 
@@ -14455,7 +14444,7 @@ public final class ArcadePortManager implements Listener {
                 Location playerImpact = previous.clone().add(
                         current.toVector().subtract(previous.toVector()).multiply(bestTargetFraction));
                 // Crispy Bacon's projectile ignites players without blast damage or impulse.
-                spawnBaconBlastImpact(session, playerImpact, blastId, !crispy, false);
+                baconController.spawnBaconBlastImpact(session, playerImpact, blastId, !crispy, false);
                 if (owner != null && owner.isOnline() && session.alive.contains(ownerId)
                         && active == session && session.alive.contains(target.getUniqueId())) {
                     if (crispy) {
@@ -14464,12 +14453,12 @@ public final class ArcadePortManager implements Listener {
                     } else {
                         if ("mama-piggles".equals(
                                 session.baconKits.getOrDefault(ownerId, "el-muchacho-pigo"))) {
-                            playMamaPigglesBaconBlastHitSound(owner);
+                            baconController.playMamaPigglesBaconBlastHitSound(owner);
                         }
                         handleBaconBrawlHit(session, owner, target, "bacon-blast", 6.0D, null, blastPower);
                     }
                 }
-                removeBaconBlastItem(session, blastId);
+                baconController.removeBaconBlastItem(session, blastId);
                 if (active != session) return;
                 continue;
             }
@@ -14477,43 +14466,18 @@ public final class ArcadePortManager implements Listener {
             Block currentBlock = current.getBlock();
             boolean stationary = current.distanceSquared(previous) <= 0.0025D
                     && bacon.getVelocity().lengthSquared() <= 0.05D;
-            boolean stationaryAgainstBlock = stationary && baconBlastTouchingAdjacentSolidBlock(current);
+            boolean stationaryAgainstBlock = stationary && baconController.baconBlastTouchingAdjacentSolidBlock(current);
             boolean touchingBlock = ArcadePortRules.isBaconBlastBlockImpact(
                     bacon.isOnGround(), currentBlock.isLiquid(), currentBlock.getType().isSolid(),
                     stationaryAgainstBlock);
             long createdAt = session.baconBlastCreatedAt.getOrDefault(blastId, 0L);
             if (ArcadePortRules.shouldExpireBaconBlast(now, createdAt, touchingBlock)) {
-                spawnBaconBlastImpact(session, current, blastId, !crispy, true);
+                baconController.spawnBaconBlastImpact(session, current, blastId, !crispy, true);
                 if (crispy && ownerId != null) placeCrispyBaconImpactFirePatch(session, current, ownerId);
-                removeBaconBlastItem(session, blastId);
+                baconController.removeBaconBlastItem(session, blastId);
                 continue;
             }
             session.baconBlastLastLocations.put(blastId, current);
-        }
-    }
-
-    private void spawnBaconBlastImpact(Session session, Location impact, UUID blastId) {
-        spawnBaconBlastImpact(session, impact, blastId, true, true);
-    }
-
-    private void spawnBaconBlastImpact(Session session, Location impact, UUID blastId,
-            boolean includeExplosion, boolean playLandingSound) {
-        // Reborn creates a 0.5-power, non-incendiary, non-block-breaking explosion on impact.
-        // Suppress health damage; crispy impacts are visual-only and have no explosion impulse.
-        if (includeExplosion) {
-            session.baconBlastExplosionDepth++;
-            try {
-                session.world.createExplosion(impact.getX(), impact.getY(), impact.getZ(), 0.5F, false, false);
-            } finally {
-                session.baconBlastExplosionDepth--;
-            }
-        }
-        session.world.spawnParticle(Particle.CLOUD, impact, 14, 0.25D, 0.25D, 0.25D, 0.04D);
-        UUID ownerId = session.baconBlastOwners.get(blastId);
-        if (playLandingSound && ownerId != null
-                && "mama-piggles".equals(session.baconKits.getOrDefault(ownerId, "el-muchacho-pigo"))) {
-            // Reborn's item impact effect is silent; Testplex adds the requested landing cue.
-            session.world.playSound(impact, Sound.BLOCK_NOTE_BLOCK_PLING, 1.2F, 1.65F);
         }
     }
 
@@ -14560,27 +14524,6 @@ public final class ArcadePortManager implements Listener {
         if (player.getFireTicks() > 0) return true;
         LivingEntity avatar = baconPlayerAvatar(session, player.getUniqueId());
         return avatar != null && avatar.getFireTicks() > 0;
-    }
-
-    private void playMamaPigglesBaconBlastHitSound(Player owner) {
-        // Send the cue directly to its owner even when impact is outside sound radius
-        // or the hit ends the round.
-        if (owner != null && owner.isOnline()) {
-            owner.playSound(owner.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.25F);
-        }
-    }
-
-    private void removeBaconBlastItem(Session session, UUID blastId) {
-        Item bacon = session.baconBlastItems.remove(blastId);
-        if (bacon != null) {
-            session.entities.remove(bacon);
-            if (bacon.isValid()) bacon.remove();
-        }
-        session.baconBlastOwners.remove(blastId);
-        session.baconBlastLastLocations.remove(blastId);
-        session.baconBlastCreatedAt.remove(blastId);
-        session.baconBlastPowerById.remove(blastId);
-        session.baconCrispyProjectiles.remove(blastId);
     }
 
     private void useBaconBrawlAbility(Session session, Player player, long now) {
