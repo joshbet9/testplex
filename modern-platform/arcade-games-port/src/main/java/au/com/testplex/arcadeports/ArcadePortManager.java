@@ -289,6 +289,7 @@ public final class ArcadePortManager implements Listener {
     private final GladiatorsManager gladiatorsController;
     private final MilkCowManager milkCowController = new MilkCowManager();
     private final WitherAssaultManager witherAssaultController = new WitherAssaultManager();
+    private final SkyWarsManager skyWarsController = new SkyWarsManager();
     private boolean gameModulesInitialized;
     private CameraShyGame cameraShyModule;
 
@@ -317,6 +318,7 @@ public final class ArcadePortManager implements Listener {
         matchControllers.register(gladiatorsController);
         matchControllers.register(milkCowController);
         matchControllers.register(witherAssaultController);
+        matchControllers.register(skyWarsController);
         this.dragonEscapeGhostStore = new DragonEscapeGhostPathStore(
                 plugin.getDataFolder().toPath(), plugin.getLogger());
         this.debugProfiles = new GameDebugProfiles(plugin);
@@ -9661,14 +9663,11 @@ public final class ArcadePortManager implements Listener {
     }
 
     private boolean isSkyWarsSkill(ItemStack item, String name) {
-        if (item == null || !item.hasItemMeta() || !item.getItemMeta().hasDisplayName()) return false;
-        return name.equalsIgnoreCase(ChatColor.stripColor(item.getItemMeta().getDisplayName()));
+        return skyWarsController.isSkill(item, name);
     }
 
     private boolean isSkyWarsAbilitySkill(ItemStack item) {
-        return isSkyWarsSkill(item, "Ice Bridge") || isSkyWarsSkill(item, "Fire Burst")
-                || isSkyWarsSkill(item, "Eye of Ender") || isSkyWarsSkill(item, "Magnet")
-                || isSkyWarsSkill(item, "Throwable Dirt");
+        return skyWarsController.isAbilitySkill(item);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
@@ -9695,48 +9694,19 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void updateSkyWarsAbilityBar(Player player, Session session, long now) {
-        long readyAt = session.skyWarsKitReadyAt.getOrDefault(player.getUniqueId(), 0L);
-        long duration = switch (session.skyWarsKits.getOrDefault(player.getUniqueId(), "ice")) {
-            case "fire", "ice" -> 30_000L;
-            case "metal" -> 15_000L;
-            case "air" -> 25_000L;
-            default -> 500L;
-        };
-        if (readyAt <= now) {
-            player.setExp(1.0F);
-            return;
-        }
-        player.setExp((float) Math.max(0.0D, Math.min(1.0D, 1.0D - (readyAt - now) / (double) duration)));
+        skyWarsController.updateAbilityBar(player, session, now);
     }
 
     private ItemStack skyWarsKitItem(Material material, String title, String lore, boolean glowing) {
-        ItemStack item = new ItemStack(material);
-        ItemMeta meta = item.getItemMeta();
-        if (meta != null) {
-            meta.setDisplayName(ChatColor.GREEN + title);
-            meta.setLore(List.of(ChatColor.GRAY + lore));
-            if (glowing) {
-                meta.addEnchant(Enchantment.UNBREAKING, 1, true);
-                meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
-            }
-            item.setItemMeta(meta);
-        }
-        return item;
+        return skyWarsController.kitItem(material, title, lore, glowing);
     }
 
     private boolean isSkyWarsTrackingCompass(ItemStack item) {
-        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
-        ItemMeta meta = item.getItemMeta();
-        return meta.hasDisplayName()
-                && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
+        return skyWarsController.isTrackingCompass(item);
     }
 
     private Player nearestSkyWarsTarget(Session session, Player player) {
-        return alivePlayers(session).stream()
-                .filter(target -> !target.getUniqueId().equals(player.getUniqueId()))
-                .min(java.util.Comparator.comparingDouble(target ->
-                        target.getLocation().distanceSquared(player.getLocation())))
-                .orElse(null);
+        return skyWarsController.nearestTarget(session, player);
     }
 
     private void openSkyWarsCompassMenu(Session session, Player player) {
