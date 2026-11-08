@@ -9,7 +9,9 @@ import java.util.UUID;
 import java.util.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.Inventory;
@@ -20,11 +22,14 @@ import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
+import org.bukkit.util.BoundingBox;
+import org.bukkit.util.Vector;
 
 /**
  * Bacon Brawl-specific mechanics migrated out of the shared match coordinator.
  * Owns disguise/nameplates, the scoreboard, ability-meter UI and spectator tracking.
- * Combat and projectile handling remain in ArcadePortManager for a later phase.
+ * Pure combat calculations live here too; combat events and projectile updates
+ * remain coordinated by ArcadePortManager until a later extraction phase.
  */
 final class BaconBrawlManager implements ArcadeMatchController {
     private final Logger logger;
@@ -389,6 +394,133 @@ final class BaconBrawlManager implements ArcadeMatchController {
                 .min(java.util.Comparator.comparingDouble(candidate ->
                         candidate.getLocation().distanceSquared(spectator.getLocation())))
                 .orElse(null);
+    }
+
+    boolean isBaconBrutusBackstab(Player target, Location attackerLocation) {
+        Vector targetLook = target.getLocation().getDirection().setY(0.0D);
+        Vector fromTargetToAttacker = attackerLocation.toVector()
+                .subtract(target.getLocation().toVector()).setY(0.0D);
+        return ArcadePortRules.isBaconBrutusBackstab(targetLook.getX(), targetLook.getZ(),
+                fromTargetToAttacker.getX(), fromTargetToAttacker.getZ());
+    }
+
+    boolean isBaconBrutusBackstab(Player target, Player attacker) {
+        Vector targetLook = target.getLocation().getDirection().setY(0.0D);
+        Vector fromTargetToAttacker = attacker.getLocation().toVector()
+                .subtract(target.getLocation().toVector()).setY(0.0D);
+        return ArcadePortRules.isBaconBrutusBackstab(targetLook.getX(), targetLook.getZ(),
+                fromTargetToAttacker.getX(), fromTargetToAttacker.getZ());
+    }
+
+    boolean isBaconBrawlBackstab(Player target, Player attacker) {
+        Vector targetLook = target.getLocation().getDirection().setY(0.0D);
+        Vector fromTargetToAttacker = attacker.getLocation().toVector()
+                .subtract(target.getLocation().toVector()).setY(0.0D);
+        return ArcadePortRules.isBaconBrawlBackstab(targetLook.getX(), targetLook.getZ(),
+                fromTargetToAttacker.getX(), fromTargetToAttacker.getZ());
+    }
+
+    /** Port DamageManager's logarithmic base and UtilAction's strength, vertical cap and ground boost. */
+    Vector baconBrawlKnockbackVelocity(Player source, Player target, double rawDamage,
+            double knockbackMultipliers, Vector projectileVelocity) {
+        return baconBrawlKnockbackVelocity(source.getLocation(), target.getLocation(), rawDamage,
+                knockbackMultipliers, projectileVelocity, target.isOnGround());
+    }
+
+    Vector baconBrawlKnockbackVelocity(Location source, Location target, double rawDamage,
+            double knockbackMultipliers, Vector projectileVelocity, boolean targetOnGround) {
+        boolean projectile = projectileVelocity != null;
+        Vector direction = projectile
+                ? projectileVelocity.clone().setY(0.0D)
+                : target.toVector().subtract(source.toVector()).setY(0.0D);
+        if (direction.lengthSquared() < 1.0E-5D) direction = source.getDirection().setY(0.0D);
+        if (direction.lengthSquared() < 1.0E-5D) direction = new Vector(0.0D, 0.0D, 1.0D);
+        double strength = ArcadePortRules.baconBrawlVelocityStrength(rawDamage, knockbackMultipliers, projectile);
+        double vertical = ArcadePortRules.baconBrawlVerticalVelocity(
+                rawDamage, knockbackMultipliers, projectile, targetOnGround);
+        return direction.normalize().multiply(strength).setY(vertical);
+    }
+
+    /** Live timing guide: the green section is the 500–900 ms critical window. */
+    String baconTimingStatusText(SessionState session, UUID id, long now) {
+        long lastHit = session.baconLastSwingAt.getOrDefault(id, 0L);
+        if (lastHit <= 0L) {
+            return ChatColor.GRAY + "[" + ChatColor.RED + "■■■■"
+                    + ChatColor.GREEN + "■■■■" + ChatColor.YELLOW + "■■■■"
+                    + ChatColor.GRAY + "] swing";
+        }
+
+        long elapsed = Math.max(0L, now - lastHit);
+        long lateMax = ArcadePortRules.baconTimingWindowMillis(
+                GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_LATE_MAX_MILLIS", ArcadePortRules.BACON_TIMED_HIT_LATE_MAX_MILLIS), session.baconKnockback);
+        long criticalMin = ArcadePortRules.baconTimingWindowMillis(
+                GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_GOOD_MIN_MILLIS", ArcadePortRules.BACON_TIMED_HIT_GOOD_MIN_MILLIS), session.baconKnockback);
+        long criticalMax = ArcadePortRules.baconTimingWindowMillis(
+                GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_GOOD_MAX_MILLIS", ArcadePortRules.BACON_TIMED_HIT_GOOD_MAX_MILLIS), session.baconKnockback);
+        int pointer = (int) Math.min(14L, elapsed * 15L / Math.max(1L, lateMax));
+        boolean criticalWindow = ArcadePortRules.isBaconTimedCritical(elapsed, session.baconKnockback);
+        int criticalStart = (int) (criticalMin * 15L / Math.max(1L, lateMax));
+        int criticalEnd = Math.min(14, (int) (criticalMax * 15L / Math.max(1L, lateMax)));
+        StringBuilder bar = new StringBuilder("[");
+        for (int i = 0; i < 15; i++) {
+            if (i == pointer) {
+                bar.append(criticalWindow ? ChatColor.GREEN : ChatColor.WHITE).append("▌");
+            } else if (i >= criticalStart && i <= criticalEnd) {
+                bar.append(ChatColor.GREEN).append("■");
+            } else if (i < criticalStart) {
+                bar.append(ChatColor.RED).append("■");
+            } else if (i < 14) {
+                bar.append(ChatColor.YELLOW).append("■");
+            } else {
+                bar.append(ChatColor.GRAY).append("■");
+            }
+        }
+        bar.append(ChatColor.GRAY).append("]");
+
+        String state;
+        if (ArcadePortRules.isBaconTimedCritical(elapsed, session.baconKnockback)) {
+            state = ChatColor.GREEN + "" + ChatColor.BOLD + "CRITICAL NOW";
+        } else if (elapsed < criticalMin) {
+            state = ChatColor.RED + "wait " + (criticalMin - elapsed) + "ms";
+        } else if (elapsed <= lateMax) {
+            state = ChatColor.YELLOW + "late";
+        } else {
+            state = ChatColor.GRAY + "swing";
+        }
+        return ChatColor.AQUA + bar.toString() + " " + state;
+    }
+
+    /** Finds the first non-passable/liquid block cell crossed by the projectile's previous-to-current path. */
+    double baconBlastFirstBlockFraction(SessionState session, Location start, Location end) {
+        if (session == null || start == null || end == null
+                || start.getWorld() != session.world || end.getWorld() != session.world) return -1.0D;
+        Vector segment = end.toVector().subtract(start.toVector());
+        double length = segment.length();
+        if (!Double.isFinite(length) || length <= 1.0E-6D) return -1.0D;
+        int samples = Math.max(1, Math.min(512, (int) Math.ceil(length / 0.1D)));
+        for (int i = 1; i <= samples; i++) {
+            double fraction = i / (double) samples;
+            Location sample = start.clone().add(segment.clone().multiply(fraction));
+            Block block = sample.getBlock();
+            if (block.isLiquid() || !block.isPassable()) return fraction;
+        }
+        return -1.0D;
+    }
+
+    /** First point where the swept bacon item intersects a player's actual entity hitbox. */
+    double baconBlastPlayerHitFraction(Player candidate, Location start, Location end,
+            double segmentLength) {
+        if (candidate == null || start == null || end == null
+                || candidate.getWorld() != start.getWorld() || start.getWorld() != end.getWorld()) return -1.0D;
+        BoundingBox hitbox = candidate.getBoundingBox().expand(0.05D);
+        Vector startVector = start.toVector();
+        if (segmentLength <= 1.0E-6D) return hitbox.contains(end.toVector()) ? 0.0D : -1.0D;
+        if (hitbox.contains(startVector)) return 0.0D;
+        Vector direction = end.toVector().subtract(startVector).multiply(1.0D / segmentLength);
+        org.bukkit.util.RayTraceResult hit = hitbox.rayTrace(startVector, direction, segmentLength);
+        if (hit == null || hit.getHitPosition() == null) return -1.0D;
+        return Math.max(0.0D, Math.min(1.0D,
+                startVector.distance(hit.getHitPosition()) / segmentLength));
     }
 
     private static ItemStack namedTrackingCompass(String lore) {

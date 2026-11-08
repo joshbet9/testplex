@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.logging.Logger;
 import org.bukkit.ChatColor;
+import org.bukkit.Location;
+import org.bukkit.util.Vector;
 import org.junit.jupiter.api.Test;
 
 class BaconBrawlManagerTest {
@@ -61,5 +63,25 @@ class BaconBrawlManagerTest {
         assertFalse(manager.isBaconCompassMenuTitle(null));
         assertFalse(manager.isBaconTrackingCompass(null));
         assertNull(manager.nearestAliveBaconTarget(session, null));
+    }
+
+    @Test
+    void knockbackAndProjectileGeometryHelpersKeepDefensiveBounds() {
+        Location source = new Location(null, 0.0D, 65.0D, 0.0D);
+        Location target = new Location(null, 2.0D, 65.0D, 0.0D);
+        Vector velocity = manager.baconBrawlKnockbackVelocity(source, target,
+                2.0D, 1.0D, null, true);
+
+        assertTrue(Double.isFinite(velocity.getX()));
+        assertTrue(Double.isFinite(velocity.getY()));
+        assertTrue(velocity.getX() > 0.0D);
+        assertEquals(-1.0D, manager.baconBlastFirstBlockFraction(null, source, target));
+        assertEquals(-1.0D, manager.baconBlastPlayerHitFraction(null, source, target, 2.0D));
+    }
+
+    @Test
+    void timingHudStillHasAnInitialSwingPrompt() {
+        SessionState session = new SessionState(ArcadePortGame.BACON_BRAWL, null, List.of(), false);
+        assertTrue(manager.baconTimingStatusText(session, UUID.randomUUID(), 1_000L).contains("swing"));
     }
 }
