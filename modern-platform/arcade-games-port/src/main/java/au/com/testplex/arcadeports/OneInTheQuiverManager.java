@@ -1,7 +1,10 @@
 package au.com.testplex.arcadeports;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -10,6 +13,10 @@ import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
@@ -149,5 +156,126 @@ final class OneInTheQuiverManager implements ArcadeMatchController {
                         session.scores.getOrDefault(player.getUniqueId(), 0));
             }
         }
+    }
+
+    ItemStack trackingCompass() {
+        ItemStack item = new ItemStack(Material.COMPASS);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(ChatColor.GOLD + "Tracking Compass");
+            meta.setLore(List.of(ChatColor.GRAY
+                    + "Left-click to teleport to the nearest player; right-click to open the spectator menu."));
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    boolean isTrackingCompass(ItemStack item) {
+        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        return meta != null && meta.hasDisplayName()
+                && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
+    }
+
+    Player nearestSpectateTarget(SessionState session, Player spectator) {
+        if (session == null || spectator == null) return null;
+        return alivePlayers(session).stream()
+                .min(java.util.Comparator.comparingDouble(candidate ->
+                        candidate.getLocation().distanceSquared(spectator.getLocation())))
+                .orElse(null);
+    }
+
+    void updateSpectatorCompass(SessionState session) {
+        if (session == null) return;
+        for (Player spectator : session.players.values()) {
+            if (spectator == null || !spectator.isOnline()
+                    || session.alive.contains(spectator.getUniqueId())
+                    || spectator.getWorld() != session.world) continue;
+            Player target = nearestSpectateTarget(session, spectator);
+            if (target == null) continue;
+            spectator.setCompassTarget(target.getLocation());
+            if (isTrackingCompass(spectator.getInventory().getItemInMainHand())) {
+                double distance = Math.sqrt(target.getLocation().distanceSquared(spectator.getLocation()));
+                double height = target.getLocation().getY() - spectator.getLocation().getY();
+                spectator.sendActionBar(ChatColor.WHITE + "" + ChatColor.BOLD + "Nearest Target: "
+                        + ChatColor.AQUA + target.getName() + ChatColor.WHITE + " | Distance: "
+                        + ChatColor.YELLOW + String.format(java.util.Locale.ROOT, "%.1f", distance)
+                        + ChatColor.WHITE + " | Height: "
+                        + ChatColor.YELLOW + String.format(java.util.Locale.ROOT, "%+.1f", height));
+            }
+        }
+    }
+
+    void openSpectatorMenu(SessionState session, Player spectator) {
+        if (session == null || spectator == null) return;
+        Inventory inventory = Bukkit.createInventory(null, 54, ChatColor.DARK_GREEN + "Spectator Menu");
+        inventory.setItem(4, trackingCompass());
+        int[] slots = {19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34,
+                37, 38, 39, 40, 41, 42, 43, 46, 47, 48, 49, 50, 51, 52};
+        Map<Integer, UUID> targetsBySlot = new HashMap<>();
+        List<Player> targets = alivePlayers(session).stream()
+                .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+        for (int i = 0; i < targets.size() && i < slots.length; i++) {
+            Player target = targets.get(i);
+            int slot = slots[i];
+            ItemStack head = new ItemStack(Material.PLAYER_HEAD);
+            if (head.getItemMeta() instanceof SkullMeta meta) {
+                meta.setOwningPlayer(target);
+                double distance = Math.sqrt(target.getLocation().distanceSquared(spectator.getLocation()));
+                double height = target.getLocation().getY() - spectator.getLocation().getY();
+                meta.setDisplayName(ChatColor.AQUA + target.getName());
+                meta.setLore(List.of(
+                        ChatColor.GRAY + "Kit: " + session.quiverKits.getOrDefault(target.getUniqueId(), "leaper"),
+                        ChatColor.GRAY + "Kills: " + session.scores.getOrDefault(target.getUniqueId(), 0),
+                        ChatColor.GRAY + "Distance: " + String.format(java.util.Locale.ROOT, "%.1f", distance),
+                        ChatColor.GRAY + "Height difference: " + String.format(java.util.Locale.ROOT, "%+.1f", height),
+                        ChatColor.YELLOW + "Left-click: Teleport",
+                        ChatColor.YELLOW + "Right-click: Spectate"));
+                head.setItemMeta(meta);
+            }
+            inventory.setItem(slot, head);
+            targetsBySlot.put(slot, target.getUniqueId());
+        }
+        session.quiverCompassMenuTargets.put(spectator.getUniqueId(), targetsBySlot);
+        spectator.openInventory(inventory);
+    }
+
+    boolean isSpectatorMenuTitle(String title) {
+        return (ChatColor.DARK_GREEN + "Spectator Menu").equals(title);
+    }
+
+    void handleSpectatorMenuClick(SessionState session, Player spectator, int slot, boolean rightClick) {
+        if (session == null || spectator == null) return;
+        Map<Integer, UUID> targets = session.quiverCompassMenuTargets.get(spectator.getUniqueId());
+        UUID targetId = targets == null ? null : targets.get(slot);
+        if (targetId == null) return;
+        Player target = session.players.get(targetId);
+        session.quiverCompassMenuTargets.remove(spectator.getUniqueId());
+        spectator.closeInventory();
+        if (target == null || !target.isOnline() || !session.alive.contains(targetId)) {
+            spectator.sendMessage(ChatColor.YELLOW + "That player is no longer alive.");
+            return;
+        }
+        if (rightClick) {
+            spectator.setSpectatorTarget(target);
+        } else {
+            long now = System.currentTimeMillis();
+            long readyAt = session.quiverSpectateNextTeleportAt.getOrDefault(spectator.getUniqueId(), 0L);
+            if (!ArcadePortRules.isQuiverSpectatorTeleportReady(now, readyAt)) return;
+            spectator.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
+            session.quiverSpectateNextTeleportAt.put(spectator.getUniqueId(),
+                    ArcadePortRules.nextQuiverSpectatorTeleportAt(now));
+        }
+        spectator.setCompassTarget(target.getLocation());
+    }
+
+    private List<Player> alivePlayers(SessionState session) {
+        List<Player> players = new ArrayList<>();
+        for (UUID id : session.alive) {
+            Player player = session.players.get(id);
+            if (player != null && player.isOnline()) players.add(player);
+        }
+        return players;
     }
 }
