@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 
 class SkyWarsManagerTest {
@@ -29,5 +31,15 @@ class SkyWarsManagerTest {
         assertFalse(skywars.isAbilitySkill(null));
         assertFalse(skywars.isTrackingCompass(null));
         assertFalse(skywars.isSkill(null, "Ice Bridge"));
+    }
+
+    @Test
+    void spectatorCompassDoesNotAllocateStateForAnEmptyMatch() {
+        SkyWarsManager skywars = new SkyWarsManager();
+        SessionState session = new SessionState(ArcadePortGame.SKY_WARS, null, List.of(), false);
+
+        skywars.updateCompass(session);
+
+        assertEquals(0, session.skyWarsSpectatorTeleportAt.size());
     }
 }
