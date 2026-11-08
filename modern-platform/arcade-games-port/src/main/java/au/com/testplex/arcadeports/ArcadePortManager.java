@@ -27375,19 +27375,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void spawnMilkCowMapAnimals(Session session, List<Location> locations, EntityType type) {
-        for (Location source : locations) {
-            Location at = source.clone();
-            at.setWorld(session.world);
-            Entity animal = session.world.spawnEntity(at, type);
-            if (animal instanceof Ageable ageable) {
-                ageable.setBaby();
-                ageable.setAgeLock(true);
-            } else {
-                animal.setCustomName("Bob");
-                animal.setCustomNameVisible(true);
-            }
-            session.entities.add(animal);
-        }
+        milkCowController.spawnMapAnimals(session, locations, type);
     }
 
     private void incrementMilkCowScore(Session session, Player player, int change, String reason) {
@@ -27419,21 +27407,7 @@ public final class ArcadePortManager implements Listener {
                 .filter(player -> session.teams.getOrDefault(player.getUniqueId(), 0) == 1).toList();
         for (Player cowPlayer : cows) {
             disguiseMilkCowPlayer(session, cowPlayer);
-            UUID id = cowPlayer.getUniqueId();
-            long nextAt = session.milkChargeHungerAt.getOrDefault(id, 0L);
-            if (now >= nextAt) {
-                int food = cowPlayer.getFoodLevel();
-                if (cowPlayer.isSprinting()) {
-                    if (food <= 0) cowPlayer.setSprinting(false);
-                    else cowPlayer.setFoodLevel(food - 1);
-                    cowPlayer.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,
-                            MilkCowRules.cowSprintSpeedDurationTicks(), MilkCowRules.cowSprintSpeedAmplifier(),
-                            false, false, false));
-                } else if (food < 20) {
-                    cowPlayer.setFoodLevel(food + 1);
-                }
-                session.milkChargeHungerAt.put(id, now + MilkCowRules.cowChargeHungerIntervalMillis());
-            }
+            milkCowController.updateCowHunger(session, cowPlayer, now);
         }
         List<Player> farmers = alivePlayers(session).stream()
                 .filter(player -> session.teams.getOrDefault(player.getUniqueId(), 0) == 0).toList();
@@ -27553,35 +27527,8 @@ public final class ArcadePortManager implements Listener {
                 || !session.alive.contains(cowPlayer.getUniqueId())
                 || session.teams.getOrDefault(cowPlayer.getUniqueId(), 0) != 1
                 || now < session.milkNextHerdUpdateAt) return;
-        if (!debugFeatureEnabledForActiveSession(ArcadePortGame.MILK_THE_COW, "herd-spawning")) {
-            for (Cow cow : new ArrayList<>(session.milkCowHerd)) {
-                if (cow != null && cow.isValid()) cow.remove();
-                session.entities.remove(cow);
-            }
-            session.milkCowHerd.clear();
-            return;
-        }
-        session.milkNextHerdUpdateAt = now + MilkCowRules.herdUpdateIntervalMillis();
-        Location target = cowPlayer.getLocation();
-        session.milkCowHerd.removeIf(cow -> cow == null || !cow.isValid());
-        for (Cow cow : session.milkCowHerd) {
-            Vector direction = target.toVector().subtract(cow.getLocation().toVector());
-            direction.setY(Math.max(-0.08D, Math.min(0.12D, direction.getY())));
-            if (direction.lengthSquared() > MilkCowRules.herdFollowMinDistanceSquared()) cow.setVelocity(direction.normalize().multiply(
-                    GameDebugRuntimeOverrides.doubleValue("MILK_THE_COW_HERD_MOVE_SPEED",
-                            MilkCowRules.HERD_MOVE_SPEED)));
-        }
-        while (session.milkCowHerd.size() < GameDebugRuntimeOverrides.intValue(
-                "MILK_THE_COW_HERD_SIZE", MilkCowRules.HERD_SIZE)) {
-            double spawnRadius = MilkCowRules.herdSpawnRadiusBlocks();
-            Location spawn = target.clone().add(
-                    ThreadLocalRandom.current().nextDouble(-spawnRadius, spawnRadius), 0.0D,
-                    ThreadLocalRandom.current().nextDouble(-spawnRadius, spawnRadius));
-            Cow cow = session.world.spawn(spawn, Cow.class);
-            cow.setRemoveWhenFarAway(false);
-            session.milkCowHerd.add(cow);
-            session.entities.add(cow);
-        }
+        milkCowController.updateHerd(session, cowPlayer, now,
+                debugFeatureEnabledForActiveSession(ArcadePortGame.MILK_THE_COW, "herd-spawning"));
     }
 
     private void damageMilkCowFarmer(Session session, Player target, Player attacker, double damage) {
