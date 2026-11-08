@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import java.util.UUID;
 import java.util.logging.Logger;
+import org.bukkit.ChatColor;
 import org.junit.jupiter.api.Test;
 
 class BaconBrawlManagerTest {
@@ -49,5 +50,16 @@ class BaconBrawlManagerTest {
 
         assertSame(manager, registry.get(ArcadePortGame.BACON_BRAWL));
         assertNull(registry.get(ArcadePortGame.EVOLUTION));
+    }
+
+    @Test
+    void spectatorMenuRecognitionAndEmptyTargetResolutionRemainGameSpecific() {
+        SessionState session = new SessionState(ArcadePortGame.BACON_BRAWL, null, List.of(), false);
+
+        assertTrue(manager.isBaconCompassMenuTitle(ChatColor.DARK_GREEN + "Spectator Menu"));
+        assertFalse(manager.isBaconCompassMenuTitle("Spectator Menu"));
+        assertFalse(manager.isBaconCompassMenuTitle(null));
+        assertFalse(manager.isBaconTrackingCompass(null));
+        assertNull(manager.nearestAliveBaconTarget(session, null));
     }
 }

@@ -1,7 +1,9 @@
 package au.com.testplex.arcadeports;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.logging.Logger;
@@ -9,8 +11,11 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
@@ -18,8 +23,8 @@ import org.bukkit.scoreboard.Team;
 
 /**
  * Bacon Brawl-specific mechanics migrated out of the shared match coordinator.
- * Initial extraction owns disguise/nameplates, the scoreboard and ability-meter UI;
- * combat and projectile handling remain in ArcadePortManager for a later phase.
+ * Owns disguise/nameplates, the scoreboard, ability-meter UI and spectator tracking.
+ * Combat and projectile handling remain in ArcadePortManager for a later phase.
  */
 final class BaconBrawlManager implements ArcadeMatchController {
     private final Logger logger;
@@ -276,6 +281,125 @@ final class BaconBrawlManager implements ArcadeMatchController {
         ItemMeta meta = item.getItemMeta();
         return meta != null && meta.hasDisplayName()
                 && ChatColor.stripColor(meta.getDisplayName()).startsWith("Ability Meter:");
+    }
+
+    /** Reborn's CompassModule gives eliminated Bacon Brawl players a live nearest-opponent tracker. */
+    void updateBaconSpectatorCompasses(SessionState session) {
+        List<Player> targets = alivePlayers(session);
+        if (targets.isEmpty()) return;
+        for (Player spectator : session.players.values()) {
+            if (spectator == null || !spectator.isOnline()
+                    || session.alive.contains(spectator.getUniqueId())) continue;
+            boolean hasCompass = false;
+            for (ItemStack item : spectator.getInventory().getContents()) {
+                if (isBaconTrackingCompass(item)) {
+                    hasCompass = true;
+                    break;
+                }
+            }
+            if (!hasCompass) {
+                spectator.getInventory().addItem(namedTrackingCompass("Tracks the nearest surviving pig."));
+            }
+            Player target = targets.stream()
+                    .min(java.util.Comparator.comparingDouble(candidate ->
+                            candidate.getLocation().distanceSquared(spectator.getLocation())))
+                    .orElse(null);
+            if (target != null) spectator.setCompassTarget(target.getLocation());
+        }
+    }
+
+    boolean isBaconTrackingCompass(ItemStack item) {
+        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        return meta != null && meta.hasDisplayName()
+                && ChatColor.stripColor(meta.getDisplayName()).equals("Tracking Compass");
+    }
+
+    void openBaconCompassMenu(SessionState session, Player spectator) {
+        Inventory inventory = Bukkit.createInventory(null, 54, ChatColor.DARK_GREEN + "Spectator Menu");
+        ItemStack header = namedTrackingCompass("Choose a surviving pig to follow.");
+        inventory.setItem(4, header);
+
+        int[] slots = {
+                19, 20, 21, 22, 23, 24, 25,
+                28, 29, 30, 31, 32, 33, 34,
+                37, 38, 39, 40, 41, 42, 43,
+                46, 47, 48, 49, 50, 51, 52
+        };
+        Map<Integer, UUID> targetsBySlot = new HashMap<>();
+        List<Player> targets = alivePlayers(session).stream()
+                .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+        for (int i = 0; i < targets.size() && i < slots.length; i++) {
+            Player target = targets.get(i);
+            int slot = slots[i];
+            ItemStack head = new ItemStack(Material.PLAYER_HEAD);
+            if (head.getItemMeta() instanceof SkullMeta meta) {
+                meta.setOwningPlayer(target);
+                meta.setDisplayName(ChatColor.YELLOW + target.getName());
+                double distance = Math.sqrt(target.getLocation().distanceSquared(spectator.getLocation()));
+                double height = target.getLocation().getY() - spectator.getLocation().getY();
+                String kit = session.baconKits.getOrDefault(target.getUniqueId(), "el-muchacho-pigo");
+                meta.setLore(List.of(
+                        ChatColor.GRAY + "Kit: " + kit,
+                        ChatColor.GRAY + "Distance: " + String.format(java.util.Locale.ROOT, "%.1f", distance),
+                        ChatColor.GRAY + "Height difference: " + String.format(java.util.Locale.ROOT, "%.1f", height),
+                        ChatColor.YELLOW + "Left-click: Teleport",
+                        ChatColor.YELLOW + "Right-click: Spectate"));
+                head.setItemMeta(meta);
+            }
+            inventory.setItem(slot, head);
+            targetsBySlot.put(slot, target.getUniqueId());
+        }
+        session.baconCompassMenuTargets.put(spectator.getUniqueId(), targetsBySlot);
+        spectator.openInventory(inventory);
+    }
+
+    void handleBaconCompassMenuClick(SessionState session, InventoryClickEvent event) {
+        if (session == null || session.type != ArcadePortGame.BACON_BRAWL
+                || !isBaconCompassMenuTitle(event.getView().getTitle())) return;
+        event.setCancelled(true);
+        if (!(event.getWhoClicked() instanceof Player spectator)) return;
+        int slot = event.getRawSlot();
+        if (slot < 0 || slot >= event.getView().getTopInventory().getSize()) return;
+        Map<Integer, UUID> targets = session.baconCompassMenuTargets.get(spectator.getUniqueId());
+        UUID targetId = targets == null ? null : targets.get(slot);
+        if (targetId == null) return;
+        Player target = session.players.get(targetId);
+        session.baconCompassMenuTargets.remove(spectator.getUniqueId());
+        spectator.closeInventory();
+        if (target == null || !target.isOnline() || !session.alive.contains(targetId)) {
+            spectator.sendMessage(ChatColor.YELLOW + "That pig is no longer alive.");
+            return;
+        }
+        if (event.isRightClick()) {
+            spectator.setSpectatorTarget(target);
+        } else {
+            spectator.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
+        }
+        spectator.setCompassTarget(target.getLocation());
+    }
+
+    boolean isBaconCompassMenuTitle(String title) {
+        return (ChatColor.DARK_GREEN + "Spectator Menu").equals(title);
+    }
+
+    Player nearestAliveBaconTarget(SessionState session, Player spectator) {
+        return alivePlayers(session).stream()
+                .min(java.util.Comparator.comparingDouble(candidate ->
+                        candidate.getLocation().distanceSquared(spectator.getLocation())))
+                .orElse(null);
+    }
+
+    private static ItemStack namedTrackingCompass(String lore) {
+        ItemStack item = new ItemStack(Material.COMPASS);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(ChatColor.GOLD + "Tracking Compass");
+            meta.setLore(List.of(ChatColor.GRAY + lore));
+            item.setItemMeta(meta);
+        }
+        return item;
     }
 
     private static List<Player> alivePlayers(SessionState session) {

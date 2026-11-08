@@ -14299,7 +14299,7 @@ public final class ArcadePortManager implements Listener {
             else updateBaconCrispyDash(session, dasher, now);
         }
         updateBaconDashFireBlocks(session, now);
-        updateBaconSpectatorCompasses(session);
+        baconController.updateBaconSpectatorCompasses(session);
         baconController.updateBaconMeterScoreboard(session);
 
         for (Map.Entry<UUID, Long> entry : new ArrayList<>(session.baconSlams.entrySet())) {
@@ -14328,122 +14328,18 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    /**
-     * Mama Piggles' Baby Piggles companion is a client-visible baby pig. It is
-     * invulnerable and follows the owner; normal player hitboxes remain authoritative.
-     */
-    /** Reborn's CompassModule gives eliminated Bacon Brawl players a live nearest-opponent tracker. */
-    private void updateBaconSpectatorCompasses(Session session) {
-        List<Player> targets = alivePlayers(session);
-        if (targets.isEmpty()) return;
-        for (Player spectator : session.players.values()) {
-            if (spectator == null || !spectator.isOnline()
-                    || session.alive.contains(spectator.getUniqueId())) continue;
-            boolean hasCompass = false;
-            for (ItemStack item : spectator.getInventory().getContents()) {
-                if (isBaconTrackingCompass(item)) {
-                    hasCompass = true;
-                    break;
-                }
-            }
-            if (!hasCompass) {
-                spectator.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
-                        "Tracks the nearest surviving pig."));
-            }
-            Player target = targets.stream()
-                    .min(java.util.Comparator.comparingDouble(candidate ->
-                            candidate.getLocation().distanceSquared(spectator.getLocation())))
-                    .orElse(null);
-            if (target != null) spectator.setCompassTarget(target.getLocation());
-        }
-    }
-
-    private boolean isBaconTrackingCompass(ItemStack item) {
-        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
-        ItemMeta meta = item.getItemMeta();
-        return meta != null && meta.hasDisplayName()
-                && ChatColor.stripColor(meta.getDisplayName()).equals("Tracking Compass");
-    }
-
-    private void openBaconCompassMenu(Session session, Player spectator) {
-        Inventory inventory = Bukkit.createInventory(null, 54, ChatColor.DARK_GREEN + "Spectator Menu");
-        ItemStack header = namedItem(Material.COMPASS, "Tracking Compass", "Choose a surviving pig to follow.");
-        inventory.setItem(4, header);
-
-        int[] slots = {
-                19, 20, 21, 22, 23, 24, 25,
-                28, 29, 30, 31, 32, 33, 34,
-                37, 38, 39, 40, 41, 42, 43,
-                46, 47, 48, 49, 50, 51, 52
-        };
-        Map<Integer, UUID> targetsBySlot = new HashMap<>();
-        List<Player> targets = alivePlayers(session).stream()
-                .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
-                .toList();
-        for (int i = 0; i < targets.size() && i < slots.length; i++) {
-            Player target = targets.get(i);
-            int slot = slots[i];
-            ItemStack head = new ItemStack(Material.PLAYER_HEAD);
-            if (head.getItemMeta() instanceof SkullMeta meta) {
-                meta.setOwningPlayer(target);
-                meta.setDisplayName(ChatColor.YELLOW + target.getName());
-                double distance = Math.sqrt(target.getLocation().distanceSquared(spectator.getLocation()));
-                double height = target.getLocation().getY() - spectator.getLocation().getY();
-                String kit = session.baconKits.getOrDefault(target.getUniqueId(), "el-muchacho-pigo");
-                meta.setLore(List.of(
-                        ChatColor.GRAY + "Kit: " + kit,
-                        ChatColor.GRAY + "Distance: " + String.format(java.util.Locale.ROOT, "%.1f", distance),
-                        ChatColor.GRAY + "Height difference: " + String.format(java.util.Locale.ROOT, "%.1f", height),
-                        ChatColor.YELLOW + "Left-click: Teleport",
-                        ChatColor.YELLOW + "Right-click: Spectate"));
-                head.setItemMeta(meta);
-            }
-            inventory.setItem(slot, head);
-            targetsBySlot.put(slot, target.getUniqueId());
-        }
-        session.baconCompassMenuTargets.put(spectator.getUniqueId(), targetsBySlot);
-        spectator.openInventory(inventory);
-    }
-
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onBaconCompassMenuClick(InventoryClickEvent event) {
         if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
-        if (session == null || session.type != ArcadePortGame.BACON_BRAWL
-                || !isBaconCompassMenuTitle(event.getView().getTitle())) return;
-        event.setCancelled(true);
-        if (!(event.getWhoClicked() instanceof Player spectator)) return;
-        int slot = event.getRawSlot();
-        if (slot < 0 || slot >= event.getView().getTopInventory().getSize()) return;
-        Map<Integer, UUID> targets = session.baconCompassMenuTargets.get(spectator.getUniqueId());
-        UUID targetId = targets == null ? null : targets.get(slot);
-        if (targetId == null) return;
-        Player target = session.players.get(targetId);
-        session.baconCompassMenuTargets.remove(spectator.getUniqueId());
-        spectator.closeInventory();
-        if (target == null || !target.isOnline() || !session.alive.contains(targetId)) {
-            spectator.sendMessage(ChatColor.YELLOW + "That pig is no longer alive.");
-            return;
-        }
-        if (event.isRightClick()) {
-            spectator.setSpectatorTarget(target);
-        } else {
-            spectator.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
-        }
-        spectator.setCompassTarget(target.getLocation());
+        if (session == null || session.type != ArcadePortGame.BACON_BRAWL) return;
+        baconController.handleBaconCompassMenuClick(session, event);
     }
 
-    private boolean isBaconCompassMenuTitle(String title) {
-        return (ChatColor.DARK_GREEN + "Spectator Menu").equals(title);
-    }
-
-    private Player nearestAliveBaconTarget(Session session, Player spectator) {
-        return alivePlayers(session).stream()
-                .min(java.util.Comparator.comparingDouble(candidate ->
-                        candidate.getLocation().distanceSquared(spectator.getLocation())))
-                .orElse(null);
-    }
-
+    /**
+     * Mama Piggles' Baby Piggles companion is a client-visible baby pig. It is
+     * invulnerable and follows the owner; normal player hitboxes remain authoritative.
+     */
     private void updateBaconBabyPig(Session session, Player owner, long now) {
         UUID ownerId = owner.getUniqueId();
         UUID pigId = session.baconBabyPigs.get(ownerId);
@@ -18297,8 +18193,8 @@ public final class ArcadePortManager implements Listener {
             }
             if (session.type == ArcadePortGame.BACON_BRAWL
                     && !session.alive.contains(id)
-                    && isBaconTrackingCompass(p.getInventory().getItemInMainHand())) {
-                Player target = nearestAliveBaconTarget(session, p);
+                    && baconController.isBaconTrackingCompass(p.getInventory().getItemInMainHand())) {
+                Player target = baconController.nearestAliveBaconTarget(session, p);
                 if (target != null) {
                     double distance = Math.sqrt(target.getLocation().distanceSquared(p.getLocation()));
                     double height = target.getLocation().getY() - p.getLocation().getY();
@@ -21606,7 +21502,7 @@ public final class ArcadePortManager implements Listener {
                     session.baconBrutusUntil.remove(entry.getKey());
                 }
                 if ((session.type == ArcadePortGame.BACON_BRAWL
-                        && isBaconCompassMenuTitle(player.getOpenInventory().getTitle()))
+                        && baconController.isBaconCompassMenuTitle(player.getOpenInventory().getTitle()))
                         || (session.type == ArcadePortGame.BOMB_LOBBERS
                         && isBombLobbersCompassMenuTitle(player.getOpenInventory().getTitle()))
                         || (session.type == ArcadePortGame.MICRO_BATTLES
@@ -27131,7 +27027,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type != ArcadePortGame.BACON_BRAWL) return;
         ItemStack dropped = event.getItemDrop().getItemStack();
-        if (!isBaconTrackingCompass(dropped) && !baconController.isBaconMeterItem(dropped)) return;
+        if (!baconController.isBaconTrackingCompass(dropped) && !baconController.isBaconMeterItem(dropped)) return;
         event.setCancelled(true);
         event.getPlayer().sendMessage(ChatColor.YELLOW + "You cannot drop the Bacon Brawl meter or Tracking Compass.");
     }
@@ -27534,12 +27430,12 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.BACON_BRAWL
                 && !session.alive.contains(player.getUniqueId())
-                && isBaconTrackingCompass(heldItem)) {
+                && baconController.isBaconTrackingCompass(heldItem)) {
             event.setCancelled(true);
             if (event.getAction().isRightClick()) {
-                openBaconCompassMenu(session, player);
+                baconController.openBaconCompassMenu(session, player);
             } else if (event.getAction().isLeftClick()) {
-                Player target = nearestAliveBaconTarget(session, player);
+                Player target = baconController.nearestAliveBaconTarget(session, player);
                 if (target != null) {
                     player.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
                     player.setCompassTarget(target.getLocation());
