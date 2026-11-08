@@ -2,6 +2,7 @@ package au.com.testplex.arcadeports;
 
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -25,5 +26,16 @@ class MicroBattlesManagerTest {
         micro.updateBorderParticles(session, List.of(), ignored -> true);
         micro.updateBorderParticles(null, List.of(), ignored -> true);
         micro.updateBorderParticles(session, null, ignored -> true);
+    }
+
+    @Test
+    void warningCleanupIsSafeWithoutActiveDisplays() {
+        MicroBattlesManager micro = new MicroBattlesManager();
+        SessionState session = new SessionState(ArcadePortGame.MICRO_BATTLES, null, List.of(), false);
+        micro.removeBorderWarning(null, null);
+        micro.removeBorderWarning(session, null);
+        micro.removeAllBorderWarnings(null);
+        micro.removeAllBorderWarnings(session);
+        assertTrue(session.microBorderWarnings.isEmpty());
     }
 }
