@@ -47,7 +47,7 @@ class DragonsManagerTest {
         DragonsManager dragons = new DragonsManager();
         SessionState session = new SessionState(ArcadePortGame.DRAGONS, null, List.of(), false);
 
-        dragons.updateSpectatorCompasses(session, 1_000L);
+        dragons.updateSpectatorCompasses(session, 1_000L, null);
 
         assertFalse(dragons.isTrackingCompass(null));
         assertFalse(dragons.isSpectatorMenu((InventoryHolder) null));
