@@ -285,6 +285,7 @@ public final class ArcadePortManager implements Listener {
     private final SheepQuestManager sheepQuestController = new SheepQuestManager();
     private final MicroBattlesManager microBattlesController = new MicroBattlesManager();
     private final TurfWarsManager turfWarsController = new TurfWarsManager();
+    private final DrawMyThingManager drawMyThingController = new DrawMyThingManager();
     private boolean gameModulesInitialized;
     private CameraShyGame cameraShyModule;
 
@@ -308,6 +309,7 @@ public final class ArcadePortManager implements Listener {
         matchControllers.register(sheepQuestController);
         matchControllers.register(microBattlesController);
         matchControllers.register(turfWarsController);
+        matchControllers.register(drawMyThingController);
         this.dragonEscapeGhostStore = new DragonEscapeGhostPathStore(
                 plugin.getDataFolder().toPath(), plugin.getLogger());
         this.debugProfiles = new GameDebugProfiles(plugin);
@@ -12311,15 +12313,6 @@ public final class ArcadePortManager implements Listener {
         DrawMyThingCanvas.clear(session.drawCanvasBlocks);
     }
 
-    private String chooseDrawWord(Session session) {
-        List<String> words=new ArrayList<>(DrawMyThingContent.WORDS);
-        words.removeAll(session.drawUsedWords);
-        if(words.isEmpty()){session.drawUsedWords.clear();words.addAll(DrawMyThingContent.WORDS);}
-        String word=words.get(ThreadLocalRandom.current().nextInt(words.size()));
-        session.drawUsedWords.add(word);
-        return word;
-    }
-
     private void giveDrawPaintPalette(Session session, Player drawer) {
         drawer.getInventory().clear();
         Material[] tools = {Material.WOODEN_SWORD, Material.IRON_SWORD, Material.STONE_SWORD,
@@ -12358,7 +12351,7 @@ public final class ArcadePortManager implements Listener {
         }
         resetDrawCanvas(session);
         session.drawCurrentDrawer=drawer.getUniqueId();
-        session.drawWord=chooseDrawWord(session);
+        session.drawWord=drawMyThingController.chooseWord(session);
         session.drawCorrectGuessers.clear();session.drawHumanCorrectGuessers.clear();
         session.drawGuessAttempts.clear();session.drawRevealedLetters.clear();
         session.drawToolQualifications.clear();session.drawCleanSlateReady=false;
@@ -12457,41 +12450,7 @@ public final class ArcadePortManager implements Listener {
         boolean allGuessed=ArcadePortRules.drawMyThingEndAfterAllGuessed() && !guessers.isEmpty()
                 && guessers.stream().allMatch(session.drawCorrectGuessers::contains);
         if(now>=session.drawRoundEndsAt||allGuessed){finishDrawMyThingRound(session,now);return;}
-        int letters=(int)session.drawWord.chars().filter(ch->ch!=' ').count();
-        boolean timedHints = GameDebugRuntimeOverrides.booleanValue("timed-hints", true);
-        if (!timedHints) session.drawRevealedLetters.clear();
-        int reveal=!timedHints?0:ArcadePortRules.drawMyThingHintRevealCount(
-                now-session.drawRoundStartedAt, session.drawRoundDurationMillis, letters);
-        int revealedBefore = session.drawRevealedLetters.size();
-        while(session.drawRevealedLetters.size()<reveal){
-            List<Integer> hidden=new ArrayList<>();
-            for(int i=0;i<session.drawWord.length();i++)
-                if(session.drawWord.charAt(i)!=' '&&!session.drawRevealedLetters.contains(i))hidden.add(i);
-            if(hidden.isEmpty())break;
-            session.drawRevealedLetters.add(hidden.get(ThreadLocalRandom.current().nextInt(hidden.size())));
-        }
-        if (session.drawRevealedLetters.size() > revealedBefore) {
-            for (Player guesser : session.players.values()) {
-                if (guesser != null && guesser.isOnline() && !guesser.getUniqueId().equals(session.drawCurrentDrawer)
-                        && GameDebugRuntimeOverrides.booleanValue("sound-feedback", true)) {
-                    guesser.playSound(guesser.getLocation(), Sound.ENTITY_CHICKEN_EGG, 1.5F, 2.0F);
-                }
-            }
-        }
-        long seconds=Math.max(0,(session.drawRoundEndsAt-now+999)/1000);
-        StringBuilder hint=new StringBuilder();
-        for(int i=0;i<session.drawWord.length();i++){
-            char ch=session.drawWord.charAt(i);
-            hint.append(ch==' '?"  ":session.drawRevealedLetters.contains(i)?ch+" ":"_ ");
-        }
-        if(drawer!=null&&drawer.isOnline())drawer.sendActionBar(Component.text("DRAW: "+session.drawWord+" | "+seconds+"s"));
-        for(Player p:session.players.values()){
-            if(p==null||!p.isOnline()||p.getUniqueId().equals(session.drawCurrentDrawer))continue;
-            if(session.drawCorrectGuessers.contains(p.getUniqueId()))p.sendActionBar(Component.text("Correct! Waiting for next round"));
-            else p.sendActionBar(Component.text(hint+" | "+seconds+"s | Guesses: "+
-                    Math.max(0,ArcadePortRules.drawMyThingMaxGuesses()-session.drawGuessAttempts.getOrDefault(p.getUniqueId(),0))
-                            +"/"+ArcadePortRules.drawMyThingMaxGuesses()));
-        }
+        drawMyThingController.updateHintUi(session, drawer, now);
     }
 
     private void processDrawMyThingGuess(Session session,UUID playerId,String raw) {
