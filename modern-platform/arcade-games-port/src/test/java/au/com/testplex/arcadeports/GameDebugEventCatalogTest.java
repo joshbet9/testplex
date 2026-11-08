@@ -663,12 +663,13 @@ class GameDebugEventCatalogTest {
         }
         String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
         String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String drawController = Files.readString(sourceRoot.resolve("DrawMyThingManager.java"));
         for (String key : List.of("guess-submission", "timed-hints", "sound-feedback")) {
             assertTrue(lobby.contains("\"" + key + "\""), key + " appears in the Draw My Thing panel");
         }
         assertTrue(manager.contains("debugFeatureEnabled(playerId, ArcadePortGame.DRAW_MY_THING, \"guess-submission\", true)"));
         for (String key : List.of("timed-hints", "sound-feedback")) {
-            assertTrue(manager.contains("booleanValue(\"" + key + "\""),
+            assertTrue(drawController.contains("booleanValue(\"" + key + "\""),
                     key + " is consumed by the active round runtime");
         }
         assertTrue(manager.contains("session.drawRevealedLetters.clear()"));
