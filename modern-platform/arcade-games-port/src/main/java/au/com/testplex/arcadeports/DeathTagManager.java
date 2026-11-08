@@ -6,6 +6,9 @@ import java.util.UUID;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
+import org.bukkit.Location;
+import org.bukkit.Particle;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -24,6 +27,65 @@ final class DeathTagManager implements ArcadeMatchController {
 
     @Override public void onPrepare(SessionState session, List<Player> participants) {
         setupDeathTagScoreboard(session);
+    }
+
+    void updateLights(SessionState session, long now) {
+        if (session.deathTagOriginalLightBlocks.isEmpty() || now < session.deathTagNextLightAt) return;
+        session.deathTagNextLightAt = now + 1_000L;
+        for (Block block : session.deathTagOriginalLightBlocks.keySet()) {
+            if (block == null || block.getWorld() != session.world) continue;
+            block.setType(ArcadePortRules.deathTagNextLightMaterial(block.getType()), false);
+        }
+    }
+
+    void updateRunnerTrails(SessionState session) {
+        if (session.ticks % 3 != 0) return;
+        for (Player player : alivePlayers(session)) {
+            UUID id = player.getUniqueId();
+            if (session.tagged.contains(id)) continue;
+            Location point = player.getLocation().clone().add(0.0D, 0.15D, 0.0D);
+            Material glass = trailGlass(session.deathTagRunnerTrailColours.get(id));
+            session.world.spawnParticle(Particle.BLOCK, point, 2,
+                    0.06D, 0.06D, 0.06D, 0.01D, glass.createBlockData());
+
+            String style = session.deathTagRunnerTrailStyles.getOrDefault(id, "classic");
+            switch (style) {
+                case "soul" -> session.world.spawnParticle(Particle.WITCH, point, 3,
+                        0.12D, 0.12D, 0.12D, 0.01D);
+                case "sparks" -> session.world.spawnParticle(Particle.FIREWORK, point, 3,
+                        0.12D, 0.12D, 0.12D, 0.02D);
+                case "smoke" -> session.world.spawnParticle(Particle.SMOKE, point, 3,
+                        0.12D, 0.12D, 0.12D, 0.01D);
+                case "ender" -> session.world.spawnParticle(Particle.PORTAL, point, 3,
+                        0.12D, 0.12D, 0.12D, 0.01D);
+                case "hearts" -> session.world.spawnParticle(Particle.HEART, point, 2,
+                        0.12D, 0.12D, 0.12D, 0.01D);
+                default -> { /* Classic uses only the selected stained-glass trail. */ }
+            }
+        }
+    }
+
+    private static Material trailGlass(String colour) {
+        String name = switch (colour == null ? "white" : colour.toLowerCase(java.util.Locale.ROOT)) {
+            case "orange" -> "ORANGE_STAINED_GLASS";
+            case "magenta" -> "MAGENTA_STAINED_GLASS";
+            case "lightblue" -> "LIGHT_BLUE_STAINED_GLASS";
+            case "yellow" -> "YELLOW_STAINED_GLASS";
+            case "lime" -> "LIME_STAINED_GLASS";
+            case "pink" -> "PINK_STAINED_GLASS";
+            case "gray" -> "GRAY_STAINED_GLASS";
+            case "silver" -> "LIGHT_GRAY_STAINED_GLASS";
+            case "cyan" -> "CYAN_STAINED_GLASS";
+            case "purple" -> "PURPLE_STAINED_GLASS";
+            case "blue" -> "BLUE_STAINED_GLASS";
+            case "brown" -> "BROWN_STAINED_GLASS";
+            case "green" -> "GREEN_STAINED_GLASS";
+            case "red" -> "RED_STAINED_GLASS";
+            case "black" -> "BLACK_STAINED_GLASS";
+            default -> "WHITE_STAINED_GLASS";
+        };
+        Material material = Material.matchMaterial(name);
+        return material == null ? Material.WHITE_STAINED_GLASS : material;
     }
 
     void updateDeathTagCompass(SessionState session) {
