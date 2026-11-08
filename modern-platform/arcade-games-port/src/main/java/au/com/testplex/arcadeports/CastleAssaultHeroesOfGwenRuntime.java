@@ -311,6 +311,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private boolean stopped;
     private boolean listenersRegistered;
     private final CastleAssaultManager castleAssaultManager = new CastleAssaultManager();
+    private final HeroesOfGwenManager heroesOfGwenManager = new HeroesOfGwenManager();
 
     CastleAssaultHeroesOfGwenRuntime(
             ArcadeMechanicsModernPlugin plugin,
@@ -618,13 +619,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         updateMobaTowerDisplay(tower);
     }
 
-    private int heroesOfGwenOpponentCount(int team) {
-        return (int) teams.values().stream().filter(other -> other == 1 - team).count();
-    }
-
     private double heroesOfGwenTowerMaxHealth(int owner, boolean first) {
-        int attackers = Math.max(1, heroesOfGwenOpponentCount(owner));
-        return ArcadePortRules.heroesOfGwenTowerMaximumHealth(first, attackers);
+        return heroesOfGwenManager.towerMaximumHealth(teams, owner, first);
     }
 
     private void refreshHeroesOfGwenTowerHealthForOpponentTeam(int team) {
@@ -632,9 +628,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             for (TowerState tower : teamTowers) {
                 if (tower.dead || tower.owner == team) continue;
                 double oldMaximum = tower.maxHealth;
-                double remainingFraction = oldMaximum <= 0.0D ? 1.0D : tower.health / oldMaximum;
                 tower.maxHealth = heroesOfGwenTowerMaxHealth(tower.owner, tower.first);
-                tower.health = Math.max(1.0D, Math.ceil(tower.maxHealth * remainingFraction));
+                tower.health = heroesOfGwenManager.rescaleTowerHealth(tower.health, oldMaximum, tower.maxHealth);
                 updateMobaTowerDisplay(tower);
             }
         }
