@@ -1,4 +1,5 @@
 name: Testplex all-game lifecycle matrix (opt-in)
+# Run this unchanged harness against the complete per-game manager refactor stack.
 
 on:
   workflow_dispatch:
