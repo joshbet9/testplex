@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import org.bukkit.Material;
 import org.junit.jupiter.api.Test;
 
@@ -34,5 +35,16 @@ class TurfWarsManagerTest {
             double deviation = turf.barrageSpread(0.2D);
             assertTrue(deviation >= -0.2D && deviation < 0.2D);
         }
+    }
+
+    @Test
+    void emptyMatchDoesNotStartOrFireBarrages() {
+        TurfWarsManager turf = new TurfWarsManager();
+        SessionState session = new SessionState(ArcadePortGame.TURF_WARS, null, List.of(), false);
+        turf.startBarrage(session, null, false);
+        turf.updateBarrages(session, 150L, ignored -> false);
+        assertTrue(session.turfBarrageFiring.isEmpty());
+        assertTrue(session.turfBarrageCharges.isEmpty());
+        assertTrue(session.turfTrackedArrows.isEmpty());
     }
 }
