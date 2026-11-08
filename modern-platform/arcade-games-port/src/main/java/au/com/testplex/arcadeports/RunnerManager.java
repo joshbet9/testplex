@@ -1,18 +1,94 @@
 package au.com.testplex.arcadeports;
 
 import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
+import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 
 /** Runner's palette-aware trail rules; shared Arcade still owns timers and block decay. */
 final class RunnerManager implements ArcadeMatchController {
     @Override public ArcadePortGame game() { return ArcadePortGame.RUNNER; }
+
+    void updateDistanceAndSpectatorCompass(SessionState session, long now) {
+        if (now >= session.runnerMarathonNextSampleAt) {
+            session.runnerMarathonNextSampleAt = now + 1_000L;
+            for (Player player : alivePlayers(session)) {
+                UUID id = player.getUniqueId();
+                Location current = player.getLocation().clone();
+                Location previous = session.runnerMarathonLastSample.put(id, current);
+                if (previous != null && previous.getWorld() == current.getWorld()) {
+                    double distance = previous.distance(current);
+                    if (Double.isFinite(distance) && distance >= 0.0D) {
+                        session.runnerMarathonDistance.merge(id, distance, Double::sum);
+                    }
+                }
+            }
+        }
+        if (now >= session.runnerCompassNextUpdateAt) {
+            session.runnerCompassNextUpdateAt = now + 250L;
+            List<Player> targets = alivePlayers(session);
+            if (targets.isEmpty()) return;
+            for (Player spectator : session.players.values()) {
+                if (spectator == null || !spectator.isOnline()
+                        || session.alive.contains(spectator.getUniqueId())
+                        || spectator.getWorld() != session.world) continue;
+                boolean hasCompass = java.util.Arrays.stream(spectator.getInventory().getContents())
+                        .anyMatch(this::isTrackingCompass);
+                if (!hasCompass) spectator.getInventory().addItem(trackingCompass());
+                Player target = targets.stream().min(Comparator.comparingDouble(candidate ->
+                        candidate.getLocation().distanceSquared(spectator.getLocation()))).orElse(null);
+                if (target == null) continue;
+                spectator.setCompassTarget(target.getLocation());
+                if (isTrackingCompass(spectator.getInventory().getItemInMainHand())) {
+                    double distance = Math.sqrt(target.getLocation().distanceSquared(spectator.getLocation()));
+                    double height = target.getLocation().getY() - spectator.getLocation().getY();
+                    spectator.sendActionBar(ChatColor.WHITE + "Nearest Target: " + ChatColor.GREEN + target.getName()
+                            + ChatColor.WHITE + " | Distance: " + ChatColor.GREEN
+                            + String.format(Locale.ROOT, "%.1f", distance)
+                            + ChatColor.WHITE + " | Height: " + ChatColor.GREEN
+                            + String.format(Locale.ROOT, "%.1f", height));
+                }
+            }
+        }
+    }
+
+    boolean isTrackingCompass(ItemStack item) {
+        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        return meta != null && meta.hasDisplayName()
+                && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
+    }
+
+    private ItemStack trackingCompass() {
+        ItemStack item = new ItemStack(Material.COMPASS);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(ChatColor.GOLD + "Tracking Compass");
+            meta.setLore(List.of(ChatColor.GRAY + "Tracks the nearest surviving Runner."));
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private List<Player> alivePlayers(SessionState session) {
+        List<Player> players = new ArrayList<>();
+        for (UUID id : session.alive) {
+            Player player = session.players.get(id);
+            if (player != null && player.isOnline()) players.add(player);
+        }
+        return players;
+    }
 
     Map<String, Integer> scanMapPalette(SessionState session, SourceMapCatalog.MapData mapData, int halfSize) {
         Map<String, Integer> palette = new HashMap<>();
