@@ -3,6 +3,7 @@ package au.com.testplex.arcadeports;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -11,6 +12,7 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
@@ -77,6 +79,56 @@ final class PaintballManager implements ArcadeMatchController {
                 player.setScoreboard(session.paintballScoreboard);
             }
         }
+    }
+
+    boolean isTrackingCompass(ItemStack item) {
+        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        return meta != null && meta.hasDisplayName()
+                && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
+    }
+
+    void updateSpectatorCompasses(SessionState session, long now) {
+        if (session == null || now < session.paintballNextCompassUpdateAt) return;
+        session.paintballNextCompassUpdateAt = now + 250L;
+        List<Player> living = alivePlayers(session);
+        if (living.isEmpty()) return;
+        for (Player spectator : session.players.values()) {
+            if (spectator == null || !spectator.isOnline()
+                    || session.alive.contains(spectator.getUniqueId())
+                    || spectator.getWorld() != session.world) continue;
+            boolean hasCompass = java.util.Arrays.stream(spectator.getInventory().getContents())
+                    .anyMatch(this::isTrackingCompass);
+            if (!hasCompass) spectator.getInventory().addItem(trackingCompass());
+            int team = session.teams.getOrDefault(spectator.getUniqueId(), -1);
+            Player target = living.stream()
+                    .filter(candidate -> session.teams.getOrDefault(candidate.getUniqueId(), -2) != team)
+                    .min(Comparator.comparingDouble(candidate ->
+                            candidate.getLocation().distanceSquared(spectator.getLocation())))
+                    .orElse(null);
+            if (target == null) continue;
+            spectator.setCompassTarget(target.getLocation());
+            if (isTrackingCompass(spectator.getInventory().getItemInMainHand())) {
+                double distance = Math.sqrt(target.getLocation().distanceSquared(spectator.getLocation()));
+                double height = target.getLocation().getY() - spectator.getLocation().getY();
+                spectator.sendActionBar(ChatColor.WHITE + "Nearest Target: " + ChatColor.RED + target.getName()
+                        + ChatColor.WHITE + " | Distance: " + ChatColor.RED
+                        + String.format(Locale.ROOT, "%.1f", distance)
+                        + ChatColor.WHITE + " | Height: " + ChatColor.RED
+                        + String.format(Locale.ROOT, "%.1f", height));
+            }
+        }
+    }
+
+    private ItemStack trackingCompass() {
+        ItemStack item = new ItemStack(Material.COMPASS);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(ChatColor.GOLD + "Tracking Compass");
+            meta.setLore(List.of(ChatColor.GRAY + "Tracks the nearest opposing Paintball player."));
+            item.setItemMeta(meta);
+        }
+        return item;
     }
 
     void setTeamArmor(SessionState session, Player player) {

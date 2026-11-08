@@ -1,5 +1,7 @@
 package au.com.testplex.arcadeports;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -27,5 +29,18 @@ class PaintballManagerTest {
         paintball.updateScoreboard(null, 500L);
 
         assertTrue(session.paintballScoreboardEntries.isEmpty());
+    }
+
+    @Test
+    void spectatorCompassUpdateKeepsCadenceWithoutLivingPlayers() {
+        PaintballManager paintball = new PaintballManager();
+        SessionState session = new SessionState(ArcadePortGame.PAINTBALL, null, List.of(), false);
+
+        paintball.updateSpectatorCompasses(session, 100L);
+        assertEquals(350L, session.paintballNextCompassUpdateAt);
+        paintball.updateSpectatorCompasses(session, 200L);
+        assertEquals(350L, session.paintballNextCompassUpdateAt);
+        paintball.updateSpectatorCompasses(null, 400L);
+        assertFalse(paintball.isTrackingCompass(null));
     }
 }
