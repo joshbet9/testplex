@@ -5432,7 +5432,8 @@ public final class ArcadePortManager implements Listener {
             } else {
                 // Solo mechanics test: use an isolated vanilla chaser so Death Tag is still interactive.
                 Player runner = participants.get(0);
-                Location chaserSpawn = deathTagSoloChaserSpawn(session, runner);
+                Location chaserSpawn = deathTagController.soloChaserSpawn(session, runner,
+                        sourceMapData.get(session.type.id()));
                 Zombie chaser = session.world.spawn(chaserSpawn, Zombie.class);
                 chaser.setCustomName(ChatColor.RED + "Death Tag Test Chaser");
                 chaser.setCustomNameVisible(true);
@@ -8041,28 +8042,6 @@ public final class ArcadePortManager implements Listener {
 
     }
 
-    private Location deathTagSoloChaserSpawn(Session session, Player runner) {
-        Location runnerLocation = runner.getLocation();
-        SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
-        if (mapData != null) {
-            Location otherSpawn = mapData.spawnLocations().stream()
-                    .filter(spawn -> horizontalDistanceSquared(spawn, runnerLocation) >= 36.0D)
-                    .max(java.util.Comparator.comparingDouble(spawn ->
-                            horizontalDistanceSquared(spawn, runnerLocation)))
-                    .orElse(null);
-            if (otherSpawn != null) return otherSpawn.clone();
-        }
-
-        double direction = runnerLocation.getX() <= 0.0D ? 1.0D : -1.0D;
-        double x = runnerLocation.getX() + direction * 8.0D;
-        double z = runnerLocation.getZ();
-        if (mapData != null && mapData.hasBounds()) {
-            x = Math.max(mapData.minX() + 1.0D, Math.min(mapData.maxX() - 1.0D, x));
-            z = Math.max(mapData.minZ() + 1.0D, Math.min(mapData.maxZ() - 1.0D, z));
-        }
-        return new Location(session.world, x, runnerLocation.getY(), z,
-                runnerLocation.getYaw() + 180.0F, 0.0F);
-    }
 
     private void makeDeathTagChaser(Session session, Player player, String reason) {
         makeDeathTagChaser(session, player, reason, null);
@@ -8155,33 +8134,6 @@ public final class ArcadePortManager implements Listener {
                 + (forcedAlpha ? "an Alpha Chaser" : "a Chaser") + " (" + reason + ").");
     }
 
-    /** Default Minecraft-style melee knockback for Chasers and the perkless NullKit. */
-    private void applyDeathTagDefaultMeleeKnockback(Player attacker, Player target, boolean alphaTarget) {
-        Vector direction = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
-        direction.setY(0.0D);
-        Vector velocity = ArcadePortRules.deathTagDefaultMeleeKnockback(
-                target.getVelocity(), direction, alphaTarget);
-        if (velocity != null) target.setVelocity(velocity);
-    }
-
-    private boolean applyDeathTagTraitorKnockback(Session session, Player attacker, Player target) {
-        String cooldownKey = attacker.getUniqueId() + ":" + target.getUniqueId();
-        long now = System.currentTimeMillis();
-        long lastUse = session.deathTagTraitorKnockbackAt.getOrDefault(cooldownKey, 0L);
-        if (!ArcadePortRules.deathTagTraitorKnockbackReady(now, lastUse)) return false;
-        Vector direction = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
-        if (direction.lengthSquared() <= 0.001D) return false;
-        session.deathTagTraitorKnockbackAt.put(cooldownKey, now);
-        double multiplier = ArcadePortRules.deathTagKnockbackMultiplier(
-                session.alphaChasers.contains(target.getUniqueId()));
-        double horizontal = GameDebugRuntimeOverrides.doubleValue(
-                "DEATH_TAG_TRAITOR_KNOCKBACK_HORIZONTAL", ArcadePortRules.DEATH_TAG_TRAITOR_KNOCKBACK_HORIZONTAL);
-        double vertical = GameDebugRuntimeOverrides.doubleValue(
-                "DEATH_TAG_TRAITOR_KNOCKBACK_VERTICAL", ArcadePortRules.DEATH_TAG_TRAITOR_KNOCKBACK_VERTICAL);
-        target.setVelocity(direction.normalize().multiply(Math.max(0.0D, horizontal) * multiplier)
-                .setY(Math.max(0.0D, vertical)));
-        return true;
-    }
 
     private void awardDeathTagKill(Session session, Player killer) {
         if (killer == null || !killer.isOnline() || !session.scores.containsKey(killer.getUniqueId())) return;
@@ -19987,14 +19939,14 @@ public final class ArcadePortManager implements Listener {
                     // friendly-fire damage. A subsequent Chaser kill can credit Gallows.
                     if (!attackerChaser && "melee".equals(source)
                             && "traitor".equals(session.deathTagRunnerKits.get(attacker.getUniqueId()))
-                            && applyDeathTagTraitorKnockback(session, attacker, target)) {
+                            && deathTagController.applyTraitorKnockback(session, attacker, target)) {
                         session.deathTagAchievements.recordTraitorKnockback(attacker.getUniqueId(),
                                 target.getUniqueId(), System.currentTimeMillis());
                     }
                     break;
                 }
                 if (ArcadePortRules.shouldSpreadDeathTag(attackerChaser, targetChaser)) {
-                    applyDeathTagDefaultMeleeKnockback(attacker, target, false);
+                    deathTagController.applyDefaultMeleeKnockback(attacker, target, false);
                     double damage = ArcadePortRules.deathTagChaserDamage(
                             session.alphaChasers.contains(attacker.getUniqueId()));
                     if (ArcadePortRules.deathTagHitIsLethal(target.getHealth(), damage)) {
@@ -20020,7 +19972,7 @@ public final class ArcadePortManager implements Listener {
                                     ArcadePortGame.DEATH_TAG, "ability-turtle", true));
                     if (!basherAbility && !traitorAbility
                             && !"projectile hit".equals(source)) {
-                        applyDeathTagDefaultMeleeKnockback(attacker, target,
+                        deathTagController.applyDefaultMeleeKnockback(attacker, target,
                                 session.alphaChasers.contains(target.getUniqueId()));
                     }
                     double baseDamage = ArcadePortRules.deathTagRunnerDamage(kit, "projectile hit".equals(source));
@@ -20048,7 +20000,7 @@ public final class ArcadePortManager implements Listener {
                     if (!lethalHit && basherAbility && !"projectile hit".equals(source)) {
                         target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 2, false, false, true));
                     } else if (!lethalHit && traitorAbility && !"projectile hit".equals(source)) {
-                        applyDeathTagTraitorKnockback(session, attacker, target);
+                        deathTagController.applyTraitorKnockback(session, attacker, target);
                     }
                 }
                 break;

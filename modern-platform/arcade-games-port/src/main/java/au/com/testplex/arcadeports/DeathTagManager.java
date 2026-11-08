@@ -16,6 +16,7 @@ import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
+import org.bukkit.util.Vector;
 
 /**
  * Death Tag's game-specific sidebar and tracking compass.
@@ -36,6 +37,61 @@ final class DeathTagManager implements ArcadeMatchController {
             if (block == null || block.getWorld() != session.world) continue;
             block.setType(ArcadePortRules.deathTagNextLightMaterial(block.getType()), false);
         }
+    }
+
+    Location soloChaserSpawn(SessionState session, Player runner, SourceMapCatalog.MapData mapData) {
+        Location runnerLocation = runner.getLocation();
+        if (mapData != null) {
+            Location otherSpawn = mapData.spawnLocations().stream()
+                    .filter(spawn -> horizontalDistanceSquared(spawn, runnerLocation) >= 36.0D)
+                    .max(java.util.Comparator.comparingDouble(spawn ->
+                            horizontalDistanceSquared(spawn, runnerLocation)))
+                    .orElse(null);
+            if (otherSpawn != null) return otherSpawn.clone();
+        }
+
+        double direction = runnerLocation.getX() <= 0.0D ? 1.0D : -1.0D;
+        double x = runnerLocation.getX() + direction * 8.0D;
+        double z = runnerLocation.getZ();
+        if (mapData != null && mapData.hasBounds()) {
+            x = Math.max(mapData.minX() + 1.0D, Math.min(mapData.maxX() - 1.0D, x));
+            z = Math.max(mapData.minZ() + 1.0D, Math.min(mapData.maxZ() - 1.0D, z));
+        }
+        return new Location(session.world, x, runnerLocation.getY(), z,
+                runnerLocation.getYaw() + 180.0F, 0.0F);
+    }
+
+    void applyDefaultMeleeKnockback(Player attacker, Player target, boolean alphaTarget) {
+        Vector direction = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
+        direction.setY(0.0D);
+        Vector velocity = ArcadePortRules.deathTagDefaultMeleeKnockback(
+                target.getVelocity(), direction, alphaTarget);
+        if (velocity != null) target.setVelocity(velocity);
+    }
+
+    boolean applyTraitorKnockback(SessionState session, Player attacker, Player target) {
+        String cooldownKey = attacker.getUniqueId() + ":" + target.getUniqueId();
+        long now = System.currentTimeMillis();
+        long lastUse = session.deathTagTraitorKnockbackAt.getOrDefault(cooldownKey, 0L);
+        if (!ArcadePortRules.deathTagTraitorKnockbackReady(now, lastUse)) return false;
+        Vector direction = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
+        if (direction.lengthSquared() <= 0.001D) return false;
+        session.deathTagTraitorKnockbackAt.put(cooldownKey, now);
+        double multiplier = ArcadePortRules.deathTagKnockbackMultiplier(
+                session.alphaChasers.contains(target.getUniqueId()));
+        double horizontal = GameDebugRuntimeOverrides.doubleValue(
+                "DEATH_TAG_TRAITOR_KNOCKBACK_HORIZONTAL", ArcadePortRules.DEATH_TAG_TRAITOR_KNOCKBACK_HORIZONTAL);
+        double vertical = GameDebugRuntimeOverrides.doubleValue(
+                "DEATH_TAG_TRAITOR_KNOCKBACK_VERTICAL", ArcadePortRules.DEATH_TAG_TRAITOR_KNOCKBACK_VERTICAL);
+        target.setVelocity(direction.normalize().multiply(Math.max(0.0D, horizontal) * multiplier)
+                .setY(Math.max(0.0D, vertical)));
+        return true;
+    }
+
+    private static double horizontalDistanceSquared(Location left, Location right) {
+        double dx = left.getX() - right.getX();
+        double dz = left.getZ() - right.getZ();
+        return dx * dx + dz * dz;
     }
 
     void updateRunnerTrails(SessionState session) {
