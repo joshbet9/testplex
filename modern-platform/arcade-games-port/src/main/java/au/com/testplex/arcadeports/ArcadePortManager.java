@@ -277,6 +277,7 @@ public final class ArcadePortManager implements Listener {
     private final PaintballManager paintballController = new PaintballManager();
     private final DragonsManager dragonsController = new DragonsManager();
     private final OneInTheQuiverManager quiverController = new OneInTheQuiverManager();
+    private final RunnerManager runnerController = new RunnerManager();
     private boolean gameModulesInitialized;
     private CameraShyGame cameraShyModule;
 
@@ -290,6 +291,7 @@ public final class ArcadePortManager implements Listener {
         matchControllers.register(paintballController);
         matchControllers.register(dragonsController);
         matchControllers.register(quiverController);
+        matchControllers.register(runnerController);
         this.dragonEscapeGhostStore = new DragonEscapeGhostPathStore(
                 plugin.getDataFolder().toPath(), plugin.getLogger());
         this.debugProfiles = new GameDebugProfiles(plugin);
@@ -4957,7 +4959,8 @@ public final class ArcadePortManager implements Listener {
             }
         }
         if (type == ArcadePortGame.RUNNER) {
-            session.runnerMapPaletteCounts.putAll(scanRunnerMapPalette(session));
+            session.runnerMapPaletteCounts.putAll(runnerController.scanMapPalette(session,
+                    sourceMapData.get(ArcadePortGame.RUNNER.id()), HALF_SIZE));
             plugin.getLogger().info("Runner exposed map palette scan found "
                     + session.runnerMapPaletteCounts.size() + " colour families.");
         }
@@ -24019,61 +24022,6 @@ public final class ArcadePortManager implements Listener {
         session.lastLocations.put(player.getUniqueId(), current.clone());
     }
 
-    /**
-     * Count colours on exposed blocks in the archived Runner map. Trails replace
-     * exposed course surfaces, so buried blocks cannot cause false palette clashes.
-     */
-    private Map<String, Integer> scanRunnerMapPalette(Session session) {
-        Map<String, Integer> palette = new HashMap<>();
-        SourceMapCatalog.MapData mapData = sourceMapData.get(ArcadePortGame.RUNNER.id());
-        int minX = mapData != null && mapData.hasBounds() ? mapData.minX() : -HALF_SIZE;
-        int maxX = mapData != null && mapData.hasBounds() ? mapData.maxX() : HALF_SIZE + 1;
-        int minZ = mapData != null && mapData.hasBounds() ? mapData.minZ() : -HALF_SIZE;
-        int maxZ = mapData != null && mapData.hasBounds() ? mapData.maxZ() : HALF_SIZE + 1;
-        int minY = mapData != null && mapData.hasVerticalBounds()
-                ? mapData.minY() : Math.max(session.world.getMinHeight(), 0);
-        int maxY = mapData != null && mapData.hasVerticalBounds()
-                ? mapData.maxY() : Math.min(session.world.getMaxHeight() - 1, 128);
-        if (mapData != null && !mapData.hasVerticalBounds()) {
-            List<Location> spawns = mapData.spawnLocations();
-            if (!spawns.isEmpty()) {
-                double lowestSpawn = spawns.stream().mapToDouble(Location::getY).min().orElse(minY);
-                double highestSpawn = spawns.stream().mapToDouble(Location::getY).max().orElse(maxY);
-                minY = Math.max(session.world.getMinHeight(), (int) Math.floor(lowestSpawn) - 16);
-                maxY = Math.min(session.world.getMaxHeight() - 1, (int) Math.ceil(highestSpawn) + 32);
-            }
-        }
-        minY = Math.max(minY, session.world.getMinHeight());
-        maxY = Math.min(maxY, session.world.getMaxHeight() - 1);
-        if (maxX <= minX || maxZ <= minZ || maxY < minY) return palette;
-
-        long area = (long) (maxX - minX) * (long) (maxZ - minZ);
-        int columnStride = Math.max(1, (int) Math.ceil(Math.sqrt(area / 12_000.0D)));
-        for (int x = minX; x < maxX; x += columnStride) {
-            for (int z = minZ; z < maxZ; z += columnStride) {
-                for (int y = minY; y <= maxY; y++) {
-                    Block block = session.world.getBlockAt(x, y, z);
-                    if (!block.getType().isSolid() || block.isLiquid()
-                            || !block.getRelative(BlockFace.UP).getType().isAir()) continue;
-                    String colour = runnerPaletteColour(block.getType());
-                    if (colour != null) palette.merge(colour, 1, Integer::sum);
-                }
-            }
-        }
-        return palette;
-    }
-
-    private String runnerPaletteColour(Material material) {
-        String name = material.name();
-        for (String suffix : List.of("_CONCRETE_POWDER", "_STAINED_GLASS_PANE", "_STAINED_GLASS",
-                "_CONCRETE", "_GLAZED_TERRACOTTA", "_TERRACOTTA", "_WOOL")) {
-            if (!name.endsWith(suffix)) continue;
-            String colour = name.substring(0, name.length() - suffix.length())
-                    .toLowerCase(java.util.Locale.ROOT).replace('_', '-');
-            if (ArcadePortRules.runnerTrailColours().contains(colour)) return colour;
-        }
-        return null;
-    }
 
     /** Read the shared catalogue selection without creating a hard plugin dependency. */
     private String runnerTrailCosmeticOption(UUID playerId) {
@@ -24148,13 +24096,6 @@ public final class ArcadePortManager implements Listener {
                 && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
     }
 
-    private Material runnerTrailMaterial(Session session, Player owner) {
-        String selected = session.runnerTrailOptions.getOrDefault(owner.getUniqueId(), "trail-cyan");
-        String colour = selected.startsWith("trail-") ? selected.substring("trail-".length()) : selected;
-        Material material = Material.matchMaterial(
-                colour.toUpperCase(java.util.Locale.ROOT).replace('-', '_') + "_TERRACOTTA");
-        return material == null ? Material.CYAN_TERRACOTTA : material;
-    }
 
     private boolean insideSourceMapBounds(Session session, int x, int z) {
         SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
@@ -24207,7 +24148,7 @@ public final class ArcadePortManager implements Listener {
                 block.getType() == Material.BEDROCK, block.isLiquid(), aboveIsAir,
                 session.runnerBlocks.containsKey(block))) return;
         // World-block changes are sent by the server to all players and spectators.
-        Material trail = runnerTrailMaterial(session, owner);
+        Material trail = runnerController.trailMaterial(session, owner);
         session.runnerOriginalBlockData.putIfAbsent(block, block.getBlockData().clone());
         session.runnerBlockOwners.put(block, owner.getUniqueId());
         block.setType(trail, false);
