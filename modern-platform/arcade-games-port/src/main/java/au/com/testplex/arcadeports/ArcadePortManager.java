@@ -14334,18 +14334,11 @@ public final class ArcadePortManager implements Listener {
     }
 
     private boolean isDragonsTrackingCompass(ItemStack item) {
-        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
-        ItemMeta meta = item.getItemMeta();
-        return meta.hasDisplayName()
-                && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
+        return dragonsController.isTrackingCompass(item);
     }
 
     private Player nearestDragonsSpectatorTarget(Session session, Player spectator) {
-        return alivePlayers(session).stream()
-                .filter(target -> !session.dragonTamerControls.containsKey(target.getUniqueId()))
-                .min(java.util.Comparator.comparingDouble(target ->
-                        target.getLocation().distanceSquared(spectator.getLocation())))
-                .orElse(null);
+        return dragonsController.nearestSpectatorTarget(session, spectator);
     }
 
     private void openDragonsSpectatorMenu(Session session, Player spectator) {
@@ -14420,40 +14413,7 @@ public final class ArcadePortManager implements Listener {
 
     private void updateDragonsSpectatorCompasses(Session session) {
         long now = System.currentTimeMillis();
-        if (now >= session.dragonNextCompassUpdateAt) {
-            session.dragonNextCompassUpdateAt = now + 250L; // CompassModule uses UpdateType.FASTER.
-            List<Player> alive = alivePlayers(session).stream()
-                    .filter(player -> !session.dragonTamerControls.containsKey(player.getUniqueId()))
-                    .toList();
-            if (!alive.isEmpty()) {
-                for (Player spectator : session.players.values()) {
-                    if (spectator == null || !spectator.isOnline()
-                            || session.alive.contains(spectator.getUniqueId())) continue;
-                    if (inventoryCount(spectator, Material.COMPASS) <= 0) {
-                        spectator.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
-                                "Points to the nearest survivor. Left-click to teleport; right-click for the spectator menu."));
-                    }
-                    Player target = alive.stream()
-                            .min(java.util.Comparator.comparingDouble(p ->
-                                    p.getLocation().distanceSquared(spectator.getLocation())))
-                            .orElse(null);
-                    if (target == null) continue;
-                    spectator.setCompassTarget(target.getLocation());
-                    // CompassModule displays target details whenever a spectator holds
-                    // the Tracking Compass in their main hand.
-                    if (isDragonsTrackingCompass(spectator.getInventory().getItemInMainHand())) {
-                        double distance = Math.sqrt(target.getLocation().distanceSquared(spectator.getLocation()));
-                        double height = target.getLocation().getY() - spectator.getLocation().getY();
-                        spectator.sendActionBar(ChatColor.WHITE + "" + ChatColor.BOLD + "Nearest Target: "
-                                + ChatColor.YELLOW + target.getName()
-                                + ChatColor.WHITE + ChatColor.BOLD + " | Distance: " + ChatColor.YELLOW
-                                + String.format(java.util.Locale.ROOT, "%.1f", distance)
-                                + ChatColor.WHITE + ChatColor.BOLD + " | Height: " + ChatColor.YELLOW
-                                + String.format(java.util.Locale.ROOT, "%.1f", height));
-                    }
-                }
-            }
-        }
+        dragonsController.updateSpectatorCompasses(session, now);
 
         if (now >= session.dragonNextCompassMenuRefreshAt) {
             session.dragonNextCompassMenuRefreshAt = now + 1_000L; // CompassMenu.refresh() uses UpdateType.SEC.
