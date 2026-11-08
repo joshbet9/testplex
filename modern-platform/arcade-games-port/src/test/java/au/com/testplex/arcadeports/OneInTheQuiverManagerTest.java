@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.logging.Logger;
+import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.junit.jupiter.api.Test;
@@ -43,5 +44,28 @@ class OneInTheQuiverManagerTest {
         assertFalse(OneInTheQuiverManager.isSpawnHazard(Material.STONE));
         assertEquals(List.of(), new OneInTheQuiverManager().spawnLocations(
                 null, null, 16, Logger.getLogger("quiver-spawn-test")));
+    }
+
+    @Test
+    void emptyQuiverSpectatorSessionKeepsMenuAndTeleportStateEmpty() {
+        OneInTheQuiverManager quiver = new OneInTheQuiverManager();
+        SessionState session = new SessionState(ArcadePortGame.ONE_IN_THE_QUIVER, null, List.of(), false);
+
+        quiver.updateSpectatorCompass(session);
+        quiver.updateSpectatorCompass(null);
+        quiver.handleSpectatorMenuClick(session, null, 19, false);
+
+        assertNull(quiver.nearestSpectateTarget(session, null));
+        assertFalse(quiver.isTrackingCompass(null));
+        assertTrue(session.quiverCompassMenuTargets.isEmpty());
+        assertTrue(session.quiverSpectateNextTeleportAt.isEmpty());
+    }
+
+    @Test
+    void spectatorMenuRequiresOriginalColourCodedTitle() {
+        OneInTheQuiverManager quiver = new OneInTheQuiverManager();
+        assertTrue(quiver.isSpectatorMenuTitle(ChatColor.DARK_GREEN + "Spectator Menu"));
+        assertFalse(quiver.isSpectatorMenuTitle("Spectator Menu"));
+        assertFalse(quiver.isSpectatorMenuTitle(null));
     }
 }
