@@ -9607,21 +9607,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void openSkyWarsCompassMenu(Session session, Player player) {
-        org.bukkit.inventory.Inventory menu = Bukkit.createInventory(null, 27, ChatColor.GREEN + "SkyWars Targets");
-        int slot = 0;
-        for (Player target : alivePlayers(session)) {
-            if (target.equals(player) || slot >= menu.getSize()) continue;
-            ItemStack head = new ItemStack(Material.PLAYER_HEAD);
-            if (head.getItemMeta() instanceof org.bukkit.inventory.meta.SkullMeta meta) {
-                meta.setOwningPlayer(target);
-                meta.setDisplayName(ChatColor.YELLOW + target.getName());
-                meta.setLore(List.of(ChatColor.GRAY + "Click to spectate this player."));
-                head.setItemMeta(meta);
-            }
-            menu.setItem(slot++, head);
-        }
-        if (slot == 0) player.sendMessage(ChatColor.YELLOW + "There are no living players to track.");
-        else player.openInventory(menu);
+        skyWarsController.openCompassMenu(session, player);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
@@ -9647,26 +9633,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void updateSkyWarsCompass(Session session) {
-        if (session.ticks % 5 != 0) return;
-        for (Player player : session.players.values()) {
-            if (player == null || !player.isOnline() || player.getWorld() != session.world) continue;
-            Player target = nearestSkyWarsTarget(session, player);
-            if (target == null) continue;
-            if (!player.getInventory().contains(Material.COMPASS)) {
-                player.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
-                        "Tracks the nearest living player. Left-click to spectate when eliminated."));
-            }
-            player.setCompassTarget(target.getLocation());
-            if (isSkyWarsTrackingCompass(player.getInventory().getItemInMainHand())) {
-                double distance = Math.sqrt(player.getLocation().distanceSquared(target.getLocation()));
-                double height = target.getLocation().getY() - player.getLocation().getY();
-                player.sendActionBar(ChatColor.WHITE + "Nearest Target: " + ChatColor.YELLOW + target.getName()
-                        + ChatColor.WHITE + " | Distance: " + ChatColor.YELLOW
-                        + String.format(java.util.Locale.ROOT, "%.1f", distance)
-                        + ChatColor.WHITE + " | Height: " + ChatColor.YELLOW
-                        + String.format(java.util.Locale.ROOT, "%.1f", height));
-            }
-        }
+        skyWarsController.updateCompass(session);
     }
 
     private void updateQuiverKit(Session session, long now) {
