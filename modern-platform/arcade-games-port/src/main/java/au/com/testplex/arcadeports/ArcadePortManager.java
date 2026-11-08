@@ -16418,19 +16418,15 @@ public final class ArcadePortManager implements Listener {
     }
 
     private int sheepPenCenterX(int team) {
-        return team <= 1 ? -14 : 14;
+        return SheepQuestManager.penCenterX(team);
     }
 
     private int sheepPenCenterZ(int team) {
-        return (team == 0 || team == 2) ? -14 : 14;
+        return SheepQuestManager.penCenterZ(team);
     }
 
     private String sheepPenMarker(int team) {
-        return switch (team) {
-            case 0 -> "RED";
-            case 1 -> "BLUE";
-            default -> ArcadePortRules.sheepQuestTeamPenMarker(team);
-        };
+        return SheepQuestManager.penMarker(team);
     }
 
     private List<Location> sourceSheepPenBlocks(Session session, int team) {
@@ -16439,72 +16435,28 @@ public final class ArcadePortManager implements Listener {
     }
 
     private Location sheepQuestPenCenter(Session session, int team) {
-        List<Location> pen = sourceSheepPenBlocks(session, team);
-        if (!pen.isEmpty()) {
-            double x = 0.0D, y = 0.0D, z = 0.0D;
-            for (Location block : pen) {
-                x += block.getBlockX() + 0.5D;
-                y += block.getBlockY();
-                z += block.getBlockZ() + 0.5D;
-            }
-            return new Location(session.world, x / pen.size(), y / pen.size(), z / pen.size());
-        }
-        return new Location(session.world, sheepPenCenterX(team) + 0.5D, 64.0D,
-                sheepPenCenterZ(team) + 0.5D);
+        return SheepQuestManager.penCenter(session.world, sourceSheepPenBlocks(session, team), team);
     }
 
     private DyeColor sheepTeamDyeColor(int team) {
-        return switch (team) {
-            case 0 -> DyeColor.RED;
-            case 1 -> DyeColor.LIGHT_BLUE;
-            case 2 -> DyeColor.LIME;
-            default -> DyeColor.YELLOW;
-        };
+        return SheepQuestManager.teamDyeColor(team);
     }
 
     private ChatColor sheepTeamChatColor(int team) {
-        return switch (team) {
-            case 0 -> ChatColor.RED;
-            case 1 -> ChatColor.AQUA;
-            case 2 -> ChatColor.GREEN;
-            default -> ChatColor.YELLOW;
-        };
+        return SheepQuestManager.teamChatColor(team);
     }
 
     private Material sheepTeamWool(int team) {
-        return switch (team) {
-            case 0 -> Material.RED_WOOL;
-            case 1 -> Material.LIGHT_BLUE_WOOL;
-            case 2 -> Material.LIME_WOOL;
-            default -> Material.YELLOW_WOOL;
-        };
+        return SheepQuestManager.teamWool(team);
     }
 
     private String sheepTeamName(int team) {
-        return switch (team) {
-            case 0 -> "Red";
-            case 1 -> "Aqua";
-            case 2 -> "Green";
-            default -> "Yellow";
-        };
+        return SheepQuestManager.teamName(team);
     }
 
     private boolean isInsideSheepPen(Session session, Location location, int team) {
-        if (session == null || location == null || team < 0 || team > 3
-                || location.getWorld() != session.world) return false;
-        List<Location> pen = sourceSheepPenBlocks(session, team);
-        if (!pen.isEmpty()) {
-            Block sheepBlock = location.getBlock();
-            for (Location marker : pen) {
-                if (ArcadePortRules.sheepQuestInsidePenMarker(sheepBlock.getX(), sheepBlock.getY(),
-                        sheepBlock.getZ(), marker.getBlockX(), marker.getBlockY(), marker.getBlockZ())) return true;
-            }
-            return false;
-        }
-        Location center = sheepQuestPenCenter(session, team);
-        return Math.abs(location.getX() - center.getX()) <= 2.5D
-                && Math.abs(location.getY() - center.getY()) <= 0.75D
-                && Math.abs(location.getZ() - center.getZ()) <= 2.5D;
+        return session != null && SheepQuestManager.insidePen(session.world,
+                sourceSheepPenBlocks(session, team), location, team);
     }
 
     private int sheepCarriedBy(Session session, UUID playerId) {
