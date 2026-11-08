@@ -12,13 +12,13 @@ import org.bukkit.Sound;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.block.Action;
 
 /** Draw My Thing's non-repeating word pool, timed letter hints and action bars. */
 final class DrawMyThingManager implements ArcadeMatchController {
