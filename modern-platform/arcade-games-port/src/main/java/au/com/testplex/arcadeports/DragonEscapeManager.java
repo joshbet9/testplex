@@ -7,6 +7,7 @@ import java.util.function.BiFunction;
 import java.util.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -25,6 +26,40 @@ final class DragonEscapeManager implements ArcadeMatchController {
     }
 
     @Override public ArcadePortGame game() { return ArcadePortGame.DRAGON_ESCAPE; }
+
+    int playerProgress(SessionState session, Player player) {
+        if (session.dragonEscapeWaypoints.isEmpty()) return player.getLocation().getBlockZ();
+        return session.dragonEscapePlayerProgress.getOrDefault(player.getUniqueId(), 0);
+    }
+
+    int closestWaypointIndex(SessionState session, Location location) {
+        int bestIndex = 0;
+        double bestDistanceSquared = Double.POSITIVE_INFINITY;
+        if (location == null || location.getWorld() != session.world) return bestIndex;
+        for (int i = 0; i < session.dragonEscapeWaypoints.size(); i++) {
+            double distanceSquared = location.distanceSquared(session.dragonEscapeWaypoints.get(i));
+            if (distanceSquared < bestDistanceSquared) {
+                bestDistanceSquared = distanceSquared;
+                bestIndex = i;
+            }
+        }
+        return bestIndex;
+    }
+
+    /** Advance only to the next authored checkpoint, preserving the race route's order. */
+    int waypointIndex(SessionState session, Location location, int currentProgress) {
+        int lastIndex = session.dragonEscapeWaypoints.size() - 1;
+        if (lastIndex < 0) return -1;
+        int current = Math.max(0, Math.min(lastIndex, currentProgress));
+        if (current >= lastIndex || location == null || location.getWorld() != session.world) return current;
+        Location currentMarker = session.dragonEscapeWaypoints.get(current);
+        Location nextMarker = session.dragonEscapeWaypoints.get(current + 1);
+        double distanceToCurrent = location.distance(currentMarker);
+        double distanceToNext = location.distance(nextMarker);
+        double spacing = currentMarker.distance(nextMarker);
+        return ArcadePortRules.shouldAdvanceDragonEscapeWaypoint(
+                distanceToCurrent, distanceToNext, spacing) ? current + 1 : current;
+    }
 
     @Override public void onPrepare(SessionState session, List<Player> participants) {
         setupScoreboard(session);
