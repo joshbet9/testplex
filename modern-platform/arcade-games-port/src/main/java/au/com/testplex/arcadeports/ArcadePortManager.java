@@ -5967,68 +5967,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private List<Location> quiverSpawnLocations(World world, SourceMapCatalog.MapData mapData, int count) {
-        if (world == null || mapData == null || mapData.spawnLocations().isEmpty()) {
-            plugin.getLogger().severe("One in the Quiver selected map has no authored spawn markers.");
-            return List.of();
-        }
-        List<Location> safe = new ArrayList<>();
-        for (Location authored : mapData.spawnLocations()) {
-            Location resolved = isSafeQuiverSpawn(authored) ? authored.clone() : findSafeQuiverSpawnNearby(authored);
-            if (resolved != null) safe.add(resolved);
-        }
-        if (safe.isEmpty()) {
-            plugin.getLogger().severe("One in the Quiver selected map has no safe surface near its authored spawns.");
-            return List.of();
-        }
-        if (safe.size() != mapData.spawnLocations().size()) {
-            plugin.getLogger().warning("One in the Quiver resolved " + safe.size() + "/"
-                    + mapData.spawnLocations().size() + " safe authored spawns on " + mapData.mapName() + ".");
-        }
-        List<Location> chosen = new ArrayList<>();
-        for (int i = 0; i < Math.max(1, count); i++) chosen.add(safe.get(i % safe.size()).clone());
-        return chosen;
-    }
-
-    private boolean isSafeQuiverSpawn(Location candidate) {
-        if (candidate == null || candidate.getWorld() == null
-                || candidate.getY() < candidate.getWorld().getMinHeight() + 1
-                || candidate.getY() >= candidate.getWorld().getMaxHeight() - 2) return false;
-        Block feet = candidate.getBlock();
-        Block head = feet.getRelative(0, 1, 0);
-        Block ground = feet.getRelative(0, -1, 0);
-        return feet.isPassable() && head.isPassable() && ground.getType().isSolid()
-                && !feet.isLiquid() && !head.isLiquid() && !ground.isLiquid()
-                && !isQuiverSpawnHazard(feet.getType())
-                && !isQuiverSpawnHazard(head.getType())
-                && !isQuiverSpawnHazard(ground.getType());
-    }
-
-    private boolean isQuiverSpawnHazard(Material material) {
-        return material == Material.LAVA || material == Material.FIRE || material == Material.SOUL_FIRE
-                || material == Material.MAGMA_BLOCK || material == Material.CAMPFIRE
-                || material == Material.SOUL_CAMPFIRE || material == Material.CACTUS
-                || material == Material.SWEET_BERRY_BUSH || material == Material.POWDER_SNOW
-                || material == Material.WITHER_ROSE;
-    }
-
-    private Location findSafeQuiverSpawnNearby(Location base) {
-        if (base == null || base.getWorld() == null) return null;
-        World world = base.getWorld();
-        for (int radius = 0; radius <= 8; radius++) {
-            for (int dx = -radius; dx <= radius; dx++) {
-                for (int dz = -radius; dz <= radius; dz++) {
-                    if (radius > 0 && Math.max(Math.abs(dx), Math.abs(dz)) != radius) continue;
-                    for (int offset = 0; offset <= 4; offset++) {
-                        for (int sign : new int[] {1, -1}) {
-                            if (offset == 0 && sign < 0) continue;
-                            Location candidate = base.clone().add(dx, offset * sign, dz);
-                            if (isSafeQuiverSpawn(candidate)) return candidate;
-                        }
-                    }
-                }
-            }
-        }
-        return null;
+        return quiverController.spawnLocations(world, mapData, count, plugin.getLogger());
     }
 
     private Location gladiatorArenaCenter(World world, int arenaSlot) {
