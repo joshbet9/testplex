@@ -16838,8 +16838,8 @@ public final class ArcadePortManager implements Listener {
             }
             if (session.type == ArcadePortGame.SPLEEF
                     && !session.alive.contains(id)
-                    && isSpleefTrackingCompass(p.getInventory().getItemInMainHand())) {
-                Player target = nearestSpleefSpectatorTarget(session, p);
+                    && spleefController.isTrackingCompass(p.getInventory().getItemInMainHand())) {
+                Player target = spleefController.nearestSpectatorTarget(session, p);
                 if (target != null) {
                     double distance = Math.sqrt(target.getLocation().distanceSquared(p.getLocation()));
                     double height = target.getLocation().getY() - p.getLocation().getY();
@@ -23335,7 +23335,7 @@ public final class ArcadePortManager implements Listener {
             }
         }
         if (active != session) return;
-        updateSpleefSpectatorCompasses(session, now);
+        spleefController.updateSpectatorCompasses(session, now);
         for (Player player : alivePlayers(session)) {
             String kit = session.spleefKits.getOrDefault(player.getUniqueId(), "snowballer");
             if ("gust".equals(kit)) {
@@ -23392,48 +23392,6 @@ public final class ArcadePortManager implements Listener {
         target.playEffect(EntityEffect.HURT);
     }
 
-
-    private boolean isSpleefTrackingCompass(ItemStack item) {
-        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
-        ItemMeta meta = item.getItemMeta();
-        return meta != null && meta.hasDisplayName()
-                && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
-    }
-
-    private boolean isSpleefFletchedArrow(ItemStack item) {
-        if (item == null || item.getType() != Material.ARROW || !item.hasItemMeta()) return false;
-        ItemMeta meta = item.getItemMeta();
-        return meta != null && meta.hasDisplayName()
-                && ChatColor.stripColor(meta.getDisplayName()).contains("Fletched Arrow");
-    }
-
-    private Player nearestSpleefSpectatorTarget(Session session, Player spectator) {
-        if (session == null || spectator == null) return null;
-        return alivePlayers(session).stream()
-                .min(java.util.Comparator.comparingDouble(target ->
-                        target.getLocation().distanceSquared(spectator.getLocation())))
-                .orElse(null);
-    }
-
-    private void updateSpleefSpectatorCompasses(Session session, long now) {
-        if (now < session.spleefNextCompassUpdateAt) return;
-        session.spleefNextCompassUpdateAt = now + 250L;
-        for (Player spectator : session.players.values()) {
-            if (spectator == null || !spectator.isOnline()
-                    || session.alive.contains(spectator.getUniqueId())) continue;
-            Player target = nearestSpleefSpectatorTarget(session, spectator);
-            if (target == null) continue;
-            boolean hasCompass = false;
-            for (ItemStack item : spectator.getInventory().getContents()) {
-                if (isSpleefTrackingCompass(item)) { hasCompass = true; break; }
-            }
-            if (!hasCompass) {
-                spectator.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
-                        "Tracks the nearest living Spleef player."));
-            }
-            spectator.setCompassTarget(target.getLocation());
-        }
-    }
 
     private void openSpleefSpectatorMenu(Session session, Player spectator) {
         SpleefCompassMenuHolder holder = new SpleefCompassMenuHolder(spectator.getUniqueId());
@@ -25633,7 +25591,7 @@ public final class ArcadePortManager implements Listener {
                 && event.getAction() == Action.LEFT_CLICK_AIR;
         boolean spleefCompassLeftClick = session.type == ArcadePortGame.SPLEEF
                 && !session.alive.contains(event.getPlayer().getUniqueId())
-                && isSpleefTrackingCompass(event.getItem()) && event.getAction().isLeftClick();
+                && spleefController.isTrackingCompass(event.getItem()) && event.getAction().isLeftClick();
         if (!event.getAction().isRightClick() && !bombLeftClick && !runnerLeftClick && !skyWarsTntClick
                 && !skyWarsCompassLeftClick
                 && !baconNonRightClick && !dragonEscapeDisruptorLeftClick
@@ -25749,7 +25707,7 @@ public final class ArcadePortManager implements Listener {
                     && session.alive.contains(player.getUniqueId());
             boolean forceSpleefCompass = session.type == ArcadePortGame.SPLEEF
                     && !session.alive.contains(player.getUniqueId())
-                    && isSpleefTrackingCompass(heldItem)
+                    && spleefController.isTrackingCompass(heldItem)
                     && (event.getAction().isRightClick() || event.getAction().isLeftClick());
             boolean forceMicroCompass = session.type == ArcadePortGame.MICRO_BATTLES
                     && !session.alive.contains(player.getUniqueId()) && isMicroTrackingCompass(heldItem)
@@ -25792,7 +25750,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.SPLEEF
                 && !session.alive.contains(player.getUniqueId())
-                && isSpleefTrackingCompass(heldItem)) {
+                && spleefController.isTrackingCompass(heldItem)) {
             event.setCancelled(true);
             if (event.getAction().isRightClick()) {
                 openSpleefSpectatorMenu(session, player);
@@ -25800,7 +25758,7 @@ public final class ArcadePortManager implements Listener {
                 long now = System.currentTimeMillis();
                 long readyAt = session.spleefSpectateNextTeleportAt.getOrDefault(player.getUniqueId(), 0L);
                 if (now < readyAt) return;
-                Player target = nearestSpleefSpectatorTarget(session, player);
+                Player target = spleefController.nearestSpectatorTarget(session, player);
                 if (target != null) {
                     player.setSpectatorTarget(null);
                     player.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
@@ -26284,7 +26242,7 @@ public final class ArcadePortManager implements Listener {
             case RUNNER -> item == Material.IRON_AXE || item == Material.FEATHER;
             case SPLEEF -> ("brawler".equals(session.spleefKits.getOrDefault(id, "snowballer"))
                     && item == Material.IRON_AXE)
-                    || (!session.alive.contains(id) && isSpleefTrackingCompass(heldItem));
+                    || (!session.alive.contains(id) && spleefController.isTrackingCompass(heldItem));
             case ONE_IN_THE_QUIVER -> "slam-shot".equals(session.quiverKits.getOrDefault(id, "leaper"))
                     && item == Material.DIAMOND_SHOVEL;
             case TURF_WARS -> "shredder".equals(session.turfWarsKits.getOrDefault(id, "marksman"))
@@ -28025,7 +27983,7 @@ public final class ArcadePortManager implements Listener {
         if (session == null || session.type != ArcadePortGame.SPLEEF
                 || !session.players.containsKey(event.getPlayer().getUniqueId())) return;
         ItemStack dropped = event.getItemDrop().getItemStack();
-        if (isSpleefTrackingCompass(dropped) || isSpleefFletchedArrow(dropped)) {
+        if (spleefController.isTrackingCompass(dropped) || spleefController.isFletchedArrow(dropped)) {
             event.setCancelled(true);
             event.getPlayer().sendMessage(ChatColor.YELLOW + "You cannot drop your Spleef compass or fletched arrows.");
         }
@@ -28125,8 +28083,8 @@ public final class ArcadePortManager implements Listener {
             }
         }
         if (currentSession != null && currentSession.type == ArcadePortGame.SPLEEF
-                && (isSpleefFletchedArrow(event.getCurrentItem())
-                        || isSpleefFletchedArrow(event.getCursor()))) {
+                && (spleefController.isFletchedArrow(event.getCurrentItem())
+                        || spleefController.isFletchedArrow(event.getCursor()))) {
             event.setCancelled(true);
             return;
         }
