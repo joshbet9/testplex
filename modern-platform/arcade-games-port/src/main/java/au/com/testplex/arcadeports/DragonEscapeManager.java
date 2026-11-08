@@ -1,12 +1,16 @@
 package au.com.testplex.arcadeports;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.function.BiFunction;
 import java.util.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
@@ -24,6 +28,58 @@ final class DragonEscapeManager implements ArcadeMatchController {
 
     @Override public void onPrepare(SessionState session, List<Player> participants) {
         setupScoreboard(session);
+    }
+
+    /** Reborn's CompassModule points eliminated racers toward the nearest living racer. */
+    void updateSpectatorCompasses(SessionState session) {
+        if (session == null) return;
+        List<Player> alive = new ArrayList<>();
+        for (java.util.UUID id : session.alive) {
+            Player player = session.players.get(id);
+            if (player != null && player.isOnline()) alive.add(player);
+        }
+        if (alive.isEmpty()) return;
+        for (Player spectator : session.players.values()) {
+            if (spectator == null || !spectator.isOnline()
+                    || session.alive.contains(spectator.getUniqueId())) continue;
+            int compasses = 0;
+            for (ItemStack item : spectator.getInventory().getContents()) {
+                if (item != null && item.getType() == Material.COMPASS) compasses += item.getAmount();
+            }
+            if (compasses == 0) spectator.getInventory().addItem(trackingCompass());
+            Player target = alive.stream().min(Comparator.comparingDouble(
+                    candidate -> candidate.getLocation().distanceSquared(spectator.getLocation()))).orElse(null);
+            if (target == null) continue;
+            spectator.setCompassTarget(target.getLocation());
+            ItemStack held = spectator.getInventory().getItemInMainHand();
+            if (isTrackingCompass(held)) {
+                double distance = spectator.getLocation().distance(target.getLocation());
+                double height = target.getLocation().getY() - spectator.getLocation().getY();
+                spectator.sendActionBar(ChatColor.WHITE + "Nearest Target: " + ChatColor.GREEN + target.getName()
+                        + ChatColor.WHITE + " | Distance: " + ChatColor.GREEN
+                        + String.format(java.util.Locale.ROOT, "%.1f", distance)
+                        + ChatColor.WHITE + " | Height: " + ChatColor.GREEN
+                        + String.format(java.util.Locale.ROOT, "%.1f", height));
+            }
+        }
+    }
+
+    boolean isTrackingCompass(ItemStack item) {
+        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        return meta.hasDisplayName()
+                && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
+    }
+
+    private ItemStack trackingCompass() {
+        ItemStack item = new ItemStack(Material.COMPASS);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(ChatColor.GOLD + "Tracking Compass");
+            meta.setLore(List.of(ChatColor.GRAY + "Points toward the nearest living Dragon Escape racer."));
+            item.setItemMeta(meta);
+        }
+        return item;
     }
 
     private void setupScoreboard(SessionState session) {

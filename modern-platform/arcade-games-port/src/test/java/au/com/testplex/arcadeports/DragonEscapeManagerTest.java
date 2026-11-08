@@ -1,5 +1,6 @@
 package au.com.testplex.arcadeports;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -27,7 +28,10 @@ class DragonEscapeManagerTest {
         escape.updateScoreboard(session, 10L, List.of(), (leader, racer) -> 0L);
         escape.cleanupScoreboard(session);
         escape.updateScoreboard(null, 10L, List.of(), (leader, racer) -> 0L);
+        escape.updateSpectatorCompasses(session);
+        escape.updateSpectatorCompasses(null);
 
         assertTrue(session.dragonEscapeScoreboardTeams.isEmpty());
+        assertFalse(escape.isTrackingCompass(null));
     }
 }
