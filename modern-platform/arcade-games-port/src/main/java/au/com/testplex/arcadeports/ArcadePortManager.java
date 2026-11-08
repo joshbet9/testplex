@@ -276,6 +276,7 @@ public final class ArcadePortManager implements Listener {
     private final BombLobbersManager bombLobbersController = new BombLobbersManager();
     private final PaintballManager paintballController = new PaintballManager();
     private final DragonsManager dragonsController = new DragonsManager();
+    private final OneInTheQuiverManager quiverController = new OneInTheQuiverManager();
     private boolean gameModulesInitialized;
     private CameraShyGame cameraShyModule;
 
@@ -288,6 +289,7 @@ public final class ArcadePortManager implements Listener {
         matchControllers.register(bombLobbersController);
         matchControllers.register(paintballController);
         matchControllers.register(dragonsController);
+        matchControllers.register(quiverController);
         this.dragonEscapeGhostStore = new DragonEscapeGhostPathStore(
                 plugin.getDataFolder().toPath(), plugin.getLogger());
         this.debugProfiles = new GameDebugProfiles(plugin);
@@ -5525,7 +5527,7 @@ public final class ArcadePortManager implements Listener {
             announce(session, ChatColor.GREEN + "Opening" + modeLabel
                     + " build phase: place your team's wool on your own turf for " + openingSeconds + " seconds.");
         }
-        if (type == ArcadePortGame.ONE_IN_THE_QUIVER) setupQuiverScoreboard(session);
+        if (type == ArcadePortGame.ONE_IN_THE_QUIVER) matchControllers.prepare(session, participants);
         if (type == ArcadePortGame.PAINTBALL) {
             matchControllers.prepare(session, participants);
             refreshPaintballTestPlayerArmor(session);
@@ -13387,7 +13389,7 @@ public final class ArcadePortManager implements Listener {
             updateQuiverKit(session, now);
             updateQuiverArrowFlightCosmetics(session);
             if (session.ticks % 5L == 0L) updateQuiverSpectatorCompass(session);
-            if (session.ticks % 10L == 0L) updateQuiverScoreboard(session);
+            if (session.ticks % 10L == 0L) quiverController.updateScoreboard(session);
         }
         if (session.type == ArcadePortGame.DRAGONS) updateTestDragons(session, now);
         if (session.type == ArcadePortGame.DEATH_TAG) {
@@ -16565,68 +16567,6 @@ public final class ArcadePortManager implements Listener {
                 leaderDistance, racerDistance, GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_RACE_GAP_ESTIMATED_SPEED", ArcadePortRules.DRAGON_ESCAPE_RACE_GAP_ESTIMATED_SPEED));
     }
 
-    private void setupQuiverScoreboard(Session session) {
-        if (session.type != ArcadePortGame.ONE_IN_THE_QUIVER || Bukkit.getScoreboardManager() == null) return;
-        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
-        Objective objective = scoreboard.registerNewObjective("quiver", "dummy",
-                ChatColor.GOLD + "ONE IN THE QUIVER");
-        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
-        Objective belowName = scoreboard.registerNewObjective("quiverkills", "dummy",
-                ChatColor.RED + "Kills");
-        belowName.setDisplaySlot(DisplaySlot.BELOW_NAME);
-        session.quiverScoreboard = scoreboard;
-        session.quiverScoreboardObjective = objective;
-        session.quiverBelowNameObjective = belowName;
-        for (int i = 0; i < 14; i++) {
-            Team line = scoreboard.registerNewTeam("qvrank" + i);
-            String entry = ChatColor.values()[i].toString();
-            line.addEntry(entry);
-            session.quiverScoreboardTeams.add(line);
-            session.quiverScoreboardEntries.add(entry);
-        }
-        for (Player player : session.players.values()) {
-            if (player != null && player.isOnline()) player.setScoreboard(scoreboard);
-        }
-        updateQuiverScoreboard(session);
-    }
-
-    private void updateQuiverScoreboard(Session session) {
-        Scoreboard scoreboard = session.quiverScoreboard;
-        Objective objective = session.quiverScoreboardObjective;
-        Objective belowName = session.quiverBelowNameObjective;
-        if (scoreboard == null || objective == null || session.type != ArcadePortGame.ONE_IN_THE_QUIVER) return;
-        List<Player> ranked = new ArrayList<>(session.players.values());
-        ranked.removeIf(player -> player == null || !player.isOnline());
-        ranked.sort((left, right) -> {
-            int byKills = Integer.compare(session.scores.getOrDefault(right.getUniqueId(), 0),
-                    session.scores.getOrDefault(left.getUniqueId(), 0));
-            return byKills != 0 ? byKills
-                    : String.CASE_INSENSITIVE_ORDER.compare(left.getName(), right.getName());
-        });
-        for (int i = 0; i < session.quiverScoreboardTeams.size(); i++) {
-            Team line = session.quiverScoreboardTeams.get(i);
-            String entry = session.quiverScoreboardEntries.get(i);
-            if (i < ranked.size()) {
-                Player rankedPlayer = ranked.get(i);
-                boolean alive = session.alive.contains(rankedPlayer.getUniqueId());
-                int kills = session.scores.getOrDefault(rankedPlayer.getUniqueId(), 0);
-                line.setPrefix((alive ? ChatColor.GREEN : ChatColor.RED) + "#" + (i + 1)
-                        + " " + rankedPlayer.getName());
-                line.setSuffix(ChatColor.GRAY + " " + kills + "/" + ArcadePortRules.quiverScoreToWin());
-                objective.getScore(entry).setScore(session.quiverScoreboardTeams.size() - i);
-            } else {
-                line.setPrefix("");
-                line.setSuffix("");
-                scoreboard.resetScores(entry);
-            }
-        }
-        if (belowName != null) {
-            for (Player player : ranked) {
-                belowName.getScore(player.getName()).setScore(
-                        session.scores.getOrDefault(player.getUniqueId(), 0));
-            }
-        }
-    }
 
     private void cleanupQuiverScoreboard(Session session) {
         Scoreboard scoreboard = session.quiverScoreboard;
