@@ -7906,28 +7906,9 @@ public final class ArcadePortManager implements Listener {
         runner.getWorld().playSound(runner.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 0.9F, 1.25F);
     }
 
-    private boolean isDeathTagRespawnHazard(Material material) {
-        return material == Material.LAVA || material == Material.FIRE || material == Material.SOUL_FIRE
-                || material == Material.MAGMA_BLOCK || material == Material.CAMPFIRE
-                || material == Material.SOUL_CAMPFIRE || material == Material.CACTUS
-                || material == Material.SWEET_BERRY_BUSH || material == Material.POWDER_SNOW
-                || material == Material.WITHER_ROSE;
-    }
-
     private boolean isSafeDeathTagRespawnSpawn(Location candidate) {
-        if (candidate == null || candidate.getWorld() == null) return false;
-        SourceMapCatalog.MapData mapData = sourceMapData.get(ArcadePortGame.DEATH_TAG.id());
-        double voidThresholdY = ArcadePortRules.sourceMapVoidThresholdY(
-                mapData != null && mapData.hasVerticalBounds(), mapData == null ? 0 : mapData.minY());
-        if (candidate.getY() < voidThresholdY) return false;
-        Block feet = candidate.getWorld().getBlockAt(candidate.getBlockX(), candidate.getBlockY(), candidate.getBlockZ());
-        Block head = feet.getRelative(0, 1, 0);
-        Block ground = feet.getRelative(0, -1, 0);
-        return feet.isPassable() && head.isPassable() && ground.getType().isSolid()
-                && !feet.isLiquid() && !head.isLiquid() && !ground.isLiquid()
-                && !isDeathTagRespawnHazard(feet.getType())
-                && !isDeathTagRespawnHazard(head.getType())
-                && !isDeathTagRespawnHazard(ground.getType());
+        return deathTagController.isSafeRespawnSpawn(candidate,
+                sourceMapData.get(ArcadePortGame.DEATH_TAG.id()));
     }
 
     /**
@@ -7936,31 +7917,8 @@ public final class ArcadePortManager implements Listener {
      * collision-free terrain; never build a substitute arena for Death Tag.
      */
     private Location findSafeDeathTagSpawnNearby(Location base) {
-        if (base == null || base.getWorld() == null) return null;
-        World world = base.getWorld();
-        int centreX = base.getBlockX();
-        int centreY = base.getBlockY();
-        int centreZ = base.getBlockZ();
-        for (int radius = 0; radius <= 16; radius++) {
-            for (int dx = -radius; dx <= radius; dx++) {
-                for (int dz = -radius; dz <= radius; dz++) {
-                    if (Math.max(Math.abs(dx), Math.abs(dz)) != radius) continue;
-                    // Prefer the authored elevation, then nearby lower/upper platforms.
-                    for (int offset = 0; offset <= 8; offset++) {
-                        for (int sign = 1; sign >= -1; sign -= 2) {
-                            if (offset == 0 && sign == -1) continue;
-                            int y = centreY + offset * sign;
-                            if (y < world.getMinHeight() + 1 || y > world.getMaxHeight() - 2) continue;
-                            Location candidate = new Location(world,
-                                    centreX + dx + 0.5D, y, centreZ + dz + 0.5D,
-                                    base.getYaw(), base.getPitch());
-                            if (isSafeDeathTagRespawnSpawn(candidate)) return candidate;
-                        }
-                    }
-                }
-            }
-        }
-        return null;
+        return deathTagController.findSafeRespawnNearby(base,
+                sourceMapData.get(ArcadePortGame.DEATH_TAG.id()));
     }
 
     private Location deathTagChaserRespawnSpawn(Session session, Player player) {

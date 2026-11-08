@@ -7,6 +7,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.Particle;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
@@ -25,6 +26,57 @@ import org.bukkit.util.Vector;
  */
 final class DeathTagManager implements ArcadeMatchController {
     @Override public ArcadePortGame game() { return ArcadePortGame.DEATH_TAG; }
+
+    static boolean isRespawnHazard(Material material) {
+        return material == Material.LAVA || material == Material.FIRE || material == Material.SOUL_FIRE
+                || material == Material.MAGMA_BLOCK || material == Material.CAMPFIRE
+                || material == Material.SOUL_CAMPFIRE || material == Material.CACTUS
+                || material == Material.SWEET_BERRY_BUSH || material == Material.POWDER_SNOW
+                || material == Material.WITHER_ROSE;
+    }
+
+    boolean isSafeRespawnSpawn(Location candidate, SourceMapCatalog.MapData mapData) {
+        if (candidate == null || candidate.getWorld() == null) return false;
+        double voidThresholdY = ArcadePortRules.sourceMapVoidThresholdY(
+                mapData != null && mapData.hasVerticalBounds(), mapData == null ? 0 : mapData.minY());
+        if (candidate.getY() < voidThresholdY) return false;
+        Block feet = candidate.getWorld().getBlockAt(candidate.getBlockX(), candidate.getBlockY(), candidate.getBlockZ());
+        Block head = feet.getRelative(0, 1, 0);
+        Block ground = feet.getRelative(0, -1, 0);
+        return feet.isPassable() && head.isPassable() && ground.getType().isSolid()
+                && !feet.isLiquid() && !head.isLiquid() && !ground.isLiquid()
+                && !isRespawnHazard(feet.getType())
+                && !isRespawnHazard(head.getType())
+                && !isRespawnHazard(ground.getType());
+    }
+
+    /** Search authored terrain only; never construct replacement platforms. */
+    Location findSafeRespawnNearby(Location base, SourceMapCatalog.MapData mapData) {
+        if (base == null || base.getWorld() == null) return null;
+        World world = base.getWorld();
+        int centreX = base.getBlockX();
+        int centreY = base.getBlockY();
+        int centreZ = base.getBlockZ();
+        for (int radius = 0; radius <= 16; radius++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) != radius) continue;
+                    for (int offset = 0; offset <= 8; offset++) {
+                        for (int sign = 1; sign >= -1; sign -= 2) {
+                            if (offset == 0 && sign == -1) continue;
+                            int y = centreY + offset * sign;
+                            if (y < world.getMinHeight() + 1 || y > world.getMaxHeight() - 2) continue;
+                            Location candidate = new Location(world,
+                                    centreX + dx + 0.5D, y, centreZ + dz + 0.5D,
+                                    base.getYaw(), base.getPitch());
+                            if (isSafeRespawnSpawn(candidate, mapData)) return candidate;
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
 
     @Override public void onPrepare(SessionState session, List<Player> participants) {
         setupDeathTagScoreboard(session);
