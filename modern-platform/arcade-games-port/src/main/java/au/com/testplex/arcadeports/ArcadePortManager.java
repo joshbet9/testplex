@@ -277,7 +277,12 @@ public final class ArcadePortManager implements Listener {
     private final PaintballManager paintballController = new PaintballManager();
     private final DragonsManager dragonsController = new DragonsManager();
     private final DragonsManager.SpectatorActions dragonsSpectatorActions =
-            session -> active == session;
+            new DragonsManager.SpectatorActions() {
+                @Override public boolean isCurrent(SessionState session) { return active == session; }
+                @Override public boolean isTamerControlled(SessionState session, UUID playerId) {
+                    return active == session && active.dragonTamerControls.containsKey(playerId);
+                }
+            };
     private final OneInTheQuiverManager quiverController = new OneInTheQuiverManager();
     private final RunnerManager runnerController = new RunnerManager();
     private final SpleefManager spleefController = new SpleefManager();
@@ -14273,7 +14278,7 @@ public final class ArcadePortManager implements Listener {
             }
         }
 
-        dragonsController.updateSpectatorCompasses(session, System.currentTimeMillis());
+        dragonsController.updateSpectatorCompasses(session, System.currentTimeMillis(), dragonsSpectatorActions);
     }
 
     private Location dragonSpectatorLocation(Session session) {
@@ -16491,7 +16496,7 @@ public final class ArcadePortManager implements Listener {
             if (session.type == ArcadePortGame.DRAGONS
                     && !session.alive.contains(id)
                     && dragonsController.isTrackingCompass(p.getInventory().getItemInMainHand())) {
-                Player target = dragonsController.nearestSpectatorTarget(session, p);
+                Player target = dragonsController.nearestSpectatorTarget(session, p, dragonsSpectatorActions);
                 if (target != null) {
                     double distance = Math.sqrt(target.getLocation().distanceSquared(p.getLocation()));
                     double height = target.getLocation().getY() - p.getLocation().getY();
@@ -25493,7 +25498,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.DRAGONS
                 && dragonsController.handleCompassInteract(session, player, heldItem,
-                        event.getAction().isLeftClick(), event.getAction().isRightClick())) {
+                        event.getAction().isLeftClick(), event.getAction().isRightClick(), dragonsSpectatorActions)) {
             event.setCancelled(true);
             return;
         }
