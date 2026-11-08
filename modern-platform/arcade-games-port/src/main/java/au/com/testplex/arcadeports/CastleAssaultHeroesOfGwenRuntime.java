@@ -310,8 +310,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private boolean ready;
     private boolean stopped;
     private boolean listenersRegistered;
-    private Scoreboard castleScoreboard;
-    private Objective castleScoreboardObjective;
+    private final CastleAssaultManager castleAssaultManager = new CastleAssaultManager();
 
     CastleAssaultHeroesOfGwenRuntime(
             ArcadeMechanicsModernPlugin plugin,
@@ -505,7 +504,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             addPlayerToWitherTeamHud(player);
             refreshHeroesOfGwenTowerHealthForOpponentTeam(team);
         }
-        if (castleScoreboard != null) player.setScoreboard(castleScoreboard);
+        if (castleAssaultManager.scoreboard() != null) player.setScoreboard(castleAssaultManager.scoreboard());
         return true;
     }
 
@@ -1947,33 +1946,15 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void createCastleScoreboard() {
-        castleScoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
-        castleScoreboardObjective = castleScoreboard.registerNewObjective("castleassault", "dummy",
-                ChatColor.DARK_RED + "Castle Assault");
-        castleScoreboardObjective.setDisplaySlot(DisplaySlot.SIDEBAR);
-        for (Player player : players.values()) {
-            if (player != null && player.isOnline()) player.setScoreboard(castleScoreboard);
-        }
+        castleAssaultManager.createScoreboard(players.values());
     }
 
     private void updateCastleScoreboard(long now) {
         nextCastleScoreboardAt = now + 1_000L;
-        if (castleScoreboard == null || castleScoreboardObjective == null) return;
-        for (String entry : new ArrayList<>(castleScoreboard.getEntries())) castleScoreboard.resetScores(entry);
-        int score = 8;
-        castleScoreboardObjective.getScore(ChatColor.GREEN + "Chest Refill").setScore(score--);
-        castleScoreboardObjective.getScore(ChatColor.WHITE + castleCountdown(nextChestRefillAt - now)
-                + ChatColor.GREEN).setScore(score--);
-        castleScoreboardObjective.getScore(ChatColor.GREEN + "TNT Spawn").setScore(score--);
-        String tntStatus = objectiveItem != null && objectiveItem.isValid() ? "Spawned"
-                : castleCountdown(objectiveRespawnAt - now);
-        castleScoreboardObjective.getScore(ChatColor.WHITE + tntStatus + ChatColor.GOLD).setScore(score--);
-        castleScoreboardObjective.getScore(ChatColor.RED + "Red King").setScore(score--);
-        KingState redKing = kings.get(0);
-        castleScoreboardObjective.getScore(ChatColor.WHITE + castleKingStatus(redKing) + ChatColor.RED).setScore(score--);
-        castleScoreboardObjective.getScore(ChatColor.AQUA + "Blue King").setScore(score--);
-        KingState blueKing = kings.get(1);
-        castleScoreboardObjective.getScore(ChatColor.WHITE + castleKingStatus(blueKing) + ChatColor.AQUA).setScore(score);
+        if (!castleAssaultManager.hasScoreboard()) return;
+        castleAssaultManager.updateScoreboard(now, nextChestRefillAt, objectiveRespawnAt,
+                objectiveItem != null && objectiveItem.isValid(),
+                castleKingStatus(kings.get(0)), castleKingStatus(kings.get(1)));
     }
 
     private String castleKingStatus(KingState king) {
@@ -1981,11 +1962,6 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         int active = king.activeCrystals();
         return active > 0 ? active + "/" + CASTLE_CRYSTAL_COUNT + " Crystals Active"
                 : Math.max(0, king.health) + " Health";
-    }
-
-    private static String castleCountdown(long millis) {
-        long seconds = Math.max(0L, (millis + 999L) / 1_000L);
-        return String.format(Locale.ROOT, "%d:%02d", seconds / 60L, seconds % 60L);
     }
 
     private void updateObjectiveCarrierProgress(Player carrier, long now) {
