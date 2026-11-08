@@ -273,6 +273,23 @@ public final class ArcadePortManager implements Listener {
     private final ArcadeMatchControllerRegistry matchControllers = new ArcadeMatchControllerRegistry();
     private final BaconBrawlManager baconController;
     private final DeathTagManager deathTagController = new DeathTagManager();
+    private final DeathTagManager.DamageActions deathTagDamageActions = new DeathTagManager.DamageActions() {
+        @Override public boolean isCurrent(SessionState session) { return active == session; }
+        @Override public void playerHit(SessionState session, Player attacker, Player target) {
+            handlePlayerHit((Session) session, attacker, target, "melee");
+        }
+        @Override public void soloPracticeHit(SessionState session, Player target, Zombie chaser) {
+            handleDeathTagSoloPracticeHit((Session) session, target, chaser);
+        }
+        @Override public void respawnChaser(SessionState session, Player target) {
+            respawnDeathTagChaser((Session) session, target);
+        }
+        @Override public void infectRunner(SessionState session, Player target, String reason) {
+            makeDeathTagChaser((Session) session, target, reason);
+        }
+        @Override public void checkRoundEnd(SessionState session) { ArcadePortManager.this.checkRoundEnd((Session) session); }
+        @Override public void damageFeedback(Player target) { playLegacyDamageFeedback(target); }
+    };
     private final BombLobbersManager bombLobbersController = new BombLobbersManager();
     private final PaintballManager paintballController = new PaintballManager();
     private final DragonsManager dragonsController = new DragonsManager();
@@ -24466,53 +24483,7 @@ public final class ArcadePortManager implements Listener {
 
     private void handleDeathTagDamage(Session session, Player target,
             EntityDamageEvent event, double incomingDamage) {
-        if (active != session || target == null || !session.alive.contains(target.getUniqueId())
-                || incomingDamage <= 0.0D) return;
-        if (session.deathTagRespawnGraceUntil.getOrDefault(target.getUniqueId(), 0L)
-                > System.currentTimeMillis()) return;
-
-        if (event instanceof EntityDamageByEntityEvent byEntity) {
-            Entity damager = byEntity.getDamager();
-            if (damager instanceof Player attacker) {
-                handlePlayerHit(session, attacker, target, "melee");
-                return;
-            }
-            if (damager instanceof Projectile projectile
-                    && projectile.getShooter() instanceof Player shooter
-                    && session.players.containsKey(shooter.getUniqueId())) {
-                // ProjectileHitEvent resolves this once with the source Archer damage and knockback perks.
-                session.deathTagProjectileDamage.put(projectile.getUniqueId(), incomingDamage);
-                return;
-            }
-            if (damager instanceof Zombie zombie && session.entities.contains(zombie)
-                    && session.participantsAtStart <= 1) {
-                handleDeathTagSoloPracticeHit(session, target, zombie);
-                return;
-            }
-        }
-
-        boolean chaser = session.tagged.contains(target.getUniqueId());
-        if (chaser && System.currentTimeMillis()
-                < session.deathTagRespawnGraceUntil.getOrDefault(target.getUniqueId(), 0L)) return;
-        double damage = chaser
-                ? ArcadePortRules.deathTagEnvironmentalDamageAfterIronSkin(incomingDamage,
-                        session.alphaChasers.contains(target.getUniqueId()),
-                        event.getCause() == EntityDamageEvent.DamageCause.FIRE_TICK)
-                : incomingDamage;
-        if (damage <= 0.0D) return;
-
-        String cause = event.getCause().name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
-        if (ArcadePortRules.deathTagHitIsLethal(target.getHealth(), damage)) {
-            if (chaser) {
-                respawnDeathTagChaser(session, target);
-            } else {
-                makeDeathTagChaser(session, target, "was killed by " + cause);
-                checkRoundEnd(session);
-            }
-        } else {
-            target.setHealth(target.getHealth() - damage);
-            playLegacyDamageFeedback(target);
-        }
+        deathTagController.handleDamage(session, target, event, incomingDamage, deathTagDamageActions);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
