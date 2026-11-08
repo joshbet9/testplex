@@ -10428,64 +10428,18 @@ public final class ArcadePortManager implements Listener {
             removeAllMicroBorderWarnings(session);
             return;
         }
-        WorldBorder border = session.world.getWorldBorder();
-        Location center = border.getCenter();
-        Set<UUID> showing = new HashSet<>();
-        for (Player player : alivePlayers(session)) {
-            if (plugin.hasAdminAccess(player)
-                    && !debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.MICRO_BATTLES,
-                            "border-warning", true)) {
-                removeMicroBorderWarning(session, player.getUniqueId());
-                continue;
-            }
-            Location location = player.getLocation();
-            boolean nearBorder = ArcadePortRules.shouldShowMicroBattlesBorderParticles(
-                    location.getX(), location.getZ(), center.getX(), center.getZ(), border.getSize(),
-                    GameDebugRuntimeOverrides.doubleValue("MICRO_BATTLES_BORDER_PARTICLE_DISTANCE",
-                            ArcadePortRules.MICRO_BATTLES_BORDER_PARTICLE_DISTANCE));
-            if (!nearBorder) continue;
-
-            UUID playerId = player.getUniqueId();
-            showing.add(playerId);
-            TextDisplay warning = session.microBorderWarnings.get(playerId);
-            Location aboveHead = location.clone().add(0.0D, 2.35D, 0.0D);
-            if (warning == null || !warning.isValid()) {
-                warning = session.world.spawn(aboveHead, TextDisplay.class);
-                warning.setText(ChatColor.GOLD + "" + ChatColor.BOLD + "⚠ BORDER");
-                warning.setBillboard(Display.Billboard.CENTER);
-                warning.setAlignment(TextDisplay.TextAlignment.CENTER);
-                warning.setSeeThrough(true);
-                warning.setShadowed(true);
-                warning.setDefaultBackground(false);
-                warning.setLineWidth(120);
-                warning.setPersistent(false);
-                warning.setGravity(false);
-                warning.setInvulnerable(true);
-                warning.setSilent(true);
-                warning.setViewRange(1.2F);
-                session.microBorderWarnings.put(playerId, warning);
-            } else {
-                // Follow every game tick so the label stays directly above a moving player.
-                warning.teleport(aboveHead);
-            }
-        }
-
-        for (UUID playerId : new HashSet<>(session.microBorderWarnings.keySet())) {
-            if (!showing.contains(playerId)) removeMicroBorderWarning(session, playerId);
-        }
+        microBattlesController.updateBorderWarnings(session, alivePlayers(session), player ->
+                !plugin.hasAdminAccess(player)
+                        || debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.MICRO_BATTLES,
+                                "border-warning", true));
     }
 
     private void removeMicroBorderWarning(Session session, UUID playerId) {
-        if (session == null || playerId == null) return;
-        TextDisplay warning = session.microBorderWarnings.remove(playerId);
-        if (warning != null && warning.isValid()) warning.remove();
+        microBattlesController.removeBorderWarning(session, playerId);
     }
 
     private void removeAllMicroBorderWarnings(Session session) {
-        if (session == null) return;
-        for (UUID playerId : new HashSet<>(session.microBorderWarnings.keySet())) {
-            removeMicroBorderWarning(session, playerId);
-        }
+        microBattlesController.removeAllBorderWarnings(session);
     }
 
     /** The source cue is a shared vertical wall marker, positioned at the nearest world-border face. */
