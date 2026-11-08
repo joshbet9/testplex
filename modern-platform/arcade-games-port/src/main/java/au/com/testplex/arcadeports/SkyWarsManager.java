@@ -2,13 +2,18 @@ package au.com.testplex.arcadeports;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
+import java.util.UUID;
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.SkullMeta;
 
 /** SkyWars' kit-item identity, ability cooldown bar and spectator target selection. */
 final class SkyWarsManager implements ArcadeMatchController {
@@ -74,5 +79,58 @@ final class SkyWarsManager implements ArcadeMatchController {
                 .min(Comparator.comparingDouble(target ->
                         target.getLocation().distanceSquared(player.getLocation())))
                 .orElse(null);
+    }
+
+    void openCompassMenu(SessionState session, Player player) {
+        Inventory menu = Bukkit.createInventory(null, 27, ChatColor.GREEN + "SkyWars Targets");
+        int slot = 0;
+        for (UUID playerId : session.alive) {
+            Player target = session.players.get(playerId);
+            if (target == null || !target.isOnline() || target.equals(player) || slot >= menu.getSize()) continue;
+            ItemStack head = new ItemStack(Material.PLAYER_HEAD);
+            if (head.getItemMeta() instanceof SkullMeta meta) {
+                meta.setOwningPlayer(target);
+                meta.setDisplayName(ChatColor.YELLOW + target.getName());
+                meta.setLore(List.of(ChatColor.GRAY + "Click to spectate this player."));
+                head.setItemMeta(meta);
+            }
+            menu.setItem(slot++, head);
+        }
+        if (slot == 0) player.sendMessage(ChatColor.YELLOW + "There are no living players to track.");
+        else player.openInventory(menu);
+    }
+
+    void updateCompass(SessionState session) {
+        if (session.ticks % 5 != 0) return;
+        for (Player player : session.players.values()) {
+            if (player == null || !player.isOnline() || player.getWorld() != session.world) continue;
+            Player target = nearestTarget(session, player);
+            if (target == null) continue;
+            if (!player.getInventory().contains(Material.COMPASS)) {
+                player.getInventory().addItem(trackingCompassItem());
+            }
+            player.setCompassTarget(target.getLocation());
+            if (isTrackingCompass(player.getInventory().getItemInMainHand())) {
+                double distance = Math.sqrt(player.getLocation().distanceSquared(target.getLocation()));
+                double height = target.getLocation().getY() - player.getLocation().getY();
+                player.sendActionBar(ChatColor.WHITE + "Nearest Target: " + ChatColor.YELLOW + target.getName()
+                        + ChatColor.WHITE + " | Distance: " + ChatColor.YELLOW
+                        + String.format(Locale.ROOT, "%.1f", distance)
+                        + ChatColor.WHITE + " | Height: " + ChatColor.YELLOW
+                        + String.format(Locale.ROOT, "%.1f", height));
+            }
+        }
+    }
+
+    private ItemStack trackingCompassItem() {
+        ItemStack item = new ItemStack(Material.COMPASS);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(ChatColor.GOLD + "Tracking Compass");
+            meta.setLore(List.of(ChatColor.GRAY
+                    + "Tracks the nearest living player. Left-click to spectate when eliminated."));
+            item.setItemMeta(meta);
+        }
+        return item;
     }
 }
