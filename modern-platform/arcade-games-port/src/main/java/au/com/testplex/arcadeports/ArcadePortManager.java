@@ -28538,55 +28538,23 @@ public final class ArcadePortManager implements Listener {
 
 
     private ItemStack createBombLobbersPowerupStack(String type) {
-        Material icon = switch (type) {
-            case "wind-charge" -> Material.WIND_CHARGE;
-            case "super-tnt" -> Material.TNT;
-            case "fiery-tnt" -> Material.FIRE_CHARGE;
-            default -> Material.SUGAR;
-        };
-        String lore = switch (type) {
-            case "wind-charge" -> "Right-click to launch a gust that blasts opponents away.";
-            case "super-tnt" -> "Throw this TNT for a bigger blast and stronger damage.";
-            case "fiery-tnt" -> "Throw this TNT to ignite opponents caught in its blast.";
-            default -> "Picked up instantly: Speed II for 12 seconds.";
-        };
-        ItemStack stack = namedItem(icon, bombLobbersPowerupName(type), lore, 1);
-        ItemMeta meta = stack.getItemMeta();
-        if (meta != null) {
-            meta.getPersistentDataContainer().set(bombPowerupKey, PersistentDataType.STRING, type);
-            stack.setItemMeta(meta);
-        }
-        return stack;
+        return bombLobbersController.createPowerupStack(type, bombPowerupKey);
     }
 
     private String bombLobbersPowerupName(String type) {
-        return switch (type) {
-            case "wind-charge" -> "Wind Charge";
-            case "super-tnt" -> "Super Explosive TNT";
-            case "fiery-tnt" -> "Fiery TNT";
-            case "speed-boost" -> "Speed Boost";
-            default -> "Power-up";
-        };
+        return bombLobbersController.powerupName(type);
     }
 
     private String bombLobbersPowerupType(ItemStack item) {
-        if (item == null || !item.hasItemMeta()) return null;
-        return item.getItemMeta().getPersistentDataContainer()
-                .get(bombPowerupKey, PersistentDataType.STRING);
+        return bombLobbersController.powerupType(item, bombPowerupKey);
     }
 
     private boolean isBombLobbersThrownTnt(ItemStack item) {
-        if (item == null) return false;
-        String powerupType = bombLobbersPowerupType(item);
-        return item.getType() == Material.TNT
-                || "super-tnt".equals(powerupType)
-                || "fiery-tnt".equals(powerupType);
+        return bombLobbersController.isThrownTnt(item, bombPowerupKey);
     }
 
     private Integer bombLobbersPowerupTeam(ItemStack item) {
-        if (item == null || !item.hasItemMeta()) return null;
-        return item.getItemMeta().getPersistentDataContainer()
-                .get(bombPowerupTeamKey, PersistentDataType.INTEGER);
+        return bombLobbersController.powerupTeam(item, bombPowerupTeamKey);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)

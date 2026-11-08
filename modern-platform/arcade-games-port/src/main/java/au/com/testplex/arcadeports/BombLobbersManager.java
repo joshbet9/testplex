@@ -10,12 +10,14 @@ import org.bukkit.ChatColor;
 import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
@@ -170,6 +172,60 @@ final class BombLobbersManager implements ArcadeMatchController {
         ItemMeta meta = item.getItemMeta();
         return meta != null && meta.hasDisplayName()
                 && ChatColor.stripColor(meta.getDisplayName()).equals("Tracking Compass");
+    }
+
+    ItemStack createPowerupStack(String type, NamespacedKey powerupKey) {
+        Material icon = switch (type) {
+            case "wind-charge" -> Material.WIND_CHARGE;
+            case "super-tnt" -> Material.TNT;
+            case "fiery-tnt" -> Material.FIRE_CHARGE;
+            default -> Material.SUGAR;
+        };
+        String lore = switch (type) {
+            case "wind-charge" -> "Right-click to launch a gust that blasts opponents away.";
+            case "super-tnt" -> "Throw this TNT for a bigger blast and stronger damage.";
+            case "fiery-tnt" -> "Throw this TNT to ignite opponents caught in its blast.";
+            default -> "Picked up instantly: Speed II for 12 seconds.";
+        };
+        ItemStack stack = new ItemStack(icon);
+        ItemMeta meta = stack.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(ChatColor.GOLD + powerupName(type));
+            meta.setLore(List.of(ChatColor.GRAY + lore));
+            meta.getPersistentDataContainer().set(powerupKey, PersistentDataType.STRING, type);
+            stack.setItemMeta(meta);
+        }
+        return stack;
+    }
+
+    String powerupName(String type) {
+        return switch (type) {
+            case "wind-charge" -> "Wind Charge";
+            case "super-tnt" -> "Super Explosive TNT";
+            case "fiery-tnt" -> "Fiery TNT";
+            case "speed-boost" -> "Speed Boost";
+            default -> "Power-up";
+        };
+    }
+
+    String powerupType(ItemStack item, NamespacedKey powerupKey) {
+        if (item == null || !item.hasItemMeta()) return null;
+        return item.getItemMeta().getPersistentDataContainer()
+                .get(powerupKey, PersistentDataType.STRING);
+    }
+
+    boolean isThrownTnt(ItemStack item, NamespacedKey powerupKey) {
+        if (item == null) return false;
+        String powerupType = powerupType(item, powerupKey);
+        return item.getType() == Material.TNT
+                || "super-tnt".equals(powerupType)
+                || "fiery-tnt".equals(powerupType);
+    }
+
+    Integer powerupTeam(ItemStack item, NamespacedKey teamKey) {
+        if (item == null || !item.hasItemMeta()) return null;
+        return item.getItemMeta().getPersistentDataContainer()
+                .get(teamKey, PersistentDataType.INTEGER);
     }
 
     Player nearestSpectateTarget(SessionState session, Player spectator) {

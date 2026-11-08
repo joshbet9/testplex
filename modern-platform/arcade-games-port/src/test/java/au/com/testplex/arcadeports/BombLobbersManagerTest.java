@@ -62,4 +62,17 @@ class BombLobbersManagerTest {
         assertFalse(bombLobbers.isSpectatorMenuTitle("Spectator Menu"));
         assertFalse(bombLobbers.isSpectatorMenuTitle(null));
     }
+
+    @Test
+    void powerupIdentityAndNamesRemainScopedToBombLobbers() {
+        BombLobbersManager bombLobbers = new BombLobbersManager();
+        assertEquals("Wind Charge", bombLobbers.powerupName("wind-charge"));
+        assertEquals("Super Explosive TNT", bombLobbers.powerupName("super-tnt"));
+        assertEquals("Fiery TNT", bombLobbers.powerupName("fiery-tnt"));
+        assertEquals("Speed Boost", bombLobbers.powerupName("speed-boost"));
+        assertEquals("Power-up", bombLobbers.powerupName("unknown"));
+        assertNull(bombLobbers.powerupType(null, null));
+        assertNull(bombLobbers.powerupTeam(null, null));
+        assertFalse(bombLobbers.isThrownTnt(null, null));
+    }
 }
