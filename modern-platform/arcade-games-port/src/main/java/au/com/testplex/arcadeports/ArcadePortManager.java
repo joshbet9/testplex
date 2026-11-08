@@ -276,6 +276,8 @@ public final class ArcadePortManager implements Listener {
     private final BombLobbersManager bombLobbersController = new BombLobbersManager();
     private final PaintballManager paintballController = new PaintballManager();
     private final DragonsManager dragonsController = new DragonsManager();
+    private final DragonsManager.SpectatorActions dragonsSpectatorActions =
+            session -> active == session;
     private final OneInTheQuiverManager quiverController = new OneInTheQuiverManager();
     private final RunnerManager runnerController = new RunnerManager();
     private final SpleefManager spleefController = new SpleefManager();
@@ -14271,7 +14273,7 @@ public final class ArcadePortManager implements Listener {
             }
         }
 
-        updateDragonsSpectatorCompasses(session);
+        dragonsController.updateSpectatorCompasses(session, System.currentTimeMillis());
     }
 
     private Location dragonSpectatorLocation(Session session) {
@@ -14331,143 +14333,6 @@ public final class ArcadePortManager implements Listener {
         session.dragonTargetPlayers.remove(dragon.getUniqueId());
         session.dragonSparklerDragonOwners.remove(dragon.getUniqueId());
         session.dragonTargetLocations.put(dragon.getUniqueId(), randomDragonSkyTarget(session));
-    }
-
-    private boolean isDragonsTrackingCompass(ItemStack item) {
-        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
-        ItemMeta meta = item.getItemMeta();
-        return meta.hasDisplayName()
-                && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
-    }
-
-    private Player nearestDragonsSpectatorTarget(Session session, Player spectator) {
-        return alivePlayers(session).stream()
-                .filter(target -> !session.dragonTamerControls.containsKey(target.getUniqueId()))
-                .min(java.util.Comparator.comparingDouble(target ->
-                        target.getLocation().distanceSquared(spectator.getLocation())))
-                .orElse(null);
-    }
-
-    private void openDragonsSpectatorMenu(Session session, Player spectator) {
-        List<Player> targets = alivePlayers(session).stream()
-                .filter(player -> !session.dragonTamerControls.containsKey(player.getUniqueId()))
-                .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
-                .toList();
-        if (targets.isEmpty()) {
-            spectator.sendMessage(ChatColor.YELLOW + "There are no living Dragons players to track.");
-            return;
-        }
-
-        // Dragons is SoloGame: the original CompassPage uses one yellow Players
-        // team header, followed by eight player heads per row.
-        int slot = 19;
-        int lastSlot = 18;
-        for (int i = 0; i < targets.size(); i++) {
-            lastSlot = slot;
-            slot = (slot + 2) % 9 == 0 ? slot + 3 : slot + 1;
-        }
-        int size = Math.min(54, Math.max(27, ((lastSlot / 9) + 1) * 9));
-        DragonCompassMenuHolder holder = new DragonCompassMenuHolder(spectator.getUniqueId());
-        holder.inventory = Bukkit.createInventory(holder, size, "Spectator Menu");
-        populateDragonsSpectatorMenu(session, spectator, holder);
-        spectator.openInventory(holder.inventory);
-    }
-
-    private boolean populateDragonsSpectatorMenu(
-            Session session, Player spectator, DragonCompassMenuHolder holder) {
-        List<Player> targets = alivePlayers(session).stream()
-                .filter(player -> !session.dragonTamerControls.containsKey(player.getUniqueId()))
-                .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
-                .toList();
-        holder.inventory.clear();
-        holder.targetsBySlot.clear();
-        ItemStack teamHeader = new ItemStack(Material.YELLOW_WOOL);
-        ItemMeta teamMeta = teamHeader.getItemMeta();
-        teamMeta.setDisplayName(ChatColor.YELLOW + "Players");
-        teamMeta.setLore(List.of(" ", ChatColor.YELLOW + "Players Alive: " + ChatColor.WHITE + targets.size()));
-        teamHeader.setItemMeta(teamMeta);
-        holder.inventory.setItem(13, teamHeader);
-        holder.inventory.setItem(4, namedItem(Material.BARRIER, ChatColor.RED + "Close",
-                "Close the Dragons spectator menu."));
-
-        int slot = 19;
-        for (Player target : targets) {
-            if (slot >= holder.inventory.getSize()) break;
-            ItemStack head = new ItemStack(Material.PLAYER_HEAD);
-            if (head.getItemMeta() instanceof SkullMeta skull) {
-                skull.setOwningPlayer(target);
-                skull.setDisplayName(ChatColor.YELLOW + target.getName());
-                double distance = Math.sqrt(spectator.getLocation().distanceSquared(target.getLocation()));
-                double heightDifference = target.getLocation().getY() - spectator.getLocation().getY();
-                String kit = session.dragonKits.getOrDefault(target.getUniqueId(), "coward");
-                skull.setLore(List.of(" ",
-                        ChatColor.YELLOW + "Kit: " + ChatColor.WHITE + kit,
-                        ChatColor.YELLOW + "Distance: " + ChatColor.WHITE
-                                + String.format(java.util.Locale.ROOT, "%.1f", distance),
-                        ChatColor.YELLOW + "Height Difference: " + ChatColor.WHITE
-                                + String.format(java.util.Locale.ROOT, "%.1f", heightDifference),
-                        " ", ChatColor.YELLOW + "Left Click " + ChatColor.RESET + "Teleport",
-                        ChatColor.YELLOW + "Right Click " + ChatColor.RESET + "Spectate"));
-                head.setItemMeta(skull);
-            }
-            holder.inventory.setItem(slot, head);
-            holder.targetsBySlot.put(slot, target.getUniqueId());
-            if ((slot + 2) % 9 == 0) slot += 3;
-            else slot++;
-        }
-        return !targets.isEmpty();
-    }
-
-    private void updateDragonsSpectatorCompasses(Session session) {
-        long now = System.currentTimeMillis();
-        if (now >= session.dragonNextCompassUpdateAt) {
-            session.dragonNextCompassUpdateAt = now + 250L; // CompassModule uses UpdateType.FASTER.
-            List<Player> alive = alivePlayers(session).stream()
-                    .filter(player -> !session.dragonTamerControls.containsKey(player.getUniqueId()))
-                    .toList();
-            if (!alive.isEmpty()) {
-                for (Player spectator : session.players.values()) {
-                    if (spectator == null || !spectator.isOnline()
-                            || session.alive.contains(spectator.getUniqueId())) continue;
-                    if (inventoryCount(spectator, Material.COMPASS) <= 0) {
-                        spectator.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
-                                "Points to the nearest survivor. Left-click to teleport; right-click for the spectator menu."));
-                    }
-                    Player target = alive.stream()
-                            .min(java.util.Comparator.comparingDouble(p ->
-                                    p.getLocation().distanceSquared(spectator.getLocation())))
-                            .orElse(null);
-                    if (target == null) continue;
-                    spectator.setCompassTarget(target.getLocation());
-                    // CompassModule displays target details whenever a spectator holds
-                    // the Tracking Compass in their main hand.
-                    if (isDragonsTrackingCompass(spectator.getInventory().getItemInMainHand())) {
-                        double distance = Math.sqrt(target.getLocation().distanceSquared(spectator.getLocation()));
-                        double height = target.getLocation().getY() - spectator.getLocation().getY();
-                        spectator.sendActionBar(ChatColor.WHITE + "" + ChatColor.BOLD + "Nearest Target: "
-                                + ChatColor.YELLOW + target.getName()
-                                + ChatColor.WHITE + ChatColor.BOLD + " | Distance: " + ChatColor.YELLOW
-                                + String.format(java.util.Locale.ROOT, "%.1f", distance)
-                                + ChatColor.WHITE + ChatColor.BOLD + " | Height: " + ChatColor.YELLOW
-                                + String.format(java.util.Locale.ROOT, "%.1f", height));
-                    }
-                }
-            }
-        }
-
-        if (now >= session.dragonNextCompassMenuRefreshAt) {
-            session.dragonNextCompassMenuRefreshAt = now + 1_000L; // CompassMenu.refresh() uses UpdateType.SEC.
-            for (Player spectator : session.players.values()) {
-                if (spectator == null || !spectator.isOnline()
-                        || !(spectator.getOpenInventory().getTopInventory().getHolder()
-                                instanceof DragonCompassMenuHolder holder)
-                        || !holder.ownerId.equals(spectator.getUniqueId())) continue;
-                if (!populateDragonsSpectatorMenu(session, spectator, holder)) {
-                    spectator.closeInventory();
-                    spectator.sendMessage(ChatColor.YELLOW + "There are no living Dragons players to track.");
-                }
-            }
-        }
     }
 
     private List<Player> dragonTargetCandidates(Session session, List<Player> alive, long now) {
@@ -16625,8 +16490,8 @@ public final class ArcadePortManager implements Listener {
             if (!p.isOnline()) continue;
             if (session.type == ArcadePortGame.DRAGONS
                     && !session.alive.contains(id)
-                    && isDragonsTrackingCompass(p.getInventory().getItemInMainHand())) {
-                Player target = nearestDragonsSpectatorTarget(session, p);
+                    && dragonsController.isTrackingCompass(p.getInventory().getItemInMainHand())) {
+                Player target = dragonsController.nearestSpectatorTarget(session, p);
                 if (target != null) {
                     double distance = Math.sqrt(target.getLocation().distanceSquared(p.getLocation()));
                     double height = target.getLocation().getY() - p.getLocation().getY();
@@ -17521,7 +17386,7 @@ public final class ArcadePortManager implements Listener {
                     player.getInventory().clear();
                     player.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
                             "Points to the nearest survivor. Left-click to spectate them."));
-                    updateDragonsSpectatorCompasses(session);
+                    dragonsController.updateSpectatorCompasses(session, System.currentTimeMillis());
                 }
             }
             player.sendMessage(ChatColor.RED + "Eliminated: " + reason + ".");
@@ -21075,21 +20940,6 @@ public final class ArcadePortManager implements Listener {
         private Inventory inventory;
 
         private SkyWarsCompassMenuHolder(UUID ownerId) {
-            this.ownerId = ownerId;
-        }
-
-        @Override
-        public Inventory getInventory() {
-            return inventory;
-        }
-    }
-
-    private static final class DragonCompassMenuHolder implements InventoryHolder {
-        private final UUID ownerId;
-        private final Map<Integer, UUID> targetsBySlot = new HashMap<>();
-        private Inventory inventory;
-
-        private DragonCompassMenuHolder(UUID ownerId) {
             this.ownerId = ownerId;
         }
 
@@ -25642,24 +25492,9 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (session.type == ArcadePortGame.DRAGONS
-                && !session.alive.contains(player.getUniqueId())
-                && isDragonsTrackingCompass(heldItem)) {
+                && dragonsController.handleCompassInteract(session, player, heldItem,
+                        event.getAction().isLeftClick(), event.getAction().isRightClick())) {
             event.setCancelled(true);
-            if (event.getAction().isLeftClick()) {
-                long now = System.currentTimeMillis();
-                long nextAllowed = session.dragonCompassNextUseAt.getOrDefault(player.getUniqueId(), 0L);
-                if (!ArcadePortRules.canUseDragonSpectatorTeleport(now, nextAllowed)) return;
-                session.dragonCompassNextUseAt.put(player.getUniqueId(),
-                        now + GameDebugRuntimeOverrides.longValue("DRAGONS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS", ArcadePortRules.DRAGONS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS));
-                Player target = nearestDragonsSpectatorTarget(session, player);
-                if (target != null) {
-                    player.setSpectatorTarget(null);
-                    player.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
-                    player.setCompassTarget(target.getLocation());
-                } else player.sendMessage(ChatColor.YELLOW + "There are no living Dragons players to track.");
-            } else if (event.getAction().isRightClick()) {
-                openDragonsSpectatorMenu(session, player);
-            }
             return;
         }
         if (session.type == ArcadePortGame.WITHER_ASSAULT
@@ -26043,7 +25878,7 @@ public final class ArcadePortManager implements Listener {
                         || ("tamer".equals(kit) && item == Material.END_CRYSTAL)
                         || ("pyrotechnic".equals(kit) && item == Material.EMERALD)
                         || ("marksman".equals(kit) && item == Material.BOW)
-                        || (!session.alive.contains(id) && isDragonsTrackingCompass(heldItem));
+                        || (!session.alive.contains(id) && dragonsController.isTrackingCompass(heldItem));
             }
             case EVOLUTION -> {
                 int level = session.evolutionLevels.getOrDefault(id, 0);
@@ -27808,52 +27643,8 @@ public final class ArcadePortManager implements Listener {
         if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session currentSession = active;
         if (currentSession != null && currentSession.type == ArcadePortGame.DRAGONS
-                && event.getView().getTopInventory().getHolder() instanceof DragonCompassMenuHolder holder) {
-            event.setCancelled(true);
-            if (!(event.getWhoClicked() instanceof Player spectator)
-                    || !holder.ownerId.equals(spectator.getUniqueId())
-                    || event.getClickedInventory() != event.getView().getTopInventory()) return;
-            if (active != currentSession || !currentSession.players.containsKey(spectator.getUniqueId())
-                    || currentSession.alive.contains(spectator.getUniqueId())) {
-                spectator.closeInventory();
-                return;
-            }
-
-            int slot = event.getRawSlot();
-            if (slot < 0 || slot >= event.getView().getTopInventory().getSize()) return;
-            if (slot == 53 || slot == 4) {
-                spectator.closeInventory();
-                return;
-            }
-
-            UUID targetId = holder.targetsBySlot.get(slot);
-            if (targetId == null) return;
-            Player target = currentSession.players.get(targetId);
-            if (target == null || !target.isOnline() || !currentSession.alive.contains(targetId)
-                    || currentSession.dragonTamerControls.containsKey(targetId)
-                    || target.getWorld() != currentSession.world) {
-                spectator.sendMessage(ChatColor.YELLOW + "That player is no longer available to track.");
-                populateDragonsSpectatorMenu(currentSession, spectator, holder);
-                return;
-            }
-
-            if (event.isLeftClick()) {
-                long now = System.currentTimeMillis();
-                long nextAllowed = currentSession.dragonCompassNextUseAt.getOrDefault(spectator.getUniqueId(), 0L);
-                if (!ArcadePortRules.canUseDragonSpectatorTeleport(now, nextAllowed)) return;
-                currentSession.dragonCompassNextUseAt.put(spectator.getUniqueId(),
-                        now + GameDebugRuntimeOverrides.longValue("DRAGONS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS", ArcadePortRules.DRAGONS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS));
-                spectator.setSpectatorTarget(null);
-                spectator.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
-                spectator.setCompassTarget(target.getLocation());
-                spectator.closeInventory();
-                return;
-            }
-            if (event.isRightClick()) {
-                spectator.setSpectatorTarget(target);
-                spectator.setCompassTarget(target.getLocation());
-                spectator.closeInventory();
-            }
+                && dragonsController.isSpectatorMenu(event.getView().getTopInventory().getHolder())) {
+            dragonsController.handleSpectatorMenuClick(event, currentSession, dragonsSpectatorActions);
             return;
         }
         if (currentSession != null && currentSession.type == ArcadePortGame.MICRO_BATTLES
