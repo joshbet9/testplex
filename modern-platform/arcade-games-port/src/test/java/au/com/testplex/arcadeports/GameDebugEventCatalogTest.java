@@ -1164,6 +1164,7 @@ class GameDebugEventCatalogTest {
         }
         String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
         String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String turf = Files.readString(sourceRoot.resolve("TurfWarsManager.java"));
         assertTrue(lobby.contains("features.put(\"build-editing\""));
         assertTrue(lobby.contains("features.put(\"combat-damage\""));
         assertTrue(manager.contains("\"build-editing\", true"));
@@ -1172,9 +1173,10 @@ class GameDebugEventCatalogTest {
         assertTrue(manager.contains("debugKitFeatureEnabled(player, ArcadePortGame.TURF_WARS, \"infiltrator\")"));
         assertTrue(manager.contains("debugKitFeatureEnabled(player, ArcadePortGame.TURF_WARS, \"shredder\")"));
         assertTrue(manager.contains("debugKitFeatureEnabled(player, ArcadePortGame.TURF_WARS, \"fortifier\")"));
-        assertTrue(manager.contains("session.turfBarrageFiring.remove(id)"));
-        assertTrue(normalize(manager).contains(normalize("private void startTurfWarsBarrage(Session session, Player player) {\n"
-                + "        if (!isDebugAbilityAllowed(player, ArcadePortGame.TURF_WARS, \"shredder\")) return;")));
+        assertTrue(manager.contains("turfWarsController.startBarrage(session, player,"));
+        assertTrue(manager.contains("isDebugAbilityAllowed(player, ArcadePortGame.TURF_WARS, \"shredder\")"));
+        assertTrue(turf.contains("if (!abilityAllowed) return;"));
+        assertTrue(turf.contains("session.turfBarrageFiring.remove(id)"));
     }
 
     @Test
@@ -1578,11 +1580,13 @@ class GameDebugEventCatalogTest {
                     "com", "testplex", "arcadeports", "ModernArcadeLobbyRuntime.java");
         }
         String source = Files.readString(managerPath);
+        String runner = Files.readString(managerPath.resolveSibling("RunnerManager.java"));
         String lobby = Files.readString(lobbyPath);
         assertTrue(lobby.contains("\"runner-trail\", \"Runner block trail\""));
         assertTrue(source.contains("debugFeatureEnabled(owner.getUniqueId(), ArcadePortGame.RUNNER, \"runner-trail\", true)"));
-        assertTrue(source.contains("session.runnerOriginalBlockData.remove(block)"));
-        assertTrue(source.contains("session.runnerBlockOwners.remove(block)"));
+        assertTrue(source.contains("runnerController.processBlocks(session, now, this::runnerTrailAllowed)"));
+        assertTrue(runner.contains("session.runnerOriginalBlockData.remove(block)"));
+        assertTrue(runner.contains("session.runnerBlockOwners.remove(block)"));
     }
 
     @Test
