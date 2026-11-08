@@ -280,7 +280,7 @@ public final class ArcadePortManager implements Listener {
             new DragonsManager.SpectatorActions() {
                 @Override public boolean isCurrent(SessionState session) { return active == session; }
                 @Override public boolean isTamerControlled(SessionState session, UUID playerId) {
-                    return active == session && active.dragonTamerControls.containsKey(playerId);
+                    return active != null && active == session && active.dragonTamerControls.containsKey(playerId);
                 }
             };
     private final OneInTheQuiverManager quiverController = new OneInTheQuiverManager();
