@@ -274,6 +274,7 @@ public final class ArcadePortManager implements Listener {
     private final BaconBrawlManager baconController;
     private final DeathTagManager deathTagController = new DeathTagManager();
     private final BombLobbersManager bombLobbersController = new BombLobbersManager();
+    private final PaintballManager paintballController = new PaintballManager();
     private boolean gameModulesInitialized;
     private CameraShyGame cameraShyModule;
 
@@ -284,6 +285,7 @@ public final class ArcadePortManager implements Listener {
         matchControllers.register(baconController);
         matchControllers.register(deathTagController);
         matchControllers.register(bombLobbersController);
+        matchControllers.register(paintballController);
         this.dragonEscapeGhostStore = new DragonEscapeGhostPathStore(
                 plugin.getDataFolder().toPath(), plugin.getLogger());
         this.debugProfiles = new GameDebugProfiles(plugin);
@@ -5523,7 +5525,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (type == ArcadePortGame.ONE_IN_THE_QUIVER) setupQuiverScoreboard(session);
         if (type == ArcadePortGame.PAINTBALL) {
-            setupPaintballScoreboard(session);
+            matchControllers.prepare(session, participants);
             refreshPaintballTestPlayerArmor(session);
         }
         if (type == ArcadePortGame.DRAGON_ESCAPE) {
@@ -7780,18 +7782,6 @@ public final class ArcadePortManager implements Listener {
     }
 
 
-    private void setupPaintballScoreboard(Session session) {
-        if (session == null || Bukkit.getScoreboardManager() == null) return;
-        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
-        Objective objective = scoreboard.registerNewObjective("paintball", "dummy", ChatColor.AQUA + "PAINTBALL");
-        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
-        session.paintballScoreboard = scoreboard;
-        session.paintballScoreboardObjective = objective;
-        for (Player player : session.players.values()) {
-            if (player != null && player.isOnline()) player.setScoreboard(scoreboard);
-        }
-        updatePaintballScoreboard(session, System.currentTimeMillis());
-    }
 
     private void setupMasterBuildersScoreboard(Session session) {
         if (session == null || Bukkit.getScoreboardManager() == null) return;
@@ -7859,48 +7849,6 @@ public final class ArcadePortManager implements Listener {
         session.masterBuildersScoreboardEntries.clear();
     }
 
-    private void updatePaintballScoreboard(Session session, long now) {
-        if (session == null || session.paintballScoreboardObjective == null
-                || now < session.paintballNextScoreboardAt) return;
-        session.paintballNextScoreboardAt = now + 500L;
-        for (String entry : session.paintballScoreboardEntries) {
-            session.paintballScoreboard.resetScores(entry);
-        }
-        session.paintballScoreboardEntries.clear();
-
-        List<String> lines = new ArrayList<>();
-        List<Player> living = alivePlayers(session);
-        if (living.size() < 13) {
-            for (int team = 0; team < 2; team++) {
-                final int teamIndex = team;
-                ChatColor colour = team == 0 ? ChatColor.AQUA : ChatColor.RED;
-                living.stream()
-                        .filter(player -> session.teams.getOrDefault(player.getUniqueId(), -1) == teamIndex)
-                        .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
-                        .forEach(player -> lines.add(colour + player.getName()));
-            }
-        } else {
-            for (int team = 0; team < 2; team++) {
-                int teamIndex = team;
-                ChatColor colour = team == 0 ? ChatColor.AQUA : ChatColor.RED;
-                String name = team == 0 ? "Frost" : "Nether";
-                long alive = living.stream()
-                        .filter(player -> session.teams.getOrDefault(player.getUniqueId(), -1) == teamIndex)
-                        .count();
-                lines.add(colour + name + ChatColor.WHITE + ": " + alive + colour + " Alive");
-            }
-        }
-        int score = lines.size();
-        for (String line : lines) {
-            session.paintballScoreboardEntries.add(line);
-            session.paintballScoreboardObjective.getScore(line).setScore(score--);
-        }
-        for (Player player : session.players.values()) {
-            if (player != null && player.isOnline() && player.getScoreboard() != session.paintballScoreboard) {
-                player.setScoreboard(session.paintballScoreboard);
-            }
-        }
-    }
 
 
 
@@ -11820,7 +11768,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void updatePaintballKitState(Session session, long now) {
-        updatePaintballScoreboard(session, now);
+        paintballController.updateScoreboard(session, now);
         updatePaintballSpectatorCompasses(session, now);
         for (UUID projectileId : new HashSet<>(session.paintballProjectilePeakY.keySet())) {
             Entity entity = Bukkit.getEntity(projectileId);
