@@ -279,6 +279,7 @@ public final class ArcadePortManager implements Listener {
     private final OneInTheQuiverManager quiverController = new OneInTheQuiverManager();
     private final RunnerManager runnerController = new RunnerManager();
     private final SpleefManager spleefController = new SpleefManager();
+    private final EvolutionManager evolutionController = new EvolutionManager();
     private boolean gameModulesInitialized;
     private CameraShyGame cameraShyModule;
 
@@ -294,6 +295,7 @@ public final class ArcadePortManager implements Listener {
         matchControllers.register(quiverController);
         matchControllers.register(runnerController);
         matchControllers.register(spleefController);
+        matchControllers.register(evolutionController);
         this.dragonEscapeGhostStore = new DragonEscapeGhostPathStore(
                 plugin.getDataFolder().toPath(), plugin.getLogger());
         this.debugProfiles = new GameDebugProfiles(plugin);
@@ -2553,14 +2555,6 @@ public final class ArcadePortManager implements Listener {
         player.sendMessage(ChatColor.GREEN + message);
     }
 
-    private long evolutionKitCooldown(Session session, UUID playerId, long baseMillis) {
-        return "darwinist".equals(session.evolutionKits.getOrDefault(playerId, "darwinist"))
-                ? EvolutionAchievementRules.darwinistCooldown(baseMillis) : baseMillis;
-    }
-
-    private long evolutionSulphurBombCooldown(Session session, UUID playerId, long baseMillis) {
-        return evolutionKitCooldown(session, playerId, baseMillis);
-    }
 
     public void selectMicroBattlesKit(Player player, String requestedKit) {
         if (player == null) return;
@@ -18358,7 +18352,7 @@ public final class ArcadePortManager implements Listener {
             UUID creditedEggOwner = session.evolutionEggAirborneAttackerByVictim.remove(victimId);
             long creditedEggHitAt = session.evolutionEggAirborneHitAt.getOrDefault(victimId, 0L);
             session.evolutionEggAirborneHitAt.remove(victimId);
-            recordEvolutionAssists(session, victimId, killer == null ? null : killer.getUniqueId(), eliminationTime);
+            evolutionController.recordAssists(session, victimId, killer == null ? null : killer.getUniqueId(), eliminationTime);
             session.evolutionLifeKills.put(victimId, 0);
             session.evolutionStartedAtMillis.remove(victimId);
             session.evolutionLevelAtAttempt.remove(victimId);
@@ -18424,7 +18418,7 @@ public final class ArcadePortManager implements Listener {
                 boolean neanderthal = "neanderthal".equals(session.evolutionKits.get(killerId));
                 if (!neanderthal) session.evolutionAvailable.add(killerId);
                 session.evolutionCharge.remove(killerId);
-                reduceEvolutionPity(session, killerId,
+                evolutionController.reducePity(session, killerId,
                         GameDebugRuntimeOverrides.longValue("EVOLUTION_PITY_KILL_REDUCTION_MILLIS", ArcadePortRules.EVOLUTION_PITY_KILL_REDUCTION_MILLIS), eliminationTime, true);
                 killer.setExp(0.0F);
                 killer.removePotionEffect(PotionEffectType.SLOWNESS);
@@ -19160,7 +19154,7 @@ public final class ArcadePortManager implements Listener {
                 || !session.alive.contains(target.getUniqueId())) return false;
         if (session.evolving.contains(attacker.getUniqueId())
                 || session.evolving.contains(target.getUniqueId())) return false;
-        recordEvolutionDamage(session, target, attacker, System.currentTimeMillis());
+        evolutionController.recordDamage(session, target, attacker, System.currentTimeMillis());
         reduceEvolutionChargeAfterHit(session, target);
         Vector away = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
         if (away.lengthSquared() < 0.001D) away = attacker.getLocation().getDirection().multiply(-1.0D);
@@ -19186,7 +19180,7 @@ public final class ArcadePortManager implements Listener {
                     + Math.max(1L, (readyAt - now + 999L) / 1_000L) + "s.");
             return;
         }
-        long cooldown = evolutionKitCooldown(session, id, GameDebugRuntimeOverrides.longValue("EVOLUTION_GOLEM_SLAM_COOLDOWN_MILLIS", ArcadePortRules.EVOLUTION_GOLEM_SLAM_COOLDOWN_MILLIS));
+        long cooldown = evolutionController.kitCooldown(session, id, GameDebugRuntimeOverrides.longValue("EVOLUTION_GOLEM_SLAM_COOLDOWN_MILLIS", ArcadePortRules.EVOLUTION_GOLEM_SLAM_COOLDOWN_MILLIS));
         session.evolutionGolemSlamReadyAt.put(id, now + cooldown);
         session.evolutionAbilitiesUsed.add(id);
         session.evolutionGolemSlamHitTargets.put(id, new HashSet<>());
@@ -19210,7 +19204,7 @@ public final class ArcadePortManager implements Listener {
                     + Math.max(1L, (readyAt - now + 999L) / 1_000L) + "s.");
             return;
         }
-        long cooldown = evolutionKitCooldown(session, id, GameDebugRuntimeOverrides.longValue("EVOLUTION_BLAZE_FLAMETHROWER_COOLDOWN_MILLIS", ArcadePortRules.EVOLUTION_BLAZE_FLAMETHROWER_COOLDOWN_MILLIS));
+        long cooldown = evolutionController.kitCooldown(session, id, GameDebugRuntimeOverrides.longValue("EVOLUTION_BLAZE_FLAMETHROWER_COOLDOWN_MILLIS", ArcadePortRules.EVOLUTION_BLAZE_FLAMETHROWER_COOLDOWN_MILLIS));
         session.evolutionBlazeReadyAt.put(id, now + cooldown);
         session.evolutionAbilitiesUsed.add(id);
         cooldownProgress.start(player, "Flamethrower", cooldown);
@@ -19229,7 +19223,7 @@ public final class ArcadePortManager implements Listener {
                     + Math.max(1L, (readyAt - now + 999L) / 1_000L) + "s.");
             return;
         }
-        long cooldown = evolutionKitCooldown(session, id, GameDebugRuntimeOverrides.longValue("EVOLUTION_SLIME_SLAM_COOLDOWN_MILLIS", ArcadePortRules.EVOLUTION_SLIME_SLAM_COOLDOWN_MILLIS));
+        long cooldown = evolutionController.kitCooldown(session, id, GameDebugRuntimeOverrides.longValue("EVOLUTION_SLIME_SLAM_COOLDOWN_MILLIS", ArcadePortRules.EVOLUTION_SLIME_SLAM_COOLDOWN_MILLIS));
         session.evolutionSlimeSlamReadyAt.put(id, now + cooldown);
         session.evolutionAbilitiesUsed.add(id);
         cooldownProgress.start(player, "Slime Slam", cooldown);
@@ -19259,59 +19253,6 @@ public final class ArcadePortManager implements Listener {
         player.playSound(player.getLocation(), Sound.ENTITY_EGG_THROW, 0.9F, 1.0F);
     }
 
-    private void reduceEvolutionPity(Session session, UUID playerId, long reductionMillis, long now,
-            boolean killBased) {
-        boolean neanderthal = "neanderthal".equals(session.evolutionKits.get(playerId));
-        if (neanderthal) reductionMillis = EvolutionAchievementRules.neanderthalPityReduction(reductionMillis);
-        if (neanderthal && killBased) {
-            session.evolutionPityKillReductionsThisCycle.merge(playerId, 1, Integer::sum);
-        }
-        long deadline = session.evolutionPityUntil.getOrDefault(playerId,
-                now + GameDebugRuntimeOverrides.longValue("EVOLUTION_PITY_CLOCK_MILLIS", ArcadePortRules.EVOLUTION_PITY_CLOCK_MILLIS));
-        long reduced = ArcadePortRules.reduceEvolutionPityDeadline(deadline, now, reductionMillis);
-        session.evolutionPityUntil.put(playerId, reduced);
-        Player player = session.players.get(playerId);
-        if (reduced <= now) {
-            boolean newlyAvailable = session.evolutionAvailable.add(playerId);
-            session.evolutionPityReady.add(playerId);
-            if (newlyAvailable && player != null && player.isOnline()) {
-                player.sendMessage(ChatColor.GOLD + ("neanderthal".equals(session.evolutionKits.get(playerId))
-                        ? "Neanderthal pity evolution ready!" : "Pity evolution ready! Hold sneak while grounded to evolve."));
-                player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.9F, 1.25F);
-            }
-        } else if (player != null && player.isOnline() && !session.evolutionAvailable.contains(playerId)) {
-            player.sendActionBar(ChatColor.GOLD + "Pity evolution "
-                    + ArcadePortRules.formatEvolutionPityRemaining(reduced - now)
-                    + ChatColor.GRAY + " | kill/assist bonus");
-        }
-    }
-
-    private void recordEvolutionDamage(Session session, Player victim, Player attacker, long now) {
-        if (session == null || session.type != ArcadePortGame.EVOLUTION || victim == null || attacker == null) return;
-        UUID victimId = victim.getUniqueId();
-        UUID attackerId = attacker.getUniqueId();
-        if (victimId.equals(attackerId) || !session.players.containsKey(attackerId)) return;
-        session.evolutionDamageContributors.computeIfAbsent(victimId, ignored -> new HashMap<>())
-                .put(attackerId, now);
-    }
-
-    private void recordEvolutionAssists(Session session, UUID victimId, UUID killerId, long now) {
-        Map<UUID, Long> contributors = session.evolutionDamageContributors.remove(victimId);
-        if (contributors == null) return;
-        for (Map.Entry<UUID, Long> contribution : contributors.entrySet()) {
-            UUID contributorId = contribution.getKey();
-            if (contributorId == null || contributorId.equals(victimId) || contributorId.equals(killerId)
-                    || now - contribution.getValue() > GameDebugRuntimeOverrides.longValue("EVOLUTION_ASSIST_WINDOW_MILLIS", ArcadePortRules.EVOLUTION_ASSIST_WINDOW_MILLIS)
-                    || !session.players.containsKey(contributorId)) continue;
-            reduceEvolutionPity(session, contributorId,
-                    GameDebugRuntimeOverrides.longValue("EVOLUTION_PITY_ASSIST_REDUCTION_MILLIS", ArcadePortRules.EVOLUTION_PITY_ASSIST_REDUCTION_MILLIS), now, false);
-            session.evolutionAssistCreditsSinceEvolution.merge(contributorId, 1, Integer::sum);
-            Player contributor = session.players.get(contributorId);
-            if (contributor != null && contributor.isOnline()) {
-                contributor.sendMessage(ChatColor.GREEN + "Evolution assist! Your pity timer was reduced by 7.5 seconds.");
-            }
-        }
-    }
 
     private String evolutionEggVariant(UUID playerId) {
         String selected = selectedGameCosmeticOption(playerId, "evolution", "metamorphosis", "shell-fragments");
@@ -19623,7 +19564,7 @@ public final class ArcadePortManager implements Listener {
             if (session.evolving.contains(attacker.getUniqueId())
                     || session.evolving.contains(target.getUniqueId())) return;
             if ("melee".equalsIgnoreCase(source)) session.evolutionMeleeUsed.add(attacker.getUniqueId());
-            recordEvolutionDamage(session, target, attacker, System.currentTimeMillis());
+        evolutionController.recordDamage(session, target, attacker, System.currentTimeMillis());
             reduceEvolutionChargeAfterHit(session, target);
         }
         if (session.type == ArcadePortGame.GLADIATORS) {
@@ -30319,7 +30260,7 @@ public final class ArcadePortManager implements Listener {
                     + ArcadePortRules.formatEvolutionPityRemaining(readyAt - now));
             return false;
         }
-        long sulphurCooldown = evolutionSulphurBombCooldown(session, playerId,
+        long sulphurCooldown = evolutionController.kitCooldown(session, playerId,
                 GameDebugRuntimeOverrides.longValue("EVOLUTION_SULPHUR_BOMB_COOLDOWN_MILLIS",
                         ArcadePortRules.EVOLUTION_SULPHUR_BOMB_COOLDOWN_MILLIS));
         session.evolutionSulphurBombReadyAt.put(playerId, now + sulphurCooldown);
@@ -30351,7 +30292,7 @@ public final class ArcadePortManager implements Listener {
             double distance = target.getLocation().distance(impact);
             if (!ArcadePortRules.isEvolutionSulphurBombInRange(distance)) continue;
             if (session.evolving.contains(target.getUniqueId())) interruptEvolutionForHit(session, target);
-            recordEvolutionDamage(session, target, shooter, now);
+            evolutionController.recordDamage(session, target, shooter, now);
             double damage = GameDebugRuntimeOverrides.doubleValue("EVOLUTION_SULPHUR_BOMB_DAMAGE", ArcadePortRules.EVOLUTION_SULPHUR_BOMB_DAMAGE);
             if (target.getHealth() <= damage) {
                 eliminate(session, target, shooter, "was hit by " + shooter.getName() + "'s Sulphur Bomb");
