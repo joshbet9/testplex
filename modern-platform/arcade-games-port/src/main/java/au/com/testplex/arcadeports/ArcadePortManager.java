@@ -23272,54 +23272,11 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void updateRunnerDistance(Session session, long now) {
-        if (now >= session.runnerMarathonNextSampleAt) {
-            session.runnerMarathonNextSampleAt = now + 1_000L;
-            for (Player player : alivePlayers(session)) {
-                UUID id = player.getUniqueId();
-                Location current = player.getLocation().clone();
-                Location previous = session.runnerMarathonLastSample.put(id, current);
-                if (previous != null && previous.getWorld() == current.getWorld()) {
-                    double distance = previous.distance(current);
-                    if (Double.isFinite(distance) && distance >= 0.0D) {
-                        session.runnerMarathonDistance.merge(id, distance, Double::sum);
-                    }
-                }
-            }
-        }
-        if (now >= session.runnerCompassNextUpdateAt) {
-            session.runnerCompassNextUpdateAt = now + 250L;
-            List<Player> targets = alivePlayers(session);
-            if (targets.isEmpty()) return;
-            for (Player spectator : session.players.values()) {
-                if (spectator == null || !spectator.isOnline()
-                        || session.alive.contains(spectator.getUniqueId())
-                        || spectator.getWorld() != session.world) continue;
-                boolean hasCompass = java.util.Arrays.stream(spectator.getInventory().getContents())
-                        .anyMatch(this::isRunnerTrackingCompass);
-                if (!hasCompass) spectator.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
-                        "Tracks the nearest surviving Runner."));
-                Player target = targets.stream().min(java.util.Comparator.comparingDouble(candidate ->
-                        candidate.getLocation().distanceSquared(spectator.getLocation()))).orElse(null);
-                if (target == null) continue;
-                spectator.setCompassTarget(target.getLocation());
-                if (isRunnerTrackingCompass(spectator.getInventory().getItemInMainHand())) {
-                    double distance = Math.sqrt(target.getLocation().distanceSquared(spectator.getLocation()));
-                    double height = target.getLocation().getY() - spectator.getLocation().getY();
-                    spectator.sendActionBar(ChatColor.WHITE + "Nearest Target: " + ChatColor.GREEN + target.getName()
-                            + ChatColor.WHITE + " | Distance: " + ChatColor.GREEN
-                            + String.format(java.util.Locale.ROOT, "%.1f", distance)
-                            + ChatColor.WHITE + " | Height: " + ChatColor.GREEN
-                            + String.format(java.util.Locale.ROOT, "%.1f", height));
-                }
-            }
-        }
+        runnerController.updateDistanceAndSpectatorCompass(session, now);
     }
 
     private boolean isRunnerTrackingCompass(ItemStack item) {
-        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
-        ItemMeta meta = item.getItemMeta();
-        return meta != null && meta.hasDisplayName()
-                && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
+        return runnerController.isTrackingCompass(item);
     }
 
 
