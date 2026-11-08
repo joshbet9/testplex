@@ -1,18 +1,30 @@
 package au.com.testplex.arcadeports;
 
+import static au.com.testplex.arcadeports.ArcadeCombatMessages.baconKillMode;
+import static au.com.testplex.arcadeports.ArcadeCombatMessages.sourceKillModeFromDamager;
+import static au.com.testplex.arcadeports.ArcadeCombatMessages.titleCase;
+import static au.com.testplex.arcadeports.ArcadeSpectatorCompassMenus.isBombLobbersCompassMenuTitle;
+import static au.com.testplex.arcadeports.ArcadeSpectatorCompassMenus.isBombTrackingCompass;
+import static au.com.testplex.arcadeports.ArcadeSpectatorCompassMenus.isQuiverTrackingCompass;
+import static au.com.testplex.arcadeports.BombLobbersSpatialRules.bombLobbersBlastExposure;
+import static au.com.testplex.arcadeports.BombLobbersSpatialRules.bombLobbersDistanceToBoundingBox;
+import static au.com.testplex.arcadeports.BombLobbersSpatialRules.bombLobbersOnlineMatchPlayers;
+import static au.com.testplex.arcadeports.BombLobbersSpatialRules.isBombTouchingAnyBlock;
+import static au.com.testplex.arcadeports.BombLobbersSpatialRules.nearestBombLobbersSpawnTeam;
+import static au.com.testplex.arcadeports.TurfWarsTerritoryGeometry.isTurfWarsTerracotta;
+import static au.com.testplex.arcadeports.TurfWarsTerritoryGeometry.isTurfWarsWool;
+import static au.com.testplex.arcadeports.TurfWarsTerritoryGeometry.turfWarsGroundTeam;
+import static au.com.testplex.arcadeports.TurfWarsTerritoryGeometry.turfWarsNearestSpawnTeam;
+import static au.com.testplex.arcadeports.TurfWarsTerritoryGeometry.turfWarsRemainingLines;
+import static au.com.testplex.arcadeports.TurfWarsTerritoryGeometry.turfWarsTeamOnBlock;
+
 import com.destroystokyo.paper.event.player.PlayerJumpEvent;
 import io.papermc.paper.event.entity.EntityKnockbackEvent;
 import io.papermc.paper.event.player.AsyncChatEvent;
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -30,8 +42,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
 import me.monstermaze.MonsterMazePlugin;
 import me.monstermaze.game.ArcadeSessionContext;
 import au.com.testplex.wizards.WizardsGameManager;
@@ -178,166 +188,6 @@ import org.bukkit.util.Vector;
 public final class ArcadePortManager implements Listener {
     private static final int HALF_SIZE = 20;
     private static final long ROUND_MS = 180_000L;
-    private static final List<Material> DRAW_MY_THING_COLOURS = List.of(
-            Material.WHITE_WOOL, Material.ORANGE_WOOL, Material.MAGENTA_WOOL, Material.LIGHT_BLUE_WOOL,
-            Material.YELLOW_WOOL, Material.LIME_WOOL, Material.PINK_WOOL, Material.GRAY_WOOL,
-            Material.LIGHT_GRAY_WOOL, Material.CYAN_WOOL, Material.PURPLE_WOOL, Material.BLUE_WOOL,
-            Material.BROWN_WOOL, Material.GREEN_WOOL, Material.RED_WOOL, Material.BLACK_WOOL);
-    private static final List<String> DRAW_MY_THING_WORDS = List.of(
-            "Bird", "Volcano", "Sloth", "Love", "Dance", "Hair",
-            "Glasses", "Domino", "Dice", "Computer", "Top Hat", "Beard",
-            "Wind", "Rain", "Minecraft", "Push", "Fighting", "Juggle",
-            "Clown", "Miner", "Creeper", "Ghast", "Spider", "Punch",
-            "Roll", "River", "Desert", "Cold", "Photo", "Quick",
-            "Mario", "Luigi", "Bridge", "Turtle", "Door Knob", "Mineplex",
-            "Binoculars", "Telescope", "Planet", "Mountain Bike", "Moon", "Comet",
-            "Flower", "Squirrel", "Horse Riding", "Chef", "Elephant", "Yoshi",
-            "Shotgun", "Pistol", "James Bond", "Money", "Salt and Pepper", "Truck",
-            "Helicopter", "Hot Air Balloon", "Sprout", "Yelling", "Muscles", "Skinny",
-            "Zombie", "Lava", "Snake", "Motorbike", "Whale", "Boat",
-            "Letterbox", "Window", "Lollipop", "Handcuffs", "Police", "Uppercut",
-            "Windmill", "Eyepatch", "Campfire", "Rainbow", "Storm", "Pikachu",
-            "Charmander", "Tornado", "Crying", "King", "Hobo", "Worm",
-            "Snail", "XBox", "Playstation", "Nintendo", "Duck", "Pull",
-            "Dinosaur", "Alligator", "Ankle", "Angel", "Acorn", "Bread",
-            "Booty", "Bacon", "Crown", "Donut", "Drill", "Leash",
-            "Magic", "Wizard", "Igloo", "Plant", "Screw", "Rifle",
-            "Puppy", "Stool", "Stamp", "Letter", "Witch", "Zebra",
-            "Wagon", "Compass", "Watch", "Clock", "Time", "Cyclops",
-            "Coconut", "Hang", "Penguin", "Confused", "Bucket", "Lion",
-            "Rubbish", "Spaceship", "Bowl", "Shark", "Pizza", "Pyramid",
-            "Dress", "Pants", "Shorts", "Boots", "Boy", "Girl",
-            "Math", "Sunglasses", "Frog", "Chair", "Cake", "Grapes",
-            "Kiss", "Snorlax", "Earth", "Spaghetti", "Couch", "Family",
-            "Milk", "Pig", "Giraffe", "Mouse", "Couch", "Fat",
-            "Chocolate", "Camel", "Cheese", "Beans", "Water", "Chicken",
-            "Zipper", "Book", "Swimming", "Horse", "Paper", "Toaster",
-            "Television", "Hammer", "Piano", "Sleeping", "Yawn", "Sheep",
-            "Night", "Chest", "Lamp", "Redstone", "Grass", "Plane",
-            "Ocean", "Lake", "Melon", "Pumpkin", "Gift", "Fishing",
-            "Pirate", "Lightning", "Stomach", "Belly Button", "Fishing Rod", "Iron Ore",
-            "Diamonds", "Emeralds", "Nether Portal", "Ender Dragon", "Rabbit", "Harry Potter",
-            "Torch", "Light", "Battery", "Zombie Pigman", "Telephone", "Tent",
-            "Hand", "Traffic Lights", "Anvil", "Tail", "Umbrella", "Piston",
-            "Skeleton", "Spikes", "Bridge", "Bomb", "Spoon", "Rainbow",
-            "Staircase", "Poop", "Dragon", "Fire", "Apple", "Shoe",
-            "Squid", "Cookie", "Tooth", "Camera", "Sock", "Monkey",
-            "Unicorn", "Smile", "Pool", "Rabbit", "Cupcake", "Pancake",
-            "Princess", "Castle", "Flag", "Planet", "Stars", "Camp Fire",
-            "Rose", "Spray", "Pencil", "Ice Cream", "Toilet", "Moose",
-            "Bear", "Batman", "Eggs", "Teapot", "Golf Club", "Tennis Racket",
-            "Shield", "Crab", "Pot of Gold", "Cactus", "Television", "Pumpkin Pie",
-            "Chimney", "Stable", "Nether", "Wither", "Beach", "Stop Sign",
-            "Chestplate", "Pokeball", "Christmas Tree", "Present", "Snowflake", "Laptop",
-            "Superman", "Football", "Basketball", "Creeper", "Tetris", "Jump",
-            "Ninja", "Baby", "Troll Face", "Grim Reaper", "Temple", "Explosion",
-            "Vomit", "Ants", "Barn", "Burn", "Baggage", "Frisbee",
-            "Iceberg", "Sleeping", "Dream", "Snorlax", "Balloons", "Elevator",
-            "Alligator", "Bikini", "Butterfly", "Bumblebee", "Pizza", "Jellyfish",
-            "Sideburns", "Speedboat", "Treehouse", "Water Gun", "Drink", "Hook",
-            "Dance", "Fall", "Summer", "Autumn", "Spring", "Winter",
-            "Night Time", "Galaxy", "Sunrise", "Sunset", "Picnic", "Snowflake",
-            "Holding Hands", "America", "Laptop", "Anvil", "Bagel", "Bench",
-            "Darts", "Muffin", "Queen", "Wheat", "Dolphin", "Scarf",
-            "Swing", "Thumb", "Tomato", "Armor", "Alien", "Beans",
-            "Cheek", "Phone", "Keyboard", "Orange", "Calculator", "Paper",
-            "Desk", "Disco", "Elbow", "Drool", "Giant", "Golem",
-            "Grave", "Llama", "Moose", "Party", "Panda", "Plumber",
-            "Salsa", "Salad", "Skunk", "Skull", "Stump", "Sugar",
-            "Ruler", "Bookcase", "Hamster", "Soup", "Teapot", "Towel",
-            "Waist", "Archer", "Anchor", "Bamboo", "Branch", "Booger",
-            "Carrot", "Cereal", "Coffee", "Wolf", "Crayon", "Finger",
-            "Forest", "Hotdog", "Burger", "Obsidian", "Pillow", "Swing",
-            "YouTube", "Farm", "Rain", "Cloud", "Frozen", "Garbage",
-            "Music", "Twitter", "Facebook", "Santa Hat", "Rope", "Neck",
-            "Sponge", "Sushi", "Noodles", "Soup", "Tower", "Berry",
-            "Capture", "Prison", "Robot", "Trash", "School", "Skype",
-            "Snowman", "Crowd", "Bank", "Mudkip", "Joker", "Lizard",
-            "Tiger", "Royal", "Erupt", "Wizard", "Stain", "Cinema",
-            "Notebook", "Blanket", "Paint", "Guard", "Astronaut", "Slime",
-            "Mansion", "Radar", "Thorn", "Tears", "Tiny", "Candy",
-            "Pepsi", "Flint", "Draw My Thing", "Rice", "Shout", "Prize",
-            "Skirt", "Thief", "Syrup", "Kirby", "Brush", "Violin",
-            "Car", "Sun", "Eye", "Bow", "Axe", "Face",
-            "Mushroom", "Guitar", "Pickle", "Banana", "Crab", "Sugar",
-            "Soda", "Cookie", "Burger", "Fries", "Speaker", "Pillow",
-            "Rug", "Purse", "Monitor", "Bow", "Pen", "Cat",
-            "Kitten", "Puppy", "Bed", "Button", "Computer", "Key",
-            "Spoon", "Lamp", "Bottle", "Card", "Newspaper", "Glasses",
-            "Mountain", "Minecraft", "Shirt", "Truck", "Car", "Phone",
-            "Cork", "iPod", "Paper", "Bag", "USB", "CD",
-            "Wallet", "Cow", "Pig", "Sheep", "Tomato", "Painting",
-            "Chair", "Keyboard", "Chocolate", "Duck", "Clock", "Balloon",
-            "Remote", "Bread", "Ring", "Necklace", "Hippo", "Flag",
-            "Window", "Door", "Radio", "Television", "Boat", "Fridge",
-            "House", "Piano", "Guitar", "Trumpet", "Drums", "Speaker",
-            "Helmet", "Tree", "Slippers", "Table", "Doll", "Headphones",
-            "Box", "Flower", "Book", "Carrot", "Egg", "Sun",
-            "Hill", "Candle", "Food", "Mouse", "Money", "Emerald",
-            "Magnet", "Camera", "Movie", "Video Game", "Teddy", "Lake",
-            "Violin", "Cheese", "Burger", "Peasant", "King", "Queen",
-            "Prince", "Princess", "Mother", "Father", "Taco", "Racecar",
-            "Car", "Truck", "Tree", "Elephant", "Lion", "Pig",
-            "Cow", "Chicken", "Dog", "Cat", "Moon", "Stars",
-            "Sun", "Diamond", "Gold", "Redstone", "Skateboard", "Bike",
-            "Swimming Pool", "Cookie", "Computer", "Laptop", "Piano", "Guitar",
-            "Trumpet", "Drums", "Flute", "Helicopter", "Plane", "Football",
-            "Tennis", "Hockey", "Water", "Ocean", "Microsoft", "Twitter",
-            "Godzilla", "Building", "House", "Rainbow", "Barbie", "Girl",
-            "Boy", "Children", "Bomb", "Explosion", "Gun", "Tank",
-            "Penguin", "Eagle", "America", "Kangaroo", "Sea", "Raspberry",
-            "Strawberry", "Jam", "Sandwich", "Owl", "Watermelon", "Australia",
-            "Canada", "United States", "Diary", "Airplane", "Alarm clock", "Alien",
-            "Alligator", "Ant", "Apple", "Arm", "Autumn", "Baby",
-            "Ball", "Balloon", "Banana", "Barn", "Base", "Baseball",
-            "Basketball", "Bat", "Bathroom", "Battery", "Beach", "Bear",
-            "Beaver", "Bed", "Beehive", "Bell", "Bicycle", "Bike",
-            "Bird", "Birthday cake", "Blocks", "Boat", "Bone", "Book",
-            "Boot", "Bottle", "Bowtie", "Boy", "Bracelet", "Brain",
-            "Branch", "Bread", "Bridge", "Bubble", "Bug", "Bunny",
-            "Bus", "Cage", "Cake", "Camera", "Cape", "Carrot",
-            "Castle", "Cat", "Cave", "Chair", "Chalk", "Cheek",
-            "Cheese", "Cheeseburger", "Cherry", "Chess", "Chicken", "Chin",
-            "Christmas", "Circle", "Circus", "Clock", "Cloud", "Coal",
-            "Coat", "Coconut", "Computer", "Cone", "Cookie", "Corn",
-            "Cow", "Crab", "Crib", "Cup", "Cupcake", "Desert",
-            "Desk", "Dinosaur", "Dog", "Doll", "Dominoes", "Door",
-            "Doormat", "Drum", "Duck", "Ear", "Ears", "Egg",
-            "Electricity", "Elephant", "Eraser", "Eyes", "Face", "Farm",
-            "Fishing pole", "Fist", "Flamingo", "Flashlight", "Flower", "Flute",
-            "Fly", "Football", "Forest", "Fountain", "Frenchfries", "Frog",
-            "Garbage", "Garden", "Gate", "Ghost", "Gingerbread man", "Giraffe",
-            "Girl", "Glasses", "Grapes", "Grass", "Graveyard", "Hair dryer",
-            "Halloween", "Hat", "Head", "Heart", "Hippo", "Hockey",
-            "Hook", "Hopscotch", "Horse", "Hospital", "House", "Hula hoop",
-            "Ice", "Icecream", "Jacket", "Jar", "Jellyfish", "Jungle",
-            "Kangaroo", "Key", "Kitchen", "Kite", "Knot", "Lamp",
-            "Lawnmower", "Leaf", "Light", "Lightbulb", "Lighthouse", "Lightsaber",
-            "Lips", "Lipstick", "Lobster", "Lollipop", "Mail", "Mailman",
-            "Mattress", "Milk", "Money", "Monkey", "Moon", "Mosquito",
-            "Mouse", "Mouth", "Muffin", "Mushroom", "Music", "Nail",
-            "Newspaper", "Nightmare", "Nose", "Ocean", "Orange", "Owl",
-            "Pajamas", "Palace", "Park", "Party", "Peach", "Peanut",
-            "Pen", "Pencil", "Penguin", "Person", "Photograph", "Piano",
-            "Pie", "Pig", "Pillow", "Pineapple", "Ping pong", "Pinwheel",
-            "Pirate", "Pizza", "Plate", "Pool Party", "Popcorn", "Popsicle",
-            "Potato", "Pretzel", "Prison", "Puppet", "Purse", "Queen",
-            "Rain", "Rainbow", "Restaurant", "Rhinoceros", "Ring", "River",
-            "Road", "Robot", "Rocket", "Rocking chair", "Roof", "Round",
-            "Rug", "Ruins", "Saddle", "Sailboat", "Salt and pepper", "Scale",
-            "School", "Scissors", "Seahorse", "Seashell", "Seesaw", "Shark",
-            "Sheep", "Shirt", "Shoe", "Shopping cart", "Shovel", "Skate",
-            "Skateboard", "Ski", "Skirt", "Slide", "Smile", "Snail",
-            "Snake", "Snowball", "Snowflake", "Snowman", "Soap", "Socks",
-            "Soda", "Song", "Spaceship", "Spider", "Spider web", "Spoon",
-            "Spring", "Stage", "Stairs", "Star", "State", "Statue",
-            "Stingray", "Stoplight", "Storm", "Suitcase", "Summer", "Sun",
-            "Sunflower", "Swimming pool", "Swing", "Swordfish", "Tail", "Taxi",
-            "Teapot", "Telephone", "Thief", "Toast", "Toothbrush", "Torch",
-            "Treasure", "Tree", "Truck", "Trumpet", "Turtle", "TV",
-            "Vest", "Violin", "Volcano", "Washing machine", "Water", "Waterfall",
-            "Watering can", "Whale", "Whisk", "Whistle", "Windmill", "Winter",
-            "Worm", "Wrench", "Yo-yo", "Zoo");
     private static final long JOIN_WINDOW_TICKS = 100L;
     static final int MANUAL_START_COUNTDOWN_SECONDS = 0;
     private final ArcadeMechanicsModernPlugin plugin;
@@ -386,7 +236,7 @@ public final class ArcadePortManager implements Listener {
     private final Map<Integer, UUID> baconAvatarOwnersByEntityId = new ConcurrentHashMap<>();
     private Object baconAvatarPacketBridge;
     private DragonEscapeGhostBridge dragonEscapeGhostBridge;
-    private final Map<String, List<DragonEscapeGhostFrame>> dragonEscapeGhostFrameCache = new HashMap<>();
+    private final DragonEscapeGhostPathStore dragonEscapeGhostStore;
     private Session active;
     /** Prevent a standalone in-process test module from overlapping the shared Arcade session. */
     private boolean standaloneGameActive;
@@ -440,6 +290,8 @@ public final class ArcadePortManager implements Listener {
     ArcadePortManager(ArcadeMechanicsModernPlugin plugin) {
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=arcade-manager-constructor-start");
         this.plugin = plugin;
+        this.dragonEscapeGhostStore = new DragonEscapeGhostPathStore(
+                plugin.getDataFolder().toPath(), plugin.getLogger());
         this.debugProfiles = new GameDebugProfiles(plugin);
         cleanupStaleGladiatorMirrorWorlds();
         this.cooldownProgress = AbilityCooldownProgress.forPlugin(plugin);
@@ -2897,60 +2749,9 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void initializeTurfWarsMap(Session session, SourceMapCatalog.MapData map) {
-        if (map == null) return;
-        List<Location> turf = map.dataLocations("YELLOW");
-        List<Location> red = map.dataLocations("RED");
-        List<Location> redBase = map.dataLocations("PINK");
-        List<Location> blue = map.dataLocations("BLUE");
-        List<Location> blueBase = map.dataLocations("LIGHT_BLUE");
-        if (turf.isEmpty() || red.isEmpty() || redBase.isEmpty() || blue.isEmpty() || blueBase.isEmpty()) {
-            plugin.getLogger().warning("Turf Wars map " + map.mapName()
-                    + " is missing its YELLOW/RED/PINK/BLUE/LIGHT_BLUE objective markers; using the bounded fallback objective.");
-            return;
-        }
-        session.turfSurfaceLocations.clear();
-        for (Location location : turf) session.turfSurfaceLocations.add(location.clone());
-        session.turfRedFront = red.get(0).clone();
-        session.turfRedBase = redBase.get(0).clone();
-        session.turfBlueFront = blue.get(0).clone();
-        session.turfBlueBase = blueBase.get(0).clone();
-        session.turfAxisX = Integer.compare(session.turfRedFront.getBlockX(), session.turfBlueFront.getBlockX());
-        session.turfAxisZ = Integer.compare(session.turfRedFront.getBlockZ(), session.turfBlueFront.getBlockZ());
-        if (session.turfAxisX == 0 && session.turfAxisZ == 0) {
-            session.turfSurfaceLocations.clear();
-            plugin.getLogger().warning("Turf Wars map " + map.mapName()
-                    + " has overlapping RED/BLUE frontline markers; using the bounded fallback objective.");
-            return;
-        }
-        session.turfMarkerGeometry = true;
-        for (Location surface : session.turfSurfaceLocations) {
-            // Source ParseData colours ties blue: only a strictly closer red marker gets red turf.
-            boolean redSide = surface.distanceSquared(session.turfRedFront)
-                    < surface.distanceSquared(session.turfBlueFront);
-            surface.getBlock().setType(redSide ? Material.RED_TERRACOTTA : Material.LIGHT_BLUE_TERRACOTTA, false);
-        }
-        session.turfFrontlineX = session.turfRedFront.getBlockX();
-        session.turfInitialFrontlineX = session.turfFrontlineX;
-        plugin.getLogger().info("Loaded source Turf Wars objective markers for " + map.mapName()
-                + " (" + turf.size() + " turf blocks; axis " + session.turfAxisX + "/" + session.turfAxisZ + ").");
+        TurfWarsTerritoryGeometry.initializeTurfWarsMap(session, map, plugin.getLogger());
     }
 
-    private int turfWarsRemainingLines(Session session, int team) {
-        if (session.turfMarkerGeometry) {
-            // Source getLines() uses X when the fronts differ on X, otherwise it uses Z.
-            if (session.turfAxisX != 0) {
-                return team == 0
-                        ? ArcadePortRules.turfWarsRemainingLines(session.turfRedFront.getBlockX(), session.turfRedBase.getBlockX())
-                        : ArcadePortRules.turfWarsRemainingLines(session.turfBlueFront.getBlockX(), session.turfBlueBase.getBlockX());
-            }
-            return team == 0
-                    ? ArcadePortRules.turfWarsRemainingLines(session.turfRedFront.getBlockZ(), session.turfRedBase.getBlockZ())
-                    : ArcadePortRules.turfWarsRemainingLines(session.turfBlueFront.getBlockZ(), session.turfBlueBase.getBlockZ());
-        }
-        if (team == 0) return Math.max(0, session.turfFrontlineMaxXExclusive - 1 - session.turfFrontlineX);
-        if (team == 1) return Math.max(0, session.turfFrontlineX - session.turfFrontlineMinX);
-        return Integer.MAX_VALUE;
-    }
 
     private boolean turfWarsTeamPresent(Session session, int team) {
         for (UUID id : session.alive) if (session.teams.getOrDefault(id, -1) == team) return true;
@@ -2975,9 +2776,6 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    private boolean isTurfWarsWool(Material material) {
-        return material != null && material.name().endsWith("_WOOL");
-    }
 
     private void cacheTurfWarsTeamSpawnCentres(Session session, SourceMapCatalog.MapData map) {
         session.turfTeamSpawnCentres.clear();
@@ -2995,66 +2793,6 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    private boolean isTurfWarsTerracotta(Material material) {
-        return material != null && material.name().endsWith("_TERRACOTTA");
-    }
-
-    private int turfWarsTeamOnBlock(Block block) {
-        if (block == null) return -1;
-        Material type = block.getType();
-        if (type == Material.RED_TERRACOTTA) return 0;
-        if (type == Material.LIGHT_BLUE_TERRACOTTA) return 1;
-        return -1;
-    }
-
-    /**
-     * Mirrors TurfForts.Territory: start beneath the feet, look at adjacent clay/Wool
-     * when grounded over a gap, then descend through non-clay blocks until the first
-     * stained-clay surface. Wool is a footprint hint, never the territory colour itself.
-     */
-    private int turfWarsGroundTeam(Player player) {
-        if (player == null || player.getWorld() == null) return -1;
-        Block ground = player.getLocation().getBlock().getRelative(BlockFace.DOWN);
-        if (ground.isEmpty() && player.isOnGround()) {
-            Block adjacent = null;
-            double nearestDistance = Double.POSITIVE_INFINITY;
-            for (int dx = -1; dx <= 1; dx++) {
-                for (int dz = -1; dz <= 1; dz++) {
-                    Block candidate = ground.getRelative(dx, 0, dz);
-                    if (!isTurfWarsTerracotta(candidate.getType()) && !isTurfWarsWool(candidate.getType())) continue;
-                    double distance = dx * dx + dz * dz;
-                    if (distance < nearestDistance) {
-                        nearestDistance = distance;
-                        adjacent = candidate;
-                    }
-                }
-            }
-            if (adjacent != null) ground = adjacent;
-        }
-
-        int minY = Math.max(0, player.getWorld().getMinHeight());
-        while (!isTurfWarsTerracotta(ground.getType()) && ground.getY() > minY) {
-            ground = ground.getRelative(BlockFace.DOWN);
-        }
-        if (!isTurfWarsTerracotta(ground.getType())) return -1;
-        return turfWarsTeamOnBlock(ground);
-    }
-
-    private int turfWarsNearestSpawnTeam(Session session, Location location) {
-        if (session == null || location == null) return -1;
-        int nearest = -1;
-        double nearestDistance = Double.POSITIVE_INFINITY;
-        for (Map.Entry<Integer, Location> entry : session.turfTeamSpawnCentres.entrySet()) {
-            Location centre = entry.getValue();
-            if (centre == null || centre.getWorld() != session.world) continue;
-            double distance = centre.distanceSquared(location);
-            if (distance < nearestDistance) {
-                nearestDistance = distance;
-                nearest = entry.getKey();
-            }
-        }
-        return nearest;
-    }
 
     private void updateTurfWarsTerritory(Session session, long now) {
         if (active != session) return;
@@ -12957,9 +12695,9 @@ public final class ArcadePortManager implements Listener {
     }
 
     private String chooseDrawWord(Session session) {
-        List<String> words=new ArrayList<>(DRAW_MY_THING_WORDS);
+        List<String> words=new ArrayList<>(DrawMyThingContent.WORDS);
         words.removeAll(session.drawUsedWords);
-        if(words.isEmpty()){session.drawUsedWords.clear();words.addAll(DRAW_MY_THING_WORDS);}
+        if(words.isEmpty()){session.drawUsedWords.clear();words.addAll(DrawMyThingContent.WORDS);}
         String word=words.get(ThreadLocalRandom.current().nextInt(words.size()));
         session.drawUsedWords.add(word);
         return word;
@@ -12979,8 +12717,8 @@ public final class ArcadePortManager implements Listener {
         for (int i = 0; i < tools.length; i++) {
             drawer.getInventory().setItem(i, namedItem(tools[i], names[i], descriptions[i]));
         }
-        for (int i = 0; i < DRAW_MY_THING_COLOURS.size(); i++) {
-            Material colour = DRAW_MY_THING_COLOURS.get(i);
+        for (int i = 0; i < DrawMyThingContent.COLOURS.size(); i++) {
+            Material colour = DrawMyThingContent.COLOURS.get(i);
             String label = colour.name().replace("_WOOL", "").replace('_', ' ');
             drawer.getInventory().setItem(i + 9,
                     namedItem(colour, label + " Paint", "Select this colour, then use a drawing tool."));
@@ -13298,7 +13036,7 @@ public final class ArcadePortManager implements Listener {
                 || !player.getUniqueId().equals(session.drawCurrentDrawer)
                 || event.getClickedInventory() == null) return;
         ItemStack clicked = event.getCurrentItem();
-        if (clicked == null || clicked.getType().isAir() || !DRAW_MY_THING_COLOURS.contains(clicked.getType())) return;
+        if (clicked == null || clicked.getType().isAir() || !DrawMyThingContent.COLOURS.contains(clicked.getType())) return;
         event.setCancelled(true);
         selectDrawColour(session, player, clicked.getType(), drawColourName(clicked.getType()));
     }
@@ -13311,7 +13049,7 @@ public final class ArcadePortManager implements Listener {
                 || session.drawCurrentDrawer == null
                 || !player.getUniqueId().equals(session.drawCurrentDrawer)) return;
         ItemStack selected = player.getInventory().getItem(event.getNewSlot());
-        if (selected == null || !DRAW_MY_THING_COLOURS.contains(selected.getType())) return;
+        if (selected == null || !DrawMyThingContent.COLOURS.contains(selected.getType())) return;
         selectDrawColour(session, player, selected.getType(), drawColourName(selected.getType()));
     }
 
@@ -13338,7 +13076,7 @@ public final class ArcadePortManager implements Listener {
         ItemStack held = event.getItem();
         String name = held == null || !held.hasItemMeta() || !held.getItemMeta().hasDisplayName()
                 ? null : ChatColor.stripColor(held.getItemMeta().getDisplayName());
-        if (held != null && DRAW_MY_THING_COLOURS.contains(held.getType())) {
+        if (held != null && DrawMyThingContent.COLOURS.contains(held.getType())) {
             selectDrawColour(session, player, held.getType(), drawColourName(held.getType()));
             return;
         }
@@ -17216,8 +16954,8 @@ public final class ArcadePortManager implements Listener {
         Location finishLocation = player.getLocation().clone();
         List<DragonEscapeGhostFrame> ghostFrames = session.dragonEscapeRunGhostFrames
                 .computeIfAbsent(id, ignored -> new ArrayList<>());
-        appendDragonEscapeGhostFrame(ghostFrames, dragonEscapeGhostFrame(player, elapsed, finishLocation));
-        saveDragonEscapeGhostFrames(id, session.dragonEscapeMapResource, ghostFrames);
+        DragonEscapeGhostPathStore.append(ghostFrames, dragonEscapeGhostFrame(player, elapsed, finishLocation));
+        dragonEscapeGhostStore.save(id, session.dragonEscapeMapResource, ghostFrames);
         plugin.getConfig().set(path + "time-ms", elapsed);
         plugin.getConfig().set(path + "map-resource", session.dragonEscapeMapResource);
         plugin.getConfig().set(path + "map-name", session.dragonEscapeMapName);
@@ -17410,10 +17148,6 @@ public final class ArcadePortManager implements Listener {
         return ArcadePortRules.interpolateDragonEscapeSplitMillis(fromTime, toTime, fraction);
     }
 
-    private static final int DRAGON_ESCAPE_GHOST_FILE_MAGIC = 0x44454748; // "DEGH"
-    private static final int DRAGON_ESCAPE_GHOST_FILE_VERSION = 1;
-    private static final int DRAGON_ESCAPE_GHOST_MAX_FRAMES = 120_000;
-
     private void recordDragonEscapeGhostFrames(Session session, long now) {
         long elapsed = Math.max(0L, now - session.startedAt);
         for (UUID id : new ArrayList<>(session.alive)) {
@@ -17422,7 +17156,7 @@ public final class ArcadePortManager implements Listener {
                     || !player.isOnline() || player.getWorld() != session.world) continue;
             List<DragonEscapeGhostFrame> frames = session.dragonEscapeRunGhostFrames
                     .computeIfAbsent(id, ignored -> new ArrayList<>());
-            appendDragonEscapeGhostFrame(frames, dragonEscapeGhostFrame(player, elapsed, player.getLocation()));
+            DragonEscapeGhostPathStore.append(frames, dragonEscapeGhostFrame(player, elapsed, player.getLocation()));
         }
     }
 
@@ -17430,141 +17164,6 @@ public final class ArcadePortManager implements Listener {
         return new DragonEscapeGhostFrame(Math.max(0L, elapsed),
                 location.getX(), location.getY(), location.getZ(), location.getYaw(), location.getPitch(),
                 player.isSneaking(), player.isSprinting(), player.isOnGround());
-    }
-
-    private void appendDragonEscapeGhostFrame(
-            List<DragonEscapeGhostFrame> frames, DragonEscapeGhostFrame frame) {
-        if (frames == null || frame == null) return;
-        if (!frames.isEmpty() && frame.timeMillis() <= frames.get(frames.size() - 1).timeMillis()) return;
-        frames.add(frame);
-        if (frames.size() > DRAGON_ESCAPE_GHOST_MAX_FRAMES) {
-            List<DragonEscapeGhostFrame> compacted = new ArrayList<>(frames.size() / 2 + 1);
-            for (int i = 0; i < frames.size(); i += 2) compacted.add(frames.get(i));
-            DragonEscapeGhostFrame last = frames.get(frames.size() - 1);
-            if (compacted.get(compacted.size() - 1) != last) compacted.add(last);
-            frames.clear();
-            frames.addAll(compacted);
-        }
-    }
-
-    private String dragonEscapeGhostCacheKey(UUID playerId, String mapResource) {
-        String mapKey = ArcadePortRules.dragonEscapeMapStorageKey(mapResource);
-        return playerId == null || mapKey.isBlank() ? "" : playerId + ":" + mapKey;
-    }
-
-    private Path dragonEscapeGhostFile(UUID playerId, String mapResource) {
-        String mapKey = ArcadePortRules.dragonEscapeMapStorageKey(mapResource);
-        if (playerId == null || mapKey.isBlank()) return null;
-        String safeMapKey = mapKey.replaceAll("[^A-Za-z0-9._-]", "_");
-        return plugin.getDataFolder().toPath().resolve("dragon-escape-ghosts")
-                .resolve(playerId.toString()).resolve(safeMapKey + ".ghost.gz");
-    }
-
-    private void saveDragonEscapeGhostFrames(
-            UUID playerId, String mapResource, List<DragonEscapeGhostFrame> frames) {
-        if (frames == null || frames.isEmpty()) return;
-        Path target = dragonEscapeGhostFile(playerId, mapResource);
-        String cacheKey = dragonEscapeGhostCacheKey(playerId, mapResource);
-        if (target == null || cacheKey.isEmpty()) return;
-        Path temporary = target.resolveSibling(target.getFileName() + ".tmp");
-        try {
-            Files.createDirectories(target.getParent());
-            try (DataOutputStream output = new DataOutputStream(new BufferedOutputStream(
-                    new GZIPOutputStream(Files.newOutputStream(temporary))))) {
-                output.writeInt(DRAGON_ESCAPE_GHOST_FILE_MAGIC);
-                output.writeInt(DRAGON_ESCAPE_GHOST_FILE_VERSION);
-                output.writeInt(frames.size());
-                for (DragonEscapeGhostFrame frame : frames) {
-                    output.writeLong(frame.timeMillis());
-                    output.writeDouble(frame.x());
-                    output.writeDouble(frame.y());
-                    output.writeDouble(frame.z());
-                    output.writeFloat(frame.yaw());
-                    output.writeFloat(frame.pitch());
-                    output.writeBoolean(frame.sneaking());
-                    output.writeBoolean(frame.sprinting());
-                    output.writeBoolean(frame.onGround());
-                }
-            }
-            try {
-                Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING,
-                        StandardCopyOption.ATOMIC_MOVE);
-            } catch (AtomicMoveNotSupportedException ignored) {
-                Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
-            }
-            dragonEscapeGhostFrameCache.put(cacheKey, List.copyOf(frames));
-        } catch (IOException exception) {
-            try { Files.deleteIfExists(temporary); } catch (IOException ignored) { }
-            plugin.getLogger().warning("Could not save Dragon Escape PB ghost path for " + playerId
-                    + " on " + mapResource + ": " + exception.getMessage());
-        }
-    }
-
-    private List<DragonEscapeGhostFrame> loadDragonEscapeGhostFrames(UUID playerId, String mapResource) {
-        String cacheKey = dragonEscapeGhostCacheKey(playerId, mapResource);
-        if (cacheKey.isEmpty()) return List.of();
-        List<DragonEscapeGhostFrame> cached = dragonEscapeGhostFrameCache.get(cacheKey);
-        if (cached != null) return cached;
-        Path file = dragonEscapeGhostFile(playerId, mapResource);
-        if (file == null || !Files.isRegularFile(file)) return List.of();
-        try (DataInputStream input = new DataInputStream(new BufferedInputStream(
-                new GZIPInputStream(Files.newInputStream(file))))) {
-            if (input.readInt() != DRAGON_ESCAPE_GHOST_FILE_MAGIC
-                    || input.readInt() != DRAGON_ESCAPE_GHOST_FILE_VERSION) return List.of();
-            int count = input.readInt();
-            if (count < 1 || count > DRAGON_ESCAPE_GHOST_MAX_FRAMES) return List.of();
-            List<DragonEscapeGhostFrame> frames = new ArrayList<>(count);
-            long previousTime = -1L;
-            for (int i = 0; i < count; i++) {
-                DragonEscapeGhostFrame frame = new DragonEscapeGhostFrame(
-                        input.readLong(), input.readDouble(), input.readDouble(), input.readDouble(),
-                        input.readFloat(), input.readFloat(),
-                        input.readBoolean(), input.readBoolean(), input.readBoolean());
-                if (frame.timeMillis() < previousTime
-                        || !Double.isFinite(frame.x()) || !Double.isFinite(frame.y())
-                        || !Double.isFinite(frame.z()) || !Float.isFinite(frame.yaw())
-                        || !Float.isFinite(frame.pitch())) return List.of();
-                previousTime = frame.timeMillis();
-                frames.add(frame);
-            }
-            List<DragonEscapeGhostFrame> loaded = List.copyOf(frames);
-            dragonEscapeGhostFrameCache.put(cacheKey, loaded);
-            return loaded;
-        } catch (IOException | RuntimeException exception) {
-            plugin.getLogger().warning("Could not read Dragon Escape PB ghost path for " + playerId
-                    + " on " + mapResource + ": " + exception.getMessage());
-            return List.of();
-        }
-    }
-
-    private DragonEscapeGhostFrame dragonEscapeGhostFrameAt(List<DragonEscapeGhostFrame> frames, long elapsed) {
-        if (frames == null || frames.isEmpty()) return null;
-        if (elapsed <= frames.get(0).timeMillis()) return frames.get(0);
-        int lastIndex = frames.size() - 1;
-        if (elapsed >= frames.get(lastIndex).timeMillis()) return frames.get(lastIndex);
-        int low = 0;
-        int high = lastIndex;
-        while (low + 1 < high) {
-            int middle = (low + high) >>> 1;
-            if (frames.get(middle).timeMillis() <= elapsed) low = middle;
-            else high = middle;
-        }
-        DragonEscapeGhostFrame from = frames.get(low);
-        DragonEscapeGhostFrame to = frames.get(high);
-        long duration = Math.max(1L, to.timeMillis() - from.timeMillis());
-        double fraction = Math.max(0.0D, Math.min(1.0D,
-                (elapsed - from.timeMillis()) / (double) duration));
-        double yawDelta = ((to.yaw() - from.yaw() + 540.0D) % 360.0D) - 180.0D;
-        boolean useNextPose = fraction >= 0.5D;
-        return new DragonEscapeGhostFrame(elapsed,
-                ArcadePortRules.interpolateDragonEscapeCoordinate(from.x(), to.x(), fraction),
-                ArcadePortRules.interpolateDragonEscapeCoordinate(from.y(), to.y(), fraction),
-                ArcadePortRules.interpolateDragonEscapeCoordinate(from.z(), to.z(), fraction),
-                (float) (from.yaw() + yawDelta * fraction),
-                (float) (from.pitch() + (to.pitch() - from.pitch()) * fraction),
-                useNextPose ? to.sneaking() : from.sneaking(),
-                useNextPose ? to.sprinting() : from.sprinting(),
-                useNextPose ? to.onGround() : from.onGround());
     }
 
     private DragonEscapeGhostFrame dragonEscapeLegacyGhostFrame(
@@ -17597,10 +17196,10 @@ public final class ArcadePortManager implements Listener {
                 bridge.hide(viewer);
                 continue;
             }
-            List<DragonEscapeGhostFrame> recorded = loadDragonEscapeGhostFrames(id, session.dragonEscapeMapResource);
+            List<DragonEscapeGhostFrame> recorded = dragonEscapeGhostStore.load(id, session.dragonEscapeMapResource);
             DragonEscapeGhostFrame frame = recorded.isEmpty()
                     ? dragonEscapeLegacyGhostFrame(session, id, elapsed, pb)
-                    : dragonEscapeGhostFrameAt(recorded, elapsed);
+                    : DragonEscapeGhostPathStore.interpolate(recorded, elapsed);
             if (frame == null) {
                 bridge.hide(viewer);
                 continue;
@@ -24710,56 +24309,9 @@ public final class ArcadePortManager implements Listener {
         for (Player player : session.players.values()) if (player != null && player.isOnline()) player.sendMessage(text);
     }
 
-    /** Mineplex F.main format: blue module header, then gray message body. */
-    private static String sourceStyleChat(String module, String body) {
-        return ChatColor.BLUE + module + "> " + ChatColor.GRAY + body;
-    }
-
-    /** Recreate the source CombatManager death output for Arcade games using detailed messages. */
     private void broadcastSourceStyleDeathMessage(Session session, Player victim, Player killer, String reason) {
-        String killMode = killer == null ? "" : sourceKillMode(session, victim, killer, reason);
-        if (session.type == ArcadePortGame.EVOLUTION || session.type == ArcadePortGame.SUPER_SPLOOR) {
-            // These source games select DeathMessageType.Simple: only the victim and killer receive it.
-            if (killer != null && killer.isOnline() && !killer.getUniqueId().equals(victim.getUniqueId())) {
-                killer.sendMessage(sourceStyleChat("Combat", "You killed " + ChatColor.YELLOW
-                        + victim.getName() + ChatColor.GRAY + " with " + ChatColor.AQUA + killMode + ChatColor.GRAY + "."));
-                victim.sendMessage(sourceStyleChat("Combat", ChatColor.YELLOW + killer.getName()
-                        + ChatColor.GRAY + " killed you with " + ChatColor.AQUA + killMode + ChatColor.GRAY + "."));
-            } else {
-                String cause = sourceDeathCause(reason);
-                String body = cause.equals("has died") ? "You have died."
-                        : cause.startsWith("was ") ? "You " + cause + "."
-                        : "You " + cause + ".";
-                victim.sendMessage(sourceStyleChat("Combat", body));
-            }
-            return;
-        }
-        String body;
-        if (session.type == ArcadePortGame.DRAGON_ESCAPE && killer != null && killer.isOnline()
-                && !killer.getUniqueId().equals(victim.getUniqueId())) {
-            body = ChatColor.YELLOW + victim.getName() + ChatColor.GRAY + " was killed by "
-                    + ChatColor.YELLOW + killer.getName() + ChatColor.GRAY + " with "
-                    + ChatColor.AQUA + killMode + ChatColor.GRAY + ".";
-        } else if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
-            String normalized = reason == null ? "" : reason.toLowerCase(java.util.Locale.ROOT);
-            if (normalized.contains("dragon")) {
-                body = victim.getName() + " was caught by Douglas the Dragon!";
-            } else if (normalized.contains("fell") || normalized.contains("fall")) {
-                body = victim.getName() + " fell from the Skylands course!";
-            } else {
-                body = victim.getName() + " couldn't escape the dragon!";
-            }
-        } else if (killer != null && killer.isOnline() && !killer.getUniqueId().equals(victim.getUniqueId())) {
-            body = ChatColor.YELLOW + victim.getName() + ChatColor.GRAY + " was killed by "
-                    + ChatColor.YELLOW + killer.getName() + ChatColor.GRAY + " with "
-                    + ChatColor.AQUA + killMode + ChatColor.GRAY + ".";
-        } else {
-            body = ChatColor.YELLOW + victim.getName() + ChatColor.GRAY + " " + sourceDeathCause(reason) + ".";
-        }
-        String message = sourceStyleChat("Combat", body);
-        for (Player participant : session.players.values()) {
-            if (participant != null && participant.isOnline()) participant.sendMessage(message);
-        }
+        ArcadeCombatMessages.broadcastDeath(session.type, session.players.values(), victim, killer, reason,
+                killer == null ? "" : sourceKillMode(session, victim, killer, reason));
     }
 
     private String sourceKillMode(Session session, Player victim, Player killer, String reason) {
@@ -24787,61 +24339,6 @@ public final class ArcadePortManager implements Listener {
                     : ChatColor.stripColor(displayName);
         }
         return "Melee";
-    }
-
-    private static String baconKillMode(String source) {
-        if (source == null) return "Iron Axe";
-        return switch (source) {
-            case "body-slam" -> "Body Slam";
-            case "bacon-blast" -> "Bacon Blast";
-            case "crispy-bacon" -> "Crispy Fire";
-            case "melee", "projectile hit" -> "Iron Axe";
-            default -> titleCase(source);
-        };
-    }
-
-    private String sourceKillModeFromDamager(Entity damager, Player attacker) {
-        if (damager instanceof Projectile projectile) {
-            if (projectile instanceof Arrow) return "Bow";
-            if (projectile instanceof Snowball) return "Snowball";
-            if (projectile instanceof Egg) return "Egg";
-            if (projectile instanceof Fireball) return "Fireball";
-            if (projectile instanceof EnderPearl) return "Ender Pearl";
-            return titleCase(projectile.getType().name());
-        }
-        if (damager instanceof TNTPrimed) return "TNT";
-        if (attacker != null) {
-            ItemStack held = attacker.getInventory().getItemInMainHand();
-            if (held != null && !held.getType().isAir()) {
-                ItemMeta meta = held.getItemMeta();
-                String displayName = meta == null ? null : meta.getDisplayName();
-                return displayName == null || displayName.isBlank()
-                        ? titleCase(held.getType().name()) : ChatColor.stripColor(displayName);
-            }
-        }
-        return damager == null ? "Melee" : titleCase(damager.getType().name());
-    }
-
-    private static String titleCase(String value) {
-        if (value == null || value.isBlank()) return "Melee";
-        StringBuilder result = new StringBuilder();
-        for (String word : value.replace('-', ' ').replace('_', ' ').trim().split("\\s+")) {
-            if (word.isBlank()) continue;
-            if (!result.isEmpty()) result.append(' ');
-            result.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
-        }
-        return result.isEmpty() ? "Melee" : result.toString();
-    }
-
-    private static String sourceDeathCause(String reason) {
-        if (reason == null || reason.isBlank()) return "has died";
-        String normalized = reason.toLowerCase(java.util.Locale.ROOT).trim();
-        if (normalized.contains("fell") || normalized.contains("fall")) return "fell to their death";
-        if (normalized.contains("void")) return "fell into the void";
-        if (normalized.contains("starv")) return "starved to death";
-        if (normalized.contains("burn")) return "burned to death";
-        if (normalized.startsWith("was ")) return normalized;
-        return "was killed by " + normalized;
     }
 
     public void stop(String reason) {
@@ -30883,81 +30380,11 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void cacheBombLobbersTeamSpawnCentres(Session session) {
-        session.bombTeamSpawnCentres.clear();
-
-        // Reborn calculates each side from every configured team spawn, not just the
-        // subset of spawn markers occupied by the current lobby. Keep that boundary stable
-        // when the test server has a small party or only one player on either team.
-        SourceMapCatalog.MapData sourceMap = sourceMapData.get(session.type.id());
-        if (sourceMap != null) {
-            boolean hasAllTeamMarkers = true;
-            for (int team = 0; team < 2; team++) {
-                List<Location> markers = sourceMap.teamSpawnLocationsForTeam(team, 2);
-                if (markers.isEmpty()) {
-                    hasAllTeamMarkers = false;
-                    break;
-                }
-                double x = 0.0D, y = 0.0D, z = 0.0D;
-                for (Location marker : markers) {
-                    x += marker.getX();
-                    y += marker.getY();
-                    z += marker.getZ();
-                }
-                int count = markers.size();
-                session.bombTeamSpawnCentres.put(team, new Location(session.world,
-                        x / count, y / count, z / count));
-            }
-            if (hasAllTeamMarkers) return;
-            session.bombTeamSpawnCentres.clear();
-        }
-
-        // Fallback for a malformed or incomplete source map: derive centres from occupied spawns.
-        Map<Integer, double[]> totals = new HashMap<>();
-        Map<Integer, Integer> counts = new HashMap<>();
-        for (UUID id : session.players.keySet()) {
-            int team = session.teams.getOrDefault(id, -1);
-            Location spawn = session.lastLocations.get(id);
-            if (team < 0 || spawn == null || spawn.getWorld() != session.world) continue;
-            double[] total = totals.computeIfAbsent(team, ignored -> new double[3]);
-            total[0] += spawn.getX();
-            total[1] += spawn.getY();
-            total[2] += spawn.getZ();
-            counts.merge(team, 1, Integer::sum);
-        }
-        for (Map.Entry<Integer, double[]> entry : totals.entrySet()) {
-            int count = counts.getOrDefault(entry.getKey(), 0);
-            if (count <= 0) continue;
-            double[] total = entry.getValue();
-            session.bombTeamSpawnCentres.put(entry.getKey(), new Location(session.world,
-                    total[0] / count, total[1] / count, total[2] / count));
-        }
+        BombLobbersSpatialRules.cacheBombLobbersTeamSpawnCentres(
+                session, sourceMapData.get(session.type.id()));
     }
 
-    private int nearestBombLobbersSpawnTeam(Session session, Location location) {
-        if (session == null || location == null || location.getWorld() != session.world
-                || session.bombTeamSpawnCentres.isEmpty()) return -1;
-        int nearestTeam = -1;
-        double nearestDistanceSquared = Double.POSITIVE_INFINITY;
-        for (Map.Entry<Integer, Location> entry : session.bombTeamSpawnCentres.entrySet()) {
-            double distanceSquared = location.distanceSquared(entry.getValue());
-            if (distanceSquared < nearestDistanceSquared) {
-                nearestDistanceSquared = distanceSquared;
-                nearestTeam = entry.getKey();
-            }
-        }
-        return nearestTeam;
-    }
 
-    private double bombLobbersDistanceToBoundingBox(Location blast, Player target) {
-        org.bukkit.util.BoundingBox box = target.getBoundingBox();
-        double dx = blast.getX() < box.getMinX() ? box.getMinX() - blast.getX()
-                : blast.getX() > box.getMaxX() ? blast.getX() - box.getMaxX() : 0.0D;
-        double dy = blast.getY() < box.getMinY() ? box.getMinY() - blast.getY()
-                : blast.getY() > box.getMaxY() ? blast.getY() - box.getMaxY() : 0.0D;
-        double dz = blast.getZ() < box.getMinZ() ? box.getMinZ() - blast.getZ()
-                : blast.getZ() > box.getMaxZ() ? blast.getZ() - box.getMaxZ() : 0.0D;
-        return Math.sqrt(dx * dx + dy * dy + dz * dz);
-    }
 
     /** Mirrors the legacy CompassModule: spectators track nearest opponents, never their own team. */
     private void updateBombLobbersSpectatorCompasses(Session session) {
@@ -31000,19 +30427,9 @@ public final class ArcadePortManager implements Listener {
                 "Left-click to teleport to the nearest player; right-click to open the spectator menu.");
     }
 
-    private boolean isQuiverTrackingCompass(ItemStack item) {
-        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
-        ItemMeta meta = item.getItemMeta();
-        return meta != null && meta.hasDisplayName()
-                && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
-    }
-
     private Player nearestQuiverSpectateTarget(Session session, Player spectator) {
         if (session == null || spectator == null) return null;
-        return alivePlayers(session).stream()
-                .min(java.util.Comparator.comparingDouble(candidate ->
-                        candidate.getLocation().distanceSquared(spectator.getLocation())))
-                .orElse(null);
+        return ArcadeSpectatorCompassMenus.nearestTarget(alivePlayers(session), spectator);
     }
 
     private void updateQuiverSpectatorCompass(Session session) {
@@ -31036,37 +30453,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void openQuiverSpectatorMenu(Session session, Player spectator) {
-        Inventory inventory = Bukkit.createInventory(null, 54, ChatColor.DARK_GREEN + "Spectator Menu");
-        inventory.setItem(4, quiverTrackingCompass());
-        int[] slots = {19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34,
-                37, 38, 39, 40, 41, 42, 43, 46, 47, 48, 49, 50, 51, 52};
-        Map<Integer, UUID> targetsBySlot = new HashMap<>();
-        List<Player> targets = alivePlayers(session).stream()
-                .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
-                .toList();
-        for (int i = 0; i < targets.size() && i < slots.length; i++) {
-            Player target = targets.get(i);
-            int slot = slots[i];
-            ItemStack head = new ItemStack(Material.PLAYER_HEAD);
-            if (head.getItemMeta() instanceof SkullMeta meta) {
-                meta.setOwningPlayer(target);
-                double distance = Math.sqrt(target.getLocation().distanceSquared(spectator.getLocation()));
-                double height = target.getLocation().getY() - spectator.getLocation().getY();
-                meta.setDisplayName(ChatColor.AQUA + target.getName());
-                meta.setLore(List.of(
-                        ChatColor.GRAY + "Kit: " + session.quiverKits.getOrDefault(target.getUniqueId(), "leaper"),
-                        ChatColor.GRAY + "Kills: " + session.scores.getOrDefault(target.getUniqueId(), 0),
-                        ChatColor.GRAY + "Distance: " + String.format(java.util.Locale.ROOT, "%.1f", distance),
-                        ChatColor.GRAY + "Height difference: " + String.format(java.util.Locale.ROOT, "%+.1f", height),
-                        ChatColor.YELLOW + "Left-click: Teleport",
-                        ChatColor.YELLOW + "Right-click: Spectate"));
-                head.setItemMeta(meta);
-            }
-            inventory.setItem(slot, head);
-            targetsBySlot.put(slot, target.getUniqueId());
-        }
-        session.quiverCompassMenuTargets.put(spectator.getUniqueId(), targetsBySlot);
-        spectator.openInventory(inventory);
+        ArcadeSpectatorCompassMenus.openQuiverSpectatorMenu(session, spectator,
+                alivePlayers(session), quiverTrackingCompass());
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -31102,64 +30490,15 @@ public final class ArcadePortManager implements Listener {
         spectator.setCompassTarget(target.getLocation());
     }
 
-    private boolean isBombTrackingCompass(ItemStack item) {
-        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
-        ItemMeta meta = item.getItemMeta();
-        return meta != null && meta.hasDisplayName()
-                && ChatColor.stripColor(meta.getDisplayName()).equals("Tracking Compass");
-    }
-
-    /** The source compass needle tracks enemies, but its left-click teleport targets any living player. */
     private Player nearestBombLobbersSpectateTarget(Session session, Player spectator) {
         if (session == null || spectator == null) return null;
-        return alivePlayers(session).stream()
-                .min(java.util.Comparator.comparingDouble(candidate ->
-                        candidate.getLocation().distanceSquared(spectator.getLocation())))
-                .orElse(null);
+        return ArcadeSpectatorCompassMenus.nearestTarget(alivePlayers(session), spectator);
     }
 
     private void openBombLobbersCompassMenu(Session session, Player spectator) {
-        Inventory inventory = Bukkit.createInventory(null, 54, ChatColor.DARK_GREEN + "Spectator Menu");
-        inventory.setItem(4, namedItem(Material.COMPASS, "Tracking Compass",
-                "Choose an enemy player to follow."));
-
-        int[] slots = {
-                19, 20, 21, 22, 23, 24, 25,
-                28, 29, 30, 31, 32, 33, 34,
-                37, 38, 39, 40, 41, 42, 43,
-                46, 47, 48, 49, 50, 51, 52
-        };
-        Map<Integer, UUID> targetsBySlot = new HashMap<>();
-        // The legacy Spectator Menu lists every living player, even though the needle itself
-        // tracks only an opposing team.
-        List<Player> targets = alivePlayers(session).stream()
-                .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
-                .toList();
-        for (int i = 0; i < targets.size() && i < slots.length; i++) {
-            Player target = targets.get(i);
-            int slot = slots[i];
-            ItemStack head = new ItemStack(Material.PLAYER_HEAD);
-            if (head.getItemMeta() instanceof SkullMeta meta) {
-                meta.setOwningPlayer(target);
-                int targetTeam = session.teams.getOrDefault(target.getUniqueId(), -1);
-                ChatColor color = targetTeam == 1 ? ChatColor.AQUA : ChatColor.RED;
-                meta.setDisplayName(color + target.getName());
-                double distance = Math.sqrt(target.getLocation().distanceSquared(spectator.getLocation()));
-                double height = target.getLocation().getY() - spectator.getLocation().getY();
-                String kit = session.bombLobbersKits.getOrDefault(target.getUniqueId(), "acrobat");
-                meta.setLore(List.of(
-                        ChatColor.GRAY + "Kit: " + kit,
-                        ChatColor.GRAY + "Distance: " + String.format(java.util.Locale.ROOT, "%.1f", distance),
-                        ChatColor.GRAY + "Height difference: " + String.format(java.util.Locale.ROOT, "%.1f", height),
-                        ChatColor.YELLOW + "Left-click: Teleport",
-                        ChatColor.YELLOW + "Right-click: Spectate"));
-                head.setItemMeta(meta);
-            }
-            inventory.setItem(slot, head);
-            targetsBySlot.put(slot, target.getUniqueId());
-        }
-        session.bombCompassMenuTargets.put(spectator.getUniqueId(), targetsBySlot);
-        spectator.openInventory(inventory);
+        ArcadeSpectatorCompassMenus.openBombLobbersCompassMenu(session, spectator,
+                alivePlayers(session), namedItem(Material.COMPASS, "Tracking Compass",
+                        "Choose an enemy player to follow."));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -31195,48 +30534,9 @@ public final class ArcadePortManager implements Listener {
         spectator.setCompassTarget(target.getLocation());
     }
 
-    private boolean isBombLobbersCompassMenuTitle(String title) {
-        return (ChatColor.DARK_GREEN + "Spectator Menu").equals(title);
-    }
 
     /** Match vanilla 1.8 World#getBlockDensity sampling for the source explosion's exposure factor. */
-    private double bombLobbersBlastExposure(Location blast, Player target) {
-        if (blast == null || target == null || blast.getWorld() == null
-                || target.getWorld() != blast.getWorld()) return 0.0D;
-        org.bukkit.util.BoundingBox box = target.getBoundingBox();
-        double xStep = ArcadePortRules.bombLobbersExposureSampleStep((box.getMaxX() - box.getMinX()));
-        double yStep = ArcadePortRules.bombLobbersExposureSampleStep(box.getHeight());
-        double zStep = ArcadePortRules.bombLobbersExposureSampleStep((box.getMaxZ() - box.getMinZ()));
-        if (!Double.isFinite(xStep) || !Double.isFinite(yStep) || !Double.isFinite(zStep)) return 0.0D;
-        double xOffset = ArcadePortRules.bombLobbersExposureSampleOffset(xStep);
-        double zOffset = ArcadePortRules.bombLobbersExposureSampleOffset(zStep);
-        int visible = 0;
-        int total = 0;
-        for (float fx = 0.0F; fx <= 1.0F; fx = (float) (fx + xStep)) {
-            for (float fy = 0.0F; fy <= 1.0F; fy = (float) (fy + yStep)) {
-                for (float fz = 0.0F; fz <= 1.0F; fz = (float) (fz + zStep)) {
-                    Location sample = new Location(blast.getWorld(),
-                            box.getMinX() + (box.getMaxX() - box.getMinX()) * fx + xOffset,
-                            box.getMinY() + box.getHeight() * fy,
-                            box.getMinZ() + (box.getMaxZ() - box.getMinZ()) * fz + zOffset);
-                    Vector ray = sample.toVector().subtract(blast.toVector());
-                    double distance = ray.length();
-                    total++;
-                    if (distance <= 1.0E-6D
-                            || blast.getWorld().rayTraceBlocks(blast, ray.normalize(), distance,
-                                    org.bukkit.FluidCollisionMode.NEVER, true) == null) visible++;
-                }
-            }
-        }
-        return total == 0 ? 0.0D : visible / (double) total;
-    }
 
-    private int bombLobbersOnlineMatchPlayers(Session session) {
-        if (session == null) return 0;
-        return (int) session.players.values().stream()
-                .filter(player -> player != null && player.isOnline() && player.getWorld() == session.world)
-                .count();
-    }
 
     private long nextBombLobbersPowerupDelayMillis() {
         // The same bounded interval is used for the first wave and subsequent paired waves.
@@ -31776,20 +31076,6 @@ public final class ArcadePortManager implements Listener {
         session.bombConstructorBlockedBombs.remove(bombId);
     }
 
-    private boolean isBombTouchingAnyBlock(TNTPrimed bomb) {
-        Block center = bomb.getLocation().getBlock();
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dy = -1; dy <= 1; dy++) {
-                for (int dz = -1; dz <= 1; dz++) {
-                    if (dx == 0 && dy == 0 && dz == 0) continue;
-                    Block nearby = center.getRelative(dx, dy, dz);
-                    // Reborn primes on any non-air neighbour, including liquids and passable blocks.
-                    if (nearby.getType() != Material.AIR) return true;
-                }
-            }
-        }
-        return false;
-    }
 
     private void throwBombLobbersWindCharge(Session session, Player player) {
         if (session == null || active != session || player == null || !player.isOnline()
@@ -33011,11 +32297,6 @@ public final class ArcadePortManager implements Listener {
     private record PaintballProjectileVisual(Projectile projectile, String style, Color teamColor) {
     }
 
-    private record DragonEscapeGhostFrame(
-            long timeMillis, double x, double y, double z,
-            float yaw, float pitch, boolean sneaking, boolean sprinting, boolean onGround) {
-    }
-
     private record DragonTamerControl(UUID dragonId, Location returnLocation, GameMode previousGameMode, long endsAtMillis) { }
 
     private enum MasterBuildersPhase { BUILDING, REVIEW }
@@ -33172,8 +32453,6 @@ public final class ArcadePortManager implements Listener {
                     int distanceOrder = Double.compare(right.distanceSquared(), left.distanceSquared());
                     return distanceOrder != 0 ? distanceOrder : Long.compare(left.sequence(), right.sequence());
                 });
-        int turfFrontlineMinX = -HALF_SIZE;
-        int turfFrontlineMaxXExclusive = HALF_SIZE;
         int turfMinZ = -HALF_SIZE;
         int turfMaxZExclusive = HALF_SIZE + 1;
         Session(ArcadePortGame type, World world, List<Player> participants, boolean mixedArcadeVariant) {
