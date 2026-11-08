@@ -41,5 +41,6 @@ class DeathTagManagerTest {
         assertFalse(deathTag.isSafeRespawnSpawn(null, null));
         assertFalse(deathTag.isSafeRespawnSpawn(new Location(null, 0, 64, 0), null));
         assertNull(deathTag.findSafeRespawnNearby(null, null));
+        assertNull(deathTag.selectChaserRespawn(null, null, null, null));
     }
 }

@@ -7911,47 +7911,11 @@ public final class ArcadePortManager implements Listener {
                 sourceMapData.get(ArcadePortGame.DEATH_TAG.id()));
     }
 
-    /**
-     * Legacy map spawn markers sometimes point into decorative blocks or stand
-     * one or two blocks above/below their actual platform. Only reuse existing,
-     * collision-free terrain; never build a substitute arena for Death Tag.
-     */
-    private Location findSafeDeathTagSpawnNearby(Location base) {
-        return deathTagController.findSafeRespawnNearby(base,
-                sourceMapData.get(ArcadePortGame.DEATH_TAG.id()));
-    }
-
     private Location deathTagChaserRespawnSpawn(Session session, Player player) {
         SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
-        if (mapData != null && !mapData.spawnLocations().isEmpty()) {
-            List<Player> activePlayers = alivePlayers(session).stream()
-                    .filter(other -> !other.getUniqueId().equals(player.getUniqueId())).toList();
-            List<Location> safeSpawns = mapData.spawnLocations().stream()
-                    .filter(this::isSafeDeathTagRespawnSpawn).toList();
-            if (!safeSpawns.isEmpty()) {
-                return safeSpawns.stream().max(java.util.Comparator.comparingDouble(candidate ->
-                        activePlayers.isEmpty() ? Double.POSITIVE_INFINITY
-                                : activePlayers.stream().mapToDouble(other ->
-                                        candidate.distanceSquared(other.getLocation())).min()
-                                        .orElse(Double.POSITIVE_INFINITY))).orElseThrow().clone();
-            }
-            // Resolve invalid legacy marker heights against actual source terrain.
-            for (Location base : mapData.spawnLocations()) {
-                Location nearby = findSafeDeathTagSpawnNearby(base);
-                if (nearby != null) return nearby;
-            }
-        }
-        Location fallback = spawnFor(session, player);
-        if (isSafeDeathTagRespawnSpawn(fallback)) return fallback;
-        Location nearbyFallback = findSafeDeathTagSpawnNearby(fallback);
-        if (nearbyFallback != null) return nearbyFallback;
-        Location worldSpawn = session.world.getSpawnLocation();
-        if (isSafeDeathTagRespawnSpawn(worldSpawn)) return worldSpawn;
-        Location nearbyWorldSpawn = findSafeDeathTagSpawnNearby(worldSpawn);
-        if (nearbyWorldSpawn != null) return nearbyWorldSpawn;
-        if (isSafeDeathTagRespawnSpawn(player.getLocation())) return player.getLocation().clone();
-        Location nearbyPlayer = findSafeDeathTagSpawnNearby(player.getLocation());
-        if (nearbyPlayer != null) return nearbyPlayer;
+        Location respawn = deathTagController.selectChaserRespawn(session, player, mapData,
+                () -> spawnFor(session, player));
+        if (respawn != null) return respawn;
         // Never send a Chaser back to a known hazardous fallback; the caller ends
         // the round cleanly when the selected map has no safe respawn surface.
         plugin.getLogger().severe("Death Tag has no safe Chaser respawn near its source markers or active players.");
