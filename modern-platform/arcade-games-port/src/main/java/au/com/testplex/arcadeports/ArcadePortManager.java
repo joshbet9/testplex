@@ -31314,7 +31314,6 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Set<UUID>> witherWardenBlockedSkulls = new HashMap<>();
         int witherLabyrinthTopY = Integer.MIN_VALUE;
         final Map<UUID, Map<Integer, Set<UUID>>> sheepQuestSoloCarryVictimsByTeam = new HashMap<>();
-        final Map<UUID, Integer> sheepQuestMaxCarried = new HashMap<>();
         final Map<UUID, Integer> sheepQuestEnemyPickups = new HashMap<>();
         final Set<UUID> sheepQuestWasEliminated = new HashSet<>();
         final Map<UUID, Set<UUID>> runnerFrostballTargets = new HashMap<>();
