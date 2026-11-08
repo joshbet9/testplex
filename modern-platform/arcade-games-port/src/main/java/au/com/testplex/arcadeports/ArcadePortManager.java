@@ -1801,7 +1801,7 @@ public final class ArcadePortManager implements Listener {
         long now = System.currentTimeMillis();
         long brutusUntil = session.baconBrutusUntil.getOrDefault(targetId, 0L);
         boolean brutusActive = brutusUntil > now;
-        boolean backstab = isBaconBrutusBackstab(target, attackerLocation);
+        boolean backstab = baconController.isBaconBrutusBackstab(target, attackerLocation);
         if (ArcadePortRules.shouldBaconBrutusGuardHit(brutusActive, backstab)) {
 
             Location guard = target.getLocation().clone().add(0.0D, 1.0D, 0.0D);
@@ -1819,7 +1819,7 @@ public final class ArcadePortManager implements Listener {
         session.baconLastDamager.remove(targetId);
         session.baconLastDamagedAt.put(targetId, now);
         session.baconLastHitSource.put(targetId, "bot");
-        Vector velocity = baconBrawlKnockbackVelocity(attackerLocation, target.getLocation(),
+        Vector velocity = baconController.baconBrawlKnockbackVelocity(attackerLocation, target.getLocation(),
                 2.0D, session.baconKnockback, null, target.isOnGround());
         target.setVelocity(velocity);
         Location impact = target.getLocation().clone().add(0.0D, 1.0D, 0.0D);
@@ -1891,7 +1891,7 @@ public final class ArcadePortManager implements Listener {
             multiplier *= GameDebugRuntimeOverrides.doubleValue("BACON_PIG_BACKSTAB_KNOCKBACK_MULTIPLIER", ArcadePortRules.BACON_PIG_BACKSTAB_KNOCKBACK_MULTIPLIER);
         }
         target.setNoDamageTicks(0);
-        target.setVelocity(baconBrawlKnockbackVelocity(
+        target.setVelocity(baconController.baconBrawlKnockbackVelocity(
                 attacker.getLocation(), target.getLocation(), rawDamage, multiplier, null, target.isOnGround()));
         Location impact = target.getLocation().clone().add(0.0D, 1.0D, 0.0D);
         target.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR, impact,
@@ -14425,12 +14425,12 @@ public final class ArcadePortManager implements Listener {
             }
             UUID ownerId = session.baconBlastOwners.get(blastId);
             double segmentLength = Math.sqrt(previous.distanceSquared(current));
-            double blockFraction = baconBlastFirstBlockFraction(session, previous, current);
+            double blockFraction = baconController.baconBlastFirstBlockFraction(session, previous, current);
             Player target = null;
             double bestTargetFraction = Double.POSITIVE_INFINITY;
             for (Player candidate : alivePlayers(session)) {
                 if (candidate.getUniqueId().equals(ownerId)) continue;
-                double targetFraction = baconBlastPlayerHitFraction(candidate, previous, current, segmentLength);
+                double targetFraction = baconController.baconBlastPlayerHitFraction(candidate, previous, current, segmentLength);
                 if (targetFraction >= 0.0D && targetFraction < bestTargetFraction) {
                     target = candidate;
                     bestTargetFraction = targetFraction;
@@ -14908,8 +14908,8 @@ public final class ArcadePortManager implements Listener {
         UUID targetId = target.getUniqueId();
         long brutusUntil = session.baconBrutusUntil.getOrDefault(targetId, 0L);
         boolean brutusActive = brutusUntil > now;
-        boolean backstab = isBaconBrawlBackstab(target, attacker);
-        boolean brutusBackstab = isBaconBrutusBackstab(target, attacker);
+        boolean backstab = baconController.isBaconBrawlBackstab(target, attacker);
+        boolean brutusBackstab = baconController.isBaconBrutusBackstab(target, attacker);
         if (ArcadePortRules.shouldBaconBrutusGuardHit(brutusActive, brutusBackstab)) {
             // Count genuine blocked player attacks, not repeated packets or bot hits.
             if (!testPlayers.isTestPlayer(attacker)) {
@@ -14994,7 +14994,7 @@ public final class ArcadePortManager implements Listener {
             knockbackMultiplier *= ArcadePortRules.baconBrawlKnockbackMultiplier(true);
             target.playSound(target.getLocation(), Sound.ENTITY_PIG_DEATH, 1.0F, 2.0F);
         }
-        target.setVelocity(baconBrawlKnockbackVelocity(attacker, target,
+        target.setVelocity(baconController.baconBrawlKnockbackVelocity(attacker, target,
                 "melee".equals(source) ? 6.0D : rawDamage,
                 knockbackMultiplier, projectileVelocity));
         // Record only a successful opponent hit during the airborne recovery.
@@ -15045,56 +15045,10 @@ public final class ArcadePortManager implements Listener {
             session.baconLastDamagedAt.put(attackerId, now);
             session.baconLastHitSource.put(attackerId, "body-slam-recoil");
             // Body Slam recoil leaves the victim's hunger unchanged.
-            attacker.setVelocity(baconBrawlKnockbackVelocity(target, attacker, 2.0D,
+            attacker.setVelocity(baconController.baconBrawlKnockbackVelocity(target, attacker, 2.0D,
                     session.baconKnockback * GameDebugRuntimeOverrides.doubleValue("BACON_BODY_SLAM_KNOCKBACK_MULTIPLIER", ArcadePortRules.BACON_BODY_SLAM_KNOCKBACK_MULTIPLIER), null));
         }
     }
-
-    private boolean isBaconBrutusBackstab(Player target, Location attackerLocation) {
-        Vector targetLook = target.getLocation().getDirection().setY(0.0D);
-        Vector fromTargetToAttacker = attackerLocation.toVector()
-                .subtract(target.getLocation().toVector()).setY(0.0D);
-        return ArcadePortRules.isBaconBrutusBackstab(targetLook.getX(), targetLook.getZ(),
-                fromTargetToAttacker.getX(), fromTargetToAttacker.getZ());
-    }
-
-    private boolean isBaconBrutusBackstab(Player target, Player attacker) {
-        Vector targetLook = target.getLocation().getDirection().setY(0.0D);
-        Vector fromTargetToAttacker = attacker.getLocation().toVector()
-                .subtract(target.getLocation().toVector()).setY(0.0D);
-        return ArcadePortRules.isBaconBrutusBackstab(targetLook.getX(), targetLook.getZ(),
-                fromTargetToAttacker.getX(), fromTargetToAttacker.getZ());
-    }
-
-    private boolean isBaconBrawlBackstab(Player target, Player attacker) {
-        Vector targetLook = target.getLocation().getDirection().setY(0.0D);
-        Vector fromTargetToAttacker = attacker.getLocation().toVector()
-                .subtract(target.getLocation().toVector()).setY(0.0D);
-        return ArcadePortRules.isBaconBrawlBackstab(targetLook.getX(), targetLook.getZ(),
-                fromTargetToAttacker.getX(), fromTargetToAttacker.getZ());
-    }
-
-    /** Port DamageManager's logarithmic base and UtilAction's strength, vertical cap and ground boost. */
-    private Vector baconBrawlKnockbackVelocity(Player source, Player target, double rawDamage,
-            double knockbackMultipliers, Vector projectileVelocity) {
-        return baconBrawlKnockbackVelocity(source.getLocation(), target.getLocation(), rawDamage,
-                knockbackMultipliers, projectileVelocity, target.isOnGround());
-    }
-
-    private Vector baconBrawlKnockbackVelocity(Location source, Location target, double rawDamage,
-            double knockbackMultipliers, Vector projectileVelocity, boolean targetOnGround) {
-        boolean projectile = projectileVelocity != null;
-        Vector direction = projectile
-                ? projectileVelocity.clone().setY(0.0D)
-                : target.toVector().subtract(source.toVector()).setY(0.0D);
-        if (direction.lengthSquared() < 1.0E-5D) direction = source.getDirection().setY(0.0D);
-        if (direction.lengthSquared() < 1.0E-5D) direction = new Vector(0.0D, 0.0D, 1.0D);
-        double strength = ArcadePortRules.baconBrawlVelocityStrength(rawDamage, knockbackMultipliers, projectile);
-        double vertical = ArcadePortRules.baconBrawlVerticalVelocity(
-                rawDamage, knockbackMultipliers, projectile, targetOnGround);
-        return direction.normalize().multiply(strength).setY(vertical);
-    }
-
 
     private void recordTurfWarsAchievements(Session session, Player winner) {
         if (session == null) return;
@@ -18209,7 +18163,7 @@ public final class ArcadePortManager implements Listener {
             if (session.type == ArcadePortGame.BACON_BRAWL) {
                 baconController.updateBaconMeterItem(session, p);
                 // Keep only the requested combat timing bar; the meter remains on the XP bar.
-                p.sendActionBar(baconTimingStatusText(session, id, now));
+                p.sendActionBar(baconController.baconTimingStatusText(session, id, now));
                 continue;
             }
             if (session.type == ArcadePortGame.CASTLE_ASSAULT
@@ -18227,55 +18181,6 @@ public final class ArcadePortManager implements Listener {
                         + (pbDelta.isEmpty() ? "" : ChatColor.DARK_GRAY + " | " + pbDelta));
             }
         }
-    }
-
-    /** Live timing guide: the green section is the 500–900 ms critical window. */
-    private String baconTimingStatusText(Session session, UUID id, long now) {
-        long lastHit = session.baconLastSwingAt.getOrDefault(id, 0L);
-        if (lastHit <= 0L) {
-            return ChatColor.GRAY + "[" + ChatColor.RED + "■■■■"
-                    + ChatColor.GREEN + "■■■■" + ChatColor.YELLOW + "■■■■"
-                    + ChatColor.GRAY + "] swing";
-        }
-
-        long elapsed = Math.max(0L, now - lastHit);
-        long lateMax = ArcadePortRules.baconTimingWindowMillis(
-                GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_LATE_MAX_MILLIS", ArcadePortRules.BACON_TIMED_HIT_LATE_MAX_MILLIS), session.baconKnockback);
-        long criticalMin = ArcadePortRules.baconTimingWindowMillis(
-                GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_GOOD_MIN_MILLIS", ArcadePortRules.BACON_TIMED_HIT_GOOD_MIN_MILLIS), session.baconKnockback);
-        long criticalMax = ArcadePortRules.baconTimingWindowMillis(
-                GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_GOOD_MAX_MILLIS", ArcadePortRules.BACON_TIMED_HIT_GOOD_MAX_MILLIS), session.baconKnockback);
-        int pointer = (int) Math.min(14L, elapsed * 15L / Math.max(1L, lateMax));
-        boolean criticalWindow = ArcadePortRules.isBaconTimedCritical(elapsed, session.baconKnockback);
-        int criticalStart = (int) (criticalMin * 15L / Math.max(1L, lateMax));
-        int criticalEnd = Math.min(14, (int) (criticalMax * 15L / Math.max(1L, lateMax)));
-        StringBuilder bar = new StringBuilder("[");
-        for (int i = 0; i < 15; i++) {
-            if (i == pointer) {
-                bar.append(criticalWindow ? ChatColor.GREEN : ChatColor.WHITE).append("▌");
-            } else if (i >= criticalStart && i <= criticalEnd) {
-                bar.append(ChatColor.GREEN).append("■");
-            } else if (i < criticalStart) {
-                bar.append(ChatColor.RED).append("■");
-            } else if (i < 14) {
-                bar.append(ChatColor.YELLOW).append("■");
-            } else {
-                bar.append(ChatColor.GRAY).append("■");
-            }
-        }
-        bar.append(ChatColor.GRAY).append("]");
-
-        String state;
-        if (ArcadePortRules.isBaconTimedCritical(elapsed, session.baconKnockback)) {
-            state = ChatColor.GREEN + "" + ChatColor.BOLD + "CRITICAL NOW";
-        } else if (elapsed < criticalMin) {
-            state = ChatColor.RED + "wait " + (criticalMin - elapsed) + "ms";
-        } else if (elapsed <= lateMax) {
-            state = ChatColor.YELLOW + "late";
-        } else {
-            state = ChatColor.GRAY + "swing";
-        }
-        return ChatColor.AQUA + bar.toString() + " " + state;
     }
 
     private int scoreFor(Session session, UUID id) {
@@ -31548,39 +31453,6 @@ public final class ArcadePortManager implements Listener {
         session.bombDoubleJumpReadyAt.put(id, readyAt);
         cooldownProgress.start(player, "Double Jump", Math.max(1L, readyAt - now));
         player.playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 0.7F, 1.3F);
-    }
-
-    /** Finds the first non-passable/liquid block cell crossed by the projectile's previous-to-current path. */
-    private double baconBlastFirstBlockFraction(Session session, Location start, Location end) {
-        if (session == null || start == null || end == null
-                || start.getWorld() != session.world || end.getWorld() != session.world) return -1.0D;
-        Vector segment = end.toVector().subtract(start.toVector());
-        double length = segment.length();
-        if (!Double.isFinite(length) || length <= 1.0E-6D) return -1.0D;
-        int samples = Math.max(1, Math.min(512, (int) Math.ceil(length / 0.1D)));
-        for (int i = 1; i <= samples; i++) {
-            double fraction = i / (double) samples;
-            Location sample = start.clone().add(segment.clone().multiply(fraction));
-            Block block = sample.getBlock();
-            if (block.isLiquid() || !block.isPassable()) return fraction;
-        }
-        return -1.0D;
-    }
-
-    /** First point where the swept bacon item intersects a player's actual entity hitbox. */
-    private double baconBlastPlayerHitFraction(Player candidate, Location start, Location end,
-            double segmentLength) {
-        if (candidate == null || start == null || end == null
-                || candidate.getWorld() != start.getWorld() || start.getWorld() != end.getWorld()) return -1.0D;
-        BoundingBox hitbox = candidate.getBoundingBox().expand(0.05D);
-        Vector startVector = start.toVector();
-        if (segmentLength <= 1.0E-6D) return hitbox.contains(end.toVector()) ? 0.0D : -1.0D;
-        if (hitbox.contains(startVector)) return 0.0D;
-        Vector direction = end.toVector().subtract(startVector).multiply(1.0D / segmentLength);
-        org.bukkit.util.RayTraceResult hit = hitbox.rayTrace(startVector, direction, segmentLength);
-        if (hit == null || hit.getHitPosition() == null) return -1.0D;
-        return Math.max(0.0D, Math.min(1.0D,
-                startVector.distance(hit.getHitPosition()) / segmentLength));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
