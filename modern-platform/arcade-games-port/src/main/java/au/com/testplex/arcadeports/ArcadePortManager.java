@@ -10705,54 +10705,28 @@ public final class ArcadePortManager implements Listener {
 
 
     private ItemStack microTeamArmorPiece(Material material, Color colour, ChatColor chatColor) {
-        ItemStack item = new ItemStack(material);
-        if (item.getItemMeta() instanceof LeatherArmorMeta meta) {
-            meta.setColor(colour);
-            meta.setDisplayName(chatColor + "" + ChatColor.BOLD + "Team Armor");
-            meta.setUnbreakable(true);
-            meta.getPersistentDataContainer().set(microTeamItemKey, PersistentDataType.STRING, "armour");
-            item.setItemMeta(meta);
-        }
-        return item;
+        return microBattlesController.teamArmorPiece(material, colour, chatColor, microTeamItemKey);
     }
 
     private Color microTeamDyeColor(int team) {
-        return switch (team) {
-            case 0 -> Color.RED;
-            case 1 -> Color.AQUA;
-            case 2 -> Color.LIME;
-            default -> Color.YELLOW;
-        };
+        return microBattlesController.teamDyeColor(team);
     }
 
     private ChatColor microTeamChatColor(int team) {
-        return switch (team) {
-            case 0 -> ChatColor.RED;
-            case 1 -> ChatColor.AQUA;
-            case 2 -> ChatColor.GREEN;
-            default -> ChatColor.YELLOW;
-        };
+        return microBattlesController.teamChatColor(team);
     }
 
     private String microTeamName(int team) {
-        return switch (team) {
-            case 0 -> "Red";
-            case 1 -> "Blue";
-            case 2 -> "Green";
-            default -> "Yellow";
-        };
+        return microBattlesController.teamName(team);
     }
 
     private boolean isMicroTeamLockedItem(ItemStack item) {
-        return item != null && item.hasItemMeta()
-                && item.getItemMeta().getPersistentDataContainer().has(microTeamItemKey, PersistentDataType.STRING);
+        return microBattlesController.isTeamLockedItem(item, microTeamItemKey);
     }
 
     /** Reborn's TeamArmorModule prevents dropping the slot-eight badge, but permits ordinary armour drops. */
     private boolean isMicroTeamBadgeItem(ItemStack item) {
-        return item != null && item.hasItemMeta()
-                && "hotbar".equals(item.getItemMeta().getPersistentDataContainer()
-                        .get(microTeamItemKey, PersistentDataType.STRING));
+        return microBattlesController.isTeamBadgeItem(item, microTeamItemKey);
     }
 
     private YamlConfiguration loadMicroBattlesCosmeticPreferences() {
