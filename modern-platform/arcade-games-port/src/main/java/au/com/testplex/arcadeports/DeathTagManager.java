@@ -6,12 +6,18 @@ import java.util.UUID;
 import java.util.function.Supplier;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
-import org.bukkit.Material;
 import org.bukkit.Location;
-import org.bukkit.World;
+import org.bukkit.Material;
 import org.bukkit.Particle;
+import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Projectile;
+import org.bukkit.entity.Zombie;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.scoreboard.DisplaySlot;
@@ -27,6 +33,97 @@ import org.bukkit.util.Vector;
  */
 final class DeathTagManager implements ArcadeMatchController {
     @Override public ArcadePortGame game() { return ArcadePortGame.DEATH_TAG; }
+
+    interface DamageActions {
+        boolean isCurrent(SessionState session);
+        void playerHit(SessionState session, Player attacker, Player target);
+        void soloPracticeHit(SessionState session, Player target, Zombie chaser);
+        void respawnChaser(SessionState session, Player target);
+        void infectRunner(SessionState session, Player target, String reason);
+        void checkRoundEnd(SessionState session);
+        void damageFeedback(Player target);
+    }
+
+    enum DamageOutcome { IGNORE, DAMAGE, RESPAWN_CHASER, INFECT_RUNNER }
+
+    Player disguiseOwner(SessionState session, Entity entity) {
+        if (session == null || entity == null) return null;
+        for (var entry : session.deathTagDisguises.entrySet()) {
+            Mob disguise = entry.getValue();
+            if (disguise == null || !disguise.getUniqueId().equals(entity.getUniqueId())) continue;
+            Player owner = session.players.get(entry.getKey());
+            return owner != null && owner.isOnline() && session.alive.contains(entry.getKey()) ? owner : null;
+        }
+        return null;
+    }
+
+    Player projectileTarget(SessionState session, Entity hitEntity) {
+        if (hitEntity instanceof Player player) return player;
+        return disguiseOwner(session, hitEntity);
+    }
+
+    static double environmentalDamage(boolean chaser, double incomingDamage, boolean alphaChaser, boolean fireTick) {
+        return chaser
+                ? ArcadePortRules.deathTagEnvironmentalDamageAfterIronSkin(incomingDamage, alphaChaser, fireTick)
+                : incomingDamage;
+    }
+
+    static DamageOutcome environmentalDamageOutcome(boolean chaser, double health, double damage) {
+        if (damage <= 0.0D) return DamageOutcome.IGNORE;
+        if (!ArcadePortRules.deathTagHitIsLethal(health, damage)) return DamageOutcome.DAMAGE;
+        return chaser ? DamageOutcome.RESPAWN_CHASER : DamageOutcome.INFECT_RUNNER;
+    }
+
+    /** Applies Death Tag's own damage semantics; the shared manager supplies only shared match actions. */
+    boolean handleDamage(SessionState session, Player target, EntityDamageEvent event, double incomingDamage,
+            DamageActions actions) {
+        if (session == null || target == null || event == null || actions == null
+                || !actions.isCurrent(session) || !session.alive.contains(target.getUniqueId())
+                || incomingDamage <= 0.0D) return false;
+        if (session.deathTagRespawnGraceUntil.getOrDefault(target.getUniqueId(), 0L)
+                > System.currentTimeMillis()) return true;
+
+        if (event instanceof EntityDamageByEntityEvent byEntity) {
+            Entity damager = byEntity.getDamager();
+            if (damager instanceof Player attacker) {
+                actions.playerHit(session, attacker, target);
+                return true;
+            }
+            if (damager instanceof Projectile projectile
+                    && projectile.getShooter() instanceof Player shooter
+                    && session.players.containsKey(shooter.getUniqueId())) {
+                // ProjectileHitEvent resolves this once with the source Archer damage and knockback perks.
+                session.deathTagProjectileDamage.put(projectile.getUniqueId(), incomingDamage);
+                return true;
+            }
+            if (damager instanceof Zombie zombie && session.entities.contains(zombie)
+                    && session.participantsAtStart <= 1) {
+                actions.soloPracticeHit(session, target, zombie);
+                return true;
+            }
+        }
+
+        boolean chaser = session.tagged.contains(target.getUniqueId());
+        double damage = environmentalDamage(chaser, incomingDamage,
+                session.alphaChasers.contains(target.getUniqueId()),
+                event.getCause() == EntityDamageEvent.DamageCause.FIRE_TICK);
+        DamageOutcome outcome = environmentalDamageOutcome(chaser, target.getHealth(), damage);
+        switch (outcome) {
+            case IGNORE -> { return true; }
+            case RESPAWN_CHASER -> actions.respawnChaser(session, target);
+            case INFECT_RUNNER -> {
+                String cause = event.getCause().name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
+                actions.infectRunner(session, target, "was killed by " + cause);
+                actions.checkRoundEnd(session);
+            }
+            case DAMAGE -> {
+                target.setHealth(target.getHealth() - damage);
+                actions.damageFeedback(target);
+            }
+        }
+        return true;
+    }
+
 
     static boolean isRespawnHazard(Material material) {
         return material == Material.LAVA || material == Material.FIRE || material == Material.SOUL_FIRE
