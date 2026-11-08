@@ -22,7 +22,7 @@ class SheepQuestManagerTest {
 
     @Test
     void missingSheepDefaultsToWhiteWool() {
-        assertEquals(Material.WHITE_WOOL, SheepQuestManager.woolIcon(null).getType());
+        assertEquals(Material.WHITE_WOOL, SheepQuestManager.woolMaterial(null));
     }
 
     @Test
