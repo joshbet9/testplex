@@ -27,6 +27,7 @@ final class DragonsManager implements ArcadeMatchController {
 
     interface SpectatorActions {
         boolean isCurrent(SessionState session);
+        boolean isTamerControlled(SessionState session, UUID playerId);
     }
 
     private static final class SpectatorMenuHolder implements InventoryHolder {
@@ -49,11 +50,11 @@ final class DragonsManager implements ArcadeMatchController {
         return holder instanceof SpectatorMenuHolder;
     }
 
-    Player nearestSpectatorTarget(SessionState session, Player spectator) {
+    Player nearestSpectatorTarget(SessionState session, Player spectator, SpectatorActions actions) {
         if (session == null || spectator == null) return null;
         Player nearest = null;
         double nearestDistance = Double.POSITIVE_INFINITY;
-        for (Player candidate : aliveTrackTargets(session)) {
+        for (Player candidate : aliveTrackTargets(session, actions)) {
             double distance = candidate.getLocation().distanceSquared(spectator.getLocation());
             if (distance < nearestDistance) {
                 nearestDistance = distance;
@@ -79,8 +80,8 @@ final class DragonsManager implements ArcadeMatchController {
         return Math.min(54, Math.max(27, ((lastSlot / 9) + 1) * 9));
     }
 
-    void openSpectatorMenu(SessionState session, Player spectator) {
-        List<Player> targets = aliveTrackTargets(session);
+    void openSpectatorMenu(SessionState session, Player spectator, SpectatorActions actions) {
+        List<Player> targets = aliveTrackTargets(session, actions);
         if (targets.isEmpty()) {
             spectator.sendMessage(ChatColor.YELLOW + "There are no living Dragons players to track.");
             return;
@@ -88,17 +89,18 @@ final class DragonsManager implements ArcadeMatchController {
         targets.sort(Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER));
         SpectatorMenuHolder holder = new SpectatorMenuHolder(spectator.getUniqueId());
         holder.inventory = Bukkit.createInventory(holder, spectatorMenuSize(targets.size()), "Spectator Menu");
-        populateSpectatorMenu(session, spectator, holder, targets);
+        populateSpectatorMenu(session, spectator, holder, targets, actions);
         spectator.openInventory(holder.inventory);
     }
 
     private boolean populateSpectatorMenu(
-            SessionState session, Player spectator, SpectatorMenuHolder holder) {
-        return populateSpectatorMenu(session, spectator, holder, aliveTrackTargets(session));
+            SessionState session, Player spectator, SpectatorMenuHolder holder, SpectatorActions actions) {
+        return populateSpectatorMenu(session, spectator, holder, aliveTrackTargets(session, actions), actions);
     }
 
     private boolean populateSpectatorMenu(
-            SessionState session, Player spectator, SpectatorMenuHolder holder, List<Player> targets) {
+            SessionState session, Player spectator, SpectatorMenuHolder holder, List<Player> targets,
+            SpectatorActions actions) {
         targets.sort(Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER));
         holder.inventory.clear();
         holder.targetsBySlot.clear();
@@ -140,7 +142,7 @@ final class DragonsManager implements ArcadeMatchController {
     }
 
     boolean handleCompassInteract(SessionState session, Player player, ItemStack heldItem,
-            boolean leftClick, boolean rightClick) {
+            boolean leftClick, boolean rightClick, SpectatorActions actions) {
         if (session == null || session.type != ArcadePortGame.DRAGONS || player == null
                 || session.alive.contains(player.getUniqueId()) || !isTrackingCompass(heldItem)) return false;
         if (leftClick) {
@@ -150,7 +152,7 @@ final class DragonsManager implements ArcadeMatchController {
             session.dragonCompassNextUseAt.put(player.getUniqueId(),
                     now + GameDebugRuntimeOverrides.longValue("DRAGONS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS",
                             ArcadePortRules.DRAGONS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS));
-            Player target = nearestSpectatorTarget(session, player);
+            Player target = nearestSpectatorTarget(session, player, actions);
             if (target != null) {
                 player.setSpectatorTarget(null);
                 player.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
@@ -159,7 +161,7 @@ final class DragonsManager implements ArcadeMatchController {
                 player.sendMessage(ChatColor.YELLOW + "There are no living Dragons players to track.");
             }
         } else if (rightClick) {
-            openSpectatorMenu(session, player);
+            openSpectatorMenu(session, player, actions);
         }
         return true;
     }
@@ -190,9 +192,9 @@ final class DragonsManager implements ArcadeMatchController {
         if (targetId == null) return true;
         Player target = session.players.get(targetId);
         if (target == null || !target.isOnline() || !session.alive.contains(targetId)
-                || session.dragonTamerControls.containsKey(targetId) || target.getWorld() != session.world) {
+                || actions == null || actions.isTamerControlled(session, targetId) || target.getWorld() != session.world) {
             spectator.sendMessage(ChatColor.YELLOW + "That player is no longer available to track.");
-            populateSpectatorMenu(session, spectator, holder);
+            populateSpectatorMenu(session, spectator, holder, actions);
             return true;
         }
 
@@ -215,11 +217,11 @@ final class DragonsManager implements ArcadeMatchController {
         return true;
     }
 
-    void updateSpectatorCompasses(SessionState session, long now) {
+    void updateSpectatorCompasses(SessionState session, long now, SpectatorActions actions) {
         if (session == null || session.type != ArcadePortGame.DRAGONS) return;
         if (now >= session.dragonNextCompassUpdateAt) {
             session.dragonNextCompassUpdateAt = now + 250L; // CompassModule uses UpdateType.FASTER.
-            List<Player> alive = aliveTrackTargets(session);
+            List<Player> alive = aliveTrackTargets(session, actions);
             if (!alive.isEmpty()) {
                 for (Player spectator : session.players.values()) {
                     if (spectator == null || !spectator.isOnline()
@@ -251,7 +253,7 @@ final class DragonsManager implements ArcadeMatchController {
                         || !(spectator.getOpenInventory().getTopInventory().getHolder()
                                 instanceof SpectatorMenuHolder holder)
                         || !holder.ownerId.equals(spectator.getUniqueId())) continue;
-                if (!populateSpectatorMenu(session, spectator, holder)) {
+                if (!populateSpectatorMenu(session, spectator, holder, actions)) {
                     spectator.closeInventory();
                     spectator.sendMessage(ChatColor.YELLOW + "There are no living Dragons players to track.");
                 }
@@ -259,11 +261,11 @@ final class DragonsManager implements ArcadeMatchController {
         }
     }
 
-    private List<Player> aliveTrackTargets(SessionState session) {
+    private List<Player> aliveTrackTargets(SessionState session, SpectatorActions actions) {
         List<Player> alive = new ArrayList<>();
         for (UUID id : session.alive) {
             Player player = session.players.get(id);
-            if (player != null && player.isOnline() && !session.dragonTamerControls.containsKey(id)) alive.add(player);
+            if (player != null && player.isOnline() && actions != null && !actions.isTamerControlled(session, id)) alive.add(player);
         }
         return alive;
     }
