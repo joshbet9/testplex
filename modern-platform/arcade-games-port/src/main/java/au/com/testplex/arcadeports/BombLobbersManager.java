@@ -1,13 +1,21 @@
 package au.com.testplex.arcadeports;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Color;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
@@ -15,7 +23,7 @@ import org.bukkit.scoreboard.Team;
 import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
 
-/** Game-specific scoreboard only; the shared Arcade runtime still owns each match. */
+/** Bomb Lobbers' scoreboard and spectator UI; the shared Arcade runtime owns each match. */
 final class BombLobbersManager implements ArcadeMatchController {
     @Override public ArcadePortGame game() { return ArcadePortGame.BOMB_LOBBERS; }
 
@@ -123,6 +131,145 @@ final class BombLobbersManager implements ArcadeMatchController {
             session.world.spawnParticle(Particle.DUST, point, 2,
                     spread, spread, spread, speed, dust);
         }
+    }
+
+    /** The original compass needle follows enemies, while spectator teleport can target anyone alive. */
+    void updateSpectatorCompasses(SessionState session) {
+        if (session == null) return;
+        List<Player> targets = alivePlayers(session);
+        if (targets.isEmpty()) return;
+        for (Player spectator : session.players.values()) {
+            if (spectator == null || !spectator.isOnline()
+                    || session.alive.contains(spectator.getUniqueId())) continue;
+            int spectatorTeam = session.teams.getOrDefault(spectator.getUniqueId(), -1);
+            List<Player> enemies = targets.stream()
+                    .filter(target -> ArcadePortRules.shouldBombLobbersCompassTrackTeam(
+                            spectatorTeam, session.teams.getOrDefault(target.getUniqueId(), -1)))
+                    .toList();
+            if (enemies.isEmpty()) continue;
+
+            boolean hasCompass = false;
+            for (ItemStack item : spectator.getInventory().getContents()) {
+                if (isTrackingCompass(item)) {
+                    hasCompass = true;
+                    break;
+                }
+            }
+            if (!hasCompass) spectator.getInventory().addItem(trackingCompass("Tracks the nearest enemy player."));
+
+            Player target = enemies.stream()
+                    .min(java.util.Comparator.comparingDouble(candidate ->
+                            candidate.getLocation().distanceSquared(spectator.getLocation())))
+                    .orElse(null);
+            if (target != null) spectator.setCompassTarget(target.getLocation());
+        }
+    }
+
+    boolean isTrackingCompass(ItemStack item) {
+        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        return meta != null && meta.hasDisplayName()
+                && ChatColor.stripColor(meta.getDisplayName()).equals("Tracking Compass");
+    }
+
+    Player nearestSpectateTarget(SessionState session, Player spectator) {
+        if (session == null || spectator == null) return null;
+        return alivePlayers(session).stream()
+                .min(java.util.Comparator.comparingDouble(candidate ->
+                        candidate.getLocation().distanceSquared(spectator.getLocation())))
+                .orElse(null);
+    }
+
+    void openSpectatorMenu(SessionState session, Player spectator) {
+        if (session == null || spectator == null) return;
+        Inventory inventory = Bukkit.createInventory(null, 54, ChatColor.DARK_GREEN + "Spectator Menu");
+        inventory.setItem(4, trackingCompass("Choose an enemy player to follow."));
+
+        int[] slots = {
+                19, 20, 21, 22, 23, 24, 25,
+                28, 29, 30, 31, 32, 33, 34,
+                37, 38, 39, 40, 41, 42, 43,
+                46, 47, 48, 49, 50, 51, 52
+        };
+        Map<Integer, UUID> targetsBySlot = new HashMap<>();
+        // Source Spectator Menu lists everyone alive, even though the needle follows enemies only.
+        List<Player> targets = alivePlayers(session).stream()
+                .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+        for (int i = 0; i < targets.size() && i < slots.length; i++) {
+            Player target = targets.get(i);
+            int slot = slots[i];
+            ItemStack head = new ItemStack(Material.PLAYER_HEAD);
+            if (head.getItemMeta() instanceof SkullMeta meta) {
+                meta.setOwningPlayer(target);
+                int targetTeam = session.teams.getOrDefault(target.getUniqueId(), -1);
+                ChatColor color = targetTeam == 1 ? ChatColor.AQUA : ChatColor.RED;
+                meta.setDisplayName(color + target.getName());
+                double distance = Math.sqrt(target.getLocation().distanceSquared(spectator.getLocation()));
+                double height = target.getLocation().getY() - spectator.getLocation().getY();
+                String kit = session.bombLobbersKits.getOrDefault(target.getUniqueId(), "acrobat");
+                meta.setLore(List.of(
+                        ChatColor.GRAY + "Kit: " + kit,
+                        ChatColor.GRAY + "Distance: " + String.format(java.util.Locale.ROOT, "%.1f", distance),
+                        ChatColor.GRAY + "Height difference: " + String.format(java.util.Locale.ROOT, "%.1f", height),
+                        ChatColor.YELLOW + "Left-click: Teleport",
+                        ChatColor.YELLOW + "Right-click: Spectate"));
+                head.setItemMeta(meta);
+            }
+            inventory.setItem(slot, head);
+            targetsBySlot.put(slot, target.getUniqueId());
+        }
+        session.bombCompassMenuTargets.put(spectator.getUniqueId(), targetsBySlot);
+        spectator.openInventory(inventory);
+    }
+
+    boolean isSpectatorMenuTitle(String title) {
+        return (ChatColor.DARK_GREEN + "Spectator Menu").equals(title);
+    }
+
+    void handleSpectatorMenuClick(SessionState session, Player spectator, int slot, boolean rightClick) {
+        if (session == null || spectator == null) return;
+        Map<Integer, UUID> targets = session.bombCompassMenuTargets.get(spectator.getUniqueId());
+        UUID targetId = targets == null ? null : targets.get(slot);
+        if (targetId == null) return;
+        Player target = session.players.get(targetId);
+        session.bombCompassMenuTargets.remove(spectator.getUniqueId());
+        spectator.closeInventory();
+        if (target == null || !target.isOnline() || !session.alive.contains(targetId)) {
+            spectator.sendMessage(ChatColor.YELLOW + "That opponent is no longer available.");
+            return;
+        }
+        if (rightClick) {
+            spectator.setSpectatorTarget(target);
+        } else {
+            long now = System.currentTimeMillis();
+            long readyAt = session.bombSpectateNextTeleportAt.getOrDefault(spectator.getUniqueId(), 0L);
+            if (!ArcadePortRules.isBombLobbersSpectatorTeleportReady(now, readyAt)) return;
+            spectator.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
+            session.bombSpectateNextTeleportAt.put(spectator.getUniqueId(),
+                    ArcadePortRules.nextBombLobbersSpectatorTeleportAt(now));
+        }
+        spectator.setCompassTarget(target.getLocation());
+    }
+
+    private ItemStack trackingCompass(String lore) {
+        ItemStack item = new ItemStack(Material.COMPASS);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(ChatColor.GOLD + "Tracking Compass");
+            meta.setLore(List.of(ChatColor.GRAY + lore));
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private List<Player> alivePlayers(SessionState session) {
+        List<Player> players = new ArrayList<>();
+        for (UUID id : session.alive) {
+            Player player = session.players.get(id);
+            if (player != null && player.isOnline()) players.add(player);
+        }
+        return players;
     }
 
     private int countAliveTeammates(SessionState session, int team) {
