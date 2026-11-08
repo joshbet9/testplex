@@ -52,7 +52,7 @@ class MicroBattlesManagerTest {
     void emptySpectatorRosterKeepsCompassStateAndTickRoutingSafe() {
         MicroBattlesManager micro = new MicroBattlesManager();
         SessionState session = new SessionState(ArcadePortGame.MICRO_BATTLES, null, List.of(), false);
-        session.ticks = 4L;
+        session.ticks = 4;
 
         micro.updateSpectatorCompass(session);
         micro.updateSpectatorCompass(null);
