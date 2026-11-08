@@ -39,4 +39,23 @@ class RunnerManagerTest {
         assertFalse(runner.isTrackingCompass(null));
         assertEquals(0, session.runnerMarathonDistance.size());
     }
+
+    @Test
+    void sourceBoundsFallbackMatchesLegacyInclusiveHalfSize() {
+        RunnerManager runner = new RunnerManager();
+        assertEquals(true, runner.insideSourceBounds(null, 50, -50, 50));
+        assertEquals(true, runner.insideSourceBounds(null, 50, 50, -50));
+        assertFalse(runner.insideSourceBounds(null, 50, 51, 0));
+        assertFalse(runner.insideSourceBounds(null, 50, 0, -51));
+    }
+
+    @Test
+    void emptyTrailProcessingDoesNotChangeSessionState() {
+        RunnerManager runner = new RunnerManager();
+        SessionState session = new SessionState(ArcadePortGame.RUNNER, null, List.of(), false);
+        runner.markFootprints(session, 100L, null, 50, ignored -> true);
+        runner.processBlocks(session, 150L, ignored -> true);
+        assertEquals(0, session.runnerBlocks.size());
+        assertEquals(0, session.runnerBlockOwners.size());
+    }
 }

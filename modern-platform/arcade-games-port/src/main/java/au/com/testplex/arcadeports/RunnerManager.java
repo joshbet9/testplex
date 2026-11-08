@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.HashSet;
+import java.util.function.Predicate;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -15,10 +17,104 @@ import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.block.data.BlockData;
 
-/** Runner's palette-aware trail rules; shared Arcade still owns timers and block decay. */
+/** Runner's palette-aware footprints, block decay and spectator tracking. */
 final class RunnerManager implements ArcadeMatchController {
     @Override public ArcadePortGame game() { return ArcadePortGame.RUNNER; }
+
+    boolean insideSourceBounds(SourceMapCatalog.MapData mapData, int halfSize, int x, int z) {
+        if (mapData != null && mapData.hasBounds()) {
+            return x >= mapData.minX() && x < mapData.maxX()
+                    && z >= mapData.minZ() && z < mapData.maxZ();
+        }
+        return Math.abs(x) <= halfSize && Math.abs(z) <= halfSize;
+    }
+
+    void markFootprints(SessionState session, long now, SourceMapCatalog.MapData mapData,
+            int halfSize, Predicate<Player> trailAllowed) {
+        for (UUID id : new HashSet<>(session.alive)) {
+            Player player = session.players.get(id);
+            if (player == null || !player.isOnline() || player.getWorld() != session.world) continue;
+
+            org.bukkit.util.BoundingBox bounds = player.getBoundingBox();
+            int minX = (int) Math.floor(bounds.getMinX());
+            int maxX = (int) Math.floor(bounds.getMaxX() - 1.0E-6D);
+            int minZ = (int) Math.floor(bounds.getMinZ());
+            int maxZ = (int) Math.floor(bounds.getMaxZ() - 1.0E-6D);
+            // Match Reborn's player-location minus half a block; jumps sample air.
+            int trailY = (int) Math.floor(player.getLocation().getY() - 0.5D);
+
+            for (int x = minX; x <= maxX; x++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    if (!insideSourceBounds(mapData, halfSize, x, z)) continue;
+                    markBlock(session, session.world.getBlockAt(x, trailY, z), player, now,
+                            mapData, halfSize, trailAllowed);
+                }
+            }
+        }
+    }
+
+    void markBlock(SessionState session, Block block, Player owner, long now,
+            SourceMapCatalog.MapData mapData, int halfSize, Predicate<Player> trailAllowed) {
+        if (block == null || block.getY() < 0
+                || block.getY() >= session.world.getMaxHeight()
+                || !insideSourceBounds(mapData, halfSize, block.getX(), block.getZ())) return;
+        if (owner != null && !trailAllowed.test(owner)) return;
+        Long graceUntil = session.runnerBlockGraceUntil.get(block);
+        if (graceUntil != null) {
+            if (now < graceUntil) return;
+            session.runnerBlockGraceUntil.remove(block);
+        }
+        boolean aboveIsAir = block.getRelative(BlockFace.UP).getType().isAir();
+        if (!ArcadePortRules.shouldMarkRunnerBlock(block.getType().isSolid(),
+                block.getType() == Material.BEDROCK, block.isLiquid(), aboveIsAir,
+                session.runnerBlocks.containsKey(block))) return;
+        // World-block changes are sent by the server to all players and spectators.
+        Material trail = trailMaterial(session, owner);
+        session.runnerOriginalBlockData.putIfAbsent(block, block.getBlockData().clone());
+        session.runnerBlockOwners.put(block, owner.getUniqueId());
+        block.setType(trail, false);
+        session.runnerBlocks.put(block, now);
+        session.runnerBlockMaterials.put(block, trail);
+    }
+
+    void processBlocks(SessionState session, long now, Predicate<Player> trailAllowed) {
+        java.util.Iterator<Map.Entry<Block, Long>> iterator = session.runnerBlocks.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<Block, Long> entry = iterator.next();
+            Block block = entry.getKey();
+            Material trail = session.runnerBlockMaterials.get(block);
+            if (block == null || trail == null || block.getType() != trail) {
+                iterator.remove();
+                session.runnerBlockMaterials.remove(block);
+                continue;
+            }
+            UUID ownerId = session.runnerBlockOwners.get(block);
+            Player owner = ownerId == null ? null : session.players.get(ownerId);
+            if (owner != null && !trailAllowed.test(owner)) {
+                BlockData original = session.runnerOriginalBlockData.remove(block);
+                if (original != null) block.setBlockData(original, false);
+                iterator.remove();
+                session.runnerBlockMaterials.remove(block);
+                session.runnerBlockOwners.remove(block);
+                continue;
+            }
+            Long graceUntil = session.runnerBlockGraceUntil.get(block);
+            if (graceUntil != null) {
+                if (now < graceUntil) continue;
+                session.runnerBlockGraceUntil.remove(block);
+            }
+            if (!ArcadePortRules.shouldDropRunnerBlock(now - entry.getValue())) continue;
+            block.setType(Material.AIR, false);
+            iterator.remove();
+            session.runnerBlockMaterials.remove(block);
+            session.runnerBlockOwners.remove(block);
+            session.runnerOriginalBlockData.remove(block);
+        }
+        session.runnerBlockGraceUntil.entrySet().removeIf(entry -> entry.getValue() <= now
+                && !session.runnerBlocks.containsKey(entry.getKey()));
+    }
 
     void updateDistanceAndSpectatorCompass(SessionState session, long now) {
         if (now >= session.runnerMarathonNextSampleAt) {

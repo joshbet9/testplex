@@ -23280,101 +23280,29 @@ public final class ArcadePortManager implements Listener {
     }
 
 
-    private boolean insideSourceMapBounds(Session session, int x, int z) {
-        SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
-        if (mapData != null && mapData.hasBounds()) {
-            return x >= mapData.minX() && x < mapData.maxX()
-                    && z >= mapData.minZ() && z < mapData.maxZ();
-        }
-        return Math.abs(x) <= HALF_SIZE && Math.abs(z) <= HALF_SIZE;
-    }
-
     private boolean insideRunnerSourceBounds(Session session, int x, int z) {
-        return insideSourceMapBounds(session, x, z);
+        return runnerController.insideSourceBounds(sourceMapData.get(session.type.id()), HALF_SIZE, x, z);
     }
 
     private void markRunnerFootprints(Session session, long now) {
-        for (UUID id : new HashSet<>(session.alive)) {
-            Player player = session.players.get(id);
-            if (player == null || !player.isOnline() || player.getWorld() != session.world) continue;
-
-            org.bukkit.util.BoundingBox bounds = player.getBoundingBox();
-            int minX = (int) Math.floor(bounds.getMinX());
-            int maxX = (int) Math.floor(bounds.getMaxX() - 1.0E-6D);
-            int minZ = (int) Math.floor(bounds.getMinZ());
-            int maxZ = (int) Math.floor(bounds.getMaxZ() - 1.0E-6D);
-            // Matches Reborn's player-location minus half a block: while jumping, the sampled block is air.
-            int trailY = (int) Math.floor(player.getLocation().getY() - 0.5D);
-
-            for (int x = minX; x <= maxX; x++) {
-                for (int z = minZ; z <= maxZ; z++) {
-                    if (!insideRunnerSourceBounds(session, x, z)) continue;
-                    markRunnerBlock(session, session.world.getBlockAt(x, trailY, z), player, now);
-                }
-            }
-        }
+        if (active != session) return;
+        runnerController.markFootprints(session, now, sourceMapData.get(session.type.id()),
+                HALF_SIZE, this::runnerTrailAllowed);
     }
 
     private void markRunnerBlock(Session session, Block block, Player owner, long now) {
-        if (active != session || block == null || block.getY() < 0
-                || block.getY() >= session.world.getMaxHeight()
-                || !insideRunnerSourceBounds(session, block.getX(), block.getZ())) return;
-        if (owner != null && plugin.hasAdminAccess(owner)
-                && !debugFeatureEnabled(owner.getUniqueId(), ArcadePortGame.RUNNER, "runner-trail", true)) return;
-        Long graceUntil = session.runnerBlockGraceUntil.get(block);
-        if (graceUntil != null) {
-            if (now < graceUntil) return;
-            session.runnerBlockGraceUntil.remove(block);
-        }
-        boolean aboveIsAir = block.getRelative(BlockFace.UP).getType().isAir();
-        if (!ArcadePortRules.shouldMarkRunnerBlock(block.getType().isSolid(),
-                block.getType() == Material.BEDROCK, block.isLiquid(), aboveIsAir,
-                session.runnerBlocks.containsKey(block))) return;
-        // World-block changes are sent by the server to all players and spectators.
-        Material trail = runnerController.trailMaterial(session, owner);
-        session.runnerOriginalBlockData.putIfAbsent(block, block.getBlockData().clone());
-        session.runnerBlockOwners.put(block, owner.getUniqueId());
-        block.setType(trail, false);
-        session.runnerBlocks.put(block, now);
-        session.runnerBlockMaterials.put(block, trail);
+        if (active != session) return;
+        runnerController.markBlock(session, block, owner, now, sourceMapData.get(session.type.id()),
+                HALF_SIZE, this::runnerTrailAllowed);
     }
 
     private void processRunnerBlocks(Session session, long now) {
-        java.util.Iterator<Map.Entry<Block, Long>> iterator = session.runnerBlocks.entrySet().iterator();
-        while (iterator.hasNext()) {
-            Map.Entry<Block, Long> entry = iterator.next();
-            Block block = entry.getKey();
-            Material trail = session.runnerBlockMaterials.get(block);
-            if (block == null || trail == null || block.getType() != trail) {
-                iterator.remove();
-                session.runnerBlockMaterials.remove(block);
-                continue;
-            }
-            UUID ownerId = session.runnerBlockOwners.get(block);
-            Player owner = ownerId == null ? null : session.players.get(ownerId);
-            if (owner != null && plugin.hasAdminAccess(owner)
-                    && !debugFeatureEnabled(ownerId, ArcadePortGame.RUNNER, "runner-trail", true)) {
-                org.bukkit.block.data.BlockData original = session.runnerOriginalBlockData.remove(block);
-                if (original != null) block.setBlockData(original, false);
-                iterator.remove();
-                session.runnerBlockMaterials.remove(block);
-                session.runnerBlockOwners.remove(block);
-                continue;
-            }
-            Long graceUntil = session.runnerBlockGraceUntil.get(block);
-            if (graceUntil != null) {
-                if (now < graceUntil) continue;
-                session.runnerBlockGraceUntil.remove(block);
-            }
-            if (!ArcadePortRules.shouldDropRunnerBlock(now - entry.getValue())) continue;
-            block.setType(Material.AIR, false);
-            iterator.remove();
-            session.runnerBlockMaterials.remove(block);
-            session.runnerBlockOwners.remove(block);
-            session.runnerOriginalBlockData.remove(block);
-        }
-        session.runnerBlockGraceUntil.entrySet().removeIf(entry -> entry.getValue() <= now
-                && !session.runnerBlocks.containsKey(entry.getKey()));
+        runnerController.processBlocks(session, now, this::runnerTrailAllowed);
+    }
+
+    private boolean runnerTrailAllowed(Player owner) {
+        return !plugin.hasAdminAccess(owner)
+                || debugFeatureEnabled(owner.getUniqueId(), ArcadePortGame.RUNNER, "runner-trail", true);
     }
 
 
