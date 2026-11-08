@@ -281,6 +281,7 @@ public final class ArcadePortManager implements Listener {
     private final SpleefManager spleefController = new SpleefManager();
     private final EvolutionManager evolutionController = new EvolutionManager();
     private final DragonEscapeManager dragonEscapeController;
+    private final MasterBuildersManager masterBuildersController;
     private boolean gameModulesInitialized;
     private CameraShyGame cameraShyModule;
 
@@ -289,6 +290,7 @@ public final class ArcadePortManager implements Listener {
         this.plugin = plugin;
         this.baconController = new BaconBrawlManager(plugin.getLogger());
         this.dragonEscapeController = new DragonEscapeManager(plugin.getLogger());
+        this.masterBuildersController = new MasterBuildersManager(plugin.getLogger());
         matchControllers.register(baconController);
         matchControllers.register(deathTagController);
         matchControllers.register(bombLobbersController);
@@ -299,6 +301,7 @@ public final class ArcadePortManager implements Listener {
         matchControllers.register(spleefController);
         matchControllers.register(evolutionController);
         matchControllers.register(dragonEscapeController);
+        matchControllers.register(masterBuildersController);
         this.dragonEscapeGhostStore = new DragonEscapeGhostPathStore(
                 plugin.getDataFolder().toPath(), plugin.getLogger());
         this.debugProfiles = new GameDebugProfiles(plugin);
@@ -7725,72 +7728,6 @@ public final class ArcadePortManager implements Listener {
 
 
 
-    private void setupMasterBuildersScoreboard(Session session) {
-        if (session == null || Bukkit.getScoreboardManager() == null) return;
-        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
-        Objective objective = scoreboard.registerNewObjective("build", "dummy",
-                ChatColor.GOLD + "MASTER BUILDERS");
-        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
-        session.masterBuildersScoreboard = scoreboard;
-        session.masterBuildersScoreboardObjective = objective;
-        for (Player player : session.players.values()) {
-            if (player != null && player.isOnline()) player.setScoreboard(scoreboard);
-        }
-        updateMasterBuildersScoreboard(session, System.currentTimeMillis());
-    }
-
-    private void updateMasterBuildersScoreboard(Session session, long now) {
-        if (session == null || session.masterBuildersScoreboardObjective == null
-                || now < session.masterBuildersNextScoreboardAt) return;
-        session.masterBuildersNextScoreboardAt = now + 500L;
-        for (String entry : session.masterBuildersScoreboardEntries) {
-            session.masterBuildersScoreboard.resetScores(entry);
-        }
-        session.masterBuildersScoreboardEntries.clear();
-
-        List<String> lines = new ArrayList<>();
-        lines.add(ChatColor.YELLOW + "Theme: " + ChatColor.WHITE + session.masterBuilderTheme);
-        if (session.masterBuilderPhase == MasterBuildersPhase.BUILDING) {
-            long remaining = Math.max(0L, session.masterBuilderBuildEndsAt - now);
-            lines.add(ChatColor.GREEN + "Build Time");
-            lines.add(ChatColor.WHITE + formatMasterBuilderTime(remaining));
-        } else if (session.masterBuilderPhase == MasterBuildersPhase.REVIEW) {
-            long remaining = Math.max(0L, session.masterBuilderVoteEndsAt - now);
-            Player builder = session.masterBuilderCurrentTarget == null ? null
-                    : session.players.get(session.masterBuilderCurrentTarget);
-            String builderName = builder == null ? "Builder" : builder.getName();
-            lines.add(ChatColor.GOLD + "Review " + (session.masterBuilderReviewIndex + 1)
-                    + "/" + session.masterBuilderReviewOrder.size());
-            lines.add(ChatColor.WHITE + builderName);
-            lines.add(ChatColor.YELLOW + "Vote Time");
-            lines.add(ChatColor.WHITE + formatMasterBuilderTime(remaining));
-        }
-        lines.add(ChatColor.GRAY + "Plots: " + ChatColor.WHITE + session.masterBuilderPlots.size());
-
-        int score = lines.size();
-        for (String line : lines) {
-            session.masterBuildersScoreboardEntries.add(line);
-            session.masterBuildersScoreboardObjective.getScore(line).setScore(score--);
-        }
-    }
-
-    private String formatMasterBuilderTime(long millis) {
-        long seconds = (millis + 999L) / 1_000L;
-        return String.format(java.util.Locale.ROOT, "%d:%02d", seconds / 60L, seconds % 60L);
-    }
-
-    private void cleanupMasterBuildersScoreboard(Session session) {
-        if (session == null || session.masterBuildersScoreboardObjective == null) return;
-        try {
-            session.masterBuildersScoreboardObjective.unregister();
-        } catch (IllegalArgumentException | IllegalStateException exception) {
-            plugin.getLogger().fine("Master Builders scoreboard was already removed: " + exception.getMessage());
-        }
-        session.masterBuildersScoreboard = null;
-        session.masterBuildersScoreboardObjective = null;
-        session.masterBuildersScoreboardEntries.clear();
-    }
-
 
 
 
@@ -13020,7 +12957,8 @@ public final class ArcadePortManager implements Listener {
         }
         masterBuildersPlots.begin(session.players.values());
         spawnMasterBuilderPlotLabels(session);
-        setupMasterBuildersScoreboard(session);
+        masterBuildersController.setupScoreboard(session);
+        masterBuildersController.updateScoreboard(session, System.currentTimeMillis(), true, false);
     }
 
     private void spawnMasterBuilderPlotLabels(Session session) {
@@ -13239,7 +13177,9 @@ public final class ArcadePortManager implements Listener {
     private void updateMasterBuilders(Session session,long now) {
         if(session.alive.isEmpty()){finish(session,null,true);return;}
         masterBuildersPlots.tick(session.players.values());
-        updateMasterBuildersScoreboard(session, now);
+        masterBuildersController.updateScoreboard(session, now,
+                session.masterBuilderPhase == MasterBuildersPhase.BUILDING,
+                session.masterBuilderPhase == MasterBuildersPhase.REVIEW);
         if(session.masterBuilderPhase==MasterBuildersPhase.BUILDING){
             long remain=Math.max(0,session.masterBuilderBuildEndsAt-now);
             String timer=String.format(java.util.Locale.ROOT,"%d:%02d",remain/60000L,(remain/1000L)%60L);
@@ -20755,7 +20695,7 @@ public final class ArcadePortManager implements Listener {
             dragonEscapeController.cleanupScoreboard(session);
         }
         if (session.type == ArcadePortGame.GLADIATORS) cleanupGladiatorsScoreboard(session);
-        if (session.type == ArcadePortGame.MASTER_BUILDERS) cleanupMasterBuildersScoreboard(session);
+        if (session.type == ArcadePortGame.MASTER_BUILDERS) masterBuildersController.cleanupScoreboard(session);
         for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
             Player player = entry.getValue();
             PlayerSnapshot snapshot = session.snapshots.get(entry.getKey());
