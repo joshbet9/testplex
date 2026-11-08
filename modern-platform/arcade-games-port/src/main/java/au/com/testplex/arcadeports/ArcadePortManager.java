@@ -11230,43 +11230,11 @@ public final class ArcadePortManager implements Listener {
     }
 
     private boolean isPaintballTrackingCompass(ItemStack item) {
-        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
-        ItemMeta meta = item.getItemMeta();
-        return meta != null && meta.hasDisplayName()
-                && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
+        return paintballController.isTrackingCompass(item);
     }
 
     private void updatePaintballSpectatorCompasses(Session session, long now) {
-        if (now < session.paintballNextCompassUpdateAt) return;
-        session.paintballNextCompassUpdateAt = now + 250L;
-        List<Player> living = alivePlayers(session);
-        if (living.isEmpty()) return;
-        for (Player spectator : session.players.values()) {
-            if (spectator == null || !spectator.isOnline()
-                    || session.alive.contains(spectator.getUniqueId())
-                    || spectator.getWorld() != session.world) continue;
-            boolean hasCompass = java.util.Arrays.stream(spectator.getInventory().getContents())
-                    .anyMatch(this::isPaintballTrackingCompass);
-            if (!hasCompass) spectator.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
-                    "Tracks the nearest opposing Paintball player."));
-            int team = session.teams.getOrDefault(spectator.getUniqueId(), -1);
-            Player target = living.stream()
-                    .filter(candidate -> session.teams.getOrDefault(candidate.getUniqueId(), -2) != team)
-                    .min(java.util.Comparator.comparingDouble(candidate ->
-                            candidate.getLocation().distanceSquared(spectator.getLocation())))
-                    .orElse(null);
-            if (target == null) continue;
-            spectator.setCompassTarget(target.getLocation());
-            if (isPaintballTrackingCompass(spectator.getInventory().getItemInMainHand())) {
-                double distance = Math.sqrt(target.getLocation().distanceSquared(spectator.getLocation()));
-                double height = target.getLocation().getY() - spectator.getLocation().getY();
-                spectator.sendActionBar(ChatColor.WHITE + "Nearest Target: " + ChatColor.RED + target.getName()
-                        + ChatColor.WHITE + " | Distance: " + ChatColor.RED
-                        + String.format(java.util.Locale.ROOT, "%.1f", distance)
-                        + ChatColor.WHITE + " | Height: " + ChatColor.RED
-                        + String.format(java.util.Locale.ROOT, "%.1f", height));
-            }
-        }
+        paintballController.updateSpectatorCompasses(session, now);
     }
 
     /**
