@@ -84,4 +84,22 @@ class BaconBrawlManagerTest {
         SessionState session = new SessionState(ArcadePortGame.BACON_BRAWL, null, List.of(), false);
         assertTrue(manager.baconTimingStatusText(session, UUID.randomUUID(), 1_000L).contains("swing"));
     }
+
+    @Test
+    void expiredBaconBlastRemovesAllProjectileBookkeeping() {
+        SessionState session = new SessionState(ArcadePortGame.BACON_BRAWL, null, List.of(), false);
+        UUID blastId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        session.baconBlastOwners.put(blastId, ownerId);
+        session.baconBlastCreatedAt.put(blastId, 10L);
+        session.baconBlastPowerById.put(blastId, 0.75D);
+        session.baconCrispyProjectiles.add(blastId);
+
+        manager.removeBaconBlastItem(session, blastId);
+
+        assertFalse(session.baconBlastOwners.containsKey(blastId));
+        assertFalse(session.baconBlastCreatedAt.containsKey(blastId));
+        assertFalse(session.baconBlastPowerById.containsKey(blastId));
+        assertFalse(session.baconCrispyProjectiles.contains(blastId));
+    }
 }

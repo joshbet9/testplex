@@ -11,7 +11,11 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Particle;
+import org.bukkit.Sound;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
+import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.Inventory;
@@ -521,6 +525,63 @@ final class BaconBrawlManager implements ArcadeMatchController {
         if (hit == null || hit.getHitPosition() == null) return -1.0D;
         return Math.max(0.0D, Math.min(1.0D,
                 startVector.distance(hit.getHitPosition()) / segmentLength));
+    }
+
+    boolean baconBlastTouchingAdjacentSolidBlock(Location location) {
+        Block center = location.getBlock();
+        for (BlockFace face : new BlockFace[] {
+                BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST,
+                BlockFace.UP, BlockFace.DOWN }) {
+            Block adjacent = center.getRelative(face);
+            if (adjacent.getType().isSolid() && !adjacent.isLiquid()) return true;
+        }
+        return false;
+    }
+
+    void spawnBaconBlastImpact(SessionState session, Location impact, UUID blastId) {
+        spawnBaconBlastImpact(session, impact, blastId, true, true);
+    }
+
+    void spawnBaconBlastImpact(SessionState session, Location impact, UUID blastId,
+            boolean includeExplosion, boolean playLandingSound) {
+        // Reborn creates a 0.5-power, non-incendiary, non-block-breaking explosion on impact.
+        // Suppress health damage; crispy impacts are visual-only and have no explosion impulse.
+        if (includeExplosion) {
+            session.baconBlastExplosionDepth++;
+            try {
+                session.world.createExplosion(impact.getX(), impact.getY(), impact.getZ(), 0.5F, false, false);
+            } finally {
+                session.baconBlastExplosionDepth--;
+            }
+        }
+        session.world.spawnParticle(Particle.CLOUD, impact, 14, 0.25D, 0.25D, 0.25D, 0.04D);
+        UUID ownerId = session.baconBlastOwners.get(blastId);
+        if (playLandingSound && ownerId != null
+                && "mama-piggles".equals(session.baconKits.getOrDefault(ownerId, "el-muchacho-pigo"))) {
+            // Reborn's item impact effect is silent; Testplex adds the requested landing cue.
+            session.world.playSound(impact, Sound.BLOCK_NOTE_BLOCK_PLING, 1.2F, 1.65F);
+        }
+    }
+
+    void playMamaPigglesBaconBlastHitSound(Player owner) {
+        // Send the cue directly to its owner even when impact is outside sound radius
+        // or the hit ends the round.
+        if (owner != null && owner.isOnline()) {
+            owner.playSound(owner.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.25F);
+        }
+    }
+
+    void removeBaconBlastItem(SessionState session, UUID blastId) {
+        Item bacon = session.baconBlastItems.remove(blastId);
+        if (bacon != null) {
+            session.entities.remove(bacon);
+            if (bacon.isValid()) bacon.remove();
+        }
+        session.baconBlastOwners.remove(blastId);
+        session.baconBlastLastLocations.remove(blastId);
+        session.baconBlastCreatedAt.remove(blastId);
+        session.baconBlastPowerById.remove(blastId);
+        session.baconCrispyProjectiles.remove(blastId);
     }
 
     private static ItemStack namedTrackingCompass(String lore) {
