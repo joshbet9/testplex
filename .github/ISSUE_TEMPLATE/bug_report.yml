@@ -1,6 +1,9 @@
 name: Testplex bug report
 description: Report a reproducible issue from the Testplex 26.3 tester server.
 title: "[Bug] "
+labels: ["bug"]
+assignees:
+  - joshbet9
 body:
   - type: markdown
     attributes:
@@ -44,6 +47,7 @@ body:
         - Turf Wars
         - Wither Assault
         - Wizards
+        - Shared lobby or global
     validations:
       required: true
   - type: input
