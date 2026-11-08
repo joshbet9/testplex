@@ -1244,7 +1244,7 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.PAINTBALL && "restore-armour".equals(eventId)) {
             GameDebugRuntimeOverrides.markDebugSession();
             session.paintPiecesRemaining.put(tester.getUniqueId(), 4);
-            setPaintballArmor(session, tester);
+            paintballController.setTeamArmor(session, tester);
             triggered = true;
         }
         if (type == ArcadePortGame.PAINTBALL && "throw-water-bomb".equals(eventId)) {
@@ -11576,7 +11576,7 @@ public final class ArcadePortManager implements Listener {
         int waterBombs = "sniper".equals(safeKit) ? 2 : 3;
         player.getInventory().setItem(1, namedItem(Material.SPLASH_POTION, "Water Bomb",
                 "Clean painted teammates or revive an eliminated teammate near the SAVE ME marker.", waterBombs));
-        setPaintballArmor(session, player);
+        paintballController.setTeamArmor(session, player);
         if ("rifle".equals(safeKit) || "shotgun".equals(safeKit)) {
             int speedLevel = "shotgun".equals(safeKit) ? 1 : 0;
             player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 160, speedLevel, false, false, true), true);
@@ -11793,7 +11793,7 @@ public final class ArcadePortManager implements Listener {
         }
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
-            ensurePaintballArmor(session, player);
+            paintballController.ensureTeamArmor(session, player);
             String kit = session.paintballKits.getOrDefault(id, "rifle");
             if ("sniper".equals(kit)) {
                 ItemStack held = player.getInventory().getItemInMainHand();
@@ -12107,36 +12107,6 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    private void setPaintballArmor(Session session, Player player) {
-        Color teamColor = ArcadePortRules.paintballTeamColor(session.teams.getOrDefault(player.getUniqueId(), 0));
-        ItemStack[] armor = new ItemStack[] {
-                paintballArmorPiece(Material.LEATHER_BOOTS, teamColor),
-                paintballArmorPiece(Material.LEATHER_LEGGINGS, teamColor),
-                paintballArmorPiece(Material.LEATHER_CHESTPLATE, teamColor),
-                paintballArmorPiece(Material.LEATHER_HELMET, teamColor)
-        };
-        player.getInventory().setArmorContents(armor);
-    }
-
-    /** Refill only missing armor slots so hit-painted purple pieces keep their progress. */
-    private void ensurePaintballArmor(Session session, Player player) {
-        if (session == null || player == null) return;
-        Color teamColor = ArcadePortRules.paintballTeamColor(session.teams.getOrDefault(player.getUniqueId(), 0));
-        Material[] materials = {
-                Material.LEATHER_BOOTS,
-                Material.LEATHER_LEGGINGS,
-                Material.LEATHER_CHESTPLATE,
-                Material.LEATHER_HELMET
-        };
-        ItemStack[] armor = player.getInventory().getArmorContents();
-        boolean changed = false;
-        for (int slot = 0; slot < materials.length; slot++) {
-            if (armor[slot] != null && !armor[slot].getType().isAir()) continue;
-            armor[slot] = paintballArmorPiece(materials[slot], teamColor);
-            changed = true;
-        }
-        if (changed) player.getInventory().setArmorContents(armor);
-    }
 
     /** FakePlayerPlugin may apply its equipment snapshot just after a match gives kits. */
     private void refreshPaintballTestPlayerArmor(Session session) {
@@ -12146,20 +12116,11 @@ public final class ArcadePortManager implements Listener {
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 if (active != session || !session.alive.contains(playerId)) return;
                 Player player = session.players.get(playerId);
-                if (player != null && player.isOnline()) setPaintballArmor(session, player);
+                if (player != null && player.isOnline()) paintballController.setTeamArmor(session, player);
             }, 2L);
         }
     }
 
-    private ItemStack paintballArmorPiece(Material material, Color color) {
-        ItemStack item = new ItemStack(material);
-        if (item.getItemMeta() instanceof LeatherArmorMeta meta) {
-            meta.setColor(color);
-            meta.setUnbreakable(true);
-            item.setItemMeta(meta);
-        }
-        return item;
-    }
 
 
 
@@ -12292,7 +12253,7 @@ public final class ArcadePortManager implements Listener {
                     teammate.getLocation().distanceSquared(impact), true)) continue;
             UUID teammateId = teammate.getUniqueId();
             session.paintPiecesRemaining.put(teammateId, 4);
-            setPaintballArmor(session, teammate);
+            paintballController.setTeamArmor(session, teammate);
             teammate.setHealth(20.0D);
             teammate.sendMessage(ChatColor.AQUA + "Water Bomb cleaned your paint!");
             teammate.playSound(teammate.getLocation(), Sound.ENTITY_SPLASH_POTION_BREAK, 0.7F, 1.25F);

@@ -6,7 +6,11 @@ import java.util.List;
 import java.util.UUID;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.Color;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
@@ -73,6 +77,47 @@ final class PaintballManager implements ArcadeMatchController {
                 player.setScoreboard(session.paintballScoreboard);
             }
         }
+    }
+
+    void setTeamArmor(SessionState session, Player player) {
+        Color teamColor = ArcadePortRules.paintballTeamColor(session.teams.getOrDefault(player.getUniqueId(), 0));
+        ItemStack[] armor = new ItemStack[] {
+                armorPiece(Material.LEATHER_BOOTS, teamColor),
+                armorPiece(Material.LEATHER_LEGGINGS, teamColor),
+                armorPiece(Material.LEATHER_CHESTPLATE, teamColor),
+                armorPiece(Material.LEATHER_HELMET, teamColor)
+        };
+        player.getInventory().setArmorContents(armor);
+    }
+
+    /** Refill only empty slots so painted purple pieces retain their progress. */
+    void ensureTeamArmor(SessionState session, Player player) {
+        if (session == null || player == null) return;
+        Color teamColor = ArcadePortRules.paintballTeamColor(session.teams.getOrDefault(player.getUniqueId(), 0));
+        Material[] materials = {
+                Material.LEATHER_BOOTS,
+                Material.LEATHER_LEGGINGS,
+                Material.LEATHER_CHESTPLATE,
+                Material.LEATHER_HELMET
+        };
+        ItemStack[] armor = player.getInventory().getArmorContents();
+        boolean changed = false;
+        for (int slot = 0; slot < materials.length; slot++) {
+            if (armor[slot] != null && !armor[slot].getType().isAir()) continue;
+            armor[slot] = armorPiece(materials[slot], teamColor);
+            changed = true;
+        }
+        if (changed) player.getInventory().setArmorContents(armor);
+    }
+
+    private ItemStack armorPiece(Material material, Color color) {
+        ItemStack item = new ItemStack(material);
+        if (item.getItemMeta() instanceof LeatherArmorMeta meta) {
+            meta.setColor(color);
+            meta.setUnbreakable(true);
+            item.setItemMeta(meta);
+        }
+        return item;
     }
 
     private List<Player> alivePlayers(SessionState session) {
