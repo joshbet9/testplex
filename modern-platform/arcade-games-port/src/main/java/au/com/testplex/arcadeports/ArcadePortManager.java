@@ -280,6 +280,7 @@ public final class ArcadePortManager implements Listener {
     private final RunnerManager runnerController = new RunnerManager();
     private final SpleefManager spleefController = new SpleefManager();
     private final EvolutionManager evolutionController = new EvolutionManager();
+    private final DragonEscapeManager dragonEscapeController;
     private boolean gameModulesInitialized;
     private CameraShyGame cameraShyModule;
 
@@ -287,6 +288,7 @@ public final class ArcadePortManager implements Listener {
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=arcade-manager-constructor-start");
         this.plugin = plugin;
         this.baconController = new BaconBrawlManager(plugin.getLogger());
+        this.dragonEscapeController = new DragonEscapeManager(plugin.getLogger());
         matchControllers.register(baconController);
         matchControllers.register(deathTagController);
         matchControllers.register(bombLobbersController);
@@ -296,6 +298,7 @@ public final class ArcadePortManager implements Listener {
         matchControllers.register(runnerController);
         matchControllers.register(spleefController);
         matchControllers.register(evolutionController);
+        matchControllers.register(dragonEscapeController);
         this.dragonEscapeGhostStore = new DragonEscapeGhostPathStore(
                 plugin.getDataFolder().toPath(), plugin.getLogger());
         this.debugProfiles = new GameDebugProfiles(plugin);
@@ -5532,7 +5535,10 @@ public final class ArcadePortManager implements Listener {
             refreshPaintballTestPlayerArmor(session);
         }
         if (type == ArcadePortGame.DRAGON_ESCAPE) {
-            setupDragonEscapeRaceScoreboard(session);
+            matchControllers.prepare(session, participants);
+            long raceNow = System.currentTimeMillis();
+            dragonEscapeController.updateScoreboard(session, raceNow, dragonEscapeRaceOrder(session),
+                    (leader, racer) -> dragonEscapeRaceGapMillis(session, leader, racer, raceNow));
         }
         if (type == ArcadePortGame.DRAW_MY_THING) {
             String drawRoundDuration = String.format(java.util.Locale.ROOT, "%.1f seconds",
@@ -16592,95 +16598,12 @@ public final class ArcadePortManager implements Listener {
         session.quiverScoreboard = null;
     }
 
-    private void setupDragonEscapeRaceScoreboard(Session session) {
-        if (session.type != ArcadePortGame.DRAGON_ESCAPE || Bukkit.getScoreboardManager() == null) return;
-        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
-        Objective objective = scoreboard.registerNewObjective("dragonrace", "dummy",
-                ChatColor.GOLD + "DRAGON ESCAPE");
-        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
-        session.dragonEscapeScoreboard = scoreboard;
-        session.dragonEscapeScoreboardObjective = objective;
-        for (int i = 0; i < 14; i++) {
-            Team line = scoreboard.registerNewTeam("derank" + i);
-            String entry = ChatColor.values()[i].toString();
-            line.addEntry(entry);
-            session.dragonEscapeScoreboardTeams.add(line);
-            session.dragonEscapeScoreboardEntries.add(entry);
-        }
-        for (Player player : session.players.values()) {
-            if (player != null && player.isOnline()) player.setScoreboard(scoreboard);
-        }
-        updateDragonEscapeRaceScoreboard(session, System.currentTimeMillis());
-    }
-
-    /** Reborn shows the top 14 ranked racers; the modern sidebar also shows live race times. */
-    private void updateDragonEscapeRaceScoreboard(Session session, long now) {
-        Scoreboard scoreboard = session.dragonEscapeScoreboard;
-        Objective objective = session.dragonEscapeScoreboardObjective;
-        if (scoreboard == null || objective == null || session.type != ArcadePortGame.DRAGON_ESCAPE) return;
-        List<Player> ranked = new ArrayList<>();
-        for (Player player : session.players.values()) {
-            if (player != null && session.dragonEscapePlayerRankScores.containsKey(player.getUniqueId())) {
-                ranked.add(player);
-            }
-        }
-        ranked.sort((left, right) -> Double.compare(
-                session.dragonEscapePlayerRankScores.get(right.getUniqueId()),
-                session.dragonEscapePlayerRankScores.get(left.getUniqueId())));
-        List<Player> liveOrder = dragonEscapeRaceOrder(session);
-        Player liveLeader = liveOrder.isEmpty() ? null : liveOrder.get(0);
-        long elapsed = Math.max(0L, now - session.startedAt);
-        for (int i = 0; i < session.dragonEscapeScoreboardTeams.size(); i++) {
-            Team line = session.dragonEscapeScoreboardTeams.get(i);
-            String entry = session.dragonEscapeScoreboardEntries.get(i);
-            if (i < ranked.size()) {
-                Player racer = ranked.get(i);
-                boolean alive = session.alive.contains(racer.getUniqueId());
-                ChatColor colour = alive ? ChatColor.GREEN : ChatColor.RED;
-                line.setPrefix(colour + "#" + (i + 1) + " " + racer.getName());
-                if (!alive) {
-                    line.setSuffix(ChatColor.DARK_RED + " OUT");
-                } else if (liveLeader != null
-                        && racer.getUniqueId().equals(liveLeader.getUniqueId())) {
-                    line.setSuffix(ChatColor.YELLOW + " " + ArcadePortRules.formatDragonEscapeTime(elapsed));
-                } else if (liveLeader != null) {
-                    long gap = dragonEscapeRaceGapMillis(session, liveLeader, racer, now);
-                    line.setSuffix(ChatColor.RED + " ~+" + ArcadePortRules.formatDragonEscapeTime(gap));
-                } else {
-                    line.setSuffix("");
-                }
-                objective.getScore(entry).setScore(14 - i);
-            } else {
-                line.setPrefix("");
-                line.setSuffix("");
-                scoreboard.resetScores(entry);
-            }
-        }
-    }
-
-    private void cleanupDragonEscapeRaceScoreboard(Session session) {
-        Scoreboard scoreboard = session.dragonEscapeScoreboard;
-        Objective objective = session.dragonEscapeScoreboardObjective;
-        if (scoreboard == null) return;
-        try {
-            for (Team team : new ArrayList<>(session.dragonEscapeScoreboardTeams)) {
-                if (scoreboard.getTeam(team.getName()) != null) team.unregister();
-            }
-            if (objective != null && scoreboard.getObjective(objective.getName()) != null) {
-                objective.unregister();
-            }
-        } catch (IllegalArgumentException | IllegalStateException exception) {
-            plugin.getLogger().fine("Dragon Escape scoreboard was already removed: " + exception.getMessage());
-        }
-        session.dragonEscapeScoreboardTeams.clear();
-        session.dragonEscapeScoreboardEntries.clear();
-        session.dragonEscapeScoreboardObjective = null;
-        session.dragonEscapeScoreboard = null;
-    }
-
     private void updateDragonEscapeRaceUi(Session session, long now) {
-        if (session.ticks % 10 == 0) updateDragonEscapeRaceScoreboard(session, now);
         List<Player> order = dragonEscapeRaceOrder(session);
+        if (session.ticks % 10 == 0) {
+            dragonEscapeController.updateScoreboard(session, now, order,
+                    (leader, racer) -> dragonEscapeRaceGapMillis(session, leader, racer, now));
+        }
         if (order.isEmpty()) return;
         Player leader = order.get(0);
         UUID leaderId = leader.getUniqueId();
@@ -20829,7 +20752,7 @@ public final class ArcadePortManager implements Listener {
             matchControllers.finish(session);
         } else if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
             for (Player racer : session.players.values()) hideDragonEscapeGhost(racer);
-            cleanupDragonEscapeRaceScoreboard(session);
+            dragonEscapeController.cleanupScoreboard(session);
         }
         if (session.type == ArcadePortGame.GLADIATORS) cleanupGladiatorsScoreboard(session);
         if (session.type == ArcadePortGame.MASTER_BUILDERS) cleanupMasterBuildersScoreboard(session);
