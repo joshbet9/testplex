@@ -288,6 +288,7 @@ public final class ArcadePortManager implements Listener {
     private final DrawMyThingManager drawMyThingController = new DrawMyThingManager();
     private final GladiatorsManager gladiatorsController;
     private final MilkCowManager milkCowController = new MilkCowManager();
+    private final WitherAssaultManager witherAssaultController = new WitherAssaultManager();
     private boolean gameModulesInitialized;
     private CameraShyGame cameraShyModule;
 
@@ -315,6 +316,7 @@ public final class ArcadePortManager implements Listener {
         matchControllers.register(drawMyThingController);
         matchControllers.register(gladiatorsController);
         matchControllers.register(milkCowController);
+        matchControllers.register(witherAssaultController);
         this.dragonEscapeGhostStore = new DragonEscapeGhostPathStore(
                 plugin.getDataFolder().toPath(), plugin.getLogger());
         this.debugProfiles = new GameDebugProfiles(plugin);
@@ -26955,10 +26957,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private boolean isWitherRevivalPotion(ItemStack item) {
-        if (item == null || item.getType() != Material.SPLASH_POTION || !item.hasItemMeta()) return false;
-        ItemMeta meta = item.getItemMeta();
-        return meta != null && meta.hasDisplayName()
-                && ChatColor.stripColor(meta.getDisplayName()).equalsIgnoreCase("Revival Potion");
+        return witherAssaultController.isRevivalPotion(item);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -26992,14 +26991,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private boolean isWitherEditorBlockUnderAnotherPlayer(Session session, Block block, Player editor) {
-        for (UUID id : session.alive) {
-            if (id.equals(editor.getUniqueId())) continue;
-            Player other = session.players.get(id);
-            if (other == null || !other.isOnline() || other.getWorld() != session.world) continue;
-            Block feet = other.getLocation().getBlock();
-            if (feet.equals(block) || feet.getRelative(0, -1, 0).equals(block)) return true;
-        }
-        return false;
+        return witherAssaultController.isBlockUnderAnotherPlayer(session, block, editor);
     }
 
     private void temporarilyRemoveWitherEditorBlock(Session session, Block block) {
@@ -27014,16 +27006,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void restoreWitherEditorBlocks(Session session) {
-        if (session == null) return;
-        for (Map.Entry<Block, BlockData> entry : new HashMap<>(session.witherEditorReplacedBlocks).entrySet()) {
-            Block block = entry.getKey();
-            if (block != null && block.getWorld() == session.world && entry.getValue() != null) {
-                block.setBlockData(entry.getValue(), false);
-            }
-        }
-        session.witherEditorBlocks.clear();
-        session.witherEditorReplacedBlocks.clear();
-        session.witherEditorBlockOwners.clear();
+        witherAssaultController.restoreEditorBlocks(session);
     }
 
     private void disguiseMilkCowPlayer(Session session, Player player) {
@@ -27511,23 +27494,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private boolean isWitherEditorTunnelPosition(Session session, Location location, UUID editorId) {
-        if (location == null || location.getWorld() != session.world) return false;
-        int x = location.getBlockX();
-        int y = location.getBlockY();
-        int z = location.getBlockZ();
-        int nearbyBlocks = 0;
-        boolean overhead = false;
-        for (Map.Entry<Block, UUID> entry : session.witherEditorBlockOwners.entrySet()) {
-            if (!editorId.equals(entry.getValue())) continue;
-            Block placed = entry.getKey();
-            if (!session.witherEditorBlocks.contains(placed) || placed.getType().isAir()) continue;
-            if (Math.abs(placed.getX() - x) > 2 || Math.abs(placed.getZ() - z) > 2
-                    || placed.getY() < y || placed.getY() > y + 3) continue;
-            nearbyBlocks++;
-            if (placed.getY() == y + 2 && Math.abs(placed.getX() - x) <= 1
-                    && Math.abs(placed.getZ() - z) <= 1) overhead = true;
-        }
-        return nearbyBlocks >= 5 && overhead;
+        return witherAssaultController.isEditorTunnelPosition(session, location, editorId);
     }
 
     private double randomSpread(double maximum) {
@@ -31097,7 +31064,6 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Integer> witherMinionEliminations = new HashMap<>();
         final Map<UUID, Set<UUID>> witherSmokeArrowTargets = new HashMap<>();
         final Map<UUID, Integer> witherEditorBlocksPlaced = new HashMap<>();
-        final Map<Block, UUID> witherEditorBlockOwners = new HashMap<>();
         final Map<UUID, Set<UUID>> witherEditorTunnelFollowers = new HashMap<>();
         final Map<UUID, Set<UUID>> witherWardenBlockedSkulls = new HashMap<>();
         int witherLabyrinthTopY = Integer.MIN_VALUE;
