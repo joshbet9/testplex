@@ -15005,37 +15005,11 @@ public final class ArcadePortManager implements Listener {
 
     /** Reborn's CompassModule points every eliminated racer at the nearest living opponent. */
     private void updateDragonEscapeSpectatorCompasses(Session session) {
-        List<Player> alive = alivePlayers(session);
-        if (alive.isEmpty()) return;
-        for (Player spectator : session.players.values()) {
-            if (spectator == null || !spectator.isOnline()
-                    || session.alive.contains(spectator.getUniqueId())) continue;
-            if (inventoryCount(spectator, Material.COMPASS) == 0) {
-                spectator.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
-                        "Points toward the nearest living Dragon Escape racer."));
-            }
-            Player target = alive.stream().min(java.util.Comparator.comparingDouble(
-                    candidate -> candidate.getLocation().distanceSquared(spectator.getLocation()))).orElse(null);
-            if (target == null) continue;
-            spectator.setCompassTarget(target.getLocation());
-            ItemStack held = spectator.getInventory().getItemInMainHand();
-            if (isDragonEscapeTrackingCompass(held)) {
-                double distance = spectator.getLocation().distance(target.getLocation());
-                double height = target.getLocation().getY() - spectator.getLocation().getY();
-                spectator.sendActionBar(ChatColor.WHITE + "Nearest Target: " + ChatColor.GREEN + target.getName()
-                        + ChatColor.WHITE + " | Distance: " + ChatColor.GREEN
-                        + String.format(java.util.Locale.ROOT, "%.1f", distance)
-                        + ChatColor.WHITE + " | Height: " + ChatColor.GREEN
-                        + String.format(java.util.Locale.ROOT, "%.1f", height));
-            }
-        }
+        dragonEscapeController.updateSpectatorCompasses(session);
     }
 
     private boolean isDragonEscapeTrackingCompass(ItemStack item) {
-        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
-        ItemMeta meta = item.getItemMeta();
-        return meta.hasDisplayName()
-                && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
+        return dragonEscapeController.isTrackingCompass(item);
     }
 
     /** Remove owner tracking when the source-style dropped TNT item despawns or is removed. */
