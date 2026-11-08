@@ -275,6 +275,7 @@ public final class ArcadePortManager implements Listener {
     private final DeathTagManager deathTagController = new DeathTagManager();
     private final BombLobbersManager bombLobbersController = new BombLobbersManager();
     private final PaintballManager paintballController = new PaintballManager();
+    private final DragonsManager dragonsController = new DragonsManager();
     private boolean gameModulesInitialized;
     private CameraShyGame cameraShyModule;
 
@@ -286,6 +287,7 @@ public final class ArcadePortManager implements Listener {
         matchControllers.register(deathTagController);
         matchControllers.register(bombLobbersController);
         matchControllers.register(paintballController);
+        matchControllers.register(dragonsController);
         this.dragonEscapeGhostStore = new DragonEscapeGhostPathStore(
                 plugin.getDataFolder().toPath(), plugin.getLogger());
         this.debugProfiles = new GameDebugProfiles(plugin);
@@ -5411,7 +5413,7 @@ public final class ArcadePortManager implements Listener {
             refreshBombLobbersTestPlayerArmor(session);
         }
         if (type == ArcadePortGame.DRAGONS) {
-            setupDragonsScoreboard(session);
+            matchControllers.prepare(session, participants);
         }
         if (type == ArcadePortGame.BACON_BRAWL) {
             // Preserve the pig/sheep avatar disguise without replacing the shared scoreboard.
@@ -7713,73 +7715,6 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    private void setupDragonsScoreboard(Session session) {
-        if (session == null || Bukkit.getScoreboardManager() == null) return;
-        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
-        Objective objective = scoreboard.registerNewObjective("dragons", "dummy",
-                ChatColor.GOLD + "DRAGONS");
-        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
-        session.dragonScoreboard = scoreboard;
-        session.dragonScoreboardObjective = objective;
-        session.dragonAliveScoreboardTeam = scoreboard.registerNewTeam("drgalive");
-        session.dragonAliveScoreboardTeam.setPrefix(ChatColor.GREEN.toString());
-        session.dragonDeadScoreboardTeam = scoreboard.registerNewTeam("drgdead");
-        session.dragonDeadScoreboardTeam.setPrefix(ChatColor.GRAY.toString());
-        for (Player player : session.players.values()) {
-            if (player != null && player.isOnline()) player.setScoreboard(scoreboard);
-        }
-        updateDragonsScoreboard(session, System.currentTimeMillis());
-    }
-
-    private void updateDragonsScoreboard(Session session, long now) {
-        if (session == null || session.type != ArcadePortGame.DRAGONS
-                || session.dragonScoreboard == null || session.dragonScoreboardObjective == null
-                || now < session.dragonNextScoreboardUpdateAt) return;
-        session.dragonNextScoreboardUpdateAt = now + 500L; // SoloGame.ScoreboardUpdate uses UpdateType.FAST.
-        Scoreboard scoreboard = session.dragonScoreboard;
-        Objective objective = session.dragonScoreboardObjective;
-        for (String entry : new ArrayList<>(scoreboard.getEntries())) {
-            scoreboard.resetScores(entry);
-            if (session.dragonAliveScoreboardTeam.hasEntry(entry)) session.dragonAliveScoreboardTeam.removeEntry(entry);
-            if (session.dragonDeadScoreboardTeam.hasEntry(entry)) session.dragonDeadScoreboardTeam.removeEntry(entry);
-        }
-
-        List<Player> roster = new ArrayList<>(session.players.values());
-        int total = roster.size();
-        int alive = session.alive.size();
-        int mode = ArcadePortRules.dragonsScoreboardMode(total, alive);
-        if (mode == 0) {
-            int score = total;
-            for (Player player : roster) {
-                if (player == null) continue;
-                String entry = player.getName();
-                if (session.alive.contains(player.getUniqueId())) {
-                    session.dragonAliveScoreboardTeam.addEntry(entry);
-                } else {
-                    session.dragonDeadScoreboardTeam.addEntry(entry);
-                }
-                objective.getScore(entry).setScore(score--);
-            }
-        } else if (mode == 1) {
-            int score = alive;
-            for (Player player : roster) {
-                if (player == null || !session.alive.contains(player.getUniqueId())) continue;
-                String entry = player.getName();
-                session.dragonAliveScoreboardTeam.addEntry(entry);
-                objective.getScore(entry).setScore(score--);
-            }
-        } else {
-            objective.getScore(ChatColor.GREEN + "Players Alive").setScore(4);
-            objective.getScore(ChatColor.WHITE + Integer.toString(alive)).setScore(3);
-            objective.getScore(ChatColor.RED + "Players Dead").setScore(2);
-            objective.getScore(ChatColor.WHITE + Integer.toString(Math.max(0, total - alive))).setScore(1);
-        }
-        for (Player player : roster) {
-            if (player != null && player.isOnline() && player.getScoreboard() != scoreboard) {
-                player.setScoreboard(scoreboard);
-            }
-        }
-    }
 
 
 
@@ -17724,7 +17659,7 @@ public final class ArcadePortManager implements Listener {
     private void updateTitles(Session session) {
         long now = System.currentTimeMillis();
         if (session.type == ArcadePortGame.BACON_BRAWL) baconController.updateBaconMeterScoreboard(session);
-        if (session.type == ArcadePortGame.DRAGONS) updateDragonsScoreboard(session, now);
+        if (session.type == ArcadePortGame.DRAGONS) dragonsController.updateScoreboard(session, now);
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) updateDragonEscapeRaceUi(session, now);
         for (UUID id : session.players.keySet()) {
             Player p = session.players.get(id);
