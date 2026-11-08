@@ -448,17 +448,18 @@ class GameDebugEventCatalogTest {
                     "com", "testplex", "arcadeports", "ArcadePortManager.java");
         }
         String source = Files.readString(managerPath);
+        String cowController = Files.readString(managerPath.resolveSibling("MilkCowManager.java"));
         int dispatcher = source.indexOf("type == ArcadePortGame.MILK_THE_COW && \"spawn-herd\".equals(eventId)");
         int update = source.indexOf("private void updateMilkCowHerd(");
         int nextMethod = source.indexOf("private void ", update + 1);
         assertTrue(dispatcher >= 0);
         assertTrue(update > dispatcher);
         assertTrue(nextMethod > update);
-        String herdUpdater = source.substring(update, nextMethod);
-        assertTrue(herdUpdater.contains("session.teams.getOrDefault(cowPlayer.getUniqueId(), 0) != 1"));
-        assertTrue(herdUpdater.contains("MILK_THE_COW_HERD_SIZE"));
-        assertTrue(herdUpdater.contains("MILK_THE_COW_HERD_MOVE_SPEED"));
-        assertTrue(herdUpdater.contains("session.world.spawn(spawn, Cow.class)"));
+        assertTrue(source.substring(update, nextMethod).contains("milkCowController.updateHerd("));
+        assertTrue(cowController.contains("session.teams.getOrDefault(cowPlayer.getUniqueId(), 0) != 1"));
+        assertTrue(cowController.contains("MILK_THE_COW_HERD_SIZE"));
+        assertTrue(cowController.contains("MILK_THE_COW_HERD_MOVE_SPEED"));
+        assertTrue(cowController.contains("session.world.spawn(spawn, Cow.class)"));
     }
 
     @Test
@@ -709,13 +710,14 @@ class GameDebugEventCatalogTest {
         }
         String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
         String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String cowController = Files.readString(sourceRoot.resolve("MilkCowManager.java"));
         for (String key : List.of("cow-charge", "farmer-double-jump", "herd-spawning", "milk-capture", "milk-scoring")) {
             assertTrue(lobby.contains("\"" + key + "\""), key + " appears in Milk the Cow debug menu");
             assertTrue(manager.contains("ArcadePortGame.MILK_THE_COW, \"" + key + "\", true"),
                     key + " reaches its live gameplay check");
         }
         assertTrue(manager.contains("debugFeatureEnabledForActiveSession(ArcadePortGame.MILK_THE_COW, \"herd-spawning\")"));
-        assertTrue(manager.contains("session.milkCowHerd.clear()"));
+        assertTrue(cowController.contains("session.milkCowHerd.clear()"));
     }
 
     @Test
