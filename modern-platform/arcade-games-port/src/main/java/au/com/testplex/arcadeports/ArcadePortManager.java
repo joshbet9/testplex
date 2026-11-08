@@ -3,6 +3,20 @@ package au.com.testplex.arcadeports;
 import static au.com.testplex.arcadeports.ArcadeCombatMessages.baconKillMode;
 import static au.com.testplex.arcadeports.ArcadeCombatMessages.sourceKillModeFromDamager;
 import static au.com.testplex.arcadeports.ArcadeCombatMessages.titleCase;
+import static au.com.testplex.arcadeports.ArcadeSpectatorCompassMenus.isBombLobbersCompassMenuTitle;
+import static au.com.testplex.arcadeports.ArcadeSpectatorCompassMenus.isBombTrackingCompass;
+import static au.com.testplex.arcadeports.ArcadeSpectatorCompassMenus.isQuiverTrackingCompass;
+import static au.com.testplex.arcadeports.BombLobbersSpatialRules.bombLobbersBlastExposure;
+import static au.com.testplex.arcadeports.BombLobbersSpatialRules.bombLobbersDistanceToBoundingBox;
+import static au.com.testplex.arcadeports.BombLobbersSpatialRules.bombLobbersOnlineMatchPlayers;
+import static au.com.testplex.arcadeports.BombLobbersSpatialRules.isBombTouchingAnyBlock;
+import static au.com.testplex.arcadeports.BombLobbersSpatialRules.nearestBombLobbersSpawnTeam;
+import static au.com.testplex.arcadeports.TurfWarsTerritoryGeometry.isTurfWarsTerracotta;
+import static au.com.testplex.arcadeports.TurfWarsTerritoryGeometry.isTurfWarsWool;
+import static au.com.testplex.arcadeports.TurfWarsTerritoryGeometry.turfWarsGroundTeam;
+import static au.com.testplex.arcadeports.TurfWarsTerritoryGeometry.turfWarsNearestSpawnTeam;
+import static au.com.testplex.arcadeports.TurfWarsTerritoryGeometry.turfWarsRemainingLines;
+import static au.com.testplex.arcadeports.TurfWarsTerritoryGeometry.turfWarsTeamOnBlock;
 
 import com.destroystokyo.paper.event.player.PlayerJumpEvent;
 import io.papermc.paper.event.entity.EntityKnockbackEvent;
@@ -2735,60 +2749,9 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void initializeTurfWarsMap(Session session, SourceMapCatalog.MapData map) {
-        if (map == null) return;
-        List<Location> turf = map.dataLocations("YELLOW");
-        List<Location> red = map.dataLocations("RED");
-        List<Location> redBase = map.dataLocations("PINK");
-        List<Location> blue = map.dataLocations("BLUE");
-        List<Location> blueBase = map.dataLocations("LIGHT_BLUE");
-        if (turf.isEmpty() || red.isEmpty() || redBase.isEmpty() || blue.isEmpty() || blueBase.isEmpty()) {
-            plugin.getLogger().warning("Turf Wars map " + map.mapName()
-                    + " is missing its YELLOW/RED/PINK/BLUE/LIGHT_BLUE objective markers; using the bounded fallback objective.");
-            return;
-        }
-        session.turfSurfaceLocations.clear();
-        for (Location location : turf) session.turfSurfaceLocations.add(location.clone());
-        session.turfRedFront = red.get(0).clone();
-        session.turfRedBase = redBase.get(0).clone();
-        session.turfBlueFront = blue.get(0).clone();
-        session.turfBlueBase = blueBase.get(0).clone();
-        session.turfAxisX = Integer.compare(session.turfRedFront.getBlockX(), session.turfBlueFront.getBlockX());
-        session.turfAxisZ = Integer.compare(session.turfRedFront.getBlockZ(), session.turfBlueFront.getBlockZ());
-        if (session.turfAxisX == 0 && session.turfAxisZ == 0) {
-            session.turfSurfaceLocations.clear();
-            plugin.getLogger().warning("Turf Wars map " + map.mapName()
-                    + " has overlapping RED/BLUE frontline markers; using the bounded fallback objective.");
-            return;
-        }
-        session.turfMarkerGeometry = true;
-        for (Location surface : session.turfSurfaceLocations) {
-            // Source ParseData colours ties blue: only a strictly closer red marker gets red turf.
-            boolean redSide = surface.distanceSquared(session.turfRedFront)
-                    < surface.distanceSquared(session.turfBlueFront);
-            surface.getBlock().setType(redSide ? Material.RED_TERRACOTTA : Material.LIGHT_BLUE_TERRACOTTA, false);
-        }
-        session.turfFrontlineX = session.turfRedFront.getBlockX();
-        session.turfInitialFrontlineX = session.turfFrontlineX;
-        plugin.getLogger().info("Loaded source Turf Wars objective markers for " + map.mapName()
-                + " (" + turf.size() + " turf blocks; axis " + session.turfAxisX + "/" + session.turfAxisZ + ").");
+        TurfWarsTerritoryGeometry.initializeTurfWarsMap(session, map, plugin.getLogger());
     }
 
-    private int turfWarsRemainingLines(Session session, int team) {
-        if (session.turfMarkerGeometry) {
-            // Source getLines() uses X when the fronts differ on X, otherwise it uses Z.
-            if (session.turfAxisX != 0) {
-                return team == 0
-                        ? ArcadePortRules.turfWarsRemainingLines(session.turfRedFront.getBlockX(), session.turfRedBase.getBlockX())
-                        : ArcadePortRules.turfWarsRemainingLines(session.turfBlueFront.getBlockX(), session.turfBlueBase.getBlockX());
-            }
-            return team == 0
-                    ? ArcadePortRules.turfWarsRemainingLines(session.turfRedFront.getBlockZ(), session.turfRedBase.getBlockZ())
-                    : ArcadePortRules.turfWarsRemainingLines(session.turfBlueFront.getBlockZ(), session.turfBlueBase.getBlockZ());
-        }
-        if (team == 0) return Math.max(0, session.turfFrontlineMaxXExclusive - 1 - session.turfFrontlineX);
-        if (team == 1) return Math.max(0, session.turfFrontlineX - session.turfFrontlineMinX);
-        return Integer.MAX_VALUE;
-    }
 
     private boolean turfWarsTeamPresent(Session session, int team) {
         for (UUID id : session.alive) if (session.teams.getOrDefault(id, -1) == team) return true;
@@ -2813,9 +2776,6 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    private boolean isTurfWarsWool(Material material) {
-        return material != null && material.name().endsWith("_WOOL");
-    }
 
     private void cacheTurfWarsTeamSpawnCentres(Session session, SourceMapCatalog.MapData map) {
         session.turfTeamSpawnCentres.clear();
@@ -2833,66 +2793,6 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    private boolean isTurfWarsTerracotta(Material material) {
-        return material != null && material.name().endsWith("_TERRACOTTA");
-    }
-
-    private int turfWarsTeamOnBlock(Block block) {
-        if (block == null) return -1;
-        Material type = block.getType();
-        if (type == Material.RED_TERRACOTTA) return 0;
-        if (type == Material.LIGHT_BLUE_TERRACOTTA) return 1;
-        return -1;
-    }
-
-    /**
-     * Mirrors TurfForts.Territory: start beneath the feet, look at adjacent clay/Wool
-     * when grounded over a gap, then descend through non-clay blocks until the first
-     * stained-clay surface. Wool is a footprint hint, never the territory colour itself.
-     */
-    private int turfWarsGroundTeam(Player player) {
-        if (player == null || player.getWorld() == null) return -1;
-        Block ground = player.getLocation().getBlock().getRelative(BlockFace.DOWN);
-        if (ground.isEmpty() && player.isOnGround()) {
-            Block adjacent = null;
-            double nearestDistance = Double.POSITIVE_INFINITY;
-            for (int dx = -1; dx <= 1; dx++) {
-                for (int dz = -1; dz <= 1; dz++) {
-                    Block candidate = ground.getRelative(dx, 0, dz);
-                    if (!isTurfWarsTerracotta(candidate.getType()) && !isTurfWarsWool(candidate.getType())) continue;
-                    double distance = dx * dx + dz * dz;
-                    if (distance < nearestDistance) {
-                        nearestDistance = distance;
-                        adjacent = candidate;
-                    }
-                }
-            }
-            if (adjacent != null) ground = adjacent;
-        }
-
-        int minY = Math.max(0, player.getWorld().getMinHeight());
-        while (!isTurfWarsTerracotta(ground.getType()) && ground.getY() > minY) {
-            ground = ground.getRelative(BlockFace.DOWN);
-        }
-        if (!isTurfWarsTerracotta(ground.getType())) return -1;
-        return turfWarsTeamOnBlock(ground);
-    }
-
-    private int turfWarsNearestSpawnTeam(Session session, Location location) {
-        if (session == null || location == null) return -1;
-        int nearest = -1;
-        double nearestDistance = Double.POSITIVE_INFINITY;
-        for (Map.Entry<Integer, Location> entry : session.turfTeamSpawnCentres.entrySet()) {
-            Location centre = entry.getValue();
-            if (centre == null || centre.getWorld() != session.world) continue;
-            double distance = centre.distanceSquared(location);
-            if (distance < nearestDistance) {
-                nearestDistance = distance;
-                nearest = entry.getKey();
-            }
-        }
-        return nearest;
-    }
 
     private void updateTurfWarsTerritory(Session session, long now) {
         if (active != session) return;
@@ -30466,81 +30366,11 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void cacheBombLobbersTeamSpawnCentres(Session session) {
-        session.bombTeamSpawnCentres.clear();
-
-        // Reborn calculates each side from every configured team spawn, not just the
-        // subset of spawn markers occupied by the current lobby. Keep that boundary stable
-        // when the test server has a small party or only one player on either team.
-        SourceMapCatalog.MapData sourceMap = sourceMapData.get(session.type.id());
-        if (sourceMap != null) {
-            boolean hasAllTeamMarkers = true;
-            for (int team = 0; team < 2; team++) {
-                List<Location> markers = sourceMap.teamSpawnLocationsForTeam(team, 2);
-                if (markers.isEmpty()) {
-                    hasAllTeamMarkers = false;
-                    break;
-                }
-                double x = 0.0D, y = 0.0D, z = 0.0D;
-                for (Location marker : markers) {
-                    x += marker.getX();
-                    y += marker.getY();
-                    z += marker.getZ();
-                }
-                int count = markers.size();
-                session.bombTeamSpawnCentres.put(team, new Location(session.world,
-                        x / count, y / count, z / count));
-            }
-            if (hasAllTeamMarkers) return;
-            session.bombTeamSpawnCentres.clear();
-        }
-
-        // Fallback for a malformed or incomplete source map: derive centres from occupied spawns.
-        Map<Integer, double[]> totals = new HashMap<>();
-        Map<Integer, Integer> counts = new HashMap<>();
-        for (UUID id : session.players.keySet()) {
-            int team = session.teams.getOrDefault(id, -1);
-            Location spawn = session.lastLocations.get(id);
-            if (team < 0 || spawn == null || spawn.getWorld() != session.world) continue;
-            double[] total = totals.computeIfAbsent(team, ignored -> new double[3]);
-            total[0] += spawn.getX();
-            total[1] += spawn.getY();
-            total[2] += spawn.getZ();
-            counts.merge(team, 1, Integer::sum);
-        }
-        for (Map.Entry<Integer, double[]> entry : totals.entrySet()) {
-            int count = counts.getOrDefault(entry.getKey(), 0);
-            if (count <= 0) continue;
-            double[] total = entry.getValue();
-            session.bombTeamSpawnCentres.put(entry.getKey(), new Location(session.world,
-                    total[0] / count, total[1] / count, total[2] / count));
-        }
+        BombLobbersSpatialRules.cacheBombLobbersTeamSpawnCentres(
+                session, sourceMapData.get(session.type.id()));
     }
 
-    private int nearestBombLobbersSpawnTeam(Session session, Location location) {
-        if (session == null || location == null || location.getWorld() != session.world
-                || session.bombTeamSpawnCentres.isEmpty()) return -1;
-        int nearestTeam = -1;
-        double nearestDistanceSquared = Double.POSITIVE_INFINITY;
-        for (Map.Entry<Integer, Location> entry : session.bombTeamSpawnCentres.entrySet()) {
-            double distanceSquared = location.distanceSquared(entry.getValue());
-            if (distanceSquared < nearestDistanceSquared) {
-                nearestDistanceSquared = distanceSquared;
-                nearestTeam = entry.getKey();
-            }
-        }
-        return nearestTeam;
-    }
 
-    private double bombLobbersDistanceToBoundingBox(Location blast, Player target) {
-        org.bukkit.util.BoundingBox box = target.getBoundingBox();
-        double dx = blast.getX() < box.getMinX() ? box.getMinX() - blast.getX()
-                : blast.getX() > box.getMaxX() ? blast.getX() - box.getMaxX() : 0.0D;
-        double dy = blast.getY() < box.getMinY() ? box.getMinY() - blast.getY()
-                : blast.getY() > box.getMaxY() ? blast.getY() - box.getMaxY() : 0.0D;
-        double dz = blast.getZ() < box.getMinZ() ? box.getMinZ() - blast.getZ()
-                : blast.getZ() > box.getMaxZ() ? blast.getZ() - box.getMaxZ() : 0.0D;
-        return Math.sqrt(dx * dx + dy * dy + dz * dz);
-    }
 
     /** Mirrors the legacy CompassModule: spectators track nearest opponents, never their own team. */
     private void updateBombLobbersSpectatorCompasses(Session session) {
@@ -30583,19 +30413,9 @@ public final class ArcadePortManager implements Listener {
                 "Left-click to teleport to the nearest player; right-click to open the spectator menu.");
     }
 
-    private boolean isQuiverTrackingCompass(ItemStack item) {
-        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
-        ItemMeta meta = item.getItemMeta();
-        return meta != null && meta.hasDisplayName()
-                && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
-    }
-
     private Player nearestQuiverSpectateTarget(Session session, Player spectator) {
         if (session == null || spectator == null) return null;
-        return alivePlayers(session).stream()
-                .min(java.util.Comparator.comparingDouble(candidate ->
-                        candidate.getLocation().distanceSquared(spectator.getLocation())))
-                .orElse(null);
+        return ArcadeSpectatorCompassMenus.nearestTarget(alivePlayers(session), spectator);
     }
 
     private void updateQuiverSpectatorCompass(Session session) {
@@ -30619,37 +30439,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void openQuiverSpectatorMenu(Session session, Player spectator) {
-        Inventory inventory = Bukkit.createInventory(null, 54, ChatColor.DARK_GREEN + "Spectator Menu");
-        inventory.setItem(4, quiverTrackingCompass());
-        int[] slots = {19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34,
-                37, 38, 39, 40, 41, 42, 43, 46, 47, 48, 49, 50, 51, 52};
-        Map<Integer, UUID> targetsBySlot = new HashMap<>();
-        List<Player> targets = alivePlayers(session).stream()
-                .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
-                .toList();
-        for (int i = 0; i < targets.size() && i < slots.length; i++) {
-            Player target = targets.get(i);
-            int slot = slots[i];
-            ItemStack head = new ItemStack(Material.PLAYER_HEAD);
-            if (head.getItemMeta() instanceof SkullMeta meta) {
-                meta.setOwningPlayer(target);
-                double distance = Math.sqrt(target.getLocation().distanceSquared(spectator.getLocation()));
-                double height = target.getLocation().getY() - spectator.getLocation().getY();
-                meta.setDisplayName(ChatColor.AQUA + target.getName());
-                meta.setLore(List.of(
-                        ChatColor.GRAY + "Kit: " + session.quiverKits.getOrDefault(target.getUniqueId(), "leaper"),
-                        ChatColor.GRAY + "Kills: " + session.scores.getOrDefault(target.getUniqueId(), 0),
-                        ChatColor.GRAY + "Distance: " + String.format(java.util.Locale.ROOT, "%.1f", distance),
-                        ChatColor.GRAY + "Height difference: " + String.format(java.util.Locale.ROOT, "%+.1f", height),
-                        ChatColor.YELLOW + "Left-click: Teleport",
-                        ChatColor.YELLOW + "Right-click: Spectate"));
-                head.setItemMeta(meta);
-            }
-            inventory.setItem(slot, head);
-            targetsBySlot.put(slot, target.getUniqueId());
-        }
-        session.quiverCompassMenuTargets.put(spectator.getUniqueId(), targetsBySlot);
-        spectator.openInventory(inventory);
+        ArcadeSpectatorCompassMenus.openQuiverSpectatorMenu(session, spectator,
+                alivePlayers(session), quiverTrackingCompass());
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -30685,64 +30476,15 @@ public final class ArcadePortManager implements Listener {
         spectator.setCompassTarget(target.getLocation());
     }
 
-    private boolean isBombTrackingCompass(ItemStack item) {
-        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
-        ItemMeta meta = item.getItemMeta();
-        return meta != null && meta.hasDisplayName()
-                && ChatColor.stripColor(meta.getDisplayName()).equals("Tracking Compass");
-    }
-
-    /** The source compass needle tracks enemies, but its left-click teleport targets any living player. */
     private Player nearestBombLobbersSpectateTarget(Session session, Player spectator) {
         if (session == null || spectator == null) return null;
-        return alivePlayers(session).stream()
-                .min(java.util.Comparator.comparingDouble(candidate ->
-                        candidate.getLocation().distanceSquared(spectator.getLocation())))
-                .orElse(null);
+        return ArcadeSpectatorCompassMenus.nearestTarget(alivePlayers(session), spectator);
     }
 
     private void openBombLobbersCompassMenu(Session session, Player spectator) {
-        Inventory inventory = Bukkit.createInventory(null, 54, ChatColor.DARK_GREEN + "Spectator Menu");
-        inventory.setItem(4, namedItem(Material.COMPASS, "Tracking Compass",
-                "Choose an enemy player to follow."));
-
-        int[] slots = {
-                19, 20, 21, 22, 23, 24, 25,
-                28, 29, 30, 31, 32, 33, 34,
-                37, 38, 39, 40, 41, 42, 43,
-                46, 47, 48, 49, 50, 51, 52
-        };
-        Map<Integer, UUID> targetsBySlot = new HashMap<>();
-        // The legacy Spectator Menu lists every living player, even though the needle itself
-        // tracks only an opposing team.
-        List<Player> targets = alivePlayers(session).stream()
-                .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
-                .toList();
-        for (int i = 0; i < targets.size() && i < slots.length; i++) {
-            Player target = targets.get(i);
-            int slot = slots[i];
-            ItemStack head = new ItemStack(Material.PLAYER_HEAD);
-            if (head.getItemMeta() instanceof SkullMeta meta) {
-                meta.setOwningPlayer(target);
-                int targetTeam = session.teams.getOrDefault(target.getUniqueId(), -1);
-                ChatColor color = targetTeam == 1 ? ChatColor.AQUA : ChatColor.RED;
-                meta.setDisplayName(color + target.getName());
-                double distance = Math.sqrt(target.getLocation().distanceSquared(spectator.getLocation()));
-                double height = target.getLocation().getY() - spectator.getLocation().getY();
-                String kit = session.bombLobbersKits.getOrDefault(target.getUniqueId(), "acrobat");
-                meta.setLore(List.of(
-                        ChatColor.GRAY + "Kit: " + kit,
-                        ChatColor.GRAY + "Distance: " + String.format(java.util.Locale.ROOT, "%.1f", distance),
-                        ChatColor.GRAY + "Height difference: " + String.format(java.util.Locale.ROOT, "%.1f", height),
-                        ChatColor.YELLOW + "Left-click: Teleport",
-                        ChatColor.YELLOW + "Right-click: Spectate"));
-                head.setItemMeta(meta);
-            }
-            inventory.setItem(slot, head);
-            targetsBySlot.put(slot, target.getUniqueId());
-        }
-        session.bombCompassMenuTargets.put(spectator.getUniqueId(), targetsBySlot);
-        spectator.openInventory(inventory);
+        ArcadeSpectatorCompassMenus.openBombLobbersCompassMenu(session, spectator,
+                alivePlayers(session), namedItem(Material.COMPASS, "Tracking Compass",
+                        "Choose an enemy player to follow."));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -30778,48 +30520,9 @@ public final class ArcadePortManager implements Listener {
         spectator.setCompassTarget(target.getLocation());
     }
 
-    private boolean isBombLobbersCompassMenuTitle(String title) {
-        return (ChatColor.DARK_GREEN + "Spectator Menu").equals(title);
-    }
 
     /** Match vanilla 1.8 World#getBlockDensity sampling for the source explosion's exposure factor. */
-    private double bombLobbersBlastExposure(Location blast, Player target) {
-        if (blast == null || target == null || blast.getWorld() == null
-                || target.getWorld() != blast.getWorld()) return 0.0D;
-        org.bukkit.util.BoundingBox box = target.getBoundingBox();
-        double xStep = ArcadePortRules.bombLobbersExposureSampleStep((box.getMaxX() - box.getMinX()));
-        double yStep = ArcadePortRules.bombLobbersExposureSampleStep(box.getHeight());
-        double zStep = ArcadePortRules.bombLobbersExposureSampleStep((box.getMaxZ() - box.getMinZ()));
-        if (!Double.isFinite(xStep) || !Double.isFinite(yStep) || !Double.isFinite(zStep)) return 0.0D;
-        double xOffset = ArcadePortRules.bombLobbersExposureSampleOffset(xStep);
-        double zOffset = ArcadePortRules.bombLobbersExposureSampleOffset(zStep);
-        int visible = 0;
-        int total = 0;
-        for (float fx = 0.0F; fx <= 1.0F; fx = (float) (fx + xStep)) {
-            for (float fy = 0.0F; fy <= 1.0F; fy = (float) (fy + yStep)) {
-                for (float fz = 0.0F; fz <= 1.0F; fz = (float) (fz + zStep)) {
-                    Location sample = new Location(blast.getWorld(),
-                            box.getMinX() + (box.getMaxX() - box.getMinX()) * fx + xOffset,
-                            box.getMinY() + box.getHeight() * fy,
-                            box.getMinZ() + (box.getMaxZ() - box.getMinZ()) * fz + zOffset);
-                    Vector ray = sample.toVector().subtract(blast.toVector());
-                    double distance = ray.length();
-                    total++;
-                    if (distance <= 1.0E-6D
-                            || blast.getWorld().rayTraceBlocks(blast, ray.normalize(), distance,
-                                    org.bukkit.FluidCollisionMode.NEVER, true) == null) visible++;
-                }
-            }
-        }
-        return total == 0 ? 0.0D : visible / (double) total;
-    }
 
-    private int bombLobbersOnlineMatchPlayers(Session session) {
-        if (session == null) return 0;
-        return (int) session.players.values().stream()
-                .filter(player -> player != null && player.isOnline() && player.getWorld() == session.world)
-                .count();
-    }
 
     private long nextBombLobbersPowerupDelayMillis() {
         // The same bounded interval is used for the first wave and subsequent paired waves.
@@ -31359,20 +31062,6 @@ public final class ArcadePortManager implements Listener {
         session.bombConstructorBlockedBombs.remove(bombId);
     }
 
-    private boolean isBombTouchingAnyBlock(TNTPrimed bomb) {
-        Block center = bomb.getLocation().getBlock();
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dy = -1; dy <= 1; dy++) {
-                for (int dz = -1; dz <= 1; dz++) {
-                    if (dx == 0 && dy == 0 && dz == 0) continue;
-                    Block nearby = center.getRelative(dx, dy, dz);
-                    // Reborn primes on any non-air neighbour, including liquids and passable blocks.
-                    if (nearby.getType() != Material.AIR) return true;
-                }
-            }
-        }
-        return false;
-    }
 
     private void throwBombLobbersWindCharge(Session session, Player player) {
         if (session == null || active != session || player == null || !player.isOnline()
@@ -32741,8 +32430,6 @@ public final class ArcadePortManager implements Listener {
                     int distanceOrder = Double.compare(right.distanceSquared(), left.distanceSquared());
                     return distanceOrder != 0 ? distanceOrder : Long.compare(left.sequence(), right.sequence());
                 });
-        int turfFrontlineMinX = -HALF_SIZE;
-        int turfFrontlineMaxXExclusive = HALF_SIZE;
         int turfMinZ = -HALF_SIZE;
         int turfMaxZExclusive = HALF_SIZE + 1;
         Session(ArcadePortGame type, World world, List<Player> participants, boolean mixedArcadeVariant) {
