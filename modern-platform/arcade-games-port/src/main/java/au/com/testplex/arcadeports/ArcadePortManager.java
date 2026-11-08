@@ -272,6 +272,7 @@ public final class ArcadePortManager implements Listener {
     private final ArcadeGameModuleRegistry gameModules = new ArcadeGameModuleRegistry();
     private final ArcadeMatchControllerRegistry matchControllers = new ArcadeMatchControllerRegistry();
     private final BaconBrawlManager baconController;
+    private final DeathTagManager deathTagController = new DeathTagManager();
     private boolean gameModulesInitialized;
     private CameraShyGame cameraShyModule;
 
@@ -280,6 +281,7 @@ public final class ArcadePortManager implements Listener {
         this.plugin = plugin;
         this.baconController = new BaconBrawlManager(plugin.getLogger());
         matchControllers.register(baconController);
+        matchControllers.register(deathTagController);
         this.dragonEscapeGhostStore = new DragonEscapeGhostPathStore(
                 plugin.getDataFolder().toPath(), plugin.getLogger());
         this.debugProfiles = new GameDebugProfiles(plugin);
@@ -5465,7 +5467,7 @@ public final class ArcadePortManager implements Listener {
                 giveDeathTagKit(session, player, session.tagged.contains(player.getUniqueId()),
                         session.alphaChasers.contains(player.getUniqueId()));
             }
-            setupDeathTagScoreboard(session);
+            matchControllers.prepare(session, participants);
         }
         if (type == ArcadePortGame.SHEEP_QUEST) {
             for (int i = 0; i < GameDebugRuntimeOverrides.intValue("SHEEP_QUEST_INITIAL_SHEEP", ArcadePortRules.SHEEP_QUEST_INITIAL_SHEEP); i++) spawnSheep(session);
@@ -7706,39 +7708,6 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    private void updateDeathTagCompass(Session session) {
-        List<Player> alive = alivePlayers(session);
-        for (Player viewer : alive) {
-            boolean viewerChaser = session.tagged.contains(viewer.getUniqueId());
-            Player target = alive.stream()
-                    .filter(candidate -> session.tagged.contains(candidate.getUniqueId()) != viewerChaser)
-                    .min(java.util.Comparator.comparingDouble(candidate ->
-                            candidate.getLocation().distanceSquared(viewer.getLocation())))
-                    .orElse(null);
-            if (target == null) continue;
-
-            boolean hasCompass = false;
-            for (ItemStack item : viewer.getInventory().getContents()) {
-                if (isDeathTagTrackingCompass(item)) {
-                    hasCompass = true;
-                    break;
-                }
-            }
-            if (!hasCompass) {
-                viewer.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
-                        "Tracks the nearest opposing Death Tag player."));
-            }
-            viewer.setCompassTarget(target.getLocation());
-        }
-    }
-
-    private boolean isDeathTagTrackingCompass(ItemStack item) {
-        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
-        ItemMeta meta = item.getItemMeta();
-        return meta != null && meta.hasDisplayName()
-                && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
-    }
-
     private void setupDragonsScoreboard(Session session) {
         if (session == null || Bukkit.getScoreboardManager() == null) return;
         Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
@@ -7804,51 +7773,6 @@ public final class ArcadePortManager implements Listener {
             if (player != null && player.isOnline() && player.getScoreboard() != scoreboard) {
                 player.setScoreboard(scoreboard);
             }
-        }
-    }
-
-    private void setupDeathTagScoreboard(Session session) {
-        if (session == null || Bukkit.getScoreboardManager() == null) return;
-        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
-        Objective objective = scoreboard.registerNewObjective("deathtag", "dummy",
-                ChatColor.GOLD + "DEATH TAG");
-        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
-        session.deathTagScoreboard = scoreboard;
-        session.deathTagScoreboardObjective = objective;
-
-        session.deathTagRunnerScoreboardLine = scoreboard.registerNewTeam("dtrunners");
-        session.deathTagRunnerScoreboardEntry = ChatColor.GREEN.toString();
-        session.deathTagRunnerScoreboardLine.addEntry(session.deathTagRunnerScoreboardEntry);
-        session.deathTagRunnerScoreboardLine.setPrefix(ChatColor.GREEN.toString());
-        objective.getScore(session.deathTagRunnerScoreboardEntry).setScore(3);
-
-        Team blankLine = scoreboard.registerNewTeam("dtblank");
-        String blankEntry = ChatColor.BLACK.toString();
-        blankLine.addEntry(blankEntry);
-        blankLine.setPrefix(" ");
-        objective.getScore(blankEntry).setScore(2);
-
-        session.deathTagChaserScoreboardLine = scoreboard.registerNewTeam("dtchasers");
-        session.deathTagChaserScoreboardEntry = ChatColor.RED.toString();
-        session.deathTagChaserScoreboardLine.addEntry(session.deathTagChaserScoreboardEntry);
-        session.deathTagChaserScoreboardLine.setPrefix(ChatColor.RED.toString());
-        objective.getScore(session.deathTagChaserScoreboardEntry).setScore(1);
-
-        for (Player player : session.players.values()) {
-            if (player != null && player.isOnline()) player.setScoreboard(scoreboard);
-        }
-        updateDeathTagScoreboard(session);
-    }
-
-    private void updateDeathTagScoreboard(Session session) {
-        if (session == null || session.deathTagScoreboardObjective == null) return;
-        int chasers = (int) session.tagged.stream().filter(session.alive::contains).count();
-        int runners = Math.max(0, session.alive.size() - chasers);
-        if (session.deathTagRunnerScoreboardLine != null) {
-            session.deathTagRunnerScoreboardLine.setSuffix(ChatColor.WHITE + " " + runners + " Runners");
-        }
-        if (session.deathTagChaserScoreboardLine != null) {
-            session.deathTagChaserScoreboardLine.setSuffix(ChatColor.WHITE + " " + chasers + " Chasers");
         }
     }
 
@@ -8133,8 +8057,8 @@ public final class ArcadePortManager implements Listener {
             }
         }
         updateDeathTagDisguises(session);
-        updateDeathTagCompass(session);
-        updateDeathTagScoreboard(session);
+        deathTagController.updateDeathTagCompass(session);
+        deathTagController.updateDeathTagScoreboard(session);
         updateDeathTagRunnerTrails(session);
         for (Player player : alivePlayers(session)) {
             if (!session.tagged.contains(player.getUniqueId())
