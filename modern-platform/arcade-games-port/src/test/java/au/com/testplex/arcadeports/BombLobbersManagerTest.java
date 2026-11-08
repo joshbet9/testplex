@@ -1,6 +1,7 @@
 package au.com.testplex.arcadeports;
 
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -28,5 +29,11 @@ class BombLobbersManagerTest {
 
         assertTrue(session.bombPowerupStatusByTeam.isEmpty());
         assertTrue(session.alive.isEmpty());
+    }
+
+    @Test
+    void blastExposureReturnsZeroForAbsentWorldAndTarget() {
+        BombLobbersManager bombLobbers = new BombLobbersManager();
+        assertEquals(0.0D, bombLobbers.blastExposure(null, null));
     }
 }

@@ -30055,37 +30055,6 @@ public final class ArcadePortManager implements Listener {
         return (ChatColor.DARK_GREEN + "Spectator Menu").equals(title);
     }
 
-    /** Match vanilla 1.8 World#getBlockDensity sampling for the source explosion's exposure factor. */
-    private double bombLobbersBlastExposure(Location blast, Player target) {
-        if (blast == null || target == null || blast.getWorld() == null
-                || target.getWorld() != blast.getWorld()) return 0.0D;
-        org.bukkit.util.BoundingBox box = target.getBoundingBox();
-        double xStep = ArcadePortRules.bombLobbersExposureSampleStep((box.getMaxX() - box.getMinX()));
-        double yStep = ArcadePortRules.bombLobbersExposureSampleStep(box.getHeight());
-        double zStep = ArcadePortRules.bombLobbersExposureSampleStep((box.getMaxZ() - box.getMinZ()));
-        if (!Double.isFinite(xStep) || !Double.isFinite(yStep) || !Double.isFinite(zStep)) return 0.0D;
-        double xOffset = ArcadePortRules.bombLobbersExposureSampleOffset(xStep);
-        double zOffset = ArcadePortRules.bombLobbersExposureSampleOffset(zStep);
-        int visible = 0;
-        int total = 0;
-        for (float fx = 0.0F; fx <= 1.0F; fx = (float) (fx + xStep)) {
-            for (float fy = 0.0F; fy <= 1.0F; fy = (float) (fy + yStep)) {
-                for (float fz = 0.0F; fz <= 1.0F; fz = (float) (fz + zStep)) {
-                    Location sample = new Location(blast.getWorld(),
-                            box.getMinX() + (box.getMaxX() - box.getMinX()) * fx + xOffset,
-                            box.getMinY() + box.getHeight() * fy,
-                            box.getMinZ() + (box.getMaxZ() - box.getMinZ()) * fz + zOffset);
-                    Vector ray = sample.toVector().subtract(blast.toVector());
-                    double distance = ray.length();
-                    total++;
-                    if (distance <= 1.0E-6D
-                            || blast.getWorld().rayTraceBlocks(blast, ray.normalize(), distance,
-                                    org.bukkit.FluidCollisionMode.NEVER, true) == null) visible++;
-                }
-            }
-        }
-        return total == 0 ? 0.0D : visible / (double) total;
-    }
 
     private int bombLobbersOnlineMatchPlayers(Session session) {
         if (session == null) return 0;
@@ -30372,7 +30341,7 @@ public final class ArcadePortManager implements Listener {
             Location current = bomb.getLocation().clone();
             Location previous = session.bombLastLocations.put(bombId, current);
             if (previous == null) previous = current;
-            if (!bomb.isOnGround()) renderBombLobbersTrail(session, ownerId, previous, current);
+            if (!bomb.isOnGround()) bombLobbersController.renderTrail(session, ownerId, previous, current);
 
             // Reborn ray-traces blocks first and clips entity collision to that first block hit.
             // Without this, a swept bounding-box test can register direct hits through solid walls.
@@ -30556,28 +30525,6 @@ public final class ArcadePortManager implements Listener {
      * branch on team, its count is 2 (not 0), so the trail uses default red dust rather
      * than RGB-tinted particles.
      */
-    private void renderBombLobbersTrail(Session session, UUID ownerId, Location previous, Location current) {
-        if (session == null || ownerId == null || previous == null || current == null
-                || previous.getWorld() != session.world || current.getWorld() != session.world) return;
-        Vector segment = current.toVector().subtract(previous.toVector());
-        double distance = segment.length();
-        if (!Double.isFinite(distance) || distance <= 1.0E-6D) return;
-        int samples = ArcadePortRules.bombLobbersTrailSampleCount(distance);
-        if (samples <= 0) return;
-
-        int team = session.teams.getOrDefault(ownerId, 0);
-        double spread = ArcadePortRules.bombLobbersTrailOffset(team);
-        double speed = ArcadePortRules.bombLobbersTrailSpeed(team);
-        Particle.DustOptions dust = new Particle.DustOptions(Color.RED, 1.0F);
-        Vector direction = segment.multiply(1.0D / distance);
-        for (int sample = 0; sample < samples; sample++) {
-            double offset = sample * GameDebugRuntimeOverrides.doubleValue("BOMB_LOBBERS_TRAIL_SAMPLE_SPACING", ArcadePortRules.BOMB_LOBBERS_TRAIL_SAMPLE_SPACING);
-            if (offset > distance) break;
-            Location point = previous.clone().add(direction.clone().multiply(offset)).add(0.0D, 0.5D, 0.0D);
-            session.world.spawnParticle(Particle.DUST, point, 2,
-                    spread, spread, spread, speed, dust);
-        }
-    }
 
     private void renderBombLobbersExplosion(Session session, Location blast, Player owner) {
         renderBombLobbersExplosion(session, blast, owner, "normal");
@@ -31306,7 +31253,7 @@ public final class ArcadePortManager implements Listener {
                     // radial damage; the head height is used only for the knockback direction.
                     double distance = target.getLocation().distance(blast);
                     if (distance <= bombBlastRadius) {
-                        blastExposure.put(target.getUniqueId(), bombLobbersBlastExposure(blast, target));
+                        blastExposure.put(target.getUniqueId(), bombLobbersController.blastExposure(blast, target));
                     }
                 }
             }
