@@ -265,7 +265,8 @@ final class DragonsManager implements ArcadeMatchController {
         List<Player> alive = new ArrayList<>();
         for (UUID id : session.alive) {
             Player player = session.players.get(id);
-            if (player != null && player.isOnline() && actions != null && !actions.isTamerControlled(session, id)) alive.add(player);
+            if (player != null && player.isOnline()
+                    && (actions == null || !actions.isTamerControlled(session, id))) alive.add(player);
         }
         return alive;
     }
