@@ -10500,34 +10500,11 @@ public final class ArcadePortManager implements Listener {
     }
 
     private boolean isMicroTrackingCompass(ItemStack item) {
-        return item != null && item.getType() == Material.COMPASS && item.hasItemMeta()
-                && item.getItemMeta().hasDisplayName()
-                && "Tracking Compass".equals(ChatColor.stripColor(item.getItemMeta().getDisplayName()));
+        return microBattlesController.isTrackingCompass(item);
     }
 
     private void giveMicroTrackingCompass(Player player) {
-        if (player == null || !player.isOnline()) return;
-        for (ItemStack item : player.getInventory().getContents()) {
-            if (isMicroTrackingCompass(item)) return;
-        }
-        ItemStack compass = new ItemStack(Material.COMPASS);
-        ItemMeta meta = compass.getItemMeta();
-        if (meta != null) {
-            meta.setDisplayName(ChatColor.GREEN + "" + ChatColor.BOLD + "Tracking Compass");
-            meta.setLore(List.of(ChatColor.GRAY + "Left-click to teleport to the nearest opponent.",
-                    ChatColor.GRAY + "Right-click to choose an opponent."));
-            compass.setItemMeta(meta);
-        }
-        player.getInventory().addItem(compass);
-    }
-
-    private Player nearestMicroCompassTarget(Session session, Player spectator) {
-        int spectatorTeam = session.teams.getOrDefault(spectator.getUniqueId(), -1);
-        return alivePlayers(session).stream()
-                .filter(target -> !target.getUniqueId().equals(spectator.getUniqueId()))
-                .filter(target -> session.teams.getOrDefault(target.getUniqueId(), -1) != spectatorTeam)
-                .min(java.util.Comparator.comparingDouble(target -> target.getLocation().distanceSquared(spectator.getLocation())))
-                .orElse(null);
+        microBattlesController.giveTrackingCompass(player);
     }
 
     /** Reborn's direct compass click teleports to the nearest living player, including a teammate. */
@@ -10637,12 +10614,7 @@ public final class ArcadePortManager implements Listener {
 
 
     private Player nearestMicroSpectateTarget(Session session, Player spectator) {
-        int spectatorTeam = session.teams.getOrDefault(spectator.getUniqueId(), -1);
-        return alivePlayers(session).stream()
-                .filter(target -> !target.getUniqueId().equals(spectator.getUniqueId()))
-                .filter(target -> session.teams.getOrDefault(target.getUniqueId(), -1) != spectatorTeam)
-                .min(java.util.Comparator.comparingDouble(target -> target.getLocation().distanceSquared(spectator.getLocation())))
-                .orElse(null);
+        return microBattlesController.nearestSpectatorTarget(session, spectator);
     }
 
 
@@ -10681,24 +10653,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void updateMicroSpectatorCompass(Session session) {
-        if (active != session || session.ticks % 4 != 0) return;
-        for (Player player : session.players.values()) {
-            if (player == null || !player.isOnline() || session.alive.contains(player.getUniqueId())) continue;
-            giveMicroTrackingCompass(player);
-            Player target = nearestMicroSpectateTarget(session, player);
-            if (target != null) {
-                player.setCompassTarget(target.getLocation());
-                if (isMicroTrackingCompass(player.getInventory().getItemInMainHand())) {
-                    double distance = Math.sqrt(player.getLocation().distanceSquared(target.getLocation()));
-                    double height = target.getLocation().getY() - player.getLocation().getY();
-                    player.sendActionBar(ChatColor.WHITE + "Nearest Target: "
-                            + microTeamChatColor(session.teams.getOrDefault(target.getUniqueId(), -1))
-                            + target.getName() + ChatColor.WHITE + " | Distance: "
-                            + String.format(java.util.Locale.ROOT, "%.1f", distance)
-                            + " | Height: " + String.format(java.util.Locale.ROOT, "%+.1f", height));
-                }
-            }
-        }
+        if (active != session) return;
+        microBattlesController.updateSpectatorCompass(session);
     }
 
     /** Local mirror of Reborn Last2Tracker; the live Mineplex mission service is not connected here. */

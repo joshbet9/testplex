@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import org.bukkit.ChatColor;
@@ -45,5 +46,20 @@ class MicroBattlesManagerTest {
         assertEquals("Yellow", micro.teamName(3));
         assertFalse(micro.isTeamLockedItem(null, null));
         assertFalse(micro.isTeamBadgeItem(null, null));
+    }
+
+    @Test
+    void emptySpectatorRosterKeepsCompassStateAndTickRoutingSafe() {
+        MicroBattlesManager micro = new MicroBattlesManager();
+        SessionState session = new SessionState(ArcadePortGame.MICRO_BATTLES, null, List.of(), false);
+        session.ticks = 4;
+
+        micro.updateSpectatorCompass(session);
+        micro.updateSpectatorCompass(null);
+        micro.giveTrackingCompass(null);
+
+        assertNull(micro.nearestSpectatorTarget(session, null));
+        assertFalse(micro.isTrackingCompass(null));
+        assertTrue(session.players.isEmpty());
     }
 }
