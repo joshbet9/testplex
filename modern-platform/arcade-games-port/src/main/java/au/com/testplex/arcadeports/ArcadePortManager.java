@@ -284,6 +284,7 @@ public final class ArcadePortManager implements Listener {
     private final MasterBuildersManager masterBuildersController;
     private final SheepQuestManager sheepQuestController = new SheepQuestManager();
     private final MicroBattlesManager microBattlesController = new MicroBattlesManager();
+    private final TurfWarsManager turfWarsController = new TurfWarsManager();
     private boolean gameModulesInitialized;
     private CameraShyGame cameraShyModule;
 
@@ -306,6 +307,7 @@ public final class ArcadePortManager implements Listener {
         matchControllers.register(masterBuildersController);
         matchControllers.register(sheepQuestController);
         matchControllers.register(microBattlesController);
+        matchControllers.register(turfWarsController);
         this.dragonEscapeGhostStore = new DragonEscapeGhostPathStore(
                 plugin.getDataFolder().toPath(), plugin.getLogger());
         this.debugProfiles = new GameDebugProfiles(plugin);
@@ -2836,7 +2838,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private boolean isTurfWarsWool(Material material) {
-        return material != null && material.name().endsWith("_WOOL");
+        return turfWarsController.isWool(material);
     }
 
     private void cacheTurfWarsTeamSpawnCentres(Session session, SourceMapCatalog.MapData map) {
@@ -2856,7 +2858,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private boolean isTurfWarsTerracotta(Material material) {
-        return material != null && material.name().endsWith("_TERRACOTTA");
+        return turfWarsController.isTerracotta(material);
     }
 
     private int turfWarsTeamOnBlock(Block block) {
@@ -8310,23 +8312,11 @@ public final class ArcadePortManager implements Listener {
     }
 
     private int countTurfWarsFletchedArrows(Player player) {
-        int count = 0;
-        for (ItemStack stack : player.getInventory().getContents()) {
-            if (stack == null || stack.getType() != Material.ARROW || !stack.hasItemMeta()) continue;
-            ItemMeta meta = stack.getItemMeta();
-            if (meta != null && meta.hasDisplayName()
-                    && ChatColor.stripColor(meta.getDisplayName()).contains("Fletched Arrow")) {
-                count += stack.getAmount();
-            }
-        }
-        return count;
+        return turfWarsController.countFletchedArrows(player);
     }
 
     private boolean isTurfWarsFletchedArrow(ItemStack stack) {
-        if (stack == null || stack.getType() != Material.ARROW || !stack.hasItemMeta()) return false;
-        ItemMeta meta = stack.getItemMeta();
-        return meta != null && meta.hasDisplayName()
-                && ChatColor.stripColor(meta.getDisplayName()).contains("Fletched Arrow");
+        return turfWarsController.isFletchedArrow(stack);
     }
 
     private void updateTurfWars(Session session, long now) {
@@ -8454,7 +8444,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private double randomTurfWarsBarrageSpread(double spread) {
-        return spread <= 0.0D ? 0.0D : ThreadLocalRandom.current().nextDouble(-spread, spread);
+        return turfWarsController.barrageSpread(spread);
     }
 
     private void giveTurfWarsWool(Session session, Player player) {
