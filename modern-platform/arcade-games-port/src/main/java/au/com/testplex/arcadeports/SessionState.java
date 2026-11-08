@@ -316,6 +316,7 @@ class SessionState {
     final Map<Block, BlockData> witherExplosionBlocks = new HashMap<>();
     final Set<Block> witherEditorBlocks = new HashSet<>();
     final Map<Block, BlockData> witherEditorReplacedBlocks = new HashMap<>();
+    final Map<Block, UUID> witherEditorBlockOwners = new HashMap<>();
     final Map<UUID, Long> witherLastAttackAt = new HashMap<>();
     final Map<UUID, Double> witherFlySpeeds = new HashMap<>();
     double witherAssaultSpawnY = 76.0D;
