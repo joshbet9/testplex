@@ -24252,7 +24252,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (session.type == ArcadePortGame.DEATH_TAG) {
-            Player disguiseOwner = deathTagDisguiseOwner(session, event.getEntity());
+            Player disguiseOwner = deathTagController.disguiseOwner(session, event.getEntity());
             if (disguiseOwner != null) {
                 double proxyDamage = event.getFinalDamage();
                 event.setCancelled(true);
@@ -24463,22 +24463,6 @@ public final class ArcadePortManager implements Listener {
             session.dragonMarksmanCharge.remove(id);
             session.dragonMarksmanNextChargeAt.remove(id);
         }
-    }
-
-    private Player deathTagDisguiseOwner(Session session, Entity entity) {
-        if (session == null || entity == null) return null;
-        for (Map.Entry<UUID, Mob> entry : session.deathTagDisguises.entrySet()) {
-            Mob disguise = entry.getValue();
-            if (disguise == null || !disguise.getUniqueId().equals(entity.getUniqueId())) continue;
-            Player owner = session.players.get(entry.getKey());
-            return owner != null && owner.isOnline() && session.alive.contains(entry.getKey()) ? owner : null;
-        }
-        return null;
-    }
-
-    private Player deathTagProjectileTarget(Session session, Entity hitEntity) {
-        if (hitEntity instanceof Player player) return player;
-        return deathTagDisguiseOwner(session, hitEntity);
     }
 
     private void handleDeathTagDamage(Session session, Player target,
@@ -24892,7 +24876,7 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.DEATH_TAG
                 && event.getEntity() instanceof Arrow deathTagArrow
                 && session.deathTagFletchedArrows.remove(deathTagArrow.getUniqueId())) {
-            Player hitTarget = deathTagProjectileTarget(session, event.getHitEntity());
+            Player hitTarget = deathTagController.projectileTarget(session, event.getHitEntity());
             if (hitTarget != null && deathTagArrow.getShooter() instanceof Player shooter) {
                 handleDeathTagArcherArrowHit(session, deathTagArrow, shooter, hitTarget);
             }
@@ -25102,7 +25086,7 @@ public final class ArcadePortManager implements Listener {
         }
 
         Player projectileTarget = session.type == ArcadePortGame.DEATH_TAG
-                ? deathTagProjectileTarget(session, event.getHitEntity())
+                ? deathTagController.projectileTarget(session, event.getHitEntity())
                 : event.getHitEntity() instanceof Player player ? player : null;
         if (projectileTarget != null && event.getEntity() instanceof Projectile projectile) {
             ProjectileSource source = projectile.getShooter();

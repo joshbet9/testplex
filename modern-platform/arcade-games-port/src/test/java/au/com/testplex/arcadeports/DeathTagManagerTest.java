@@ -31,6 +31,8 @@ class DeathTagManagerTest {
         deathTag.updateDeathTagCompass(session);
 
         assertFalse(deathTag.isDeathTagTrackingCompass(null));
+        assertNull(deathTag.disguiseOwner(null, null));
+        assertNull(deathTag.projectileTarget(null, null));
     }
 
     @Test

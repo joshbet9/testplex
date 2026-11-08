@@ -12,6 +12,7 @@ import org.bukkit.Particle;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
 import org.bukkit.entity.Zombie;
@@ -44,6 +45,22 @@ final class DeathTagManager implements ArcadeMatchController {
     }
 
     enum DamageOutcome { IGNORE, DAMAGE, RESPAWN_CHASER, INFECT_RUNNER }
+
+    Player disguiseOwner(SessionState session, Entity entity) {
+        if (session == null || entity == null) return null;
+        for (var entry : session.deathTagDisguises.entrySet()) {
+            Mob disguise = entry.getValue();
+            if (disguise == null || !disguise.getUniqueId().equals(entity.getUniqueId())) continue;
+            Player owner = session.players.get(entry.getKey());
+            return owner != null && owner.isOnline() && session.alive.contains(entry.getKey()) ? owner : null;
+        }
+        return null;
+    }
+
+    Player projectileTarget(SessionState session, Entity hitEntity) {
+        if (hitEntity instanceof Player player) return player;
+        return disguiseOwner(session, hitEntity);
+    }
 
     static double environmentalDamage(boolean chaser, double incomingDamage, boolean alphaChaser, boolean fireTick) {
         return chaser
