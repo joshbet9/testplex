@@ -1,0 +1,88 @@
+package au.com.testplex.arcadeports;
+
+import java.util.List;
+import java.util.UUID;
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
+import org.bukkit.entity.Player;
+import org.bukkit.scoreboard.DisplaySlot;
+import org.bukkit.scoreboard.Objective;
+import org.bukkit.scoreboard.Scoreboard;
+import org.bukkit.scoreboard.Team;
+
+/** Game-specific scoreboard only; the shared Arcade runtime still owns each match. */
+final class BombLobbersManager implements ArcadeMatchController {
+    @Override public ArcadePortGame game() { return ArcadePortGame.BOMB_LOBBERS; }
+
+    @Override public void onPrepare(SessionState session, List<Player> participants) {
+        setupScoreboard(session);
+    }
+
+    private void setupScoreboard(SessionState session) {
+        if (session == null || Bukkit.getScoreboardManager() == null) return;
+        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
+        Objective objective = scoreboard.registerNewObjective("bomblob", "dummy",
+                ChatColor.GOLD + "BOMB LOBBERS");
+        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+        session.bombLobbersScoreboard = scoreboard;
+        session.bombLobbersScoreboardObjective = objective;
+
+        session.bombRedScoreboardLine = scoreboard.registerNewTeam("bombred");
+        session.bombRedScoreboardEntry = ChatColor.RED.toString();
+        session.bombRedScoreboardLine.addEntry(session.bombRedScoreboardEntry);
+        session.bombRedScoreboardLine.setPrefix(ChatColor.RED + "Red Team: ");
+        objective.getScore(session.bombRedScoreboardEntry).setScore(3);
+
+        Team blank = scoreboard.registerNewTeam("bombblank");
+        String blankEntry = ChatColor.DARK_GRAY.toString();
+        blank.addEntry(blankEntry);
+        blank.setPrefix(" ");
+        objective.getScore(blankEntry).setScore(2);
+
+        session.bombBlueScoreboardLine = scoreboard.registerNewTeam("bombblue");
+        session.bombBlueScoreboardEntry = ChatColor.BLUE.toString();
+        session.bombBlueScoreboardLine.addEntry(session.bombBlueScoreboardEntry);
+        session.bombBlueScoreboardLine.setPrefix(ChatColor.BLUE + "Blue Team: ");
+        objective.getScore(session.bombBlueScoreboardEntry).setScore(1);
+
+        for (Player player : session.players.values()) {
+            if (player != null && player.isOnline()) player.setScoreboard(scoreboard);
+        }
+        updateScoreboard(session);
+    }
+
+    void updateScoreboard(SessionState session) {
+        if (session == null || session.bombLobbersScoreboardObjective == null) return;
+        int red = countAliveTeammates(session, 0);
+        int blue = countAliveTeammates(session, 1);
+        if (session.bombRedScoreboardLine != null) {
+            session.bombRedScoreboardLine.setSuffix(powerupScoreboardText(session, 0)
+                    + ChatColor.WHITE + Integer.toString(red));
+        }
+        if (session.bombBlueScoreboardLine != null) {
+            session.bombBlueScoreboardLine.setSuffix(powerupScoreboardText(session, 1)
+                    + ChatColor.WHITE + Integer.toString(blue));
+        }
+    }
+
+    private int countAliveTeammates(SessionState session, int team) {
+        int count = 0;
+        for (UUID id : session.alive) {
+            Player player = session.players.get(id);
+            if (player != null && player.isOnline()
+                    && session.teams.getOrDefault(id, -1) == team) count++;
+        }
+        return count;
+    }
+
+    private String powerupScoreboardText(SessionState session, int team) {
+        BombLobbersPowerupStatus status = session.bombPowerupStatusByTeam.get(team);
+        if (status == null) return "";
+        ChatColor color = switch (status) {
+            case SPAWNED -> ChatColor.DARK_GRAY;
+            case OBTAINED -> ChatColor.YELLOW;
+            case ACTIVATED -> ChatColor.GREEN;
+        };
+        return color + " Powerup " + ChatColor.RESET;
+    }
+}

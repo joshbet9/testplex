@@ -453,6 +453,7 @@ class SessionState {
     final Map<UUID, Item> bombPowerupDrops = new HashMap<>();
     final Map<UUID, Integer> bombPowerupTeamByDrop = new HashMap<>();
     final Map<Integer, Long> bombNextPowerupSpawnAtByTeam = new HashMap<>();
+    final Map<Integer, BombLobbersPowerupStatus> bombPowerupStatusByTeam = new HashMap<>();
     Scoreboard bombLobbersScoreboard;
     Objective bombLobbersScoreboardObjective;
     Team bombRedScoreboardLine;

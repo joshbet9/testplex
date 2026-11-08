@@ -273,6 +273,7 @@ public final class ArcadePortManager implements Listener {
     private final ArcadeMatchControllerRegistry matchControllers = new ArcadeMatchControllerRegistry();
     private final BaconBrawlManager baconController;
     private final DeathTagManager deathTagController = new DeathTagManager();
+    private final BombLobbersManager bombLobbersController = new BombLobbersManager();
     private boolean gameModulesInitialized;
     private CameraShyGame cameraShyModule;
 
@@ -282,6 +283,7 @@ public final class ArcadePortManager implements Listener {
         this.baconController = new BaconBrawlManager(plugin.getLogger());
         matchControllers.register(baconController);
         matchControllers.register(deathTagController);
+        matchControllers.register(bombLobbersController);
         this.dragonEscapeGhostStore = new DragonEscapeGhostPathStore(
                 plugin.getDataFolder().toPath(), plugin.getLogger());
         this.debugProfiles = new GameDebugProfiles(plugin);
@@ -5403,7 +5405,7 @@ public final class ArcadePortManager implements Listener {
             lobbyRuntime.deployBots(type, spawns, -1);
         }
         if (type == ArcadePortGame.BOMB_LOBBERS) {
-            setupBombLobbersScoreboard(session);
+            matchControllers.prepare(session, participants);
             refreshBombLobbersTestPlayerArmor(session);
         }
         if (type == ArcadePortGame.DRAGONS) {
@@ -7777,38 +7779,6 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    private void setupBombLobbersScoreboard(Session session) {
-        if (session == null || Bukkit.getScoreboardManager() == null) return;
-        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
-        Objective objective = scoreboard.registerNewObjective("bomblob", "dummy",
-                ChatColor.GOLD + "BOMB LOBBERS");
-        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
-        session.bombLobbersScoreboard = scoreboard;
-        session.bombLobbersScoreboardObjective = objective;
-
-        session.bombRedScoreboardLine = scoreboard.registerNewTeam("bombred");
-        session.bombRedScoreboardEntry = ChatColor.RED.toString();
-        session.bombRedScoreboardLine.addEntry(session.bombRedScoreboardEntry);
-        session.bombRedScoreboardLine.setPrefix(ChatColor.RED + "Red Team: ");
-        objective.getScore(session.bombRedScoreboardEntry).setScore(3);
-
-        Team blank = scoreboard.registerNewTeam("bombblank");
-        String blankEntry = ChatColor.DARK_GRAY.toString();
-        blank.addEntry(blankEntry);
-        blank.setPrefix(" ");
-        objective.getScore(blankEntry).setScore(2);
-
-        session.bombBlueScoreboardLine = scoreboard.registerNewTeam("bombblue");
-        session.bombBlueScoreboardEntry = ChatColor.BLUE.toString();
-        session.bombBlueScoreboardLine.addEntry(session.bombBlueScoreboardEntry);
-        session.bombBlueScoreboardLine.setPrefix(ChatColor.BLUE + "Blue Team: ");
-        objective.getScore(session.bombBlueScoreboardEntry).setScore(1);
-
-        for (Player player : session.players.values()) {
-            if (player != null && player.isOnline()) player.setScoreboard(scoreboard);
-        }
-        updateBombLobbersScoreboard(session);
-    }
 
     private void setupPaintballScoreboard(Session session) {
         if (session == null || Bukkit.getScoreboardManager() == null) return;
@@ -7932,32 +7902,6 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    private void updateBombLobbersScoreboard(Session session) {
-        if (session == null || session.bombLobbersScoreboardObjective == null) return;
-        int red = (int) alivePlayers(session).stream()
-                .filter(player -> session.teams.getOrDefault(player.getUniqueId(), -1) == 0).count();
-        int blue = (int) alivePlayers(session).stream()
-                .filter(player -> session.teams.getOrDefault(player.getUniqueId(), -1) == 1).count();
-        if (session.bombRedScoreboardLine != null) {
-            session.bombRedScoreboardLine.setSuffix(bombLobbersPowerupScoreboardText(session, 0)
-                    + ChatColor.WHITE + Integer.toString(red));
-        }
-        if (session.bombBlueScoreboardLine != null) {
-            session.bombBlueScoreboardLine.setSuffix(bombLobbersPowerupScoreboardText(session, 1)
-                    + ChatColor.WHITE + Integer.toString(blue));
-        }
-    }
-
-    private String bombLobbersPowerupScoreboardText(Session session, int team) {
-        BombLobbersPowerupStatus status = session.bombPowerupStatusByTeam.get(team);
-        if (status == null) return "";
-        ChatColor color = switch (status) {
-            case SPAWNED -> ChatColor.DARK_GRAY;
-            case OBTAINED -> ChatColor.YELLOW;
-            case ACTIVATED -> ChatColor.GREEN;
-        };
-        return color + " Powerup " + ChatColor.RESET;
-    }
 
 
     private String deathTagCosmeticChoice(UUID playerId, String setting, String fallback) {
@@ -30222,7 +30166,7 @@ public final class ArcadePortManager implements Listener {
         for (int team = 0; team < 2; team++) {
             session.bombNextPowerupSpawnAtByTeam.put(team, nextWave);
         }
-        if (spawned > 0) updateBombLobbersScoreboard(session);
+        if (spawned > 0) bombLobbersController.updateScoreboard(session);
     }
 
     private Location findBombLobbersPowerupSpawn(Session session, int requestedTeam) {
@@ -30340,13 +30284,13 @@ public final class ArcadePortManager implements Listener {
                 session.entities.remove(drop);
             }
         });
-        updateBombLobbersScoreboard(session);
+        bombLobbersController.updateScoreboard(session);
     }
 
     private void activateBombLobbersPowerup(Session session, Integer team) {
         if (session == null || team == null) return;
         session.bombPowerupStatusByTeam.put(team, BombLobbersPowerupStatus.ACTIVATED);
-        updateBombLobbersScoreboard(session);
+        bombLobbersController.updateScoreboard(session);
     }
 
     private void useBombLobbersSpeedBoost(Session session, Player player, ItemStack held) {
@@ -30365,7 +30309,7 @@ public final class ArcadePortManager implements Listener {
 
     private void updateBombLobbers(Session session) {
         long now = System.currentTimeMillis();
-        updateBombLobbersScoreboard(session);
+        bombLobbersController.updateScoreboard(session);
         updateBombLobbersPowerups(session, now);
         if (now >= session.bombNextCompassUpdateAt) {
             session.bombNextCompassUpdateAt = now + 250L;
@@ -31884,7 +31828,6 @@ public final class ArcadePortManager implements Listener {
     private record DragonTamerControl(UUID dragonId, Location returnLocation, GameMode previousGameMode, long endsAtMillis) { }
 
     private enum MasterBuildersPhase { BUILDING, REVIEW }
-    private enum BombLobbersPowerupStatus { SPAWNED, OBTAINED, ACTIVATED }
 
     private record SkyWarsCrumbleCandidate(Block block, double distanceSquared, long sequence) { }
     private record MicroPlacedBlockOwner(UUID ownerId, long placedAtMillis) { }
@@ -32023,7 +31966,6 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, BaconCrispyDashState> baconCrispyDashes = new HashMap<>();
         final Map<Block, BaconDashFireState> baconDashFireBlocks = new HashMap<>();
         final Map<BaconHitPair, Long> baconLastHitAtByPair = new HashMap<>();
-        final Map<Integer, BombLobbersPowerupStatus> bombPowerupStatusByTeam = new HashMap<>();
         final Map<UUID, TurfWarsInfiltration> turfInfiltration = new HashMap<>();
         final Map<Block, MicroPlacedBlockOwner> microPlacedBlockOwners = new HashMap<>();
         final Map<UUID, MicroPlacedBlockKnock> microPlacedBlockKnocks = new HashMap<>();
