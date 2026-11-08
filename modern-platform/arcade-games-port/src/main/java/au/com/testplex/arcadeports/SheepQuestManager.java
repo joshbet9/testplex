@@ -50,7 +50,11 @@ final class SheepQuestManager implements ArcadeMatchController {
     }
 
     static ItemStack woolIcon(Sheep sheep) {
+        return new ItemStack(woolMaterial(sheep));
+    }
+
+    static Material woolMaterial(Sheep sheep) {
         Material wool = Material.matchMaterial((sheep == null ? "WHITE" : sheep.getColor().name()) + "_WOOL");
-        return new ItemStack(wool == null ? Material.WHITE_WOOL : wool);
+        return wool == null ? Material.WHITE_WOOL : wool;
     }
 }
