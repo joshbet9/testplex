@@ -96,6 +96,8 @@ public class GameManager implements Listener {
     private BukkitTask mainTask;
     private BukkitTask secondTask;
     private BukkitTask startingTask;   // runs the jump lock during STARTING (pre-glass fall)
+    private BukkitTask pendingCompletionTask;
+    private long roundSerial;
     private List<Player> pendingTestplexParticipants;
     private boolean testplexManagedRound;
 
@@ -277,6 +279,8 @@ public void startGame(Location preferCenter) {
 
 public void startGame(Location preferCenter, int requestedPattern) {
     if (state != GameState.IDLE) return;
+    roundSerial++;
+    cancelPendingCompletionTask();
 
     if (center == null) {
         if (preferCenter != null && preferCenter.getWorld() != null) {
@@ -511,6 +515,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
      */
     private void forceStop(boolean completedNormally) {
         boolean notifyTestplexCompletion = completedNormally && testplexManagedRound;
+        cancelPendingCompletionTask();
         state = GameState.ENDING;
         publishArcadePhase();
         if (mainTask != null) { mainTask.cancel(); mainTask = null; }
@@ -910,9 +915,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
                 state = GameState.ENDING;
                 publishArcadePhase();
                 broadcast(ChatColor.GOLD + "Solo run over — reached stage " + curSafe + "!");
-                Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
-                    @Override public void run() { forceStop(true); }
-                }, 80L);
+                scheduleRoundCompletion(80L);
             }
             return;
         }
@@ -941,10 +944,28 @@ public void startGame(Location preferCenter, int requestedPattern) {
             // Transition state after recording
             state = GameState.ENDING;
             publishArcadePhase();
-            Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
-                @Override public void run() { forceStop(true); }
-            }, 100L);
+            scheduleRoundCompletion(100L);
         }
+    }
+
+    /** Never let an earlier round's delayed victory callback stop the next mode. */
+    private void scheduleRoundCompletion(long delayTicks) {
+        cancelPendingCompletionTask();
+        long scheduledRound = roundSerial;
+        pendingCompletionTask = Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), () -> {
+            pendingCompletionTask = null;
+            if (shouldCompleteScheduledRound(state, roundSerial, scheduledRound)) forceStop(true);
+        }, delayTicks);
+    }
+
+    private void cancelPendingCompletionTask() {
+        if (pendingCompletionTask == null) return;
+        pendingCompletionTask.cancel();
+        pendingCompletionTask = null;
+    }
+
+    static boolean shouldCompleteScheduledRound(GameState currentState, long currentRound, long scheduledRound) {
+        return currentState == GameState.ENDING && currentRound == scheduledRound;
     }
 
     public boolean tryBumpCooldown(Player player) { return true; }

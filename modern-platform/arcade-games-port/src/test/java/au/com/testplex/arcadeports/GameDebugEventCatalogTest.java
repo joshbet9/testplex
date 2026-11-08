@@ -448,17 +448,18 @@ class GameDebugEventCatalogTest {
                     "com", "testplex", "arcadeports", "ArcadePortManager.java");
         }
         String source = Files.readString(managerPath);
+        String cowController = Files.readString(managerPath.resolveSibling("MilkCowManager.java"));
         int dispatcher = source.indexOf("type == ArcadePortGame.MILK_THE_COW && \"spawn-herd\".equals(eventId)");
         int update = source.indexOf("private void updateMilkCowHerd(");
         int nextMethod = source.indexOf("private void ", update + 1);
         assertTrue(dispatcher >= 0);
         assertTrue(update > dispatcher);
         assertTrue(nextMethod > update);
-        String herdUpdater = source.substring(update, nextMethod);
-        assertTrue(herdUpdater.contains("session.teams.getOrDefault(cowPlayer.getUniqueId(), 0) != 1"));
-        assertTrue(herdUpdater.contains("MILK_THE_COW_HERD_SIZE"));
-        assertTrue(herdUpdater.contains("MILK_THE_COW_HERD_MOVE_SPEED"));
-        assertTrue(herdUpdater.contains("session.world.spawn(spawn, Cow.class)"));
+        assertTrue(source.substring(update, nextMethod).contains("milkCowController.updateHerd("));
+        assertTrue(cowController.contains("session.teams.getOrDefault(cowPlayer.getUniqueId(), 0) != 1"));
+        assertTrue(cowController.contains("MILK_THE_COW_HERD_SIZE"));
+        assertTrue(cowController.contains("MILK_THE_COW_HERD_MOVE_SPEED"));
+        assertTrue(cowController.contains("session.world.spawn(spawn, Cow.class)"));
     }
 
     @Test
@@ -663,12 +664,13 @@ class GameDebugEventCatalogTest {
         }
         String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
         String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String drawController = Files.readString(sourceRoot.resolve("DrawMyThingManager.java"));
         for (String key : List.of("guess-submission", "timed-hints", "sound-feedback")) {
             assertTrue(lobby.contains("\"" + key + "\""), key + " appears in the Draw My Thing panel");
         }
         assertTrue(manager.contains("debugFeatureEnabled(playerId, ArcadePortGame.DRAW_MY_THING, \"guess-submission\", true)"));
         for (String key : List.of("timed-hints", "sound-feedback")) {
-            assertTrue(manager.contains("booleanValue(\"" + key + "\""),
+            assertTrue(drawController.contains("booleanValue(\"" + key + "\""),
                     key + " is consumed by the active round runtime");
         }
         assertTrue(manager.contains("session.drawRevealedLetters.clear()"));
@@ -708,13 +710,14 @@ class GameDebugEventCatalogTest {
         }
         String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
         String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String cowController = Files.readString(sourceRoot.resolve("MilkCowManager.java"));
         for (String key : List.of("cow-charge", "farmer-double-jump", "herd-spawning", "milk-capture", "milk-scoring")) {
             assertTrue(lobby.contains("\"" + key + "\""), key + " appears in Milk the Cow debug menu");
             assertTrue(manager.contains("ArcadePortGame.MILK_THE_COW, \"" + key + "\", true"),
                     key + " reaches its live gameplay check");
         }
         assertTrue(manager.contains("debugFeatureEnabledForActiveSession(ArcadePortGame.MILK_THE_COW, \"herd-spawning\")"));
-        assertTrue(manager.contains("session.milkCowHerd.clear()"));
+        assertTrue(cowController.contains("session.milkCowHerd.clear()"));
     }
 
     @Test
@@ -1161,6 +1164,7 @@ class GameDebugEventCatalogTest {
         }
         String lobby = Files.readString(sourceRoot.resolve("ModernArcadeLobbyRuntime.java"));
         String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        String turf = Files.readString(sourceRoot.resolve("TurfWarsManager.java"));
         assertTrue(lobby.contains("features.put(\"build-editing\""));
         assertTrue(lobby.contains("features.put(\"combat-damage\""));
         assertTrue(manager.contains("\"build-editing\", true"));
@@ -1169,9 +1173,10 @@ class GameDebugEventCatalogTest {
         assertTrue(manager.contains("debugKitFeatureEnabled(player, ArcadePortGame.TURF_WARS, \"infiltrator\")"));
         assertTrue(manager.contains("debugKitFeatureEnabled(player, ArcadePortGame.TURF_WARS, \"shredder\")"));
         assertTrue(manager.contains("debugKitFeatureEnabled(player, ArcadePortGame.TURF_WARS, \"fortifier\")"));
-        assertTrue(manager.contains("session.turfBarrageFiring.remove(id)"));
-        assertTrue(normalize(manager).contains(normalize("private void startTurfWarsBarrage(Session session, Player player) {\n"
-                + "        if (!isDebugAbilityAllowed(player, ArcadePortGame.TURF_WARS, \"shredder\")) return;")));
+        assertTrue(manager.contains("turfWarsController.startBarrage(session, player,"));
+        assertTrue(manager.contains("isDebugAbilityAllowed(player, ArcadePortGame.TURF_WARS, \"shredder\")"));
+        assertTrue(turf.contains("if (!abilityAllowed) return;"));
+        assertTrue(turf.contains("session.turfBarrageFiring.remove(id)"));
     }
 
     @Test
@@ -1368,11 +1373,13 @@ class GameDebugEventCatalogTest {
         }
         String source = Files.readString(managerPath);
         assertTrue(source.contains("type == ArcadePortGame.BOMB_LOBBERS && \"spawn-powerups\".equals(eventId)"));
-        int updater = source.indexOf("private void updateBombLobbersPowerups(Session session, long now)");
-        int featureGate = source.indexOf("if (!ArcadePortRules.bombLobbersPowerupsEnabled())", updater);
-        int wave = source.indexOf("String[] choices = {\"wind-charge\"", featureGate);
+        assertTrue(source.contains("bombLobbersController.updatePowerups(session, now,"));
+        String bombManager = Files.readString(managerPath.resolveSibling("BombLobbersManager.java"));
+        int updater = bombManager.indexOf("void updatePowerups(SessionState session, long now,");
+        int featureGate = bombManager.indexOf("if (!ArcadePortRules.bombLobbersPowerupsEnabled())", updater);
+        int wave = bombManager.indexOf("String[] choices = {\"wind-charge\"", featureGate);
         assertTrue(updater >= 0 && featureGate > updater && wave > featureGate);
-        assertTrue(source.substring(updater, wave).contains("session.bombPowerupDrops.clear()"));
+        assertTrue(bombManager.substring(updater, wave).contains("session.bombPowerupDrops.clear()"));
     }
 
     @Test
@@ -1575,11 +1582,13 @@ class GameDebugEventCatalogTest {
                     "com", "testplex", "arcadeports", "ModernArcadeLobbyRuntime.java");
         }
         String source = Files.readString(managerPath);
+        String runner = Files.readString(managerPath.resolveSibling("RunnerManager.java"));
         String lobby = Files.readString(lobbyPath);
         assertTrue(lobby.contains("\"runner-trail\", \"Runner block trail\""));
         assertTrue(source.contains("debugFeatureEnabled(owner.getUniqueId(), ArcadePortGame.RUNNER, \"runner-trail\", true)"));
-        assertTrue(source.contains("session.runnerOriginalBlockData.remove(block)"));
-        assertTrue(source.contains("session.runnerBlockOwners.remove(block)"));
+        assertTrue(source.contains("runnerController.processBlocks(session, now, this::runnerTrailAllowed)"));
+        assertTrue(runner.contains("session.runnerOriginalBlockData.remove(block)"));
+        assertTrue(runner.contains("session.runnerBlockOwners.remove(block)"));
     }
 
     @Test

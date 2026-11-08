@@ -316,6 +316,7 @@ class SessionState {
     final Map<Block, BlockData> witherExplosionBlocks = new HashMap<>();
     final Set<Block> witherEditorBlocks = new HashSet<>();
     final Map<Block, BlockData> witherEditorReplacedBlocks = new HashMap<>();
+    final Map<Block, UUID> witherEditorBlockOwners = new HashMap<>();
     final Map<UUID, Long> witherLastAttackAt = new HashMap<>();
     final Map<UUID, Double> witherFlySpeeds = new HashMap<>();
     double witherAssaultSpawnY = 76.0D;
@@ -420,6 +421,8 @@ class SessionState {
     final Map<Sheep, Location> sheepLastMovementLocations = new HashMap<>();
     final Map<Sheep, Long> sheepLastMovementAt = new HashMap<>();
     final Map<UUID, String> sheepQuestKits = new HashMap<>();
+    /** Maximum simultaneous carries, needed by the per-game Sheep Quest controller. */
+    final Map<UUID, Integer> sheepQuestMaxCarried = new HashMap<>();
     final Map<UUID, Long> sheepNextPickupAt = new HashMap<>();
     final Map<UUID, Long> sheepBerserkerReadyAt = new HashMap<>();
     final Map<UUID, Long> sheepBerserkerLeapUntil = new HashMap<>();
@@ -453,6 +456,7 @@ class SessionState {
     final Map<UUID, Item> bombPowerupDrops = new HashMap<>();
     final Map<UUID, Integer> bombPowerupTeamByDrop = new HashMap<>();
     final Map<Integer, Long> bombNextPowerupSpawnAtByTeam = new HashMap<>();
+    final Map<Integer, BombLobbersPowerupStatus> bombPowerupStatusByTeam = new HashMap<>();
     Scoreboard bombLobbersScoreboard;
     Objective bombLobbersScoreboardObjective;
     Team bombRedScoreboardLine;
