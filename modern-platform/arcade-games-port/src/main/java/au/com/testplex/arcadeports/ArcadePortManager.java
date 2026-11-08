@@ -19991,7 +19991,7 @@ public final class ArcadePortManager implements Listener {
             attacker.getInventory().addItem(allowQuiverGlassBreaks(namedItem(Material.ARROW,
                     "Super Arrow", "One arrow per shot; earn another with each kill.")));
         }
-        updateQuiverScoreboard(session);
+        quiverController.updateScoreboard(session);
         attacker.sendMessage(ChatColor.GREEN + "Quiver kill! " + kills + "/" + ArcadePortRules.quiverScoreToWin() + ".");
         checkWinnerForScore(session, attacker);
         if (active != session) return;
