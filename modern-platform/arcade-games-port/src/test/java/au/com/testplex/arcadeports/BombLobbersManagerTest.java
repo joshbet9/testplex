@@ -75,4 +75,21 @@ class BombLobbersManagerTest {
         assertNull(bombLobbers.powerupTeam(null, null));
         assertFalse(bombLobbers.isThrownTnt(null, null));
     }
+
+    @Test
+    void powerupSchedulerAndSpawnLocationHandleEmptySession() {
+        BombLobbersManager bombLobbers = new BombLobbersManager();
+        SessionState session = new SessionState(ArcadePortGame.BOMB_LOBBERS, null, List.of(), false);
+
+        assertEquals(-1, bombLobbers.nearestSpawnTeam(session, null));
+        assertEquals(-1, bombLobbers.nearestSpawnTeam(null, null));
+        assertNull(bombLobbers.findPowerupSpawn(session, 0, null));
+        assertNull(bombLobbers.findPowerupSpawn(null, 1, null));
+        assertTrue(bombLobbers.nextPowerupDelayMillis() > 0);
+
+        bombLobbers.updatePowerups(session, 100L, null, null, null);
+        bombLobbers.updatePowerups(null, 100L, null, null, null);
+        assertTrue(session.bombPowerupDrops.isEmpty());
+        assertTrue(session.bombNextPowerupSpawnAtByTeam.isEmpty());
+    }
 }

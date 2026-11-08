@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Color;
@@ -12,6 +13,9 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
+import org.bukkit.Sound;
+import org.bukkit.block.Block;
+import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -78,6 +82,134 @@ final class BombLobbersManager implements ArcadeMatchController {
             session.bombBlueScoreboardLine.setSuffix(powerupScoreboardText(session, 1)
                     + ChatColor.WHITE + Integer.toString(blue));
         }
+    }
+
+    int nearestSpawnTeam(SessionState session, Location location) {
+        if (session == null || location == null || location.getWorld() != session.world
+                || session.bombTeamSpawnCentres.isEmpty()) return -1;
+        int nearestTeam = -1;
+        double nearestDistanceSquared = Double.POSITIVE_INFINITY;
+        for (Map.Entry<Integer, Location> entry : session.bombTeamSpawnCentres.entrySet()) {
+            double distanceSquared = location.distanceSquared(entry.getValue());
+            if (distanceSquared < nearestDistanceSquared) {
+                nearestDistanceSquared = distanceSquared;
+                nearestTeam = entry.getKey();
+            }
+        }
+        return nearestTeam;
+    }
+
+    private int onlineMatchPlayers(SessionState session) {
+        if (session == null) return 0;
+        return (int) session.players.values().stream()
+                .filter(player -> player != null && player.isOnline() && player.getWorld() == session.world)
+                .count();
+    }
+
+    long nextPowerupDelayMillis() {
+        // The same bounded interval is used for the first wave and subsequent paired waves.
+        return ArcadePortRules.bombLobbersPowerupSpawnDelayMillis(ThreadLocalRandom.current().nextLong());
+    }
+
+    void updatePowerups(SessionState session, long now, SourceMapCatalog.MapData map,
+            NamespacedKey powerupKey, NamespacedKey teamKey) {
+        if (session == null) return;
+        if (!ArcadePortRules.bombLobbersPowerupsEnabled()) {
+            for (Item drop : session.bombPowerupDrops.values()) {
+                if (drop != null && drop.isValid()) drop.remove();
+                if (drop != null) session.entities.remove(drop);
+            }
+            session.bombPowerupDrops.clear();
+            session.bombPowerupTeamByDrop.clear();
+            session.bombPowerupStatusByTeam.clear();
+            session.bombNextPowerupSpawnAtByTeam.clear();
+            return;
+        }
+        for (Map.Entry<UUID, Item> entry : new ArrayList<>(session.bombPowerupDrops.entrySet())) {
+            Item drop = entry.getValue();
+            if (drop == null || !drop.isValid()) {
+                session.bombPowerupDrops.remove(entry.getKey());
+                session.bombPowerupTeamByDrop.remove(entry.getKey());
+                if (drop != null) session.entities.remove(drop);
+            }
+        }
+        if (onlineMatchPlayers(session) <= 0) return;
+        long nextWaveAt = session.bombNextPowerupSpawnAtByTeam.computeIfAbsent(
+                0, ignored -> now + nextPowerupDelayMillis());
+        if (now < nextWaveAt) return;
+
+        String[] choices = {"wind-charge", "super-tnt", "fiery-tnt", "speed-boost"};
+        int spawned = 0;
+        for (int team = 0; team < 2; team++) {
+            BombLobbersPowerupStatus status = session.bombPowerupStatusByTeam.get(team);
+            if (status == BombLobbersPowerupStatus.SPAWNED
+                    || status == BombLobbersPowerupStatus.OBTAINED) continue;
+            Location spawn = findPowerupSpawn(session, team, map);
+            if (spawn == null) continue;
+            String powerup = choices[ThreadLocalRandom.current().nextInt(choices.length)];
+            ItemStack powerupStack = createPowerupStack(powerup, powerupKey);
+            ItemMeta powerupMeta = powerupStack.getItemMeta();
+            if (powerupMeta != null) {
+                powerupMeta.getPersistentDataContainer().set(teamKey, PersistentDataType.INTEGER, team);
+                powerupStack.setItemMeta(powerupMeta);
+            }
+            Item drop = session.world.dropItem(spawn, powerupStack);
+            drop.setVelocity(new Vector(0.0D, 0.04D, 0.0D));
+            drop.setPickupDelay(10);
+            drop.setInvulnerable(true);
+            drop.setGlowing(true);
+            drop.setCustomName(ChatColor.GOLD + ChatColor.BOLD.toString() + powerupName(powerup));
+            drop.setCustomNameVisible(true);
+            drop.getPersistentDataContainer().set(powerupKey, PersistentDataType.STRING, powerup);
+            session.entities.add(drop);
+            session.bombPowerupDrops.put(drop.getUniqueId(), drop);
+            session.bombPowerupTeamByDrop.put(drop.getUniqueId(), team);
+            session.bombPowerupStatusByTeam.put(team, BombLobbersPowerupStatus.SPAWNED);
+            session.world.spawnParticle(Particle.HAPPY_VILLAGER, spawn.clone().add(0.0D, 0.5D, 0.0D),
+                    28, 0.55D, 0.65D, 0.55D, 0.04D);
+            session.world.spawnParticle(Particle.END_ROD, spawn.clone().add(0.0D, 0.6D, 0.0D),
+                    8, 0.25D, 0.35D, 0.25D, 0.02D);
+            session.world.playSound(spawn, Sound.BLOCK_NOTE_BLOCK_PLING, 0.9F, 1.6F);
+            spawned++;
+        }
+        // Both sides share one unpredictable wave clock, not two frequent announcements.
+        long retryDelay = Math.max(1L, GameDebugRuntimeOverrides.longValue("BOMB_LOBBERS_POWERUP_RETRY_DELAY_MILLIS",
+                ArcadePortRules.BOMB_LOBBERS_POWERUP_RETRY_DELAY_MILLIS));
+        long nextWave = now + (spawned == 0 ? retryDelay : nextPowerupDelayMillis());
+        for (int team = 0; team < 2; team++) {
+            session.bombNextPowerupSpawnAtByTeam.put(team, nextWave);
+        }
+        if (spawned > 0) updateScoreboard(session);
+    }
+
+    Location findPowerupSpawn(SessionState session, int requestedTeam, SourceMapCatalog.MapData map) {
+        if (session == null || session.world == null || requestedTeam < 0 || requestedTeam > 1) return null;
+        int minX = map != null && map.hasBounds() ? map.minX() + 3 : -18;
+        int maxX = map != null && map.hasBounds() ? map.maxX() - 3 : 18;
+        int minZ = map != null && map.hasBounds() ? map.minZ() + 3 : -18;
+        int maxZ = map != null && map.hasBounds() ? map.maxZ() - 3 : 18;
+        if (maxX <= minX || maxZ <= minZ) return null;
+        for (int attempt = 0; attempt < 120; attempt++) {
+            int x = ThreadLocalRandom.current().nextInt(minX, maxX + 1);
+            int z = ThreadLocalRandom.current().nextInt(minZ, maxZ + 1);
+            int y = session.world.getHighestBlockYAt(x, z);
+            Block ground = session.world.getBlockAt(x, y, z);
+            Block feet = ground.getRelative(0, 1, 0);
+            Block head = ground.getRelative(0, 2, 0);
+            if (!ground.getType().isSolid() || ground.isLiquid()
+                    || !feet.isPassable() || !head.isPassable()
+                    || feet.isLiquid() || head.isLiquid()) continue;
+            Location candidate = new Location(session.world, x + 0.5D, y + 1.1D, z + 0.5D);
+            if (nearestSpawnTeam(session, candidate) != requestedTeam) continue;
+            boolean nearSpawn = session.bombTeamSpawnCentres.values().stream()
+                    .anyMatch(center -> center != null && center.distanceSquared(candidate) < 100.0D);
+            if (nearSpawn) continue;
+            boolean underPlayer = alivePlayers(session).stream()
+                    .anyMatch(player -> player.getLocation().distanceSquared(candidate) < 25.0D);
+            if (underPlayer) continue;
+            return candidate;
+        }
+        return null;
     }
 
     /** Sample line-of-sight like vanilla 1.8 World#getBlockDensity. */

@@ -1373,11 +1373,13 @@ class GameDebugEventCatalogTest {
         }
         String source = Files.readString(managerPath);
         assertTrue(source.contains("type == ArcadePortGame.BOMB_LOBBERS && \"spawn-powerups\".equals(eventId)"));
-        int updater = source.indexOf("private void updateBombLobbersPowerups(Session session, long now)");
-        int featureGate = source.indexOf("if (!ArcadePortRules.bombLobbersPowerupsEnabled())", updater);
-        int wave = source.indexOf("String[] choices = {\"wind-charge\"", featureGate);
+        assertTrue(source.contains("bombLobbersController.updatePowerups(session, now,"));
+        String bombManager = Files.readString(managerPath.resolveSibling("BombLobbersManager.java"));
+        int updater = bombManager.indexOf("void updatePowerups(SessionState session, long now,");
+        int featureGate = bombManager.indexOf("if (!ArcadePortRules.bombLobbersPowerupsEnabled())", updater);
+        int wave = bombManager.indexOf("String[] choices = {\"wind-charge\"", featureGate);
         assertTrue(updater >= 0 && featureGate > updater && wave > featureGate);
-        assertTrue(source.substring(updater, wave).contains("session.bombPowerupDrops.clear()"));
+        assertTrue(bombManager.substring(updater, wave).contains("session.bombPowerupDrops.clear()"));
     }
 
     @Test
