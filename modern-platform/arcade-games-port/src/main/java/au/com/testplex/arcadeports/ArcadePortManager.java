@@ -287,6 +287,7 @@ public final class ArcadePortManager implements Listener {
     private final TurfWarsManager turfWarsController = new TurfWarsManager();
     private final DrawMyThingManager drawMyThingController = new DrawMyThingManager();
     private final GladiatorsManager gladiatorsController;
+    private final MilkCowManager milkCowController = new MilkCowManager();
     private boolean gameModulesInitialized;
     private CameraShyGame cameraShyModule;
 
@@ -313,6 +314,7 @@ public final class ArcadePortManager implements Listener {
         matchControllers.register(turfWarsController);
         matchControllers.register(drawMyThingController);
         matchControllers.register(gladiatorsController);
+        matchControllers.register(milkCowController);
         this.dragonEscapeGhostStore = new DragonEscapeGhostPathStore(
                 plugin.getDataFolder().toPath(), plugin.getLogger());
         this.debugProfiles = new GameDebugProfiles(plugin);
@@ -27604,31 +27606,7 @@ public final class ArcadePortManager implements Listener {
 
     private void incrementMilkCowScore(Session session, Player player, int change, String reason) {
         if (active != session || player == null || !session.players.containsKey(player.getUniqueId())) return;
-        UUID id = player.getUniqueId();
-        int score = MilkCowRules.scoreAfterChange(session.scores.getOrDefault(id, 0), change);
-        session.scores.put(id, score);
-        int scoreToWin = GameDebugRuntimeOverrides.intValue(
-                "MILK_THE_COW_SCORE_TO_WIN", MilkCowRules.SCORE_TO_WIN);
-        if (score != scoreToWin - 1 && !session.milkSpiltMilkCandidates.contains(id)) {
-            session.milkNearWinBucketEmptyings.remove(id);
-        }
-        int bestOpponentScore = session.scores.entrySet().stream()
-                .filter(entry -> !entry.getKey().equals(id))
-                .mapToInt(Map.Entry::getValue).max().orElse(0);
-        if (bestOpponentScore - score >= 5) session.milkComebackCandidates.add(id);
-        int currentLeaderScore = session.scores.values().stream().mapToInt(Integer::intValue).max().orElse(0);
-        List<UUID> currentLeaders = session.scores.entrySet().stream()
-                .filter(entry -> entry.getValue() == currentLeaderScore)
-                .map(Map.Entry::getKey).toList();
-        UUID nextLeader = currentLeaders.size() == 1 ? currentLeaders.get(0) : null;
-        if (nextLeader != null && !nextLeader.equals(session.milkCurrentLeader)) {
-            session.milkTimesLed.merge(nextLeader, 1, Integer::sum);
-        }
-        session.milkCurrentLeader = nextLeader;
-        player.sendMessage((change >= 0 ? ChatColor.GREEN : ChatColor.RED)
-                + reason + ": " + score + "/" + GameDebugRuntimeOverrides.intValue(
-                        "MILK_THE_COW_SCORE_TO_WIN", MilkCowRules.SCORE_TO_WIN));
-        if (MilkCowRules.hasWon(score)) {
+        if (milkCowController.incrementScore(session, player, change, reason)) {
             announce(session, ChatColor.GOLD + player.getName() + " reached " + GameDebugRuntimeOverrides.intValue(
                     "MILK_THE_COW_SCORE_TO_WIN", MilkCowRules.SCORE_TO_WIN) + " points!");
             finish(session, player, true);
