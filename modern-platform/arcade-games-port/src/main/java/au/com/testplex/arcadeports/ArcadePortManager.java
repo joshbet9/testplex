@@ -23612,6 +23612,9 @@ public final class ArcadePortManager implements Listener {
             setDragonEscapeGhostHotbarItem(player);
         }
         if (!enabled) hideDragonEscapeGhost(player);
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.DRAGON_ESCAPE
+                && session.alive.contains(player.getUniqueId())) setDragonEscapeGhostHotbarItem(player);
         if (enabled && dragonEscapeGhostBridge == null) {
             player.sendMessage(ChatColor.RED + "Transparent player ghosts require PacketEvents 2.14.0 on this server.");
         }
