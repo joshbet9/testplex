@@ -937,6 +937,46 @@ jobs:
             exit 1
           }
 
+          # PacketEvents is a server-side runtime plugin used by the optional
+          # Dragon Escape player-ghost renderer. Install its unmodified 26.3
+          # compatible Spigot release; clients do not need a mod. Pin the exact
+          # Modrinth version and SHA-512 so deployments cannot silently float.
+          PE_VERSION="2.14.0"
+          PE_SHA512="18a942cb55f64783a63b28deea2cebbbe782e5d6a1089f6700430e183bfbce0a45398a640ed0dff4361b55190dcf47017f2ca7788f4a5c8c9efad1f549a63fe3"
+          PE_TMP="$UPLOAD_DIR/packetevents-spigot-$PE_VERSION.jar"
+          PE_INSTALLED="$SERVER_DIR/plugins/PacketEvents.jar"
+          PE_URL="https://cdn.modrinth.com/data/HYKaKraK/versions/m78nFxYg/packetevents-spigot-$PE_VERSION.jar"
+          PE_REPLACE=true
+          if sudo -n test -s "$PE_INSTALLED" && unzip -tq "$PE_INSTALLED" >/dev/null 2>&1; then
+            pe_descriptor="$(sudo -n unzip -p "$PE_INSTALLED" plugin.yml 2>/dev/null || true)"
+            pe_name="$(yaml_descriptor_value name "$pe_descriptor")"
+            pe_version="$(yaml_descriptor_value version "$pe_descriptor")"
+            pe_main="$(yaml_descriptor_value main "$pe_descriptor")"
+            pe_sha512="$(sudo -n sha512sum "$PE_INSTALLED" | awk '{print $1}')"
+            if [[ "$pe_name" == "packetevents" && "$pe_version" == "$PE_VERSION" \
+               && "$pe_main" == "io.github.retrooper.packetevents.PacketEventsPlugin" \
+               && "$pe_sha512" == "$PE_SHA512" ]]; then
+              PE_REPLACE=false
+              echo "PacketEvents $PE_VERSION is already installed and checksum-verified; skipping its download."
+            fi
+          fi
+          if [[ "$PE_REPLACE" == true ]]; then
+            echo "[deploy] downloading pinned PacketEvents $PE_VERSION from Modrinth (6 minute limit)."
+            timeout --foreground --signal=TERM 6m curl --fail --location --retry 3 --user-agent "$USER_AGENT" \
+              "$PE_URL" -o "$PE_TMP"
+            printf '%s  %s\n' "$PE_SHA512" "$PE_TMP" | sha512sum -c -
+            unzip -tq "$PE_TMP" >/dev/null
+            pe_descriptor="$(unzip -p "$PE_TMP" plugin.yml)"
+          fi
+          pe_name="$(yaml_descriptor_value name "$pe_descriptor")"
+          pe_version="$(yaml_descriptor_value version "$pe_descriptor")"
+          pe_main="$(yaml_descriptor_value main "$pe_descriptor")"
+          [[ "$pe_name" == "packetevents" && "$pe_version" == "$PE_VERSION" \
+             && "$pe_main" == "io.github.retrooper.packetevents.PacketEventsPlugin" ]] || {
+            echo "Downloaded PacketEvents descriptor did not match pinned release $PE_VERSION." >&2
+            exit 1
+          }
+
           # Stage and validate source worlds outside the live Bukkit world folders.
           MAP_STAGE_DIR="$UPLOAD_DIR/mm-map-stage"
           if [[ "$MM_MAPS_REQUIRED" == true ]]; then
@@ -1098,10 +1138,21 @@ jobs:
                 echo "Removed duplicate/old FakePlayerPlugin jar $plugin_jar."
               fi
             fi
+            if [[ "$plugin_name" == "packetevents" \
+               || "$plugin_main" == "io.github.retrooper.packetevents.PacketEventsPlugin" ]]; then
+              if [[ "$plugin_jar" != "$PE_INSTALLED" || "$PE_REPLACE" == true ]]; then
+                sudo -n rm -f -- "$plugin_jar"
+                echo "Removed duplicate/old PacketEvents jar $plugin_jar."
+              fi
+            fi
           done
           if [[ "$FPP_REPLACE" == true ]]; then
             sudo -n install -o monstermaze -g monstermaze -m 0644 \
               "$FPP_TMP" "$SERVER_DIR/plugins/FakePlayerPlugin.jar"
+          fi
+          if [[ "$PE_REPLACE" == true ]]; then
+            sudo -n install -o monstermaze -g monstermaze -m 0644 \
+              "$PE_TMP" "$PE_INSTALLED"
           fi
 
           # Disable FPP restart persistence before Paper starts. Its own onEnable
@@ -1398,7 +1449,7 @@ jobs:
             rollback
             exit 1
           fi
-          for plugin in TestplexModernArcade ArcadeMechanicsModern FakePlayerPlugin; do
+          for plugin in TestplexModernArcade ArcadeMechanicsModern FakePlayerPlugin packetevents; do
             if ! sudo -n grep -Fq "$plugin" "$SERVER_DIR/logs/latest.log"; then
               echo "Expected plugin name $plugin not found in the modern server log." >&2
               rollback
@@ -1754,6 +1805,7 @@ jobs:
             echo "- Replaced plugin JARs: ${CHANGED_JARS:-none}"
             echo "- Plugin transfer payload: ${JAR_TRANSFER_BYTES:-unknown} bytes of entry deltas/full first-install JARs; transfer checksummed before assembly"
             echo "- Paper and FakePlayerPlugin: reused when the installed versions match"
+            echo "- PacketEvents: server-side 2.14.0 plugin installed and SHA-512 verified; clients need no mod"
             echo "- Monster Maze maps uploaded: ${MM_MAPS_REQUIRED:-unknown}"
             echo "- Wizards map archive uploaded: ${WIZARDS_MAPS_REQUIRED:-unknown}"
             echo "- Destination: /home/monstermaze/servers/testplex-modern"
@@ -1762,4 +1814,5 @@ jobs:
             echo "- Memory safety: only Testplex's own legacy service is stopped; separate Monster Maze services are left untouched, and deployment aborts rather than stopping them when memory is insufficient; successful deployments leave only modern Paper running"
             echo "- Rollback: modern-only backup created before replacement; startup is checked before success"
           } >> "$GITHUB_STEP_SUMMARY"
+
 
