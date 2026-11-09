@@ -202,7 +202,7 @@ public final class ArcadePortManager implements Listener {
     private final Map<UUID, String> paintballKitPreferences = new HashMap<>();
     private final Map<UUID, String> superSploorKitPreferences = new HashMap<>();
     private final Map<UUID, String> castleAssaultKitPreferences = new HashMap<>();
-    private final Map<UUID, String> heroesOfGwenHeroPreferences = new HashMap<>();
+    private final HeroesOfGwenManager heroesOfGwenManager = new HeroesOfGwenManager();
     private final Map<UUID, String> deathTagRunnerKitPreferences = new HashMap<>();
     private final Map<UUID, String> baconKitPreferences = new HashMap<>();
     private final Map<UUID, String> bombLobbersKitPreferences = new HashMap<>();
@@ -2762,7 +2762,7 @@ public final class ArcadePortManager implements Listener {
                 && session.players.containsKey(id) && session.variantRuntime != null) {
             player.sendMessage(ChatColor.YELLOW + "Use the Change Hero compass in your hotbar to choose an available hero.");
         } else {
-            heroesOfGwenHeroPreferences.put(id, hero);
+            heroesOfGwenManager.setPreferredHero(id, hero);
             player.sendMessage(ChatColor.GREEN + "Heroes of Gwen hero set to " + display
                     + " (" + role + ") for your next game.");
         }
@@ -3488,7 +3488,7 @@ public final class ArcadePortManager implements Listener {
         session.lastLocations.put(id, spawn.clone());
         if (session.type == ArcadePortGame.HEROES_OF_GWEN) {
             session.variantRuntime.setHeroesOfGwenHero(player,
-                    heroesOfGwenHeroPreferences.getOrDefault(id, "hattori"));
+                    heroesOfGwenManager.preferredHero(id));
         }
         for (LinkedHashMap<UUID, Player> existingQueue : queues.values()) existingQueue.remove(id);
         applySessionTeamTabTeams(session);
@@ -5614,7 +5614,7 @@ public final class ArcadePortManager implements Listener {
 
                         @Override
                         public void heroSelected(Player player, String hero) {
-                            heroesOfGwenHeroPreferences.put(player.getUniqueId(), hero);
+                            heroesOfGwenManager.setPreferredHero(player.getUniqueId(), hero);
                         }
 
                         @Override
@@ -8234,7 +8234,7 @@ public final class ArcadePortManager implements Listener {
                 player.getInventory().setBoots(new ItemStack(Material.LEATHER_BOOTS));
                 if (session.variantRuntime != null && session.variantRuntime.isReady()) {
                     session.variantRuntime.setHeroesOfGwenHero(player,
-                            heroesOfGwenHeroPreferences.getOrDefault(player.getUniqueId(), "hattori"));
+                            heroesOfGwenManager.preferredHero(player.getUniqueId()));
                 }
                 break;
             case WITHER_ASSAULT:
