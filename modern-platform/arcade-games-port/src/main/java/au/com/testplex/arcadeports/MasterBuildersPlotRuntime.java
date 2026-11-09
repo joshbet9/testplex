@@ -383,8 +383,6 @@ final class MasterBuildersPlotRuntime implements Listener {
         }
         if (slot == 10 && mob instanceof Ageable ageable) {
             if (ageable.isAdult()) ageable.setBaby(); else ageable.setAdult();
-        } else if (slot == 12) {
-            mob.setCollidable(!mob.isCollidable());
         } else if (slot == 14 && mob instanceof Slime slime) {
             slime.setSize(Math.max(1, slime.getSize() - 1));
         } else if (slot == 15 && mob instanceof Slime slime) {
@@ -461,8 +459,8 @@ final class MasterBuildersPlotRuntime implements Listener {
         if (entity instanceof Ageable ageable) put(inventory, 10, Material.BLAZE_ROD,
                 ageable.isAdult() ? "Make Baby" : "Make Adult", "Toggle this mob's age.");
         if (entity instanceof LivingEntity living) {
-            put(inventory, 12, Material.FEATHER, living.isCollidable() ? "Disable Pushing" : "Allow Pushing",
-                    "Pushing is currently " + (living.isCollidable() ? "enabled" : "disabled") + ".");
+            put(inventory, 12, Material.FEATHER, "Pass-through Mob",
+                    "Mobs never push players or other mobs in Testplex games.");
             put(inventory, 18, Material.GHAST_TEAR, "Look at Me", "Turn this mob to face you.");
         }
         if (entity instanceof Slime slime) {

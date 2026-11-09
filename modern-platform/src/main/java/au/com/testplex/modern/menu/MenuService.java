@@ -598,15 +598,17 @@ public final class MenuService implements Listener {
         for (int index = start; index < Math.min(line.getOptions().size(), start + 45); index++) {
             CosmeticOption option = line.getOptions().get(index);
             String selectionHint = line.getSelectionMode() == CosmeticLineDefinition.SelectionMode.SINGLE
-                    ? ChatColor.YELLOW + "Click to equip"
+                    ? ChatColor.YELLOW + "Left click to equip"
                     : option.getSelectionGroup() == null
-                            ? ChatColor.YELLOW + "Click to toggle"
-                            : ChatColor.YELLOW + "Click to equip in " + option.getSelectionGroup();
+                            ? ChatColor.YELLOW + "Left click to toggle"
+                            : ChatColor.YELLOW + "Left click to equip in " + option.getSelectionGroup();
             ItemStack item = makeItem(line.getIcon(),
                     (selected.contains(option.getId()) ? ChatColor.GREEN + "✓ " : ChatColor.WHITE) + option.getName(),
                     List.of(ChatColor.GRAY + option.getDescription(),
                             selected.contains(option.getId()) ? ChatColor.GREEN + "Selected" : ChatColor.GRAY + "Not selected",
-                            selectionHint));
+                            selectionHint,
+                            selected.contains(option.getId())
+                                    ? ChatColor.RED + "Right click to disable" : ChatColor.DARK_GRAY + "Right click does nothing"));
             mark(item, "cosmetic-option", game, line, option.getId());
             inventory.setItem(index - start, item);
         }
@@ -630,9 +632,10 @@ public final class MenuService implements Listener {
         String equipped = preferences.getWinEffect(player.getUniqueId(), game);
         for (CosmeticOption option : game.getWinEffects()) {
             ItemStack item = makeItem(Material.FIREWORK_ROCKET,
-                    (equipped.equals(option.getId()) ? ChatColor.GREEN + "✓ " : ChatColor.WHITE) + option.getName(),
+                    (option.getId().equals(equipped) ? ChatColor.GREEN + "✓ " : ChatColor.WHITE) + option.getName(),
                     List.of(ChatColor.GRAY + option.getDescription(),
-                            equipped.equals(option.getId()) ? ChatColor.GREEN + "Equipped" : ChatColor.YELLOW + "Click to equip"));
+                            option.getId().equals(equipped) ? ChatColor.GREEN + "Equipped" : ChatColor.YELLOW + "Left click to equip",
+                            option.getId().equals(equipped) ? ChatColor.RED + "Right click to disable" : ChatColor.DARK_GRAY + "Right click does nothing"));
             mark(item, "win-option", game, null, option.getId());
             inventory.setItem(slot++, item);
         }
@@ -680,9 +683,15 @@ public final class MenuService implements Listener {
             if ("cosmetic-option".equals(action) && game != null && lineId != null && optionId != null) {
                 CosmeticLineDefinition line = findLine(game, lineId);
                 if (line != null) {
-                    preferences.chooseOption(player.getUniqueId(), game, line, optionId);
+                    if (event.getClick().isRightClick()) {
+                        boolean disabled = preferences.disableOption(player.getUniqueId(), game, line, optionId);
+                        player.sendMessage(disabled ? ChatColor.YELLOW + "Disabled " + line.getTitle() + "."
+                                : ChatColor.GRAY + "That option is not currently selected.");
+                    } else {
+                        preferences.chooseOption(player.getUniqueId(), game, line, optionId);
+                        player.sendMessage(ChatColor.GREEN + "Saved " + game.getName() + " → " + line.getTitle() + ".");
+                    }
                     if ("monster-maze".equals(game.getId())) refreshMonsterMazeCosmetics(player);
-                    player.sendMessage(ChatColor.GREEN + "Saved " + game.getName() + " → " + line.getTitle() + ".");
                     openOptions(player, game, line, cosmeticOptionPages.getOrDefault(player.getUniqueId(), 0));
                 }
                 return;
@@ -849,9 +858,15 @@ public final class MenuService implements Listener {
         if (title.startsWith(WIN_HOME_TITLE + " | ")) {
             if ("back-win-home".equals(action)) openWinEffectsHome(player);
             else if ("win-option".equals(action) && game != null && optionId != null) {
-                preferences.chooseWinEffect(player.getUniqueId(), game, optionId);
+                if (event.getClick().isRightClick()) {
+                    boolean disabled = preferences.disableWinEffect(player.getUniqueId(), game, optionId);
+                    player.sendMessage(disabled ? ChatColor.YELLOW + "Disabled your " + game.getName() + " win effect."
+                            : ChatColor.GRAY + "That win effect is not currently equipped.");
+                } else {
+                    preferences.chooseWinEffect(player.getUniqueId(), game, optionId);
+                    player.sendMessage(ChatColor.GREEN + "Saved the " + game.getName() + " win effect.");
+                }
                 openWinEffects(player, game);
-                player.sendMessage(ChatColor.GREEN + "Saved the " + game.getName() + " win effect.");
             }
             return;
         }
@@ -1012,15 +1027,27 @@ public final class MenuService implements Listener {
         } else if ("cosmetic-option".equals(action) && game != null && lineId != null && optionId != null) {
             CosmeticLineDefinition line = findLine(game, lineId);
             if (line != null) {
-                preferences.chooseOption(player.getUniqueId(), game, line, optionId);
-                player.sendMessage(ChatColor.GREEN + "Saved " + game.getName() + " → " + line.getTitle() + ".");
-                player.sendMessage(ChatColor.GRAY + "This preference is saved; its in-game renderer is implemented as the game port is completed.");
+                if (event.getClick().isRightClick()) {
+                    boolean disabled = preferences.disableOption(player.getUniqueId(), game, line, optionId);
+                    player.sendMessage(disabled ? ChatColor.YELLOW + "Disabled " + line.getTitle() + "."
+                            : ChatColor.GRAY + "That option is not currently selected.");
+                } else {
+                    preferences.chooseOption(player.getUniqueId(), game, line, optionId);
+                    player.sendMessage(ChatColor.GREEN + "Saved " + game.getName() + " → " + line.getTitle() + ".");
+                    player.sendMessage(ChatColor.GRAY + "This preference is saved; its in-game renderer is implemented as the game port is completed.");
+                }
                 openOptions(player, game, line);
             }
         } else if ("win-option".equals(action) && game != null && optionId != null) {
-            preferences.chooseWinEffect(player.getUniqueId(), game, optionId);
-            player.sendMessage(ChatColor.GREEN + "Saved the " + game.getName() + " win effect.");
-            player.sendMessage(ChatColor.GRAY + "The win-scene renderer is wired during that game's port.");
+            if (event.getClick().isRightClick()) {
+                boolean disabled = preferences.disableWinEffect(player.getUniqueId(), game, optionId);
+                player.sendMessage(disabled ? ChatColor.YELLOW + "Disabled your " + game.getName() + " win effect."
+                        : ChatColor.GRAY + "That win effect is not currently equipped.");
+            } else {
+                preferences.chooseWinEffect(player.getUniqueId(), game, optionId);
+                player.sendMessage(ChatColor.GREEN + "Saved the " + game.getName() + " win effect.");
+                player.sendMessage(ChatColor.GRAY + "The win-scene renderer is wired during that game's port.");
+            }
             openWinEffects(player, game);
         } else if ("open-stats".equals(action)) {
             player.closeInventory();

@@ -535,7 +535,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
                 p.getInventory().setArmorContents(null);
                 kitManager.resetPlayerState(p);
                 p.setGameMode(GameMode.SURVIVAL);
-                p.setCollidable(true);
+                p.setCollidable(false);
 
                 // Restore visibility for all players in lobby
                 for (Player target : arenaPlayers) p.showPlayer(target);

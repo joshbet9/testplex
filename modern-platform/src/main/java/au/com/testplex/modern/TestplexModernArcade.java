@@ -143,7 +143,7 @@ public final class TestplexModernArcade extends JavaPlugin implements Listener {
         for (var line : game.getCosmeticLines()) {
             if (group.equals(line.getId())) {
                 var selected = preferences.getSelected(playerId, game, line);
-                return selected.isEmpty() ? line.getDefaultOptionId() : selected.iterator().next();
+                return selected.isEmpty() ? null : selected.iterator().next();
             }
             for (var option : line.getOptions()) {
                 if (group.equals(option.getSelectionGroup())

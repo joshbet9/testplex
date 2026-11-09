@@ -552,7 +552,7 @@ final class SneakyAssassinsMechanics {
         npc.setPersistent(true);
         npc.setRemoveWhenFarAway(false);
         npc.setCanPickupItems(false);
-        npc.setCollidable(true);
+        npc.setCollidable(false);
         npcIds.add(npc.getUniqueId());
     }
 

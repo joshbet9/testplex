@@ -430,7 +430,7 @@ final class ArcadeTestPlayerManager {
         invoke(handle, "setPickUpXpEnabled", new Class<?>[] {boolean.class}, true);
         player.setInvulnerable(false);
         player.setNoDamageTicks(0);
-        player.setCollidable(true);
+        ArcadeCollisionRules.disable(player);
         player.setCanPickupItems(true);
         player.setOp(false);
         // Preserve a game-assigned respawn mode (for example, spectator).

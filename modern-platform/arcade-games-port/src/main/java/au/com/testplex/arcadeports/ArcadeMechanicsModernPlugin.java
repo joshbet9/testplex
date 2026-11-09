@@ -9,6 +9,9 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.entity.EntitySpawnEvent;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
@@ -372,8 +375,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+        ArcadeCollisionRules.disable(player);
         Bukkit.getScheduler().runTask(this, () -> {
             if (player.isOnline() && manager != null) {
+                ArcadeCollisionRules.disable(player);
                 // Session fake players must remain in the game lifecycle that just admitted them.
                 if (manager.isTestPlayer(player)) return;
                 boolean restoredSpeedBuilders = speedBuilders != null && speedBuilders.restorePendingSnapshot(player);
@@ -382,6 +387,14 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 manager.restoreMonsterMazeKitPreference(player);
             }
         });
+    }
+
+    /** All game mobs are pass-through actors; collision never affects hit targeting. */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onGameEntitySpawn(EntitySpawnEvent event) {
+        if (event.getEntity() instanceof LivingEntity living && !(living instanceof Player)) {
+            living.setCollidable(false);
+        }
     }
 
     private boolean isConfiguredOwner(Player player) {

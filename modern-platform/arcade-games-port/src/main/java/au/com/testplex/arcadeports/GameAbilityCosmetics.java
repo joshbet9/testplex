@@ -12,7 +12,7 @@ final class GameAbilityCosmetics {
     private GameAbilityCosmetics() { }
 
     static void preview(Player viewer, Location center, String optionId) {
-        if (optionId == null || optionId.isBlank()) return;
+        if (!GameDebugRuntimeOverrides.globalCosmeticsEnabled() || optionId == null || optionId.isBlank()) return;
         emit(viewer, center, optionId, "", 1.0D);
     }
 
@@ -21,12 +21,12 @@ final class GameAbilityCosmetics {
     }
 
     static void hit(Player viewer, Location center, String optionId, String abilityName) {
-        if (optionId == null || optionId.isBlank()) return;
+        if (!GameDebugRuntimeOverrides.globalCosmeticsEnabled() || optionId == null || optionId.isBlank()) return;
         emit(viewer, center, optionId, abilityName, 0.38D);
     }
 
     static void celebrate(Player scorer, Location center, String optionId) {
-        if (optionId == null || optionId.isBlank()) return;
+        if (!GameDebugRuntimeOverrides.globalCosmeticsEnabled() || optionId == null || optionId.isBlank()) return;
         emit(scorer, center, optionId, "", 1.15D);
     }
 
