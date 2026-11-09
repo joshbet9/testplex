@@ -785,7 +785,9 @@ jobs:
           echo "[deploy] opening an exclusive remote deployment lock."
           deploy_exit=0
           timeout --foreground --signal=TERM --kill-after=30s 28m ssh "${ssh_opts[@]}" "$remote" sudo -n flock -n /var/lock/testplex-modern-deploy.lock bash -s -- "$BUILD_SHA" "$UPLOAD_DIR" "$ACCEPT_EULA" "$MM_MAPS_REQUIRED" "$WIZARDS_MAPS_REQUIRED" <<'REMOTE_DEPLOY' || deploy_exit=$?
-          set -euo pipefail
+          set -Eeuo pipefail
+          DEPLOY_PHASE="bootstrap"
+          trap 'rc=$?; printf "[deploy] remote script failed in phase=%s at line=%s (status=%s)\\n" "${DEPLOY_PHASE:-unknown}" "${BASH_LINENO[0]:-unknown}" "$rc" >&2' ERR
           BUILD_SHA="$1"
           UPLOAD_DIR="$2"
           ACCEPT_EULA="$3"
@@ -825,6 +827,7 @@ jobs:
           fi
           sudo -n test -s "$UPLOAD_DIR/SHA256SUMS"
 
+          DEPLOY_PHASE="journal-recovery"
           STATE_DIR=/var/lib/testplex-modern-deploy
           RECOVERY_HELPER=/usr/local/sbin/testplex-modern-recovery
           # Gate before host prerequisites or service changes. This SSH session
@@ -872,6 +875,7 @@ jobs:
           fi
           "$JAVA_BIN" -version
 
+          DEPLOY_PHASE="paper-download-and-verification"
           echo "Fetching a stable Paper build for Minecraft 26.3 from PaperMC's official downloads service."
           echo "[deploy] querying Paper 26.3 metadata (4 minute limit)."
           builds_json="$(timeout --foreground --signal=TERM 4m curl --fail --silent --show-error --retry 3 --user-agent "$USER_AGENT" \
@@ -895,6 +899,7 @@ jobs:
             printf '%s  %s\n' "$paper_sha" "$paper_tmp" | sha256sum -c -
           fi
 
+          DEPLOY_PHASE="fake-player-plugin-verification"
           # FakePlayerPlugin is a separate Paper plugin with its own distribution terms.
           # Fetch the unmodified, pinned release directly onto the user's administered VM:
           # it is intentionally not bundled into or redistributed with Testplex artifacts.
@@ -937,6 +942,7 @@ jobs:
             exit 1
           }
 
+          DEPLOY_PHASE="packetevents-download-and-verification"
           # PacketEvents is a server-side runtime plugin used by the optional
           # Dragon Escape player-ghost renderer. Install its unmodified 26.3
           # compatible Spigot release; clients do not need a mod. Pin the exact
@@ -977,6 +983,7 @@ jobs:
             exit 1
           }
 
+          DEPLOY_PHASE="source-map-validation"
           # Stage and validate source worlds outside the live Bukkit world folders.
           MAP_STAGE_DIR="$UPLOAD_DIR/mm-map-stage"
           if [[ "$MM_MAPS_REQUIRED" == true ]]; then
@@ -999,6 +1006,7 @@ jobs:
             }
           fi
 
+          DEPLOY_PHASE="transaction-preparation"
           STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
           DEPLOYMENT_ID="$(cat /proc/sys/kernel/random/uuid)"
           BACKUP_DIR="$STATE_DIR/backups/$STAMP-$BUILD_SHA-$DEPLOYMENT_ID"
