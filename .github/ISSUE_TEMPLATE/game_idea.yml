@@ -1,6 +1,9 @@
 name: Testplex game idea
 description: Suggest a gameplay, balance, polish, or tester-tool improvement.
 title: "[Idea] "
+labels: ["enhancement"]
+assignees:
+  - joshbet9
 body:
   - type: markdown
     attributes:
