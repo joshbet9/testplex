@@ -370,6 +370,15 @@ public final class PlexballGame implements Listener {
         return players;
     }
 
+    /** Read-only career counters for rankings on the shared /stats game icon. */
+    public long recordedMatches(UUID playerId) {
+        return playerId == null ? 0L : Math.max(0L, readProgress(playerId).matches);
+    }
+
+    public long recordedWins(UUID playerId) {
+        return playerId == null ? 0L : Math.max(0L, readProgress(playerId).wins);
+    }
+
     public List<String> statsSummary(UUID playerId) {
         PlayerProgress profile = readProgress(playerId);
         return List.of(ChatColor.GRAY + "Matches: " + ChatColor.WHITE + profile.matches,
