@@ -96,7 +96,8 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
                 ("testplex:dragon-escape-pb-ghost:" + viewer.getUniqueId())
                         .getBytes(StandardCharsets.UTF_8));
         String suffix = String.format("%08x", ghostUuid.getLeastSignificantBits()).substring(0, 8);
-        String profileName = "PB_Ghost";
+        // Use the racer’s name for the overhead label so the replay is identifiable.
+        String profileName = viewer.getName();
         String teamName = "deg" + suffix;
         // Keep packet-only NPC IDs positive and far outside normal server entity IDs.
         int entityId = 1_800_000_000 - (ghostUuid.hashCode() & 0x1fffffff);
@@ -129,11 +130,12 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
                         WrapperPlayServerTeams.CollisionRule.NEVER,
                         NamedTextColor.WHITE,
                         WrapperPlayServerTeams.OptionData.FRIENDLY_CAN_SEE_INVISIBLE);
-        // Team membership must include the viewer as well as the fake player:
-        // vanilla only renders invisible team-mates translucently to team members.
+        // The ghost profile deliberately shares the viewer's scoreboard name, so one
+        // team entry covers both. This makes the invisible ghost visible translucently
+        // only to its owner without displaying a generic PB_Ghost label.
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
                 new WrapperPlayServerTeams(teamName, WrapperPlayServerTeams.TeamMode.CREATE,
-                        teamInfo, List.of(viewer.getName(), profileName)));
+                        teamInfo, List.of(profileName)));
 
         // Since 1.20.2, player-shaped NPCs use Add Entity (EntityTypes.PLAYER).
         // The old Add Player packet does not create a player entity on 26.3 clients.
