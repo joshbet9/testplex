@@ -280,6 +280,7 @@ jobs:
           grep -Fq 'need_mm_maps' "$deploy_workflow"
           grep -Fq 'Insufficient deployment staging space:' "$deploy_workflow"
           grep -Fq 'tmp_required_kb' "$deploy_workflow"
+          grep -Fq "failure() && steps.install-and-start.outcome != 'skipped'" "$deploy_workflow"
           echo "The game suite is delivered by the shared Arcade plugin; Snake and Monster Maze are in-process Arcade modules. No standalone SnakeModern or WizardsModern game plugins are packaged."
 
       - name: Validate independent deployment recovery and shell syntax
