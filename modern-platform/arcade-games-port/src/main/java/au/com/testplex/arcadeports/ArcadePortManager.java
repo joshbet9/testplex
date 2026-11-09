@@ -9175,11 +9175,10 @@ public final class ArcadePortManager implements Listener {
                 // Reborn grants invisibility to every runner when their Dragon Escape kit is given.
                 player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY,
                         Integer.MAX_VALUE, 0, false, false, false));
-                player.setExp(0.99F);
                 String kit = session.dragonEscapeKits.getOrDefault(id, "jumper");
                 int leaps = session.dragonEscapeLeapUsesRemaining.getOrDefault(id, ArcadePortRules.dragonEscapeLeapUses(kit));
                 if (!"digger".equals(kit)) {
-                    setDragonEscapeLeapItem(player, leaps);
+                    setDragonEscapeLeapItem(player, leaps, ArcadePortRules.dragonEscapeLeapUses(kit));
                 }
                 if ("disruptor".equals(kit)) {
                     player.getInventory().addItem(namedItem(Material.TNT, "Disruptor",
@@ -13819,7 +13818,6 @@ public final class ArcadePortManager implements Listener {
             session.tickTask.cancel();
             return;
         }
-        disableParticipantCollisions(session);
         long now = System.currentTimeMillis();
         session.ticks++;
         if (session.sharedMatchScoreboardObjective != null) updateSharedMatchScoreboard(session, now);
@@ -14020,6 +14018,8 @@ public final class ArcadePortManager implements Listener {
             if (active != session) return;
         }
         if (session.type == ArcadePortGame.TURF_WARS) updateTurfWars(session, now);
+        // Reassert after game and scoreboard updates so neither can restore player pushing.
+        disableParticipantCollisions(session);
          updateTitles(session);
         checkRoundEnd(session);
     }
@@ -16446,7 +16446,8 @@ public final class ArcadePortManager implements Listener {
         player.setExp(Math.max(0.0F, Math.min(0.99F,
                 remaining / (float) Math.max(1, ArcadePortRules.dragonEscapeLeapUses(
                         session.dragonEscapeKits.getOrDefault(id, "jumper"))))));
-        setDragonEscapeLeapItem(player, remaining);
+        setDragonEscapeLeapItem(player, remaining, ArcadePortRules.dragonEscapeLeapUses(
+                session.dragonEscapeKits.getOrDefault(id, "jumper")));
         Vector direction = player.getLocation().getDirection().normalize().multiply(1.0D);
         direction.setY(ArcadePortRules.dragonEscapeLeapVerticalVelocity(
                 direction.getY(), player.isOnGround()));
@@ -18870,7 +18871,7 @@ public final class ArcadePortManager implements Listener {
                     || session.type == ArcadePortGame.DEATH_TAG
                     || session.type == ArcadePortGame.DRAGONS
                     || session.type == ArcadePortGame.DRAW_MY_THING) continue;
-            if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
+            if (session.type == ArcadePortGame.DRAGON_ESCAPE && !cooldownProgress.isActive(p)) {
                 String timeText = String.format(java.util.Locale.ROOT, "%.1fs",
                         Math.max(0L, now - session.startedAt) / 1_000.0D);
                 String pbDelta = dragonEscapePbDeltaText(session, p, now);
@@ -28990,9 +28991,9 @@ public final class ArcadePortManager implements Listener {
         };
     }
 
-    /** Keep Dragon Escape's Leap tool in slot 1 and remove stale duplicates. */
-    private void setDragonEscapeLeapItem(Player player, int remaining) {
-        if (player == null) return;
+    /** Keep one Leap tool and display its remaining charges in the experience bar. */
+    private void setDragonEscapeLeapItem(Player player, int remaining, int maximumUses) {
+        if (player == null || maximumUses <= 0) return;
         for (int slot = 0; slot < 9; slot++) {
             ItemStack current = player.getInventory().getItem(slot);
             if (current == null || current.getType() != Material.IRON_AXE || !current.hasItemMeta()) continue;
@@ -29002,10 +29003,11 @@ public final class ArcadePortManager implements Listener {
                 player.getInventory().setItem(slot, null);
             }
         }
-        if (remaining > 0) {
-            player.getInventory().setItem(0, namedItem(Material.IRON_AXE, "Leap",
-                    "Right-click to leap forward (" + remaining + " uses remaining).", remaining));
-        }
+        int charges = Math.max(0, Math.min(maximumUses, remaining));
+        player.getInventory().setItem(0, namedItem(Material.IRON_AXE, "Leap",
+                "Right-click to leap forward.", 1));
+        player.setLevel(charges);
+        player.setExp(charges / (float) maximumUses);
     }
 
     /** Match Reborn's UtilBlock.usable guard so map containers, switches and doors stay inert. */

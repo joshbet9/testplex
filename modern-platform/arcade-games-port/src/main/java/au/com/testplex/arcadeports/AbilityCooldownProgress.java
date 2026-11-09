@@ -34,6 +34,13 @@ public final class AbilityCooldownProgress implements Listener {
         Bukkit.getPluginManager().registerEvents(this, plugin);
     }
 
+    /** Returns whether an ability cooldown should currently own the player's action bar. */
+    public boolean isActive(Player player) {
+        if (player == null) return false;
+        Cooldown cooldown = active.get(player.getUniqueId());
+        return cooldown != null && System.currentTimeMillis() < cooldown.startedAt + cooldown.durationMillis;
+    }
+
     public void start(Player player, String name, long durationMillis) {
         start(player, name, durationMillis, null);
     }
