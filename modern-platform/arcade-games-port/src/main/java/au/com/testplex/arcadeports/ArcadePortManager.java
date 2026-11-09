@@ -437,6 +437,7 @@ public final class ArcadePortManager implements Listener {
     private final NamespacedKey gladiatorHotbarKey;
     private final NamespacedKey dragonEscapeGhostHotbarKey;
     private final NamespacedKey dragonEscapeGhostMenuActionKey;
+    private final NamespacedKey dragonEscapePracticeHotbarKey;
     private final ModernArcadeLobby lobby;
     private final ModernArcadeLobbyRuntime lobbyRuntime;
     private final ArcadeLobbyLeaderboardService lobbyLeaderboards;    private final AbilityCooldownProgress cooldownProgress;
@@ -546,6 +547,7 @@ public final class ArcadePortManager implements Listener {
         this.gladiatorHotbarKey = new NamespacedKey(plugin, "gladiators-hotbar-editor");
         this.dragonEscapeGhostHotbarKey = new NamespacedKey(plugin, "dragon-escape-ghost-toggle");
         this.dragonEscapeGhostMenuActionKey = new NamespacedKey(plugin, "dragon-escape-ghost-menu-action");
+        this.dragonEscapePracticeHotbarKey = new NamespacedKey(plugin, "dragon-escape-practice-action");
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=manager-keys-ready");
         this.lobby = new ModernArcadeLobby(plugin);
         World lobbyWorld = lobby.ensureWorld();
@@ -4698,6 +4700,65 @@ public final class ArcadePortManager implements Listener {
 
     private void startQueuedInternal(ArcadePortGame type, Player requester,
             org.bukkit.command.CommandSender sender, boolean mixedArcadeVariant) {
+        startQueuedInternal(type, requester, sender, mixedArcadeVariant, false);
+    }
+
+    /** Solo practice uses the regular Dragon Escape physics, but never the public queue or progression. */
+    public void startDragonEscapePractice(Player player) {
+        if (player == null || !player.isOnline()) return;
+        if (active != null || standaloneGameActive || cameraShyModule != null && cameraShyModule.isActive()
+                || monsterMazeRunning() || wizardsRunning() || snakeRunning()) {
+            player.sendMessage(ChatColor.RED + "Practice needs the Arcade arena to be free. Stop the active match first.");
+            return;
+        }
+        startQueuedInternal(ArcadePortGame.DRAGON_ESCAPE, player, player, false, true);
+        if (active != null && active.dragonEscapePractice) {
+            player.sendMessage(ChatColor.GREEN + "Solo Dragon Escape practice started. "
+                    + ChatColor.GRAY + "Use your hotbar to save a checkpoint, respawn or restart. "
+                    + "Practice never counts towards records, achievements or milestones.");
+        }
+    }
+
+    public void restartDragonEscapePractice(Player player) {
+        Session session = active;
+        if (player == null || session == null || !session.dragonEscapePractice
+                || !session.players.containsKey(player.getUniqueId())) {
+            if (player != null) player.sendMessage(ChatColor.YELLOW + "You are not in solo Dragon Escape practice.");
+            return;
+        }
+        restartDragonEscapePracticeRun(session, player, true);
+    }
+
+    public void stopDragonEscapePractice(Player player) {
+        Session session = active;
+        if (player == null || session == null || !session.dragonEscapePractice
+                || !session.players.containsKey(player.getUniqueId())) {
+            if (player != null) player.sendMessage(ChatColor.YELLOW + "You are not in solo Dragon Escape practice.");
+            return;
+        }
+        stop("Dragon Escape practice ended");
+        player.sendMessage(ChatColor.AQUA + "Practice ended. No official progress was recorded.");
+    }
+
+    public void setDragonEscapePracticeDouglas(Player player, boolean enabled) {
+        if (player == null) return;
+        plugin.getConfig().set("dragon-escape-practice.douglas." + player.getUniqueId(), enabled);
+        plugin.saveConfig();
+        Session session = active;
+        if (session != null && session.dragonEscapePractice
+                && session.players.containsKey(player.getUniqueId())) {
+            session.dragonEscapePracticeDouglas = enabled;
+            if (session.dragonEscapeDragon != null && session.dragonEscapeDragon.isValid())
+                session.dragonEscapeDragon.setInvisible(!enabled);
+            restartDragonEscapePracticeRun(session, player, true);
+        }
+        player.sendMessage(ChatColor.AQUA + "Practice Douglas: "
+                + (enabled ? ChatColor.GREEN + "ON" : ChatColor.RED + "OFF")
+                + ChatColor.GRAY + " (changing this restarts the practice run).");
+    }
+
+    private void startQueuedInternal(ArcadePortGame type, Player requester,
+            org.bukkit.command.CommandSender sender, boolean mixedArcadeVariant, boolean practiceMode) {
         if (standaloneGameActive) {
             sender.sendMessage(ChatColor.RED + "A standalone Arcade test is currently running.");
             return;
@@ -4755,6 +4816,7 @@ public final class ArcadePortManager implements Listener {
         if (requester != null && requester.isOnline() && participants.stream().noneMatch(p -> p.getUniqueId().equals(requester.getUniqueId()))) {
             participants.add(requester);
         }
+        if (practiceMode && requester != null) participants = new ArrayList<>(List.of(requester));
         if (participants.isEmpty()) {
             String requestedId = mixedArcadeVariant ? type.id() + "-mixed" : type.id();
             sender.sendMessage(ChatColor.YELLOW + "No online players queued. Use /arcadeport join "
@@ -5071,6 +5133,9 @@ public final class ArcadePortManager implements Listener {
         }
         if (!sourceMapWorlds.contains(type.id())) buildArena(type, world);
         Session session = new Session(type, world, participants, mixedArcadeVariant);
+        session.dragonEscapePractice = practiceMode && type == ArcadePortGame.DRAGON_ESCAPE;
+        session.dragonEscapePracticeDouglas = session.dragonEscapePractice && plugin.getConfig().getBoolean(
+                "dragon-escape-practice.douglas." + requester.getUniqueId(), false);
         if (type == ArcadePortGame.SUPER_SPLOOR) {
             // Build the authoritative territory index before moving anyone out of the lobby.
             session.superSploorEngine = new SuperSploorEngine(world, sourceMapData.get(type.id()));
@@ -5091,6 +5156,7 @@ public final class ArcadePortManager implements Listener {
         session.startedAt = now;
         session.prepareDurationMillis = type == ArcadePortGame.SKY_WARS
                 ? SkyWarsMixedArcadeRules.prepareMillis()
+                : session.dragonEscapePractice ? 0L
                 : ArcadeLobbyLifecycleRules.prepareSeconds(
                         plugin.getConfig().getInt("lifecycle.prepare-seconds", ArcadeLobbyLifecycleRules.DEFAULT_PREPARE_SECONDS)) * 1_000L;
         session.prepareEndsAt = now + session.prepareDurationMillis;
@@ -5267,7 +5333,12 @@ public final class ArcadePortManager implements Listener {
         }
         lastDragonHazard = now + 8_000L;
         session.sheepNextSpawnAt = now + GameDebugRuntimeOverrides.longValue("SHEEP_QUEST_SPAWN_INTERVAL_MILLIS", ArcadePortRules.SHEEP_QUEST_SPAWN_INTERVAL_MILLIS);
-        if (type == ArcadePortGame.DRAGON_ESCAPE) spawnDragonEscapeDragon(session);
+        if (type == ArcadePortGame.DRAGON_ESCAPE) {
+            spawnDragonEscapeDragon(session);
+            if (session.dragonEscapePractice && !session.dragonEscapePracticeDouglas
+                    && session.dragonEscapeDragon != null)
+                session.dragonEscapeDragon.setInvisible(true);
+        }
         SourceMapCatalog.MapData sourceMap = sourceMapData.get(type.id());
         String sourceMapName = sourceMap == null ? "" : sourceMap.mapName();
         world.setTime(type == ArcadePortGame.DRAGON_ESCAPE
@@ -9212,6 +9283,7 @@ public final class ArcadePortManager implements Listener {
                             Math.max(1, digs)));
                 }
                 setDragonEscapeGhostHotbarItem(player);
+                if (session.dragonEscapePractice) setDragonEscapePracticeHotbarItems(player);
                 break;
             }
             case DRAGONS: {
@@ -16441,6 +16513,98 @@ public final class ArcadePortManager implements Listener {
         session.entities.add(dragon);
     }
 
+    private void restoreDragonEscapePracticeCourse(Session session) {
+        if (session == null || !session.dragonEscapePractice) return;
+        for (Map.Entry<Block, BlockData> entry : session.dragonEscapePracticeChangedBlocks.entrySet()) {
+            if (entry.getKey().getWorld() == session.world)
+                entry.getKey().setBlockData(entry.getValue(), false);
+        }
+        session.dragonEscapePracticeChangedBlocks.clear();
+    }
+
+    private void respawnDragonEscapePractice(Session session, Player player) {
+        UUID id = player.getUniqueId();
+        Location checkpoint = session.dragonEscapePracticeCheckpoints.get(id);
+        Location start = session.dragonEscapeStartLocations.get(id);
+        if (start == null && !session.spawns.isEmpty()) start = session.spawns.getFirst();
+        if (checkpoint == null || checkpoint.getWorld() != session.world
+                || !checkpoint.clone().subtract(0, 1, 0).getBlock().getType().isSolid()) checkpoint = start;
+        if (checkpoint == null) return;
+        player.teleport(checkpoint.clone());
+        player.setVelocity(new Vector());
+        player.setFallDistance(0F);
+        player.setFireTicks(0);
+        player.setHealth(Math.min(20.0D, player.getMaxHealth()));
+        player.setFoodLevel(20);
+        player.sendActionBar(ChatColor.AQUA + "Practice: respawned at "
+                + (session.dragonEscapePracticeCheckpoints.containsKey(id) && checkpoint != start
+                        ? "your checkpoint" : "the start"));
+    }
+
+    private void restartDragonEscapePracticeRun(Session session, Player player, boolean manual) {
+        if (active != session || !session.dragonEscapePractice || player == null) return;
+        UUID id = player.getUniqueId();
+        restoreAllDragonEscapeBuilderBricks(session);
+        session.dragonEscapeBuilderBricks.clear();
+        session.dragonEscapeTunnelBlocks.clear();
+        session.dragonEscapeTunnelOwners.clear();
+        session.dragonEscapeBlockRestoreTokens.clear();
+        restoreDragonEscapePracticeCourse(session);
+        session.dragonEscapePracticeCheckpoints.remove(id);
+        session.dragonEscapePlayerProgress.remove(id);
+        session.dragonEscapePlayerRankScores.remove(id);
+        session.dragonEscapeCompleted.clear();
+        session.dragonEscapeWinner = null;
+        session.dragonEscapeRunSplitMillis.put(id, new HashMap<>(Map.of(0, 0L)));
+        session.dragonEscapeRunSplitLocations.put(id, new HashMap<>());
+        session.dragonEscapeRunGhostFrames.remove(id);
+        session.dragonEscapeSafeLocations.remove(id);
+        session.dragonEscapeLeapReadyAt.remove(id);
+        session.dragonEscapeLeapUsesRemaining.put(id,
+                ArcadePortRules.dragonEscapeLeapUses(session.dragonEscapeKits.getOrDefault(id, "jumper")));
+        session.dragonEscapeDiggerUsesRemaining.put(id, GameDebugRuntimeOverrides.intValue(
+                "DRAGON_ESCAPE_DIGGER_MAX_USES", ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES));
+        session.dragonEscapeWarperUsed.remove(id);
+        session.dragonEscapeNextScoreUpdateAt = 0L;
+        session.startedAt = System.currentTimeMillis();
+        session.dragonEscapeNextTntAt.put(id, session.startedAt);
+        session.dragonEscapeNextBrickAt.put(id, session.startedAt);
+        session.dragonEscapeDragonProgress = 0;
+        if (session.dragonEscapeDragon != null && session.dragonEscapeStartLocation != null) {
+            session.dragonEscapeDragon.teleport(session.dragonEscapeStartLocation.clone());
+            session.dragonEscapeDragon.setInvisible(!session.dragonEscapePracticeDouglas);
+            session.dragonEscapeLastDestructionLocation = null;
+            session.dragonEscapeDragonLocation = session.dragonEscapeStartLocation.clone();
+            session.dragonEscapeDragonVelocity = new Vector(0.0D, 0.0D, 1.0D);
+        }
+        session.dragonEscapePracticeCheckpoints.remove(id);
+        giveKit(session, player);
+        respawnDragonEscapePractice(session, player);
+        if (manual) player.sendMessage(ChatColor.AQUA + "Practice run restarted. Timer reset; no official records affected.");
+    }
+
+    private ItemStack dragonEscapePracticeItem(Material material, String title, String lore, String action) {
+        ItemStack item = namedItem(material, title, lore);
+        ItemMeta meta = item.getItemMeta();
+        meta.getPersistentDataContainer().set(dragonEscapePracticeHotbarKey, PersistentDataType.STRING, action);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private void setDragonEscapePracticeHotbarItems(Player player) {
+        player.getInventory().setItem(5, dragonEscapePracticeItem(Material.RECOVERY_COMPASS,
+                ChatColor.GREEN + "Save Checkpoint", "Right-click while grounded to save your practice respawn.", "save"));
+        player.getInventory().setItem(6, dragonEscapePracticeItem(Material.RESPAWN_ANCHOR,
+                ChatColor.AQUA + "Respawn", "Right-click to return to your practice checkpoint.", "respawn"));
+        player.getInventory().setItem(7, dragonEscapePracticeItem(Material.CLOCK,
+                ChatColor.YELLOW + "Restart Run", "Right-click to restart practice with a fresh timer.", "restart"));
+    }
+
+    private String dragonEscapePracticeAction(ItemStack item) {
+        return item == null || !item.hasItemMeta() ? null : item.getItemMeta()
+                .getPersistentDataContainer().get(dragonEscapePracticeHotbarKey, PersistentDataType.STRING);
+    }
+
     private void useDragonEscapeLeap(Session session, Player player) {
         if (!isDebugAbilityAllowed(player, ArcadePortGame.DRAGON_ESCAPE,
                 session.dragonEscapeKits.getOrDefault(player.getUniqueId(), "jumper"))) return;
@@ -16954,6 +17118,8 @@ public final class ArcadePortManager implements Listener {
 
         BlockState originalState = block.getState();
         BlockData originalBlockData = originalState.getBlockData().clone();
+        if (session.dragonEscapePractice)
+            session.dragonEscapePracticeChangedBlocks.putIfAbsent(block, originalBlockData.clone());
         Material mined = block.getType();
         Location dropLocation = block.getLocation().add(0.5D, 0.5D, 0.5D);
         block.setType(Material.AIR, false);
@@ -17004,6 +17170,8 @@ public final class ArcadePortManager implements Listener {
             if (racer.getWorld() == session.world && racer.getBoundingBox().overlaps(box)) return;
         }
         BlockState previous = target.getState();
+        if (session.dragonEscapePractice)
+            session.dragonEscapePracticeChangedBlocks.putIfAbsent(target, previous.getBlockData().clone());
         target.setType(held.getType(), false);
         scheduleDragonEscapeBlockRestore(session, previous, target.getBlockData().clone());
         trackDragonEscapeDiggerPillar(session, id, target);
@@ -17117,7 +17285,8 @@ public final class ArcadePortManager implements Listener {
         }
         Location location = dragon.getLocation();
         boolean dragonMovementEnabled = debugFeatureEnabledForActiveSession(
-                ArcadePortGame.DRAGON_ESCAPE, "dragon-movement");
+                ArcadePortGame.DRAGON_ESCAPE, "dragon-movement")
+                && (!session.dragonEscapePractice || session.dragonEscapePracticeDouglas);
         if (!session.dragonEscapeWaypoints.isEmpty()) {
             int dragonCandidate = dragonMovementEnabled ? getDragonEscapeWaypointIndex(
                     session, location, session.dragonEscapeDragonProgress) : session.dragonEscapeDragonProgress;
@@ -17148,7 +17317,12 @@ public final class ArcadePortManager implements Listener {
                             if (block.isLiquid() || block.getRelative(BlockFace.UP).isLiquid()) continue;
                             if (session.dragonEscapeMapName.contains("Hell") && block.getY() < 30) continue;
                             if (session.dragonEscapeMapName.contains("Pirate") && block.getY() < 6) continue;
-                            if (!block.getType().isAir()) block.setType(Material.AIR, false);
+                            if (!block.getType().isAir()) {
+                                if (session.dragonEscapePractice)
+                                    session.dragonEscapePracticeChangedBlocks.putIfAbsent(
+                                            block, block.getBlockData().clone());
+                                block.setType(Material.AIR, false);
+                            }
                         }
                     }
                 }
@@ -17176,7 +17350,7 @@ public final class ArcadePortManager implements Listener {
                         finish(session, player, true);
                         return;
                     }
-                    if (dragonScore > playerScore) {
+                    if (dragonMovementEnabled && dragonScore > playerScore) {
                         eliminate(session, player, null, "was caught by Douglas the Dragon");
                         if (active != session) return;
                     }
@@ -17203,7 +17377,11 @@ public final class ArcadePortManager implements Listener {
                     double dx = x + 0.5D - location.getX();
                     double dy = 63.5D - location.getY();
                     double dz = z + 0.5D - location.getZ();
-                    if (dx * dx + dy * dy + dz * dz <= radius * radius) block.setType(Material.AIR, false);
+                    if (dx * dx + dy * dy + dz * dz <= radius * radius) {
+                        if (session.dragonEscapePractice)
+                            session.dragonEscapePracticeChangedBlocks.putIfAbsent(block, block.getBlockData().clone());
+                        block.setType(Material.AIR, false);
+                    }
                 }
             }
         }
@@ -17224,7 +17402,8 @@ public final class ArcadePortManager implements Listener {
                 finish(session, player, true);
                 return;
             }
-            if (ArcadePortRules.shouldDragonEscapePlayerBeCaught(dragonProgress, player.getLocation().getZ())) {
+            if (dragonMovementEnabled && ArcadePortRules.shouldDragonEscapePlayerBeCaught(
+                    dragonProgress, player.getLocation().getZ())) {
                 eliminate(session, player, null, "was caught by Douglas the Dragon");
                 if (active != session) return;
             }
@@ -17263,6 +17442,13 @@ public final class ArcadePortManager implements Listener {
 
     private void recordDragonEscapeFinish(Session session, Player player, long now) {
         if (session == null || player == null || testPlayers.isTestPlayer(player)) return;
+        if (session.dragonEscapePractice) {
+            long elapsed = Math.max(1L, now - session.startedAt);
+            player.sendMessage(ChatColor.GOLD + "Practice finish: " + ChatColor.WHITE
+                    + ArcadePortRules.formatDragonEscapeTime(elapsed)
+                    + ChatColor.GRAY + " — unofficial, no PB or progression saved.");
+            return;
+        }
         UUID id = player.getUniqueId();
         long elapsed = Math.max(1L, now - session.startedAt);
         boolean newlyCompleted = session.dragonEscapeCompleted.add(id);
@@ -19333,6 +19519,10 @@ public final class ArcadePortManager implements Listener {
     private void eliminate(Session session, Player player, Player killer, String reason) {
         if (active != session || player == null || !session.players.containsKey(player.getUniqueId())
                 || !session.alive.contains(player.getUniqueId())) return;
+        if (session.dragonEscapePractice) {
+            respawnDragonEscapePractice(session, player);
+            return;
+        }
         if (session.type == ArcadePortGame.SKY_WARS) {
             Player[] resolvedKiller = { killer };
             resolveSkyWarsAbilityElimination(session, player, resolvedKiller, reason);
@@ -21976,6 +22166,10 @@ public final class ArcadePortManager implements Listener {
 
     private void finish(Session session, Player winner, boolean announceWinner) {
         if (active != session) return;
+        if (session.dragonEscapePractice && winner != null) {
+            restartDragonEscapePracticeRun(session, winner, false);
+            return;
+        }
         boolean debugRound = GameDebugRuntimeOverrides.isDebugSession();
         awardMicroBattlesCompletionAchievements(session, winner, announceWinner);
         if (session.type == ArcadePortGame.MASTER_BUILDERS) {
@@ -22032,7 +22226,8 @@ public final class ArcadePortManager implements Listener {
         if (announceWinner && session.type == ArcadePortGame.DEATH_TAG) {
             recordDeathTagRewards(session);
         }
-        if (session.type != ArcadePortGame.PLEXBALL && !session.type.isMonsterMaze()) recordLocalStats(session, winner, announceWinner);
+        if (!session.dragonEscapePractice && session.type != ArcadePortGame.PLEXBALL
+                && !session.type.isMonsterMaze()) recordLocalStats(session, winner, announceWinner);
         if (announceWinner && session.type == ArcadePortGame.SKY_WARS && winner != null
                 && !GameDebugRuntimeOverrides.isDebugSession()
                 && !testPlayers.isTestPlayer(winner)) {
@@ -22179,7 +22374,8 @@ public final class ArcadePortManager implements Listener {
         if (announceWinner && session.type == ArcadePortGame.GLADIATORS && winner != null) {
             recordGladiatorsWinnerAchievements(session, winner);
         }
-        if (announceWinner && winner != null && session.type == ArcadePortGame.DRAGON_ESCAPE) {
+        if (announceWinner && winner != null && session.type == ArcadePortGame.DRAGON_ESCAPE
+                && !session.dragonEscapePractice) {
             recordDragonEscapeAchievements(session, winner);
         }
         if (announceWinner && winner != null && session.type == ArcadePortGame.EVOLUTION) {
@@ -22197,7 +22393,11 @@ public final class ArcadePortManager implements Listener {
             session.dragonSparklerStyles.clear();
             session.dragonSparklerLanded.clear();
         }
-        if (session.type == ArcadePortGame.DRAGON_ESCAPE) restoreAllDragonEscapeBuilderBricks(session);
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
+            restoreAllDragonEscapeBuilderBricks(session);
+            restoreDragonEscapePracticeCourse(session);
+            if (session.dragonEscapePractice) session.dragonEscapeBlockRestoreTokens.clear();
+        }
         active = null;
         GameDebugRuntimeOverrides.clear();
         if (activeDebugProfileGame == session.type) {
@@ -22853,6 +23053,7 @@ public final class ArcadePortManager implements Listener {
 
     private void awardCatalogAchievement(UUID playerId, Player player, String gameId, String achievementId) {
         if (playerId == null) return;
+        if ("dragon-escape".equals(gameId) && active != null && active.dragonEscapePractice) return;
         ArcadePortGame game = ArcadePortGame.fromId(gameId);
         String displayName = ArcadeProgressCatalog.achievements(gameId).stream()
                 .filter(achievement -> achievement.id().equals(achievementId))
@@ -24039,7 +24240,10 @@ public final class ArcadePortManager implements Listener {
                 ? player.getInventory().getItem(event.getHotbarButton()) : null;
         if (isDragonEscapeGhostHotbarItem(event.getCurrentItem())
                 || isDragonEscapeGhostHotbarItem(event.getCursor())
-                || isDragonEscapeGhostHotbarItem(hotbarSwap)) event.setCancelled(true);
+                || isDragonEscapeGhostHotbarItem(hotbarSwap)
+                || session.dragonEscapePractice && (dragonEscapePracticeAction(event.getCurrentItem()) != null
+                        || dragonEscapePracticeAction(event.getCursor()) != null
+                        || dragonEscapePracticeAction(hotbarSwap) != null)) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -24052,7 +24256,10 @@ public final class ArcadePortManager implements Listener {
         if (session == null || session.type != ArcadePortGame.DRAGON_ESCAPE
                 || !session.alive.contains(event.getWhoClicked().getUniqueId())) return;
         if (isDragonEscapeGhostHotbarItem(event.getOldCursor())
-                || event.getNewItems().values().stream().anyMatch(this::isDragonEscapeGhostHotbarItem)) {
+                || event.getNewItems().values().stream().anyMatch(this::isDragonEscapeGhostHotbarItem)
+                || session.dragonEscapePractice && (dragonEscapePracticeAction(event.getOldCursor()) != null
+                        || event.getNewItems().values().stream().anyMatch(
+                                item -> dragonEscapePracticeAction(item) != null))) {
             event.setCancelled(true);
         }
     }
@@ -28828,6 +29035,29 @@ public final class ArcadePortManager implements Listener {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Session session = active;
         if (session == null) return;
+        if (session.dragonEscapePractice
+                && session.alive.contains(event.getPlayer().getUniqueId())) {
+            String practiceAction = dragonEscapePracticeAction(event.getItem());
+            if (practiceAction != null) {
+                event.setCancelled(true);
+                if (!event.getAction().isRightClick()) return;
+                Player player = event.getPlayer();
+                if ("save".equals(practiceAction)) {
+                    if (!player.isOnGround() || !player.getLocation().clone().subtract(0, 1, 0)
+                            .getBlock().getType().isSolid()) {
+                        player.sendMessage(ChatColor.YELLOW + "Stand on a solid course block to save a checkpoint.");
+                    } else {
+                        session.dragonEscapePracticeCheckpoints.put(player.getUniqueId(), player.getLocation().clone());
+                        player.sendMessage(ChatColor.GREEN + "Practice checkpoint saved.");
+                    }
+                } else if ("respawn".equals(practiceAction)) {
+                    respawnDragonEscapePractice(session, player);
+                } else if ("restart".equals(practiceAction)) {
+                    restartDragonEscapePracticeRun(session, player, true);
+                }
+                return;
+            }
+        }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE
                 && session.alive.contains(event.getPlayer().getUniqueId())
                 && isDragonEscapeGhostHotbarItem(event.getItem())) {
@@ -33573,6 +33803,10 @@ public final class ArcadePortManager implements Listener {
         }
         Session session = active;
         if (session == null || !session.players.containsKey(id)) return;
+        if (session.dragonEscapePractice) {
+            stop("Solo Dragon Escape practice player disconnected");
+            return;
+        }
         Player player = event.getPlayer();
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
             removeMicroBorderWarning(session, id);
@@ -34024,6 +34258,10 @@ public final class ArcadePortManager implements Listener {
             Scoreboard scoreboard, Objective objective, List<Team> teams, List<String> entries) { }
 
     private static final class Session extends SessionState {
+        boolean dragonEscapePractice;
+        boolean dragonEscapePracticeDouglas;
+        final Map<UUID, Location> dragonEscapePracticeCheckpoints = new HashMap<>();
+        final Map<Block, BlockData> dragonEscapePracticeChangedBlocks = new HashMap<>();
         final Map<UUID, BaconBlastCombo> baconBlastCombosByVictim = new HashMap<>();
         final Map<UUID, Set<MasterBuilderBlockKey>> masterBuilderPlacedBlocks = new HashMap<>();
         MasterBuildersPhase masterBuilderPhase = MasterBuildersPhase.BUILDING;
