@@ -1,0 +1,81 @@
+name: Prepare Testplex Fly tester release (no deployment)
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: 'Completed successful integration-branch Testplex Modern Paper 26.3 run ID'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: testplex-fly-tester-preflight
+  cancel-in-progress: false
+
+jobs:
+  verify-release:
+    name: Verify existing build for future Fly promotion
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Verify exact successful source run
+        id: source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]] || { echo 'Run ID must be numeric.' >&2; exit 1; }
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID" \
+            -o "$RUNNER_TEMP/source-run.json"
+          jq -e --arg repo "$GITHUB_REPOSITORY" '
+            .status == "completed" and .conclusion == "success" and
+            .head_branch == "feat/testplex-modern-26.3-platform" and
+            .path == ".github/workflows/testplex-modern-build.yml" and
+            (.head_repository.full_name | ascii_downcase) == ($repo | ascii_downcase) and
+            (.head_sha | test("^[0-9a-f]{40}$"))
+          ' "$RUNNER_TEMP/source-run.json" >/dev/null || {
+            echo 'Only a successful, completed build from the modern integration branch is eligible.' >&2
+            exit 1
+          }
+          echo "sha=$(jq -r '.head_sha' "$RUNNER_TEMP/source-run.json")" >> "$GITHUB_OUTPUT"
+
+      - name: Check out the preflight script
+        uses: actions/checkout@v4
+
+      - name: Download verified build artifact without rebuilding it
+        uses: actions/download-artifact@v4
+        with:
+          name: testplex-modern-paper-26.3
+          path: ${{ runner.temp }}/source-artifact
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate jars and map package, write immutable manifest
+        env:
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          bash deploy/fly/preflight-build.sh \
+            "$RUNNER_TEMP/source-artifact" "$RUNNER_TEMP/fly-candidate"
+
+      - name: Retain candidate manifest for approval
+        uses: actions/upload-artifact@v4
+        with:
+          name: testplex-fly-candidate-manifest
+          path: ${{ runner.temp }}/fly-candidate/
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Confirm that nothing was deployed
+        run: |
+          echo 'Fly preflight only: no image built, Fly token read, app changed, Machine changed, or volume changed.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Before promotion, verify Fly target, storage, maps, secrets, cost, health and rollback as documented in docs/fly-tester-release.md.' >> "$GITHUB_STEP_SUMMARY"

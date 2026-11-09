@@ -1,0 +1,31 @@
+# Unapproved template: preflight only; no deployment workflow consumes this file.
+# The selected tester policy is ephemeral storage: world/player/stat data resets
+# when the Machine is replaced or redeployed. Do not add a volume without review.
+# Reuse an existing app only after confirming its current cost and a rollback path.
+app = "REPLACE_WITH_APPROVED_APP_NAME"
+primary_region = "iad"
+kill_signal = "SIGTERM"
+kill_timeout = "60s"
+
+# Java Edition uses direct TCP. The current Hyper-V test server uses 25568.
+[[services]]
+  protocol = "tcp"
+  internal_port = 25568
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[services.ports]]
+    port = 25568
+
+  [[services.tcp_checks]]
+    interval = "30s"
+    timeout = "10s"
+    grace_period = "120s"
+
+# Intentionally no [[mounts]] section. Data reset on deployment is the
+# approved tester policy. All required maps and plugin defaults must be
+# packaged in the pinned release image before any deployment is possible.
+
+# No [build] or [vm] section is provided: image packaging, memory, target
+# Machine/process replacement, cost and rollback remain subject to preflight.
