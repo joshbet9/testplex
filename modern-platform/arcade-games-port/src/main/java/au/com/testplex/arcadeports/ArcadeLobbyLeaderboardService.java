@@ -160,7 +160,7 @@ final class ArcadeLobbyLeaderboardService implements Listener {
         for (Map<?, ?> saved : plugin.getConfig().getMapList(path)) {
             if (results.size() >= MAX_BOARDS) break;
             Map<String, Object> data = new HashMap<>();
-            saved.forEach((key, value) -> data.put(String.valueOf(key), value));
+            saved.forEach((field, value) -> data.put(String.valueOf(field), value));
             Board board = new Board();
             String metric = String.valueOf(data.getOrDefault("metric", "wins"));
             board.metric = List.of(METRICS).contains(metric) ? metric : "wins";
