@@ -22259,7 +22259,7 @@ public final class ArcadePortManager implements Listener {
                         || player.getOpenInventory().getTopInventory().getHolder() instanceof GladiatorMenuHolder) {
                     player.closeInventory();
                 }
-                if (session.type == ArcadePortGame.SPLEEF) player.setCompassTarget(null);
+                // PlayerSnapshot restores a safe lobby compass target.
                 if (!announceWinner) {
                     snapshot.restore(player);
                     lobby.sendToLobby(player);
@@ -25312,6 +25312,15 @@ public final class ArcadePortManager implements Listener {
                 && plugin.getPlexballGame() != null) {
             plugin.getPlexballGame().stopForArcadeLifecycle(reason);
         }
+        // Stop Monster Maze while its players are still in the arena. Restoring
+        // them first fires world-change eliminations, which can transition the
+        // module into ENDING and schedule a stale completion for the next mode.
+        if (monsterMazeModule != null && monsterMazeModule.getGameManager() != null
+                && shouldStopMonsterMazeBeforeRestore(
+                        stopping == null ? null : stopping.type,
+                        monsterMazeModule.getGameManager().getState())) {
+            monsterMazeModule.getGameManager().forceStop();
+        }
         if (stopping != null) {
             try {
                 finish(stopping, null, false);
@@ -25328,10 +25337,6 @@ public final class ArcadePortManager implements Listener {
                 endingSnapshots.clear();
             }
         } else hoops.shutdown();
-        if (monsterMazeRunning() && monsterMazeModule != null
-                && monsterMazeModule.getGameManager() != null) {
-            monsterMazeModule.getGameManager().forceStop();
-        }
         if (monsterMazeModule != null) monsterMazeModule.clearActiveArcadeGame();
         if (!cameraShyWasActive && !speedBuildersWasActive) testPlayers.despawnSessionPlayers();
         // Camera Shy and Speed Builders own their AFK-roster restoration lifecycles.
@@ -25340,9 +25345,9 @@ public final class ArcadePortManager implements Listener {
         if (stopping != null && stopping.type == ArcadePortGame.SPLEEF) {
             for (Player player : participantsToReturn) {
                 if (player == null || !player.isOnline()) continue;
+                if (player.getGameMode() == GameMode.SPECTATOR) player.setSpectatorTarget(null);
                 PlayerSnapshot snapshot = stopSnapshots.get(player.getUniqueId());
                 if (snapshot != null) snapshot.restore(player);
-                player.setSpectatorTarget(null);
                 player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
                 player.setFallDistance(0.0F);
                 player.setNoDamageTicks(0);
@@ -25352,6 +25357,15 @@ public final class ArcadePortManager implements Listener {
         queues.clear();
         gladiatorLobbyVotes.clear();
         plugin.getLogger().info("Modern Arcade ports reset: " + reason);
+    }
+
+    static boolean shouldStopMonsterMazeBeforeRestore(
+            ArcadePortGame sessionType, me.monstermaze.game.GameState moduleState) {
+        if (moduleState == null) return false;
+        if (moduleState == me.monstermaze.game.GameState.STARTING
+                || moduleState == me.monstermaze.game.GameState.LIVE) return true;
+        return moduleState == me.monstermaze.game.GameState.ENDING
+                && sessionType != null && sessionType.isMonsterMaze();
     }
 
     public String status() {
@@ -33276,10 +33290,19 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session != null && session.startupComplete && !session.liveStarted
                 && session.players.containsKey(event.getPlayer().getUniqueId())) {
-            event.setCancelled(true);
+            boolean enteringMonsterMazeArena = allowsMonsterMazeStartupTeleport(
+                    session.type,
+                    session.modulePhase,
+                    event.getTo() != null && event.getTo().getWorld() == session.world);
+            if (!enteringMonsterMazeArena) event.setCancelled(true);
         }
     }
 
+    static boolean allowsMonsterMazeStartupTeleport(
+            ArcadePortGame type, String modulePhase, boolean destinationIsArenaWorld) {
+        return type != null && type.isMonsterMaze()
+                && "STARTING".equals(modulePhase) && destinationIsArenaWorld;
+    }
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
     public void onPreparePlayerInteract(PlayerInteractEvent event) {
         cancelPrepareAction(event.getPlayer(), event);
