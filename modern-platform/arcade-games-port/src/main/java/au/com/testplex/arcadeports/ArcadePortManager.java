@@ -287,6 +287,8 @@ public final class ArcadePortManager implements Listener {
     private final RunnerManager runnerController = new RunnerManager();
     private final SpleefManager spleefController = new SpleefManager();
     private final EvolutionManager evolutionController = new EvolutionManager();
+    private final EvolutionManager.AchievementAwarder evolutionAchievementAwarder =
+            (player, achievementId) -> awardCatalogAchievement(player, "evolution", achievementId);
     private final DragonEscapeManager dragonEscapeController;
     private final MasterBuildersManager masterBuildersController;
     private final SheepQuestManager sheepQuestController = new SheepQuestManager();
@@ -19473,7 +19475,7 @@ public final class ArcadePortManager implements Listener {
             recordDragonEscapeAchievements(session, winner);
         }
         if (announceWinner && winner != null && session.type == ArcadePortGame.EVOLUTION) {
-            recordEvolutionAchievements(session, winner);
+            evolutionController.recordWinAchievements(session, winner, evolutionAchievementAwarder);
         }
         if (announceWinner && session.type == ArcadePortGame.SHEEP_QUEST) {
             recordSheepQuestRewards(session, winner);
@@ -20004,52 +20006,6 @@ public final class ArcadePortManager implements Listener {
             if (ArcadePortRules.shouldAwardBombLobbersMasterBomber(wins)) {
                 awardBombLobbersAchievement(winningPlayer, BombLobbersAchievement.MASTER_BOMBER.configKey(winnerId),
                         "Master Bomber — won 30 Bomb Lobbers games.");
-            }
-        }
-    }
-
-    private void recordEvolutionAchievements(Session session, Player winner) {
-        UUID id = winner.getUniqueId();
-        if (!session.evolutionDeaths.contains(id)) awardCatalogAchievement(winner, "evolution", "perfect-game");
-        if (!session.evolutionDamageWhileCharging.contains(id)) {
-            awardCatalogAchievement(winner, "evolution", "stealth-mastah");
-        }
-        if (!session.evolutionAbilitiesUsed.contains(id)) {
-            awardCatalogAchievement(winner, "evolution", "melee-monster");
-        }
-        if (EvolutionAchievementRules.shouldAwardOverkill(true, session.evolutionOverkillEligible.contains(id))) {
-            awardCatalogAchievement(winner, "evolution", "overkill");
-        }
-        if (EvolutionAchievementRules.shouldAwardSecondWind(true,
-                session.evolutionHealthRestored.getOrDefault(id, 0.0D))) {
-            awardCatalogAchievement(winner, "evolution", "second-wind");
-        }
-        if (EvolutionAchievementRules.shouldAwardPityParty(true,
-                session.evolutionPityEvolutions.getOrDefault(id, 0))) {
-            awardCatalogAchievement(winner, "evolution", "pity-party");
-        }
-        if (EvolutionAchievementRules.shouldAwardQuickChangeArtist(true,
-                "quick-evolver".equals(session.evolutionKits.get(id)),
-                !session.evolutionQuickTransformationInterrupted.contains(id),
-                session.evolutionQuickTransformations.getOrDefault(id, 0))) {
-            awardCatalogAchievement(winner, "evolution", "quick-change-artist");
-        }
-        if (EvolutionAchievementRules.shouldAwardPityTheAncient(true,
-                "neanderthal".equals(session.evolutionKits.get(id)),
-                session.evolutionNeanderthalCyclesCompleted.getOrDefault(id, 0))) {
-            awardCatalogAchievement(winner, "evolution", "pity-the-ancient");
-        }
-        for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
-            UUID loserId = entry.getKey();
-            Player loser = entry.getValue();
-            Long startedAt = session.evolutionStartedAtMillis.get(loserId);
-            if (loserId.equals(id) || loser == null || !loser.isOnline() || startedAt == null
-                    || !"darwinist".equals(session.evolutionKits.get(loserId))) continue;
-            long elapsedTicks = Math.max(0L, (System.currentTimeMillis() - startedAt) / 50L);
-            if (EvolutionAchievementRules.shouldAwardWrongKitChamp(session.evolutionKits.get(loserId),
-                    session.evolutionLevelAtAttempt.getOrDefault(loserId, -1),
-                    session.evolving.contains(loserId), elapsedTicks)) {
-                awardCatalogAchievement(loser, "evolution", "wrong-kit-champ");
             }
         }
     }
