@@ -965,21 +965,22 @@ jobs:
             timeout --foreground --signal=TERM 6m curl --fail --location --retry 3 --user-agent "$USER_AGENT" \
               "$PE_URL" -o "$PE_TMP"
             printf '%s  %s\n' "$PE_SHA512" "$PE_TMP" | sha512sum -c -
-            # The exact SHA-512 pins the official artifact. Read the descriptor with
-            # Python's standard ZIP reader: this VM has Python 3 but no JDK jar tool,
-            # and Info-ZIP's whole-archive CRC scan rejects this pinned release.
-            if ! pe_descriptor="$(python3 - "$PE_TMP" <<'PY'
-          from zipfile import ZipFile
-          import sys
-
-          with ZipFile(sys.argv[1]) as archive:
-              candidates = [name for name in ("plugin.yml", "paper-plugin.yml") if name in archive.namelist()]
-              if len(candidates) != 1:
-                  raise SystemExit(f"Expected one root Paper plugin descriptor, found: {candidates}")
-              sys.stdout.write(archive.read(candidates[0]).decode("utf-8-sig"))
-          PY
-          )"; then
-              echo "Could not read the root Paper plugin descriptor from the SHA-512-pinned PacketEvents archive." >&2
+            # The exact SHA-512 pins the official artifact. Read only the ZIP
+            # central directory and the plugin descriptor; the VM's Info-ZIP CRC
+            # scan rejects this release, and the JRE does not include the jar CLI.
+            entries_file="$UPLOAD_DIR/packetevents-entries.txt"
+            if ! unzip -Z1 "$PE_TMP" >"$entries_file"; then
+              echo "Could not read the SHA-512-pinned PacketEvents ZIP directory." >&2
+              exit 1
+            fi
+            pe_descriptor_path="$(awk '$0 == "plugin.yml" || $0 == "paper-plugin.yml" { print; exit }' "$entries_file")"
+            if [[ -z "$pe_descriptor_path" ]]; then
+              descriptor_entries="$(grep -E '(^|/)(paper-)?plugin\\.yml$' "$entries_file" || true)"
+              echo "Pinned PacketEvents artifact has no root plugin descriptor; matching entries: ${descriptor_entries:-none}." >&2
+              exit 1
+            fi
+            if ! pe_descriptor="$(unzip -p "$PE_TMP" "$pe_descriptor_path")" || [[ -z "$pe_descriptor" ]]; then
+              echo "Could not extract PacketEvents descriptor at [$pe_descriptor_path]." >&2
               exit 1
             fi
           fi
