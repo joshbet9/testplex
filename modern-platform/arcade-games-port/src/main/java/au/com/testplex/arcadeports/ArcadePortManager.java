@@ -10173,10 +10173,8 @@ public final class ArcadePortManager implements Listener {
 
     private void updateMicroCrumble(Session session, long now) {
         if (active != session) return;
-        SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
         microBattlesController.updateCrumble(session, now, session.startedAt,
-                () -> microCrumbleSpectatorLocation(session, mapData),
-                message -> plugin.getLogger().info(message));
+                sourceMapData.get(session.type.id()));
     }
 
     private int countNamedItems(Player player, Material material, String expectedName) {
