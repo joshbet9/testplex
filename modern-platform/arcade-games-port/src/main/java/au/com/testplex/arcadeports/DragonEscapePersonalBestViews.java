@@ -1,5 +1,6 @@
 package au.com.testplex.arcadeports;
 
+import org.bukkit.Material;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,6 +34,17 @@ final class DragonEscapePersonalBestViews {
             if (kit.id.equals(kitId)) return kit.name;
         }
         return "Unknown (legacy record)";
+    }
+
+    static Material icon(String kitId) {
+        return switch (kitId) {
+            case "jumper" -> Material.FEATHER;
+            case "disruptor" -> Material.TNT;
+            case "warper" -> Material.ENDER_PEARL;
+            case "builder" -> Material.BRICK;
+            case "digger" -> Material.DIAMOND_PICKAXE;
+            default -> Material.CLOCK;
+        };
     }
 
     static boolean improves(long existingMillis, long elapsedMillis) {

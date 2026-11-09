@@ -620,6 +620,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 sender.sendMessage(ChatColor.GREEN + selectedLobbyGame.displayName()
                         + " selected. Kit and queue datapoints are ready in the lobby.");
                 return true;
+            case "leaderboards":
+                if (sender instanceof Player leaderboardViewer) manager.openLobbyLeaderboardMenu(leaderboardViewer);
+                else sender.sendMessage(ChatColor.RED + "Leaderboards can only be configured by players.");
+                return true;
             case "bot":
             case "bots":
                 manager.handleBotCommand(sender, java.util.Arrays.copyOfRange(args, 1, args.length));
