@@ -33,6 +33,15 @@ class MicroBattlesManagerTest {
     }
 
     @Test
+    void crumbleScanUsesConfiguredTickIntervalAndStopsWhenComplete() {
+        assertTrue(MicroBattlesManager.shouldScanCrumble(false, 0L, 2));
+        assertFalse(MicroBattlesManager.shouldScanCrumble(false, 1L, 2));
+        assertTrue(MicroBattlesManager.shouldScanCrumble(false, 4L, 2));
+        assertFalse(MicroBattlesManager.shouldScanCrumble(true, 4L, 2));
+        assertFalse(MicroBattlesManager.shouldScanCrumble(false, 4L, 0));
+    }
+
+    @Test
     void barrierOnlyReleasesAfterItsConfiguredDeadline() {
         MicroBattlesManager micro = new MicroBattlesManager();
         SessionState session = new SessionState(ArcadePortGame.MICRO_BATTLES, null, List.of(), false);
