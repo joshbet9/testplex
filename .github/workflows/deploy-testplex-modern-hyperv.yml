@@ -971,22 +971,26 @@ jobs:
             timeout --foreground --signal=TERM 6m curl --fail --location --retry 3 --user-agent "$USER_AGENT" \
               "$PE_URL" -o "$PE_TMP"
             printf '%s  %s\n' "$PE_SHA512" "$PE_TMP" | sha512sum -c -
-            # Validate each archive operation explicitly so set -e cannot obscure which
-            # PacketEvents verification command failed before a deploy transaction opens.
-            if ! unzip -tq "$PE_TMP" >/dev/null 2>&1; then
-              echo "Pinned PacketEvents artifact failed ZIP/JAR integrity validation." >&2
+            # Validate the pinned Java archive with the Java 25 toolchain used by Paper.
+            # Info-ZIP rejects this release even though its checksum matches Modrinth.
+            if ! jar tf "$PE_TMP" >"$UPLOAD_DIR/packetevents-entries.txt" 2>"$UPLOAD_DIR/packetevents-jar-error.txt"; then
+              cat "$UPLOAD_DIR/packetevents-jar-error.txt" >&2 || true
+              echo "Pinned PacketEvents artifact is not readable by the installed Java archive tool." >&2
               exit 1
             fi
-            pe_descriptor_path="$(unzip -Z1 "$PE_TMP" 2>/dev/null | awk '$0 == "plugin.yml" || $0 == "paper-plugin.yml" { print; exit }')"
+            pe_descriptor_path="$(awk '$0 == "plugin.yml" || $0 == "paper-plugin.yml" { print; exit }' "$UPLOAD_DIR/packetevents-entries.txt")"
             if [[ -z "$pe_descriptor_path" ]]; then
-              descriptor_entries="$(unzip -Z1 "$PE_TMP" 2>/dev/null | grep -E '(^|/)(paper-)?plugin\.yml$' || true)"
+              descriptor_entries="$(grep -E '(^|/)(paper-)?plugin\.yml$' "$UPLOAD_DIR/packetevents-entries.txt" || true)"
               echo "Pinned PacketEvents artifact has no root plugin descriptor; matching entries: ${descriptor_entries:-none}." >&2
               exit 1
             fi
-            if ! pe_descriptor="$(unzip -p "$PE_TMP" "$pe_descriptor_path" 2>/dev/null)"; then
-              echo "Could not read PacketEvents descriptor at [$pe_descriptor_path]." >&2
+            PE_DESCRIPTOR_DIR="$UPLOAD_DIR/packetevents-descriptor"
+            mkdir -p "$PE_DESCRIPTOR_DIR"
+            if ! (cd "$PE_DESCRIPTOR_DIR" && jar xf "$PE_TMP" "$pe_descriptor_path"); then
+              echo "Could not extract PacketEvents descriptor at [$pe_descriptor_path] with the Java archive tool." >&2
               exit 1
             fi
+            pe_descriptor="$(cat "$PE_DESCRIPTOR_DIR/$pe_descriptor_path")"
           fi
           pe_name="$(yaml_descriptor_value name "$pe_descriptor")"
           pe_version="$(yaml_descriptor_value version "$pe_descriptor")"
