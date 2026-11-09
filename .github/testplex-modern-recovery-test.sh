@@ -249,10 +249,19 @@ run_helper recover "$target_sha" >/dev/null
 grep -Fxq 'status=FORWARD_REDEPLOY_READY' "$STATE/current.properties"
 echo 'PASS a verified restored artifact with an unhealthy runtime permits a guarded forward redeployment'
 
-# A different unresolved deployment cannot be recovered by this job's identity.
+# A different unresolved deployment cannot be recovered or classified as a stale terminal record.
 write_txn REPLACING true true
 if run_helper recover cccccccccccccccccccccccccccccccccccccccc >/dev/null 2>&1; then echo 'FAIL mismatched deployment identity accepted' >&2; exit 1; fi
+if run_helper classify-target cccccccccccccccccccccccccccccccccccccccc >/dev/null 2>&1; then echo 'FAIL unresolved mismatched transaction was treated as absent' >&2; exit 1; fi
 echo 'PASS deployment identity fences independent recovery'
+
+# A completed prior transaction with another SHA means the new target never reached journaled replacement.
+write_txn DEPLOYMENT_VERIFIED true false
+classification="$(run_helper classify-target cccccccccccccccccccccccccccccccccccccccc)"
+grep -q "no-target-transaction: requested SHA=cccccccccccccccccccccccccccccccccccccccc; current journal target SHA=$target_sha; status=DEPLOYMENT_VERIFIED" <<< "$classification"
+classification="$(run_helper classify-target "$target_sha")"
+grep -q "target-transaction: requested SHA=$target_sha; status=DEPLOYMENT_VERIFIED" <<< "$classification"
+echo 'PASS stale terminal journal is distinguished from an unstarted target transaction'
 
 # A deployment marked complete is only accepted after a fresh process/port/Arcade-readiness check.
 write_txn DEPLOYMENT_VERIFIED true true

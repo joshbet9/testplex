@@ -364,9 +364,9 @@ verify_deployed_runtime() {
       verify_running_runtime "$target_sha" ACTIVE)"; then
     fail "deployed Paper service, 25568 listener, process identity, or Arcade lobby readiness is not currently healthy"
   fi
-  runtime_sha="$(printf '%s\\n' "$runtime_info" | sed -n '1p')"
-  invocation="$(printf '%s\\n' "$runtime_info" | sed -n '2p')"
-  pid="$(printf '%s\\n' "$runtime_info" | sed -n '3p')"
+  runtime_sha="$(printf '%s\n' "$runtime_info" | sed -n '1p')"
+  invocation="$(printf '%s\n' "$runtime_info" | sed -n '2p')"
+  pid="$(printf '%s\n' "$runtime_info" | sed -n '3p')"
   [[ "$runtime_sha" == "$target_sha" ]] ||
     fail "running Arcade process does not attest the target build SHA"
   write_manifest runtime_sha "$runtime_sha"
@@ -524,6 +524,30 @@ EOF
       validate_transaction
       assert_backup_complete
       echo "Snapshot verified: artifact SHA=$(value backup_sha); transaction=$(value deployment_id)."
+      ;;
+    classify-target)
+      local expected_target="${2:-}" current_target current_status
+      [[ "$expected_target" =~ ^[0-9a-f]{40}$ ]] || fail "a valid deployment SHA is required"
+      if [[ ! -f "$MANIFEST" ]]; then
+        printf 'no-target-transaction: requested SHA=%s; no durable journal exists.\n' "$expected_target"
+        return 0
+      fi
+      validate_transaction
+      current_target="$(value target_sha)"
+      current_status="$(value status)"
+      if [[ "$current_target" == "$expected_target" ]]; then
+        printf 'target-transaction: requested SHA=%s; status=%s.\n' "$expected_target" "$current_status"
+      else
+        case "$current_status" in
+          DEPLOYMENT_VERIFIED|RECOVERY_VERIFIED|NO_PRIOR_DEPLOYMENT_RESTORED|FORWARD_REDEPLOY_READY)
+            printf 'no-target-transaction: requested SHA=%s; current journal target SHA=%s; status=%s; no mutation was recorded for the requested target.\n' \
+              "$expected_target" "$current_target" "$current_status"
+            ;;
+          *)
+            fail "journal targets different build $current_target with unresolved status $current_status"
+            ;;
+        esac
+      fi
       ;;
     verify-deployment)
       local expected_target="${2:-}"
