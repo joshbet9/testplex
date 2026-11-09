@@ -11,6 +11,7 @@ import java.util.Set;
 import java.lang.reflect.Proxy;
 import java.util.UUID;
 import org.bukkit.Material;
+import org.bukkit.entity.Player;
 import org.junit.jupiter.api.Test;
 
 class DrawMyThingManagerTest {
