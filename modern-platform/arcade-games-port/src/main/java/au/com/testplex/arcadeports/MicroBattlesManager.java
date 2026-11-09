@@ -17,7 +17,6 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.WorldBorder;
-import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
@@ -93,7 +92,7 @@ final class MicroBattlesManager implements ArcadeMatchController {
                 best.getRelative(BlockFace.UP).setType(Material.AIR, false);
             } else if (ThreadLocalRandom.current().nextDouble() > 0.95D) {
                 // Preserve the server's default falling-block item-drop behaviour.
-                FallingBlock falling = session.world.spawnFallingBlock(
+                session.world.spawnFallingBlock(
                         best.getLocation().add(0.5D, 0.5D, 0.5D), best.getBlockData());
             }
             best.setType(Material.AIR, false);
