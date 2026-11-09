@@ -16442,8 +16442,8 @@ public final class ArcadePortManager implements Listener {
         long now = System.currentTimeMillis();
         long readyAt = session.dragonEscapeLeapReadyAt.getOrDefault(id, 0L);
         if (now < readyAt) {
-            player.sendActionBar(ChatColor.YELLOW + "Leap recharging: "
-                    + String.format(java.util.Locale.ROOT, "%.1f", (readyAt - now) / 1000.0D) + "s");
+            // AbilityCooldownProgress owns the source-style action bar while the
+            // recharge is active. Keep repeated clicks from replacing that bar.
             return;
         }
         int remaining = session.dragonEscapeLeapUsesRemaining.getOrDefault(id, 0);
@@ -17955,7 +17955,9 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void updateDragonEscapeRaceUi(Session session, long now) {
-        if (session.ticks % 10 == 0) updateDragonEscapeRaceScoreboard(session, now);
+        // Refresh the race clock and PB delta at 10 Hz. The scoreboard is the
+        // only race-time display, so half-second updates felt noticeably stale.
+        if (session.ticks % 2 == 0) updateDragonEscapeRaceScoreboard(session, now);
         long elapsed = Math.max(0L, now - session.startedAt);
         if (!GameDebugRuntimeOverrides.globalCosmeticsEnabled()) {
             restoreDragonEscapeBeaconGlass(session);
@@ -18950,20 +18952,9 @@ public final class ArcadePortManager implements Listener {
                 continue;
             }
             if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
-                String kit = session.dragonEscapeKits.getOrDefault(id, "jumper");
-                long readyAt = session.dragonEscapeLeapReadyAt.getOrDefault(id, 0L);
-                int remainingUses = session.dragonEscapeLeapUsesRemaining.getOrDefault(id, 0);
-                if (ArcadePortRules.dragonEscapeLeapUses(kit) > 0 && remainingUses > 0 && now < readyAt) {
-                    long cooldown = Math.max(1L, GameDebugRuntimeOverrides.longValue(
-                            "DRAGON_ESCAPE_LEAP_RECHARGE_MILLIS", ArcadePortRules.DRAGON_ESCAPE_LEAP_RECHARGE_MILLIS));
-                    long left = readyAt - now;
-                    double progress = Math.max(0.0D, Math.min(1.0D, 1.0D - left / (double) cooldown));
-                    int filled = (int) Math.round(progress * 10.0D);
-                    p.sendActionBar(ChatColor.WHITE + "LEAP " + ChatColor.RED + "▰".repeat(filled)
-                            + ChatColor.DARK_GRAY + "▱".repeat(10 - filled) + ChatColor.GRAY + " "
-                            + String.format(java.util.Locale.ROOT, "%.1fs", left / 1_000.0D));
-                }
-                // Time and PB pace now live at the bottom of the in-game scoreboard.
+                // AbilityCooldownProgress exclusively owns the source-style
+                // leap recharge bar and its "Leap Recharged" completion message.
+                // Race time and PB pace live on the scoreboard.
                 continue;
             }
             if (session.type == ArcadePortGame.CASTLE_ASSAULT
