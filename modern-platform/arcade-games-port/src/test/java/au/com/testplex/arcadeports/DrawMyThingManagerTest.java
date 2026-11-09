@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.Set;
+import java.lang.reflect.Proxy;
+import java.util.UUID;
 import org.bukkit.Material;
 import org.junit.jupiter.api.Test;
 
@@ -44,6 +46,38 @@ class DrawMyThingManagerTest {
         assertEquals("light blue", DrawMyThingManager.colourName(Material.LIGHT_BLUE_WOOL));
         assertEquals("red", DrawMyThingManager.colourName(Material.RED_TERRACOTTA));
         assertEquals("black", DrawMyThingManager.colourName(Material.BLACK_CONCRETE_POWDER));
+    }
+
+    @Test
+    void disabledPaletteAndCanvasToolsDoNotChangeDrawingState() {
+        DrawMyThingManager draw = new DrawMyThingManager();
+        SessionState session = new SessionState(ArcadePortGame.DRAW_MY_THING, null, List.of(), false);
+        UUID playerId = UUID.randomUUID();
+        session.drawBrushColours.put(playerId, Material.BLUE_WOOL);
+        Player player = playerStub();
+
+        draw.selectColour(session, player, Material.RED_WOOL, "red", false);
+        draw.performToolAction(session, player, null, "Pencil", false);
+
+        assertEquals(Material.BLUE_WOOL, session.drawBrushColours.get(playerId));
+        assertFalse(session.drawStartedPainting);
+    }
+
+    private static Player playerStub() {
+        return (Player) Proxy.newProxyInstance(Player.class.getClassLoader(), new Class<?>[] {Player.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "equals" -> proxy == args[0];
+                    case "hashCode" -> System.identityHashCode(proxy);
+                    case "toString" -> "Draw My Thing test player";
+                    default -> method.getReturnType() == boolean.class ? false
+                            : method.getReturnType() == int.class ? 0
+                            : method.getReturnType() == long.class ? 0L
+                            : method.getReturnType() == double.class ? 0.0D
+                            : method.getReturnType() == float.class ? 0.0F
+                            : method.getReturnType() == short.class ? (short) 0
+                            : method.getReturnType() == byte.class ? (byte) 0
+                            : method.getReturnType() == char.class ? '\0' : null;
+                });
     }
 
     @Test
