@@ -429,6 +429,7 @@ public final class ArcadePortManager implements Listener {
     private final NamespacedKey gladiatorMenuValueKey;
     private final NamespacedKey gladiatorPotionKey;
     private final NamespacedKey gladiatorHotbarKey;
+    private final NamespacedKey dragonEscapeGhostToggleKey;
     private final ModernArcadeLobby lobby;
     private final ModernArcadeLobbyRuntime lobbyRuntime;
     private final AbilityCooldownProgress cooldownProgress;
@@ -536,6 +537,7 @@ public final class ArcadePortManager implements Listener {
         this.gladiatorMenuValueKey = new NamespacedKey(plugin, "gladiators-menu-value");
         this.gladiatorPotionKey = new NamespacedKey(plugin, "gladiators-healing-pot");
         this.gladiatorHotbarKey = new NamespacedKey(plugin, "gladiators-hotbar-editor");
+        this.dragonEscapeGhostToggleKey = new NamespacedKey(plugin, "dragon-escape-ghost-toggle");
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=manager-keys-ready");
         this.lobby = new ModernArcadeLobby(plugin);
         World lobbyWorld = lobby.ensureWorld();
@@ -9194,6 +9196,7 @@ public final class ArcadePortManager implements Listener {
                             "Left-click course blocks to recover and place as shortcuts (" + digs + " digs left).",
                             Math.max(1, digs)));
                 }
+                player.getInventory().setItem(8, dragonEscapeGhostToggleItem(id));
                 break;
             }
             case DRAGONS: {
@@ -23466,6 +23469,35 @@ public final class ArcadePortManager implements Listener {
         return playerId != null && plugin.getConfig().getBoolean("dragon-escape-ghost-visible." + playerId, false);
     }
 
+    private ItemStack dragonEscapeGhostToggleItem(UUID playerId) {
+        boolean enabled = isDragonEscapeGhostEnabled(playerId);
+        ItemStack item = namedItem(Material.ENDER_EYE,
+                "PB Ghost: " + (enabled ? "ON" : "OFF"),
+                "Right-click to toggle your personal-best ghost.");
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.getPersistentDataContainer().set(dragonEscapeGhostToggleKey, PersistentDataType.BYTE, (byte) 1);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private boolean isDragonEscapeGhostToggleItem(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return false;
+        Byte marker = item.getItemMeta().getPersistentDataContainer()
+                .get(dragonEscapeGhostToggleKey, PersistentDataType.BYTE);
+        return marker != null && marker == (byte) 1;
+    }
+
+    private void refreshDragonEscapeGhostToggleItem(Player player) {
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.DRAGON_ESCAPE
+                && session.players.containsKey(player.getUniqueId())
+                && isDragonEscapeGhostToggleItem(player.getInventory().getItem(8))) {
+            player.getInventory().setItem(8, dragonEscapeGhostToggleItem(player.getUniqueId()));
+        }
+    }
+
     public boolean setDragonEscapeGhost(Player player, String requested) {
         if (player == null || requested == null) return false;
         String value = requested.toLowerCase(java.util.Locale.ROOT);
@@ -23479,6 +23511,7 @@ public final class ArcadePortManager implements Listener {
         }
         plugin.getConfig().set("dragon-escape-ghost-visible." + player.getUniqueId(), enabled);
         plugin.saveConfig();
+        refreshDragonEscapeGhostToggleItem(player);
         if (!enabled) hideDragonEscapeGhost(player);
         if (enabled && dragonEscapeGhostBridge == null) {
             player.sendMessage(ChatColor.RED + "Transparent player ghosts require PacketEvents 2.14.0 on this server.");
@@ -28194,6 +28227,15 @@ public final class ArcadePortManager implements Listener {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Session session = active;
         if (session == null) return;
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE
+                && session.alive.contains(event.getPlayer().getUniqueId())
+                && isDragonEscapeGhostToggleItem(event.getItem())) {
+            event.setCancelled(true);
+            if (event.getAction().isRightClick()) {
+                setDragonEscapeGhost(event.getPlayer(), "toggle");
+            }
+            return;
+        }
         if (session.type == ArcadePortGame.GLADIATORS && event.getPlayer().getGameMode() == GameMode.SPECTATOR) {
             ItemStack held = event.getItem();
             if (held != null && held.hasItemMeta() && "spectator-menu".equals(held.getItemMeta()
