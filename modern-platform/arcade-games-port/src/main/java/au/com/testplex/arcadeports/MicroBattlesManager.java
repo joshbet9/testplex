@@ -3,8 +3,11 @@ package au.com.testplex.arcadeports;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
+import java.util.function.IntFunction;
 import java.util.function.Predicate;
 import org.bukkit.ChatColor;
+import org.bukkit.block.Block;
 import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -20,6 +23,45 @@ import org.bukkit.persistence.PersistentDataType;
 /** Micro Battles' per-player world-border cue, invoked from the existing match tick. */
 final class MicroBattlesManager implements ArcadeMatchController {
     @Override public ArcadePortGame game() { return ArcadePortGame.MICRO_BATTLES; }
+
+    boolean shouldReleaseBarrier(SessionState session, long elapsedMillis) {
+        if (session == null || !session.microBarrierActive) return false;
+        long duration = GameDebugRuntimeOverrides.longValue("MICRO_BATTLES_BARRIER_DURATION_MILLIS",
+                ArcadePortRules.MICRO_BATTLES_BARRIER_DURATION_MILLIS);
+        return ArcadePortRules.shouldRemoveMicroBarrier(elapsedMillis, duration);
+    }
+
+    void releaseBarrier(SessionState session, IntFunction<Location> islandCenter, Consumer<String> announce) {
+        if (session == null || !session.microBarrierActive || session.world == null
+                || islandCenter == null || announce == null) return;
+        for (Block block : session.microBarrierBlocks) {
+            if (block.getType() == Material.GLASS) block.setType(Material.AIR, false);
+        }
+        // Some imported maps have incomplete glass marker metadata. Clear the expected island rings too.
+        for (int team = 0; team < 4; team++) {
+            Location island = islandCenter.apply(team);
+            if (island == null) continue;
+            int cx = island.getBlockX();
+            int cy = island.getBlockY();
+            int cz = island.getBlockZ();
+            for (int offset = -4; offset <= 4; offset++) {
+                for (int y = cy; y <= ArcadePortRules.microBattlesBarrierTopY(cy); y++) {
+                    Block[] ring = {
+                            session.world.getBlockAt(cx + offset, y, cz - 4),
+                            session.world.getBlockAt(cx + offset, y, cz + 4),
+                            session.world.getBlockAt(cx - 4, y, cz + offset),
+                            session.world.getBlockAt(cx + 4, y, cz + offset)
+                    };
+                    for (Block block : ring) {
+                        if (block.getType() == Material.GLASS) block.setType(Material.AIR, false);
+                    }
+                }
+            }
+        }
+        session.microBarrierBlocks.clear();
+        session.microBarrierActive = false;
+        announce.accept("Glass barriers are down! Fight for your team.");
+    }
 
     void updateBorderParticles(SessionState session, List<Player> alive, Predicate<Player> showForPlayer) {
         if (session == null || session.type != ArcadePortGame.MICRO_BATTLES
