@@ -270,15 +270,17 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         Inventory pbInventory = owner.getOpenInventory().getTopInventory();
         require(pbInventory.getItem(0) != null && pbInventory.getItem(0).getType() == Material.RED_BED,
                 "Dragon Escape PB back bed missing");
-        require(pbInventory.getItem(8) != null && pbInventory.getItem(8).getType() == Material.LEVER,
-                "Dragon Escape PB kit toggle missing");
+        require(pbInventory.getItem(8) != null && pbInventory.getItem(8).getType() == Material.CLOCK,
+                "Dragon Escape PB overall best-time icon missing");
         require(statsFooterSlot(pbInventory, Material.REDSTONE_LAMP) >= 0
                         && statsFooterSlot(pbInventory, Material.BLAZE_POWDER) >= 0,
                 "Dragon Escape PB standard tab navigation missing");
-        for (int i = 0; i < 6; i++) {
+        Material[] pbIcons = {Material.FEATHER, Material.TNT, Material.BRICK,
+                Material.ENDER_PEARL, Material.DIAMOND_PICKAXE, Material.CLOCK};
+        for (int i = 0; i < pbIcons.length; i++) {
             clickStatsSlot(8);
-            require(owner.getOpenInventory().getTopInventory().getItem(8).getType() == Material.LEVER,
-                    "Dragon Escape PB toggle failed on view " + i);
+            require(owner.getOpenInventory().getTopInventory().getItem(8).getType() == pbIcons[i],
+                    "Dragon Escape PB toggle has wrong kit icon at view " + (i + 1));
         }
         require(owner.getOpenInventory().getTopInventory().getItem(8).getItemMeta()
                         .getDisplayName().contains("Best Time"),
