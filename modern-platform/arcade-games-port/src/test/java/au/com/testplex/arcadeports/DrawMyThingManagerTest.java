@@ -82,7 +82,7 @@ class DrawMyThingManagerTest {
         if (type == float.class) return Float.valueOf(0.0F);
         if (type == short.class) return Short.valueOf((short) 0);
         if (type == byte.class) return Byte.valueOf((byte) 0);
-        if (type == char.class) return Character.valueOf('\\0');
+        if (type == char.class) return Character.valueOf((char) 0);
         return null;
     }
 
