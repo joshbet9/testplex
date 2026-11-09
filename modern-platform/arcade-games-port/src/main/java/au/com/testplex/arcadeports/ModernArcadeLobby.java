@@ -198,7 +198,8 @@ public final class ModernArcadeLobby implements Listener {
         inventory.setItem(HOTBAR_LEADERBOARDS_SLOT, createHotbarItem(Material.NAME_TAG,
                 ChatColor.AQUA + "Lobby Leaderboards",
                 List.of(ChatColor.GRAY + "Customize up to 10 floating leaderboard panels.",
-                        ChatColor.YELLOW + "Choose games, metrics, periods, maps and kits.",
+                        ChatColor.YELLOW + "This game has its own saved leaderboard layout.",
+                        ChatColor.GRAY + "Choose metrics, periods, maps and kits.",
                         ChatColor.DARK_GRAY + "Command: /arcadeport leaderboards"), "arcadeport leaderboards"));
         inventory.setItem(HOTBAR_PREVIEW_SLOT, createHotbarItem(Material.FIREWORK_ROCKET,
                 ChatColor.LIGHT_PURPLE + "Cosmetic Preview Sandbox",

@@ -48,7 +48,8 @@ final class ArcadeLobbyLeaderboardService implements Listener {
     private final JavaPlugin plugin;
     private final ArcadePortManager manager;
     private final ModernArcadeLobby lobby;
-    private final Map<UUID, List<Board>> preferences = new HashMap<>();
+    /** Each viewer has a different layout for *each selected lobby game*. */
+    private final Map<LayoutKey, List<Board>> preferences = new HashMap<>();
     private final Map<UUID, List<Panel>> visible = new HashMap<>();
     private BukkitTask renderTask;
     private BukkitTask historyTask;
@@ -62,8 +63,9 @@ final class ArcadeLobbyLeaderboardService implements Listener {
         Period(String title) { this.title = title; }
     }
 
+    private record LayoutKey(UUID viewer, String game) { }
+
     private static final class Board {
-        String game = "selected";
         String metric = "wins";
         Period period = Period.ALL_TIME;
         EnumSet<Period> periods = EnumSet.allOf(Period.class);
@@ -89,17 +91,19 @@ final class ArcadeLobbyLeaderboardService implements Listener {
         }
     }
 
-    private enum MenuType { ROOT, EDIT, GAME, MAP }
+    private enum MenuType { ROOT, EDIT, MAP }
 
     private static final class Menu implements InventoryHolder {
         final MenuType type;
         final int board;
         final int page;
+        final String game;
         Inventory inventory;
-        Menu(MenuType type, int board, int page) {
+        Menu(MenuType type, int board, int page, String game) {
             this.type = type;
             this.board = board;
             this.page = page;
+            this.game = game;
         }
         @Override public Inventory getInventory() { return inventory; }
     }
@@ -135,26 +139,29 @@ final class ArcadeLobbyLeaderboardService implements Listener {
         openRoot(player);
     }
 
-    private String effectiveGame(Board board) {
+    private String selectedGame() {
         String selected = plugin.getConfig().getString("lobby-selected-game", "bacon-brawl");
-        String id = "selected".equals(board.game) ? selected : board.game;
-        return ArcadeGameDirectory.find(id) == null ? "bacon-brawl" : id;
+        if (selected.startsWith("monster-maze")) return "monster-maze";
+        if (selected.startsWith("skywars")) return "skywars";
+        return ArcadeGameDirectory.find(selected) == null ? "bacon-brawl" : selected;
+    }
+
+    private String effectiveGame(Board board) {
+        return selectedGame();
     }
 
     private List<Board> boards(UUID viewer) {
-        return preferences.computeIfAbsent(viewer, this::loadBoards);
+        return preferences.computeIfAbsent(new LayoutKey(viewer, selectedGame()), this::loadBoards);
     }
 
-    private List<Board> loadBoards(UUID viewer) {
+    private List<Board> loadBoards(LayoutKey key) {
         List<Board> results = new ArrayList<>();
-        for (Map<?, ?> saved : plugin.getConfig().getMapList(ROOT + "players." + viewer + ".boards")) {
+        String path = ROOT + "players." + key.viewer() + ".games." + key.game() + ".boards";
+        for (Map<?, ?> saved : plugin.getConfig().getMapList(path)) {
             if (results.size() >= MAX_BOARDS) break;
             Map<String, Object> data = new HashMap<>();
             saved.forEach((key, value) -> data.put(String.valueOf(key), value));
             Board board = new Board();
-            String game = String.valueOf(data.getOrDefault("game", "selected"));
-            board.game = "selected".equals(game) || ArcadeGameDirectory.find(game) != null
-                    ? game : "selected";
             String metric = String.valueOf(data.getOrDefault("metric", "wins"));
             board.metric = List.of(METRICS).contains(metric) ? metric : "wins";
             board.map = String.valueOf(data.getOrDefault("map", ""));
@@ -174,7 +181,7 @@ final class ArcadeLobbyLeaderboardService implements Listener {
             if (!board.periods.contains(board.period)) board.period = board.periods.iterator().next();
             results.add(board);
         }
-        if (results.isEmpty() && !plugin.getConfig().contains(ROOT + "players." + viewer + ".boards"))
+        if (results.isEmpty() && !plugin.getConfig().contains(path))
             results.add(new Board());
         return results;
     }
@@ -183,7 +190,6 @@ final class ArcadeLobbyLeaderboardService implements Listener {
         List<Map<String, Object>> serialized = new ArrayList<>();
         for (Board board : boards(viewer)) {
             Map<String, Object> row = new LinkedHashMap<>();
-            row.put("game", board.game);
             row.put("metric", board.metric);
             row.put("period", board.period.name());
             row.put("periods", String.join(",", board.periods.stream().map(Enum::name).toList()));
@@ -193,7 +199,7 @@ final class ArcadeLobbyLeaderboardService implements Listener {
             row.put("cycleKits", board.cycleKits);
             serialized.add(row);
         }
-        plugin.getConfig().set(ROOT + "players." + viewer + ".boards", serialized);
+        plugin.getConfig().set(ROOT + "players." + viewer + ".games." + selectedGame() + ".boards", serialized);
         plugin.saveConfig();
         clear(viewer);
     }
@@ -436,7 +442,7 @@ final class ArcadeLobbyLeaderboardService implements Listener {
 
     @EventHandler public void onQuit(PlayerQuitEvent event) {
         clear(event.getPlayer().getUniqueId());
-        preferences.remove(event.getPlayer().getUniqueId());
+        preferences.keySet().removeIf(key -> key.viewer().equals(event.getPlayer().getUniqueId()));
     }
 
     private static ItemStack item(Material material, String title, String... lore) {
@@ -449,13 +455,15 @@ final class ArcadeLobbyLeaderboardService implements Listener {
     }
 
     private Inventory inventory(MenuType type, int board, int page, String title) {
-        Menu holder = new Menu(type, board, page);
+        Menu holder = new Menu(type, board, page, selectedGame());
         holder.inventory = Bukkit.createInventory(holder, 54, title);
         return holder.inventory;
     }
 
     private void openRoot(Player player) {
-        Inventory inv = inventory(MenuType.ROOT, -1, 0, "Lobby Leaderboards");
+        String selected = selectedGame();
+        Inventory inv = inventory(MenuType.ROOT, -1, 0,
+                ArcadeGameDirectory.find(selected).name() + " Leaderboards");
         inv.setItem(0, item(Material.RED_BED, ChatColor.RED + "Close",
                 ChatColor.GRAY + "Return to the lobby."));
         List<Board> all = boards(player.getUniqueId());
@@ -464,7 +472,7 @@ final class ArcadeLobbyLeaderboardService implements Listener {
             String game = effectiveGame(board);
             inv.setItem(10 + i, item(board.isPb(game) ? Material.CLOCK : ArcadeGameDirectory.find(game).icon(),
                     ChatColor.AQUA + "Board " + (i + 1) + ": " + ArcadeGameDirectory.find(game).name(),
-                    ChatColor.GRAY + ("selected".equals(board.game) ? "Follows selected lobby game" : "Fixed game"),
+                    ChatColor.GRAY + "Only affects the currently selected lobby game.",
                     ChatColor.YELLOW + "Metric: " + board.metric,
                     ChatColor.YELLOW + "Current: " + (board.isPb(game) ? mapLabel(board) : board.period.title),
                     ChatColor.GREEN + "Click to configure this board."));
@@ -488,9 +496,9 @@ final class ArcadeLobbyLeaderboardService implements Listener {
         Inventory inv = inventory(MenuType.EDIT, index, 0, "Leaderboard " + (index + 1) + " Settings");
         inv.setItem(0, item(Material.RED_BED, ChatColor.GRAY + "Back to Leaderboards"));
         inv.setItem(10, item(ArcadeGameDirectory.find(game).icon(), ChatColor.AQUA + "Game: "
-                + ArcadeGameDirectory.find(game).name(), ChatColor.GRAY + ("selected".equals(board.game)
-                ? "Follows the current game in the lobby." : "Fixed to this game."),
-                ChatColor.YELLOW + "Click to choose any Arcade game."));
+                + ArcadeGameDirectory.find(game).name(),
+                ChatColor.GRAY + "Follows the currently selected lobby game.",
+                ChatColor.YELLOW + "This game's settings are independent."));
         inv.setItem(12, item(pb ? Material.CLOCK : Material.PAPER,
                 ChatColor.AQUA + "Metric: " + board.metric,
                 ChatColor.GRAY + "Wins, Games Played, Losses, Gems",
@@ -525,17 +533,6 @@ final class ArcadeLobbyLeaderboardService implements Listener {
         player.openInventory(inv);
     }
 
-    private void openGamePicker(Player player, int index) {
-        Inventory inv = inventory(MenuType.GAME, index, 0, "Choose Leaderboard Game");
-        inv.setItem(0, item(Material.NETHER_STAR, ChatColor.GREEN + "Follow Selected Lobby Game",
-                ChatColor.GRAY + "The board switches whenever the game panel changes."));
-        int slot = 1;
-        for (ArcadeGameDirectory.Game game : ArcadeGameDirectory.games())
-            inv.setItem(slot++, item(game.icon(), ChatColor.AQUA + game.name()));
-        inv.setItem(49, item(Material.RED_BED, ChatColor.GRAY + "Back"));
-        player.openInventory(inv);
-    }
-
     private void openMapPicker(Player player, int index, int requestedPage) {
         List<SourceMapCatalog.MapArchive> maps = dragonMaps();
         int page = Math.max(0, Math.min(requestedPage, Math.max(0, (maps.size() - 1) / 45)));
@@ -556,6 +553,7 @@ final class ArcadeLobbyLeaderboardService implements Listener {
         if (!(event.getWhoClicked() instanceof Player player)) return;
         int slot = event.getRawSlot();
         if (slot < 0 || slot >= 54) return;
+        if (!menu.game.equals(selectedGame())) { openRoot(player); return; }
         UUID id = player.getUniqueId();
         List<Board> all = boards(id);
         if (menu.type == MenuType.ROOT) {
@@ -570,18 +568,6 @@ final class ArcadeLobbyLeaderboardService implements Listener {
         }
         if (menu.board < 0 || menu.board >= all.size()) { openRoot(player); return; }
         Board board = all.get(menu.board);
-        if (menu.type == MenuType.GAME) {
-            if (slot == 49) { openEdit(player, menu.board); return; }
-            if (slot == 0) board.game = "selected";
-            else if (slot <= ArcadeGameDirectory.games().size())
-                board.game = ArcadeGameDirectory.games().get(slot - 1).id();
-            else return;
-            if (!"dragon-escape".equals(effectiveGame(board)) && "pb".equals(board.metric))
-                board.metric = "wins";
-            save(id);
-            openEdit(player, menu.board);
-            return;
-        }
         if (menu.type == MenuType.MAP) {
             if (slot == 49) { openEdit(player, menu.board); return; }
             if (slot == 45 && menu.page > 0) { openMapPicker(player, menu.board, menu.page - 1); return; }
@@ -597,7 +583,7 @@ final class ArcadeLobbyLeaderboardService implements Listener {
         }
         if (slot == 0 || slot == 49) { openRoot(player); return; }
         boolean pb = board.isPb(effectiveGame(board));
-        if (slot == 10) { openGamePicker(player, menu.board); return; }
+        if (slot == 10) return;
         if (slot == 12) {
             int index = List.of(METRICS).indexOf(board.metric);
             do { board.metric = METRICS[(++index) % METRICS.length]; }
