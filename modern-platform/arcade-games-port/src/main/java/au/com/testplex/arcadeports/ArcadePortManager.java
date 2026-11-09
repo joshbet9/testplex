@@ -12268,21 +12268,21 @@ public final class ArcadePortManager implements Listener {
         finishMasterBuilders(session);
     }
 
-    private void handleMasterBuildersVote(Session session,Player player,PlayerInteractEvent event) {
+    private void handleMasterBuildersVote(Session session, Player player, PlayerInteractEvent event) {
         event.setCancelled(true);
         if (plugin.hasAdminAccess(player)
                 && !debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.MASTER_BUILDERS, "review-voting", true)) return;
-        if(event.getHand()!=EquipmentSlot.HAND
-                ||session.masterBuilderPhase!=MasterBuildersPhase.REVIEW
-                ||System.currentTimeMillis()>=session.masterBuilderVoteEndsAt
-                ||!event.getAction().isRightClick()||session.masterBuilderCurrentTarget==null
-                ||player.getUniqueId().equals(session.masterBuilderCurrentTarget))return;
-        ItemStack item=event.getItem();if(item==null)return;
+        if (event.getHand() != EquipmentSlot.HAND || !event.getAction().isRightClick()) return;
+        ItemStack item = event.getItem();
+        if (item == null) return;
         int score = ArcadePortRules.masterBuildersRatingScore(item.getType());
-        if(score==0)return;
-        session.masterBuilderVotes.computeIfAbsent(session.masterBuilderCurrentTarget,k->new HashMap<>())
-                .put(player.getUniqueId(),score);
-        player.sendActionBar(Component.text("Your rating: "+score+"/"+ArcadePortRules.masterBuildersMaxRating()));
+        if (score == 0) return;
+        boolean reviewPhase = session.masterBuilderPhase == MasterBuildersPhase.REVIEW;
+        if (masterBuildersController.recordVote(session, player.getUniqueId(), score, reviewPhase,
+                System.currentTimeMillis())) {
+            player.sendActionBar(Component.text("Your rating: " + score + "/"
+                    + ArcadePortRules.masterBuildersMaxRating()));
+        }
     }
 
     private void finishMasterBuilders(Session session) {
