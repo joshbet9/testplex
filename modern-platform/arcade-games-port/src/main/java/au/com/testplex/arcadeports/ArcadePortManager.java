@@ -1619,12 +1619,15 @@ public final class ArcadePortManager implements Listener {
         debugContextGame = type;
         Map<String, Object> values = new LinkedHashMap<>(
                 starter == null ? Map.of() : debugProfiles.values(starter.getUniqueId(), type));
+        Set<String> profileFeatureKeys = starter == null
+                ? Set.of() : debugProfiles.featureKeys(starter.getUniqueId(), type);
+        if (!profileFeatureKeys.isEmpty()) values.put("__DEBUG_GAMEPLAY_FEATURES", true);
         if (debugProfiles.testBotCount(starter == null ? null : starter.getUniqueId(), type, 0) > 0) {
             values.put("__DEBUG_TEST_BOT_ROSTER", true);
         }
         GameDebugRuntimeOverrides.activate(values, activeDebugProfileOwner);
         activeDebugFeatureKeys.clear();
-        if (starter != null) activeDebugFeatureKeys.addAll(debugProfiles.featureKeys(starter.getUniqueId(), type));
+        activeDebugFeatureKeys.addAll(profileFeatureKeys);
     }
 
     String configuredTestBotKit(ArcadePortGame type, int botIndex) {
@@ -5367,10 +5370,9 @@ public final class ArcadePortManager implements Listener {
                 session.dragonEscapeRunSplitLocations.put(playerId, new HashMap<>());
                 String savedKit = plugin.getConfig().getString(
                         "lobby-kit-preferences." + playerId + ".dragon-escape", "jumper");
-                String normalizedSavedKit = ArcadePortRules.normalizeDragonEscapeKit(savedKit);
                 String kit = validKitForMatch(playerId, type,
-                        dragonEscapeKitPreferences.getOrDefault(playerId,
-                                normalizedSavedKit == null ? "jumper" : normalizedSavedKit), "jumper");
+                        ArcadePortRules.dragonEscapeKitPreference(savedKit,
+                                dragonEscapeKitPreferences.get(playerId)), "jumper");
                 session.dragonEscapeKits.put(playerId, kit);
                 session.dragonEscapeLeapUsesRemaining.put(playerId, ArcadePortRules.dragonEscapeLeapUses(kit));
                 session.dragonEscapeDiggerUsesRemaining.put(playerId, GameDebugRuntimeOverrides.intValue("DRAGON_ESCAPE_DIGGER_MAX_USES", ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES));
@@ -17248,7 +17250,7 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.GOLD + "Dragon Escape finish on " + session.dragonEscapeMapName + ": "
                     + ChatColor.YELLOW + ArcadePortRules.formatDragonEscapeTime(elapsed) + ChatColor.GRAY + ".");
         }
-        if (GameDebugRuntimeOverrides.isDebugSession()) return;
+        if (GameDebugRuntimeOverrides.hasGameplayDebugOverrides()) return;
         if (session.dragonEscapeMapResource == null) return;
         Map<Integer, Long> splits = session.dragonEscapeRunSplitMillis.computeIfAbsent(id, ignored -> new HashMap<>());
         splits.putIfAbsent(0, 0L);

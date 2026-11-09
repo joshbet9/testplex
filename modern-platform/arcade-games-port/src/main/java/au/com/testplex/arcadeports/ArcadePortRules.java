@@ -1348,6 +1348,14 @@ public final class ArcadePortRules {
         };
     }
 
+    /** The persisted lobby selection is authoritative over a stale in-memory cache. */
+    public static String dragonEscapeKitPreference(String persisted, String cached) {
+        String saved = normalizeDragonEscapeKit(persisted);
+        if (saved != null) return saved;
+        String selected = normalizeDragonEscapeKit(cached);
+        return selected == null ? "jumper" : selected;
+    }
+
     public static final int DRAGON_ESCAPE_DIGGER_MAX_USES = 6;
     public static final long DRAGON_ESCAPE_DIGGER_OPENING_LOCKOUT_MILLIS = 10_000L;
     public static final long DRAGON_ESCAPE_DIGGER_RECHARGE_MILLIS = 100L;
