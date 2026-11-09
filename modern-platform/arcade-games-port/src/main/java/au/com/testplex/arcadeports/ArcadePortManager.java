@@ -12163,34 +12163,10 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void startMasterBuilders(Session session,long now) {
-        List<String> themes=List.of("Castle","Dragon","Treehouse","Robot","Pirate Ship","Underwater City",
-                "Volcano","Space Station","Farm","Haunted House","Rollercoaster","Zoo","Airplane",
-                "Lighthouse","Wizard Tower","Football Stadium");
-        session.masterBuilderTheme=themes.get(ArcadePortRules.masterBuildersThemeIndex(
-                ThreadLocalRandom.current().nextInt(themes.size()) + 1) - 1);
-        session.masterBuilderPhase=MasterBuildersPhase.BUILDING;
-        int judgedBuildCount=session.masterBuilderReviewOrder.size();
-        long buildMillis = ArcadeProgressRules.masterBuildersBuildMillis(
-                ArcadePortRules.masterBuildersTotalMillis(), judgedBuildCount,
-                ArcadePortRules.masterBuildersReviewMillis());
-        session.masterBuilderBuildEndsAt=now+buildMillis;
-        for(Player p:session.players.values())if(p!=null&&p.isOnline()){
-            p.getInventory().clear();
-            p.setGameMode(GameMode.CREATIVE);
-            Integer plotIndex=session.masterBuilderPlots.get(p.getUniqueId());
-            if(plotIndex!=null)p.teleport(masterBuilderPlotCenter(session.world,plotIndex));
-            p.sendMessage(ChatColor.YELLOW+"Build: "+ChatColor.GOLD+session.masterBuilderTheme
-                    +ChatColor.YELLOW+" | Your plot: "+(plotIndex==null?"unassigned":plotIndex+1));
-            p.sendMessage(ChatColor.GRAY+"Use Creative inventory inside your quartz plot border. "
-                    +"Build time adjusts to the number of human plots so building plus voting totals five minutes.");
-            p.sendTitle(ChatColor.GOLD+"MASTER BUILDERS",
-                    ChatColor.YELLOW+"Build: "+session.masterBuilderTheme+ChatColor.GRAY+" | Plot "+(plotIndex==null?"?":plotIndex+1),
-                    5, 50, 10);
-        }
-        masterBuildersPlots.begin(session.players.values());
-        spawnMasterBuilderPlotLabels(session);
-        masterBuildersController.setupScoreboard(session);
-        masterBuildersController.updateScoreboard(session, System.currentTimeMillis(), true, false);
+        session.masterBuilderPhase = MasterBuildersPhase.BUILDING;
+        masterBuildersController.startBuild(session, now, masterBuildersPlots,
+                slot -> masterBuilderPlotCenter(session.world, slot),
+                ignored -> spawnMasterBuilderPlotLabels(session));
     }
 
     private void spawnMasterBuilderPlotLabels(Session session) {
