@@ -1,8 +1,10 @@
 package au.com.testplex.arcadeports;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 import java.util.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -20,6 +22,16 @@ final class MasterBuildersManager implements ArcadeMatchController {
     }
 
     @Override public ArcadePortGame game() { return ArcadePortGame.MASTER_BUILDERS; }
+
+    boolean recordVote(SessionState session, UUID voterId, int score, boolean reviewPhase, long now) {
+        if (session == null || voterId == null || !reviewPhase || session.masterBuilderCurrentTarget == null
+                || voterId.equals(session.masterBuilderCurrentTarget) || now >= session.masterBuilderVoteEndsAt
+                || score < 1 || score > ArcadePortRules.masterBuildersMaxRating()) return false;
+        session.masterBuilderVotes.computeIfAbsent(session.masterBuilderCurrentTarget, ignored -> new HashMap<>())
+                .put(voterId, score);
+        return true;
+    }
+
 
     /** Called at the existing beginning-of-build point, not during the shared preparation phase. */
     void setupScoreboard(SessionState session) {
