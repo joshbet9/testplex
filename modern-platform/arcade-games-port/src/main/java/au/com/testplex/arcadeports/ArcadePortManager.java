@@ -428,6 +428,7 @@ public final class ArcadePortManager implements Listener {
     private final NamespacedKey gladiatorPotionKey;
     private final NamespacedKey gladiatorHotbarKey;
     private final NamespacedKey dragonEscapeGhostHotbarKey;
+    private final NamespacedKey dragonEscapeGhostMenuActionKey;
     private final ModernArcadeLobby lobby;
     private final ModernArcadeLobbyRuntime lobbyRuntime;
     private final AbilityCooldownProgress cooldownProgress;
@@ -536,6 +537,7 @@ public final class ArcadePortManager implements Listener {
         this.gladiatorPotionKey = new NamespacedKey(plugin, "gladiators-healing-pot");
         this.gladiatorHotbarKey = new NamespacedKey(plugin, "gladiators-hotbar-editor");
         this.dragonEscapeGhostHotbarKey = new NamespacedKey(plugin, "dragon-escape-ghost-toggle");
+        this.dragonEscapeGhostMenuActionKey = new NamespacedKey(plugin, "dragon-escape-ghost-menu-action");
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=manager-keys-ready");
         this.lobby = new ModernArcadeLobby(plugin);
         World lobbyWorld = lobby.ensureWorld();
@@ -17203,11 +17205,25 @@ public final class ArcadePortManager implements Listener {
         if (GameDebugRuntimeOverrides.isDebugSession()) return;
         if (session.dragonEscapeMapResource == null) return;
         long elapsed = Math.max(1L, now - session.startedAt);
+        DragonEscapeGhostSelection.Source comparison = selectedDragonEscapeGhost(player, session);
+        if (comparison != null) {
+            String finishDelta = DragonEscapeGhostSelection.relativeFinish(elapsed, comparison.timeMillis());
+            player.sendMessage(ChatColor.AQUA + "Ghost comparison: " + ChatColor.WHITE
+                    + ArcadePortRules.formatDragonEscapeTime(elapsed) + ChatColor.GRAY + " vs "
+                    + ChatColor.YELLOW + comparison.label() + ChatColor.GRAY + " ("
+                    + ArcadePortRules.formatDragonEscapeTime(comparison.timeMillis()) + "): "
+                    + (elapsed <= comparison.timeMillis() ? ChatColor.GREEN : ChatColor.RED) + finishDelta);
+        } else {
+            player.sendMessage(ChatColor.GRAY + "No saved ghost comparison for this map and selected mode.");
+        }
         Map<Integer, Long> splits = session.dragonEscapeRunSplitMillis.computeIfAbsent(id, ignored -> new HashMap<>());
         splits.putIfAbsent(0, 0L);
         splits.put(session.dragonEscapeWaypoints.size(), elapsed);
         String path = dragonEscapePbPath(id, session.dragonEscapeMapResource);
         if (path.isEmpty()) return;
+        String kit = session.dragonEscapeKits.getOrDefault(id, "jumper");
+        long kitExisting = plugin.getConfig().getLong(path + "kits." + kit + ".time-ms", -1L);
+        boolean improvedKit = kitExisting <= 0L || elapsed < kitExisting;
         long existing = plugin.getConfig().getLong(path + "time-ms", -1L);
         if (existing > 0L && existing - elapsed >= 10_000L && isDragonEscapeGhostEnabled(id)) {
             awardCatalogAchievement(player, "dragon-escape", "beat-the-clock");
@@ -17215,13 +17231,21 @@ public final class ArcadePortManager implements Listener {
         if (existing > 0L && Math.abs(existing - elapsed) <= 50L) {
             awardCatalogAchievement(player, "dragon-escape", "twinning-this-halloween");
         }
-        if (existing > 0L && existing <= elapsed) return;
         Location finishLocation = player.getLocation().clone();
         List<DragonEscapeGhostFrame> ghostFrames = session.dragonEscapeRunGhostFrames
                 .computeIfAbsent(id, ignored -> new ArrayList<>());
         appendDragonEscapeGhostFrame(ghostFrames, dragonEscapeGhostFrame(player, elapsed, finishLocation));
+        if (improvedKit) {
+            plugin.getConfig().set(path + "kits." + kit + ".time-ms", elapsed);
+            saveDragonEscapeGhostFrames(id, session.dragonEscapeMapResource, kit, ghostFrames);
+        }
+        if (existing > 0L && existing <= elapsed) {
+            if (improvedKit) plugin.saveConfig();
+            return;
+        }
         saveDragonEscapeGhostFrames(id, session.dragonEscapeMapResource, ghostFrames);
         plugin.getConfig().set(path + "time-ms", elapsed);
+        plugin.getConfig().set(path + "best-kit", kit);
         plugin.getConfig().set(path + "map-resource", session.dragonEscapeMapResource);
         plugin.getConfig().set(path + "map-name", session.dragonEscapeMapName);
         // Store each runner's actual GREEN start and exact finish so their PB ghost replays
@@ -17451,23 +17475,41 @@ public final class ArcadePortManager implements Listener {
     }
 
     private String dragonEscapeGhostCacheKey(UUID playerId, String mapResource) {
+        return dragonEscapeGhostCacheKey(playerId, mapResource, null);
+    }
+
+    private String dragonEscapeGhostCacheKey(UUID playerId, String mapResource, String kitId) {
         String mapKey = ArcadePortRules.dragonEscapeMapStorageKey(mapResource);
-        return playerId == null || mapKey.isBlank() ? "" : playerId + ":" + mapKey;
+        return playerId == null || mapKey.isBlank() ? ""
+                : playerId + ":" + mapKey + (kitId == null ? "" : ":" + kitId);
     }
 
     private Path dragonEscapeGhostFile(UUID playerId, String mapResource) {
+        return dragonEscapeGhostFile(playerId, mapResource, null);
+    }
+
+    private Path dragonEscapeGhostFile(UUID playerId, String mapResource, String kitId) {
         String mapKey = ArcadePortRules.dragonEscapeMapStorageKey(mapResource);
         if (playerId == null || mapKey.isBlank()) return null;
         String safeMapKey = mapKey.replaceAll("[^A-Za-z0-9._-]", "_");
-        return plugin.getDataFolder().toPath().resolve("dragon-escape-ghosts")
-                .resolve(playerId.toString()).resolve(safeMapKey + ".ghost.gz");
+        Path playerFolder = plugin.getDataFolder().toPath().resolve("dragon-escape-ghosts")
+                .resolve(playerId.toString());
+        // Keep the legacy overall PB replay filename backwards compatible.
+        if (kitId == null) return playerFolder.resolve(safeMapKey + ".ghost.gz");
+        if (!Set.of("jumper", "disruptor", "builder", "warper", "digger").contains(kitId)) return null;
+        return playerFolder.resolve(safeMapKey).resolve(kitId + ".ghost.gz");
     }
 
     private void saveDragonEscapeGhostFrames(
             UUID playerId, String mapResource, List<DragonEscapeGhostFrame> frames) {
+        saveDragonEscapeGhostFrames(playerId, mapResource, null, frames);
+    }
+
+    private void saveDragonEscapeGhostFrames(
+            UUID playerId, String mapResource, String kitId, List<DragonEscapeGhostFrame> frames) {
         if (frames == null || frames.isEmpty()) return;
-        Path target = dragonEscapeGhostFile(playerId, mapResource);
-        String cacheKey = dragonEscapeGhostCacheKey(playerId, mapResource);
+        Path target = dragonEscapeGhostFile(playerId, mapResource, kitId);
+        String cacheKey = dragonEscapeGhostCacheKey(playerId, mapResource, kitId);
         if (target == null || cacheKey.isEmpty()) return;
         Path temporary = target.resolveSibling(target.getFileName() + ".tmp");
         try {
@@ -17504,11 +17546,16 @@ public final class ArcadePortManager implements Listener {
     }
 
     private List<DragonEscapeGhostFrame> loadDragonEscapeGhostFrames(UUID playerId, String mapResource) {
-        String cacheKey = dragonEscapeGhostCacheKey(playerId, mapResource);
+        return loadDragonEscapeGhostFrames(playerId, mapResource, null);
+    }
+
+    private List<DragonEscapeGhostFrame> loadDragonEscapeGhostFrames(
+            UUID playerId, String mapResource, String kitId) {
+        String cacheKey = dragonEscapeGhostCacheKey(playerId, mapResource, kitId);
         if (cacheKey.isEmpty()) return List.of();
         List<DragonEscapeGhostFrame> cached = dragonEscapeGhostFrameCache.get(cacheKey);
         if (cached != null) return cached;
-        Path file = dragonEscapeGhostFile(playerId, mapResource);
+        Path file = dragonEscapeGhostFile(playerId, mapResource, kitId);
         if (file == null || !Files.isRegularFile(file)) return List.of();
         try (DataInputStream input = new DataInputStream(new BufferedInputStream(
                 new GZIPInputStream(Files.newInputStream(file))))) {
@@ -17594,23 +17641,28 @@ public final class ArcadePortManager implements Listener {
                 hideDragonEscapeGhost(viewer);
                 continue;
             }
-            long pb = dragonEscapePersonalBestMillis(id, session.dragonEscapeMapResource);
+            DragonEscapeGhostSelection.Source source = selectedDragonEscapeGhost(viewer, session);
             long elapsed = Math.max(0L, now - session.startedAt);
-            if (pb <= 0L || elapsed >= pb) {
+            if (source == null || elapsed >= source.timeMillis()) {
                 bridge.hide(viewer);
                 continue;
             }
-            List<DragonEscapeGhostFrame> recorded = loadDragonEscapeGhostFrames(id, session.dragonEscapeMapResource);
-            DragonEscapeGhostFrame frame = recorded.isEmpty()
-                    ? dragonEscapeLegacyGhostFrame(session, id, elapsed, pb)
-                    : dragonEscapeGhostFrameAt(recorded, elapsed);
+            List<DragonEscapeGhostFrame> recorded = loadDragonEscapeGhostFrames(
+                    source.playerId(), session.dragonEscapeMapResource, source.kitId());
+            // Only the viewer's legacy overall PB can use the old split-based fallback.
+            // Another player's or another kit's run requires its own genuine replay.
+            boolean ownOverall = source.playerId().equals(id) && source.kitId() == null;
+            DragonEscapeGhostFrame frame = !recorded.isEmpty()
+                    ? dragonEscapeGhostFrameAt(recorded, elapsed)
+                    : ownOverall ? dragonEscapeLegacyGhostFrame(session, id, elapsed, source.timeMillis()) : null;
             if (frame == null) {
                 bridge.hide(viewer);
                 continue;
             }
             Location ghostLocation = new Location(session.world,
                     frame.x(), frame.y(), frame.z(), frame.yaw(), frame.pitch());
-            bridge.update(viewer, ghostLocation, frame.sneaking(), frame.sprinting(), frame.onGround());
+            bridge.update(viewer, source.playerId(), ghostLocation,
+                    frame.sneaking(), frame.sprinting(), frame.onGround());
         }
     }
 
@@ -23420,6 +23472,22 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private static final class DragonEscapeGhostMenuHolder implements InventoryHolder {
+        private final UUID ownerId;
+        private final boolean targetPicker;
+        private final int page;
+        private final Map<Integer, UUID> targets = new HashMap<>();
+        private Inventory inventory;
+
+        private DragonEscapeGhostMenuHolder(UUID ownerId, boolean targetPicker, int page) {
+            this.ownerId = ownerId;
+            this.targetPicker = targetPicker;
+            this.page = page;
+        }
+
+        @Override public Inventory getInventory() { return inventory; }
+    }
+
     // AchievementMainPage's exact 5-row OX layout, and the 1.8 non-Arcade categories.
     private static final String[][] ROOT_STATS_CATEGORIES = {
             {"global", "Global", "EMERALD"},
@@ -23455,6 +23523,75 @@ public final class ArcadePortManager implements Listener {
         return playerId != null && plugin.getConfig().getBoolean("dragon-escape-ghost-visible." + playerId, false);
     }
 
+    private boolean isDragonEscapeGhostPublic(UUID playerId) {
+        return playerId != null && plugin.getConfig().getBoolean(
+                "dragon-escape-ghost-public." + playerId, true);
+    }
+
+    private DragonEscapeGhostSelection.Mode dragonEscapeGhostMode(UUID playerId) {
+        return DragonEscapeGhostSelection.mode(plugin.getConfig().getString(
+                "dragon-escape-ghost-mode." + playerId, "personal"));
+    }
+
+    private UUID dragonEscapeGhostTarget(UUID playerId) {
+        String stored = plugin.getConfig().getString("dragon-escape-ghost-target." + playerId);
+        if (stored == null) return null;
+        try { return UUID.fromString(stored); }
+        catch (IllegalArgumentException ignored) { return null; }
+    }
+
+    private DragonEscapeGhostSelection.Source selectedDragonEscapeGhost(Player player, Session session) {
+        if (player == null || session == null || session.dragonEscapeMapResource == null) return null;
+        UUID viewerId = player.getUniqueId();
+        String resource = session.dragonEscapeMapResource;
+        DragonEscapeGhostSelection.Mode mode = dragonEscapeGhostMode(viewerId);
+        if (mode == DragonEscapeGhostSelection.Mode.CURRENT_KIT) {
+            String kit = session.dragonEscapeKits.getOrDefault(viewerId, "jumper");
+            long best = plugin.getConfig().getLong(dragonEscapePbPath(viewerId, resource)
+                    + "kits." + kit + ".time-ms", -1L);
+            return best > 0L ? new DragonEscapeGhostSelection.Source(viewerId, best, kit,
+                    "Your " + kit + " PB") : null;
+        }
+        UUID sourceId = viewerId;
+        if (mode == DragonEscapeGhostSelection.Mode.TARGET_PLAYER) {
+            sourceId = dragonEscapeGhostTarget(viewerId);
+            if (sourceId == null || !DragonEscapeGhostSelection.canShare(
+                    sourceId, viewerId, isDragonEscapeGhostPublic(sourceId))) return null;
+        }
+        long best = dragonEscapePersonalBestMillis(sourceId, resource);
+        if (best <= 0L) return null;
+        String label = mode == DragonEscapeGhostSelection.Mode.TARGET_PLAYER
+                ? plugin.getConfig().getString("dragon-escape-ghost-target-name." + viewerId) : null;
+        if (label == null || label.isBlank()) label = mode == DragonEscapeGhostSelection.Mode.TARGET_PLAYER
+                ? "Racer " + sourceId.toString().substring(0, 8) : "Your overall PB";
+        return new DragonEscapeGhostSelection.Source(sourceId, best, null, label);
+    }
+
+    private void chooseDragonEscapeGhostMode(Player player, DragonEscapeGhostSelection.Mode mode) {
+        plugin.getConfig().set("dragon-escape-ghost-mode." + player.getUniqueId(),
+                switch (mode) {
+                    case CURRENT_KIT -> "kit";
+                    case TARGET_PLAYER -> "target";
+                    default -> "personal";
+                });
+        plugin.saveConfig();
+        if (!isDragonEscapeGhostEnabled(player.getUniqueId())) setDragonEscapeGhost(player, "on");
+        else setDragonEscapeGhostHotbarItem(player);
+    }
+
+    private void chooseDragonEscapeGhostTarget(Player player, UUID targetId) {
+        if (targetId == null || !DragonEscapeGhostSelection.canShare(
+                targetId, player.getUniqueId(), isDragonEscapeGhostPublic(targetId))) {
+            player.sendMessage(ChatColor.RED + "That racer does not share PB ghosts.");
+            return;
+        }
+        plugin.getConfig().set("dragon-escape-ghost-target." + player.getUniqueId(), targetId.toString());
+        plugin.getConfig().set("dragon-escape-ghost-target-name." + player.getUniqueId(),
+                Bukkit.getOfflinePlayer(targetId).getName());
+        plugin.saveConfig();
+        chooseDragonEscapeGhostMode(player, DragonEscapeGhostSelection.Mode.TARGET_PLAYER);
+    }
+
     public boolean setDragonEscapeGhost(Player player, String requested) {
         if (player == null || requested == null) return false;
         String value = requested.toLowerCase(java.util.Locale.ROOT);
@@ -23480,13 +23617,124 @@ public final class ArcadePortManager implements Listener {
         return enabled;
     }
 
+    private ItemStack dragonEscapeGhostMenuItem(Material material, String name,
+            List<String> lore, String action) {
+        ItemStack item = namedItem(material, name, lore.toArray(String[]::new));
+        ItemMeta meta = item.getItemMeta();
+        meta.getPersistentDataContainer().set(dragonEscapeGhostMenuActionKey,
+                PersistentDataType.STRING, action);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private void openDragonEscapeGhostOptions(Player viewer) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.DRAGON_ESCAPE
+                || !session.alive.contains(viewer.getUniqueId())) return;
+        DragonEscapeGhostMenuHolder holder = new DragonEscapeGhostMenuHolder(viewer.getUniqueId(), false, 0);
+        Inventory inventory = Bukkit.createInventory(holder, 27, "Dragon Escape Ghost Options");
+        holder.inventory = inventory;
+        DragonEscapeGhostSelection.Mode selected = dragonEscapeGhostMode(viewer.getUniqueId());
+        boolean shared = isDragonEscapeGhostPublic(viewer.getUniqueId());
+        inventory.setItem(0, dragonEscapeGhostMenuItem(Material.RED_BED,
+                ChatColor.GRAY + "↩ Back to Race", List.of(), "close"));
+        inventory.setItem(11, dragonEscapeGhostMenuItem(Material.CLOCK,
+                (selected == DragonEscapeGhostSelection.Mode.PERSONAL_BEST ? ChatColor.GREEN : ChatColor.YELLOW)
+                        + "Personal Best", List.of(ChatColor.GRAY + "Replay your fastest overall run on this map."),
+                "personal"));
+        inventory.setItem(13, dragonEscapeGhostMenuItem(Material.DIAMOND_PICKAXE,
+                (selected == DragonEscapeGhostSelection.Mode.CURRENT_KIT ? ChatColor.GREEN : ChatColor.YELLOW)
+                        + "Current Kit PB", List.of(ChatColor.GRAY + "Replay the record for your active kit.",
+                        ChatColor.DARK_GRAY + "Requires a recorded finish with that kit."), "kit"));
+        String targetName = plugin.getConfig().getString(
+                "dragon-escape-ghost-target-name." + viewer.getUniqueId(), "None selected");
+        inventory.setItem(15, dragonEscapeGhostMenuItem(Material.PLAYER_HEAD,
+                (selected == DragonEscapeGhostSelection.Mode.TARGET_PLAYER ? ChatColor.GREEN : ChatColor.YELLOW)
+                        + "Target Ghost", List.of(ChatColor.GRAY + "Current target: " + targetName,
+                        ChatColor.GRAY + "Click to choose another recorded racer.",
+                        ChatColor.DARK_GRAY + "Only public replay files appear."), "targets"));
+        inventory.setItem(21, dragonEscapeGhostMenuItem(Material.LEVER,
+                ChatColor.AQUA + "My Ghost Sharing: "
+                        + (shared ? ChatColor.GREEN + "PUBLIC" : ChatColor.RED + "PRIVATE"),
+                List.of(ChatColor.GRAY + "Other racers may use your recorded ghosts by default.",
+                        ChatColor.YELLOW + "Click to " + (shared ? "opt out" : "opt in") + "."), "sharing"));
+        inventory.setItem(23, dragonEscapeGhostMenuItem(Material.ENDER_EYE,
+                ChatColor.YELLOW + "Ghost Rendering: "
+                        + (isDragonEscapeGhostEnabled(viewer.getUniqueId())
+                        ? ChatColor.GREEN + "ON" : ChatColor.RED + "OFF"),
+                List.of(ChatColor.GRAY + "Click to show/hide the selected ghost."), "toggle"));
+        viewer.openInventory(inventory);
+    }
+
+    private void openDragonEscapeGhostTargets(Player viewer, int requestedPage) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.DRAGON_ESCAPE
+                || session.dragonEscapeMapResource == null) return;
+        var records = plugin.getConfig().getConfigurationSection("dragon-escape-pb");
+        List<UUID> candidates = new ArrayList<>();
+        if (records != null) for (String candidate : records.getKeys(false)) {
+            try {
+                UUID id = UUID.fromString(candidate);
+                if (id.equals(viewer.getUniqueId()) || testPlayers.isTestPlayer(id)
+                        || !isDragonEscapeGhostPublic(id)
+                        || dragonEscapePersonalBestMillis(id, session.dragonEscapeMapResource) <= 0L) continue;
+                Path replay = dragonEscapeGhostFile(id, session.dragonEscapeMapResource);
+                if (replay != null && Files.isRegularFile(replay)) candidates.add(id);
+            } catch (IllegalArgumentException ignored) { }
+        }
+        candidates.sort(java.util.Comparator.comparingLong(
+                id -> dragonEscapePersonalBestMillis(id, session.dragonEscapeMapResource)));
+        int totalPages = Math.max(1, (candidates.size() + 35) / 36);
+        int page = Math.max(0, Math.min(requestedPage, totalPages - 1));
+        DragonEscapeGhostMenuHolder holder = new DragonEscapeGhostMenuHolder(viewer.getUniqueId(), true, page);
+        Inventory inventory = Bukkit.createInventory(holder, 54, "Dragon Escape Target Ghosts");
+        holder.inventory = inventory;
+        inventory.setItem(0, dragonEscapeGhostMenuItem(Material.RED_BED,
+                ChatColor.GRAY + "↩ Ghost Options", List.of(), "back"));
+        inventory.setItem(4, dragonEscapeGhostMenuItem(Material.PAPER,
+                ChatColor.GOLD + session.dragonEscapeMapName,
+                List.of(ChatColor.GRAY + "Public Testplex PB replays: " + candidates.size()), "noop"));
+        int start = page * 36;
+        for (int i = start; i < Math.min(candidates.size(), start + 36); i++) {
+            UUID racerId = candidates.get(i);
+            int slot = 9 + i - start;
+            holder.targets.put(slot, racerId);
+            String name = Bukkit.getOfflinePlayer(racerId).getName();
+            if (name == null) name = racerId.toString().substring(0, 8);
+            ItemStack head = dragonEscapeGhostMenuItem(Material.PLAYER_HEAD,
+                    ChatColor.YELLOW + name, List.of(ChatColor.GRAY + "PB: "
+                            + ArcadePortRules.formatDragonEscapeTime(
+                                    dragonEscapePersonalBestMillis(racerId, session.dragonEscapeMapResource)),
+                            ChatColor.AQUA + "Click to race this ghost."), "select-target");
+            if (head.getItemMeta() instanceof SkullMeta skull) {
+                skull.setOwningPlayer(Bukkit.getOfflinePlayer(racerId));
+                head.setItemMeta(skull);
+            }
+            inventory.setItem(slot, head);
+        }
+        if (candidates.isEmpty()) inventory.setItem(22, dragonEscapeGhostMenuItem(Material.BARRIER,
+                ChatColor.YELLOW + "No public replays yet",
+                List.of(ChatColor.GRAY + "A racer must finish this map and share their replay."), "noop"));
+        if (page > 0) inventory.setItem(45, dragonEscapeGhostMenuItem(Material.ARROW,
+                ChatColor.YELLOW + "← Previous", List.of(), "previous"));
+        if (page + 1 < totalPages) inventory.setItem(53, dragonEscapeGhostMenuItem(Material.ARROW,
+                ChatColor.YELLOW + "Next →", List.of(), "next"));
+        viewer.openInventory(inventory);
+    }
+
     /** A dedicated last-slot control, independent of /stats and the Dragon Escape cosmetics menu. */
     private void setDragonEscapeGhostHotbarItem(Player player) {
         if (player == null) return;
         boolean enabled = isDragonEscapeGhostEnabled(player.getUniqueId());
+        String mode = switch (dragonEscapeGhostMode(player.getUniqueId())) {
+            case PERSONAL_BEST -> "Personal PB";
+            case CURRENT_KIT -> "Kit PB";
+            case TARGET_PLAYER -> "Target Racer";
+        };
         ItemStack toggle = namedItem(Material.ENDER_EYE,
                 "PB Ghost: " + (enabled ? ChatColor.GREEN + "ON" : ChatColor.RED + "OFF"),
-                "Right-click to " + (enabled ? "hide" : "show") + " your personal-best ghost."
+                "Selected: " + mode + ". Right-click to " + (enabled ? "hide" : "show") + " the ghost; "
+                        + "left-click to choose Personal PB, Kit PB, or Target Ghost."
                         + (dragonEscapeGhostBridge == null ? " Requires PacketEvents 2.14.0." : ""));
         ItemMeta meta = toggle.getItemMeta();
         meta.getPersistentDataContainer().set(dragonEscapeGhostHotbarKey, PersistentDataType.BYTE, (byte) 1);
@@ -23515,6 +23763,10 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDragonEscapeGhostHotbarDrag(InventoryDragEvent event) {
+        if (event.getView().getTopInventory().getHolder() instanceof DragonEscapeGhostMenuHolder) {
+            event.setCancelled(true);
+            return;
+        }
         Session session = active;
         if (session == null || session.type != ArcadePortGame.DRAGON_ESCAPE
                 || !session.alive.contains(event.getWhoClicked().getUniqueId())) return;
@@ -28009,6 +28261,7 @@ public final class ArcadePortManager implements Listener {
                 && isDragonEscapeGhostHotbarItem(event.getItem())) {
             event.setCancelled(true);
             if (event.getAction().isRightClick()) setDragonEscapeGhost(event.getPlayer(), "toggle");
+            else if (event.getAction().isLeftClick()) openDragonEscapeGhostOptions(event.getPlayer());
             return;
         }
         if (session.type == ArcadePortGame.GLADIATORS && event.getPlayer().getGameMode() == GameMode.SPECTATOR) {
@@ -30811,6 +31064,42 @@ public final class ArcadePortManager implements Listener {
                 spectator.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
             }
             spectator.setCompassTarget(target.getLocation());
+            return;
+        }
+        if (event.getView().getTopInventory().getHolder() instanceof DragonEscapeGhostMenuHolder holder) {
+            event.setCancelled(true);
+            if (!(event.getWhoClicked() instanceof Player player)
+                    || !holder.ownerId.equals(player.getUniqueId())
+                    || event.getClickedInventory() != event.getView().getTopInventory()) return;
+            ItemStack item = event.getCurrentItem();
+            if (item == null || !item.hasItemMeta()) return;
+            String action = item.getItemMeta().getPersistentDataContainer()
+                    .get(dragonEscapeGhostMenuActionKey, PersistentDataType.STRING);
+            if ("close".equals(action)) player.closeInventory();
+            else if ("back".equals(action)) openDragonEscapeGhostOptions(player);
+            else if ("personal".equals(action) || "kit".equals(action)) {
+                chooseDragonEscapeGhostMode(player, DragonEscapeGhostSelection.mode(action));
+                openDragonEscapeGhostOptions(player);
+            } else if ("targets".equals(action)) openDragonEscapeGhostTargets(player, 0);
+            else if ("sharing".equals(action)) {
+                boolean publicGhost = !isDragonEscapeGhostPublic(player.getUniqueId());
+                plugin.getConfig().set("dragon-escape-ghost-public." + player.getUniqueId(), publicGhost);
+                plugin.saveConfig();
+                player.sendMessage(ChatColor.AQUA + "Your Dragon Escape ghosts are now "
+                        + (publicGhost ? ChatColor.GREEN + "public" : ChatColor.RED + "private") + ".");
+                openDragonEscapeGhostOptions(player);
+            } else if ("toggle".equals(action)) {
+                setDragonEscapeGhost(player, "toggle");
+                openDragonEscapeGhostOptions(player);
+            } else if ("select-target".equals(action) && holder.targetPicker) {
+                UUID targetId = holder.targets.get(event.getSlot());
+                if (targetId != null) {
+                    chooseDragonEscapeGhostTarget(player, targetId);
+                    openDragonEscapeGhostOptions(player);
+                }
+            } else if ("previous".equals(action) || "next".equals(action)) {
+                openDragonEscapeGhostTargets(player, holder.page + ("next".equals(action) ? 1 : -1));
+            }
             return;
         }
         if (event.getView().getTopInventory().getHolder() instanceof StatsMenuHolder holder) {
