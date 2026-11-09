@@ -964,7 +964,7 @@ jobs:
             echo "[deploy] downloading pinned PacketEvents $PE_VERSION from Modrinth (6 minute limit)."
             timeout --foreground --signal=TERM 6m curl --fail --location --retry 3 --user-agent "$USER_AGENT" \
               "$PE_URL" -o "$PE_TMP"
-            printf '%s  %s\\n' "$PE_SHA512" "$PE_TMP" | sha512sum -c -
+            printf '%s  %s\n' "$PE_SHA512" "$PE_TMP" | sha512sum -c -
             # The exact SHA-512 pins the official artifact. Read the descriptor with
             # Python's standard ZIP reader: this VM has Python 3 but no JDK jar tool,
             # and Info-ZIP's whole-archive CRC scan rejects this pinned release.
@@ -982,7 +982,6 @@ jobs:
               echo "Could not read the root Paper plugin descriptor from the SHA-512-pinned PacketEvents archive." >&2
               exit 1
             fi
-          fi
           fi
           pe_name="$(yaml_descriptor_value name "$pe_descriptor")"
           pe_version="$(yaml_descriptor_value version "$pe_descriptor")"
@@ -1537,7 +1536,7 @@ jobs:
             exit 1
           fi
 
-          if ! sudo -n grep -iE '\\[packetevents\\].*Enabling packetevents v2\\.14\\.0' "$SERVER_DIR/logs/latest.log"; then
+          if ! sudo -n grep -Fqi '[packetevents] Enabling packetevents v2.14.0' "$SERVER_DIR/logs/latest.log"; then
             echo "Pinned PacketEvents $PE_VERSION did not enable in Paper; rolling back." >&2
             timeout --foreground --signal=TERM 10s sudo -n grep -i -E -C 3 'PacketEvents|packetevents|ERROR|SEVERE|Exception|Failed|Could not' "$SERVER_DIR/logs/latest.log" | tail -n 120 >&2 || true
             rollback
