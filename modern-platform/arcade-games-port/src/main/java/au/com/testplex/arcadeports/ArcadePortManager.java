@@ -23619,7 +23619,7 @@ public final class ArcadePortManager implements Listener {
 
     private ItemStack dragonEscapeGhostMenuItem(Material material, String name,
             List<String> lore, String action) {
-        ItemStack item = namedItem(material, name, lore.toArray(String[]::new));
+        ItemStack item = statsSummaryItem(material, name, lore);
         ItemMeta meta = item.getItemMeta();
         meta.getPersistentDataContainer().set(dragonEscapeGhostMenuActionKey,
                 PersistentDataType.STRING, action);
