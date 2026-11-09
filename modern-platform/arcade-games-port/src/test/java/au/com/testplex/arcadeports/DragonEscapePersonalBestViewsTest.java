@@ -1,6 +1,7 @@
 package au.com.testplex.arcadeports;
 
 import org.junit.jupiter.api.Test;
+import org.bukkit.Material;
 
 import java.util.List;
 
@@ -20,6 +21,9 @@ class DragonEscapePersonalBestViewsTest {
         assertEquals("Best Time", DragonEscapePersonalBestViews.name("best-time"));
         assertEquals("Builder", DragonEscapePersonalBestViews.name("builder"));
         assertEquals("Unknown (legacy record)", DragonEscapePersonalBestViews.name(null));
+        assertEquals(List.of(Material.CLOCK, Material.FEATHER, Material.TNT,
+                        Material.BRICK, Material.ENDER_PEARL, Material.DIAMOND_PICKAXE),
+                DragonEscapePersonalBestViews.all().stream().map(DragonEscapePersonalBestViews::icon).toList());
     }
 
     @Test

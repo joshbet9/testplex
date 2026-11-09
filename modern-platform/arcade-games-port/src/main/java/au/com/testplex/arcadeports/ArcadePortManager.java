@@ -431,6 +431,7 @@ public final class ArcadePortManager implements Listener {
     private final NamespacedKey gladiatorHotbarKey;
     private final ModernArcadeLobby lobby;
     private final ModernArcadeLobbyRuntime lobbyRuntime;
+    private final ArcadeLobbyLeaderboardService lobbyLeaderboards;
     private final AbilityCooldownProgress cooldownProgress;
     private MonsterMazePlugin monsterMazeModule;
     private ArcadeGameModule monsterMazeLifecycle;
@@ -549,6 +550,7 @@ public final class ArcadePortManager implements Listener {
         plugin.getLogger().info("TESTPLEX_ARCADE_LOBBY_READY world=" + ModernArcadeLobby.WORLD_NAME
                 + " bounds=-50..49 floor-y=" + ModernArcadeLobby.FLOOR_Y);
         this.lobbyRuntime = new ModernArcadeLobbyRuntime(plugin, this, lobby);
+        this.lobbyLeaderboards = new ArcadeLobbyLeaderboardService(plugin, this, lobby);
         this.testPlayers.cleanupStaleSessionPlayers();
         Bukkit.getPluginManager().registerEvents(lobbyRuntime, plugin);
         lobbyRuntime.setSelectedGame(ArcadePortGame.fromId(plugin.getConfig().getString("lobby-selected-game", "bacon-brawl")));
@@ -568,6 +570,7 @@ public final class ArcadePortManager implements Listener {
         initializeWizardsGameModule();
         initializeSnakeGameModule();
         gameModulesInitialized = true;
+        lobbyLeaderboards.start();
         // Take the saved-progress baseline first: restarting the server must not
         // replay existing achievements and milestone tiers into chat.
         for (Player player : Bukkit.getOnlinePlayers()) {
@@ -23661,6 +23664,30 @@ public final class ArcadePortManager implements Listener {
         };
     }
 
+    /** Snapshot of recorded human results; lobby leaderboard rendering must never count AFK test bots. */
+    Map<UUID, Long> lobbyLeaderboardScores(String gameId, String metric) {
+        Map<UUID, Long> scores = new LinkedHashMap<>();
+        for (UUID id : statsEligiblePlayers(gameId))
+            scores.put(id, statsGameMetric(id, gameId, metric));
+        return scores;
+    }
+
+    /** Dragon Escape records are stored independently per map and kit. Smaller times rank higher. */
+    Map<UUID, Long> lobbyDragonEscapeTimes(String mapResource, String kitId) {
+        Map<UUID, Long> scores = new LinkedHashMap<>();
+        for (UUID id : dragonEscapePbRecordedPlayers()) {
+            long time = DragonEscapePersonalBestViews.BEST_TIME.equals(kitId)
+                    ? dragonEscapePersonalBestMillis(id, mapResource)
+                    : dragonEscapeKitPersonalBestMillis(id, mapResource, kitId);
+            if (time > 0L) scores.put(id, time);
+        }
+        return scores;
+    }
+
+    public void openLobbyLeaderboardMenu(Player player) {
+        lobbyLeaderboards.open(player);
+    }
+
     private ArcadeStatsPlacement.Result gamePlacement(UUID targetId, String gameId, String metric,
                                                        List<UUID> eligible) {
         if (!eligible.contains(targetId)) return null;
@@ -24344,7 +24371,8 @@ public final class ArcadePortManager implements Listener {
         Inventory inventory = createStatsInventory(StatsPage.MILESTONES, targetId, targetName,
                 statsGameName(gameId) + " Milestones", gameId, returnAchievementPage, incompleteOnly);
         inventory.setItem(ArcadeStatsLayout.BACK, statsItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back",
-                List.of(ChatColor.GRAY + "Return to Arcade games."), "back-arcade", null, null));
+                List.of(ChatColor.GRAY + "Return to this game's achievements."),
+                "open-game-achievements", null, gameId));
         for (int index = 0; index < visible.size(); index++) {
             StatsMilestone track = visible.get(index);
             int column = columns.get(index);
@@ -24600,7 +24628,7 @@ public final class ArcadePortManager implements Listener {
                 List.of(ChatColor.GRAY + "No Dragon Escape map archives were found."), "noop", null, null));
         inventory.setItem(ArcadeStatsLayout.BACK, statsItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back", List.of(),
                 "back-dragon-escape", null, null));
-        inventory.setItem(8, statsItem(Material.LEVER,
+        inventory.setItem(8, statsItem(DragonEscapePersonalBestViews.icon(view),
                 ChatColor.AQUA + "Showing: " + DragonEscapePersonalBestViews.name(view),
                 List.of(ChatColor.GRAY + "Click for " + DragonEscapePersonalBestViews.name(
                                 DragonEscapePersonalBestViews.selected(DragonEscapePersonalBestViews.next(requestedView)))
@@ -25186,6 +25214,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     public void shutdown() {
+        lobbyLeaderboards.shutdown();
         if (statsUnlockNotificationTask != null) statsUnlockNotificationTask.cancel();
         statsUnlockNotificationTask = null;
         statsUnlockTracker.clear();
