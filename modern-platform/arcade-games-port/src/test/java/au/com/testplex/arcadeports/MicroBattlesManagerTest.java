@@ -33,6 +33,18 @@ class MicroBattlesManagerTest {
     }
 
     @Test
+    void barrierOnlyReleasesAfterItsConfiguredDeadline() {
+        MicroBattlesManager micro = new MicroBattlesManager();
+        SessionState session = new SessionState(ArcadePortGame.MICRO_BATTLES, null, List.of(), false);
+        long duration = ArcadePortRules.MICRO_BATTLES_BARRIER_DURATION_MILLIS;
+
+        assertFalse(micro.shouldReleaseBarrier(session, duration));
+        session.microBarrierActive = true;
+        assertFalse(micro.shouldReleaseBarrier(session, duration - 1L));
+        assertTrue(micro.shouldReleaseBarrier(session, duration));
+    }
+
+    @Test
     void fourTeamIdentityMatchesOriginalColorsAndBadgeRules() {
         MicroBattlesManager micro = new MicroBattlesManager();
         assertEquals(Color.RED, micro.teamDyeColor(0));
