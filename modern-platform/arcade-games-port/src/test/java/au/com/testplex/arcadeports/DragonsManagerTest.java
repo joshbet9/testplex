@@ -51,7 +51,7 @@ class DragonsManagerTest {
 
         assertFalse(dragons.isTrackingCompass(null));
         assertFalse(dragons.isSpectatorMenu((InventoryHolder) null));
-        assertNull(dragons.nearestSpectatorTarget(session, null));
+        assertNull(dragons.nearestSpectatorTarget(session, null, null));
     }
 
 }
