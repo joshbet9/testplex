@@ -85,3 +85,12 @@ Do not collapse maps with similar names or rely on the convenience `maps/dragon-
 ## Controlled-queue acceptance gate
 
 Dragon Escape is enabled for combined controlled testing because the modern source-map loader, race implementation, four kits, PB timing and optional packet ghost are present with deterministic rule coverage. This promotion is **not** a claim of live gameplay acceptance. Complete the map-by-map checks and at least one two-client race on every map, then repeat the highest-risk switchback, Hell and Pirate maps with multiple racers. Record and fix defects without weakening source route, kit or shared-lifecycle parity.
+
+
+### Dragon Escape follow-up: collision and leap display
+
+- [ ] In a live race, run through another human player and an active bot without either being pushed or blocked. Confirm this remains true after scoreboard refreshes and game ticks.
+- [ ] On the four-leap Jumper kit, inventory contains exactly one iron axe named Leap. Its display name/lore does not contain the charge count. The XP level/bar show 4/full initially, then 3/75%, 2/50%, 1/25%, and 0/empty after successive leaps.
+- [ ] On the three-leap Disruptor and Warper kits, the XP level/bar show 3/full initially, then 2/about 66%, 1/about 33%, and 0/empty. Inventory still contains exactly one Leap iron axe.
+- [ ] During Leap recharge, the green/red timed-ability bar owns the action bar and replaces TIME/PB until recharge ends. TIME/PB resumes after the cooldown display expires; verify this for all leap kits.
+- [ ] Reset/stopping the match restores the participant's original XP level, XP bar, inventory and collision behavior.
