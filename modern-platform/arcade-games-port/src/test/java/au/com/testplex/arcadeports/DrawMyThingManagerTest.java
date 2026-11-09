@@ -70,15 +70,20 @@ class DrawMyThingManagerTest {
                     case "equals" -> proxy == args[0];
                     case "hashCode" -> System.identityHashCode(proxy);
                     case "toString" -> "Draw My Thing test player";
-                    default -> method.getReturnType() == boolean.class ? false
-                            : method.getReturnType() == int.class ? 0
-                            : method.getReturnType() == long.class ? 0L
-                            : method.getReturnType() == double.class ? 0.0D
-                            : method.getReturnType() == float.class ? 0.0F
-                            : method.getReturnType() == short.class ? (short) 0
-                            : method.getReturnType() == byte.class ? (byte) 0
-                            : method.getReturnType() == char.class ? '\0' : null;
+                    default -> defaultValue(method.getReturnType());
                 });
+    }
+
+    private static Object defaultValue(Class<?> type) {
+        if (type == boolean.class) return Boolean.FALSE;
+        if (type == int.class) return Integer.valueOf(0);
+        if (type == long.class) return Long.valueOf(0L);
+        if (type == double.class) return Double.valueOf(0.0D);
+        if (type == float.class) return Float.valueOf(0.0F);
+        if (type == short.class) return Short.valueOf((short) 0);
+        if (type == byte.class) return Byte.valueOf((byte) 0);
+        if (type == char.class) return Character.valueOf('\\0');
+        return null;
     }
 
     @Test
