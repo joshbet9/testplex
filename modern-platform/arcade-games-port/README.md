@@ -104,13 +104,17 @@ Game-specific cosmetic renderers are still deferred for most games, but Paintbal
 Dragon Escape has a source-comparison checklist for the PB ghost and live race timing:
 
 1. Complete a full map once so the test server saves a map-specific PB and its checkpoint splits. Use `/stats` → Arcade → Dragon Escape to inspect the map PB list.
-2. Toggle the personal ghost with `/arcadeport ghost on` (or the PB Ghost option in Dragon Escape stats), then rerun the same map. Confirm a full player model using the owner's skin appears semi-transparent, follows the recorded PB movement and pose continuously, is visible only to its owner, has no collision/hitbox, and disappears when the PB time is reached.
+2. Toggle the personal ghost with `/arcadeport ghost on` (the in-race hotbar toggle is implemented in separate PR #269), then rerun the same map. Confirm a full player model using the owner's skin appears semi-transparent, follows the recorded PB movement and pose continuously, is visible only to its owner, has no collision/hitbox, and disappears when the PB time is reached.
 3. Confirm the PB delta remains in the action bar even when the ghost is off, updates through the final three-block finish radius, and changes sign when the current run moves ahead of or behind the PB.
 4. Run with multiple racers. The sidebar and player list should agree on ranking, show the leader's elapsed time, show approximate `~+` gaps for trailing racers, and mark eliminated racers `OUT`. The sidebar should restore each player's pre-race scoreboard after the match.
 5. Change maps and confirm PBs and checkpoint splits stay isolated per archive. Restart the server and confirm saved PBs, splits, and ghost preference persist.
 6. Repeat on a tight switchback map and with Warper to verify checkpoint progress remains monotonic without false shortcut eliminations; separately confirm Douglas's chase and Digger/Disruptor/Leap interactions do not corrupt split timing.
 
 The estimated time gaps use course distance at a fixed display pace; they are presentation estimates, not authoritative race timing. Build/unit checks do not replace live acceptance on the isolated Paper 26.3 server.
+
+### Local `/stats` placement details
+
+Shift-left-click the centred game icon on any Arcade game's Achievements page to toggle placement details in its hover tooltip. The details rank wins and losses among recorded human Testplex players using shared competition ranks; Test Gems are ranked only if that game has recorded awards, and kit XP remains explicitly untracked. On Dragon Escape's Personal Bests page, shift-left-click any paper map entry to show/hide placement for every visible map under the currently selected Best Time or kit filter. Faster times rank higher; map and kit populations are separate. The placement colour bands are pink for #1–10, blue for #11–100, green for #101–1000, then top 5% yellow, top 25% white and the remainder grey. These are **local testing rankings**, not Mineplex-wide rankings or imported production data; missing records are marked unranked.
 
 
 #### Death Tag parity continuation

@@ -403,6 +403,8 @@ public final class ArcadePortManager implements Listener {
     private BukkitTask automaticRotationTask;
     /** Watches the same canonical unlocks rendered by /stats, including mid-match changes. */
     private final ArcadeStatsUnlockTracker statsUnlockTracker = new ArcadeStatsUnlockTracker();
+    /** Per-viewer, per-game visibility of local placement details on stats tooltips. */
+    private final Map<UUID, Set<String>> statsPlacementDetails = new HashMap<>();
     private BukkitTask statsUnlockNotificationTask;
     private String lastAutomaticRotationGameId;
     private boolean automaticRotationOnReturn;
@@ -23610,6 +23612,115 @@ public final class ArcadePortManager implements Listener {
                 + ". These remain isolated from production Mineplex stats.");
     }
 
+    private boolean showStatsPlacementDetails(Player viewer, String gameId) {
+        return viewer != null && gameId != null
+                && statsPlacementDetails.getOrDefault(viewer.getUniqueId(), Set.of()).contains(gameId);
+    }
+
+    private void toggleStatsPlacementDetails(Player viewer, String gameId) {
+        if (viewer == null || gameId == null) return;
+        Set<String> enabled = statsPlacementDetails.computeIfAbsent(viewer.getUniqueId(), id -> new HashSet<>());
+        if (!enabled.add(gameId)) enabled.remove(gameId);
+        if (enabled.isEmpty()) statsPlacementDetails.remove(viewer.getUniqueId());
+    }
+
+    private ChatColor statsPlacementColour(ArcadeStatsPlacement.Band band) {
+        return switch (band) {
+            case PINK -> ChatColor.LIGHT_PURPLE;
+            case BLUE -> ChatColor.AQUA;
+            case GREEN -> ChatColor.GREEN;
+            case YELLOW -> ChatColor.YELLOW;
+            case WHITE -> ChatColor.WHITE;
+            case GRAY -> ChatColor.GRAY;
+        };
+    }
+
+    private String statsPlacementLabel(ArcadeStatsPlacement.Result placement) {
+        return placement == null ? ChatColor.DARK_GRAY + "(unranked)"
+                : statsPlacementColour(placement.band()) + "(" + placement.label() + ")";
+    }
+
+    private long statsGameMetric(UUID playerId, String gameId, String metric) {
+        if ("plexball".equals(gameId) && plugin.getPlexballGame() != null) {
+            PlexballGame plexball = plugin.getPlexballGame();
+            return switch (metric) {
+                case "wins" -> plexball.recordedWins(playerId);
+                case "games-played" -> plexball.recordedMatches(playerId);
+                case "losses" -> Math.max(0L, plexball.recordedMatches(playerId) - plexball.recordedWins(playerId));
+                default -> 0L;
+            };
+        }
+        String path = localStatsPath(playerId, statsCatalogId(gameId));
+        long played = Math.max(0L, plugin.getConfig().getLong(path + "games-played", 0L));
+        long wins = Math.max(0L, plugin.getConfig().getLong(path + "wins", 0L));
+        return switch (metric) {
+            case "losses" -> Math.max(0L, played - wins);
+            case "games-played" -> played;
+            case "wins" -> wins;
+            default -> Math.max(0L, plugin.getConfig().getLong(path + metric, 0L));
+        };
+    }
+
+    private ArcadeStatsPlacement.Result gamePlacement(UUID targetId, String gameId, String metric,
+                                                       List<UUID> eligible) {
+        if (!eligible.contains(targetId)) return null;
+        List<Long> scores = new ArrayList<>(eligible.size());
+        for (UUID id : eligible) scores.add(statsGameMetric(id, gameId, metric));
+        return ArcadeStatsPlacement.higherIsBetter(statsGameMetric(targetId, gameId, metric), scores);
+    }
+
+    private void appendGamePlacementDetails(List<String> lore, UUID targetId, String gameId) {
+        List<UUID> eligible = statsEligiblePlayers(gameId);
+        long wins = statsGameMetric(targetId, gameId, "wins");
+        long losses = statsGameMetric(targetId, gameId, "losses");
+        long gems = statsGameMetric(targetId, gameId, "test-gems-earned");
+        lore.add(" ");
+        lore.add(ChatColor.GOLD + "Local placement details");
+        lore.add(ChatColor.YELLOW + "Wins: " + ChatColor.WHITE + wins + " "
+                + statsPlacementLabel(gamePlacement(targetId, gameId, "wins", eligible)));
+        lore.add(ChatColor.YELLOW + "Losses: " + ChatColor.WHITE + losses + " "
+                + statsPlacementLabel(gamePlacement(targetId, gameId, "losses", eligible)));
+        lore.add(ChatColor.YELLOW + "Games Played: " + ChatColor.WHITE
+                + statsGameMetric(targetId, gameId, "games-played"));
+        boolean gemRecords = !"plexball".equals(gameId) && eligible.stream()
+                .anyMatch(id -> statsGameMetric(id, gameId, "test-gems-earned") > 0L);
+        lore.add(ChatColor.YELLOW + "Test Gems Earned: " + ChatColor.WHITE + gems
+                + (gemRecords ? " " + statsPlacementLabel(gamePlacement(
+                        targetId, gameId, "test-gems-earned", eligible))
+                        : ChatColor.DARK_GRAY + " (no recorded awards)"));
+        lore.add(ChatColor.YELLOW + "XP Earned: " + ChatColor.DARK_GRAY + "Not tracked yet");
+        lore.add(ChatColor.DARK_GRAY + "Testplex local records: " + eligible.size() + " players.");
+    }
+
+    private List<UUID> dragonEscapePbRecordedPlayers() {
+        var root = plugin.getConfig().getConfigurationSection("dragon-escape-pb");
+        if (root == null) return List.of();
+        List<UUID> players = new ArrayList<>();
+        for (String key : root.getKeys(false)) {
+            try {
+                UUID id = UUID.fromString(key);
+                if (!testPlayers.isTestPlayer(id)) players.add(id);
+            } catch (IllegalArgumentException ignored) { }
+        }
+        return players;
+    }
+
+    private ArcadeStatsPlacement.Result dragonEscapeMapPlacement(UUID targetId, String mapResource,
+            String view, List<UUID> recordedPlayers) {
+        long targetTime = DragonEscapePersonalBestViews.BEST_TIME.equals(view)
+                ? dragonEscapePersonalBestMillis(targetId, mapResource)
+                : dragonEscapeKitPersonalBestMillis(targetId, mapResource, view);
+        if (targetTime <= 0L) return null;
+        List<Long> scores = new ArrayList<>();
+        for (UUID id : recordedPlayers) {
+            long time = DragonEscapePersonalBestViews.BEST_TIME.equals(view)
+                    ? dragonEscapePersonalBestMillis(id, mapResource)
+                    : dragonEscapeKitPersonalBestMillis(id, mapResource, view);
+            if (time > 0L) scores.add(time);
+        }
+        return ArcadeStatsPlacement.lowerIsBetter(targetTime, scores);
+    }
+
     /** Used by achievement-kit previews that link directly to their game's achievements. */
     public void openOwnGameAchievements(Player viewer, ArcadePortGame game) {
         if (viewer == null || game == null) return;
@@ -24122,16 +24233,29 @@ public final class ArcadePortManager implements Listener {
         summary.add(" ");
         StatsCompletion completion = statsCompletion(targetId, gameId);
         summary.addAll(statsCompletionLore(completion));
+        boolean placementDetails = showStatsPlacementDetails(viewer, gameId);
+        if (placementDetails) {
+            summary.removeIf(line -> {
+                String plain = ChatColor.stripColor(line);
+                return plain != null && (plain.startsWith("Games Played:")
+                        || plain.startsWith("Matches:") || plain.startsWith("Wins:"));
+            });
+            appendGamePlacementDetails(summary, targetId, gameId);
+        }
         List<StatsMilestone> milestones = statsMilestones(gameId);
         summary.add(ChatColor.GRAY + (incompleteOnly ? "Incomplete achievements" : "All achievements")
                 + " — page " + (page + 1) + "/" + pageCount);
+        summary.add(" ");
+        summary.add(ChatColor.YELLOW + "Shift-left-click: "
+                + (placementDetails ? "Hide" : "Show") + " placement details");
         ItemStack gameLogo = statsSummaryItem(
                 ArcadeGameDirectory.find(gameId).icon(), ChatColor.BOLD + displayName + " Stats", summary);
-        if (completion.mastered()) {
-            ItemMeta meta = gameLogo.getItemMeta();
-            meta.setEnchantmentGlintOverride(true);
-            gameLogo.setItemMeta(meta);
-        }
+        ItemMeta gameLogoMeta = gameLogo.getItemMeta();
+        gameLogoMeta.getPersistentDataContainer().set(statsActionKey, PersistentDataType.STRING,
+                "toggle-placement-details");
+        gameLogoMeta.getPersistentDataContainer().set(statsGameKey, PersistentDataType.STRING, gameId);
+        if (completion.mastered()) gameLogoMeta.setEnchantmentGlintOverride(true);
+        gameLogo.setItemMeta(gameLogoMeta);
         inventory.setItem(ArcadeStatsLayout.GAME_LOGO, gameLogo);
         int start = page * ArcadeStatsLayout.ACHIEVEMENTS_PER_PAGE;
         List<StatsAchievement> visible = sorted.subList(start,
@@ -24435,6 +24559,8 @@ public final class ArcadePortManager implements Listener {
                                                int returnAchievementPage, boolean incompleteOnly,
                                                int requestedPage, int requestedView) {
         String view = DragonEscapePersonalBestViews.selected(requestedView);
+        boolean placementDetails = showStatsPlacementDetails(viewer, "dragon-escape");
+        List<UUID> recordedPlayers = placementDetails ? dragonEscapePbRecordedPlayers() : List.of();
         List<SourceMapCatalog.MapArchive> maps = SourceMapCatalog.mapsFor(plugin, ArcadePortGame.DRAGON_ESCAPE);
         int page = ArcadeStatsLayout.clampPage(requestedPage, maps.size(),
                 ArcadeStatsLayout.DRAGON_ESCAPE_MAPS_PER_PAGE);
@@ -24456,9 +24582,19 @@ public final class ArcadePortManager implements Listener {
             if (pb > 0L || !DragonEscapePersonalBestViews.BEST_TIME.equals(view))
                 lore.add(ChatColor.GRAY + "Kit: " + ChatColor.WHITE
                         + DragonEscapePersonalBestViews.name(bestKit));
+            if (placementDetails) {
+                ArcadeStatsPlacement.Result rank = dragonEscapeMapPlacement(
+                        targetId, map.resource(), view, recordedPlayers);
+                lore.add(ChatColor.GOLD + "Map placement: " + statsPlacementLabel(rank));
+                if (rank != null) lore.add(ChatColor.DARK_GRAY + "Testplex recorded times: "
+                        + rank.participants() + " players.");
+            }
+            lore.add(" ");
+            lore.add(ChatColor.YELLOW + "Shift-left-click: "
+                    + (placementDetails ? "Hide" : "Show") + " placements");
             inventory.setItem(9 + i - start, statsItem(Material.PAPER,
                     ChatColor.BOLD + map.displayName(), lore,
-                    "noop", map.resource(), null));
+                    "toggle-placement-details", map.resource(), "dragon-escape"));
         }
         if (maps.isEmpty()) inventory.setItem(22, statsItem(Material.BARRIER, ChatColor.RED + "No Maps Installed",
                 List.of(ChatColor.GRAY + "No Dragon Escape map archives were found."), "noop", null, null));
@@ -30883,6 +31019,20 @@ public final class ArcadePortManager implements Listener {
                 case "open-category" -> openStatsCategory(player, holder.targetId, holder.targetName,
                         category == null ? "global" : category);
                 case "open-game" -> openStatsGame(player, holder.targetId, holder.targetName, gameId);
+                case "toggle-placement-details" -> {
+                    // Normal clicks on the logo and PB map papers remain inert.
+                    if (!event.isShiftClick() || !event.isLeftClick()) return;
+                    String placementGame = gameId != null ? gameId : holder.categoryId;
+                    toggleStatsPlacementDetails(player, placementGame);
+                    if (holder.page == StatsPage.GAME) {
+                        openGameStats(player, holder.targetId, holder.targetName,
+                                placementGame, holder.achievementPage, holder.incompleteOnly);
+                    } else if (holder.page == StatsPage.DRAGON_ESCAPE_MAPS) {
+                        openDragonEscapePersonalBests(player, holder.targetId, holder.targetName,
+                                holder.achievementPage, holder.incompleteOnly,
+                                holder.menuPage, holder.dragonPbView);
+                    }
+                }
                 case "toggle-game-filter" -> openGameStats(player, holder.targetId, holder.targetName,
                         gameId, holder.achievementPage, !holder.incompleteOnly);
                 case "open-game-achievements" -> openGameStats(player, holder.targetId, holder.targetName,
@@ -32696,6 +32846,7 @@ public final class ArcadePortManager implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         statsUnlockTracker.forget(event.getPlayer().getUniqueId());
+        statsPlacementDetails.remove(event.getPlayer().getUniqueId());
         // Bukkit removes the quitter after this event. Rebuild active-match tab
         // groups and lobby scoreboards on the next tick using the final player roster.
         Bukkit.getScheduler().runTask(plugin, () -> {
