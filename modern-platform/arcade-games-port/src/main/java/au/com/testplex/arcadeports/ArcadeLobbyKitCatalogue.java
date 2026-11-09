@@ -113,7 +113,7 @@ final class ArcadeLobbyKitCatalogue {
                     choice("disruptor", "Disruptor", Material.TNT,
                             Unlock.GEM, Zombie.class, Material.TNT),
                     choice("builder", "Builder", Material.BRICKS,
-                            Unlock.GEM, Zombie.class, Material.BRICKS),
+                            Unlock.ACHIEVEMENT, Zombie.class, Material.BRICKS),
                     choice("warper", "Warper", Material.ENDER_PEARL,
                             Unlock.GEM, Zombie.class, Material.ENDER_PEARL),
                     choice("digger", "Digger", Material.IRON_PICKAXE,
