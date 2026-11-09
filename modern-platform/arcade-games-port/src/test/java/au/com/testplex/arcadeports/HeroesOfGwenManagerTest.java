@@ -11,6 +11,19 @@ class HeroesOfGwenManagerTest {
     private final HeroesOfGwenManager manager = new HeroesOfGwenManager();
 
     @Test
+    void heroPreferenceHasSafeDefaultAndRejectsUnknownHeroes() {
+        UUID playerId = UUID.randomUUID();
+        assertEquals("hattori", manager.preferredHero(playerId));
+
+        manager.setPreferredHero(playerId, "rowena");
+        assertEquals("rowena", manager.preferredHero(playerId));
+        manager.setPreferredHero(playerId, "not-a-hero");
+        assertEquals("rowena", manager.preferredHero(playerId));
+        manager.setPreferredHero(null, "hattori");
+        assertEquals("hattori", manager.preferredHero(null));
+    }
+
+    @Test
     void opponentScalingUsesOnlyTheOtherTeamAndNeverZeroAttackers() {
         Map<UUID, Integer> teams = new HashMap<>();
         teams.put(UUID.randomUUID(), 0);
