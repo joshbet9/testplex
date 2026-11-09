@@ -787,7 +787,7 @@ jobs:
           timeout --foreground --signal=TERM --kill-after=30s 28m ssh "${ssh_opts[@]}" "$remote" sudo -n flock -n /var/lock/testplex-modern-deploy.lock bash -s -- "$BUILD_SHA" "$UPLOAD_DIR" "$ACCEPT_EULA" "$MM_MAPS_REQUIRED" "$WIZARDS_MAPS_REQUIRED" <<'REMOTE_DEPLOY' || deploy_exit=$?
           set -Eeuo pipefail
           DEPLOY_PHASE="bootstrap"
-          trap 'rc=$?; printf "[deploy] remote script failed in phase=%s at line=%s (status=%s)\\n" "${DEPLOY_PHASE:-unknown}" "${BASH_LINENO[0]:-unknown}" "$rc" >&2' ERR
+          trap 'rc=$?; printf "[deploy] remote script failed in phase=%s at line=%s (status=%s)\n" "${DEPLOY_PHASE:-unknown}" "${BASH_LINENO[0]:-unknown}" "$rc" >&2' ERR
           BUILD_SHA="$1"
           UPLOAD_DIR="$2"
           ACCEPT_EULA="$3"
