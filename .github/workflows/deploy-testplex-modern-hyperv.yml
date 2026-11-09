@@ -1599,7 +1599,7 @@ jobs:
           echo "Separate Monster Maze project units/data were not modified. The Testplex Reborn 1.8 service remains stopped after a successful modern deployment to preserve VM memory."
 
       - name: Restore previously running game servers if modern deployment fails
-        if: ${{ failure() }}
+        if: ${{ failure() && steps.install-and-start.outcome != 'skipped' }}
         shell: bash
         env:
           HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
