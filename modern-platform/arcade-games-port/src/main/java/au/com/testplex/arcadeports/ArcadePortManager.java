@@ -10172,66 +10172,11 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void updateMicroCrumble(Session session, long now) {
-        if (active != session || session.type != ArcadePortGame.MICRO_BATTLES) return;
-        if (!GameDebugRuntimeOverrides.booleanValue("MICRO_BATTLES_CRUMBLE_ENABLED",
-                ArcadePortRules.MICRO_BATTLES_CRUMBLE_ENABLED)) return;
-
-        // Source MapCrumbleModule scans the arena vertically in two-tick slices.
-        if (!session.microCrumbleScanComplete
-                && session.ticks % GameDebugRuntimeOverrides.intValue("MICRO_BATTLES_CRUMBLE_SCAN_INTERVAL_TICKS", ArcadePortRules.MICRO_BATTLES_CRUMBLE_SCAN_INTERVAL_TICKS) == 0) {
-            int y = session.microCrumbleScanY;
-            for (int x = session.microCrumbleMinX; x < session.microCrumbleMaxX; x++) {
-                for (int z = session.microCrumbleMinZ; z < session.microCrumbleMaxZ; z++) {
-                    Block block = session.world.getBlockAt(x, y, z);
-                    if (!block.getType().isAir()) session.microCrumbleBlocks.add(block);
-                }
-            }
-            session.microCrumbleScanY++;
-            if (ArcadePortRules.isMicroCrumbleScanComplete(session.microCrumbleScanY, session.microCrumbleMaxY)) {
-                session.microCrumbleScanComplete = true;
-                plugin.getLogger().info("Micro Battles source map scan completed with "
-                        + session.microCrumbleBlocks.size() + " crumble candidates.");
-            }
-        }
-
-        // Reborn starts crumbling after one second and removes three blocks per tick,
-        // prioritising blocks furthest from the map's spectator/centre location.
-        if (now - session.startedAt < 1_000L || session.microCrumbleBlocks.isEmpty()) return;
+        if (active != session) return;
         SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
-        Location spectatorCenter = microCrumbleSpectatorLocation(session, mapData);
-        double centerX = spectatorCenter.getX();
-        double centerZ = spectatorCenter.getZ();
-        for (int i = 0; i < GameDebugRuntimeOverrides.intValue("MICRO_BATTLES_CRUMBLE_BLOCKS_PER_TICK", ArcadePortRules.MICRO_BATTLES_CRUMBLE_BLOCKS_PER_TICK); i++) {
-            Block best = null;
-            double farthest = -1.0D;
-            for (Block candidate : session.microCrumbleBlocks) {
-                double dx = candidate.getX() + 0.5D - centerX;
-                double dz = candidate.getZ() + 0.5D - centerZ;
-                double distanceSquared = dx * dx + dz * dz;
-                if (best == null || distanceSquared > farthest) {
-                    best = candidate;
-                    farthest = distanceSquared;
-                }
-            }
-            if (best == null) break;
-
-            while (best.getY() > session.world.getMinHeight()
-                    && !best.getRelative(BlockFace.DOWN).getType().isAir()) {
-                best = best.getRelative(BlockFace.DOWN);
-            }
-            session.microCrumbleBlocks.remove(best);
-            if (best.getWorld() != spectatorCenter.getWorld() || best.getType().isAir()) continue;
-
-            Material material = best.getType();
-            if (material.name().endsWith("_DOOR")) {
-                best.getRelative(BlockFace.UP).setType(Material.AIR, false);
-            } else if (ThreadLocalRandom.current().nextDouble() > 0.95D) {
-                // The source spawnFallingBlock overload keeps the server's default item-drop behaviour.
-                FallingBlock falling = session.world.spawnFallingBlock(
-                        best.getLocation().add(0.5D, 0.5D, 0.5D), best.getBlockData());
-            }
-            best.setType(Material.AIR, false);
-        }
+        microBattlesController.updateCrumble(session, now, session.startedAt,
+                () -> microCrumbleSpectatorLocation(session, mapData),
+                message -> plugin.getLogger().info(message));
     }
 
     private int countNamedItems(Player player, Material material, String expectedName) {
