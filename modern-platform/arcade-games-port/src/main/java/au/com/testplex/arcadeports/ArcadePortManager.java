@@ -17809,6 +17809,12 @@ public final class ArcadePortManager implements Listener {
         objective.setDisplaySlot(DisplaySlot.SIDEBAR);
         session.dragonEscapeScoreboard = scoreboard;
         session.dragonEscapeScoreboardObjective = objective;
+        // This race-specific scoreboard replaces the lobby/team scoreboard. Keep
+        // every racer (including FakePlayerPlugin bots) in one NEVER-collision
+        // team so client-side player collision prediction is disabled as well.
+        ArcadeCollisionRules.addNoCollisionTeam(scoreboard, session.players.values().stream()
+                .filter(player -> player != null && player.isOnline())
+                .map(player -> player.getName()).toList());
         for (int i = 0; i < 14; i++) {
             Team line = scoreboard.registerNewTeam("derank" + i);
             String entry = ChatColor.values()[i].toString();
