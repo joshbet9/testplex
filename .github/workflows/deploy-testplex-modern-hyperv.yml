@@ -975,7 +975,7 @@ jobs:
             fi
             pe_descriptor_path="$(awk '$0 == "plugin.yml" || $0 == "paper-plugin.yml" { print; exit }' "$entries_file")"
             if [[ -z "$pe_descriptor_path" ]]; then
-              descriptor_entries="$(grep -E '(^|/)(paper-)?plugin\\.yml$' "$entries_file" || true)"
+              descriptor_entries="$(grep -E '(^|/)(paper-)?plugin\.yml$' "$entries_file" || true)"
               echo "Pinned PacketEvents artifact has no root plugin descriptor; matching entries: ${descriptor_entries:-none}." >&2
               exit 1
             fi
