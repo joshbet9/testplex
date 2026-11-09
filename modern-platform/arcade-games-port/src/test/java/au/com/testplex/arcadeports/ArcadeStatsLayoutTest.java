@@ -42,6 +42,9 @@ class ArcadeStatsLayoutTest {
     void footerAndPageBoundariesRemainAccessible() {
         assertEquals(List.of(49), ArcadeStatsLayout.footerSlots(1));
         assertEquals(List.of(48, 50), ArcadeStatsLayout.footerSlots(2));
+        assertEquals(List.of(47, 49, 51), ArcadeStatsLayout.footerSlots(3));
+        assertEquals(2, ArcadeStatsLayout.pages(9, ArcadeStatsLayout.KITS_PER_PAGE));
+        assertEquals(2, ArcadeStatsLayout.pages(37, ArcadeStatsLayout.DRAGON_ESCAPE_MAPS_PER_PAGE));
         assertEquals(0, ArcadeStatsLayout.clampPage(-99, 16, 14));
         assertEquals(1, ArcadeStatsLayout.clampPage(99, 16, 14));
         assertArrayEquals(new long[] {25, 63, 125, 250}, ArcadeStatsLayout.fourStages(250));

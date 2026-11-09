@@ -11,6 +11,8 @@ final class ArcadeStatsLayout {
     static final int PREVIOUS = 45;
     static final int NEXT = 53;
     static final int ACHIEVEMENTS_PER_PAGE = 14;
+    static final int KITS_PER_PAGE = 7;
+    static final int DRAGON_ESCAPE_MAPS_PER_PAGE = 36;
     static final int TRACKS_PER_PAGE = 4;
     static final int STAGES_PER_PAGE = 4;
 
