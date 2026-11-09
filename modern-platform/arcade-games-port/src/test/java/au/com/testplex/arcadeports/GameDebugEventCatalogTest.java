@@ -1605,10 +1605,13 @@ class GameDebugEventCatalogTest {
         }
         String source = Files.readString(managerPath);
         String lobby = Files.readString(lobbyPath);
+        String drawMyThing = Files.readString(managerPath.resolveSibling("DrawMyThingManager.java"));
         assertTrue(lobby.contains("\"canvas-tools\", \"Canvas drawing tools\""));
         assertTrue(lobby.contains("\"palette-selection\", \"Palette selection\""));
-        assertTrue(source.contains("ArcadePortGame.DRAW_MY_THING, \"canvas-tools\", true"));
-        assertTrue(source.contains("ArcadePortGame.DRAW_MY_THING, \"palette-selection\", true"));
+        assertTrue(source.contains("drawMyThingFeatureEnabled(player, \"canvas-tools\")"));
+        assertTrue(source.contains("drawMyThingFeatureEnabled(player, \"palette-selection\")"));
+        assertTrue(drawMyThing.contains("performToolAction(session, player, target, name, canvasToolsEnabled)"));
+        assertTrue(drawMyThing.contains("selectColour(session, player, clicked.getType(), colourName(clicked.getType()), paletteEnabled)"));
     }
 
     @Test
