@@ -45,6 +45,12 @@ class DragonEscapeDebugRulesTest {
         assertVariable("DRAGON_ESCAPE_LEAP_GROUNDED_Y_BONUS", 0.0D, 2.0D);
     }
 
+    @Test void persistedDragonEscapeKitWinsOverStaleInMemorySelection() {
+        assertEquals("jumper", ArcadePortRules.dragonEscapeKitPreference("jumper", "disruptor"));
+        assertEquals("warper", ArcadePortRules.dragonEscapeKitPreference("invalid-kit", "warper"));
+        assertEquals("jumper", ArcadePortRules.dragonEscapeKitPreference(null, null));
+    }
+
     @Test void chaseDiggerRouteAndLeapControlsChangeTheirGameplayRules() {
         assertTrue(ArcadePortRules.isDragonEscapeBlockInsideDestructionRadius(100.0D));
         assertFalse(ArcadePortRules.isDragonEscapeBlockInsideDestructionRadius(121.0D));

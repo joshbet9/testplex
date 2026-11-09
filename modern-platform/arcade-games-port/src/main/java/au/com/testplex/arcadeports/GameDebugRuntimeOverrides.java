@@ -8,6 +8,7 @@ import java.util.UUID;
 public final class GameDebugRuntimeOverrides {
     private static volatile Map<String, Object> values = Map.of();
     private static volatile boolean debugSession;
+    private static volatile boolean gameplayDebugSession;
     private static volatile UUID debugOwner;
     private static volatile boolean globalCosmeticsEnabled = true;
     private static volatile boolean globalAntiCheatEnabled = true;
@@ -22,6 +23,8 @@ public final class GameDebugRuntimeOverrides {
     public static void activate(Map<String, Object> overrides, UUID owner) {
         values = overrides == null ? Map.of() : Map.copyOf(new LinkedHashMap<>(overrides));
         debugSession = !values.isEmpty();
+        gameplayDebugSession = values.keySet().stream()
+                .anyMatch(key -> !"__DEBUG_TEST_BOT_ROSTER".equals(key));
         debugOwner = owner;
     }
 
@@ -44,6 +47,7 @@ public final class GameDebugRuntimeOverrides {
     public static void clear() {
         values = Map.of();
         debugSession = false;
+        gameplayDebugSession = false;
         debugOwner = null;
     }
 
@@ -51,10 +55,16 @@ public final class GameDebugRuntimeOverrides {
     public static void resetActiveValues() {
         values = Map.of();
         debugSession = true;
+        gameplayDebugSession = true;
     }
 
     public static boolean isDebugSession() {
         return debugSession;
+    }
+
+    /** True when gameplay rules/events were changed; a bot roster alone does not alter human mechanics. */
+    public static boolean hasGameplayDebugOverrides() {
+        return gameplayDebugSession;
     }
 
     /** Global, operator-gated test switches; defaults always preserve normal play. */
@@ -72,6 +82,7 @@ public final class GameDebugRuntimeOverrides {
     /** Mark an already-running round as a test after an authorized live debug action. */
     public static void markDebugSession() {
         debugSession = true;
+        gameplayDebugSession = true;
     }
 
     public static int intValue(String key, int fallback) {

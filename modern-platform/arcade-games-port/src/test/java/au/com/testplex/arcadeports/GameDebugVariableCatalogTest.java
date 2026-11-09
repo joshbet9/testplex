@@ -663,6 +663,22 @@ class GameDebugVariableCatalogTest {
     }
 
     @Test
+    void botRosterAloneDoesNotBlockDragonEscapeHumanPersonalBestPersistence() {
+        GameDebugRuntimeOverrides.activate(Map.of("__DEBUG_TEST_BOT_ROSTER", true));
+        assertTrue(GameDebugRuntimeOverrides.isDebugSession(),
+                "bot-only rounds remain isolated from ordinary lifetime statistics");
+        assertFalse(GameDebugRuntimeOverrides.hasGameplayDebugOverrides(),
+                "a configured roster does not change the human racer's game rules");
+
+        GameDebugRuntimeOverrides.activate(Map.of(
+                "__DEBUG_TEST_BOT_ROSTER", true,
+                "DRAGON_ESCAPE_CHASE_SPEED", 0.5D));
+        assertTrue(GameDebugRuntimeOverrides.hasGameplayDebugOverrides(),
+                "modified gameplay rules must continue to suppress personal-best saves");
+        GameDebugRuntimeOverrides.clear();
+    }
+
+    @Test
     void documentedLiveSwitchesUpdateTheActiveBooleanRuleWithoutReactivation() {
         GameDebugRuntimeOverrides.activate(Map.of("MICRO_BATTLES_CRUMBLE_ENABLED", true));
         assertTrue(GameDebugRuntimeOverrides.booleanValue("MICRO_BATTLES_CRUMBLE_ENABLED", false));
