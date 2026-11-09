@@ -785,7 +785,9 @@ jobs:
           echo "[deploy] opening an exclusive remote deployment lock."
           deploy_exit=0
           timeout --foreground --signal=TERM --kill-after=30s 28m ssh "${ssh_opts[@]}" "$remote" sudo -n flock -n /var/lock/testplex-modern-deploy.lock bash -s -- "$BUILD_SHA" "$UPLOAD_DIR" "$ACCEPT_EULA" "$MM_MAPS_REQUIRED" "$WIZARDS_MAPS_REQUIRED" <<'REMOTE_DEPLOY' || deploy_exit=$?
-          set -euo pipefail
+          set -Eeuo pipefail
+          DEPLOY_PHASE="bootstrap"
+          trap 'rc=$?; printf "[deploy] remote script failed in phase=%s at line=%s (status=%s)\n" "${DEPLOY_PHASE:-unknown}" "${BASH_LINENO[0]:-unknown}" "$rc" >&2' ERR
           BUILD_SHA="$1"
           UPLOAD_DIR="$2"
           ACCEPT_EULA="$3"
@@ -825,6 +827,7 @@ jobs:
           fi
           sudo -n test -s "$UPLOAD_DIR/SHA256SUMS"
 
+          DEPLOY_PHASE="journal-recovery"
           STATE_DIR=/var/lib/testplex-modern-deploy
           RECOVERY_HELPER=/usr/local/sbin/testplex-modern-recovery
           # Gate before host prerequisites or service changes. This SSH session
@@ -872,6 +875,7 @@ jobs:
           fi
           "$JAVA_BIN" -version
 
+          DEPLOY_PHASE="paper-download-and-verification"
           echo "Fetching a stable Paper build for Minecraft 26.3 from PaperMC's official downloads service."
           echo "[deploy] querying Paper 26.3 metadata (4 minute limit)."
           builds_json="$(timeout --foreground --signal=TERM 4m curl --fail --silent --show-error --retry 3 --user-agent "$USER_AGENT" \
@@ -895,6 +899,7 @@ jobs:
             printf '%s  %s\n' "$paper_sha" "$paper_tmp" | sha256sum -c -
           fi
 
+          DEPLOY_PHASE="fake-player-plugin-verification"
           # FakePlayerPlugin is a separate Paper plugin with its own distribution terms.
           # Fetch the unmodified, pinned release directly onto the user's administered VM:
           # it is intentionally not bundled into or redistributed with Testplex artifacts.
@@ -937,6 +942,7 @@ jobs:
             exit 1
           }
 
+          DEPLOY_PHASE="packetevents-download-and-verification"
           # PacketEvents is a server-side runtime plugin used by the optional
           # Dragon Escape player-ghost renderer. Install its unmodified 26.3
           # compatible Spigot release; clients do not need a mod. Pin the exact
@@ -977,6 +983,7 @@ jobs:
             exit 1
           }
 
+          DEPLOY_PHASE="source-map-validation"
           # Stage and validate source worlds outside the live Bukkit world folders.
           MAP_STAGE_DIR="$UPLOAD_DIR/mm-map-stage"
           if [[ "$MM_MAPS_REQUIRED" == true ]]; then
@@ -999,6 +1006,7 @@ jobs:
             }
           fi
 
+          DEPLOY_PHASE="transaction-preparation"
           STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
           DEPLOYMENT_ID="$(cat /proc/sys/kernel/random/uuid)"
           BACKUP_DIR="$STATE_DIR/backups/$STAMP-$BUILD_SHA-$DEPLOYMENT_ID"
@@ -1505,7 +1513,7 @@ jobs:
             if [[ "$diagnostic_pid" =~ ^[1-9][0-9]*$ ]]; then
               echo "===== Selected Java process environment =====" >&2
               timeout --foreground --signal=TERM 8s sudo -n sh -c \
-                "tr '\\000' '\\n' < '/proc/$diagnostic_pid/environ' | grep -E '^(INVOCATION_ID|TESTPLEX_DEPLOYED_BUILD_SHA|TESTPLEX_DEPLOYMENT_ID)=' || true" >&2 || true
+                "tr '\\000' '\n' < '/proc/$diagnostic_pid/environ' | grep -E '^(INVOCATION_ID|TESTPLEX_DEPLOYED_BUILD_SHA|TESTPLEX_DEPLOYMENT_ID)=' || true" >&2 || true
             fi
             echo "===== Modern service journal (last 100 lines) =====" >&2
             timeout --foreground --signal=TERM 8s sudo -n journalctl -u testplex-modern.service \
@@ -1582,6 +1590,10 @@ jobs:
               else
                 verify_exit=$?
                 printf '%s\n' "$verification_output" >&2
+                if grep -Fq "deployment identity mismatch: journal targets" <<< "$verification_output"; then
+                  echo "[deploy] No durable transaction was created for $BUILD_SHA; the existing terminal journal belongs to a different build." >&2
+                  break
+                fi
                 echo "[deploy] Fresh verification connection failed with exit $verify_exit." >&2
               fi
               sleep 5
@@ -1618,15 +1630,28 @@ jobs:
           recovered=false
           for attempt in 1 2 3 4 5; do
             echo "Independent artifact recovery SSH attempt $attempt/5."
-            if timeout --foreground --signal=TERM --kill-after=20s 240s ssh "${ssh_opts[@]}" "$remote" bash -s <<'REMOTE_RESTORE'
+            if timeout --foreground --signal=TERM --kill-after=20s 240s ssh "${ssh_opts[@]}" "$remote" bash -s -- "$BUILD_SHA" <<'REMOTE_RESTORE'
           set -euo pipefail
           helper=/usr/local/sbin/testplex-modern-recovery
+          target_sha="$1"
           if ! sudo -n test -x "$helper"; then
             echo "Independent recovery helper is missing or not executable by root; no rollback success is claimed." >&2
             exit 1
           fi
           recovery_output=""
-          if ! recovery_output="$(sudo -n env TESTPLEX_LOCK_WAIT_SECONDS=30 "$helper" recover)"; then
+          if ! recovery_output="$(sudo -n flock -w 30 /var/lock/testplex-modern-deploy.lock bash -s -- "$helper" "$target_sha" <<'REMOTE_LOCKED_RECOVERY'
+          set -euo pipefail
+          helper="$1"
+          target_sha="$2"
+          classification="$("$helper" --locked classify-target "$target_sha")"
+          printf '%s\n' "$classification"
+          if grep -Fq 'no-target-transaction:' <<< "$classification"; then
+            echo "No rollback was performed: this target never opened a replacement transaction, so this attempt made no server-file or service replacement."
+            exit 0
+          fi
+          "$helper" --locked recover "$target_sha"
+          REMOTE_LOCKED_RECOVERY
+          )"; then
             printf '%s\n' "$recovery_output" >&2
             echo "Independent rollback remains unresolved; artifact and runtime restoration are not verified." >&2
             echo "===== Recovery service status =====" >&2
@@ -1640,21 +1665,19 @@ jobs:
             exit 1
           fi
           printf '%s\n' "$recovery_output"
-          if ! grep -Eq '^Rollback (verified|already verified):' <<< "$recovery_output" &&
-             ! grep -Eq '^Deployment already verified:' <<< "$recovery_output" &&
-             ! grep -Eq '^no-prior-deployment-restored:' <<< "$recovery_output" &&
-             ! grep -Fxq 'No durable transaction is present; no rollback was claimed.' <<< "$recovery_output"; then
-            echo "Recovery helper returned no recognized transaction outcome; no rollback success is claimed." >&2
-            exit 1
-          fi
-          if grep -Eq '^Rollback (verified|already verified):' <<< "$recovery_output"; then
+          if grep -Fq 'no-target-transaction:' <<< "$recovery_output"; then
+            echo "Deployment failed before its target transaction began; no rollback was required or claimed."
+          elif grep -Eq '^Rollback (verified|already verified):' <<< "$recovery_output"; then
             echo "Independent recovery finished with separately verified restored artifact SHA and running runtime SHA."
           elif grep -Eq '^Deployment already verified:' <<< "$recovery_output"; then
             echo "The remote transaction had already recorded successful deployment verification; rollback and legacy restart were skipped."
           elif grep -Eq '^no-prior-deployment-restored:' <<< "$recovery_output"; then
             echo "The verified pre-installation absence of the deployment was restored."
-          else
+          elif grep -Fxq 'No durable transaction is present; no rollback was claimed.' <<< "$recovery_output"; then
             echo "No deployment transaction existed; no rollback was needed or claimed."
+          else
+            echo "Recovery helper returned no recognized transaction outcome; no rollback success is claimed." >&2
+            exit 1
           fi
           echo "Separate Monster Maze services were never changed."
           REMOTE_RESTORE
