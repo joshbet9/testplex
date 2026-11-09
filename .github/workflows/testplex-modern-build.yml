@@ -271,10 +271,16 @@ jobs:
           grep -Fq 'ChangedModernJars.txt' "$deploy_workflow"
           grep -Fq 'Unchanged plugin JAR; omitting upload' "$deploy_workflow"
           grep -Fq 'WizardsSourceMaps.sha256' "$deploy_workflow"
+          grep -Fq 'PE_VERSION="2.14.0"' "$deploy_workflow"
+          grep -Fq 'PE_SHA512="18a942cb55f64783a63b28deea2cebbbe782e5d6a1089f6700430e183bfbce0a45398a640ed0dff4361b55190dcf47017f2ca7788f4a5c8c9efad1f549a63fe3"' "$deploy_workflow"
+          grep -Fq 'packetevents-spigot-$PE_VERSION.jar' "$deploy_workflow"
+          grep -Fq 'PacketEvents.jar' "$deploy_workflow"
+          grep -Fq 'for plugin in TestplexModernArcade ArcadeMechanicsModern FakePlayerPlugin packetevents' "$deploy_workflow"
           grep -Fq 'need_wizards_maps' "$deploy_workflow"
           grep -Fq 'need_mm_maps' "$deploy_workflow"
           grep -Fq 'Insufficient deployment staging space:' "$deploy_workflow"
           grep -Fq 'tmp_required_kb' "$deploy_workflow"
+          grep -Fq "failure() && steps.install-and-start.outcome != 'skipped'" "$deploy_workflow"
           echo "The game suite is delivered by the shared Arcade plugin; Snake and Monster Maze are in-process Arcade modules. No standalone SnakeModern or WizardsModern game plugins are packaged."
 
       - name: Validate independent deployment recovery and shell syntax
@@ -335,4 +341,5 @@ jobs:
       deploy_to_modern_test_server: true
       source_run_id: ${{ format('{0}', github.run_id) }}
     secrets: inherit
+
 
