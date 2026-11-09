@@ -953,11 +953,29 @@ jobs:
           PE_INSTALLED="$SERVER_DIR/plugins/PacketEvents.jar"
           PE_URL="https://cdn.modrinth.com/data/HYKaKraK/versions/m78nFxYg/packetevents-spigot-$PE_VERSION.jar"
           PE_REPLACE=true
+          pe_descriptor=""
           if sudo -n test -s "$PE_INSTALLED"; then
             pe_sha512="$(sudo -n sha512sum "$PE_INSTALLED" | awk '{print $1}')"
             if [[ "$pe_sha512" == "$PE_SHA512" ]]; then
               PE_REPLACE=false
               echo "PacketEvents $PE_VERSION is already installed with the pinned SHA-512; skipping its download."
+              # Reuse the verified installed artifact's descriptor too. The download-only
+              # branch below populates this variable, so the cache-hit branch must do so
+              # explicitly before the common metadata validation.
+              installed_entries="$UPLOAD_DIR/packetevents-installed-entries.txt"
+              if ! sudo -n unzip -Z1 "$PE_INSTALLED" >"$installed_entries"; then
+                echo "Could not read the verified installed PacketEvents ZIP directory." >&2
+                exit 1
+              fi
+              pe_descriptor_path="$(awk '$0 == "plugin.yml" || $0 == "paper-plugin.yml" { print; exit }' "$installed_entries")"
+              if [[ -z "$pe_descriptor_path" ]]; then
+                echo "Verified installed PacketEvents artifact has no root plugin descriptor." >&2
+                exit 1
+              fi
+              if ! pe_descriptor="$(sudo -n unzip -p "$PE_INSTALLED" "$pe_descriptor_path")" || [[ -z "$pe_descriptor" ]]; then
+                echo "Could not extract installed PacketEvents descriptor at [$pe_descriptor_path]." >&2
+                exit 1
+              fi
             fi
           fi
           if [[ "$PE_REPLACE" == true ]]; then
