@@ -8007,42 +8007,15 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void updateMicroBarrier(Session session, long now) {
-        if (!session.microBarrierActive || !ArcadePortRules.shouldRemoveMicroBarrier(now - session.startedAt,
-                GameDebugRuntimeOverrides.longValue("MICRO_BATTLES_BARRIER_DURATION_MILLIS",
-                        ArcadePortRules.MICRO_BATTLES_BARRIER_DURATION_MILLIS))) return;
+        if (!microBattlesController.shouldReleaseBarrier(session, now - session.startedAt)) return;
         releaseMicroBattlesBarrier(session);
     }
 
     private void releaseMicroBattlesBarrier(Session session) {
-        if (session == null || !session.microBarrierActive) return;
-        for (Block block : session.microBarrierBlocks) {
-            if (block.getType() == Material.GLASS) block.setType(Material.AIR, false);
-        }
-        // Some imported maps have incomplete glass marker metadata. Clear the
-        // expected island rings too, regardless of whether marker blocks were found.
-        for (int team = 0; team < 4; team++) {
-            SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
-            Location island = mapData == null ? islandSpawn(team * 2) : microTeamCenter(session, team);
-            int cx = island.getBlockX();
-            int cy = island.getBlockY();
-            int cz = island.getBlockZ();
-            for (int offset = -4; offset <= 4; offset++) {
-                for (int y = cy; y <= ArcadePortRules.microBattlesBarrierTopY(cy); y++) {
-                    Block[] ring = {
-                            session.world.getBlockAt(cx + offset, y, cz - 4),
-                            session.world.getBlockAt(cx + offset, y, cz + 4),
-                            session.world.getBlockAt(cx - 4, y, cz + offset),
-                            session.world.getBlockAt(cx + 4, y, cz + offset)
-                    };
-                    for (Block block : ring) {
-                        if (block.getType() == Material.GLASS) block.setType(Material.AIR, false);
-                    }
-                }
-            }
-        }
-        session.microBarrierBlocks.clear();
-        session.microBarrierActive = false;
-        announce(session, ChatColor.AQUA + "Glass barriers are down! Fight for your team.");
+        SourceMapCatalog.MapData mapData = session == null ? null : sourceMapData.get(session.type.id());
+        microBattlesController.releaseBarrier(session,
+                team -> mapData == null ? islandSpawn(team * 2) : microTeamCenter(session, team),
+                message -> announce(session, ChatColor.AQUA + message));
     }
 
     private Location turfWarsSpawn(Session session, int team, int slot, int slots) {
