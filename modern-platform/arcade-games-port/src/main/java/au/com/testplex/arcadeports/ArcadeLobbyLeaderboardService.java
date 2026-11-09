@@ -246,7 +246,7 @@ final class ArcadeLobbyLeaderboardService implements Listener {
         double x = (index - (count - 1) / 2.0D) * 9.2D;
         double z = -28.0D;
         for (int line = 0; line < 15; line++) {
-            Location at = new Location(world, x, 113.5D - line * 0.55D, z);
+            Location at = new Location(world, x, 109.0D - line * 0.55D, z);
             TextDisplay display = world.spawn(at, TextDisplay.class, entity -> {
                 entity.setVisibleByDefault(false);
                 entity.setPersistent(false);
