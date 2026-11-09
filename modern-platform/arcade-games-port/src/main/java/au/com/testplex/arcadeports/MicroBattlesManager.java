@@ -5,8 +5,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
-import java.util.function.Supplier;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.logging.Logger;
 import java.util.function.Predicate;
 import org.bukkit.ChatColor;
 import org.bukkit.block.Block;
@@ -25,6 +25,7 @@ import org.bukkit.persistence.PersistentDataType;
 
 /** Micro Battles' per-player world-border cue, invoked from the existing match tick. */
 final class MicroBattlesManager implements ArcadeMatchController {
+    private static final Logger LOGGER = Logger.getLogger("ArcadeMechanicsModern");
     @Override public ArcadePortGame game() { return ArcadePortGame.MICRO_BATTLES; }
 
     static boolean shouldScanCrumble(boolean scanComplete, long ticks, int intervalTicks) {
@@ -32,10 +33,8 @@ final class MicroBattlesManager implements ArcadeMatchController {
     }
 
     /** Arena scan and block removal run from the existing shared tick, in two-tick vertical slices. */
-    void updateCrumble(SessionState session, long now, long startedAt, Supplier<Location> spectatorCenter,
-            java.util.function.Consumer<String> log) {
-        if (session == null || session.type != ArcadePortGame.MICRO_BATTLES || session.world == null
-                || spectatorCenter == null || log == null) return;
+    void updateCrumble(SessionState session, long now, long startedAt, SourceMapCatalog.MapData mapData) {
+        if (session == null || session.type != ArcadePortGame.MICRO_BATTLES || session.world == null) return;
         if (!GameDebugRuntimeOverrides.booleanValue("MICRO_BATTLES_CRUMBLE_ENABLED",
                 ArcadePortRules.MICRO_BATTLES_CRUMBLE_ENABLED)) return;
 
@@ -53,7 +52,7 @@ final class MicroBattlesManager implements ArcadeMatchController {
             if (ArcadePortRules.isMicroCrumbleScanComplete(session.microCrumbleScanY,
                     session.microCrumbleMaxY)) {
                 session.microCrumbleScanComplete = true;
-                log.accept("Micro Battles source map scan completed with "
+                LOGGER.info("Micro Battles source map scan completed with "
                         + session.microCrumbleBlocks.size() + " crumble candidates.");
             }
         }
@@ -61,8 +60,7 @@ final class MicroBattlesManager implements ArcadeMatchController {
         // Reborn starts crumbling after one second and removes three blocks per tick,
         // prioritising blocks furthest from the map's spectator/centre location.
         if (now - startedAt < 1_000L || session.microCrumbleBlocks.isEmpty()) return;
-        Location center = spectatorCenter.get();
-        if (center == null) return;
+        Location center = crumbleSpectatorLocation(session, mapData);
         double centerX = center.getX();
         double centerZ = center.getZ();
         for (int i = 0; i < GameDebugRuntimeOverrides.intValue("MICRO_BATTLES_CRUMBLE_BLOCKS_PER_TICK",
@@ -97,6 +95,21 @@ final class MicroBattlesManager implements ArcadeMatchController {
             }
             best.setType(Material.AIR, false);
         }
+    }
+
+    private Location crumbleSpectatorLocation(SessionState session, SourceMapCatalog.MapData mapData) {
+        if (mapData != null) {
+            List<Location> markers = mapData.customLocations("SPECTATOR");
+            if (markers.isEmpty()) markers = mapData.dataLocations("SPECTATOR");
+            if (!markers.isEmpty()) return markers.get(0).clone();
+            if (mapData.hasBounds()) {
+                double y = mapData.hasVerticalBounds()
+                        ? Math.max(mapData.minY() + 8.0D, mapData.maxY() - 5.0D)
+                        : session.world.getSpawnLocation().getY() + 10.0D;
+                return new Location(session.world, mapData.centerX(), y, mapData.centerZ());
+            }
+        }
+        return session.world.getSpawnLocation().clone().add(0.0D, 10.0D, 0.0D);
     }
 
     boolean shouldReleaseBarrier(SessionState session, long elapsedMillis) {
