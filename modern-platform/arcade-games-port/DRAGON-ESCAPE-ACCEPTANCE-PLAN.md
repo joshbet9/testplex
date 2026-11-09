@@ -76,6 +76,9 @@ Do not collapse maps with similar names or rely on the convenience `maps/dragon-
 - [ ] Verify the sidebar and tab list agree on the top-14 race ranking, leader elapsed time, estimated `~+` gaps and eliminated `OUT` rows; pre-race scoreboards are restored at the end.
 - [ ] Complete the same map twice and confirm PBs and checkpoint splits are isolated per archive, persist across restart, and do not carry over to a differently named map.
 - [ ] Enable the PB ghost and confirm the owner's saved skin, location, yaw/pitch, sprint/sneak and grounded pose replay continuously. It must be translucent, visible only to its owner, have no server hitbox/collision and disappear at PB completion or when disabled.
+- [ ] During a live Dragon Escape race, verify slot nine contains a PB Ghost eye in all kits. Right-click to switch ON/OFF; the item's label updates, the setting survives subsequent rounds, and the item cannot be moved out of its hotbar slot.
+- [ ] On the current Minecraft client, verify the ghost uses the modern player-entity spawn packet; ensure that rendering succeeds both with a fresh recorded route and with a legacy best-time replay. Check multiple players toggling independently.
+- [ ] Verify Beacon Colour can only be selected through in-game cosmetics, and neither Beacon Colour nor PB Ghost is exposed as a Personal Bests-page button.
 - [ ] Install PacketEvents 2.14.0 on the Paper 26.3 acceptance server for the optional packet ghost path. Without it, the plugin must log the documented warning and keep the race playable without the ghost.
 - [ ] Confirm the ghost profile, entity, viewer-local team membership and packets are removed on map change, match end, disable, disconnect and reconnect.
 
