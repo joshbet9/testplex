@@ -1,6 +1,7 @@
 package au.com.testplex.arcadeports;
 
 import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
 import com.github.retrooper.packetevents.protocol.entity.pose.EntityPose;
@@ -15,7 +16,7 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEn
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPlayerInfoRemove;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPlayerInfoUpdate;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnPlayer;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnEntity;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerTeams;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -29,6 +30,7 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -43,7 +45,6 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
     private static final byte INVISIBLE_FLAG = 0x20;
     private static final byte SNEAKING_FLAG = 0x02;
     private static final byte SPRINTING_FLAG = 0x08;
-    private static final int PLAYER_SKIN_PARTS_METADATA_INDEX = 17;
 
     private final Map<UUID, GhostState> ghosts = new HashMap<>();
 
@@ -96,7 +97,8 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
         String suffix = String.format("%08x", ghostUuid.getLeastSignificantBits()).substring(0, 8);
         String profileName = "DEGhost" + suffix;
         String teamName = "deg" + suffix;
-        int entityId = -1 - (ghostUuid.hashCode() & 0x3fffffff);
+        // Keep packet-only NPC IDs positive and far outside normal server entity IDs.
+        int entityId = 1_800_000_000 - (ghostUuid.hashCode() & 0x1fffffff);
 
         UserProfile sourceProfile = viewerUser.getProfile();
         UserProfile ghostProfile = new UserProfile(ghostUuid, profileName);
@@ -132,18 +134,18 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
                 new WrapperPlayServerTeams(teamName, WrapperPlayServerTeams.TeamMode.CREATE,
                         teamInfo, List.of(viewer.getName(), profileName)));
 
-        // Player entities use the dedicated Add Player packet, not Add Entity.
+        // Since 1.20.2, player-shaped NPCs use Add Entity (EntityTypes.PLAYER).
+        // The old Add Player packet does not create a player entity on 26.3 clients.
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
-                new WrapperPlayServerSpawnPlayer(entityId, ghostUuid,
+                new WrapperPlayServerSpawnEntity(entityId, Optional.of(ghostUuid), EntityTypes.PLAYER,
                         new Vector3d(location.getX(), location.getY(), location.getZ()),
-                        location.getYaw(), location.getPitch(), List.of()));
+                        location.getPitch(), location.getYaw(), location.getYaw(), 0, Optional.empty()));
 
         byte flags = INVISIBLE_FLAG;
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
                 new WrapperPlayServerEntityMetadata(entityId, List.of(
                         new EntityData<>(0, EntityDataTypes.BYTE, flags),
-                        new EntityData<>(6, EntityDataTypes.ENTITY_POSE, EntityPose.STANDING),
-                        new EntityData<>(PLAYER_SKIN_PARTS_METADATA_INDEX, EntityDataTypes.BYTE, (byte) 0x7f))));
+                        new EntityData<>(6, EntityDataTypes.ENTITY_POSE, EntityPose.STANDING))));
 
         return new GhostState(entityId, ghostUuid, teamName, flags, EntityPose.STANDING);
     }
