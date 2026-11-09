@@ -2925,4 +2925,13 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldLegacyNaturalRegen(20, 0.0D, 20.0D));
     }
 
+    @Test void lobbyFeedbackShortcutUsesAnAvailableSlotAndThePublicForms() {
+        assertEquals(1, ModernArcadeLobby.HOTBAR_FEEDBACK_SLOT);
+        assertEquals("https://github.com/joshbet9/testplex/issues/new?template=bug_report.yml",
+                ModernArcadeLobby.feedbackFormUrl("bug"));
+        assertEquals("https://github.com/joshbet9/testplex/issues/new?template=idea.yml",
+                ModernArcadeLobby.feedbackFormUrl("idea"));
+        assertThrows(IllegalArgumentException.class, () -> ModernArcadeLobby.feedbackFormUrl("other"));
+    }
+
 }
