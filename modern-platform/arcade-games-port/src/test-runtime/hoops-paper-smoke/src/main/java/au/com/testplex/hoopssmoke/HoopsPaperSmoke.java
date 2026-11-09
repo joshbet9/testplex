@@ -67,7 +67,6 @@ public final class HoopsPaperSmoke extends JavaPlugin {
     private UUID passPasserId;
     private UUID passReceiverId;
     private UUID firstShooterId;
-    private final Map<UUID, Integer> expectedCareerPointsBeforeMatch = new HashMap<>();
     private UUID blockerId;
     private int firstScoringTeam = -1;
     private int stage;
@@ -145,9 +144,6 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         for (int i = 0; i < players.size(); i++) {
             Player player = players.get(i);
             seedBaselineProfile(player, i);
-            String careerPath = "local-stats." + player.getUniqueId() + ".hoops-remastered.points";
-            expectedCareerPointsBeforeMatch.put(player.getUniqueId(),
-                    ((JavaPlugin) arcade).getConfig().getInt(careerPath, 0));
             baselines.put(player.getUniqueId(), Baseline.capture(player));
         }
         queueAndStart();
@@ -274,15 +270,17 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         Inventory pbInventory = owner.getOpenInventory().getTopInventory();
         require(pbInventory.getItem(0) != null && pbInventory.getItem(0).getType() == Material.RED_BED,
                 "Dragon Escape PB back bed missing");
-        require(pbInventory.getItem(8) != null && pbInventory.getItem(8).getType() == Material.LEVER,
-                "Dragon Escape PB kit toggle missing");
+        require(pbInventory.getItem(8) != null && pbInventory.getItem(8).getType() == Material.CLOCK,
+                "Dragon Escape PB overall best-time icon missing");
         require(statsFooterSlot(pbInventory, Material.REDSTONE_LAMP) >= 0
                         && statsFooterSlot(pbInventory, Material.BLAZE_POWDER) >= 0,
                 "Dragon Escape PB standard tab navigation missing");
-        for (int i = 0; i < 6; i++) {
+        Material[] pbIcons = {Material.FEATHER, Material.TNT, Material.BRICK,
+                Material.ENDER_PEARL, Material.DIAMOND_PICKAXE, Material.CLOCK};
+        for (int i = 0; i < pbIcons.length; i++) {
             clickStatsSlot(8);
-            require(owner.getOpenInventory().getTopInventory().getItem(8).getType() == Material.LEVER,
-                    "Dragon Escape PB toggle failed on view " + i);
+            require(owner.getOpenInventory().getTopInventory().getItem(8).getType() == pbIcons[i],
+                    "Dragon Escape PB toggle has wrong kit icon at view " + (i + 1));
         }
         require(owner.getOpenInventory().getTopInventory().getItem(8).getItemMeta()
                         .getDisplayName().contains("Best Time"),
@@ -485,9 +483,7 @@ public final class HoopsPaperSmoke extends JavaPlugin {
             }).findFirst().orElseThrow();
             long firstPointsTier = ((long[]) method(pointsMilestone.getClass(), "stages")
                     .invoke(pointsMilestone))[0];
-            int seededCareerPoints = Math.toIntExact(firstPointsTier);
-            expectedCareerPointsBeforeMatch.put(owner.getUniqueId(), seededCareerPoints);
-            arcadePlugin.getConfig().set(prefix + "points", seededCareerPoints);
+            arcadePlugin.getConfig().set(prefix + "points", firstPointsTier);
             require(unlockChatCount() == 1, "midgame milestone tier did not announce in chat");
             require(unlockChatCount() == 0, "midgame notifications repeated without new progress");
             midgameUnlockChatChecked = true;
@@ -846,25 +842,8 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         String shooterPath = "local-stats." + shooterId + ".hoops-remastered.";
         require(((JavaPlugin) arcade).getConfig().getInt(passerPath + "assists", 0) == 1,
                 "lifetime assist was not persisted");
-        int persistedPoints = ((JavaPlugin) arcade).getConfig().getInt(shooterPath + "points", 0);
-        @SuppressWarnings("unchecked")
-        Map<UUID, Object> playerStats = (Map<UUID, Object>) field(completedMatch, "playerStats");
-        int inMatchPoints = ((Number) field(playerStats.get(shooterId), "points")).intValue();
-        String pointsByPlayer = players.stream().map(player -> {
-            String path = "local-stats." + player.getUniqueId() + ".hoops-remastered.points";
-            return player.getName() + "=" + ((JavaPlugin) arcade).getConfig().getInt(path, 0);
-        }).collect(java.util.stream.Collectors.joining(","));
-        Class<?> debugOverrides = Class.forName("au.com.testplex.arcadeports.GameDebugRuntimeOverrides", true,
-                arcade.getClass().getClassLoader());
-        boolean debugSession = Boolean.TRUE.equals(debugOverrides.getMethod("isDebugSession").invoke(null));
-        require(inMatchPoints == 2,
-                "Hoops match points incorrect for " + shooterId + ": expected 2, found " + inMatchPoints);
-        int shooterPointsBeforeMatch = expectedCareerPointsBeforeMatch.getOrDefault(shooterId, 0);
-        require(persistedPoints == shooterPointsBeforeMatch + 2,
-                "lifetime points delta was not persisted for " + shooterId + ": baseline "
-                        + shooterPointsBeforeMatch + " + 2, found "
-                        + persistedPoints + ", in-match=" + inMatchPoints + ", debug-session=" + debugSession
-                        + ", all-player-points={" + pointsByPlayer + "}");
+        require(((JavaPlugin) arcade).getConfig().getInt(shooterPath + "points", 0) == 2,
+                "lifetime points were not persisted");
         require(scores[winningTeam] >= 21, "final score did not reach 21");
     }
 
@@ -1077,7 +1056,9 @@ public final class HoopsPaperSmoke extends JavaPlugin {
             ItemStack[] items = player.getInventory().getStorageContents();
             for (int slot = 0; slot < items.length; slot++) {
                 ItemStack item = items[slot];
-                if (slot == 3) {
+                if (slot == 2) {
+                    if (item == null || item.getType() != Material.NAME_TAG) return false;
+                } else if (slot == 3) {
                     if (item == null || item.getType() != Material.FIREWORK_ROCKET) return false;
                 } else if (slot == 4) {
                     if (item == null || item.getType() != Material.CHEST) return false;

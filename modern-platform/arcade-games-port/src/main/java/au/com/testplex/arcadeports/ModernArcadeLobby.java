@@ -46,6 +46,7 @@ public final class ModernArcadeLobby implements Listener {
     public static final int PLANE_MAX_EXCLUSIVE = 50;
     public static final int FLOOR_Y = 100;
     public static final int HOTBAR_PREVIEW_SLOT = 3;
+    public static final int HOTBAR_LEADERBOARDS_SLOT = 2;
     public static final int HOTBAR_COSMETICS_SLOT = 4;
     public static final int HOTBAR_BOT_SETUP_SLOT = 5;
     public static final int HOTBAR_GAME_PREFERENCES_SLOT = 6;
@@ -194,6 +195,12 @@ public final class ModernArcadeLobby implements Listener {
             ItemStack item = inventory.getItem(slot);
             if (isLobbyHotbarItem(item)) inventory.setItem(slot, null);
         }
+        inventory.setItem(HOTBAR_LEADERBOARDS_SLOT, createHotbarItem(Material.NAME_TAG,
+                ChatColor.AQUA + "Lobby Leaderboards",
+                List.of(ChatColor.GRAY + "Customize up to 10 floating leaderboard panels.",
+                        ChatColor.YELLOW + "This game has its own saved leaderboard layout.",
+                        ChatColor.GRAY + "Choose metrics, periods, maps and kits.",
+                        ChatColor.DARK_GRAY + "Command: /arcadeport leaderboards"), "arcadeport leaderboards"));
         inventory.setItem(HOTBAR_PREVIEW_SLOT, createHotbarItem(Material.FIREWORK_ROCKET,
                 ChatColor.LIGHT_PURPLE + "Cosmetic Preview Sandbox",
                 List.of(ChatColor.GRAY + "Enter the preview space for the selected game.",
