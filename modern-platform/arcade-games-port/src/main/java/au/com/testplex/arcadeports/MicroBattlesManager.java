@@ -5,15 +5,19 @@ import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
+import java.util.function.Supplier;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Predicate;
 import org.bukkit.ChatColor;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.WorldBorder;
+import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
@@ -23,6 +27,78 @@ import org.bukkit.persistence.PersistentDataType;
 /** Micro Battles' per-player world-border cue, invoked from the existing match tick. */
 final class MicroBattlesManager implements ArcadeMatchController {
     @Override public ArcadePortGame game() { return ArcadePortGame.MICRO_BATTLES; }
+
+    static boolean shouldScanCrumble(boolean scanComplete, long ticks, int intervalTicks) {
+        return !scanComplete && intervalTicks > 0 && Math.floorMod(ticks, intervalTicks) == 0;
+    }
+
+    /** Arena scan and block removal run from the existing shared tick, in two-tick vertical slices. */
+    void updateCrumble(SessionState session, long now, long startedAt, Supplier<Location> spectatorCenter,
+            java.util.function.Consumer<String> log) {
+        if (session == null || session.type != ArcadePortGame.MICRO_BATTLES || session.world == null
+                || spectatorCenter == null || log == null) return;
+        if (!GameDebugRuntimeOverrides.booleanValue("MICRO_BATTLES_CRUMBLE_ENABLED",
+                ArcadePortRules.MICRO_BATTLES_CRUMBLE_ENABLED)) return;
+
+        if (shouldScanCrumble(session.microCrumbleScanComplete, session.ticks,
+                GameDebugRuntimeOverrides.intValue("MICRO_BATTLES_CRUMBLE_SCAN_INTERVAL_TICKS",
+                        ArcadePortRules.MICRO_BATTLES_CRUMBLE_SCAN_INTERVAL_TICKS))) {
+            int y = session.microCrumbleScanY;
+            for (int x = session.microCrumbleMinX; x < session.microCrumbleMaxX; x++) {
+                for (int z = session.microCrumbleMinZ; z < session.microCrumbleMaxZ; z++) {
+                    Block block = session.world.getBlockAt(x, y, z);
+                    if (!block.getType().isAir()) session.microCrumbleBlocks.add(block);
+                }
+            }
+            session.microCrumbleScanY++;
+            if (ArcadePortRules.isMicroCrumbleScanComplete(session.microCrumbleScanY,
+                    session.microCrumbleMaxY)) {
+                session.microCrumbleScanComplete = true;
+                log.accept("Micro Battles source map scan completed with "
+                        + session.microCrumbleBlocks.size() + " crumble candidates.");
+            }
+        }
+
+        // Reborn starts crumbling after one second and removes three blocks per tick,
+        // prioritising blocks furthest from the map's spectator/centre location.
+        if (now - startedAt < 1_000L || session.microCrumbleBlocks.isEmpty()) return;
+        Location center = spectatorCenter.get();
+        if (center == null) return;
+        double centerX = center.getX();
+        double centerZ = center.getZ();
+        for (int i = 0; i < GameDebugRuntimeOverrides.intValue("MICRO_BATTLES_CRUMBLE_BLOCKS_PER_TICK",
+                ArcadePortRules.MICRO_BATTLES_CRUMBLE_BLOCKS_PER_TICK); i++) {
+            Block best = null;
+            double farthest = -1.0D;
+            for (Block candidate : session.microCrumbleBlocks) {
+                double dx = candidate.getX() + 0.5D - centerX;
+                double dz = candidate.getZ() + 0.5D - centerZ;
+                double distanceSquared = dx * dx + dz * dz;
+                if (best == null || distanceSquared > farthest) {
+                    best = candidate;
+                    farthest = distanceSquared;
+                }
+            }
+            if (best == null) break;
+
+            while (best.getY() > session.world.getMinHeight()
+                    && !best.getRelative(BlockFace.DOWN).getType().isAir()) {
+                best = best.getRelative(BlockFace.DOWN);
+            }
+            session.microCrumbleBlocks.remove(best);
+            if (best.getWorld() != center.getWorld() || best.getType().isAir()) continue;
+
+            Material material = best.getType();
+            if (material.name().endsWith("_DOOR")) {
+                best.getRelative(BlockFace.UP).setType(Material.AIR, false);
+            } else if (ThreadLocalRandom.current().nextDouble() > 0.95D) {
+                // Preserve the server's default falling-block item-drop behaviour.
+                FallingBlock falling = session.world.spawnFallingBlock(
+                        best.getLocation().add(0.5D, 0.5D, 0.5D), best.getBlockData());
+            }
+            best.setType(Material.AIR, false);
+        }
+    }
 
     boolean shouldReleaseBarrier(SessionState session, long elapsedMillis) {
         if (session == null || !session.microBarrierActive) return false;
