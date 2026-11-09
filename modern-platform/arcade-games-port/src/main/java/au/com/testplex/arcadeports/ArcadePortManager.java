@@ -296,6 +296,23 @@ public final class ArcadePortManager implements Listener {
     private final TurfWarsManager turfWarsController = new TurfWarsManager();
     private final DrawMyThingManager drawMyThingController = new DrawMyThingManager();
     private final GladiatorsManager gladiatorsController;
+
+    private final GladiatorsManager.AchievementSink gladiatorsAchievementSink =
+            new GladiatorsManager.AchievementSink() {
+                @Override public void awardCatalog(Player player, String achievementId) {
+                    awardCatalogAchievement(player, "gladiators", achievementId);
+                }
+                @Override public void awardLegacy(Player player, String achievementId, String displayName) {
+                    awardGladiatorsAchievement(player, achievementId, displayName);
+                }
+                @Override public void recordModeWin(Player player, GladiatorsMode mode) {
+                    recordGladiatorsModeWin(player, mode);
+                }
+                @Override public void incrementLifetimeStat(Player player, String stat, int amount,
+                        int achievementThreshold, String achievementId) {
+                    incrementGladiatorsLifetimeStat(player, stat, amount, achievementThreshold, achievementId);
+                }
+            };
     private final MilkCowManager milkCowController = new MilkCowManager();
     private final WitherAssaultManager witherAssaultController = new WitherAssaultManager();
     private final SkyWarsManager skyWarsController = new SkyWarsManager();
@@ -6447,37 +6464,6 @@ public final class ArcadePortManager implements Listener {
                 plugin.getConfig().getInt(statsPath + "loser-bracket-wins", 0) + 1);
         plugin.saveConfig();
         player.sendMessage(ChatColor.LIGHT_PURPLE + "Silky Seconds — Loser Bracket Wins: " + wins);
-    }
-
-    private void recordGladiatorsWinnerAchievements(Session session, Player winner) {
-        GladiatorsMode mode = GladiatorsMode.fromId(session.gladiatorMode);
-        UUID id = winner.getUniqueId();
-        recordGladiatorsModeWin(winner, mode);
-        if (GladiatorsAchievementRules.qualifiesFullArsenalTournament(
-                mode == GladiatorsMode.NORMAL,
-                session.gladiatorFullArsenalDuelsFought.getOrDefault(id, 0),
-                session.gladiatorFullArsenalIncomplete.contains(id))) {
-            awardCatalogAchievement(winner, "gladiators", "full-arsenal");
-        }
-        if (session.gladiatorLosses.getOrDefault(id, 0) > 0) {
-            if (session.gladiatorLostRoundOneClose.contains(id)) {
-                awardCatalogAchievement(winner, "gladiators", "silky-seconds");
-            }
-            if (session.gladiatorLostRoundOneAfterTenDamage.contains(id)) {
-                awardCatalogAchievement(winner, "gladiators", "comeback-kid");
-            }
-        }
-        if (mode != null && mode.hasClassicRangedTools() && !session.gladiatorUsedRod.contains(id)) {
-            awardCatalogAchievement(winner, "gladiators", "man-of-integrity");
-        }
-        if (ArcadePortRules.shouldAwardGladiatorsNoBowOrRodWin(mode != null && mode.hasClassicRangedTools(),
-                session.gladiatorUsedBow.contains(id), session.gladiatorUsedRod.contains(id))) {
-            awardGladiatorsAchievement(winner, "are-you-not-entertained", "Are you not entertained?");
-        }
-        int arrowsShot = session.gladiatorArrowsShot.getOrDefault(id, 0);
-        if (arrowsShot >= 3 && arrowsShot == session.gladiatorArrowsHit.getOrDefault(id, 0)) {
-            incrementGladiatorsLifetimeStat(winner, "precision", 1, 1, "precision");
-        }
     }
 
     private void recordGladiatorsModeWin(Player winner, GladiatorsMode mode) {
@@ -19469,7 +19455,11 @@ public final class ArcadePortManager implements Listener {
             }
         }
         if (announceWinner && session.type == ArcadePortGame.GLADIATORS && winner != null) {
-            recordGladiatorsWinnerAchievements(session, winner);
+            gladiatorsController.recordWinnerAchievements(session, winner,
+                    GladiatorsMode.fromId(session.gladiatorMode),
+                    session.gladiatorFullArsenalDuelsFought.getOrDefault(winner.getUniqueId(), 0),
+                    session.gladiatorFullArsenalIncomplete.contains(winner.getUniqueId()),
+                    gladiatorsAchievementSink);
         }
         if (announceWinner && winner != null && session.type == ArcadePortGame.DRAGON_ESCAPE) {
             recordDragonEscapeAchievements(session, winner);

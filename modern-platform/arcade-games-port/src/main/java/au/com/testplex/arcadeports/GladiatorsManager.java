@@ -23,6 +23,46 @@ final class GladiatorsManager implements ArcadeMatchController {
 
     @Override public ArcadePortGame game() { return ArcadePortGame.GLADIATORS; }
 
+    interface AchievementSink {
+        void awardCatalog(Player player, String achievementId);
+        void awardLegacy(Player player, String achievementId, String displayName);
+        void recordModeWin(Player player, GladiatorsMode mode);
+        void incrementLifetimeStat(Player player, String stat, int amount,
+                int achievementThreshold, String achievementId);
+    }
+
+    void recordWinnerAchievements(SessionState session, Player winner, GladiatorsMode mode,
+            int fullArsenalDuels, boolean fullArsenalIncomplete, AchievementSink sink) {
+        if (session == null || winner == null || sink == null) return;
+        UUID id = winner.getUniqueId();
+        sink.recordModeWin(winner, mode);
+        if (GladiatorsAchievementRules.qualifiesFullArsenalTournament(
+                mode == GladiatorsMode.NORMAL,
+                fullArsenalDuels,
+                fullArsenalIncomplete)) {
+            sink.awardCatalog(winner, "full-arsenal");
+        }
+        if (session.gladiatorLosses.getOrDefault(id, 0) > 0) {
+            if (session.gladiatorLostRoundOneClose.contains(id)) {
+                sink.awardCatalog(winner, "silky-seconds");
+            }
+            if (session.gladiatorLostRoundOneAfterTenDamage.contains(id)) {
+                sink.awardCatalog(winner, "comeback-kid");
+            }
+        }
+        if (mode != null && mode.hasClassicRangedTools() && !session.gladiatorUsedRod.contains(id)) {
+            sink.awardCatalog(winner, "man-of-integrity");
+        }
+        if (ArcadePortRules.shouldAwardGladiatorsNoBowOrRodWin(mode != null && mode.hasClassicRangedTools(),
+                session.gladiatorUsedBow.contains(id), session.gladiatorUsedRod.contains(id))) {
+            sink.awardLegacy(winner, "are-you-not-entertained", "Are you not entertained?");
+        }
+        int arrowsShot = session.gladiatorArrowsShot.getOrDefault(id, 0);
+        if (arrowsShot >= 3 && arrowsShot == session.gladiatorArrowsHit.getOrDefault(id, 0)) {
+            sink.incrementLifetimeStat(winner, "precision", 1, 1, "precision");
+        }
+    }
+
     void setupScoreboard(SessionState session) {
         if (session == null || Bukkit.getScoreboardManager() == null) return;
         Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
