@@ -215,18 +215,14 @@ public final class HoopsPaperSmoke extends JavaPlugin {
 
             require(Bukkit.dispatchCommand(owner, "stats " + id), id + " stats command failed");
             Inventory current = owner.getOpenInventory().getTopInventory();
-            int milestonesButton = -1;
-            for (int slot = 45; slot < 54; slot++) {
-                ItemStack item = current.getItem(slot);
-                if (item != null && item.getType() == Material.PAPER) { milestonesButton = slot; break; }
-            }
+            int milestonesButton = statsFooterSlot(current, Material.REDSTONE_LAMP);
             require(milestonesButton >= 0, id + " missing milestones button");
             clickStatsSlot(milestonesButton);
             Set<String> seenMilestones = new HashSet<>();
             for (int page = 0; page < 40; page++) {
                 Inventory inventory = owner.getOpenInventory().getTopInventory();
                 require(owner.getOpenInventory().getTitle().endsWith("Milestones"), id + " milestones did not open");
-                require(inventory.getItem(49) != null && inventory.getItem(49).getType() == Material.DIAMOND,
+                require(statsFooterSlot(inventory, Material.DIAMOND) >= 0,
                         id + " missing diamond achievements return");
                 for (int slot = 9; slot <= 44; slot++) {
                     String entry = statsEntry(inventory.getItem(slot), entryKey);
@@ -240,10 +236,53 @@ public final class HoopsPaperSmoke extends JavaPlugin {
             }
             require(seenMilestones.equals(expectedMilestoneTiers), id + " omitted milestone tiers");
             checkedMilestones += seenMilestones.size();
-            clickStatsSlot(49);
+            clickStatsSlot(statsFooterSlot(owner.getOpenInventory().getTopInventory(), Material.DIAMOND));
             require(owner.getOpenInventory().getTitle().endsWith("Achievements"),
                     id + " diamond did not return to achievements");
+            int kitLevelsButton = statsFooterSlot(owner.getOpenInventory().getTopInventory(), Material.BLAZE_POWDER);
+            require(kitLevelsButton >= 0, id + " missing kit levels button");
+            clickStatsSlot(kitLevelsButton);
+            require(owner.getOpenInventory().getTitle().endsWith("Kit Levels"), id + " kit levels did not open");
+            Inventory levels = owner.getOpenInventory().getTopInventory();
+            require(levels.getItem(0) != null && levels.getItem(0).getType() == Material.RED_BED,
+                    id + " kit levels missing back bed");
+            for (int slot = 18; slot <= 26; slot++) {
+                ItemStack kit = levels.getItem(slot);
+                if (kit == null || kit.getType() == Material.BARRIER) continue;
+                require(kit.hasItemMeta() && kit.getItemMeta().hasLore()
+                        && kit.getItemMeta().getLore().stream()
+                                .anyMatch(line -> line.contains("0 XP")),
+                        id + " missing 0 XP placeholder for kit at slot " + slot);
+                require(levels.getItem(slot + 9) != null,
+                        id + " missing level-colour block for kit at slot " + slot);
+            }
+            clickStatsSlot(statsFooterSlot(owner.getOpenInventory().getTopInventory(), Material.DIAMOND));
+            require(owner.getOpenInventory().getTitle().endsWith("Achievements"),
+                    id + " kit levels did not return to achievements");
         }
+
+        require(Bukkit.dispatchCommand(owner, "stats dragon-escape"), "Dragon Escape stats did not open");
+        int pbButton = statsFooterSlot(owner.getOpenInventory().getTopInventory(), Material.CLOCK);
+        require(pbButton >= 0, "Dragon Escape PB button missing");
+        clickStatsSlot(pbButton);
+        require("Dragon Escape Personal Bests".equals(owner.getOpenInventory().getTitle()),
+                "Dragon Escape PB title contains player name or is not standardized");
+        Inventory pbInventory = owner.getOpenInventory().getTopInventory();
+        require(pbInventory.getItem(0) != null && pbInventory.getItem(0).getType() == Material.RED_BED,
+                "Dragon Escape PB back bed missing");
+        require(pbInventory.getItem(8) != null && pbInventory.getItem(8).getType() == Material.LEVER,
+                "Dragon Escape PB kit toggle missing");
+        require(statsFooterSlot(pbInventory, Material.REDSTONE_LAMP) >= 0
+                        && statsFooterSlot(pbInventory, Material.BLAZE_POWDER) >= 0,
+                "Dragon Escape PB standard tab navigation missing");
+        for (int i = 0; i < 6; i++) {
+            clickStatsSlot(8);
+            require(owner.getOpenInventory().getTopInventory().getItem(8).getType() == Material.LEVER,
+                    "Dragon Escape PB toggle failed on view " + i);
+        }
+        require(owner.getOpenInventory().getTopInventory().getItem(8).getItemMeta()
+                        .getDisplayName().contains("Best Time"),
+                "Dragon Escape PB toggle did not wrap to Best Time");
 
         // Incomplete filter, rarity ordering and page memory on a 20-achievement game.
         String sampleUnlock = "local-achievements." + owner.getUniqueId() + ".camera-shy.smoke-and-mirrors";
@@ -260,9 +299,9 @@ public final class HoopsPaperSmoke extends JavaPlugin {
             if (statsEntry(filtered.getItem(slot), entryKey) != null) filteredPageCount++;
         }
         require(filteredPageCount == 5, "Snap incomplete page 2 should have 5 achievements: " + filteredPageCount);
-        clickStatsSlot(49);
+        clickStatsSlot(statsFooterSlot(owner.getOpenInventory().getTopInventory(), Material.REDSTONE_LAMP));
         require(owner.getOpenInventory().getTitle().endsWith("Milestones"), "Snap filter milestone navigation failed");
-        clickStatsSlot(49);
+        clickStatsSlot(statsFooterSlot(owner.getOpenInventory().getTopInventory(), Material.DIAMOND));
         Inventory returned = owner.getOpenInventory().getTopInventory();
         require(returned.getItem(8) != null && returned.getItem(8).getType() == Material.LIME_DYE,
                 "incomplete filter state was lost returning from milestones");
@@ -363,6 +402,14 @@ public final class HoopsPaperSmoke extends JavaPlugin {
     private static String statsEntry(ItemStack item, NamespacedKey key) {
         if (item == null || !item.hasItemMeta()) return null;
         return item.getItemMeta().getPersistentDataContainer().get(key, PersistentDataType.STRING);
+    }
+
+    private static int statsFooterSlot(Inventory inventory, Material icon) {
+        for (int slot = 45; slot < 54; slot++) {
+            ItemStack item = inventory.getItem(slot);
+            if (item != null && item.getType() == icon) return slot;
+        }
+        return -1;
     }
 
     private void clickStatsSlot(int slot) {

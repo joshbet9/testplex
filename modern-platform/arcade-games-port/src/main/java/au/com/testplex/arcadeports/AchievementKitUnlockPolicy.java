@@ -87,7 +87,9 @@ final class AchievementKitUnlockPolicy {
         add(rules, "death-tag", "runner-turtle", "Runner Turtle", "lots-of-subject-matter");
         add(rules, "death-tag", "runner-trickster", "Runner Trickster", "smoke-and-mirrors");
         add(rules, "dragons", "tamer", "Tamer", "dragon-tamer");
-        add(rules, "dragon-escape", "digger", "Digger", "to-hell-and-back", "paralympics");
+        add(rules, "dragon-escape", "builder", "Builder", "paralympics");
+        add(rules, "dragon-escape", "digger", "Digger",
+                "skylands-master", "to-hell-and-back", "plundered");
         add(rules, "evolution", "health-harvester", "Health Harvester", "second-wind");
         add(rules, "evolution", "neanderthal", "Neanderthal", "pity-party");
         add(rules, "micro-battles", "dasher", "Dasher", "speedster");

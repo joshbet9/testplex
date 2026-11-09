@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class AchievementKitUnlockPolicyTest {
     @Test void everyReviewedAchievementKitHasStableEarnableRequirements() {
-        assertEquals(23, AchievementKitUnlockPolicy.all().size());
+        assertEquals(24, AchievementKitUnlockPolicy.all().size());
         for (AchievementKitUnlockPolicy.Rule rule : AchievementKitUnlockPolicy.all()) {
             assertFalse(rule.requirements().isEmpty(), rule.kitId());
             assertEquals(rule.requirements().size(), Set.copyOf(rule.requirements()).size(), rule.kitId());
@@ -44,7 +44,7 @@ class AchievementKitUnlockPolicyTest {
                 assertNotNull(AchievementKitUnlockPolicy.find(game, choice.id), game.id() + ":" + choice.id);
             }
         }
-        assertEquals(23, purple);
+        assertEquals(24, purple);
     }
 
     @Test void combinationsRequireEverySpecificAchievement() {
@@ -56,11 +56,16 @@ class AchievementKitUnlockPolicyTest {
         assertTrue(constructor.unlocked(Set.copyOf(constructor.requirements())::contains));
         AchievementKitUnlockPolicy.Rule digger = AchievementKitUnlockPolicy.find(ArcadePortGame.DRAGON_ESCAPE, "digger");
         Set<String> earned = new HashSet<>(Set.of("to-hell-and-back"));
-        assertEquals(java.util.List.of("paralympics"), digger.missing(earned::contains));
+        assertEquals(java.util.List.of("skylands-master", "plundered"), digger.missing(earned::contains));
         assertFalse(digger.unlocked(earned::contains));
-        earned.add("paralympics");
+        earned.addAll(Set.of("skylands-master", "plundered"));
         assertTrue(digger.unlocked(earned::contains));
         assertFalse(digger.requirements().contains("learn-to-code"));
+        var builder = AchievementKitUnlockPolicy.find(ArcadePortGame.DRAGON_ESCAPE, "builder");
+        assertEquals(java.util.List.of("paralympics"), builder.requirements());
+        assertFalse(builder.unlocked(earned::contains));
+        earned.add("paralympics");
+        assertTrue(builder.unlocked(earned::contains));
         var chris = AchievementKitUnlockPolicy.find(ArcadePortGame.BACON_BRAWL, "chris-p-bacon");
         assertEquals(java.util.List.of("flash-fried", "raw-pork"), chris.requirements());
         assertFalse(chris.unlocked(Set.of("flash-fried")::contains));

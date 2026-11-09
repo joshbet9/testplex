@@ -28,6 +28,10 @@ class ArcadeAchievementKitRequirementsTest {
     }
 
     @Test void knownRewardsCanBeShownInAchievementTooltips() {
+        assertEquals(java.util.List.of("builder"),
+                ArcadeAchievementKitRequirements.kitIdsForAchievement("dragon-escape", "paralympics"));
+        assertEquals(java.util.List.of("skylands-master", "to-hell-and-back", "plundered"),
+                ArcadeAchievementKitRequirements.find("dragon-escape", "digger").achievementIds());
         assertEquals(java.util.List.of("dasher"),
                 ArcadeAchievementKitRequirements.kitIdsForAchievement("micro-battles", "speedster"));
         assertEquals(java.util.List.of("runnerkit-switcher"),
