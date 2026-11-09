@@ -40,6 +40,16 @@ class MasterBuildersManagerTest {
     }
 
     @Test
+    void buildWindowUsesTheConfiguredTotalAndPerPlotReviewBudget() {
+        long total = ArcadePortRules.masterBuildersTotalMillis();
+        long review = ArcadePortRules.masterBuildersReviewMillis();
+        for (int plots = 2; plots <= 8; plots++) {
+            long expected = Math.max(30_000L, total - plots * Math.max(0L, review));
+            assertEquals(expected, MasterBuildersManager.buildMillis(plots));
+        }
+    }
+
+    @Test
     void sidebarTimeRoundsUpToNextSecond() {
         assertEquals("0:00", MasterBuildersManager.formatTime(0L));
         assertEquals("0:01", MasterBuildersManager.formatTime(1L));
