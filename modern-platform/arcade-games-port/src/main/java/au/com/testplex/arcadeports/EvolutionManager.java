@@ -11,6 +11,58 @@ import org.bukkit.entity.Player;
 final class EvolutionManager implements ArcadeMatchController {
     @Override public ArcadePortGame game() { return ArcadePortGame.EVOLUTION; }
 
+    @FunctionalInterface
+    interface AchievementAwarder {
+        void award(Player player, String achievementId);
+    }
+
+    void recordWinAchievements(SessionState session, Player winner, AchievementAwarder awarder) {
+        if (session == null || winner == null || awarder == null) return;
+        UUID id = winner.getUniqueId();
+        if (!session.evolutionDeaths.contains(id)) awarder.award(winner, "perfect-game");
+        if (!session.evolutionDamageWhileCharging.contains(id)) {
+            awarder.award(winner, "stealth-mastah");
+        }
+        if (!session.evolutionAbilitiesUsed.contains(id)) {
+            awarder.award(winner, "melee-monster");
+        }
+        if (EvolutionAchievementRules.shouldAwardOverkill(true, session.evolutionOverkillEligible.contains(id))) {
+            awarder.award(winner, "overkill");
+        }
+        if (EvolutionAchievementRules.shouldAwardSecondWind(true,
+                session.evolutionHealthRestored.getOrDefault(id, 0.0D))) {
+            awarder.award(winner, "second-wind");
+        }
+        if (EvolutionAchievementRules.shouldAwardPityParty(true,
+                session.evolutionPityEvolutions.getOrDefault(id, 0))) {
+            awarder.award(winner, "pity-party");
+        }
+        if (EvolutionAchievementRules.shouldAwardQuickChangeArtist(true,
+                "quick-evolver".equals(session.evolutionKits.get(id)),
+                !session.evolutionQuickTransformationInterrupted.contains(id),
+                session.evolutionQuickTransformations.getOrDefault(id, 0))) {
+            awarder.award(winner, "quick-change-artist");
+        }
+        if (EvolutionAchievementRules.shouldAwardPityTheAncient(true,
+                "neanderthal".equals(session.evolutionKits.get(id)),
+                session.evolutionNeanderthalCyclesCompleted.getOrDefault(id, 0))) {
+            awarder.award(winner, "pity-the-ancient");
+        }
+        for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
+            UUID loserId = entry.getKey();
+            Player loser = entry.getValue();
+            Long startedAt = session.evolutionStartedAtMillis.get(loserId);
+            if (loserId.equals(id) || loser == null || !loser.isOnline() || startedAt == null
+                    || !"darwinist".equals(session.evolutionKits.get(loserId))) continue;
+            long elapsedTicks = Math.max(0L, (System.currentTimeMillis() - startedAt) / 50L);
+            if (EvolutionAchievementRules.shouldAwardWrongKitChamp(session.evolutionKits.get(loserId),
+                    session.evolutionLevelAtAttempt.getOrDefault(loserId, -1),
+                    session.evolving.contains(loserId), elapsedTicks)) {
+                awarder.award(loser, "wrong-kit-champ");
+            }
+        }
+    }
+
     long kitCooldown(SessionState session, UUID playerId, long baseMillis) {
         return "darwinist".equals(session.evolutionKits.getOrDefault(playerId, "darwinist"))
                 ? EvolutionAchievementRules.darwinistCooldown(baseMillis) : baseMillis;
