@@ -432,8 +432,7 @@ public final class ArcadePortManager implements Listener {
     private final NamespacedKey dragonEscapeGhostHotbarKey;
     private final ModernArcadeLobby lobby;
     private final ModernArcadeLobbyRuntime lobbyRuntime;
-    private final ArcadeLobbyLeaderboardService lobbyLeaderboards;
-    private final AbilityCooldownProgress cooldownProgress;
+    private final ArcadeLobbyLeaderboardService lobbyLeaderboards;    private final AbilityCooldownProgress cooldownProgress;
     private MonsterMazePlugin monsterMazeModule;
     private ArcadeGameModule monsterMazeLifecycle;
     private au.com.testplex.snake.SnakeGameManager snakeModule;
@@ -552,8 +551,7 @@ public final class ArcadePortManager implements Listener {
         plugin.getLogger().info("TESTPLEX_ARCADE_LOBBY_READY world=" + ModernArcadeLobby.WORLD_NAME
                 + " bounds=-50..49 floor-y=" + ModernArcadeLobby.FLOOR_Y);
         this.lobbyRuntime = new ModernArcadeLobbyRuntime(plugin, this, lobby);
-        this.lobbyLeaderboards = new ArcadeLobbyLeaderboardService(plugin, this, lobby);
-        this.testPlayers.cleanupStaleSessionPlayers();
+        this.lobbyLeaderboards = new ArcadeLobbyLeaderboardService(plugin, this, lobby);        this.testPlayers.cleanupStaleSessionPlayers();
         Bukkit.getPluginManager().registerEvents(lobbyRuntime, plugin);
         lobbyRuntime.setSelectedGame(ArcadePortGame.fromId(plugin.getConfig().getString("lobby-selected-game", "bacon-brawl")));
         registerOptionalBaconPacketBridge();
@@ -572,8 +570,7 @@ public final class ArcadePortManager implements Listener {
         initializeWizardsGameModule();
         initializeSnakeGameModule();
         gameModulesInitialized = true;
-        lobbyLeaderboards.start();
-        // Take the saved-progress baseline first: restarting the server must not
+        lobbyLeaderboards.start();        // Take the saved-progress baseline first: restarting the server must not
         // replay existing achievements and milestone tiers into chat.
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (!testPlayers.isTestPlayer(player)) statsUnlockTracker.observe(
