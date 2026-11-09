@@ -3457,6 +3457,14 @@ public final class ArcadePortRules {
                 < radius * radius;
     }
 
+    /** A beacon is a valid finish only once the racer has reached the final route segment. */
+    public static boolean isDragonEscapeFinishBeaconReached(
+            int playerProgress, int finalWaypointIndex, double distanceSquared) {
+        if (finalWaypointIndex < 0 || !Double.isFinite(distanceSquared) || distanceSquared < 0.0D) return false;
+        int finalSegmentStart = Math.max(0, finalWaypointIndex - 2);
+        return playerProgress >= finalSegmentStart && distanceSquared <= 36.0D;
+    }
+
     /** Reborn kills runners once Douglas's route progress has overtaken theirs. */
     /** Keep route progress monotonic when a course crosses near one of its earlier waypoints. */
     /** For source maps with vertical bounds, let players fall just below the mapped volume before elimination. */

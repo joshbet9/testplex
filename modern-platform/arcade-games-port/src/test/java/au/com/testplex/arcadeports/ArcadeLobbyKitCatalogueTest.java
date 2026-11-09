@@ -130,12 +130,12 @@ class ArcadeLobbyKitCatalogueTest {
     }
 
     @Test
-    void dragonEscapeBuilderAndDiggerAreBothAchievementKits() {
+    void dragonEscapeBuilderPrecedesDiggerAndBothRemainAchievementLocked() {
         List<ArcadeLobbyKitCatalogue.KitChoice> choices =
                 ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.DRAGON_ESCAPE, List.of());
-        assertEquals(List.of("jumper", "disruptor", "builder", "warper", "digger"),
+        assertEquals(List.of("jumper", "disruptor", "warper", "builder", "digger"),
                 choices.stream().map(choice -> choice.id).toList());
-        assertEquals(ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT, choices.get(2).unlock);
+        assertEquals(ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT, choices.get(3).unlock);
         assertEquals(ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT, choices.get(4).unlock);
     }
 

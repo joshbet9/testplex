@@ -719,6 +719,8 @@ class SessionState {
     UUID dragonEscapeBeaconLeader;
     UUID dragonEscapeWinner;
     String dragonEscapeBeaconColor = "white";
+    Block dragonEscapeBeaconGlassBlock;
+    BlockData dragonEscapeBeaconOriginalGlass;
     int dragonEscapeDragonProgress;
     long dragonEscapeNextScoreUpdateAt;
     final Map<UUID, Integer> dragonEscapePlayerProgress = new HashMap<>();

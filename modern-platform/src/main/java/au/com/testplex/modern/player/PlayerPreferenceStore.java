@@ -31,7 +31,9 @@ public final class PlayerPreferenceStore {
     public Set<String> getSelected(UUID player, GameDefinition game, CosmeticLineDefinition line) {
         String path = linePath(player, game, line);
         if (line.getSelectionMode() == CosmeticLineDefinition.SelectionMode.SINGLE) {
-            return Set.of(data.getString(path, line.getDefaultOptionId()));
+            String selected = data.getString(path);
+            if (selected == null) return Set.of(line.getDefaultOptionId());
+            return selected.isBlank() ? Set.of() : Set.of(selected);
         }
         if (!data.contains(path)) {
             // A grouped MULTI line starts with the first option in each group equipped.
@@ -69,6 +71,22 @@ public final class PlayerPreferenceStore {
         save();
     }
 
+    /** Disable one equipped option without allowing the default to silently re-equip. */
+    public boolean disableOption(UUID player, GameDefinition game, CosmeticLineDefinition line, String optionId) {
+        boolean belongs = line.getOptions().stream().anyMatch(option -> option.getId().equals(optionId));
+        if (!belongs) throw new IllegalArgumentException("Option does not belong to " + line.getId());
+        Set<String> selected = getSelected(player, game, line);
+        if (!selected.contains(optionId)) return false;
+        String path = linePath(player, game, line);
+        if (line.getSelectionMode() == CosmeticLineDefinition.SelectionMode.SINGLE) {
+            data.set(path, "");
+        } else {
+            data.set(path, new ArrayList<>(selectionAfterDisable(selected, optionId)));
+        }
+        save();
+        return true;
+    }
+
     static Set<String> selectionAfterChoice(
             CosmeticLineDefinition line, Set<String> currentSelections, String optionId) {
         CosmeticOption selectedOption = line.getOptions().stream()
@@ -92,8 +110,28 @@ public final class PlayerPreferenceStore {
         return selected;
     }
 
+    static Set<String> selectionAfterDisable(Set<String> currentSelections, String optionId) {
+        Set<String> remaining = new LinkedHashSet<>(currentSelections);
+        remaining.remove(optionId);
+        return remaining;
+    }
+
     public String getWinEffect(UUID player, GameDefinition game) {
-        return data.getString(winPath(player, game), game.getDefaultWinEffectId());
+        return winEffectOrDefault(data.getString(winPath(player, game)), game.getDefaultWinEffectId());
+    }
+
+    static String winEffectOrDefault(String selected, String defaultEffect) {
+        return selected == null ? defaultEffect : selected;
+    }
+
+    public boolean disableWinEffect(UUID player, GameDefinition game, String optionId) {
+        boolean belongs = game.getWinEffects().stream().anyMatch(option -> option.getId().equals(optionId));
+        if (!belongs) throw new IllegalArgumentException("Win effect does not belong to " + game.getId());
+        String path = winPath(player, game);
+        if (!optionId.equals(data.getString(path, game.getDefaultWinEffectId()))) return false;
+        data.set(path, "");
+        save();
+        return true;
     }
 
     public void chooseWinEffect(UUID player, GameDefinition game, String optionId) {

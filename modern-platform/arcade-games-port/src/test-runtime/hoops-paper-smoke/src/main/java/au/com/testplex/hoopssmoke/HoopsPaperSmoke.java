@@ -275,8 +275,8 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         require(statsFooterSlot(pbInventory, Material.REDSTONE_LAMP) >= 0
                         && statsFooterSlot(pbInventory, Material.BLAZE_POWDER) >= 0,
                 "Dragon Escape PB standard tab navigation missing");
-        Material[] pbIcons = {Material.FEATHER, Material.TNT, Material.BRICK,
-                Material.ENDER_PEARL, Material.DIAMOND_PICKAXE, Material.CLOCK};
+        Material[] pbIcons = {Material.FEATHER, Material.TNT, Material.ENDER_PEARL,
+                Material.BRICK, Material.DIAMOND_PICKAXE, Material.CLOCK};
         for (int i = 0; i < pbIcons.length; i++) {
             clickStatsSlot(8);
             require(owner.getOpenInventory().getTopInventory().getItem(8).getType() == pbIcons[i],

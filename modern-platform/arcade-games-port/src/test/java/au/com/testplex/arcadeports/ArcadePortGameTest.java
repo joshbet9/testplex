@@ -1953,6 +1953,15 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.isDragonEscapeFinishReached(0.5D, 64.0D, 77.5D));
     }
 
+    @Test void dragonEscapeFinishBeaconOnlyCompletesNearTheFinalRouteSegment() {
+        assertFalse(ArcadePortRules.isDragonEscapeFinishBeaconReached(5, 20, 1.0D));
+        assertFalse(ArcadePortRules.isDragonEscapeFinishBeaconReached(18, 20, 37.0D));
+        assertTrue(ArcadePortRules.isDragonEscapeFinishBeaconReached(18, 20, 36.0D));
+        assertTrue(ArcadePortRules.isDragonEscapeFinishBeaconReached(0, 0, 0.0D));
+        assertFalse(ArcadePortRules.isDragonEscapeFinishBeaconReached(1, -1, 0.0D));
+        assertFalse(ArcadePortRules.isDragonEscapeFinishBeaconReached(20, 20, Double.NaN));
+    }
+
     @Test void spleefProjectileRadiusScalesWithArrowSpeed() {
         assertEquals(1, ArcadePortRules.spleefProjectileClearRadius(false, 8.0D));
         assertEquals(1, ArcadePortRules.spleefProjectileClearRadius(true, 0.0D));

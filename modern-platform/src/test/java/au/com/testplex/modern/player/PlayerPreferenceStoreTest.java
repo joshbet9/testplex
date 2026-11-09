@@ -42,4 +42,24 @@ class PlayerPreferenceStoreTest {
         assertThrows(IllegalArgumentException.class, () -> PlayerPreferenceStore.selectionAfterChoice(
                 line("paintball"), Set.of("classic-pellet"), "not-a-pellet"));
     }
+
+    @Test
+    void disablingOneGroupedCosmeticPreservesOtherGroups() {
+        assertEquals(Set.of("blue-burst"), PlayerPreferenceStore.selectionAfterDisable(
+                Set.of("blue-burst", "prism-pellet"), "prism-pellet"));
+    }
+
+    @Test
+    void disablingLastSelectionLeavesTheLineUnequipped() {
+        assertEquals(Set.of(), PlayerPreferenceStore.selectionAfterDisable(Set.of("classic-pellet"), "classic-pellet"));
+        assertEquals(Set.of("classic-pellet"), PlayerPreferenceStore.selectionAfterDisable(
+                Set.of("classic-pellet"), "not-selected"));
+    }
+
+    @Test
+    void disabledWinEffectDoesNotFallBackToDefault() {
+        assertEquals("default", PlayerPreferenceStore.winEffectOrDefault(null, "default"));
+        assertEquals("", PlayerPreferenceStore.winEffectOrDefault("", "default"));
+        assertEquals("selected", PlayerPreferenceStore.winEffectOrDefault("selected", "default"));
+    }
 }

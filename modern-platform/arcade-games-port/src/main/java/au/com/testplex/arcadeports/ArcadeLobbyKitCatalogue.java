@@ -112,10 +112,10 @@ final class ArcadeLobbyKitCatalogue {
                             Unlock.FREE, Zombie.class, Material.IRON_AXE),
                     choice("disruptor", "Disruptor", Material.TNT,
                             Unlock.GEM, Zombie.class, Material.TNT),
-                    choice("builder", "Builder", Material.BRICKS,
-                            Unlock.ACHIEVEMENT, Zombie.class, Material.BRICKS),
                     choice("warper", "Warper", Material.ENDER_PEARL,
                             Unlock.GEM, Zombie.class, Material.ENDER_PEARL),
+                    choice("builder", "Builder", Material.BRICKS,
+                            Unlock.ACHIEVEMENT, Zombie.class, Material.BRICKS),
                     choice("digger", "Digger", Material.IRON_PICKAXE,
                             Unlock.ACHIEVEMENT, Zombie.class, Material.DIAMOND_PICKAXE));
             case DRAGONS -> List.of(

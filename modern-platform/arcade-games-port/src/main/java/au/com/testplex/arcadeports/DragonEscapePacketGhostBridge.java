@@ -43,6 +43,7 @@ import java.util.UUID;
  */
 public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBridge {
     private static final byte INVISIBLE_FLAG = 0x20;
+    private static final byte GLOWING_FLAG = 0x40;
     private static final byte SNEAKING_FLAG = 0x02;
     private static final byte SPRINTING_FLAG = 0x08;
 
@@ -73,7 +74,7 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
                 new WrapperPlayServerEntityHeadLook(state.entityId, location.getYaw()));
 
-        byte flags = (byte) (INVISIBLE_FLAG
+        byte flags = (byte) (INVISIBLE_FLAG | GLOWING_FLAG
                 | (sneaking ? SNEAKING_FLAG : 0)
                 | (sprinting ? SPRINTING_FLAG : 0));
         EntityPose pose = sneaking ? EntityPose.CROUCHING : EntityPose.STANDING;
@@ -95,7 +96,7 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
                 ("testplex:dragon-escape-pb-ghost:" + viewer.getUniqueId())
                         .getBytes(StandardCharsets.UTF_8));
         String suffix = String.format("%08x", ghostUuid.getLeastSignificantBits()).substring(0, 8);
-        String profileName = "DEGhost" + suffix;
+        String profileName = "PB_Ghost";
         String teamName = "deg" + suffix;
         // Keep packet-only NPC IDs positive and far outside normal server entity IDs.
         int entityId = 1_800_000_000 - (ghostUuid.hashCode() & 0x1fffffff);
@@ -124,7 +125,7 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
                         Component.text("Dragon Escape PB Ghost"),
                         Component.empty(),
                         Component.empty(),
-                        WrapperPlayServerTeams.NameTagVisibility.NEVER,
+                        WrapperPlayServerTeams.NameTagVisibility.ALWAYS,
                         WrapperPlayServerTeams.CollisionRule.NEVER,
                         NamedTextColor.WHITE,
                         WrapperPlayServerTeams.OptionData.FRIENDLY_CAN_SEE_INVISIBLE);
@@ -141,7 +142,7 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
                         new Vector3d(location.getX(), location.getY(), location.getZ()),
                         location.getPitch(), location.getYaw(), location.getYaw(), 0, Optional.empty()));
 
-        byte flags = INVISIBLE_FLAG;
+        byte flags = (byte) (INVISIBLE_FLAG | GLOWING_FLAG);
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
                 new WrapperPlayServerEntityMetadata(entityId, List.of(
                         new EntityData<>(0, EntityDataTypes.BYTE, flags),

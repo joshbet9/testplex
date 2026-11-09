@@ -9,6 +9,8 @@ public final class GameDebugRuntimeOverrides {
     private static volatile Map<String, Object> values = Map.of();
     private static volatile boolean debugSession;
     private static volatile UUID debugOwner;
+    private static volatile boolean globalCosmeticsEnabled = true;
+    private static volatile boolean globalAntiCheatEnabled = true;
 
     private GameDebugRuntimeOverrides() { }
 
@@ -53,6 +55,18 @@ public final class GameDebugRuntimeOverrides {
 
     public static boolean isDebugSession() {
         return debugSession;
+    }
+
+    /** Global, operator-gated test switches; defaults always preserve normal play. */
+    public static boolean globalCosmeticsEnabled() { return globalCosmeticsEnabled; }
+    public static boolean toggleGlobalCosmetics() {
+        globalCosmeticsEnabled = !globalCosmeticsEnabled;
+        return globalCosmeticsEnabled;
+    }
+    public static boolean globalAntiCheatEnabled() { return globalAntiCheatEnabled; }
+    public static boolean toggleGlobalAntiCheat() {
+        globalAntiCheatEnabled = !globalAntiCheatEnabled;
+        return globalAntiCheatEnabled;
     }
 
     /** Mark an already-running round as a test after an authorized live debug action. */

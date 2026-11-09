@@ -1075,6 +1075,14 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 "Trigger supported events in the active game through normal runtime handlers.", "debug-open:events"));
         inventory.setItem(29, testBotButton(Material.KNOWLEDGE_BOOK, "Achievement previews",
                 "Preview each achievement message; previews never unlock or save progress.", "debug-open:achievements"));
+        inventory.setItem(31, testBotButton(Material.FIREWORK_ROCKET,
+                "Game cosmetics: " + (GameDebugRuntimeOverrides.globalCosmeticsEnabled() ? "ON" : "OFF"),
+                "Global tester switch. OFF suppresses game cosmetic effects; normal gameplay defaults to ON.",
+                "debug-global:cosmetics"));
+        inventory.setItem(33, testBotButton(Material.IRON_BARS,
+                "Anti-cheat checks: " + (GameDebugRuntimeOverrides.globalAntiCheatEnabled() ? "ON" : "OFF"),
+                "Global tester switch for anti-cheat eliminations. Normal gameplay defaults to ON.",
+                "debug-global:anti-cheat"));
         inventory.setItem(37, testBotButton(Material.CLOCK, "Profile application",
                 "Immediate switches take effect now. Rule switches and numeric values apply when the next round starts."));
         inventory.setItem(39, testBotButton(Material.FEATHER, "Advance game phase or timer",
@@ -1105,6 +1113,18 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         if ("debug-open:achievements".equals(action)) { openDebugAchievements(player); return; }
         if ("debug-open:variables:0".equals(action)) { openDebugVariables(player, 0); return; }
         if ("debug-open:bots".equals(action)) { openTestBotSetup(player, debugGame(player)); return; }
+        if ("debug-global:cosmetics".equals(action)) {
+            boolean enabled = GameDebugRuntimeOverrides.toggleGlobalCosmetics();
+            player.sendMessage(ChatColor.AQUA + "Game cosmetics are now " + (enabled ? "enabled." : "disabled."));
+            openDebugMenu(player);
+            return;
+        }
+        if ("debug-global:anti-cheat".equals(action)) {
+            boolean enabled = GameDebugRuntimeOverrides.toggleGlobalAntiCheat();
+            player.sendMessage(ChatColor.AQUA + "Anti-cheat eliminations are now " + (enabled ? "enabled." : "disabled."));
+            openDebugMenu(player);
+            return;
+        }
         ArcadePortGame game = debugGame(player);
         if (action.startsWith("debug-event:")) {
             String eventId = action.substring("debug-event:".length());

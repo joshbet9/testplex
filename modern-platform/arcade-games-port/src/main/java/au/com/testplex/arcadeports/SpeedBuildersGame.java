@@ -1333,7 +1333,7 @@ public final class SpeedBuildersGame implements Listener {
         if (entity == null) return;
         // A player-placed mob is hittable for removal, but never wanders away or damages anyone.
         entity.setInvulnerable(false);
-        if (entity instanceof LivingEntity living) living.setCollidable(true);
+        if (entity instanceof LivingEntity living) living.setCollidable(false);
         if (entity instanceof Mob mob) mob.setAI(false);
         state.mobs.add(entity);
         ItemStack held = event.getHand() == EquipmentSlot.OFF_HAND
