@@ -12,9 +12,13 @@ import org.bukkit.Sound;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Player;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerItemHeldEvent;
+import org.bukkit.event.inventory.InventoryClickEvent;
 
 /** Draw My Thing's non-repeating word pool, timed letter hints and action bars. */
 final class DrawMyThingManager implements ArcadeMatchController {
@@ -33,6 +37,62 @@ final class DrawMyThingManager implements ArcadeMatchController {
                 && block.getY() <= Math.max(first.getBlockY(), second.getBlockY())
                 && block.getZ() >= Math.min(first.getBlockZ(), second.getBlockZ())
                 && block.getZ() <= Math.max(first.getBlockZ(), second.getBlockZ());
+    }
+
+    boolean handlePaletteClick(InventoryClickEvent event, SessionState session, boolean paletteEnabled) {
+        if (session == null || session.type != ArcadePortGame.DRAW_MY_THING
+                || !(event.getWhoClicked() instanceof Player player)
+                || session.drawCurrentDrawer == null
+                || !player.getUniqueId().equals(session.drawCurrentDrawer)
+                || event.getClickedInventory() == null) return false;
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || clicked.getType().isAir() || !DrawMyThingContent.COLOURS.contains(clicked.getType())) {
+            return false;
+        }
+        event.setCancelled(true);
+        selectColour(session, player, clicked.getType(), colourName(clicked.getType()), paletteEnabled);
+        return true;
+    }
+
+    boolean handlePaletteHotbarChange(PlayerItemHeldEvent event, SessionState session, boolean paletteEnabled) {
+        Player player = event.getPlayer();
+        if (session == null || session.type != ArcadePortGame.DRAW_MY_THING
+                || session.drawCurrentDrawer == null
+                || !player.getUniqueId().equals(session.drawCurrentDrawer)) return false;
+        ItemStack selected = player.getInventory().getItem(event.getNewSlot());
+        if (selected == null || !DrawMyThingContent.COLOURS.contains(selected.getType())) return false;
+        selectColour(session, player, selected.getType(), colourName(selected.getType()), paletteEnabled);
+        return true;
+    }
+
+    void handleInteract(SessionState session, PlayerInteractEvent event, SourceMapCatalog.MapData map,
+            boolean paletteEnabled, boolean canvasToolsEnabled) {
+        event.setCancelled(true);
+        Player player = event.getPlayer();
+        UUID id = player.getUniqueId();
+        if (session.drawCurrentDrawer == null
+                || !id.equals(session.drawCurrentDrawer) || !session.alive.contains(id)) return;
+
+        Block clicked = event.getClickedBlock();
+        if (clicked == null) {
+            Block target = player.getTargetBlockExact(64);
+            if (target != null && isPaletteSwatch(session, target, map)) clicked = target;
+        }
+        if (clicked != null && isPaletteSwatch(session, clicked, map)) {
+            selectColour(session, player, clicked.getType(), colourName(clicked.getType()), paletteEnabled);
+            return;
+        }
+
+        ItemStack held = event.getItem();
+        String name = held == null || !held.hasItemMeta() || !held.getItemMeta().hasDisplayName()
+                ? null : ChatColor.stripColor(held.getItemMeta().getDisplayName());
+        if (held != null && DrawMyThingContent.COLOURS.contains(held.getType())) {
+            selectColour(session, player, held.getType(), colourName(held.getType()), paletteEnabled);
+            return;
+        }
+        if (!event.getAction().isRightClick() || name == null) return;
+        Block target = canvasTarget(session, player, event.getClickedBlock());
+        if (target != null) performToolAction(session, player, target, name, canvasToolsEnabled);
     }
 
     static String colourName(Material colour) {

@@ -12020,7 +12020,7 @@ public final class ArcadePortManager implements Listener {
             session.drawGuesserPoints.merge(playerId, guesserPoints, Integer::sum);
             boolean humanGuesser = !testPlayers.isTestPlayer(playerId);
             if (humanGuesser) session.drawHumanCorrectGuessers.add(playerId);
-            if (first) session.drawPaintedBlocksAtFirstGuess = countDrawPaintedBlocks(session);
+            if (first) session.drawPaintedBlocksAtFirstGuess = drawMyThingController.countPaintedBlocks(session);
             if (humanGuesser) {
                 long remaining = session.drawRoundEndsAt - now;
                 int totalLetters = (int) session.drawWord.chars().filter(ch -> ch != ' ').count();
@@ -12044,7 +12044,7 @@ public final class ArcadePortManager implements Listener {
                 if (session.drawToolQualifications.contains("perfectly-round")) {
                     awardCatalogAchievement(drawerForAward, "draw-my-thing", "perfectly-round");
                 }
-                if (session.drawCleanSlateReady && countDrawPaintedBlocks(session) >= 8) {
+                if (session.drawCleanSlateReady && drawMyThingController.countPaintedBlocks(session) >= 8) {
                     awardCatalogAchievement(drawerForAward, "draw-my-thing", "clean-slate");
                 }
             }
@@ -12136,89 +12136,28 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onDrawMyThingPaletteClick(InventoryClickEvent event) {
-        Session session = active;
-        if (session == null || session.type != ArcadePortGame.DRAW_MY_THING
-                || !(event.getWhoClicked() instanceof Player player)
-                || session.drawCurrentDrawer == null
-                || !player.getUniqueId().equals(session.drawCurrentDrawer)
-                || event.getClickedInventory() == null) return;
-        ItemStack clicked = event.getCurrentItem();
-        if (clicked == null || clicked.getType().isAir() || !DrawMyThingContent.COLOURS.contains(clicked.getType())) return;
-        event.setCancelled(true);
-        selectDrawColour(session, player, clicked.getType(), drawColourName(clicked.getType()));
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+        drawMyThingController.handlePaletteClick(event, active,
+                drawMyThingFeatureEnabled(player, "palette-selection"));
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onDrawMyThingPaletteHotbarChange(PlayerItemHeldEvent event) {
-        Session session = active;
-        Player player = event.getPlayer();
-        if (session == null || session.type != ArcadePortGame.DRAW_MY_THING
-                || session.drawCurrentDrawer == null
-                || !player.getUniqueId().equals(session.drawCurrentDrawer)) return;
-        ItemStack selected = player.getInventory().getItem(event.getNewSlot());
-        if (selected == null || !DrawMyThingContent.COLOURS.contains(selected.getType())) return;
-        selectDrawColour(session, player, selected.getType(), drawColourName(selected.getType()));
+        drawMyThingController.handlePaletteHotbarChange(event, active,
+                drawMyThingFeatureEnabled(event.getPlayer(), "palette-selection"));
     }
 
     private void handleDrawMyThingInteract(Session session, PlayerInteractEvent event) {
-        event.setCancelled(true);
         Player player = event.getPlayer();
-        UUID id = player.getUniqueId();
-        if (session.drawCurrentDrawer == null
-                || !id.equals(session.drawCurrentDrawer) || !session.alive.contains(id)) return;
-
-        // Reborn's palette is the wool swatch area marked GREEN in the source map.
-        // Keep that interaction as well as the inventory palette. Selecting a swatch
-        // with either mouse button must not paint it as a side effect.
-        Block clicked = event.getClickedBlock();
-        if (clicked == null) {
-            Block target = player.getTargetBlockExact(64);
-            if (target != null && isDrawPaletteSwatch(session, target)) clicked = target;
-        }
-        if (clicked != null && isDrawPaletteSwatch(session, clicked)) {
-            selectDrawColour(session, player, clicked.getType(), drawColourName(clicked.getType()));
-            return;
-        }
-
-        ItemStack held = event.getItem();
-        String name = held == null || !held.hasItemMeta() || !held.getItemMeta().hasDisplayName()
-                ? null : ChatColor.stripColor(held.getItemMeta().getDisplayName());
-        if (held != null && DrawMyThingContent.COLOURS.contains(held.getType())) {
-            selectDrawColour(session, player, held.getType(), drawColourName(held.getType()));
-            return;
-        }
-        if (!event.getAction().isRightClick() || name == null) return;
-        Block target = drawCanvasTarget(session, player, event.getClickedBlock());
-        if (target != null) performDrawToolAction(session, player, target, name);
+        drawMyThingController.handleInteract(session, event,
+                sourceMapData.get(ArcadePortGame.DRAW_MY_THING.id()),
+                drawMyThingFeatureEnabled(player, "palette-selection"),
+                drawMyThingFeatureEnabled(player, "canvas-tools"));
     }
 
-    private boolean isDrawPaletteSwatch(Session session, Block block) {
-        return drawMyThingController.isPaletteSwatch(session, block,
-                sourceMapData.get(ArcadePortGame.DRAW_MY_THING.id()));
-    }
-
-    private String drawColourName(Material colour) {
-        return DrawMyThingManager.colourName(colour);
-    }
-
-    private void selectDrawColour(Session session, Player player, Material colour, String colourName) {
-        drawMyThingController.selectColour(session, player, colour, colourName,
-                !plugin.hasAdminAccess(player) || debugFeatureEnabled(player.getUniqueId(),
-                        ArcadePortGame.DRAW_MY_THING, "palette-selection", true));
-    }
-
-    private Block drawCanvasTarget(Session session, Player player, Block clicked) {
-        return drawMyThingController.canvasTarget(session, player, clicked);
-    }
-
-    private void performDrawToolAction(Session session, Player player, Block target, String tool) {
-        drawMyThingController.performToolAction(session, player, target, tool,
-                !plugin.hasAdminAccess(player) || debugFeatureEnabled(player.getUniqueId(),
-                        ArcadePortGame.DRAW_MY_THING, "canvas-tools", true));
-    }
-
-    private int countDrawPaintedBlocks(Session session) {
-        return drawMyThingController.countPaintedBlocks(session);
+    private boolean drawMyThingFeatureEnabled(Player player, String feature) {
+        return !plugin.hasAdminAccess(player)
+                || debugFeatureEnabled(player.getUniqueId(), ArcadePortGame.DRAW_MY_THING, feature, true);
     }
 
     @EventHandler(priority=EventPriority.LOWEST)
