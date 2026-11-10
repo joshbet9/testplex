@@ -23880,6 +23880,38 @@ public final class ArcadePortManager implements Listener {
         @Override public Inventory getInventory() { return inventory; }
     }
 
+    private static final class DragonEscapeLeaderboardHolder implements InventoryHolder {
+        private final UUID viewerId;
+        private final UUID targetId;
+        private final String targetName;
+        private final String mapResource;
+        private final int returnAchievementPage;
+        private final boolean incompleteOnly;
+        private final int mapPage;
+        private final int selectedView;
+        private final boolean followingOnly;
+        private final int page;
+        private final Map<Integer, UUID> playerSlots = new HashMap<>();
+        private Inventory inventory;
+
+        private DragonEscapeLeaderboardHolder(Player viewer, UUID targetId, String targetName,
+                String mapResource, int returnAchievementPage, boolean incompleteOnly,
+                int mapPage, int selectedView, boolean followingOnly, int page) {
+            this.viewerId = viewer.getUniqueId();
+            this.targetId = targetId;
+            this.targetName = targetName;
+            this.mapResource = mapResource;
+            this.returnAchievementPage = returnAchievementPage;
+            this.incompleteOnly = incompleteOnly;
+            this.mapPage = mapPage;
+            this.selectedView = selectedView;
+            this.followingOnly = followingOnly;
+            this.page = page;
+        }
+
+        @Override public Inventory getInventory() { return inventory; }
+    }
+
     // AchievementMainPage's exact 5-row OX layout, and the 1.8 non-Arcade categories.
     private static final String[][] ROOT_STATS_CATEGORIES = {
             {"global", "Global", "EMERALD"},
@@ -24540,6 +24572,113 @@ public final class ArcadePortManager implements Listener {
             } catch (IllegalArgumentException ignored) { }
         }
         return players;
+    }
+
+    private Set<UUID> dragonEscapeFollowedPlayers(UUID viewerId) {
+        var section = plugin.getConfig().getConfigurationSection("dragon-escape-pb-following." + viewerId);
+        if (section == null) return Set.of();
+        Set<UUID> followed = new HashSet<>();
+        for (String key : section.getKeys(false)) {
+            if (!section.getBoolean(key, false)) continue;
+            try { followed.add(UUID.fromString(key)); }
+            catch (IllegalArgumentException ignored) { }
+        }
+        return followed;
+    }
+
+    private void toggleDragonEscapeFollowing(Player viewer, UUID targetId) {
+        if (targetId.equals(viewer.getUniqueId())) return;
+        String path = "dragon-escape-pb-following." + viewer.getUniqueId() + "." + targetId;
+        boolean following = plugin.getConfig().getBoolean(path, false);
+        plugin.getConfig().set(path, following ? null : true);
+        plugin.saveConfig();
+        String playerName = Bukkit.getOfflinePlayer(targetId).getName();
+        viewer.sendMessage(ChatColor.AQUA + (following ? "Unfollowed " : "Following ")
+                + ChatColor.WHITE + (playerName == null ? targetId.toString() : playerName)
+                + ChatColor.GRAY + " for Dragon Escape PB leaderboards.");
+    }
+
+    private void openDragonEscapePbLeaderboard(Player viewer, UUID targetId, String targetName,
+            String mapResource, int returnAchievementPage, boolean incompleteOnly,
+            int mapPage, int selectedView, boolean followingOnly, int requestedPage) {
+        String view = DragonEscapePersonalBestViews.selected(selectedView);
+        String mapName = SourceMapCatalog.mapsFor(plugin, ArcadePortGame.DRAGON_ESCAPE).stream()
+                .filter(map -> map.resource().equals(mapResource)).map(SourceMapCatalog.MapArchive::displayName)
+                .findFirst().orElse("Unknown map");
+        List<DragonEscapePbLeaderboard.Run> runs = new ArrayList<>();
+        for (UUID id : dragonEscapePbRecordedPlayers()) {
+            long millis = DragonEscapePersonalBestViews.BEST_TIME.equals(view)
+                    ? dragonEscapePersonalBestMillis(id, mapResource)
+                    : dragonEscapeKitPersonalBestMillis(id, mapResource, view);
+            if (millis <= 0L) continue;
+            String kit = DragonEscapePersonalBestViews.BEST_TIME.equals(view)
+                    ? dragonEscapePersonalBestKit(id, mapResource) : view;
+            runs.add(new DragonEscapePbLeaderboard.Run(id, millis, kit));
+        }
+        Set<UUID> followed = dragonEscapeFollowedPlayers(viewer.getUniqueId());
+        List<DragonEscapePbLeaderboard.RankedRun> ranked = DragonEscapePbLeaderboard.rank(runs,
+                viewer.getUniqueId(), followed, followingOnly);
+        int totalPages = Math.max(1, (ranked.size() + 35) / 36);
+        int page = Math.max(0, Math.min(requestedPage, totalPages - 1));
+        DragonEscapeLeaderboardHolder holder = new DragonEscapeLeaderboardHolder(viewer, targetId,
+                targetName, mapResource, returnAchievementPage, incompleteOnly,
+                mapPage, selectedView, followingOnly, page);
+        Inventory inventory = Bukkit.createInventory(holder, 54, "Dragon Escape PB Rankings");
+        holder.inventory = inventory;
+        inventory.setItem(0, statsItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back",
+                List.of(ChatColor.GRAY + "Return to Personal Bests."), "pb-board-back", null, null));
+        inventory.setItem(4, statsItem(Material.PAPER, ChatColor.GOLD + mapName,
+                List.of(ChatColor.GRAY + "Times: " + DragonEscapePersonalBestViews.name(view),
+                        ChatColor.GRAY + "Local recorded racers: " + ranked.size(),
+                        ChatColor.DARK_GRAY + "Rankings use Testplex records only."),
+                "noop", null, null));
+        inventory.setItem(7, statsItem(Material.CLOCK,
+                ChatColor.AQUA + "Showing: " + DragonEscapePersonalBestViews.name(view),
+                List.of(ChatColor.GRAY + "Click to cycle overall and each kit."),
+                "pb-board-view", null, null));
+        inventory.setItem(8, statsItem(Material.LEVER,
+                ChatColor.YELLOW + (followingOnly ? "Following + You" : "All Racers"),
+                List.of(ChatColor.GRAY + "Click to switch leaderboard audience.",
+                        ChatColor.DARK_GRAY + "Shift-right-click a racer to follow/unfollow them."),
+                "pb-board-audience", null, null));
+        int start = page * 36;
+        for (int i = start; i < Math.min(ranked.size(), start + 36); i++) {
+            DragonEscapePbLeaderboard.RankedRun run = ranked.get(i);
+            int slot = 9 + i - start;
+            holder.playerSlots.put(slot, run.playerId());
+            boolean own = run.playerId().equals(viewer.getUniqueId());
+            boolean isFollowed = followed.contains(run.playerId());
+            String name = Bukkit.getOfflinePlayer(run.playerId()).getName();
+            if (name == null || name.isBlank()) name = "Player " + run.playerId().toString().substring(0, 8);
+            List<String> lore = new ArrayList<>();
+            lore.add(ChatColor.YELLOW + "Placement: " + ChatColor.WHITE + "#" + run.rank());
+            lore.add(ChatColor.YELLOW + "Time: " + ChatColor.WHITE
+                    + ArcadePortRules.formatDragonEscapeTime(run.elapsedMillis()));
+            lore.add(ChatColor.YELLOW + "Kit: " + ChatColor.WHITE
+                    + DragonEscapePersonalBestViews.name(run.kitId()));
+            lore.add(own ? ChatColor.GREEN + "Your record"
+                    : ChatColor.GRAY + (isFollowed ? "Following" : "Not following"));
+            if (!own) lore.add(ChatColor.AQUA + "Shift-right-click to "
+                    + (isFollowed ? "unfollow" : "follow") + " racer");
+            ItemStack head = statsItem(Material.PLAYER_HEAD,
+                    (own ? ChatColor.GREEN : ChatColor.GOLD) + "#" + run.rank() + " " + name,
+                    lore, "pb-board-racer", null, null);
+            if (head.getItemMeta() instanceof SkullMeta skull) {
+                skull.setOwningPlayer(Bukkit.getOfflinePlayer(run.playerId()));
+                head.setItemMeta(skull);
+            }
+            inventory.setItem(slot, head);
+        }
+        if (ranked.isEmpty()) inventory.setItem(22, statsItem(Material.BARRIER,
+                ChatColor.YELLOW + "No recorded times", List.of(
+                        ChatColor.GRAY + "Finish this map to record a local PB.",
+                        ChatColor.GRAY + (followingOnly ? "Try All Racers for more times." : "")),
+                "noop", null, null));
+        if (page > 0) inventory.setItem(45, statsItem(Material.ARROW,
+                ChatColor.YELLOW + "← Previous Page", List.of(), "pb-board-previous", null, null));
+        if (page + 1 < totalPages) inventory.setItem(53, statsItem(Material.ARROW,
+                ChatColor.YELLOW + "Next Page →", List.of(), "pb-board-next", null, null));
+        viewer.openInventory(inventory);
     }
 
     private ArcadeStatsPlacement.Result dragonEscapeMapPlacement(UUID targetId, String mapResource,
@@ -25428,6 +25567,7 @@ public final class ArcadePortManager implements Listener {
                         + rank.participants() + " players.");
             }
             lore.add(" ");
+            lore.add(ChatColor.AQUA + "Right-click: View local PB leaderboard");
             lore.add(ChatColor.YELLOW + "Shift-left-click: "
                     + (placementDetails ? "Hide" : "Show") + " placements");
             inventory.setItem(9 + i - start, statsItem(Material.PAPER,
@@ -31919,6 +32059,43 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
+        if (event.getView().getTopInventory().getHolder() instanceof DragonEscapeLeaderboardHolder holder) {
+            event.setCancelled(true);
+            if (!(event.getWhoClicked() instanceof Player player)
+                    || !holder.viewerId.equals(player.getUniqueId())
+                    || event.getClickedInventory() != event.getView().getTopInventory()) return;
+            ItemStack item = event.getCurrentItem();
+            if (item == null || !item.hasItemMeta()) return;
+            String action = item.getItemMeta().getPersistentDataContainer()
+                    .get(statsActionKey, PersistentDataType.STRING);
+            if ("pb-board-back".equals(action)) {
+                openDragonEscapePersonalBests(player, holder.targetId, holder.targetName,
+                        holder.returnAchievementPage, holder.incompleteOnly,
+                        holder.mapPage, holder.selectedView);
+            } else if ("pb-board-view".equals(action)) {
+                openDragonEscapePbLeaderboard(player, holder.targetId, holder.targetName,
+                        holder.mapResource, holder.returnAchievementPage, holder.incompleteOnly,
+                        holder.mapPage, DragonEscapePersonalBestViews.next(holder.selectedView),
+                        holder.followingOnly, 0);
+            } else if ("pb-board-audience".equals(action)) {
+                openDragonEscapePbLeaderboard(player, holder.targetId, holder.targetName,
+                        holder.mapResource, holder.returnAchievementPage, holder.incompleteOnly,
+                        holder.mapPage, holder.selectedView, !holder.followingOnly, 0);
+            } else if ("pb-board-previous".equals(action) || "pb-board-next".equals(action)) {
+                openDragonEscapePbLeaderboard(player, holder.targetId, holder.targetName,
+                        holder.mapResource, holder.returnAchievementPage, holder.incompleteOnly,
+                        holder.mapPage, holder.selectedView, holder.followingOnly,
+                        holder.page + ("pb-board-next".equals(action) ? 1 : -1));
+            } else if ("pb-board-racer".equals(action) && event.isShiftClick() && event.isRightClick()) {
+                UUID racerId = holder.playerSlots.get(event.getSlot());
+                if (racerId == null) return;
+                toggleDragonEscapeFollowing(player, racerId);
+                openDragonEscapePbLeaderboard(player, holder.targetId, holder.targetName,
+                        holder.mapResource, holder.returnAchievementPage, holder.incompleteOnly,
+                        holder.mapPage, holder.selectedView, holder.followingOnly, holder.page);
+            }
+            return;
+        }
         if (event.getView().getTopInventory().getHolder() instanceof StatsMenuHolder holder) {
             event.setCancelled(true);
             if (!(event.getWhoClicked() instanceof Player player)
@@ -31943,7 +32120,14 @@ public final class ArcadePortManager implements Listener {
                         category == null ? "global" : category);
                 case "open-game" -> openStatsGame(player, holder.targetId, holder.targetName, gameId);
                 case "toggle-placement-details" -> {
-                    // Normal clicks on the logo and PB map papers remain inert.
+                    if (holder.page == StatsPage.DRAGON_ESCAPE_MAPS && event.isRightClick()
+                            && !event.isShiftClick() && category != null) {
+                        openDragonEscapePbLeaderboard(player, holder.targetId, holder.targetName,
+                                category, holder.achievementPage, holder.incompleteOnly,
+                                holder.menuPage, holder.dragonPbView, false, 0);
+                        return;
+                    }
+                    // Other normal clicks on the logo and PB map papers remain inert.
                     if (!event.isShiftClick() || !event.isLeftClick()) return;
                     String placementGame = gameId != null ? gameId : holder.categoryId;
                     toggleStatsPlacementDetails(player, placementGame);
