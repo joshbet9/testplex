@@ -4887,6 +4887,18 @@ public final class ArcadePortManager implements Listener {
                 pendingMixedArcadeVariant = false;
             }
             Session session = new Session(type, plexballWorld, participants, false);
+            long plexballStartedAt = System.currentTimeMillis();
+            session.startedAt = plexballStartedAt;
+            session.prepareDurationMillis = 0L;
+            session.prepareEndsAt = plexballStartedAt;
+            session.lastPrepareSecond = 0;
+            // Plexball owns its intro/countdown. The shared session is already
+            // gameplay-active so generic Prepare gates must not cancel its arena
+            // teleports or player input.
+            session.liveStarted = true;
+            session.startupComplete = true;
+            session.endsAt = 0L;
+            session.modulePhase = "LIVE";
             active = session;
             activateDebugProfile(requester != null ? requester : sender instanceof Player player ? player : null, type);
             try {
@@ -5109,18 +5121,17 @@ public final class ArcadePortManager implements Listener {
         }
         if (type == ArcadePortGame.SKY_WARS) {
             SourceMapCatalog.MapData skyWarsMap = sourceMapData.get(type.id());
-            List<Location> skyWarsStarts = skyWarsMap == null ? List.of() : skyWarsMap.spawnLocations();
-            if (skyWarsStarts.isEmpty() && skyWarsMap != null) skyWarsStarts = skyWarsMap.dataLocations("GREEN");
+            List<Location> skyWarsStarts = SkyWarsIslandSpawnResolver.resolve(
+                    world, skyWarsMap, participants.size());
             if (skyWarsStarts.isEmpty()) {
                 sender.sendMessage(ChatColor.RED + "The selected SkyWars map has no authored player-island spawns. Choose a different map.");
                 return;
             }
             if (participants.size() > skyWarsStarts.size()) {
-                for (Player overflow : participants.subList(skyWarsStarts.size(), participants.size())) {
-                    overflow.sendMessage(ChatColor.YELLOW + "This SkyWars map has only "
-                            + skyWarsStarts.size() + " player spawns; you were left in the lobby.");
-                }
-                participants = new ArrayList<>(participants.subList(0, skyWarsStarts.size()));
+                sender.sendMessage(ChatColor.RED + "The selected SkyWars map only has " + skyWarsStarts.size()
+                        + " safe, distinct island starts; " + participants.size()
+                        + " players need separate islands. The round was not started.");
+                return;
             }
         }
         if (type == ArcadePortGame.BACON_BRAWL
@@ -5131,7 +5142,10 @@ public final class ArcadePortManager implements Listener {
                     + mapName + ". The map was preserved and no generated platform was added; check server logs.");
             return;
         }
-        if (!sourceMapWorlds.contains(type.id())) buildArena(type, world);
+        SourceMapCatalog.MapData selectedMapData = sourceMapData.get(type.id());
+        boolean inferredMasterBuildersMap = type == ArcadePortGame.MASTER_BUILDERS
+                && selectedMapData != null && selectedMapData.inferredMetadata();
+        if (inferredMasterBuildersMap || !sourceMapWorlds.contains(type.id())) buildArena(type, world);
         Session session = new Session(type, world, participants, mixedArcadeVariant);
         session.dragonEscapePractice = practiceMode && type == ArcadePortGame.DRAGON_ESCAPE;
         session.dragonEscapePracticeDouglas = session.dragonEscapePractice && plugin.getConfig().getBoolean(
@@ -6080,6 +6094,9 @@ public final class ArcadePortManager implements Listener {
     }
 
     private List<Location> spawnLocations(ArcadePortGame type, int count) {
+        if (type == ArcadePortGame.SKY_WARS) {
+            return SkyWarsIslandSpawnResolver.resolve(worlds.get(type.id()), sourceMapData.get(type.id()), count);
+        }
         if (type == ArcadePortGame.HOOPS_REMASTERED) {
             return HoopsRemasteredRuntime.spawnLocations(worlds.get(type.id()), count);
         }
@@ -6425,6 +6442,11 @@ public final class ArcadePortManager implements Listener {
     private void giveGladiatorSpectatorMenuItem(Player player) {
         player.getInventory().setItem(7, gladiatorMenuItem(Material.COMPASS, "Tournament Matches",
                 "Right-click to browse live winners' and losers' bracket duels.", "spectator-menu", null));
+    }
+
+    private void giveGladiatorVoteItem(Player player) {
+        player.getInventory().setItem(8, gladiatorMenuItem(Material.WRITABLE_BOOK, "Vote: PvP Rules",
+                "Right-click to choose or change the tournament ruleset during voting.", "open-vote", null));
     }
 
     private void openGladiatorVoteMenu(Player player) {
@@ -6804,14 +6826,12 @@ public final class ArcadePortManager implements Listener {
             player.closeInventory();
             player.getInventory().clear();
             player.setGameMode(GameMode.ADVENTURE);
+            giveGladiatorVoteItem(player);
             if (!session.gladiatorVotes.containsKey(player.getUniqueId())) {
                 player.sendMessage(ChatColor.YELLOW + "You have not voted in the lobby yet — choose a ruleset now.");
             }
             openGladiatorVoteMenu(player);
         }
-        long onlineVoters = session.players.values().stream()
-                .filter(player -> player != null && player.isOnline()).count();
-        if (session.gladiatorVotes.size() >= onlineVoters) resolveGladiatorVote(session);
     }
 
     public void openGladiatorVote(Player player) {
@@ -12948,8 +12968,26 @@ public final class ArcadePortManager implements Listener {
     }
 
     private Location masterBuilderPlotCenter(World world, int slot) {
-        return new Location(world, ArcadePortRules.masterBuildersPlotCenterX(slot), 64.0D,
-                ArcadePortRules.masterBuildersPlotCenterZ(slot));
+        SourceMapCatalog.MapData sourceMap = sourceMapData.get(ArcadePortGame.MASTER_BUILDERS.id());
+        // WorldDownloader archives for Master Builders omit WorldConfig.dat. Their
+        // generic inferred terrain starts are not plot markers, so use the shared
+        // generated plot layout centered inside the selected map's bounds.
+        List<Location> authoredPlots = sourceMap == null || sourceMap.inferredMetadata()
+                ? List.of() : sourceMap.spawnLocations();
+        if (authoredPlots.isEmpty() && sourceMap != null && !sourceMap.inferredMetadata()) {
+            authoredPlots = sourceMap.dataLocations("GREEN");
+        }
+        if (slot >= 0 && slot < authoredPlots.size()) {
+            Location authored = authoredPlots.get(slot).clone();
+            authored.setWorld(world);
+            return authored;
+        }
+        double offsetX = sourceMap != null && sourceMap.inferredMetadata() && sourceMap.hasBounds()
+                ? sourceMap.centerX() : 0.0D;
+        double offsetZ = sourceMap != null && sourceMap.inferredMetadata() && sourceMap.hasBounds()
+                ? sourceMap.centerZ() : 0.0D;
+        return new Location(world, offsetX + ArcadePortRules.masterBuildersPlotCenterX(slot), 64.0D,
+                offsetZ + ArcadePortRules.masterBuildersPlotCenterZ(slot));
     }
 
     private MasterBuilderBlockKey masterBuilderBlockKey(Block block) {
@@ -12957,8 +12995,13 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void buildMasterBuildersArena(World world) {
-        for (int x = -36; x <= 36; x++) {
-            for (int z = -36; z <= 36; z++) {
+        SourceMapCatalog.MapData sourceMap = sourceMapData.get(ArcadePortGame.MASTER_BUILDERS.id());
+        int arenaCenterX = sourceMap != null && sourceMap.inferredMetadata() && sourceMap.hasBounds()
+                ? (int) Math.round(sourceMap.centerX()) : 0;
+        int arenaCenterZ = sourceMap != null && sourceMap.inferredMetadata() && sourceMap.hasBounds()
+                ? (int) Math.round(sourceMap.centerZ()) : 0;
+        for (int x = arenaCenterX - 36; x <= arenaCenterX + 36; x++) {
+            for (int z = arenaCenterZ - 36; z <= arenaCenterZ + 36; z++) {
                 for (int y = 62; y < 120; y++) world.getBlockAt(x, y, z).setType(Material.AIR, false);
                 world.getBlockAt(x, 62, z).setType(Material.POLISHED_ANDESITE, false);
             }
@@ -12967,15 +13010,15 @@ public final class ArcadePortManager implements Listener {
             Location c = masterBuilderPlotCenter(world, slot);
             for (int x = c.getBlockX() - 5; x <= c.getBlockX() + 5; x++) {
                 for (int z = c.getBlockZ() - 5; z <= c.getBlockZ() + 5; z++) {
-                    world.getBlockAt(x, 63, z).setType(Material.GRASS_BLOCK, false);
+                    world.getBlockAt(x, 63, z).setType(Material.YELLOW_TERRACOTTA, false);
                     if (Math.abs(x - c.getBlockX()) == 5 || Math.abs(z - c.getBlockZ()) == 5)
                         world.getBlockAt(x, 64, z).setType(Material.QUARTZ_BLOCK, false);
                 }
             }
         }
         // A clean stone walk grid separates the plots from the andesite base.
-        for (int x = -36; x <= 36; x++) {
-            for (int z = -36; z <= 36; z++) {
+        for (int x = arenaCenterX - 36; x <= arenaCenterX + 36; x++) {
+            for (int z = arenaCenterZ - 36; z <= arenaCenterZ + 36; z++) {
                 boolean plotFootprint = false;
                 for (int slot = 0; slot < GameDebugRuntimeOverrides.intValue("MASTER_BUILDERS_MAX_BUILDERS", ArcadePortRules.MASTER_BUILDERS_MAX_BUILDERS); slot++) {
                     Location centre = masterBuilderPlotCenter(world, slot);
@@ -12987,8 +13030,10 @@ public final class ArcadePortManager implements Listener {
                 if (!plotFootprint) world.getBlockAt(x, 63, z).setType(Material.STONE_BRICKS, false);
             }
         }
-        for (int x : new int[] {-16, 0, 16}) {
-            for (int z : new int[] {-16, 0, 16}) {
+        for (int dx : new int[] {-16, 0, 16}) {
+            for (int dz : new int[] {-16, 0, 16}) {
+                int x = arenaCenterX + dx;
+                int z = arenaCenterZ + dz;
                 world.getBlockAt(x, 63, z).setType(Material.SEA_LANTERN, false);
             }
         }
@@ -15882,6 +15927,7 @@ public final class ArcadePortManager implements Listener {
                 session.dragonTargetLocations.remove(id);
                 session.dragonTargetPlayers.remove(id);
                 session.dragonFlightVectors.remove(id);
+                session.dragonLastBlockDamageLocation.remove(id);
                 session.dragonSparklerDragonOwners.remove(id);
                 it.remove();
             }
@@ -15897,6 +15943,14 @@ public final class ArcadePortManager implements Listener {
             // Reborn only reads WorldData.GetDataLocs("RED"). It does not invent spawn
             // positions when a map has no RED locations.
             List<Location> spawns = mapData == null ? List.of() : mapData.dataLocations("RED");
+            boolean fallbackSpawn = spawns.isEmpty();
+            if (spawns.isEmpty() && mapData != null) {
+                // Older map archives can retain player TEAM_SPAWNS while omitting
+                // the separate RED dragon marker. Use a real map spawn at a safe
+                // altitude rather than starting a dragonless round.
+                spawns = mapData.spawnLocations();
+            }
+            if (spawns.isEmpty()) spawns = session.spawns;
             if (spawns.isEmpty()) {
                 if (!session.dragonMissingSpawnWarned) {
                     plugin.getLogger().warning("Dragons selected map has no RED spawn markers. "
@@ -15905,6 +15959,7 @@ public final class ArcadePortManager implements Listener {
                 }
             } else {
                 Location spawn = spawns.get(ThreadLocalRandom.current().nextInt(spawns.size())).clone();
+                if (fallbackSpawn) spawn.add(0.0D, 12.0D, 0.0D);
                 EnderDragon dragon = session.world.spawn(spawn, EnderDragon.class);
                 dragon.setAI(false);
                 dragon.setGravity(false);
@@ -15917,6 +15972,7 @@ public final class ArcadePortManager implements Listener {
                 Vector initialHeading = dragon.getLocation().getDirection().normalize();
                 if (initialHeading.lengthSquared() < 1.0E-6D) initialHeading = new Vector(0.0D, 0.0D, 1.0D);
                 session.dragonFlightVectors.put(dragon.getUniqueId(), initialHeading);
+                session.dragonLastBlockDamageLocation.remove(dragon.getUniqueId());
                 spawn.getWorld().playSound(spawn, Sound.ENTITY_ENDER_DRAGON_GROWL, 20.0F, 1.0F);
             }
             }
@@ -16072,6 +16128,7 @@ public final class ArcadePortManager implements Listener {
                 next.setDirection(flight);
                 if (dragon.teleport(next)) {
                     dragon.setVelocity(new Vector());
+                    damageDragonTerrainAlongPath(session, dragon);
                 } else {
                     // A failed teleport must not leave a no-AI dragon stranded at spawn.
                     dragon.setAI(true);
@@ -16427,6 +16484,35 @@ public final class ArcadePortManager implements Listener {
         session.dragonMarksmanCharge.put(id, charge);
         session.dragonMarksmanNextChargeAt.put(id, now + GameDebugRuntimeOverrides.longValue("DRAGONS_BARRAGE_INTERVAL_MILLIS", ArcadePortRules.DRAGONS_BARRAGE_INTERVAL_MILLIS));
         player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT, 1.0F, 1.0F + (0.1F * charge));
+    }
+
+    private void damageDragonTerrainAlongPath(Session session, EnderDragon dragon) {
+        Location current = dragon.getLocation();
+        Location previous = session.dragonLastBlockDamageLocation.get(dragon.getUniqueId());
+        if (previous != null && previous.getWorld() == current.getWorld()
+                && previous.distanceSquared(current) < 4.0D) return;
+        session.dragonLastBlockDamageLocation.put(dragon.getUniqueId(), current.clone());
+
+        SourceMapCatalog.MapData map = sourceMapData.get(ArcadePortGame.DRAGONS.id());
+        int radius = 3;
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dy = -radius; dy <= radius; dy++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    Block block = current.getBlock().getRelative(dx, dy, dz);
+                    if (map != null && map.hasBounds() && (block.getX() < map.minX() || block.getX() > map.maxX()
+                            || block.getZ() < map.minZ() || block.getZ() > map.maxZ())) continue;
+                    if (block.getType().isAir() || block.isLiquid()) continue;
+                    Material type = block.getType();
+                    if (type == Material.BEDROCK || type == Material.BARRIER || type == Material.END_PORTAL
+                            || type == Material.END_GATEWAY || type == Material.COMMAND_BLOCK
+                            || type == Material.CHAIN_COMMAND_BLOCK || type == Material.REPEATING_COMMAND_BLOCK
+                            || type == Material.STRUCTURE_BLOCK || type == Material.STRUCTURE_VOID) continue;
+                    block.setType(Material.AIR, false);
+                }
+            }
+        }
+        current.getWorld().spawnParticle(Particle.BLOCK, current, 8, 1.5D, 1.0D, 1.5D, 0.0D,
+                Material.COBBLESTONE.createBlockData());
     }
 
     private void applyDragonContactHit(Session session, EnderDragon dragon, Player target, long now) {
@@ -29175,6 +29261,16 @@ public final class ArcadePortManager implements Listener {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Session session = active;
         if (session == null) return;
+        if (session.type == ArcadePortGame.GLADIATORS
+                && session.gladiatorVotingEndsAt > System.currentTimeMillis()
+                && event.getAction().isRightClick() && event.getItem() != null
+                && event.getItem().hasItemMeta()
+                && "open-vote".equals(event.getItem().getItemMeta().getPersistentDataContainer()
+                        .get(gladiatorMenuActionKey, PersistentDataType.STRING))) {
+            event.setCancelled(true);
+            openGladiatorVote(event.getPlayer());
+            return;
+        }
         if (session.dragonEscapePractice
                 && session.alive.contains(event.getPlayer().getUniqueId())) {
             String practiceAction = dragonEscapePracticeAction(event.getItem());

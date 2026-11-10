@@ -1241,7 +1241,11 @@ public final class SpeedBuildersGame implements Listener {
         Location target = new Location(state.plot.world(), state.plot.centerX() + 0.5D,
                 state.plot.baseY(), state.plot.centerZ() + 0.5D);
         spawn.setDirection(target.toVector().subtract(spawn.toVector()));
-        state.player.teleport(spawn);
+        state.plot.world().getChunkAt(spawn).load();
+        if (!state.player.teleport(spawn) || state.player.getWorld() != state.plot.world()) {
+            throw new IllegalStateException("Speed Builders could not teleport " + state.player.getName()
+                    + " to their authored plot in " + state.plot.world().getName() + ".");
+        }
     }
 
     private List<PlayerState> activePlayers() {

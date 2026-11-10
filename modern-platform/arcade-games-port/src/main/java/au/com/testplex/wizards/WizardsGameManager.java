@@ -61,6 +61,7 @@ import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -1144,6 +1145,48 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
                 inventory.setItem(slot, makeWand(state, slot));
             }
         }
+        player.updateInventory();
+    }
+
+    private static EquipmentSlot armorSlot(Material material) {
+        if (material == null) return null;
+        String name = material.name();
+        if (name.endsWith("_HELMET")) return EquipmentSlot.HEAD;
+        if (name.endsWith("_CHESTPLATE")) return EquipmentSlot.CHEST;
+        if (name.endsWith("_LEGGINGS")) return EquipmentSlot.LEGS;
+        if (name.endsWith("_BOOTS")) return EquipmentSlot.FEET;
+        return null;
+    }
+
+    private void equipArmorFromHand(Player player, EquipmentSlot slot) {
+        PlayerInventory inventory = player.getInventory();
+        ItemStack held = inventory.getItemInMainHand();
+        if (held == null || held.getType().isAir() || armorSlot(held.getType()) != slot) return;
+        ItemStack previous = switch (slot) {
+            case HEAD -> inventory.getHelmet();
+            case CHEST -> inventory.getChestplate();
+            case LEGS -> inventory.getLeggings();
+            case FEET -> inventory.getBoots();
+            default -> null;
+        };
+        ItemStack equipped = held.clone();
+        equipped.setAmount(1);
+        switch (slot) {
+            case HEAD -> inventory.setHelmet(equipped);
+            case CHEST -> inventory.setChestplate(equipped);
+            case LEGS -> inventory.setLeggings(equipped);
+            case FEET -> inventory.setBoots(equipped);
+            default -> { return; }
+        }
+        if (held.getAmount() > 1) {
+            held.setAmount(held.getAmount() - 1);
+            inventory.setItemInMainHand(held);
+            if (previous != null && !previous.getType().isAir()) inventory.addItem(previous);
+        } else {
+            inventory.setItemInMainHand(previous == null || previous.getType().isAir() ? null : previous);
+        }
+        player.updateInventory();
+        player.playSound(player.getLocation(), Sound.ITEM_ARMOR_EQUIP_GENERIC, 0.8F, 1.0F);
     }
 
     private ItemStack makeWand(WizardState state, int slot) {
@@ -1267,6 +1310,12 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         Action action = event.getAction();
         ItemStack item = event.getItem();
         if (action == Action.RIGHT_CLICK_AIR || action == Action.RIGHT_CLICK_BLOCK) {
+            EquipmentSlot armorSlot = armorSlot(item == null ? null : item.getType());
+            if (armorSlot != null) {
+                event.setCancelled(true);
+                equipArmorFromHand(player, armorSlot);
+                return;
+            }
             if (isMenuBook(item)) {
                 event.setCancelled(true);
                 openSpellMenu(player, state);

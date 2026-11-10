@@ -684,6 +684,7 @@ class SessionState {
     final Map<UUID, Location> dragonTargetLocations = new HashMap<>();
     final Map<UUID, UUID> dragonTargetPlayers = new HashMap<>();
     final Map<UUID, Vector> dragonFlightVectors = new HashMap<>();
+    final Map<UUID, Location> dragonLastBlockDamageLocation = new HashMap<>();
     Location dragonSpectatorLocation;
     long dragonNextSpawnAt;
     final Map<UUID, Long> dragonLeapReadyAt = new HashMap<>();

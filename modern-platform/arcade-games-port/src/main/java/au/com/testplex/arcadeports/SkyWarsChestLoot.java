@@ -8,6 +8,7 @@ import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.Chest;
+import org.bukkit.Chunk;
 import org.bukkit.block.data.Directional;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemStack;
@@ -23,7 +24,45 @@ final class SkyWarsChestLoot {
         total += populateFamily(map.dataLocations("BROWN"), islandPools());
         total += populateFamily(map.dataLocations("GRAY"), connectorPools());
         total += populateFamily(map.dataLocations("BLACK"), middlePools());
+        if (total == 0) total = populateExistingSourceChests(map);
         return total;
+    }
+
+    /**
+     * Some original WorldConfig files omit the coloured chest markers even though
+     * their map archives contain real chests. Keep those maps playable by filling
+     * their authored chests rather than leaving an apparently empty SkyWars map.
+     */
+    private static int populateExistingSourceChests(SourceMapCatalog.MapData map) {
+        List<org.bukkit.Location> starts = map.spawnLocations();
+        if (starts.isEmpty()) starts = map.dataLocations("GREEN");
+        if (starts.isEmpty() || starts.getFirst().getWorld() == null) return 0;
+        org.bukkit.World world = starts.getFirst().getWorld();
+        double centerX = map.hasBounds() ? map.centerX() : world.getSpawnLocation().getX();
+        double centerZ = map.hasBounds() ? map.centerZ() : world.getSpawnLocation().getZ();
+        int count = 0;
+        for (Chunk chunk : world.getLoadedChunks()) {
+            if (map.hasBounds() && (chunk.getX() * 16 > map.maxX() || chunk.getX() * 16 + 15 < map.minX()
+                    || chunk.getZ() * 16 > map.maxZ() || chunk.getZ() * 16 + 15 < map.minZ())) continue;
+            for (org.bukkit.block.BlockState state : chunk.getTileEntities()) {
+                if (!(state instanceof Chest chest)) continue;
+                org.bukkit.Location location = chest.getLocation();
+                double nearestIsland = starts.stream().mapToDouble(spawn -> {
+                    double dx = location.getX() - spawn.getX();
+                    double dz = location.getZ() - spawn.getZ();
+                    return dx * dx + dz * dz;
+                }).min().orElse(Double.POSITIVE_INFINITY);
+                double fromCenterX = location.getX() - centerX;
+                double fromCenterZ = location.getZ() - centerZ;
+                double centerDistance = fromCenterX * fromCenterX + fromCenterZ * fromCenterZ;
+                List<Pool> pools = nearestIsland <= 32.0D * 32.0D
+                        ? islandPools()
+                        : centerDistance <= 20.0D * 20.0D ? middlePools() : connectorPools();
+                populateChest(chest, pools);
+                count++;
+            }
+        }
+        return count;
     }
 
     static ItemStack randomMiddleItem() {
@@ -49,23 +88,31 @@ final class SkyWarsChestLoot {
                 }
             }
             if (!(block.getState() instanceof Chest chest)) continue;
-            chest.getBlockInventory().clear();
-            List<Integer> slots = new ArrayList<>();
-            for (int slot = 0; slot < chest.getBlockInventory().getSize(); slot++) slots.add(slot);
-            for (Pool pool : pools) {
-                if (slots.isEmpty() || ThreadLocalRandom.current().nextDouble() >= pool.probability) continue;
-                int amount = randomInclusive(pool.minItems, pool.maxItems);
-                for (int item = 0; item < amount && !slots.isEmpty(); item++) {
-                    ItemStack stack = pool.randomItem();
-                    if (stack == null) continue;
-                    int slotIndex = ThreadLocalRandom.current().nextInt(slots.size());
-                    chest.getBlockInventory().setItem(slots.remove(slotIndex), stack);
-                }
-            }
-            chest.update(true, false);
+            populateChest(chest, pools);
             count++;
         }
         return count;
+    }
+
+    private static void populateChest(Chest chest, List<Pool> pools) {
+        chest.getBlockInventory().clear();
+        List<Integer> slots = new ArrayList<>();
+        for (int slot = 0; slot < chest.getBlockInventory().getSize(); slot++) slots.add(slot);
+        for (Pool pool : pools) {
+            if (slots.isEmpty() || ThreadLocalRandom.current().nextDouble() >= pool.probability) continue;
+            int amount = randomInclusive(pool.minItems, pool.maxItems);
+            for (int item = 0; item < amount && !slots.isEmpty(); item++) {
+                ItemStack stack = pool.randomItem();
+                if (stack == null) continue;
+                int slotIndex = ThreadLocalRandom.current().nextInt(slots.size());
+                chest.getBlockInventory().setItem(slots.remove(slotIndex), stack);
+            }
+        }
+        if (chest.getBlockInventory().isEmpty()) {
+            ItemStack fallback = pools.getFirst().randomItem();
+            if (fallback != null) chest.getBlockInventory().setItem(13, fallback);
+        }
+        chest.update(true, false);
     }
 
     private static Enchantment weightedEnchantment(List<WeightedEnchantment> entries) {
