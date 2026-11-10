@@ -17,12 +17,15 @@ final class DragonEscapeRaceScoreboardLayout {
     private DragonEscapeRaceScoreboardLayout() { }
 
     static String racerName(String name, RacerStatus status) {
-        return color(status) + (status == RacerStatus.ELIMINATED ? ChatColor.STRIKETHROUGH : "") + name;
+        return color(status).toString() + strikethrough(status) + name;
     }
 
     static String racerTime(String value, RacerStatus status) {
-        return color(status) + (status == RacerStatus.ELIMINATED ? ChatColor.STRIKETHROUGH : "")
-                + " " + value + ChatColor.RESET;
+        return color(status).toString() + strikethrough(status) + " " + value + ChatColor.RESET;
+    }
+
+    private static String strikethrough(RacerStatus status) {
+        return status == RacerStatus.ELIMINATED ? ChatColor.STRIKETHROUGH.toString() : "";
     }
 
     private static ChatColor color(RacerStatus status) {
