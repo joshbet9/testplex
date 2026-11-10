@@ -176,6 +176,7 @@ import org.bukkit.util.EulerAngle;
 import org.bukkit.util.Vector;
 
 public final class ArcadePortManager implements Listener {
+    private static final int DRAGON_ESCAPE_KIT_BLOCK_SLOT = 1;
     private static final int HALF_SIZE = 20;
     private static final long ROUND_MS = 180_000L;
     private static final List<Material> DRAW_MY_THING_COLOURS = List.of(
@@ -9193,11 +9194,11 @@ public final class ArcadePortManager implements Listener {
                     setDragonEscapeLeapItem(player, leaps, ArcadePortRules.dragonEscapeLeapUses(kit));
                 }
                 if ("disruptor".equals(kit)) {
-                    player.getInventory().addItem(namedItem(Material.TNT, "Disruptor",
-                            "Click to place a dropped TNT trap; arms after 2 seconds. Recharges every 8 seconds.", 1));
+                    setDragonEscapeKitBlockCharges(player, Material.TNT, "Disruptor",
+                            "Stationary trip mine; triggers opponents on pickup after 2 seconds.", 1);
                 } else if ("builder".equals(kit)) {
-                    player.getInventory().setItem(1, namedItem(Material.BRICKS, "Temporary Brick",
-                            "Right-click to place a temporary foothold. One active at a time; recharges every 8 seconds.", 1));
+                    setDragonEscapeKitBlockCharges(player, Material.BRICKS, "Temporary Brick",
+                            "Right-click a block face to place a foothold. It disappears after you step off.", 1);
                 } else if ("warper".equals(kit)) {
                     player.getInventory().addItem(namedItem(Material.ENDER_PEARL, "Warp",
                             "Right-click to warp to the next-ranked racer ahead. One use."));
@@ -16610,7 +16611,33 @@ public final class ArcadePortManager implements Listener {
         player.playSound(player.getLocation(), Sound.ENTITY_TNT_PRIMED, 0.8F, 1.15F);
     }
 
-    /** Server-authoritative placement also supports an air click while falling. */
+    /**
+     * Keep the consumable tool's charges in one stable hotbar slot. Consolidating
+     * by material also repairs stacks split by older descriptions or inventory moves.
+     */
+    private void setDragonEscapeKitBlockCharges(
+            Player player, Material material, String displayName, String lore, int requestedCount) {
+        if (player == null) return;
+        for (int slot = 0; slot < player.getInventory().getSize(); slot++) {
+            ItemStack item = player.getInventory().getItem(slot);
+            if (item == null || item.getType() != material) continue;
+            player.getInventory().setItem(slot, null);
+        }
+        int count = Math.max(0, Math.min(64, requestedCount));
+        if (count > 0) {
+            player.getInventory().setItem(DRAGON_ESCAPE_KIT_BLOCK_SLOT,
+                    namedItem(material, displayName, lore, count));
+        }
+    }
+
+    private void rechargeDragonEscapeKitBlock(Player player, Material material,
+            String displayName, String lore, int maximum) {
+        int current = inventoryCount(player, material);
+        if (current >= maximum) return;
+        setDragonEscapeKitBlockCharges(player, material, displayName, lore, current + 1);
+    }
+
+    /** Builder placement follows vanilla block-face placement; air clicks do nothing. */
     private void placeDragonEscapeBuilderBrick(Session session, Player player, Block clicked, BlockFace face) {
         UUID id = player.getUniqueId();
         if (active != session || !session.alive.contains(id)
@@ -16619,11 +16646,13 @@ public final class ArcadePortManager implements Listener {
             player.sendActionBar(ChatColor.YELLOW + "Wait for your previous brick to disappear.");
             return;
         }
+        if (clicked == null || face == null || face == BlockFace.SELF) {
+            player.sendActionBar(ChatColor.YELLOW + "Right-click a block face to place your brick.");
+            return;
+        }
         if (inventoryCount(player, Material.BRICKS) <= 0
                 || player.getInventory().getItemInMainHand().getType() != Material.BRICKS) return;
-        Block target = clicked != null && face != null && face != BlockFace.SELF
-                ? clicked.getRelative(face)
-                : player.getLocation().getBlock().getRelative(BlockFace.DOWN);
+        Block target = clicked.getRelative(face);
         if (target.getWorld() != session.world || !target.isEmpty()
                 || !isDragonEscapeDiggerBuildLocationAllowed(session, target)) {
             player.sendActionBar(ChatColor.YELLOW + "You cannot place a temporary brick there.");
@@ -16756,8 +16785,8 @@ public final class ArcadePortManager implements Listener {
                 long nextAt = session.dragonEscapeNextTntAt.getOrDefault(id, Long.MAX_VALUE);
                 if (now >= nextAt) {
                     if (inventoryCount(player, Material.TNT) < maxTnt) {
-                        player.getInventory().addItem(namedItem(Material.TNT, "Disruptor",
-                                "Stationary trip mine; triggers opponents on pickup after 2 seconds."));
+                        rechargeDragonEscapeKitBlock(player, Material.TNT, "Disruptor",
+                                "Stationary trip mine; triggers opponents on pickup after 2 seconds.", maxTnt);
                         player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.4F, 1.2F);
                     }
                     session.dragonEscapeNextTntAt.put(id, now + interval);
@@ -16771,8 +16800,9 @@ public final class ArcadePortManager implements Listener {
                 long nextAt = session.dragonEscapeNextBrickAt.getOrDefault(id, Long.MAX_VALUE);
                 if (now >= nextAt) {
                     if (inventoryCount(player, Material.BRICKS) < maxBricks) {
-                        player.getInventory().addItem(namedItem(Material.BRICKS, "Temporary Brick",
-                                "Right-click for a short-lived foothold. One active at a time."));
+                        rechargeDragonEscapeKitBlock(player, Material.BRICKS, "Temporary Brick",
+                                "Right-click a block face to place a foothold. It disappears after you step off.",
+                                maxBricks);
                         player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.4F, 1.2F);
                     }
                     session.dragonEscapeNextBrickAt.put(id, now + interval);
@@ -28809,7 +28839,11 @@ public final class ArcadePortManager implements Listener {
             }
             if (event.getAction().isRightClick() && item == Material.BRICKS && "builder".equals(kit)) {
                 event.setCancelled(true);
-                placeDragonEscapeBuilderBrick(session, player, event.getClickedBlock(), event.getBlockFace());
+                if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
+                    placeDragonEscapeBuilderBrick(session, player, event.getClickedBlock(), event.getBlockFace());
+                } else {
+                    player.sendActionBar(ChatColor.YELLOW + "Right-click a block face to place your brick.");
+                }
                 return;
             }
         }
