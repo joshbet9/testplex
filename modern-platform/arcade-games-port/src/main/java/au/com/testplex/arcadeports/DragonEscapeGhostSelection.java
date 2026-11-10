@@ -7,8 +7,9 @@ import java.util.UUID;
 /** Selection and privacy rules shared by the hotbar menu, race rendering and finish summary. */
 final class DragonEscapeGhostSelection {
     enum Mode { PERSONAL_BEST, CURRENT_KIT, TARGET_PLAYER }
+    static final int MAX_CONCURRENT_SOURCES = 4;
     private static final List<String> SOURCE_KEYS = List.of(
-            "personal-pb", "kit-pb", "world-record", "kit-record");
+            "personal-pb", "kit-pb", "world-record", "kit-record", "target");
 
     record Source(String key, UUID playerId, long timeMillis, String kitId, String label) { }
 
@@ -24,6 +25,11 @@ final class DragonEscapeGhostSelection {
     }
 
     static List<String> sourceKeys() { return SOURCE_KEYS; }
+
+    static List<Source> limitConcurrent(List<Source> sources) {
+        if (sources == null || sources.isEmpty()) return List.of();
+        return List.copyOf(sources.subList(0, Math.min(sources.size(), MAX_CONCURRENT_SOURCES)));
+    }
 
     static boolean canShare(UUID owner, UUID viewer, boolean publiclyShared) {
         return owner != null && (owner.equals(viewer) || publiclyShared);

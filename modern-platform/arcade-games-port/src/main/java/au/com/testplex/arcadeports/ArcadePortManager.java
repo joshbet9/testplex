@@ -23733,12 +23733,28 @@ public final class ArcadePortManager implements Listener {
 
     private DragonEscapeGhostSelection.Source selectedDragonEscapeGhost(Player player, Session session) {
         List<DragonEscapeGhostSelection.Source> sources = selectedDragonEscapeGhosts(player, session);
+        if (player != null && dragonEscapeGhostMode(player.getUniqueId())
+                == DragonEscapeGhostSelection.Mode.TARGET_PLAYER) {
+            for (DragonEscapeGhostSelection.Source source : sources) {
+                if ("target".equals(source.key())) return source;
+            }
+        }
         return sources.isEmpty() ? null : sources.get(0);
     }
 
     private boolean isDragonEscapeGhostSourceEnabled(UUID playerId, String sourceKey) {
+        boolean defaultEnabled = "target".equals(sourceKey)
+                && dragonEscapeGhostMode(playerId) == DragonEscapeGhostSelection.Mode.TARGET_PLAYER;
         return plugin.getConfig().getBoolean(
-                "dragon-escape-ghost-sources." + playerId + "." + sourceKey, true);
+                "dragon-escape-ghost-sources." + playerId + "." + sourceKey, defaultEnabled);
+    }
+
+    private int enabledDragonEscapeGhostSourceCount(UUID playerId) {
+        int count = 0;
+        for (String key : DragonEscapeGhostSelection.sourceKeys()) {
+            if (isDragonEscapeGhostSourceEnabled(playerId, key)) count++;
+        }
+        return count;
     }
 
     private List<DragonEscapeGhostSelection.Source> selectedDragonEscapeGhosts(Player player, Session session) {
@@ -23746,7 +23762,8 @@ public final class ArcadePortManager implements Listener {
         UUID viewerId = player.getUniqueId();
         String resource = session.dragonEscapeMapResource;
         String kit = session.dragonEscapeKits.getOrDefault(viewerId, "jumper");
-        List<DragonEscapeGhostSelection.Source> sources = new ArrayList<>(4);
+        List<DragonEscapeGhostSelection.Source> sources = new ArrayList<>(
+                DragonEscapeGhostSelection.MAX_CONCURRENT_SOURCES);
         if (isDragonEscapeGhostSourceEnabled(viewerId, "personal-pb")) {
             long time = dragonEscapePersonalBestMillis(viewerId, resource);
             if (time > 0L) sources.add(new DragonEscapeGhostSelection.Source(
@@ -23781,12 +23798,30 @@ public final class ArcadePortManager implements Listener {
                     "kit-record", kitRecord.playerId(), kitRecord.timeMillis(), kit,
                     name + " " + kit + " WR"));
         }
-        return sources;
+        UUID targetId = dragonEscapeGhostTarget(viewerId);
+        if (targetId != null && isDragonEscapeGhostSourceEnabled(viewerId, "target")
+                && DragonEscapeGhostSelection.canShare(
+                        targetId, viewerId, isDragonEscapeGhostPublic(targetId))) {
+            long targetPb = dragonEscapePersonalBestMillis(targetId, resource);
+            if (targetPb > 0L) {
+                String name = Optional.ofNullable(Bukkit.getOfflinePlayer(targetId).getName())
+                        .orElse("Target Racer");
+                sources.add(new DragonEscapeGhostSelection.Source(
+                        "target", targetId, targetPb, null, name + " PB"));
+            }
+        }
+        return DragonEscapeGhostSelection.limitConcurrent(sources);
     }
 
     private void toggleDragonEscapeGhostSource(Player player, String sourceKey) {
+        boolean currentlyEnabled = isDragonEscapeGhostSourceEnabled(player.getUniqueId(), sourceKey);
+        if (!currentlyEnabled && enabledDragonEscapeGhostSourceCount(player.getUniqueId())
+                >= DragonEscapeGhostSelection.MAX_CONCURRENT_SOURCES) {
+            player.sendMessage(ChatColor.YELLOW + "Choose up to four ghosts; disable one before enabling another.");
+            return;
+        }
         String path = "dragon-escape-ghost-sources." + player.getUniqueId() + "." + sourceKey;
-        plugin.getConfig().set(path, !plugin.getConfig().getBoolean(path, true));
+        plugin.getConfig().set(path, !currentlyEnabled);
         plugin.saveConfig();
         setDragonEscapeGhostHotbarItem(player);
     }
@@ -23804,6 +23839,12 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void chooseDragonEscapeGhostTarget(Player player, UUID targetId) {
+        boolean targetSlotEnabled = isDragonEscapeGhostSourceEnabled(player.getUniqueId(), "target");
+        if (!targetSlotEnabled && enabledDragonEscapeGhostSourceCount(player.getUniqueId())
+                >= DragonEscapeGhostSelection.MAX_CONCURRENT_SOURCES) {
+            player.sendMessage(ChatColor.YELLOW + "Choose up to four ghosts; disable one before adding a target.");
+            return;
+        }
         if (targetId == null || !DragonEscapeGhostSelection.canShare(
                 targetId, player.getUniqueId(), isDragonEscapeGhostPublic(targetId))) {
             player.sendMessage(ChatColor.RED + "That racer does not share PB ghosts.");
@@ -23812,6 +23853,7 @@ public final class ArcadePortManager implements Listener {
         plugin.getConfig().set("dragon-escape-ghost-target." + player.getUniqueId(), targetId.toString());
         plugin.getConfig().set("dragon-escape-ghost-target-name." + player.getUniqueId(),
                 Bukkit.getOfflinePlayer(targetId).getName());
+        plugin.getConfig().set("dragon-escape-ghost-sources." + player.getUniqueId() + ".target", true);
         plugin.saveConfig();
         chooseDragonEscapeGhostMode(player, DragonEscapeGhostSelection.Mode.TARGET_PLAYER);
     }
@@ -23875,6 +23917,15 @@ public final class ArcadePortManager implements Listener {
                 "Overall WR", "Race the map record holder's run."));
         inventory.setItem(16, dragonEscapeGhostSourceItem(viewer, "kit-record", Material.NETHER_STAR,
                 kit + " WR", "Race the selected kit's map record holder."));
+        String targetName = plugin.getConfig().getString(
+                "dragon-escape-ghost-target-name." + viewer.getUniqueId(), "None selected");
+        inventory.setItem(22, dragonEscapeGhostMenuItem(Material.PLAYER_HEAD,
+                ChatColor.YELLOW + "Target PB: " + targetName,
+                List.of(ChatColor.GRAY + "Target replay counts toward the four active ghosts.",
+                        ChatColor.YELLOW + "Left-click to choose or replace the target.",
+                        ChatColor.YELLOW + "Right-click to "
+                                + (isDragonEscapeGhostSourceEnabled(viewer.getUniqueId(), "target")
+                                        ? "disable" : "enable") + " target ghost."), "targets"));
         inventory.setItem(21, dragonEscapeGhostMenuItem(Material.LEVER,
                 ChatColor.AQUA + "My Ghost Sharing: "
                         + (shared ? ChatColor.GREEN + "PUBLIC" : ChatColor.RED + "PRIVATE"),
@@ -31611,7 +31662,12 @@ public final class ArcadePortManager implements Listener {
             else if ("personal".equals(action) || "kit".equals(action)) {
                 chooseDragonEscapeGhostMode(player, DragonEscapeGhostSelection.mode(action));
                 openDragonEscapeGhostOptions(player);
-            } else if ("targets".equals(action)) openDragonEscapeGhostTargets(player, 0);
+            } else if ("targets".equals(action)) {
+                if (event.isRightClick()) {
+                    toggleDragonEscapeGhostSource(player, "target");
+                    openDragonEscapeGhostOptions(player);
+                } else openDragonEscapeGhostTargets(player, 0);
+            }
             else if ("sharing".equals(action)) {
                 boolean publicGhost = !isDragonEscapeGhostPublic(player.getUniqueId());
                 plugin.getConfig().set("dragon-escape-ghost-public." + player.getUniqueId(), publicGhost);

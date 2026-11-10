@@ -22,10 +22,16 @@ class DragonEscapeGhostSelectionTest {
         assertTrue(DragonEscapeGhostSelection.canShare(a, a, false));
     }
 
-    @Test void exposesExactlyTheFourPersistentRaceGhostSources() {
-        assertEquals(java.util.List.of("personal-pb", "kit-pb", "world-record", "kit-record"),
+    @Test void exposesPbAndWrSourcesWithFourConcurrentSlots() {
+        assertEquals(java.util.List.of("personal-pb", "kit-pb", "world-record", "kit-record", "target"),
                 DragonEscapeGhostSelection.sourceKeys());
-        assertEquals(4, DragonEscapeGhostSelection.sourceKeys().size());
+        assertEquals(4, DragonEscapeGhostSelection.MAX_CONCURRENT_SOURCES);
+        var sources = DragonEscapeGhostSelection.sourceKeys().stream()
+                .map(key -> new DragonEscapeGhostSelection.Source(key, a, 1_000L, null, key))
+                .toList();
+        assertEquals(java.util.List.of("personal-pb", "kit-pb", "world-record", "kit-record"),
+                DragonEscapeGhostSelection.limitConcurrent(sources).stream()
+                        .map(DragonEscapeGhostSelection.Source::key).toList());
     }
 
     @Test void finishSummaryUsesSmallerTimeAsFaster() {
