@@ -29,13 +29,18 @@ class DragonEscapeRaceScoreboardLayoutTest {
     }
 
     @Test
-    void finishedAndEliminatedRowsKeepTheirRecordedTimer() {
+    void finishedRowsKeepTimerButEliminatedRowsShowOnlyTheirName() {
         assertEquals(ChatColor.AQUA + " 1:23.45" + ChatColor.RESET,
                 DragonEscapeRaceScoreboardLayout.racerTime(
                         "1:23.45", DragonEscapeRaceScoreboardLayout.RacerStatus.FINISHED));
+        assertEquals(ChatColor.GREEN + " 0:42.10" + ChatColor.RESET,
+                DragonEscapeRaceScoreboardLayout.racerTime(
+                        "0:42.10", DragonEscapeRaceScoreboardLayout.RacerStatus.RUNNING, true));
+        assertEquals(ChatColor.RED + " 0:43.10" + ChatColor.RESET,
+                DragonEscapeRaceScoreboardLayout.racerTime(
+                        "0:43.10", DragonEscapeRaceScoreboardLayout.RacerStatus.RUNNING, false));
         String eliminated = DragonEscapeRaceScoreboardLayout.racerTime(
                 "0:42.10", DragonEscapeRaceScoreboardLayout.RacerStatus.ELIMINATED);
-        assertTrue(eliminated.contains("0:42.10"));
-        assertTrue(eliminated.contains(ChatColor.STRIKETHROUGH.toString()));
+        assertEquals("", eliminated);
     }
 }

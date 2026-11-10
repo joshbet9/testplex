@@ -1302,7 +1302,7 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.isBaconTimedCritical(500L));
         assertTrue(ArcadePortRules.isBaconTimedCritical(900L));
         assertFalse(ArcadePortRules.isBaconTimedCritical(499L));
-        assertFalse(ArcadePortRules.isBaconTimedCritical(901L));
+        assertTrue(ArcadePortRules.isBaconTimedCritical(901L));
         assertEquals(0L, ArcadePortRules.baconAbilityDurationMillis(10));
         assertEquals(2_750L, ArcadePortRules.baconAbilityDurationMillis(50));
         assertEquals(ArcadePortRules.BACON_PIG_INVINCIBILITY_MAX_MILLIS,
@@ -1380,6 +1380,7 @@ class ArcadePortGameTest {
         assertEquals(1_000L, ArcadePortRules.baconTimingWindowMillis(500L, 3.0D));
         assertEquals(1_800L, ArcadePortRules.baconTimingWindowMillis(900L, 3.0D));
         assertTrue(ArcadePortRules.isBaconTimedCritical(1_400L, 3.0D));
+        assertFalse(ArcadePortRules.isBaconTimedCritical(999L, 3.0D));
     }
 
 

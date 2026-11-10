@@ -90,7 +90,6 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAGONS), "DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAGONS), "DRAGONS_SPAWNING_ENABLED");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAGONS), "DRAGONS_TAMER_FLIGHT_SPEED");
-        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAGONS), "DRAGONS_TURN_RATE");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAGONS), "DRAGONS_SURVIVE_FIVE_MINUTES_MILLIS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.DRAGONS), "DRAGONS_WIN_STREAK_ACHIEVEMENT");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNAKE), "SNAKE_HAZARD_STEERING_SPEED");

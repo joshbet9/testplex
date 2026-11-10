@@ -91,6 +91,7 @@ class SessionState {
     long drawNextRoundAt;
     int drawTurnIndex;
     final Map<UUID, Integer> masterBuilderPlots = new LinkedHashMap<>();
+    final List<Location> masterBuilderPlotCenters = new ArrayList<>();
     final List<UUID> masterBuilderReviewOrder = new ArrayList<>();
     final Set<UUID> masterBuilderReviewedTargets = new HashSet<>();
     final Map<UUID, Map<UUID, Integer>> masterBuilderVotes = new HashMap<>();
@@ -371,6 +372,7 @@ class SessionState {
     final Map<UUID, Long> baconSlams = new HashMap<>();
     final Map<UUID, Long> baconBrutusUntil = new HashMap<>();
     final Map<UUID, Long> baconCloakUntil = new HashMap<>();
+    final Map<UUID, Long> baconTimedAbilityDurationMillis = new HashMap<>();
     final Map<UUID, Integer> legacyNaturalRegenTicks = new HashMap<>();
     final Map<UUID, Long> baconLastSwingAt = new HashMap<>();
     final Map<UUID, Map<UUID, Long>> baconRecentHitsByAttacker = new HashMap<>();

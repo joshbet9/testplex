@@ -550,11 +550,8 @@ public final class CameraShyGame implements Listener {
         Kit kit = Kit.fromId(requestedKit);
         if (kit == null) return "smoke-artist";
         if (kit != Kit.UNDERSTUDY) return kit.id();
-        AchievementKitUnlockPolicy.Rule rule = AchievementKitUnlockPolicy.find(
-                ArcadePortGame.CAMERA_SHY, "snap-understudy");
-        boolean earned = rule != null && rule.unlocked(id -> plugin.getConfig().getBoolean(
-                "local-achievements." + playerId + ".camera-shy." + id, false));
-        return earned ? kit.id() : "smoke-artist";
+        return manager.hasAchievementKitUnlocked(playerId, ArcadePortGame.CAMERA_SHY, "snap-understudy")
+                ? kit.id() : "smoke-artist";
     }
 
     public void startFromLobby(org.bukkit.command.CommandSender sender, Collection<Player> lobbyPlayers) {

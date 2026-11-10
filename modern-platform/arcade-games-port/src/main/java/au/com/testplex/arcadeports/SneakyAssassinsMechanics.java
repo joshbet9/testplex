@@ -172,9 +172,9 @@ final class SneakyAssassinsMechanics {
 
     private boolean briberUnlocked(UUID playerId) {
         if (playerId == null) return false;
-        AchievementKitUnlockPolicy.Rule rule = AchievementKitUnlockPolicy.find(ArcadePortGame.SNEAKY_ASSASSINS, "briber");
-        return rule != null && rule.unlocked(id -> plugin.getConfig().getBoolean(
-                "local-achievements." + playerId + ".sneaky-assassins." + id, false));
+        ArcadePortManager manager = plugin.getArcadePortManager();
+        return manager != null && manager.hasAchievementKitUnlocked(
+                playerId, ArcadePortGame.SNEAKY_ASSASSINS, "briber");
     }
 
     boolean debugUseSelectedKitAbility(Player tester) {

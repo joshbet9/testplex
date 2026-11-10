@@ -45,6 +45,13 @@ class GameDebugProfilesTest {
         assertEquals(Boolean.TRUE, reloaded.values(tester, ArcadePortGame.BACON_BRAWL).get("all-kits"));
         assertTrue(reloaded.feature(tester, ArcadePortGame.BACON_BRAWL, "achievement-preview-only", false));
         assertNull(reloaded.variable(tester, ArcadePortGame.CAMERA_SHY, "BACON_1_8_HIT_DELAY_MILLIS"));
+
+        var achievementKit = AchievementKitUnlockPolicy.find(ArcadePortGame.BACON_BRAWL, "chris-p-bacon");
+        assertTrue(AchievementKitUnlockPolicy.unlocked(achievementKit, id -> false,
+                reloaded.feature(tester, ArcadePortGame.BACON_BRAWL, "all-kits", false)));
+        UUID otherTester = UUID.randomUUID();
+        assertFalse(AchievementKitUnlockPolicy.unlocked(achievementKit, id -> false,
+                reloaded.feature(otherTester, ArcadePortGame.BACON_BRAWL, "all-kits", false)));
     }
 
     @Test

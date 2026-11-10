@@ -476,7 +476,7 @@ public final class ArcadePortManager implements Listener {
                 if (session == null || player == null || location == null || location.getWorld() != session.world) return false;
                 Integer slot = session.masterBuilderPlots.get(player.getUniqueId());
                 if (slot == null || location.getBlockY() < 63 || location.getBlockY() >= 120) return false;
-                Location center = masterBuilderPlotCenter(session.world, slot);
+                Location center = masterBuilderPlotCenter(session, slot);
                 return Math.abs(location.getBlockX() - center.getBlockX()) < 5
                         && Math.abs(location.getBlockZ() - center.getBlockZ()) < 5;
             }
@@ -484,7 +484,7 @@ public final class ArcadePortManager implements Listener {
             @Override public Location plotCenter(Player player) {
                 Session session = current();
                 Integer slot = session == null || player == null ? null : session.masterBuilderPlots.get(player.getUniqueId());
-                return slot == null ? null : masterBuilderPlotCenter(session.world, slot);
+                return slot == null ? null : masterBuilderPlotCenter(session, slot);
             }
 
             @Override public Player ownerAt(Location location) {
@@ -1341,7 +1341,7 @@ public final class ArcadePortManager implements Listener {
                 && session.masterBuilderPhase == MasterBuildersPhase.BUILDING) {
             Integer plot = session.masterBuilderPlots.get(tester.getUniqueId());
             if (plot != null) {
-                Location centre = masterBuilderPlotCenter(session.world, plot);
+                Location centre = masterBuilderPlotCenter(session, plot);
                 for (int x = centre.getBlockX() - 4; x <= centre.getBlockX() + 4; x++) {
                     for (int z = centre.getBlockZ() - 4; z <= centre.getBlockZ() + 4; z++) {
                         for (int y = 64; y < 120; y++) session.world.getBlockAt(x, y, z).setType(Material.AIR, false);
@@ -2438,8 +2438,14 @@ public final class ArcadePortManager implements Listener {
         if (choice == null) return false;
         if (choice.unlock != ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT) return true;
         AchievementKitUnlockPolicy.Rule rule = AchievementKitUnlockPolicy.find(game, kitId);
-        // Never treat a purple kit with no approved predicate as free.
-        return rule != null && rule.unlocked(id -> hasAchievementForKit(playerId, rule.gameId(), id));
+        // The player's profile applies in the lobby. During an active debug round,
+        // the round owner's profile also governs the configured test roster (including bots).
+        boolean sessionDebugUnlockAll = activeDebugProfileGame == game
+                && activeDebugProfileOwner != null
+                && isDebugOverrideEnabled(activeDebugProfileOwner, game, "all-kits");
+        return AchievementKitUnlockPolicy.unlocked(rule,
+                id -> hasAchievementForKit(playerId, rule == null ? game.id() : rule.gameId(), id),
+                isDebugOverrideEnabled(playerId, game, "all-kits"), sessionDebugUnlockAll);
     }
 
     private boolean hasAchievementForKit(UUID playerId, String gameId, String achievementId) {
@@ -5370,11 +5376,20 @@ public final class ArcadePortManager implements Listener {
         }
         border.setDamageAmount(0.0D);
         List<Location> spawns = spawnLocations(type, participants.size());
+        if (type == ArcadePortGame.MASTER_BUILDERS && spawns.size() < participants.size()) {
+            sender.sendMessage(ChatColor.RED + "The selected Master Builders map has " + spawns.size()
+                    + " separate source plots for " + participants.size()
+                    + " players. No plots were generated or modified; select a map with enough plots.");
+            return;
+        }
         if (type == ArcadePortGame.ONE_IN_THE_QUIVER && spawns.isEmpty()) {
             sender.sendMessage(ChatColor.RED + "One in the Quiver cannot start: the selected map has no safe player spawns.");
             return;
         }
         session.spawns.addAll(spawns.stream().map(Location::clone).toList());
+        if (type == ArcadePortGame.MASTER_BUILDERS) {
+            session.masterBuilderPlotCenters.addAll(spawns.stream().map(Location::clone).toList());
+        }
         Set<Integer> specialTeamSlots = new HashSet<>();
         if (type == ArcadePortGame.MILK_THE_COW || type == ArcadePortGame.WITHER_ASSAULT) {
             int specialCount = type == ArcadePortGame.MILK_THE_COW
@@ -6101,10 +6116,18 @@ public final class ArcadePortManager implements Listener {
             return HoopsRemasteredRuntime.spawnLocations(worlds.get(type.id()), count);
         }
         if (type == ArcadePortGame.MASTER_BUILDERS) {
-            List<Location> locations = new ArrayList<>();
             World world = worlds.get(type.id());
-            for (int i = 0; i < Math.max(1, count); i++) locations.add(masterBuilderPlotCenter(world, i));
-            return locations;
+            SourceMapCatalog.MapData map = sourceMapData.get(type.id());
+            List<Location> plots = map != null && !map.inferredMetadata()
+                    ? map.spawnLocations() : List.of();
+            if (plots.isEmpty() && map != null && !map.inferredMetadata()) plots = map.dataLocations("GREEN");
+            if (plots.isEmpty()) {
+                plots = MasterBuildersPlotLayout.findExistingClayPlots(
+                        world, map, ArcadePortRules.MASTER_BUILDERS_MAX_BUILDERS);
+            }
+            plugin.getLogger().info("Master Builders source map " + (map == null ? "unknown" : map.mapName())
+                    + " has " + plots.size() + " existing clay plots.");
+            return plots;
         }
         if (type == ArcadePortGame.DRAW_MY_THING) {
             SourceMapCatalog.MapData drawMap = sourceMapData.get(type.id());
@@ -10915,6 +10938,7 @@ public final class ArcadePortManager implements Listener {
                 player.getGameMode(), now + GameDebugRuntimeOverrides.longValue("DRAGONS_TAMER_DURATION_MILLIS", ArcadePortRules.DRAGONS_TAMER_DURATION_MILLIS));
         session.dragonTamerControls.put(playerId, control);
         session.dragonTamerByDragon.put(dragon.getUniqueId(), playerId);
+        dragon.setAI(false);
         session.dragonTamerReadyAt.put(playerId, now + GameDebugRuntimeOverrides.longValue("DRAGONS_TAMER_COOLDOWN_MILLIS", ArcadePortRules.DRAGONS_TAMER_COOLDOWN_MILLIS));
         cooldownProgress.start(player, "Dragon Tamer", GameDebugRuntimeOverrides.longValue("DRAGONS_TAMER_COOLDOWN_MILLIS", ArcadePortRules.DRAGONS_TAMER_COOLDOWN_MILLIS));
         player.setCooldown(Material.END_CRYSTAL,
@@ -10948,6 +10972,12 @@ public final class ArcadePortManager implements Listener {
         DragonTamerControl control = session.dragonTamerControls.remove(playerId);
         if (control == null) return;
         session.dragonTamerByDragon.remove(control.dragonId(), playerId);
+        Entity controlled = Bukkit.getEntity(control.dragonId());
+        if (controlled instanceof EnderDragon dragon && dragon.isValid()) {
+            dragon.setTarget(null);
+            dragon.setAI(true);
+            dragon.setPhase(EnderDragon.Phase.CIRCLING);
+        }
         Player player = session.players.get(playerId);
         if (!restorePlayer || player == null || !player.isOnline()) return;
         player.setSpectatorTarget(null);
@@ -12990,6 +13020,13 @@ public final class ArcadePortManager implements Listener {
                 offsetZ + ArcadePortRules.masterBuildersPlotCenterZ(slot));
     }
 
+    private Location masterBuilderPlotCenter(Session session, int slot) {
+        if (session != null && slot >= 0 && slot < session.masterBuilderPlotCenters.size()) {
+            return session.masterBuilderPlotCenters.get(slot).clone();
+        }
+        return session == null ? null : masterBuilderPlotCenter(session.world, slot);
+    }
+
     private MasterBuilderBlockKey masterBuilderBlockKey(Block block) {
         return new MasterBuilderBlockKey(block.getX(), block.getY(), block.getZ());
     }
@@ -13042,7 +13079,7 @@ public final class ArcadePortManager implements Listener {
     private boolean isInsideMasterBuilderPlot(Session session, UUID playerId, Block block) {
         Integer slot = session.masterBuilderPlots.get(playerId);
         if (slot == null || block == null || block.getWorld() != session.world) return false;
-        Location c = masterBuilderPlotCenter(session.world, slot);
+        Location c = masterBuilderPlotCenter(session, slot);
         return Math.abs(block.getX() - c.getBlockX()) < 5 && Math.abs(block.getZ() - c.getBlockZ()) < 5
                 && block.getY() >= 64 && block.getY() < 120;
     }
@@ -13695,7 +13732,7 @@ public final class ArcadePortManager implements Listener {
             p.getInventory().clear();
             p.setGameMode(GameMode.CREATIVE);
             Integer plotIndex=session.masterBuilderPlots.get(p.getUniqueId());
-            if(plotIndex!=null)p.teleport(masterBuilderPlotCenter(session.world,plotIndex));
+            if(plotIndex!=null)p.teleport(masterBuilderPlotCenter(session,plotIndex));
             p.sendMessage(ChatColor.YELLOW+"Build: "+ChatColor.GOLD+session.masterBuilderTheme
                     +ChatColor.YELLOW+" | Your plot: "+(plotIndex==null?"unassigned":plotIndex+1));
             p.sendMessage(ChatColor.GRAY+"Use Creative inventory inside your quartz plot border. "
@@ -13712,7 +13749,7 @@ public final class ArcadePortManager implements Listener {
     private void spawnMasterBuilderPlotLabels(Session session) {
         for (Map.Entry<UUID,Integer> entry : session.masterBuilderPlots.entrySet()) {
             Player builder = session.players.get(entry.getKey());
-            Location labelAt = masterBuilderPlotCenter(session.world, entry.getValue()).add(0.0D, 1.1D, -5.45D);
+            Location labelAt = masterBuilderPlotCenter(session, entry.getValue()).add(0.0D, 1.1D, -5.45D);
             TextDisplay label = session.world.spawn(labelAt, TextDisplay.class);
             String builderName = builder == null ? "Builder" : builder.getName();
             String labelText = "PLOT " + String.format(java.util.Locale.ROOT, "%02d", entry.getValue() + 1)
@@ -13755,7 +13792,7 @@ public final class ArcadePortManager implements Listener {
             session.masterBuilderReviewEndsAt = now + ArcadePortRules.masterBuildersReviewMillis();
             session.masterBuilderVoteEndsAt = now + ArcadePortRules.masterBuildersVoteMillis();
             session.masterBuilderLastReviewSecond=-1;
-            Location centre=masterBuilderPlotCenter(session.world,session.masterBuilderPlots.getOrDefault(targetId,0));
+            Location centre=masterBuilderPlotCenter(session,session.masterBuilderPlots.getOrDefault(targetId,0));
             Material[] ratings={Material.RED_CONCRETE,Material.ORANGE_CONCRETE,Material.YELLOW_CONCRETE,
                     Material.LIME_CONCRETE,Material.LIGHT_BLUE_CONCRETE,Material.PURPLE_CONCRETE};
             int maxRating = ArcadePortRules.masterBuildersMaxRating();
@@ -14531,8 +14568,20 @@ public final class ArcadePortManager implements Listener {
     private void updateBaconMeterItem(Session session, Player player) {
         if (session.type != ArcadePortGame.BACON_BRAWL || player == null || !player.isOnline()
                 || !session.alive.contains(player.getUniqueId())) return;
+        UUID playerId = player.getUniqueId();
+        long activeUntil = Math.max(session.baconCloakUntil.getOrDefault(playerId, 0L),
+                session.baconBrutusUntil.getOrDefault(playerId, 0L));
+        if (activeUntil > System.currentTimeMillis()) {
+            long duration = Math.max(1L, session.baconTimedAbilityDurationMillis.getOrDefault(playerId, 1L));
+            long remaining = activeUntil - System.currentTimeMillis();
+            float remainingProgress = Math.max(0.0F, Math.min(0.999F, remaining / (float) duration));
+            int remainingSeconds = (int) Math.max(1L, (remaining + 999L) / 1_000L);
+            if (Math.abs(player.getExp() - remainingProgress) > 0.001F) player.setExp(remainingProgress);
+            if (player.getLevel() != remainingSeconds) player.setLevel(remainingSeconds);
+            return;
+        }
         int percent = Math.max(0, Math.min(GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", ArcadePortRules.BACON_METER_MAX),
-                session.baconMeters.getOrDefault(player.getUniqueId(), 0)));
+                session.baconMeters.getOrDefault(playerId, 0)));
         float progress = Math.min(0.999F, percent / (float) GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", ArcadePortRules.BACON_METER_MAX));
         if (Math.abs(player.getExp() - progress) > 0.001F) player.setExp(progress);
         if (player.getLevel() != percent) player.setLevel(percent);
@@ -14768,12 +14817,14 @@ public final class ArcadePortManager implements Listener {
 
     private void endBaconCloak(Session session, UUID ownerId, Player owner) {
         session.baconCloakUntil.remove(ownerId);
+        session.baconTimedAbilityDurationMillis.remove(ownerId);
         LivingEntity avatar = baconPlayerAvatar(session, ownerId);
         if (avatar != null) avatar.setInvisible(false);
     }
 
     private void endBaconBrutus(Session session, UUID ownerId, Player owner) {
         session.baconBrutusUntil.remove(ownerId);
+        session.baconTimedAbilityDurationMillis.remove(ownerId);
         if (owner != null && owner.isOnline()) {
             owner.removePotionEffect(PotionEffectType.RESISTANCE);
             owner.removePotionEffect(PotionEffectType.SLOWNESS);
@@ -15322,6 +15373,7 @@ public final class ArcadePortManager implements Listener {
             case "pig": {
                 long duration = ArcadePortRules.baconAbilityDurationMillis(charge);
                 session.baconCloakUntil.put(id, now + duration);
+                session.baconTimedAbilityDurationMillis.put(id, duration);
                 LivingEntity avatar = baconPlayerAvatar(session, id);
                 if (avatar != null) avatar.setInvisible(true);
                 player.getWorld().spawnParticle(Particle.SMOKE,
@@ -15337,6 +15389,7 @@ public final class ArcadePortManager implements Listener {
             case "brutus-bacon": {
                 long duration = ArcadePortRules.baconAbilityDurationMillis(charge);
                 session.baconBrutusUntil.put(id, now + duration);
+                session.baconTimedAbilityDurationMillis.put(id, duration);
                 int ticks = (int) Math.max(1L, (duration + 49L) / 50L);
                 player.addPotionEffect(new PotionEffect(
                         PotionEffectType.RESISTANCE, ticks, 4, false, false, true));
@@ -15528,6 +15581,10 @@ public final class ArcadePortManager implements Listener {
             session.baconSwingCritical.remove(id);
         }
         session.baconLastSwingAt.put(id, now);
+        long criticalDelay = ArcadePortRules.baconTimingWindowMillis(
+                GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_GOOD_MIN_MILLIS",
+                        ArcadePortRules.BACON_TIMED_HIT_GOOD_MIN_MILLIS), session.baconKnockback);
+        cooldownProgress.start(player, "Critical Hit", criticalDelay, ArcadePortGame.BACON_BRAWL);
     }
 
     private void handleBaconBrawlHit(Session session, Player attacker, Player target, String source) {
@@ -15961,10 +16018,14 @@ public final class ArcadePortManager implements Listener {
                 Location spawn = spawns.get(ThreadLocalRandom.current().nextInt(spawns.size())).clone();
                 if (fallbackSpawn) spawn.add(0.0D, 12.0D, 0.0D);
                 EnderDragon dragon = session.world.spawn(spawn, EnderDragon.class);
-                dragon.setAI(false);
+                dragon.setAI(true);
                 dragon.setGravity(false);
-                // Reborn calls UtilEnt.vegetate + ghost(dragon, true, false):
-                // no normal AI and no collision, while remaining visible and targetable by the port.
+                var flightSpeed = dragon.getAttribute(Attribute.FLYING_SPEED);
+                if (flightSpeed != null) {
+                    flightSpeed.setBaseValue(GameDebugRuntimeOverrides.doubleValue(
+                            "DRAGONS_AUTONOMOUS_FLIGHT_SPEED", ArcadePortRules.DRAGONS_AUTONOMOUS_FLIGHT_SPEED));
+                }
+                dragon.setPhase(EnderDragon.Phase.CIRCLING);
                 dragon.setCollidable(false);
                 dragon.setRemoveWhenFarAway(false);
                 session.entities.add(dragon);
@@ -16060,9 +16121,7 @@ public final class ArcadePortManager implements Listener {
                 if (ArcadePortRules.shouldRetargetDragon(
                         dragon.getLocation().getY(), targetDistanceSquared, target != null)) {
                     session.dragonSparklerDragonOwners.remove(dragonId);
-                    if (session.dragonSpectatorLocation != null
-                            && dragon.getLocation().getY() > session.dragonSpectatorLocation.getY()
-                            && !possibleTargets.isEmpty()) {
+                    if (!possibleTargets.isEmpty()) {
                         Player newTarget = possibleTargets.get(
                                 ThreadLocalRandom.current().nextInt(possibleTargets.size()));
                         session.dragonTargetPlayers.put(dragonId, newTarget.getUniqueId());
@@ -16073,13 +16132,33 @@ public final class ArcadePortManager implements Listener {
                     }
                     session.dragonTargetLocations.put(dragonId, target.clone());
                 }
+
+                if (!GameDebugRuntimeOverrides.booleanValue("DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED",
+                        ArcadePortRules.DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED)) {
+                    dragon.setAI(false);
+                    dragon.setTarget(null);
+                    continue;
+                }
+                dragon.setAI(true);
+                UUID selectedPlayer = session.dragonTargetPlayers.get(dragonId);
+                Player nativeTarget = selectedPlayer == null ? null : session.players.get(selectedPlayer);
+                if (nativeTarget != null && nativeTarget.isOnline() && session.alive.contains(selectedPlayer)) {
+                    dragon.setTarget(nativeTarget);
+                    if (dragon.getPhase() != EnderDragon.Phase.STRAFING) {
+                        dragon.setPhase(EnderDragon.Phase.STRAFING);
+                    }
+                } else {
+                    dragon.setTarget(null);
+                    if (dragon.getPhase() != EnderDragon.Phase.CIRCLING) {
+                        dragon.setPhase(EnderDragon.Phase.CIRCLING);
+                    }
+                }
             }
 
         }
 
-        // The EnderDragon controller overrides Bukkit velocity when AI is disabled.
-        // Move it by position each tick, as the Dragon Escape port does for Douglas,
-        // while keeping source target selection and contact checks on FASTEST (125 ms).
+        // Only Tamer-controlled dragons use direct steering. Autonomous dragons fly
+        // with Paper's native dragon controller and the source circling/strafe phases.
         for (EnderDragon dragon : dragons) {
             UUID dragonId = dragon.getUniqueId();
             UUID controllerId = session.dragonTamerByDragon.get(dragonId);
@@ -16087,6 +16166,7 @@ public final class ArcadePortManager implements Listener {
             if (controllerId != null && session.dragonTamerControls.containsKey(controllerId)) {
                 Player controller = session.players.get(controllerId);
                 if (controller != null && controller.isOnline()) {
+                    dragon.setAI(false);
                     Vector facing = controller.getLocation().getDirection();
                     if (facing.lengthSquared() < 0.001D) facing = new Vector(0.0D, 0.0D, 1.0D);
                     facing.normalize();
@@ -16098,43 +16178,19 @@ public final class ArcadePortManager implements Listener {
                             dragon.getLocation().clone().add(facing.clone().multiply(GameDebugRuntimeOverrides.doubleValue(
                                     "DRAGONS_TAMER_LOOKAHEAD_BLOCKS", ArcadePortRules.DRAGONS_TAMER_LOOKAHEAD_BLOCKS))));
                 }
-            } else if (GameDebugRuntimeOverrides.booleanValue("DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED",
-                    ArcadePortRules.DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED)) {
-                Location target = session.dragonTargetLocations.get(dragonId);
-                Vector heading = session.dragonFlightVectors.get(dragonId);
-                if (heading == null || heading.lengthSquared() < 1.0E-6D) {
-                    heading = dragon.getLocation().getDirection().normalize();
-                }
-                if (target != null && target.getWorld() == dragon.getWorld()) {
-                    Vector desired = target.toVector().subtract(dragon.getLocation().toVector());
-                    if (desired.lengthSquared() > 1.0E-6D) {
-                        // Reborn delegates steering to the native dragon controller.
-                        // Gradually turn this Paper-controlled dragon toward its target
-                        // so it follows a flight path instead of snapping every tick.
-                        heading = ArcadePortRules.turnDragonHeading(heading, desired,
-                                GameDebugRuntimeOverrides.doubleValue("DRAGONS_TURN_RATE",
-                                        ArcadePortRules.DRAGONS_TURN_RATE));
-                    }
-                }
-                if (heading.lengthSquared() < 1.0E-6D) heading = new Vector(0.0D, 0.0D, 1.0D);
-                heading.normalize();
-                session.dragonFlightVectors.put(dragonId, heading.clone());
-                flight = ArcadePortRules.autonomousDragonFlight(heading,
-                        GameDebugRuntimeOverrides.doubleValue("DRAGONS_AUTONOMOUS_FLIGHT_SPEED",
-                                ArcadePortRules.DRAGONS_AUTONOMOUS_FLIGHT_SPEED));
             }
             if (flight != null) {
                 Location next = dragon.getLocation().clone().add(flight);
                 next.setDirection(flight);
                 if (dragon.teleport(next)) {
                     dragon.setVelocity(new Vector());
-                    damageDragonTerrainAlongPath(session, dragon);
                 } else {
                     // A failed teleport must not leave a no-AI dragon stranded at spawn.
                     dragon.setAI(true);
                     dragon.setVelocity(flight);
                 }
             }
+            if (targetUpdate && controllerId == null) damageDragonTerrainAlongPath(session, dragon);
             if (targetUpdate) {
                 for (Player player : alive) {
                     if (!session.dragonTamerControls.containsKey(player.getUniqueId())
@@ -18297,7 +18353,7 @@ public final class ArcadePortManager implements Listener {
                     } else {
                         timeText = ArcadePortRules.formatDragonEscapeTime(elapsed);
                     }
-                    line.setSuffix(DragonEscapeRaceScoreboardLayout.racerTime(timeText, status));
+                    line.setSuffix(DragonEscapeRaceScoreboardLayout.racerTime(timeText, status, i == 0));
                     view.objective().getScore(entry).setScore(
                             DragonEscapeRaceScoreboardLayout.MAX_ROWS - i);
                 } else {
@@ -19385,8 +19441,6 @@ public final class ArcadePortManager implements Listener {
             }
             if (session.type == ArcadePortGame.BACON_BRAWL) {
                 updateBaconMeterItem(session, p);
-                // Keep only the requested combat timing bar; the meter remains on the XP bar.
-                p.sendActionBar(baconTimingStatusText(session, id, now));
                 continue;
             }
             if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
@@ -19406,54 +19460,6 @@ public final class ArcadePortManager implements Listener {
     }
 
     /** Live timing guide: the green section is the 500–900 ms critical window. */
-    private String baconTimingStatusText(Session session, UUID id, long now) {
-        long lastHit = session.baconLastSwingAt.getOrDefault(id, 0L);
-        if (lastHit <= 0L) {
-            return ChatColor.GRAY + "[" + ChatColor.RED + "■■■■"
-                    + ChatColor.GREEN + "■■■■" + ChatColor.YELLOW + "■■■■"
-                    + ChatColor.GRAY + "] swing";
-        }
-
-        long elapsed = Math.max(0L, now - lastHit);
-        long lateMax = ArcadePortRules.baconTimingWindowMillis(
-                GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_LATE_MAX_MILLIS", ArcadePortRules.BACON_TIMED_HIT_LATE_MAX_MILLIS), session.baconKnockback);
-        long criticalMin = ArcadePortRules.baconTimingWindowMillis(
-                GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_GOOD_MIN_MILLIS", ArcadePortRules.BACON_TIMED_HIT_GOOD_MIN_MILLIS), session.baconKnockback);
-        long criticalMax = ArcadePortRules.baconTimingWindowMillis(
-                GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_GOOD_MAX_MILLIS", ArcadePortRules.BACON_TIMED_HIT_GOOD_MAX_MILLIS), session.baconKnockback);
-        int pointer = (int) Math.min(14L, elapsed * 15L / Math.max(1L, lateMax));
-        boolean criticalWindow = ArcadePortRules.isBaconTimedCritical(elapsed, session.baconKnockback);
-        int criticalStart = (int) (criticalMin * 15L / Math.max(1L, lateMax));
-        int criticalEnd = Math.min(14, (int) (criticalMax * 15L / Math.max(1L, lateMax)));
-        StringBuilder bar = new StringBuilder("[");
-        for (int i = 0; i < 15; i++) {
-            if (i == pointer) {
-                bar.append(criticalWindow ? ChatColor.GREEN : ChatColor.WHITE).append("▌");
-            } else if (i >= criticalStart && i <= criticalEnd) {
-                bar.append(ChatColor.GREEN).append("■");
-            } else if (i < criticalStart) {
-                bar.append(ChatColor.RED).append("■");
-            } else if (i < 14) {
-                bar.append(ChatColor.YELLOW).append("■");
-            } else {
-                bar.append(ChatColor.GRAY).append("■");
-            }
-        }
-        bar.append(ChatColor.GRAY).append("]");
-
-        String state;
-        if (ArcadePortRules.isBaconTimedCritical(elapsed, session.baconKnockback)) {
-            state = ChatColor.GREEN + "" + ChatColor.BOLD + "CRITICAL NOW";
-        } else if (elapsed < criticalMin) {
-            state = ChatColor.RED + "wait " + (criticalMin - elapsed) + "ms";
-        } else if (elapsed <= lateMax) {
-            state = ChatColor.YELLOW + "late";
-        } else {
-            state = ChatColor.GRAY + "swing";
-        }
-        return ChatColor.AQUA + bar.toString() + " " + state;
-    }
-
     private int scoreFor(Session session, UUID id) {
         return session.scores.getOrDefault(id, 0);
     }
@@ -19818,6 +19824,7 @@ public final class ArcadePortManager implements Listener {
             session.baconSlamPowerPercent.remove(playerId);
             session.baconBrutusUntil.remove(playerId);
             session.baconCloakUntil.remove(playerId);
+            session.baconTimedAbilityDurationMillis.remove(playerId);
             if (!session.alive.remove(playerId)) return;
             if (killer != null && ArcadePortRules.shouldCreditBaconKill(
                     playerId, killer.getUniqueId(), session.scores.containsKey(killer.getUniqueId()))) {
@@ -19850,11 +19857,12 @@ public final class ArcadePortManager implements Listener {
                 player.getInventory().clear();
                 player.sendMessage(ChatColor.RED + "Knocked out! You are out of Bacon Brawl.");
             }
+
             // Bacon Brawl is Reborn's last-pig-standing SoloGame: eliminated players do not respawn.
             checkRoundEnd(session);
             return;
         }
-        
+
         if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER
                 && session.alive.contains(player.getUniqueId())) {
             UUID victimId = player.getUniqueId();
@@ -22752,6 +22760,7 @@ public final class ArcadePortManager implements Listener {
         session.baconAbilitiesUsed.clear();
         session.baconBrutusUntil.clear();
         session.baconCloakUntil.clear();
+        session.baconTimedAbilityDurationMillis.clear();
         session.baconSlamPowerPercent.clear();
         session.baconBodySlamKills.clear();
         session.baconThreeForOneAwarded.clear();
@@ -34183,6 +34192,7 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.BACON_BRAWL) {
             session.baconBrutusUntil.remove(id);
             session.baconCloakUntil.remove(id);
+            session.baconTimedAbilityDurationMillis.remove(id);
             removeBaconBabyPig(session, id);
             removeBaconPlayerPig(session, id);
             restoreBaconPlayerVisibilityForOwner(session, id, player);
@@ -34322,7 +34332,11 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session != null && session.startupComplete && !session.liveStarted
                 && session.players.containsKey(event.getPlayer().getUniqueId())) {
-            event.setCancelled(true);
+            me.monstermaze.game.GameManager maze = monsterMazeModule == null
+                    ? null : monsterMazeModule.getGameManager();
+            if (maze == null || !maze.allowsTestplexStartupTeleport(event.getPlayer(), event.getTo())) {
+                event.setCancelled(true);
+            }
         }
     }
 
