@@ -24,7 +24,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scoreboard.Team;
 
 import java.nio.charset.StandardCharsets;
 import java.util.EnumSet;
@@ -118,10 +117,13 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
         UUID ghostUuid = UUID.nameUUIDFromBytes(
                 ("testplex:dragon-escape-ghost:" + viewer.getUniqueId() + ":" + ghostKey)
                         .getBytes(StandardCharsets.UTF_8));
-        String suffix = String.format("%08x", ghostUuid.getLeastSignificantBits()).substring(0, 8);
         // Use the racer’s name for the overhead label so the replay is identifiable.
         String sourceName = sourcePlayerId == null ? null : Bukkit.getOfflinePlayer(sourcePlayerId).getName();
-        String profileName = sourceName == null || sourceName.isBlank() ? viewer.getName() : sourceName;
+        String displayName = sourceName == null || sourceName.isBlank() ? viewer.getName() : sourceName;
+        // The profile and team entry must be unique per ghost. The visible custom name
+        // remains the real racer's name, even when one racer owns multiple selected records.
+        String profileName = profileName(ghostUuid);
+        String suffix = String.format("%08x", ghostUuid.getLeastSignificantBits()).substring(0, 8);
         String teamName = "deg" + suffix;
         // Keep packet-only NPC IDs positive and far outside normal server entity IDs.
         int entityId = 1_800_000_000 - (ghostUuid.hashCode() & 0x1fffffff);
@@ -174,10 +176,18 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
                 new WrapperPlayServerEntityMetadata(entityId, List.of(
                         new EntityData<>(0, EntityDataTypes.BYTE, flags),
+                        new EntityData<>(2, EntityDataTypes.OPTIONAL_ADV_COMPONENT,
+                                Optional.of(Component.text(displayName))),
+                        new EntityData<>(3, EntityDataTypes.BOOLEAN, true),
                         new EntityData<>(6, EntityDataTypes.ENTITY_POSE, EntityPose.STANDING))));
 
         return new GhostState(entityId, ghostUuid, teamName, profileName, sourcePlayerId,
                 flags, EntityPose.STANDING);
+    }
+
+    static String profileName(UUID ghostUuid) {
+        String suffix = String.format("%08x", ghostUuid.getLeastSignificantBits()).substring(0, 8);
+        return "DEGhost" + suffix;
     }
 
     @Override
@@ -208,18 +218,6 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
                 new WrapperPlayServerPlayerInfoRemove(state.profileUuid));
 
-        // Restore any real player whose name was temporarily reused by this viewer-only
-        // ghost team so their normal scoreboard team remains intact.
-        Player realPlayer = Bukkit.getPlayerExact(state.profileName);
-        Team currentTeam = realPlayer == null ? null
-                : realPlayer.getScoreboard().getEntryTeam(realPlayer.getName());
-        if (realPlayer != null && currentTeam != null) {
-            PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
-                    new WrapperPlayServerTeams(currentTeam.getName(),
-                            WrapperPlayServerTeams.TeamMode.ADD_ENTITIES,
-                            (WrapperPlayServerTeams.ScoreBoardTeamInfo) null,
-                            realPlayer.getName()));
-        }
     }
 
     private static final class GhostState {

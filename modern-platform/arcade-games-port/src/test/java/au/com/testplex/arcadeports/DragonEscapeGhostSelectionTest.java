@@ -39,4 +39,17 @@ class DragonEscapeGhostSelectionTest {
         assertTrue(DragonEscapeGhostSelection.relativeFinish(11_000L, 10_000L).endsWith("slower"));
         assertEquals("exactly matched", DragonEscapeGhostSelection.relativeFinish(10_000L, 10_000L));
     }
+
+    @Test void simultaneousGhostProfilesHaveUniqueClientTeamEntries() {
+        UUID viewer = a;
+        String personal = DragonEscapePacketGhostBridge.profileName(
+                UUID.nameUUIDFromBytes(("testplex:dragon-escape-ghost:" + viewer + ":personal-pb")
+                        .getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        String kit = DragonEscapePacketGhostBridge.profileName(
+                UUID.nameUUIDFromBytes(("testplex:dragon-escape-ghost:" + viewer + ":kit-pb")
+                        .getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        assertNotEquals(personal, kit);
+        assertTrue(personal.length() <= 16);
+        assertTrue(kit.length() <= 16);
+    }
 }
