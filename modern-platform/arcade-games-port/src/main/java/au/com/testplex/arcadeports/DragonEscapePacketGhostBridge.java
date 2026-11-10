@@ -49,7 +49,7 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
     private static final byte SNEAKING_FLAG = 0x02;
     private static final byte SPRINTING_FLAG = 0x08;
 
-    private final Map<UUID, GhostState> ghosts = new HashMap<>();
+    private final Map<UUID, Map<String, GhostState>> ghosts = new HashMap<>();
 
     public DragonEscapePacketGhostBridge(JavaPlugin plugin) {
         if (plugin == null) throw new IllegalArgumentException("plugin");
@@ -64,20 +64,30 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
     @Override
     public void update(Player viewer, UUID sourcePlayerId, Location location,
                        boolean sneaking, boolean sprinting, boolean onGround) {
+        update(viewer, "personal", sourcePlayerId, location, sneaking, sprinting, onGround);
+    }
+
+    @Override
+    public void update(Player viewer, String ghostKey, UUID sourcePlayerId, Location location,
+                       boolean sneaking, boolean sprinting, boolean onGround) {
         if (viewer == null || !viewer.isOnline() || location == null || location.getWorld() != viewer.getWorld()) {
-            if (viewer != null) hide(viewer);
+            if (viewer != null) hide(viewer, ghostKey);
             return;
         }
 
-        GhostState state = ghosts.get(viewer.getUniqueId());
+        String key = ghostKey == null || ghostKey.isBlank() ? "personal" : ghostKey;
+        Map<String, GhostState> viewerGhosts = ghosts.computeIfAbsent(
+                viewer.getUniqueId(), ignored -> new HashMap<>());
+        GhostState state = viewerGhosts.get(key);
         if (state != null && !Objects.equals(state.sourcePlayerId, sourcePlayerId)) {
-            hide(viewer);
+            hide(viewer, key);
+            viewerGhosts = ghosts.computeIfAbsent(viewer.getUniqueId(), ignored -> new HashMap<>());
             state = null;
         }
         if (state == null) {
-            state = spawn(viewer, sourcePlayerId, location);
+            state = spawn(viewer, key, sourcePlayerId, location);
             if (state == null) return;
-            ghosts.put(viewer.getUniqueId(), state);
+            viewerGhosts.put(key, state);
         }
 
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
@@ -101,16 +111,17 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
         }
     }
 
-    private GhostState spawn(Player viewer, UUID sourcePlayerId, Location location) {
+    private GhostState spawn(Player viewer, String ghostKey, UUID sourcePlayerId, Location location) {
         User viewerUser = PacketEvents.getAPI().getPlayerManager().getUser(viewer);
         if (viewerUser == null || viewerUser.getProfile() == null) return null;
 
         UUID ghostUuid = UUID.nameUUIDFromBytes(
-                ("testplex:dragon-escape-pb-ghost:" + viewer.getUniqueId())
+                ("testplex:dragon-escape-ghost:" + viewer.getUniqueId() + ":" + ghostKey)
                         .getBytes(StandardCharsets.UTF_8));
         String suffix = String.format("%08x", ghostUuid.getLeastSignificantBits()).substring(0, 8);
         // Use the racer’s name for the overhead label so the replay is identifiable.
-        String profileName = viewer.getName();
+        String sourceName = sourcePlayerId == null ? null : Bukkit.getOfflinePlayer(sourcePlayerId).getName();
+        String profileName = sourceName == null || sourceName.isBlank() ? viewer.getName() : sourceName;
         String teamName = "deg" + suffix;
         // Keep packet-only NPC IDs positive and far outside normal server entity IDs.
         int entityId = 1_800_000_000 - (ghostUuid.hashCode() & 0x1fffffff);
@@ -146,9 +157,8 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
                         WrapperPlayServerTeams.CollisionRule.NEVER,
                         NamedTextColor.WHITE,
                         WrapperPlayServerTeams.OptionData.FRIENDLY_CAN_SEE_INVISIBLE);
-        // The ghost profile deliberately shares the viewer's scoreboard name, so one
-        // team entry covers both. This makes the invisible ghost visible translucently
-        // only to its owner without displaying a generic PB_Ghost label.
+        // The ghost profile name is the source racer's name, so the overhead nametag
+        // identifies whose run this ghost represents.
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
                 new WrapperPlayServerTeams(teamName, WrapperPlayServerTeams.TeamMode.CREATE,
                         teamInfo, List.of(profileName)));
@@ -166,14 +176,29 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
                         new EntityData<>(0, EntityDataTypes.BYTE, flags),
                         new EntityData<>(6, EntityDataTypes.ENTITY_POSE, EntityPose.STANDING))));
 
-        return new GhostState(entityId, ghostUuid, teamName, sourcePlayerId, flags, EntityPose.STANDING);
+        return new GhostState(entityId, ghostUuid, teamName, profileName, sourcePlayerId,
+                flags, EntityPose.STANDING);
     }
 
     @Override
     public void hide(Player viewer) {
         if (viewer == null) return;
-        GhostState state = ghosts.remove(viewer.getUniqueId());
-        if (state == null || !viewer.isOnline()) return;
+        Map<String, GhostState> removed = ghosts.remove(viewer.getUniqueId());
+        if (removed == null || !viewer.isOnline()) return;
+        for (GhostState state : removed.values()) hideState(viewer, state);
+    }
+
+    @Override
+    public void hide(Player viewer, String ghostKey) {
+        if (viewer == null || ghostKey == null) return;
+        Map<String, GhostState> viewerGhosts = ghosts.get(viewer.getUniqueId());
+        if (viewerGhosts == null) return;
+        GhostState state = viewerGhosts.remove(ghostKey);
+        if (viewerGhosts.isEmpty()) ghosts.remove(viewer.getUniqueId());
+        if (state != null && viewer.isOnline()) hideState(viewer, state);
+    }
+
+    private void hideState(Player viewer, GhostState state) {
 
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
                 new WrapperPlayServerDestroyEntities(state.entityId));
@@ -183,15 +208,17 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
                 new WrapperPlayServerPlayerInfoRemove(state.profileUuid));
 
-        // The viewer was temporarily added to the private ghost team. Put them
-        // back into whichever real team the server scoreboard currently assigns.
-        Team currentTeam = viewer.getScoreboard().getEntryTeam(viewer.getName());
-        if (currentTeam != null) {
+        // Restore any real player whose name was temporarily reused by this viewer-only
+        // ghost team so their normal scoreboard team remains intact.
+        Player realPlayer = Bukkit.getPlayerExact(state.profileName);
+        Team currentTeam = realPlayer == null ? null
+                : realPlayer.getScoreboard().getEntryTeam(realPlayer.getName());
+        if (realPlayer != null && currentTeam != null) {
             PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
                     new WrapperPlayServerTeams(currentTeam.getName(),
                             WrapperPlayServerTeams.TeamMode.ADD_ENTITIES,
                             (WrapperPlayServerTeams.ScoreBoardTeamInfo) null,
-                            viewer.getName()));
+                            realPlayer.getName()));
         }
     }
 
@@ -199,15 +226,17 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
         private final int entityId;
         private final UUID profileUuid;
         private final String teamName;
+        private final String profileName;
         private final UUID sourcePlayerId;
         private byte entityFlags;
         private EntityPose entityPose;
 
-        private GhostState(int entityId, UUID profileUuid, String teamName, UUID sourcePlayerId,
+        private GhostState(int entityId, UUID profileUuid, String teamName, String profileName, UUID sourcePlayerId,
                            byte entityFlags, EntityPose entityPose) {
             this.entityId = entityId;
             this.profileUuid = profileUuid;
             this.teamName = teamName;
+            this.profileName = profileName;
             this.sourcePlayerId = sourcePlayerId;
             this.entityFlags = entityFlags;
             this.entityPose = entityPose;

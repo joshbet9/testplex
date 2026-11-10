@@ -1,13 +1,16 @@
 package au.com.testplex.arcadeports;
 
 import java.util.Locale;
+import java.util.List;
 import java.util.UUID;
 
 /** Selection and privacy rules shared by the hotbar menu, race rendering and finish summary. */
 final class DragonEscapeGhostSelection {
     enum Mode { PERSONAL_BEST, CURRENT_KIT, TARGET_PLAYER }
+    private static final List<String> SOURCE_KEYS = List.of(
+            "personal-pb", "kit-pb", "world-record", "kit-record");
 
-    record Source(UUID playerId, long timeMillis, String kitId, String label) { }
+    record Source(String key, UUID playerId, long timeMillis, String kitId, String label) { }
 
     private DragonEscapeGhostSelection() { }
 
@@ -19,6 +22,8 @@ final class DragonEscapeGhostSelection {
             default -> Mode.PERSONAL_BEST;
         };
     }
+
+    static List<String> sourceKeys() { return SOURCE_KEYS; }
 
     static boolean canShare(UUID owner, UUID viewer, boolean publiclyShared) {
         return owner != null && (owner.equals(viewer) || publiclyShared);

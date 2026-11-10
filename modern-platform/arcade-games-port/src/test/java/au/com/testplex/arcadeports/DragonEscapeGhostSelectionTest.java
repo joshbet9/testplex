@@ -22,6 +22,12 @@ class DragonEscapeGhostSelectionTest {
         assertTrue(DragonEscapeGhostSelection.canShare(a, a, false));
     }
 
+    @Test void exposesExactlyTheFourPersistentRaceGhostSources() {
+        assertEquals(java.util.List.of("personal-pb", "kit-pb", "world-record", "kit-record"),
+                DragonEscapeGhostSelection.sourceKeys());
+        assertEquals(4, DragonEscapeGhostSelection.sourceKeys().size());
+    }
+
     @Test void finishSummaryUsesSmallerTimeAsFaster() {
         assertTrue(DragonEscapeGhostSelection.relativeFinish(9_000L, 10_000L).endsWith("faster"));
         assertTrue(DragonEscapeGhostSelection.relativeFinish(11_000L, 10_000L).endsWith("slower"));

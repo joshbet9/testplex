@@ -16,5 +16,10 @@ public interface DragonEscapeGhostBridge {
                         boolean sneaking, boolean sprinting, boolean onGround) {
         update(viewer, location, sneaking, sprinting, onGround);
     }
+    default void update(Player viewer, String ghostKey, UUID sourcePlayerId, Location location,
+                        boolean sneaking, boolean sprinting, boolean onGround) {
+        update(viewer, sourcePlayerId, location, sneaking, sprinting, onGround);
+    }
+    default void hide(Player viewer, String ghostKey) { hide(viewer); }
     void hide(Player viewer);
 }
