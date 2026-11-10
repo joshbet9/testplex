@@ -51,11 +51,20 @@ jobs:
             })).map(label => label.name));
             for (const label of [...labels, trackerLabel, ...lifecycleLabels]) {
               if (!existing.has(label.name)) {
-                await github.rest.issues.createLabel({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  ...label,
-                });
+                try {
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    ...label,
+                  });
+                } catch (error) {
+                  const alreadyCreated = error.status === 422 &&
+                    error.response?.data?.errors?.some(
+                      entry => entry.code === "already_exists" && entry.field === "name"
+                    );
+                  if (!alreadyCreated) throw error;
+                }
+                existing.add(label.name);
               }
               if (label.name !== "game-tracker" && !lifecycleLabels.some(status => status.name === label.name)) {
                 await github.rest.issues.addLabels({
