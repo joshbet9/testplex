@@ -70,6 +70,10 @@ final class SkyWarsChestLoot {
         return pools.get(ThreadLocalRandom.current().nextInt(pools.size())).randomItem();
     }
 
+    static void populateSupplementalIslandChest(Chest chest) {
+        if (chest != null) populateChest(chest, islandPools());
+    }
+
     private static int populateFamily(List<org.bukkit.Location> locations, List<Pool> pools) {
         int count = 0;
         for (org.bukkit.Location location : locations) {

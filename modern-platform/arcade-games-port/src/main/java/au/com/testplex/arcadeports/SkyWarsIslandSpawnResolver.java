@@ -31,10 +31,51 @@ final class SkyWarsIslandSpawnResolver {
         List<Location> targets = additionalIslandTargets(resolved, center, required - resolved.size());
         for (Location target : targets) {
             Location safe = nearestSafeIslandSurface(world, target, resolved);
+            if (safe == null) safe = createSupplementalIsland(world, map, target, resolved);
             if (safe != null) resolved.add(safe);
             if (resolved.size() >= required) break;
         }
         return List.copyOf(resolved);
+    }
+
+    /** Add a compact, lootable island only when the source map has no terrain in a required gap. */
+    private static Location createSupplementalIsland(World world, SourceMapCatalog.MapData map,
+            Location target, List<Location> existing) {
+        int centerX = target.getBlockX();
+        int centerZ = target.getBlockZ();
+        int topY = nearestStartY(existing, centerX, centerZ) - 1;
+        if (topY <= world.getMinHeight() || topY >= world.getMaxHeight() - 3) return null;
+        if (!map.hasBounds() || centerX - 4 < map.minX() || centerX + 4 > map.maxX()
+                || centerZ - 4 < map.minZ() || centerZ + 4 > map.maxZ()) return null;
+
+        Location spawn = new Location(world, centerX + 0.5D, topY + 1.0D, centerZ + 0.5D);
+        if (existing.stream().anyMatch(start -> start != null
+                && horizontalDistanceSquared(start, spawn.getX(), spawn.getZ())
+                < MIN_ISLAND_SEPARATION_SQUARED)) return null;
+
+        world.getChunkAt(centerX >> 4, centerZ >> 4).load();
+        for (int dx = -4; dx <= 4; dx++) {
+            for (int dz = -4; dz <= 4; dz++) {
+                world.getBlockAt(centerX + dx, topY, centerZ + dz).setType(Material.GRASS_BLOCK, false);
+                world.getBlockAt(centerX + dx, topY - 1, centerZ + dz).setType(Material.DIRT, false);
+            }
+        }
+        for (int layer = 1; layer <= 4; layer++) {
+            int radius = 4 - layer;
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    world.getBlockAt(centerX + dx, topY - 1 - layer, centerZ + dz)
+                            .setType(Material.STONE, false);
+                }
+            }
+        }
+
+        org.bukkit.block.Block chestBlock = world.getBlockAt(centerX + 3, topY + 1, centerZ);
+        chestBlock.setType(Material.CHEST, false);
+        if (chestBlock.getState() instanceof org.bukkit.block.Chest chest) {
+            SkyWarsChestLoot.populateSupplementalIslandChest(chest);
+        }
+        return spawn;
     }
 
     /** Place inferred targets in the widest gaps between authored islands. */
