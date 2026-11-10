@@ -573,6 +573,17 @@ class ArcadePortGameTest {
         assertEquals(30_000L, ArcadePortRules.DEATH_TAG_CHASER_PROMOTION_INTERVAL_MILLIS);
     }
 
+    @Test void dragonEscapeWaterDamageHonorsTheAuthoredMarkerAndPirateOverride() {
+        assertEquals(0, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGON_ESCAPE,
+                "Time Travel"));
+        assertEquals(4, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGON_ESCAPE,
+                "Time Travel", true));
+        assertEquals(2, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGON_ESCAPE,
+                "Pirate Bay", true));
+        assertEquals(4, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGONS,
+                "Any map", false));
+    }
+
     @Test void sourceWorldResetOnlyAcceptsReservedWorldNames() {
         assertTrue(SourceMapCatalog.isReservedSourceWorldName("arcadeport_source_bacon_brawl"));
         assertTrue(SourceMapCatalog.isReservedSourceWorldName("arcadeport_source_micro_battles"));

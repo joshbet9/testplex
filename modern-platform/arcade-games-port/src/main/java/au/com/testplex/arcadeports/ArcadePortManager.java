@@ -3582,7 +3582,7 @@ public final class ArcadePortManager implements Listener {
         player.closeInventory();
         player.leaveVehicle();
         player.teleport(spawn);
-        player.setGameMode(arcadePlayerGameMode(session.type));
+        player.setGameMode(arcadePlayerGameMode(session, id));
         player.setHealth(player.getMaxHealth());
         player.setFoodLevel(20);
         player.setSaturation(20.0F);
@@ -5369,12 +5369,16 @@ public final class ArcadePortManager implements Listener {
         world.setStorm(false);
         world.setThundering(false);
         WorldBorder border = world.getWorldBorder();
-        if (sourceMap != null && sourceMap.hasBounds()) {
-            border.setCenter(sourceMap.centerX(), sourceMap.centerZ());
-            border.setSize(Math.max(40.0D, Math.max(sourceMap.width(), sourceMap.depth()) + 8.0D));
+        // Source maps have authored physical/playable edges. Do not add a guessed
+        // vanilla barrier that can block valid routes; Micro Battles needs its
+        // shrinking border as an intentional game mechanic.
+        if (type == ArcadePortGame.MICRO_BATTLES) {
+            border.setCenter(sourceMap != null && sourceMap.hasBounds() ? sourceMap.centerX() : 0.0D,
+                    sourceMap != null && sourceMap.hasBounds() ? sourceMap.centerZ() : 0.0D);
+            border.setSize(42.0D);
         } else {
             border.setCenter(0.0D, 0.0D);
-            border.setSize(type == ArcadePortGame.MICRO_BATTLES ? 42.0D : 80.0D);
+            border.setSize(59_999_968.0D);
         }
         border.setDamageAmount(0.0D);
         List<Location> spawns = spawnLocations(type, participants.size());
@@ -5609,7 +5613,7 @@ public final class ArcadePortManager implements Listener {
             player.closeInventory();
             player.leaveVehicle();
             player.teleport(spawn);
-            player.setGameMode(arcadePlayerGameMode(type));
+            player.setGameMode(arcadePlayerGameMode(session, player.getUniqueId()));
             player.setHealth(player.getMaxHealth());
             player.setFoodLevel(20);
             player.setSaturation(20.0F);
@@ -14237,7 +14241,9 @@ public final class ArcadePortManager implements Listener {
 
     private void updateSourceWaterDamage(Session session, long now) {
         SourceMapCatalog.MapData map = sourceMapData.get(session.type.id());
-        int damage = ArcadePortRules.sourceWorldWaterDamage(session.type, map == null ? "" : map.mapName());
+        int damage = ArcadePortRules.sourceWorldWaterDamage(session.type,
+                map == null ? "" : map.mapName(),
+                map != null && !map.customLocations("WATER_DAMAGE").isEmpty());
         if (damage <= 0) return;
 
         if (session.type == ArcadePortGame.DRAGONS) {
@@ -16970,7 +16976,7 @@ public final class ArcadePortManager implements Listener {
             player.sendActionBar(ChatColor.YELLOW + "Wait for your previous brick to disappear.");
             return;
         }
-        if (clicked == null || face == null || face == BlockFace.SELF) {
+        if (clicked == null || face == null || face == BlockFace.SELF || clicked.getType().isAir()) {
             player.sendActionBar(ChatColor.YELLOW + "Right-click a block face to place your brick.");
             return;
         }
@@ -17236,8 +17242,8 @@ public final class ArcadePortManager implements Listener {
         if (block.getY() < 1 || block.getY() >= session.world.getMaxHeight() - 1) return false;
         SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
         if (mapData != null && mapData.hasBounds()) {
-            return block.getX() >= mapData.minX() && block.getX() < mapData.maxX()
-                    && block.getZ() >= mapData.minZ() && block.getZ() < mapData.maxZ();
+            SourceMapCatalog.MapData.MapBounds bounds = mapData.boundsIncludingAuthoredLocations();
+            return bounds != null && bounds.contains(block.getX(), block.getZ());
         }
         return block.getX() >= -4 && block.getX() <= 4
                 && block.getZ() >= -24 && block.getZ() <= 80;
@@ -26403,6 +26409,19 @@ public final class ArcadePortManager implements Listener {
         return GameMode.SURVIVAL;
     }
 
+    private GameMode arcadePlayerGameMode(Session session, UUID playerId) {
+        if (session != null && session.type == ArcadePortGame.DRAGON_ESCAPE) {
+            String kit = session.dragonEscapeKits.getOrDefault(playerId,
+                    dragonEscapeKitPreferences.getOrDefault(playerId,
+                            plugin.getConfig().getString("lobby-kit-preferences." + playerId
+                                    + ".dragon-escape", "jumper")));
+            if ("builder".equalsIgnoreCase(kit) || "digger".equalsIgnoreCase(kit)) {
+                return GameMode.SURVIVAL;
+            }
+        }
+        return arcadePlayerGameMode(session == null ? null : session.type);
+    }
+
     private void checkPlayerArena(Session session, Player player) {
         if (!session.alive.contains(player.getUniqueId())) return;
         if (session.type == ArcadePortGame.DEATH_TAG
@@ -26440,11 +26459,14 @@ public final class ArcadePortManager implements Listener {
         } else {
             voidThresholdY = ArcadePortRules.sourceMapVoidThresholdY(false, 0);
         }
-        if (session.type == ArcadePortGame.DRAGON_ESCAPE && sourceMap != null
-                && sourceMap.hasBounds()
+        SourceMapCatalog.MapData.MapBounds dragonEscapeBounds =
+                session.type == ArcadePortGame.DRAGON_ESCAPE && sourceMap != null
+                        ? sourceMap.boundsIncludingAuthoredLocations() : null;
+        if (dragonEscapeBounds != null
                 && ArcadePortRules.isOutsideDragonEscapeMapBounds(
                         location.getX(), location.getY(), location.getZ(),
-                        sourceMap.minX(), sourceMap.maxX(), sourceMap.minZ(), sourceMap.maxZ(),
+                        dragonEscapeBounds.minX(), dragonEscapeBounds.maxX(),
+                        dragonEscapeBounds.minZ(), dragonEscapeBounds.maxZ(),
                         false, 0, 0)) {
             eliminate(session, player, null, "left the playable map area");
             return;
@@ -31393,6 +31415,25 @@ public final class ArcadePortManager implements Listener {
         if (session == null || event.getBlock().getWorld() != session.world) return;
         ItemStack heldItem = event.getPlayer().getInventory().getItemInMainHand();
         Material heldMaterial = heldItem == null ? Material.AIR : heldItem.getType();
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE
+                && session.alive.contains(event.getPlayer().getUniqueId())) {
+            Player breaker = event.getPlayer();
+            if ("builder".equals(session.dragonEscapeKits.getOrDefault(breaker.getUniqueId(), "jumper"))) {
+                DragonEscapeBuilderBrick brick =
+                        session.dragonEscapeBuilderBricks.get(breaker.getUniqueId());
+                if (brick != null && brick.original.getBlock().equals(event.getBlock())) {
+                    event.setCancelled(true);
+                    restoreDragonEscapeBuilderBrick(brick);
+                    session.dragonEscapeBuilderBricks.remove(breaker.getUniqueId());
+                    return;
+                }
+            }
+            // Only the kit's server-authoritative temporary abilities may change
+            // the course; ordinary breaking would permanently damage the map.
+            event.setCancelled(true);
+            return;
+        }
+
         if (session.type == ArcadePortGame.MICRO_BATTLES
                 && session.alive.contains(event.getPlayer().getUniqueId())
                 && "worker".equals(session.microKits.getOrDefault(event.getPlayer().getUniqueId(), "archer"))
@@ -34295,7 +34336,7 @@ public final class ArcadePortManager implements Listener {
                     if (active != session || !session.alive.contains(playerId)) return;
                     Player current = session.players.get(playerId);
                     if (current == null || !current.isOnline()) return;
-                    current.setGameMode(arcadePlayerGameMode(session.type));
+                    current.setGameMode(arcadePlayerGameMode(session, playerId));
                     if (session.type == ArcadePortGame.DEATH_TAG) {
                         boolean chaser = session.tagged.contains(playerId);
                         giveDeathTagKit(session, current, chaser,

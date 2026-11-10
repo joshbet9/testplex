@@ -3425,17 +3425,24 @@ public final class ArcadePortRules {
 
  
     /** Legacy Dragon Escape runs its Hell course at night; other courses keep the normal day start. */
-    /**
-     * Preserve the original per-game world-water damage settings. Dragon Escape
-     * only enables this penalty on its Pirate course.
-     */
+    /** Preserve original per-game water damage and Dragon Escape's map overrides. */
     public static int sourceWorldWaterDamage(ArcadePortGame game, String mapName) {
+        return sourceWorldWaterDamage(game, mapName, false);
+    }
+
+    /**
+     * Mineplex's shared WorldWaterDamage flag enables four-damage ticks when a
+     * WorldConfig contains WATER_DAMAGE; Pirate Bay overrides that value to two.
+     */
+    public static int sourceWorldWaterDamage(ArcadePortGame game, String mapName,
+            boolean hasWaterDamageMarker) {
         if (game == null) return 0;
         return switch (game) {
             case BOMB_LOBBERS -> 5;
             case DRAGONS, RUNNER, SPLEEF -> 4;
             case DRAGON_ESCAPE -> mapName != null
-                    && mapName.toLowerCase(java.util.Locale.ROOT).contains("pirate") ? 2 : 0;
+                    && mapName.toLowerCase(java.util.Locale.ROOT).contains("pirate") ? 2
+                    : hasWaterDamageMarker ? 4 : 0;
             default -> 0;
         };
     }

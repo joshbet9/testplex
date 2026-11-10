@@ -1874,6 +1874,36 @@ public final class SourceMapCatalog {
         public List<Location> customLocations(String name) {
             return copyLocations(customLocations.get(name == null ? "" : name.toUpperCase(java.util.Locale.ROOT)));
         }
+
+        /**
+         * Some legacy WorldConfig files put valid route markers just outside their
+         * declared rectangle. Include all authored locations when checking bounds.
+         */
+        public MapBounds boundsIncludingAuthoredLocations() {
+            if (!hasBounds()) return null;
+            int expandedMinX = minX;
+            int expandedMaxX = maxX;
+            int expandedMinZ = minZ;
+            int expandedMaxZ = maxZ;
+            for (Map<String, List<Location>> groups : List.of(teamSpawns, dataLocations, customLocations)) {
+                for (List<Location> locations : groups.values()) {
+                    for (Location location : locations) {
+                        if (location == null) continue;
+                        expandedMinX = Math.min(expandedMinX, location.getBlockX());
+                        expandedMaxX = Math.max(expandedMaxX, location.getBlockX());
+                        expandedMinZ = Math.min(expandedMinZ, location.getBlockZ());
+                        expandedMaxZ = Math.max(expandedMaxZ, location.getBlockZ());
+                    }
+                }
+            }
+            return new MapBounds(expandedMinX, expandedMaxX, expandedMinZ, expandedMaxZ);
+        }
+
+        public record MapBounds(int minX, int maxX, int minZ, int maxZ) {
+            public boolean contains(int x, int z) {
+                return x >= minX && x <= maxX && z >= minZ && z <= maxZ;
+            }
+        }
         /** All authored custom marker groups, copied so match runtimes cannot mutate map metadata. */
         public Map<String, List<Location>> customLocationGroups() {
             Map<String, List<Location>> copy = new LinkedHashMap<>();
