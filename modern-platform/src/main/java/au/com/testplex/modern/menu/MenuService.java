@@ -31,6 +31,8 @@ import java.util.UUID;
 /** Simple modern inventory UI. Game-specific renderers are registered alongside each port. */
 public final class MenuService implements Listener {
     private static final String PANEL_TITLE = "Game Panel";
+    private static final String DRAGON_PRACTICE_TITLE = "Dragon Escape Practice";
+    private static final String DRAGON_PRACTICE_KITS_TITLE = "Dragon Escape Practice Kits";
     private static final String SET_GAME_TITLE = "Set Game";
     private static final String GAME_OPTIONS_TITLE = "Game Options";
     private static final String REMOVE_PLAYER_TITLE = "Remove Player";
@@ -95,6 +97,62 @@ public final class MenuService implements Listener {
         panelButton(inventory, 26, Material.TNT, "Kill Private Server", "panel-kill-server");
         panelButton(inventory, 30, Material.BOOKSHELF, "Rotation Status", "panel-voting");
         panelButton(inventory, 32, Material.PAPER, "Whitelisted Players", "panel-whitelist");
+        panelButton(inventory, 28, Material.CLOCK, "Dragon Escape Practice", "panel-dragon-practice");
+        player.openInventory(inventory);
+    }
+
+    private void openDragonPracticePanel(Player player) {
+        if (!isAdmin(player)) return;
+        Inventory inventory = Bukkit.createInventory(null, 27, DRAGON_PRACTICE_TITLE);
+        JavaPlugin engine = arcadeMechanicsPlugin();
+        String map = engine == null ? "Arcade engine unavailable" : engine.getConfig()
+                .getString("selected-maps.dragon-escape", "Default rotation map");
+        boolean douglas = engine != null && engine.getConfig().getBoolean(
+                "dragon-escape-practice.douglas." + player.getUniqueId(), false);
+        ItemStack mapItem = makeItem(Material.FILLED_MAP, ChatColor.AQUA + "Choose Practice Map",
+                List.of(ChatColor.GRAY + "Selected: " + ChatColor.WHITE + map,
+                        ChatColor.YELLOW + "Click to choose an installed Dragon Escape map."));
+        mark(mapItem, "dragon-practice-map", null, null, null);
+        inventory.setItem(10, mapItem);
+        ItemStack kitItem = makeItem(Material.IRON_AXE, ChatColor.YELLOW + "Choose Practice Kit",
+                List.of(ChatColor.GRAY + "Choose one of the five Dragon Escape kits.",
+                        ChatColor.DARK_GRAY + "Achievement-kit unlocks still apply."));
+        mark(kitItem, "dragon-practice-kits", null, null, null);
+        inventory.setItem(12, kitItem);
+        ItemStack dragonItem = makeItem(Material.DRAGON_HEAD, ChatColor.LIGHT_PURPLE + "Douglas: "
+                + (douglas ? ChatColor.GREEN + "ON" : ChatColor.RED + "OFF"),
+                List.of(ChatColor.GRAY + "Click to toggle the chase and destruction.",
+                        ChatColor.DARK_GRAY + "Changing this in practice restarts the run."));
+        mark(dragonItem, "dragon-practice-douglas", null, null, null);
+        inventory.setItem(14, dragonItem);
+        ItemStack start = makeItem(Material.EMERALD_BLOCK, ChatColor.GREEN + "Start Solo Practice",
+                List.of(ChatColor.GRAY + "One racer. No XP, wins, PBs or achievements.",
+                        ChatColor.GRAY + "In-game: save checkpoint, respawn, instant restart."));
+        mark(start, "dragon-practice-start", null, null, null);
+        inventory.setItem(16, start);
+        ItemStack exit = makeItem(Material.BARRIER, ChatColor.RED + "End Practice",
+                List.of(ChatColor.GRAY + "Return to the lobby without saving stats."));
+        mark(exit, "dragon-practice-stop", null, null, null);
+        inventory.setItem(22, exit);
+        inventory.setItem(0, backItem("Go Back", "dragon-practice-back", null));
+        player.openInventory(inventory);
+    }
+
+    private void openDragonPracticeKits(Player player) {
+        Inventory inventory = Bukkit.createInventory(null, 27, DRAGON_PRACTICE_KITS_TITLE);
+        String[][] kits = {
+                {"jumper", "Jumper", "IRON_AXE"}, {"disruptor", "Disruptor", "TNT"},
+                {"builder", "Builder", "BRICKS"}, {"warper", "Warper", "ENDER_PEARL"},
+                {"digger", "Digger", "DIAMOND_PICKAXE"}
+        };
+        for (int i = 0; i < kits.length; i++) {
+            ItemStack kit = makeItem(Material.valueOf(kits[i][2]), ChatColor.YELLOW + kits[i][1],
+                    List.of(ChatColor.GRAY + "Select " + kits[i][1] + " for your practice run.",
+                            ChatColor.DARK_GRAY + "Achievement-kit unlock requirements still apply."));
+            mark(kit, "dragon-practice-select-kit", null, null, kits[i][0]);
+            inventory.setItem(11 + i, kit);
+        }
+        inventory.setItem(0, backItem("Go Back", "dragon-practice-kits-back", null));
         player.openInventory(inventory);
     }
 
@@ -653,6 +711,7 @@ public final class MenuService implements Listener {
         if (!(event.getWhoClicked() instanceof Player player)) return;
         String title = ChatColor.stripColor(event.getView().getTitle());
         if (title == null || !(title.equals(PANEL_TITLE) || title.equals(SET_GAME_TITLE)
+                || title.equals(DRAGON_PRACTICE_TITLE) || title.equals(DRAGON_PRACTICE_KITS_TITLE)
                 || title.equals("Edit Game Rotation") || title.equals(GAME_OPTIONS_TITLE)
                 || title.equals(REMOVE_PLAYER_TITLE) || title.equals(UNREMOVE_PLAYER_TITLE)
                 || title.equals(COHOST_ADD_TITLE) || title.equals(COHOST_REMOVE_TITLE)
@@ -670,6 +729,33 @@ public final class MenuService implements Listener {
         String lineId = meta.getPersistentDataContainer().get(lineKey, PersistentDataType.STRING);
         String optionId = meta.getPersistentDataContainer().get(optionKey, PersistentDataType.STRING);
         GameDefinition game = catalog.getGame(gameId);
+
+        if (DRAGON_PRACTICE_TITLE.equals(title) || DRAGON_PRACTICE_KITS_TITLE.equals(title)) {
+            if (!isAdmin(player)) return;
+            if ("dragon-practice-back".equals(action)) openGamePanel(player);
+            else if ("dragon-practice-kits-back".equals(action)) openDragonPracticePanel(player);
+            else if ("dragon-practice-map".equals(action)) {
+                player.closeInventory();
+                player.performCommand("arcadeport maps dragon-escape");
+            } else if ("dragon-practice-kits".equals(action)) openDragonPracticeKits(player);
+            else if ("dragon-practice-select-kit".equals(action) && optionId != null) {
+                player.performCommand("arcadeport kit " + optionId);
+                openDragonPracticePanel(player);
+            } else if ("dragon-practice-douglas".equals(action)) {
+                JavaPlugin engine = arcadeMechanicsPlugin();
+                boolean enabled = engine != null && engine.getConfig().getBoolean(
+                        "dragon-escape-practice.douglas." + player.getUniqueId(), false);
+                player.performCommand("arcadeport practice douglas " + (enabled ? "off" : "on"));
+                openDragonPracticePanel(player);
+            } else if ("dragon-practice-start".equals(action)) {
+                player.closeInventory();
+                player.performCommand("arcadeport practice start");
+            } else if ("dragon-practice-stop".equals(action)) {
+                player.closeInventory();
+                player.performCommand("arcadeport practice stop");
+            }
+            return;
+        }
 
         if (title.startsWith(OPTIONS_TITLE)) {
             if ("cosmetic-option-page".equals(action) && game != null && lineId != null && optionId != null) {
@@ -898,7 +984,10 @@ public final class MenuService implements Listener {
             return;
         }
         if (PANEL_TITLE.equals(title)) {
-            if ("panel-set-game".equals(action)) {
+            if ("panel-dragon-practice".equals(action)) {
+                if (isAdmin(player)) openDragonPracticePanel(player);
+                else player.sendMessage(ChatColor.RED + "Operator permission required for Practice Mode.");
+            } else if ("panel-set-game".equals(action)) {
                 if (isAdmin(player)) openGameSelection(player, false);
                 else player.sendMessage(ChatColor.RED + "Operator permission required to select the lobby game.");
             } else if ("panel-rotation".equals(action)) {

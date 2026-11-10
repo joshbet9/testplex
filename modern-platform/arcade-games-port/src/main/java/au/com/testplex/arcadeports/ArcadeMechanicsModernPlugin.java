@@ -734,6 +734,38 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 }
                 manager.setDragonEscapeGhost(player, args.length > 1 ? args[1] : "toggle");
                 return true;
+            case "practice":
+                if (!hasAdminAccess(sender)) {
+                    sender.sendMessage(ChatColor.RED + "Game Panel permission is required for solo practice.");
+                    return true;
+                }
+                if (!(sender instanceof Player practicePlayer)) {
+                    sender.sendMessage("Dragon Escape practice requires a player.");
+                    return true;
+                }
+                if (args.length < 2) {
+                    practicePlayer.sendMessage(ChatColor.YELLOW
+                            + "Usage: /arcadeport practice <start|restart|stop|douglas on|douglas off>");
+                    return true;
+                }
+                switch (args[1].toLowerCase(java.util.Locale.ROOT)) {
+                    case "start" -> manager.startDragonEscapePractice(practicePlayer);
+                    case "restart" -> manager.restartDragonEscapePractice(practicePlayer);
+                    case "stop" -> manager.stopDragonEscapePractice(practicePlayer);
+                    case "douglas" -> {
+                        if (args.length < 3 || !(args[2].equalsIgnoreCase("on")
+                                || args[2].equalsIgnoreCase("off"))) {
+                            practicePlayer.sendMessage(ChatColor.YELLOW
+                                    + "Usage: /arcadeport practice douglas <on|off>");
+                        } else {
+                            manager.setDragonEscapePracticeDouglas(practicePlayer,
+                                    args[2].equalsIgnoreCase("on"));
+                        }
+                    }
+                    default -> practicePlayer.sendMessage(ChatColor.YELLOW
+                            + "Usage: /arcadeport practice <start|restart|stop|douglas on|douglas off>");
+                }
+                return true;
             case "dragoncolor":
             case "dragoncolour":
                 if (!(sender instanceof Player player)) {
@@ -793,6 +825,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport kit <kit-id>" + ChatColor.GRAY + " — choose a game kit; Snap IDs: snap-smoke-artist, snap-decoy, snap-runner, snap-spotter, snap-understudy (legacy camera-shy-* aliases still work)");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport leave" + ChatColor.GRAY + " — leave the Snap queue");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport ghost <on|off|toggle>" + ChatColor.GRAY + " — show or hide your Dragon Escape PB ghost");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport practice start" + ChatColor.GRAY
+                        + " — solo Dragon Escape practice with checkpoints, no recorded progression");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport dragoncolor <colour>" + ChatColor.GRAY + " — set your Dragon Escape leader beacon colour");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport status" + ChatColor.GRAY + " — active game and queue counts");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport stop" + ChatColor.GRAY + " — operator reset");
