@@ -5268,6 +5268,34 @@ public final class ArcadePortRules {
         return Math.log10(Math.max(damage, 2.0D)) * (projectile ? 1.6D : 1.0D);
     }
 
+    /**
+     * Source Mineplex 1.8 DamageManager knockback for ordinary PvP hits.
+     * Direction is attacker-to-target for melee and projectile velocity for ranged hits.
+     */
+    public static Vector legacyPvpKnockback(double damage, boolean projectile, Vector direction,
+            boolean targetGrounded) {
+        if (!Double.isFinite(damage) || damage <= 0.0D || direction == null
+                || !Double.isFinite(direction.lengthSquared())) return null;
+        double strength = Math.log10(Math.max(damage, 2.0D));
+        Vector trajectory = direction.clone();
+        trajectory.setY(0.0D);
+        double horizontalLength = trajectory.length();
+        if (horizontalLength < 1.0E-6D) return null;
+        if (projectile) {
+            trajectory.multiply(0.37D * strength / horizontalLength);
+            trajectory.setY(0.06D);
+        } else {
+            trajectory.multiply(0.6D * strength);
+            trajectory.setY(Math.abs(0.2D * strength));
+        }
+        double velocity = 0.2D + trajectory.length() * 0.8D;
+        Vector applied = trajectory.normalize().multiply(velocity);
+        applied.setY(Math.min(0.4D + 0.04D * strength,
+                applied.getY() + Math.abs(0.2D * strength)));
+        if (targetGrounded) applied.setY(applied.getY() + 0.2D);
+        return applied;
+    }
+
 
 
     // Fletcher passive — source values for the two Heroes of Gwen Hunters.

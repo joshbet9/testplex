@@ -20392,7 +20392,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void applyGladiatorDamage(Session session, Player attacker, Player target,
-            double damage, boolean projectile) {
+            double damage, boolean projectile, Vector projectileVelocity) {
         if (active != session || attacker.equals(target) || !Double.isFinite(damage) || damage <= 0.0D) return;
         UUID attackerId = attacker.getUniqueId();
         UUID targetId = target.getUniqueId();
@@ -20437,18 +20437,37 @@ public final class ArcadePortManager implements Listener {
         }
         target.setHealth(target.getHealth() - damage);
         playLegacyDamageFeedback(target);
-        Vector push = target.getLocation().toVector().subtract(attacker.getLocation().toVector()).setY(0.0D);
-        if (push.lengthSquared() > 0.001D) {
-            target.setVelocity(target.getVelocity().add(push.normalize()
-                    .multiply(ArcadePortRules.gladiatorsKnockbackHorizontal(projectile))
-                    .setY(ArcadePortRules.gladiatorsKnockbackVertical(projectile))));
-        }
+        applyGladiatorsSourceKnockback(attacker, target, damage, projectile, projectileVelocity);
 
         Player creditedKiller = attacker == null ? recentMicroBattlesKiller(session, target.getUniqueId()) : attacker;
         target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
         target.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
                 target.getLocation().clone().add(0.0D, 1.0D, 0.0D), 5,
                 0.25D, 0.35D, 0.25D, 0.04D);
+    }
+
+    private void applyGladiatorsSourceKnockback(Player attacker, Player target, double damage,
+            boolean projectile, Vector projectileVelocity) {
+        Vector direction = projectile && projectileVelocity != null
+                ? projectileVelocity.clone()
+                : target.getLocation().toVector().subtract(attacker.getLocation().toVector());
+        Vector velocity = ArcadePortRules.legacyPvpKnockback(damage, projectile, direction, target.isOnGround());
+        if (velocity == null) return;
+        double horizontalDefault = projectile
+                ? ArcadePortRules.GLADIATOR_PROJECTILE_KNOCKBACK_HORIZONTAL
+                : ArcadePortRules.GLADIATOR_MELEE_KNOCKBACK_HORIZONTAL;
+        double verticalDefault = projectile
+                ? ArcadePortRules.GLADIATOR_PROJECTILE_KNOCKBACK_VERTICAL
+                : ArcadePortRules.GLADIATOR_MELEE_KNOCKBACK_VERTICAL;
+        double horizontalScale = horizontalDefault <= 0.0D ? 1.0D
+                : ArcadePortRules.gladiatorsKnockbackHorizontal(projectile) / horizontalDefault;
+        double verticalScale = verticalDefault <= 0.0D ? 1.0D
+                : ArcadePortRules.gladiatorsKnockbackVertical(projectile) / verticalDefault;
+        velocity.setX(velocity.getX() * horizontalScale);
+        velocity.setZ(velocity.getZ() * horizontalScale);
+        velocity.setY(velocity.getY() * verticalScale);
+        target.setFallDistance(0.0F);
+        target.setVelocity(velocity);
     }
 
     private void applyGladiatorEnvironmentalDamage(Session session, Player target, double damage, String reason) {
@@ -28217,7 +28236,8 @@ public final class ArcadePortManager implements Listener {
                     if (session.alive.contains(attacker.getUniqueId())
                             && session.alive.contains(gladiatorTarget.getUniqueId())) {
                         applyGladiatorDamage(session, attacker, gladiatorTarget,
-                                ArcadePortRules.gladiatorsPvpDamage(finalDamage), damager instanceof Projectile);
+                                ArcadePortRules.gladiatorsPvpDamage(finalDamage), damager instanceof Projectile,
+                                damager instanceof Projectile projectile ? projectile.getVelocity() : null);
                     }
                 } else {
                     applyGladiatorEnvironmentalDamage(session, gladiatorTarget, finalDamage, damageReason);
