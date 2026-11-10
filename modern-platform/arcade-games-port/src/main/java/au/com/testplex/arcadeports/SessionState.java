@@ -728,6 +728,7 @@ class SessionState {
     final Map<UUID, Double> dragonEscapePlayerRankScores = new HashMap<>();
     final Map<UUID, Double> dragonEscapeBlocksTravelled = new HashMap<>();
     final Set<UUID> dragonEscapeCompleted = new HashSet<>();
+    final Map<UUID, Long> dragonEscapeStoppedTimesMillis = new HashMap<>();
     Scoreboard dragonEscapeScoreboard;
     Objective dragonEscapeScoreboardObjective;
     final List<Team> dragonEscapeScoreboardTeams = new ArrayList<>();
