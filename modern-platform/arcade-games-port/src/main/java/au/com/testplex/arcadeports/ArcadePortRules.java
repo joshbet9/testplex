@@ -1368,8 +1368,8 @@ public final class ArcadePortRules {
     public static final long DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS = 8_000L;
     public static final int DRAGON_ESCAPE_BUILDER_MAX_BRICKS = 2;
     public static final long DRAGON_ESCAPE_BUILDER_RECHARGE_MILLIS = 8_000L;
-    public static final long DRAGON_ESCAPE_BUILDER_BLOCK_LIFETIME_MILLIS = 500L;
-    public static final long DRAGON_ESCAPE_BUILDER_MAX_PING_COMPENSATION_MILLIS = 250L;
+    public static final long DRAGON_ESCAPE_BUILDER_BLOCK_LIFETIME_MILLIS = 2_000L;
+    public static final long DRAGON_ESCAPE_BUILDER_MAX_PING_COMPENSATION_MILLIS = 3_000L;
     public static final long DRAGON_ESCAPE_LEAP_RECHARGE_MILLIS = 8_000L;
     public static final long DRAGON_ESCAPE_SCORE_UPDATE_MILLIS = 500L;
     public static final int DRAGON_ESCAPE_DISRUPTOR_ARM_TICKS = 40;
@@ -1383,12 +1383,14 @@ public final class ArcadePortRules {
     public static long dragonEscapeBuilderBlockLifetimeMillis(int pingMillis) {
         return DRAGON_ESCAPE_BUILDER_BLOCK_LIFETIME_MILLIS
                 + Math.min(DRAGON_ESCAPE_BUILDER_MAX_PING_COMPENSATION_MILLIS,
-                        Math.max(0, pingMillis) / 2L);
+                        Math.max(0, pingMillis));
     }
 
     public static boolean shouldRemoveDragonEscapeBuilderBrick(
             long now, long expiresAt, boolean hasBeenUsed, boolean stillStandingOnIt, boolean ownerAlive) {
-        return now >= expiresAt || !ownerAlive || (hasBeenUsed && !stillStandingOnIt);
+        if (!ownerAlive) return true;
+        if (hasBeenUsed) return !stillStandingOnIt;
+        return now >= expiresAt;
     }
 
     public static boolean shouldAllowDragonEscapeKitChange(boolean activeRaceParticipant) {
@@ -1414,6 +1416,18 @@ public final class ArcadePortRules {
         double y = Math.min(1.0D, normalizedFacingY + facingBonus);
         if (grounded) y += groundedBonus;
         return y;
+    }
+
+    /** Mirrors Mineplex UtilAction.velocity(entity, 1, 0.2, 1, true). */
+    public static Vector dragonEscapeLeapVelocity(Vector facing, boolean grounded) {
+        if (facing == null || !Double.isFinite(facing.getX())
+                || !Double.isFinite(facing.getY()) || !Double.isFinite(facing.getZ())
+                || facing.lengthSquared() == 0.0D) {
+            return new Vector();
+        }
+        Vector velocity = facing.clone().normalize();
+        velocity.setY(dragonEscapeLeapVerticalVelocity(velocity.getY(), grounded));
+        return velocity;
     }
 
     /** Initial rank uses the current closest waypoint; later observations never move backwards. */
