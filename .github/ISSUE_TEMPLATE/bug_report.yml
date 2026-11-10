@@ -9,7 +9,7 @@ body:
     attributes:
       value: |
         <!-- testplex-feedback:type=bug -->
-        Please do not include passwords, access tokens, private IP addresses, or personal information.
+        Your report is public. Do not include passwords, access tokens, private IP addresses, or personal information. Pick the closest game; the report will be linked under that game's tracker automatically. Submit one issue per independently actionable bug.
   - type: dropdown
     id: game
     attributes:

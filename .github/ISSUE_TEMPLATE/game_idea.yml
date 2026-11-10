@@ -9,7 +9,7 @@ body:
     attributes:
       value: |
         <!-- testplex-feedback:type=idea -->
-        Ideas and discussion are public. Do not include private account or server details.
+        Ideas and discussion are public. Do not include private account or server details. Pick the closest game; the idea will be linked under that game's tracker automatically. Submit one issue per independently actionable idea.
   - type: dropdown
     id: game
     attributes:

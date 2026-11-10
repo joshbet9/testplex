@@ -5,6 +5,7 @@ on:
     types: [opened, reopened]
 
 permissions:
+  contents: read
   issues: write
 
 jobs:
@@ -12,23 +13,40 @@ jobs:
     if: contains(github.event.issue.body, 'testplex-feedback:type=')
     runs-on: ubuntu-latest
     steps:
+      - name: Load game tracker directory
+        uses: actions/checkout@v4
       - name: Label and assign tester feedback
         uses: actions/github-script@v7
         with:
           script: |
             const body = context.payload.issue.body || "";
-            const kind = body.includes("testplex-feedback:type=bug") ? "bug" : "idea";
+            const marker = body.match(/<!--\s*testplex-feedback:type=(bug|idea)\s*-->/);
+            if (!marker) return;
+            const kind = marker[1];
+            const selectedGame = body.match(/^### Game\s*\r?\n+([^\r\n]+)/m)?.[1]?.trim();
+            const trackers = require(`${process.env.GITHUB_WORKSPACE}/docs/tester-feedback-trackers.json`);
+            const tracker = trackers.games[selectedGame] || trackers.games["Shared lobby or global"];
+            if (!tracker) throw new Error(`No feedback tracker is configured for '${selectedGame || "(missing game)"}'.`);
             const labels = [
               { name: "tester-feedback", color: "1d76db", description: "Feedback submitted from Testplex testers" },
               { name: `tester-${kind}`, color: kind === "bug" ? "d73a4a" : "a2eeef", description: `Testplex tester ${kind}` },
               { name: "needs-triage", color: "fbca04", description: "Needs reproduction and triage" },
+              { name: `game:${tracker.slug}`, color: "5319e7", description: `Testplex feedback for ${tracker.name}` },
+            ];
+            const trackerLabel = { name: "game-tracker", color: "5319e7", description: "Parent issue that groups feedback for a game" };
+            const lifecycleLabels = [
+              { name: "accepted", color: "0e8a16", description: "Confirmed bug or approved idea" },
+              { name: "in-progress", color: "1d76db", description: "Implementation is in progress" },
+              { name: "needs-tester-check", color: "fbca04", description: "Ready for reporter verification on staging" },
+              { name: "not-planned", color: "cfd3d7", description: "Reviewed and intentionally not planned" },
+              { name: "duplicate", color: "cfd3d7", description: "Covered by another report" },
             ];
             const existing = new Set((await github.paginate(github.rest.issues.listLabelsForRepo, {
               owner: context.repo.owner,
               repo: context.repo.repo,
               per_page: 100,
             })).map(label => label.name));
-            for (const label of labels) {
+            for (const label of [...labels, trackerLabel, ...lifecycleLabels]) {
               if (!existing.has(label.name)) {
                 await github.rest.issues.createLabel({
                   owner: context.repo.owner,
@@ -36,12 +54,14 @@ jobs:
                   ...label,
                 });
               }
-              await github.rest.issues.addLabels({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                labels: [label.name],
-              });
+              if (label.name !== "game-tracker" && !lifecycleLabels.some(status => status.name === label.name)) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  labels: [label.name],
+                });
+              }
             }
             await github.rest.issues.addAssignees({
               owner: context.repo.owner,
@@ -49,4 +69,40 @@ jobs:
               issue_number: context.issue.number,
               assignees: ["joshbet9"],
             });
-            core.notice(`Routed public Testplex ${kind} feedback to joshbet9 for triage.`);
+            const parent = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: tracker.issue_number,
+            });
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: tracker.issue_number,
+              labels: [`game:${tracker.slug}`, "game-tracker"],
+            });
+            const existingChildren = await github.request(
+              "GET /repos/{owner}/{repo}/issues/{issue_number}/sub_issues",
+              { owner: context.repo.owner, repo: context.repo.repo, issue_number: tracker.issue_number, per_page: 100 }
+            );
+            const childId = context.payload.issue.id;
+            if (!existingChildren.data.some(issue => issue.id === childId)) {
+              await github.request(
+                "POST /repos/{owner}/{repo}/issues/{issue_number}/sub_issues",
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: tracker.issue_number,
+                  sub_issue_id: childId,
+                  headers: { "X-GitHub-Api-Version": "2022-11-28" },
+                }
+              );
+            }
+            if (context.payload.action === "opened") {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: `Thanks — this ${kind} report is filed under [${tracker.name} #${tracker.issue_number}](${parent.data.html_url}) and assigned for triage. We’ll update this issue as it is reproduced and worked on.`,
+              });
+            }
+            core.notice(`Routed public Testplex ${kind} feedback for ${tracker.name} to its game tracker and joshbet9.`);
