@@ -18328,15 +18328,24 @@ public final class ArcadePortManager implements Listener {
     /** Keep racers in race order, followed by separate map and kit PB/WR rows. */
     private void updateDragonEscapeRaceScoreboard(Session session, long now) {
         if (session.type != ArcadePortGame.DRAGON_ESCAPE) return;
+        refreshDragonEscapeDisplayRankScores(session);
         List<Player> ranked = new ArrayList<>();
         for (Player player : session.players.values()) {
-            if (player != null && session.dragonEscapePlayerRankScores.containsKey(player.getUniqueId())) {
-                ranked.add(player);
-            }
+            if (player != null) ranked.add(player);
         }
-        ranked.sort((left, right) -> Double.compare(
-                session.dragonEscapePlayerRankScores.get(right.getUniqueId()),
-                session.dragonEscapePlayerRankScores.get(left.getUniqueId())));
+        if (session.dragonEscapeWaypoints.isEmpty()) {
+            ranked.sort((left, right) -> Double.compare(
+                    session.dragonEscapePlayerRankScores.getOrDefault(
+                            right.getUniqueId(), (double) right.getLocation().getBlockZ()),
+                    session.dragonEscapePlayerRankScores.getOrDefault(
+                            left.getUniqueId(), (double) left.getLocation().getBlockZ())));
+        } else {
+            ranked.sort((left, right) -> Double.compare(
+                    session.dragonEscapePlayerRankScores.getOrDefault(right.getUniqueId(),
+                            dragonEscapeFallbackRankScore(session, right)),
+                    session.dragonEscapePlayerRankScores.getOrDefault(left.getUniqueId(),
+                            dragonEscapeFallbackRankScore(session, left))));
+        }
         List<Player> liveOrder = dragonEscapeRaceOrder(session);
         Player liveLeader = liveOrder.isEmpty() ? null : liveOrder.get(0);
         long elapsed = Math.max(0L, now - session.startedAt);
@@ -18347,6 +18356,8 @@ public final class ArcadePortManager implements Listener {
             if (viewer == null || !viewer.isOnline()) continue;
             DragonEscapeRaceScoreboardView view = dragonEscapeRaceScoreboards.get(viewer.getUniqueId());
             if (view == null) continue;
+            // Reattach the match board if another plugin or reconnect replaced it.
+            if (viewer.getScoreboard() != view.scoreboard()) viewer.setScoreboard(view.scoreboard());
             // The client sidebar is limited to 15 rows. Four record rows leave 11
             // rows for racers; their vertical order carries rank without #1/#2 labels.
             for (int i = 0; i < DragonEscapeRaceScoreboardLayout.RACER_ROW_COUNT; i++) {
@@ -18432,6 +18443,26 @@ public final class ArcadePortManager implements Listener {
             }
             kitWrTeam.setSuffix(ChatColor.WHITE + kitWrSuffix);
             view.objective().getScore(kitWrEntry).setScore(1);
+        }
+    }
+
+    /** Recalculate display positions from current racer positions on each scoreboard refresh. */
+    private void refreshDragonEscapeDisplayRankScores(Session session) {
+        if (session.dragonEscapeWaypoints.isEmpty()) {
+            for (Player player : alivePlayers(session)) {
+                session.dragonEscapePlayerRankScores.put(
+                        player.getUniqueId(), (double) player.getLocation().getBlockZ());
+            }
+            return;
+        }
+        int lastIndex = session.dragonEscapeWaypoints.size() - 1;
+        for (Player player : alivePlayers(session)) {
+            UUID id = player.getUniqueId();
+            int progress = session.dragonEscapePlayerProgress.getOrDefault(id, 0);
+            Location next = session.dragonEscapeWaypoints.get(Math.min(lastIndex,
+                    Math.max(0, progress + 1)));
+            session.dragonEscapePlayerRankScores.put(id, ArcadePortRules.dragonEscapeRankScore(
+                    progress, player.getLocation().distance(next)));
         }
     }
 
