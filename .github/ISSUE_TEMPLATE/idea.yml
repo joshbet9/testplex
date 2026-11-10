@@ -8,13 +8,13 @@ body:
   - type: markdown
     attributes:
       value: |
-        <!-- testplex-feedback:type=idea -->
         Ideas and discussion are public. Do not include private account or server details.
   - type: dropdown
     id: game
     attributes:
       label: Game
       options:
+        - Skip / not sure
         - Bacon Brawl
         - Bomb Lobbers
         - Castle Assault
@@ -49,26 +49,26 @@ body:
         - Wizards
         - Shared lobby or global
     validations:
-      required: true
+      required: false
   - type: input
     id: summary
     attributes:
       label: Short idea
     validations:
-      required: true
+      required: false
   - type: textarea
     id: player_problem
     attributes:
       label: What player problem or opportunity does this address?
     validations:
-      required: true
+      required: false
   - type: textarea
     id: proposal
     attributes:
       label: How should it work?
       description: Describe the player-visible behavior and any useful edge cases.
     validations:
-      required: true
+      required: false
   - type: textarea
     id: parity
     attributes:
