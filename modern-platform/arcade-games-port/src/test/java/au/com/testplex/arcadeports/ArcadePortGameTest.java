@@ -2950,8 +2950,8 @@ class ArcadePortGameTest {
     @Test void legacyPvpKnockbackMatchesSourceDamageManagerForMeleeAndProjectiles() {
         Vector melee = ArcadePortRules.legacyPvpKnockback(6.0D, false, new Vector(0.0D, 0.0D, 1.0D), true);
         assertEquals(0.0D, melee.getX(), 0.00001D);
-        assertEquals(0.54338D, melee.getY(), 0.00001D);
-        assertEquals(0.56325D, melee.getZ(), 0.00001D);
+        assertEquals(0.35563D, melee.getY(), 0.00001D);
+        assertEquals(0.57351D, melee.getZ(), 0.00001D);
 
         Vector projectile = ArcadePortRules.legacyPvpKnockback(6.0D, true, new Vector(0.0D, 0.2D, 1.0D), true);
         assertEquals(0.0D, projectile.getX(), 0.00001D);
