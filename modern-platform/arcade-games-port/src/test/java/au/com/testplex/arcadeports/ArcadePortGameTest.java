@@ -1896,6 +1896,10 @@ class ArcadePortGameTest {
         assertEquals("0:00.000", ArcadePortRules.formatDragonEscapeTime(0L));
         assertEquals("1:02.345", ArcadePortRules.formatDragonEscapeTime(62_345L));
         assertEquals("--:--.---", ArcadePortRules.formatDragonEscapeTime(-1L));
+        assertEquals("+0.1s", ArcadePortRules.formatDragonEscapeRaceGap(1L));
+        assertEquals("+0.5s", ArcadePortRules.formatDragonEscapeRaceGap(450L));
+        assertEquals("+1.0s", ArcadePortRules.formatDragonEscapeRaceGap(1_000L));
+        assertEquals("+1:02.4", ArcadePortRules.formatDragonEscapeRaceGap(62_345L));
         assertEquals("+0:03.100", ArcadePortRules.formatDragonEscapeDelta(3_100L));
         assertEquals("-0:01.250", ArcadePortRules.formatDragonEscapeDelta(-1_250L));
         assertEquals("0:00.000", ArcadePortRules.formatDragonEscapeDelta(0L));

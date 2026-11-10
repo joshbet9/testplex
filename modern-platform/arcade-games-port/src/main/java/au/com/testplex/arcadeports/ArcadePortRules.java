@@ -3531,6 +3531,16 @@ public final class ArcadePortRules {
         return Math.max(0L, Math.round(distanceGap / estimatedSpeed * 1_000.0D));
     }
 
+    /** Compact live race gap; sub-minute gaps stay readable to a tenth of a second. */
+    public static String formatDragonEscapeRaceGap(long millis) {
+        long tenths = Math.max(0L, (millis + 99L) / 100L);
+        long minutes = tenths / 600L;
+        long seconds = tenths / 10L % 60L;
+        long tenth = tenths % 10L;
+        if (minutes == 0L) return String.format(java.util.Locale.ROOT, "+%d.%ds", seconds, tenth);
+        return String.format(java.util.Locale.ROOT, "+%d:%02d.%d", minutes, seconds, tenth);
+    }
+
     public static int monotonicDragonEscapeProgress(int previous, int candidate, int waypointCount) {
         if (waypointCount <= 0) return -1;
         return Math.min(waypointCount - 1, Math.max(0, Math.max(previous, candidate)));

