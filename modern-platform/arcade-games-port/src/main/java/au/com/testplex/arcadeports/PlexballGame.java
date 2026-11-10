@@ -1844,7 +1844,7 @@ public final class PlexballGame implements Listener {
     }
 
     private void teleportToBatter(Player player) {
-        player.teleport(new Location(arena, 0.5D, FLOOR_Y + 1.0D, 4.5D, 180.0F, 7.0F));
+        teleportToArena(player, new Location(arena, 0.5D, FLOOR_Y + 1.0D, 4.5D, 180.0F, 7.0F));
     }
 
     private void teleportToField(Player player, int playerIndex) {
@@ -1854,7 +1854,20 @@ public final class PlexballGame implements Listener {
         double z = -22.0D - row * 22.0D;
         double lane = (column - 1.5D) * 0.45D;
         double x = lane * PlexballRules.fieldHalfWidthAtZ(z);
-        player.teleport(new Location(arena, x + 0.5D, FLOOR_Y + 1.0D, z + 0.5D, 0.0F, 0.0F));
+        teleportToArena(player,
+                new Location(arena, x + 0.5D, FLOOR_Y + 1.0D, z + 0.5D, 0.0F, 0.0F));
+    }
+
+    private void teleportToArena(Player player, Location destination) {
+        if (player == null || !player.isOnline() || arena == null
+                || destination.getWorld() != arena) {
+            throw new IllegalStateException("Plexball could not resolve a valid player arena destination.");
+        }
+        arena.getChunkAt(destination).load();
+        boolean teleported = player.teleport(destination);
+        if (!teleported || player.getWorld() != arena) {
+            throw new IllegalStateException("Plexball arena teleport was cancelled for " + player.getName() + ".");
+        }
     }
 
     private void createTeeBall() {
