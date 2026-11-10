@@ -5285,8 +5285,8 @@ public final class ArcadePortRules {
             trajectory.multiply(0.37D * strength / horizontalLength);
             trajectory.setY(0.06D);
         } else {
-            trajectory.multiply(0.6D * strength);
-            trajectory.setY(Math.abs(0.2D * strength));
+            trajectory.normalize().multiply(0.6D * strength);
+            trajectory.setY(Math.abs(trajectory.getY()));
         }
         double velocity = 0.2D + trajectory.length() * 0.8D;
         Vector applied = trajectory.normalize().multiply(velocity);
