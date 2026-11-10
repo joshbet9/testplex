@@ -149,6 +149,7 @@ import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.player.PlayerToggleFlightEvent;
 import org.bukkit.event.player.PlayerToggleSneakEvent;
 import org.bukkit.event.player.PlayerToggleSprintEvent;
+import org.bukkit.event.player.PlayerVelocityEvent;
 import org.bukkit.event.player.PlayerUnleashEntityEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
@@ -392,6 +393,7 @@ public final class ArcadePortManager implements Listener {
     private final Map<String, List<DragonEscapeDynamicPbTime.Point>> dragonEscapePbTrackCache = new HashMap<>();
     private final Map<String, DragonEscapeTimeRecord> dragonEscapeWorldRecordCache = new HashMap<>();
     private final Map<UUID, DragonEscapeRaceScoreboardView> dragonEscapeRaceScoreboards = new HashMap<>();
+    private final Map<UUID, Vector> pendingDragonEscapeLeapVelocity = new HashMap<>();
     private Session active;
     /** Prevent a standalone in-process test module from overlapping the shared Arcade session. */
     private boolean standaloneGameActive;
@@ -16781,14 +16783,26 @@ public final class ArcadePortManager implements Listener {
                         session.dragonEscapeKits.getOrDefault(id, "jumper"))))));
         setDragonEscapeLeapItem(player, remaining, ArcadePortRules.dragonEscapeLeapUses(
                 session.dragonEscapeKits.getOrDefault(id, "jumper")));
-        Vector direction = player.getLocation().getDirection().normalize().multiply(1.0D);
-        direction.setY(ArcadePortRules.dragonEscapeLeapVerticalVelocity(
-                direction.getY(), player.isOnGround()));
-        player.setVelocity(direction);
+        Vector velocity = ArcadePortRules.dragonEscapeLeapVelocity(
+                player.getLocation().getDirection(), player.isOnGround());
+        pendingDragonEscapeLeapVelocity.put(id, velocity);
+        player.setVelocity(velocity.clone());
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (pendingDragonEscapeLeapVelocity.get(id) == velocity) {
+                pendingDragonEscapeLeapVelocity.remove(id);
+            }
+        }, 2L);
         player.setFallDistance(0.0F);
-        player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation(), 16,
-                0.35D, 0.3D, 0.35D, 0.05D);
-        player.playSound(player.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 0.7F, 1.15F);
+        // Reborn's PerkLeap plays the original Blaze Shoot effect and then the
+        // player's equipped game leap cosmetic; avoid substituting modern rocket FX.
+        player.playEffect(player.getLocation(), Effect.BLAZE_SHOOT, 8);
+    }
+
+    /** Preserve the requested launch vector until Paper emits the outbound velocity event. */
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onDragonEscapeLeapVelocity(PlayerVelocityEvent event) {
+        Vector requested = pendingDragonEscapeLeapVelocity.remove(event.getPlayer().getUniqueId());
+        if (requested != null) event.setVelocity(requested.clone());
     }
 
     private void useDragonEscapeWarper(Session session, Player player) {
@@ -16982,6 +16996,11 @@ public final class ArcadePortManager implements Listener {
         BlockState previous = target.getState();
         target.setType(Material.BRICKS, false);
         consumeHeld(player);
+        // The interaction is deliberately cancelled so Adventure-mode clients do not
+        // rely on vanilla placement permission prediction. Confirm both server block
+        // state and inventory immediately to the placing client (including high ping).
+        player.sendBlockChange(target.getLocation(), target.getBlockData());
+        player.updateInventory();
         long expiresAt = System.currentTimeMillis()
                 + ArcadePortRules.dragonEscapeBuilderBlockLifetimeMillis(player.getPing());
         session.dragonEscapeBuilderBricks.put(id, new DragonEscapeBuilderBrick(previous, expiresAt));
@@ -17031,7 +17050,9 @@ public final class ArcadePortManager implements Listener {
     private void restoreDragonEscapeBuilderBrick(DragonEscapeBuilderBrick brick) {
         Block block = brick.original.getBlock();
         if (block.getWorld().isChunkLoaded(block.getX() >> 4, block.getZ() >> 4)
-                && block.getType() == Material.BRICKS) brick.original.update(true, false);
+                && block.getType() == Material.BRICKS) {
+            brick.original.update(true, false);
+        }
     }
 
     private void updateDragonEscapeSafeLocations(Session session) {
@@ -18307,15 +18328,24 @@ public final class ArcadePortManager implements Listener {
     /** Keep racers in race order, followed by separate map and kit PB/WR rows. */
     private void updateDragonEscapeRaceScoreboard(Session session, long now) {
         if (session.type != ArcadePortGame.DRAGON_ESCAPE) return;
+        refreshDragonEscapeDisplayRankScores(session);
         List<Player> ranked = new ArrayList<>();
         for (Player player : session.players.values()) {
-            if (player != null && session.dragonEscapePlayerRankScores.containsKey(player.getUniqueId())) {
-                ranked.add(player);
-            }
+            if (player != null) ranked.add(player);
         }
-        ranked.sort((left, right) -> Double.compare(
-                session.dragonEscapePlayerRankScores.get(right.getUniqueId()),
-                session.dragonEscapePlayerRankScores.get(left.getUniqueId())));
+        if (session.dragonEscapeWaypoints.isEmpty()) {
+            ranked.sort((left, right) -> Double.compare(
+                    session.dragonEscapePlayerRankScores.getOrDefault(
+                            right.getUniqueId(), (double) right.getLocation().getBlockZ()),
+                    session.dragonEscapePlayerRankScores.getOrDefault(
+                            left.getUniqueId(), (double) left.getLocation().getBlockZ())));
+        } else {
+            ranked.sort((left, right) -> Double.compare(
+                    session.dragonEscapePlayerRankScores.getOrDefault(right.getUniqueId(),
+                            dragonEscapeFallbackRankScore(session, right)),
+                    session.dragonEscapePlayerRankScores.getOrDefault(left.getUniqueId(),
+                            dragonEscapeFallbackRankScore(session, left))));
+        }
         List<Player> liveOrder = dragonEscapeRaceOrder(session);
         Player liveLeader = liveOrder.isEmpty() ? null : liveOrder.get(0);
         long elapsed = Math.max(0L, now - session.startedAt);
@@ -18326,6 +18356,8 @@ public final class ArcadePortManager implements Listener {
             if (viewer == null || !viewer.isOnline()) continue;
             DragonEscapeRaceScoreboardView view = dragonEscapeRaceScoreboards.get(viewer.getUniqueId());
             if (view == null) continue;
+            // Reattach the match board if another plugin or reconnect replaced it.
+            if (viewer.getScoreboard() != view.scoreboard()) viewer.setScoreboard(view.scoreboard());
             // The client sidebar is limited to 15 rows. Four record rows leave 11
             // rows for racers; their vertical order carries rank without #1/#2 labels.
             for (int i = 0; i < DragonEscapeRaceScoreboardLayout.RACER_ROW_COUNT; i++) {
@@ -18411,6 +18443,26 @@ public final class ArcadePortManager implements Listener {
             }
             kitWrTeam.setSuffix(ChatColor.WHITE + kitWrSuffix);
             view.objective().getScore(kitWrEntry).setScore(1);
+        }
+    }
+
+    /** Recalculate display positions from current racer positions on each scoreboard refresh. */
+    private void refreshDragonEscapeDisplayRankScores(Session session) {
+        if (session.dragonEscapeWaypoints.isEmpty()) {
+            for (Player player : alivePlayers(session)) {
+                session.dragonEscapePlayerRankScores.put(
+                        player.getUniqueId(), (double) player.getLocation().getBlockZ());
+            }
+            return;
+        }
+        int lastIndex = session.dragonEscapeWaypoints.size() - 1;
+        for (Player player : alivePlayers(session)) {
+            UUID id = player.getUniqueId();
+            int progress = session.dragonEscapePlayerProgress.getOrDefault(id, 0);
+            Location next = session.dragonEscapeWaypoints.get(Math.min(lastIndex,
+                    Math.max(0, progress + 1)));
+            session.dragonEscapePlayerRankScores.put(id, ArcadePortRules.dragonEscapeRankScore(
+                    progress, player.getLocation().distance(next)));
         }
     }
 
