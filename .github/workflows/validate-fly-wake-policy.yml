@@ -1,0 +1,33 @@
+name: Validate Fly tester wake policy
+
+on:
+  pull_request:
+    paths:
+      - "deploy/fly/fly.toml.example"
+      - "docs/fly-tester-release.md"
+      - ".github/workflows/validate-fly-wake-policy.yml"
+  push:
+    branches: [stable]
+    paths:
+      - "deploy/fly/fly.toml.example"
+      - "docs/fly-tester-release.md"
+      - ".github/workflows/validate-fly-wake-policy.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  wake-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert raw TCP traffic cannot wake Fly
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Eq '^  auto_start_machines = false$' deploy/fly/fly.toml.example
+          grep -Eq '^  auto_stop_machines = "stop"$' deploy/fly/fly.toml.example
+          grep -Eq '^  min_machines_running = 0$' deploy/fly/fly.toml.example
+          grep -q 'disables proxy autostart' docs/fly-tester-release.md
+          grep -q 'explicitly starts the Machine through Fly' docs/fly-tester-release.md
+          ! grep -Eq '^  auto_start_machines = true$' deploy/fly/fly.toml.example
