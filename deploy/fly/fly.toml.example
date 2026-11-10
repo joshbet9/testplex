@@ -1,4 +1,6 @@
 # Unapproved template: preflight only; no deployment workflow consumes this file.
+# Proxy autostart is intentionally disabled: only the authenticated Oracle wake gateway
+# may start this Machine after validating a real Minecraft login.
 # The selected tester policy is ephemeral storage: world/player/stat data resets
 # when the Machine is replaced or redeployed. Do not add a volume without review.
 # Reuse an existing app only after confirming its current cost and a rollback path.
@@ -12,7 +14,7 @@ kill_timeout = "60s"
   protocol = "tcp"
   internal_port = 25568
   auto_stop_machines = "stop"
-  auto_start_machines = true
+  auto_start_machines = false
   min_machines_running = 0
 
   [[services.ports]]

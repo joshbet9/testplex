@@ -29,17 +29,21 @@ Actions artifact; it must not rebuild plugin JARs during promotion.
   and its app-bound dedicated IP can avoid a second $2/month IP charge, but it
   does **not** remove compute charges while Testplex is running. Verify the
   account's current bill and machine rootfs size before promotion.
-- The candidate service template enables Fly Proxy autostart and autostop
-  with zero minimum running Machines. Autostop only stops existing Machines;
-  keep one `mm21` Machine provisioned in the app so a later player connection
-  can start it. This can reduce compute charges between sessions; the
-  provisioned Machine still incurs stopped-rootfs storage charges. Confirm
-  through an external client that a connection starts it, reaches Paper after
-  boot, and that an idle server stops cleanly. This is not yet runtime-verified
-  for Minecraft raw TCP.
+- The candidate service template keeps Fly Proxy autostop enabled with
+  zero minimum running Machines, but **disables proxy autostart**. A raw TCP
+  connection or status ping to Fly's public address must never start Testplex.
+  The Oracle wake gateway is the only wake path: it validates a Minecraft
+  login username and UUID, then explicitly starts the Machine through Fly's
+  Machines API. Once the machine is running, the gateway tells the player to
+  connect to the direct Fly service. Keep one `mm21` Machine provisioned;
+  autostop can stop it between sessions without removing its configuration.
+  The stopped Machine still incurs root-filesystem storage charges. Verify
+  that status pings leave it stopped and an authorized gateway login starts it.
 
 The app cost comparison and current machine/image state still need to be
-rechecked immediately before promotion. This PR makes no Fly API changes.
+rechecked immediately before promotion. The live Machine's per-machine
+`autostart` setting must also remain false; a future `fly deploy` must not
+restore proxy autostart from stale release metadata. This PR makes no Fly API changes.
 
 ## Implemented now
 
