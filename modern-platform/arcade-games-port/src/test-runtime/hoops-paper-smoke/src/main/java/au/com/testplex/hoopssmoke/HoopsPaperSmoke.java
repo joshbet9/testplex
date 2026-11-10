@@ -63,6 +63,7 @@ public final class HoopsPaperSmoke extends JavaPlugin {
     private Object secondMatch;
     private UUID firstDisplayId;
     private UUID secondDisplayId;
+    private int injectedOwnerPointsBaseline;
     private UUID firstPasserId;
     private UUID passPasserId;
     private UUID passReceiverId;
@@ -484,6 +485,7 @@ public final class HoopsPaperSmoke extends JavaPlugin {
             long firstPointsTier = ((long[]) method(pointsMilestone.getClass(), "stages")
                     .invoke(pointsMilestone))[0];
             arcadePlugin.getConfig().set(prefix + "points", firstPointsTier);
+            injectedOwnerPointsBaseline = Math.toIntExact(firstPointsTier);
             require(unlockChatCount() == 1, "midgame milestone tier did not announce in chat");
             require(unlockChatCount() == 0, "midgame notifications repeated without new progress");
             midgameUnlockChatChecked = true;
@@ -842,8 +844,11 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         String shooterPath = "local-stats." + shooterId + ".hoops-remastered.";
         require(((JavaPlugin) arcade).getConfig().getInt(passerPath + "assists", 0) == 1,
                 "lifetime assist was not persisted");
-        require(((JavaPlugin) arcade).getConfig().getInt(shooterPath + "points", 0) == 2,
-                "lifetime points were not persisted");
+        int expectedShooterPoints = 2 + (shooterId.equals(owner.getUniqueId())
+                ? injectedOwnerPointsBaseline : 0);
+        require(((JavaPlugin) arcade).getConfig().getInt(shooterPath + "points", 0) == expectedShooterPoints,
+                "lifetime points were not persisted: expected=" + expectedShooterPoints
+                        + ", actual=" + ((JavaPlugin) arcade).getConfig().getInt(shooterPath + "points", 0));
         require(scores[winningTeam] >= 21, "final score did not reach 21");
     }
 
