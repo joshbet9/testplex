@@ -21,7 +21,14 @@ final class DragonEscapeRaceScoreboardLayout {
     }
 
     static String racerTime(String value, RacerStatus status) {
-        return color(status).toString() + strikethrough(status) + " " + value + ChatColor.RESET;
+        return racerTime(value, status, false);
+    }
+
+    static String racerTime(String value, RacerStatus status, boolean firstPlace) {
+        if (status == RacerStatus.ELIMINATED) return "";
+        ChatColor timeColor = status == RacerStatus.RUNNING
+                ? firstPlace ? ChatColor.GREEN : ChatColor.RED : color(status);
+        return timeColor.toString() + " " + value + ChatColor.RESET;
     }
 
     private static String strikethrough(RacerStatus status) {

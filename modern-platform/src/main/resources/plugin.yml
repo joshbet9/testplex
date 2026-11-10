@@ -26,3 +26,6 @@ permissions:
   testplex.modern.admin:
     description: Access modern Arcade test harness commands.
     default: op
+  testplex.arcade.tester:
+    description: Access the Game Panel, Arcade debug controls and test bots without operator status.
+    default: false

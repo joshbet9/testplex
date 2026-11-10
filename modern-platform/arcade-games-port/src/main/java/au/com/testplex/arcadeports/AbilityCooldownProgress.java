@@ -83,14 +83,17 @@ public final class AbilityCooldownProgress implements Listener {
                 player.sendActionBar(ChatColor.GREEN + ChatColor.BOLD.toString() + cooldown.name + " Recharged");
                 return true;
             }
-            long remaining = Math.max(1L, (cooldown.durationMillis - elapsed + 999L) / 1_000L);
+            long remainingMillis = Math.max(1L, cooldown.durationMillis - elapsed);
+            long remainingTenths = (remainingMillis + 99L) / 100L;
             int filled = (int) Math.floor(progress * BAR_SEGMENTS);
             StringBuilder display = new StringBuilder(ChatColor.GOLD + ChatColor.BOLD.toString()
                     + cooldown.name + ChatColor.RESET + " ");
             for (int segment = 0; segment < BAR_SEGMENTS; segment++) {
                 display.append(segment < filled ? ChatColor.GREEN : ChatColor.RED).append('\u258c');
             }
-            display.append(ChatColor.RESET).append(' ').append(remaining).append('s');
+            display.append(ChatColor.RESET).append(' ')
+                    .append(remainingTenths / 10L).append('.')
+                    .append(remainingTenths % 10L).append(" seconds");
             player.sendActionBar(display.toString());
             return false;
         });

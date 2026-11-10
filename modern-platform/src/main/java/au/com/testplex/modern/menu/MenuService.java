@@ -1200,7 +1200,8 @@ public final class MenuService implements Listener {
         }
         return configuredAdmin || isCohost(player) || player.isOp()
                 || player.hasPermission("testplex.modern.admin")
-                || player.hasPermission("testplex.arcadeports.admin");
+                || player.hasPermission("testplex.arcadeports.admin")
+                || player.hasPermission("testplex.arcade.tester");
     }
 
     private CosmeticLineDefinition findLine(GameDefinition game, String id) {

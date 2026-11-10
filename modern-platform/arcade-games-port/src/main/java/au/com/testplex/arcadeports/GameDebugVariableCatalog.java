@@ -616,7 +616,7 @@ final class GameDebugVariableCatalog {
         if (name.startsWith("DRAGON_ESCAPE_") && name.endsWith("_LEAP_USES")) return 0.0D;
         if (name.startsWith("DRAGON_ESCAPE_LEAP_") && name.endsWith("_Y_BONUS")) return 0.0D;
         if (name.startsWith("DRAGONS_FLIGHT_") && name.endsWith("_VERTICAL_SPEED")) return -1.0D;
-        if (name.equals("DRAGONS_FLIGHT_VERTICAL_BIAS") || name.equals("DRAGONS_TURN_RATE")) return 0.0D;
+        if (name.equals("DRAGONS_FLIGHT_VERTICAL_BIAS")) return 0.0D;
         if (name.equals("DRAGONS_GLIDER_MIN_VERTICAL")) return -1.0D;
         if (name.startsWith("DRAGONS_") && (name.endsWith("_SPEED") || name.endsWith("_KNOCKBACK")
                 || name.endsWith("_SPREAD") || name.endsWith("_BONUS") || name.endsWith("_FACTOR")
@@ -1049,7 +1049,6 @@ final class GameDebugVariableCatalog {
         if (name.equals("DRAGONS_TAMER_LOOKAHEAD_BLOCKS") || name.equals("DRAGONS_SPARKLER_MIN_ATTRACT_Y")
                 || name.equals("DRAGONS_RETARGET_ALTITUDE_Y")) return 128.0D;
         if (name.equals("DRAGONS_RETARGET_DISTANCE_SQUARED")) return 4_096.0D;
-        if (name.equals("DRAGONS_TURN_RATE")) return 1.0D;
         if (name.startsWith("DRAGONS_FLIGHT_") && name.endsWith("_VERTICAL_SPEED")) return 1.0D;
         if (name.equals("DRAGONS_FLIGHT_VERTICAL_BIAS")) return 1.0D;
         if (name.equals("DRAGONS_TAMER_VERTICAL_FLIGHT_CAP")) return 8.0D;

@@ -68,7 +68,8 @@ public final class TestplexModernArcade extends JavaPlugin implements Listener {
             menus.openSetGamePage(player);
         });
         bind("arcadetest", "Inspect modern port readiness.", (sender) -> {
-            if (!sender.hasPermission("testplex.modern.admin")) {
+            if (!sender.hasPermission("testplex.modern.admin")
+                    && !sender.hasPermission("testplex.arcade.tester")) {
                 sender.sendMessage(ChatColor.RED + "You do not have permission to use this command.");
                 return;
             }

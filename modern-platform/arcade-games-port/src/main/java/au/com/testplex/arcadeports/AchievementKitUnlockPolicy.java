@@ -32,6 +32,15 @@ final class AchievementKitUnlockPolicy {
         }
     }
 
+    static boolean unlocked(Rule rule, Predicate<String> hasAchievement, boolean debugUnlockAll) {
+        return rule != null && (debugUnlockAll || rule.unlocked(hasAchievement));
+    }
+
+    static boolean unlocked(Rule rule, Predicate<String> hasAchievement,
+                            boolean playerDebugUnlockAll, boolean sessionDebugUnlockAll) {
+        return unlocked(rule, hasAchievement, playerDebugUnlockAll || sessionDebugUnlockAll);
+    }
+
     private static final Map<String, Rule> RULES = createRules();
 
     private AchievementKitUnlockPolicy() { }

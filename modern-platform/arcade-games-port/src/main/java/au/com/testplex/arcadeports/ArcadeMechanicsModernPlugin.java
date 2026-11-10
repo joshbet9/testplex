@@ -420,7 +420,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
 
     /** Shared admin check for the Game Panel, Arcade commands and embedded game settings. */
     public boolean hasAdminAccess(CommandSender sender) {
-        if (sender.isOp() || sender.hasPermission("testplex.arcadeports.admin")) return true;
+        if (sender.isOp() || sender.hasPermission("testplex.arcadeports.admin")
+                || sender.hasPermission("testplex.arcade.tester")) return true;
         if (!(sender instanceof Player player)) return false;
         if (mineplexCoreRankBridge != null
                 && mineplexCoreRankBridge.hasAdminAccess(player).orElse(false)) return true;

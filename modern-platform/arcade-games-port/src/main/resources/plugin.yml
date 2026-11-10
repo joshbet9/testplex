@@ -34,6 +34,9 @@ permissions:
   testplex.arcadeports.admin:
     description: Allows stopping and resetting an Arcade prototype
     default: op
+  testplex.arcade.tester:
+    description: Access the Arcade Game Panel, debug controls and test bots without operator status.
+    default: false
   testplex.rank.owner:
     description: Displays the Testplex Owner rank in the Arcade tab list.
     default: false

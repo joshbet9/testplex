@@ -262,6 +262,14 @@ public boolean startTestplexRound(List<Player> participants, ArcadeSessionContex
 
 public boolean isTestplexManagedRound() { return testplexManagedRound; }
 
+/** Permit the single arena handoff while Testplex is generating a managed maze. */
+public boolean allowsTestplexStartupTeleport(Player player, Location destination) {
+    return testplexManagedRound && state == GameState.STARTING
+            && player != null && roundParticipants.contains(player.getUniqueId())
+            && center != null && destination != null
+            && isInArenaWorld(center.getWorld(), destination.getWorld());
+}
+
 public void startGame() {
     startGame(null, -1);
 }
@@ -359,7 +367,13 @@ public void startGame(Location preferCenter, int requestedPattern) {
                     }
                     if (testplexManagedRound) {
                         p.closeInventory();
-                        p.teleport(center.clone().add(0.5D, 1.0D, 0.5D));
+                        Location spawn = center.clone().add(0.5D, 1.0D, 0.5D);
+                        if (!p.teleport(spawn) || !isInArenaWorld(center.getWorld(), p.getWorld())) {
+                            plugin.getLogger().warning("Monster Maze could not place registered participant "
+                                    + p.getName() + " into the generated arena; excluding them from this round.");
+                            roundParticipants.remove(playerId);
+                            continue;
+                        }
                     }
                     if (!isInArenaWorld(center == null ? null : center.getWorld(), p.getWorld())) {
                         roundParticipants.remove(playerId);
@@ -367,7 +381,13 @@ public void startGame(Location preferCenter, int requestedPattern) {
                     }
                     alive.add(playerId);
                     preparePlayer(p);
-                    p.teleport(center.clone().add(0.5, 1, 0.5));
+                    if (!p.teleport(center.clone().add(0.5D, 1.0D, 0.5D))
+                            || !isInArenaWorld(center.getWorld(), p.getWorld())) {
+                        alive.remove(playerId);
+                        roundParticipants.remove(playerId);
+                        plugin.getLogger().warning("Monster Maze lost participant " + p.getName()
+                                + " during final spawn placement; excluding them from this round.");
+                    }
                 }
 
                 // Selected kits were chosen in Testplex's shared Arcade lobby.

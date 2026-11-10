@@ -1305,10 +1305,16 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         if (event.getHand() != null && event.getHand() != org.bukkit.inventory.EquipmentSlot.HAND) return;
         Player player = event.getPlayer();
         WizardState state = states.get(player.getUniqueId());
-        if (!running || state == null || !state.alive) return;
+        if (state == null || !state.alive) return;
 
         Action action = event.getAction();
         ItemStack item = event.getItem();
+        if (!running && (action == Action.RIGHT_CLICK_AIR || action == Action.RIGHT_CLICK_BLOCK)
+                && equipArmorFromHand(player, item)) {
+            event.setCancelled(true);
+            return;
+        }
+        if (!running) return;
         if (action == Action.RIGHT_CLICK_AIR || action == Action.RIGHT_CLICK_BLOCK) {
             EquipmentSlot armorSlot = armorSlot(item == null ? null : item.getType());
             if (armorSlot != null) {
@@ -1390,6 +1396,39 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
                 event.setCancelled(false);
             }
         }
+        if (event.getClickedInventory() == player.getInventory()) event.setCancelled(false);
+    }
+
+    private boolean equipArmorFromHand(Player player, ItemStack item) {
+        if (player == null || item == null || item.getType().isAir()) return false;
+        org.bukkit.inventory.EquipmentSlot slot = switch (item.getType()) {
+            case LEATHER_HELMET, CHAINMAIL_HELMET, IRON_HELMET, GOLDEN_HELMET, DIAMOND_HELMET,
+                    TURTLE_HELMET, NETHERITE_HELMET -> org.bukkit.inventory.EquipmentSlot.HEAD;
+            case LEATHER_CHESTPLATE, CHAINMAIL_CHESTPLATE, IRON_CHESTPLATE, GOLDEN_CHESTPLATE,
+                    DIAMOND_CHESTPLATE, NETHERITE_CHESTPLATE -> org.bukkit.inventory.EquipmentSlot.CHEST;
+            case LEATHER_LEGGINGS, CHAINMAIL_LEGGINGS, IRON_LEGGINGS, GOLDEN_LEGGINGS,
+                    DIAMOND_LEGGINGS, NETHERITE_LEGGINGS -> org.bukkit.inventory.EquipmentSlot.LEGS;
+            case LEATHER_BOOTS, CHAINMAIL_BOOTS, IRON_BOOTS, GOLDEN_BOOTS, DIAMOND_BOOTS,
+                    NETHERITE_BOOTS -> org.bukkit.inventory.EquipmentSlot.FEET;
+            default -> null;
+        };
+        if (slot == null) return false;
+        org.bukkit.inventory.EntityEquipment equipment = player.getEquipment();
+        ItemStack old = equipment.getItem(slot);
+        if (old != null && !old.getType().isAir()
+                && player.getInventory().firstEmpty() == -1 && item.getAmount() == 1) return false;
+        ItemStack equipped = item.clone();
+        equipped.setAmount(1);
+        equipment.setItem(slot, equipped);
+        ItemStack hand = player.getInventory().getItemInMainHand();
+        if (hand.getAmount() <= 1) player.getInventory().setItemInMainHand(null);
+        else {
+            hand.setAmount(hand.getAmount() - 1);
+            player.getInventory().setItemInMainHand(hand);
+        }
+        if (old != null && !old.getType().isAir()) player.getInventory().addItem(old);
+        player.playSound(player.getLocation(), Sound.ITEM_ARMOR_EQUIP_IRON, 0.8F, 1.0F);
+        return true;
     }
 
     @EventHandler
@@ -1447,10 +1486,11 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         state.mana = WizardsRules.addMana(state.mana, amount, state.maximumMana);
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onHeldSlotChange(PlayerItemHeldEvent event) {
         WizardState state = states.get(event.getPlayer().getUniqueId());
         if (state == null || !state.alive) return;
+        event.setCancelled(false);
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (event.getPlayer().isOnline()) updateWandLabels(event.getPlayer(), state);
         });

@@ -413,9 +413,7 @@ public final class PlexballGame implements Listener {
             List<String> lore = new ArrayList<>();
             lore.add(ChatColor.GRAY + describeKit(kit));
             lore.add(ChatColor.GRAY + "Ability: " + ChatColor.AQUA + kit.abilityName());
-            boolean skyguardUnlocked = kit != Kit.SKYGUARD || AchievementKitUnlockPolicy
-                    .find(ArcadePortGame.PLEXBALL, "skyguard")
-                    .unlocked(id -> hasAchievement(player.getUniqueId(), id));
+            boolean skyguardUnlocked = kit != Kit.SKYGUARD || skyguardUnlocked(player.getUniqueId());
             if (kit == Kit.SKYGUARD) {
                 lore.add(ChatColor.GOLD + "Achievement Kit");
                 lore.add(ChatColor.GRAY + "Requires Sticky Gloves and Sweet Spot.");
@@ -480,8 +478,7 @@ public final class PlexballGame implements Listener {
         Kit kit = Kit.fromId(id);
         if (kit == null) return false;
         if (kit == Kit.SKYGUARD) {
-            AchievementKitUnlockPolicy.Rule rule = AchievementKitUnlockPolicy.find(ArcadePortGame.PLEXBALL, "skyguard");
-            if (rule == null || !rule.unlocked(achievement -> hasAchievement(player.getUniqueId(), achievement))) {
+            if (!skyguardUnlocked(player.getUniqueId())) {
                 player.sendMessage(ChatColor.RED + "Skyguard is locked. Earn Sticky Gloves and Sweet Spot first.");
                 return false;
             }
@@ -511,8 +508,12 @@ public final class PlexballGame implements Listener {
     private Kit playableKit(UUID playerId) {
         Kit saved = selectedKits.getOrDefault(playerId, Kit.TECHNICIAN);
         if (saved != Kit.SKYGUARD) return saved;
-        AchievementKitUnlockPolicy.Rule rule = AchievementKitUnlockPolicy.find(ArcadePortGame.PLEXBALL, "skyguard");
-        return rule != null && rule.unlocked(id -> hasAchievement(playerId, id)) ? saved : Kit.TECHNICIAN;
+        return skyguardUnlocked(playerId) ? saved : Kit.TECHNICIAN;
+    }
+
+    private boolean skyguardUnlocked(UUID playerId) {
+        ArcadePortManager manager = plugin.getArcadePortManager();
+        return manager != null && manager.hasAchievementKitUnlocked(playerId, ArcadePortGame.PLEXBALL, "skyguard");
     }
 
     /** Arena creation is invoked by ArcadePortManager before it creates the global Session. */

@@ -8,6 +8,24 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 class AchievementKitUnlockPolicyTest {
+    @Test void debugUnlockAllBypassesOnlyKnownAchievementRequirements() {
+        AchievementKitUnlockPolicy.Rule skyguard = AchievementKitUnlockPolicy.find(
+                ArcadePortGame.PLEXBALL, "skyguard");
+
+        assertFalse(AchievementKitUnlockPolicy.unlocked(skyguard, id -> false, false));
+        assertTrue(AchievementKitUnlockPolicy.unlocked(skyguard, id -> false, true));
+        assertFalse(AchievementKitUnlockPolicy.unlocked(null, id -> true, true));
+    }
+
+    @Test void activeDebugRoundUnlockAppliesToConfiguredRosterWithoutUnlockingUnknownKits() {
+        AchievementKitUnlockPolicy.Rule skyguard = AchievementKitUnlockPolicy.find(
+                ArcadePortGame.PLEXBALL, "skyguard");
+
+        assertTrue(AchievementKitUnlockPolicy.unlocked(skyguard, id -> false, false, true));
+        assertFalse(AchievementKitUnlockPolicy.unlocked(skyguard, id -> false, false, false));
+        assertFalse(AchievementKitUnlockPolicy.unlocked(null, id -> true, false, true));
+    }
+
     @Test void everyReviewedAchievementKitHasStableEarnableRequirements() {
         assertEquals(24, AchievementKitUnlockPolicy.all().size());
         for (AchievementKitUnlockPolicy.Rule rule : AchievementKitUnlockPolicy.all()) {

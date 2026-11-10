@@ -750,8 +750,10 @@ public final class ArcadePortRules {
     }
 
     public static boolean isBaconTimedCritical(long intervalMillis, double knockbackMultiplier) {
-        return intervalMillis >= baconTimingWindowMillis(GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_GOOD_MIN_MILLIS", BACON_TIMED_HIT_GOOD_MIN_MILLIS), knockbackMultiplier)
-                && intervalMillis <= baconTimingWindowMillis(GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_GOOD_MAX_MILLIS", BACON_TIMED_HIT_GOOD_MAX_MILLIS), knockbackMultiplier);
+        long criticalDelay = baconTimingWindowMillis(
+                GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_GOOD_MIN_MILLIS", BACON_TIMED_HIT_GOOD_MIN_MILLIS),
+                knockbackMultiplier);
+        return intervalMillis >= criticalDelay;
     }
 
     public static boolean isBaconTimedCritical(long intervalMillis) {
@@ -1156,7 +1158,6 @@ public final class ArcadePortRules {
     public static final boolean DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED = true;
     public static final double DRAGONS_AUTONOMOUS_FLIGHT_SPEED = 0.32D;
     public static final double DRAGONS_TAMER_FLIGHT_SPEED = 0.42D;
-    public static final double DRAGONS_TURN_RATE = 0.12D;
     /** UpdateType.SEC_05: Reborn adds one dragon every five seconds. */
     public static final long DRAGONS_SPAWN_INTERVAL_MILLIS = 5_000L;
     /** UpdateType.FASTEST is the source dragon-target/contact update cadence. */
@@ -1590,17 +1591,6 @@ public final class ArcadePortRules {
         if (grounded) velocity.setY(velocity.getY() + GameDebugRuntimeOverrides.doubleValue(
                 "DRAGONS_CONTACT_GROUNDED_Y_BONUS", DRAGONS_CONTACT_GROUNDED_Y_BONUS));
         return velocity;
-    }
-
-    public static Vector turnDragonHeading(Vector heading, Vector targetDirection, double turnRate) {
-        Vector result = heading == null ? new Vector() : heading.clone();
-        if (targetDirection != null && targetDirection.lengthSquared() > 1.0E-6D) {
-            Vector desired = targetDirection.clone().normalize();
-            double boundedTurnRate = Math.max(0.0D, Math.min(1.0D, turnRate));
-            result.add(desired.subtract(result.clone()).multiply(boundedTurnRate));
-        }
-        if (result.lengthSquared() < 1.0E-6D) return new Vector(0.0D, 0.0D, 1.0D);
-        return result.normalize();
     }
 
     public static Vector autonomousDragonFlight(Vector heading, double speed) {
@@ -3539,6 +3529,16 @@ public final class ArcadePortRules {
                 || !Double.isFinite(estimatedSpeed) || estimatedSpeed <= 0.0D) return 0L;
         double distanceGap = Math.max(0.0D, leaderCourseDistance - racerCourseDistance);
         return Math.max(0L, Math.round(distanceGap / estimatedSpeed * 1_000.0D));
+    }
+
+    /** Compact live race gap; sub-minute gaps stay readable to a tenth of a second. */
+    public static String formatDragonEscapeRaceGap(long millis) {
+        long tenths = Math.max(0L, (millis + 99L) / 100L);
+        long minutes = tenths / 600L;
+        long seconds = tenths / 10L % 60L;
+        long tenth = tenths % 10L;
+        if (minutes == 0L) return String.format(java.util.Locale.ROOT, "+%d.%ds", seconds, tenth);
+        return String.format(java.util.Locale.ROOT, "+%d:%02d.%d", minutes, seconds, tenth);
     }
 
     public static int monotonicDragonEscapeProgress(int previous, int candidate, int waypointCount) {
