@@ -548,12 +548,18 @@ public void startGame(Location preferCenter, int requestedPattern) {
         mazeGenerator.cleanup();
         scoreboard.clear(arenaPlayers);
 
+        // Always unwind Monster Maze-only attributes and effects. Arcade-managed
+        // sessions still delegate inventory, location and presentation restoration
+        // to the shared lifecycle, but the module owns its jump lock cleanup.
+        for (Player p : arenaPlayers) {
+            kitManager.resetPlayerState(p);
+        }
+
         if (!testplexManagedRound) {
             for (Player p : arenaPlayers) {
                 p.setExp(0); p.setLevel(0);
                 p.getInventory().clear();
                 p.getInventory().setArmorContents(null);
-                kitManager.resetPlayerState(p);
                 p.setGameMode(GameMode.SURVIVAL);
                 p.setCollidable(false);
 

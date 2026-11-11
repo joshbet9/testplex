@@ -773,23 +773,16 @@ public final class ArcadePortManager implements Listener {
         return monsterMazeRunning();
     }
 
-    public void restoreMonsterMazeKitPreference(Player player) {
-        if (player == null || monsterMazeModule == null || monsterMazeModule.getGameManager() == null) return;
+    private void loadMonsterMazeKitPreference(Player player, ArcadePortGame game) {
+        if (player == null || game == null || !game.isMonsterMaze()
+                || monsterMazeModule == null || monsterMazeModule.getGameManager() == null) return;
         String selected = plugin.getConfig().getString(
                 "lobby-kit-preferences." + player.getUniqueId() + ".monster-maze", "jumper");
         me.monstermaze.kit.KitType kit = me.monstermaze.kit.KitType.byName(selected);
-        if (kit == null) return;
-        ArcadePortGame lobbyGame = ArcadePortGame.fromId(
-                plugin.getConfig().getString("lobby-selected-game", "death-tag"));
-        me.monstermaze.game.MazeMode mode = lobbyGame == ArcadePortGame.MONSTER_MAZE_SPEED
-                ? me.monstermaze.game.MazeMode.SPEED
-                : lobbyGame == ArcadePortGame.MONSTER_MAZE_MODERN
-                        ? me.monstermaze.game.MazeMode.MODERN : me.monstermaze.game.MazeMode.ORIGINAL;
-        // Restoring a saved QOL-only kit in the Original lobby mode invokes the old
-        // standalone rejection message on every login. Keep the preference saved and
-        // let the integrated game use its normal Jumper fallback until a QOL mode is selected.
-        if (kit.qolOnly() && !mode.qolEnabled()) return;
-        monsterMazeModule.getGameManager().getKitManager().setKit(player, kit);
+        if (kit == null) kit = me.monstermaze.kit.KitType.JUMPER;
+        me.monstermaze.game.MazeMode mode = mazeModeFor(game);
+        if (kit.qolOnly() && !mode.qolEnabled()) kit = me.monstermaze.kit.KitType.JUMPER;
+        monsterMazeModule.getGameManager().getKitManager().restoreSelection(player, kit);
     }
 
     private boolean monsterMazeRunning() {
@@ -4158,6 +4151,7 @@ public final class ArcadePortManager implements Listener {
         try {
             for (Player player : participants) {
                 if (player == null || !player.isOnline()) continue;
+                loadMonsterMazeKitPreference(player, type);
                 UUID id = player.getUniqueId();
                 PlayerSnapshot pending = pendingRestore.remove(id);
                 if (pending != null) pending.restore(player);
