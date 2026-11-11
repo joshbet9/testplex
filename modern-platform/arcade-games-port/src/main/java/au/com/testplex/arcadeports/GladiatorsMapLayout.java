@@ -30,8 +30,8 @@ final class GladiatorsMapLayout {
         while (arenas.size() < 15) {
             PairChoice choice = nearestSeparatedPair(remaining, arenas, 18.0D);
             if (choice == null) return Map.of();
-            Location first = remaining.remove(choice.firstIndex());
             Location second = remaining.remove(choice.secondIndex());
+            Location first = remaining.remove(choice.firstIndex());
             Location center = first.clone().add(second.toVector().subtract(first.toVector()).multiply(0.5D));
             arenas.add(new ArenaSpawns(center, first, second));
         }
