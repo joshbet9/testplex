@@ -292,6 +292,11 @@ public final class PlexballGame implements Listener {
         return phase != Phase.IDLE;
     }
 
+    String selectedKitId(UUID playerId) {
+        Kit kit = playerId == null ? null : selectedKits.get(playerId);
+        return kit == null ? Kit.TECHNICIAN.id() : kit.id();
+    }
+
     public String status() {
         if (phase == Phase.IDLE) return "idle";
         return phase.name().toLowerCase(java.util.Locale.ROOT)

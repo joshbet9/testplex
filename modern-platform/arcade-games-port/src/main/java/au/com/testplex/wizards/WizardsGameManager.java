@@ -449,6 +449,10 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         start(plugin.getServer().getConsoleSender());
     }
 
+    public WizardsKit selectedKit(UUID playerId) {
+        return selectedKits.getOrDefault(playerId, defaultKit());
+    }
+
     public void setKit(Player player, WizardsKit kit) {
         if (running) {
             player.sendMessage(ChatColor.RED + "Kits cannot be changed after the round starts.");

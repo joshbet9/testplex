@@ -1,0 +1,59 @@
+FROM eclipse-temurin:25-jre-noble
+
+ARG PAPER_VERSION=26.3
+ARG FPP_VERSION=2.1.7
+ARG SOURCE_SHA=unknown
+LABEL org.opencontainers.image.revision="${SOURCE_SHA}"
+RUN mkdir -p /opt/testplex && printf '%s\n' "${SOURCE_SHA}" > /opt/testplex/source-build.txt
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl jq unzip gosu tar \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 10001 minecraft \
+    && useradd --uid 10001 --gid 10001 --home-dir /home/minecraft --create-home --shell /usr/sbin/nologin minecraft
+
+WORKDIR /opt/testplex
+
+# Resolve the latest stable Paper build for the pinned Minecraft/Paper line and
+# verify it against PaperMC's published SHA-256 before putting it in the image.
+RUN set -eu; \
+    metadata="$(curl --fail --silent --show-error --retry 3 \
+      --user-agent 'TestplexModern/26.3' \
+      "https://fill.papermc.io/v3/projects/paper/versions/${PAPER_VERSION}/builds")"; \
+    build="$(printf '%s' "$metadata" | jq -er 'first(.[] | select(.channel == "STABLE") | .id)')"; \
+    url="$(printf '%s' "$metadata" | jq -er 'first(.[] | select(.channel == "STABLE") | .downloads."server:default".url)')"; \
+    checksum="$(printf '%s' "$metadata" | jq -er 'first(.[] | select(.channel == "STABLE") | .downloads."server:default".checksums.sha256)')"; \
+    curl --fail --location --silent --show-error --retry 3 "$url" -o /opt/testplex/paper.jar; \
+    printf '%s  %s\n' "$checksum" /opt/testplex/paper.jar | sha256sum --check --status; \
+    printf '%s\n' "$build" > /opt/testplex/paper-build.txt
+
+RUN set -eu; \
+    curl --fail --location --silent --show-error --retry 3 \
+      "https://hangarcdn.papermc.io/plugins/Janky-Development/FakePlayerPlugin/versions/${FPP_VERSION}/PAPER/fake-player-plugin-${FPP_VERSION}.jar" \
+      -o /opt/testplex/fake-player-plugin.jar; \
+    unzip -tq /opt/testplex/fake-player-plugin.jar >/dev/null; \
+    descriptor="$(unzip -p /opt/testplex/fake-player-plugin.jar plugin.yml)"; \
+    name="$(printf '%s\n' "$descriptor" | awk -F': *' '$1 == "name" { gsub(/["\047\r]/, "", $2); print $2; exit }')"; \
+    version="$(printf '%s\n' "$descriptor" | awk -F': *' '$1 == "version" { gsub(/["\047\r]/, "", $2); print $2; exit }')"; \
+    main="$(printf '%s\n' "$descriptor" | awk -F': *' '$1 == "main" { gsub(/["\047\r]/, "", $2); print $2; exit }')"; \
+    test "$name" = "FakePlayerPlugin"; \
+    test "$version" = "$FPP_VERSION"; \
+    test "$main" = "me.bill.fakePlayerPlugin.FakePlayerPlugin"
+
+COPY deploy/fly/packetevents-spigot-2.14.0.jar /opt/testplex/packetevents.jar
+
+# This vendored artifact's SHA-512 was verified against the pinned 2.14.0
+# release before deployment. The builder's unzip implementation returns a
+# nonzero status for this valid jar, so do not use unzip -t as an integrity gate.
+
+COPY modern-platform/target/TestplexModernArcade.jar /opt/testplex/plugins/TestplexModernArcade.jar
+COPY modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar /opt/testplex/plugins/ArcadeMechanicsModern.jar
+COPY deploy/fly/WizardsSourceMaps.tar.gz /opt/testplex/WizardsSourceMaps.tar.gz
+COPY deploy/fly/entrypoint.sh /usr/local/bin/testplex-entrypoint
+RUN chmod 0755 /usr/local/bin/testplex-entrypoint
+
+ENV TESTPLEX_PORT=25566 \
+    TESTPLEX_DATA_ROOT=/server \
+    JAVA_TOOL_OPTIONS="-XX:+UseG1GC -XX:+ExitOnOutOfMemoryError -Dfile.encoding=UTF-8"
+
+EXPOSE 25566/tcp
+ENTRYPOINT ["/usr/local/bin/testplex-entrypoint"]

@@ -100,6 +100,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         getCommand("stats").setExecutor(this);
         getCommand("arcadeport").setExecutor(this);
         getCommand("gamepreferences").setExecutor(this);
+        getCommand("kit").setExecutor(this);
         getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=commands-and-menus-registered");
 
         // ArcadePortManager registers and initializes manager-owned game modules through
@@ -551,6 +552,14 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 return true;
             }
             preferenceMenu.open(player);
+            return true;
+        }
+        if (command.getName().equalsIgnoreCase("kit")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("Players only.");
+                return true;
+            }
+            manager.openKitCommand(player);
             return true;
         }
         String sub = args.length == 0 ? "help" : args[0].toLowerCase(java.util.Locale.ROOT);

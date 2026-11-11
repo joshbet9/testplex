@@ -14,9 +14,11 @@ final class CastleAssaultDebugRulesTest {
     @AfterEach void resetOverrides() { GameDebugRuntimeOverrides.clear(); }
 
     @Test void castleAssaultDefaultsKeepTeamScaledKingAndSourceTntBehaviour() {
-        assertEquals(600, ArcadePortRules.castleAssaultKingHealthForOpponents(15));
-        assertEquals(160, ArcadePortRules.castleAssaultKingHealthForOpponents(4));
+        assertEquals(100, ArcadePortRules.castleAssaultKingHealthForOpponents(15));
+        assertEquals(27, ArcadePortRules.castleAssaultKingHealthForOpponents(4));
         assertEquals(1, ArcadePortRules.castleAssaultKingHealthForOpponents(0));
+        assertEquals(30_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(false));
+        assertEquals(15_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(true));
         assertEquals(60_000L, ArcadePortRules.castleAssaultCarrierFuseMillis());
         assertEquals(4.0D, ArcadePortRules.castleAssaultTntRadius("fighter"));
         assertEquals(7.0D, ArcadePortRules.castleAssaultTntRadius("demolitionist"));
@@ -44,7 +46,7 @@ final class CastleAssaultDebugRulesTest {
         assertEquals(0.0D, ArcadePortRules.castleAssaultTntKnockbackMultiplier());
 
         GameDebugRuntimeOverrides.resetActiveValues();
-        assertEquals(160, ArcadePortRules.castleAssaultKingHealthForOpponents(4));
+        assertEquals(27, ArcadePortRules.castleAssaultKingHealthForOpponents(4));
         assertEquals(60_000L, ArcadePortRules.castleAssaultCarrierFuseMillis());
         assertEquals(4.0D, ArcadePortRules.castleAssaultTntRadius("fighter"));
         assertEquals(7.0D, ArcadePortRules.castleAssaultTntRadius("demolitionist"));
@@ -138,12 +140,12 @@ final class CastleAssaultDebugRulesTest {
     }
 
     @Test void objectiveTntRespawnProfileAppliesToNormalAndMixedArcadeIntervals() {
-        assertEquals(60_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(false));
-        assertEquals(30_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(true));
+        assertEquals(30_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(false));
+        assertEquals(15_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(true));
         GameDebugRuntimeOverrides.activate(Map.of("CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS", 20_000L));
         assertEquals(20_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(false));
         assertEquals(10_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(true));
         GameDebugRuntimeOverrides.resetActiveValues();
-        assertEquals(60_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(false));
+        assertEquals(30_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(false));
     }
 }

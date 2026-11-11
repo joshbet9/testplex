@@ -18,6 +18,9 @@ commands:
     description: Rate Arcade games and view their weighted rotation likelihood.
     usage: /gamepreferences
     aliases: [gameprefs]
+  kit:
+    description: Show your current Arcade kit and open the kit selector.
+    usage: /kit
   arcadeport:
     description: Start and test a modern Arcade game
     usage: /arcadeport <play|join|leave|spectate|start|kit|stats|ghost|maps|lobby|bot|debug|preview|status|stop>

@@ -82,6 +82,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
+import org.bukkit.scoreboard.Team;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 
@@ -312,6 +313,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private boolean listenersRegistered;
     private Scoreboard castleScoreboard;
     private Objective castleScoreboardObjective;
+    private Team castleRedTeam;
+    private Team castleBlueTeam;
 
     CastleAssaultHeroesOfGwenRuntime(
             ArcadeMechanicsModernPlugin plugin,
@@ -438,6 +441,17 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             castleChests.add(block);
             fillCastleChest(block);
         }
+        // Some authored maps use placed chests rather than BROWN marker blocks.
+        // Discover them once at match setup so those source loot containers are usable too.
+        for (org.bukkit.Chunk chunk : world.getLoadedChunks()) {
+            for (org.bukkit.block.BlockState state : chunk.getTileEntities()) {
+                if (!(state instanceof Chest)) continue;
+                Block chestBlock = state.getBlock();
+                if (castleChests.contains(chestBlock)) continue;
+                castleChests.add(chestBlock);
+                fillCastleChest(chestBlock);
+            }
+        }
         return true;
     }
 
@@ -447,6 +461,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         king.setSilent(true);
         king.setInvulnerable(false);
         king.setRemoveWhenFarAway(false);
+        king.setMaximumNoDamageTicks(0);
+        king.setNoDamageTicks(0);
         king.getEquipment().setHelmet(castleArmour(Material.DIAMOND_HELMET, null, 0));
         king.getEquipment().setChestplate(castleArmour(Material.DIAMOND_CHESTPLATE, null, 0));
         king.getEquipment().setLeggings(castleArmour(Material.DIAMOND_LEGGINGS, null, 0));
@@ -458,6 +474,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         king.getEquipment().setLeggingsDropChance(0.0F);
         king.getEquipment().setBootsDropChance(0.0F);
         int kingHealth = castleKingHealthForOpponents(team);
+        if (king.getAttribute(Attribute.MAX_HEALTH) != null) {
+            king.getAttribute(Attribute.MAX_HEALTH).setBaseValue(kingHealth);
+            king.setHealth(kingHealth);
+        }
         king.setCustomName(teamColour(team) + name + ChatColor.RED + " ❤ " + kingHealth);
         king.setCustomNameVisible(true);
         king.getPersistentDataContainer().set(kingKey, PersistentDataType.INTEGER, team);
@@ -1951,14 +1971,34 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         castleScoreboardObjective = castleScoreboard.registerNewObjective("castleassault", "dummy",
                 ChatColor.DARK_RED + "Castle Assault");
         castleScoreboardObjective.setDisplaySlot(DisplaySlot.SIDEBAR);
+        if (game == ArcadePortGame.CASTLE_ASSAULT) {
+            castleRedTeam = castleScoreboard.registerNewTeam("castle_red");
+            castleRedTeam.setColor(ChatColor.RED);
+            castleBlueTeam = castleScoreboard.registerNewTeam("castle_blue");
+            castleBlueTeam.setColor(ChatColor.AQUA);
+            updateCastleScoreboardTeams();
+        }
         for (Player player : players.values()) {
             if (player != null && player.isOnline()) player.setScoreboard(castleScoreboard);
+        }
+    }
+
+    private void updateCastleScoreboardTeams() {
+        if (game != ArcadePortGame.CASTLE_ASSAULT || castleRedTeam == null || castleBlueTeam == null) return;
+        for (String entry : new ArrayList<>(castleRedTeam.getEntries())) castleRedTeam.removeEntry(entry);
+        for (String entry : new ArrayList<>(castleBlueTeam.getEntries())) castleBlueTeam.removeEntry(entry);
+        for (Player player : players.values()) {
+            if (player == null || !player.isOnline()) continue;
+            int team = teams.getOrDefault(player.getUniqueId(), -1);
+            if (team == 0) castleRedTeam.addEntry(player.getName());
+            else if (team == 1) castleBlueTeam.addEntry(player.getName());
         }
     }
 
     private void updateCastleScoreboard(long now) {
         nextCastleScoreboardAt = now + 1_000L;
         if (castleScoreboard == null || castleScoreboardObjective == null) return;
+        updateCastleScoreboardTeams();
         for (String entry : new ArrayList<>(castleScoreboard.getEntries())) castleScoreboard.resetScores(entry);
         int score = 8;
         castleScoreboardObjective.getScore(ChatColor.GREEN + "Chest Refill").setScore(score--);
@@ -3425,6 +3465,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (king.activeCrystals() > 0 || king.health <= 0) return;
         king.health = Math.max(0, king.health - (int) Math.ceil(damage));
         if (king.entity != null && king.entity.isValid()) {
+            king.entity.setNoDamageTicks(0);
+            king.entity.setHealth(Math.max(1.0D, king.health));
             king.entity.setCustomName(teamColour(king.team) + king.name + ChatColor.RED + " ❤ " + king.health);
             king.entity.playEffect(org.bukkit.EntityEffect.HURT);
         }
@@ -3825,6 +3867,20 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private boolean isHeroSelectorItem(ItemStack item) {
         return item != null && item.hasItemMeta()
                 && item.getItemMeta().getPersistentDataContainer().has(heroSelectorKey, PersistentDataType.BYTE);
+    }
+
+    String selectedCastleAssaultKit(UUID playerId) {
+        return playerId == null ? null : castleAssaultPlayerKits.get(playerId);
+    }
+
+    String selectedHeroesOfGwen(UUID playerId) {
+        return playerId == null ? null : selectedHeroesOfGwen.get(playerId);
+    }
+
+    public void openHeroesOfGwenHeroMenu(Player player) {
+        if (game == ArcadePortGame.HEROES_OF_GWEN && player != null && players.containsKey(player.getUniqueId())) {
+            openHeroSelection(player);
+        }
     }
 
     private void openHeroSelection(Player player) {
