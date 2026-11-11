@@ -40,6 +40,21 @@ import org.bukkit.util.Vector;
  * No tasks, listeners, loops or additional collections are created here.
  */
 class SessionState {
+    static final class EvolutionScoreboardView {
+        final Scoreboard scoreboard;
+        final Objective objective;
+        final List<Team> lines;
+        final List<String> entries;
+
+        EvolutionScoreboardView(Scoreboard scoreboard, Objective objective,
+                List<Team> lines, List<String> entries) {
+            this.scoreboard = scoreboard;
+            this.objective = objective;
+            this.lines = lines;
+            this.entries = entries;
+        }
+    }
+
     final Map<Block, Long> evolutionWebs = new HashMap<>();
     SuperSploorEngine superSploorEngine;
     Map<UUID, SuperSploorRuntime.PlayerMatchStats> superSploorPlayerStats = Map.of();
@@ -113,6 +128,8 @@ class SessionState {
     final List<Team> sharedMatchScoreboardTeams = new ArrayList<>();
     final List<String> sharedMatchScoreboardEntries = new ArrayList<>();
     long sharedMatchNextScoreboardAt;
+    final Map<UUID, EvolutionScoreboardView> evolutionScoreboards = new HashMap<>();
+    long evolutionNextScoreboardAt;
     final Map<UUID, Integer> paintPiecesRemaining = new HashMap<>();
     Scoreboard paintballScoreboard;
     Objective paintballScoreboardObjective;
@@ -710,6 +727,7 @@ class SessionState {
     final Map<UUID, Location> dragonEscapeSafeLocations = new HashMap<>();
     final Map<UUID, Long> dragonEscapeWarpedAt = new HashMap<>();
     final Map<UUID, Long> dragonEscapeWaterDamageNextAt = new HashMap<>();
+    final Map<UUID, Long> dragonEscapeEnvironmentalDamageNextAt = new HashMap<>();
     final Map<UUID, Integer> dragonEscapeObservedWaypoint = new HashMap<>();
     final Map<UUID, Long> dragonEscapeDiggerNextUseAt = new HashMap<>();
     final Map<Block, BlockData> dragonEscapeTunnelBlocks = new HashMap<>();

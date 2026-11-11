@@ -15,8 +15,8 @@ import java.util.UUID;
  */
 public final class ArcadePortRules {
     /** Reborn's normal Castle Assault objective TNT pickup-to-respawn delay. */
-    public static final long CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS = 60_000L;
-    public static final int CASTLE_ASSAULT_KING_HEALTH_BASE = 600;
+    public static final long CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS = 30_000L;
+    public static final int CASTLE_ASSAULT_KING_HEALTH_BASE = 100;
     public static final int CASTLE_ASSAULT_KING_HEALTH_REFERENCE_PLAYERS = 15;
     public static final long CASTLE_ASSAULT_CARRIER_FUSE_MILLIS = 60_000L;
     public static final int CASTLE_ASSAULT_TNT_FUSE_TICKS = 60;

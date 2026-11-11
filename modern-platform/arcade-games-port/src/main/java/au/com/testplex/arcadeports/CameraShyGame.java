@@ -426,6 +426,12 @@ public final class CameraShyGame implements Listener {
 
     public boolean isActive() { return phase == Phase.STARTING || phase == Phase.LIVE || phase == Phase.ENDING; }
 
+    String selectedKitId(UUID playerId) {
+        if (playerId == null) return null;
+        return selectedKits.getOrDefault(playerId,
+                plugin.getConfig().getString("camera-shy-kit-preferences." + playerId, "smoke-artist"));
+    }
+
     boolean isLiveParticipant(Player player) {
         return phase == Phase.LIVE && player != null && players.containsKey(player.getUniqueId())
                 && alive.contains(player.getUniqueId()) && player.getWorld() == arena;

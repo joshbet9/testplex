@@ -2233,6 +2233,169 @@ public final class ArcadePortManager implements Listener {
         selectKit(player, requestedKit, null);
     }
 
+    /** Private kit status plus the appropriate lobby/live selection interface. */
+    public void openKitCommand(Player player) {
+        if (player == null || !player.isOnline()) return;
+        Session session = active;
+        boolean participating = session != null && session.players.containsKey(player.getUniqueId());
+        ArcadePortGame game = participating ? session.type
+                : lobby.isLobbyWorld(player.getWorld())
+                        ? ArcadePortGame.fromId(plugin.getConfig().getString("lobby-selected-game", ""))
+                        : activeDebugGame();
+        if (game == null) {
+            player.sendMessage(ChatColor.YELLOW + "No Arcade kit is selected right now.");
+            return;
+        }
+        String kitId = currentKitId(player, participating ? session : null, game);
+        String kitName = kitDisplayName(game, kitId);
+        player.sendMessage(ChatColor.GOLD + "Kit: " + ChatColor.YELLOW + kitName
+                + ChatColor.GRAY + " (" + game.displayName() + ")");
+
+        if (participating) {
+            if (!session.alive.contains(player.getUniqueId())) {
+                player.sendMessage(ChatColor.GRAY + "Spectators cannot change kits.");
+                return;
+            }
+            if (!session.liveStarted) {
+                player.sendMessage(ChatColor.YELLOW + "Kit selection is locked until the round begins.");
+                return;
+            }
+            if (game == ArcadePortGame.HEROES_OF_GWEN && session.variantRuntime != null) {
+                session.variantRuntime.openHeroesOfGwenHeroMenu(player);
+                return;
+            }
+            if (!supportsLiveKitChange(game)) {
+                player.sendMessage(ChatColor.GRAY + "This game locks kits for the rest of the round.");
+                return;
+            }
+        } else if (!lobby.isLobbyWorld(player.getWorld())) {
+            player.sendMessage(ChatColor.GRAY + "Kits for this game are locked until the next round.");
+            return;
+        }
+        openKitCommandMenu(player, game, kitId);
+    }
+
+    private boolean supportsLiveKitChange(ArcadePortGame game) {
+        return switch (game) {
+            case CASTLE_ASSAULT, HEROES_OF_GWEN, BOMB_LOBBERS, SPLEEF,
+                    MICRO_BATTLES, EVOLUTION, PAINTBALL, DEATH_TAG, TURF_WARS -> true;
+            default -> false;
+        };
+    }
+
+    private String currentKitId(Player player, Session session, ArcadePortGame game) {
+        UUID id = player.getUniqueId();
+        String kit = null;
+        if (session != null) {
+            kit = switch (game) {
+                case BACON_BRAWL -> session.baconKits.get(id);
+                case BOMB_LOBBERS -> session.bombLobbersKits.get(id);
+                case SPLEEF -> session.spleefKits.get(id);
+                case MICRO_BATTLES -> session.microKits.get(id);
+                case EVOLUTION -> session.evolutionKits.get(id);
+                case ONE_IN_THE_QUIVER -> session.quiverKits.get(id);
+                case DRAGONS -> session.dragonKits.get(id);
+                case DRAGON_ESCAPE -> session.dragonEscapeKits.get(id);
+                case DEATH_TAG -> session.deathTagRunnerKits.get(id);
+                case PAINTBALL -> session.paintballKits.get(id);
+                case TURF_WARS -> session.turfWarsKits.get(id);
+                case RUNNER -> session.runnerKits.get(id);
+                case WITHER_ASSAULT -> session.witherAssaultKits.get(id);
+                case SKY_WARS -> session.skyWarsKits.get(id);
+                case CASTLE_ASSAULT -> session.variantRuntime == null ? castleAssaultKitPreferences.get(id)
+                        : session.variantRuntime.selectedCastleAssaultKit(id);
+                case HEROES_OF_GWEN -> session.variantRuntime == null ? heroesOfGwenHeroPreferences.get(id)
+                        : session.variantRuntime.selectedHeroesOfGwen(id);
+                default -> null;
+            };
+        }
+        if (kit == null || kit.isBlank()) {
+            kit = switch (game) {
+                case BACON_BRAWL -> baconKitPreferences.get(id);
+                case BOMB_LOBBERS -> bombLobbersKitPreferences.get(id);
+                case SPLEEF -> spleefKitPreferences.get(id);
+                case MICRO_BATTLES -> microKitPreferences.get(id);
+                case EVOLUTION -> evolutionKitPreferences.get(id);
+                case ONE_IN_THE_QUIVER -> quiverKitPreferences.get(id);
+                case DRAGONS -> dragonsKitPreferences.get(id);
+                case DRAGON_ESCAPE -> dragonEscapeKitPreferences.get(id);
+                case DEATH_TAG -> deathTagRunnerKitPreferences.get(id);
+                case PAINTBALL -> paintballKitPreferences.get(id);
+                case TURF_WARS -> turfWarsKitPreferences.get(id);
+                case RUNNER -> runnerKitPreferences.get(id);
+                case SHEEP_QUEST -> sheepQuestKitPreferences.get(id);
+                case WITHER_ASSAULT -> witherAssaultKitPreferences.get(id);
+                case SKY_WARS -> skyWarsKitPreferences.get(id);
+                case CASTLE_ASSAULT -> castleAssaultKitPreferences.get(id);
+                case HEROES_OF_GWEN -> heroesOfGwenHeroPreferences.get(id);
+                case SUPER_SPLOOR -> superSploorKitPreferences.get(id);
+                default -> null;
+            };
+        }
+        if ((kit == null || kit.isBlank()) && game.isMonsterMaze()) {
+            loadMonsterMazeKitPreference(player, game);
+            kit = plugin.getConfig().getString("lobby-kit-preferences." + id + ".monster-maze");
+        }
+        if (kit == null || kit.isBlank()) {
+            kit = switch (game) {
+                case CAMERA_SHY -> cameraShyModule == null ? null : cameraShyModule.selectedKitId(id);
+                case PLEXBALL -> plugin.getPlexballGame() == null ? null : plugin.getPlexballGame().selectedKitId(id);
+                case WIZARDS -> plugin.getWizardsGameManager() == null ? null
+                        : plugin.getWizardsGameManager().selectedKit(id).name().toLowerCase(java.util.Locale.ROOT);
+                case SNAKE -> plugin.getConfig().getString("snake-kits." + id, "speed");
+                default -> null;
+            };
+        }
+        return kit;
+    }
+
+    private String kitDisplayName(ArcadePortGame game, String kitId) {
+        if (kitId == null || kitId.isBlank()) return "No selectable kit";
+        String normalized = kitId.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        for (ArcadeLobbyKitCatalogue.KitChoice choice : ArcadeLobbyKitCatalogue.forGame(game, List.of())) {
+            if (choice.id.equalsIgnoreCase(normalized)
+                    || (game == ArcadePortGame.DEATH_TAG && choice.id.equalsIgnoreCase("runner-" + normalized))) {
+                return choice.name;
+            }
+        }
+        return titleCase(kitId);
+    }
+
+    private void openKitCommandMenu(Player player, ArcadePortGame game, String currentKit) {
+        List<ArcadeLobbyKitCatalogue.KitChoice> choices = ArcadeLobbyKitCatalogue.forGame(game, List.of());
+        if (choices.isEmpty()) {
+            player.sendMessage(ChatColor.GRAY + "This game has no selectable kits.");
+            return;
+        }
+        KitCommandMenuHolder holder = new KitCommandMenuHolder(player.getUniqueId(), game);
+        Inventory inventory = Bukkit.createInventory(holder, 54, ChatColor.DARK_GREEN + "Choose " + game.displayName() + " Kit");
+        holder.inventory = inventory;
+        int slot = 10;
+        for (ArcadeLobbyKitCatalogue.KitChoice choice : choices) {
+            if (slot % 9 == 8) slot += 2;
+            if (slot >= 44) break;
+            ItemStack item = new ItemStack(choice.icon == null ? Material.CHEST : choice.icon);
+            ItemMeta meta = item.getItemMeta();
+            if (meta != null) {
+                meta.setDisplayName(choice.unlock.nameColor + choice.name);
+                List<String> lore = new ArrayList<>();
+                lore.add(currentKit != null && currentKit.equalsIgnoreCase(choice.id)
+                        ? ChatColor.GREEN + "Currently selected" : ChatColor.GRAY + "Click to select");
+                if (choice.unlock == ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT) {
+                    lore.add(ChatColor.LIGHT_PURPLE + "Achievement kit");
+                } else if (choice.unlock == ArcadeLobbyKitCatalogue.Unlock.GEM) {
+                    lore.add(ChatColor.AQUA + "GEM kit");
+                }
+                meta.setLore(lore);
+                item.setItemMeta(meta);
+            }
+            inventory.setItem(slot, item);
+            holder.choicesBySlot.put(slot, choice);
+            slot++;
+        }
+        player.openInventory(inventory);
+    }
+
     private void selectKit(Player player, String requestedKit, ArcadePortGame gameOverride) {
         if (player == null || requestedKit == null) return;
         if (isPreparingParticipant(player)) {
@@ -5863,7 +6026,8 @@ public final class ArcadePortManager implements Listener {
                         + (mixedArcadeVariant ? "Middle towers are removed and store prices are halved." : "Earn gold to buy upgrades."));
             }
         }
-        if (usesSharedMatchScoreboard(type)) setupSharedMatchScoreboard(session);
+        if (type == ArcadePortGame.EVOLUTION) setupEvolutionScoreboards(session);
+        else if (usesSharedMatchScoreboard(type)) setupSharedMatchScoreboard(session);
         if (participants.size() == 1) announce(session, ChatColor.GRAY + "Solo test mode: the run will remain available for practice until the timer ends or you reset it.");
         // All initial spawns/teleports are complete. Prepare now freezes participant
         // movement as well as gameplay input until the Live transition.
@@ -6472,6 +6636,23 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private static final class KitCommandMenuHolder implements InventoryHolder {
+        private final UUID ownerId;
+        private final ArcadePortGame game;
+        private final Map<Integer, ArcadeLobbyKitCatalogue.KitChoice> choicesBySlot = new HashMap<>();
+        private Inventory inventory;
+
+        private KitCommandMenuHolder(UUID ownerId, ArcadePortGame game) {
+            this.ownerId = ownerId;
+            this.game = game;
+        }
+
+        @Override
+        public Inventory getInventory() {
+            return inventory;
+        }
+    }
+
     private ItemStack gladiatorMenuItem(Material material, String title, String lore,
             String action, String value) {
         ItemStack item = namedItem(material, title, lore);
@@ -7015,6 +7196,91 @@ public final class ArcadePortManager implements Listener {
                     TURF_WARS, DRAW_MY_THING, SKY_WARS, MILK_THE_COW,
                     WITHER_ASSAULT -> true;
         };
+    }
+
+    private void setupEvolutionScoreboards(Session session) {
+        if (session == null || Bukkit.getScoreboardManager() == null) return;
+        for (Player player : session.players.values()) setupEvolutionScoreboard(session, player);
+        applySessionTeamTabTeams(session);
+        updateEvolutionScoreboards(session, System.currentTimeMillis());
+    }
+
+    private void setupEvolutionScoreboard(Session session, Player player) {
+        if (session == null || player == null || !player.isOnline() || Bukkit.getScoreboardManager() == null) return;
+        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
+        Objective objective = scoreboard.registerNewObjective("evolution", "dummy", ChatColor.GOLD + "EVOLUTION");
+        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+        List<Team> lineTeams = new ArrayList<>(15);
+        List<String> entries = new ArrayList<>(15);
+        for (int index = 0; index < 15; index++) {
+            Team line = scoreboard.registerNewTeam("evoline" + index);
+            String entry = ChatColor.values()[index].toString() + ChatColor.RESET;
+            line.addEntry(entry);
+            lineTeams.add(line);
+            entries.add(entry);
+        }
+        session.evolutionScoreboards.put(player.getUniqueId(),
+                new SessionState.EvolutionScoreboardView(scoreboard, objective, lineTeams, entries));
+        player.setScoreboard(scoreboard);
+    }
+
+    private void updateEvolutionScoreboards(Session session, long now) {
+        if (session == null || now < session.evolutionNextScoreboardAt) return;
+        session.evolutionNextScoreboardAt = now + 500L;
+        List<Player> ranked = alivePlayers(session);
+        ranked.sort(java.util.Comparator
+                .comparingInt((Player player) -> session.evolutionLevels.getOrDefault(player.getUniqueId(), 0))
+                .reversed().thenComparing(Player::getName, String.CASE_INSENSITIVE_ORDER));
+
+        for (Player viewer : session.players.values()) {
+            if (viewer == null || !viewer.isOnline()) continue;
+            SessionState.EvolutionScoreboardView view = session.evolutionScoreboards.get(viewer.getUniqueId());
+            if (view == null) {
+                setupEvolutionScoreboard(session, viewer);
+                view = session.evolutionScoreboards.get(viewer.getUniqueId());
+                if (view == null) continue;
+                applySessionTeamTabTeams(session);
+            }
+            List<String> lines = new ArrayList<>(15);
+            lines.add(" ");
+            lines.add(ChatColor.YELLOW + "First to 6");
+            lines.add("  ");
+            int shown = ranked.size() > 10 ? 9 : ranked.size();
+            for (int index = 0; index < shown; index++) {
+                Player player = ranked.get(index);
+                lines.add(ChatColor.GREEN + player.getName() + ChatColor.WHITE + "  "
+                        + session.evolutionLevels.getOrDefault(player.getUniqueId(), 0));
+            }
+            if (ranked.size() > shown) lines.add(ChatColor.GRAY + "+" + (ranked.size() - shown) + " more");
+            while (lines.size() < 13) lines.add("  ".repeat(lines.size() - 1));
+            lines.add("   ");
+            UUID viewerId = viewer.getUniqueId();
+            if (!session.liveStarted) {
+                lines.add(ChatColor.GOLD + "Pity: Begins in Live");
+            } else if (!session.alive.contains(viewerId)) {
+                lines.add(ChatColor.GRAY + "Pity: Spectating");
+            } else if (session.evolutionAvailable.contains(viewerId)) {
+                lines.add(ChatColor.GOLD + "Pity: Ready");
+            } else {
+                long deadline = session.evolutionPityUntil.getOrDefault(viewerId, now);
+                long remaining = ArcadePortRules.evolutionPityRemainingMillis(deadline, now);
+                lines.add(ChatColor.GOLD + "Pity: " + ChatColor.WHITE
+                        + ArcadePortRules.formatEvolutionPityRemaining(remaining));
+            }
+            for (int index = 0; index < view.lines.size(); index++) {
+                Team line = view.lines.get(index);
+                String entry = view.entries.get(index);
+                if (index < lines.size()) {
+                    String text = lines.get(index);
+                    line.setPrefix(text.length() <= 64 ? text : text.substring(0, 64));
+                    view.objective.getScore(entry).setScore(lines.size() - index);
+                } else {
+                    line.setPrefix("");
+                    view.scoreboard.resetScores(entry);
+                }
+            }
+            if (viewer.getScoreboard() != view.scoreboard) viewer.setScoreboard(view.scoreboard);
+        }
     }
 
     private void setupSharedMatchScoreboard(Session session) {
@@ -14070,7 +14336,8 @@ public final class ArcadePortManager implements Listener {
         }
         long now = System.currentTimeMillis();
         session.ticks++;
-        if (session.sharedMatchScoreboardObjective != null) updateSharedMatchScoreboard(session, now);
+        if (session.type == ArcadePortGame.EVOLUTION) updateEvolutionScoreboards(session, now);
+        else if (session.sharedMatchScoreboardObjective != null) updateSharedMatchScoreboard(session, now);
         if (session.liveStarted) updateLegacyNaturalRegeneration(session);
         if (session.type.isMonsterMaze()) {
             if (!monsterMazeRunning()) finish(session, null, true);
@@ -17494,7 +17761,7 @@ public final class ArcadePortManager implements Listener {
         // The 1.8 DragonEscapeData explicitly adds 180 degrees because Douglas's
         // model faces opposite the Bukkit vector yaw. Without this, the dragon's
         // body points backward along its otherwise-correct route movement.
-        location.setYaw(180.0F + dragonEscapeYaw(velocity));
+        location.setYaw(dragonEscapeYaw(velocity));
         session.dragonEscapeDragonVelocity = velocity;
         session.dragonEscapeDragonPitch = pitch;
         session.dragonEscapeDragonLocation = location.clone();
@@ -26242,11 +26509,14 @@ public final class ArcadePortManager implements Listener {
         } else if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
             String normalized = reason == null ? "" : reason.toLowerCase(java.util.Locale.ROOT);
             if (normalized.contains("dragon")) {
-                body = victim.getName() + " was caught by Douglas the Dragon!";
+                body = ChatColor.YELLOW + victim.getName() + ChatColor.GRAY
+                        + " was caught by Douglas the Dragon!";
             } else if (normalized.contains("fell") || normalized.contains("fall")) {
-                body = victim.getName() + " fell from the Skylands course!";
+                body = ChatColor.YELLOW + victim.getName() + ChatColor.GRAY
+                        + " fell from the Skylands course!";
             } else {
-                body = victim.getName() + " couldn't escape the dragon!";
+                body = ChatColor.YELLOW + victim.getName() + ChatColor.GRAY
+                        + " couldn't escape the dragon!";
             }
         } else if (killer != null && killer.isOnline() && !killer.getUniqueId().equals(victim.getUniqueId())) {
             body = ChatColor.YELLOW + victim.getName() + ChatColor.GRAY + " was killed by "
@@ -26516,6 +26786,26 @@ public final class ArcadePortManager implements Listener {
         return arcadePlayerGameMode(session == null ? null : session.type);
     }
 
+    private SourceMapCatalog.MapData.MapBounds dragonEscapePlayableBounds(
+            Session session, SourceMapCatalog.MapData sourceMap) {
+        SourceMapCatalog.MapData.MapBounds authored = sourceMap.boundsIncludingAuthoredLocations();
+        if (authored == null || session == null) return authored;
+        int minX = authored.minX();
+        int maxX = authored.maxX();
+        int minZ = authored.minZ();
+        int maxZ = authored.maxZ();
+        // Some source finish beacons sit just beyond the declared rectangle. Keep
+        // map-authored limits while including a small approach area around the route.
+        for (Location point : session.dragonEscapeWaypoints) {
+            if (point == null || point.getWorld() != session.world) continue;
+            minX = Math.min(minX, point.getBlockX() - 12);
+            maxX = Math.max(maxX, point.getBlockX() + 12);
+            minZ = Math.min(minZ, point.getBlockZ() - 12);
+            maxZ = Math.max(maxZ, point.getBlockZ() + 12);
+        }
+        return new SourceMapCatalog.MapData.MapBounds(minX, maxX, minZ, maxZ);
+    }
+
     private void checkPlayerArena(Session session, Player player) {
         if (!session.alive.contains(player.getUniqueId())) return;
         if (session.type == ArcadePortGame.DEATH_TAG
@@ -26555,7 +26845,7 @@ public final class ArcadePortManager implements Listener {
         }
         SourceMapCatalog.MapData.MapBounds dragonEscapeBounds =
                 session.type == ArcadePortGame.DRAGON_ESCAPE && sourceMap != null
-                        ? sourceMap.boundsIncludingAuthoredLocations() : null;
+                        ? dragonEscapePlayableBounds(session, sourceMap) : null;
         if (dragonEscapeBounds != null
                 && ArcadePortRules.isOutsideDragonEscapeMapBounds(
                         location.getX(), location.getY(), location.getZ(),
@@ -27872,6 +28162,7 @@ public final class ArcadePortManager implements Listener {
         // Keep the shared damage pipeline's previous ignore-cancelled behavior, while
         // allowing Bacon Brawl to take ownership of void knockouts already intercepted elsewhere.
         boolean gladiatorPlayerHit = false;
+        boolean castleAssaultPlayerHit = false;
         if (session.type == ArcadePortGame.GLADIATORS
                 && event instanceof EntityDamageByEntityEvent gladiatorDamage
                 && event.getEntity() instanceof Player gladiatorVictim
@@ -27880,7 +28171,15 @@ public final class ArcadePortManager implements Listener {
             gladiatorPlayerHit = gladiatorAttacker != null && !gladiatorAttacker.equals(gladiatorVictim)
                     && session.players.containsKey(gladiatorAttacker.getUniqueId());
         }
-        if (event.isCancelled() && !gladiatorPlayerHit
+        if ((session.type == ArcadePortGame.CASTLE_ASSAULT || session.type == ArcadePortGame.HEROES_OF_GWEN)
+                && event instanceof EntityDamageByEntityEvent castleHit
+                && event.getEntity() instanceof Player castleVictim
+                && session.players.containsKey(castleVictim.getUniqueId())) {
+            Player castleAttacker = playerShooter(castleHit.getDamager());
+            castleAssaultPlayerHit = castleAttacker != null && !castleAttacker.equals(castleVictim)
+                    && session.players.containsKey(castleAttacker.getUniqueId());
+        }
+        if (event.isCancelled() && !gladiatorPlayerHit && !castleAssaultPlayerHit
                 && !(session.type == ArcadePortGame.BACON_BRAWL
                     && event.getCause() == EntityDamageEvent.DamageCause.VOID
                     && event.getEntity() instanceof Player)) return;
@@ -27997,6 +28296,7 @@ public final class ArcadePortManager implements Listener {
         if ((session.type == ArcadePortGame.CASTLE_ASSAULT || session.type == ArcadePortGame.HEROES_OF_GWEN)
                 && event.getEntity() instanceof Player teamTarget
                 && session.players.containsKey(teamTarget.getUniqueId())) {
+            double damage = Math.max(0.0D, event.getFinalDamage());
             event.setCancelled(true);
             if (!session.alive.contains(teamTarget.getUniqueId())) return;
             Player attacker = null;
@@ -28013,7 +28313,6 @@ public final class ArcadePortManager implements Listener {
                         || session.teams.getOrDefault(attacker.getUniqueId(), -1)
                                 == session.teams.getOrDefault(teamTarget.getUniqueId(), -2)) return;
             }
-            double damage = Math.max(0.0D, event.getFinalDamage());
             if (damage <= 0.0D) return;
             if (teamTarget.getHealth() <= damage) {
                 eliminate(session, teamTarget, attacker, attacker == null
@@ -28022,6 +28321,19 @@ public final class ArcadePortManager implements Listener {
                 teamTarget.setHealth(teamTarget.getHealth() - damage);
                 playLegacyDamageFeedback(teamTarget);
                 teamTarget.playSound(teamTarget.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
+            }
+            if (event instanceof EntityDamageByEntityEvent byEntity && attacker != null) {
+                Entity damager = byEntity.getDamager();
+                boolean projectile = damager instanceof Projectile;
+                Vector direction = projectile
+                        ? damager.getVelocity().clone()
+                        : teamTarget.getLocation().toVector().subtract(attacker.getLocation().toVector());
+                Vector knockback = ArcadePortRules.legacyPvpKnockback(damage, projectile,
+                        direction, teamTarget.isOnGround());
+                if (knockback != null) {
+                    teamTarget.setFallDistance(0.0F);
+                    teamTarget.setVelocity(knockback);
+                }
             }
             return;
         }
@@ -28503,6 +28815,15 @@ public final class ArcadePortManager implements Listener {
             if (!playerCausedDamage && incomingDamage > 0.0D
                     && session.alive.contains(target.getUniqueId())) {
                 if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
+                    if (event.getCause() != EntityDamageEvent.DamageCause.FALL
+                            && event.getCause() != EntityDamageEvent.DamageCause.VOID) {
+                        long now = System.currentTimeMillis();
+                        long nextDamageAt = session.dragonEscapeEnvironmentalDamageNextAt
+                                .getOrDefault(target.getUniqueId(), 0L);
+                        if (now < nextDamageAt) return;
+                        session.dragonEscapeEnvironmentalDamageNextAt.put(
+                                target.getUniqueId(), now + 500L);
+                    }
                     session.dragonEscapeDamageTaken.add(target.getUniqueId());
                 }
                 target.playEffect(EntityEffect.HURT);
@@ -32149,6 +32470,25 @@ public final class ArcadePortManager implements Listener {
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
         if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
+        if (event.getView().getTopInventory().getHolder() instanceof KitCommandMenuHolder holder) {
+            event.setCancelled(true);
+            if (!(event.getWhoClicked() instanceof Player player)
+                    || !holder.ownerId.equals(player.getUniqueId())
+                    || event.getClickedInventory() != event.getView().getTopInventory()) return;
+            ArcadePortGame currentGame = active != null && active.players.containsKey(player.getUniqueId())
+                    ? active.type : lobby.isLobbyWorld(player.getWorld())
+                            ? ArcadePortGame.fromId(plugin.getConfig().getString("lobby-selected-game", "")) : null;
+            if (currentGame != holder.game) {
+                player.closeInventory();
+                player.sendMessage(ChatColor.YELLOW + "Your game changed; reopen /kit to choose the current kit.");
+                return;
+            }
+            ArcadeLobbyKitCatalogue.KitChoice choice = holder.choicesBySlot.get(event.getRawSlot());
+            if (choice == null) return;
+            player.closeInventory();
+            selectKit(player, choice.id, holder.game);
+            return;
+        }
         Session currentSession = active;
         if (currentSession != null && currentSession.type == ArcadePortGame.DRAGONS
                 && event.getView().getTopInventory().getHolder() instanceof DragonCompassMenuHolder holder) {
@@ -32583,6 +32923,18 @@ public final class ArcadePortManager implements Listener {
         if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         if (event.getView().getTopInventory().getHolder() instanceof GladiatorMenuHolder) {
             event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onKitCommandMenuDrag(InventoryDragEvent event) {
+        if (event.getView().getTopInventory().getHolder() instanceof KitCommandMenuHolder) {
+            for (int rawSlot : event.getRawSlots()) {
+                if (rawSlot < event.getView().getTopInventory().getSize()) {
+                    event.setCancelled(true);
+                    return;
+                }
+            }
         }
     }
 
