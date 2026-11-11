@@ -1310,10 +1310,10 @@ class ArcadePortGameTest {
                 "A hit from the front remains guarded.");
         assertFalse(ArcadePortRules.isBaconBrutusBackstab(0.0D, 1.0D, 1.0D, 0.0D),
                 "A side hit does not count as a backstab.");
-        assertTrue(ArcadePortRules.isBaconTimedCritical(500L));
-        assertTrue(ArcadePortRules.isBaconTimedCritical(900L));
-        assertFalse(ArcadePortRules.isBaconTimedCritical(499L));
-        assertTrue(ArcadePortRules.isBaconTimedCritical(901L));
+        assertTrue(ArcadePortRules.isBaconTimedCritical(1_000L));
+        assertTrue(ArcadePortRules.isBaconTimedCritical(1_800L));
+        assertFalse(ArcadePortRules.isBaconTimedCritical(999L));
+        assertTrue(ArcadePortRules.isBaconTimedCritical(1_801L));
         assertEquals(0L, ArcadePortRules.baconAbilityDurationMillis(10));
         assertEquals(2_750L, ArcadePortRules.baconAbilityDurationMillis(50));
         assertEquals(ArcadePortRules.BACON_PIG_INVINCIBILITY_MAX_MILLIS,
@@ -1383,15 +1383,16 @@ class ArcadePortGameTest {
         assertEquals(0.65D, ArcadePortRules.baconTimedHitKnockbackMultiplier(250L), 0.00001D);
         assertEquals(1.1D, ArcadePortRules.baconTimedHitKnockbackMultiplier(251L), 0.00001D);
         assertEquals(1.1D, ArcadePortRules.baconTimedHitKnockbackMultiplier(499L), 0.00001D);
-        assertEquals(1.6D, ArcadePortRules.baconTimedHitKnockbackMultiplier(500L), 0.00001D);
-        assertEquals(1.6D, ArcadePortRules.baconTimedHitKnockbackMultiplier(900L), 0.00001D);
-        assertEquals(1.25D, ArcadePortRules.baconTimedHitKnockbackMultiplier(901L), 0.00001D);
-        assertEquals(1.25D, ArcadePortRules.baconTimedHitKnockbackMultiplier(1_400L), 0.00001D);
-        assertEquals(1.0D, ArcadePortRules.baconTimedHitKnockbackMultiplier(1_401L), 0.00001D);
-        assertEquals(1_000L, ArcadePortRules.baconTimingWindowMillis(500L, 3.0D));
-        assertEquals(1_800L, ArcadePortRules.baconTimingWindowMillis(900L, 3.0D));
-        assertTrue(ArcadePortRules.isBaconTimedCritical(1_400L, 3.0D));
-        assertFalse(ArcadePortRules.isBaconTimedCritical(999L, 3.0D));
+        assertEquals(1.25D, ArcadePortRules.baconTimedHitKnockbackMultiplier(999L), 0.00001D);
+        assertEquals(1.6D, ArcadePortRules.baconTimedHitKnockbackMultiplier(1_000L), 0.00001D);
+        assertEquals(1.6D, ArcadePortRules.baconTimedHitKnockbackMultiplier(1_800L), 0.00001D);
+        assertEquals(1.25D, ArcadePortRules.baconTimedHitKnockbackMultiplier(1_801L), 0.00001D);
+        assertEquals(1.25D, ArcadePortRules.baconTimedHitKnockbackMultiplier(2_800L), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.baconTimedHitKnockbackMultiplier(2_801L), 0.00001D);
+        assertEquals(2_000L, ArcadePortRules.baconTimingWindowMillis(1_000L, 3.0D));
+        assertEquals(3_600L, ArcadePortRules.baconTimingWindowMillis(1_800L, 3.0D));
+        assertTrue(ArcadePortRules.isBaconTimedCritical(2_000L, 3.0D));
+        assertFalse(ArcadePortRules.isBaconTimedCritical(1_999L, 3.0D));
     }
 
 
@@ -2233,15 +2234,15 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.canGladiatorsFight(5_000L, 5_000L, -1, 0, false));
     }
 
-    @Test void gladiatorsPoisonOnlyUnresolvedDuelsAfterSixtySecondsAtOneDamagePerSecond() {
-        assertEquals(60_000L, ArcadePortRules.GLADIATOR_POISON_DELAY_MILLIS);
+    @Test void gladiatorsPoisonOnlyUnresolvedDuelsAfterThirtySecondsAtOneDamagePerSecond() {
+        assertEquals(30_000L, ArcadePortRules.GLADIATOR_POISON_DELAY_MILLIS);
         assertEquals(1_000L, ArcadePortRules.GLADIATOR_POISON_INTERVAL_MILLIS);
         assertEquals(1.0D, ArcadePortRules.GLADIATOR_POISON_DAMAGE, 0.0001D);
-        assertFalse(ArcadePortRules.shouldGladiatorPoison(59_999L, 0L, false, 2));
-        assertTrue(ArcadePortRules.shouldGladiatorPoison(60_000L, 0L, false, 2));
-        assertFalse(ArcadePortRules.shouldGladiatorPoison(60_000L, 0L, true, 2));
-        assertFalse(ArcadePortRules.shouldGladiatorPoison(60_000L, 0L, false, 1));
-        assertFalse(ArcadePortRules.shouldGladiatorPoison(60_000L, 0L, false, 0));
+        assertFalse(ArcadePortRules.shouldGladiatorPoison(29_999L, 0L, false, 2));
+        assertTrue(ArcadePortRules.shouldGladiatorPoison(30_000L, 0L, false, 2));
+        assertFalse(ArcadePortRules.shouldGladiatorPoison(30_000L, 0L, true, 2));
+        assertFalse(ArcadePortRules.shouldGladiatorPoison(30_000L, 0L, false, 1));
+        assertFalse(ArcadePortRules.shouldGladiatorPoison(30_000L, 0L, false, 0));
     }
 
     @Test void gladiatorsPairPlayersAndOnlyAdvanceAfterEveryMatchResolves() {

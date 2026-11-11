@@ -26,6 +26,7 @@ final class PlayerSnapshot {
     final double maxHealthBase;
     final double absorption;
     final double attackSpeedBase;
+    final double jumpStrengthBase;
     final int food;
     final float saturation;
     final float walkSpeed;
@@ -53,6 +54,8 @@ final class PlayerSnapshot {
         absorption = p.getAbsorptionAmount();
         var attackSpeedAttribute = p.getAttribute(Attribute.ATTACK_SPEED);
         attackSpeedBase = attackSpeedAttribute == null ? 4.0D : attackSpeedAttribute.getBaseValue();
+        var jumpStrengthAttribute = p.getAttribute(Attribute.JUMP_STRENGTH);
+        jumpStrengthBase = jumpStrengthAttribute == null ? 0.42D : jumpStrengthAttribute.getBaseValue();
         var maxHealthAttribute = p.getAttribute(Attribute.MAX_HEALTH);
         maxHealthBase = maxHealthAttribute == null ? p.getMaxHealth() : maxHealthAttribute.getBaseValue();
         food = p.getFoodLevel();
@@ -89,6 +92,8 @@ final class PlayerSnapshot {
         p.setFireTicks(fireTicks);
         var attackSpeedAttribute = p.getAttribute(Attribute.ATTACK_SPEED);
         if (attackSpeedAttribute != null) attackSpeedAttribute.setBaseValue(attackSpeedBase);
+        var jumpStrengthAttribute = p.getAttribute(Attribute.JUMP_STRENGTH);
+        if (jumpStrengthAttribute != null) jumpStrengthAttribute.setBaseValue(jumpStrengthBase);
         p.setCompassTarget(compassTarget == null ? null : compassTarget.clone());
         p.setCollidable(collidable);
         p.setInvulnerable(invulnerable);

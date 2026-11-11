@@ -217,6 +217,11 @@ class SessionState {
     final Map<UUID, Location> gladiatorAdvanceSpawns = new HashMap<>();
     final Map<UUID, Long> gladiatorAdvanceUntil = new HashMap<>();
     final Map<UUID, List<Block>> gladiatorAdvanceDoors = new HashMap<>();
+    final Map<UUID, GladiatorsParticleTrail> gladiatorParticleTrails = new HashMap<>();
+    final Map<UUID, Long> gladiatorNextParticleTrailAt = new HashMap<>();
+    final Map<UUID, Location> gladiatorAdvanceTrailTargets = new HashMap<>();
+    final Map<UUID, Long> gladiatorAdvanceDoorCloseAt = new HashMap<>();
+    final Set<UUID> gladiatorDoorWorldsInitialized = new HashSet<>();
     final Map<Integer, Long> gladiatorFightStartsAtByPair = new HashMap<>();
     final Map<Integer, Long> gladiatorRoundStartedAtByPair = new HashMap<>();
     final Map<Integer, Long> gladiatorNextPoisonAtByPair = new HashMap<>();
@@ -234,11 +239,7 @@ class SessionState {
     final Set<UUID> gladiatorUsedBow = new HashSet<>();
     final Set<UUID> gladiatorUsedRod = new HashSet<>();
     boolean gladiatorSwiftKillRecorded;
-    Scoreboard gladiatorScoreboard;
-    Objective gladiatorScoreboardObjective;
-    Objective gladiatorPreviousSidebar;
-    final List<Team> gladiatorScoreboardTeams = new ArrayList<>();
-    final List<String> gladiatorScoreboardEntries = new ArrayList<>();
+    final Map<UUID, GladiatorScoreboardView> gladiatorScoreboards = new HashMap<>();
     long gladiatorNextScoreboardAt;
     final Map<UUID, Double> gladiatorRoundDamageTaken = new HashMap<>();
     final Map<UUID, Double> gladiatorLethalMargin = new HashMap<>();
@@ -836,5 +837,19 @@ class SessionState {
         this.world = world;
         this.participantsAtStart = participants.size();
         this.mixedArcadeVariant = mixedArcadeVariant;
+    }
+}
+
+final class GladiatorScoreboardView {
+    final Scoreboard scoreboard;
+    final Objective objective;
+    final List<Team> teams;
+    final List<String> entries;
+
+    GladiatorScoreboardView(Scoreboard scoreboard, Objective objective, List<Team> teams, List<String> entries) {
+        this.scoreboard = scoreboard;
+        this.objective = objective;
+        this.teams = teams;
+        this.entries = entries;
     }
 }

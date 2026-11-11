@@ -6315,9 +6315,22 @@ public final class ArcadePortManager implements Listener {
     private boolean hasGladiatorSourceArenas(Session session, int round, boolean losersBracket) {
         SourceMapCatalog.MapData data = losersBracket ? session.gladiatorMirrorMapData
                 : sourceMapData.get(session.type.id());
-        return data != null
-                && !data.dataLocations(ArcadePortRules.gladiatorsArenaMarkerGroup(round)).isEmpty()
-                && data.dataLocations("BLACK").size() >= 2;
+        if (data == null) return false;
+        List<Location> tierCenters = data.dataLocations(ArcadePortRules.gladiatorsArenaMarkerGroup(round));
+        List<Location> allCenters = gladiatorAllArenaCenters(data);
+        List<Location> spawns = data.dataLocations("BLACK");
+        return !tierCenters.isEmpty() && spawns.size() >= 2
+                && tierCenters.stream().allMatch(center ->
+                        GladiatorsMapLayout.spawnsForArena(allCenters, spawns, center).size() == 2);
+    }
+
+    private List<Location> gladiatorAllArenaCenters(SourceMapCatalog.MapData data) {
+        if (data == null) return List.of();
+        List<Location> centers = new ArrayList<>();
+        for (String group : List.of("GREEN", "YELLOW", "ORANGE", "RED")) {
+            centers.addAll(data.dataLocations(group));
+        }
+        return centers;
     }
 
     /** Prefer the actual arena centres in the selected Reborn map; generated centres are test fallback only. */
@@ -6339,7 +6352,7 @@ public final class ArcadePortManager implements Listener {
         return fallback;
     }
 
-    /** Reborn marks both combat positions with BLACK; each arena uses its two nearest spawn markers. */
+    /** Reborn marks both combat positions with BLACK; bind each pair to its nearest arena center. */
     private Location[] gladiatorArenaSpawnPair(Session session, Location center, boolean useSourceMap) {
         return gladiatorArenaSpawnPair(session, center, useSourceMap, false);
     }
@@ -6349,12 +6362,14 @@ public final class ArcadePortManager implements Listener {
         if (useSourceMap) {
             SourceMapCatalog.MapData data = losersBracket ? session.gladiatorMirrorMapData
                     : sourceMapData.get(session.type.id());
-            List<Location> candidates = data.dataLocations("BLACK").stream()
-                    .map(location -> locationInWorld(location, center.getWorld())).collect(java.util.stream.Collectors.toCollection(ArrayList::new));
-            candidates.sort((left, right) -> Double.compare(
-                    left.distanceSquared(center), right.distanceSquared(center)));
-            Location first = candidates.get(0).clone();
-            Location second = candidates.get(1).clone();
+            List<Location> allCenters = gladiatorAllArenaCenters(data).stream()
+                    .map(location -> locationInWorld(location, center.getWorld())).toList();
+            List<Location> assignedSpawns = GladiatorsMapLayout.spawnsForArena(allCenters,
+                    data.dataLocations("BLACK").stream()
+                            .map(location -> locationInWorld(location, center.getWorld())).toList(), center);
+            if (assignedSpawns.size() != 2) return null;
+            Location first = assignedSpawns.get(0);
+            Location second = assignedSpawns.get(1);
             first.setDirection(center.toVector().subtract(first.toVector()));
             second.setDirection(center.toVector().subtract(second.toVector()));
             first.setPitch(0.0F);
@@ -6390,12 +6405,12 @@ public final class ArcadePortManager implements Listener {
     }
 
     private List<Block> gladiatorDoorBlocksBetween(Session session, Location from, Location to) {
-        SourceMapCatalog.MapData data = sourceMapData.get(session.type.id());
+        SourceMapCatalog.MapData data = from != null && session.gladiatorMirrorWorld != null
+                && from.getWorld() == session.gladiatorMirrorWorld
+                        ? session.gladiatorMirrorMapData : sourceMapData.get(session.type.id());
         if (data == null || from == null || to == null) return List.of();
-        List<Location> arenaMids = new ArrayList<>();
-        for (String colour : List.of("RED", "ORANGE", "YELLOW", "GREEN")) {
-            arenaMids.addAll(data.dataLocations(colour));
-        }
+        ensureGladiatorDoorsInitialized(session, data, from.getWorld());
+        List<Location> arenaMids = gladiatorAllArenaCenters(data);
         List<Block> doors = new ArrayList<>();
         for (Location marker : data.customLocations("129")) {
             List<Location> closest = arenaMids.stream()
@@ -6406,6 +6421,14 @@ public final class ArcadePortManager implements Listener {
             if (connects && !doors.contains(marker.getBlock())) doors.add(marker.getBlock());
         }
         return doors;
+    }
+
+    private void ensureGladiatorDoorsInitialized(
+            Session session, SourceMapCatalog.MapData data, World world) {
+        if (data == null || world == null || !session.gladiatorDoorWorldsInitialized.add(world.getUID())) return;
+        for (Location marker : data.customLocations("129")) {
+            locationInWorld(marker, world).getBlock().setType(Material.OAK_FENCE, false);
+        }
     }
 
     private void buildGladiatorArena(World world, int arenaSlot, int tier) {
@@ -7155,27 +7178,30 @@ public final class ArcadePortManager implements Listener {
 
     private void setupGladiatorsScoreboard(Session session) {
         if (session == null || Bukkit.getScoreboardManager() == null) return;
-        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
-        Objective objective = scoreboard.registerNewObjective("glad", "dummy", ChatColor.GOLD + "GLADIATORS");
-        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
-        session.gladiatorScoreboard = scoreboard;
-        session.gladiatorScoreboardObjective = objective;
-        for (int index = 0; index < 15; index++) {
-            Team line = scoreboard.registerNewTeam("gladline" + index);
-            String entry = ChatColor.values()[index].toString();
-            line.addEntry(entry);
-            session.gladiatorScoreboardTeams.add(line);
-            session.gladiatorScoreboardEntries.add(entry);
-        }
         for (Player player : session.players.values()) {
-            if (player != null && player.isOnline()) player.setScoreboard(scoreboard);
+            if (player == null || !player.isOnline()) continue;
+            Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
+            Objective objective = scoreboard.registerNewObjective("glad", "dummy", ChatColor.GOLD + "GLADIATORS");
+            objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+            List<Team> teams = new ArrayList<>();
+            List<String> entries = new ArrayList<>();
+            for (int index = 0; index < 20; index++) {
+                Team line = scoreboard.registerNewTeam("gladline" + index);
+                String entry = ChatColor.values()[index].toString();
+                line.addEntry(entry);
+                teams.add(line);
+                entries.add(entry);
+            }
+            session.gladiatorScoreboards.put(player.getUniqueId(),
+                    new GladiatorScoreboardView(scoreboard, objective, teams, entries));
+            player.setScoreboard(scoreboard);
         }
         applySessionTeamTabTeams(session);
         updateGladiatorsScoreboard(session, System.currentTimeMillis());
     }
 
     private void updateGladiatorsScoreboard(Session session, long now) {
-        if (session == null || session.gladiatorScoreboardObjective == null
+        if (session == null || session.gladiatorScoreboards.isEmpty()
                 || now < session.gladiatorNextScoreboardAt) return;
         session.gladiatorNextScoreboardAt = now + 500L;
         int activeMatches = 0;
@@ -7197,80 +7223,73 @@ public final class ArcadePortManager implements Listener {
 
         List<Player> players = alivePlayers(session).stream()
                 .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER)).toList();
-        List<String> lines = new ArrayList<>();
-        lines.add(ChatColor.GREEN + "Status");
-        lines.add(ChatColor.WHITE + status);
-        lines.add(" ");
-        lines.add(ChatColor.AQUA + "Matches Left");
-        lines.add(ChatColor.WHITE + Integer.toString(activeMatches));
-        lines.add("  ");
-        lines.add(ChatColor.YELLOW + "Players");
-        if (players.size() > 7) lines.add(ChatColor.WHITE + Integer.toString(players.size()) + " Players");
-        else for (Player player : players) lines.add(ChatColor.WHITE + player.getName());
-        for (int index = 0; index < session.gladiatorScoreboardTeams.size(); index++) {
-            Team line = session.gladiatorScoreboardTeams.get(index);
-            String entry = session.gladiatorScoreboardEntries.get(index);
-            if (index < lines.size()) {
-                line.setPrefix(lines.get(index));
-                session.gladiatorScoreboardObjective.getScore(entry).setScore(lines.size() - index);
-            } else {
-                line.setPrefix("");
-                session.gladiatorScoreboard.resetScores(entry);
+        for (Map.Entry<UUID, GladiatorScoreboardView> scoreboardEntry : session.gladiatorScoreboards.entrySet()) {
+            GladiatorScoreboardView view = scoreboardEntry.getValue();
+            List<String> lines = new ArrayList<>();
+            lines.add(ChatColor.GREEN + "Status");
+            lines.add(ChatColor.WHITE + status);
+            lines.add(" ");
+            lines.add(ChatColor.AQUA + "Matches Left");
+            lines.add(ChatColor.WHITE + Integer.toString(activeMatches));
+            lines.add("  ");
+            lines.add(ChatColor.YELLOW + "Players");
+            if (players.size() > 7) lines.add(ChatColor.WHITE + Integer.toString(players.size()) + " Players");
+            else for (Player player : players) lines.add(ChatColor.WHITE + player.getName());
+            String bracketStatus = gladiatorBracketStatus(session, scoreboardEntry.getKey());
+            if (bracketStatus != null) {
+                lines.add("   ");
+                lines.add(ChatColor.GOLD + "Your Match");
+                lines.add(ChatColor.WHITE + bracketStatus);
+            }
+            for (int index = 0; index < view.teams.size(); index++) {
+                Team line = view.teams.get(index);
+                String entry = view.entries.get(index);
+                if (index < lines.size()) {
+                    line.setPrefix(lines.get(index));
+                    view.objective.getScore(entry).setScore(lines.size() - index);
+                } else {
+                    line.setPrefix("");
+                    view.scoreboard.resetScores(entry);
+                }
             }
         }
-        updateGladiatorBracketActionbars(session);
     }
 
-    private void updateGladiatorBracketActionbars(Session session) {
-        if (session.gladiatorBracket == null) return;
+    private String gladiatorBracketStatus(Session session, UUID playerId) {
+        if (session.gladiatorBracket == null) return null;
         List<GladiatorsBracket.MatchView> matches = session.gladiatorBracket.matches();
-        for (UUID playerId : session.alive) {
-            Player player = session.players.get(playerId);
-            if (player == null || !player.isOnline()) continue;
-            GladiatorsBracket.MatchView next = matches.stream()
-                    .filter(match -> match.status() != GladiatorsBracket.Status.COMPLETED
-                            && (playerId.equals(match.first()) || playerId.equals(match.second())))
-                    .min(java.util.Comparator.comparingInt(GladiatorsBracket.MatchView::round)).orElse(null);
-            if (next == null) {
-                player.sendActionBar(ChatColor.GOLD + "Bracket "
-                        + (session.gladiatorBracket.losses(playerId) == 0 ? "Winners" : "Losers")
-                        + " | Losses: " + session.gladiatorBracket.losses(playerId) + " | Waiting for opponent");
-                continue;
-            }
-            String bracketName = switch (next.bracket()) {
-                case WINNERS -> "Winners";
-                case LOSERS -> "Losers";
-                case GRAND_FINAL, GRAND_FINAL_RESET -> "Grand Final";
-            };
-            UUID opponentId = playerId.equals(next.first()) ? next.second() : next.first();
-            Player opponent = opponentId == null ? null : session.players.get(opponentId);
-            String opponentName = opponent == null ? "TBD" : opponent.getName();
-            String state = next.status() == GladiatorsBracket.Status.FIGHTING ? "Duel active"
-                    : next.status() == GladiatorsBracket.Status.READY ? "Ready" : "Waiting";
-            player.sendActionBar(ChatColor.GOLD + bracketName + " R" + next.round() + " | Losses: "
-                    + session.gladiatorBracket.losses(playerId) + " | vs " + opponentName + " | " + state);
-        }
+        GladiatorsBracket.MatchView next = matches.stream()
+                .filter(match -> match.status() != GladiatorsBracket.Status.COMPLETED
+                        && (playerId.equals(match.first()) || playerId.equals(match.second())))
+                .min(java.util.Comparator.comparingInt(GladiatorsBracket.MatchView::round)).orElse(null);
+        int losses = session.gladiatorBracket.losses(playerId);
+        if (next == null) return (losses == 0 ? "Winners" : "Losers") + " R? | Losses " + losses + " | Waiting";
+        String bracketName = switch (next.bracket()) {
+            case WINNERS -> "Winners";
+            case LOSERS -> "Losers";
+            case GRAND_FINAL, GRAND_FINAL_RESET -> "Grand Final";
+        };
+        UUID opponentId = playerId.equals(next.first()) ? next.second() : next.first();
+        Player opponent = opponentId == null ? null : session.players.get(opponentId);
+        String opponentName = opponent == null ? "TBD" : opponent.getName();
+        String state = next.status() == GladiatorsBracket.Status.FIGHTING ? "Fighting"
+                : next.status() == GladiatorsBracket.Status.READY ? "Ready" : "Waiting";
+        return bracketName + " R" + next.round() + " Losses " + losses + " vs " + opponentName + " " + state;
     }
 
     private void cleanupGladiatorsScoreboard(Session session) {
-        if (session == null || session.gladiatorScoreboard == null) return;
-        try {
-            if (session.gladiatorScoreboard.getObjective(DisplaySlot.SIDEBAR)
-                    == session.gladiatorScoreboardObjective && session.gladiatorPreviousSidebar != null) {
-                session.gladiatorPreviousSidebar.setDisplaySlot(DisplaySlot.SIDEBAR);
+        if (session == null) return;
+        for (GladiatorScoreboardView view : session.gladiatorScoreboards.values()) {
+            try {
+                for (Team team : view.teams) {
+                    if (view.scoreboard.getTeam(team.getName()) != null) team.unregister();
+                }
+                if (view.objective != null) view.objective.unregister();
+            } catch (IllegalArgumentException | IllegalStateException exception) {
+                plugin.getLogger().fine("Gladiators scoreboard was already removed: " + exception.getMessage());
             }
-            for (Team team : new ArrayList<>(session.gladiatorScoreboardTeams)) {
-                if (session.gladiatorScoreboard.getTeam(team.getName()) != null) team.unregister();
-            }
-            if (session.gladiatorScoreboardObjective != null) session.gladiatorScoreboardObjective.unregister();
-        } catch (IllegalArgumentException | IllegalStateException exception) {
-            plugin.getLogger().fine("Gladiators scoreboard was already removed: " + exception.getMessage());
         }
-        session.gladiatorScoreboardTeams.clear();
-        session.gladiatorScoreboardEntries.clear();
-        session.gladiatorScoreboard = null;
-        session.gladiatorScoreboardObjective = null;
-        session.gladiatorPreviousSidebar = null;
+        session.gladiatorScoreboards.clear();
     }
 
     private void resolveGladiatorVote(Session session) {
@@ -7508,6 +7527,7 @@ public final class ArcadePortManager implements Listener {
         World matchWorld = losersBracket ? session.gladiatorMirrorWorld : session.world;
         SourceMapCatalog.MapData matchMapData = losersBracket ? session.gladiatorMirrorMapData
                 : sourceMapData.get(session.type.id());
+        ensureGladiatorDoorsInitialized(session, matchMapData, matchWorld);
         int arenaRound = bracket == GLADIATOR_BRACKET_FINAL ? 3 : matchTier;
         boolean sourceArenas = hasGladiatorSourceArenas(session, arenaRound, losersBracket);
         Location center;
@@ -7551,14 +7571,22 @@ public final class ArcadePortManager implements Listener {
         }
 
         Map<UUID, List<Block>> advancingDoors = new HashMap<>();
-        if (bracket == GLADIATOR_BRACKET_WINNERS && sourceArenas) {
+        boolean canWalkToNextArena = bracket == GLADIATOR_BRACKET_WINNERS && sourceArenas;
+        if (canWalkToNextArena) {
             for (UUID id : List.of(firstId, secondId)) {
                 Location previousCenter = session.gladiatorPreviousArenaCentersByPlayer.get(id);
+                if (previousCenter == null || previousCenter.getWorld() != matchWorld) {
+                    canWalkToNextArena = false;
+                    break;
+                }
                 List<Block> doors = gladiatorDoorBlocksBetween(session, previousCenter, center);
                 if (!doors.isEmpty()) advancingDoors.put(id, doors);
             }
         }
-        boolean walkToNextArena = advancingDoors.size() == 2;
+        // Keep the source game's walk-to-next-arena flow even on WorldDownloader maps
+        // without authored door markers. The source 15-second slow-mover recovery is
+        // retained as a single fallback, never as the normal round transition.
+        boolean walkToNextArena = canWalkToNextArena;
         long transitionUntil = walkToNextArena ? now + ArcadePortRules.gladiatorsArenaTransitionMillis() : now;
         long fightStartsAt = transitionUntil + GameDebugRuntimeOverrides.longValue("GLADIATOR_ROUND_COUNTDOWN_MILLIS", ArcadePortRules.GLADIATOR_ROUND_COUNTDOWN_MILLIS);
         session.gladiatorRoundStartedAtByPair.put(pair, fightStartsAt);
@@ -7581,8 +7609,16 @@ public final class ArcadePortManager implements Listener {
                 UUID id = player.getUniqueId();
                 session.gladiatorAdvanceSpawns.put(id, spawn.clone());
                 session.gladiatorAdvanceUntil.put(id, transitionUntil);
-                session.gladiatorAdvanceDoors.put(id, advancingDoors.get(id));
-                for (Block door : advancingDoors.get(id)) door.setType(Material.AIR, false);
+                session.gladiatorAdvanceDoors.put(id, advancingDoors.getOrDefault(id, List.of()));
+                Location previousCenter = session.gladiatorPreviousArenaCentersByPlayer.get(id);
+                Location trailTarget = previousCenter == null ? null : matchMapData.dataLocations("PINK").stream()
+                        .map(location -> locationInWorld(location, matchWorld))
+                        .min(java.util.Comparator.comparingDouble(location -> location.distanceSquared(previousCenter)))
+                        .orElse(null);
+                session.gladiatorAdvanceTrailTargets.put(id,
+                        trailTarget == null ? spawn.clone() : trailTarget.clone());
+                for (Block door : advancingDoors.getOrDefault(id, List.of())) door.setType(Material.AIR, false);
+                player.sendMessage(ChatColor.GREEN + "Follow the particle trail to your next arena.");
             } else player.teleport(spawn);
             player.setGameMode(GameMode.SURVIVAL);
             player.setHealth(player.getMaxHealth());
@@ -7755,33 +7791,38 @@ public final class ArcadePortManager implements Listener {
                 session.gladiatorAdvanceUntil.remove(id);
                 session.gladiatorAdvanceSpawns.remove(id);
                 session.gladiatorAdvanceDoors.remove(id);
+                session.gladiatorParticleTrails.remove(id);
+                session.gladiatorNextParticleTrailAt.remove(id);
+                session.gladiatorAdvanceTrailTargets.remove(id);
+                session.gladiatorAdvanceDoorCloseAt.remove(id);
                 continue;
             }
             if (now < entry.getValue()) {
-                if (now % 500L < 50L) {
-                    Vector route = destination.toVector().subtract(player.getLocation().toVector());
-                    double distance = Math.min(28.0D, route.length());
-                    if (distance > 1.0D) {
-                        Vector direction = route.normalize();
-                        for (double step = 3.0D; step < distance; step += 4.0D) {
-                            Location point = player.getLocation().clone().add(direction.clone().multiply(step));
-                            session.world.spawnParticle(Particle.HAPPY_VILLAGER, point, 1,
-                                    0.12D, 0.18D, 0.12D, 0.0D);
-                        }
-                    }
-                    session.world.spawnParticle(Particle.END_ROD, destination.clone().add(0.0D, 0.5D, 0.0D),
-                            2, 0.25D, 0.3D, 0.25D, 0.01D);
+                long nextTrailAt = session.gladiatorNextParticleTrailAt.getOrDefault(id, 0L);
+                if (now >= nextTrailAt) {
+                    Location target = session.gladiatorAdvanceTrailTargets.getOrDefault(id, destination);
+                    session.gladiatorParticleTrails.put(id, new GladiatorsParticleTrail(player, target));
+                    session.gladiatorNextParticleTrailAt.put(id, now + 3_000L);
                 }
+                GladiatorsParticleTrail trail = session.gladiatorParticleTrails.get(id);
+                if (trail != null && trail.tick()) session.gladiatorParticleTrails.remove(id);
                 continue;
             }
             if (player.getLocation().distanceSquared(destination) > 100.0D) {
                 player.teleport(destination);
-                player.sendMessage(ChatColor.RED + "You took too long to reach the next arena and were moved there.");
+                player.sendMessage(ChatColor.RED + "TELEPORTED! YOU TOOK TOO LONG!");
             }
+            long closeDoorsAt = session.gladiatorAdvanceDoorCloseAt.computeIfAbsent(id,
+                    ignored -> now + 250L);
+            if (now < closeDoorsAt) continue;
             for (Block door : doors) door.setType(Material.OBSIDIAN, false);
             session.gladiatorAdvanceUntil.remove(id);
             session.gladiatorAdvanceSpawns.remove(id);
             session.gladiatorAdvanceDoors.remove(id);
+            session.gladiatorParticleTrails.remove(id);
+            session.gladiatorNextParticleTrailAt.remove(id);
+            session.gladiatorAdvanceTrailTargets.remove(id);
+            session.gladiatorAdvanceDoorCloseAt.remove(id);
         }
     }
 
@@ -14572,28 +14613,24 @@ public final class ArcadePortManager implements Listener {
         };
     }
 
-    /** The vanilla XP bar is the ability meter during Bacon Brawl. */
+    /** The vanilla XP bar fills to the next timing critical; the sidebar/item lore show meter charge. */
     private void updateBaconMeterItem(Session session, Player player) {
         if (session.type != ArcadePortGame.BACON_BRAWL || player == null || !player.isOnline()
                 || !session.alive.contains(player.getUniqueId())) return;
         UUID playerId = player.getUniqueId();
-        long activeUntil = Math.max(session.baconCloakUntil.getOrDefault(playerId, 0L),
-                session.baconBrutusUntil.getOrDefault(playerId, 0L));
-        if (activeUntil > System.currentTimeMillis()) {
-            long duration = Math.max(1L, session.baconTimedAbilityDurationMillis.getOrDefault(playerId, 1L));
-            long remaining = activeUntil - System.currentTimeMillis();
-            float remainingProgress = Math.max(0.0F, Math.min(0.999F, remaining / (float) duration));
-            int remainingSeconds = (int) Math.max(1L, (remaining + 999L) / 1_000L);
-            if (Math.abs(player.getExp() - remainingProgress) > 0.001F) player.setExp(remainingProgress);
-            if (player.getLevel() != remainingSeconds) player.setLevel(remainingSeconds);
-            return;
-        }
+        long now = System.currentTimeMillis();
+        long criticalDelay = ArcadePortRules.baconTimingWindowMillis(
+                GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_GOOD_MIN_MILLIS",
+                        ArcadePortRules.BACON_TIMED_HIT_GOOD_MIN_MILLIS), session.baconKnockback);
+        long lastSwing = session.baconLastSwingAt.getOrDefault(playerId, 0L);
+        long elapsed = lastSwing <= 0L ? criticalDelay : Math.max(0L, now - lastSwing);
+        long remaining = Math.max(0L, criticalDelay - elapsed);
+        float progress = Math.min(1.0F, elapsed / (float) Math.max(1L, criticalDelay));
+        int secondsRemaining = (int) ((remaining + 999L) / 1_000L);
+        if (Math.abs(player.getExp() - progress) > 0.001F) player.setExp(progress);
+        if (player.getLevel() != secondsRemaining) player.setLevel(secondsRemaining);
         int percent = Math.max(0, Math.min(GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", ArcadePortRules.BACON_METER_MAX),
                 session.baconMeters.getOrDefault(playerId, 0)));
-        float progress = Math.min(0.999F, percent / (float) GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", ArcadePortRules.BACON_METER_MAX));
-        if (Math.abs(player.getExp() - progress) > 0.001F) player.setExp(progress);
-        if (player.getLevel() != percent) player.setLevel(percent);
-
         ItemStack ability = player.getInventory().getItem(0);
         if (ability != null && ability.getType() == Material.IRON_AXE
                 && ability.hasItemMeta() && ability.getItemMeta().hasDisplayName()
@@ -14826,6 +14863,7 @@ public final class ArcadePortManager implements Listener {
     private void endBaconCloak(Session session, UUID ownerId, Player owner) {
         session.baconCloakUntil.remove(ownerId);
         session.baconTimedAbilityDurationMillis.remove(ownerId);
+        if (owner != null && owner.isOnline()) cooldownProgress.stop(owner);
         LivingEntity avatar = baconPlayerAvatar(session, ownerId);
         if (avatar != null) avatar.setInvisible(false);
     }
@@ -14834,6 +14872,7 @@ public final class ArcadePortManager implements Listener {
         session.baconBrutusUntil.remove(ownerId);
         session.baconTimedAbilityDurationMillis.remove(ownerId);
         if (owner != null && owner.isOnline()) {
+            cooldownProgress.stop(owner);
             owner.removePotionEffect(PotionEffectType.RESISTANCE);
             owner.removePotionEffect(PotionEffectType.SLOWNESS);
         }
@@ -15382,6 +15421,7 @@ public final class ArcadePortManager implements Listener {
                 long duration = ArcadePortRules.baconAbilityDurationMillis(charge);
                 session.baconCloakUntil.put(id, now + duration);
                 session.baconTimedAbilityDurationMillis.put(id, duration);
+                cooldownProgress.start(player, "Cloak", duration, ArcadePortGame.BACON_BRAWL);
                 LivingEntity avatar = baconPlayerAvatar(session, id);
                 if (avatar != null) avatar.setInvisible(true);
                 player.getWorld().spawnParticle(Particle.SMOKE,
@@ -15398,6 +15438,7 @@ public final class ArcadePortManager implements Listener {
                 long duration = ArcadePortRules.baconAbilityDurationMillis(charge);
                 session.baconBrutusUntil.put(id, now + duration);
                 session.baconTimedAbilityDurationMillis.put(id, duration);
+                cooldownProgress.start(player, "Brutus", duration, ArcadePortGame.BACON_BRAWL);
                 int ticks = (int) Math.max(1L, (duration + 49L) / 50L);
                 player.addPotionEffect(new PotionEffect(
                         PotionEffectType.RESISTANCE, ticks, 4, false, false, true));
@@ -15589,10 +15630,7 @@ public final class ArcadePortManager implements Listener {
             session.baconSwingCritical.remove(id);
         }
         session.baconLastSwingAt.put(id, now);
-        long criticalDelay = ArcadePortRules.baconTimingWindowMillis(
-                GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_GOOD_MIN_MILLIS",
-                        ArcadePortRules.BACON_TIMED_HIT_GOOD_MIN_MILLIS), session.baconKnockback);
-        cooldownProgress.start(player, "Critical Hit", criticalDelay, ArcadePortGame.BACON_BRAWL);
+        updateBaconMeterItem(session, player);
     }
 
     private void handleBaconBrawlHit(Session session, Player attacker, Player target, String source) {
@@ -22831,6 +22869,16 @@ public final class ArcadePortManager implements Listener {
         session.baconPlayerPigs.clear();
         session.baconPigOwners.clear();
         session.baconCompassMenuTargets.clear();
+        for (List<Block> doors : session.gladiatorAdvanceDoors.values()) {
+            for (Block door : doors) door.setType(Material.OBSIDIAN, false);
+        }
+        session.gladiatorAdvanceDoors.clear();
+        session.gladiatorAdvanceDoorCloseAt.clear();
+        session.gladiatorAdvanceUntil.clear();
+        session.gladiatorAdvanceSpawns.clear();
+        session.gladiatorAdvanceTrailTargets.clear();
+        session.gladiatorParticleTrails.clear();
+        session.gladiatorNextParticleTrailAt.clear();
         session.respawning.clear();
         session.alive.clear();
         session.players.clear();

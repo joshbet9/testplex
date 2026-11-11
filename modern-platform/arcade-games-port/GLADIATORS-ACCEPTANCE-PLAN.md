@@ -43,14 +43,21 @@ For a tournament with multiple players:
 - [ ] First defeat advances through the predetermined lower-bracket feeder; second defeat eliminates the player.
 - [ ] A lower-bracket duel starts as soon as its feeder results are known and an arena is free, without waiting on unrelated duels.
 - [x] Automated tests cover the winners' champion ending the tournament immediately and both finalists entering the reset final after a lower-bracket grand-final win; either player can win the reset without giving the winner a third loss.
-- [ ] Unresolved duels receive the intended poison escalation after 60 seconds, without poisoning completed duels.
+- [ ] Unresolved duels receive poison after 30 seconds at one point of damage per second, without poisoning completed duels.
+- [ ] Every Gladiators source archive has usable bracket-tier arena centres and two terrain-safe spawn locations assigned to each arena; missing `WorldConfig.dat` archives are labelled inferred and must never silently start at shared/default coordinates.
+- [ ] Map-by-map metadata audit: `Caged In` retains the original authored 8/4/2/1 centres, 30 BLACK duel spawns, 14 PINK guide points and `129` door markers. The other 22 archives (`Alberwood Creek`, `Autumn Kingdom`, `Bliss`, `Castaway Cove`, `Cherry Bomb`, `Choco Valley`, `Clockwork`, `Cosmos`, `Ethereal Caverns`, `Fierce Desert`, `Flushed Away`, `Harmony`, `Mythical Forests`, `OutLaw`, `Planet Douglas`, `Primitive`, `Savanna`, `The Shire`, `Tribal Battleground`, `Tropics`, `Under the Sea`, `Urban`) omit authored `WorldConfig.dat`; their terrain-derived layouts are explicitly inferred test metadata and still require per-map Paper gameplay acceptance.
+- [ ] Authored `BLACK` spawn markers are assigned to their nearest arena centre rather than reusing the globally nearest pair for every arena.
+- [ ] Authored `129` door markers open to air as the source arena advances, close back to obsidian after passage, and are resolved in the correct world instance.
+- [ ] Maps without authored `129` locations do not have unrelated terrain rewritten as gates; their inferred safe paths use the Happy Villager trail and the source 15-second slow-mover recovery.
+- [ ] Fighters that win in the winners' bracket walk toward their next arena following the source-style homing Happy Villager trails; the duel countdown begins after the source 15-second movement window. The source slow-mover recovery is used only once at that window's end.
+- [ ] Maps without source `WorldConfig.dat` have inferred arena spawn locations and route guides derived from terrain-checked positions; because those archives omit authored door markers, no unrelated map blocks are rewritten as doors.
 - [ ] Environmental damage remains active inside a duel; eliminated and out-of-pair players cannot be damaged.
 - [ ] A disconnect, quit, death or server-side stop resolves the affected pair and does not strand either bracket.
 - [ ] Solo practice does not create a tournament win or advance a bracket.
 
 ## Mirrored world and spectator checks
 
-- [ ] The losers' bracket receives a separate world extracted from the same selected source-map archive, preserving terrain, arena markers and configuration.
+- [ ] The losers' bracket receives a separate world extracted from the same selected source-map archive, preserving terrain, authored or explicitly inferred arena markers and configuration.
 - [ ] Winners' fighters remain in the original map and losers' fighters remain in the mirror; arena assignments do not overlap within either world.
 - [ ] A spectator can switch between winners' and losers' matches, return to the match list, and cannot attack or interact with fighters.
 - [ ] The spectator match list shows bracket, round, both fighters, current state, and completed results.

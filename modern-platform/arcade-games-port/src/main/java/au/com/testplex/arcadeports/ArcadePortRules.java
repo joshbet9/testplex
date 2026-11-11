@@ -579,11 +579,11 @@ public final class ArcadePortRules {
     public static final double BACON_CRISPY_FIRE_CONTACT_RADIUS_SQUARED = 2.25D;
     public static final int BACON_CRISPY_IMPACT_FIRE_BLOCKS = 3;
     public static final long BACON_TIMED_HIT_SPAM_WINDOW_MILLIS = 250L;
-    public static final long BACON_TIMED_HIT_GOOD_MIN_MILLIS = 500L;
-    public static final long BACON_TIMED_HIT_GOOD_MAX_MILLIS = 900L;
+    public static final long BACON_TIMED_HIT_GOOD_MIN_MILLIS = 1_000L;
+    public static final long BACON_TIMED_HIT_GOOD_MAX_MILLIS = 1_800L;
     public static final long BACON_TIMED_HIT_OK_MIN_MILLIS = 251L;
     public static final long BACON_TIMED_HIT_OK_MAX_MILLIS = 499L;
-    public static final long BACON_TIMED_HIT_LATE_MAX_MILLIS = 1_400L;
+    public static final long BACON_TIMED_HIT_LATE_MAX_MILLIS = 2_800L;
     public static final long BACON_HIT_FEEDBACK_MILLIS = 1_000L;
     /** The Pig kit's damage meter controls its invincibility window, capped at five seconds. */
     public static final long BACON_PIG_INVINCIBILITY_MIN_MILLIS = 500L;
@@ -3241,7 +3241,7 @@ public final class ArcadePortRules {
     /** Mode indices follow GladiatorsMode: Normal, Rodless, Bowless, Modern, Pot. */
     public static final boolean GLADIATOR_FORCE_MODE_ENABLED = false;
     public static final int GLADIATOR_MODE_OVERRIDE = 0;
-    public static final long GLADIATOR_POISON_DELAY_MILLIS = 60_000L;
+    public static final long GLADIATOR_POISON_DELAY_MILLIS = 30_000L;
     public static final long GLADIATOR_POISON_INTERVAL_MILLIS = 1_000L;
     public static final double GLADIATOR_POISON_DAMAGE = 1.0D;
     public static final int GLADIATOR_MELEE_NO_DAMAGE_TICKS = 10;

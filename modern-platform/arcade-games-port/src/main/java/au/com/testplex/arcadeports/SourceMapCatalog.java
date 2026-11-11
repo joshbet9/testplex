@@ -1162,9 +1162,11 @@ public final class SourceMapCatalog {
         if (plugin == null || game == null || world == null) return null;
         Path config = resolveWorldConfigPath(world.getWorldFolder().toPath(),
                 Bukkit.getWorldContainer().toPath(), world.getName());
+        MapData onDisk = null;
         if (config != null && Files.isRegularFile(config)) {
             try {
-                return parseMapConfig(world, Files.readAllLines(config, StandardCharsets.UTF_8));
+                onDisk = parseMapConfig(world, Files.readAllLines(config, StandardCharsets.UTF_8));
+                if (game != ArcadePortGame.GLADIATORS) return onDisk;
             } catch (IOException exception) {
                 plugin.getLogger().log(java.util.logging.Level.WARNING,
                         "Could not read on-disk WorldConfig.dat for " + game.displayName()
@@ -1175,13 +1177,92 @@ public final class SourceMapCatalog {
 
         String resource = selectedResource(plugin, game);
         if (resource == null) {
+            if (game == ArcadePortGame.GLADIATORS && onDisk != null) {
+                return readGladiatorsResource(plugin, "", world, onDisk);
+            }
             plugin.getLogger().warning("Cannot read source map metadata for " + game.displayName()
                     + ": no selected archive is configured.");
             return null;
         }
-        MapData authored = readResource(plugin, resource, world);
+        MapData authored = onDisk == null ? readResource(plugin, resource, world) : onDisk;
+        if (game == ArcadePortGame.GLADIATORS) {
+            return readGladiatorsResource(plugin, resource, world, authored);
+        }
         if (authored != null) return authored;
         return readInferredResource(plugin, resource, world);
+    }
+
+    /**
+     * Gladiators needs its four bracket tiers and two exact spawn markers per arena.
+     * Most WorldDownloader exports omit WorldConfig.dat, so reconstruct a clearly
+     * labelled test-only layout from safe terrain locations while preserving all
+     * authored markers when they are present and complete.
+     */
+    private static MapData readGladiatorsResource(
+            JavaPlugin plugin, String resource, World world, MapData authored) {
+        if (authored != null && hasCompleteGladiatorLayout(authored)) return authored;
+
+        ChunkBounds bounds = readRegionChunkBounds(plugin, resource);
+        if (bounds == null) {
+            plugin.getLogger().warning("Gladiators archive " + resource
+                    + " has no populated region chunks from which to resolve safe arena spawns.");
+            return null;
+        }
+        MapData inferred = new MapData();
+        inferred.mapName = authored != null && authored.mapName() != null
+                && !authored.mapName().isBlank() ? authored.mapName() : mapNameFromResource(resource);
+        inferred.inferredMetadata = true;
+        inferred.minX = bounds.minChunkX() * 16;
+        inferred.maxX = (bounds.maxChunkX() + 1) * 16 - 1;
+        inferred.minZ = bounds.minChunkZ() * 16;
+        inferred.maxZ = (bounds.maxChunkZ() + 1) * 16 - 1;
+        inferred.minY = world.getMinHeight();
+        inferred.maxY = world.getMaxHeight() - 1;
+        inferred.hasMinX = inferred.hasMaxX = inferred.hasMinZ = inferred.hasMaxZ = true;
+        inferred.hasMinY = inferred.hasMaxY = true;
+
+        List<Location> safeStarts = findSafeSurfaceLocations(
+                world, inferred, 120, 0.36D, bounds.populatedChunks());
+        Map<String, List<Location>> markers = GladiatorsMapLayout.inferArenaMarkers(
+                safeStarts, inferred.centerX(), inferred.centerZ());
+        if (markers.isEmpty()) {
+            plugin.getLogger().warning("Gladiators archive " + resource + " yielded " + safeStarts.size()
+                    + " safe surface locations but not the 30 non-overlapping starts needed for all 15 bracket arenas; refusing unsafe arena spawns.");
+            return null;
+        }
+        for (Map.Entry<String, List<Location>> entry : markers.entrySet()) {
+            inferred.dataLocations.put(entry.getKey(), new ArrayList<>(entry.getValue()));
+        }
+        if (authored != null) {
+            List<Location> authoredGuides = authored.dataLocations("PINK");
+            if (!authoredGuides.isEmpty()) {
+                inferred.dataLocations.put("PINK", new ArrayList<>(authoredGuides));
+            }
+            List<Location> authoredObsidianDoors = authored.customLocations("129");
+            if (!authoredObsidianDoors.isEmpty()) {
+                inferred.customLocations.put("129", new ArrayList<>(authoredObsidianDoors));
+            }
+        }
+        inferred.teamSpawns.put("INFERRED_GLADIATOR_STARTS",
+                markers.getOrDefault("BLACK", List.of()));
+        plugin.getLogger().warning("Using inferred Gladiators test arena layout for " + resource + ": created "
+                + "8 green, 4 yellow, 2 orange and 1 red terrain-checked arenas (30 safe starts). "
+                + "This is not original Mineplex WorldConfig data; source door markers are unavailable.");
+        return inferred;
+    }
+
+    private static boolean hasCompleteGladiatorLayout(MapData data) {
+        if (data == null || data.inferredMetadata()) return false;
+        int[] expectedArenas = {8, 4, 2, 1};
+        List<Location> allCenters = new ArrayList<>();
+        List<String> tiers = List.of("GREEN", "YELLOW", "ORANGE", "RED");
+        for (int index = 0; index < tiers.size(); index++) {
+            List<Location> tierCenters = data.dataLocations(tiers.get(index));
+            if (tierCenters.size() != expectedArenas[index]) return false;
+            allCenters.addAll(tierCenters);
+        }
+        List<Location> black = data.dataLocations("BLACK");
+        return black.size() >= 30 && GladiatorsMapLayout.hasTwoSpawnsPerArena(allCenters, black);
     }
 
     /**
