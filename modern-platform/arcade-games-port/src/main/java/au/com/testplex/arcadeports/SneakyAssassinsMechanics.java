@@ -1280,6 +1280,15 @@ final class SneakyAssassinsMechanics {
             attacker.removePotionEffect(PotionEffectType.INVISIBILITY);
         }
         if (damage <= 0.0D) return;
+        if (directPlayerAttack && attacker != null) {
+            Vector direction = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
+            Vector velocity = ArcadePortRules.legacyPvpKnockbackVelocity(
+                    direction, null, damage, 1.0D, target.isOnGround());
+            if (velocity != null) {
+                target.setFallDistance(0.0F);
+                target.setVelocity(velocity);
+            }
+        }
         applyDamage(target, damage, attacker, "was defeated");
     }
 
@@ -1325,6 +1334,13 @@ final class SneakyAssassinsMechanics {
         }
         cloakUntil.remove(shooter.getUniqueId());
         shooter.removePotionEffect(PotionEffectType.INVISIBILITY);
+        Vector velocity = ArcadePortRules.legacyPvpKnockbackVelocity(
+                target.getLocation().toVector().subtract(shooter.getLocation().toVector()),
+                projectile.getVelocity(), damage, 1.0D, target.isOnGround());
+        if (velocity != null) {
+            target.setFallDistance(0.0F);
+            target.setVelocity(velocity);
+        }
         applyDamage(target, damage, shooter, "was defeated by " + shooter.getName());
         projectile.remove();
     }

@@ -10,6 +10,15 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ArcadePortGameTest {
+    @Test void lobbyFeedbackShortcutUsesAnAvailableSlotAndThePublicForms() {
+        assertEquals(1, ModernArcadeLobby.HOTBAR_FEEDBACK_SLOT);
+        assertEquals("https://github.com/joshbet9/testplex/issues/new?template=bug_report.yml",
+                ModernArcadeLobby.feedbackFormUrl("bug"));
+        assertEquals("https://github.com/joshbet9/testplex/issues/new?template=idea.yml",
+                ModernArcadeLobby.feedbackFormUrl("idea"));
+        assertThrows(IllegalArgumentException.class, () -> ModernArcadeLobby.feedbackFormUrl("other"));
+    }
+
     @Test void legacyMapCatalogIncludesAllMovedMapFoldersForSupportedGames() {
         assertEquals(java.util.List.of("Bacon Brawl"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.BACON_BRAWL));
         assertEquals(java.util.List.of("Bomb Lobbers"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.BOMB_LOBBERS));

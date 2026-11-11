@@ -1874,6 +1874,36 @@ public final class SourceMapCatalog {
         public List<Location> customLocations(String name) {
             return copyLocations(customLocations.get(name == null ? "" : name.toUpperCase(java.util.Locale.ROOT)));
         }
+        /**
+         * Expand authored map bounds to include every configured spawn/data/custom
+         * marker. Some legacy archives contain course waypoints just outside their
+         * declared WorldConfig bounds; these locations are still part of the map.
+         */
+        public MapBounds boundsIncludingAuthoredLocations() {
+            if (!hasBounds()) return null;
+            int expandedMinX = minX;
+            int expandedMaxX = maxX;
+            int expandedMinZ = minZ;
+            int expandedMaxZ = maxZ;
+            for (Map<String, List<Location>> groups : List.of(teamSpawns, dataLocations, customLocations)) {
+                for (List<Location> locations : groups.values()) {
+                    for (Location location : locations) {
+                        if (location == null) continue;
+                        expandedMinX = Math.min(expandedMinX, location.getBlockX());
+                        expandedMaxX = Math.max(expandedMaxX, location.getBlockX());
+                        expandedMinZ = Math.min(expandedMinZ, location.getBlockZ());
+                        expandedMaxZ = Math.max(expandedMaxZ, location.getBlockZ());
+                    }
+                }
+            }
+            return new MapBounds(expandedMinX, expandedMaxX, expandedMinZ, expandedMaxZ);
+        }
+        public record MapBounds(int minX, int maxX, int minZ, int maxZ) {
+            public double centerX() { return (minX + maxX) / 2.0D; }
+            public double centerZ() { return (minZ + maxZ) / 2.0D; }
+            public double width() { return Math.max(1, maxX - minX); }
+            public double depth() { return Math.max(1, maxZ - minZ); }
+        }
         /** All authored custom marker groups, copied so match runtimes cannot mutate map metadata. */
         public Map<String, List<Location>> customLocationGroups() {
             Map<String, List<Location>> copy = new LinkedHashMap<>();

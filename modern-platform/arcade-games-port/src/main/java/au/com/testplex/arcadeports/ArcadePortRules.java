@@ -3421,17 +3421,25 @@ public final class ArcadePortRules {
 
  
     /** Legacy Dragon Escape runs its Hell course at night; other courses keep the normal day start. */
-    /**
-     * Preserve the original per-game world-water damage settings. Dragon Escape
-     * only enables this penalty on its Pirate course.
-     */
+    /** Preserve per-game water damage and Dragon Escape's Pirate/map-marker overrides. */
     public static int sourceWorldWaterDamage(ArcadePortGame game, String mapName) {
+        return sourceWorldWaterDamage(game, mapName, false);
+    }
+
+    /**
+     * Preserve Mineplex's map-authored WATER_DAMAGE flag as well as game defaults.
+     * Dragon Escape's Pirate map sets its own two-damage rule; other maps opt into
+     * the shared four-damage rule through a WorldConfig WATER_DAMAGE marker.
+     */
+    public static int sourceWorldWaterDamage(ArcadePortGame game, String mapName,
+            boolean hasWaterDamageMarker) {
         if (game == null) return 0;
         return switch (game) {
             case BOMB_LOBBERS -> 5;
             case DRAGONS, RUNNER, SPLEEF -> 4;
             case DRAGON_ESCAPE -> mapName != null
-                    && mapName.toLowerCase(java.util.Locale.ROOT).contains("pirate") ? 2 : 0;
+                    && mapName.toLowerCase(java.util.Locale.ROOT).contains("pirate") ? 2
+                    : hasWaterDamageMarker ? 4 : 0;
             default -> 0;
         };
     }
@@ -5252,6 +5260,37 @@ public final class ArcadePortRules {
     public static double microBattlesKnockbackStrength(double damage, boolean projectile) {
         if (!Double.isFinite(damage)) return 0.0D;
         return Math.log10(Math.max(damage, 2.0D)) * (projectile ? 1.6D : 1.0D);
+    }
+
+    /**
+     * Reproduces Mineplex 1.8 DamageManager's default PvP impulse. The legacy manager
+     * scaled horizontal strength by log10(damage), used projectile travel direction for
+     * arrows, added a capped vertical lift, and replaced the victim's velocity.
+     */
+    public static Vector legacyPvpKnockbackVelocity(Vector attackerToTarget, Vector projectileVelocity,
+            double damage, double knockbackMultiplier, boolean targetGrounded) {
+        if (!Double.isFinite(damage) || damage <= 0.0D
+                || !Double.isFinite(knockbackMultiplier) || knockbackMultiplier <= 0.0D) return null;
+        double knockback = Math.log10(Math.max(damage, 2.0D)) * knockbackMultiplier;
+        Vector trajectory;
+        if (projectileVelocity != null) {
+            trajectory = projectileVelocity.clone().setY(0.0D);
+            double length = trajectory.length();
+            if (!Double.isFinite(length) || length < 1.0E-6D) return null;
+            trajectory.multiply(0.37D * knockback / length).setY(0.06D);
+        } else {
+            if (attackerToTarget == null || !Double.isFinite(attackerToTarget.lengthSquared())
+                    || attackerToTarget.lengthSquared() < 1.0E-6D) return null;
+            trajectory = attackerToTarget.clone().setY(0.0D).normalize().multiply(0.6D * knockback);
+        }
+        double trajectoryLength = trajectory.length();
+        if (!Double.isFinite(trajectoryLength) || trajectoryLength < 1.0E-6D) return null;
+        double velocityStrength = 0.2D + trajectoryLength * 0.8D;
+        Vector velocity = trajectory.normalize().multiply(velocityStrength);
+        velocity.setY(Math.min(0.4D + 0.04D * knockback,
+                velocity.getY() + Math.abs(0.2D * knockback)));
+        if (targetGrounded) velocity.setY(velocity.getY() + 0.2D);
+        return velocity;
     }
 
 

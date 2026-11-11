@@ -3568,7 +3568,7 @@ public final class ArcadePortManager implements Listener {
         player.closeInventory();
         player.leaveVehicle();
         player.teleport(spawn);
-        player.setGameMode(arcadePlayerGameMode(session.type));
+        player.setGameMode(arcadePlayerGameMode(session, id));
         player.setHealth(player.getMaxHealth());
         player.setFoodLevel(20);
         player.setSaturation(20.0F);
@@ -5272,12 +5272,17 @@ public final class ArcadePortManager implements Listener {
         world.setStorm(false);
         world.setThundering(false);
         WorldBorder border = world.getWorldBorder();
-        if (sourceMap != null && sourceMap.hasBounds()) {
-            border.setCenter(sourceMap.centerX(), sourceMap.centerZ());
-            border.setSize(Math.max(40.0D, Math.max(sourceMap.width(), sourceMap.depth()) + 8.0D));
+        // Source maps already provide their own physical/logic boundaries. A
+        // guessed vanilla world border traps players inside many maps, especially
+        // when legacy waypoints extend beyond WorldConfig bounds. Micro Battles is
+        // the exception: its shrinking world border is an intentional mechanic.
+        if (type == ArcadePortGame.MICRO_BATTLES) {
+            border.setCenter(sourceMap != null && sourceMap.hasBounds() ? sourceMap.centerX() : 0.0D,
+                    sourceMap != null && sourceMap.hasBounds() ? sourceMap.centerZ() : 0.0D);
+            border.setSize(42.0D);
         } else {
             border.setCenter(0.0D, 0.0D);
-            border.setSize(type == ArcadePortGame.MICRO_BATTLES ? 42.0D : 80.0D);
+            border.setSize(59_999_968.0D);
         }
         border.setDamageAmount(0.0D);
         List<Location> spawns = spawnLocations(type, participants.size());
@@ -5503,7 +5508,7 @@ public final class ArcadePortManager implements Listener {
             player.closeInventory();
             player.leaveVehicle();
             player.teleport(spawn);
-            player.setGameMode(arcadePlayerGameMode(type));
+            player.setGameMode(arcadePlayerGameMode(session, player.getUniqueId()));
             player.setHealth(player.getMaxHealth());
             player.setFoodLevel(20);
             player.setSaturation(20.0F);
@@ -11056,6 +11061,7 @@ public final class ArcadePortManager implements Listener {
         // Mineplex's Strength perk adds one damage to Brawler's normal fist punch too;
         // the kit weapon's sword/shovel damage must not leak into bare-hand or bow-punch hits.
         double damage = ArcadePortRules.quiverMeleeDamage(kit, holdingKitWeapon);
+        applyLegacyPvpKnockback(attacker, target, damage, null);
         if (ArcadePortRules.shouldRemoveQuiverInvisibilityOnHit(true, "ninja".equals(kit))) {
             if (session.quiverCloakedUntil.getOrDefault(attacker.getUniqueId(), 0L) > System.currentTimeMillis()) {
                 session.quiverPendingNinjaVanishKillers.add(attacker.getUniqueId());
@@ -14077,7 +14083,9 @@ public final class ArcadePortManager implements Listener {
 
     private void updateSourceWaterDamage(Session session, long now) {
         SourceMapCatalog.MapData map = sourceMapData.get(session.type.id());
-        int damage = ArcadePortRules.sourceWorldWaterDamage(session.type, map == null ? "" : map.mapName());
+        int damage = ArcadePortRules.sourceWorldWaterDamage(session.type,
+                map == null ? "" : map.mapName(),
+                map != null && !map.customLocations("WATER_DAMAGE").isEmpty());
         if (damage <= 0) return;
 
         if (session.type == ArcadePortGame.DRAGONS) {
@@ -16610,7 +16618,7 @@ public final class ArcadePortManager implements Listener {
         player.playSound(player.getLocation(), Sound.ENTITY_TNT_PRIMED, 0.8F, 1.15F);
     }
 
-    /** Server-authoritative placement also supports an air click while falling. */
+    /** Server-authoritative placement targets a clicked face, like vanilla block placement. */
     private void placeDragonEscapeBuilderBrick(Session session, Player player, Block clicked, BlockFace face) {
         UUID id = player.getUniqueId();
         if (active != session || !session.alive.contains(id)
@@ -16621,9 +16629,8 @@ public final class ArcadePortManager implements Listener {
         }
         if (inventoryCount(player, Material.BRICKS) <= 0
                 || player.getInventory().getItemInMainHand().getType() != Material.BRICKS) return;
-        Block target = clicked != null && face != null && face != BlockFace.SELF
-                ? clicked.getRelative(face)
-                : player.getLocation().getBlock().getRelative(BlockFace.DOWN);
+        if (clicked == null || face == null || face == BlockFace.SELF || clicked.getType().isAir()) return;
+        Block target = clicked.getRelative(face);
         if (target.getWorld() != session.world || !target.isEmpty()
                 || !isDragonEscapeDiggerBuildLocationAllowed(session, target)) {
             player.sendActionBar(ChatColor.YELLOW + "You cannot place a temporary brick there.");
@@ -16875,8 +16882,9 @@ public final class ArcadePortManager implements Listener {
         if (block.getY() < 1 || block.getY() >= session.world.getMaxHeight() - 1) return false;
         SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
         if (mapData != null && mapData.hasBounds()) {
-            return block.getX() >= mapData.minX() && block.getX() < mapData.maxX()
-                    && block.getZ() >= mapData.minZ() && block.getZ() < mapData.maxZ();
+            SourceMapCatalog.MapData.MapBounds bounds = mapData.boundsIncludingAuthoredLocations();
+            return bounds != null && block.getX() >= bounds.minX() && block.getX() <= bounds.maxX()
+                    && block.getZ() >= bounds.minZ() && block.getZ() <= bounds.maxZ();
         }
         return block.getX() >= -4 && block.getX() <= 4
                 && block.getZ() >= -24 && block.getZ() <= 80;
@@ -16953,7 +16961,7 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    /** Adventure mode cannot rely on vanilla block placement for Digger's recovered blocks. */
+    /** Place Digger's recovered blocks server-side while honoring vanilla clicked-face placement. */
     private void placeDragonEscapeDiggerBlock(Session session, Player player, Block clicked, BlockFace face) {
         if (clicked == null || face == null || face == BlockFace.SELF) return;
         UUID id = player.getUniqueId();
@@ -19886,8 +19894,46 @@ public final class ArcadePortManager implements Listener {
         checkRoundEnd(session);
     }
 
+    private void applyLegacyPvpKnockback(Player attacker, Player target, double damage,
+            Vector projectileVelocity) {
+        if (attacker == null || target == null || attacker.equals(target)) return;
+        Vector direction = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
+        Vector velocity = ArcadePortRules.legacyPvpKnockbackVelocity(direction, projectileVelocity,
+                damage, 1.0D, target.isOnGround());
+        if (velocity == null) return;
+        target.setFallDistance(0.0F);
+        target.setVelocity(velocity);
+    }
+
+    private void applyGladiatorKnockback(Player attacker, Player target, double damage,
+            Vector projectileVelocity) {
+        if (attacker == null || target == null || attacker.equals(target)) return;
+        boolean projectile = projectileVelocity != null;
+        double baseHorizontal = projectile ? ArcadePortRules.GLADIATOR_PROJECTILE_KNOCKBACK_HORIZONTAL
+                : ArcadePortRules.GLADIATOR_MELEE_KNOCKBACK_HORIZONTAL;
+        double baseVertical = projectile ? ArcadePortRules.GLADIATOR_PROJECTILE_KNOCKBACK_VERTICAL
+                : ArcadePortRules.GLADIATOR_MELEE_KNOCKBACK_VERTICAL;
+        double horizontal = ArcadePortRules.gladiatorsKnockbackHorizontal(projectile);
+        double vertical = ArcadePortRules.gladiatorsKnockbackVertical(projectile);
+        Vector direction = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
+        Vector velocity = ArcadePortRules.legacyPvpKnockbackVelocity(direction, projectileVelocity, damage,
+                baseHorizontal <= 0.0D ? 1.0D : horizontal / baseHorizontal, target.isOnGround());
+        if (velocity == null) return;
+        if (baseVertical > 0.0D) velocity.setY(velocity.getY() * vertical / baseVertical);
+        target.setFallDistance(0.0F);
+        target.setVelocity(velocity);
+    }
+
+    private static boolean usesDedicatedPvpKnockback(ArcadePortGame game) {
+        return game == ArcadePortGame.BACON_BRAWL || game == ArcadePortGame.BOMB_LOBBERS
+                || game == ArcadePortGame.DEATH_TAG || game == ArcadePortGame.PAINTBALL
+                || game == ArcadePortGame.MICRO_BATTLES
+                || game == ArcadePortGame.SPLEEF || game == ArcadePortGame.DRAGON_ESCAPE
+                || game == ArcadePortGame.DRAGONS || game == ArcadePortGame.WIZARDS;
+    }
+
     private void applyGladiatorDamage(Session session, Player attacker, Player target,
-            double damage, boolean projectile) {
+            double damage, Vector projectileVelocity) {
         if (active != session || attacker.equals(target) || !Double.isFinite(damage) || damage <= 0.0D) return;
         UUID attackerId = attacker.getUniqueId();
         UUID targetId = target.getUniqueId();
@@ -19900,6 +19946,7 @@ public final class ArcadePortManager implements Listener {
                 targetPair == null ? -2 : targetPair,
                 attackerPair != null && session.gladiatorResolvedPairs.contains(attackerPair))) return;
         if (target.getNoDamageTicks() > 0) return;
+        boolean projectile = projectileVelocity != null;
         if (projectile) {
             recordGladiatorToolHit(session, attacker, target, GladiatorsAchievementRules.BOW_HIT);
             session.gladiatorBoutTimedCritStreak.remove(attackerId);
@@ -19932,12 +19979,7 @@ public final class ArcadePortManager implements Listener {
         }
         target.setHealth(target.getHealth() - damage);
         playLegacyDamageFeedback(target);
-        Vector push = target.getLocation().toVector().subtract(attacker.getLocation().toVector()).setY(0.0D);
-        if (push.lengthSquared() > 0.001D) {
-            target.setVelocity(target.getVelocity().add(push.normalize()
-                    .multiply(ArcadePortRules.gladiatorsKnockbackHorizontal(projectile))
-                    .setY(ArcadePortRules.gladiatorsKnockbackVertical(projectile))));
-        }
+        applyGladiatorKnockback(attacker, target, damage, projectileVelocity);
 
         Player creditedKiller = attacker == null ? recentMicroBattlesKiller(session, target.getUniqueId()) : attacker;
         target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
@@ -20954,6 +20996,11 @@ public final class ArcadePortManager implements Listener {
 
     private void handlePlayerHit(Session session, Player attacker, Player target, String source,
             int paintballAmount, double sourceDamage) {
+        handlePlayerHit(session, attacker, target, source, paintballAmount, sourceDamage, null);
+    }
+
+    private void handlePlayerHit(Session session, Player attacker, Player target, String source,
+            int paintballAmount, double sourceDamage, Vector projectileVelocity) {
         if (active != session || attacker.equals(target) || !session.alive.contains(attacker.getUniqueId())
                 || !session.alive.contains(target.getUniqueId())) return;
         if (session.type == ArcadePortGame.GLADIATORS
@@ -21000,6 +21047,21 @@ public final class ArcadePortManager implements Listener {
                     session.spleefBrawlerSmashBlocks.getOrDefault(attackerId, 0)));
             handleSpleefKnockback(session, attacker, target);
             return;
+        }
+        boolean sourceDefaultKnockback = "melee".equalsIgnoreCase(source)
+                || "projectile hit".equalsIgnoreCase(source)
+                || "sheep archer arrow".equalsIgnoreCase(source);
+        if (sourceDefaultKnockback
+                && !usesDedicatedPvpKnockback(session.type)
+                && session.type != ArcadePortGame.EVOLUTION
+                && session.type != ArcadePortGame.ONE_IN_THE_QUIVER) {
+            ItemStack weapon = attacker.getInventory().getItemInMainHand();
+            int sharpness = weapon == null ? 0 : weapon.getEnchantmentLevel(Enchantment.SHARPNESS);
+            double knockbackDamage = Double.isFinite(sourceDamage) && sourceDamage > 0.0D
+                    ? sourceDamage : projectileVelocity != null
+                            ? projectileVelocity.length() * 3.0D
+                            : ArcadePortRules.legacyMeleeDamage(weapon == null ? Material.AIR : weapon.getType(), sharpness);
+            applyLegacyPvpKnockback(attacker, target, knockbackDamage, projectileVelocity);
         }
 
         switch (session.type) {
@@ -21102,6 +21164,9 @@ public final class ArcadePortManager implements Listener {
             case EVOLUTION: {
                 int level = Math.max(0, Math.min(4, session.evolutionLevels.getOrDefault(attacker.getUniqueId(), 0)));
                 double damage = ArcadePortRules.evolutionMeleeDamage(level);
+                if ("melee".equalsIgnoreCase(source)) {
+                    applyLegacyPvpKnockback(attacker, target, damage, null);
+                }
                 if (target.getHealth() <= damage) {
                     target.getWorld().playSound(target.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 1.0F, 0.8F);
                     eliminate(session, target, attacker, "was defeated by " + attacker.getName());
@@ -21613,7 +21678,8 @@ public final class ArcadePortManager implements Listener {
                     awardCatalogAchievement(shooter, "turf-wars", "watch-your-step");
                 }
             }
-            handlePlayerHit(session, shooter, target, "projectile hit");
+            handlePlayerHit(session, shooter, target, "projectile hit", 1, Double.NaN,
+                    projectile.getVelocity().clone());
             session.turfTrackedArrows.remove(projectile.getUniqueId());
             session.entities.remove(projectile);
             projectile.remove();
@@ -21625,7 +21691,7 @@ public final class ArcadePortManager implements Listener {
             int bonus = arrow.isCritical() && baseDamage > 0
                     ? ThreadLocalRandom.current().nextInt(baseDamage / 2 + 2) : 0;
             handlePlayerHit(session, shooter, target, "sheep archer arrow", 1,
-                    ArcadePortRules.sheepQuestLegacyArrowDamage(speed, bonus));
+                    ArcadePortRules.sheepQuestLegacyArrowDamage(speed, bonus), arrow.getVelocity().clone());
             session.entities.remove(projectile);
             projectile.remove();
         } else if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER) {
@@ -21664,7 +21730,8 @@ public final class ArcadePortManager implements Listener {
         } else if (session.type == ArcadePortGame.MICRO_BATTLES) {
             handlePlayerHit(session, shooter, target, "arrow hit");
         } else {
-            handlePlayerHit(session, shooter, target, "projectile hit");
+            handlePlayerHit(session, shooter, target, "projectile hit", 1, Double.NaN,
+                    projectile.getVelocity().clone());
         }
     }
 
@@ -25432,6 +25499,18 @@ public final class ArcadePortManager implements Listener {
         return GameMode.SURVIVAL;
     }
 
+    private GameMode arcadePlayerGameMode(Session session, UUID playerId) {
+        if (session != null && session.type == ArcadePortGame.DRAGON_ESCAPE) {
+            String kit = session.dragonEscapeKits.getOrDefault(playerId,
+                    dragonEscapeKitPreferences.getOrDefault(playerId,
+                            plugin.getConfig().getString("lobby-kit-preferences." + playerId + ".dragon-escape", "jumper")));
+            if ("builder".equalsIgnoreCase(kit) || "digger".equalsIgnoreCase(kit)) {
+                return GameMode.SURVIVAL;
+            }
+        }
+        return arcadePlayerGameMode(session == null ? null : session.type);
+    }
+
     private void checkPlayerArena(Session session, Player player) {
         if (!session.alive.contains(player.getUniqueId())) return;
         if (session.type == ArcadePortGame.DEATH_TAG
@@ -25469,11 +25548,13 @@ public final class ArcadePortManager implements Listener {
         } else {
             voidThresholdY = ArcadePortRules.sourceMapVoidThresholdY(false, 0);
         }
-        if (session.type == ArcadePortGame.DRAGON_ESCAPE && sourceMap != null
-                && sourceMap.hasBounds()
+        SourceMapCatalog.MapData.MapBounds dragonEscapeBounds = session.type == ArcadePortGame.DRAGON_ESCAPE
+                && sourceMap != null ? sourceMap.boundsIncludingAuthoredLocations() : null;
+        if (dragonEscapeBounds != null
                 && ArcadePortRules.isOutsideDragonEscapeMapBounds(
                         location.getX(), location.getY(), location.getZ(),
-                        sourceMap.minX(), sourceMap.maxX(), sourceMap.minZ(), sourceMap.maxZ(),
+                        dragonEscapeBounds.minX(), dragonEscapeBounds.maxX(),
+                        dragonEscapeBounds.minZ(), dragonEscapeBounds.maxZ(),
                         false, 0, 0)) {
             eliminate(session, player, null, "left the playable map area");
             return;
@@ -26918,6 +26999,11 @@ public final class ArcadePortManager implements Listener {
             }
             double damage = Math.max(0.0D, event.getFinalDamage());
             if (damage <= 0.0D) return;
+            if (attacker != null && event instanceof EntityDamageByEntityEvent byEntity) {
+                Entity damager = byEntity.getDamager();
+                applyLegacyPvpKnockback(attacker, teamTarget, event.getDamage(),
+                        damager instanceof Projectile projectile ? projectile.getVelocity().clone() : null);
+            }
             if (teamTarget.getHealth() <= damage) {
                 eliminate(session, teamTarget, attacker, attacker == null
                         ? "was defeated" : "was defeated by " + attacker.getName());
@@ -27246,7 +27332,8 @@ public final class ArcadePortManager implements Listener {
                     if (session.alive.contains(attacker.getUniqueId())
                             && session.alive.contains(gladiatorTarget.getUniqueId())) {
                         applyGladiatorDamage(session, attacker, gladiatorTarget,
-                                ArcadePortRules.gladiatorsPvpDamage(finalDamage), damager instanceof Projectile);
+                                ArcadePortRules.gladiatorsPvpDamage(finalDamage),
+                                damager instanceof Projectile projectile ? projectile.getVelocity().clone() : null);
                     }
                 } else {
                     applyGladiatorEnvironmentalDamage(session, gladiatorTarget, finalDamage, damageReason);
@@ -27421,13 +27508,9 @@ public final class ArcadePortManager implements Listener {
                     session.deathTagProjectileDamage.put(projectile.getUniqueId(), incomingDamage);
                 }
                 if (damager instanceof Player attacker) {
-                    if (session.type == ArcadePortGame.SHEEP_QUEST) {
-                        // Use native damage only for the 26.3 spear's charge strength.
-                        // All legacy axes and swords use their 1.8 values instead.
-                        handlePlayerHit(session, attacker, target, "melee", 1, event.getDamage());
-                    } else {
-                        handlePlayerHit(session, attacker, target, "melee");
-                    }
+                    // Preserve the already-adjusted legacy weapon damage for source-style knockback
+                    // and Sheep Quest's charged spear handling.
+                    handlePlayerHit(session, attacker, target, "melee", 1, event.getDamage());
                 } else if (session.type == ArcadePortGame.DEATH_TAG && damager instanceof Zombie zombie
                         && session.entities.contains(zombie)) {
                     if (session.participantsAtStart <= 1) {
@@ -30402,6 +30485,38 @@ public final class ArcadePortManager implements Listener {
             event.setCancelled(true);
             return;
         }
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE
+                && session.alive.contains(event.getPlayer().getUniqueId())) {
+            Player player = event.getPlayer();
+            UUID playerId = player.getUniqueId();
+            String kit = session.dragonEscapeKits.getOrDefault(playerId, "jumper");
+            if ("digger".equals(kit) && heldMaterial == Material.DIAMOND_PICKAXE) {
+                event.setCancelled(true);
+                useDragonEscapeDigger(session, player, event.getBlock());
+                return;
+            }
+            if ("builder".equals(kit)) {
+                DragonEscapeBuilderBrick brick = session.dragonEscapeBuilderBricks.get(playerId);
+                if (brick != null && brick.original.getBlock().equals(event.getBlock())) {
+                    event.setCancelled(true);
+                    restoreDragonEscapeBuilderBrick(brick);
+                    session.dragonEscapeBuilderBricks.remove(playerId);
+                    return;
+                }
+            }
+            Block broken = event.getBlock();
+            if (isDragonEscapeDiggerBlockAllowed(broken.getType())
+                    && isDragonEscapeDiggerBuildLocationAllowed(session, broken)
+                    && !(broken.getState() instanceof org.bukkit.block.Container)) {
+                BlockState original = broken.getState();
+                scheduleDragonEscapeBlockRestore(session, original, Bukkit.createBlockData(Material.AIR));
+                event.setCancelled(false);
+                event.setExpToDrop(0);
+                return;
+            }
+            event.setCancelled(true);
+            return;
+        }
         if (event.isCancelled() && session.type != ArcadePortGame.MICRO_BATTLES
                 && session.type != ArcadePortGame.MASTER_BUILDERS) return;
         if (session.type == ArcadePortGame.SKY_WARS
@@ -33187,7 +33302,7 @@ public final class ArcadePortManager implements Listener {
                     if (active != session || !session.alive.contains(playerId)) return;
                     Player current = session.players.get(playerId);
                     if (current == null || !current.isOnline()) return;
-                    current.setGameMode(arcadePlayerGameMode(session.type));
+                    current.setGameMode(arcadePlayerGameMode(session, playerId));
                     if (session.type == ArcadePortGame.DEATH_TAG) {
                         boolean chaser = session.tagged.contains(playerId);
                         giveDeathTagKit(session, current, chaser,
