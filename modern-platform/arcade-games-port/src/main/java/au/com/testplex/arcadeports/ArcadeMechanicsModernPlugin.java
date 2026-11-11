@@ -120,7 +120,6 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                             && cameraShy != null && cameraShy.restorePendingSnapshot(online);
                     if (!restoredSpeedBuilders && !restoredCameraShy) manager.returnPlayerToLobby(online);
                     grantConfiguredAdmin(online);
-                    manager.restoreMonsterMazeKitPreference(online);
                 }
             });
         }
@@ -384,7 +383,6 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 boolean restoredSpeedBuilders = speedBuilders != null && speedBuilders.restorePendingSnapshot(player);
                 if (!restoredSpeedBuilders && cameraShy != null) cameraShy.restorePendingSnapshot(player);
                 grantConfiguredAdmin(player);
-                manager.restoreMonsterMazeKitPreference(player);
             }
         });
     }

@@ -182,6 +182,12 @@ public class KitManager implements Listener {
         }
     }
 
+    /** Restore a saved selection for the next integrated match without changing player state or messaging. */
+    public void restoreSelection(Player player, KitType type) {
+        if (player == null || type == null) return;
+        selected.put(player.getUniqueId(), type);
+    }
+
     public void clearAll() {
         selected.clear();
         jumpRecharge.clear();
@@ -274,8 +280,8 @@ public class KitManager implements Listener {
         player.removePotionEffect(PotionEffectType.INVISIBILITY);
         player.removePotionEffect(PotionEffectType.SPEED);
         AttributeInstance a = player.getAttribute(Attribute.JUMP_STRENGTH);
-        if (a != null && Math.abs(a.getBaseValue() - jumpStrengthDefault()) > 0.0001) {
-            a.setBaseValue(jumpStrengthDefault());
+        if (a != null && Math.abs(a.getBaseValue() - 0.42D) > 0.0001) {
+            a.setBaseValue(0.42D);
         }
         AttributeInstance m = player.getAttribute(Attribute.MOVEMENT_SPEED);
         if (m != null && Math.abs(m.getBaseValue() - 0.100D) > 0.0001) {
