@@ -7178,27 +7178,30 @@ public final class ArcadePortManager implements Listener {
 
     private void setupGladiatorsScoreboard(Session session) {
         if (session == null || Bukkit.getScoreboardManager() == null) return;
-        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
-        Objective objective = scoreboard.registerNewObjective("glad", "dummy", ChatColor.GOLD + "GLADIATORS");
-        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
-        session.gladiatorScoreboard = scoreboard;
-        session.gladiatorScoreboardObjective = objective;
-        for (int index = 0; index < 15; index++) {
-            Team line = scoreboard.registerNewTeam("gladline" + index);
-            String entry = ChatColor.values()[index].toString();
-            line.addEntry(entry);
-            session.gladiatorScoreboardTeams.add(line);
-            session.gladiatorScoreboardEntries.add(entry);
-        }
         for (Player player : session.players.values()) {
-            if (player != null && player.isOnline()) player.setScoreboard(scoreboard);
+            if (player == null || !player.isOnline()) continue;
+            Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
+            Objective objective = scoreboard.registerNewObjective("glad", "dummy", ChatColor.GOLD + "GLADIATORS");
+            objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+            List<Team> teams = new ArrayList<>();
+            List<String> entries = new ArrayList<>();
+            for (int index = 0; index < 20; index++) {
+                Team line = scoreboard.registerNewTeam("gladline" + index);
+                String entry = ChatColor.values()[index].toString();
+                line.addEntry(entry);
+                teams.add(line);
+                entries.add(entry);
+            }
+            session.gladiatorScoreboards.put(player.getUniqueId(),
+                    new GladiatorScoreboardView(scoreboard, objective, teams, entries));
+            player.setScoreboard(scoreboard);
         }
         applySessionTeamTabTeams(session);
         updateGladiatorsScoreboard(session, System.currentTimeMillis());
     }
 
     private void updateGladiatorsScoreboard(Session session, long now) {
-        if (session == null || session.gladiatorScoreboardObjective == null
+        if (session == null || session.gladiatorScoreboards.isEmpty()
                 || now < session.gladiatorNextScoreboardAt) return;
         session.gladiatorNextScoreboardAt = now + 500L;
         int activeMatches = 0;
@@ -7220,80 +7223,73 @@ public final class ArcadePortManager implements Listener {
 
         List<Player> players = alivePlayers(session).stream()
                 .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER)).toList();
-        List<String> lines = new ArrayList<>();
-        lines.add(ChatColor.GREEN + "Status");
-        lines.add(ChatColor.WHITE + status);
-        lines.add(" ");
-        lines.add(ChatColor.AQUA + "Matches Left");
-        lines.add(ChatColor.WHITE + Integer.toString(activeMatches));
-        lines.add("  ");
-        lines.add(ChatColor.YELLOW + "Players");
-        if (players.size() > 7) lines.add(ChatColor.WHITE + Integer.toString(players.size()) + " Players");
-        else for (Player player : players) lines.add(ChatColor.WHITE + player.getName());
-        for (int index = 0; index < session.gladiatorScoreboardTeams.size(); index++) {
-            Team line = session.gladiatorScoreboardTeams.get(index);
-            String entry = session.gladiatorScoreboardEntries.get(index);
-            if (index < lines.size()) {
-                line.setPrefix(lines.get(index));
-                session.gladiatorScoreboardObjective.getScore(entry).setScore(lines.size() - index);
-            } else {
-                line.setPrefix("");
-                session.gladiatorScoreboard.resetScores(entry);
+        for (Map.Entry<UUID, GladiatorScoreboardView> scoreboardEntry : session.gladiatorScoreboards.entrySet()) {
+            GladiatorScoreboardView view = scoreboardEntry.getValue();
+            List<String> lines = new ArrayList<>();
+            lines.add(ChatColor.GREEN + "Status");
+            lines.add(ChatColor.WHITE + status);
+            lines.add(" ");
+            lines.add(ChatColor.AQUA + "Matches Left");
+            lines.add(ChatColor.WHITE + Integer.toString(activeMatches));
+            lines.add("  ");
+            lines.add(ChatColor.YELLOW + "Players");
+            if (players.size() > 7) lines.add(ChatColor.WHITE + Integer.toString(players.size()) + " Players");
+            else for (Player player : players) lines.add(ChatColor.WHITE + player.getName());
+            String bracketStatus = gladiatorBracketStatus(session, scoreboardEntry.getKey());
+            if (bracketStatus != null) {
+                lines.add("   ");
+                lines.add(ChatColor.GOLD + "Your Match");
+                lines.add(ChatColor.WHITE + bracketStatus);
+            }
+            for (int index = 0; index < view.teams.size(); index++) {
+                Team line = view.teams.get(index);
+                String entry = view.entries.get(index);
+                if (index < lines.size()) {
+                    line.setPrefix(lines.get(index));
+                    view.objective.getScore(entry).setScore(lines.size() - index);
+                } else {
+                    line.setPrefix("");
+                    view.scoreboard.resetScores(entry);
+                }
             }
         }
-        updateGladiatorBracketActionbars(session);
     }
 
-    private void updateGladiatorBracketActionbars(Session session) {
-        if (session.gladiatorBracket == null) return;
+    private String gladiatorBracketStatus(Session session, UUID playerId) {
+        if (session.gladiatorBracket == null) return null;
         List<GladiatorsBracket.MatchView> matches = session.gladiatorBracket.matches();
-        for (UUID playerId : session.alive) {
-            Player player = session.players.get(playerId);
-            if (player == null || !player.isOnline()) continue;
-            GladiatorsBracket.MatchView next = matches.stream()
-                    .filter(match -> match.status() != GladiatorsBracket.Status.COMPLETED
-                            && (playerId.equals(match.first()) || playerId.equals(match.second())))
-                    .min(java.util.Comparator.comparingInt(GladiatorsBracket.MatchView::round)).orElse(null);
-            if (next == null) {
-                player.sendActionBar(ChatColor.GOLD + "Bracket "
-                        + (session.gladiatorBracket.losses(playerId) == 0 ? "Winners" : "Losers")
-                        + " | Losses: " + session.gladiatorBracket.losses(playerId) + " | Waiting for opponent");
-                continue;
-            }
-            String bracketName = switch (next.bracket()) {
-                case WINNERS -> "Winners";
-                case LOSERS -> "Losers";
-                case GRAND_FINAL, GRAND_FINAL_RESET -> "Grand Final";
-            };
-            UUID opponentId = playerId.equals(next.first()) ? next.second() : next.first();
-            Player opponent = opponentId == null ? null : session.players.get(opponentId);
-            String opponentName = opponent == null ? "TBD" : opponent.getName();
-            String state = next.status() == GladiatorsBracket.Status.FIGHTING ? "Duel active"
-                    : next.status() == GladiatorsBracket.Status.READY ? "Ready" : "Waiting";
-            player.sendActionBar(ChatColor.GOLD + bracketName + " R" + next.round() + " | Losses: "
-                    + session.gladiatorBracket.losses(playerId) + " | vs " + opponentName + " | " + state);
-        }
+        GladiatorsBracket.MatchView next = matches.stream()
+                .filter(match -> match.status() != GladiatorsBracket.Status.COMPLETED
+                        && (playerId.equals(match.first()) || playerId.equals(match.second())))
+                .min(java.util.Comparator.comparingInt(GladiatorsBracket.MatchView::round)).orElse(null);
+        int losses = session.gladiatorBracket.losses(playerId);
+        if (next == null) return (losses == 0 ? "Winners" : "Losers") + " R? | Losses " + losses + " | Waiting";
+        String bracketName = switch (next.bracket()) {
+            case WINNERS -> "Winners";
+            case LOSERS -> "Losers";
+            case GRAND_FINAL, GRAND_FINAL_RESET -> "Grand Final";
+        };
+        UUID opponentId = playerId.equals(next.first()) ? next.second() : next.first();
+        Player opponent = opponentId == null ? null : session.players.get(opponentId);
+        String opponentName = opponent == null ? "TBD" : opponent.getName();
+        String state = next.status() == GladiatorsBracket.Status.FIGHTING ? "Fighting"
+                : next.status() == GladiatorsBracket.Status.READY ? "Ready" : "Waiting";
+        return bracketName + " R" + next.round() + " Losses " + losses + " vs " + opponentName + " " + state;
     }
 
     private void cleanupGladiatorsScoreboard(Session session) {
-        if (session == null || session.gladiatorScoreboard == null) return;
-        try {
-            if (session.gladiatorScoreboard.getObjective(DisplaySlot.SIDEBAR)
-                    == session.gladiatorScoreboardObjective && session.gladiatorPreviousSidebar != null) {
-                session.gladiatorPreviousSidebar.setDisplaySlot(DisplaySlot.SIDEBAR);
+        if (session == null) return;
+        for (GladiatorScoreboardView view : session.gladiatorScoreboards.values()) {
+            try {
+                for (Team team : view.teams) {
+                    if (view.scoreboard.getTeam(team.getName()) != null) team.unregister();
+                }
+                if (view.objective != null) view.objective.unregister();
+            } catch (IllegalArgumentException | IllegalStateException exception) {
+                plugin.getLogger().fine("Gladiators scoreboard was already removed: " + exception.getMessage());
             }
-            for (Team team : new ArrayList<>(session.gladiatorScoreboardTeams)) {
-                if (session.gladiatorScoreboard.getTeam(team.getName()) != null) team.unregister();
-            }
-            if (session.gladiatorScoreboardObjective != null) session.gladiatorScoreboardObjective.unregister();
-        } catch (IllegalArgumentException | IllegalStateException exception) {
-            plugin.getLogger().fine("Gladiators scoreboard was already removed: " + exception.getMessage());
         }
-        session.gladiatorScoreboardTeams.clear();
-        session.gladiatorScoreboardEntries.clear();
-        session.gladiatorScoreboard = null;
-        session.gladiatorScoreboardObjective = null;
-        session.gladiatorPreviousSidebar = null;
+        session.gladiatorScoreboards.clear();
     }
 
     private void resolveGladiatorVote(Session session) {

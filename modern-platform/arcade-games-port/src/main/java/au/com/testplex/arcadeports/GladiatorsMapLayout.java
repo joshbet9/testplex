@@ -59,7 +59,7 @@ final class GladiatorsMapLayout {
             List<ArenaSpawns> nextTier = tierArenas.get(tier + 1);
             for (ArenaSpawns arena : tierArenas.get(tier)) {
                 ArenaSpawns nextArena = nextTier.stream().min(Comparator.comparingDouble(
-                        candidate -> candidate.center().distanceSquared(arena.center()))).orElse(null);
+                        candidate -> distanceSquared(candidate.center(), arena.center()))).orElse(null);
                 if (nextArena == null) continue;
                 Location guide = arena.center().clone().add(nextArena.center().toVector()
                         .subtract(arena.center().toVector()).multiply(0.5D));
@@ -78,7 +78,7 @@ final class GladiatorsMapLayout {
         List<Location> assigned = blackMarkers.stream().filter(marker -> marker != null
                         && marker.getWorld() == center.getWorld())
                 .filter(marker -> nearestCenter(centers, marker) == centerIndex(centers, center))
-                .sorted(Comparator.comparingDouble(marker -> marker.distanceSquared(center)))
+                .sorted(Comparator.comparingDouble(marker -> distanceSquared(marker, center)))
                 .limit(2).map(Location::clone).toList();
         return assigned.size() == 2 ? assigned : List.of();
     }
@@ -94,7 +94,7 @@ final class GladiatorsMapLayout {
         for (int i = 0; i < centers.size(); i++) {
             Location candidate = centers.get(i);
             if (candidate == null || candidate.getWorld() != marker.getWorld()) continue;
-            double distance = candidate.distanceSquared(marker);
+            double distance = distanceSquared(candidate, marker);
             if (distance < bestDistance) {
                 bestDistance = distance;
                 best = i;
@@ -124,11 +124,11 @@ final class GladiatorsMapLayout {
             for (int j = i + 1; j < locations.size(); j++) {
                 Location second = locations.get(j);
                 if (first.getWorld() != second.getWorld()) continue;
-                double spawnDistance = first.distanceSquared(second);
+                double spawnDistance = distanceSquared(first, second);
                 if (spawnDistance < 64.0D || spawnDistance > 1_600.0D || spawnDistance >= bestDistance) continue;
                 Location center = first.clone().add(second.toVector().subtract(first.toVector()).multiply(0.5D));
                 boolean overlaps = existing.stream().anyMatch(arena -> arena.center().getWorld() == center.getWorld()
-                        && arena.center().distanceSquared(center) < minCenterDistanceSquared);
+                        && distanceSquared(arena.center(), center) < minCenterDistanceSquared);
                 if (overlaps) continue;
                 best = new PairChoice(i, j);
                 bestDistance = spawnDistance;
@@ -141,6 +141,13 @@ final class GladiatorsMapLayout {
         double dx = location.getX() - x;
         double dz = location.getZ() - z;
         return dx * dx + dz * dz;
+    }
+
+    private static double distanceSquared(Location first, Location second) {
+        double dx = first.getX() - second.getX();
+        double dy = first.getY() - second.getY();
+        double dz = first.getZ() - second.getZ();
+        return dx * dx + dy * dy + dz * dz;
     }
 
     private record ArenaSpawns(Location center, Location first, Location second) {}
