@@ -1,0 +1,17 @@
+**
+!Dockerfile.fly
+!deploy/
+!deploy/fly/
+!deploy/fly/entrypoint.sh
+!deploy/fly/packetevents-spigot-2.14.0.jar
+!deploy/fly/WizardsSourceMaps.tar.gz
+!modern-platform/
+modern-platform/**
+!modern-platform/target/
+modern-platform/target/**
+!modern-platform/target/TestplexModernArcade.jar
+!modern-platform/arcade-games-port/
+modern-platform/arcade-games-port/**
+!modern-platform/arcade-games-port/target/
+modern-platform/arcade-games-port/target/**
+!modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar
