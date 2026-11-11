@@ -6315,9 +6315,22 @@ public final class ArcadePortManager implements Listener {
     private boolean hasGladiatorSourceArenas(Session session, int round, boolean losersBracket) {
         SourceMapCatalog.MapData data = losersBracket ? session.gladiatorMirrorMapData
                 : sourceMapData.get(session.type.id());
-        return data != null
-                && !data.dataLocations(ArcadePortRules.gladiatorsArenaMarkerGroup(round)).isEmpty()
-                && data.dataLocations("BLACK").size() >= 2;
+        if (data == null) return false;
+        List<Location> tierCenters = data.dataLocations(ArcadePortRules.gladiatorsArenaMarkerGroup(round));
+        List<Location> allCenters = gladiatorAllArenaCenters(data);
+        List<Location> spawns = data.dataLocations("BLACK");
+        return !tierCenters.isEmpty() && spawns.size() >= 2
+                && tierCenters.stream().allMatch(center ->
+                        GladiatorsMapLayout.spawnsForArena(allCenters, spawns, center).size() == 2);
+    }
+
+    private List<Location> gladiatorAllArenaCenters(SourceMapCatalog.MapData data) {
+        if (data == null) return List.of();
+        List<Location> centers = new ArrayList<>();
+        for (String group : List.of("GREEN", "YELLOW", "ORANGE", "RED")) {
+            centers.addAll(data.dataLocations(group));
+        }
+        return centers;
     }
 
     /** Prefer the actual arena centres in the selected Reborn map; generated centres are test fallback only. */
@@ -6339,7 +6352,7 @@ public final class ArcadePortManager implements Listener {
         return fallback;
     }
 
-    /** Reborn marks both combat positions with BLACK; each arena uses its two nearest spawn markers. */
+    /** Reborn marks both combat positions with BLACK; bind each pair to its nearest arena center. */
     private Location[] gladiatorArenaSpawnPair(Session session, Location center, boolean useSourceMap) {
         return gladiatorArenaSpawnPair(session, center, useSourceMap, false);
     }
@@ -6349,12 +6362,14 @@ public final class ArcadePortManager implements Listener {
         if (useSourceMap) {
             SourceMapCatalog.MapData data = losersBracket ? session.gladiatorMirrorMapData
                     : sourceMapData.get(session.type.id());
-            List<Location> candidates = data.dataLocations("BLACK").stream()
-                    .map(location -> locationInWorld(location, center.getWorld())).collect(java.util.stream.Collectors.toCollection(ArrayList::new));
-            candidates.sort((left, right) -> Double.compare(
-                    left.distanceSquared(center), right.distanceSquared(center)));
-            Location first = candidates.get(0).clone();
-            Location second = candidates.get(1).clone();
+            List<Location> allCenters = gladiatorAllArenaCenters(data).stream()
+                    .map(location -> locationInWorld(location, center.getWorld())).toList();
+            List<Location> assignedSpawns = GladiatorsMapLayout.spawnsForArena(allCenters,
+                    data.dataLocations("BLACK").stream()
+                            .map(location -> locationInWorld(location, center.getWorld())).toList(), center);
+            if (assignedSpawns.size() != 2) return null;
+            Location first = assignedSpawns.get(0);
+            Location second = assignedSpawns.get(1);
             first.setDirection(center.toVector().subtract(first.toVector()));
             second.setDirection(center.toVector().subtract(second.toVector()));
             first.setPitch(0.0F);
@@ -6390,12 +6405,12 @@ public final class ArcadePortManager implements Listener {
     }
 
     private List<Block> gladiatorDoorBlocksBetween(Session session, Location from, Location to) {
-        SourceMapCatalog.MapData data = sourceMapData.get(session.type.id());
+        SourceMapCatalog.MapData data = from != null && session.gladiatorMirrorWorld != null
+                && from.getWorld() == session.gladiatorMirrorWorld
+                        ? session.gladiatorMirrorMapData : sourceMapData.get(session.type.id());
         if (data == null || from == null || to == null) return List.of();
-        List<Location> arenaMids = new ArrayList<>();
-        for (String colour : List.of("RED", "ORANGE", "YELLOW", "GREEN")) {
-            arenaMids.addAll(data.dataLocations(colour));
-        }
+        ensureGladiatorDoorsInitialized(session, data, from.getWorld());
+        List<Location> arenaMids = gladiatorAllArenaCenters(data);
         List<Block> doors = new ArrayList<>();
         for (Location marker : data.customLocations("129")) {
             List<Location> closest = arenaMids.stream()
@@ -6406,6 +6421,14 @@ public final class ArcadePortManager implements Listener {
             if (connects && !doors.contains(marker.getBlock())) doors.add(marker.getBlock());
         }
         return doors;
+    }
+
+    private void ensureGladiatorDoorsInitialized(
+            Session session, SourceMapCatalog.MapData data, World world) {
+        if (data == null || world == null || !session.gladiatorDoorWorldsInitialized.add(world.getUID())) return;
+        for (Location marker : data.customLocations("129")) {
+            locationInWorld(marker, world).getBlock().setType(Material.OAK_FENCE, false);
+        }
     }
 
     private void buildGladiatorArena(World world, int arenaSlot, int tier) {
@@ -7508,6 +7531,7 @@ public final class ArcadePortManager implements Listener {
         World matchWorld = losersBracket ? session.gladiatorMirrorWorld : session.world;
         SourceMapCatalog.MapData matchMapData = losersBracket ? session.gladiatorMirrorMapData
                 : sourceMapData.get(session.type.id());
+        ensureGladiatorDoorsInitialized(session, matchMapData, matchWorld);
         int arenaRound = bracket == GLADIATOR_BRACKET_FINAL ? 3 : matchTier;
         boolean sourceArenas = hasGladiatorSourceArenas(session, arenaRound, losersBracket);
         Location center;
@@ -7551,14 +7575,22 @@ public final class ArcadePortManager implements Listener {
         }
 
         Map<UUID, List<Block>> advancingDoors = new HashMap<>();
-        if (bracket == GLADIATOR_BRACKET_WINNERS && sourceArenas) {
+        boolean canWalkToNextArena = bracket == GLADIATOR_BRACKET_WINNERS && sourceArenas;
+        if (canWalkToNextArena) {
             for (UUID id : List.of(firstId, secondId)) {
                 Location previousCenter = session.gladiatorPreviousArenaCentersByPlayer.get(id);
+                if (previousCenter == null || previousCenter.getWorld() != matchWorld) {
+                    canWalkToNextArena = false;
+                    break;
+                }
                 List<Block> doors = gladiatorDoorBlocksBetween(session, previousCenter, center);
                 if (!doors.isEmpty()) advancingDoors.put(id, doors);
             }
         }
-        boolean walkToNextArena = advancingDoors.size() == 2;
+        // Keep the source game's walk-to-next-arena flow even on WorldDownloader maps
+        // without authored door markers. The source 15-second slow-mover recovery is
+        // retained as a single fallback, never as the normal round transition.
+        boolean walkToNextArena = canWalkToNextArena;
         long transitionUntil = walkToNextArena ? now + ArcadePortRules.gladiatorsArenaTransitionMillis() : now;
         long fightStartsAt = transitionUntil + GameDebugRuntimeOverrides.longValue("GLADIATOR_ROUND_COUNTDOWN_MILLIS", ArcadePortRules.GLADIATOR_ROUND_COUNTDOWN_MILLIS);
         session.gladiatorRoundStartedAtByPair.put(pair, fightStartsAt);
@@ -7581,8 +7613,16 @@ public final class ArcadePortManager implements Listener {
                 UUID id = player.getUniqueId();
                 session.gladiatorAdvanceSpawns.put(id, spawn.clone());
                 session.gladiatorAdvanceUntil.put(id, transitionUntil);
-                session.gladiatorAdvanceDoors.put(id, advancingDoors.get(id));
-                for (Block door : advancingDoors.get(id)) door.setType(Material.AIR, false);
+                session.gladiatorAdvanceDoors.put(id, advancingDoors.getOrDefault(id, List.of()));
+                Location previousCenter = session.gladiatorPreviousArenaCentersByPlayer.get(id);
+                Location trailTarget = previousCenter == null ? null : matchMapData.dataLocations("PINK").stream()
+                        .map(location -> locationInWorld(location, matchWorld))
+                        .min(java.util.Comparator.comparingDouble(location -> location.distanceSquared(previousCenter)))
+                        .orElse(null);
+                session.gladiatorAdvanceTrailTargets.put(id,
+                        trailTarget == null ? spawn.clone() : trailTarget.clone());
+                for (Block door : advancingDoors.getOrDefault(id, List.of())) door.setType(Material.AIR, false);
+                player.sendMessage(ChatColor.GREEN + "Follow the particle trail to your next arena.");
             } else player.teleport(spawn);
             player.setGameMode(GameMode.SURVIVAL);
             player.setHealth(player.getMaxHealth());
@@ -7755,33 +7795,38 @@ public final class ArcadePortManager implements Listener {
                 session.gladiatorAdvanceUntil.remove(id);
                 session.gladiatorAdvanceSpawns.remove(id);
                 session.gladiatorAdvanceDoors.remove(id);
+                session.gladiatorParticleTrails.remove(id);
+                session.gladiatorNextParticleTrailAt.remove(id);
+                session.gladiatorAdvanceTrailTargets.remove(id);
+                session.gladiatorAdvanceDoorCloseAt.remove(id);
                 continue;
             }
             if (now < entry.getValue()) {
-                if (now % 500L < 50L) {
-                    Vector route = destination.toVector().subtract(player.getLocation().toVector());
-                    double distance = Math.min(28.0D, route.length());
-                    if (distance > 1.0D) {
-                        Vector direction = route.normalize();
-                        for (double step = 3.0D; step < distance; step += 4.0D) {
-                            Location point = player.getLocation().clone().add(direction.clone().multiply(step));
-                            session.world.spawnParticle(Particle.HAPPY_VILLAGER, point, 1,
-                                    0.12D, 0.18D, 0.12D, 0.0D);
-                        }
-                    }
-                    session.world.spawnParticle(Particle.END_ROD, destination.clone().add(0.0D, 0.5D, 0.0D),
-                            2, 0.25D, 0.3D, 0.25D, 0.01D);
+                long nextTrailAt = session.gladiatorNextParticleTrailAt.getOrDefault(id, 0L);
+                if (now >= nextTrailAt) {
+                    Location target = session.gladiatorAdvanceTrailTargets.getOrDefault(id, destination);
+                    session.gladiatorParticleTrails.put(id, new GladiatorsParticleTrail(player, target));
+                    session.gladiatorNextParticleTrailAt.put(id, now + 3_000L);
                 }
+                GladiatorsParticleTrail trail = session.gladiatorParticleTrails.get(id);
+                if (trail != null && trail.tick()) session.gladiatorParticleTrails.remove(id);
                 continue;
             }
             if (player.getLocation().distanceSquared(destination) > 100.0D) {
                 player.teleport(destination);
-                player.sendMessage(ChatColor.RED + "You took too long to reach the next arena and were moved there.");
+                player.sendMessage(ChatColor.RED + "TELEPORTED! YOU TOOK TOO LONG!");
             }
+            long closeDoorsAt = session.gladiatorAdvanceDoorCloseAt.computeIfAbsent(id,
+                    ignored -> now + 250L);
+            if (now < closeDoorsAt) continue;
             for (Block door : doors) door.setType(Material.OBSIDIAN, false);
             session.gladiatorAdvanceUntil.remove(id);
             session.gladiatorAdvanceSpawns.remove(id);
             session.gladiatorAdvanceDoors.remove(id);
+            session.gladiatorParticleTrails.remove(id);
+            session.gladiatorNextParticleTrailAt.remove(id);
+            session.gladiatorAdvanceTrailTargets.remove(id);
+            session.gladiatorAdvanceDoorCloseAt.remove(id);
         }
     }
 
@@ -22831,6 +22876,16 @@ public final class ArcadePortManager implements Listener {
         session.baconPlayerPigs.clear();
         session.baconPigOwners.clear();
         session.baconCompassMenuTargets.clear();
+        for (List<Block> doors : session.gladiatorAdvanceDoors.values()) {
+            for (Block door : doors) door.setType(Material.OBSIDIAN, false);
+        }
+        session.gladiatorAdvanceDoors.clear();
+        session.gladiatorAdvanceDoorCloseAt.clear();
+        session.gladiatorAdvanceUntil.clear();
+        session.gladiatorAdvanceSpawns.clear();
+        session.gladiatorAdvanceTrailTargets.clear();
+        session.gladiatorParticleTrails.clear();
+        session.gladiatorNextParticleTrailAt.clear();
         session.respawning.clear();
         session.alive.clear();
         session.players.clear();

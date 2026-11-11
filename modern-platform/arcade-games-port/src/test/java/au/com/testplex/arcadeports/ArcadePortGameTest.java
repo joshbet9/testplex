@@ -2233,15 +2233,15 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.canGladiatorsFight(5_000L, 5_000L, -1, 0, false));
     }
 
-    @Test void gladiatorsPoisonOnlyUnresolvedDuelsAfterSixtySecondsAtOneDamagePerSecond() {
-        assertEquals(60_000L, ArcadePortRules.GLADIATOR_POISON_DELAY_MILLIS);
+    @Test void gladiatorsPoisonOnlyUnresolvedDuelsAfterThirtySecondsAtOneDamagePerSecond() {
+        assertEquals(30_000L, ArcadePortRules.GLADIATOR_POISON_DELAY_MILLIS);
         assertEquals(1_000L, ArcadePortRules.GLADIATOR_POISON_INTERVAL_MILLIS);
         assertEquals(1.0D, ArcadePortRules.GLADIATOR_POISON_DAMAGE, 0.0001D);
-        assertFalse(ArcadePortRules.shouldGladiatorPoison(59_999L, 0L, false, 2));
-        assertTrue(ArcadePortRules.shouldGladiatorPoison(60_000L, 0L, false, 2));
-        assertFalse(ArcadePortRules.shouldGladiatorPoison(60_000L, 0L, true, 2));
-        assertFalse(ArcadePortRules.shouldGladiatorPoison(60_000L, 0L, false, 1));
-        assertFalse(ArcadePortRules.shouldGladiatorPoison(60_000L, 0L, false, 0));
+        assertFalse(ArcadePortRules.shouldGladiatorPoison(29_999L, 0L, false, 2));
+        assertTrue(ArcadePortRules.shouldGladiatorPoison(30_000L, 0L, false, 2));
+        assertFalse(ArcadePortRules.shouldGladiatorPoison(30_000L, 0L, true, 2));
+        assertFalse(ArcadePortRules.shouldGladiatorPoison(30_000L, 0L, false, 1));
+        assertFalse(ArcadePortRules.shouldGladiatorPoison(30_000L, 0L, false, 0));
     }
 
     @Test void gladiatorsPairPlayersAndOnlyAdvanceAfterEveryMatchResolves() {

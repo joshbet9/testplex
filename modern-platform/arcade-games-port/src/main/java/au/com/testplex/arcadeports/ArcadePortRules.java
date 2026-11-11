@@ -3241,7 +3241,7 @@ public final class ArcadePortRules {
     /** Mode indices follow GladiatorsMode: Normal, Rodless, Bowless, Modern, Pot. */
     public static final boolean GLADIATOR_FORCE_MODE_ENABLED = false;
     public static final int GLADIATOR_MODE_OVERRIDE = 0;
-    public static final long GLADIATOR_POISON_DELAY_MILLIS = 60_000L;
+    public static final long GLADIATOR_POISON_DELAY_MILLIS = 30_000L;
     public static final long GLADIATOR_POISON_INTERVAL_MILLIS = 1_000L;
     public static final double GLADIATOR_POISON_DAMAGE = 1.0D;
     public static final int GLADIATOR_MELEE_NO_DAMAGE_TICKS = 10;
