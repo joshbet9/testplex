@@ -556,14 +556,18 @@ public final class MenuService implements Listener {
         int index = 0;
         for (CosmeticLineDefinition line : game.getCosmeticLines()) {
             if (index >= slots.length) break;
-            Set<String> selected = preferences.getSelected(player.getUniqueId(), game, line);
+            GameDefinition preferenceGame = cosmeticPreferenceGame(game);
+            Set<String> selected = preferences.getSelected(player.getUniqueId(), preferenceGame, line);
             long enabled = selected.stream().filter(optionId -> line.getOptions().stream()
                     .anyMatch(option -> option.getId().equals(optionId) && option.getSelectionGroup() == null)).count();
             String equipped = selected.isEmpty() ? "Default" : selected.iterator().next();
+            String selectionSummary = isMonsterMazeGame(game) && "mob-sets".equals(line.getId())
+                    ? "Enabled mob sets: " + Math.max(1, enabled) + (enabled == 0 ? " (Map Default fallback)" : "")
+                    : (line.getSelectionMode() == CosmeticLineDefinition.SelectionMode.MULTI
+                    ? "Enabled toggles: " + enabled : "Equipped: " + equipped);
             ItemStack item = makeItem(icon(line.getIcon()), ChatColor.YELLOW + line.getTitle(), List.of(
                     ChatColor.GRAY + line.getDescription(),
-                    ChatColor.GRAY + (line.getSelectionMode() == CosmeticLineDefinition.SelectionMode.MULTI
-                            ? "Enabled toggles: " + enabled : "Equipped: " + equipped),
+                    ChatColor.GRAY + selectionSummary,
                     ChatColor.GREEN + "Click to view options",
                     ChatColor.DARK_GRAY + "Feature: " + line.getId()));
             mark(item, "cosmetic-line", game, line, null);
@@ -588,12 +592,16 @@ public final class MenuService implements Listener {
     }
 
     private void openOptions(Player player, GameDefinition game, CosmeticLineDefinition line, int requestedPage) {
+        if (isMonsterMazeGame(game) && "mob-sets".equals(line.getId())) {
+            openMonsterMazeMobSetList(player, game, line, requestedPage);
+            return;
+        }
         int pageCount = Math.max(1, (line.getOptions().size() + 44) / 45);
         int page = Math.max(0, Math.min(pageCount - 1, requestedPage));
         cosmeticOptionPages.put(player.getUniqueId(), page);
         Inventory inventory = Bukkit.createInventory(null, 54,
                 OPTIONS_TITLE + game.getId() + " | " + line.getId() + " | " + (page + 1));
-        Set<String> selected = preferences.getSelected(player.getUniqueId(), game, line);
+        Set<String> selected = preferences.getSelected(player.getUniqueId(), cosmeticPreferenceGame(game), line);
         int start = page * 45;
         for (int index = start; index < Math.min(line.getOptions().size(), start + 45); index++) {
             CosmeticOption option = line.getOptions().get(index);
@@ -624,6 +632,178 @@ public final class MenuService implements Listener {
             inventory.setItem(53, next);
         }
         player.openInventory(inventory);
+    }
+
+    private void openMonsterMazeMobSetList(Player player, GameDefinition game,
+                                           CosmeticLineDefinition line, int requestedPage) {
+        List<CosmeticOption> mobSets = line.getOptions().stream()
+                .filter(option -> option.getSelectionGroup() == null).toList();
+        int pageCount = Math.max(1, (mobSets.size() + 44) / 45);
+        int page = Math.max(0, Math.min(pageCount - 1, requestedPage));
+        cosmeticOptionPages.put(player.getUniqueId(), page);
+        Inventory inventory = Bukkit.createInventory(null, 54,
+                OPTIONS_TITLE + game.getId() + " | Mob Sets | " + (page + 1));
+        Set<String> enabled = preferences.getSelected(player.getUniqueId(), cosmeticPreferenceGame(game), line);
+        int start = page * 45;
+        for (int index = start; index < Math.min(mobSets.size(), start + 45); index++) {
+            CosmeticOption mob = mobSets.get(index);
+            boolean selected = isMonsterMazeMobSetEnabled(line, enabled, mob.getId());
+            ItemStack item = makeItem(monsterMazeMobIcon(mob.getId()),
+                    (selected ? ChatColor.GREEN + "Enabled: " : ChatColor.RED + "Disabled: ") + mob.getName(),
+                    List.of(ChatColor.GRAY + mob.getDescription(),
+                            selected ? ChatColor.GREEN + "Included in the in-game cycle" : ChatColor.RED + "Not in the in-game cycle",
+                            ChatColor.YELLOW + "Left-click to " + (selected ? "disable" : "enable"),
+                            ChatColor.YELLOW + "Right-click to set Safe Pad and beacon colours"));
+            mark(item, "monster-maze-mob-set", game, line, mob.getId());
+            inventory.setItem(index - start, item);
+        }
+        if (page > 0) {
+            ItemStack previous = backItem("Previous page", "cosmetic-option-page", game);
+            mark(previous, "cosmetic-option-page", game, line, Integer.toString(page - 1));
+            inventory.setItem(45, previous);
+        }
+        inventory.setItem(49, backItem("Back to Game Cosmetics", "back-lines", game));
+        if (page + 1 < pageCount) {
+            ItemStack next = backItem("Next page", "cosmetic-option-page", game);
+            mark(next, "cosmetic-option-page", game, line, Integer.toString(page + 1));
+            inventory.setItem(53, next);
+        }
+        player.openInventory(inventory);
+    }
+
+    private void openMonsterMazeMobSetSettings(Player player, GameDefinition game,
+                                               CosmeticLineDefinition line, String mobId) {
+        CosmeticOption mob = findOption(line, mobId);
+        if (mob == null || mob.getSelectionGroup() != null) return;
+        GameDefinition preferenceGame = cosmeticPreferenceGame(game);
+        Set<String> enabledOptions = preferences.getSelected(player.getUniqueId(), preferenceGame, line);
+        boolean enabled = isMonsterMazeMobSetEnabled(line, enabledOptions, mobId);
+        Inventory inventory = Bukkit.createInventory(null, 27,
+                OPTIONS_TITLE + game.getId() + " | " + mob.getName());
+
+        ItemStack toggle = makeItem(monsterMazeMobIcon(mobId),
+                (enabled ? ChatColor.GREEN + "Enabled: " : ChatColor.RED + "Disabled: ") + mob.getName(),
+                List.of(ChatColor.GRAY + "Choose whether this mob appears in your hotbar cycle.",
+                        ChatColor.YELLOW + "Click to " + (enabled ? "disable" : "enable")));
+        mark(toggle, "monster-maze-mob-settings-toggle", game, line, mobId);
+        inventory.setItem(10, toggle);
+
+        addMonsterMazeColourSetting(inventory, player, game, line, mob, "pad", 12);
+        addMonsterMazeColourSetting(inventory, player, game, line, mob, "beacon", 14);
+        ItemStack back = backItem("Back to Mob Sets", "monster-maze-mob-settings-back", game);
+        mark(back, "monster-maze-mob-settings-back", game, line,
+                Integer.toString(cosmeticOptionPages.getOrDefault(player.getUniqueId(), 0)));
+        inventory.setItem(22, back);
+        player.openInventory(inventory);
+    }
+
+    private void addMonsterMazeColourSetting(Inventory inventory, Player player, GameDefinition game,
+                                             CosmeticLineDefinition line, CosmeticOption mob,
+                                             String part, int slot) {
+        String group = part + "-" + mob.getId();
+        String selectedId = selectedMonsterMazeColour(player, game, line, group);
+        CosmeticOption selected = findOption(line, selectedId);
+        String label = "pad".equals(part) ? "Safe Pad colour" : "Beacon colour";
+        ItemStack item = makeItem(monsterMazeColourIcon(mob.getId(), part, selectedId),
+                ChatColor.YELLOW + label,
+                List.of(ChatColor.GRAY + "Current: " + (selected == null ? "Mob colour" : selected.getName()),
+                        ChatColor.GRAY + "Set this colour independently for " + mob.getName() + ".",
+                        ChatColor.GREEN + "Click to customise"));
+        mark(item, "monster-maze-mob-colour-open", game, line, mob.getId() + "|" + part);
+        inventory.setItem(slot, item);
+    }
+
+    private void openMonsterMazeColourPalette(Player player, GameDefinition game,
+                                              CosmeticLineDefinition line, String mobId, String part) {
+        if (!"pad".equals(part) && !"beacon".equals(part)) return;
+        CosmeticOption mob = findOption(line, mobId);
+        if (mob == null || mob.getSelectionGroup() != null) return;
+        String group = part + "-" + mobId;
+        String selectedId = selectedMonsterMazeColour(player, game, line, group);
+        List<CosmeticOption> colours = line.getOptions().stream()
+                .filter(option -> group.equals(option.getSelectionGroup())).toList();
+        String label = "pad".equals(part) ? "Safe Pad colour" : "Beacon colour";
+        Inventory inventory = Bukkit.createInventory(null, 27,
+                OPTIONS_TITLE + game.getId() + " | " + mob.getName() + " | " + label);
+        for (int index = 0; index < colours.size() && index < 18; index++) {
+            CosmeticOption colour = colours.get(index);
+            boolean selected = colour.getId().equals(selectedId);
+            ItemStack item = makeItem(monsterMazeColourIcon(mobId, part, colour.getId()),
+                    (selected ? ChatColor.GREEN + "Selected: " : ChatColor.WHITE) + colour.getName(),
+                    List.of(ChatColor.GRAY + colour.getDescription(),
+                            selected ? ChatColor.GREEN + "Selected" : ChatColor.YELLOW + "Click to select"));
+            mark(item, "monster-maze-mob-colour", game, line, colour.getId());
+            inventory.setItem(index, item);
+        }
+        ItemStack back = backItem("Back to " + mob.getName(), "monster-maze-mob-colour-back", game);
+        mark(back, "monster-maze-mob-colour-back", game, line, mobId);
+        inventory.setItem(22, back);
+        player.openInventory(inventory);
+    }
+
+    private String selectedMonsterMazeColour(Player player, GameDefinition game,
+                                             CosmeticLineDefinition line, String group) {
+        Set<String> selected = preferences.getSelected(player.getUniqueId(), cosmeticPreferenceGame(game), line);
+        return line.getOptions().stream()
+                .filter(option -> group.equals(option.getSelectionGroup()) && selected.contains(option.getId()))
+                .map(CosmeticOption::getId).findFirst().orElse(group + "-inherit");
+    }
+
+    private boolean isMonsterMazeMobSetEnabled(CosmeticLineDefinition line, Set<String> selected, String mobId) {
+        if (selected.contains(mobId)) return true;
+        // Map Default is the safe fallback whenever no explicit mob form is enabled.
+        return "map_default".equals(mobId) && line.getOptions().stream()
+                .filter(option -> option.getSelectionGroup() == null)
+                .map(CosmeticOption::getId)
+                .noneMatch(selected::contains);
+    }
+
+    private Material monsterMazeColourIcon(String mobId, String part, String optionId) {
+        String prefix = part + "-" + mobId + "-";
+        if (optionId == null || !optionId.startsWith(prefix)) return monsterMazeMobIcon(mobId);
+        String colour = optionId.substring(prefix.length());
+        if ("inherit".equals(colour)) return monsterMazeMobIcon(mobId);
+        String suffix = "pad".equals(part) ? "_TERRACOTTA" : "_STAINED_GLASS";
+        Material material = Material.matchMaterial(colour.toUpperCase(Locale.ROOT) + suffix);
+        return material == null ? Material.WHITE_STAINED_GLASS : material;
+    }
+
+    private Material monsterMazeMobIcon(String mobId) {
+        if ("map_default".equals(mobId)) return Material.MAP;
+        if ("random".equals(mobId)) return Material.NETHER_STAR;
+        if ("creeper".equals(mobId)) return Material.CREEPER_HEAD;
+        if ("skeleton".equals(mobId)) return Material.SKELETON_SKULL;
+        if ("zombie".equals(mobId)) return Material.ZOMBIE_HEAD;
+        String spawnEgg = switch (mobId) {
+            case "zombie_pigman" -> "ZOMBIFIED_PIGLIN_SPAWN_EGG";
+            case "snowman" -> "SNOW_GOLEM_SPAWN_EGG";
+            default -> mobId.toUpperCase(Locale.ROOT) + "_SPAWN_EGG";
+        };
+        Material material = Material.matchMaterial(spawnEgg);
+        return material == null ? Material.CREEPER_HEAD : material;
+    }
+
+    private CosmeticOption findOption(CosmeticLineDefinition line, String optionId) {
+        return line.getOptions().stream().filter(option -> option.getId().equals(optionId)).findFirst().orElse(null);
+    }
+
+    static boolean isMonsterMazeGame(GameDefinition game) {
+        return game != null && isMonsterMazeGameId(game.getId());
+    }
+
+    static boolean isMonsterMazeGameId(String gameId) {
+        return "monster-maze".equals(gameId) || "monster-maze-speed".equals(gameId)
+                || "monster-maze-modern".equals(gameId);
+    }
+
+    static String cosmeticPreferenceGameId(String gameId) {
+        return isMonsterMazeGameId(gameId) ? "monster-maze" : gameId;
+    }
+
+    private GameDefinition cosmeticPreferenceGame(GameDefinition game) {
+        if (game == null) return null;
+        GameDefinition preferenceGame = catalog.getGame(cosmeticPreferenceGameId(game.getId()));
+        return preferenceGame == null ? game : preferenceGame;
     }
 
     private void openWinEffects(Player player, GameDefinition game) {
@@ -672,6 +852,86 @@ public final class MenuService implements Listener {
         GameDefinition game = catalog.getGame(gameId);
 
         if (title.startsWith(OPTIONS_TITLE)) {
+            if (game != null && lineId != null && optionId != null) {
+                CosmeticLineDefinition line = findLine(game, lineId);
+                if (line != null && isMonsterMazeGame(game) && "mob-sets".equals(lineId)) {
+                    GameDefinition preferenceGame = cosmeticPreferenceGame(game);
+                    if ("monster-maze-mob-set".equals(action)) {
+                        if (event.getClick().isRightClick()) {
+                            openMonsterMazeMobSetSettings(player, game, line, optionId);
+                        } else {
+                            Set<String> selectedOptions = preferences.getSelected(player.getUniqueId(), preferenceGame, line);
+                            boolean selected = isMonsterMazeMobSetEnabled(line, selectedOptions, optionId);
+                            boolean hasOtherEnabledSet = line.getOptions().stream()
+                                    .filter(option -> option.getSelectionGroup() == null)
+                                    .map(CosmeticOption::getId)
+                                    .filter(id -> !"map_default".equals(id))
+                                    .anyMatch(selectedOptions::contains);
+                            if ("map_default".equals(optionId) && selected && !hasOtherEnabledSet) {
+                                player.sendMessage(ChatColor.GRAY + "Map Default stays available as the fallback when no mob sets are enabled.");
+                                openMonsterMazeMobSetList(player, game, line,
+                                        cosmeticOptionPages.getOrDefault(player.getUniqueId(), 0));
+                                return;
+                            }
+                            if (selected) {
+                                preferences.disableOption(player.getUniqueId(), preferenceGame, line, optionId);
+                            } else {
+                                preferences.chooseOption(player.getUniqueId(), preferenceGame, line, optionId);
+                            }
+                            refreshMonsterMazeCosmetics(player);
+                            player.sendMessage((selected ? ChatColor.YELLOW + "Disabled " : ChatColor.GREEN + "Enabled ")
+                                    + findOption(line, optionId).getName() + " in your Monster Maze mob cycle.");
+                            openMonsterMazeMobSetList(player, game, line,
+                                    cosmeticOptionPages.getOrDefault(player.getUniqueId(), 0));
+                        }
+                        return;
+                    }
+                    if ("monster-maze-mob-settings-toggle".equals(action)) {
+                        Set<String> selectedOptions = preferences.getSelected(player.getUniqueId(), preferenceGame, line);
+                        boolean selected = isMonsterMazeMobSetEnabled(line, selectedOptions, optionId);
+                        boolean hasOtherEnabledSet = line.getOptions().stream()
+                                .filter(option -> option.getSelectionGroup() == null)
+                                .map(CosmeticOption::getId)
+                                .filter(id -> !"map_default".equals(id))
+                                .anyMatch(selectedOptions::contains);
+                        if ("map_default".equals(optionId) && selected && !hasOtherEnabledSet) {
+                            player.sendMessage(ChatColor.GRAY + "Map Default stays available as the fallback when no mob sets are enabled.");
+                            openMonsterMazeMobSetSettings(player, game, line, optionId);
+                            return;
+                        }
+                        if (selected) preferences.disableOption(player.getUniqueId(), preferenceGame, line, optionId);
+                        else preferences.chooseOption(player.getUniqueId(), preferenceGame, line, optionId);
+                        refreshMonsterMazeCosmetics(player);
+                        openMonsterMazeMobSetSettings(player, game, line, optionId);
+                        return;
+                    }
+                    if ("monster-maze-mob-colour-open".equals(action)) {
+                        String[] parts = optionId.split("\\|", 2);
+                        if (parts.length == 2) openMonsterMazeColourPalette(player, game, line, parts[0], parts[1]);
+                        return;
+                    }
+                    if ("monster-maze-mob-colour".equals(action)) {
+                        CosmeticOption colour = findOption(line, optionId);
+                        if (colour != null && colour.getSelectionGroup() != null) {
+                            preferences.chooseOption(player.getUniqueId(), preferenceGame, line, optionId);
+                            refreshMonsterMazeCosmetics(player);
+                            String[] parts = colour.getSelectionGroup().split("-", 2);
+                            if (parts.length == 2) openMonsterMazeMobSetSettings(player, game, line, parts[1]);
+                        }
+                        return;
+                    }
+                    if ("monster-maze-mob-settings-back".equals(action)) {
+                        int page = 0;
+                        try { page = Integer.parseInt(optionId); } catch (NumberFormatException ignored) { }
+                        openMonsterMazeMobSetList(player, game, line, page);
+                        return;
+                    }
+                    if ("monster-maze-mob-colour-back".equals(action)) {
+                        openMonsterMazeMobSetSettings(player, game, line, optionId);
+                        return;
+                    }
+                }
+            }
             if ("cosmetic-option-page".equals(action) && game != null && lineId != null && optionId != null) {
                 CosmeticLineDefinition line = findLine(game, lineId);
                 if (line != null) {
@@ -683,15 +943,16 @@ public final class MenuService implements Listener {
             if ("cosmetic-option".equals(action) && game != null && lineId != null && optionId != null) {
                 CosmeticLineDefinition line = findLine(game, lineId);
                 if (line != null) {
+                    GameDefinition preferenceGame = cosmeticPreferenceGame(game);
                     if (event.getClick().isRightClick()) {
-                        boolean disabled = preferences.disableOption(player.getUniqueId(), game, line, optionId);
+                        boolean disabled = preferences.disableOption(player.getUniqueId(), preferenceGame, line, optionId);
                         player.sendMessage(disabled ? ChatColor.YELLOW + "Disabled " + line.getTitle() + "."
                                 : ChatColor.GRAY + "That option is not currently selected.");
                     } else {
-                        preferences.chooseOption(player.getUniqueId(), game, line, optionId);
+                        preferences.chooseOption(player.getUniqueId(), preferenceGame, line, optionId);
                         player.sendMessage(ChatColor.GREEN + "Saved " + game.getName() + " → " + line.getTitle() + ".");
                     }
-                    if ("monster-maze".equals(game.getId())) refreshMonsterMazeCosmetics(player);
+                    if (isMonsterMazeGame(game)) refreshMonsterMazeCosmetics(player);
                     openOptions(player, game, line, cosmeticOptionPages.getOrDefault(player.getUniqueId(), 0));
                 }
                 return;

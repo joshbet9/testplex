@@ -59,8 +59,13 @@ public final class MobThemeManager implements Listener {
         Material icon=selectorIcon(iconTheme);ItemStack item=new ItemStack(icon==null?Material.PAPER:icon);
         ItemMeta meta=item.getItemMeta();
         meta.setDisplayName(ChatColor.LIGHT_PURPLE+"Mob Theme: "+ChatColor.YELLOW+displayName(choice));
-        meta.setLore(Arrays.asList(ChatColor.GRAY+"Right-click to cycle mob themes",ChatColor.GRAY+"Uses vanilla mob heads or spawn eggs",ChatColor.GRAY+"Map Default uses the map's normal mob and colours."));
+        meta.setLore(Arrays.asList(ChatColor.GRAY+"Right-click to cycle enabled mob sets",ChatColor.GRAY+"Uses vanilla mob heads or spawn eggs",ChatColor.GRAY+"Map Default uses the map's normal mob and colours."));
         item.setItemMeta(meta);p.getInventory().setItem(SLOT,item);p.updateInventory();
+    }
+    /** Refresh an already-issued selector after the player's enabled mob cycle changes. */
+    public void refreshSelectorIfPresent(Player player) {
+        if (player == null || !player.isOnline() || !isSelector(player.getInventory().getItem(SLOT))) return;
+        giveSelector(player);
     }
     static Material selectorIcon(String theme){
         if("random".equals(theme))return Material.NETHER_STAR;

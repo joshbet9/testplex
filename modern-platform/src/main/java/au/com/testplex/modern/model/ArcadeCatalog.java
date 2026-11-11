@@ -729,7 +729,7 @@ public final class ArcadeCatalog {
             }
         }
         return new CosmeticLineDefinition("mob-sets", "Monster Maze Mob Sets",
-                "Choose mob forms for your in-game cycle slot and set separate beacon-glass and Safe Pad colours for each form.",
+                "Enable the mob forms you want in your in-game cycle. Open any mob to customise its Safe Pad and beacon colours.",
                 "CREEPER_HEAD", CosmeticLineDefinition.SelectionMode.MULTI, options, "map_default");
     }
 

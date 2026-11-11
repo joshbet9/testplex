@@ -134,7 +134,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         MonsterMazePlugin module = getMonsterMazeModule();
         if (player == null || module == null) return;
         module.refreshPlayerMobThemes(player);
-        if (module.getMobThemeManager() != null) module.getMobThemeManager().refreshPlayerPads(player);
+        if (module.getMobThemeManager() != null) {
+            module.getMobThemeManager().refreshSelectorIfPresent(player);
+            module.getMobThemeManager().refreshPlayerPads(player);
+        }
     }
 
     public boolean isArcadeDebugRound() { return GameDebugRuntimeOverrides.isDebugSession(); }
