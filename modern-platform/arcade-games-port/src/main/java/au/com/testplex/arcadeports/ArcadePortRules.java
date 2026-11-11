@@ -404,6 +404,12 @@ public final class ArcadePortRules {
         return String.format(java.util.Locale.ROOT, "%d:%02d.%03d", minutes, seconds, ms);
     }
 
+    public static String dragonEscapeFirstCompletionMessage(String playerName, long elapsedMillis) {
+        String name = playerName == null || playerName.isBlank() ? "A player" : playerName;
+        return "FIRST COMPLETION! " + name + " — " + formatDragonEscapeTime(elapsedMillis)
+                + ". Other racers have 30 seconds.";
+    }
+
     public static String formatDragonEscapeDelta(long deltaMillis) {
         if (deltaMillis == 0L) return "0:00.000";
         return (deltaMillis > 0L ? "+" : "-") + formatDragonEscapeTime(Math.abs(deltaMillis));

@@ -388,6 +388,10 @@ class GameDebugEventCatalogTest {
         assertTrue(manager.contains("lobbyRuntime.debugFeatureAppliesImmediately(type, flag)"));
         assertTrue(manager.contains("debugProfiles.featureKeys(tester.getUniqueId(), type)"));
         assertTrue(manager.contains("debugProfiles.selectedFeatureValues("));
+        assertFalse(manager.contains("values.put(\"__DEBUG_GAMEPLAY_FEATURES\", true)"),
+                "features in another saved profile must not activate debug for the selected profile");
+        assertFalse(manager.contains("Debug overrides are active; this run does not save PBs or world records."),
+                "Dragon Escape test runs must keep recording PB and WR times");
         assertTrue(manager.contains("GameDebugRuntimeOverrides.removeValue(key)"));
         assertTrue(lobby.contains("boolean debugFeatureAppliesImmediately(ArcadePortGame game, String key)"));
         assertTrue(lobby.contains("boolean appliesImmediately)"));
