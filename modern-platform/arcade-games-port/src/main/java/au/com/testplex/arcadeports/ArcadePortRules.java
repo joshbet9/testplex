@@ -1308,6 +1308,14 @@ public final class ArcadePortRules {
      */
     public static boolean shouldRejectDragonEscapeShortcut(int previousNode, int observedNode,
             double distanceToNextWaypoint, double distanceToObservedWaypoint, long nowMillis, long warpedAtMillis) {
+        return shouldRejectDragonEscapeShortcut(previousNode, observedNode, distanceToNextWaypoint,
+                distanceToObservedWaypoint, nowMillis, warpedAtMillis, false);
+    }
+
+    public static boolean shouldRejectDragonEscapeShortcut(int previousNode, int observedNode,
+            double distanceToNextWaypoint, double distanceToObservedWaypoint, long nowMillis, long warpedAtMillis,
+            boolean recentBuilderPlacement) {
+        if (recentBuilderPlacement) return false;
         if (observedNode - previousNode < 3
                 || !Double.isFinite(distanceToNextWaypoint) || distanceToNextWaypoint < 0.0D
                 || !Double.isFinite(distanceToObservedWaypoint) || distanceToObservedWaypoint < 0.0D) return false;
@@ -1363,6 +1371,9 @@ public final class ArcadePortRules {
     public static final int DRAGON_ESCAPE_DIGGER_BLOCK_RESTORE_TICKS = 2_400;
     public static final double DRAGON_ESCAPE_DIGGER_NEARBY_PLAYER_RADIUS = 1.5D;
     public static final long DRAGON_ESCAPE_WARPER_GRACE_MILLIS = 1_000L;
+    public static final int DRAGON_ESCAPE_ROUTE_BOUNDS_MARGIN = 32;
+    public static final long DRAGON_ESCAPE_BUILDER_SHORTCUT_GRACE_MILLIS = 3_500L;
+    public static final long DRAGON_ESCAPE_FINISH_WINDOW_MILLIS = 30_000L;
     public static final long DRAGON_ESCAPE_WATER_DAMAGE_INTERVAL_MILLIS = 500L;
     public static final int DRAGON_ESCAPE_DISRUPTOR_MAX_TNT = 2;
     public static final long DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS = 8_000L;
@@ -3502,6 +3513,23 @@ public final class ArcadePortRules {
                 || x <= minX || x >= maxX + 1.0D
                 || z <= minZ || z >= maxZ + 1.0D) return true;
         return hasVerticalBounds && (y <= minY || y >= maxY + 1.0D);
+    }
+
+    public static boolean dragonEscapeSuppressZodiacLavaFlow(String mapName) {
+        return mapName != null && mapName.toLowerCase(java.util.Locale.ROOT).contains("zodiac");
+    }
+
+    public static String dragonEscapeRecordMilestone(boolean firstCompletion, boolean firstKitCompletion,
+            boolean newWorldRecord, boolean newKitWorldRecord, boolean newPersonalBest,
+            boolean newKitPersonalBest, String kit) {
+        String suffix = kit == null ? "" : " " + kit.toUpperCase(java.util.Locale.ROOT);
+        if (firstCompletion) return "FIRST COMPLETION!";
+        if (firstKitCompletion) return "FIRST" + suffix + " COMPLETION!";
+        if (newWorldRecord) return "NEW WORLD RECORD!";
+        if (newKitWorldRecord) return "NEW WORLD RECORD" + suffix + "!";
+        if (newPersonalBest) return "NEW PERSONAL BEST!";
+        if (newKitPersonalBest) return "NEW PERSONAL BEST" + suffix + "!";
+        return null;
     }
 
     /** Backwards-compatible fallback when a map has no authored vertical bounds. */

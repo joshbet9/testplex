@@ -1824,8 +1824,38 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldRejectDragonEscapeShortcut(2, 5, 10.0D, 0.0D, 1_999L, 1_000L));
         assertTrue(ArcadePortRules.shouldRejectDragonEscapeShortcut(2, 5, 10.0D, 0.0D, 2_000L, 1_000L));
         assertFalse(ArcadePortRules.shouldRejectDragonEscapeShortcut(2, 4, 10.0D, 0.0D, 2_000L, -1L));
+        assertFalse(ArcadePortRules.shouldRejectDragonEscapeShortcut(
+                2, 5, 10.0D, 0.0D, 5_000L, -1L, true));
+        assertTrue(ArcadePortRules.shouldRejectDragonEscapeShortcut(
+                2, 5, 10.0D, 0.0D, 5_000L, -1L, false));
         assertTrue(ArcadePortRules.isDragonEscapeWarpGraceActive(1_999L, 1_000L));
         assertFalse(ArcadePortRules.isDragonEscapeWarpGraceActive(2_000L, 1_000L));
+    }
+
+    @Test void dragonEscapeBoundsAndZodiacFlowGuardAreMapSpecific() {
+        assertEquals(32, ArcadePortRules.DRAGON_ESCAPE_ROUTE_BOUNDS_MARGIN);
+        assertTrue(ArcadePortRules.dragonEscapeSuppressZodiacLavaFlow("Zodiac"));
+        assertTrue(ArcadePortRules.dragonEscapeSuppressZodiacLavaFlow("zodiac final"));
+        assertFalse(ArcadePortRules.dragonEscapeSuppressZodiacLavaFlow("Time Travel"));
+        assertFalse(ArcadePortRules.dragonEscapeSuppressZodiacLavaFlow(null));
+        assertEquals(30_000L, ArcadePortRules.DRAGON_ESCAPE_FINISH_WINDOW_MILLIS);
+    }
+
+    @Test void dragonEscapeRecordAnnouncementsChooseOneGlobalPriorityMessage() {
+        assertEquals("FIRST COMPLETION!", ArcadePortRules.dragonEscapeRecordMilestone(
+                true, true, true, true, true, true, "jumper"));
+        assertEquals("FIRST JUMPER COMPLETION!", ArcadePortRules.dragonEscapeRecordMilestone(
+                false, true, true, true, true, true, "jumper"));
+        assertEquals("NEW WORLD RECORD!", ArcadePortRules.dragonEscapeRecordMilestone(
+                false, false, true, true, true, true, "jumper"));
+        assertEquals("NEW WORLD RECORD JUMPER!", ArcadePortRules.dragonEscapeRecordMilestone(
+                false, false, false, true, true, true, "jumper"));
+        assertEquals("NEW PERSONAL BEST!", ArcadePortRules.dragonEscapeRecordMilestone(
+                false, false, false, false, true, true, "jumper"));
+        assertEquals("NEW PERSONAL BEST JUMPER!", ArcadePortRules.dragonEscapeRecordMilestone(
+                false, false, false, false, false, true, "jumper"));
+        assertEquals(null, ArcadePortRules.dragonEscapeRecordMilestone(
+                false, false, false, false, false, false, "jumper"));
     }
 
     @Test void dragonEscapeKitsCannotBeChangedMidRace() {

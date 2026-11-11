@@ -8,13 +8,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DragonEscapeRaceScoreboardLayoutTest {
     @Test
-    void reservesFourDistinctRecordRowsBelowElevenOrderedRacers() {
+    void reservesRecordAndFinishRowsAfterOrderedRacers() {
         assertEquals(15, DragonEscapeRaceScoreboardLayout.MAX_ROWS);
-        assertEquals(11, DragonEscapeRaceScoreboardLayout.RACER_ROW_COUNT);
-        assertEquals(11, DragonEscapeRaceScoreboardLayout.MAP_PB_ROW);
-        assertEquals(12, DragonEscapeRaceScoreboardLayout.MAP_WR_ROW);
-        assertEquals(13, DragonEscapeRaceScoreboardLayout.KIT_PB_ROW);
-        assertEquals(14, DragonEscapeRaceScoreboardLayout.KIT_WR_ROW);
+        assertEquals(9, DragonEscapeRaceScoreboardLayout.RACER_ROW_COUNT);
+        assertEquals(9, DragonEscapeRaceScoreboardLayout.MAP_PB_ROW);
+        assertEquals(10, DragonEscapeRaceScoreboardLayout.MAP_WR_ROW);
+        assertEquals(11, DragonEscapeRaceScoreboardLayout.KIT_PB_ROW);
+        assertEquals(12, DragonEscapeRaceScoreboardLayout.KIT_WR_ROW);
+        assertEquals(13, DragonEscapeRaceScoreboardLayout.FINISH_TIMER_LABEL_ROW);
+        assertEquals(14, DragonEscapeRaceScoreboardLayout.FINISH_TIMER_VALUE_ROW);
     }
 
     @Test
@@ -42,5 +44,20 @@ class DragonEscapeRaceScoreboardLayoutTest {
         String eliminated = DragonEscapeRaceScoreboardLayout.racerTime(
                 "0:42.10", DragonEscapeRaceScoreboardLayout.RacerStatus.ELIMINATED);
         assertEquals("", eliminated);
+    }
+
+    @Test
+    void firstLiveFrameIsExactlyZeroWithoutChangingLaterElapsedTime() {
+        assertEquals(0L, DragonEscapeRaceScoreboardLayout.displayedElapsedMillis(40L, true));
+        assertEquals(0L, DragonEscapeRaceScoreboardLayout.displayedElapsedMillis(-40L, false));
+        assertEquals(125L, DragonEscapeRaceScoreboardLayout.displayedElapsedMillis(125L, false));
+    }
+
+    @Test
+    void firstFinisherCountdownDisplaysTenthsAndStopsAtZero() {
+        assertEquals(29_000L, DragonEscapeRaceScoreboardLayout.remainingFinishWindowMillis(30_000L, 1_000L));
+        assertEquals("29.0 Seconds", DragonEscapeRaceScoreboardLayout.finishWindowSeconds(29_000L));
+        assertEquals("0.0 Seconds", DragonEscapeRaceScoreboardLayout.finishWindowSeconds(0L));
+        assertEquals(0L, DragonEscapeRaceScoreboardLayout.remainingFinishWindowMillis(30_000L, 40_000L));
     }
 }

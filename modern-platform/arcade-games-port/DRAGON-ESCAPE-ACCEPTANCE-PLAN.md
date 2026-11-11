@@ -49,7 +49,7 @@ Do not collapse maps with similar names or rely on the convenience `maps/dragon-
 ### Shared lifecycle and race rules
 
 - [ ] Start from the Game Panel and `/arcadeport play dragon-escape`; confirm it enters the shared queue, dedicated source-map world, session setup and standard end/restore lifecycle.
-- [ ] Confirm the round is an elapsed race, not a short fixed-duration match. Finish the race naturally, eliminate racers through Douglas, and verify the game ends only when its source completion conditions are met.
+- [ ] Confirm the round is an elapsed race, not a short fixed-duration match. After the first finisher, verify the 30-second finish window lets remaining racers finish and save valid times; end earlier only after no active racer remains.
 - [ ] Confirm all participants receive their correct source map spawn and map-specific bounds, and that map reloads do not leak the prior world's blocks, marker state or scheduled tasks.
 - [ ] Verify disconnect, operator stop, natural finish and immediate rematch all restore inventories, armour, effects, mode, food, health, experience, movement state, scoreboards and lobby location.
 
@@ -81,6 +81,17 @@ Do not collapse maps with similar names or rely on the convenience `maps/dragon-
 - [ ] Verify Beacon Colour can only be selected through in-game cosmetics, and neither Beacon Colour nor PB Ghost is exposed as a Personal Bests-page button.
 - [ ] Install PacketEvents 2.14.0 on the Paper 26.3 acceptance server for the optional packet ghost path. Without it, the plugin must log the documented warning and keep the race playable without the ghost.
 - [ ] Confirm the ghost profile, entity, viewer-local team membership and packets are removed on map change, match end, disable, disconnect and reconnect.
+
+### Tester reports — November 12 follow-up
+
+- [ ] **Time Travel (#358, #344):** run beneath the pterodactyl after the first leap and finish the map. The playable boundary now includes a 32-block corridor around every authored route waypoint, in addition to the map's authored bounds.
+- [ ] **Builder (#359, #346):** start with two bricks, place and break with the intended Adventure-mode input, and verify charges/recharge remain correct. Initial charges now use the configured Builder maximum.
+- [ ] **Builder anti-cheat (#360):** repeat Builder placements while moving. A recent Builder placement receives a 3.5-second exemption only from the route-shortcut heuristic; global anti-cheat remains enabled and other checks are unchanged.
+- [ ] **Zodiac (#361):** confirm vanilla lava does not spread into the final jump path. Lava flow is cancelled only in the active Zodiac Dragon Escape world; other games and maps retain normal fluid behavior.
+- [ ] **PB/WR (#362):** perform a normal, non-practice run with Game Debug and all gameplay overrides disabled; confirm map and kit records persist across reconnect/restart. Unlock-all-kits is a debug override, so debug runs intentionally do not persist PBs/WRs.
+- [ ] **Race clock (#363):** confirm the first Live scoreboard frame is `0:00.000` while saved run timing remains measured from the actual start timestamp.
+- [ ] **Finish window and notices (#364):** confirm a 30.0-second countdown appears after the first completion, updates in tenths, and lets other runners finish. Verify the chat emits at most one record milestone per run, preferring global over kit PB/WR notices.
+- [ ] **Live verification:** the changes above have unit coverage, but require a Paper 26.3 multiplayer acceptance run before marking the reports fixed.
 
 ## Controlled-queue acceptance gate
 

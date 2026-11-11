@@ -6,15 +6,30 @@ import org.bukkit.ChatColor;
 final class DragonEscapeRaceScoreboardLayout {
     static final int MAX_ROWS = 15;
     static final int RECORD_ROW_COUNT = 4;
-    static final int RACER_ROW_COUNT = MAX_ROWS - RECORD_ROW_COUNT;
+    static final int FINISH_TIMER_ROW_COUNT = 2;
+    static final int RACER_ROW_COUNT = MAX_ROWS - RECORD_ROW_COUNT - FINISH_TIMER_ROW_COUNT;
     static final int MAP_PB_ROW = RACER_ROW_COUNT;
     static final int MAP_WR_ROW = MAP_PB_ROW + 1;
     static final int KIT_PB_ROW = MAP_WR_ROW + 1;
     static final int KIT_WR_ROW = KIT_PB_ROW + 1;
+    static final int FINISH_TIMER_LABEL_ROW = KIT_WR_ROW + 1;
+    static final int FINISH_TIMER_VALUE_ROW = FINISH_TIMER_LABEL_ROW + 1;
 
     enum RacerStatus { RUNNING, FINISHED, ELIMINATED }
 
     private DragonEscapeRaceScoreboardLayout() { }
+
+    static long displayedElapsedMillis(long elapsedMillis, boolean firstLiveFrame) {
+        return firstLiveFrame ? 0L : Math.max(0L, elapsedMillis);
+    }
+
+    static long remainingFinishWindowMillis(long deadlineMillis, long nowMillis) {
+        return deadlineMillis <= 0L ? 0L : Math.max(0L, deadlineMillis - nowMillis);
+    }
+
+    static String finishWindowSeconds(long remainingMillis) {
+        return String.format(java.util.Locale.ROOT, "%.1f Seconds", Math.max(0L, remainingMillis) / 1000.0D);
+    }
 
     static String racerName(String name, RacerStatus status) {
         return color(status).toString() + strikethrough(status) + name;
