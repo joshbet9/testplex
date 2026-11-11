@@ -15,8 +15,11 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
@@ -24,6 +27,9 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.generator.BlockPopulator;
 import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.generator.ChunkGenerator.ChunkData;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.format.NamedTextColor;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -47,6 +53,7 @@ public final class ModernArcadeLobby implements Listener {
     public static final int FLOOR_Y = 100;
     public static final int HOTBAR_PREVIEW_SLOT = 3;
     public static final int HOTBAR_LEADERBOARDS_SLOT = 2;
+    public static final int HOTBAR_FEEDBACK_SLOT = 1;
     public static final int HOTBAR_COSMETICS_SLOT = 4;
     public static final int HOTBAR_BOT_SETUP_SLOT = 5;
     public static final int HOTBAR_GAME_PREFERENCES_SLOT = 6;
@@ -72,11 +79,15 @@ public final class ModernArcadeLobby implements Listener {
     public static final double TEAM_DISPLAY_X = 18.0D;
 
     private static final String LOBBY_MARKER = "TESTPLEX_LEGACY_LOBBY_V1";
+    private static final String FEEDBACK_MENU_TITLE = ChatColor.DARK_AQUA + "Testplex Feedback";
+    private static final String BUG_REPORT_URL = "https://github.com/joshbet9/testplex/issues/new?template=bug_report.yml";
+    private static final String IDEA_SUBMISSION_URL = "https://github.com/joshbet9/testplex/issues/new?template=idea.yml";
     private final JavaPlugin plugin;
     private final ModernLobbyScoreboard lobbyScoreboard;
     private final NamespacedKey displayKey;
     private final NamespacedKey hotbarActionKey;
     private final NamespacedKey legacyPanelItemKey;
+    private final NamespacedKey feedbackActionKey;
     private World lobbyWorld;
 
     public ModernArcadeLobby(JavaPlugin plugin) {
@@ -85,6 +96,7 @@ public final class ModernArcadeLobby implements Listener {
         this.displayKey = new NamespacedKey(plugin, "legacy-lobby-datapoint");
         this.hotbarActionKey = new NamespacedKey(plugin, "lobby-hotbar-action");
         this.legacyPanelItemKey = new NamespacedKey(plugin, "game-panel-item");
+        this.feedbackActionKey = new NamespacedKey(plugin, "feedback-menu-action");
     }
 
     public World ensureWorld() {
@@ -201,6 +213,11 @@ public final class ModernArcadeLobby implements Listener {
                         ChatColor.YELLOW + "This game has its own saved leaderboard layout.",
                         ChatColor.GRAY + "Choose metrics, periods, maps and kits.",
                         ChatColor.DARK_GRAY + "Command: /arcadeport leaderboards"), "arcadeport leaderboards"));
+        inventory.setItem(HOTBAR_FEEDBACK_SLOT, createHotbarItem(Material.WRITABLE_BOOK,
+                ChatColor.YELLOW + "Bug Report / Idea",
+                List.of(ChatColor.GRAY + "Send a bug report or game idea.",
+                        ChatColor.YELLOW + "Right-click to choose a form.",
+                        ChatColor.DARK_GRAY + "Submissions are public GitHub issues."), "feedback"));
         inventory.setItem(HOTBAR_PREVIEW_SLOT, createHotbarItem(Material.FIREWORK_ROCKET,
                 ChatColor.LIGHT_PURPLE + "Cosmetic Preview Sandbox",
                 List.of(ChatColor.GRAY + "Enter the preview space for the selected game.",
@@ -287,7 +304,69 @@ public final class ModernArcadeLobby implements Listener {
             }
         }
         event.setCancelled(true);
+        if ("feedback".equals(action)) {
+            openFeedbackMenu(event.getPlayer());
+            return;
+        }
         Bukkit.dispatchCommand(event.getPlayer(), action);
+    }
+
+    private void openFeedbackMenu(Player player) {
+        Inventory menu = Bukkit.createInventory(null, 9, FEEDBACK_MENU_TITLE);
+        menu.setItem(3, feedbackMenuItem(Material.REDSTONE, ChatColor.RED + "Report a Bug", "bug",
+                "Describe a reproducible problem in the GitHub form."));
+        menu.setItem(5, feedbackMenuItem(Material.EMERALD, ChatColor.GREEN + "Submit an Idea", "idea",
+                "Suggest a gameplay, balance, polish or tester-tool improvement."));
+        player.openInventory(menu);
+    }
+
+    private ItemStack feedbackMenuItem(Material material, String title, String action, String description) {
+        ItemStack item = new ItemStack(material);
+        ItemMeta meta = item.getItemMeta();
+        meta.setDisplayName(title);
+        meta.setLore(List.of(ChatColor.GRAY + description, ChatColor.YELLOW + "Click to open the public form."));
+        meta.getPersistentDataContainer().set(feedbackActionKey, PersistentDataType.STRING, action);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    @EventHandler
+    public void onFeedbackMenuClick(InventoryClickEvent event) {
+        if (!FEEDBACK_MENU_TITLE.equals(event.getView().getTitle())) return;
+        event.setCancelled(true);
+        if (!(event.getWhoClicked() instanceof Player player) || event.getClickedInventory() == null
+                || event.getClickedInventory() != event.getView().getTopInventory()) return;
+        ItemStack item = event.getCurrentItem();
+        if (item == null || !item.hasItemMeta()) return;
+        String action = item.getItemMeta().getPersistentDataContainer()
+                .get(feedbackActionKey, PersistentDataType.STRING);
+        if ("bug".equals(action)) {
+            sendFeedbackLink(player, "Open the Testplex bug report form", BUG_REPORT_URL);
+        } else if ("idea".equals(action)) {
+            sendFeedbackLink(player, "Open the Testplex idea form", IDEA_SUBMISSION_URL);
+        } else {
+            return;
+        }
+        player.closeInventory();
+    }
+
+    @EventHandler
+    public void onFeedbackMenuDrag(InventoryDragEvent event) {
+        if (FEEDBACK_MENU_TITLE.equals(event.getView().getTitle())) event.setCancelled(true);
+    }
+
+    private void sendFeedbackLink(Player player, String label, String url) {
+        player.sendMessage(Component.text(label, NamedTextColor.AQUA)
+                .clickEvent(ClickEvent.openUrl(url)));
+        player.sendMessage(ChatColor.GRAY + "The GitHub form is public. Do not include passwords, tokens, or private server details.");
+    }
+
+    static String feedbackFormUrl(String action) {
+        return switch (action) {
+            case "bug" -> BUG_REPORT_URL;
+            case "idea" -> IDEA_SUBMISSION_URL;
+            default -> throw new IllegalArgumentException("Unknown feedback form: " + action);
+        };
     }
 
     private void ensurePlane(World world) {
