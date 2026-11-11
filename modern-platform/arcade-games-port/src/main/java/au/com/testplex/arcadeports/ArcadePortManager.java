@@ -1630,7 +1630,6 @@ public final class ArcadePortManager implements Listener {
                 starter == null ? Map.of() : debugProfiles.values(starter.getUniqueId(), type));
         Set<String> profileFeatureKeys = starter == null
                 ? Set.of() : debugProfiles.featureKeys(starter.getUniqueId(), type);
-        if (!profileFeatureKeys.isEmpty()) values.put("__DEBUG_GAMEPLAY_FEATURES", true);
         if (debugProfiles.testBotCount(starter == null ? null : starter.getUniqueId(), type, 0) > 0) {
             values.put("__DEBUG_TEST_BOT_ROSTER", true);
         }
@@ -17990,8 +17989,8 @@ public final class ArcadePortManager implements Listener {
                 session.dragonEscapeWinner = id;
                 session.dragonEscapeFinishWindowEndsAt = now
                         + ArcadePortRules.DRAGON_ESCAPE_FINISH_WINDOW_MILLIS;
-                announce(session, ChatColor.GOLD + "FIRST COMPLETION! " + ChatColor.YELLOW
-                        + player.getName() + ChatColor.GOLD + " finished; other racers have 30 seconds.");
+                announce(session, ChatColor.GOLD + ArcadePortRules.dragonEscapeFirstCompletionMessage(
+                        player.getName(), elapsed));
             }
             if (!GameDebugRuntimeOverrides.isDebugSession()) {
                 String statsPath = localStatsPath(id, ArcadePortGame.DRAGON_ESCAPE.id());
@@ -18004,11 +18003,6 @@ public final class ArcadePortManager implements Listener {
                 }
                 plugin.saveConfig();
             }
-        }
-        if (GameDebugRuntimeOverrides.hasGameplayDebugOverrides()) {
-            player.sendMessage(ChatColor.GRAY
-                    + "Debug overrides are active; this run does not save PBs or world records.");
-            return;
         }
         if (session.dragonEscapeMapResource == null) return;
         String kit = session.dragonEscapeKits.getOrDefault(id, "jumper");

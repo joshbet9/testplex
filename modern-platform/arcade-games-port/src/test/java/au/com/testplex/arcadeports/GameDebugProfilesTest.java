@@ -163,6 +163,28 @@ class GameDebugProfilesTest {
     }
 
     @Test
+    void featuresInAnUnselectedProfileDoNotMarkTheDefaultRunAsDebug() {
+        GameDebugProfiles profiles = new GameDebugProfiles(directory.resolve("unselected-features.yml").toFile(),
+                ignored -> { });
+        UUID tester = UUID.randomUUID();
+        ArcadePortGame game = ArcadePortGame.DRAGON_ESCAPE;
+        profiles.setFeature(tester, game, "builder-bricks", false);
+        assertEquals("default", profiles.selected(tester, game));
+        assertEquals(Map.of("builder-bricks", false), profiles.values(tester, game));
+
+        profiles.create(tester, game, "untouched");
+        assertEquals("untouched", profiles.selected(tester, game));
+        Map<String, Object> selectedValues = profiles.values(tester, game);
+        assertTrue(selectedValues.isEmpty());
+        GameDebugRuntimeOverrides.activate(selectedValues, tester);
+
+        assertFalse(GameDebugRuntimeOverrides.isDebugSession(),
+                "an empty selected profile must not inherit feature settings from another profile");
+        assertEquals(Set.of("builder-bricks"), profiles.featureKeys(tester, game),
+                "the union remains available for clearing stale immediate feature overrides");
+    }
+
+    @Test
     void resetCanRestoreTheActiveRuntimeToIntendedDefaults() {
         GameDebugProfiles profiles = new GameDebugProfiles(directory.resolve("active-reset.yml").toFile(), ignored -> { });
         UUID tester = UUID.randomUUID();

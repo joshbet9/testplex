@@ -1858,6 +1858,11 @@ class ArcadePortGameTest {
                 false, false, false, false, false, false, "jumper"));
     }
 
+    @Test void dragonEscapeFirstCompletionAnnouncementIncludesTheSavedRunTime() {
+        assertEquals("FIRST COMPLETION! JN_PlayzMC — 1:23.456. Other racers have 30 seconds.",
+                ArcadePortRules.dragonEscapeFirstCompletionMessage("JN_PlayzMC", 83_456L));
+    }
+
     @Test void dragonEscapeKitsCannotBeChangedMidRace() {
         assertFalse(ArcadePortRules.shouldAllowDragonEscapeKitChange(true));
         assertTrue(ArcadePortRules.shouldAllowDragonEscapeKitChange(false));
