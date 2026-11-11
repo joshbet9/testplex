@@ -1222,7 +1222,7 @@ public final class SourceMapCatalog {
         inferred.hasMinY = inferred.hasMaxY = true;
 
         List<Location> safeStarts = findSafeSurfaceLocations(
-                world, inferred, 120, 0.36D, bounds.populatedChunks());
+                world, inferred, 120, 0.42D, bounds.populatedChunks(), true);
         Map<String, List<Location>> markers = GladiatorsMapLayout.inferArenaMarkers(
                 safeStarts, inferred.centerX(), inferred.centerZ());
         if (markers.isEmpty()) {
@@ -1248,7 +1248,27 @@ public final class SourceMapCatalog {
         plugin.getLogger().warning("Using inferred Gladiators test arena layout for " + resource + ": created "
                 + "8 green, 4 yellow, 2 orange and 1 red terrain-checked arenas (30 safe starts). "
                 + "This is not original Mineplex WorldConfig data; source door markers are unavailable.");
+        List<Location> allCenters = new ArrayList<>();
+        for (String tier : List.of("GREEN", "YELLOW", "ORANGE", "RED")) {
+            allCenters.addAll(markers.getOrDefault(tier, List.of()));
+        }
+        for (String tier : List.of("GREEN", "YELLOW", "ORANGE", "RED")) {
+            List<Location> centers = markers.getOrDefault(tier, List.of());
+            for (int index = 0; index < centers.size(); index++) {
+                Location center = centers.get(index);
+                List<Location> arenaSpawns = GladiatorsMapLayout.spawnsForArena(
+                        allCenters, markers.getOrDefault("BLACK", List.of()), center);
+                plugin.getLogger().info("Gladiators inferred arena map=" + inferred.mapName()
+                        + " tier=" + tier + " arena=" + (index + 1)
+                        + " center=" + blockPosition(center)
+                        + " spawns=" + arenaSpawns.stream().map(SourceMapCatalog::blockPosition).toList());
+            }
+        }
         return inferred;
+    }
+
+    private static String blockPosition(Location location) {
+        return location.getBlockX() + "," + location.getBlockY() + "," + location.getBlockZ();
     }
 
     private static boolean hasCompleteGladiatorLayout(MapData data) {
@@ -1535,6 +1555,12 @@ public final class SourceMapCatalog {
     private static List<Location> findSafeSurfaceLocations(
             World world, MapData data, int wanted, double radiusFactor,
             List<ChunkCoordinate> populatedChunks) {
+        return findSafeSurfaceLocations(world, data, wanted, radiusFactor, populatedChunks, false);
+    }
+
+    private static List<Location> findSafeSurfaceLocations(
+            World world, MapData data, int wanted, double radiusFactor,
+            List<ChunkCoordinate> populatedChunks, boolean requireStableSurface) {
         List<Location> found = new ArrayList<>();
         java.util.Set<Long> allowedChunkKeys = null;
         if (populatedChunks != null && !populatedChunks.isEmpty()) {
@@ -1551,14 +1577,20 @@ public final class SourceMapCatalog {
             int x = (int) Math.round(data.centerX() + Math.cos(angle) * radiusX);
             int z = (int) Math.round(data.centerZ() + Math.sin(angle) * radiusZ);
             addDistinctSafeLocation(found,
-                    findSafeSurfaceLocation(world, data, x, z, 8, allowedChunkKeys), 8.0D);
+                    findSafeSurfaceLocation(world, data, x, z, 8, allowedChunkKeys, requireStableSurface), 8.0D);
         }
 
         int step = Math.max(8, (int) Math.min(data.width(), data.depth()) / 8);
-        for (int x = data.minX + 4; x <= data.maxX - 4 && found.size() < wanted; x += step) {
-            for (int z = data.minZ + 4; z <= data.maxZ - 4 && found.size() < wanted; z += step) {
+        int scanMinX = requireStableSurface ? (int) Math.ceil(data.centerX() - radiusX) : data.minX + 4;
+        int scanMaxX = requireStableSurface ? (int) Math.floor(data.centerX() + radiusX) : data.maxX - 4;
+        int scanMinZ = requireStableSurface ? (int) Math.ceil(data.centerZ() - radiusZ) : data.minZ + 4;
+        int scanMaxZ = requireStableSurface ? (int) Math.floor(data.centerZ() + radiusZ) : data.maxZ - 4;
+        for (int x = Math.max(data.minX + 4, scanMinX); x <= Math.min(data.maxX - 4, scanMaxX)
+                && found.size() < wanted; x += step) {
+            for (int z = Math.max(data.minZ + 4, scanMinZ); z <= Math.min(data.maxZ - 4, scanMaxZ)
+                    && found.size() < wanted; z += step) {
                 addDistinctSafeLocation(found,
-                        findSafeSurfaceLocation(world, data, x, z, 4, allowedChunkKeys), 8.0D);
+                        findSafeSurfaceLocation(world, data, x, z, 4, allowedChunkKeys, requireStableSurface), 8.0D);
             }
         }
         return found;
@@ -1592,6 +1624,12 @@ public final class SourceMapCatalog {
     private static Location findSafeSurfaceLocation(
             World world, MapData data, int targetX, int targetZ, int searchRadius,
             java.util.Set<Long> allowedChunkKeys) {
+        return findSafeSurfaceLocation(world, data, targetX, targetZ, searchRadius, allowedChunkKeys, false);
+    }
+
+    private static Location findSafeSurfaceLocation(
+            World world, MapData data, int targetX, int targetZ, int searchRadius,
+            java.util.Set<Long> allowedChunkKeys, boolean requireStableSurface) {
         for (int radius = 0; radius <= searchRadius; radius++) {
             for (int dx = -radius; dx <= radius; dx++) {
                 for (int dz = -radius; dz <= radius; dz++) {
@@ -1609,11 +1647,38 @@ public final class SourceMapCatalog {
                             || material == org.bukkit.Material.SOUL_FIRE || material == org.bukkit.Material.POWDER_SNOW) continue;
                     if (!world.getBlockAt(x, y + 1, z).isPassable()
                             || !world.getBlockAt(x, y + 2, z).isPassable()) continue;
+                    if (requireStableSurface && !hasStableGladiatorSpawnSurface(
+                            world, data, x, y, z, allowedChunkKeys)) continue;
                     return new Location(world, x + 0.5D, y + 1.0D, z + 0.5D);
                 }
             }
         }
         return null;
+    }
+
+    private static boolean hasStableGladiatorSpawnSurface(
+            World world, MapData data, int x, int y, int z, java.util.Set<Long> allowedChunkKeys) {
+        int walkableNeighbours = 0;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx == 0 && dz == 0) continue;
+                int neighbourX = x + dx;
+                int neighbourZ = z + dz;
+                if (neighbourX < data.minX + 2 || neighbourX > data.maxX - 2
+                        || neighbourZ < data.minZ + 2 || neighbourZ > data.maxZ - 2
+                        || !isBlockInPopulatedChunks(neighbourX, neighbourZ, allowedChunkKeys)) continue;
+                org.bukkit.block.Block floor = world.getBlockAt(neighbourX, y, neighbourZ);
+                org.bukkit.Material material = floor.getType();
+                if (!material.isSolid() || material == org.bukkit.Material.MAGMA_BLOCK
+                        || material == org.bukkit.Material.CACTUS || material == org.bukkit.Material.CAMPFIRE
+                        || material == org.bukkit.Material.SOUL_CAMPFIRE || material == org.bukkit.Material.FIRE
+                        || material == org.bukkit.Material.SOUL_FIRE || material == org.bukkit.Material.POWDER_SNOW
+                        || !world.getBlockAt(neighbourX, y + 1, neighbourZ).isPassable()
+                        || !world.getBlockAt(neighbourX, y + 2, neighbourZ).isPassable()) continue;
+                walkableNeighbours++;
+            }
+        }
+        return GladiatorsMapLayout.hasStableSpawnSurface(walkableNeighbours);
     }
 
     private static List<Location> findWizardsChestBlocks(World world, MapData data) {

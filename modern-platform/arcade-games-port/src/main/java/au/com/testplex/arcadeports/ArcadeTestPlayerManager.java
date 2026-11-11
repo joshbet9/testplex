@@ -39,6 +39,7 @@ final class ArcadeTestPlayerManager {
     private static final String FPP_PLUGIN_NAME = "FakePlayerPlugin";
     private static final String RESERVED_NAME_PREFIX = "TPXTEST";
     private static final int CLEANUP_TIMEOUT_TICKS = 200;
+    static final int SPAWN_SETTLE_TICKS = 3;
 
     private final JavaPlugin host;
     private final NamespacedKey markerKey;
@@ -94,6 +95,14 @@ final class ArcadeTestPlayerManager {
     static int additionalPlayersNeeded(int humanPlayers, int targetRosterSize) {
         int clampedTarget = Math.max(1, Math.min(TARGET_ROSTER_SIZE, targetRosterSize));
         return Math.max(0, clampedTarget - Math.max(0, humanPlayers));
+    }
+
+    static int consecutiveReadyTicks(boolean ready, int previousTicks) {
+        return ready ? Math.min(SPAWN_SETTLE_TICKS, Math.max(0, previousTicks) + 1) : 0;
+    }
+
+    static boolean readyToCompleteSpawn(boolean ready, int stableTicks) {
+        return ready && stableTicks >= SPAWN_SETTLE_TICKS;
     }
 
     static boolean canFitHumanPlayers(int humanPlayers) {
@@ -363,6 +372,7 @@ final class ArcadeTestPlayerManager {
         pendingApi = api;
         final int timeoutTicks = 200;
         final int[] elapsed = {0};
+        final int[] stableReadyTicks = {0};
         pendingSpawnTask = Bukkit.getScheduler().runTaskTimer(host, () -> {
             if (shuttingDown) {
                 cancelPendingSpawn();
@@ -394,7 +404,9 @@ final class ArcadeTestPlayerManager {
             }
 
             elapsed[0]++;
-            if (allReady && ready.size() == handles.size()) {
+            boolean batchReady = allReady && ready.size() == handles.size();
+            stableReadyTicks[0] = consecutiveReadyTicks(batchReady, stableReadyTicks[0]);
+            if (readyToCompleteSpawn(batchReady, stableReadyTicks[0])) {
                 cancelPendingSpawn();
                 pendingHandles = List.of();
                 pendingApi = null;
@@ -478,6 +490,7 @@ final class ArcadeTestPlayerManager {
             return;
         }
         final int[] elapsed = {0};
+        final int[] stableReadyTicks = {0};
         final BukkitTask[] task = new BukkitTask[1];
         task[0] = Bukkit.getScheduler().runTaskTimer(schedulerOwner, () -> {
             if (shuttingDown || retiringHandles.containsKey(playerId)
@@ -493,10 +506,14 @@ final class ArcadeTestPlayerManager {
                     configureAsAfkPlayer(handle, player, false);
                     activePlayers.put(playerId, player);
                     syncMatchRespawnLocation(player);
-                    task[0].cancel();
-                    completion.accept(player);
+                    stableReadyTicks[0] = consecutiveReadyTicks(true, stableReadyTicks[0]);
+                    if (readyToCompleteSpawn(true, stableReadyTicks[0])) {
+                        task[0].cancel();
+                        completion.accept(player);
+                    }
                     return;
                 }
+                stableReadyTicks[0] = consecutiveReadyTicks(false, stableReadyTicks[0]);
                 if (++elapsed[0] >= CLEANUP_TIMEOUT_TICKS) {
                     host.getLogger().warning("Timed out waiting for FakePlayerPlugin to finish respawning "
                             + "test player " + playerId + ".");

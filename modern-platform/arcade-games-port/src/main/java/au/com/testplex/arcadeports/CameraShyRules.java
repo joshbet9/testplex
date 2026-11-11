@@ -182,13 +182,9 @@ public final class CameraShyRules {
         return won ? Math.max(0, currentStreak) + 1 : 0;
     }
 
-    /**
-     * AFK test players are target dummies, not eligible winners. A solo human test
-     * continues while any dummies remain, but wins immediately after clearing them.
-     */
-    public static boolean shouldEndMatch(int aliveParticipants, int livingHumans, int totalHumans) {
-        if (aliveParticipants <= 1 || livingHumans <= 0) return true;
-        return totalHumans > 1 && livingHumans <= 1;
+    /** Every admitted player, including an AFK test player, is a normal match entrant. */
+    public static boolean shouldEndMatch(int aliveParticipants) {
+        return aliveParticipants <= 1;
     }
 
     /** True when a smoke sphere intersects the finite segment from camera to target. */

@@ -978,12 +978,9 @@ public final class CameraShyGame implements Listener {
         if (serverTick % 5L == 0L) updateSpotlightMarkers(now);
         if (serverTick % 5L == 0L) refreshHud(now);
 
-        long livingHumans = alive.stream().filter(humans::contains).count();
-        if (CameraShyRules.shouldEndMatch(alive.size(), (int) livingHumans, humans.size())) {
-            UUID winner = alive.stream().filter(humans::contains).findFirst().orElse(null);
-            String endReason = winner == null ? "All human players were eliminated."
-                    : alive.size() <= 1 ? "Last player standing!" : "Last human player standing!";
-            finish(winner, endReason, true);
+        if (CameraShyRules.shouldEndMatch(alive.size())) {
+            UUID winner = alive.stream().findFirst().orElse(null);
+            finish(winner, winner == null ? "All players were eliminated." : "Last player standing!", true);
         }
     }
 
@@ -1010,7 +1007,7 @@ public final class CameraShyGame implements Listener {
     }
 
     private UUID selectTimeoutWinner() {
-        return alive.stream().filter(humans::contains)
+        return alive.stream()
                 .max((first, second) -> CameraShyRules.compareTimeoutRank(
                         exposures.getOrDefault(first, 0), exposures.getOrDefault(second, 0),
                         photos.getOrDefault(first, 0), photos.getOrDefault(second, 0),
@@ -1120,24 +1117,24 @@ public final class CameraShyGame implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onKick(PlayerKickEvent event) {
-        removeHumanOnDisconnect(event.getPlayer());
+        removeParticipantOnDisconnect(event.getPlayer());
     }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        removeHumanOnDisconnect(event.getPlayer());
+        removeParticipantOnDisconnect(event.getPlayer());
     }
 
-    private void removeHumanOnDisconnect(Player player) {
+    private void removeParticipantOnDisconnect(Player player) {
         if (player == null) return;
         UUID id = player.getUniqueId();
         queue.remove(id);
-        if (phase != Phase.LIVE || !humans.contains(id) || !alive.remove(id)) return;
+        if (phase != Phase.LIVE || !players.containsKey(id) || !alive.remove(id)) return;
         ArmorStand understudy = understudyStands.remove(id);
         if (understudy != null && understudy.isValid()) understudy.remove();
         clearSpotlight(id);
         PlayerSnapshot snapshot = snapshots.remove(id);
-        if (snapshot != null) {
+        if (humans.contains(id) && snapshot != null) {
             if (player.isOnline()) {
                 manager.returnPlayerToLobby(player);
                 snapshot.restore(player);
@@ -1148,9 +1145,8 @@ public final class CameraShyGame implements Listener {
             }
         }
         removePlayerPresentation(id);
-        long remainingHumans = alive.stream().filter(humans::contains).count();
-        if (remainingHumans == 0L || (humans.size() > 1 && remainingHumans == 1L)) {
-            finish(alive.stream().filter(humans::contains).findFirst().orElse(null),
+        if (CameraShyRules.shouldEndMatch(alive.size())) {
+            finish(alive.stream().findFirst().orElse(null),
                     "A player disconnected; the match has ended.", true);
         }
     }

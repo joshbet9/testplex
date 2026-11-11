@@ -2,15 +2,26 @@ package au.com.testplex.arcadeports;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.bukkit.util.Vector;
 
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GladiatorsDebugRulesTest {
+
+    @Test
+    void modernModeUsesVanillaAttackSpeedWhileClassicModesKeepLegacySwingTiming() {
+        assertTrue(GladiatorsMode.MODERN.usesModernCombat());
+        assertEquals(4.0D, GladiatorsMode.MODERN.attackSpeedBaseValue(), 0.0D);
+        assertFalse(GladiatorsMode.NORMAL.usesModernCombat());
+        assertEquals(ArcadePortRules.LEGACY_ATTACK_SPEED, GladiatorsMode.NORMAL.attackSpeedBaseValue(), 0.0D);
+        assertEquals(ArcadePortRules.LEGACY_ATTACK_SPEED, GladiatorsMode.RODLESS.attackSpeedBaseValue(), 0.0D);
+    }
     @AfterEach
     void resetOverrides() {
         GameDebugRuntimeOverrides.clear();
@@ -44,10 +55,10 @@ class GladiatorsDebugRulesTest {
     void meleeAndProjectileHitWindowsAndKnockbackAreIndependentlyAdjustable() {
         assertEquals(10, ArcadePortRules.gladiatorsNoDamageTicks(false));
         assertEquals(8, ArcadePortRules.gladiatorsNoDamageTicks(true));
-        assertEquals(0.32D, ArcadePortRules.gladiatorsKnockbackHorizontal(false), 1.0e-9);
-        assertEquals(0.12D, ArcadePortRules.gladiatorsKnockbackVertical(false), 1.0e-9);
-        assertEquals(0.18D, ArcadePortRules.gladiatorsKnockbackHorizontal(true), 1.0e-9);
-        assertEquals(0.06D, ArcadePortRules.gladiatorsKnockbackVertical(true), 1.0e-9);
+        assertEquals(0.4D, ArcadePortRules.gladiatorsKnockbackHorizontal(false), 1.0e-9);
+        assertEquals(0.35D, ArcadePortRules.gladiatorsKnockbackVertical(false), 1.0e-9);
+        assertEquals(0.4D, ArcadePortRules.gladiatorsKnockbackHorizontal(true), 1.0e-9);
+        assertEquals(0.12D, ArcadePortRules.gladiatorsKnockbackVertical(true), 1.0e-9);
 
         GameDebugRuntimeOverrides.activate(Map.of(
                 "GLADIATOR_MELEE_NO_DAMAGE_TICKS", 4,
@@ -66,8 +77,8 @@ class GladiatorsDebugRulesTest {
         GameDebugRuntimeOverrides.clear();
         assertEquals(10, ArcadePortRules.gladiatorsNoDamageTicks(false));
         assertEquals(8, ArcadePortRules.gladiatorsNoDamageTicks(true));
-        assertEquals(0.32D, ArcadePortRules.gladiatorsKnockbackHorizontal(false), 1.0e-9);
-        assertEquals(0.18D, ArcadePortRules.gladiatorsKnockbackHorizontal(true), 1.0e-9);
+        assertEquals(0.4D, ArcadePortRules.gladiatorsKnockbackHorizontal(false), 1.0e-9);
+        assertEquals(0.4D, ArcadePortRules.gladiatorsKnockbackHorizontal(true), 1.0e-9);
     }
 
     @Test
@@ -130,6 +141,25 @@ class GladiatorsDebugRulesTest {
         GameDebugRuntimeOverrides.clear();
         assertEquals(20.0D, ArcadePortRules.gladiatorsPvpDamage(20.0D), 1.0e-9);
         assertEquals(10, ArcadePortRules.gladiatorsEnvironmentalNoDamageTicks());
+    }
+
+    @Test
+    void ordinaryPvpKnockbackMatchesTheSourceDamageManagerForMeleeAndProjectiles() {
+        Vector melee = ArcadePortRules.legacyPvpKnockback(
+                6.0D, false, new Vector(0.0D, 0.0D, 1.0D), true);
+        assertEquals(0.0D, melee.getX(), 0.00001D);
+        assertEquals(0.35563D, melee.getY(), 0.00001D);
+        assertEquals(0.57351D, melee.getZ(), 0.00001D);
+
+        Vector projectile = ArcadePortRules.legacyPvpKnockback(
+                6.0D, true, new Vector(0.0D, 0.2D, 1.0D), true);
+        assertEquals(0.0D, projectile.getX(), 0.00001D);
+        assertEquals(0.44443D, projectile.getY(), 0.00001D);
+        assertEquals(0.42613D, projectile.getZ(), 0.00001D);
+
+        assertNull(ArcadePortRules.legacyPvpKnockback(Double.NaN, false,
+                new Vector(0.0D, 0.0D, 1.0D), true));
+        assertNull(ArcadePortRules.legacyPvpKnockback(6.0D, false, new Vector(), true));
     }
 
     @Test

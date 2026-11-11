@@ -27,6 +27,12 @@ public enum GladiatorsMode {
     public boolean rodAvailable() { return rodAvailable; }
     public boolean bowAvailable() { return bowAvailable; }
     public boolean hasClassicRangedTools() { return rodAvailable || bowAvailable; }
+    public boolean usesModernCombat() { return this == MODERN; }
+
+    /** Modern uses the vanilla attack-speed base so sword/axe item modifiers drive cooldowns. */
+    public double attackSpeedBaseValue() {
+        return usesModernCombat() ? 4.0D : ArcadePortRules.LEGACY_ATTACK_SPEED;
+    }
 
     /** The untouched Reborn-style loadout is the default when nobody votes or in solo practice. */
     public static GladiatorsMode defaultMode() { return NORMAL; }
