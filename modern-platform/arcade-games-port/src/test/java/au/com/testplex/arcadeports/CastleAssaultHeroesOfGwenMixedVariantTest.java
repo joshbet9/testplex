@@ -121,8 +121,8 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
 
     @Test
     void castleAssaultMixedArcadeHalvesObjectiveTntRespawnDelay() {
-        assertEquals(60_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(false));
-        assertEquals(30_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(true));
+        assertEquals(30_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(false));
+        assertEquals(15_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(true));
     }
 
     @Test

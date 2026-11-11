@@ -140,12 +140,12 @@ final class CastleAssaultDebugRulesTest {
     }
 
     @Test void objectiveTntRespawnProfileAppliesToNormalAndMixedArcadeIntervals() {
-        assertEquals(60_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(false));
-        assertEquals(30_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(true));
+        assertEquals(30_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(false));
+        assertEquals(15_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(true));
         GameDebugRuntimeOverrides.activate(Map.of("CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS", 20_000L));
         assertEquals(20_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(false));
         assertEquals(10_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(true));
         GameDebugRuntimeOverrides.resetActiveValues();
-        assertEquals(60_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(false));
+        assertEquals(30_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(false));
     }
 }
