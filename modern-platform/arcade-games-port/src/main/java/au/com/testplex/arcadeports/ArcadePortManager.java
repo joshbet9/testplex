@@ -760,7 +760,7 @@ public final class ArcadePortManager implements Listener {
                 || !isRotationCandidateAvailable(ArcadePortGame.MONSTER_MAZE)) return false;
         LinkedHashMap<UUID, Player> selected = new LinkedHashMap<>();
         for (Player player : requestedParticipants) {
-            if (player == null || !player.isOnline() || testPlayers.isTestPlayer(player)) continue;
+            if (player == null || !player.isOnline()) continue;
             for (LinkedHashMap<UUID, Player> queue : queues.values()) queue.remove(player.getUniqueId());
             lobby.ensurePlayerInLobby(player);
             selected.put(player.getUniqueId(), player);
