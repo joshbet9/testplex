@@ -162,13 +162,11 @@ class CameraShyRulesTest {
     }
 
     @Test
-    void soloTestWinnerMustClearAllAfkTargetsButMultiplayerEndsWithOneHuman() {
-        assertFalse(CameraShyRules.shouldEndMatch(16, 1, 1));
-        assertFalse(CameraShyRules.shouldEndMatch(2, 1, 1));
-        assertTrue(CameraShyRules.shouldEndMatch(1, 1, 1));
-        assertTrue(CameraShyRules.shouldEndMatch(10, 0, 1));
-        assertTrue(CameraShyRules.shouldEndMatch(10, 1, 4));
-        assertFalse(CameraShyRules.shouldEndMatch(14, 2, 4));
+    void everyAdmittedPlayerUsesTheSameLastPlayerStandingRule() {
+        assertFalse(CameraShyRules.shouldEndMatch(16));
+        assertFalse(CameraShyRules.shouldEndMatch(2));
+        assertTrue(CameraShyRules.shouldEndMatch(1));
+        assertTrue(CameraShyRules.shouldEndMatch(0));
     }
 
     @Test

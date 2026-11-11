@@ -26,6 +26,19 @@ class ArcadeTestPlayerManagerTest {
     }
 
     @Test
+    void botSpawnAndRespawnWaitForFakePlayerSetupToSettleBeforeGivingGameLoadouts() {
+        int stableTicks = ArcadeTestPlayerManager.consecutiveReadyTicks(true, 0);
+        assertFalse(ArcadeTestPlayerManager.readyToCompleteSpawn(true, stableTicks));
+        stableTicks = ArcadeTestPlayerManager.consecutiveReadyTicks(true, stableTicks);
+        assertFalse(ArcadeTestPlayerManager.readyToCompleteSpawn(true, stableTicks));
+        stableTicks = ArcadeTestPlayerManager.consecutiveReadyTicks(true, stableTicks);
+        assertTrue(ArcadeTestPlayerManager.readyToCompleteSpawn(true, stableTicks));
+
+        assertEquals(0, ArcadeTestPlayerManager.consecutiveReadyTicks(false, stableTicks));
+        assertFalse(ArcadeTestPlayerManager.readyToCompleteSpawn(false, stableTicks));
+    }
+
+    @Test
     void disposableThreeClientAcceptanceNeedsNoFakePlayersButLiveDefaultRemainsSixteen() {
         assertEquals(3, ArcadeTestPlayerManager.additionalPlayersNeeded(0, 3));
         assertEquals(1, ArcadeTestPlayerManager.additionalPlayersNeeded(2, 3));

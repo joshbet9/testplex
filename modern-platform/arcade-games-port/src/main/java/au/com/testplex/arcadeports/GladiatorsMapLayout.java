@@ -88,6 +88,9 @@ final class GladiatorsMapLayout {
         return centers.stream().allMatch(center -> spawnsForArena(centers, blackMarkers, center).size() == 2);
     }
 
+    static boolean hasStableSpawnSurface(int walkableNeighbours) {
+        return walkableNeighbours >= 6;
+    }
     private static int nearestCenter(List<Location> centers, Location marker) {
         int best = -1;
         double bestDistance = Double.POSITIVE_INFINITY;

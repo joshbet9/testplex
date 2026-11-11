@@ -3248,10 +3248,10 @@ public final class ArcadePortRules {
     public static final int GLADIATOR_PROJECTILE_NO_DAMAGE_TICKS = 8;
     public static final int GLADIATOR_ENVIRONMENTAL_NO_DAMAGE_TICKS = 10;
     public static final double GLADIATOR_PVP_DAMAGE_MULTIPLIER = 1.0D;
-    public static final double GLADIATOR_MELEE_KNOCKBACK_HORIZONTAL = 0.32D;
-    public static final double GLADIATOR_MELEE_KNOCKBACK_VERTICAL = 0.12D;
-    public static final double GLADIATOR_PROJECTILE_KNOCKBACK_HORIZONTAL = 0.18D;
-    public static final double GLADIATOR_PROJECTILE_KNOCKBACK_VERTICAL = 0.06D;
+    public static final double GLADIATOR_MELEE_KNOCKBACK_HORIZONTAL = 0.4D;
+    public static final double GLADIATOR_MELEE_KNOCKBACK_VERTICAL = 0.35D;
+    public static final double GLADIATOR_PROJECTILE_KNOCKBACK_HORIZONTAL = 0.4D;
+    public static final double GLADIATOR_PROJECTILE_KNOCKBACK_VERTICAL = 0.12D;
     public static final int GLADIATOR_TIER_0_ARROWS = 3;
     public static final int GLADIATOR_TIER_1_ARROWS = 5;
     public static final int GLADIATOR_TIER_2_ARROWS = 7;
@@ -5273,6 +5273,31 @@ public final class ArcadePortRules {
     public static double microBattlesKnockbackStrength(double damage, boolean projectile) {
         if (!Double.isFinite(damage)) return 0.0D;
         return Math.log10(Math.max(damage, 2.0D)) * (projectile ? 1.6D : 1.0D);
+    }
+
+    /** Source Mineplex 1.8 DamageManager knockback for ordinary PvP hits. */
+    public static Vector legacyPvpKnockback(double damage, boolean projectile, Vector direction,
+            boolean targetGrounded) {
+        if (!Double.isFinite(damage) || damage <= 0.0D || direction == null
+                || !Double.isFinite(direction.lengthSquared())) return null;
+        double strength = Math.log10(Math.max(damage, 2.0D));
+        Vector trajectory = direction.clone();
+        trajectory.setY(0.0D);
+        double horizontalLength = trajectory.length();
+        if (horizontalLength < 1.0E-6D) return null;
+        if (projectile) {
+            trajectory.multiply(0.37D * strength / horizontalLength);
+            trajectory.setY(0.06D);
+        } else {
+            trajectory.normalize().multiply(0.6D * strength);
+            trajectory.setY(0.0D);
+        }
+        double velocity = 0.2D + trajectory.length() * 0.8D;
+        Vector applied = trajectory.normalize().multiply(velocity);
+        applied.setY(Math.min(0.4D + 0.04D * strength,
+                applied.getY() + Math.abs(0.2D * strength)));
+        if (targetGrounded) applied.setY(applied.getY() + 0.2D);
+        return applied;
     }
 
 

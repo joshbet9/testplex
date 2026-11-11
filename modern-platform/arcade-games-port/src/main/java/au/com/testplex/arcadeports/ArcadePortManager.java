@@ -677,7 +677,15 @@ public final class ArcadePortManager implements Listener {
                 && module.getGameManager() != null;
     }
 
-    /** Identifies a server-side fake Player so human join/leave hooks do not redirect it. */
+    /**
+     * Identifies a server-side fake-player account.
+     *
+     * <p>Use this for FakePlayerPlugin lifecycle handling and to prevent a
+     * synthetic account from receiving persistent account progression. A managed
+     * test player is a normal match participant: game mechanics must not branch on
+     * this identity for kits, equipment, damage, movement, objectives, scoring,
+     * eliminations, or round outcomes.</p>
+     */
     public boolean isTestPlayer(Player player) {
         return testPlayers.isTestPlayer(player);
     }
@@ -752,7 +760,7 @@ public final class ArcadePortManager implements Listener {
                 || !isRotationCandidateAvailable(ArcadePortGame.MONSTER_MAZE)) return false;
         LinkedHashMap<UUID, Player> selected = new LinkedHashMap<>();
         for (Player player : requestedParticipants) {
-            if (player == null || !player.isOnline() || testPlayers.isTestPlayer(player)) continue;
+            if (player == null || !player.isOnline()) continue;
             for (LinkedHashMap<UUID, Player> queue : queues.values()) queue.remove(player.getUniqueId());
             lobby.ensurePlayerInLobby(player);
             selected.put(player.getUniqueId(), player);
@@ -5201,12 +5209,10 @@ public final class ArcadePortManager implements Listener {
             for (int i = 0; i < participants.size(); i++) {
                 Player participant = participants.get(i);
                 session.masterBuilderPlots.put(participant.getUniqueId(), i);
-                // Fake players remain full match participants and receive their
-                // own plots, but AFK builders have no build to judge and should
-                // not turn a human tester's review into empty-plot downtime.
-                if (!testPlayers.isTestPlayer(participant)) {
-                    session.masterBuilderReviewOrder.add(participant.getUniqueId());
-                }
+                // Every participant gets the same plot and review slot. An AFK
+                // test player is still a player in the round, so its empty plot
+                // follows the same judging and round timing as any other empty plot.
+                session.masterBuilderReviewOrder.add(participant.getUniqueId());
             }
         }
         if (type == ArcadePortGame.RUNNER) {
@@ -5686,7 +5692,6 @@ public final class ArcadePortManager implements Listener {
         }
         if (type == ArcadePortGame.BOMB_LOBBERS) {
             setupBombLobbersScoreboard(session);
-            refreshBombLobbersTestPlayerArmor(session);
         }
         if (type == ArcadePortGame.DRAGONS) {
             setupDragonsScoreboard(session);
@@ -5804,7 +5809,6 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.ONE_IN_THE_QUIVER) setupQuiverScoreboard(session);
         if (type == ArcadePortGame.PAINTBALL) {
             setupPaintballScoreboard(session);
-            refreshPaintballTestPlayerArmor(session);
         }
         if (type == ArcadePortGame.DRAGON_ESCAPE) {
             setupDragonEscapeRaceScoreboard(session);
@@ -6532,7 +6536,7 @@ public final class ArcadePortManager implements Listener {
                 case NORMAL -> "Classic loadout: sword, bow, arrows and fishing rod.";
                 case RODLESS -> "Bow available; fishing rod disabled.";
                 case BOWLESS -> "Fishing rod available; bow disabled.";
-                case MODERN -> "Sword, axe and shield. No bow or rod.";
+                case MODERN -> "Sword, axe and shield with modern weapon cooldowns and shield rules. No bow or rod.";
                 case POT -> "Sword and healing potions. No bow or rod.";
             };
             String mine = mode.id().equals(votes.get(player.getUniqueId())) ? " Your vote." : "";
@@ -6848,6 +6852,63 @@ public final class ArcadePortManager implements Listener {
         return GladiatorsAchievementRules.isTimedCritical(attacker.isOnGround(),
                 attacker.getFallDistance(), attacker.getVelocity().getY(), attacker.isInWater(),
                 attacker.hasPotionEffect(PotionEffectType.BLINDNESS), attacker.isInsideVehicle());
+    }
+
+    /**
+     * Keep Minecraft's native modern melee pipeline for the Modern vote: attack cooldown,
+     * weapon attack-speed/damage modifiers, critical hits, sweep rules, shield blocking and
+     * axe shield disabling all depend on the original uncancelled player-attack event.
+     */
+    private void applyModernGladiatorDamage(Session session, Player attacker, Player target,
+            EntityDamageByEntityEvent event) {
+        UUID attackerId = attacker.getUniqueId();
+        UUID targetId = target.getUniqueId();
+        if (attackerId.equals(targetId)) {
+            event.setCancelled(true);
+            return;
+        }
+        Integer attackerPair = session.gladiatorPairs.get(attackerId);
+        Integer targetPair = session.gladiatorPairs.get(targetId);
+        long startsAt = attackerPair == null ? Long.MAX_VALUE
+                : session.gladiatorFightStartsAtByPair.getOrDefault(attackerPair, Long.MAX_VALUE);
+        if (!session.alive.contains(attackerId) || !session.alive.contains(targetId)
+                || !ArcadePortRules.canGladiatorsFight(System.currentTimeMillis(), startsAt,
+                        attackerPair == null ? -1 : attackerPair,
+                        targetPair == null ? -2 : targetPair,
+                        attackerPair != null && session.gladiatorResolvedPairs.contains(attackerPair))) {
+            event.setCancelled(true);
+            return;
+        }
+
+        // A valid tournament duel owns its PvP hit event. This keeps fake players and
+        // human players on the same combat path if another listener pre-cancelled it.
+        event.setCancelled(false);
+        double damageMultiplier = ArcadePortRules.gladiatorsPvpDamage(1.0D);
+        if (damageMultiplier != 1.0D) event.setDamage(event.getDamage() * damageMultiplier);
+        double damage = event.getFinalDamage();
+        if (!Double.isFinite(damage) || damage <= 0.0D) return;
+
+        ItemStack held = attacker.getInventory().getItemInMainHand();
+        boolean swordHit = held != null && held.getType().name().endsWith("_SWORD");
+        if (swordHit) {
+            recordGladiatorToolHit(session, attacker, target, GladiatorsAchievementRules.SWORD_HIT);
+            boolean timedCritical = isGladiatorTimedCritical(attacker)
+                    && attacker.getAttackCooldown() >= 0.9F;
+            int streak = GladiatorsAchievementRules.nextTimedCriticalStreak(
+                    session.gladiatorBoutTimedCritStreak.getOrDefault(attackerId, 0),
+                    timedCritical, false);
+            if (streak == 0) session.gladiatorBoutTimedCritStreak.remove(attackerId);
+            else session.gladiatorBoutTimedCritStreak.put(attackerId, streak);
+        } else {
+            session.gladiatorBoutTimedCritStreak.remove(attackerId);
+        }
+        session.gladiatorBoutTimedCritStreak.remove(targetId);
+        session.gladiatorRoundDamageTaken.merge(targetId, damage, Double::sum);
+        if (target.getHealth() + target.getAbsorptionAmount() <= damage) {
+            event.setCancelled(true);
+            target.getWorld().playSound(target.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 0.9F, 0.9F);
+            eliminate(session, target, attacker, "was defeated by " + attacker.getName());
+        }
     }
 
     private void incrementGladiatorsLifetimeStat(Player player, String stat, int amount,
@@ -7239,7 +7300,9 @@ public final class ArcadePortManager implements Listener {
             if (bracketStatus != null) {
                 lines.add("   ");
                 lines.add(ChatColor.GOLD + "Your Match");
-                lines.add(ChatColor.WHITE + bracketStatus);
+                for (String matchLine : bracketStatus.split("\\n")) {
+                    lines.add(matchLine);
+                }
             }
             for (int index = 0; index < view.teams.size(); index++) {
                 Team line = view.teams.get(index);
@@ -7263,18 +7326,22 @@ public final class ArcadePortManager implements Listener {
                         && (playerId.equals(match.first()) || playerId.equals(match.second())))
                 .min(java.util.Comparator.comparingInt(GladiatorsBracket.MatchView::round)).orElse(null);
         int losses = session.gladiatorBracket.losses(playerId);
-        if (next == null) return (losses == 0 ? "Winners" : "Losers") + " R? | Losses " + losses + " | Waiting";
-        String bracketName = switch (next.bracket()) {
-            case WINNERS -> "Winners";
-            case LOSERS -> "Losers";
-            case GRAND_FINAL, GRAND_FINAL_RESET -> "Grand Final";
+        if (next == null) {
+            String bracketCode = losses == 0 ? "W" : "L";
+            return ChatColor.WHITE + "vs TBD\n" + ChatColor.GRAY + bracketCode + " R? - Waiting";
+        }
+        String bracketCode = switch (next.bracket()) {
+            case WINNERS -> "W";
+            case LOSERS -> "L";
+            case GRAND_FINAL, GRAND_FINAL_RESET -> "GF";
         };
         UUID opponentId = playerId.equals(next.first()) ? next.second() : next.first();
         Player opponent = opponentId == null ? null : session.players.get(opponentId);
         String opponentName = opponent == null ? "TBD" : opponent.getName();
         String state = next.status() == GladiatorsBracket.Status.FIGHTING ? "Fighting"
                 : next.status() == GladiatorsBracket.Status.READY ? "Ready" : "Waiting";
-        return bracketName + " R" + next.round() + " Losses " + losses + " vs " + opponentName + " " + state;
+        String roundLabel = "GF".equals(bracketCode) ? bracketCode : bracketCode + " R" + next.round();
+        return ChatColor.WHITE + "vs " + opponentName + "\n" + ChatColor.GRAY + roundLabel + " - " + state;
     }
 
     private void cleanupGladiatorsScoreboard(Session session) {
@@ -7673,6 +7740,8 @@ public final class ArcadePortManager implements Listener {
         player.getInventory().addItem(new ItemStack(sword));
         GladiatorsMode mode = GladiatorsMode.fromId(session.gladiatorMode);
         if (mode == null) mode = GladiatorsMode.defaultMode();
+        var attackSpeed = player.getAttribute(Attribute.ATTACK_SPEED);
+        if (attackSpeed != null) attackSpeed.setBaseValue(mode.attackSpeedBaseValue());
         switch (mode) {
             case NORMAL -> {
                 player.getInventory().addItem(new ItemStack(Material.FISHING_ROD));
@@ -11475,21 +11544,6 @@ public final class ArcadePortManager implements Listener {
         player.updateInventory();
     }
 
-    /** FakePlayerPlugin may finish its player equipment sync after Arcade gives the kit. */
-    private void refreshBombLobbersTestPlayerArmor(Session session) {
-        if (session == null || session.type != ArcadePortGame.BOMB_LOBBERS) return;
-        for (UUID playerId : session.players.keySet()) {
-            if (!testPlayers.isTestPlayer(playerId)) continue;
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                if (active != session || !session.alive.contains(playerId)) return;
-                Player player = session.players.get(playerId);
-                if (player == null || !player.isOnline()) return;
-                setBombLobbersArmor(session, player,
-                        session.bombLobbersKits.getOrDefault(playerId, "acrobat"));
-            }, 2L);
-        }
-    }
-
     /** Sends the chosen glass only to its owner; the server world stays unchanged for everyone else. */
     private void applyMicroMiddleGlassCosmetic(Session session, Player player) {
         UUID playerId = player.getUniqueId();
@@ -12779,19 +12833,6 @@ public final class ArcadePortManager implements Listener {
         if (changed) player.getInventory().setArmorContents(armor);
     }
 
-    /** FakePlayerPlugin may apply its equipment snapshot just after a match gives kits. */
-    private void refreshPaintballTestPlayerArmor(Session session) {
-        if (session == null || session.type != ArcadePortGame.PAINTBALL) return;
-        for (UUID playerId : session.players.keySet()) {
-            if (!testPlayers.isTestPlayer(playerId)) continue;
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                if (active != session || !session.alive.contains(playerId)) return;
-                Player player = session.players.get(playerId);
-                if (player != null && player.isOnline()) setPaintballArmor(session, player);
-            }, 2L);
-        }
-    }
-
     private ItemStack paintballArmorPiece(Material material, Color color) {
         ItemStack item = new ItemStack(material);
         if (item.getItemMeta() instanceof LeatherArmorMeta meta) {
@@ -13783,7 +13824,7 @@ public final class ArcadePortManager implements Listener {
             p.sendMessage(ChatColor.YELLOW+"Build: "+ChatColor.GOLD+session.masterBuilderTheme
                     +ChatColor.YELLOW+" | Your plot: "+(plotIndex==null?"unassigned":plotIndex+1));
             p.sendMessage(ChatColor.GRAY+"Use Creative inventory inside your quartz plot border. "
-                    +"Build time adjusts to the number of human plots so building plus voting totals five minutes.");
+                    +"Build time adjusts to the number of participant plots so building plus voting totals five minutes.");
             p.sendTitle(ChatColor.GOLD+"MASTER BUILDERS",
                     ChatColor.YELLOW+"Build: "+session.masterBuilderTheme+ChatColor.GRAY+" | Plot "+(plotIndex==null?"?":plotIndex+1),
                     5, 50, 10);
@@ -13800,7 +13841,7 @@ public final class ArcadePortManager implements Listener {
             TextDisplay label = session.world.spawn(labelAt, TextDisplay.class);
             String builderName = builder == null ? "Builder" : builder.getName();
             String labelText = "PLOT " + String.format(java.util.Locale.ROOT, "%02d", entry.getValue() + 1)
-                    + "\n" + (testPlayers.isTestPlayer(builder) ? "AFK BUILDER" : builderName);
+                    + "\n" + builderName;
             label.text(Component.text(labelText, net.kyori.adventure.text.format.NamedTextColor.GOLD));
             label.setAlignment(TextDisplay.TextAlignment.CENTER);
             label.setBillboard(Display.Billboard.CENTER);
@@ -13823,7 +13864,7 @@ public final class ArcadePortManager implements Listener {
         int maxRating = ArcadePortRules.masterBuildersMaxRating();
         long reviewSeconds = (ArcadePortRules.masterBuildersReviewMillis() + 999L) / 1_000L;
         long voteSeconds = (ArcadePortRules.masterBuildersVoteMillis() + 999L) / 1_000L;
-        announce(session,ChatColor.GOLD+"Build time is over! Review each human-built plot for "
+        announce(session,ChatColor.GOLD+"Build time is over! Review each player's plot for "
                 + reviewSeconds + " seconds. " + ChatColor.YELLOW + "Right-click a rating from 1 (low) to "
                 + maxRating + " (outstanding) during the first " + voteSeconds + " seconds.");
         showNextMasterBuilderReview(session,now);
@@ -13844,13 +13885,12 @@ public final class ArcadePortManager implements Listener {
                     Material.LIME_CONCRETE,Material.LIGHT_BLUE_CONCRETE,Material.PURPLE_CONCRETE};
             int maxRating = ArcadePortRules.masterBuildersMaxRating();
             long onlineCount=session.players.values().stream()
-                    .filter(p->p!=null&&p.isOnline()&&!testPlayers.isTestPlayer(p)).count();
+                    .filter(p->p!=null&&p.isOnline()).count();
             int viewerSlot=0;
             for(Player p:session.players.values()){
                 if(p==null||!p.isOnline())continue;
                 p.setGameMode(GameMode.ADVENTURE);
                 p.getInventory().clear();
-                if(testPlayers.isTestPlayer(p))continue;
                 double angle=-Math.PI/2.0D+Math.PI*2.0D*viewerSlot/Math.max(1L,onlineCount);
                 Location view=centre.clone().add(Math.cos(angle)*12.0D,5.0D,Math.sin(angle)*12.0D);
                 view.setDirection(centre.toVector().subtract(view.toVector()));
@@ -14023,7 +14063,7 @@ public final class ArcadePortManager implements Listener {
                 String status=now<session.masterBuilderVoteEndsAt
                         ?"Rate 1-6 | "+seconds+"s":"Viewing build | "+seconds+"s";
                 for(Player p:alivePlayers(session)){
-                    if(!testPlayers.isTestPlayer(p))p.sendActionBar(Component.text("Plot "
+                    p.sendActionBar(Component.text("Plot "
                             +(session.masterBuilderReviewIndex+1)+"/"+session.masterBuilderReviewOrder.size()
                             +" | "+status));
                 }
@@ -20436,7 +20476,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void applyGladiatorDamage(Session session, Player attacker, Player target,
-            double damage, boolean projectile) {
+            double damage, boolean projectile, Vector projectileVelocity) {
         if (active != session || attacker.equals(target) || !Double.isFinite(damage) || damage <= 0.0D) return;
         UUID attackerId = attacker.getUniqueId();
         UUID targetId = target.getUniqueId();
@@ -20448,7 +20488,7 @@ public final class ArcadePortManager implements Listener {
                 attackerPair == null ? -1 : attackerPair,
                 targetPair == null ? -2 : targetPair,
                 attackerPair != null && session.gladiatorResolvedPairs.contains(attackerPair))) return;
-        if (target.getNoDamageTicks() > 0) return;
+        boolean damageWindowOpen = target.getNoDamageTicks() <= 0;
         if (projectile) {
             recordGladiatorToolHit(session, attacker, target, GladiatorsAchievementRules.BOW_HIT);
             session.gladiatorBoutTimedCritStreak.remove(attackerId);
@@ -20470,29 +20510,53 @@ public final class ArcadePortManager implements Listener {
             }
         }
         session.gladiatorBoutTimedCritStreak.remove(targetId);
-        target.setNoDamageTicks(ArcadePortRules.gladiatorsNoDamageTicks(projectile));
-        session.gladiatorRoundDamageTaken.merge(targetId, damage, Double::sum);
-        if (target.getHealth() <= damage) {
+        if (damageWindowOpen) {
+            target.setNoDamageTicks(ArcadePortRules.gladiatorsNoDamageTicks(projectile));
+            session.gladiatorRoundDamageTaken.merge(targetId, damage, Double::sum);
+        }
+        if (damageWindowOpen && target.getHealth() <= damage) {
             target.getWorld().playSound(target.getLocation(),
                     projectile ? Sound.ENTITY_ARROW_HIT_PLAYER : Sound.ENTITY_PLAYER_ATTACK_STRONG,
                     0.9F, 0.9F);
             eliminate(session, target, attacker, "was defeated by " + attacker.getName());
             return;
         }
-        target.setHealth(target.getHealth() - damage);
-        playLegacyDamageFeedback(target);
-        Vector push = target.getLocation().toVector().subtract(attacker.getLocation().toVector()).setY(0.0D);
-        if (push.lengthSquared() > 0.001D) {
-            target.setVelocity(target.getVelocity().add(push.normalize()
-                    .multiply(ArcadePortRules.gladiatorsKnockbackHorizontal(projectile))
-                    .setY(ArcadePortRules.gladiatorsKnockbackVertical(projectile))));
+        if (damageWindowOpen) {
+            target.setHealth(target.getHealth() - damage);
+            playLegacyDamageFeedback(target);
         }
+        applyGladiatorsSourceKnockback(attacker, target, damage, projectile, projectileVelocity);
 
         Player creditedKiller = attacker == null ? recentMicroBattlesKiller(session, target.getUniqueId()) : attacker;
         target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
         target.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
                 target.getLocation().clone().add(0.0D, 1.0D, 0.0D), 5,
                 0.25D, 0.35D, 0.25D, 0.04D);
+    }
+
+    private void applyGladiatorsSourceKnockback(Player attacker, Player target, double damage,
+            boolean projectile, Vector projectileVelocity) {
+        Vector direction = projectile && projectileVelocity != null
+                ? projectileVelocity.clone()
+                : target.getLocation().toVector().subtract(attacker.getLocation().toVector());
+        Vector velocity = ArcadePortRules.legacyPvpKnockback(
+                damage, projectile, direction, target.isOnGround());
+        if (velocity == null) return;
+        double horizontalDefault = projectile
+                ? ArcadePortRules.GLADIATOR_PROJECTILE_KNOCKBACK_HORIZONTAL
+                : ArcadePortRules.GLADIATOR_MELEE_KNOCKBACK_HORIZONTAL;
+        double verticalDefault = projectile
+                ? ArcadePortRules.GLADIATOR_PROJECTILE_KNOCKBACK_VERTICAL
+                : ArcadePortRules.GLADIATOR_MELEE_KNOCKBACK_VERTICAL;
+        double horizontalScale = horizontalDefault <= 0.0D ? 1.0D
+                : ArcadePortRules.gladiatorsKnockbackHorizontal(projectile) / horizontalDefault;
+        double verticalScale = verticalDefault <= 0.0D ? 1.0D
+                : ArcadePortRules.gladiatorsKnockbackVertical(projectile) / verticalDefault;
+        velocity.setX(velocity.getX() * horizontalScale);
+        velocity.setZ(velocity.getZ() * horizontalScale);
+        velocity.setY(velocity.getY() * verticalScale);
+        target.setFallDistance(0.0F);
+        target.setVelocity(velocity);
     }
 
     private void applyGladiatorEnvironmentalDamage(Session session, Player target, double damage, String reason) {
@@ -27825,9 +27889,19 @@ public final class ArcadePortManager implements Listener {
         }
         // Keep the shared damage pipeline's previous ignore-cancelled behavior, while
         // allowing Bacon Brawl to take ownership of void knockouts already intercepted elsewhere.
-        if (event.isCancelled() && !(session.type == ArcadePortGame.BACON_BRAWL
-                && event.getCause() == EntityDamageEvent.DamageCause.VOID
-                && event.getEntity() instanceof Player)) return;
+        boolean gladiatorPlayerHit = false;
+        if (session.type == ArcadePortGame.GLADIATORS
+                && event instanceof EntityDamageByEntityEvent gladiatorDamage
+                && event.getEntity() instanceof Player gladiatorVictim
+                && session.players.containsKey(gladiatorVictim.getUniqueId())) {
+            Player gladiatorAttacker = playerShooter(gladiatorDamage.getDamager());
+            gladiatorPlayerHit = gladiatorAttacker != null && !gladiatorAttacker.equals(gladiatorVictim)
+                    && session.players.containsKey(gladiatorAttacker.getUniqueId());
+        }
+        if (event.isCancelled() && !gladiatorPlayerHit
+                && !(session.type == ArcadePortGame.BACON_BRAWL
+                    && event.getCause() == EntityDamageEvent.DamageCause.VOID
+                    && event.getEntity() instanceof Player)) return;
         if (event.getEntity() instanceof Player debugTarget
                 && session.players.containsKey(debugTarget.getUniqueId())) {
             UUID debugId = debugTarget.getUniqueId();
@@ -28275,6 +28349,13 @@ public final class ArcadePortManager implements Listener {
                 && event.getEntity() instanceof Player gladiatorTarget
                 && session.players.containsKey(gladiatorTarget.getUniqueId())) {
             double finalDamage = event.getFinalDamage();
+            GladiatorsMode mode = GladiatorsMode.fromId(session.gladiatorMode);
+            if (mode != null && mode.usesModernCombat()
+                    && event instanceof EntityDamageByEntityEvent modernDamage
+                    && modernDamage.getDamager() instanceof Player modernAttacker) {
+                applyModernGladiatorDamage(session, modernAttacker, gladiatorTarget, modernDamage);
+                return;
+            }
             event.setCancelled(true);
             String damageReason = event.getCause().name().toLowerCase(java.util.Locale.ROOT)
                     .replace('_', ' ');
@@ -28287,7 +28368,8 @@ public final class ArcadePortManager implements Listener {
                     if (session.alive.contains(attacker.getUniqueId())
                             && session.alive.contains(gladiatorTarget.getUniqueId())) {
                         applyGladiatorDamage(session, attacker, gladiatorTarget,
-                                ArcadePortRules.gladiatorsPvpDamage(finalDamage), damager instanceof Projectile);
+                                ArcadePortRules.gladiatorsPvpDamage(finalDamage), damager instanceof Projectile,
+                                damager instanceof Projectile projectile ? projectile.getVelocity() : null);
                     }
                 } else {
                     applyGladiatorEnvironmentalDamage(session, gladiatorTarget, finalDamage, damageReason);
@@ -28742,7 +28824,7 @@ public final class ArcadePortManager implements Listener {
         if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || !(event.getEntity() instanceof Player player)
-                || event.getEntity().getWorld() != session.world
+                || !isSessionWorld(session, event.getEntity().getWorld())
                 || !session.players.containsKey(player.getUniqueId())) return;
         if (session.type == ArcadePortGame.GLADIATORS) {
             Integer pair = session.gladiatorPairs.get(player.getUniqueId());
@@ -28810,7 +28892,7 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         Player player = event.getPlayer();
         if (session == null || session.type != ArcadePortGame.GLADIATORS
-                || player.getWorld() != session.world
+                || !isSessionWorld(session, player.getWorld())
                 || (event.getState() != PlayerFishEvent.State.FISHING
                         && event.getState() != PlayerFishEvent.State.CAUGHT_ENTITY)) return;
         Integer pair = session.gladiatorPairs.get(player.getUniqueId());
@@ -28829,13 +28911,18 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
-        if (event.getState() == PlayerFishEvent.State.FISHING && !event.isCancelled()) {
+        if (event.getState() == PlayerFishEvent.State.FISHING) {
+            event.setCancelled(false);
             session.gladiatorUsedRod.add(player.getUniqueId());
         } else if (event.getState() == PlayerFishEvent.State.CAUGHT_ENTITY
-                && !event.isCancelled() && event.getCaught() instanceof Player target
-                && pair.equals(session.gladiatorPairs.get(target.getUniqueId()))
-                && session.alive.contains(target.getUniqueId())) {
-            recordGladiatorToolHit(session, player, target, GladiatorsAchievementRules.ROD_HIT);
+                && event.getCaught() instanceof Player target) {
+            if (pair.equals(session.gladiatorPairs.get(target.getUniqueId()))
+                    && session.alive.contains(target.getUniqueId())) {
+                event.setCancelled(false);
+                recordGladiatorToolHit(session, player, target, GladiatorsAchievementRules.ROD_HIT);
+            } else {
+                event.setCancelled(true);
+            }
         }
     }
 
@@ -28873,7 +28960,7 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onProjectileHit(ProjectileHitEvent event) {
         Session session = active;
-        if (session == null || event.getEntity().getWorld() != session.world) return;
+        if (session == null || !isSessionWorld(session, event.getEntity().getWorld())) return;
 
         if (session.type == ArcadePortGame.GLADIATORS
                 && event.getEntity() instanceof Arrow gladiatorArrow) {

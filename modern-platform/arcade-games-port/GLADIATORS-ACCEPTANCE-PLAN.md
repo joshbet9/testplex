@@ -25,6 +25,7 @@ For a tournament with multiple players:
 - [ ] Rodless gives the bow and arrows but no fishing rod.
 - [ ] Bowless gives the fishing rod but no bow.
 - [ ] Modern gives the sword, stone axe and shield, with neither bow nor fishing rod.
+- [ ] Modern uses the native Paper/Minecraft melee combat pipeline: weapon cooldown and charge, sword/axe damage modifiers, falling critical hits, sweep rules, shield blocking and axe shield disable. Classic modes retain their legacy rapid-swing/custom-damage rules.
 - [ ] Pot gives the sword and healing potions, with neither bow nor fishing rod.
 - [ ] Existing lobby votes carry into the match vote; changing a vote updates the visible count.
 - [ ] Equal/no-vote outcomes resolve deterministically to Normal rather than silently selecting Rodless.
@@ -46,6 +47,7 @@ For a tournament with multiple players:
 - [ ] Unresolved duels receive poison after 30 seconds at one point of damage per second, without poisoning completed duels.
 - [ ] Every Gladiators source archive has usable bracket-tier arena centres and two terrain-safe spawn locations assigned to each arena; missing `WorldConfig.dat` archives are labelled inferred and must never silently start at shared/default coordinates.
 - [ ] Map-by-map metadata audit: `Caged In` retains the original authored 8/4/2/1 centres, 30 BLACK duel spawns, 14 PINK guide points and `129` door markers. The other 22 archives (`Alberwood Creek`, `Autumn Kingdom`, `Bliss`, `Castaway Cove`, `Cherry Bomb`, `Choco Valley`, `Clockwork`, `Cosmos`, `Ethereal Caverns`, `Fierce Desert`, `Flushed Away`, `Harmony`, `Mythical Forests`, `OutLaw`, `Planet Douglas`, `Primitive`, `Savanna`, `The Shire`, `Tribal Battleground`, `Tropics`, `Under the Sea`, `Urban`) omit authored `WorldConfig.dat`; their terrain-derived layouts are explicitly inferred test metadata and still require per-map Paper gameplay acceptance.
+- [ ] Alberwood Creek regression: duelists spawn on broad walkable interior terrain and fight inside the arena layout, never outside the playable map or on top of its perimeter border.
 - [ ] Authored `BLACK` spawn markers are assigned to their nearest arena centre rather than reusing the globally nearest pair for every arena.
 - [ ] Authored `129` door markers open to air as the source arena advances, close back to obsidian after passage, and are resolved in the correct world instance.
 - [ ] Maps without authored `129` locations do not have unrelated terrain rewritten as gates; their inferred safe paths use the Happy Villager trail and the source 15-second slow-mover recovery.

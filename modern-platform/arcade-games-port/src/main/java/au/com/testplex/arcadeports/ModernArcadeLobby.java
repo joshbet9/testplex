@@ -9,6 +9,7 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.WorldCreator;
 import org.bukkit.WorldType;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.block.Block;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Player;
@@ -168,6 +169,7 @@ public final class ModernArcadeLobby implements Listener {
         player.setFlying(false);
         player.setAllowFlight(false);
         player.setWalkSpeed(0.2F);
+        restoreVanillaJumpStrength(player);
         player.getInventory().clear();
         player.getInventory().setArmorContents(new ItemStack[4]);
         player.getInventory().setItemInOffHand(null);
@@ -190,8 +192,16 @@ public final class ModernArcadeLobby implements Listener {
         if (!isLobbyWorld(player.getWorld())) {
             sendToLobby(player);
         } else {
+            // Repair stale zero-jump state from older Monster Maze rounds before
+            // this lobby state is snapshotted for another game.
+            restoreVanillaJumpStrength(player);
             ensurePanelItem(player);
         }
+    }
+
+    private static void restoreVanillaJumpStrength(Player player) {
+        var jumpStrength = player.getAttribute(Attribute.JUMP_STRENGTH);
+        if (jumpStrength != null) jumpStrength.setBaseValue(0.42D);
     }
 
     /**
