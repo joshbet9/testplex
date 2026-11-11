@@ -583,7 +583,7 @@ public final class ArcadePortRules {
     public static final long BACON_TIMED_HIT_GOOD_MAX_MILLIS = 1_800L;
     public static final long BACON_TIMED_HIT_OK_MIN_MILLIS = 251L;
     public static final long BACON_TIMED_HIT_OK_MAX_MILLIS = 499L;
-    public static final long BACON_TIMED_HIT_LATE_MAX_MILLIS = 1_400L;
+    public static final long BACON_TIMED_HIT_LATE_MAX_MILLIS = 2_800L;
     public static final long BACON_HIT_FEEDBACK_MILLIS = 1_000L;
     /** The Pig kit's damage meter controls its invincibility window, capped at five seconds. */
     public static final long BACON_PIG_INVINCIBILITY_MIN_MILLIS = 500L;
