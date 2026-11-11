@@ -579,8 +579,8 @@ public final class ArcadePortRules {
     public static final double BACON_CRISPY_FIRE_CONTACT_RADIUS_SQUARED = 2.25D;
     public static final int BACON_CRISPY_IMPACT_FIRE_BLOCKS = 3;
     public static final long BACON_TIMED_HIT_SPAM_WINDOW_MILLIS = 250L;
-    public static final long BACON_TIMED_HIT_GOOD_MIN_MILLIS = 500L;
-    public static final long BACON_TIMED_HIT_GOOD_MAX_MILLIS = 900L;
+    public static final long BACON_TIMED_HIT_GOOD_MIN_MILLIS = 1_000L;
+    public static final long BACON_TIMED_HIT_GOOD_MAX_MILLIS = 1_800L;
     public static final long BACON_TIMED_HIT_OK_MIN_MILLIS = 251L;
     public static final long BACON_TIMED_HIT_OK_MAX_MILLIS = 499L;
     public static final long BACON_TIMED_HIT_LATE_MAX_MILLIS = 1_400L;

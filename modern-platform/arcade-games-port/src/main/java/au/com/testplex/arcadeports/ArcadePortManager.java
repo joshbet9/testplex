@@ -14613,28 +14613,24 @@ public final class ArcadePortManager implements Listener {
         };
     }
 
-    /** The vanilla XP bar is the ability meter during Bacon Brawl. */
+    /** The vanilla XP bar fills to the next timing critical; the sidebar/item lore show meter charge. */
     private void updateBaconMeterItem(Session session, Player player) {
         if (session.type != ArcadePortGame.BACON_BRAWL || player == null || !player.isOnline()
                 || !session.alive.contains(player.getUniqueId())) return;
         UUID playerId = player.getUniqueId();
-        long activeUntil = Math.max(session.baconCloakUntil.getOrDefault(playerId, 0L),
-                session.baconBrutusUntil.getOrDefault(playerId, 0L));
-        if (activeUntil > System.currentTimeMillis()) {
-            long duration = Math.max(1L, session.baconTimedAbilityDurationMillis.getOrDefault(playerId, 1L));
-            long remaining = activeUntil - System.currentTimeMillis();
-            float remainingProgress = Math.max(0.0F, Math.min(0.999F, remaining / (float) duration));
-            int remainingSeconds = (int) Math.max(1L, (remaining + 999L) / 1_000L);
-            if (Math.abs(player.getExp() - remainingProgress) > 0.001F) player.setExp(remainingProgress);
-            if (player.getLevel() != remainingSeconds) player.setLevel(remainingSeconds);
-            return;
-        }
+        long now = System.currentTimeMillis();
+        long criticalDelay = ArcadePortRules.baconTimingWindowMillis(
+                GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_GOOD_MIN_MILLIS",
+                        ArcadePortRules.BACON_TIMED_HIT_GOOD_MIN_MILLIS), session.baconKnockback);
+        long lastSwing = session.baconLastSwingAt.getOrDefault(playerId, 0L);
+        long elapsed = lastSwing <= 0L ? criticalDelay : Math.max(0L, now - lastSwing);
+        long remaining = Math.max(0L, criticalDelay - elapsed);
+        float progress = Math.min(1.0F, elapsed / (float) Math.max(1L, criticalDelay));
+        int secondsRemaining = (int) ((remaining + 999L) / 1_000L);
+        if (Math.abs(player.getExp() - progress) > 0.001F) player.setExp(progress);
+        if (player.getLevel() != secondsRemaining) player.setLevel(secondsRemaining);
         int percent = Math.max(0, Math.min(GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", ArcadePortRules.BACON_METER_MAX),
                 session.baconMeters.getOrDefault(playerId, 0)));
-        float progress = Math.min(0.999F, percent / (float) GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", ArcadePortRules.BACON_METER_MAX));
-        if (Math.abs(player.getExp() - progress) > 0.001F) player.setExp(progress);
-        if (player.getLevel() != percent) player.setLevel(percent);
-
         ItemStack ability = player.getInventory().getItem(0);
         if (ability != null && ability.getType() == Material.IRON_AXE
                 && ability.hasItemMeta() && ability.getItemMeta().hasDisplayName()
@@ -14867,6 +14863,7 @@ public final class ArcadePortManager implements Listener {
     private void endBaconCloak(Session session, UUID ownerId, Player owner) {
         session.baconCloakUntil.remove(ownerId);
         session.baconTimedAbilityDurationMillis.remove(ownerId);
+        if (owner != null && owner.isOnline()) cooldownProgress.stop(owner);
         LivingEntity avatar = baconPlayerAvatar(session, ownerId);
         if (avatar != null) avatar.setInvisible(false);
     }
@@ -14875,6 +14872,7 @@ public final class ArcadePortManager implements Listener {
         session.baconBrutusUntil.remove(ownerId);
         session.baconTimedAbilityDurationMillis.remove(ownerId);
         if (owner != null && owner.isOnline()) {
+            cooldownProgress.stop(owner);
             owner.removePotionEffect(PotionEffectType.RESISTANCE);
             owner.removePotionEffect(PotionEffectType.SLOWNESS);
         }
@@ -15423,6 +15421,7 @@ public final class ArcadePortManager implements Listener {
                 long duration = ArcadePortRules.baconAbilityDurationMillis(charge);
                 session.baconCloakUntil.put(id, now + duration);
                 session.baconTimedAbilityDurationMillis.put(id, duration);
+                cooldownProgress.start(player, "Cloak", duration, ArcadePortGame.BACON_BRAWL);
                 LivingEntity avatar = baconPlayerAvatar(session, id);
                 if (avatar != null) avatar.setInvisible(true);
                 player.getWorld().spawnParticle(Particle.SMOKE,
@@ -15439,6 +15438,7 @@ public final class ArcadePortManager implements Listener {
                 long duration = ArcadePortRules.baconAbilityDurationMillis(charge);
                 session.baconBrutusUntil.put(id, now + duration);
                 session.baconTimedAbilityDurationMillis.put(id, duration);
+                cooldownProgress.start(player, "Brutus", duration, ArcadePortGame.BACON_BRAWL);
                 int ticks = (int) Math.max(1L, (duration + 49L) / 50L);
                 player.addPotionEffect(new PotionEffect(
                         PotionEffectType.RESISTANCE, ticks, 4, false, false, true));
@@ -15630,10 +15630,7 @@ public final class ArcadePortManager implements Listener {
             session.baconSwingCritical.remove(id);
         }
         session.baconLastSwingAt.put(id, now);
-        long criticalDelay = ArcadePortRules.baconTimingWindowMillis(
-                GameDebugRuntimeOverrides.longValue("BACON_TIMED_HIT_GOOD_MIN_MILLIS",
-                        ArcadePortRules.BACON_TIMED_HIT_GOOD_MIN_MILLIS), session.baconKnockback);
-        cooldownProgress.start(player, "Critical Hit", criticalDelay, ArcadePortGame.BACON_BRAWL);
+        updateBaconMeterItem(session, player);
     }
 
     private void handleBaconBrawlHit(Session session, Player attacker, Player target, String source) {
