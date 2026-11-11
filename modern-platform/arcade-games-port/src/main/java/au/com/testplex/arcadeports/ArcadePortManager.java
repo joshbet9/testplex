@@ -2666,8 +2666,8 @@ public final class ArcadePortManager implements Listener {
                     + ArcadeLobbyKitCatalogue.helpNames(ArcadePortGame.SPLEEF) + ".");
             return;
         }
-        if ("gust".equals(kit) && !testPlayers.isTestPlayer(player.getUniqueId())
-                && !hasSpleefGustAchievement(player.getUniqueId())) {
+        if ("gust".equals(kit) && !hasAchievementKitUnlocked(
+                player.getUniqueId(), ArcadePortGame.SPLEEF, "spleef-gust")) {
             player.sendMessage(ChatColor.RED
                     + "Gust is locked. Unlock it by earning Praying to the Gods: win while falling into the void.");
             return;
@@ -2682,11 +2682,6 @@ public final class ArcadePortManager implements Listener {
         } else {
             player.sendMessage(ChatColor.GREEN + "Spleef kit set to " + kit + " for your next test.");
         }
-    }
-
-    private boolean hasSpleefGustAchievement(UUID playerId) {
-        return playerId != null && plugin.getConfig().getBoolean(
-                arcadeAchievementConfigKey(playerId, "spleef", "praying-to-the-gods"), false);
     }
 
     public void selectEvolutionKit(Player player, String requestedKit) {
@@ -2748,8 +2743,8 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         UUID playerId = player.getUniqueId();
-        if ("dasher".equals(kit) && !testPlayers.isTestPlayer(playerId)
-                && !plugin.getConfig().getBoolean(MicroBattlesAchievement.SPEEDSTER.configKey(playerId), false)) {
+        if ("dasher".equals(kit) && !hasAchievementKitUnlocked(
+                playerId, ArcadePortGame.MICRO_BATTLES, "dasher")) {
             player.sendMessage(ChatColor.RED + "Dasher is locked. Win a Micro Battles game in under 1:30 to unlock it.");
             return;
         }
@@ -2841,8 +2836,8 @@ public final class ArcadePortManager implements Listener {
         }
         UUID id = player.getUniqueId();
         Session session = active;
-        if ("switcher".equals(kit) && !testPlayers.isTestPlayer(id)
-                && !player.isOp() && !hasAllRunnerAchievements(id)) {
+        if ("switcher".equals(kit) && !hasAchievementKitUnlocked(
+                id, ArcadePortGame.RUNNER, "runnerkit-switcher")) {
             player.sendMessage(ChatColor.RED + "Switcher requires the Jumper, Frosty, and Archer achievements.");
             return;
         }
@@ -3244,8 +3239,8 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         UUID id = player.getUniqueId();
-        if ("fortifier".equals(kit) && !testPlayers.isTestPlayer(id) && !plugin.getConfig().getBoolean(
-                "local-achievements." + id + ".turf-wars.genius-mathematician", false)) {
+        if ("fortifier".equals(kit) && !hasAchievementKitUnlocked(
+                id, ArcadePortGame.TURF_WARS, "turf-wars-fortifier")) {
             player.sendMessage(ChatColor.RED + "Fortifier unlocks with Genius Mathematician: win without leaving your base or being killed.");
             return;
         }
@@ -22977,13 +22972,6 @@ public final class ArcadePortManager implements Listener {
 
     private String runnerAchievementKey(UUID playerId, String slug) {
         return "test-achievements.runner." + playerId + "." + slug;
-    }
-
-    private boolean hasAllRunnerAchievements(UUID playerId) {
-        if (playerId == null) return false;
-        AchievementKitUnlockPolicy.Rule rule = AchievementKitUnlockPolicy.find(
-                ArcadePortGame.RUNNER, "runnerkit-switcher");
-        return rule != null && rule.unlocked(id -> hasAchievementForKit(playerId, "runner", id));
     }
 
     private void recordRunnerAchievements(Session session, Player winner) {
