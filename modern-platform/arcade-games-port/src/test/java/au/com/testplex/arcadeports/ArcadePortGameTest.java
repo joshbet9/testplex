@@ -1704,6 +1704,13 @@ class ArcadePortGameTest {
         assertEquals(0.5D, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y, 0.00001D);
     }
 
+    @Test void dragonEscapeDeathMessagesDistinguishVoidFromCourseFalls() {
+        assertEquals("fell into the void!", ArcadePortManager.dragonEscapeDeathCause("fell into the void"));
+        assertEquals("fell from the Skylands course!", ArcadePortManager.dragonEscapeDeathCause("fell"));
+        assertEquals("was caught by Douglas the Dragon!", ArcadePortManager.dragonEscapeDeathCause("dragon contact"));
+        assertEquals("fell into the void", ArcadePortManager.sourceDeathCause("fell into the void"));
+    }
+
     @Test void dragonEscapeSourceMapBoundsUseInclusiveWorldDataLimits() {
         int minX = -100, maxX = 100, minZ = -80, maxZ = 80, minY = 20, maxY = 130;
         assertTrue(ArcadePortRules.isOutsideDragonEscapeMapBounds(-100.0D, 64.0D, 0.0D,
@@ -1929,6 +1936,10 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(9L, 10L, false, false));
         assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, true, false));
         assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false, true));
+        assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementLiquid(true, false));
+        assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementLiquid(false, true));
+        assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementLiquid(true, true));
+        assertFalse(ArcadePortRules.isDragonEscapeBuilderPlacementLiquid(false, false));
     }
 
     @Test void dragonEscapeFinishWindowWaitsForRacersOrItsDeadline() {

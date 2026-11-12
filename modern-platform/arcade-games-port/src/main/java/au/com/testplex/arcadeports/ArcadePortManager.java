@@ -2494,6 +2494,21 @@ public final class ArcadePortManager implements Listener {
                 }
                 return;
             }
+            if (lobbyGame == ArcadePortGame.DRAGON_ESCAPE) {
+                String dragonEscapeKit = ArcadePortRules.normalizeDragonEscapeKit(value);
+                if (dragonEscapeKit == null) {
+                    player.sendMessage(ChatColor.YELLOW + "Dragon Escape kits: "
+                            + ArcadeLobbyKitCatalogue.helpNames(ArcadePortGame.DRAGON_ESCAPE) + ".");
+                    return;
+                }
+                saveDragonEscapeKitPreference(player, dragonEscapeKit);
+                lobby.refreshPlayerScoreboard(player);
+                String kitName = ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.DRAGON_ESCAPE, List.of()).stream()
+                        .filter(choice -> choice.id.equals(dragonEscapeKit))
+                        .map(choice -> choice.name).findFirst().orElse(titleCaseAchievement(dragonEscapeKit));
+                player.sendMessage(ChatColor.GREEN + "Selected " + kitName + " for Dragon Escape.");
+                return;
+            }
         }
         boolean explicitMonsterMazeKit = value.startsWith("monster-maze-");
         if (explicitMonsterMazeKit) value = value.substring("monster-maze-".length());
@@ -2667,8 +2682,21 @@ public final class ArcadePortManager implements Listener {
                     + achievementKitUnlockDescription(game, kitId));
             return false;
         }
+        if (game == ArcadePortGame.DRAGON_ESCAPE) {
+            String normalized = ArcadePortRules.normalizeDragonEscapeKit(kitId);
+            if (normalized == null) return false;
+            saveDragonEscapeKitPreference(player, normalized);
+            return true;
+        }
         selectKit(player, kitId);
         return true;
+    }
+
+    private void saveDragonEscapeKitPreference(Player player, String kit) {
+        UUID id = player.getUniqueId();
+        dragonEscapeKitPreferences.put(id, kit);
+        plugin.getConfig().set("lobby-kit-preferences." + id + ".dragon-escape", kit);
+        plugin.saveConfig();
     }
 
     static String titleCaseAchievement(String id) {
@@ -2975,9 +3003,7 @@ public final class ArcadePortManager implements Listener {
                     + "Dragon Escape kits are locked once the race starts. Your current kit stays unchanged.");
             return;
         }
-        dragonEscapeKitPreferences.put(id, kit);
-        plugin.getConfig().set("lobby-kit-preferences." + id + ".dragon-escape", kit);
-        plugin.saveConfig();
+        saveDragonEscapeKitPreference(player, kit);
         player.sendMessage(ChatColor.GREEN + "Dragon Escape kit set to " + kit + " for your next test.");
     }
 
@@ -6702,8 +6728,7 @@ public final class ArcadePortManager implements Listener {
                 GladiatorMenuType.VOTE, votes == gladiatorLobbyVotes);
         Inventory inventory = Bukkit.createInventory(holder, 27, title);
         holder.inventory = inventory;
-        int[] slots = modes.size() == GladiatorsVoteOptions.OPTION_COUNT
-                ? new int[]{11, 13, 15} : new int[]{7, 9, 11, 13, 15, 17};
+        int[] slots = GladiatorsVoteOptions.centeredVoteSlots(modes.size());
         for (int i = 0; i < modes.size(); i++) {
             GladiatorsMode mode = modes.get(i);
             int count = (int) votes.values().stream().filter(mode.id()::equals).count();
@@ -7668,17 +7693,26 @@ public final class ArcadePortManager implements Listener {
     private boolean prepareGladiatorLosersWorld(Session session) {
         SourceMapCatalog.MapData source = sourceMapData.get(session.type.id());
         String resource = SourceMapCatalog.selectedResource(plugin, session.type);
-        if (source == null || resource == null || session.world == null) return false;
+        if (source == null || resource == null || session.world == null) {
+            plugin.getLogger().severe("Cannot prepare Gladiators losers-map copy: sourceMetadata="
+                    + (source != null) + ", selectedResource=" + resource + ", winnersWorld="
+                    + (session.world == null ? "missing" : session.world.getName()) + ".");
+            return false;
+        }
         String worldName = "arcadeport_source_gladiators_losers_"
                 + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
         try {
             if (!SourceMapCatalog.install(plugin, session.type, worldName)) {
+                plugin.getLogger().severe("Could not install Gladiators losers-map copy from " + resource
+                        + " into " + worldName + "; see the preceding SourceMapCatalog error for the extraction cause.");
                 SourceMapCatalog.resetTestWorld(plugin, worldName);
                 return false;
             }
             World mirror = new WorldCreator(worldName).environment(World.Environment.NORMAL)
                     .generateStructures(false).createWorld();
             if (mirror == null) {
+                plugin.getLogger().severe("Paper returned no world while loading Gladiators losers-map copy "
+                        + worldName + " from " + resource + ".");
                 SourceMapCatalog.resetTestWorld(plugin, worldName);
                 return false;
             }
@@ -17336,11 +17370,13 @@ public final class ArcadePortManager implements Listener {
         }
         Block target = clicked.getRelative(face);
         boolean pendingBrick = session.dragonEscapeBuilderBricks.containsKey(id);
+        boolean liquidPlacement = ArcadePortRules.isDragonEscapeBuilderPlacementLiquid(
+                clicked.isLiquid(), target.isLiquid());
         if (!ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(
-                now, nextChargeAt, pendingBrick, target.isLiquid())) {
+                now, nextChargeAt, pendingBrick, liquidPlacement)) {
             player.sendActionBar(ChatColor.YELLOW + (pendingBrick
                     ? "Wait for your previous brick to disappear."
-                    : target.isLiquid() ? "You cannot place a temporary brick in water."
+                    : liquidPlacement ? "You cannot place a temporary brick in water."
                     : "Your next Builder brick is still recharging."));
             return;
         }
@@ -26642,17 +26678,8 @@ public final class ArcadePortManager implements Listener {
                     + ChatColor.YELLOW + killer.getName() + ChatColor.GRAY + " with "
                     + ChatColor.AQUA + killMode + ChatColor.GRAY + ".";
         } else if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
-            String normalized = reason == null ? "" : reason.toLowerCase(java.util.Locale.ROOT);
-            if (normalized.contains("dragon")) {
-                body = ChatColor.YELLOW + victim.getName() + ChatColor.GRAY
-                        + " was caught by Douglas the Dragon!";
-            } else if (normalized.contains("fell") || normalized.contains("fall")) {
-                body = ChatColor.YELLOW + victim.getName() + ChatColor.GRAY
-                        + " fell from the Skylands course!";
-            } else {
-                body = ChatColor.YELLOW + victim.getName() + ChatColor.GRAY
-                        + " couldn't escape the dragon!";
-            }
+            body = ChatColor.YELLOW + victim.getName() + ChatColor.GRAY + " "
+                    + dragonEscapeDeathCause(reason);
         } else if (killer != null && killer.isOnline() && !killer.getUniqueId().equals(victim.getUniqueId())) {
             body = ChatColor.YELLOW + victim.getName() + ChatColor.GRAY + " was killed by "
                     + ChatColor.YELLOW + killer.getName() + ChatColor.GRAY + " with "
@@ -26737,15 +26764,23 @@ public final class ArcadePortManager implements Listener {
         return result.isEmpty() ? "Melee" : result.toString();
     }
 
-    private static String sourceDeathCause(String reason) {
+    static String sourceDeathCause(String reason) {
         if (reason == null || reason.isBlank()) return "has died";
         String normalized = reason.toLowerCase(java.util.Locale.ROOT).trim();
-        if (normalized.contains("fell") || normalized.contains("fall")) return "fell to their death";
         if (normalized.contains("void")) return "fell into the void";
+        if (normalized.contains("fell") || normalized.contains("fall")) return "fell to their death";
         if (normalized.contains("starv")) return "starved to death";
         if (normalized.contains("burn")) return "burned to death";
         if (normalized.startsWith("was ")) return normalized;
         return "was killed by " + normalized;
+    }
+
+    static String dragonEscapeDeathCause(String reason) {
+        String normalized = reason == null ? "" : reason.toLowerCase(java.util.Locale.ROOT);
+        if (normalized.contains("dragon")) return "was caught by Douglas the Dragon!";
+        if (normalized.contains("void")) return "fell into the void!";
+        if (normalized.contains("fell") || normalized.contains("fall")) return "fell from the Skylands course!";
+        return "couldn't escape the dragon!";
     }
 
     public void stop(String reason) {

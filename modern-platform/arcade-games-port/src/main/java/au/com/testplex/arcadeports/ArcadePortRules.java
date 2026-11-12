@@ -1419,6 +1419,10 @@ public final class ArcadePortRules {
         return !hasPendingBrick && !targetIsLiquid && now >= nextChargeAt;
     }
 
+    public static boolean isDragonEscapeBuilderPlacementLiquid(boolean clickedIsLiquid, boolean targetIsLiquid) {
+        return clickedIsLiquid || targetIsLiquid;
+    }
+
     public static boolean isDragonEscapeWaterContact(boolean inWater, boolean feetInWater, boolean headInWater) {
         return inWater || feetInWater || headInWater;
     }

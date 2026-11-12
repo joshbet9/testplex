@@ -342,6 +342,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         npc.setRotation(at.getYaw(), 0.0F);
         if (npc instanceof Mob mob) mob.setAI(false);
         if (npc instanceof Zombie zombie) {
+            zombie.setBaby(false);
             zombie.setShouldBurnInDay(false);
             zombie.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE,
                     Integer.MAX_VALUE, 0, false, false, false));
@@ -947,7 +948,10 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 plugin.saveConfig();
                 lobby.refreshPlayerScoreboard(p);
                 p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0F, 1.5F);
-                p.sendMessage(ChatColor.GREEN + "Selected " + kit.replace('-', ' ')
+                String kitName = ArcadeLobbyKitCatalogue.forGame(selectedGame, List.of()).stream()
+                        .filter(choice -> choice.id.equals(kit))
+                        .map(choice -> choice.name).findFirst().orElse(ArcadePortManager.titleCaseAchievement(kit));
+                p.sendMessage(ChatColor.GREEN + "Selected " + kitName
                         + " for " + selectedGame.displayName() + ".");
                 p.closeInventory();
             }else if(e.getSlot()==31)p.closeInventory();
