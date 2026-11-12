@@ -6702,7 +6702,8 @@ public final class ArcadePortManager implements Listener {
                 GladiatorMenuType.VOTE, votes == gladiatorLobbyVotes);
         Inventory inventory = Bukkit.createInventory(holder, 27, title);
         holder.inventory = inventory;
-        int[] slots = {7, 9, 11, 13, 15, 17};
+        int[] slots = modes.size() == GladiatorsVoteOptions.OPTION_COUNT
+                ? new int[]{11, 13, 15} : new int[]{7, 9, 11, 13, 15, 17};
         for (int i = 0; i < modes.size(); i++) {
             GladiatorsMode mode = modes.get(i);
             int count = (int) votes.values().stream().filter(mode.id()::equals).count();
