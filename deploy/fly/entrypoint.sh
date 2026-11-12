@@ -40,10 +40,18 @@ if [[ ! -f "$STATE_MIGRATION_MARKER" ]]; then
     chown minecraft:minecraft "$STATE_MIGRATION_MARKER"
 fi
 
-# Plugin binaries are immutable image inputs; player/game data remains on the
-# attached persistent volume and must never be recreated from image defaults.
+# Plugin binaries are immutable image inputs. Keep the large Arcade plugin out
+# of the 1 GB persistent volume; plugin configuration and player/game data stay
+# on the volume. Replace only these known binary paths, never plugin data dirs.
 for plugin in TestplexModernArcade.jar ArcadeMechanicsModern.jar; do
-    install -o minecraft -g minecraft -m 0644 "/opt/testplex/plugins/$plugin" "$PLUGIN_DIR/$plugin"
+    source_plugin="/opt/testplex/plugins/$plugin"
+    volume_plugin="$PLUGIN_DIR/$plugin"
+    if [[ ! -f "$source_plugin" || -L "$source_plugin" ]]; then
+        echo "FATAL: packaged plugin binary is missing or is not a regular image file: $source_plugin" >&2
+        exit 1
+    fi
+    rm -f -- "$volume_plugin"
+    ln -s -- "$source_plugin" "$volume_plugin"
 done
 install -o minecraft -g minecraft -m 0644 /opt/testplex/fake-player-plugin.jar "$PLUGIN_DIR/FakePlayerPlugin.jar"
 install -o minecraft -g minecraft -m 0644 /opt/testplex/packetevents.jar "$PLUGIN_DIR/PacketEvents.jar"
