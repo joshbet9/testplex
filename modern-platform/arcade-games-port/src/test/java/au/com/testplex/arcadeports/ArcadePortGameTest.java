@@ -1864,8 +1864,8 @@ class ArcadePortGameTest {
     }
 
     @Test void dragonEscapeFirstCompletionAnnouncementIncludesTheSavedRunTime() {
-        assertEquals(ChatColor.GREEN + "JN_PlayzMC" + ChatColor.GRAY + " has completed the map in "
-                        + ChatColor.YELLOW + "83.46" + ChatColor.GRAY + " seconds!",
+        assertEquals(ChatColor.YELLOW + "JN_PlayzMC" + ChatColor.GRAY + " has completed the map in "
+                        + ChatColor.GREEN + "83.46" + ChatColor.GRAY + " seconds!",
                 ArcadePortRules.dragonEscapeCompletionMessage("JN_PlayzMC", 83_456L));
         assertEquals(ChatColor.AQUA + "The game will end in 30 seconds!",
                 ArcadePortRules.dragonEscapeFinishWindowMessage());
