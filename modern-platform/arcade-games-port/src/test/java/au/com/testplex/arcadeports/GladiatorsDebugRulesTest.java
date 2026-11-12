@@ -17,10 +17,26 @@ class GladiatorsDebugRulesTest {
     @Test
     void modernModeUsesVanillaAttackSpeedWhileClassicModesKeepLegacySwingTiming() {
         assertTrue(GladiatorsMode.MODERN.usesModernCombat());
+        assertTrue(GladiatorsMode.MODERN_SWORD.usesModernCombat());
         assertEquals(4.0D, GladiatorsMode.MODERN.attackSpeedBaseValue(), 0.0D);
+        assertEquals(4.0D, GladiatorsMode.MODERN_SWORD.attackSpeedBaseValue(), 0.0D);
         assertFalse(GladiatorsMode.NORMAL.usesModernCombat());
         assertEquals(ArcadePortRules.LEGACY_ATTACK_SPEED, GladiatorsMode.NORMAL.attackSpeedBaseValue(), 0.0D);
         assertEquals(ArcadePortRules.LEGACY_ATTACK_SPEED, GladiatorsMode.RODLESS.attackSpeedBaseValue(), 0.0D);
+    }
+
+    @Test
+    void axeLoadoutReplacesTheSwordAndUsesTheRequestedTieredVanillaAxes() {
+        assertEquals(org.bukkit.Material.WOODEN_AXE, GladiatorsMode.MODERN.meleeWeaponForTier(0));
+        assertEquals(org.bukkit.Material.STONE_AXE, GladiatorsMode.MODERN.meleeWeaponForTier(1));
+        assertEquals(org.bukkit.Material.IRON_AXE, GladiatorsMode.MODERN.meleeWeaponForTier(2));
+        assertEquals(org.bukkit.Material.DIAMOND_AXE, GladiatorsMode.MODERN.meleeWeaponForTier(3));
+        assertTrue(GladiatorsMode.MODERN.hasCrossbow());
+        assertTrue(GladiatorsMode.MODERN.hasShield());
+        assertEquals(org.bukkit.Material.WOODEN_SWORD, GladiatorsMode.MODERN_SWORD.meleeWeaponForTier(0));
+        assertEquals(org.bukkit.Material.DIAMOND_SWORD, GladiatorsMode.MODERN_SWORD.meleeWeaponForTier(3));
+        assertFalse(GladiatorsMode.MODERN_SWORD.hasCrossbow());
+        assertFalse(GladiatorsMode.MODERN_SWORD.hasShield());
     }
     @AfterEach
     void resetOverrides() {
@@ -164,14 +180,14 @@ class GladiatorsDebugRulesTest {
 
     @Test
     void setupVariablesAreExposedWithBoundedRangesAndModeDescriptions() {
-        assertVariable("GLADIATOR_MODE_OVERRIDE", 0.0D, 4.0D);
+        assertVariable("GLADIATOR_MODE_OVERRIDE", 0.0D, 5.0D);
         assertVariable("GLADIATOR_STARTING_TIER_OVERRIDE", -1.0D, 3.0D);
         assertVariable("GLADIATOR_POTION_COUNT", 0.0D, 64.0D);
         assertVariable("GLADIATOR_ARENA_TRANSITION_MILLIS", 0.0D, 60_000.0D);
         assertVariable("GLADIATOR_VOTE_MILLIS", 0.0D, 60_000.0D);
         assertVariable("GLADIATOR_PVP_DAMAGE_MULTIPLIER", 0.0D, 5.0D);
         assertVariable("GLADIATOR_ENVIRONMENTAL_NO_DAMAGE_TICKS", 0.0D, 40.0D);
-        assertTrue(GameDebugVariableCatalog.humanize("GLADIATOR_MODE_OVERRIDE").contains("0 Normal"));
+        assertTrue(GameDebugVariableCatalog.humanize("GLADIATOR_MODE_OVERRIDE").contains("0 Classic"));
         assertNotNull(GameDebugVariableCatalog.variable(ArcadePortGame.GLADIATORS,
                 "GLADIATOR_FORCE_MODE_ENABLED"));
     }

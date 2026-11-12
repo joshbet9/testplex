@@ -3281,7 +3281,7 @@ public final class ArcadePortRules {
     public static final long GLADIATOR_ARENA_TRANSITION_MILLIS = 15_000L;
     /** -1 preserves lobby-size-based source tier selection; 0 through 3 force an arena tier for testing. */
     public static final int GLADIATOR_STARTING_TIER_OVERRIDE = -1;
-    /** Mode indices follow GladiatorsMode: Normal, Rodless, Bowless, Modern, Pot. */
+    /** Mode indices follow GladiatorsMode: Classic, Rodless, Bowless, Axe, Pot, Modern Sword. */
     public static final boolean GLADIATOR_FORCE_MODE_ENABLED = false;
     public static final int GLADIATOR_MODE_OVERRIDE = 0;
     public static final long GLADIATOR_POISON_DELAY_MILLIS = 30_000L;
@@ -3313,7 +3313,7 @@ public final class ArcadePortRules {
     }
 
     public static int gladiatorsModeOverrideIndex() {
-        return Math.max(0, Math.min(4, GameDebugRuntimeOverrides.intValue(
+        return Math.max(0, Math.min(5, GameDebugRuntimeOverrides.intValue(
                 "GLADIATOR_MODE_OVERRIDE", GLADIATOR_MODE_OVERRIDE)));
     }
 
