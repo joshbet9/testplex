@@ -7,10 +7,21 @@ import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GladiatorsVoteOptionsTest {
+    @Test
+    void centersThreeOptionsOnTheMiddleRow() {
+        assertArrayEquals(new int[]{11, 13, 15}, GladiatorsVoteOptions.centeredVoteSlots(3));
+    }
+
+    @Test
+    void centersSixOptionsAroundTheMiddleSlotWithoutSpillingRows() {
+        assertArrayEquals(new int[]{10, 11, 12, 14, 15, 16}, GladiatorsVoteOptions.centeredVoteSlots(6));
+    }
+
     @Test
     void eachTournamentGetsThreeUniqueOptionsFromOnlyTheDiscussedModePool() {
         List<GladiatorsMode> first = GladiatorsVoteOptions.randomOptions(new Random(4L));

@@ -25,6 +25,23 @@ final class GladiatorsVoteOptions {
         return List.copyOf(pool.subList(0, Math.min(OPTION_COUNT, pool.size())));
     }
 
+    /** Place every available mode in a balanced, centered row of a 27-slot menu. */
+    static int[] centeredVoteSlots(int count) {
+        return switch (count) {
+            case 0 -> new int[0];
+            case 1 -> new int[]{13};
+            case 2 -> new int[]{12, 14};
+            case 3 -> new int[]{11, 13, 15};
+            case 4 -> new int[]{11, 12, 14, 15};
+            case 5 -> new int[]{9, 11, 13, 15, 17};
+            case 6 -> new int[]{10, 11, 12, 14, 15, 16};
+            case 7 -> new int[]{10, 11, 12, 13, 14, 15, 16};
+            case 8 -> new int[]{9, 10, 11, 12, 14, 15, 16, 17};
+            case 9 -> new int[]{9, 10, 11, 12, 13, 14, 15, 16, 17};
+            default -> throw new IllegalArgumentException("A 27-slot vote menu supports at most 9 modes.");
+        };
+    }
+
     static GladiatorsMode winner(List<GladiatorsMode> options, Collection<String> votes) {
         if (options == null || options.isEmpty()) return GladiatorsMode.defaultMode();
         Map<GladiatorsMode, Integer> counts = new EnumMap<>(GladiatorsMode.class);
