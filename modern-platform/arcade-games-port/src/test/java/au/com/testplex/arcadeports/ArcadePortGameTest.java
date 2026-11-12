@@ -2195,11 +2195,12 @@ class ArcadePortGameTest {
         assertEquals(3, ArcadePortRules.gladiatorsTierForRound(4));
     }
 
-    @Test void gladiatorsVoteModesExposeTheDefaultAndFourVariants() {
+    @Test void gladiatorsVoteModesExposeSixModesAndKeepClassicAsTheDefault() {
         GladiatorsMode normal = GladiatorsMode.fromId("normal");
-        assertEquals(5, GladiatorsMode.values().length);
+        assertEquals(6, GladiatorsMode.values().length);
         assertSame(GladiatorsMode.NORMAL, GladiatorsMode.defaultMode());
         assertSame(GladiatorsMode.NORMAL, normal);
+        assertEquals("Classic", normal.displayName());
         assertTrue(normal.rodAvailable());
         assertTrue(normal.bowAvailable());
         assertTrue(normal.hasClassicRangedTools());
@@ -2211,6 +2212,9 @@ class ArcadePortGameTest {
         assertFalse(GladiatorsMode.fromId("bowless").bowAvailable());
         assertFalse(GladiatorsMode.fromId("modern").hasClassicRangedTools());
         assertFalse(GladiatorsMode.fromId("pot").hasClassicRangedTools());
+        assertSame(GladiatorsMode.MODERN, GladiatorsMode.fromId("modern"));
+        assertEquals("Axe", GladiatorsMode.MODERN.displayName());
+        assertSame(GladiatorsMode.MODERN_SWORD, GladiatorsMode.fromId("modern-sword"));
         assertNull(GladiatorsMode.fromId("not-a-mode"));
     }
 
