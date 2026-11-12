@@ -412,13 +412,13 @@ public final class ArcadePortRules {
 
     public static String dragonEscapeCompletionMessage(String playerName, long elapsedMillis) {
         String name = playerName == null || playerName.isBlank() ? "A player" : playerName;
-        return ChatColor.YELLOW + name + ChatColor.GRAY + " has completed the map in "
-                + ChatColor.GREEN + String.format(java.util.Locale.ROOT, "%.2f", Math.max(0L, elapsedMillis) / 1000.0D)
+        return ChatColor.GREEN + name + ChatColor.GRAY + " has completed the map in "
+                + ChatColor.YELLOW + String.format(java.util.Locale.ROOT, "%.2f", Math.max(0L, elapsedMillis) / 1000.0D)
                 + ChatColor.GRAY + " seconds!";
     }
 
     public static String dragonEscapeFinishWindowMessage() {
-        return ChatColor.AQUA + "The game will end in 30 seconds!";
+        return ChatColor.GRAY + "The game will end in 30 seconds!";
     }
 
     public static String formatDragonEscapeDelta(long deltaMillis) {
