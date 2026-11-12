@@ -31,6 +31,19 @@ final class DragonEscapeRaceScoreboardLayout {
         return String.format(java.util.Locale.ROOT, "%.1f Seconds", Math.max(0L, remainingMillis) / 1000.0D);
     }
 
+    static String kitRecordLabel(String kit, boolean worldRecord) {
+        String normalized = ArcadePortRules.normalizeDragonEscapeKit(kit);
+        String kitName = switch (normalized == null ? "" : normalized) {
+            case "builder" -> "Builder";
+            case "digger" -> "Digger";
+            case "disruptor" -> "Disruptor";
+            case "jumper" -> "Jumper";
+            case "warper" -> "Warper";
+            default -> "Kit";
+        };
+        return kitName + (worldRecord ? " WR" : " PB");
+    }
+
     static String racerName(String name, RacerStatus status) {
         return color(status).toString() + strikethrough(status) + name;
     }

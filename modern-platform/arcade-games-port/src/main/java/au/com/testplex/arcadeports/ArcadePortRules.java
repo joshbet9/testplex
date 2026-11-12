@@ -2,6 +2,7 @@ package au.com.testplex.arcadeports;
 
 import org.bukkit.Material;
 import org.bukkit.Color;
+import org.bukkit.ChatColor;
 import org.bukkit.util.Vector;
 import java.util.Collection;
 import java.util.ArrayList;
@@ -18,6 +19,7 @@ public final class ArcadePortRules {
     public static final long CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS = 30_000L;
     public static final int CASTLE_ASSAULT_KING_HEALTH_BASE = 100;
     public static final int CASTLE_ASSAULT_KING_HEALTH_REFERENCE_PLAYERS = 15;
+    public static final long CASTLE_ASSAULT_KING_INVULNERABILITY_MILLIS = 500L;
     public static final long CASTLE_ASSAULT_CARRIER_FUSE_MILLIS = 60_000L;
     public static final int CASTLE_ASSAULT_TNT_FUSE_TICKS = 60;
     public static final double CASTLE_ASSAULT_TNT_THROW_SPEED = 0.5D;
@@ -57,6 +59,10 @@ public final class ArcadePortRules {
                 "CASTLE_ASSAULT_KING_HEALTH_BASE", CASTLE_ASSAULT_KING_HEALTH_BASE));
         return Math.max(1, (int) Math.ceil(base * Math.min(reference, Math.max(0, opponentCount))
                 / (double) reference));
+    }
+
+    public static boolean canDamageCastleKing(long now, long nextDamageAt) {
+        return now >= nextDamageAt;
     }
 
     public static double castleAssaultTntRadius(String kit) {
@@ -404,10 +410,15 @@ public final class ArcadePortRules {
         return String.format(java.util.Locale.ROOT, "%d:%02d.%03d", minutes, seconds, ms);
     }
 
-    public static String dragonEscapeFirstCompletionMessage(String playerName, long elapsedMillis) {
+    public static String dragonEscapeCompletionMessage(String playerName, long elapsedMillis) {
         String name = playerName == null || playerName.isBlank() ? "A player" : playerName;
-        return "FIRST COMPLETION! " + name + " — " + formatDragonEscapeTime(elapsedMillis)
-                + ". Other racers have 30 seconds.";
+        return ChatColor.GREEN + name + ChatColor.GRAY + " has completed the map in "
+                + ChatColor.YELLOW + String.format(java.util.Locale.ROOT, "%.2f", Math.max(0L, elapsedMillis) / 1000.0D)
+                + ChatColor.GRAY + " seconds!";
+    }
+
+    public static String dragonEscapeFinishWindowMessage() {
+        return ChatColor.AQUA + "The game will end in 30 seconds!";
     }
 
     public static String formatDragonEscapeDelta(long deltaMillis) {
@@ -1401,6 +1412,21 @@ public final class ArcadePortRules {
         return DRAGON_ESCAPE_BUILDER_BLOCK_LIFETIME_MILLIS
                 + Math.min(DRAGON_ESCAPE_BUILDER_MAX_PING_COMPENSATION_MILLIS,
                         Math.max(0, pingMillis));
+    }
+
+    public static boolean shouldAllowDragonEscapeBuilderPlacement(
+            long now, long nextChargeAt, boolean hasPendingBrick, boolean targetIsLiquid) {
+        return !hasPendingBrick && !targetIsLiquid && now >= nextChargeAt;
+    }
+
+    public static boolean isDragonEscapeWaterContact(boolean inWater, boolean feetInWater, boolean headInWater) {
+        return inWater || feetInWater || headInWater;
+    }
+
+    public static boolean shouldEndDragonEscapeFinishWindow(long now, long finishWindowEndsAt,
+            int unresolvedRacerCount) {
+        return finishWindowEndsAt > 0L
+                && (now >= finishWindowEndsAt || unresolvedRacerCount <= 0);
     }
 
     public static boolean shouldRemoveDragonEscapeBuilderBrick(

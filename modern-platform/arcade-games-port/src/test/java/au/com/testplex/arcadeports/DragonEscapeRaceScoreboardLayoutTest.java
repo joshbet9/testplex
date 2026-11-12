@@ -60,4 +60,15 @@ class DragonEscapeRaceScoreboardLayoutTest {
         assertEquals("0.0 Seconds", DragonEscapeRaceScoreboardLayout.finishWindowSeconds(0L));
         assertEquals(0L, DragonEscapeRaceScoreboardLayout.remainingFinishWindowMillis(30_000L, 40_000L));
     }
+
+    @Test
+    void kitRecordRowsNameTheSelectedKit() {
+        assertEquals("Builder PB", DragonEscapeRaceScoreboardLayout.kitRecordLabel("builder", false));
+        assertEquals("Builder WR", DragonEscapeRaceScoreboardLayout.kitRecordLabel("builder", true));
+        assertEquals("Jumper PB", DragonEscapeRaceScoreboardLayout.kitRecordLabel("jumper", false));
+        assertEquals("Jumper WR", DragonEscapeRaceScoreboardLayout.kitRecordLabel("jumper", true));
+        assertEquals("Disruptor PB", DragonEscapeRaceScoreboardLayout.kitRecordLabel("disruptor", false));
+        assertEquals("Warper WR", DragonEscapeRaceScoreboardLayout.kitRecordLabel("warper", true));
+        assertEquals("Digger PB", DragonEscapeRaceScoreboardLayout.kitRecordLabel("digger", false));
+    }
 }

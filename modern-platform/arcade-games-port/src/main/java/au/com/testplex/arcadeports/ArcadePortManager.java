@@ -14625,7 +14625,8 @@ public final class ArcadePortManager implements Listener {
                 Block feet = player.getLocation().getBlock();
                 Material lower = feet.getType();
                 Material upper = feet.getRelative(BlockFace.UP).getType();
-                if (lower != Material.WATER && upper != Material.WATER) continue;
+                if (!ArcadePortRules.isDragonEscapeWaterContact(player.isInWater(),
+                        lower == Material.WATER, upper == Material.WATER)) continue;
                 session.dragonEscapeDamageTaken.add(id);
                 if (player.getHealth() <= damage) {
                     eliminate(session, player, null, "was lost to the water");
@@ -17312,22 +17313,29 @@ public final class ArcadePortManager implements Listener {
         UUID id = player.getUniqueId();
         if (active != session || !session.alive.contains(id)
                 || !"builder".equals(session.dragonEscapeKits.get(id))) return;
-        if (session.dragonEscapeBuilderBricks.containsKey(id)) {
-            player.sendActionBar(ChatColor.YELLOW + "Wait for your previous brick to disappear.");
-            return;
-        }
+        long now = System.currentTimeMillis();
+        long nextChargeAt = session.dragonEscapeNextBrickAt.getOrDefault(id, 0L);
         if (clicked == null || face == null || face == BlockFace.SELF || clicked.getType().isAir()) {
             player.sendActionBar(ChatColor.YELLOW + "Right-click a block face to place your brick.");
             return;
         }
-        if (inventoryCount(player, Material.BRICKS) <= 0
-                || player.getInventory().getItemInMainHand().getType() != Material.BRICKS) return;
         Block target = clicked.getRelative(face);
+        boolean pendingBrick = session.dragonEscapeBuilderBricks.containsKey(id);
+        if (!ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(
+                now, nextChargeAt, pendingBrick, target.isLiquid())) {
+            player.sendActionBar(ChatColor.YELLOW + (pendingBrick
+                    ? "Wait for your previous brick to disappear."
+                    : target.isLiquid() ? "You cannot place a temporary brick in water."
+                    : "Your next Builder brick is still recharging."));
+            return;
+        }
         if (target.getWorld() != session.world || !target.isEmpty()
                 || !isDragonEscapeDiggerBuildLocationAllowed(session, target)) {
             player.sendActionBar(ChatColor.YELLOW + "You cannot place a temporary brick there.");
             return;
         }
+        if (inventoryCount(player, Material.BRICKS) <= 0
+                || player.getInventory().getItemInMainHand().getType() != Material.BRICKS) return;
         // No block is allowed to appear inside another racer's body, including the owner.
         org.bukkit.util.BoundingBox placementBox = new org.bukkit.util.BoundingBox(
                 target.getX(), target.getY(), target.getZ(),
@@ -17788,17 +17796,20 @@ public final class ArcadePortManager implements Listener {
     /** Paper recreation of Reborn's DragonEscapeData.Move plus the radius-10 destruction. */
     private void updateDragonEscapeChase(Session session) {
         EnderDragon dragon = session.dragonEscapeDragon;
-        if (active != session || dragon == null || !dragon.isValid() || dragon.isDead()) return;
+        if (active != session) return;
         if (session.dragonEscapeFinishWindowEndsAt > 0L) {
             long now = System.currentTimeMillis();
-            if (now >= session.dragonEscapeFinishWindowEndsAt
-                    || session.alive.stream().noneMatch(id -> !session.dragonEscapeCompleted.contains(id))) {
+            long unresolvedRacers = session.alive.stream()
+                    .filter(id -> !session.dragonEscapeCompleted.contains(id)).count();
+            if (ArcadePortRules.shouldEndDragonEscapeFinishWindow(
+                    now, session.dragonEscapeFinishWindowEndsAt, (int) unresolvedRacers)) {
                 Player winner = session.dragonEscapeWinner == null ? timeoutWinner(session)
                         : session.players.get(session.dragonEscapeWinner);
                 finish(session, winner, true);
                 return;
             }
         }
+        if (dragon == null || !dragon.isValid() || dragon.isDead()) return;
         // Reborn enforces WorldBoundary on its FAST update even when a player is not moving.
         for (Player racer : new ArrayList<>(alivePlayers(session))) {
             checkPlayerArena(session, racer);
@@ -17868,12 +17879,8 @@ public final class ArcadePortManager implements Listener {
                             dragonIndex, location.distance(dragonNext));
                     session.dragonEscapePlayerRankScores.put(player.getUniqueId(), playerScore);
                     if (dragonEscapeReachedAuthoredFinish(session, player, player.getLocation())) {
-                        recordDragonEscapeFinish(session, player, now);
+                        completeDragonEscapeRacer(session, player, now);
                         if (active != session) return;
-                        if (session.alive.stream().noneMatch(id -> !session.dragonEscapeCompleted.contains(id))) {
-                            finish(session, session.players.get(session.dragonEscapeWinner), true);
-                            return;
-                        }
                         continue;
                     }
                     if (dragonMovementEnabled && dragonScore > playerScore) {
@@ -17970,8 +17977,26 @@ public final class ArcadePortManager implements Listener {
         return false;
     }
 
+    private void completeDragonEscapeRacer(Session session, Player player, long now) {
+        if (session == null || player == null || active != session) return;
+        if (session.dragonEscapePractice) {
+            recordDragonEscapeFinish(session, player, now);
+            if (active == session) finish(session, player, true);
+            return;
+        }
+        UUID id = player.getUniqueId();
+        if (session.dragonEscapeCompleted.contains(id)) return;
+        recordDragonEscapeFinish(session, player, now);
+        if (active != session) return;
+        if (session.alive.stream().noneMatch(aliveId -> !session.dragonEscapeCompleted.contains(aliveId))) {
+            Player winner = session.dragonEscapeWinner == null ? timeoutWinner(session)
+                    : session.players.get(session.dragonEscapeWinner);
+            finish(session, winner, true);
+        }
+    }
+
     private void recordDragonEscapeFinish(Session session, Player player, long now) {
-        if (session == null || player == null || testPlayers.isTestPlayer(player)) return;
+        if (session == null || player == null) return;
         if (session.dragonEscapePractice) {
             long elapsed = Math.max(1L, now - session.startedAt);
             player.sendMessage(ChatColor.GOLD + "Practice finish: " + ChatColor.WHITE
@@ -17980,19 +18005,21 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         UUID id = player.getUniqueId();
+        boolean persistentPlayer = !testPlayers.isTestPlayer(player);
         long elapsed = Math.max(1L, now - session.startedAt);
         boolean newlyCompleted = session.dragonEscapeCompleted.add(id);
         boolean firstFinisher = session.dragonEscapeCompleted.size() == 1 && newlyCompleted;
         if (newlyCompleted) {
             session.dragonEscapeStoppedTimesMillis.put(id, elapsed);
+            announce(session, ArcadePortRules.dragonEscapeCompletionMessage(player.getName(), elapsed));
             if (firstFinisher) {
                 session.dragonEscapeWinner = id;
                 session.dragonEscapeFinishWindowEndsAt = now
                         + ArcadePortRules.DRAGON_ESCAPE_FINISH_WINDOW_MILLIS;
-                announce(session, ChatColor.GOLD + ArcadePortRules.dragonEscapeFirstCompletionMessage(
-                        player.getName(), elapsed));
+                announce(session, ChatColor.YELLOW + "FIRST COMPLETION!");
+                announce(session, ArcadePortRules.dragonEscapeFinishWindowMessage());
             }
-            if (!GameDebugRuntimeOverrides.isDebugSession()) {
+            if (persistentPlayer && !GameDebugRuntimeOverrides.isDebugSession()) {
                 String statsPath = localStatsPath(id, ArcadePortGame.DRAGON_ESCAPE.id());
                 plugin.getConfig().set(statsPath + "course-completes",
                         plugin.getConfig().getInt(statsPath + "course-completes", 0) + 1);
@@ -18004,7 +18031,9 @@ public final class ArcadePortManager implements Listener {
                 plugin.saveConfig();
             }
         }
-        if (session.dragonEscapeMapResource == null) return;
+        // Test bots are real racers for placement, finish-window progression, and chat
+        // announcements, but they must not create persistent PBs, ghosts, or progression.
+        if (!persistentPlayer || session.dragonEscapeMapResource == null) return;
         String kit = session.dragonEscapeKits.getOrDefault(id, "jumper");
         DragonEscapeTimeRecord previousWorldRecord = dragonEscapeWorldRecord(
                 session.dragonEscapeMapResource, null);
@@ -18117,9 +18146,7 @@ public final class ArcadePortManager implements Listener {
         boolean newKitPersonalBest = improvedKit && (previousKitPb <= 0L || elapsed < previousKitPb);
         String message = ArcadePortRules.dragonEscapeRecordMilestone(firstCompletion, firstKitCompletion,
                 newWorldRecord, newKitWorldRecord, newPersonalBest, newKitPersonalBest, kit);
-        if (message != null) announce(session, ChatColor.GOLD + message + ChatColor.YELLOW
-                + " " + player.getName() + ChatColor.GRAY + " — "
-                + ArcadePortRules.formatDragonEscapeTime(elapsed));
+        if (message != null) announce(session, ChatColor.YELLOW + message);
     }
 
     private Location dragonEscapePersonalBestStartLocation(
@@ -18826,7 +18853,7 @@ public final class ArcadePortManager implements Listener {
                     DragonEscapeRaceScoreboardLayout.MAX_ROWS - DragonEscapeRaceScoreboardLayout.MAP_WR_ROW);
             String kitPbEntry = view.entries().get(DragonEscapeRaceScoreboardLayout.KIT_PB_ROW);
             Team kitPbTeam = view.teams().get(DragonEscapeRaceScoreboardLayout.KIT_PB_ROW);
-            kitPbTeam.setPrefix(ChatColor.AQUA + "K PB");
+            kitPbTeam.setPrefix(ChatColor.AQUA + DragonEscapeRaceScoreboardLayout.kitRecordLabel(kit, false));
             String kitPbSuffix = kitPb > 0L ? " " + ArcadePortRules.formatDragonEscapeTime(kitPb) : " —";
             if (kitPb > 0L && session.liveStarted && session.alive.contains(viewer.getUniqueId())) {
                 kitPbSuffix += " " + dragonEscapeScoreDelta(
@@ -18837,7 +18864,7 @@ public final class ArcadePortManager implements Listener {
                     DragonEscapeRaceScoreboardLayout.MAX_ROWS - DragonEscapeRaceScoreboardLayout.KIT_PB_ROW);
             String kitWrEntry = view.entries().get(DragonEscapeRaceScoreboardLayout.KIT_WR_ROW);
             Team kitWrTeam = view.teams().get(DragonEscapeRaceScoreboardLayout.KIT_WR_ROW);
-            kitWrTeam.setPrefix(ChatColor.GOLD + "K WR");
+            kitWrTeam.setPrefix(ChatColor.GOLD + DragonEscapeRaceScoreboardLayout.kitRecordLabel(kit, true));
             DragonEscapeTimeRecord kitRecord = session.dragonEscapeMapResource == null ? null
                     : dragonEscapeWorldRecord(session.dragonEscapeMapResource, kit);
             long kitWr = kitRecord == null ? -1L : kitRecord.timeMillis();
@@ -27179,8 +27206,7 @@ public final class ArcadePortManager implements Listener {
                         event.getTo().getX(), event.getTo().getY(), event.getTo().getZ())) {
             // Fixed finish coordinates are only for the generated fallback course.
             // Original Reborn maps finish at their last authored route waypoint.
-            recordDragonEscapeFinish(session, player, System.currentTimeMillis());
-            finish(session, player, true);
+            completeDragonEscapeRacer(session, player, System.currentTimeMillis());
             return;
         }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE
@@ -27192,8 +27218,7 @@ public final class ArcadePortManager implements Listener {
             session.dragonEscapePlayerProgress.put(playerId, lastIndex);
             session.dragonEscapePlayerRankScores.put(playerId,
                     ArcadePortRules.dragonEscapeRankScore(lastIndex, 0.0D));
-            recordDragonEscapeFinish(session, player, now);
-            finish(session, player, true);
+            completeDragonEscapeRacer(session, player, now);
             return;
         }
         checkPlayerArena(session, player);
