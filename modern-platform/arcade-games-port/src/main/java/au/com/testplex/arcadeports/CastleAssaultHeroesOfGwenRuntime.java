@@ -55,6 +55,7 @@ import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.entity.PotionSplashEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -2239,6 +2240,19 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             inventory.setItem(slot, loot);
         }
         chest.update(true, false);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onCastleMapChunkLoad(ChunkLoadEvent event) {
+        if (game != ArcadePortGame.CASTLE_ASSAULT || world == null
+                || event.getWorld() != world || stopped || !ready || !listenersRegistered) return;
+        for (org.bukkit.block.BlockState state : event.getChunk().getTileEntities()) {
+            if (!(state instanceof Chest)) continue;
+            Block block = state.getBlock();
+            if (castleChests.contains(block)) continue;
+            castleChests.add(block);
+            fillCastleChest(block);
+        }
     }
 
     boolean isObjectiveCarrier(UUID playerId) {

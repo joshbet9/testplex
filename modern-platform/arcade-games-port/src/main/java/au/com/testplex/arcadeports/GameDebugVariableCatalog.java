@@ -938,7 +938,7 @@ final class GameDebugVariableCatalog {
         if (name.equals("GLADIATOR_POTION_SPLASH_RADIUS")) return 16.0D;
         if (name.equals("GLADIATOR_POTION_COUNT")) return 64.0D;
         if (name.equals("GLADIATOR_STARTING_TIER_OVERRIDE")) return 3.0D;
-        if (name.equals("GLADIATOR_MODE_OVERRIDE")) return 4.0D;
+        if (name.equals("GLADIATOR_MODE_OVERRIDE")) return 5.0D;
         if (name.equals("GLADIATOR_VOTE_MILLIS") || name.equals("GLADIATOR_ARENA_TRANSITION_MILLIS")) return 60_000.0D;
         if (name.equals("GLADIATOR_MELEE_NO_DAMAGE_TICKS")
                 || name.equals("GLADIATOR_PROJECTILE_NO_DAMAGE_TICKS")
@@ -1285,7 +1285,7 @@ final class GameDebugVariableCatalog {
     }
 
     static String humanize(String key) {
-        if ("GLADIATOR_MODE_OVERRIDE".equals(key)) return "mode override (0 Normal, 1 Rodless, 2 Bowless, 3 Modern, 4 Pot)";
+        if ("GLADIATOR_MODE_OVERRIDE".equals(key)) return "mode override (0 Classic, 1 Rodless, 2 Bowless, 3 Axe, 4 Pot, 5 Modern Sword)";
         if ("GLADIATOR_STARTING_TIER_OVERRIDE".equals(key)) return "starting tier override (-1 auto, 0-3 arena tier)";
         return key.toLowerCase(Locale.ROOT).replace('_', ' ');
     }

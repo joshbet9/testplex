@@ -134,6 +134,21 @@ class DragonsDebugRulesTest {
     }
 
     @Test
+    void autonomousDragonsCanOnlyTargetTheirSelectedLivingRacerAndNeverDealEntityDamage() {
+        java.util.UUID selected = java.util.UUID.randomUUID();
+        java.util.UUID other = java.util.UUID.randomUUID();
+
+        assertTrue(ArcadePortRules.shouldAllowDragonEntityTarget(selected, selected, true, false));
+        assertFalse(ArcadePortRules.shouldAllowDragonEntityTarget(other, selected, true, false));
+        assertFalse(ArcadePortRules.shouldAllowDragonEntityTarget(selected, selected, false, false));
+        assertFalse(ArcadePortRules.shouldAllowDragonEntityTarget(selected, selected, true, true));
+
+        assertTrue(ArcadePortRules.shouldCancelDragonPlayerDamage(ArcadePortGame.DRAGONS, true));
+        assertFalse(ArcadePortRules.shouldCancelDragonPlayerDamage(ArcadePortGame.DRAGONS, false));
+        assertFalse(ArcadePortRules.shouldCancelDragonPlayerDamage(ArcadePortGame.DRAGON_ESCAPE, true));
+    }
+
+    @Test
     void exposedDragonMechanicsHaveBoundedProfileControls() {
         assertVariable("DRAGONS_MAX_DRAGONS", 0.0D, 64.0D);
         assertVariable("DRAGONS_DODGEMS_QUIET_MILLIS", 0.0D, 120_000.0D);

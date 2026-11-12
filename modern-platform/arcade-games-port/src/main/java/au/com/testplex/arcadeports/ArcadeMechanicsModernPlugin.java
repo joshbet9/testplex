@@ -5,6 +5,8 @@ import au.com.testplex.wizards.WizardsGameManager;
 import au.com.testplex.wizards.WizardsKit;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.GameRule;
+import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -15,6 +17,7 @@ import org.bukkit.event.entity.EntitySpawnEvent;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.world.WorldLoadEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements CommandExecutor, Listener {
@@ -97,6 +100,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(mapMenu, this);
         getServer().getPluginManager().registerEvents(preferenceMenu, this);
+        Bukkit.getWorlds().forEach(ArcadeMechanicsModernPlugin::disableLocatorBar);
         getCommand("stats").setExecutor(this);
         getCommand("arcadeport").setExecutor(this);
         getCommand("gamepreferences").setExecutor(this);
@@ -124,6 +128,19 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 }
             });
         }
+    }
+
+    @EventHandler
+    public void onWorldLoadDisableLocatorBar(WorldLoadEvent event) {
+        disableLocatorBar(event.getWorld());
+    }
+
+    private static void disableLocatorBar(World world) {
+        // Mojang named the rule locatorBar in 1.21.6; accept locator_bar as well
+        // for later server versions that use the namespaced registry spelling.
+        GameRule<Boolean> rule = GameRule.getByName("locatorBar");
+        if (rule == null) rule = GameRule.getByName("locator_bar");
+        if (rule != null) world.setGameRule(rule, false);
     }
 
     public MonsterMazePlugin getMonsterMazeModule() {

@@ -59,7 +59,7 @@ The overall programme tracks 30 titles/variants: **27 shared Arcade catalogue ga
 | 4 | Dragon Escape | Controlled acceptance candidate; original 30-map race, four source kits and PB ghost implemented | Enabled |
 | 5 | Dragons (Solo) | Source implementation prepared; controlled gameplay acceptance required | Enabled |
 | 6 | Evolution | Mechanics in progress | Disabled |
-| 7 | Gladiators | Controlled acceptance; Normal default plus four voteable rulesets and tournament lifecycle implemented | Enabled |
+| 7 | Gladiators | Controlled acceptance; Classic default, six-discussed-mode pool with three choices sampled per tournament, and tournament lifecycle implemented | Enabled |
 | 8 | Micro Battles | Controlled acceptance; original map, four-team combat, kits and achievements implemented | Enabled |
 | 9 | Monster Maze | Embedded in Testplex Arcade lifecycle; controlled acceptance available, full gameplay acceptance ongoing | Enabled |
 | 10 | One in the Quiver | Acceptance-ready | Enabled |

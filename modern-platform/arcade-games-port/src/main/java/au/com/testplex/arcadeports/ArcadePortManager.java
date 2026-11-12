@@ -93,6 +93,7 @@ import org.bukkit.entity.Snowball;
 import org.bukkit.entity.TNTPrimed;
 import org.bukkit.entity.TextDisplay;
 import org.bukkit.entity.ThrownPotion;
+import org.bukkit.entity.Trident;
 import org.bukkit.entity.Wither;
 import org.bukkit.entity.WitherSkeleton;
 import org.bukkit.entity.WitherSkull;
@@ -136,6 +137,7 @@ import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerFishEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import io.papermc.paper.event.player.PlayerStopUsingItemEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerAnimationEvent;
@@ -381,6 +383,7 @@ public final class ArcadePortManager implements Listener {
     private final Map<UUID, String> runnerKitPreferences = new HashMap<>();
     private final Map<UUID, String> sheepQuestKitPreferences = new HashMap<>();
     private final Map<UUID, String> gladiatorLobbyVotes = new HashMap<>();
+    private List<GladiatorsMode> gladiatorLobbyVoteOptions = List.of();
     private final Map<UUID, String> dragonsKitPreferences = new HashMap<>();
     private final Map<UUID, String> dragonEscapeKitPreferences = new HashMap<>();
     private final Map<UUID, String> skyWarsKitPreferences = new HashMap<>();
@@ -6670,7 +6673,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void giveGladiatorVoteItem(Player player) {
-        player.getInventory().setItem(8, gladiatorMenuItem(Material.WRITABLE_BOOK, "Vote: PvP Rules",
+        player.getInventory().setItem(8, gladiatorMenuItem(Material.BOOK, "Vote: PvP Rules",
                 "Right-click to choose or change the tournament ruleset during voting.", "open-vote", null));
     }
 
@@ -6678,7 +6681,8 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null || session.type != ArcadePortGame.GLADIATORS
                 || session.gladiatorVotingEndsAt <= System.currentTimeMillis()) return;
-        openGladiatorVoteMenu(player, session.gladiatorVotes, "Gladiators — PvP Vote");
+        openGladiatorVoteMenu(player, session.gladiatorVotes, "Gladiators — PvP Vote",
+                session.gladiatorVoteOptions);
     }
 
     private void openGladiatorLobbyVoteMenu(Player player) {
@@ -6687,37 +6691,51 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "Join the Gladiators lobby queue before voting.");
             return;
         }
-        openGladiatorVoteMenu(player, gladiatorLobbyVotes, "Gladiators Lobby — PvP Vote");
+        if (gladiatorLobbyVoteOptions.isEmpty()) {
+            gladiatorLobbyVoteOptions = GladiatorsVoteOptions.randomOptions();
+        }
+        openGladiatorVoteMenu(player, gladiatorLobbyVotes, "Gladiators Lobby — PvP Vote",
+                gladiatorLobbyVoteOptions);
     }
 
-    private void openGladiatorVoteMenu(Player player, Map<UUID, String> votes, String title) {
+    private void openGladiatorVoteMenu(Player player, Map<UUID, String> votes, String title,
+            List<GladiatorsMode> modes) {
         GladiatorMenuHolder holder = new GladiatorMenuHolder(
                 GladiatorMenuType.VOTE, votes == gladiatorLobbyVotes);
         Inventory inventory = Bukkit.createInventory(holder, 27, title);
         holder.inventory = inventory;
-        Material[] icons = {Material.IRON_SWORD, Material.BOW, Material.FISHING_ROD, Material.SHIELD, Material.SPLASH_POTION};
-        GladiatorsMode[] modes = GladiatorsMode.values();
-        int[] slots = {9, 11, 13, 15, 17};
-        for (int i = 0; i < modes.length; i++) {
-            GladiatorsMode mode = modes[i];
+        int[] slots = {7, 9, 11, 13, 15, 17};
+        for (int i = 0; i < modes.size(); i++) {
+            GladiatorsMode mode = modes.get(i);
             int count = (int) votes.values().stream().filter(mode.id()::equals).count();
             String details = switch (mode) {
-                case NORMAL -> "Classic loadout: sword, bow, arrows and fishing rod.";
+                case NORMAL -> "Classic 1.8-style loadout: sword, bow, arrows and fishing rod.";
                 case RODLESS -> "Bow available; fishing rod disabled.";
                 case BOWLESS -> "Fishing rod available; bow disabled.";
-                case MODERN -> "Sword, axe and shield with modern weapon cooldowns and shield rules. No bow or rod.";
+                case MODERN -> "Tiered axe, crossbow, arrows and shield with modern combat.";
                 case POT -> "Sword and healing potions. No bow or rod.";
+                case MODERN_SWORD -> "Sword-only weapon loadout with modern combat; no ranged weapon.";
             };
             String mine = mode.id().equals(votes.get(player.getUniqueId())) ? " Your vote." : "";
-            ItemStack option = gladiatorMenuItem(icons[i], mode.displayName(),
+            ItemStack option = gladiatorMenuItem(gladiatorModeIcon(mode), mode.displayName(),
                     details + " Votes: " + count + "." + mine, "vote", mode.id());
             inventory.setItem(slots[i], option);
         }
         inventory.setItem(22, gladiatorMenuItem(Material.WRITABLE_BOOK, "Hotbar Editor",
                 "Available once your duel begins: /arcadeport hotbar.", null, null));
         inventory.setItem(26, gladiatorMenuItem(Material.CLOCK, "Voting",
-                "Choose one ruleset. Votes are visible to the lobby.", null, null));
+                "Three options are drawn for this tournament. Votes are visible to the lobby.", null, null));
         player.openInventory(inventory);
+    }
+
+    private Material gladiatorModeIcon(GladiatorsMode mode) {
+        return switch (mode) {
+            case NORMAL, MODERN_SWORD -> Material.IRON_SWORD;
+            case RODLESS -> Material.BOW;
+            case BOWLESS -> Material.FISHING_ROD;
+            case MODERN -> Material.CROSSBOW;
+            case POT -> Material.SPLASH_POTION;
+        };
     }
 
     private void openGladiatorHotbarMenu(Player player) {
@@ -7095,10 +7113,16 @@ public final class ArcadePortManager implements Listener {
     private static final int GLADIATOR_BRACKET_FINAL = 2;
 
     private void beginGladiatorVote(Session session) {
+        session.gladiatorVoteOptions = gladiatorLobbyVoteOptions.isEmpty()
+                ? GladiatorsVoteOptions.randomOptions() : List.copyOf(gladiatorLobbyVoteOptions);
+        gladiatorLobbyVoteOptions = List.of();
         session.gladiatorVotes.clear();
         for (UUID id : session.players.keySet()) {
             String vote = gladiatorLobbyVotes.remove(id);
-            if (GladiatorsMode.fromId(vote) != null) session.gladiatorVotes.put(id, vote);
+            GladiatorsMode mode = GladiatorsMode.fromId(vote);
+            if (mode != null && session.gladiatorVoteOptions.contains(mode)) {
+                session.gladiatorVotes.put(id, vote);
+            }
         }
         session.gladiatorMode = GladiatorsMode.defaultMode().id();
         session.gladiatorVotingEndsAt = System.currentTimeMillis() + ArcadePortRules.gladiatorsVoteMillis();
@@ -7149,6 +7173,10 @@ public final class ArcadePortManager implements Listener {
         if (session == null) {
             LinkedHashMap<UUID, Player> queue = queues.get(ArcadePortGame.GLADIATORS.id());
             if (queue == null || !queue.containsKey(player.getUniqueId())) return;
+            if (gladiatorLobbyVoteOptions.isEmpty()) {
+                gladiatorLobbyVoteOptions = GladiatorsVoteOptions.randomOptions();
+            }
+            if (!gladiatorLobbyVoteOptions.contains(mode)) return;
             gladiatorLobbyVotes.put(player.getUniqueId(), mode.id());
             player.closeInventory();
             player.sendMessage(ChatColor.GREEN + "Lobby vote recorded: " + mode.displayName() + ".");
@@ -7156,13 +7184,14 @@ public final class ArcadePortManager implements Listener {
                 if (queued == null || !queued.isOnline()) continue;
                 queued.sendMessage(ChatColor.GOLD + player.getName() + " voted " + mode.displayName() + ".");
                 openGladiatorVoteMenu(queued, gladiatorLobbyVotes,
-                        "Gladiators Lobby — PvP Vote");
+                        "Gladiators Lobby — PvP Vote", gladiatorLobbyVoteOptions);
             }
             return;
         }
         if (active != session || session.type != ArcadePortGame.GLADIATORS
                 || session.gladiatorVotingEndsAt <= System.currentTimeMillis()
-                || !session.players.containsKey(player.getUniqueId())) return;
+                || !session.players.containsKey(player.getUniqueId())
+                || !session.gladiatorVoteOptions.contains(mode)) return;
         session.gladiatorVotes.put(player.getUniqueId(), mode.id());
         player.sendMessage(ChatColor.GREEN + "Vote recorded: " + mode.displayName() + ".");
         long onlineVoters = session.players.values().stream()
@@ -7616,20 +7645,8 @@ public final class ArcadePortManager implements Listener {
     private void resolveGladiatorVote(Session session) {
         if (active != session || session.gladiatorVotingEndsAt <= 0L) return;
         session.gladiatorVotingEndsAt = 0L;
-        Map<GladiatorsMode, Integer> counts = new java.util.EnumMap<>(GladiatorsMode.class);
-        for (String vote : session.gladiatorVotes.values()) {
-            GladiatorsMode mode = GladiatorsMode.fromId(vote);
-            if (mode != null) counts.merge(mode, 1, Integer::sum);
-        }
-        GladiatorsMode selected = GladiatorsMode.defaultMode();
-        int highest = -1;
-        for (GladiatorsMode mode : GladiatorsMode.values()) {
-            int count = counts.getOrDefault(mode, 0);
-            if (count > highest) {
-                highest = count;
-                selected = mode;
-            }
-        }
+        GladiatorsMode selected = GladiatorsVoteOptions.winner(
+                session.gladiatorVoteOptions, session.gladiatorVotes.values());
         if (GameDebugRuntimeOverrides.isDebugSession() && ArcadePortRules.gladiatorsForceModeEnabled()) {
             selected = GladiatorsMode.values()[ArcadePortRules.gladiatorsModeOverrideIndex()];
         }
@@ -7977,12 +7994,8 @@ public final class ArcadePortManager implements Listener {
 
     private void giveGladiatorKit(Session session, Player player, int requestedTier) {
         int tier = Math.max(0, Math.min(3, requestedTier));
-        Material sword = switch (tier) {
-            case 1 -> Material.STONE_SWORD;
-            case 2 -> Material.IRON_SWORD;
-            case 3 -> Material.DIAMOND_SWORD;
-            default -> Material.WOODEN_SWORD;
-        };
+        GladiatorsMode mode = GladiatorsMode.fromId(session.gladiatorMode);
+        if (mode == null) mode = GladiatorsMode.defaultMode();
         Material[] armor = switch (tier) {
             case 1 -> new Material[]{Material.GOLDEN_BOOTS, Material.GOLDEN_LEGGINGS, Material.GOLDEN_CHESTPLATE, Material.GOLDEN_HELMET};
             case 2 -> new Material[]{Material.CHAINMAIL_BOOTS, Material.CHAINMAIL_LEGGINGS, Material.CHAINMAIL_CHESTPLATE, Material.CHAINMAIL_HELMET};
@@ -7991,9 +8004,7 @@ public final class ArcadePortManager implements Listener {
         };
         player.getInventory().clear();
         player.getInventory().setItemInOffHand(null);
-        player.getInventory().addItem(new ItemStack(sword));
-        GladiatorsMode mode = GladiatorsMode.fromId(session.gladiatorMode);
-        if (mode == null) mode = GladiatorsMode.defaultMode();
+        player.getInventory().addItem(new ItemStack(mode.meleeWeaponForTier(tier)));
         var attackSpeed = player.getAttribute(Attribute.ATTACK_SPEED);
         if (attackSpeed != null) attackSpeed.setBaseValue(mode.attackSpeedBaseValue());
         switch (mode) {
@@ -8008,9 +8019,14 @@ public final class ArcadePortManager implements Listener {
             }
             case BOWLESS -> player.getInventory().addItem(new ItemStack(Material.FISHING_ROD));
             case MODERN -> {
-                player.getInventory().addItem(new ItemStack(Material.STONE_AXE));
-                player.getInventory().setItemInOffHand(new ItemStack(Material.SHIELD));
+                if (mode.hasCrossbow()) {
+                    player.getInventory().addItem(new ItemStack(Material.CROSSBOW));
+                    player.getInventory().addItem(new ItemStack(Material.ARROW,
+                            ArcadePortRules.gladiatorsArrowCount(tier)));
+                }
+                if (mode.hasShield()) player.getInventory().setItemInOffHand(new ItemStack(Material.SHIELD));
             }
+            case MODERN_SWORD -> { }
             case POT -> {
                 int potionCount = ArcadePortRules.gladiatorsPotionCount();
                 if (potionCount > 0) {
@@ -9931,7 +9947,6 @@ public final class ArcadePortManager implements Listener {
                 player.getInventory().setItem(0, new ItemStack(Material.WOODEN_SPEAR));
                 player.getInventory().setItem(1, namedItem(Material.SADDLE, "Herding Saddle",
                         "Carry unlimited sheep. Slowness increases every two sheep."));
-                player.getInventory().setItem(2, new ItemStack(Material.SHEARS));
             }
             default -> {
                 player.getInventory().setItem(0, namedItem(Material.IRON_AXE, "Beserker Jump",
@@ -14912,7 +14927,7 @@ public final class ArcadePortManager implements Listener {
         };
     }
 
-    /** The vanilla XP bar fills to the next timing critical; the sidebar/item lore show meter charge. */
+    /** The XP bar tracks timed critical progress and its level displays the ability meter charge. */
     private void updateBaconMeterItem(Session session, Player player) {
         if (session.type != ArcadePortGame.BACON_BRAWL || player == null || !player.isOnline()
                 || !session.alive.contains(player.getUniqueId())) return;
@@ -14923,13 +14938,13 @@ public final class ArcadePortManager implements Listener {
                         ArcadePortRules.BACON_TIMED_HIT_GOOD_MIN_MILLIS), session.baconKnockback);
         long lastSwing = session.baconLastSwingAt.getOrDefault(playerId, 0L);
         long elapsed = lastSwing <= 0L ? criticalDelay : Math.max(0L, now - lastSwing);
-        long remaining = Math.max(0L, criticalDelay - elapsed);
+        int meterMaximum = GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", ArcadePortRules.BACON_METER_MAX);
+        int percent = ArcadePortRules.baconAbilityMeterDisplayLevel(
+                session.baconMeters.getOrDefault(playerId, 0), meterMaximum);
         float progress = Math.min(1.0F, elapsed / (float) Math.max(1L, criticalDelay));
-        int secondsRemaining = (int) ((remaining + 999L) / 1_000L);
         if (Math.abs(player.getExp() - progress) > 0.001F) player.setExp(progress);
-        if (player.getLevel() != secondsRemaining) player.setLevel(secondsRemaining);
-        int percent = Math.max(0, Math.min(GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", ArcadePortRules.BACON_METER_MAX),
-                session.baconMeters.getOrDefault(playerId, 0)));
+        // The XP bar is timed critical progress; its level number is the ability meter charge.
+        if (player.getLevel() != percent) player.setLevel(percent);
         ItemStack ability = player.getInventory().getItem(0);
         if (ability != null && ability.getType() == Material.IRON_AXE
                 && ability.hasItemMeta() && ability.getItemMeta().hasDisplayName()
@@ -17136,7 +17151,8 @@ public final class ArcadePortManager implements Listener {
                 pendingDragonEscapeLeapVelocity.remove(id);
             }
         }, 2L);
-        player.setFallDistance(0.0F);
+        // Preserve accumulated fall distance so a mid-air leap does not erase the
+        // vanilla fall damage calculation when the racer eventually lands.
         // Reborn's PerkLeap plays the original Blaze Shoot effect and then the
         // player's equipped game leap cosmetic; avoid substituting modern rocket FX.
         player.playEffect(player.getLocation(), Effect.BLAZE_SHOOT, 8);
@@ -18011,12 +18027,14 @@ public final class ArcadePortManager implements Listener {
         boolean firstFinisher = session.dragonEscapeCompleted.size() == 1 && newlyCompleted;
         if (newlyCompleted) {
             session.dragonEscapeStoppedTimesMillis.put(id, elapsed);
+            player.setGameMode(GameMode.CREATIVE);
+            player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY,
+                    Integer.MAX_VALUE, 0, false, false, false));
             announce(session, ArcadePortRules.dragonEscapeCompletionMessage(player.getName(), elapsed));
             if (firstFinisher) {
                 session.dragonEscapeWinner = id;
                 session.dragonEscapeFinishWindowEndsAt = now
                         + ArcadePortRules.DRAGON_ESCAPE_FINISH_WINDOW_MILLIS;
-                announce(session, ChatColor.YELLOW + "FIRST COMPLETION!");
                 announce(session, ArcadePortRules.dragonEscapeFinishWindowMessage());
             }
             if (persistentPlayer && !GameDebugRuntimeOverrides.isDebugSession()) {
@@ -18033,7 +18051,10 @@ public final class ArcadePortManager implements Listener {
         }
         // Test bots are real racers for placement, finish-window progression, and chat
         // announcements, but they must not create persistent PBs, ghosts, or progression.
-        if (!persistentPlayer || session.dragonEscapeMapResource == null) return;
+        if (!persistentPlayer || session.dragonEscapeMapResource == null) {
+            if (firstFinisher) announce(session, ChatColor.YELLOW + "FIRST COMPLETION!");
+            return;
+        }
         String kit = session.dragonEscapeKits.getOrDefault(id, "jumper");
         DragonEscapeTimeRecord previousWorldRecord = dragonEscapeWorldRecord(
                 session.dragonEscapeMapResource, null);
@@ -18136,7 +18157,7 @@ public final class ArcadePortManager implements Listener {
     private void announceDragonEscapeRecordMilestone(Session session, Player player, String kit, long elapsed,
             long previousOverallPb, long previousKitPb, DragonEscapeTimeRecord previousWorldRecord,
             DragonEscapeTimeRecord previousKitWorldRecord, boolean improvedKit, boolean firstFinisher) {
-        if (firstFinisher || player == null || session == null) return;
+        if (player == null || session == null) return;
         boolean firstCompletion = previousWorldRecord == null;
         boolean firstKitCompletion = previousKitWorldRecord == null;
         boolean newWorldRecord = previousWorldRecord != null && elapsed < previousWorldRecord.timeMillis();
@@ -19661,7 +19682,10 @@ public final class ArcadePortManager implements Listener {
             int team = session.teams.getOrDefault(carrierId, -1);
             if (team < 0 || team > 3) continue;
             for (Sheep sheep : entry.getValue()) {
-                if (!isInsideSheepPen(session, sheep.getLocation(), team)) continue;
+                // Passenger entity coordinates can sit just outside the pen volume
+                // while the carrier is already inside. Source capture is triggered
+                // by the carrier entering the team's pen.
+                if (!isInsideSheepPen(session, carrier.getLocation(), team)) continue;
                 int owner = session.sheepOwners.getOrDefault(sheep, -1);
                 // SetOwner returns immediately for sheep already belonging to this team;
                 // those sheep remain passengers and still count while standing in the pen.
@@ -20871,7 +20895,8 @@ public final class ArcadePortManager implements Listener {
             boolean swordHit = held != null && held.getType().name().endsWith("_SWORD");
             if (swordHit) {
                 recordGladiatorToolHit(session, attacker, target, GladiatorsAchievementRules.SWORD_HIT);
-                if (GladiatorsMode.MODERN.id().equals(session.gladiatorMode)) {
+                GladiatorsMode currentMode = GladiatorsMode.fromId(session.gladiatorMode);
+                if (currentMode != null && currentMode.usesModernCombat()) {
                     boolean timedCritical = isGladiatorTimedCritical(attacker);
                     int streak = GladiatorsAchievementRules.nextTimedCriticalStreak(
                             session.gladiatorBoutTimedCritStreak.getOrDefault(attackerId, 0),
@@ -20993,8 +21018,9 @@ public final class ArcadePortManager implements Listener {
                     session.gladiatorRoundDamageTaken.getOrDefault(winnerId, 0.0D), forfeit)) {
                 incrementGladiatorsLifetimeStat(killer, "untouchable", 1, 10, "untouchable");
             }
+            GladiatorsMode currentMode = GladiatorsMode.fromId(session.gladiatorMode);
             if (!forfeit && GladiatorsAchievementRules.qualifiesBladeProtocol(
-                    GladiatorsMode.MODERN.id().equals(session.gladiatorMode), true,
+                    currentMode != null && currentMode.usesModernCombat(), true,
                     session.gladiatorBoutTimedCritStreak.getOrDefault(winnerId, 0))) {
                 awardCatalogAchievement(killer, "gladiators", "blade-protocol");
             }
@@ -21939,6 +21965,14 @@ public final class ArcadePortManager implements Listener {
                 && !attacker.isInWater() && !attacker.hasPotionEffect(PotionEffectType.BLINDNESS);
     }
 
+    private boolean claimCustomPlayerHit(Session session, UUID victimId, long now) {
+        if (session == null || victimId == null) return false;
+        long nextAllowedAt = session.customPlayerHitNextAt.getOrDefault(victimId, 0L);
+        if (!ArcadePortRules.canReceiveCustomPlayerHit(now, nextAllowedAt)) return false;
+        session.customPlayerHitNextAt.put(victimId, ArcadePortRules.nextCustomPlayerHitAt(now));
+        return true;
+    }
+
     private void handlePlayerHit(Session session, Player attacker, Player target, String source,
             int paintballAmount, double sourceDamage) {
         if (active != session || attacker.equals(target) || !session.alive.contains(attacker.getUniqueId())
@@ -21979,6 +22013,11 @@ public final class ArcadePortManager implements Listener {
                         ArcadePortGame.TURF_WARS, "combat-damage", true)))) return;
         if (session.type == ArcadePortGame.TURF_WARS && !session.turfCombat) return;
         if (session.type == ArcadePortGame.DRAGONS) return; // PvP is disabled; use Pyro against dragons.
+        // Custom damage events are cancelled and applied directly, so vanilla never
+        // starts its hurt timer. Keep the 1.8 10-tick hurt window per victim here.
+        // Bacon Brawl and Gladiators have their own source-specific hit timers.
+        if (session.type != ArcadePortGame.GLADIATORS && session.type != ArcadePortGame.BACON_BRAWL
+                && !claimCustomPlayerHit(session, target.getUniqueId(), System.currentTimeMillis())) return;
         if (session.type == ArcadePortGame.SPLEEF) {
             UUID attackerId = attacker.getUniqueId();
             session.spleefLastHit.put(target.getUniqueId(), new SpleefHit(attackerId, "melee",
@@ -22102,7 +22141,10 @@ public final class ArcadePortManager implements Listener {
             case SHEEP_QUEST: {
                 double rawSheepQuestDamage = "sheep archer arrow".equals(source)
                         ? (Double.isFinite(sourceDamage) ? Math.max(0.0D, sourceDamage) : 0.0D)
-                        : ArcadePortRules.sheepQuestLegacyMeleeDamage(
+                        : "sheep shepherd spear".equals(source)
+                                ? ArcadePortRules.sheepQuestLegacyMeleeDamage(
+                                        "WOODEN_SPEAR", false, sourceDamage)
+                                : ArcadePortRules.sheepQuestLegacyMeleeDamage(
                                 attacker.getInventory().getItemInMainHand().getType().name(),
                                 sheepQuestCriticalMeleeHit(attacker), sourceDamage);
                 var sheepQuestArmour = target.getAttribute(Attribute.ARMOR);
@@ -22136,6 +22178,15 @@ public final class ArcadePortManager implements Listener {
                                 != session.teams.getOrDefault(target.getUniqueId(), -2)) {
                     recordSheepQuestStat(attacker.getUniqueId(), "animal-rescue");
                 }
+                String sheepKillMode = switch (session.sheepQuestKits.getOrDefault(
+                        attacker.getUniqueId(), "beserker")) {
+                    case "archer" -> "sheep archer arrow".equals(source) ? "Archery" : "Brawler Sword";
+                    case "brute" -> "Brawler Sword";
+                    case "shepherd" -> "Wooden Spear";
+                    default -> "Berserker Axe";
+                };
+                session.lastHitModeByVictim.put(target.getUniqueId(), sheepKillMode);
+                session.lastHitKillerByVictim.put(target.getUniqueId(), attacker.getUniqueId());
                 dropSheepFromCarrier(session, target, "was hit");
                 if (target.getHealth() <= sheepQuestDamage) {
                     eliminate(session, target, attacker, "was defeated while carrying sheep");
@@ -22602,6 +22653,15 @@ public final class ArcadePortManager implements Listener {
             }
             handlePlayerHit(session, shooter, target, "projectile hit");
             session.turfTrackedArrows.remove(projectile.getUniqueId());
+            session.entities.remove(projectile);
+            projectile.remove();
+        } else if (session.type == ArcadePortGame.SHEEP_QUEST
+                && projectile instanceof Trident
+                && session.sheepQuestShepherdSpears.remove(projectile.getUniqueId())) {
+            double damage = session.sheepQuestShepherdSpearDamage.getOrDefault(projectile.getUniqueId(),
+                    ArcadePortRules.SHEEP_QUEST_SHEPHERD_SPEAR_JAB_DAMAGE);
+            session.sheepQuestShepherdSpearDamage.remove(projectile.getUniqueId());
+            handlePlayerHit(session, shooter, target, "sheep shepherd spear", 1, damage);
             session.entities.remove(projectile);
             projectile.remove();
         } else if (session.type == ArcadePortGame.SHEEP_QUEST
@@ -26810,6 +26870,7 @@ public final class ArcadePortManager implements Listener {
         }
         queues.clear();
         gladiatorLobbyVotes.clear();
+        gladiatorLobbyVoteOptions = List.of();
         plugin.getLogger().info("Modern Arcade ports reset: " + reason);
     }
 
@@ -28006,6 +28067,8 @@ public final class ArcadePortManager implements Listener {
             player.teleport(playerLocation);
             return false;
         }
+        // Position Swap is a single-use kit ability; remove its activator on success.
+        player.getInventory().remove(Material.ENDER_EYE);
         session.runnerSwapUsed.add(id);
         if (RunnerAchievementRules.switcheroo(session.alive.size() == 2)) {
             awardCatalogAchievement(player, "runner", "switcheroo");
@@ -28096,7 +28159,18 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session != null && session.type == ArcadePortGame.DRAGONS
                 && event.getEntity().getWorld() == session.world) {
-            event.setCancelled(true);
+            boolean selectedLivingPlayer = false;
+            if (event.getEntity() instanceof EnderDragon dragon
+                    && event.getTarget() instanceof Player target) {
+                selectedLivingPlayer = ArcadePortRules.shouldAllowDragonEntityTarget(
+                        target.getUniqueId(), session.dragonTargetPlayers.get(dragon.getUniqueId()),
+                        session.alive.contains(target.getUniqueId()),
+                        session.dragonTamerByDragon.containsKey(dragon.getUniqueId()));
+            }
+            // The controller sets this target explicitly every pursuit update. Cancelling
+            // all EntityTargetEvents also cancelled our own setTarget() call, leaving every
+            // dragon in the source-map sky targets and never diving at a racer.
+            if (!selectedLivingPlayer) event.setCancelled(true);
         }
     }
 
@@ -28258,6 +28332,27 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onSheepQuestShepherdSpearReleased(PlayerStopUsingItemEvent event) {
+        Session session = active;
+        Player player = event.getPlayer();
+        UUID playerId = player.getUniqueId();
+        if (session == null || session.type != ArcadePortGame.SHEEP_QUEST
+                || !session.alive.contains(playerId)
+                || !"shepherd".equals(session.sheepQuestKits.getOrDefault(playerId, "beserker"))
+                || event.getItem() == null || event.getItem().getType() != Material.WOODEN_SPEAR) return;
+        int chargeTicks = Math.max(0, event.getTicksHeldFor());
+        double damage = ArcadePortRules.sheepQuestShepherdSpearDamageForChargeTicks(chargeTicks);
+        Trident spear = player.launchProjectile(Trident.class);
+        spear.setItemStack(new ItemStack(Material.WOODEN_SPEAR));
+        spear.setDamage(damage);
+        spear.setPickupStatus(org.bukkit.entity.AbstractArrow.PickupStatus.DISALLOWED);
+        spear.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(1.6D));
+        session.entities.add(spear);
+        session.sheepQuestShepherdSpears.add(spear.getUniqueId());
+        session.sheepQuestShepherdSpearDamage.put(spear.getUniqueId(), damage);
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onDamage(EntityDamageEvent event) {
         if (event.getEntity() instanceof Player prepareVictim && cancelPrepareAction(prepareVictim, event)) return;
@@ -28313,6 +28408,16 @@ public final class ArcadePortManager implements Listener {
                 debugTarget.setFallDistance(0.0F);
                 return;
             }
+        }
+        if (event instanceof EntityDamageByEntityEvent
+                && event.getEntity() instanceof Player dragonVictim
+                && ArcadePortRules.shouldCancelDragonPlayerDamage(
+                        session.type, session.alive.contains(dragonVictim.getUniqueId()))) {
+            // Contact is a knockback hit in the source game. The scheduled overlap
+            // handler supplies that knockback; vanilla EnderDragon/PvP damage must not
+            // also remove health or make contact lethal.
+            event.setCancelled(true);
+            return;
         }
         if (event instanceof EntityDamageByEntityEvent byEntity
                 && event.getEntity() instanceof Player victim
@@ -28431,6 +28536,8 @@ public final class ArcadePortManager implements Listener {
                                 == session.teams.getOrDefault(teamTarget.getUniqueId(), -2)) return;
             }
             if (damage <= 0.0D) return;
+            if (attacker != null && !claimCustomPlayerHit(
+                    session, teamTarget.getUniqueId(), System.currentTimeMillis())) return;
             if (teamTarget.getHealth() <= damage) {
                 eliminate(session, teamTarget, attacker, attacker == null
                         ? "was defeated" : "was defeated by " + attacker.getName());
@@ -28840,6 +28947,8 @@ public final class ArcadePortManager implements Listener {
                     || attacker.getUniqueId().equals(microTarget.getUniqueId())
                     || session.teams.getOrDefault(attacker.getUniqueId(), -1)
                             .equals(session.teams.getOrDefault(microTarget.getUniqueId(), -2)))) return;
+            if (attacker != null && !claimCustomPlayerHit(
+                    session, microTarget.getUniqueId(), System.currentTimeMillis())) return;
             applyMicroBattlesHit(session, attacker, microTarget, source, rawDamage, projectile, event.getCause());
             return;
         }
@@ -29403,6 +29512,16 @@ public final class ArcadePortManager implements Listener {
                 }
                 else sneakyAssassins.projectileMissed(projectile);
             }
+            return;
+        }
+
+        if (session.type == ArcadePortGame.SHEEP_QUEST
+                && event.getEntity() instanceof Trident spear
+                && event.getHitEntity() == null
+                && session.sheepQuestShepherdSpears.remove(spear.getUniqueId())) {
+            session.sheepQuestShepherdSpearDamage.remove(spear.getUniqueId());
+            session.entities.remove(spear);
+            spear.remove();
             return;
         }
 
@@ -35281,6 +35400,10 @@ public final class ArcadePortManager implements Listener {
             Scoreboard scoreboard, Objective objective, List<Team> teams, List<String> entries) { }
 
     private static final class Session extends SessionState {
+        List<GladiatorsMode> gladiatorVoteOptions = List.of();
+        final Map<UUID, Long> customPlayerHitNextAt = new HashMap<>();
+        final Set<UUID> sheepQuestShepherdSpears = new HashSet<>();
+        final Map<UUID, Double> sheepQuestShepherdSpearDamage = new HashMap<>();
         boolean dragonEscapePractice;
         boolean dragonEscapePracticeDouglas;
         boolean dragonEscapeScoreboardZeroFrameShown;

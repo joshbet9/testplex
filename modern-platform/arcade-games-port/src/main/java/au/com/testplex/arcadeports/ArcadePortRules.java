@@ -578,6 +578,12 @@ public final class ArcadePortRules {
     }
 
     public static final int BACON_METER_MAX = 100;
+
+    /** XP-level text displays meter charge directly, bounded by the configured meter capacity. */
+    public static int baconAbilityMeterDisplayLevel(int charge, int configuredMaximum) {
+        int maximum = Math.max(0, configuredMaximum);
+        return Math.max(0, Math.min(maximum, charge));
+    }
     public static final int BACON_METER_MIN_ABILITY = 50;
     public static final int BACON_METER_GAIN_NORMAL_HIT = 5;
     public static final int BACON_METER_GAIN_CRITICAL_HIT = 10;
@@ -1683,6 +1689,27 @@ public final class ArcadePortRules {
                 "DRAGONS_RETARGET_DISTANCE_SQUARED", DRAGONS_RETARGET_DISTANCE_SQUARED);
     }
 
+    /** Only allow a Dragons entity to target the living player selected by the round controller. */
+    public static boolean shouldAllowDragonEntityTarget(UUID requestedTargetId, UUID selectedTargetId,
+            boolean targetAlive, boolean dragonControlled) {
+        return !dragonControlled && targetAlive && requestedTargetId != null
+                && requestedTargetId.equals(selectedTargetId);
+    }
+
+    /** Dragons has no entity-caused health damage; contact is handled as source-style knockback. */
+    public static boolean shouldCancelDragonPlayerDamage(ArcadePortGame game, boolean targetAlive) {
+        return game == ArcadePortGame.DRAGONS && targetAlive;
+    }
+
+    /** Shared custom-combat immunity window matching the 10-tick 1.8 hurt interval. */
+    public static boolean canReceiveCustomPlayerHit(long nowMillis, long nextAllowedAtMillis) {
+        return nowMillis >= nextAllowedAtMillis;
+    }
+
+    public static long nextCustomPlayerHitAt(long nowMillis) {
+        return nowMillis + 500L;
+    }
+
     public static Vector dragonsGliderVelocity(Vector facing) {
         if (facing == null || facing.lengthSquared() <= 1.0E-12D) return new Vector();
         Vector velocity = facing.clone().normalize().multiply(GameDebugRuntimeOverrides.doubleValue(
@@ -2782,10 +2809,10 @@ public final class ArcadePortRules {
         };
     }
 
-    /** Legacy SheepData compares the sheep's feet block directly with the DATA_LOCS pen blocks. */
+    /** A carrier's feet can be one block above the authored pen block at the floor. */
     public static boolean sheepQuestInsidePenMarker(int sheepBlockX, int sheepFeetY, int sheepBlockZ,
             int markerX, int markerY, int markerZ) {
-        return sheepBlockX == markerX && sheepFeetY == markerY && sheepBlockZ == markerZ;
+        return sheepBlockX == markerX && Math.abs(sheepFeetY - markerY) <= 1 && sheepBlockZ == markerZ;
     }
 
     // Retained as an optional debug-profile override; normal hits use the 1.8 weapon table below.
@@ -2793,6 +2820,14 @@ public final class ArcadePortRules {
     public static final double SHEEP_QUEST_THROWER_DAMAGE = 6.0D;
     public static final double SHEEP_QUEST_SHEPHERD_SPEAR_JAB_DAMAGE = 3.0D;
     public static final double SHEEP_QUEST_SHEPHERD_SPEAR_MAX_DAMAGE = 5.0D;
+    public static final int SHEEP_QUEST_SHEPHERD_SPEAR_FULL_CHARGE_TICKS = 20;
+
+    public static double sheepQuestShepherdSpearDamageForChargeTicks(int ticksHeld) {
+        double charge = Math.max(0.0D, Math.min(1.0D,
+                ticksHeld / (double) SHEEP_QUEST_SHEPHERD_SPEAR_FULL_CHARGE_TICKS));
+        return SHEEP_QUEST_SHEPHERD_SPEAR_JAB_DAMAGE
+                + (SHEEP_QUEST_SHEPHERD_SPEAR_MAX_DAMAGE - SHEEP_QUEST_SHEPHERD_SPEAR_JAB_DAMAGE) * charge;
+    }
     public static final int SHEEP_QUEST_INITIAL_SHEEP = 4;
     public static final long SHEEP_QUEST_ROUND_MILLIS = 300_000L;
     public static final int SHEEP_QUEST_MAX_CARRY = 3;
@@ -3281,7 +3316,7 @@ public final class ArcadePortRules {
     public static final long GLADIATOR_ARENA_TRANSITION_MILLIS = 15_000L;
     /** -1 preserves lobby-size-based source tier selection; 0 through 3 force an arena tier for testing. */
     public static final int GLADIATOR_STARTING_TIER_OVERRIDE = -1;
-    /** Mode indices follow GladiatorsMode: Normal, Rodless, Bowless, Modern, Pot. */
+    /** Mode indices follow GladiatorsMode: Classic, Rodless, Bowless, Axe, Pot, Modern Sword. */
     public static final boolean GLADIATOR_FORCE_MODE_ENABLED = false;
     public static final int GLADIATOR_MODE_OVERRIDE = 0;
     public static final long GLADIATOR_POISON_DELAY_MILLIS = 30_000L;
@@ -3313,7 +3348,7 @@ public final class ArcadePortRules {
     }
 
     public static int gladiatorsModeOverrideIndex() {
-        return Math.max(0, Math.min(4, GameDebugRuntimeOverrides.intValue(
+        return Math.max(0, Math.min(5, GameDebugRuntimeOverrides.intValue(
                 "GLADIATOR_MODE_OVERRIDE", GLADIATOR_MODE_OVERRIDE)));
     }
 
@@ -3555,12 +3590,12 @@ public final class ArcadePortRules {
             boolean newWorldRecord, boolean newKitWorldRecord, boolean newPersonalBest,
             boolean newKitPersonalBest, String kit) {
         String suffix = kit == null ? "" : " " + kit.toUpperCase(java.util.Locale.ROOT);
-        if (firstCompletion) return "FIRST COMPLETION!";
-        if (firstKitCompletion) return "FIRST" + suffix + " COMPLETION!";
         if (newWorldRecord) return "NEW WORLD RECORD!";
         if (newKitWorldRecord) return "NEW WORLD RECORD" + suffix + "!";
         if (newPersonalBest) return "NEW PERSONAL BEST!";
         if (newKitPersonalBest) return "NEW PERSONAL BEST" + suffix + "!";
+        if (firstCompletion) return "FIRST COMPLETION!";
+        if (firstKitCompletion) return "FIRST" + suffix + " COMPLETION!";
         return null;
     }
 

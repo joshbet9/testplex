@@ -44,6 +44,13 @@ class SheepQuestCombatRulesTest {
                 "WOODEN_SPEAR", true, Double.NaN));
     }
 
+    @Test void shepherdThrownSpearChargeScalesFromThreeToFiveDamage() {
+        assertEquals(3.0D, ArcadePortRules.sheepQuestShepherdSpearDamageForChargeTicks(0), 0.00001D);
+        assertEquals(4.0D, ArcadePortRules.sheepQuestShepherdSpearDamageForChargeTicks(10), 0.00001D);
+        assertEquals(5.0D, ArcadePortRules.sheepQuestShepherdSpearDamageForChargeTicks(20), 0.00001D);
+        assertEquals(5.0D, ArcadePortRules.sheepQuestShepherdSpearDamageForChargeTicks(200), 0.00001D);
+    }
+
     @Test void arrowsUseImpactVelocityAndBoundedCriticalBonus() {
         assertEquals(2.0D, ArcadePortRules.sheepQuestLegacyArrowDamage(1.0D, 0));
         assertEquals(3.0D, ArcadePortRules.sheepQuestLegacyArrowDamage(1.5D, 0));
