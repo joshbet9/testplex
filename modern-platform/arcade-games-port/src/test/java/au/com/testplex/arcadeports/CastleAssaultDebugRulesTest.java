@@ -17,6 +17,9 @@ final class CastleAssaultDebugRulesTest {
         assertEquals(100, ArcadePortRules.castleAssaultKingHealthForOpponents(15));
         assertEquals(27, ArcadePortRules.castleAssaultKingHealthForOpponents(4));
         assertEquals(1, ArcadePortRules.castleAssaultKingHealthForOpponents(0));
+        assertEquals(500L, ArcadePortRules.CASTLE_ASSAULT_KING_INVULNERABILITY_MILLIS);
+        assertTrue(ArcadePortRules.canDamageCastleKing(500L, 500L));
+        assertFalse(ArcadePortRules.canDamageCastleKing(499L, 500L));
         assertEquals(30_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(false));
         assertEquals(15_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(true));
         assertEquals(60_000L, ArcadePortRules.castleAssaultCarrierFuseMillis());

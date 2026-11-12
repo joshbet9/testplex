@@ -461,8 +461,6 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         king.setSilent(true);
         king.setInvulnerable(false);
         king.setRemoveWhenFarAway(false);
-        king.setMaximumNoDamageTicks(0);
-        king.setNoDamageTicks(0);
         king.getEquipment().setHelmet(castleArmour(Material.DIAMOND_HELMET, null, 0));
         king.getEquipment().setChestplate(castleArmour(Material.DIAMOND_CHESTPLATE, null, 0));
         king.getEquipment().setLeggings(castleArmour(Material.DIAMOND_LEGGINGS, null, 0));
@@ -3463,9 +3461,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private void damageCastleKing(KingState king, double damage, Player attacker) {
         if (!debugFeatureEnabled(attacker, "king-damage")) return;
         if (king.activeCrystals() > 0 || king.health <= 0) return;
+        long now = System.currentTimeMillis();
+        if (!ArcadePortRules.canDamageCastleKing(now, king.nextDamageAt)) return;
+        king.nextDamageAt = now + ArcadePortRules.CASTLE_ASSAULT_KING_INVULNERABILITY_MILLIS;
         king.health = Math.max(0, king.health - (int) Math.ceil(damage));
         if (king.entity != null && king.entity.isValid()) {
-            king.entity.setNoDamageTicks(0);
+            king.entity.setNoDamageTicks(10);
             king.entity.setHealth(Math.max(1.0D, king.health));
             king.entity.setCustomName(teamColour(king.team) + king.name + ChatColor.RED + " ❤ " + king.health);
             king.entity.playEffect(org.bukkit.EntityEffect.HURT);
@@ -7409,6 +7410,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         final List<EnderCrystal> crystals = new ArrayList<>();
         int health;
         int maxHealth;
+        long nextDamageAt;
         KingState(int team, String name, Location location, Zombie entity, int health) {
             this.team = team;
             this.name = name;

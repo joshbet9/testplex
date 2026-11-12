@@ -2,6 +2,7 @@ package au.com.testplex.arcadeports;
 
 import org.junit.jupiter.api.Test;
 import org.bukkit.Material;
+import org.bukkit.ChatColor;
 import org.bukkit.util.Vector;
 import java.nio.file.Path;
 import java.util.HashSet;
@@ -582,6 +583,10 @@ class ArcadePortGameTest {
                 "Pirate Bay", true));
         assertEquals(4, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGONS,
                 "Any map", false));
+        assertTrue(ArcadePortRules.isDragonEscapeWaterContact(true, false, false));
+        assertTrue(ArcadePortRules.isDragonEscapeWaterContact(false, true, false));
+        assertTrue(ArcadePortRules.isDragonEscapeWaterContact(false, false, true));
+        assertFalse(ArcadePortRules.isDragonEscapeWaterContact(false, false, false));
     }
 
     @Test void sourceWorldResetOnlyAcceptsReservedWorldNames() {
@@ -1859,8 +1864,11 @@ class ArcadePortGameTest {
     }
 
     @Test void dragonEscapeFirstCompletionAnnouncementIncludesTheSavedRunTime() {
-        assertEquals("FIRST COMPLETION! JN_PlayzMC — 1:23.456. Other racers have 30 seconds.",
-                ArcadePortRules.dragonEscapeFirstCompletionMessage("JN_PlayzMC", 83_456L));
+        assertEquals(ChatColor.GREEN + "JN_PlayzMC" + ChatColor.GRAY + " has completed the map in "
+                        + ChatColor.YELLOW + "83.46" + ChatColor.GRAY + " seconds!",
+                ArcadePortRules.dragonEscapeCompletionMessage("JN_PlayzMC", 83_456L));
+        assertEquals(ChatColor.AQUA + "The game will end in 30 seconds!",
+                ArcadePortRules.dragonEscapeFinishWindowMessage());
     }
 
     @Test void dragonEscapeKitsCannotBeChangedMidRace() {
@@ -1917,6 +1925,18 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(20_000L, 2_000L, true, true, true));
         assertTrue(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(20_000L, 2_000L, true, false, true));
         assertTrue(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(1_000L, 2_000L, false, false, false));
+        assertTrue(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false, false));
+        assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(9L, 10L, false, false));
+        assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, true, false));
+        assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false, true));
+    }
+
+    @Test void dragonEscapeFinishWindowWaitsForRacersOrItsDeadline() {
+        assertFalse(ArcadePortRules.shouldEndDragonEscapeFinishWindow(10_000L, 30_000L, 4));
+        assertFalse(ArcadePortRules.shouldEndDragonEscapeFinishWindow(30_000L, 60_000L, 1));
+        assertTrue(ArcadePortRules.shouldEndDragonEscapeFinishWindow(30_000L, 30_000L, 4));
+        assertTrue(ArcadePortRules.shouldEndDragonEscapeFinishWindow(10_000L, 30_000L, 0));
+        assertFalse(ArcadePortRules.shouldEndDragonEscapeFinishWindow(40_000L, 0L, 0));
     }
 
     @Test void dragonEscapeDisruptorMineTriggersOnlyOnArmedOpponentPickup() {
