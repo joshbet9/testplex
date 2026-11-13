@@ -1435,6 +1435,12 @@ public final class ArcadePortRules {
                 && (now >= finishWindowEndsAt || unresolvedRacerCount <= 0);
     }
 
+    /** A finish can only be recorded for an active, living racer who has not already finished. */
+    public static boolean isDragonEscapeFinishEligible(boolean inAliveRoster, boolean spectator,
+            boolean alreadyCompleted) {
+        return inAliveRoster && !spectator && !alreadyCompleted;
+    }
+
     public static boolean shouldRemoveDragonEscapeBuilderBrick(
             long now, long expiresAt, boolean hasBeenUsed, boolean stillStandingOnIt, boolean ownerAlive) {
         if (!ownerAlive) return true;

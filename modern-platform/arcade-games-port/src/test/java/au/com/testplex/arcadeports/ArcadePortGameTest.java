@@ -1951,6 +1951,13 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldEndDragonEscapeFinishWindow(40_000L, 0L, 0));
     }
 
+    @Test void dragonEscapeFinishRequiresAnUnfinishedLiveNonspectatorRacer() {
+        assertTrue(ArcadePortRules.isDragonEscapeFinishEligible(true, false, false));
+        assertFalse(ArcadePortRules.isDragonEscapeFinishEligible(false, false, false));
+        assertFalse(ArcadePortRules.isDragonEscapeFinishEligible(true, true, false));
+        assertFalse(ArcadePortRules.isDragonEscapeFinishEligible(true, false, true));
+    }
+
     @Test void dragonEscapeDisruptorMineTriggersOnlyOnArmedOpponentPickup() {
         assertFalse(ArcadePortRules.shouldTriggerDragonEscapeDisruptor(39, 0.5D, false));
         assertFalse(ArcadePortRules.shouldTriggerDragonEscapeDisruptor(40, 2.01D, false));
