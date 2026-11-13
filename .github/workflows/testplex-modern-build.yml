@@ -322,12 +322,12 @@ jobs:
             echo
             echo "- Runtime/API baseline: Java 25 / Paper 26.3"
             echo "- Separate from legacy Java 8 build and deployment"
-            echo "- Catalogue: 32 Arcade selectable IDs (32 READY_FOR_TEST, 0 MECHANICS_IN_PROGRESS), all enabled across 30 distinct titles"
+            echo "- Catalogue: 30 Arcade selectable IDs (30 READY_FOR_TEST, 0 MECHANICS_IN_PROGRESS), all enabled across 30 distinct titles"
             echo "- Built artifacts: TestplexModernArcade.jar and ArcadeMechanicsModern.jar; all games run through the shared Arcade plugin (including Snake, Wizards and Monster Maze)"
             echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
             echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
-            echo "- Gameplay ports: 32 selections enabled across 30 distinct games, including Evolution, Heroes of Gwen Arcade, Hoops Remastered and Wizards Arcade"
-            echo "- Playable allow-list: Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Castle Assault, Gladiators, Micro Battles, Milk the Cow, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons, Evolution, Runner, Sheep Quest, Turf Wars, Snap, Monster Maze (Original), Monster Maze (Speed), Monster Maze (Modern), Snake, Draw My Thing, Master Builders, SkyWars Mixed, Wither Assault, Sneaky Assassins, Speed Builders, Heroes of Gwen, Hoops Remastered and Wizards"
+            echo "- Gameplay ports: 30 selections enabled across 30 distinct games, including Evolution, Heroes of Gwen Arcade, Hoops Remastered and Wizards Arcade"
+            echo "- Playable allow-list: Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Castle Assault, Gladiators, Micro Battles, Milk the Cow, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons, Evolution, Runner, Sheep Quest, Turf Wars, Snap, Monster Maze, Snake, Draw My Thing, Master Builders, SkyWars Mixed, Wither Assault, Sneaky Assassins, Speed Builders, Heroes of Gwen, Hoops Remastered and Wizards"
             echo "- Deployment: successful pushes to feat/testplex-modern-26.3-platform automatically deploy through the isolated modern Hyper-V workflow"
           } >> "$GITHUB_STEP_SUMMARY"
 
