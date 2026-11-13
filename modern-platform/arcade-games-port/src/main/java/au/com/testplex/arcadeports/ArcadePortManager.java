@@ -6700,7 +6700,8 @@ public final class ArcadePortManager implements Listener {
                 GladiatorMenuType.VOTE, votes == gladiatorLobbyVotes);
         Inventory inventory = Bukkit.createInventory(holder, 27, title);
         holder.inventory = inventory;
-        int[] slots = {7, 9, 11, 13, 15, 17};
+        int[] slots = modes.size() == GladiatorsVoteOptions.OPTION_COUNT
+                ? new int[]{11, 13, 15} : new int[]{7, 9, 11, 13, 15, 17};
         for (int i = 0; i < modes.size(); i++) {
             GladiatorsMode mode = modes.get(i);
             int count = (int) votes.values().stream().filter(mode.id()::equals).count();
@@ -18031,6 +18032,7 @@ public final class ArcadePortManager implements Listener {
                 session.dragonEscapeWinner = id;
                 session.dragonEscapeFinishWindowEndsAt = now
                         + ArcadePortRules.DRAGON_ESCAPE_FINISH_WINDOW_MILLIS;
+                announce(session, ChatColor.YELLOW + "FIRST COMPLETION!");
                 announce(session, ArcadePortRules.dragonEscapeFinishWindowMessage());
             }
             if (persistentPlayer && !GameDebugRuntimeOverrides.isDebugSession()) {
@@ -18047,10 +18049,7 @@ public final class ArcadePortManager implements Listener {
         }
         // Test bots are real racers for placement, finish-window progression, and chat
         // announcements, but they must not create persistent PBs, ghosts, or progression.
-        if (!persistentPlayer || session.dragonEscapeMapResource == null) {
-            if (firstFinisher) announce(session, ChatColor.YELLOW + "FIRST COMPLETION!");
-            return;
-        }
+        if (!persistentPlayer || session.dragonEscapeMapResource == null) return;
         String kit = session.dragonEscapeKits.getOrDefault(id, "jumper");
         DragonEscapeTimeRecord previousWorldRecord = dragonEscapeWorldRecord(
                 session.dragonEscapeMapResource, null);

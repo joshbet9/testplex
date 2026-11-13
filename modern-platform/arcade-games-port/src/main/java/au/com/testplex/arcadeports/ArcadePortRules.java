@@ -418,7 +418,7 @@ public final class ArcadePortRules {
     }
 
     public static String dragonEscapeFinishWindowMessage() {
-        return ChatColor.AQUA + "The game will end in 30 seconds!";
+        return ChatColor.GRAY + "The game will end in 30 seconds!";
     }
 
     public static String formatDragonEscapeDelta(long deltaMillis) {
