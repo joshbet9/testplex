@@ -160,12 +160,8 @@ public final class ArcadeCatalog {
                 win("micro-monument", "Micro Monument", "A tiny monument assembles around the winner."),
                 win("falling-stars", "Falling Stars", "A narrow star shower descends onto the platform")));
 
-        register(monsterMazeGame("monster-maze", "Monster Maze (Original)",
-                "The original Monster Maze experience, recreated as faithfully as possible."));
-        register(monsterMazeModeGame("monster-maze-speed", "Monster Maze (Speed)",
-                "The Speed mode keeps the original timer and monster spawning with the Speed gameplay rules."));
-        register(monsterMazeModeGame("monster-maze-modern", "Monster Maze (Modern)",
-                "The Modern mode accelerates stages, increases monster counts and expands kit abilities."));
+        register(monsterMazeGame("monster-maze", "Monster Maze",
+                "The consolidated Modern Monster Maze ruleset with enhanced kits and faster stages."));
 
         register(game("one-in-the-quiver", "One in the Quiver", "ARROW", "Land the decisive bow shot with one arrow at a time.",
                 GameDefinition.PortStatus.READY_FOR_TEST,
@@ -367,14 +363,6 @@ public final class ArcadeCatalog {
                 List.of(),
                 win("highest-accuracy", "Highest Accuracy",
                         "The builder with the highest cumulative model accuracy is announced as the winner.")));
-    }
-
-    /** Speed and Modern share Original's one player-facing Monster Maze cosmetics page. */
-    private static GameDefinition monsterMazeModeGame(String id, String name, String description) {
-        return game(id, name, "ROTTEN_FLESH", description,
-                GameDefinition.PortStatus.READY_FOR_TEST,
-                List.of(),
-                win("maze-blueprint", "Maze Blueprint", "A miniature maze trace forms above the winner."));
     }
 
     private static GameDefinition monsterMazeGame(String id, String name, String description) {
@@ -747,6 +735,13 @@ public final class ArcadeCatalog {
     }
 
     public List<GameDefinition> getGames() { return List.copyOf(games.values()); }
-    public GameDefinition getGame(String id) { return id == null ? null : games.get(id.toLowerCase(Locale.ROOT)); }
+    public GameDefinition getGame(String id) {
+        if (id == null) return null;
+        String normalized = id.toLowerCase(Locale.ROOT);
+        if (normalized.equals("monster-maze-speed") || normalized.equals("monster-maze-modern")) {
+            normalized = "monster-maze";
+        }
+        return games.get(normalized);
+    }
     public int size() { return games.size(); }
 }

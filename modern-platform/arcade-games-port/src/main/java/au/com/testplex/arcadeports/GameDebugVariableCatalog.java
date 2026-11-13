@@ -162,8 +162,6 @@ final class GameDebugVariableCatalog {
                 Object raw = field.get(null);
                 double value = raw instanceof Boolean enabled ? (enabled ? 1.0D : 0.0D)
                         : ((Number) raw).doubleValue();
-                if (game == ArcadePortGame.MONSTER_MAZE && source.getSimpleName().equals("MazeDebugRules")
-                        && name.equals("JUMPER_MAX_JUMPS")) value = 5.0D;
                 double minimum = minimum(name, value, kind);
                 double maximum = maximum(name, kind, value);
                 if (game == ArcadePortGame.SUPER_SPLOOR && source == SuperSploorRules.class) {
@@ -345,7 +343,8 @@ final class GameDebugVariableCatalog {
             case SNEAKY_ASSASSINS -> "SNEAKY_ASSASSINS_";
             case ONE_IN_THE_QUIVER -> "QUIVER_";
             case GLADIATORS -> "GLADIATOR_";
-            case MONSTER_MAZE -> "MONSTER_MAZE_";
+            // Keep the existing Modern profile values when the mode variants collapse.
+            case MONSTER_MAZE -> "MONSTER_MAZE_MODERN_";
             case MONSTER_MAZE_SPEED -> "MONSTER_MAZE_SPEED_";
             case MONSTER_MAZE_MODERN -> "MONSTER_MAZE_MODERN_";
             default -> game.name() + "_";

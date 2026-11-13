@@ -48,7 +48,7 @@ class MonsterMazePortContractTest {
         assertEquals(15, MazeMode.CLASSIC.additionalMonstersPerSafePad());
 
         assertTrue(MazeMode.SPEED.speedBoostEnabled());
-        assertTrue(MazeMode.MODERN.speedBoostEnabled());
+        assertFalse(MazeMode.MODERN.speedBoostEnabled());
         assertFalse(MazeMode.CLASSIC.speedBoostEnabled());
         assertFalse(MazeMode.ORIGINAL.speedBoostEnabled());
     }

@@ -16,10 +16,10 @@ class ArcadeCatalogTest {
             "turf-wars", "wither-assault");
 
     @Test
-    void registersAllThirtyTwoSelectableArcadeIds() {
+    void registersAllThirtySelectableArcadeIds() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        assertEquals(32, catalog.size());
-        assertEquals(32, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
+        assertEquals(30, catalog.size());
+        assertEquals(30, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
     }
 
     @Test
@@ -36,8 +36,6 @@ class ArcadeCatalogTest {
                 Map.entry("hoops-remastered", "score-flares"),
                 Map.entry("micro-battles", "start-glass-colour"),
                 Map.entry("monster-maze", "mob-sets"),
-                Map.entry("monster-maze-speed", "mob-sets"),
-                Map.entry("monster-maze-modern", "mob-sets"),
                 Map.entry("paintball", "pellet-styles"),
                 Map.entry("plexball", "ball-styles"),
                 Map.entry("runner", "trail-colour"),
@@ -74,7 +72,7 @@ class ArcadeCatalogTest {
     }
 
     @Test
-    void monsterMazeModesShareOneMobSetLine() {
+    void monsterMazeLegacyIdsResolveToTheSingleMobSetLine() {
         ArcadeCatalog catalog = new ArcadeCatalog();
         List<String> expected = List.of("map_default", "creeper", "skeleton", "spider", "zombie", "slime",
                 "witch", "enderman", "guardian", "cave_spider", "silverfish", "blaze", "magma_cube", "bat",

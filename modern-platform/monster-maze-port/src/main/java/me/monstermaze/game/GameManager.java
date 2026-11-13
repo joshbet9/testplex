@@ -69,8 +69,8 @@ public class GameManager implements Listener {
     private Location center;
     private long liveStartMs;
 
-    /** Active game mode (Original / Speed / Modern). */
-    private MazeMode mode = MazeMode.ORIGINAL;
+    /** Testplex exposes one consolidated Modern ruleset. */
+    private MazeMode mode = MazeMode.MODERN;
 
     private Set<UUID> alive = new HashSet<UUID>();
     private Set<UUID> spectators = new HashSet<UUID>();
@@ -102,8 +102,7 @@ public class GameManager implements Listener {
 
     /** PERF: cached per-tick packet targets so we only send what actually changed. */
     private int liveTick;
-    private float lastExpPct = -1;
-    private int lastLevel = -1;
+    private final Map<UUID, Long> lastExpBarStates = new HashMap<UUID, Long>();
     private final Map<UUID, Location> lastCompassTargets = new HashMap<UUID, Location>();
     private final Set<UUID> firstPadPlayers = new HashSet<UUID>();
     private final Map<UUID, Integer> firstPadStageByPlayer = new HashMap<UUID, Integer>();
@@ -310,6 +309,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         spectators.clear();
         playersOnPad.clear();
         padLockIns.clear();
+        lastExpBarStates.clear();
         lastCompassTargets.clear();
         safePadNavigation.clear();
         curSafe = 1;
@@ -325,6 +325,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         photoFinishCandidates.clear();
         photoFinishRivalsThisPhase.clear();
         kitManager.resetAchievementTracking();
+        kitManager.resetJumperProgress();
 
         // Freeze the participant list before generation so late entrants are not reset or counted.
         final List<Player> startingPlayers = testplexManagedRound && pendingTestplexParticipants != null
@@ -541,6 +542,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         feedback.clear();
         safePadNavigation.clear();
         padLockIns.clear();
+        lastExpBarStates.clear();
         lastCompassTargets.clear();
         playersOnPad.clear();
         destroyAllPads();
@@ -1001,22 +1003,26 @@ public void startGame(Location preferCenter, int requestedPattern) {
     }
 
     private void updateExpBars(List<Player> aliveNow) {
-        float pct;
+        float timerPct;
         if (safePad == null) {
-            pct = 0;
+            timerPct = 0;
         } else if (playersOnPad.isEmpty()) {
-            pct = (float) Math.min(Math.max(phaseTimer * (1.0 / Math.max(1, phaseTimerStart)), 0), 0.999);
+            timerPct = (float) Math.min(Math.max(phaseTimer * (1.0 / Math.max(1, phaseTimerStart)), 0), 0.999);
         } else {
-            pct = (float) Math.min(Math.max(phaseTimer / (double) Math.max(6, 16 - (curSafe - 1)), 0), 0.999);
+            timerPct = (float) Math.min(Math.max(phaseTimer / (double) Math.max(6, 16 - (curSafe - 1)), 0), 0.999);
         }
-        int lvl = Math.max(0, phaseTimer);
-        // PERF: values change at 1Hz at most; only send the packets when they actually change.
-        if (pct == lastExpPct && lvl == lastLevel) return;
-        lastExpPct = pct;
-        lastLevel = lvl;
+        int timerLevel = Math.max(0, phaseTimer);
         for (Player p : aliveNow) {
-            p.setExp(pct);
-            p.setLevel(lvl);
+            boolean jumper = kitManager.isJumper(p);
+            float pct = jumper ? kitManager.jumperSafePadProgress(p) : timerPct;
+            int level = jumper ? kitManager.jumperBonusJumps(p) : timerLevel;
+            long state = ((long) level << 32) | (Float.floatToIntBits(pct) & 0xffffffffL);
+            Long previous = lastExpBarStates.put(p.getUniqueId(), state);
+            // Send packets only when this player's timer or Jumper progress changes.
+            if (previous == null || previous.longValue() != state) {
+                p.setExp(pct);
+                p.setLevel(level);
+            }
         }
     }
 
@@ -1218,6 +1224,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         UUID id = player.getUniqueId();
         scoreboard.clear(Collections.singletonList(player));
         padLockIns.remove(id);
+        lastExpBarStates.remove(id);
         lastCompassTargets.remove(id);
         
         for (Player online : getRoundPlayersForCleanup()) {

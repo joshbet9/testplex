@@ -3,8 +3,7 @@ package me.monstermaze.game;
 import org.bukkit.ChatColor;
 
 /**
- * Game modes. ORIGINAL is a 1:1 recreation of the source.
- * The other modes provide alternate gameplay tuning and mechanics.
+ * Historical mode identifiers remain readable; Testplex gameplay is normalized to Modern.
  */
 public enum MazeMode {
     ORIGINAL("Original", ChatColor.GRAY,
@@ -57,9 +56,9 @@ public enum MazeMode {
         return Math.max(0, MazeDebugRules.intValue(this, "ADDITIONAL_MONSTERS_PER_SAFE_PAD", fallback));
     }
 
-    /** Speed restores the old 1.8 speeding feel; Modern keeps its boost, Classic opts out. */
+    /** Testplex selects Modern, which does not use Speed II as a jump-lock substitute. */
     public boolean speedBoostEnabled() {
-        return this == SPEED || this == MODERN;
+        return this == SPEED;
     }
 
     public static MazeMode byName(String name) {

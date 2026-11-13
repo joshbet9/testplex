@@ -60,7 +60,7 @@ public final class MonsterMazePlugin {
     private MapManager mapManager;
     private MapThemeApplier mapThemeApplier;
     private MapWorldSafetyListener mapWorldSafetyListener;
-    private MazeMode mode = MazeMode.ORIGINAL;
+    private MazeMode mode = MazeMode.MODERN;
     private me.monstermaze.stats.LeaderboardManager leaderboards;
     private boolean soloMode;
     private boolean debug;
@@ -105,9 +105,9 @@ public final class MonsterMazePlugin {
         getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=stats-and-world-services-created");
 
         FileConfiguration cfg = getConfig();
-        MazeMode stored = MazeMode.byName(cfg.getString("mode", "Original"));
-        if (stored == null) stored = MazeMode.ORIGINAL;
-        this.mode = stored;
+        // Testplex runs one consolidated Monster Maze ruleset. Keep the saved
+        // setting readable for older installs, but always start in Modern.
+        this.mode = MazeMode.MODERN;
         this.soloMode = cfg.getBoolean("solo-mode", false);
         this.debug = cfg.getBoolean("debug", false);
         this.recordRuns = cfg.getBoolean("record-runs", true);
@@ -261,7 +261,9 @@ public final class MonsterMazePlugin {
     }
     public MazeMode getMode() { return mode; }
     public MazeMode setMode(MazeMode newMode) {
-        if (newMode == null) newMode = MazeMode.ORIGINAL;
+        // Older mode identifiers remain in the enum so historic PBs and config
+        // values can still be read, but gameplay is always the consolidated mode.
+        newMode = MazeMode.MODERN;
         this.mode = newMode;
         getConfig().set("mode", newMode.id);
         saveConfig();

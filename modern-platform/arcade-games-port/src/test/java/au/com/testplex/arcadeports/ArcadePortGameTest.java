@@ -176,7 +176,7 @@ class ArcadePortGameTest {
         assertEquals(ArcadePortGame.MONSTER_MAZE, ArcadePortGame.fromId("monster-maze"));
         assertEquals(ArcadePortGame.MONSTER_MAZE_SPEED, ArcadePortGame.fromId("monster-maze-speed"));
         assertEquals(ArcadePortGame.MONSTER_MAZE_MODERN, ArcadePortGame.fromId("monster-maze-modern"));
-        assertEquals("Monster Maze (Original)", ArcadePortGame.MONSTER_MAZE.displayName());
+        assertEquals("Monster Maze", ArcadePortGame.MONSTER_MAZE.displayName());
         assertEquals("Monster Maze (Speed)", ArcadePortGame.MONSTER_MAZE_SPEED.displayName());
         assertEquals("Monster Maze (Modern)", ArcadePortGame.MONSTER_MAZE_MODERN.displayName());
         assertTrue(ArcadePortGame.MONSTER_MAZE.isMonsterMaze());

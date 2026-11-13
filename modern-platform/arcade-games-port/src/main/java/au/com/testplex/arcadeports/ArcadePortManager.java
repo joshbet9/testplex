@@ -674,8 +674,6 @@ public final class ArcadePortManager implements Listener {
                 && monsterMazeModule == module
                 && monsterMazeLifecycle != null
                 && gameModules.isRegistered(ArcadePortGame.MONSTER_MAZE, monsterMazeLifecycle)
-                && gameModules.isRegistered(ArcadePortGame.MONSTER_MAZE_SPEED, monsterMazeLifecycle)
-                && gameModules.isRegistered(ArcadePortGame.MONSTER_MAZE_MODERN, monsterMazeLifecycle)
                 && module.getHostPlugin() == plugin
                 && module.getGameManager() != null;
     }
@@ -4376,9 +4374,7 @@ public final class ArcadePortManager implements Listener {
 
     private me.monstermaze.game.MazeMode mazeModeFor(ArcadePortGame type) {
         return switch (type) {
-            case MONSTER_MAZE -> me.monstermaze.game.MazeMode.ORIGINAL;
-            case MONSTER_MAZE_SPEED -> me.monstermaze.game.MazeMode.SPEED;
-            case MONSTER_MAZE_MODERN -> me.monstermaze.game.MazeMode.MODERN;
+            case MONSTER_MAZE, MONSTER_MAZE_SPEED, MONSTER_MAZE_MODERN -> me.monstermaze.game.MazeMode.MODERN;
             default -> throw new IllegalArgumentException("Not a Monster Maze game: " + type.id());
         };
     }
@@ -24663,7 +24659,7 @@ public final class ArcadePortManager implements Listener {
             {"nano-games", "Nano Games", "EGG"}
     };
 
-    // One alphabetical entry per Arcade game; Monster Maze's three modes share one row.
+    // One alphabetical entry per Arcade game, including the consolidated Monster Maze.
     private static final List<ArcadeGameDirectory.Game> ARCADE_STATS_GAMES = ArcadeGameDirectory.games();
 
     private static final List<String> DRAGON_ESCAPE_BEACON_COLOR_NAMES =
@@ -26174,7 +26170,7 @@ public final class ArcadePortManager implements Listener {
         };
     }
 
-    /** All three selectable Testplex modes, each with three genuine per-kit pattern PBs. */
+    /** The consolidated Modern ruleset, with three genuine per-kit pattern PBs. */
     private void openMonsterMazePersonalBests(Player viewer, UUID targetId, String targetName,
                                              int returnAchievementPage) {
         openMonsterMazePersonalBests(viewer, targetId, targetName, returnAchievementPage, false);
@@ -26185,8 +26181,7 @@ public final class ArcadePortManager implements Listener {
         Inventory inventory = createStatsInventory(StatsPage.MONSTER_MAZE_PBS, targetId, targetName,
                 "Monster Maze Personal Bests", "monster-maze", returnAchievementPage, incompleteOnly);
         var leaderboard = monsterMazeModule == null ? null : monsterMazeModule.getLeaderboards();
-        me.monstermaze.game.MazeMode[] modes = {me.monstermaze.game.MazeMode.ORIGINAL,
-                me.monstermaze.game.MazeMode.SPEED, me.monstermaze.game.MazeMode.MODERN};
+        me.monstermaze.game.MazeMode[] modes = {me.monstermaze.game.MazeMode.MODERN};
         for (int modeIndex = 0; modeIndex < modes.length; modeIndex++) {
             var mode = modes[modeIndex];
             for (int pattern = 0; pattern < me.monstermaze.stats.LeaderboardManager.PATTERN_COUNT; pattern++) {
@@ -26218,11 +26213,10 @@ public final class ArcadePortManager implements Listener {
 
     private void openMonsterMazeKitBests(Player viewer, UUID targetId, String targetName, String selection,
                                         int returnAchievementPage, boolean incompleteOnly) {
-        if (selection == null || !selection.matches("[0-2]:[0-2]")) return;
+        if (selection == null || !selection.matches("0:[0-2]")) return;
         int modeIndex = selection.charAt(0) - '0';
         int pattern = selection.charAt(2) - '0';
-        me.monstermaze.game.MazeMode[] modes = {me.monstermaze.game.MazeMode.ORIGINAL,
-                me.monstermaze.game.MazeMode.SPEED, me.monstermaze.game.MazeMode.MODERN};
+        me.monstermaze.game.MazeMode[] modes = {me.monstermaze.game.MazeMode.MODERN};
         var mode = modes[modeIndex];
         Inventory inventory = createStatsInventory(StatsPage.MONSTER_MAZE_KITS, targetId, targetName,
                 mode.id + " Pattern " + (pattern + 1) + " PBs", "monster-maze",
