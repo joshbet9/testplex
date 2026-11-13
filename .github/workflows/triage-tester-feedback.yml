@@ -33,16 +33,15 @@ jobs:
             const labels = [
               { name: "tester-feedback", color: "1d76db", description: "Feedback submitted from Testplex testers" },
               { name: `tester-${kind}`, color: kind === "bug" ? "d73a4a" : "a2eeef", description: `Testplex tester ${kind}` },
-              { name: "needs-triage", color: "fbca04", description: "Needs reproduction and triage" },
               { name: `game:${tracker.slug}`, color: "5319e7", description: `Testplex feedback for ${tracker.name}` },
             ];
             const trackerLabel = { name: "game-tracker", color: "5319e7", description: "Parent issue that groups feedback for a game" };
             const lifecycleLabels = [
-              { name: "accepted", color: "0e8a16", description: "Confirmed bug or approved idea" },
+              { name: "submitted", color: "d9eaf7", description: "A new tester report awaiting work." },
               { name: "in-progress", color: "1d76db", description: "Implementation is in progress" },
-              { name: "needs-tester-check", color: "fbca04", description: "Ready for reporter verification on staging" },
-              { name: "not-planned", color: "cfd3d7", description: "Reviewed and intentionally not planned" },
-              { name: "duplicate", color: "cfd3d7", description: "Covered by another report" },
+              { name: "waiting-tester", color: "c5def5", description: "A tester needs to clarify or verify this report." },
+              { name: "resolved", color: "0e8a16", description: "Fix is ready and confirmed by the reporter." },
+              { name: "deployed", color: "5319e7", description: "Fix or approved change has been deployed." },
             ];
             const existing = new Set((await github.paginate(github.rest.issues.listLabelsForRepo, {
               owner: context.repo.owner,
@@ -74,6 +73,52 @@ jobs:
                   labels: [label.name],
                 });
               }
+            }
+            const lifecycleNames = lifecycleLabels.map(label => label.name);
+            const currentIssueLabels = await github.paginate(github.rest.issues.listLabelsOnIssue, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const currentNames = new Set(currentIssueLabels.map(label => label.name));
+            const legacyStatusMap = new Map([
+              ["needs-triage", "submitted"],
+              ["needs-tester-check", "waiting-tester"],
+            ]);
+            let desiredStatus = context.payload.action === "opened" || context.payload.action === "reopened"
+              ? "submitted"
+              : lifecycleNames.find(name => currentNames.has(name));
+            if (!desiredStatus) {
+              desiredStatus = [...legacyStatusMap].find(([legacy]) => currentNames.has(legacy))?.[1] || "submitted";
+            }
+            for (const name of [...currentNames]) {
+              if ((lifecycleNames.includes(name) || legacyStatusMap.has(name)) && name !== desiredStatus) {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  name,
+                });
+              }
+            }
+            for (const [legacy, replacement] of legacyStatusMap) {
+              if (currentNames.has(legacy) && replacement === desiredStatus) {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  name: legacy,
+                });
+              }
+            }
+            if (!currentNames.has(desiredStatus)) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                labels: [desiredStatus],
+              });
             }
             await github.rest.issues.addAssignees({
               owner: context.repo.owner,
