@@ -26,6 +26,11 @@ Create a recurring ChatGPT Scheduled task named **Testplex feedback review** and
 
 The hourly task can triage and update GitHub feedback, but it must not claim code changes, merge PRs, or deploy. Those remain a separate Codex implementation/review/deploy step. A report that needs code remains Submitted until implementation actually starts; it becomes In Progress once a PR is opened. Recheck ChatGPT Scheduled if runs stop, require approval, or the GitHub connection expires. The hourly task uses background model allowance even on quiet runs, so pause it when you do not want continuous monitoring.
 
+Use this task prompt:
+
+> Review new and updated Bug/Idea reports in `joshbet9/testplex`, including human comments on open reports, since your previous check. Read the report, parent game tracker, linked PRs/commits, and deployment comments before changing anything. Keep exactly one lifecycle status per report. New reports start as Submitted. Use In Progress only when a concrete implementation PR has started; use Waiting Tester when a repro detail or named staging verification is needed; use Resolved only after the reporter confirms the fix; use Deployed only after production deployment is verified, then close the report. Ask one concise question when information is missing. Add a GitHub comment only for a meaningful status change, a specific question, or new implementation/deployment evidence; do not repeat comments or claim unverified fixes. Never merge, deploy, or claim code work. At the end, send Josh a short digest with changed issue links, status changes, questions waiting for him/testers, and blockers. If nothing changed, say there were no new reports or comments.
+
+
 This uses repository issues, so repository Issues must be enabled for the forms and assignment workflow to operate. Enabling Issues makes all submissions and discussion public.
 
 ## Hyper-V staging and Fly production promotion
