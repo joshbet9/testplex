@@ -8,6 +8,7 @@ import java.lang.reflect.Proxy;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ModernArcadeLobbyRuntimeTest {
@@ -35,5 +36,16 @@ class ModernArcadeLobbyRuntimeTest {
         ModernArcadeLobbyRuntime.normalizeKitZombieAge(zombie);
 
         assertTrue(adultFormApplied.get(), "kit NPC zombies must be explicitly grown before display");
+    }
+
+    @Test
+    void onlyUnmanagedNonPlayerLivingEntitiesArePurgedFromTheLobby() {
+        assertTrue(ModernArcadeLobbyRuntime.shouldPurgeUnmanagedLobbyMob(true, false, false));
+        assertFalse(ModernArcadeLobbyRuntime.shouldPurgeUnmanagedLobbyMob(true, true, false),
+                "players must not be purged");
+        assertFalse(ModernArcadeLobbyRuntime.shouldPurgeUnmanagedLobbyMob(true, false, true),
+                "tagged Arcade NPCs and showcases must be preserved");
+        assertFalse(ModernArcadeLobbyRuntime.shouldPurgeUnmanagedLobbyMob(false, false, false),
+                "non-living displays must be preserved");
     }
 }

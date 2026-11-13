@@ -17962,7 +17962,11 @@ public final class ArcadePortManager implements Listener {
 
     private boolean dragonEscapeReachedAuthoredFinish(Session session, Player player, Location location) {
         if (session == null || location == null || session.dragonEscapeWaypoints.isEmpty()
-                || location.getWorld() != session.world || player == null) return false;
+                || location.getWorld() != session.world || player == null
+                || !ArcadePortRules.isDragonEscapeFinishEligible(
+                        session.alive.contains(player.getUniqueId()),
+                        player.getGameMode() == GameMode.SPECTATOR,
+                        session.dragonEscapeCompleted.contains(player.getUniqueId()))) return false;
         Location finish = session.dragonEscapeWaypoints.get(session.dragonEscapeWaypoints.size() - 1);
         double radius = GameDebugRuntimeOverrides.doubleValue(
                 "DRAGON_ESCAPE_FINISH_RADIUS", ArcadePortRules.DRAGON_ESCAPE_FINISH_RADIUS);
@@ -17992,13 +17996,14 @@ public final class ArcadePortManager implements Listener {
 
     private void completeDragonEscapeRacer(Session session, Player player, long now) {
         if (session == null || player == null || active != session) return;
+        UUID id = player.getUniqueId();
+        if (!ArcadePortRules.isDragonEscapeFinishEligible(session.alive.contains(id),
+                player.getGameMode() == GameMode.SPECTATOR, session.dragonEscapeCompleted.contains(id))) return;
         if (session.dragonEscapePractice) {
             recordDragonEscapeFinish(session, player, now);
             if (active == session) finish(session, player, true);
             return;
         }
-        UUID id = player.getUniqueId();
-        if (session.dragonEscapeCompleted.contains(id)) return;
         recordDragonEscapeFinish(session, player, now);
         if (active != session) return;
         if (session.alive.stream().noneMatch(aliveId -> !session.dragonEscapeCompleted.contains(aliveId))) {

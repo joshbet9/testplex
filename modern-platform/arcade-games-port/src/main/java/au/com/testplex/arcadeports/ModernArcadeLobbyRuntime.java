@@ -27,6 +27,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerAnimationEvent;
@@ -129,6 +130,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         clearLobbyShowcase();
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=lobby-runtime-legacy-bot-cleanup-start");
         clearLegacyBots();
+        clearUnmanagedLobbyMobs(lobby.ensureWorld());
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=lobby-runtime-legacy-bot-cleanup-complete");
         task = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 20L, 10L);
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=lobby-runtime-constructor-complete");
@@ -178,6 +180,50 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 entity.remove();
             }
         }
+        if (lobby.isLobbyWorld(event.getWorld())) {
+            for (Entity entity : event.getChunk().getEntities()) {
+                if (isUnmanagedLobbyMob(entity)) entity.remove();
+            }
+        }
+    }
+
+    /** Prevent natural spawns in the persistent lobby, including worlds carrying old saved mobs. */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onLobbyCreatureSpawn(CreatureSpawnEvent event) {
+        if (!lobby.isLobbyWorld(event.getLocation().getWorld())) return;
+        CreatureSpawnEvent.SpawnReason reason = event.getSpawnReason();
+        if (reason == CreatureSpawnEvent.SpawnReason.NATURAL
+                || reason == CreatureSpawnEvent.SpawnReason.CHUNK_GEN) {
+            event.setCancelled(true);
+        }
+    }
+
+    private void clearUnmanagedLobbyMobs(World world) {
+        if (world == null) return;
+        int removed = 0;
+        for (Entity entity : new ArrayList<>(world.getEntities())) {
+            if (!isUnmanagedLobbyMob(entity)) continue;
+            entity.remove();
+            removed++;
+        }
+        if (removed > 0) {
+            plugin.getLogger().info("Removed " + removed
+                    + " untagged saved living mob(s) from the persistent Arcade lobby.");
+        }
+    }
+
+    private boolean isUnmanagedLobbyMob(Entity entity) {
+        var data = entity.getPersistentDataContainer();
+        boolean managed = data.has(kitNpcKey, PersistentDataType.STRING)
+                || data.has(teamNpcKey, PersistentDataType.STRING)
+                || data.has(themeKey, PersistentDataType.STRING)
+                || data.has(displayKey, PersistentDataType.STRING);
+        return shouldPurgeUnmanagedLobbyMob(entity instanceof LivingEntity,
+                entity instanceof Player, !managed);
+    }
+
+    static boolean shouldPurgeUnmanagedLobbyMob(boolean livingEntity, boolean player, boolean managed) {
+        return livingEntity && !player && !managed;
     }
 
     public void setSelectedGame(ArcadePortGame game) {
