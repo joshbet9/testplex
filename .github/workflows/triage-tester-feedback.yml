@@ -102,16 +102,6 @@ jobs:
                 });
               }
             }
-            for (const [legacy, replacement] of legacyStatusMap) {
-              if (currentNames.has(legacy) && replacement === desiredStatus) {
-                await github.rest.issues.removeLabel({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: context.issue.number,
-                  name: legacy,
-                });
-              }
-            }
             if (!currentNames.has(desiredStatus)) {
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
