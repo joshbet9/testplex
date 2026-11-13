@@ -88,12 +88,13 @@ jobs:
             });
             const currentNames = new Set(currentIssueLabels.map(label => label.name));
             const legacyStatusMap = new Map([
-              ["needs-triage", "submitted"],
               ["needs-tester-check", "waiting-tester"],
+              ["needs-triage", "submitted"],
             ]);
+            const lifecyclePrecedence = ["deployed", "resolved", "waiting-tester", "in-progress", "submitted"];
             let desiredStatus = context.payload.action === "opened" || context.payload.action === "reopened"
               ? "submitted"
-              : lifecycleNames.find(name => currentNames.has(name));
+              : lifecyclePrecedence.find(name => currentNames.has(name));
             if (!desiredStatus) {
               desiredStatus = [...legacyStatusMap].find(([legacy]) => currentNames.has(legacy))?.[1] || "submitted";
             }
