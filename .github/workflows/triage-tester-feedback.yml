@@ -3,6 +3,8 @@ name: Triage Testplex tester feedback
 on:
   issues:
     types: [opened, reopened, edited]
+  issue_comment:
+    types: [created, edited]
 
 permissions:
   contents: read
@@ -10,7 +12,10 @@ permissions:
 
 jobs:
   triage:
-    if: startsWith(github.event.issue.title, '[Bug]') || startsWith(github.event.issue.title, '[Idea]')
+    if: >
+      (github.event_name == 'issues' || github.event_name == 'issue_comment') &&
+      (github.event_name != 'issue_comment' || github.event.comment.user.type != 'Bot') &&
+      (startsWith(github.event.issue.title, '[Bug]') || startsWith(github.event.issue.title, '[Idea]'))
     runs-on: ubuntu-latest
     steps:
       - name: Load game tracker directory
