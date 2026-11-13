@@ -5,10 +5,11 @@
 ### 1.8 implementation
 The old module includes server-version-locked `v1_8_R3` classes such as `AddonGhostSnowman`, `AddonGhostOcelot`, and `AddonGhostVillager`. Those depend on 1.8 server internals and must not be copied into the modern target.
 
-### Legacy 1.8 Speed mode retained in the modern port
-- The 1.8 source exposes Original, Speed and Modern. Speed enables QOL kit rules while preserving the original stage timer (60 seconds, minus 2 per stage, floored at 15 seconds), 150 initial monsters, and 15 additional monsters per Safe Pad.
-- The 1.21 source exposes Original, Modern and Classic instead. The modern port keeps both historical Speed and current Classic so neither mode family is lost: only Modern uses the accelerated stage timer, 225 initial monsters, and 30 additional monsters per Safe Pad. Speed and Modern receive the closest Paper 26.3 equivalent available for the 1.8 ground-level speeding dash (Speed II on players whose jump is locked); Classic opts out.
-- Contract tests cover the mode names, kit availability, timer boundaries, and monster-count cadence.
+### Consolidated Testplex mode
+- Testplex exposes one Modern ruleset: accelerated stage timing (35 seconds initially, decreasing to 15), 225 initial monsters, and 30 additional monsters per Safe Pad.
+- The enhanced kit set remains available. The jump-lock Speed II substitute is disabled.
+- Jumper starts with three jumps; reaching each fifth Safe Pad adds one to its maximum and refills it. The XP bar shows bonus jumps earned and progress toward the next one.
+- Historical Original, Speed and Classic identifiers remain in the engine for reading old records/configuration, but they are not selectable in the Testplex Arcade queue.
 
 ### 1.21 implementation used as the baseline
 - `GameManager` owns the round/stage rules; `MazeGenerator` owns maze geometry and block placement; `MonsterManager` owns monster routing and bump/freeze behavior.
@@ -22,7 +23,7 @@ Java 21/Paper 1.21 code is not assumed to be compatible with Paper 26.3 automati
 
 ## In-game acceptance checklist
 1. Start a random run and each of the three patterns; maze generation must not freeze the server.
-2. Verify Original/Speed/Modern/Classic timing, Safe Pad generation/claim/decay/restoration, beacon visibility and compass targeting.
+2. Verify the consolidated Modern timing, Safe Pad generation/claim/decay/restoration, Jumper progression, beacon visibility and compass targeting.
 3. Verify monster movement/routing, bumps, launch/freeze interactions and cleanup.
 4. Verify kits, jumps, abilities, death/spectator handling and solo runs.
 5. Repeat with two players, a late join, quit/rejoin and a second run after cleanup.

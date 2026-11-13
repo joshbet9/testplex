@@ -21,7 +21,7 @@ class EvolutionEnabledConfigTest {
             YamlConfiguration configuration = YamlConfiguration.loadConfiguration(
                     new InputStreamReader(resource, StandardCharsets.UTF_8));
             List<String> enabled = configuration.getStringList("enabled-games");
-            assertEquals(32, enabled.size(), "all 32 currently ready selections should be enabled");
+            assertEquals(30, enabled.size(), "all 30 current game selections should be enabled");
             assertEquals(enabled.size(), enabled.stream().distinct().count(), "no duplicate game selections");
             assertTrue(enabled.contains("evolution"), "Evolution must be selectable for live testing");
             assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.EVOLUTION),
@@ -36,8 +36,8 @@ class EvolutionEnabledConfigTest {
 
             Field revisionField = ArcadeMechanicsModernPlugin.class.getDeclaredField("PLAYABLE_GAMES_REVISION");
             revisionField.setAccessible(true);
-            assertTrue(((String) revisionField.get(null)).contains("32-selectable-ids"),
-                    "existing servers need an allow-list revision bump to pick up Evolution");
+            assertTrue(((String) revisionField.get(null)).contains("monster-maze-single-modern"),
+                    "existing servers need an allow-list revision bump to consolidate Monster Maze modes");
         }
     }
 }

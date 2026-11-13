@@ -31,7 +31,7 @@ public enum ArcadePortGame {
     DRAW_MY_THING("draw-my-thing", "Draw My Thing", Material.WHITE_WOOL, 0),
     MASTER_BUILDERS("master-builders", "Master Builders", Material.GRASS_BLOCK, 0),
     SPEED_BUILDERS("speed-builders", "Speed Builders", Material.QUARTZ_BLOCK, 0),
-    MONSTER_MAZE("monster-maze", "Monster Maze (Original)", Material.ROTTEN_FLESH, 0),
+    MONSTER_MAZE("monster-maze", "Monster Maze", Material.ROTTEN_FLESH, 0),
     MONSTER_MAZE_SPEED("monster-maze-speed", "Monster Maze (Speed)", Material.ROTTEN_FLESH, 0),
     MONSTER_MAZE_MODERN("monster-maze-modern", "Monster Maze (Modern)", Material.ROTTEN_FLESH, 0),
     SNEAKY_ASSASSINS("sneaky-assassins", "Sneaky Assassins", Material.EMERALD_BLOCK, 0),
@@ -71,7 +71,7 @@ public enum ArcadePortGame {
     /** True when a game has roles but assigns them without lobby team selection. */
     public boolean lobbyRolesAssignedAutomatically() { return lobbyRolesAssignedAutomatically; }
 
-    /** True for the three Arcade-selectable Monster Maze modes backed by one gameplay runtime. */
+    /** True for Monster Maze and its retained legacy mode IDs. Only Monster Maze is selectable. */
     public boolean isMonsterMaze() {
         return this == MONSTER_MAZE || this == MONSTER_MAZE_SPEED || this == MONSTER_MAZE_MODERN;
     }

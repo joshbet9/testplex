@@ -24,10 +24,7 @@ final class MonsterMazeGameModuleAdapter implements ArcadeGameModule {
 
     @Override
     public Set<ArcadePortGame> games() {
-        return new LinkedHashSet<>(java.util.List.of(
-                ArcadePortGame.MONSTER_MAZE,
-                ArcadePortGame.MONSTER_MAZE_SPEED,
-                ArcadePortGame.MONSTER_MAZE_MODERN));
+        return new LinkedHashSet<>(java.util.List.of(ArcadePortGame.MONSTER_MAZE));
     }
 
     @Override

@@ -76,6 +76,10 @@ public class MMCommand implements CommandExecutor {
         }
         if(args.length==0){showHelp(sender);return true;}
         String sub=args[0].toLowerCase();
+        if(sub.equals("mode")){
+            sender.sendMessage(ChatColor.AQUA+"Testplex Monster Maze has one consolidated ruleset: "+ChatColor.LIGHT_PURPLE+"Modern"+ChatColor.AQUA+".");
+            return true;
+        }
         if(sub.equals("gui")){sender.sendMessage(ChatColor.YELLOW+"Monster Maze uses the shared Testplex Arcade lobby kit selector. Open the Game Panel, select Monster Maze, then choose a kit at the normal Testplex kit station.");return true;}
         if(sub.equals("stats")||sub.equals("profile")){if(!(sender instanceof Player)){sender.sendMessage(ChatColor.RED+"Players only.");return true;}competitiveUI.showStats((Player)sender);return true;}
         if(sub.equals("clb")||sub.equals("competitive")||sub.equals("competitiveleaderboard")){if(!(sender instanceof Player)){sender.sendMessage(ChatColor.RED+"Players only.");return true;}competitiveUI.showLeaderboard((Player)sender,args.length>=2?args[1]:"mmcl");return true;}
@@ -145,7 +149,7 @@ public class MMCommand implements CommandExecutor {
         sender.sendMessage(ChatColor.WHITE+"/mm start mmr"+ChatColor.GRAY+" - start your weakest MMR configuration");
         sender.sendMessage(ChatColor.WHITE+"/mm map <name>"+ChatColor.GRAY+" - choose the map");
         sender.sendMessage(ChatColor.WHITE+"/mm pattern <1|2|3|random>"+ChatColor.GRAY+" - choose the maze");
-        sender.sendMessage(ChatColor.WHITE+"/mm mode <original|speed|modern|classic>"+ChatColor.GRAY+" - choose the mode");
+        sender.sendMessage(ChatColor.WHITE+"Monster Maze mode: Modern"+ChatColor.GRAY+" (single consolidated mode)");
         sender.sendMessage(ChatColor.WHITE+"/mm gui"+ChatColor.GRAY+" - open kit selector");
         sender.sendMessage(ChatColor.WHITE+"/mm kit <kit>"+ChatColor.GRAY+" - choose a kit");
         sender.sendMessage(ChatColor.WHITE+"/mm kits"+ChatColor.GRAY+" - list kits");

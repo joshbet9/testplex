@@ -342,6 +342,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         npc.setRotation(at.getYaw(), 0.0F);
         if (npc instanceof Mob mob) mob.setAI(false);
         if (npc instanceof Zombie zombie) {
+            normalizeKitZombieAge(zombie);
             zombie.setShouldBurnInDay(false);
             zombie.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE,
                     Integer.MAX_VALUE, 0, false, false, false));
@@ -371,6 +372,10 @@ public final class ModernArcadeLobbyRuntime implements Listener {
 
         npc.getPersistentDataContainer().set(kitNpcKey, PersistentDataType.STRING, choice.id);
         return npc;
+    }
+
+    static void normalizeKitZombieAge(Zombie zombie) {
+        zombie.setAdult();
     }
 
     static Material[] npcArmorSlots(Material[] kitArmour) {

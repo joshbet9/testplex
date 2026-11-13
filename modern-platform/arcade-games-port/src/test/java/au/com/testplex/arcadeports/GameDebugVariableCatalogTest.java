@@ -156,7 +156,7 @@ class GameDebugVariableCatalogTest {
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNEAKY_ASSASSINS), "SNEAKY_ASSASSINS_NPC_RECOVERY_HORIZONTAL");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNEAKY_ASSASSINS), "SNEAKY_ASSASSINS_ASSASSIN_STARTING_ARROWS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.SNEAKY_ASSASSINS), "SNEAKY_ASSASSINS_REVEALER_STARTING_DIAMONDS");
-        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MONSTER_MAZE), "MONSTER_MAZE_CRYO_RADIUS_BLOCKS");
+        assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MONSTER_MAZE), "MONSTER_MAZE_MODERN_CRYO_RADIUS_BLOCKS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MONSTER_MAZE_SPEED), "MONSTER_MAZE_SPEED_CRYO_RADIUS_BLOCKS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.MONSTER_MAZE_MODERN), "MONSTER_MAZE_MODERN_CRYO_RADIUS_BLOCKS");
         assertContains(GameDebugVariableCatalog.variables(ArcadePortGame.BACON_BRAWL), "BACON_BRAWL_HITS_DAMAGE_HEALTH");
@@ -978,23 +978,23 @@ class GameDebugVariableCatalogTest {
     }
 
     @Test
-    void monsterMazeKitVariablesShowModeCorrectDefaultsAndValidatedRanges() {
-        GameDebugVariableCatalog.Variable originalJumps = GameDebugVariableCatalog.variable(
-                ArcadePortGame.MONSTER_MAZE, "MONSTER_MAZE_JUMPER_MAX_JUMPS");
+    void monsterMazeKitVariablesUseConsolidatedModernDefaultsAndValidatedRanges() {
+        GameDebugVariableCatalog.Variable modernJumps = GameDebugVariableCatalog.variable(
+                ArcadePortGame.MONSTER_MAZE, "MONSTER_MAZE_MODERN_JUMPER_MAX_JUMPS");
         GameDebugVariableCatalog.Variable speedJumps = GameDebugVariableCatalog.variable(
                 ArcadePortGame.MONSTER_MAZE_SPEED, "MONSTER_MAZE_SPEED_JUMPER_MAX_JUMPS");
-        GameDebugVariableCatalog.Variable modernJumps = GameDebugVariableCatalog.variable(
+        GameDebugVariableCatalog.Variable modernModeJumps = GameDebugVariableCatalog.variable(
                 ArcadePortGame.MONSTER_MAZE_MODERN, "MONSTER_MAZE_MODERN_JUMPER_MAX_JUMPS");
         GameDebugVariableCatalog.Variable modernSlow = GameDebugVariableCatalog.variable(
                 ArcadePortGame.MONSTER_MAZE_MODERN, "MONSTER_MAZE_MODERN_SLOWBALL_SLOW_TICKS");
         GameDebugVariableCatalog.Variable modernRepulsor = GameDebugVariableCatalog.variable(
                 ArcadePortGame.MONSTER_MAZE_MODERN, "MONSTER_MAZE_MODERN_REPULSOR_RADIUS_BLOCKS");
-        assertNotNull(originalJumps);
+        assertNotNull(modernModeJumps);
         assertNotNull(speedJumps);
         assertNotNull(modernJumps);
         assertNotNull(modernSlow);
         assertNotNull(modernRepulsor);
-        assertEquals(5.0D, originalJumps.defaultValue());
+        assertEquals(3.0D, modernModeJumps.defaultValue());
         assertEquals(3.0D, speedJumps.defaultValue());
         assertEquals(0.0D, modernJumps.minimum());
         assertEquals(1_200.0D, modernSlow.maximum());

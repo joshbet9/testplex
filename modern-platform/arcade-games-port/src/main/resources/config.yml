@@ -1,6 +1,6 @@
 # The Arcade catalogue and controlled test queue grow as source-faithful games are promoted.
 # READY_FOR_TEST games are available together for the shared controlled test session.
-# All 32 Arcade selections are enabled, representing 30 distinct titles.
+# All 30 current Arcade selections are enabled, representing 30 distinct titles.
 # Evolution's six recovered arenas use inferred test spawns until authored WorldConfig.dat is recovered.
 enabled-games:
   - death-tag
@@ -23,8 +23,6 @@ enabled-games:
   - turf-wars
   - camera-shy
   - monster-maze
-  - monster-maze-speed
-  - monster-maze-modern
   - snake
   - draw-my-thing
   - master-builders

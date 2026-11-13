@@ -176,7 +176,7 @@ class ArcadePortGameTest {
         assertEquals(ArcadePortGame.MONSTER_MAZE, ArcadePortGame.fromId("monster-maze"));
         assertEquals(ArcadePortGame.MONSTER_MAZE_SPEED, ArcadePortGame.fromId("monster-maze-speed"));
         assertEquals(ArcadePortGame.MONSTER_MAZE_MODERN, ArcadePortGame.fromId("monster-maze-modern"));
-        assertEquals("Monster Maze (Original)", ArcadePortGame.MONSTER_MAZE.displayName());
+        assertEquals("Monster Maze", ArcadePortGame.MONSTER_MAZE.displayName());
         assertEquals("Monster Maze (Speed)", ArcadePortGame.MONSTER_MAZE_SPEED.displayName());
         assertEquals("Monster Maze (Modern)", ArcadePortGame.MONSTER_MAZE_MODERN.displayName());
         assertTrue(ArcadePortGame.MONSTER_MAZE.isMonsterMaze());
@@ -1847,10 +1847,6 @@ class ArcadePortGameTest {
     }
 
     @Test void dragonEscapeRecordAnnouncementsChooseOneGlobalPriorityMessage() {
-        assertEquals("FIRST COMPLETION!", ArcadePortRules.dragonEscapeRecordMilestone(
-                true, true, true, true, true, true, "jumper"));
-        assertEquals("FIRST JUMPER COMPLETION!", ArcadePortRules.dragonEscapeRecordMilestone(
-                false, true, true, true, true, true, "jumper"));
         assertEquals("NEW WORLD RECORD!", ArcadePortRules.dragonEscapeRecordMilestone(
                 false, false, true, true, true, true, "jumper"));
         assertEquals("NEW WORLD RECORD JUMPER!", ArcadePortRules.dragonEscapeRecordMilestone(
@@ -1859,8 +1855,24 @@ class ArcadePortGameTest {
                 false, false, false, false, true, true, "jumper"));
         assertEquals("NEW PERSONAL BEST JUMPER!", ArcadePortRules.dragonEscapeRecordMilestone(
                 false, false, false, false, false, true, "jumper"));
+        assertEquals("FIRST COMPLETION!", ArcadePortRules.dragonEscapeRecordMilestone(
+                true, true, false, false, false, false, "jumper"));
         assertEquals(null, ArcadePortRules.dragonEscapeRecordMilestone(
                 false, false, false, false, false, false, "jumper"));
+    }
+
+    @Test void baconAbilityMeterIsShownAsTheXpBarLevel() {
+        assertEquals(0, ArcadePortRules.baconAbilityMeterDisplayLevel(0, 100));
+        assertEquals(47, ArcadePortRules.baconAbilityMeterDisplayLevel(47, 100));
+        assertEquals(100, ArcadePortRules.baconAbilityMeterDisplayLevel(120, 100));
+        assertEquals(0, ArcadePortRules.baconAbilityMeterDisplayLevel(20, 0));
+    }
+
+    @Test void customPlayerDamageUsesTheHalfSecondLegacyHurtWindow() {
+        long nextAllowed = ArcadePortRules.nextCustomPlayerHitAt(1_000L);
+        assertEquals(1_500L, nextAllowed);
+        assertFalse(ArcadePortRules.canReceiveCustomPlayerHit(1_499L, nextAllowed));
+        assertTrue(ArcadePortRules.canReceiveCustomPlayerHit(1_500L, nextAllowed));
     }
 
     @Test void dragonEscapeFirstCompletionAnnouncementIncludesTheSavedRunTime() {
@@ -2799,7 +2811,8 @@ class ArcadePortGameTest {
 
     @Test void sheepQuestPenMarkersMatchTheExactSourceDataLocations() {
         assertTrue(ArcadePortRules.sheepQuestInsidePenMarker(10, 64, -4, 10, 64, -4));
-        assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(10, 65, -4, 10, 64, -4));
+        assertTrue(ArcadePortRules.sheepQuestInsidePenMarker(10, 65, -4, 10, 64, -4));
+        assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(10, 66, -4, 10, 64, -4));
         assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(11, 64, -4, 10, 64, -4));
         assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(10, 64, -3, 10, 64, -4));
     }

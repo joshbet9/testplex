@@ -70,6 +70,8 @@ public class KitManager implements Listener {
 
     /** Jumper: Recharge "MM Player Jump" 750ms */
     private final Map<UUID, Long> jumpRecharge = new HashMap<UUID, Long>();
+    /** Jumper earns one extra maximum jump for each five Safe Pads reached this round. */
+    private final Map<UUID, Integer> jumperSafePads = new HashMap<UUID, Integer>();
 
     /** Slowball constructor: last give time */
     private final Map<UUID, Long> snowballConstructor = new HashMap<UUID, Long>();
@@ -191,6 +193,7 @@ public class KitManager implements Listener {
     public void clearAll() {
         selected.clear();
         jumpRecharge.clear();
+        jumperSafePads.clear();
         snowballConstructor.clear();
         bodyRushUntil.clear();
         bodyRushHitFeedback.clear();
@@ -209,6 +212,11 @@ public class KitManager implements Listener {
     public void resetAchievementTracking() {
         bodyRushLaunchedMonsters.clear();
         repulsorLaunchedMonsters.clear();
+    }
+
+    /** Reset round-scoped Jumper progression while keeping each player's selected kit. */
+    public void resetJumperProgress() {
+        jumperSafePads.clear();
     }
 
     // -------------------- Give items (exact slots) --------------------
@@ -241,8 +249,8 @@ public class KitManager implements Listener {
 
         switch (kit) {
             case JUMPER:
-                // slot 8: 5 feathers "5 Jumps Remaining" (3 in Speed mode)
-                setJumpsLeft(player, jumperMaxJumps());
+                // Start with three jumps; each five Safe Pads reached adds one.
+                setJumpsLeft(player, jumperJumpsFor(player));
                 break;
             case SLOWBALL:
                 // PerkConstructor starts empty; first tick will grant snowballs
@@ -459,6 +467,26 @@ public class KitManager implements Listener {
                     ChatColor.YELLOW + "" + ChatColor.BOLD + jumps + " Jumps Remaining"));
         }
         player.updateInventory();
+    }
+
+    private int jumperJumpsFor(Player player) {
+        int pads = jumperSafePads.getOrDefault(player.getUniqueId(), 0);
+        return Math.min(64, jumperMaxJumps() + pads / 5);
+    }
+
+    public boolean isJumper(Player player) {
+        return player != null && getKit(player) == KitType.JUMPER;
+    }
+
+    /** Number of bonus jumps already earned, displayed as the XP level during a run. */
+    public int jumperBonusJumps(Player player) {
+        return player == null ? 0 : jumperSafePads.getOrDefault(player.getUniqueId(), 0) / 5;
+    }
+
+    /** Fractional progress to the next bonus jump, displayed in the XP bar. */
+    public float jumperSafePadProgress(Player player) {
+        if (player == null) return 0.0F;
+        return (jumperSafePads.getOrDefault(player.getUniqueId(), 0) % 5) / 5.0F;
     }
 
     private boolean hasJumpsLeft(Player p) {
@@ -730,7 +758,8 @@ public class KitManager implements Listener {
 
         // Speed/Modern (QOL) modes: Jumper jumps reset to full on every Safe Pad.
         if (game.qolEnabled() && getKit(player) == KitType.JUMPER) {
-            setJumpsLeft(player, jumperMaxJumps());
+            int reached = jumperSafePads.merge(player.getUniqueId(), 1, Integer::sum);
+            setJumpsLeft(player, Math.min(64, jumperMaxJumps() + reached / 5));
         }
     }
 
@@ -1230,6 +1259,7 @@ public class KitManager implements Listener {
         UUID id = event.getPlayer().getUniqueId();
         removeKitNameplate(id);
         jumpRecharge.remove(id);
+        jumperSafePads.remove(id);
         snowballConstructor.remove(id);
         bodyRushUntil.remove(id);
         cryoCooldown.remove(id);
