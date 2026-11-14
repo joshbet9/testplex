@@ -8614,7 +8614,7 @@ public final class ArcadePortManager implements Listener {
             lines.add(ChatColor.YELLOW + "Vote Time");
             lines.add(ChatColor.WHITE + formatMasterBuilderTime(remaining));
         }
-        lines.add(ChatColor.GRAY + "Plots: " + ChatColor.WHITE + session.masterBuilderPlots.size());
+        lines.add(ChatColor.GRAY + "Players: " + ChatColor.WHITE + session.masterBuilderPlots.size());
 
         int score = lines.size();
         for (String line : lines) {
@@ -14148,7 +14148,6 @@ public final class ArcadePortManager implements Listener {
             session.masterBuilderReviewedTargets.add(targetId);
             session.masterBuilderReviewEndsAt = now + ArcadePortRules.masterBuildersReviewMillis();
             session.masterBuilderVoteEndsAt = now + ArcadePortRules.masterBuildersVoteMillis();
-            session.masterBuilderLastReviewSecond=-1;
             Location centre=masterBuilderPlotCenter(session,session.masterBuilderPlots.getOrDefault(targetId,0));
             Material[] ratings={Material.RED_CONCRETE,Material.ORANGE_CONCRETE,Material.YELLOW_CONCRETE,
                     Material.LIME_CONCRETE,Material.LIGHT_BLUE_CONCRETE,Material.PURPLE_CONCRETE};
@@ -14320,23 +14319,8 @@ public final class ArcadePortManager implements Listener {
         masterBuildersPlots.tick(session.players.values());
         updateMasterBuildersScoreboard(session, now);
         if(session.masterBuilderPhase==MasterBuildersPhase.BUILDING){
-            long remain=Math.max(0,session.masterBuilderBuildEndsAt-now);
-            String timer=String.format(java.util.Locale.ROOT,"%d:%02d",remain/60000L,(remain/1000L)%60L);
-            for(Player p:alivePlayers(session))p.sendActionBar(Component.text("Theme: "+session.masterBuilderTheme+" | Build: "+timer));
             if(now>=session.masterBuilderBuildEndsAt)beginMasterBuildersReview(session,now);
         }else if(session.masterBuilderPhase==MasterBuildersPhase.REVIEW){
-            long remaining=Math.max(0L,session.masterBuilderReviewEndsAt-now);
-            long seconds=(remaining+999L)/1_000L;
-            if(seconds!=session.masterBuilderLastReviewSecond){
-                session.masterBuilderLastReviewSecond=seconds;
-                String status=now<session.masterBuilderVoteEndsAt
-                        ?"Rate 1-6 | "+seconds+"s":"Viewing build | "+seconds+"s";
-                for(Player p:alivePlayers(session)){
-                    p.sendActionBar(Component.text("Plot "
-                            +(session.masterBuilderReviewIndex+1)+"/"+session.masterBuilderReviewOrder.size()
-                            +" | "+status));
-                }
-            }
             if(now>=session.masterBuilderReviewEndsAt){
                 session.masterBuilderReviewIndex++;showNextMasterBuilderReview(session,now);
             }
