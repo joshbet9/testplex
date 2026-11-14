@@ -2412,10 +2412,24 @@ class ArcadePortGameTest {
         assertEquals(0.6D, airborne.getY(), 0.00001D);
     }
 
+    @Test void dragonsAutonomousFlightSteersAtConfiguredSpeedTowardSelectedTarget() {
+        Vector velocity = ArcadePortRules.dragonsFlightVelocity(
+                new Vector(1.0D, 2.0D, 3.0D), new Vector(1.0D, 2.0D, 13.0D), 0.32D);
+        assertEquals(0.0D, velocity.getX(), 0.00001D);
+        assertEquals(0.0D, velocity.getY(), 0.00001D);
+        assertEquals(0.32D, velocity.getZ(), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.dragonsFlightVelocity(
+                new Vector(1.0D, 2.0D, 3.0D), new Vector(1.0D, 2.0D, 3.0D), 0.32D).length(), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.dragonsFlightVelocity(
+                new Vector(), new Vector(0.0D, 0.0D, 1.0D), Double.NaN).length(), 0.00001D);
+    }
+
     @Test void dragonsDisableDirectAndProjectilePvpAndOnlyAllowEmeraldWorldItems() {
         assertTrue(ArcadePortRules.shouldCancelDragonsPvp(true, false));
         assertTrue(ArcadePortRules.shouldCancelDragonsPvp(false, true));
         assertFalse(ArcadePortRules.shouldCancelDragonsPvp(false, false));
+        assertTrue(ArcadePortRules.shouldCancelDragonPlayerDamage(ArcadePortGame.DRAGONS, true));
+        assertFalse(ArcadePortRules.shouldCancelDragonPlayerDamage(ArcadePortGame.DRAGONS, false));
         assertTrue(ArcadePortRules.shouldAllowDragonWorldItem(Material.EMERALD));
         assertFalse(ArcadePortRules.shouldAllowDragonWorldItem(Material.ARROW));
         assertFalse(ArcadePortRules.shouldAllowDragonWorldItem(Material.FIREWORK_ROCKET));
