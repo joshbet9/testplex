@@ -64,7 +64,8 @@ async function discoverTokenEndpoint() {
   const response = await fetch('https://auth.openai.com/.well-known/openid-configuration', { signal: AbortSignal.timeout(10_000) });
   if (!response.ok) throw new Error(`OpenID discovery failed (HTTP ${response.status}).`);
   const metadata = await response.json();
-  if (metadata.issuer !== 'https://auth.openai.com' || typeof metadata.token_endpoint !== 'string') throw new Error('Unexpected OpenID token endpoint.');
+  if (metadata.issuer !== 'https://auth.openai.com' || typeof metadata.token_endpoint !== 'string' ||
+      new URL(metadata.token_endpoint).origin !== 'https://auth.openai.com') throw new Error('Unexpected OpenID token endpoint.');
   return metadata.token_endpoint;
 }
 
@@ -76,6 +77,7 @@ async function refresh() {
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      redirect: 'error',
       body: new URLSearchParams({
         grant_type: 'refresh_token',
         client_id: current.clientId,
@@ -169,6 +171,7 @@ const server = createServer(async (request, response) => {
       method: 'POST',
       headers: upstreamRequestHeaders(request, credentials.accessToken),
       body,
+      redirect: 'error',
       signal: AbortSignal.timeout(5 * 60_000),
     });
     response.writeHead(upstream.status, {

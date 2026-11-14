@@ -37,7 +37,7 @@ or resolved; Josh reviews the PR and handles the paired Hyper-V/Fly release.
   the approved ChatGPT plan allowance shared with his other Codex use; they do
   not use an OpenAI API key. Sign-in with ChatGPT is a preview and account usage
   attribution/revocation for transferred VM sessions has current limitations.
-- Four Linux service identities isolate webhook, issue worker, Codex runner,
+- Five Linux service identities isolate webhook, issue worker, Codex runner,
   publisher and OAuth proxy privileges. The OAuth credential file remains
   owner-only. The Codex runner gets only the local proxy key, never the real
   ChatGPT access or refresh tokens.

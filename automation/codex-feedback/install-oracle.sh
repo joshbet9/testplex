@@ -8,6 +8,10 @@ fi
 
 SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 INSTALL_DIR=/opt/testplex-codex-feedback
+if [[ "$SOURCE_DIR" == "$INSTALL_DIR" ]]; then
+  echo 'Run the installer from a source checkout outside /opt/testplex-codex-feedback.' >&2
+  exit 1
+fi
 
 node_major="$(node -p 'Number(process.versions.node.split(".")[0])')"
 if (( node_major < 22 )); then

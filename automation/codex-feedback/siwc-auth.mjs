@@ -35,7 +35,8 @@ async function openIdConfiguration() {
   const response = await fetch(`${ISSUER}/.well-known/openid-configuration`, { signal: AbortSignal.timeout(10_000) });
   if (!response.ok) throw new Error(`OpenID discovery failed (HTTP ${response.status}).`);
   const config = await response.json();
-  if (config.issuer !== ISSUER || typeof config.jwks_uri !== 'string' || typeof config.token_endpoint !== 'string') {
+  if (config.issuer !== ISSUER || typeof config.jwks_uri !== 'string' || typeof config.token_endpoint !== 'string' ||
+      new URL(config.jwks_uri).origin !== ISSUER || new URL(config.token_endpoint).origin !== ISSUER) {
     throw new Error('OpenID discovery returned unexpected issuer metadata.');
   }
   return config;
@@ -193,6 +194,7 @@ async function authorize() {
   const tokenResponse = await fetch(tokenEndpoint, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    redirect: 'error',
     body: new URLSearchParams({
       grant_type: 'authorization_code',
       client_id: result.issuedClientId,
