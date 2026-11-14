@@ -135,20 +135,8 @@ enable a service if a secret is still a `REPLACE_...` placeholder.
 
 ## Current implementation state
 
-The event receiver, durable queue, issue-context loader, isolated Codex runner,
-publisher, SIWC bootstrap/refresh proxy, systemd units and Oracle installer are
-implemented in this branch. On 2026-11-14, Node.js 22.23.5, GitHub CLI 2.104.0
-and Codex CLI 0.169.0 were installed on the Oracle VM; service accounts, units
-and private configuration templates were installed, and the Caddy webhook route
-was added with a backup. All four units remain disabled and inactive. The
-configuration files are root-owned mode 0600. The maintainer configured
-the two GitHub tokens privately and completed SIWC authorization; the validated
-credential is installed at owner-only mode 0600. The OAuth proxy and webhook
-receiver are enabled and active; the issue worker and publisher remain disabled
-until the GitHub webhook is registered. The live Caddy route strips the public
-/testplex prefix correctly and was verified to reach the receiver (an unsigned
-POST receives HTTP 401). No signed GitHub delivery, issue event, or draft PR has
-been processed. A Windows invocation issue in the SIWC helper was fixed at the
-current branch head after the first setup attempt. Keep PR #461 in draft until
-the maintainer reviews the code and completes event acceptance. Do not transfer
-credentials before that review.
+The Oracle deployment was prepared on 2026-11-14. Node.js 22.23.5, GitHub CLI 2.104.0 and Codex CLI 0.169.0 are installed. The isolated service accounts, current PR service files and scripts are installed; the Caddy route is active and strips the `/testplex` prefix. Its route was verified to reach the receiver; unsigned requests receive HTTP 401.
+
+The maintainer configured the private GitHub tokens, completed SIWC authorization and confirmed the GitHub webhook is configured. The validated SIWC credential is stored mode 0600 for its service account. All four services (OAuth proxy, webhook receiver, issue worker and draft publisher) are enabled and active. During startup, the worker and publisher exposed a shared SQLite permissions issue. The database is now group-writable (mode 0660), the webhook initializes it before the worker/publisher through systemd dependencies, and both consumers are running.
+
+No signed GitHub delivery, real issue event, Codex processing turn or draft PR has yet been verified. Please check the webhook’s recent deliveries and send a safe test issue or comment before relying on automatic processing. PR #461 remains a draft and is not merged. No gameplay server was changed or deployed by this automation setup.
