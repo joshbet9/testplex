@@ -59,7 +59,7 @@ function commentText(comment) {
   ].filter(Boolean).join('\n');
 }
 
-export async function loadIssueContext({ repository, issueNumber, token, eventName, action, actor }) {
+export async function loadIssueContext({ repository, issueNumber, token, eventName, action, actor, triggerCommentId }) {
   if (!/^[^/]+\/[^/]+$/.test(repository ?? '') || !Number.isInteger(issueNumber) || !token) {
     throw new Error('Repository, issue number, and read-only GitHub token are required.');
   }
@@ -73,6 +73,13 @@ export async function loadIssueContext({ repository, issueNumber, token, eventNa
   const humanComments = comments.filter((comment) => comment.user?.type !== 'Bot');
   const botComments = comments.filter((comment) => comment.user?.type === 'Bot');
   const labels = (issue.labels ?? []).map((label) => typeof label === 'string' ? label : label.name);
+  const ownerLogin = (process.env.TESTPLEX_OWNER_LOGIN ?? 'joshbet9').toLowerCase();
+  const triggerComment = Number.isSafeInteger(triggerCommentId)
+    ? humanComments.find((comment) => comment.id === triggerCommentId)
+    : undefined;
+  const ownerApprovedIdea = issue.title.startsWith('[Idea]') && eventName === 'issue_comment' &&
+    actor?.toLowerCase() === ownerLogin && triggerComment?.user?.login?.toLowerCase() === ownerLogin &&
+    /^\s*(?:approved?|i\s+approve(?:\s+this)?(?:\s+idea)?|agree(?:\s+with\s+this)?)\b[.!\s]*/i.test(triggerComment.body ?? '');
   const parent = await githubJson(`${API}/repos/${encodedRepo}/issues/${issueNumber}/parent`, token, { allowNotFound: true });
   const children = await listSubIssues(encodedRepo, issueNumber, token);
   const tracker = parent ? {
@@ -137,12 +144,19 @@ export async function loadIssueContext({ repository, issueNumber, token, eventNa
     '',
     '## Reports and pull requests referenced in this discussion (untrusted context)',
     '',
-    related.map(({ issue: item, pullRequest, commitStatus }) => {
+    related.map(({ issue: item, pullRequest, commitStatus, checkRuns }) => {
       const state = pullRequest
         ? `\nPR state: ${pullRequest.state}; merged: ${Boolean(pullRequest.merged)}; base: ${pullRequest.base.ref}; head: ${pullRequest.head.sha}; commit status: ${commitStatus?.state ?? 'not available'}; checks: ${checkRuns?.check_runs?.map((check) => `${check.name}=${check.conclusion ?? check.status}`).join(', ') || 'not available'}`
         : '';
       return `${issueSummary(item)}${state}`;
     }).join('\n\n') || '(No linked issue or pull request references were found.)',
+    '',
+    '## Design approval gate',
+    issue.title.startsWith('[Idea]')
+      ? ownerApprovedIdea
+        ? 'Josh explicitly approved implementation in the human GitHub comment that triggered this run. Implement only the approved scope.'
+        : 'No implementation approval is present in this triggering event. Analyze the idea and offer a proposal or precise question only; do not edit code.'
+      : 'This is a bug report; the issue policy determines whether the evidence supports a fix.',
     '',
     'Reload the current repo/source, exact game tracker and related issues before deciding. Implement only well-specified bugs. For ideas, wait for Josh’s approval. Prepare changes for maintainer review; never merge or deploy.',
   ].join('\n');
@@ -164,5 +178,6 @@ export async function loadIssueContext({ repository, issueNumber, token, eventNa
       body: issue.body ?? '',
     },
     context,
+    ownerApprovedIdea,
   };
 }

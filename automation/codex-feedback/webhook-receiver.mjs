@@ -106,6 +106,7 @@ const server = createServer(async (request, response) => {
       repository: { full_name: payload.repository.full_name },
       issue: { number: payload.issue.number },
       sender: { login: payload.sender?.login },
+      comment: eventName === 'issue_comment' ? { id: payload.comment.id } : undefined,
     },
   });
   process.stdout.write(`[feedback-webhook] ${inserted ? 'queued' : 'duplicate'} ${eventName}/${action} issue=${payload.issue.number} delivery=${deliveryId}\n`);

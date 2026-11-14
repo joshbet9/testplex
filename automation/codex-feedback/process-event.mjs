@@ -68,6 +68,7 @@ export async function processEvent(eventRow) {
     eventName: eventRow.event_name,
     action: eventRow.action,
     actor: payload.sender?.login,
+    triggerCommentId: payload.comment?.id,
   });
   if (!event.actionable) return { skipped: event.reason };
 
@@ -117,9 +118,14 @@ export async function processEvent(eventRow) {
   if (untrackedPaths.length) await run(GIT, ['add', '-N', '--', ...untrackedPaths], { cwd: workspace });
   const allPaths = validatePaths(await run(GIT, ['diff', '--name-only', '-z', baseSha], { cwd: workspace }));
   await run(GIT, ['diff', '--check', baseSha], { cwd: workspace });
-  const patch = allPaths.length ? await run(GIT, ['diff', '--binary', baseSha], { cwd: workspace }) : Buffer.alloc(0);
-  const marker = summary.match(/^TESTPLEX_STATUS=(submitted|in-progress|waiting-tester)\s*$/m)?.[1] ?? 'submitted';
-  const cleanSummary = summary.replace(/^TESTPLEX_STATUS=(submitted|in-progress|waiting-tester)\s*\r?\n?/gm, '').slice(0, 30_000);
+  const ideaNeedsApproval = event.issue.title.startsWith('[Idea]') && !event.ownerApprovedIdea;
+  const publishPaths = ideaNeedsApproval ? [] : allPaths;
+  const patch = publishPaths.length ? await run(GIT, ['diff', '--binary', baseSha], { cwd: workspace }) : Buffer.alloc(0);
+  const marker = ideaNeedsApproval ? 'submitted' : (summary.match(/^TESTPLEX_STATUS=(submitted|in-progress|waiting-tester)\s*$/m)?.[1] ?? 'submitted');
+  let cleanSummary = summary.replace(/^TESTPLEX_STATUS=(submitted|in-progress|waiting-tester)\s*\r?\n?/gm, '').slice(0, 30_000);
+  if (ideaNeedsApproval && allPaths.length) {
+    cleanSummary += '\n\nThe local implementation was discarded because Josh has not approved this idea for implementation. To approve it, add a human GitHub comment beginning with “Approved”, “I approve”, or “Agree”; then the updated thread will be reviewed again.';
+  }
   await mkdir(inbox, { recursive: false, mode: 0o2770 });
   await publishFile(join(inbox, 'summary.md'), cleanSummary, 0o640);
   await publishFile(join(inbox, 'changes.patch'), patch, 0o640);
@@ -131,10 +137,11 @@ export async function processEvent(eventRow) {
     issueUpdatedAt: event.issue.updatedAt,
     reviewFingerprint: event.issue.reviewFingerprint,
     status: marker,
-    changedPaths: allPaths,
+    changedPaths: publishPaths,
+    ideaApproved: event.ownerApprovedIdea,
     createdAt: new Date().toISOString(),
   }, null, 2), 0o640);
-  return { stagedForPublisher: true, issueNumber, changedPaths: allPaths, eventId, inboxPath: inbox };
+  return { stagedForPublisher: true, issueNumber, changedPaths: publishPaths, eventId, inboxPath: inbox };
   } finally {
     await Promise.all([
       rm(workspace, { recursive: true, force: true }),

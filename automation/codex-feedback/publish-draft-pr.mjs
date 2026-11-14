@@ -130,6 +130,9 @@ async function publish(directory) {
   const patch = await readFile(join(inbox, 'changes.patch'));
   if (patch.length > 15 * 1024 * 1024) throw new Error('Patch exceeds the publisher size limit.');
   const hasPatch = patch.length > 0;
+  if (hasPatch && job.issueTitle?.startsWith('[Idea]') && job.ideaApproved !== true) {
+    throw new Error('Refusing to publish an Idea implementation without Josh approval recorded from a direct human GitHub comment.');
+  }
   const status = hasPatch ? 'in-progress' : job.status;
   let prUrl = '';
   const markerId = createHash('sha256').update(`${job.issueNumber}:${job.issueUpdatedAt}:${job.createdAt}`).digest('hex').slice(0, 20);

@@ -15,6 +15,9 @@ or resolved; Josh reviews the PR and handles the paired Hyper-V/Fly release.
    Issue content is explicitly treated as untrusted. Bugs with sufficient
    evidence get a focused implementation; ideas wait for Josh's approval; a
    genuine blocker produces a specific question.
+   For an Idea, code is discarded unless the triggering direct human GitHub
+   comment is by Josh and begins with `Approved`, `I approve`, or `Agree`. The
+   separate publisher checks the same approval flag before opening a PR.
 3. Codex receives no GitHub token, webhook secret, Fly token, SSH key or real
    ChatGPT token. Its app-server sends requests to the loopback OAuth proxy with
    a separate random local proxy key. Only that proxy reads and refreshes the protected ChatGPT
