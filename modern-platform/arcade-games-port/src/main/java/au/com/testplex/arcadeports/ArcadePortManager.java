@@ -7336,7 +7336,14 @@ public final class ArcadePortManager implements Listener {
         session.sharedMatchNextScoreboardAt = now + 500L;
 
         List<String> lines = new ArrayList<>();
-        if (session.type == ArcadePortGame.TURF_WARS) {
+        if (session.type == ArcadePortGame.RUNNER) {
+            List<RunnerScoreboardRules.PlayerEntry> runners = session.players.values().stream()
+                    .filter(java.util.Objects::nonNull)
+                    .map(player -> new RunnerScoreboardRules.PlayerEntry(player.getName(),
+                            session.alive.contains(player.getUniqueId())))
+                    .toList();
+            lines.addAll(RunnerScoreboardRules.lines(runners));
+        } else if (session.type == ArcadePortGame.TURF_WARS) {
             lines.add(ChatColor.RED + Integer.toString(turfWarsRemainingLines(session, 0)) + " Red");
             lines.add(ChatColor.AQUA + Integer.toString(turfWarsRemainingLines(session, 1)) + " Blue");
             lines.add(" ");
