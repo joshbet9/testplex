@@ -71,6 +71,6 @@ Do not take control of Josh's desktop or Minecraft client. Do not restart a live
 
 ## Event-triggered automation
 
-The feedback automation is event-driven: process newly opened/reopened reports and new human comments. A scheduled reconciliation can serve as a missed-event safety net, but hourly polling is not the primary workflow.
+The feedback automation is event-driven: process newly opened/reopened reports and new direct human GitHub comments. A scheduled reconciliation can serve as a missed-event safety net, but hourly polling is not the primary workflow. Discord-bridge comments authored as a bot are filtered to prevent loops; do not remove that filter without a signed/idempotent bridge event that identifies the source comment.
 
 For each event, reload the complete current issue and comment history, deduplicate by issue/comment IDs, and serialize work per issue. Ignore bot-authored events to prevent loops. Do not rely solely on the event payload because later comments may already exist by the time a run starts. Prepare fixes as draft PRs for review; never merge or deploy from an unreviewed issue event. Do not expose deployment credentials to the Codex action. Keep API usage bounded and report when a required secret or permission is missing rather than pretending automation is active.
