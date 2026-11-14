@@ -1319,6 +1319,13 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
             return;
         }
         if (!running) return;
+        if (shouldDeferWandClickToContainer(action, isWand(item), event.getClickedBlock() != null
+                && event.getClickedBlock().getState() instanceof InventoryHolder)) {
+            // Do not consume the chest click as a wand action. Denying only the
+            // item use leaves Bukkit's normal container interaction available.
+            event.setUseItemInHand(org.bukkit.event.Event.Result.DENY);
+            return;
+        }
         if (action == Action.RIGHT_CLICK_AIR || action == Action.RIGHT_CLICK_BLOCK) {
             EquipmentSlot armorSlot = armorSlot(item == null ? null : item.getType());
             if (armorSlot != null) {
@@ -1346,6 +1353,10 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
                 if (spell != null) castSpell(player, state, spell, null, event.getClickedBlock(), slot);
             }
         }
+    }
+
+    static boolean shouldDeferWandClickToContainer(Action action, boolean wand, boolean inventoryHolderBlock) {
+        return action == Action.RIGHT_CLICK_BLOCK && wand && inventoryHolderBlock;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
