@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import { createHash, createPublicKey, randomBytes, randomUUID, verify } from 'node:crypto';
 import { link, open, readFile, unlink, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { homedir, platform } from 'node:os';
 import { execFileSync, spawn } from 'node:child_process';
 
@@ -241,7 +242,7 @@ async function main() {
   await authorize();
 }
 
-if (import.meta.url === new URL(process.argv[1], 'file:').href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   main().catch((error) => {
     console.error(error.message);
     process.exitCode = 1;
