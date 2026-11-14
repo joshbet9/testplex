@@ -10328,7 +10328,15 @@ public final class ArcadePortManager implements Listener {
 
     private boolean handleSkyWarsInteract(Session session, Player player,
             PlayerInteractEvent event, ItemStack item) {
-        if (event.isCancelled()) return false;
+        UUID id = player.getUniqueId();
+        boolean iceBridgeInput = session.alive.contains(id)
+                && "ice".equals(session.skyWarsKits.getOrDefault(id, "ice"))
+                && event.getAction().isRightClick()
+                && isSkyWarsSkill(item, "Ice Bridge");
+        // Paper can mark an Adventure-mode right click as cancelled because the
+        // held ICE cannot be placed. It is still a valid kit activation, so let
+        // the ability handler consume it instead of falling through to vanilla.
+        if (event.isCancelled() && !iceBridgeInput) return false;
         if (!session.alive.contains(player.getUniqueId()) && isSkyWarsTrackingCompass(item)) {
             event.setCancelled(true);
             if (event.getAction().isRightClick()) {
@@ -10378,15 +10386,18 @@ public final class ArcadePortManager implements Listener {
         }
 
         if (item == null || !event.getAction().isRightClick()) return false;
-        UUID id = player.getUniqueId();
         String kit = session.skyWarsKits.getOrDefault(id, "ice");
         if ("ice".equals(kit) && isSkyWarsSkill(item, "Ice Bridge")) {
             event.setCancelled(true);
+            event.setUseInteractedBlock(org.bukkit.event.Event.Result.DENY);
+            event.setUseItemInHand(org.bukkit.event.Event.Result.DENY);
             if (!isDebugAbilityAllowed(player, ArcadePortGame.SKY_WARS, kit)) return true;
             if (!session.liveStarted) return true;
             long now = System.currentTimeMillis();
             if (now < session.skyWarsKitReadyAt.getOrDefault(id, 0L)) return true;
-            session.skyWarsKitReadyAt.put(id, now + SkyWarsMixedArcadeRules.iceBridgeCooldownMillis());
+            long cooldown = SkyWarsMixedArcadeRules.iceBridgeCooldownMillis();
+            session.skyWarsKitReadyAt.put(id, now + cooldown);
+            cooldownProgress.start(player, "Ice Bridge", cooldown, ArcadePortGame.SKY_WARS);
             session.skyWarsIceBridgeStarts.put(id, player.getLocation().clone());
             Location launch = player.getLocation().clone().add(0.0D, 1.0D, 0.0D);
             player.teleport(launch);
@@ -10401,7 +10412,9 @@ public final class ArcadePortManager implements Listener {
             if (!session.liveStarted) return true;
             long now = System.currentTimeMillis();
             if (now < session.skyWarsKitReadyAt.getOrDefault(id, 0L)) return true;
-            session.skyWarsKitReadyAt.put(id, now + SkyWarsMixedArcadeRules.fireKitCooldownMillis());
+            long cooldown = SkyWarsMixedArcadeRules.fireKitCooldownMillis();
+            session.skyWarsKitReadyAt.put(id, now + cooldown);
+            cooldownProgress.start(player, "Fire Burst", cooldown, ArcadePortGame.SKY_WARS);
             long burstId = ++session.skyWarsFireBurstSequence;
             session.skyWarsFireBurstOwners.put(burstId, id);
             session.skyWarsFireBurstAt.put(burstId, now);
@@ -10455,7 +10468,9 @@ public final class ArcadePortManager implements Listener {
             }
             long now = System.currentTimeMillis();
             if (now < session.skyWarsKitReadyAt.getOrDefault(id, 0L)) return true;
-            session.skyWarsKitReadyAt.put(id, now + SkyWarsMixedArcadeRules.metalMagnetCooldownMillis());
+            long cooldown = SkyWarsMixedArcadeRules.metalMagnetCooldownMillis();
+            session.skyWarsKitReadyAt.put(id, now + cooldown);
+            cooldownProgress.start(player, "Magnet", cooldown, ArcadePortGame.SKY_WARS);
             if (SkyWarsAchievementRules.hasFullMetalArmor(armorPieces)) {
                 session.skyWarsMagnetPullOwners.put(target.getUniqueId(), id);
                 session.skyWarsMagnetPullAt.put(target.getUniqueId(), now);
@@ -10476,7 +10491,9 @@ public final class ArcadePortManager implements Listener {
             if (!session.liveStarted) return true;
             long now = System.currentTimeMillis();
             if (now < session.skyWarsKitReadyAt.getOrDefault(id, 0L)) return true;
-            session.skyWarsKitReadyAt.put(id, now + SkyWarsMixedArcadeRules.earthThrowCooldownMillis());
+            long cooldown = SkyWarsMixedArcadeRules.earthThrowCooldownMillis();
+            session.skyWarsKitReadyAt.put(id, now + cooldown);
+            cooldownProgress.start(player, "Throwable Dirt", cooldown, ArcadePortGame.SKY_WARS);
             if (item.getAmount() <= 1) player.getInventory().setItemInMainHand(null);
             else item.setAmount(item.getAmount() - 1);
             FallingBlock dirt = session.world.spawnFallingBlock(
@@ -10712,7 +10729,10 @@ public final class ArcadePortManager implements Listener {
             player.setFlying(false);
             return;
         }
-        session.skyWarsKitReadyAt.put(id, System.currentTimeMillis() + SkyWarsMixedArcadeRules.airDoubleJumpCooldownMillis());
+        long now = System.currentTimeMillis();
+        long cooldown = SkyWarsMixedArcadeRules.airDoubleJumpCooldownMillis();
+        session.skyWarsKitReadyAt.put(id, now + cooldown);
+        cooldownProgress.start(player, "Double Jump", cooldown, ArcadePortGame.SKY_WARS);
         player.setAllowFlight(false);
         player.setFlying(false);
         Vector velocity = player.getVelocity();
