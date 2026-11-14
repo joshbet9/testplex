@@ -19941,8 +19941,7 @@ public final class ArcadePortManager implements Listener {
     private void configureQuestSheep(Session session, Sheep sheep) {
         sheep.setAdult();
         sheep.setColor(DyeColor.WHITE);
-        sheep.setCustomName(ChatColor.WHITE + "Sheep");
-        sheep.setCustomNameVisible(true);
+        SheepQuestEntityRules.hideNameTag(sheep);
         sheep.setAI(true);
         sheep.setInvulnerable(true);
         sheep.setCollidable(false);
