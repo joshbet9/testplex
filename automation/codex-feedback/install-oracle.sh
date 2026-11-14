@@ -69,17 +69,19 @@ case "$workspace" in /var/lib/testplex-feedback-shared/workspaces/*) ;; *) echo 
 case "$context" in /var/lib/testplex-feedback-shared/contexts/*.md) ;; *) echo 'context outside feedback root' >&2; exit 65 ;; esac
 [[ -d "$workspace/.git" && -f "$context" ]] || { echo 'workspace/context missing' >&2; exit 66; }
 codex_bin="$(command -v codex)"
+node_bin="$(command -v node)"
 access_token="$(cat /var/lib/testplex-feedback-proxy/proxy.key)"
 exec /usr/bin/env -i \
   PATH=/usr/local/bin:/usr/bin:/bin \
   HOME=/var/lib/testplex-codex-runner \
   CODEX_HOME=/var/lib/testplex-codex-runner/.codex \
   CODEX_BIN="$codex_bin" \
+  NODE_BIN="$node_bin" \
   CODEX_MODEL=gpt-6.1-sol \
   SIWC_PROXY_URL=http://127.0.0.1:8768/v1 \
   ACCESS_TOKEN="$access_token" \
   LANG=C.UTF-8 LC_ALL=C.UTF-8 \
-  /usr/bin/node /opt/testplex-codex-feedback/run-codex-turn.mjs "$workspace" "$context"
+  "$NODE_BIN" /opt/testplex-codex-feedback/run-codex-turn.mjs "$workspace" "$context"
 RUNNER
 chown root:root /usr/local/sbin/testplex-feedback-run-codex
 chmod 0755 /usr/local/sbin/testplex-feedback-run-codex
