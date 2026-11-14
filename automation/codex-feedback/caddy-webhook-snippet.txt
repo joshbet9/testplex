@@ -1,6 +1,7 @@
 # Add this route inside the existing HTTPS site block. Replace the path only if
 # the webhook URL is changed; do not expose port 8787 directly to the internet.
 handle /testplex/github/webhook {
+	uri strip_prefix /testplex
 	reverse_proxy 127.0.0.1:8787
 }
 
