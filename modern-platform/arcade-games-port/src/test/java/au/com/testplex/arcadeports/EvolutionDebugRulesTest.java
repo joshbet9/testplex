@@ -36,11 +36,34 @@ final class EvolutionDebugRulesTest {
         assertEquals(250L, ArcadePortRules.evolutionWaterDamageIntervalMillis());
         assertEquals(1.0D, ArcadePortRules.evolutionWaterDamage());
         assertEquals(1_000L, ArcadePortRules.evolutionGolemSlamImpactDelayMillis());
+        assertVectorEquals(new org.bukkit.util.Vector(0.0D, 0.8D, 0.8D),
+                ArcadePortRules.evolutionGolemSlamLaunchVelocity(new org.bukkit.util.Vector(0.0D, -3.0D, 4.0D), 1.0D, true));
         assertEquals(1_000L, ArcadePortRules.evolutionSlimeSlamMaxDurationMillis());
         assertEquals(100L, ArcadePortRules.evolutionSlimeSlamMinAirtimeMillis());
         assertEquals(0.07D, ArcadePortRules.evolutionBlazeSpreadRadians());
         assertEquals(16.5D, ArcadePortRules.evolutionGolemSlamDamageAtDistance(0.0D));
         assertEquals(0.5D, ArcadePortRules.evolutionGolemSlamDamageAtDistance(6.0D));
+    }
+
+    @Test void seismicSlamLaunchMirrorsDownwardAimCapsVerticalSpeedAndBoostsGroundLaunch() {
+        org.bukkit.util.Vector airborne = ArcadePortRules.evolutionGolemSlamLaunchVelocity(
+                new org.bukkit.util.Vector(0.0D, -3.0D, 4.0D), 1.0D, false);
+        assertEquals(0.6D, airborne.getY(), 0.0000001D);
+        assertEquals(0.8D, airborne.getZ(), 0.0000001D);
+        org.bukkit.util.Vector grounded = ArcadePortRules.evolutionGolemSlamLaunchVelocity(
+                new org.bukkit.util.Vector(0.0D, -3.0D, 4.0D), 1.0D, true);
+        assertEquals(0.8D, grounded.getY(), 0.0000001D);
+        assertEquals(0.8D, grounded.getZ(), 0.0000001D);
+        org.bukkit.util.Vector fallback = ArcadePortRules.evolutionGolemSlamLaunchVelocity(
+                new org.bukkit.util.Vector(), 1.0D, false);
+        assertEquals(0.4472135955D, fallback.getY(), 0.0000001D);
+        assertEquals(0.894427191D, fallback.getZ(), 0.0000001D);
+    }
+
+    private static void assertVectorEquals(org.bukkit.util.Vector expected, org.bukkit.util.Vector actual) {
+        assertEquals(expected.getX(), actual.getX(), 0.0000001D);
+        assertEquals(expected.getY(), actual.getY(), 0.0000001D);
+        assertEquals(expected.getZ(), actual.getZ(), 0.0000001D);
     }
 
     @Test void profileOverridesChangeFormCombatChargeAndOverkillProgressionThenReset() {

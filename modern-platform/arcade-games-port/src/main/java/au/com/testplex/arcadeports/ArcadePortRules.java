@@ -2689,6 +2689,17 @@ public final class ArcadePortRules {
                 EVOLUTION_GOLEM_SLAM_IMPACT_DELAY_MILLIS));
     }
 
+    /** Matches the 1.8 Seismic Slam launch: reflect downward aim upward, then normalize. */
+    public static Vector evolutionGolemSlamLaunchVelocity(Vector facing, double speed, boolean grounded) {
+        Vector direction = facing == null ? new Vector() : facing.clone();
+        if (direction.getY() < 0.0D) direction.setY(-direction.getY());
+        if (direction.lengthSquared() < 0.001D) direction = new Vector(0.0D, 0.5D, 1.0D);
+        direction.normalize().multiply(Math.max(0.0D, speed));
+        if (direction.getY() > 1.0D) direction.setY(1.0D);
+        if (grounded) direction.setY(direction.getY() + 0.2D);
+        return direction;
+    }
+
     public static double evolutionGolemSlamDamageAtDistance(double distance) {
         double radius = Math.max(0.1D, GameDebugRuntimeOverrides.doubleValue(
                 "EVOLUTION_GOLEM_SLAM_RADIUS", EVOLUTION_GOLEM_SLAM_RADIUS));
