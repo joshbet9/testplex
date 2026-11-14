@@ -25,6 +25,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.IntStream;
 
 /**
  * Replaces the outgoing player spawn with a Villager spawn using the same entity ID.
@@ -99,6 +100,11 @@ public final class SneakyAssassinsPacketDisguiseBridge implements PacketListener
             if (!disguisedEntityOwners.containsKey(metadata.getEntityId())) return;
 
             // Player-only metadata indices have a different type/layout on Villagers.
+            // Keep already-compatible packets intact. This also avoids rewriting the
+            // Villager name metadata emitted by sendVillagerSpawn().
+            if (!containsVillagerIncompatibleMetadata(metadata.getEntityMetadata().stream()
+                    .mapToInt(EntityData::getIndex))) return;
+
             List<EntityData<?>> compatible = new ArrayList<>();
             for (EntityData<?> value : metadata.getEntityMetadata()) {
                 if (isVillagerCompatibleMetadataIndex(value.getIndex())) compatible.add(value);
@@ -118,6 +124,10 @@ public final class SneakyAssassinsPacketDisguiseBridge implements PacketListener
         // fields begin at 8 and may have unrelated Villager types/layouts, which
         // makes forwarding them capable of disconnecting 26.3 clients.
         return index >= 0 && index <= 7;
+    }
+
+    static boolean containsVillagerIncompatibleMetadata(IntStream metadataIndices) {
+        return metadataIndices.anyMatch(index -> !isVillagerCompatibleMetadataIndex(index));
     }
 
     private void sendVillagerSpawn(Player viewer, int entityId, UUID playerId,
