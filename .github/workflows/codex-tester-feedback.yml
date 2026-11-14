@@ -100,18 +100,18 @@ jobs:
         run: |
           set -euo pipefail
           rm -f .codex/feedback-event.md .codex/feedback-result.md
+          changed="$(git status --porcelain)"
+          if [[ -z "$changed" ]]; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           if [[ -z "${GH_TOKEN:-}" ]]; then
             echo "CODEX_GITHUB_TOKEN is required to publish a draft PR and trigger its CI." >&2
             exit 1
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          changed="$(git status --porcelain)"
-          if [[ -z "$changed" ]]; then
-            echo "has_changes=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
 
           while IFS= read -r path; do
             case "$path" in
