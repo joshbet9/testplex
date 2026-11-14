@@ -81,6 +81,7 @@ export async function processEvent(eventRow) {
   const workspace = join(SHARED_ROOT, 'workspaces', eventId);
   const contextPath = join(SHARED_ROOT, 'contexts', `${eventId}.md`);
   const inbox = join(PUBLISHER_INBOX, eventId);
+  const git = (...args) => run(GIT, ['-c', `safe.directory=${workspace}`, ...args], { cwd: workspace });
   await mkdir(join(SHARED_ROOT, 'workspaces'), { recursive: true, mode: 0o2770 });
   await mkdir(join(SHARED_ROOT, 'contexts'), { recursive: true, mode: 0o2770 });
   await mkdir(PUBLISHER_INBOX, { recursive: true, mode: 0o2770 });
@@ -96,7 +97,7 @@ export async function processEvent(eventRow) {
   try {
   process.stdout.write(`[feedback-worker] issue=${issueNumber} stage=clone branch=${base}\n`);
   await run(SUDO, ['-n', '-u', RUNNER_USER, '--', CLONE_LAUNCHER, repository, base, workspace]);
-  const baseSha = (await run(GIT, ['rev-parse', 'HEAD'], { cwd: workspace })).toString('utf8').trim();
+  const baseSha = (await git('rev-parse', 'HEAD')).toString('utf8').trim();
   const [repositoryInstructions, feedbackPrompt] = await Promise.all([
     readFile(join(workspace, 'AGENTS.md'), 'utf8'),
     readFile(join(workspace, '.codex', 'tester-feedback-prompt.md'), 'utf8'),
@@ -116,17 +117,17 @@ export async function processEvent(eventRow) {
   const response = await run(SUDO, runnerArgs, { cwd: workspace });
   const summary = response.toString('utf8').trim();
   if (!summary) throw new Error('Codex completed without a review summary.');
-  const rawPaths = await run(GIT, ['diff', '--name-only', '-z', baseSha], { cwd: workspace });
+  const rawPaths = await git('diff', '--name-only', '-z', baseSha);
   validatePaths(rawPaths);
-  const untrackedPaths = validatePaths(await run(GIT, ['ls-files', '--others', '--exclude-standard', '-z'], { cwd: workspace }));
+  const untrackedPaths = validatePaths(await git('ls-files', '--others', '--exclude-standard', '-z'));
   // `git diff` omits untracked files. Mark them intent-to-add so the publisher
   // receives complete new-file diffs without allowing Codex to commit changes.
-  if (untrackedPaths.length) await run(GIT, ['add', '-N', '--', ...untrackedPaths], { cwd: workspace });
-  const allPaths = validatePaths(await run(GIT, ['diff', '--name-only', '-z', baseSha], { cwd: workspace }));
-  await run(GIT, ['diff', '--check', baseSha], { cwd: workspace });
+  if (untrackedPaths.length) await git('add', '-N', '--', ...untrackedPaths);
+  const allPaths = validatePaths(await git('diff', '--name-only', '-z', baseSha));
+  await git('diff', '--check', baseSha);
   const ideaNeedsApproval = event.issue.title.startsWith('[Idea]') && !event.ownerApprovedIdea;
   const publishPaths = ideaNeedsApproval ? [] : allPaths;
-  const patch = publishPaths.length ? await run(GIT, ['diff', '--binary', baseSha], { cwd: workspace }) : Buffer.alloc(0);
+  const patch = publishPaths.length ? await git('diff', '--binary', baseSha) : Buffer.alloc(0);
   const marker = ideaNeedsApproval ? 'submitted' : (summary.match(/^TESTPLEX_STATUS=(submitted|in-progress|waiting-tester)\s*$/m)?.[1] ?? 'submitted');
   let cleanSummary = summary.replace(/^TESTPLEX_STATUS=(submitted|in-progress|waiting-tester)\s*\r?\n?/gm, '').slice(0, 30_000);
   if (ideaNeedsApproval && allPaths.length) {
