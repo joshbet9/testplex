@@ -574,13 +574,17 @@ class ArcadePortGameTest {
         assertEquals(30_000L, ArcadePortRules.DEATH_TAG_CHASER_PROMOTION_INTERVAL_MILLIS);
     }
 
-    @Test void dragonEscapeWaterDamageHonorsTheAuthoredMarkerAndPirateOverride() {
-        assertEquals(0, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGON_ESCAPE,
+    @Test void dragonEscapeWaterDamageUsesNormalRateOnEveryCourseExceptThroughHell() {
+        assertEquals(4, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGON_ESCAPE,
                 "Time Travel"));
         assertEquals(4, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGON_ESCAPE,
-                "Time Travel", true));
-        assertEquals(2, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGON_ESCAPE,
+                "Time Travel", false));
+        assertEquals(4, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGON_ESCAPE,
                 "Pirate Bay", true));
+        assertEquals(4, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGON_ESCAPE,
+                "Steve's Swamp", false));
+        assertEquals(0, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGON_ESCAPE,
+                "Through Hell", true));
         assertEquals(4, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGONS,
                 "Any map", false));
         assertTrue(ArcadePortRules.isDragonEscapeWaterContact(true, false, false));
@@ -1651,15 +1655,15 @@ class ArcadePortGameTest {
         assertEquals(4, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGONS, "Dragons"));
         assertEquals(4, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.RUNNER, "Runner"));
         assertEquals(4, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.SPLEEF, "Spleef"));
-        assertEquals(2, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGON_ESCAPE, "Pirate"));
-        assertEquals(0, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGON_ESCAPE, "Hell"));
+        assertEquals(4, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGON_ESCAPE, "Pirate"));
+        assertEquals(0, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGON_ESCAPE, "Through Hell"));
         assertEquals(0, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.BACON_BRAWL, "Arena"));
     }
 
-    @Test void dragonEscapePirateWaterDamageUsesTheSourceHalfSecondRecharge() {
+    @Test void dragonEscapeWaterDamageUsesTheNormalDamageAndHalfSecondRecharge() {
         assertEquals(500L, ArcadePortRules.DRAGON_ESCAPE_WATER_DAMAGE_INTERVAL_MILLIS);
-        assertEquals(2, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGON_ESCAPE, "Pirate"));
-        assertEquals(0, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGON_ESCAPE, "Hell"));
+        assertEquals(4, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGON_ESCAPE, "Pirate"));
+        assertEquals(0, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGON_ESCAPE, "Through Hell"));
     }
 
     @Test void dragonEscapeHellMapStartsAtNight() {

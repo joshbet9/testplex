@@ -3524,14 +3524,15 @@ public final class ArcadePortRules {
 
  
     /** Legacy Dragon Escape runs its Hell course at night; other courses keep the normal day start. */
-    /** Preserve original per-game water damage and Dragon Escape's map overrides. */
+    /** Preserve original per-game water damage and the approved Dragon Escape course exception. */
     public static int sourceWorldWaterDamage(ArcadePortGame game, String mapName) {
         return sourceWorldWaterDamage(game, mapName, false);
     }
 
     /**
-     * Mineplex's shared WorldWaterDamage flag enables four-damage ticks when a
-     * WorldConfig contains WATER_DAMAGE; Pirate Bay overrides that value to two.
+     * Dragon Escape applies its normal four-damage water tick on every course with
+     * water except Through Hell. This reflects the owner-approved course policy;
+     * actual damage still requires the player to be submerged or touching water.
      */
     public static int sourceWorldWaterDamage(ArcadePortGame game, String mapName,
             boolean hasWaterDamageMarker) {
@@ -3539,9 +3540,8 @@ public final class ArcadePortRules {
         return switch (game) {
             case BOMB_LOBBERS -> 5;
             case DRAGONS, RUNNER, SPLEEF -> 4;
-            case DRAGON_ESCAPE -> mapName != null
-                    && mapName.toLowerCase(java.util.Locale.ROOT).contains("pirate") ? 2
-                    : hasWaterDamageMarker ? 4 : 0;
+            case DRAGON_ESCAPE -> mapName == null
+                    || !mapName.toLowerCase(java.util.Locale.ROOT).contains("through hell") ? 4 : 0;
             default -> 0;
         };
     }
