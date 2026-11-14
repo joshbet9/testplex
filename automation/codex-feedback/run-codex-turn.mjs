@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
 import { createInterface } from 'node:readline';
 
 const PROVIDER = 'testplex_chatgpt_plan_proxy';
@@ -10,12 +9,14 @@ const CODEX = process.env.CODEX_BIN ?? 'codex';
 const TIMEOUT_MS = Number(process.env.CODEX_TURN_TIMEOUT_MS ?? 30 * 60_000);
 
 function safeEnvironment() {
+  const proxyKey = process.env.ACCESS_TOKEN;
+  if (!proxyKey) throw new Error('Local proxy credential is unavailable.');
   const env = {
     PATH: process.env.PATH ?? '/usr/local/bin:/usr/bin:/bin',
     HOME: process.env.HOME ?? '/var/lib/testplex-codex-runner',
     LANG: 'C.UTF-8',
     LC_ALL: 'C.UTF-8',
-    ACCESS_TOKEN: randomBytes(32).toString('hex'),
+    ACCESS_TOKEN: proxyKey,
   };
   if (process.env.TMPDIR) env.TMPDIR = process.env.TMPDIR;
   if (process.env.CODEX_HOME) env.CODEX_HOME = process.env.CODEX_HOME;
