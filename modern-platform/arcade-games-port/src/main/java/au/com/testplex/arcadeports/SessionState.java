@@ -117,7 +117,6 @@ class SessionState {
     long masterBuilderBuildEndsAt;
     long masterBuilderVoteEndsAt;
     long masterBuilderReviewEndsAt;
-    long masterBuilderLastReviewSecond = -1L;
     int masterBuilderReviewIndex;
     Scoreboard masterBuildersScoreboard;
     Objective masterBuildersScoreboardObjective;
