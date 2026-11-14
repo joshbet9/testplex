@@ -137,25 +137,75 @@ jobs:
           echo "has_changes=true" >> "$GITHUB_OUTPUT"
           echo "pr_url=$pr_url" >> "$GITHUB_OUTPUT"
 
-      - name: Comment with findings and the draft PR, if any
+      - name: Comment with findings, status, and draft PR
         if: always() && steps.codex.outputs.final-message != ''
         uses: actions/github-script@v7
         env:
-          GH_TOKEN: ${{ github.token }}
           CODEX_MESSAGE: ${{ steps.codex.outputs.final-message }}
           PR_URL: ${{ steps.publish.outputs.pr_url }}
         with:
           script: |
-            const body = process.env.CODEX_MESSAGE || "Codex did not return a summary.";
-            const pr = process.env.PR_URL;
+            const raw = process.env.CODEX_MESSAGE || "";
+            const marker = raw.match(/^TESTPLEX_STATUS=(submitted|in-progress|waiting-tester)\\s*$/m);
+            const pr = process.env.PR_URL || "";
+            const desired = pr ? "in-progress" : (marker?.[1] || "submitted");
+            const body = raw.replace(/^TESTPLEX_STATUS=(submitted|in-progress|waiting-tester)\\s*\\r?\\n?/m, "").trim();
+            const lifecycle = new Set([
+              "submitted", "in-progress", "waiting-tester", "resolved", "deployed",
+              "needs-triage", "needs-tester-check", "accepted",
+            ]);
+            const current = await github.paginate(github.rest.issues.listLabelsOnIssue, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const present = new Set(current.map(label => label.name));
+            const colors = {
+              "submitted": "d9eaf7",
+              "in-progress": "1d76db",
+              "waiting-tester": "c5def5",
+            };
+            if (!present.has(desired)) {
+              try {
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: desired,
+                  color: colors[desired] || "cfd3d7",
+                  description: "Testplex feedback lifecycle status",
+                });
+              } catch (error) {
+                const alreadyCreated = error.status === 422;
+                if (!alreadyCreated) throw error;
+              }
+            }
+            for (const label of current) {
+              if (lifecycle.has(label.name) && label.name !== desired) {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  name: label.name,
+                });
+              }
+            }
+            if (!present.has(desired)) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                labels: [desired],
+              });
+            }
             const suffix = pr
-              ? `\n\nDraft implementation PR: ${pr}. It is not merged or deployed.`
+              ? `\\n\\nDraft implementation PR: ${pr}. It is not merged or deployed.`
               : "";
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `## Codex feedback review\n\n${body}${suffix}`,
+              body: `## Codex feedback review\\n\\n${body}${suffix}`,
             });
 
       - name: Report an automation failure
