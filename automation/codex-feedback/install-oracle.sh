@@ -58,13 +58,16 @@ install -d -o root -g root -m 0750 /etc/testplex-feedback
 find "$INSTALL_DIR" -maxdepth 1 -type f -name '*.mjs' -delete
 find "$SOURCE_DIR" -maxdepth 1 -type f -name '*.mjs' -exec install -o root -g root -m 0644 '{}' "$INSTALL_DIR/" \;
 install -o root -g root -m 0644 "$SOURCE_DIR"/systemd/*.service /etc/systemd/system/
+install -o root -g root -m 0755 "$SOURCE_DIR/clone-repo.sh" /usr/local/sbin/testplex-feedback-clone-repo
 
 install -o root -g root -m 0755 /dev/stdin /usr/local/sbin/testplex-feedback-run-codex <<'RUNNER'
 #!/usr/bin/env bash
 set -euo pipefail
-if [[ $# -ne 2 ]]; then exit 64; fi
+if [[ $# -ne 3 ]]; then exit 64; fi
 workspace="$(realpath -e -- "$1")"
 context="$(realpath -e -- "$2")"
+model="$3"
+[[ "$model" =~ ^[A-Za-z0-9._-]{1,80}$ ]] || { echo 'model name is invalid' >&2; exit 64; }
 case "$workspace" in /var/lib/testplex-feedback-shared/workspaces/*) ;; *) echo 'workspace outside feedback root' >&2; exit 65 ;; esac
 case "$context" in /var/lib/testplex-feedback-shared/contexts/*.md) ;; *) echo 'context outside feedback root' >&2; exit 65 ;; esac
 [[ -d "$workspace/.git" && -f "$context" ]] || { echo 'workspace/context missing' >&2; exit 66; }
@@ -77,7 +80,7 @@ exec /usr/bin/env -i \
   CODEX_HOME=/var/lib/testplex-codex-runner/.codex \
   CODEX_BIN="$codex_bin" \
   NODE_BIN="$node_bin" \
-  CODEX_MODEL=gpt-6.1-sol \
+  CODEX_MODEL="$model" \
   SIWC_PROXY_URL=http://127.0.0.1:8768/v1 \
   ACCESS_TOKEN="$access_token" \
   LANG=C.UTF-8 LC_ALL=C.UTF-8 \
@@ -86,7 +89,7 @@ RUNNER
 chown root:root /usr/local/sbin/testplex-feedback-run-codex
 chmod 0755 /usr/local/sbin/testplex-feedback-run-codex
 
-printf '%s\n' 'testplex-feedback-worker ALL=(testplex-codex-runner) NOPASSWD: /usr/local/sbin/testplex-feedback-run-codex' > /etc/sudoers.d/testplex-feedback-worker
+printf '%s\n' 'testplex-feedback-worker ALL=(testplex-codex-runner) NOPASSWD: /usr/local/sbin/testplex-feedback-clone-repo, /usr/local/sbin/testplex-feedback-run-codex' > /etc/sudoers.d/testplex-feedback-worker
 chmod 0440 /etc/sudoers.d/testplex-feedback-worker
 visudo -cf /etc/sudoers.d/testplex-feedback-worker >/dev/null
 
@@ -112,6 +115,7 @@ FEEDBACK_DATABASE=/var/lib/testplex-feedback/feedback-events.sqlite
 FEEDBACK_WORK_ROOT=/var/lib/testplex-feedback-shared
 FEEDBACK_PUBLISHER_INBOX=/var/lib/testplex-feedback-publisher/inbox
 CODEX_RUNNER_USER=testplex-codex-runner
+CODEX_MODEL=gpt-6.1-sol
 ENV
 write_template /etc/testplex-feedback/publisher.env <<'ENV'
 GH_TOKEN=REPLACE_WITH_FINE_GRAINED_PUBLISH_TOKEN
