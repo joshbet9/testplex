@@ -1421,8 +1421,13 @@ public final class ArcadePortRules {
     }
 
     public static boolean shouldAllowDragonEscapeBuilderPlacement(
-            long now, long nextChargeAt, boolean hasPendingBrick, boolean targetIsLiquid) {
-        return !hasPendingBrick && !targetIsLiquid && now >= nextChargeAt;
+            long now, long nextChargeAt, boolean hasPendingBrick, boolean placementTouchesWater) {
+        return !hasPendingBrick && !placementTouchesWater && now >= nextChargeAt;
+    }
+
+    public static boolean dragonEscapeBuilderPlacementTouchesWater(
+            boolean clickedBlockIsLiquid, boolean targetBlockIsLiquid) {
+        return clickedBlockIsLiquid || targetBlockIsLiquid;
     }
 
     public static boolean isDragonEscapeWaterContact(boolean inWater, boolean feetInWater, boolean headInWater) {
