@@ -112,7 +112,7 @@ jobs:
 
           while IFS= read -r path; do
             case "$path" in
-              .github/workflows/*|.github/actions/*|AGENTS.md|SECURITY.md)
+              .github/workflows/*|.github/actions/*|.codex/*|AGENTS.md|SECURITY.md)
                 echo "Codex changed a protected automation/instruction path: $path" >&2
                 exit 1
                 ;;
@@ -153,4 +153,16 @@ jobs:
               repo: context.repo.repo,
               issue_number: context.issue.number,
               body: `## Codex feedback review\n\n${body}${suffix}`,
+            });
+
+      - name: Report an automation failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `The automated review run failed before it completed. No fix or deployment is being claimed. Please check this [Actions run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) for the failure details.`,
             });
