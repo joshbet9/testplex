@@ -14542,7 +14542,7 @@ public final class ArcadePortManager implements Listener {
             updateDragonEscapeTunnelBlocks(session);
             updateDragonEscapeResources(session, now);
             updateDragonEscapeMines(session);
-            updateDragonEscapeBuilderBricks(session, now);
+            updateDragonEscapeBuilderBricks(session);
             updateDragonEscapeChase(session);
             if (active == session) {
                 recordDragonEscapeGhostFrames(session, now);
@@ -17398,8 +17398,13 @@ public final class ArcadePortManager implements Listener {
                 target.getX(), target.getY(), target.getZ(),
                 target.getX() + 1, target.getY() + 1, target.getZ() + 1);
         for (Player racer : alivePlayers(session)) {
-            if (racer.getWorld() == session.world
-                    && racer.getBoundingBox().overlaps(placementBox)) {
+            // Vanilla block placement ignores the placing player when checking for
+            // entity collisions. Keep other racers protected, but allow the builder
+            // to place a foothold beside their own hitbox.
+            boolean overlaps = racer.getWorld() == session.world
+                    && racer.getBoundingBox().overlaps(placementBox);
+            if (ArcadePortRules.shouldRejectDragonEscapeBuilderEntityOverlap(
+                    racer.getUniqueId().equals(id), overlaps)) {
                 player.sendActionBar(ChatColor.YELLOW + "A racer is occupying that space.");
                 return;
             }
@@ -17412,9 +17417,7 @@ public final class ArcadePortManager implements Listener {
         // state and inventory immediately to the placing client (including high ping).
         player.sendBlockChange(target.getLocation(), target.getBlockData());
         player.updateInventory();
-        long expiresAt = System.currentTimeMillis()
-                + ArcadePortRules.dragonEscapeBuilderBlockLifetimeMillis(player.getPing());
-        session.dragonEscapeBuilderBricks.put(id, new DragonEscapeBuilderBrick(previous, expiresAt));
+        session.dragonEscapeBuilderBricks.put(id, new DragonEscapeBuilderBrick(previous));
         session.dragonEscapeBuilderLastPlacedAt.put(id, System.currentTimeMillis());
         session.dragonEscapeNextBrickAt.put(id,
                 System.currentTimeMillis() + ArcadePortRules.DRAGON_ESCAPE_BUILDER_RECHARGE_MILLIS);
@@ -17423,7 +17426,7 @@ public final class ArcadePortManager implements Listener {
         player.playSound(target.getLocation(), Sound.BLOCK_STONE_PLACE, 0.65F, 1.3F);
     }
 
-    private void updateDragonEscapeBuilderBricks(Session session, long now) {
+    private void updateDragonEscapeBuilderBricks(Session session) {
         for (Map.Entry<UUID, DragonEscapeBuilderBrick> entry
                 : new ArrayList<>(session.dragonEscapeBuilderBricks.entrySet())) {
             Player owner = session.players.get(entry.getKey());
@@ -17443,7 +17446,7 @@ public final class ArcadePortManager implements Listener {
                             entry.getKey(), ignored -> new HashSet<>()).add(brick);
                 }
             }
-            if (ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(now, brick.expiresAt,
+            if (ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(
                     brick.used, standingOnBrick, session.alive.contains(entry.getKey()))
                     || block.getType() != Material.BRICKS) {
                 restoreDragonEscapeBuilderBrick(brick);
@@ -35444,12 +35447,10 @@ public final class ArcadePortManager implements Listener {
 
     private static final class DragonEscapeBuilderBrick {
         final BlockState original;
-        final long expiresAt;
         boolean used;
 
-        DragonEscapeBuilderBrick(BlockState original, long expiresAt) {
+        DragonEscapeBuilderBrick(BlockState original) {
             this.original = original;
-            this.expiresAt = expiresAt;
         }
     }
 
