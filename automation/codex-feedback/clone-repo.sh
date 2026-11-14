@@ -14,10 +14,10 @@ workspace="$3"
 
 workspace_root="$(realpath -e -- /var/lib/testplex-feedback-shared/workspaces)"
 workspace_parent="$(realpath -e -- "$(dirname -- "$workspace")")"
-case "$workspace_parent" in
-  "$workspace_root"/*) ;;
-  *) echo 'workspace is outside the feedback work root' >&2; exit 65 ;;
-esac
+[[ "$workspace_parent" == "$workspace_root" ]] || {
+  echo 'workspace is outside the feedback work root' >&2
+  exit 65
+}
 [[ "$(basename -- "$workspace")" =~ ^[0-9]+-[a-f0-9]{32}$ ]] || {
   echo 'workspace name is invalid' >&2
   exit 65
