@@ -57,6 +57,8 @@ install -d -o root -g root -m 0750 /etc/testplex-feedback
 
 find "$INSTALL_DIR" -maxdepth 1 -type f -name '*.mjs' -delete
 find "$SOURCE_DIR" -maxdepth 1 -type f -name '*.mjs' -exec install -o root -g root -m 0644 '{}' "$INSTALL_DIR/" \;
+install -o root -g root -m 0644 "$SOURCE_DIR/agent-policy.md" "$INSTALL_DIR/agent-policy.md"
+install -o root -g root -m 0644 "$SOURCE_DIR/tester-feedback-prompt.md" "$INSTALL_DIR/tester-feedback-prompt.md"
 install -o root -g root -m 0644 "$SOURCE_DIR"/systemd/*.service /etc/systemd/system/
 install -o root -g root -m 0755 "$SOURCE_DIR/clone-repo.sh" /usr/local/sbin/testplex-feedback-clone-repo
 install -o root -g root -m 0755 "$SOURCE_DIR/cleanup-workspace.sh" /usr/local/sbin/testplex-feedback-cleanup-workspace
