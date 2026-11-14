@@ -39,5 +39,12 @@ final class ArcadeAchievementProgress {
         return COUNTERS.get(game + "/" + achievement);
     }
 
+    static java.util.List<String> statKeys(String game) {
+        return COUNTERS.entrySet().stream()
+                .filter(entry -> entry.getKey().startsWith(game + "/"))
+                .map(entry -> entry.getValue().statKey())
+                .distinct().sorted().toList();
+    }
+
     private ArcadeAchievementProgress() { }
 }

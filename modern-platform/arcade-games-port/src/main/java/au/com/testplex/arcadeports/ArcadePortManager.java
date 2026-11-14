@@ -25214,12 +25214,7 @@ public final class ArcadePortManager implements Listener {
     private long statsGameMetric(UUID playerId, String gameId, String metric) {
         if ("plexball".equals(gameId) && plugin.getPlexballGame() != null) {
             PlexballGame plexball = plugin.getPlexballGame();
-            return switch (metric) {
-                case "wins" -> plexball.recordedWins(playerId);
-                case "games-played" -> plexball.recordedMatches(playerId);
-                case "losses" -> Math.max(0L, plexball.recordedMatches(playerId) - plexball.recordedWins(playerId));
-                default -> 0L;
-            };
+            return plexball.recordedLeaderboardMetric(playerId, metric);
         }
         String path = localStatsPath(playerId, statsCatalogId(gameId));
         long played = Math.max(0L, plugin.getConfig().getLong(path + "games-played", 0L));
@@ -25238,6 +25233,41 @@ public final class ArcadePortManager implements Listener {
         for (UUID id : statsEligiblePlayers(gameId))
             scores.put(id, statsGameMetric(id, gameId, metric));
         return scores;
+    }
+
+    /**
+     * Returns the complete stat picker for one game. It combines declared progression counters with
+     * numeric counters already present in human player records, including nested map/kit counters.
+     */
+    List<ArcadeLobbyLeaderboardMetricCatalog.Metric> lobbyLeaderboardMetrics(String gameId) {
+        String catalogId = statsCatalogId(gameId);
+        Set<String> statIds = new java.util.TreeSet<>();
+        if ("dragon-escape".equals(gameId)) statIds.add("pb");
+        if ("plexball".equals(gameId)) {
+            statIds.addAll(PlexballGame.leaderboardMetricIds());
+        } else {
+            for (ArcadeProgressCatalog.Milestone milestone : ArcadeProgressCatalog.milestones(catalogId))
+                statIds.add(milestone.statKey());
+            statIds.addAll(ArcadeAchievementProgress.statKeys(catalogId));
+            var root = plugin.getConfig().getConfigurationSection("local-stats");
+            if (root != null) {
+                for (String playerKey : root.getKeys(false)) {
+                    UUID playerId;
+                    try { playerId = UUID.fromString(playerKey); }
+                    catch (IllegalArgumentException ignored) { continue; }
+                    if (testPlayers.isTestPlayer(playerId)) continue;
+                    String path = localStatsPath(playerId, catalogId);
+                    var stats = plugin.getConfig().getConfigurationSection(path);
+                    if (stats == null) continue;
+                    for (String key : stats.getKeys(true)) {
+                        if (plugin.getConfig().get(path + key) instanceof Number
+                                && ArcadeLobbyLeaderboardMetricCatalog.isSelectableStatId(key))
+                            statIds.add(key);
+                    }
+                }
+            }
+        }
+        return ArcadeLobbyLeaderboardMetricCatalog.metrics(gameId, statIds);
     }
 
     /** Dragon Escape records are stored independently per map and kit. Smaller times rank higher. */
