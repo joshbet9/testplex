@@ -87,7 +87,7 @@ exec /usr/bin/env -i \
   SIWC_PROXY_URL=http://127.0.0.1:8768/v1 \
   ACCESS_TOKEN="$access_token" \
   LANG=C.UTF-8 LC_ALL=C.UTF-8 \
-  "$NODE_BIN" /opt/testplex-codex-feedback/run-codex-turn.mjs "$workspace" "$context"
+  "$node_bin" /opt/testplex-codex-feedback/run-codex-turn.mjs "$workspace" "$context"
 RUNNER
 chown root:root /usr/local/sbin/testplex-feedback-run-codex
 chmod 0755 /usr/local/sbin/testplex-feedback-run-codex
