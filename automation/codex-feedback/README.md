@@ -137,7 +137,12 @@ enable a service if a secret is still a `REPLACE_...` placeholder.
 
 The event receiver, durable queue, issue-context loader, isolated Codex runner,
 publisher, SIWC bootstrap/refresh proxy, systemd units and Oracle installer are
-implemented in this branch. They have not been installed on Oracle or exercised
-with a real GitHub webhook or ChatGPT authorization. Keep PR #461 in draft until
-the maintainer reviews the code and completes the one-time setup and event
-acceptance flow. Do not transfer credentials before that review.
+implemented in this branch. On 2026-11-14, Node.js 22.23.5, GitHub CLI 2.104.0
+and Codex CLI 0.169.0 were installed on the Oracle VM; service accounts, units
+and private configuration templates were installed, and the Caddy webhook route
+was added with a backup. All four units remain disabled and inactive. The
+configuration files are root-owned mode 0600. No GitHub webhook or tokens, nor
+ChatGPT authorization, have been configured; no real event or draft PR has been
+processed. Keep PR #461 in draft until the maintainer reviews the code and
+completes the one-time setup and event acceptance flow. Do not transfer
+credentials before that review.
