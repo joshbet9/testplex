@@ -3411,6 +3411,11 @@ public final class ArcadePortRules {
                 projectile ? GLADIATOR_PROJECTILE_NO_DAMAGE_TICKS : GLADIATOR_MELEE_NO_DAMAGE_TICKS));
     }
 
+    /** A blocked hit must not apply damage, knockback, feedback, or progression credit. */
+    public static boolean isGladiatorDamageWindowOpen(int remainingNoDamageTicks) {
+        return remainingNoDamageTicks <= 0;
+    }
+
     public static int gladiatorsEnvironmentalNoDamageTicks() {
         return Math.max(0, GameDebugRuntimeOverrides.intValue("GLADIATOR_ENVIRONMENTAL_NO_DAMAGE_TICKS",
                 GLADIATOR_ENVIRONMENTAL_NO_DAMAGE_TICKS));
