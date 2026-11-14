@@ -3413,6 +3413,10 @@ public final class ArcadePortRules {
                 GLADIATOR_POTION_HEALING));
     }
 
+    public static org.bukkit.potion.PotionType gladiatorsPotionType() {
+        return org.bukkit.potion.PotionType.HEALING;
+    }
+
     public static double gladiatorsPotionSplashRadius() {
         return Math.max(0.1D, GameDebugRuntimeOverrides.doubleValue("GLADIATOR_POTION_SPLASH_RADIUS",
                 GLADIATOR_POTION_SPLASH_RADIUS));
