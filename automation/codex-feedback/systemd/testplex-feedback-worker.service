@@ -1,8 +1,8 @@
 [Unit]
 Description=Testplex issue analysis and Codex draft preparation worker
-After=network-online.target testplex-feedback-oauth-proxy.service
+After=network-online.target testplex-feedback-oauth-proxy.service testplex-feedback-webhook.service
 Wants=network-online.target
-Requires=testplex-feedback-oauth-proxy.service
+Requires=testplex-feedback-oauth-proxy.service testplex-feedback-webhook.service
 
 [Service]
 Type=simple
