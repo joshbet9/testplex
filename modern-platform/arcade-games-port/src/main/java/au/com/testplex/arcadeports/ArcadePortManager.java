@@ -21518,9 +21518,8 @@ public final class ArcadePortManager implements Listener {
     private void resolveEvolutionGolemSlam(Session session, Player player) {
         if (active != session || !session.alive.contains(player.getUniqueId())) return;
         Location centre = player.getLocation().clone();
-        session.world.spawnParticle(Particle.EXPLOSION, centre, 1, 0.1D, 0.1D, 0.1D, 0.0D);
-        session.world.spawnParticle(Particle.CLOUD, centre, 32, 2.0D, 0.2D, 2.0D, 0.1D);
-        session.world.playSound(centre, Sound.ENTITY_GENERIC_EXPLODE, 1.2F, 0.65F);
+        session.world.playSound(centre, Sound.ENTITY_ZOMBIE_ATTACK_WOODEN_DOOR, 2.0F, 0.2F);
+        playEvolutionGolemSlamGroundEffects(centre);
         for (Player target : alivePlayers(session)) {
             if (target.equals(player)) continue;
             double distance = target.getLocation().distance(centre);
@@ -21535,6 +21534,28 @@ public final class ArcadePortManager implements Listener {
                 awardCatalogAchievement(player, "evolution", "groundbreaker");
             }
             if (active != session) return;
+        }
+    }
+
+    private void playEvolutionGolemSlamGroundEffects(Location centre) {
+        World world = centre.getWorld();
+        if (world == null) return;
+        int centreX = centre.getBlockX();
+        int centreY = centre.getBlockY();
+        int centreZ = centre.getBlockZ();
+        for (int x = centreX - 4; x <= centreX + 4; x++) {
+            for (int y = centreY - 4; y <= centreY + 4; y++) {
+                for (int z = centreZ - 4; z <= centreZ + 4; z++) {
+                    Block block = world.getBlockAt(x, y, z);
+                    if (block.getLocation().distanceSquared(centre) > 16.0D
+                            || !block.getType().isSolid()
+                            || block.getRelative(BlockFace.UP).getType().isSolid()
+                            || ThreadLocalRandom.current().nextDouble() < 0.9D) {
+                        continue;
+                    }
+                    world.playEffect(block.getLocation(), Effect.STEP_SOUND, block.getType());
+                }
+            }
         }
     }
 
@@ -21576,14 +21597,15 @@ public final class ArcadePortManager implements Listener {
         session.evolutionAbilitiesUsed.add(id);
         session.evolutionGolemSlamHitTargets.put(id, new HashSet<>());
         cooldownProgress.start(player, "Seismic Slam", cooldown);
-        Vector direction = player.getLocation().getDirection();
-        if (direction.getY() < 0.0D) direction.setY(-direction.getY());
-        if (direction.lengthSquared() < 0.001D) direction = new Vector(0.0D, 0.5D, 1.0D);
-        player.setVelocity(direction.normalize().multiply(GameDebugRuntimeOverrides.doubleValue(
-                "EVOLUTION_GOLEM_SLAM_LAUNCH_SPEED", ArcadePortRules.EVOLUTION_GOLEM_SLAM_LAUNCH_SPEED)));
+        Vector direction = ArcadePortRules.evolutionGolemSlamLaunchVelocity(
+                player.getLocation().getDirection(), GameDebugRuntimeOverrides.doubleValue(
+                        "EVOLUTION_GOLEM_SLAM_LAUNCH_SPEED", ArcadePortRules.EVOLUTION_GOLEM_SLAM_LAUNCH_SPEED),
+                player.isOnGround());
+        // The original UtilAction.velocity resets accumulated fall distance before launching.
+        player.setFallDistance(0.0F);
+        player.setVelocity(direction);
         session.evolutionGolemSlamStartedAt.put(id, now);
         player.sendMessage(ChatColor.GREEN + "Seismic Slam!");
-        player.playSound(player.getLocation(), Sound.ENTITY_IRON_GOLEM_ATTACK, 0.9F, 0.8F);
     }
 
     private void startEvolutionFlamethrower(Session session, Player player, long now) {
