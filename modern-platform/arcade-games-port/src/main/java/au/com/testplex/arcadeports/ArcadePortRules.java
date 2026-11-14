@@ -1709,6 +1709,15 @@ public final class ArcadePortRules {
                 "DRAGONS_RETARGET_DISTANCE_SQUARED", DRAGONS_RETARGET_DISTANCE_SQUARED);
     }
 
+    /** Return a fixed per-tick flight vector toward the current source-selected target. */
+    public static Vector dragonsFlightVelocity(Vector position, Vector target, double speed) {
+        if (position == null || target == null || !Double.isFinite(speed) || speed <= 0.0D) return new Vector();
+        Vector direction = target.clone().subtract(position);
+        if (!Double.isFinite(direction.getX()) || !Double.isFinite(direction.getY())
+                || !Double.isFinite(direction.getZ()) || direction.lengthSquared() < 1.0E-8D) return new Vector();
+        return direction.normalize().multiply(speed);
+    }
+
     /** Only allow a Dragons entity to target the living player selected by the round controller. */
     public static boolean shouldAllowDragonEntityTarget(UUID requestedTargetId, UUID selectedTargetId,
             boolean targetAlive, boolean dragonControlled) {

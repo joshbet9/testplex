@@ -16409,14 +16409,13 @@ public final class ArcadePortManager implements Listener {
                 Location spawn = spawns.get(ThreadLocalRandom.current().nextInt(spawns.size())).clone();
                 if (fallbackSpawn) spawn.add(0.0D, 12.0D, 0.0D);
                 EnderDragon dragon = session.world.spawn(spawn, EnderDragon.class);
-                dragon.setAI(true);
+                dragon.setAI(false);
                 dragon.setGravity(false);
                 var flightSpeed = dragon.getAttribute(Attribute.FLYING_SPEED);
                 if (flightSpeed != null) {
                     flightSpeed.setBaseValue(GameDebugRuntimeOverrides.doubleValue(
                             "DRAGONS_AUTONOMOUS_FLIGHT_SPEED", ArcadePortRules.DRAGONS_AUTONOMOUS_FLIGHT_SPEED));
                 }
-                dragon.setPhase(EnderDragon.Phase.CIRCLING);
                 dragon.setCollidable(false);
                 dragon.setRemoveWhenFarAway(false);
                 session.entities.add(dragon);
@@ -16528,22 +16527,15 @@ public final class ArcadePortManager implements Listener {
                         ArcadePortRules.DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED)) {
                     dragon.setAI(false);
                     dragon.setTarget(null);
+                    dragon.setVelocity(new Vector());
+                    session.dragonFlightVectors.remove(dragonId);
                     continue;
                 }
-                dragon.setAI(true);
-                UUID selectedPlayer = session.dragonTargetPlayers.get(dragonId);
-                Player nativeTarget = selectedPlayer == null ? null : session.players.get(selectedPlayer);
-                if (nativeTarget != null && nativeTarget.isOnline() && session.alive.contains(selectedPlayer)) {
-                    dragon.setTarget(nativeTarget);
-                    if (dragon.getPhase() != EnderDragon.Phase.STRAFING) {
-                        dragon.setPhase(EnderDragon.Phase.STRAFING);
-                    }
-                } else {
-                    dragon.setTarget(null);
-                    if (dragon.getPhase() != EnderDragon.Phase.CIRCLING) {
-                        dragon.setPhase(EnderDragon.Phase.CIRCLING);
-                    }
-                }
+                // Paper's native EnderDragon controller does not reliably follow
+                // the source-selected target on custom arcade maps. Keep target
+                // selection source-driven and steer the dragon directly each tick.
+                dragon.setAI(false);
+                dragon.setTarget(null);
             }
 
         }
@@ -16579,6 +16571,22 @@ public final class ArcadePortManager implements Listener {
                     // A failed teleport must not leave a no-AI dragon stranded at spawn.
                     dragon.setAI(true);
                     dragon.setVelocity(flight);
+                }
+            } else if (controllerId == null
+                    && GameDebugRuntimeOverrides.booleanValue("DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED",
+                            ArcadePortRules.DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED)) {
+                Location target = session.dragonTargetLocations.get(dragonId);
+                if (target != null) {
+                    Vector heading = ArcadePortRules.dragonsFlightVelocity(
+                            dragon.getLocation().toVector(), target.toVector(), GameDebugRuntimeOverrides.doubleValue(
+                                    "DRAGONS_AUTONOMOUS_FLIGHT_SPEED", ArcadePortRules.DRAGONS_AUTONOMOUS_FLIGHT_SPEED));
+                    if (heading.lengthSquared() > 0.0D) {
+                        dragon.setVelocity(heading);
+                        Location facing = dragon.getLocation().clone();
+                        facing.setDirection(heading);
+                        dragon.setRotation(facing.getYaw(), facing.getPitch());
+                        session.dragonFlightVectors.put(dragonId, heading.clone());
+                    }
                 }
             }
             if (targetUpdate && controllerId == null) damageDragonTerrainAlongPath(session, dragon);
