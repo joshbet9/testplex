@@ -36,7 +36,7 @@ final class EvolutionDebugRulesTest {
         assertEquals(250L, ArcadePortRules.evolutionWaterDamageIntervalMillis());
         assertEquals(1.0D, ArcadePortRules.evolutionWaterDamage());
         assertEquals(1_000L, ArcadePortRules.evolutionGolemSlamImpactDelayMillis());
-        assertVectorEquals(new org.bukkit.util.Vector(0.0D, 1.0D, 0.8D),
+        assertVectorEquals(new org.bukkit.util.Vector(0.0D, 0.8D, 0.8D),
                 ArcadePortRules.evolutionGolemSlamLaunchVelocity(new org.bukkit.util.Vector(0.0D, -3.0D, 4.0D), 1.0D, true));
         assertEquals(1_000L, ArcadePortRules.evolutionSlimeSlamMaxDurationMillis());
         assertEquals(100L, ArcadePortRules.evolutionSlimeSlamMinAirtimeMillis());
@@ -48,11 +48,11 @@ final class EvolutionDebugRulesTest {
     @Test void seismicSlamLaunchMirrorsDownwardAimCapsVerticalSpeedAndBoostsGroundLaunch() {
         org.bukkit.util.Vector airborne = ArcadePortRules.evolutionGolemSlamLaunchVelocity(
                 new org.bukkit.util.Vector(0.0D, -3.0D, 4.0D), 1.0D, false);
-        assertEquals(0.8D, airborne.getY(), 0.0000001D);
+        assertEquals(0.6D, airborne.getY(), 0.0000001D);
         assertEquals(0.8D, airborne.getZ(), 0.0000001D);
         org.bukkit.util.Vector grounded = ArcadePortRules.evolutionGolemSlamLaunchVelocity(
                 new org.bukkit.util.Vector(0.0D, -3.0D, 4.0D), 1.0D, true);
-        assertEquals(1.0D, grounded.getY(), 0.0000001D);
+        assertEquals(0.8D, grounded.getY(), 0.0000001D);
         assertEquals(0.8D, grounded.getZ(), 0.0000001D);
         org.bukkit.util.Vector fallback = ArcadePortRules.evolutionGolemSlamLaunchVelocity(
                 new org.bukkit.util.Vector(), 1.0D, false);
