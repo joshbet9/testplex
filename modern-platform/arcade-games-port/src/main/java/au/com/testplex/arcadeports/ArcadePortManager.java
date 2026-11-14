@@ -8031,7 +8031,10 @@ public final class ArcadePortManager implements Listener {
                             "Right-click to restore two hearts.", potionCount);
                     ItemMeta meta = potions.getItemMeta();
                     if (meta instanceof org.bukkit.inventory.meta.PotionMeta potionMeta) {
-                        potionMeta.setColor(Color.PURPLE);
+                        // Preserve the match's duel-scoped, distance-scaled heal
+                        // in the splash handler while using the vanilla potion
+                        // type and client presentation for the held item.
+                        potionMeta.setBasePotionType(ArcadePortRules.gladiatorsPotionType());
                     }
                     meta.getPersistentDataContainer().set(gladiatorPotionKey, PersistentDataType.BYTE, (byte) 1);
                     potions.setItemMeta(meta);
