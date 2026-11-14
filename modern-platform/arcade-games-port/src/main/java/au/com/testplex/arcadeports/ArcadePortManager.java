@@ -7216,7 +7216,7 @@ public final class ArcadePortManager implements Listener {
                     SUPER_SPLOOR, PLEXBALL, MASTER_BUILDERS, SNEAKY_ASSASSINS,
                     SPEED_BUILDERS,
                     MONSTER_MAZE, MONSTER_MAZE_SPEED, MONSTER_MAZE_MODERN, SNAKE,
-                    WIZARDS, CAMERA_SHY -> false;
+                    WIZARDS, CAMERA_SHY, EVOLUTION -> false;
             case MICRO_BATTLES, RUNNER, SHEEP_QUEST, SPLEEF,
                     TURF_WARS, DRAW_MY_THING, SKY_WARS, MILK_THE_COW,
                     WITHER_ASSAULT -> true;
