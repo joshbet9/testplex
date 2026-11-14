@@ -30914,17 +30914,17 @@ public final class ArcadePortManager implements Listener {
         player.setExp(charges / (float) maximumUses);
     }
 
-    /** Match Reborn's UtilBlock.usable guard so map containers, switches and doors stay inert. */
+    /** Keep course controls usable while suppressing accidental container/switch interactions. */
     private boolean isDragonEscapeUsableBlock(Block block) {
         if (block == null) return false;
+        if (ArcadePortRules.isDragonEscapeDoorInteractionAllowed(block.getType().name())) return false;
         if (block.getState() instanceof org.bukkit.block.Container) return true;
         BlockData data = block.getBlockData();
         if (data instanceof org.bukkit.block.data.Openable
                 || data instanceof org.bukkit.block.data.Powerable
                 || data instanceof org.bukkit.block.data.type.Switch) return true;
         String material = block.getType().name();
-        if (material.endsWith("_BED") || material.endsWith("_DOOR")
-                || material.endsWith("_TRAPDOOR") || material.endsWith("_FENCE_GATE")
+        if (material.endsWith("_BED") || material.endsWith("_FENCE_GATE")
                 || material.endsWith("_BUTTON")) return true;
         return material.equals("DISPENSER") || material.equals("DROPPER")
                 || material.equals("HOPPER") || material.equals("CRAFTING_TABLE")

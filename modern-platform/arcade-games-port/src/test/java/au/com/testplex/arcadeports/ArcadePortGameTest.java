@@ -1666,6 +1666,16 @@ class ArcadePortGameTest {
         assertEquals(0, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGON_ESCAPE, "Through Hell"));
     }
 
+    @Test void dragonEscapeCourseDoorsAndTrapdoorsRemainInteractable() {
+        assertTrue(ArcadePortRules.isDragonEscapeDoorInteractionAllowed("OAK_DOOR"));
+        assertTrue(ArcadePortRules.isDragonEscapeDoorInteractionAllowed("IRON_DOOR"));
+        assertTrue(ArcadePortRules.isDragonEscapeDoorInteractionAllowed("SPRUCE_TRAPDOOR"));
+        assertTrue(ArcadePortRules.isDragonEscapeDoorInteractionAllowed("COPPER_TRAPDOOR"));
+        assertFalse(ArcadePortRules.isDragonEscapeDoorInteractionAllowed("CHEST"));
+        assertFalse(ArcadePortRules.isDragonEscapeDoorInteractionAllowed("OAK_FENCE_GATE"));
+        assertFalse(ArcadePortRules.isDragonEscapeDoorInteractionAllowed(null));
+    }
+
     @Test void dragonEscapeHellMapStartsAtNight() {
         assertEquals(16_000L, ArcadePortRules.dragonEscapeWorldTime("Dragon Escape Hell"));
         assertEquals(12_000L, ArcadePortRules.dragonEscapeWorldTime("Dragon Escape Pirate"));

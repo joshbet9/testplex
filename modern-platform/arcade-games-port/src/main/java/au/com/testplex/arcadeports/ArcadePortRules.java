@@ -3578,6 +3578,13 @@ public final class ArcadePortRules {
         return sourceWorldTime(ArcadePortGame.DRAGON_ESCAPE, mapName);
     }
 
+    /** Doors and trapdoors are authored course controls and remain usable during races. */
+    public static boolean isDragonEscapeDoorInteractionAllowed(String materialName) {
+        if (materialName == null) return false;
+        String material = materialName.toUpperCase(java.util.Locale.ROOT);
+        return material.endsWith("_DOOR") || material.endsWith("_TRAPDOOR");
+    }
+
     /** The source game finishes near its final map waypoint, not anywhere on a Z plane. */
     public static boolean isDragonEscapeFinishReached(double x, double y, double z) {
         double dx = x - GameDebugRuntimeOverrides.doubleValue("DRAGON_ESCAPE_FINISH_X", DRAGON_ESCAPE_FINISH_X);
