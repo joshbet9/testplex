@@ -77,9 +77,13 @@ export async function loadIssueContext({ repository, issueNumber, token, eventNa
   const triggerComment = Number.isSafeInteger(triggerCommentId)
     ? humanComments.find((comment) => comment.id === triggerCommentId)
     : undefined;
+  const triggerCommentText = (triggerComment?.body ?? '')
+    .replace(/^\s*\*\*[^*]+\*\*\s*/i, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .trim();
   const ownerApprovedIdea = issue.title.startsWith('[Idea]') && eventName === 'issue_comment' &&
     actor?.toLowerCase() === ownerLogin && triggerComment?.user?.login?.toLowerCase() === ownerLogin &&
-    /^\s*(?:approved?|i\s+approve(?:\s+this)?(?:\s+idea)?|agree(?:\s+with\s+this)?)\b[.!\s]*/i.test(triggerComment.body ?? '');
+    /^\s*(?:approved?|i\s+approve(?:\s+this)?(?:\s+idea)?|agree(?:\s+with\s+this)?|i(?:['’])?ll\s+go\s+with\s+your\s+recommendation)\b[.!\s]*/i.test(triggerCommentText);
   const parent = await githubJson(`${API}/repos/${encodedRepo}/issues/${issueNumber}/parent`, token, { allowNotFound: true });
   const children = await listSubIssues(encodedRepo, issueNumber, token);
   const tracker = parent ? {
