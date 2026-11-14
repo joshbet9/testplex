@@ -11,6 +11,7 @@ const SHARED_ROOT = resolve(process.env.FEEDBACK_WORK_ROOT ?? '/var/lib/testplex
 const PUBLISHER_INBOX = resolve(process.env.FEEDBACK_PUBLISHER_INBOX ?? '/var/lib/testplex-feedback-publisher/inbox');
 const RUNNER_LAUNCHER = process.env.CODEX_RUNNER_LAUNCHER ?? '/usr/local/sbin/testplex-feedback-run-codex';
 const CLONE_LAUNCHER = process.env.CODEX_CLONE_LAUNCHER ?? '/usr/local/sbin/testplex-feedback-clone-repo';
+const CLEANUP_LAUNCHER = process.env.CODEX_CLEANUP_LAUNCHER ?? '/usr/local/sbin/testplex-feedback-cleanup-workspace';
 const CODEX_MODEL = process.env.CODEX_MODEL ?? 'gpt-6.1-sol';
 
 function run(command, args, options = {}) {
@@ -90,7 +91,7 @@ export async function processEvent(eventRow) {
   if (!resolve(workspace).startsWith(`${workspaceRoot}/`) || !resolve(inbox).startsWith(`${inboxRoot}/`)) {
     throw new Error('Generated event paths escaped their configured work roots.');
   }
-  await rm(workspace, { recursive: true, force: true });
+  await run(SUDO, ['-n', '-u', RUNNER_USER, '--', CLEANUP_LAUNCHER, workspace]);
   await rm(inbox, { recursive: true, force: true });
   try {
   process.stdout.write(`[feedback-worker] issue=${issueNumber} stage=clone branch=${base}\n`);
@@ -149,7 +150,7 @@ export async function processEvent(eventRow) {
   return { stagedForPublisher: true, issueNumber, changedPaths: publishPaths, eventId, inboxPath: inbox };
   } finally {
     await Promise.all([
-      rm(workspace, { recursive: true, force: true }),
+      run(SUDO, ['-n', '-u', RUNNER_USER, '--', CLEANUP_LAUNCHER, workspace]),
       rm(contextPath, { force: true }),
     ]);
   }
