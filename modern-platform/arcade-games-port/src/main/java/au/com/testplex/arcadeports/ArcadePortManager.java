@@ -7122,7 +7122,8 @@ public final class ArcadePortManager implements Listener {
             }
         }
         session.gladiatorMode = GladiatorsMode.defaultMode().id();
-        session.gladiatorVotingEndsAt = System.currentTimeMillis() + ArcadePortRules.gladiatorsVoteMillis();
+        session.gladiatorVotingStartedAt = System.currentTimeMillis();
+        session.gladiatorVotingEndsAt = session.gladiatorVotingStartedAt + ArcadePortRules.gladiatorsVoteMillis();
         announce(session, ChatColor.GOLD + "Gladiators vote: choose the PvP rules for this tournament.");
         for (Player player : session.players.values()) {
             if (player == null || !player.isOnline()) continue;
@@ -7557,7 +7558,15 @@ public final class ArcadePortManager implements Listener {
                     session.gladiatorNextPoisonAtByPair.getOrDefault(pair, Long.MAX_VALUE));
         }
         String status;
-        if (activeMatches == 0) status = session.gladiatorVotingEndsAt > now ? "Vote" : "Waiting";
+        boolean voting = activeMatches == 0 && session.gladiatorVotingEndsAt > now;
+        GladiatorVoteProgress.View voteProgress = voting
+                ? GladiatorVoteProgress.at(now, session.gladiatorVotingStartedAt, session.gladiatorVotingEndsAt)
+                : null;
+        if (voting) {
+            long seconds = voteProgress.secondsLeft();
+            status = "Voting " + seconds + (seconds == 1L ? " second" : " seconds") + " left";
+        }
+        else if (activeMatches == 0) status = "Waiting";
         else if (now < nextFightAt) status = "Starting in " + Math.max(1, (nextFightAt - now + 999L) / 1_000L) + "s";
         else if (now >= nextPoisonAt) status = "Poison Active";
         else status = "Poison in " + Math.max(0, (nextPoisonAt - now + 500L) / 1_000L) + "s";
@@ -7566,6 +7575,15 @@ public final class ArcadePortManager implements Listener {
                 .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER)).toList();
         for (Map.Entry<UUID, GladiatorScoreboardView> scoreboardEntry : session.gladiatorScoreboards.entrySet()) {
             GladiatorScoreboardView view = scoreboardEntry.getValue();
+            Player viewer = session.players.get(scoreboardEntry.getKey());
+            if (voting && viewer != null && viewer.isOnline()) {
+                String bar = ChatColor.GREEN + "▰".repeat(voteProgress.greenSegments())
+                        + ChatColor.RED + "▰".repeat(voteProgress.redSegments())
+                        + ChatColor.GRAY + " Voting " + ChatColor.WHITE
+                        + (voteProgress.remainingTenths() / 10L) + "."
+                        + (voteProgress.remainingTenths() % 10L) + " seconds";
+                viewer.sendActionBar(bar);
+            }
             List<String> lines = new ArrayList<>();
             lines.add(ChatColor.GREEN + "Status");
             lines.add(ChatColor.WHITE + status);
@@ -7642,6 +7660,7 @@ public final class ArcadePortManager implements Listener {
     private void resolveGladiatorVote(Session session) {
         if (active != session || session.gladiatorVotingEndsAt <= 0L) return;
         session.gladiatorVotingEndsAt = 0L;
+        session.gladiatorVotingStartedAt = 0L;
         GladiatorsMode selected = GladiatorsVoteOptions.winner(
                 session.gladiatorVoteOptions, session.gladiatorVotes.values());
         if (GameDebugRuntimeOverrides.isDebugSession() && ArcadePortRules.gladiatorsForceModeEnabled()) {
@@ -7649,9 +7668,11 @@ public final class ArcadePortManager implements Listener {
         }
         session.gladiatorMode = selected.id();
         for (Player player : session.players.values()) {
-            if (player != null && player.isOnline()
-                    && player.getOpenInventory().getTopInventory().getHolder() instanceof GladiatorMenuHolder holder
-                    && holder.type == GladiatorMenuType.VOTE) player.closeInventory();
+            if (player != null && player.isOnline()) {
+                player.sendActionBar("");
+                if (player.getOpenInventory().getTopInventory().getHolder() instanceof GladiatorMenuHolder holder
+                        && holder.type == GladiatorMenuType.VOTE) player.closeInventory();
+            }
         }
         announce(session, ChatColor.GOLD + "Gladiators rules selected: " + ChatColor.YELLOW
                 + selected.displayName() + ChatColor.GOLD + ". First-loss players enter the parallel loser's bracket.");

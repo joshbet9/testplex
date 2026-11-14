@@ -277,6 +277,7 @@ class SessionState {
     int gladiatorWinnerArenaCursor;
     int gladiatorLoserArenaCursor;
     long gladiatorVotingEndsAt;
+    long gladiatorVotingStartedAt;
     boolean gladiatorWinnerBracketStarted;
     String gladiatorMode = "rodless";
     final Map<UUID, Integer> teams = new HashMap<>();
