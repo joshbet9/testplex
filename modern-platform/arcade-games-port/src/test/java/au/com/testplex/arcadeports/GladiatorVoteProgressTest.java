@@ -7,12 +7,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class GladiatorVoteProgressTest {
     @Test
     void exposesElapsedAndRemainingSegmentsAndCeilingSeconds() {
-        GladiatorVoteProgress.View view = GladiatorVoteProgress.at(5_500L, 0L, 10_000L);
+        GladiatorVoteProgress.View view = GladiatorVoteProgress.at(5_000L, 0L, 10_000L);
 
         assertEquals(12, view.greenSegments());
         assertEquals(12, view.redSegments());
         assertEquals(5L, view.secondsLeft());
-        assertEquals(45L, view.remainingTenths());
+        assertEquals(50L, view.remainingTenths());
     }
 
     @Test
