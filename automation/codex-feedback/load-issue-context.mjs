@@ -83,7 +83,7 @@ export async function loadIssueContext({ repository, issueNumber, token, eventNa
     .trim();
   const ownerApprovedIdea = issue.title.startsWith('[Idea]') && eventName === 'issue_comment' &&
     actor?.toLowerCase() === ownerLogin && triggerComment?.user?.login?.toLowerCase() === ownerLogin &&
-    /^\s*(?:approved?|i\s+approve(?:\s+this)?(?:\s+idea)?|agree(?:\s+with\s+this)?|i(?:['’])?ll\s+go\s+with\s+your\s+recommendation)\b[.!\s]*/i.test(triggerCommentText);
+    /^\s*(?:approved?|i\s+approve(?:\s+this)?(?:\s+idea)?|agree(?:\s+with\s+this)?|correct|i(?:['’])?ll\s+go\s+with\s+your\s+recommendation)\b[.!\s]*/i.test(triggerCommentText);
   const parent = await githubJson(`${API}/repos/${encodedRepo}/issues/${issueNumber}/parent`, token, { allowNotFound: true });
   const children = await listSubIssues(encodedRepo, issueNumber, token);
   const tracker = parent ? {
