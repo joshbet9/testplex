@@ -1900,6 +1900,13 @@ class ArcadePortGameTest {
         assertEquals(500L, ArcadePortRules.DRAGON_ESCAPE_SCORE_UPDATE_MILLIS);
     }
 
+    @Test void dragonEscapeDouglasFacesOppositeTheRouteVelocityLikeTheSourceModel() {
+        assertEquals(180.0F, ArcadePortRules.dragonEscapeModelYaw(new Vector(0, 0, 1)), 0.0001F);
+        assertEquals(90.0F, ArcadePortRules.dragonEscapeModelYaw(new Vector(1, 0, 0)), 0.0001F);
+        assertEquals(360.0F, ArcadePortRules.dragonEscapeModelYaw(new Vector(0, 0, -1)), 0.0001F);
+        assertEquals(180.0F, ArcadePortRules.dragonEscapeModelYaw(new Vector()), 0.0001F);
+    }
+
     @Test void dragonEscapeLeapUsesSourceVelocityClampBeforeGroundBoostAndSourceItemCharges() {
         assertEquals(0.4D, ArcadePortRules.dragonEscapeLeapVerticalVelocity(0.0D, true), 0.00001D);
         assertEquals(1.0D, ArcadePortRules.dragonEscapeLeapVerticalVelocity(0.9D, false), 0.00001D);

@@ -17783,11 +17783,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private float dragonEscapeYaw(Vector vector) {
-        if (vector == null || !Double.isFinite(vector.getX()) || !Double.isFinite(vector.getZ())
-                || vector.lengthSquared() < 1.0E-12D) return 0.0F;
-        double yaw = Math.toDegrees(Math.atan((-vector.getX()) / vector.getZ()));
-        if (vector.getZ() < 0.0D) yaw += 180.0D;
-        return (float) yaw;
+        return ArcadePortRules.dragonEscapeModelYaw(vector);
     }
 
     private Location moveDragonEscapeDragon(Session session, Location target) {
@@ -17820,9 +17816,8 @@ public final class ArcadePortManager implements Listener {
         location.add(velocity.clone().multiply(speed));
         location.add(0.0D, -pitch, 0.0D);
         location.setPitch(-pitch);
-        // The 1.8 DragonEscapeData explicitly adds 180 degrees because Douglas's
-        // model faces opposite the Bukkit vector yaw. Without this, the dragon's
-        // body points backward along its otherwise-correct route movement.
+        // Reborn's DragonEscapeData adds 180 degrees because Douglas's model
+        // faces opposite the Bukkit vector yaw. Match that model heading here.
         location.setYaw(dragonEscapeYaw(velocity));
         session.dragonEscapeDragonVelocity = velocity;
         session.dragonEscapeDragonPitch = pitch;
