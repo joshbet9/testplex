@@ -1947,17 +1947,14 @@ class ArcadePortGameTest {
                 ArcadePortRules.dragonEscapeNextTntChargeAt(-1_000L) - (-1_000L));
     }
 
-    @Test void dragonEscapeBuilderPlacementHasLatencyWindowAndStaysUntilUsedBrickIsVacated() {
-        assertEquals(2_000L, ArcadePortRules.dragonEscapeBuilderBlockLifetimeMillis(0));
-        assertEquals(2_100L, ArcadePortRules.dragonEscapeBuilderBlockLifetimeMillis(100));
-        assertEquals(2_900L, ArcadePortRules.dragonEscapeBuilderBlockLifetimeMillis(900));
-        assertEquals(5_000L, ArcadePortRules.dragonEscapeBuilderBlockLifetimeMillis(9_000));
-        assertEquals(2_000L, ArcadePortRules.dragonEscapeBuilderBlockLifetimeMillis(-20));
-        assertFalse(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(1_999L, 2_000L, false, false, true));
-        assertTrue(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(2_000L, 2_000L, false, false, true));
-        assertFalse(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(20_000L, 2_000L, true, true, true));
-        assertTrue(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(20_000L, 2_000L, true, false, true));
-        assertTrue(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(1_000L, 2_000L, false, false, false));
+    @Test void dragonEscapeBuilderBrickRemainsUntilUsedAndVacatedOrOwnerEliminated() {
+        assertFalse(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(false, false, true));
+        assertFalse(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(true, true, true));
+        assertTrue(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(true, false, true));
+        assertTrue(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(false, false, false));
+        assertFalse(ArcadePortRules.shouldRejectDragonEscapeBuilderEntityOverlap(true, true));
+        assertTrue(ArcadePortRules.shouldRejectDragonEscapeBuilderEntityOverlap(false, true));
+        assertFalse(ArcadePortRules.shouldRejectDragonEscapeBuilderEntityOverlap(false, false));
         assertTrue(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false, false));
         assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(9L, 10L, false, false));
         assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, true, false));
