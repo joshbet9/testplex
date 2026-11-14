@@ -1,7 +1,23 @@
+import { chmodSync, statSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
+
+function ensureSharedDatabaseModes(path) {
+  if (typeof process.getuid !== 'function') return;
+  for (const file of [path, `${path}-wal`, `${path}-shm`]) {
+    try {
+      const info = statSync(file);
+      if (info.uid !== process.getuid()) continue;
+      const mode = info.mode & 0o777;
+      if ((mode & 0o060) !== 0o060) chmodSync(file, mode | 0o060);
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+  }
+}
 
 export class EventStore {
   constructor(path) {
+    this.path = path;
     this.db = new DatabaseSync(path, { timeout: 5000 });
     this.db.exec(`
       PRAGMA journal_mode = WAL;
@@ -36,6 +52,7 @@ export class EventStore {
       this.db.exec(`ALTER TABLE feedback_events ADD COLUMN artifact_path TEXT`);
     }
     this.db.exec(`UPDATE feedback_events SET available_at=received_at WHERE available_at=''`);
+    ensureSharedDatabaseModes(this.path);
     this.insertEvent = this.db.prepare(`
       INSERT OR IGNORE INTO feedback_events
         (event_key, delivery_id, issue_number, event_name, action, payload_json, received_at, available_at)
@@ -70,30 +87,37 @@ export class EventStore {
       new Date().toISOString(),
       new Date().toISOString(),
     );
+    ensureSharedDatabaseModes(this.path);
     return result.changes === 1;
   }
 
   claim() {
     const now = new Date().toISOString();
-    return this.claimNext.get(now, now);
+    const row = this.claimNext.get(now, now);
+    ensureSharedDatabaseModes(this.path);
+    return row;
   }
 
   complete(eventKey) {
     this.db.prepare(`UPDATE feedback_events SET state='complete', finished_at=?, last_error=NULL WHERE event_key=?`)
       .run(new Date().toISOString(), eventKey);
+    ensureSharedDatabaseModes(this.path);
   }
 
   stage(eventKey, artifactPath) {
     this.db.prepare(`UPDATE feedback_events SET state='ready_to_publish', artifact_path=?, lease_started_at=NULL WHERE event_key=?`)
       .run(artifactPath, eventKey);
+    ensureSharedDatabaseModes(this.path);
   }
 
   claimReady() {
     const now = new Date().toISOString();
-    return this.db.prepare(`UPDATE feedback_events SET state='publishing', lease_started_at=?, attempts=attempts+1
+    const row = this.db.prepare(`UPDATE feedback_events SET state='publishing', lease_started_at=?, attempts=attempts+1
       WHERE event_key=(SELECT event_key FROM feedback_events
         WHERE state='ready_to_publish' AND available_at <= ? ORDER BY received_at, event_key LIMIT 1)
         AND state='ready_to_publish' RETURNING *`).get(now, now);
+    ensureSharedDatabaseModes(this.path);
+    return row;
   }
 
   fail(eventKey, error, maxAttempts = 5, retryState = 'pending') {
@@ -103,14 +127,17 @@ export class EventStore {
     const availableAt = new Date(Date.now() + delaySeconds * 1000).toISOString();
     this.db.prepare(`UPDATE feedback_events SET state=?, last_error=?, lease_started_at=NULL, available_at=? WHERE event_key=?`)
       .run(state, String(error).slice(0, 2000), availableAt, eventKey);
+    ensureSharedDatabaseModes(this.path);
   }
 
   recoverStale(leaseMs = 45 * 60_000) {
     const threshold = new Date(Date.now() - leaseMs).toISOString();
     const now = new Date().toISOString();
-    return this.db.prepare(`UPDATE feedback_events SET state=CASE state WHEN 'processing' THEN 'pending' ELSE 'ready_to_publish' END,
+    const result = this.db.prepare(`UPDATE feedback_events SET state=CASE state WHEN 'processing' THEN 'pending' ELSE 'ready_to_publish' END,
       lease_started_at=NULL, available_at=? WHERE state IN ('processing','publishing') AND lease_started_at < ?`)
-      .run(now, threshold).changes;
+      .run(now, threshold);
+    ensureSharedDatabaseModes(this.path);
+    return result.changes;
   }
 
   close() { this.db.close(); }
