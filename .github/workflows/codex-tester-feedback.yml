@@ -7,9 +7,8 @@ on:
     types: [created]
 
 permissions:
-  contents: write
+  contents: read
   issues: write
-  pull-requests: write
 
 concurrency:
   group: codex-feedback-${{ github.event.issue.number }}
@@ -92,7 +91,7 @@ jobs:
         id: publish
         if: steps.codex.outputs.final-message != ''
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.CODEX_GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
           RUN_ID: ${{ github.run_id }}
@@ -101,6 +100,10 @@ jobs:
         run: |
           set -euo pipefail
           rm -f .codex/feedback-event.md .codex/feedback-result.md
+          if [[ -z "${GH_TOKEN:-}" ]]; then
+            echo "CODEX_GITHUB_TOKEN is required to publish a draft PR and trigger its CI." >&2
+            exit 1
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
