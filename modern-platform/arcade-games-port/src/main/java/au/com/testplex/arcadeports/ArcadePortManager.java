@@ -17367,12 +17367,14 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         Block target = clicked.getRelative(face);
+        boolean placementTouchesWater = ArcadePortRules.dragonEscapeBuilderPlacementTouchesWater(
+                clicked.isLiquid(), target.isLiquid());
         boolean pendingBrick = session.dragonEscapeBuilderBricks.containsKey(id);
         if (!ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(
-                now, nextChargeAt, pendingBrick, target.isLiquid())) {
+                now, nextChargeAt, pendingBrick, placementTouchesWater)) {
             player.sendActionBar(ChatColor.YELLOW + (pendingBrick
                     ? "Wait for your previous brick to disappear."
-                    : target.isLiquid() ? "You cannot place a temporary brick in water."
+                    : placementTouchesWater ? "You cannot place a temporary brick in water."
                     : "Your next Builder brick is still recharging."));
             return;
         }

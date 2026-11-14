@@ -1945,6 +1945,12 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(9L, 10L, false, false));
         assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, true, false));
         assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false, true));
+        assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false,
+                ArcadePortRules.dragonEscapeBuilderPlacementTouchesWater(true, false)));
+        assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false,
+                ArcadePortRules.dragonEscapeBuilderPlacementTouchesWater(false, true)));
+        assertTrue(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false,
+                ArcadePortRules.dragonEscapeBuilderPlacementTouchesWater(false, false)));
     }
 
     @Test void dragonEscapeFinishWindowWaitsForRacersOrItsDeadline() {
