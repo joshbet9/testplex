@@ -10,6 +10,8 @@ const RUNNER_USER = process.env.CODEX_RUNNER_USER ?? 'testplex-codex-runner';
 const SHARED_ROOT = resolve(process.env.FEEDBACK_WORK_ROOT ?? '/var/lib/testplex-feedback-shared');
 const PUBLISHER_INBOX = resolve(process.env.FEEDBACK_PUBLISHER_INBOX ?? '/var/lib/testplex-feedback-publisher/inbox');
 const RUNNER_LAUNCHER = process.env.CODEX_RUNNER_LAUNCHER ?? '/usr/local/sbin/testplex-feedback-run-codex';
+const CLONE_LAUNCHER = process.env.CODEX_CLONE_LAUNCHER ?? '/usr/local/sbin/testplex-feedback-clone-repo';
+const CODEX_MODEL = process.env.CODEX_MODEL ?? 'gpt-6.1-sol';
 
 function run(command, args, options = {}) {
   return new Promise((resolveRun, rejectRun) => {
@@ -74,6 +76,7 @@ export async function processEvent(eventRow) {
 
   const base = process.env.GITHUB_DEFAULT_BRANCH ?? 'stable';
   const eventId = `${issueNumber}-${createHash('sha256').update(eventRow.event_key).digest('hex').slice(0, 32)}`;
+  if (!/^[A-Za-z0-9._-]{1,80}$/.test(CODEX_MODEL)) throw new Error('Configured Codex model name is invalid.');
   const workspace = join(SHARED_ROOT, 'workspaces', eventId);
   const contextPath = join(SHARED_ROOT, 'contexts', `${eventId}.md`);
   const inbox = join(PUBLISHER_INBOX, eventId);
@@ -90,7 +93,8 @@ export async function processEvent(eventRow) {
   await rm(workspace, { recursive: true, force: true });
   await rm(inbox, { recursive: true, force: true });
   try {
-  await run(SUDO, ['-n', '-u', RUNNER_USER, '--', GIT, 'clone', '--depth', '1', '--branch', base, `https://github.com/${repository}.git`, workspace]);
+  process.stdout.write(`[feedback-worker] issue=${issueNumber} stage=clone branch=${base}\\n`);
+  await run(SUDO, ['-n', '-u', RUNNER_USER, '--', CLONE_LAUNCHER, repository, base, workspace]);
   const baseSha = (await run(GIT, ['rev-parse', 'HEAD'], { cwd: workspace })).toString('utf8').trim();
   const [repositoryInstructions, feedbackPrompt] = await Promise.all([
     readFile(join(workspace, 'AGENTS.md'), 'utf8'),
@@ -106,7 +110,8 @@ export async function processEvent(eventRow) {
   ].join('\n\n');
   await publishFile(contextPath, fullPrompt, 0o640);
 
-  const runnerArgs = ['-n', '-u', RUNNER_USER, '--', RUNNER_LAUNCHER, workspace, contextPath];
+  process.stdout.write(`[feedback-worker] issue=${issueNumber} stage=codex model=${CODEX_MODEL}\\n`);
+  const runnerArgs = ['-n', '-u', RUNNER_USER, '--', RUNNER_LAUNCHER, workspace, contextPath, CODEX_MODEL];
   const response = await run(SUDO, runnerArgs, { cwd: workspace });
   const summary = response.toString('utf8').trim();
   if (!summary) throw new Error('Codex completed without a review summary.');
