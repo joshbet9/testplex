@@ -123,6 +123,39 @@ enable a service if a secret is still a `REPLACE_...` placeholder.
 - Identical webhook deliveries and comments are deduplicated. Work on a single
   issue is serialized. Failed work is retried with backoff and becomes visible
   in the service log after the retry limit.
+
+### Choose the model and trace work
+
+The worker model is configured in `/etc/testplex-feedback/worker.env` as
+`CODEX_MODEL`. It currently defaults to `gpt-6.1-sol`. Set it to another model
+ID supported by the installed Codex CLI, then restart the worker; the value is
+logged for each Codex turn.
+
+Follow the full path from webhook receipt through publishing with:
+
+```sh
+sudo journalctl -f -u testplex-feedback-webhook.service \
+  -u testplex-feedback-worker.service -u testplex-feedback-publisher.service
+```
+
+The log records the issue number, delivery ID, clone stage, selected model,
+Codex stage, whether a patch was staged, and publish outcome. It does not log
+the issue body or webhook secret. To inspect queue state without reading stored
+payloads:
+
+```sh
+sudo node --input-type=module -e 'import {DatabaseSync} from "node:sqlite"; const db=new DatabaseSync("/var/lib/testplex-feedback/feedback-events.sqlite",{readOnly:true}); console.log(db.prepare("SELECT issue_number,event_name,action,state,attempts,received_at,last_error FROM feedback_events ORDER BY received_at DESC LIMIT 20").all()); db.close()'
+```
+
+To change the model:
+
+```sh
+sudoedit /etc/testplex-feedback/worker.env
+sudo systemctl restart testplex-feedback-worker.service
+```
+
+Pending issue comments are retained in SQLite while the worker is stopped and
+will resume after it starts.
 - The draft publisher rechecks the human-discussion fingerprint before pushing.
   If Josh or a tester adds context while Codex works, that patch is rejected and
   the newer event is processed separately.
