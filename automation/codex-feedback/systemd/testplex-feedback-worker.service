@@ -1,0 +1,29 @@
+[Unit]
+Description=Testplex issue analysis and Codex draft preparation worker
+After=network-online.target testplex-feedback-oauth-proxy.service testplex-feedback-webhook.service
+Wants=network-online.target
+Requires=testplex-feedback-oauth-proxy.service testplex-feedback-webhook.service
+
+[Service]
+Type=simple
+User=testplex-feedback-worker
+Group=testplex-feedback-db
+SupplementaryGroups=testplex-feedback-work testplex-feedback-publish
+WorkingDirectory=/var/lib/testplex-feedback
+EnvironmentFile=/etc/testplex-feedback/worker.env
+ExecStart=/usr/bin/env node /opt/testplex-codex-feedback/event-worker.mjs
+Restart=on-failure
+RestartSec=3s
+UMask=0007
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+LockPersonality=yes
+ReadWritePaths=/var/lib/testplex-feedback /var/lib/testplex-feedback-shared /var/lib/testplex-feedback-publisher/inbox /var/lib/testplex-codex-runner/.codex
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

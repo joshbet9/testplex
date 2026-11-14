@@ -1,0 +1,31 @@
+[Unit]
+Description=Testplex GitHub feedback draft PR publisher
+After=network-online.target testplex-feedback-webhook.service
+Wants=network-online.target
+Requires=testplex-feedback-webhook.service
+
+[Service]
+Type=simple
+User=testplex-feedback-publisher
+Group=testplex-feedback-db
+SupplementaryGroups=testplex-feedback-publish
+WorkingDirectory=/var/lib/testplex-feedback
+EnvironmentFile=/etc/testplex-feedback/publisher.env
+ExecStart=/usr/bin/env node /opt/testplex-codex-feedback/publisher-worker.mjs
+Restart=on-failure
+RestartSec=3s
+UMask=0007
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+ReadWritePaths=/var/lib/testplex-feedback /var/lib/testplex-feedback-publisher/inbox /tmp
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

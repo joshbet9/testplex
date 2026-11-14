@@ -1,28 +1,50 @@
 # Testplex tester feedback
 
-## Intake
+## Intake and issue structure
 
-The public GitHub issue forms provide separate Bug and Idea paths. Every form field is optional; if no game is selected, the report is routed to the shared lobby/global tracker. Bug reports ask for game, build, map/mode, phase, expected and actual behavior, reproduction steps, frequency, and optional media. Idea reports capture the game, player opportunity, proposed behavior, and any 1.8 reference. The forms state that reports are public and warn testers not to include credentials or private server details. Submit one independently actionable report at a time.
+The public GitHub issue forms provide separate Bug and Idea paths. Every form field is optional. If a game is unknown or omitted, the intake workflow routes it to the shared lobby/global tracker. Reports become native GitHub sub-issues of the matching game tracker; Monster Maze modes use the shared Monster Maze tracker while the selected mode remains on the report.
 
-The `.github/workflows/triage-tester-feedback.yml` workflow recognizes these forms, applies `tester-feedback`, `tester-bug` or `tester-idea`, `needs-triage`, and a `game:<slug>` label, assigns the report to `joshbet9`, and adds it as a native GitHub sub-issue under the matching game tracker. Monster Maze modes share a tracker while the selected mode stays on the report. New reports receive a comment linking to the parent. If the sub-issue relationship cannot be created, the action fails visibly so the report is not silently misrouted.
+The `.github/workflows/triage-tester-feedback.yml` workflow labels and assigns new/reopened reports, applies one canonical lifecycle status, preserves the status on edits and human comments, and ignores bot comments to avoid loops. The tracker directory links all 30 game trackers and the shared lobby/global tracker. The reports and discussion are public; never include passwords, tokens, private connection details, player personal data, or secrets in an issue.
 
-The [tracker directory](tester-feedback-trackers.md) links to all 30 game trackers and the shared lobby/global tracker. GitHub Actions needs repository `Issues: write` and `Contents: read`; GitHub Issues must be enabled. The reports and discussion are public.
+The [tracker directory](tester-feedback-trackers.md) records the game-to-parent mapping. GitHub Actions requires `Issues: write` and `Contents: read` for routing, native sub-issue creation, and comments. GitHub Issues must be enabled.
 
-After intake, use the issue lifecycle:
+## Required Codex review
 
-1. `needs-triage`: acknowledge, reproduce on the named build, and add the result/build to the report.
-2. For confirmed work, apply `accepted` and create a focused PR linked with `Fixes #<report>`; for an idea, discuss and record the decision before implementation.
-3. Apply `in-progress` while work is active and `needs-tester-check` when a staging build is ready for the reporter.
-4. Close through the linked PR after deployment/verification. Keep the parent tracker open so it remains the per-game inbox and progress view.
+Repository-wide instructions for thorough issue work are in [AGENTS.md](../AGENTS.md). Read those before responding to any report. In brief:
 
-This uses repository issues, so repository Issues must be enabled for the forms and assignment workflow to operate. Enabling Issues makes all submissions and discussion public.
+- Inspect the complete issue thread, game parent, current repository state, original source where available, modern code path, related reports, PR/CI evidence, and deployment evidence before deciding what to do.
+- Do the code investigation and implementation for actionable, well-specified bugs. Do not stop at a vague acknowledgement or ask for information already present or inferable from code/source/logs.
+- For genuine blockers, ask a precise question that explains what the current implementation does and why the missing answer changes the fix. Continue independent work.
+- For ideas, provide a concrete proposal and wait for Josh's approval before implementation.
+- Implement focused changes with behavior-level tests. Report exact files, root cause, checks, and limitations. Never describe a build as live verification.
+- Consolidate exact duplicates only. Keep distinct symptoms in their own issues and cross-link related reports.
+- Each report keeps exactly one status: `submitted`, `in-progress`, `waiting-tester`, `resolved`, or `deployed`. Use `owner-only-staging` when only private Hyper-V staging has a verified deployment; Josh is the only tester with access there.
+- Do not mark a report Resolved without reporter confirmation. Do not mark Deployed or close until all required production targets have verified the exact release.
 
-## Hyper-V staging and Fly production promotion
+## Event-triggered Codex automation
 
-The supported first deployment target is the isolated Hyper-V Testplex server. Build on `feat/testplex-modern-26.3-platform`, wait for the matching Java 25 / Paper 26.3 build to pass, then run **Deploy Testplex Modern Paper 26.3 to isolated Hyper-V** with `deploy_to_modern_test_server=true` and that successful build's run ID. The workflow transfers only changed plugin JAR deltas and required changed map assets, takes a modern-server-only backup, restarts `testplex-modern.service`, and requires runtime readiness before it reports success. Check the deployment summary and live service identity before asking testers to verify. A workflow run that merely built or uploaded artifacts is not a deployment.
+The intended review trigger is each new/reopened Bug or Idea report and each new direct human GitHub comment. The intake workflow routes and labels reports; Codex must reload the full current discussion, game parent, related reports, code, source, and linked CI/deployment evidence. Serialize review per issue and ignore bot events to prevent loops. A missed-event reconciliation can be added as a safety net; hourly polling is not the primary workflow.
 
-Fly is the later production promotion target, not staging. PR #202 only provides a **non-deploying preflight**; the merged integration branch currently has no production Fly deploy workflow. Do not promote by rebuilding from a different source revision. First complete Hyper-V acceptance, create a release image from that exact source commit, record and verify its immutable image digest and plugin hashes, then require a protected `production` environment approval before any `fly deploy` or machine change.
+### Use Josh's ChatGPT Plus allowance
 
-The previous user-supplied Fly inventory showed app `monstermaze` with stopped legacy `mm18` and `mm21` Machines, a dedicated IPv4, and no volumes. That is historical and must be rechecked with `fly status`, `fly machine list`, `fly volumes list`, `fly ips list`, and `fly config show` immediately before production work. The prior authorization allows repurposing the app if it reduces costs, provided both legacy server images/config/plugins can be retrieved and redeployed. Save the old image digests, full app config, secrets references, process commands, and machine sizes; preserve verified backups. Keep `mm18` and `mm21` reversible until the Testplex target passes an external connection, wake/autostop, whitelist/admin, game start/end, and rollback acceptance.
+Do not activate the initial `openai/codex-action` prototype in this PR as the final design. It requires `OPENAI_API_KEY` and would use separately billed API usage. Do not add that key or merge the API-backed version unless Josh explicitly chooses API billing.
 
-Persistent player data is a production decision, not a staging behavior. The prior Fly preflight recorded that tester world/stats data should reset on deploy and initially proposed no volume. If persistent stats are required, select an external Oracle-backed database or add a mounted Fly volume before production; test backup/restore and migration first. Never put Fly tokens, database credentials, or private server details in issues, artifacts, or source. Store an app-scoped deploy token only in a protected GitHub `production` environment and require manual approval.
+OpenAI now documents Sign in with ChatGPT plan usage for eligible Plus accounts in open-source and self-hosted applications, including a Codex app-server configured with an authorized ChatGPT-plan OAuth token. The intended direction is a signed GitHub event bridge to a Codex app-server worker on the existing self-hosted Oracle VM. Josh must complete a one-time browser sign-in and consent flow; refresh credentials must then be stored securely and refreshed on the Oracle host. This should consume the ChatGPT plan's included allowance and its limits, not API-key billing. Verify the current eligibility and integration requirements before implementation.
+
+The event bridge needs signature verification, replay protection, per-issue serialization, and a durable event cursor. Codex runs read-only with respect to GitHub credentials; a separate publisher creates a draft PR after the patch is checked. Issue events must never receive Fly or Hyper-V deploy credentials, and must never merge or deploy. A reviewed release workflow remains separate.
+
+The initial API-key GitHub Action and its workflow/prompt files are a prototype only: they are not active, have not passed Actions validation, and must be replaced or removed before PR #461 is considered merge-ready. The Plus-authenticated Oracle worker, OAuth lifecycle, GitHub event delivery, draft PR publication, Discord-bridge event handoff, and end-to-end event test are not implemented yet.
+
+OpenAI API calls use separate API billing; ChatGPT subscription and API billing are separate. Do not assume a ChatGPT Plus subscription pays for an API key. See [ChatGPT billing and API billing](https://help.openai.com/en/articles/9039756-managing-billing-for-chatgpt-and-the-api-platform), [Sign in with ChatGPT plan usage](https://developers.openai.com/siwc/token-sharing-open-source), and [Codex app-server OAuth configuration](https://developers.openai.com/siwc/token-sharing-open-source/codex-app-server).
+
+## Paired staging and production deployment
+
+Josh has directed that approved fixes be deployed to **both** private Hyper-V staging and Fly production. Use one reviewed source commit and the same immutable artifact identity for both. Check the current workflow files, successful CI artifact, target app/server identity, persistent storage, and runtime before deploying; old inventories and remembered run IDs are not authoritative.
+
+The isolated Hyper-V deployment workflow transfers changed plugin/map artifacts, backs up the modern server state, restarts its service, and checks runtime readiness. Hyper-V is private staging and only Josh can access it. A staging-only deployment is not the complete delivery: apply `owner-only-staging`, state which production deployment remains pending, and do not ask public testers to verify a build they cannot access.
+
+Fly is the tester-facing production environment. Preserve the attached persistent data volume and its player statistics. Never delete, detach, replace, or reformat it as a storage cleanup or deployment shortcut. Before storage operations, inspect machine and volume attachments, free space, backups/snapshots, and the exact config. Do not treat old Fly inventories as current. If a safe deployment path for either target is unavailable, finish code/PR work and report the precise blocker rather than improvise a direct deployment.
+
+Do not say the fix is deployed until the same candidate has passed required checks and both Hyper-V and Fly runtime identities are verified. Record commit, artifact hashes, deployment run IDs, target service/machine, and rollback point. After deployment, comment on each issue and its Discord mirror with the exact change, automated checks, both target identities, and a concrete manual test. Leave the report `waiting-tester` until Josh/tester confirms. Move it to `resolved` only after that confirmation; `deployed` is the production release state and then the issue can be closed.
+
+Never make an unreviewed issue-event change directly to a live server. Preserve production data and keep rollback available. Do not take control of Josh's desktop/Minecraft session or restart an active server while Josh has said he is playing or testing.
