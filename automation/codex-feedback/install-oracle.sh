@@ -59,6 +59,7 @@ find "$INSTALL_DIR" -maxdepth 1 -type f -name '*.mjs' -delete
 find "$SOURCE_DIR" -maxdepth 1 -type f -name '*.mjs' -exec install -o root -g root -m 0644 '{}' "$INSTALL_DIR/" \;
 install -o root -g root -m 0644 "$SOURCE_DIR"/systemd/*.service /etc/systemd/system/
 install -o root -g root -m 0755 "$SOURCE_DIR/clone-repo.sh" /usr/local/sbin/testplex-feedback-clone-repo
+install -o root -g root -m 0755 "$SOURCE_DIR/cleanup-workspace.sh" /usr/local/sbin/testplex-feedback-cleanup-workspace
 
 install -o root -g root -m 0755 /dev/stdin /usr/local/sbin/testplex-feedback-run-codex <<'RUNNER'
 #!/usr/bin/env bash
@@ -89,7 +90,7 @@ RUNNER
 chown root:root /usr/local/sbin/testplex-feedback-run-codex
 chmod 0755 /usr/local/sbin/testplex-feedback-run-codex
 
-printf '%s\n' 'testplex-feedback-worker ALL=(testplex-codex-runner) NOPASSWD: /usr/local/sbin/testplex-feedback-clone-repo, /usr/local/sbin/testplex-feedback-run-codex' > /etc/sudoers.d/testplex-feedback-worker
+printf '%s\n' 'testplex-feedback-worker ALL=(testplex-codex-runner) NOPASSWD: /usr/local/sbin/testplex-feedback-clone-repo, /usr/local/sbin/testplex-feedback-cleanup-workspace, /usr/local/sbin/testplex-feedback-run-codex' > /etc/sudoers.d/testplex-feedback-worker
 chmod 0440 /etc/sudoers.d/testplex-feedback-worker
 visudo -cf /etc/sudoers.d/testplex-feedback-worker >/dev/null
 
