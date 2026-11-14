@@ -384,6 +384,32 @@ public final class PlexballGame implements Listener {
         return playerId == null ? 0L : Math.max(0L, readProgress(playerId).wins);
     }
 
+    /** Every persisted Plexball career counter, for the shared lobby leaderboard picker. */
+    public static List<String> leaderboardMetricIds() {
+        return List.of("matches", "wins", "losses", "current-win-streak", "best-win-streak",
+                "at-bats", "total-distance-tenths", "best-distance-tenths", "catches",
+                "home-runs", "perfect-contacts");
+    }
+
+    public long recordedLeaderboardMetric(UUID playerId, String metric) {
+        if (playerId == null || metric == null) return 0L;
+        PlayerProgress profile = readProgress(playerId);
+        return Math.max(0L, switch (metric) {
+            case "matches", "games-played" -> profile.matches;
+            case "wins" -> profile.wins;
+            case "losses" -> Math.max(0L, profile.matches - profile.wins);
+            case "current-win-streak" -> profile.currentWinStreak;
+            case "best-win-streak" -> profile.bestWinStreak;
+            case "at-bats" -> profile.atBats;
+            case "total-distance-tenths" -> profile.totalDistanceTenths;
+            case "best-distance-tenths" -> profile.bestDistanceTenths;
+            case "catches" -> profile.catches;
+            case "home-runs" -> profile.homeRuns;
+            case "perfect-contacts" -> profile.perfectHits;
+            default -> 0L;
+        });
+    }
+
     public List<String> statsSummary(UUID playerId) {
         PlayerProgress profile = readProgress(playerId);
         return List.of(ChatColor.GRAY + "Matches: " + ChatColor.WHITE + profile.matches,

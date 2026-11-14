@@ -43,19 +43,22 @@ import java.util.UUID;
 final class ArcadeLobbyLeaderboardService implements Listener {
     private static final int MAX_BOARDS = 10;
     private static final int MAX_ROWS = 10;
+    private static final long METRIC_CACHE_MILLIS = 15_000L;
     private static final String ROOT = "lobby-leaderboards.";
-    private static final String[] METRICS = {"wins", "games-played", "losses", "test-gems-earned", "pb"};
     private final JavaPlugin plugin;
     private final ArcadePortManager manager;
     private final ModernArcadeLobby lobby;
     /** Each viewer has a different layout for *each selected lobby game*. */
     private final Map<LayoutKey, List<Board>> preferences = new HashMap<>();
     private final Map<UUID, List<Panel>> visible = new HashMap<>();
+    private final Map<String, CachedMetrics> metricCache = new HashMap<>();
     private BukkitTask renderTask;
     private BukkitTask historyTask;
     private boolean historyDirty;
     private List<SourceMapCatalog.MapArchive> cachedDragonMaps;
     private long dragonMapsCacheUntil;
+
+    private record CachedMetrics(long expiresAt, List<ArcadeLobbyLeaderboardMetricCatalog.Metric> metrics) { }
 
     enum Period {
         ALL_TIME("All-Time"), WEEKLY("Weekly"), DAILY("Daily"), AROUND_YOU("All-Time (Around You)");
@@ -73,6 +76,8 @@ final class ArcadeLobbyLeaderboardService implements Listener {
         String kit = DragonEscapePersonalBestViews.BEST_TIME;
         boolean cycleMaps = true;
         boolean cycleKits = true;
+        ArcadeLobbyLeaderboardAction leftAction = ArcadeLobbyLeaderboardAction.DEFAULT_CYCLE;
+        ArcadeLobbyLeaderboardAction rightAction = ArcadeLobbyLeaderboardAction.DEFAULT_CYCLE;
 
         boolean isPb(String effectiveGame) {
             return "dragon-escape".equals(effectiveGame) && "pb".equals(metric);
@@ -91,19 +96,25 @@ final class ArcadeLobbyLeaderboardService implements Listener {
         }
     }
 
-    private enum MenuType { ROOT, EDIT, MAP }
+    private enum MenuType { ROOT, EDIT, MAP, METRIC, ACTION }
+    private enum ActionSide { LEFT, RIGHT }
 
     private static final class Menu implements InventoryHolder {
         final MenuType type;
         final int board;
         final int page;
         final String game;
+        final ActionSide actionSide;
         Inventory inventory;
         Menu(MenuType type, int board, int page, String game) {
+            this(type, board, page, game, ActionSide.LEFT);
+        }
+        Menu(MenuType type, int board, int page, String game, ActionSide actionSide) {
             this.type = type;
             this.board = board;
             this.page = page;
             this.game = game;
+            this.actionSide = actionSide;
         }
         @Override public Inventory getInventory() { return inventory; }
     }
@@ -163,13 +174,18 @@ final class ArcadeLobbyLeaderboardService implements Listener {
             saved.forEach((field, value) -> data.put(String.valueOf(field), value));
             Board board = new Board();
             String metric = String.valueOf(data.getOrDefault("metric", "wins"));
-            board.metric = List.of(METRICS).contains(metric) ? metric : "wins";
+            board.metric = ArcadeLobbyLeaderboardMetricCatalog.isSelectableStatId(metric)
+                    || "pb".equals(metric) && "dragon-escape".equals(key.game()) ? metric : "wins";
             board.map = String.valueOf(data.getOrDefault("map", ""));
             board.kit = String.valueOf(data.getOrDefault("kit", DragonEscapePersonalBestViews.BEST_TIME));
             if (!DragonEscapePersonalBestViews.all().contains(board.kit))
                 board.kit = DragonEscapePersonalBestViews.BEST_TIME;
             board.cycleMaps = Boolean.parseBoolean(String.valueOf(data.getOrDefault("cycleMaps", true)));
             board.cycleKits = Boolean.parseBoolean(String.valueOf(data.getOrDefault("cycleKits", true)));
+            board.leftAction = ArcadeLobbyLeaderboardAction.byId(data.get("leftAction"),
+                    ArcadeLobbyLeaderboardAction.DEFAULT_CYCLE);
+            board.rightAction = ArcadeLobbyLeaderboardAction.byId(data.get("rightAction"),
+                    ArcadeLobbyLeaderboardAction.DEFAULT_CYCLE);
             board.periods.clear();
             for (String name : String.valueOf(data.getOrDefault("periods", "ALL_TIME,WEEKLY,DAILY,AROUND_YOU")).split(",")) {
                 try { board.periods.add(Period.valueOf(name)); }
@@ -197,6 +213,8 @@ final class ArcadeLobbyLeaderboardService implements Listener {
             row.put("kit", board.kit);
             row.put("cycleMaps", board.cycleMaps);
             row.put("cycleKits", board.cycleKits);
+            row.put("leftAction", board.leftAction.id());
+            row.put("rightAction", board.rightAction.id());
             serialized.add(row);
         }
         plugin.getConfig().set(ROOT + "players." + viewer + ".games." + selectedGame() + ".boards", serialized);
@@ -246,7 +264,7 @@ final class ArcadeLobbyLeaderboardService implements Listener {
         double x = (index - (count - 1) / 2.0D) * 9.2D;
         double z = -28.0D;
         for (int line = 0; line < 15; line++) {
-            Location at = new Location(world, x, 109.0D - line * 0.55D, z);
+            Location at = new Location(world, x, 106.8D - line * 0.32D, z);
             TextDisplay display = world.spawn(at, TextDisplay.class, entity -> {
                 entity.setVisibleByDefault(false);
                 entity.setPersistent(false);
@@ -259,16 +277,16 @@ final class ArcadeLobbyLeaderboardService implements Listener {
                 entity.setShadowed(true);
                 entity.setLineWidth(450);
                 entity.setTransformation(new Transformation(new Vector3f(), new Quaternionf(),
-                        new Vector3f(0.65F, 0.65F, 0.65F), new Quaternionf()));
+                        new Vector3f(0.48F, 0.48F, 0.48F), new Quaternionf()));
             });
             viewer.showEntity(plugin, display);
             panel.rows.add(display);
         }
-        panel.hitbox = world.spawn(new Location(world, x, 104.0D, z), Interaction.class, entity -> {
+        panel.hitbox = world.spawn(new Location(world, x, 104.2D, z), Interaction.class, entity -> {
             entity.setVisibleByDefault(false);
             entity.setPersistent(false);
-            entity.setInteractionWidth(7.8F);
-            entity.setInteractionHeight(10.5F);
+            entity.setInteractionWidth(6.0F);
+            entity.setInteractionHeight(5.4F);
             entity.setResponsive(true);
         });
         viewer.showEntity(plugin, panel.hitbox);
@@ -301,18 +319,16 @@ final class ArcadeLobbyLeaderboardService implements Listener {
         String name = ArcadeGameDirectory.find(game).name();
         String subtitle = pb ? "Best Time: " + mapLabel(board) + " / "
                 + DragonEscapePersonalBestViews.name(board.kit)
-                : switch (board.metric) {
-                    case "games-played" -> "Most Games Played";
-                    case "losses" -> "Most Losses";
-                    case "test-gems-earned" -> "Most Gems Earned";
-                    default -> "Most Wins";
-                };
+                : "Most " + ArcadeLobbyLeaderboardMetricCatalog.label(board.metric);
         if (pb) subtitle += board.period == Period.AROUND_YOU ? " (Around You)" : "";
         Map<UUID, Long> data = pb ? manager.lobbyDragonEscapeTimes(board.map, board.kit)
                 : (board.period == Period.ALL_TIME || board.period == Period.AROUND_YOU)
                 ? manager.lobbyLeaderboardScores(game, board.metric)
                 : historicalScores(game, board.metric, board.period);
-        List<ArcadeLobbyLeaderboardRankings.Entry> ranked = ArcadeLobbyLeaderboardRankings.rank(data, pb);
+        boolean lowerIsBetter = pb || metricsFor(game).stream()
+                .filter(metric -> metric.id().equals(board.metric)).findFirst()
+                .map(ArcadeLobbyLeaderboardMetricCatalog.Metric::lowerIsBetter).orElse(false);
+        List<ArcadeLobbyLeaderboardRankings.Entry> ranked = ArcadeLobbyLeaderboardRankings.rank(data, lowerIsBetter);
         List<ArcadeLobbyLeaderboardRankings.Entry> rows = ArcadeLobbyLeaderboardRankings.visible(
                 ranked, viewer.getUniqueId(), board.period == Period.AROUND_YOU, MAX_ROWS);
         StringBuilder out = new StringBuilder(ChatColor.AQUA + (pb ? "All-Time " : board.period.title + " ")
@@ -335,8 +351,9 @@ final class ArcadeLobbyLeaderboardService implements Listener {
                 .append(own == null ? ChatColor.GRAY + "Unranked" : ChatColor.WHITE + "#" + own.rank()
                         + ChatColor.GRAY + " - " + ChatColor.YELLOW
                         + (pb ? ArcadePortRules.formatDragonEscapeTime(own.value()) : own.value()));
-        out.append('\n').append(ChatColor.YELLOW).append("Punch to view the")
-                .append('\n').append(ChatColor.YELLOW).append("next category");
+        out.append('\n').append(ChatColor.YELLOW).append("Left: ").append(board.leftAction.label())
+                .append(ChatColor.GRAY).append(" | ").append(ChatColor.YELLOW).append("Right: ")
+                .append(board.rightAction.label());
         return out.toString();
     }
 
@@ -364,16 +381,30 @@ final class ArcadeLobbyLeaderboardService implements Listener {
     private void captureHistory() {
         FileConfiguration config = plugin.getConfig();
         for (ArcadeGameDirectory.Game game : ArcadeGameDirectory.games()) {
-            for (String metric : List.of("wins", "games-played", "losses", "test-gems-earned")) {
+            for (ArcadeLobbyLeaderboardMetricCatalog.Metric metricSpec : metricsFor(game.id())) {
+                String metric = metricSpec.id();
+                // Dragon Escape PBs are map/kit time records, not counters with a meaningful period delta.
+                if ("pb".equals(metric)) continue;
                 for (var entry : manager.lobbyLeaderboardScores(game.id(), metric).entrySet()) {
                     String observed = ROOT + "observed." + game.id() + "." + metric + "." + entry.getKey();
                     long total = entry.getValue();
                     if (config.contains(observed)) {
-                        long delta = Math.max(0L, total - config.getLong(observed));
-                        if (delta > 0L) {
-                            for (Period period : List.of(Period.DAILY, Period.WEEKLY)) {
-                                String path = historicPath(period, game.id(), metric, entry.getKey());
-                                config.set(path, config.getLong(path) + delta);
+                        long previous = config.getLong(observed);
+                        if (metricSpec.lowerIsBetter()) {
+                            if (total > 0L && (previous <= 0L || total < previous)) {
+                                for (Period period : List.of(Period.DAILY, Period.WEEKLY)) {
+                                    String path = historicPath(period, game.id(), metric, entry.getKey());
+                                    long priorRecord = config.getLong(path);
+                                    if (priorRecord <= 0L || total < priorRecord) config.set(path, total);
+                                }
+                            }
+                        } else {
+                            long delta = Math.max(0L, total - previous);
+                            if (delta > 0L) {
+                                for (Period period : List.of(Period.DAILY, Period.WEEKLY)) {
+                                    String path = historicPath(period, game.id(), metric, entry.getKey());
+                                    config.set(path, config.getLong(path) + delta);
+                                }
                             }
                         }
                     }
@@ -390,32 +421,69 @@ final class ArcadeLobbyLeaderboardService implements Listener {
         }
     }
 
-    private void advance(Player viewer, int index) {
+    private void applyAction(Player viewer, int index, ArcadeLobbyLeaderboardAction action) {
         List<Board> all = boards(viewer.getUniqueId());
-        if (index < 0 || index >= all.size()) return;
+        if (index < 0 || index >= all.size() || action == null) return;
         Board board = all.get(index);
-        if (board.isPb(effectiveGame(board))) {
-            normalizeMap(board);
-            List<String> kits = DragonEscapePersonalBestViews.all();
-            int kitIndex = Math.max(0, kits.indexOf(board.kit));
-            if (board.cycleKits) board.kit = kits.get((kitIndex + 1) % kits.size());
-            if (board.cycleMaps && (!board.cycleKits || kitIndex + 1 >= kits.size())) {
-                List<SourceMapCatalog.MapArchive> maps = dragonMaps();
-                for (int i = 0; i < maps.size(); i++) {
-                    if (maps.get(i).resource().equals(board.map)) {
-                        board.map = maps.get((i + 1) % maps.size()).resource();
-                        break;
-                    }
-                }
+        switch (action) {
+            case NONE -> { return; }
+            case CYCLE_STAT -> {
+                List<ArcadeLobbyLeaderboardMetricCatalog.Metric> metrics = metricsFor(selectedGame());
+                if (metrics.isEmpty()) return;
+                List<String> ids = metrics.stream().map(ArcadeLobbyLeaderboardMetricCatalog.Metric::id).toList();
+                int current = ids.indexOf(board.metric);
+                board.metric = ids.get((current + 1 + ids.size()) % ids.size());
             }
-            if (!board.cycleKits && !board.cycleMaps) board.period = board.period == Period.AROUND_YOU
-                    ? Period.ALL_TIME : Period.AROUND_YOU;
-        } else {
-            List<Period> periods = List.copyOf(board.periods);
-            board.period = periods.get((periods.indexOf(board.period) + 1) % periods.size());
+            case CYCLE_PERIOD -> cyclePeriod(board);
+            case CYCLE_MAP -> { if (board.isPb(effectiveGame(board))) cycleMap(board); }
+            case CYCLE_KIT -> { if (board.isPb(effectiveGame(board))) cycleKit(board); }
+            case DEFAULT_CYCLE -> defaultCycle(board);
         }
         save(viewer.getUniqueId());
         render(viewer, viewer.getWorld());
+    }
+
+    private void defaultCycle(Board board) {
+        if (!board.isPb(effectiveGame(board))) {
+            cyclePeriod(board);
+            return;
+        }
+        normalizeMap(board);
+        int oldKitIndex = Math.max(0, DragonEscapePersonalBestViews.all().indexOf(board.kit));
+        if (board.cycleKits) cycleKit(board);
+        if (board.cycleMaps && (!board.cycleKits || oldKitIndex + 1 >= DragonEscapePersonalBestViews.all().size()))
+            cycleMap(board);
+        if (!board.cycleKits && !board.cycleMaps)
+            board.period = board.period == Period.AROUND_YOU ? Period.ALL_TIME : Period.AROUND_YOU;
+    }
+
+    private void cyclePeriod(Board board) {
+        List<Period> periods = List.copyOf(board.periods);
+        int index = periods.indexOf(board.period);
+        board.period = periods.get((index + 1 + periods.size()) % periods.size());
+    }
+
+    private void cycleKit(Board board) {
+        List<String> kits = DragonEscapePersonalBestViews.all();
+        int index = Math.max(0, kits.indexOf(board.kit));
+        board.kit = kits.get((index + 1) % kits.size());
+    }
+
+    private void cycleMap(Board board) {
+        List<SourceMapCatalog.MapArchive> maps = dragonMaps();
+        if (maps.isEmpty()) return;
+        int index = 0;
+        for (int i = 0; i < maps.size(); i++) if (maps.get(i).resource().equals(board.map)) { index = i; break; }
+        board.map = maps.get((index + 1) % maps.size()).resource();
+    }
+
+    private List<ArcadeLobbyLeaderboardMetricCatalog.Metric> metricsFor(String game) {
+        long now = System.currentTimeMillis();
+        CachedMetrics cached = metricCache.get(game);
+        if (cached != null && now < cached.expiresAt()) return cached.metrics();
+        List<ArcadeLobbyLeaderboardMetricCatalog.Metric> metrics = manager.lobbyLeaderboardMetrics(game);
+        metricCache.put(game, new CachedMetrics(now + METRIC_CACHE_MILLIS, metrics));
+        return metrics;
     }
 
     private int findPanel(Player viewer, Entity entity) {
@@ -425,11 +493,17 @@ final class ArcadeLobbyLeaderboardService implements Listener {
         return -1;
     }
 
+    private Board boardAt(Player player, int index) {
+        List<Board> all = boards(player.getUniqueId());
+        return index >= 0 && index < all.size() ? all.get(index) : null;
+    }
+
     @EventHandler public void onPunch(PrePlayerAttackEntityEvent event) {
         int index = findPanel(event.getPlayer(), event.getAttacked());
         if (index < 0) return;
         event.setCancelled(true);
-        advance(event.getPlayer(), index);
+        Board board = boardAt(event.getPlayer(), index);
+        if (board != null) applyAction(event.getPlayer(), index, board.leftAction);
     }
 
     @EventHandler public void onRightClick(PlayerInteractEntityEvent event) {
@@ -437,7 +511,8 @@ final class ArcadeLobbyLeaderboardService implements Listener {
         int index = findPanel(event.getPlayer(), event.getRightClicked());
         if (index < 0) return;
         event.setCancelled(true);
-        advance(event.getPlayer(), index);
+        Board board = boardAt(event.getPlayer(), index);
+        if (board != null) applyAction(event.getPlayer(), index, board.rightAction);
     }
 
     @EventHandler public void onQuit(PlayerQuitEvent event) {
@@ -500,10 +575,9 @@ final class ArcadeLobbyLeaderboardService implements Listener {
                 ChatColor.GRAY + "Follows the currently selected lobby game.",
                 ChatColor.YELLOW + "This game's settings are independent."));
         inv.setItem(12, item(pb ? Material.CLOCK : Material.PAPER,
-                ChatColor.AQUA + "Metric: " + board.metric,
-                ChatColor.GRAY + "Wins, Games Played, Losses, Gems",
-                ChatColor.GRAY + "or Dragon Escape personal bests.",
-                ChatColor.YELLOW + "Click to change metric."));
+                ChatColor.AQUA + "Metric: " + ArcadeLobbyLeaderboardMetricCatalog.label(board.metric),
+                ChatColor.GRAY + "Every tracked stat for this game is selectable.",
+                ChatColor.YELLOW + "Click to choose a stat."));
         inv.setItem(14, item(Material.FILLED_MAP,
                 ChatColor.AQUA + "Dragon Escape map: " + (pb ? mapLabel(board) : "N/A"),
                 ChatColor.YELLOW + (pb ? "Click to pick a map." : "Select the Dragon Escape PB metric.")));
@@ -516,14 +590,21 @@ final class ArcadeLobbyLeaderboardService implements Listener {
         inv.setItem(22, item(board.cycleKits ? Material.LIME_DYE : Material.GRAY_DYE,
                 ChatColor.AQUA + "Cycle PB kits: " + (board.cycleKits ? "ON" : "OFF"),
                 ChatColor.GRAY + "Punch to advance to the next kit."));
+        inv.setItem(24, item(Material.IRON_SWORD, ChatColor.AQUA + "Left-click action: " + board.leftAction.label(),
+                ChatColor.GRAY + board.leftAction.description(), ChatColor.YELLOW + "Click to configure."));
+        inv.setItem(25, item(Material.IRON_INGOT, ChatColor.AQUA + "Right-click action: " + board.rightAction.label(),
+                ChatColor.GRAY + board.rightAction.description(), ChatColor.YELLOW + "Click to configure."));
         int[] periodSlots = {28, 29, 30, 31};
         int p = 0;
         for (Period period : Period.values()) {
             boolean enabled = board.periods.contains(period);
-            inv.setItem(periodSlots[p++], item(enabled ? Material.LIME_DYE : Material.RED_DYE,
-                    (enabled ? ChatColor.GREEN : ChatColor.RED) + period.title,
-                    ChatColor.GRAY + "Punch cycles only through enabled categories.",
-                    ChatColor.YELLOW + "Click to " + (enabled ? "disable" : "enable") + ".",
+            boolean supported = !pb || period == Period.ALL_TIME || period == Period.AROUND_YOU;
+            inv.setItem(periodSlots[p++], item(!supported ? Material.GRAY_DYE
+                            : enabled ? Material.LIME_DYE : Material.RED_DYE,
+                    (enabled && supported ? ChatColor.GREEN : supported ? ChatColor.RED : ChatColor.DARK_GRAY) + period.title,
+                    ChatColor.GRAY + (pb ? "PB records are lifetime map/kit times." : "Punch cycles only through enabled categories."),
+                    supported ? ChatColor.YELLOW + "Click to " + (enabled ? "disable" : "enable") + "."
+                            : ChatColor.DARK_GRAY + "Not available for this record type.",
                     board.period == period ? ChatColor.GOLD + "Currently displaying" : ""));
         }
         inv.setItem(38, item(Material.ARROW, ChatColor.YELLOW + "Move board left"));
@@ -543,6 +624,39 @@ final class ArcadeLobbyLeaderboardService implements Listener {
                     ChatColor.GRAY + "Click to use this map for PB rankings."));
         if (page > 0) inv.setItem(45, item(Material.ARROW, ChatColor.YELLOW + "Previous"));
         if ((page + 1) * 45 < maps.size()) inv.setItem(53, item(Material.ARROW, ChatColor.YELLOW + "Next"));
+        inv.setItem(49, item(Material.RED_BED, ChatColor.GRAY + "Back"));
+        player.openInventory(inv);
+    }
+
+    private void openMetricPicker(Player player, int index, int requestedPage) {
+        List<ArcadeLobbyLeaderboardMetricCatalog.Metric> metrics = metricsFor(selectedGame());
+        int page = Math.max(0, Math.min(requestedPage, Math.max(0, (metrics.size() - 1) / 45)));
+        Inventory inv = inventory(MenuType.METRIC, index, page, "Choose Tracked Statistic");
+        for (int i = page * 45; i < Math.min(metrics.size(), (page + 1) * 45); i++) {
+            ArcadeLobbyLeaderboardMetricCatalog.Metric metric = metrics.get(i);
+            inv.setItem(i - page * 45, item(Material.PAPER, ChatColor.AQUA + metric.label(),
+                    ChatColor.GRAY + "Stat: " + metric.id(),
+                    ChatColor.GRAY + "Ranking: " + (metric.lowerIsBetter() ? "lowest first" : "highest first"),
+                    ChatColor.YELLOW + "Click to use this stat."));
+        }
+        if (page > 0) inv.setItem(45, item(Material.ARROW, ChatColor.YELLOW + "Previous"));
+        if ((page + 1) * 45 < metrics.size()) inv.setItem(53, item(Material.ARROW, ChatColor.YELLOW + "Next"));
+        inv.setItem(49, item(Material.RED_BED, ChatColor.GRAY + "Back"));
+        player.openInventory(inv);
+    }
+
+    private void openActionPicker(Player player, int index, ActionSide side, int requestedPage) {
+        boolean pb = boards(player.getUniqueId()).get(index).isPb(selectedGame());
+        List<ArcadeLobbyLeaderboardAction> actions = ArcadeLobbyLeaderboardAction.choices(pb);
+        int page = Math.max(0, Math.min(requestedPage, Math.max(0, (actions.size() - 1) / 45)));
+        Menu holder = new Menu(MenuType.ACTION, index, page, selectedGame(), side);
+        holder.inventory = Bukkit.createInventory(holder, 54, "Choose " + side.name().toLowerCase(Locale.ROOT) + "-click action");
+        Inventory inv = holder.inventory;
+        for (int i = page * 45; i < Math.min(actions.size(), (page + 1) * 45); i++) {
+            ArcadeLobbyLeaderboardAction action = actions.get(i);
+            inv.setItem(i - page * 45, item(Material.LEVER, ChatColor.AQUA + action.label(),
+                    ChatColor.GRAY + action.description(), ChatColor.YELLOW + "Click to assign."));
+        }
         inv.setItem(49, item(Material.RED_BED, ChatColor.GRAY + "Back"));
         player.openInventory(inv);
     }
@@ -581,21 +695,49 @@ final class ArcadeLobbyLeaderboardService implements Listener {
             }
             return;
         }
+        if (menu.type == MenuType.METRIC) {
+            if (slot == 49) { openEdit(player, menu.board); return; }
+            if (slot == 45 && menu.page > 0) { openMetricPicker(player, menu.board, menu.page - 1); return; }
+            if (slot == 53) { openMetricPicker(player, menu.board, menu.page + 1); return; }
+            List<ArcadeLobbyLeaderboardMetricCatalog.Metric> metrics = metricsFor(selectedGame());
+            int metricIndex = menu.page * 45 + slot;
+            if (slot < 45 && metricIndex < metrics.size()) {
+                board.metric = metrics.get(metricIndex).id();
+                save(id);
+                openEdit(player, menu.board);
+            }
+            return;
+        }
+        if (menu.type == MenuType.ACTION) {
+            if (slot == 49) { openEdit(player, menu.board); return; }
+            List<ArcadeLobbyLeaderboardAction> actions = ArcadeLobbyLeaderboardAction.choices(
+                    board.isPb(effectiveGame(board)));
+            int actionIndex = menu.page * 45 + slot;
+            if (slot < 45 && actionIndex < actions.size()) {
+                if (menu.actionSide == ActionSide.LEFT) board.leftAction = actions.get(actionIndex);
+                else board.rightAction = actions.get(actionIndex);
+                save(id);
+                openEdit(player, menu.board);
+            }
+            return;
+        }
         if (slot == 0 || slot == 49) { openRoot(player); return; }
         boolean pb = board.isPb(effectiveGame(board));
         if (slot == 10) return;
         if (slot == 12) {
-            int index = List.of(METRICS).indexOf(board.metric);
-            do { board.metric = METRICS[(++index) % METRICS.length]; }
-            while ("pb".equals(board.metric) && !"dragon-escape".equals(effectiveGame(board)));
+            openMetricPicker(player, menu.board, 0);
+            return;
         } else if (slot == 14 && pb) { openMapPicker(player, menu.board, 0); return; }
         else if (slot == 16 && pb) {
             var kits = DragonEscapePersonalBestViews.all();
             board.kit = kits.get((Math.max(0, kits.indexOf(board.kit)) + 1) % kits.size());
         } else if (slot == 20 && pb) board.cycleMaps = !board.cycleMaps;
         else if (slot == 22 && pb) board.cycleKits = !board.cycleKits;
+        else if (slot == 24) { openActionPicker(player, menu.board, ActionSide.LEFT, 0); return; }
+        else if (slot == 25) { openActionPicker(player, menu.board, ActionSide.RIGHT, 0); return; }
         else if (slot >= 28 && slot <= 31) {
             Period period = Period.values()[slot - 28];
+            if (pb && period != Period.ALL_TIME && period != Period.AROUND_YOU) return;
             if (board.periods.contains(period) && board.periods.size() > 1) board.periods.remove(period);
             else board.periods.add(period);
             if (!board.periods.contains(board.period)) board.period = board.periods.iterator().next();
