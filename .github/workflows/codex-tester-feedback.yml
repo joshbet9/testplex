@@ -205,7 +205,6 @@ jobs:
         if: always()
         uses: actions/github-script@v7
         env:
-          CODEX_MESSAGE: ${{ env.CODEX_MESSAGE }}
           PR_URL: ${{ steps.create_pr.outputs.pr_url }}
         with:
           script: |
