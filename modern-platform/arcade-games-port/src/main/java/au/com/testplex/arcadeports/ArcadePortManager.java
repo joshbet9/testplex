@@ -5385,7 +5385,7 @@ public final class ArcadePortManager implements Listener {
                 || type == ArcadePortGame.DRAW_MY_THING
                 || type == ArcadePortGame.MASTER_BUILDERS
                 || type == ArcadePortGame.GLADIATORS || type == ArcadePortGame.SUPER_SPLOOR
-                || type == ArcadePortGame.HOOPS_REMASTERED
+                || type == ArcadePortGame.HOOPS_REMASTERED || type == ArcadePortGame.EVOLUTION
                 ? 0L : now + (type == ArcadePortGame.SHEEP_QUEST ? GameDebugRuntimeOverrides.longValue("SHEEP_QUEST_ROUND_MILLIS", ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS)
                 : type == ArcadePortGame.GLADIATORS ? 0L
                 : type == ArcadePortGame.BOMB_LOBBERS ? GameDebugRuntimeOverrides.longValue("BOMB_LOBBERS_ROUND_MILLIS", ArcadePortRules.BOMB_LOBBERS_ROUND_MILLIS)
@@ -7217,8 +7217,8 @@ public final class ArcadePortManager implements Listener {
                     SUPER_SPLOOR, PLEXBALL, MASTER_BUILDERS, SNEAKY_ASSASSINS,
                     SPEED_BUILDERS,
                     MONSTER_MAZE, MONSTER_MAZE_SPEED, MONSTER_MAZE_MODERN, SNAKE,
-                    WIZARDS, CAMERA_SHY -> false;
-            case EVOLUTION, MICRO_BATTLES, RUNNER, SHEEP_QUEST, SPLEEF,
+                    WIZARDS, CAMERA_SHY, EVOLUTION -> false;
+            case MICRO_BATTLES, RUNNER, SHEEP_QUEST, SPLEEF,
                     TURF_WARS, DRAW_MY_THING, SKY_WARS, MILK_THE_COW,
                     WITHER_ASSAULT -> true;
         };
@@ -7269,15 +7269,14 @@ public final class ArcadePortManager implements Listener {
             }
             List<String> lines = new ArrayList<>(15);
             lines.add(" ");
-            lines.add(ChatColor.YELLOW + "First to 6");
+            lines.add(ChatColor.YELLOW + "First to 5");
             lines.add("  ");
-            int shown = ranked.size() > 10 ? 9 : ranked.size();
+            int shown = EvolutionChargeBar.visibleRankedPlayers(ranked.size());
             for (int index = 0; index < shown; index++) {
                 Player player = ranked.get(index);
                 lines.add(ChatColor.GREEN + player.getName() + ChatColor.WHITE + "  "
                         + session.evolutionLevels.getOrDefault(player.getUniqueId(), 0));
             }
-            if (ranked.size() > shown) lines.add(ChatColor.GRAY + "+" + (ranked.size() - shown) + " more");
             while (lines.size() < 13) lines.add("  ".repeat(lines.size() - 1));
             lines.add("   ");
             UUID viewerId = viewer.getUniqueId();
@@ -21412,7 +21411,6 @@ public final class ArcadePortManager implements Listener {
                     + ArcadePortRules.evolutionChargePerTick(
                             session.evolutionLifeKills.getOrDefault(id, 0), quickEvolver));
             session.evolutionCharge.put(id, progress);
-            player.setExp(progress);
             player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 4, 1, false, false, true));
             if (session.ticks % 5 == 0) {
                 player.getWorld().spawnParticle(Particle.HAPPY_VILLAGER,
@@ -21421,8 +21419,7 @@ public final class ArcadePortManager implements Listener {
             if (session.ticks % 10 == 0) {
                 player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 0.55F, progress + 0.6F);
             }
-            player.sendActionBar(ChatColor.GREEN + "EVOLVING " + ChatColor.WHITE
-                    + Math.min(100, (int) (progress * 100.0F)) + "%");
+            player.sendTitle("", EvolutionChargeBar.format(progress), 0, 3, 0);
             if (progress >= 0.9999F) beginEvolution(session, player);
         }
     }
@@ -21780,7 +21777,6 @@ public final class ArcadePortManager implements Listener {
         if (charge == null) return;
         float remaining = Math.max(0.0F, charge * 0.92F);
         session.evolutionCharge.put(id, remaining);
-        player.setExp(remaining);
     }
 
     private void interruptEvolutionForHit(Session session, Player player) {
