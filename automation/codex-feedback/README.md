@@ -141,11 +141,14 @@ implemented in this branch. On 2026-11-14, Node.js 22.23.5, GitHub CLI 2.104.0
 and Codex CLI 0.169.0 were installed on the Oracle VM; service accounts, units
 and private configuration templates were installed, and the Caddy webhook route
 was added with a backup. All four units remain disabled and inactive. The
-configuration files are root-owned mode 0600. GitHub tokens have been
-configured privately by the maintainer, but no webhook or completed ChatGPT
-authorization is present; no real event or draft PR has been processed. A
-Windows invocation issue in the SIWC helper was fixed at the current branch
-head after the first setup attempt; the OAuth flow still needs a successful
-retry and verification. Keep PR #461 in draft until the maintainer reviews the
-code and completes the one-time setup and event acceptance flow. Do not transfer
+configuration files are root-owned mode 0600. The maintainer configured
+the two GitHub tokens privately and completed SIWC authorization; the validated
+credential is installed at owner-only mode 0600. The OAuth proxy and webhook
+receiver are enabled and active; the issue worker and publisher remain disabled
+until the GitHub webhook is registered. The live Caddy route strips the public
+/testplex prefix correctly and was verified to reach the receiver (an unsigned
+POST receives HTTP 401). No signed GitHub delivery, issue event, or draft PR has
+been processed. A Windows invocation issue in the SIWC helper was fixed at the
+current branch head after the first setup attempt. Keep PR #461 in draft until
+the maintainer reviews the code and completes event acceptance. Do not transfer
 credentials before that review.
