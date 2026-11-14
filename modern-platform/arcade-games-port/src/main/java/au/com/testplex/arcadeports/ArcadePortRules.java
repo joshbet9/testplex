@@ -1466,6 +1466,15 @@ public final class ArcadePortRules {
                 "DRAGON_ESCAPE_SCORE_UPDATE_MILLIS", DRAGON_ESCAPE_SCORE_UPDATE_MILLIS));
     }
 
+    /** Reborn's Douglas model faces opposite the route velocity vector. */
+    public static float dragonEscapeModelYaw(Vector velocity) {
+        if (velocity == null || !Double.isFinite(velocity.getX()) || !Double.isFinite(velocity.getZ())
+                || (velocity.getX() == 0.0D && velocity.getZ() == 0.0D)) return 180.0F;
+        double yaw = Math.toDegrees(Math.atan((-velocity.getX()) / velocity.getZ()));
+        if (velocity.getZ() < 0.0D) yaw += 180.0D;
+        return (float) (180.0D + yaw);
+    }
+
     /** Reborn applies the 0.2 lift, caps Y, then adds a further 0.2 when grounded. */
     public static double dragonEscapeLeapVerticalVelocity(double normalizedFacingY, boolean grounded) {
         if (!Double.isFinite(normalizedFacingY)) normalizedFacingY = 0.0D;
