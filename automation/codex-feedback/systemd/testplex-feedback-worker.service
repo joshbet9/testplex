@@ -22,7 +22,7 @@ ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes
 LockPersonality=yes
-ReadWritePaths=/var/lib/testplex-feedback /var/lib/testplex-feedback-shared /var/lib/testplex-feedback-publisher/inbox
+ReadWritePaths=/var/lib/testplex-feedback /var/lib/testplex-feedback-shared /var/lib/testplex-feedback-publisher/inbox /var/lib/testplex-codex-runner/.codex
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 
 [Install]
