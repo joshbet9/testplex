@@ -21368,25 +21368,10 @@ public final class ArcadePortManager implements Listener {
             }
             if (!session.evolutionAvailable.contains(id)) {
                 if (player.getExp() != 0.0F) player.setExp(0.0F);
-                if (session.ticks % 20L == 0L) {
-                    long remaining = ArcadePortRules.evolutionPityRemainingMillis(pityDeadline, now);
-                    player.sendActionBar(ChatColor.GOLD + "Pity evolution " + ChatColor.YELLOW
-                            + ArcadePortRules.formatEvolutionPityRemaining(remaining)
-                            + ChatColor.GRAY + " | kills & assists reduce the timer");
-                }
                 continue;
             }
             if (!player.isSneaking()) {
                 cancelEvolutionCharge(session, player);
-                if (now % 2_000L < 50L) {
-                    long pityRemaining = ArcadePortRules.evolutionPityRemainingMillis(pityDeadline, now);
-                    String pityStatus = pityRemaining > 0L
-                            ? "Pity " + ArcadePortRules.formatEvolutionPityRemaining(pityRemaining)
-                            : "Pity ready";
-                    player.sendActionBar(ChatColor.GREEN + "Evolution ready"
-                            + ChatColor.GOLD + " | " + pityStatus
-                            + ChatColor.GRAY + " — hold sneak while grounded.");
-                }
                 continue;
             }
             if (player.getLocation().getBlock().isLiquid()) {
@@ -21687,10 +21672,6 @@ public final class ArcadePortManager implements Listener {
                         ? "Neanderthal pity evolution ready!" : "Pity evolution ready! Hold sneak while grounded to evolve."));
                 player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.9F, 1.25F);
             }
-        } else if (player != null && player.isOnline() && !session.evolutionAvailable.contains(playerId)) {
-            player.sendActionBar(ChatColor.GOLD + "Pity evolution "
-                    + ArcadePortRules.formatEvolutionPityRemaining(reduced - now)
-                    + ChatColor.GRAY + " | kill/assist bonus");
         }
     }
 
