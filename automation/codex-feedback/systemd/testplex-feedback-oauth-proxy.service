@@ -1,0 +1,30 @@
+[Unit]
+Description=Testplex Sign in with ChatGPT credential refresh proxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=testplex-feedback-siwc
+Group=testplex-feedback-siwc
+SupplementaryGroups=testplex-feedback-proxy
+WorkingDirectory=/opt/testplex-codex-feedback
+EnvironmentFile=/etc/testplex-feedback/oauth-proxy.env
+ExecStart=/usr/bin/node /opt/testplex-codex-feedback/oauth-proxy.mjs
+Restart=on-failure
+RestartSec=5s
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+ReadWritePaths=/var/lib/testplex-siwc
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

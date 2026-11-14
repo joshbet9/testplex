@@ -1,0 +1,8 @@
+# Add this route inside the existing HTTPS site block. Replace the path only if
+# the webhook URL is changed; do not expose port 8787 directly to the internet.
+handle /testplex/github/webhook {
+	reverse_proxy 127.0.0.1:8787
+}
+
+# GitHub webhook URL: https://YOUR_EXISTING_ORACLE_DOMAIN/testplex/github/webhook
+# Subscribe to Issues and Issue comments. Select application/json payloads.

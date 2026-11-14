@@ -1,0 +1,29 @@
+[Unit]
+Description=Testplex signed GitHub feedback webhook receiver
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=testplex-feedback-webhook
+Group=testplex-feedback-db
+WorkingDirectory=/var/lib/testplex-feedback
+EnvironmentFile=/etc/testplex-feedback/webhook.env
+ExecStart=/usr/bin/node /opt/testplex-codex-feedback/webhook-receiver.mjs
+Restart=on-failure
+RestartSec=3s
+UMask=0007
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+ReadWritePaths=/var/lib/testplex-feedback
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target
