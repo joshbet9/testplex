@@ -10,6 +10,12 @@ import org.junit.jupiter.api.Test;
 
 class MasterBuildersPlotRuntimeTest {
     @Test
+    void changesGroundAtTheDetectedPlotFloorInsteadOfAssumingWorldHeight63() {
+        assertEquals(63, MasterBuildersPlotRuntime.groundBlockY(64));
+        assertEquals(81, MasterBuildersPlotRuntime.groundBlockY(82));
+    }
+
+    @Test
     void sourceOptionsIncludeAllGroundAndFriendlyParticleChoices() {
         assertEquals(23, MasterBuildersPlotRuntime.groundOptionCount());
         assertEquals(29, MasterBuildersPlotRuntime.particleOptionCount());

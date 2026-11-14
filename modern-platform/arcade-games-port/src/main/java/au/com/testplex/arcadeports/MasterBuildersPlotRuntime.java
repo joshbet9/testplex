@@ -483,13 +483,18 @@ final class MasterBuildersPlotRuntime implements Listener {
     private void applyGround(Player player, Material material) {
         Location plotCenter = access.plotCenter(player);
         if (plotCenter == null) return;
+        int groundY = groundBlockY(plotCenter.getBlockY());
         for (int x = plotCenter.getBlockX() - 5; x <= plotCenter.getBlockX() + 5; x++) {
             for (int z = plotCenter.getBlockZ() - 5; z <= plotCenter.getBlockZ() + 5; z++) {
-                Block block = plotCenter.getWorld().getBlockAt(x, 63, z);
+                Block block = plotCenter.getWorld().getBlockAt(x, groundY, z);
                 if (!access.insidePlot(player, block.getLocation().add(0.0D, 1.0D, 0.0D))) continue;
                 block.setType(material, false);
             }
         }
+    }
+
+    static int groundBlockY(int plotSpawnY) {
+        return plotSpawnY - 1;
     }
 
     private void placeParticle(Player player, PlayerInteractEvent event) {
