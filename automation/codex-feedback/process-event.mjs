@@ -93,7 +93,7 @@ export async function processEvent(eventRow) {
   await rm(workspace, { recursive: true, force: true });
   await rm(inbox, { recursive: true, force: true });
   try {
-  process.stdout.write(`[feedback-worker] issue=${issueNumber} stage=clone branch=${base}\\n`);
+  process.stdout.write(`[feedback-worker] issue=${issueNumber} stage=clone branch=${base}\n`);
   await run(SUDO, ['-n', '-u', RUNNER_USER, '--', CLONE_LAUNCHER, repository, base, workspace]);
   const baseSha = (await run(GIT, ['rev-parse', 'HEAD'], { cwd: workspace })).toString('utf8').trim();
   const [repositoryInstructions, feedbackPrompt] = await Promise.all([
@@ -110,7 +110,7 @@ export async function processEvent(eventRow) {
   ].join('\n\n');
   await publishFile(contextPath, fullPrompt, 0o640);
 
-  process.stdout.write(`[feedback-worker] issue=${issueNumber} stage=codex model=${CODEX_MODEL}\\n`);
+  process.stdout.write(`[feedback-worker] issue=${issueNumber} stage=codex model=${CODEX_MODEL}\n`);
   const runnerArgs = ['-n', '-u', RUNNER_USER, '--', RUNNER_LAUNCHER, workspace, contextPath, CODEX_MODEL];
   const response = await run(SUDO, runnerArgs, { cwd: workspace });
   const summary = response.toString('utf8').trim();
