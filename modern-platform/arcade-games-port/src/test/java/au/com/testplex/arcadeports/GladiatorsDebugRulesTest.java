@@ -98,6 +98,14 @@ class GladiatorsDebugRulesTest {
     }
 
     @Test
+    void gladiatorHitsDuringHurtFramesAreFullyRejected() {
+        assertFalse(ArcadePortRules.isGladiatorDamageWindowOpen(10));
+        assertFalse(ArcadePortRules.isGladiatorDamageWindowOpen(1));
+        assertTrue(ArcadePortRules.isGladiatorDamageWindowOpen(0));
+        assertTrue(ArcadePortRules.isGladiatorDamageWindowOpen(-1));
+    }
+
+    @Test
     void potSplashHealingAndRadiusAreTunableAndRestoreSourceDefaults() {
         assertEquals(4.0D, ArcadePortRules.gladiatorsPotionHealing(), 1.0e-9);
         assertEquals(4.0D, ArcadePortRules.gladiatorsPotionSplashRadius(), 1.0e-9);

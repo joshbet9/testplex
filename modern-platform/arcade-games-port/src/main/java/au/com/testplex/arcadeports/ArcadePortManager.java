@@ -20924,7 +20924,8 @@ public final class ArcadePortManager implements Listener {
                 attackerPair == null ? -1 : attackerPair,
                 targetPair == null ? -2 : targetPair,
                 attackerPair != null && session.gladiatorResolvedPairs.contains(attackerPair))) return;
-        boolean damageWindowOpen = target.getNoDamageTicks() <= 0;
+        boolean damageWindowOpen = ArcadePortRules.isGladiatorDamageWindowOpen(target.getNoDamageTicks());
+        if (!damageWindowOpen) return;
         if (projectile) {
             recordGladiatorToolHit(session, attacker, target, GladiatorsAchievementRules.BOW_HIT);
             session.gladiatorBoutTimedCritStreak.remove(attackerId);
@@ -20947,21 +20948,17 @@ public final class ArcadePortManager implements Listener {
             }
         }
         session.gladiatorBoutTimedCritStreak.remove(targetId);
-        if (damageWindowOpen) {
-            target.setNoDamageTicks(ArcadePortRules.gladiatorsNoDamageTicks(projectile));
-            session.gladiatorRoundDamageTaken.merge(targetId, damage, Double::sum);
-        }
-        if (damageWindowOpen && target.getHealth() <= damage) {
+        target.setNoDamageTicks(ArcadePortRules.gladiatorsNoDamageTicks(projectile));
+        session.gladiatorRoundDamageTaken.merge(targetId, damage, Double::sum);
+        if (target.getHealth() <= damage) {
             target.getWorld().playSound(target.getLocation(),
                     projectile ? Sound.ENTITY_ARROW_HIT_PLAYER : Sound.ENTITY_PLAYER_ATTACK_STRONG,
                     0.9F, 0.9F);
             eliminate(session, target, attacker, "was defeated by " + attacker.getName());
             return;
         }
-        if (damageWindowOpen) {
-            target.setHealth(target.getHealth() - damage);
-            playLegacyDamageFeedback(target);
-        }
+        target.setHealth(target.getHealth() - damage);
+        playLegacyDamageFeedback(target);
         applyGladiatorsSourceKnockback(attacker, target, damage, projectile, projectileVelocity);
 
         Player creditedKiller = attacker == null ? recentMicroBattlesKiller(session, target.getUniqueId()) : attacker;
