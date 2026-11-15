@@ -3,6 +3,7 @@ package au.com.testplex.arcadeports;
 import org.junit.jupiter.api.Test;
 import org.bukkit.Material;
 import org.bukkit.ChatColor;
+import org.bukkit.entity.EnderDragon;
 import org.bukkit.util.Vector;
 import java.nio.file.Path;
 import java.util.HashSet;
@@ -2445,28 +2446,10 @@ class ArcadePortGameTest {
         assertEquals(0.6D, airborne.getY(), 0.00001D);
     }
 
-    @Test void dragonsAutonomousFlightSteersAtConfiguredSpeedTowardSelectedTarget() {
-        Vector velocity = ArcadePortRules.dragonsFlightVelocity(
-                new Vector(1.0D, 2.0D, 3.0D), new Vector(1.0D, 2.0D, 13.0D), 0.32D);
-        assertEquals(0.0D, velocity.getX(), 0.00001D);
-        assertEquals(0.0D, velocity.getY(), 0.00001D);
-        assertEquals(0.32D, velocity.getZ(), 0.00001D);
-        assertEquals(0.0D, ArcadePortRules.dragonsFlightVelocity(
-                new Vector(1.0D, 2.0D, 3.0D), new Vector(1.0D, 2.0D, 3.0D), 0.32D).length(), 0.00001D);
-        assertEquals(0.0D, ArcadePortRules.dragonsFlightVelocity(
-                new Vector(), new Vector(0.0D, 0.0D, 1.0D), Double.NaN).length(), 0.00001D);
-    }
-
-    @Test void dragonsAutonomousFlightStepAdvancesTheEntityWhenNativeAiIsDisabled() {
-        Vector position = new Vector(4.0D, 70.0D, 8.0D);
-        Vector next = ArcadePortRules.dragonsFlightStep(
-                position, new Vector(4.0D, 70.0D, 18.0D), 0.32D);
-
-        assertEquals(4.0D, next.getX(), 0.00001D);
-        assertEquals(70.0D, next.getY(), 0.00001D);
-        assertEquals(8.32D, next.getZ(), 0.00001D);
-        assertEquals(4.0D, position.getX(), 0.00001D);
-        assertEquals(8.0D, position.getZ(), 0.00001D);
+    @Test void dragonsAutonomousFlightUsesNativeMovingPhases() {
+        assertEquals(EnderDragon.Phase.STRAFING, ArcadePortRules.dragonsAutonomousPhase(true));
+        assertEquals(EnderDragon.Phase.FLY_TO_PORTAL, ArcadePortRules.dragonsAutonomousPhase(false));
+        assertEquals(0.6D, ArcadePortRules.DRAGONS_AUTONOMOUS_FLIGHT_SPEED, 0.00001D);
     }
 
     @Test void dragonsDisableDirectAndProjectilePvpAndOnlyAllowEmeraldWorldItems() {

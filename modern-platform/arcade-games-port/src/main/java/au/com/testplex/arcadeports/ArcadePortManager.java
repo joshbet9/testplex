@@ -16449,7 +16449,7 @@ public final class ArcadePortManager implements Listener {
                 Location spawn = spawns.get(ThreadLocalRandom.current().nextInt(spawns.size())).clone();
                 if (fallbackSpawn) spawn.add(0.0D, 12.0D, 0.0D);
                 EnderDragon dragon = session.world.spawn(spawn, EnderDragon.class);
-                dragon.setAI(false);
+                dragon.setAI(true);
                 dragon.setGravity(false);
                 var flightSpeed = dragon.getAttribute(Attribute.FLYING_SPEED);
                 if (flightSpeed != null) {
@@ -16459,7 +16459,12 @@ public final class ArcadePortManager implements Listener {
                 dragon.setCollidable(false);
                 dragon.setRemoveWhenFarAway(false);
                 session.entities.add(dragon);
-                session.dragonTargetLocations.put(dragon.getUniqueId(), randomDragonSkyTarget(session));
+                Location initialSkyTarget = randomDragonSkyTarget(session);
+                session.dragonTargetLocations.put(dragon.getUniqueId(), initialSkyTarget);
+                // The source assigns a native dragon waypoint. Paper exposes the
+                // waypoint used by its flight phases through the dragon's podium.
+                dragon.setPodium(initialSkyTarget);
+                dragon.setPhase(ArcadePortRules.dragonsAutonomousPhase(false));
                 Vector initialHeading = dragon.getLocation().getDirection().normalize();
                 if (initialHeading.lengthSquared() < 1.0E-6D) initialHeading = new Vector(0.0D, 0.0D, 1.0D);
                 session.dragonFlightVectors.put(dragon.getUniqueId(), initialHeading);
@@ -16571,17 +16576,38 @@ public final class ArcadePortManager implements Listener {
                     session.dragonFlightVectors.remove(dragonId);
                     continue;
                 }
-                // Paper's native EnderDragon controller does not reliably follow
-                // the source-selected target on custom arcade maps. Keep target
-                // selection source-driven and steer the dragon directly each tick.
-                dragon.setAI(false);
-                dragon.setTarget(null);
+                dragon.setAI(true);
+                Player selectedPlayer = session.dragonTargetPlayers.containsKey(dragonId)
+                        ? session.players.get(session.dragonTargetPlayers.get(dragonId)) : null;
+                if (selectedPlayer != null && selectedPlayer.isOnline()
+                        && session.alive.contains(selectedPlayer.getUniqueId())) {
+                    // Reborn's setTargetEntity path maps to the native strafing
+                    // phase against the living player selected by the source logic.
+                    dragon.setTarget(selectedPlayer);
+                    EnderDragon.Phase phase = ArcadePortRules.dragonsAutonomousPhase(true);
+                    if (dragon.getPhase() != phase) {
+                        dragon.setPhase(phase);
+                    }
+                } else {
+                    dragon.setTarget(null);
+                    Location waypoint = session.dragonTargetLocations.get(dragonId);
+                    if (waypoint == null) {
+                        waypoint = randomDragonSkyTarget(session);
+                        session.dragonTargetLocations.put(dragonId, waypoint);
+                    }
+                    // Reborn's setTargetBlock path becomes a native waypoint flight;
+                    // the server's dragon tick remains active for real flight motion.
+                    dragon.setPodium(waypoint);
+                    EnderDragon.Phase phase = ArcadePortRules.dragonsAutonomousPhase(false);
+                    if (dragon.getPhase() != phase) {
+                        dragon.setPhase(phase);
+                    }
+                }
             }
 
         }
 
-        // Only Tamer-controlled dragons use direct steering. Autonomous dragons fly
-        // with Paper's native dragon controller and the source circling/strafe phases.
+        // Tamer's ability is manual steering; autonomous dragons use native flight phases.
         for (EnderDragon dragon : dragons) {
             UUID dragonId = dragon.getUniqueId();
             UUID controllerId = session.dragonTamerByDragon.get(dragonId);
@@ -16611,30 +16637,6 @@ public final class ArcadePortManager implements Listener {
                     // A failed teleport must not leave a no-AI dragon stranded at spawn.
                     dragon.setAI(true);
                     dragon.setVelocity(flight);
-                }
-            } else if (controllerId == null
-                    && GameDebugRuntimeOverrides.booleanValue("DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED",
-                            ArcadePortRules.DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED)) {
-                Location target = session.dragonTargetLocations.get(dragonId);
-                if (target != null) {
-                    Location current = dragon.getLocation();
-                    Vector currentPosition = current.toVector();
-                    double speed = GameDebugRuntimeOverrides.doubleValue(
-                            "DRAGONS_AUTONOMOUS_FLIGHT_SPEED", ArcadePortRules.DRAGONS_AUTONOMOUS_FLIGHT_SPEED);
-                    Vector heading = ArcadePortRules.dragonsFlightVelocity(currentPosition, target.toVector(), speed);
-                    if (heading.lengthSquared() > 0.0D) {
-                        Vector nextPosition = ArcadePortRules.dragonsFlightStep(currentPosition, target.toVector(), speed);
-                        Location next = new Location(current.getWorld(), nextPosition.getX(),
-                                nextPosition.getY(), nextPosition.getZ());
-                        next.setDirection(heading);
-                        // With the EnderDragon brain disabled, Paper's dragon movement controller
-                        // ignores setVelocity. Advance the source-selected flight vector directly
-                        // each tick so dragons actually cross the arena and swoop toward players.
-                        if (dragon.teleport(next)) {
-                            dragon.setVelocity(new Vector());
-                            session.dragonFlightVectors.put(dragonId, heading.clone());
-                        }
-                    }
                 }
             }
             if (targetUpdate && controllerId == null) damageDragonTerrainAlongPath(session, dragon);
