@@ -1408,6 +1408,7 @@ public final class ArcadePortRules {
     public static final long DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS = 8_000L;
     public static final int DRAGON_ESCAPE_BUILDER_MAX_BRICKS = 2;
     public static final long DRAGON_ESCAPE_BUILDER_RECHARGE_MILLIS = 8_000L;
+    public static final long DRAGON_ESCAPE_BUILDER_PLACEMENT_RESYNC_GRACE_MILLIS = 250L;
     public static final long DRAGON_ESCAPE_BUILDER_USED_BRICK_GRACE_MILLIS = 500L;
     public static final long DRAGON_ESCAPE_LEAP_RECHARGE_MILLIS = 8_000L;
     public static final long DRAGON_ESCAPE_SCORE_UPDATE_MILLIS = 500L;
@@ -1456,6 +1457,12 @@ public final class ArcadePortRules {
         if (!ownerAlive) return true;
         return hasBeenUsed && !stillStandingOnIt && vacatedAtMillis > 0L
                 && nowMillis >= vacatedAtMillis + DRAGON_ESCAPE_BUILDER_USED_BRICK_GRACE_MILLIS;
+    }
+
+    public static boolean shouldResyncDragonEscapeBuilderPlacement(
+            long nowMillis, long placedAtMillis, boolean blockIsBrick) {
+        return !blockIsBrick && placedAtMillis >= 0L && nowMillis >= placedAtMillis
+                && nowMillis - placedAtMillis <= DRAGON_ESCAPE_BUILDER_PLACEMENT_RESYNC_GRACE_MILLIS;
     }
 
     public static boolean shouldAllowDragonEscapeKitChange(boolean activeRaceParticipant) {

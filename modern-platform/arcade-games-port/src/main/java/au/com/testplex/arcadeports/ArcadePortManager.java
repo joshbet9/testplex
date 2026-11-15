@@ -17415,6 +17415,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (inventoryCount(player, Material.BRICKS) <= 0
                 || player.getInventory().getItemInMainHand().getType() != Material.BRICKS) return;
+        int remainingCharges = inventoryCount(player, Material.BRICKS) - 1;
         // No block is allowed to appear inside another racer's body, including the owner.
         org.bukkit.util.BoundingBox placementBox = new org.bukkit.util.BoundingBox(
                 target.getX(), target.getY(), target.getZ(),
@@ -17433,7 +17434,11 @@ public final class ArcadePortManager implements Listener {
         }
         BlockState previous = target.getState();
         target.setType(Material.BRICKS, false);
-        consumeHeld(player);
+        DragonEscapeBuilderBrick placed = new DragonEscapeBuilderBrick(previous, now, remainingCharges);
+        session.dragonEscapeBuilderBricks.put(id, placed);
+        setDragonEscapeKitBlockCharges(player, Material.BRICKS, "Temporary Brick",
+                "Right-click a block face to place a foothold. It disappears after you step off.",
+                remainingCharges);
         // The interaction is deliberately cancelled so Adventure-mode clients do not
         // rely on vanilla placement permission prediction. Confirm both server block
         // state and inventory immediately to the placing client (including high ping).
@@ -17443,11 +17448,16 @@ public final class ArcadePortManager implements Listener {
         // its predicted stack. Re-send both authoritative values after Bukkit has
         // completed this interaction so a placement never appears free to the owner.
         Bukkit.getScheduler().runTask(plugin, () -> {
-            if (!player.isOnline() || active != session || !session.alive.contains(id)) return;
+            if (!player.isOnline() || active != session || !session.alive.contains(id)
+                    || session.dragonEscapeBuilderBricks.get(id) != placed) return;
+            if (target.getType() != Material.BRICKS) target.setType(Material.BRICKS, false);
+            setDragonEscapeKitBlockCharges(player, Material.BRICKS, "Temporary Brick",
+                    "Right-click a block face to place a foothold. It disappears after you step off.",
+                    placed.remainingCharges);
             player.sendBlockChange(target.getLocation(), target.getBlockData());
             player.updateInventory();
+            placed.authoritativeResyncSent = true;
         });
-        session.dragonEscapeBuilderBricks.put(id, new DragonEscapeBuilderBrick(previous));
         session.dragonEscapeBuilderLastPlacedAt.put(id, System.currentTimeMillis());
         session.dragonEscapeNextBrickAt.put(id,
                 System.currentTimeMillis() + ArcadePortRules.DRAGON_ESCAPE_BUILDER_RECHARGE_MILLIS);
@@ -17480,9 +17490,24 @@ public final class ArcadePortManager implements Listener {
             } else if (brick.used && brick.vacatedAt == 0L) {
                 brick.vacatedAt = now;
             }
+            boolean missingBrick = block.getType() != Material.BRICKS;
+            if (session.alive.contains(entry.getKey())
+                    && ArcadePortRules.shouldResyncDragonEscapeBuilderPlacement(
+                    now, brick.placedAtMillis, missingBrick)) {
+                block.setType(Material.BRICKS, false);
+                if (!brick.authoritativeResyncSent && owner != null && owner.isOnline()) {
+                    setDragonEscapeKitBlockCharges(owner, Material.BRICKS, "Temporary Brick",
+                            "Right-click a block face to place a foothold. It disappears after you step off.",
+                            brick.remainingCharges);
+                    owner.sendBlockChange(block.getLocation(), block.getBlockData());
+                    owner.updateInventory();
+                    brick.authoritativeResyncSent = true;
+                }
+                continue;
+            }
             if (ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(
                     brick.used, standingOnBrick, session.alive.contains(entry.getKey()), now, brick.vacatedAt)
-                    || block.getType() != Material.BRICKS) {
+                    || missingBrick) {
                 restoreDragonEscapeBuilderBrick(brick);
                 session.dragonEscapeBuilderBricks.remove(entry.getKey());
             }
@@ -35547,11 +35572,16 @@ public final class ArcadePortManager implements Listener {
 
     private static final class DragonEscapeBuilderBrick {
         final BlockState original;
+        final long placedAtMillis;
+        final int remainingCharges;
         boolean used;
         long vacatedAt;
+        boolean authoritativeResyncSent;
 
-        DragonEscapeBuilderBrick(BlockState original) {
+        DragonEscapeBuilderBrick(BlockState original, long placedAtMillis, int remainingCharges) {
             this.original = original;
+            this.placedAtMillis = placedAtMillis;
+            this.remainingCharges = remainingCharges;
         }
     }
 

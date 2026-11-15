@@ -1981,6 +1981,14 @@ class ArcadePortGameTest {
                 ArcadePortRules.dragonEscapeBuilderPlacementTouchesWater(false, false)));
     }
 
+    @Test void dragonEscapeBuilderPlacementGetsBoundedAuthoritativeResyncGrace() {
+        assertTrue(ArcadePortRules.shouldResyncDragonEscapeBuilderPlacement(10_000L, 10_000L, false));
+        assertTrue(ArcadePortRules.shouldResyncDragonEscapeBuilderPlacement(10_200L, 10_000L, false));
+        assertFalse(ArcadePortRules.shouldResyncDragonEscapeBuilderPlacement(10_251L, 10_000L, false));
+        assertFalse(ArcadePortRules.shouldResyncDragonEscapeBuilderPlacement(9_999L, 10_000L, false));
+        assertFalse(ArcadePortRules.shouldResyncDragonEscapeBuilderPlacement(10_100L, 10_000L, true));
+    }
+
     @Test void dragonEscapeFinishWindowWaitsForRacersOrItsDeadline() {
         assertFalse(ArcadePortRules.shouldEndDragonEscapeFinishWindow(10_000L, 30_000L, 4));
         assertFalse(ArcadePortRules.shouldEndDragonEscapeFinishWindow(30_000L, 60_000L, 1));
