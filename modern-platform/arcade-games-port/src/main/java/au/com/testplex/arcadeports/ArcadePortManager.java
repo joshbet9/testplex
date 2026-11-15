@@ -29557,6 +29557,52 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null || !isSessionWorld(session, event.getEntity().getWorld())) return;
 
+        if (session.type == ArcadePortGame.EVOLUTION
+                && event.getEntity() instanceof Projectile evolutionProjectile) {
+            UUID projectileId = evolutionProjectile.getUniqueId();
+            if (session.evolutionFlameProjectiles.remove(projectileId)) {
+                Player shooter = evolutionProjectile.getShooter() instanceof Player player ? player : null;
+                if (shooter != null && event.getHitEntity() instanceof Player target
+                        && ArcadePortRules.shouldApplyEvolutionProjectileDamage(
+                                session.alive.contains(shooter.getUniqueId()),
+                                session.alive.contains(target.getUniqueId()), shooter.equals(target))) {
+                    hitEvolutionAbilityTarget(session, shooter, target,
+                            ArcadePortRules.EVOLUTION_BLAZE_FLAME_DAMAGE,
+                            ArcadePortRules.EVOLUTION_BLAZE_FLAME_KNOCKBACK, "Flamethrower");
+                    if (active == session && session.alive.contains(target.getUniqueId())) {
+                        target.setFireTicks(Math.max(target.getFireTicks(), 40));
+                    }
+                }
+                session.entities.remove(evolutionProjectile);
+                evolutionProjectile.remove();
+                return;
+            }
+            if (session.evolutionSulphurBombs.remove(projectileId)) {
+                Player shooter = evolutionProjectile.getShooter() instanceof Player player ? player : null;
+                Entity hitEntity = event.getHitEntity();
+                Location impact = hitEntity == null
+                        ? evolutionProjectile.getLocation().clone() : hitEntity.getLocation().clone();
+                if (shooter != null) {
+                    resolveEvolutionSulphurBomb(session, shooter, impact,
+                            hitEntity instanceof Player target ? target : null);
+                }
+                session.entities.remove(evolutionProjectile);
+                evolutionProjectile.remove();
+                return;
+            }
+            if (evolutionProjectile instanceof Egg egg && egg.getShooter() instanceof Player shooter
+                    && event.getHitEntity() instanceof Player target
+                    && ArcadePortRules.shouldApplyEvolutionProjectileDamage(
+                            session.alive.contains(shooter.getUniqueId()),
+                            session.alive.contains(target.getUniqueId()), shooter.equals(target))) {
+                hitEvolutionAbilityTarget(session, shooter, target,
+                        ArcadePortRules.evolutionEggDamage(), 0.65D, "Egg Launch");
+                session.entities.remove(egg);
+                egg.remove();
+                return;
+            }
+        }
+
         if (session.type == ArcadePortGame.GLADIATORS
                 && event.getEntity() instanceof Arrow gladiatorArrow) {
             UUID archer = session.gladiatorArrowOwners.remove(gladiatorArrow.getUniqueId());
@@ -34224,7 +34270,7 @@ public final class ArcadePortManager implements Listener {
         return true;
     }
 
-    private void resolveEvolutionSulphurBomb(Session session, Player shooter, Location impact) {
+    private void resolveEvolutionSulphurBomb(Session session, Player shooter, Location impact, Player directTarget) {
         if (session == null || active != session || session.type != ArcadePortGame.EVOLUTION
                 || shooter == null || !shooter.isOnline()
                 || !session.alive.contains(shooter.getUniqueId())
@@ -34232,22 +34278,15 @@ public final class ArcadePortManager implements Listener {
         session.world.spawnParticle(Particle.EXPLOSION, impact, 1, 0.05D, 0.05D, 0.05D, 0.0D);
         session.world.spawnParticle(Particle.SMOKE, impact, 10, 0.25D, 0.2D, 0.25D, 0.015D);
         session.world.playSound(impact, Sound.ENTITY_GENERIC_EXPLODE, 0.7F, 1.5F);
-        long now = System.currentTimeMillis();
-        for (Player target : alivePlayers(session)) {
-            if (target.getUniqueId().equals(shooter.getUniqueId())) continue;
-            double distance = target.getLocation().distance(impact);
-            if (!ArcadePortRules.isEvolutionSulphurBombInRange(distance)) continue;
-            if (session.evolving.contains(target.getUniqueId())) interruptEvolutionForHit(session, target);
-            recordEvolutionDamage(session, target, shooter, now);
-            double damage = GameDebugRuntimeOverrides.doubleValue("EVOLUTION_SULPHUR_BOMB_DAMAGE", ArcadePortRules.EVOLUTION_SULPHUR_BOMB_DAMAGE);
-            if (target.getHealth() <= damage) {
-                eliminate(session, target, shooter, "was hit by " + shooter.getName() + "'s Sulphur Bomb");
-                if (active != session) return;
-            } else {
-                target.setHealth(target.getHealth() - damage);
-                playLegacyDamageFeedback(target);
-                target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.7F, 1.15F);
-            }
+        // The 1.8 bomb only damages a living entity on direct contact. A block impact
+        // still produces the explosion effect, but must not become an invented AOE hit.
+        if (directTarget != null && ArcadePortRules.shouldApplyEvolutionProjectileDamage(
+                session.alive.contains(shooter.getUniqueId()),
+                session.alive.contains(directTarget.getUniqueId()), shooter.equals(directTarget))) {
+            hitEvolutionAbilityTarget(session, shooter, directTarget,
+                    GameDebugRuntimeOverrides.doubleValue("EVOLUTION_SULPHUR_BOMB_DAMAGE",
+                            ArcadePortRules.EVOLUTION_SULPHUR_BOMB_DAMAGE),
+                    ArcadePortRules.EVOLUTION_SULPHUR_BOMB_KNOCKBACK, "Sulphur Bomb");
         }
     }
 

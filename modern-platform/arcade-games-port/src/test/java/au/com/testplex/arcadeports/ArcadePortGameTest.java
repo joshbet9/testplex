@@ -2144,6 +2144,8 @@ class ArcadePortGameTest {
         assertEquals(1_000L, ArcadePortRules.EVOLUTION_BLAZE_FLAMETHROWER_DURATION_MILLIS);
         assertEquals(50L, ArcadePortRules.EVOLUTION_BLAZE_FLAMETHROWER_TICK_MILLIS);
         assertEquals(1.6D, ArcadePortRules.EVOLUTION_BLAZE_FLAME_SPEED);
+        assertEquals(2.0D, ArcadePortRules.EVOLUTION_BLAZE_FLAME_DAMAGE);
+        assertEquals(0.7D, ArcadePortRules.EVOLUTION_BLAZE_FLAME_KNOCKBACK);
         assertEquals(7_000L, ArcadePortRules.EVOLUTION_SLIME_SLAM_COOLDOWN_MILLIS);
         assertEquals(2.0D, ArcadePortRules.EVOLUTION_SLIME_SLAM_RADIUS);
         assertEquals(8.0D, ArcadePortRules.EVOLUTION_SLIME_SLAM_DAMAGE);
@@ -2160,7 +2162,12 @@ class ArcadePortGameTest {
         assertEquals(3_000L, ArcadePortRules.EVOLUTION_SULPHUR_BOMB_COOLDOWN_MILLIS);
         assertEquals(1.2D, ArcadePortRules.EVOLUTION_SULPHUR_BOMB_SPEED);
         assertEquals(2.5D, ArcadePortRules.EVOLUTION_SULPHUR_BOMB_RADIUS);
-        assertEquals(4.0D, ArcadePortRules.EVOLUTION_SULPHUR_BOMB_DAMAGE);
+        assertEquals(5.0D, ArcadePortRules.EVOLUTION_SULPHUR_BOMB_DAMAGE);
+        assertEquals(1.5D, ArcadePortRules.EVOLUTION_SULPHUR_BOMB_KNOCKBACK);
+        assertTrue(ArcadePortRules.shouldApplyEvolutionProjectileDamage(true, true, false));
+        assertFalse(ArcadePortRules.shouldApplyEvolutionProjectileDamage(false, true, false));
+        assertFalse(ArcadePortRules.shouldApplyEvolutionProjectileDamage(true, false, false));
+        assertFalse(ArcadePortRules.shouldApplyEvolutionProjectileDamage(true, true, true));
         assertTrue(ArcadePortRules.canUseEvolutionSulphurBomb(2, true, true));
         assertFalse(ArcadePortRules.canUseEvolutionSulphurBomb(1, true, true));
         assertFalse(ArcadePortRules.canUseEvolutionSulphurBomb(3, true, true));
