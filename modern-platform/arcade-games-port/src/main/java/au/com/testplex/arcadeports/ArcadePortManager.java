@@ -6015,6 +6015,15 @@ public final class ArcadePortManager implements Listener {
                 finish(session, null, false);
                 return;
             }
+            if (type == ArcadePortGame.HEROES_OF_GWEN) {
+                // Initial inventories were granted before this runtime became ready, so
+                // reapply each selected hero's real loadout once its selectors/abilities exist.
+                for (Player player : participants) {
+                    if (player == null || !player.isOnline()) continue;
+                    session.variantRuntime.setHeroesOfGwenHero(player,
+                            heroesOfGwenHeroPreferences.getOrDefault(player.getUniqueId(), "hattori"));
+                }
+            }
             if (type == ArcadePortGame.CASTLE_ASSAULT) {
                 announce(session, ChatColor.GOLD + "Castle Assault: destroy the two enemy sentry crystals, then defeat the King. "
                         + "Objective TNT respawns every "

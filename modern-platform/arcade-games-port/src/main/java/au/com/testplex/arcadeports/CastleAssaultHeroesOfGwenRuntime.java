@@ -3583,8 +3583,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private Material teamGlass(int team) {
-        return team == 0 ? Material.RED_STAINED_GLASS
-                : team == 1 ? Material.LIGHT_BLUE_STAINED_GLASS : Material.WHITE_STAINED_GLASS;
+        return ArcadePortRules.heroesOfGwenCaptureBeaconMaterial(team);
     }
 
     private Material teamWool(int team) {
