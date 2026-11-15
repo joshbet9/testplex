@@ -15,6 +15,8 @@ public final class HoopsRemasteredRules {
     public static final long CLUTCH_WINDOW_MILLIS = 60_000L;
     public static final long BUZZER_WINDOW_MILLIS = 3_000L;
     public static final double THREE_POINT_DISTANCE = 12.5D;
+    public static final double COURT_HALF_LENGTH = 36.0D;
+    public static final double COURT_HALF_WIDTH = 21.0D;
     public static final double STEAL_RADIUS = 2.6D;
     public static final double BLOCK_RADIUS = 2.5D;
     public static final long BLOCK_COOLDOWN_MILLIS = 700L;
@@ -206,10 +208,16 @@ public final class HoopsRemasteredRules {
     }
 
     public static double spawnX(int team) {
-        return team == 0 ? -10.0D : 10.0D;
+        return team == 0 ? -15.0D : 15.0D;
     }
 
     public static double spawnZ(int playerWithinTeam) {
-        return -8.0D + Math.floorMod(playerWithinTeam, 8) * (16.0D / 7.0D);
+        return -12.0D + Math.floorMod(playerWithinTeam, 8) * (24.0D / 7.0D);
+    }
+
+    public static boolean isInsideCourt(double x, double z) {
+        return Double.isFinite(x) && Double.isFinite(z)
+                && Math.abs(x) <= COURT_HALF_LENGTH - 0.5D
+                && Math.abs(z) <= COURT_HALF_WIDTH - 0.5D;
     }
 }

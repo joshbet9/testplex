@@ -72,8 +72,8 @@ public final class HoopsRemasteredRuntime implements Listener {
     }
 
     private static final int FLOOR_Y = 63;
-    private static final double LEFT_HOOP_X = -20.0D;
-    private static final double RIGHT_HOOP_X = 20.0D;
+    private static final double LEFT_HOOP_X = -30.0D;
+    private static final double RIGHT_HOOP_X = 30.0D;
     private static final double HOOP_Y = 66.2D;
     private static final String GAME_ID = "hoops-remastered";
     private static final String[] STAT_KEYS = {"points", "assists", "rebounds", "blocks", "steals"};
@@ -107,38 +107,38 @@ public final class HoopsRemasteredRuntime implements Listener {
 
     /** Build an isolated indoor hardwood court; no production world is touched. */
     public static void buildCourt(World world) {
-        for (int x = -27; x <= 27; x++) {
-            for (int z = -22; z <= 22; z++) {
+        for (int x = -39; x <= 39; x++) {
+            for (int z = -27; z <= 27; z++) {
                 for (int y = FLOOR_Y + 1; y <= FLOOR_Y + 15; y++) {
                     world.getBlockAt(x, y, z).setType(Material.AIR, false);
                 }
-                if (x >= -24 && x <= 24 && z >= -14 && z <= 14) {
+                if (x >= -36 && x <= 36 && z >= -21 && z <= 21) {
                     world.getBlockAt(x, FLOOR_Y, z).setType(Material.BIRCH_PLANKS, false);
                 }
             }
         }
         // Hardwood boundary and centre line.
-        for (int x = -24; x <= 24; x++) {
-            world.getBlockAt(x, FLOOR_Y, -14).setType(Material.SMOOTH_QUARTZ, false);
-            world.getBlockAt(x, FLOOR_Y, 14).setType(Material.SMOOTH_QUARTZ, false);
+        for (int x = -36; x <= 36; x++) {
+            world.getBlockAt(x, FLOOR_Y, -21).setType(Material.SMOOTH_QUARTZ, false);
+            world.getBlockAt(x, FLOOR_Y, 21).setType(Material.SMOOTH_QUARTZ, false);
         }
-        for (int z = -14; z <= 14; z++) {
-            world.getBlockAt(-24, FLOOR_Y, z).setType(Material.SMOOTH_QUARTZ, false);
-            world.getBlockAt(24, FLOOR_Y, z).setType(Material.SMOOTH_QUARTZ, false);
+        for (int z = -21; z <= 21; z++) {
+            world.getBlockAt(-36, FLOOR_Y, z).setType(Material.SMOOTH_QUARTZ, false);
+            world.getBlockAt(36, FLOOR_Y, z).setType(Material.SMOOTH_QUARTZ, false);
             world.getBlockAt(0, FLOOR_Y, z).setType(Material.WHITE_CONCRETE, false);
         }
         for (int z = -1; z <= 1; z++) {
             for (int x = -1; x <= 1; x++) world.getBlockAt(x, FLOOR_Y, z).setType(Material.WHITE_CONCRETE, false);
         }
         // Two painted keys and free-throw marks.
-        for (int x = -15; x <= -10; x++) {
+        for (int x = -22; x <= -15; x++) {
             for (int z = -5; z <= 5; z++) world.getBlockAt(x, FLOOR_Y, z).setType(Material.RED_TERRACOTTA, false);
         }
-        for (int x = 10; x <= 15; x++) {
+        for (int x = 15; x <= 22; x++) {
             for (int z = -5; z <= 5; z++) world.getBlockAt(x, FLOOR_Y, z).setType(Material.LIGHT_BLUE_TERRACOTTA, false);
         }
-        world.getBlockAt(-9, FLOOR_Y, 0).setType(Material.WHITE_CONCRETE, false);
-        world.getBlockAt(9, FLOOR_Y, 0).setType(Material.WHITE_CONCRETE, false);
+        world.getBlockAt(-14, FLOOR_Y, 0).setType(Material.WHITE_CONCRETE, false);
+        world.getBlockAt(14, FLOOR_Y, 0).setType(Material.WHITE_CONCRETE, false);
         drawThreePointArc(world, LEFT_HOOP_X, true);
         drawThreePointArc(world, RIGHT_HOOP_X, false);
         // A small centre circle makes the tip-off area immediately readable.
@@ -156,40 +156,40 @@ public final class HoopsRemasteredRuntime implements Listener {
 
     private static void buildArenaShell(World world) {
         // Coloured spectator seating beyond the boundary, with a simple enclosed arena shell.
-        for (int x = -23; x <= 23; x++) {
-            for (int z = -21; z <= 21; z++) {
-                if (z < -14 || z > 14) world.getBlockAt(x, FLOOR_Y, z).setType(Material.GRAY_CONCRETE, false);
+        for (int x = -35; x <= 35; x++) {
+            for (int z = -27; z <= 27; z++) {
+                if (z < -21 || z > 21) world.getBlockAt(x, FLOOR_Y, z).setType(Material.GRAY_CONCRETE, false);
             }
         }
-        for (int x = -22; x <= 22; x++) {
+        for (int x = -34; x <= 34; x++) {
             for (int row = 0; row < 3; row++) {
-                world.getBlockAt(x, FLOOR_Y + 1 + row, -15 - row).setType(Material.RED_CONCRETE, false);
-                world.getBlockAt(x, FLOOR_Y + 1 + row, 15 + row).setType(Material.LIGHT_BLUE_CONCRETE, false);
+                world.getBlockAt(x, FLOOR_Y + 1 + row, -22 - row).setType(Material.RED_CONCRETE, false);
+                world.getBlockAt(x, FLOOR_Y + 1 + row, 22 + row).setType(Material.LIGHT_BLUE_CONCRETE, false);
             }
         }
-        for (int x = -27; x <= 27; x++) {
+        for (int x = -39; x <= 39; x++) {
             for (int y = FLOOR_Y + 1; y <= FLOOR_Y + 14; y++) {
                 Material wall = y == FLOOR_Y + 6 || y == FLOOR_Y + 10
                         ? Material.GRAY_STAINED_GLASS : Material.GRAY_CONCRETE;
-                world.getBlockAt(x, y, -22).setType(wall, false);
-                world.getBlockAt(x, y, 22).setType(wall, false);
+                world.getBlockAt(x, y, -27).setType(wall, false);
+                world.getBlockAt(x, y, 27).setType(wall, false);
             }
         }
-        for (int z = -22; z <= 22; z++) {
+        for (int z = -27; z <= 27; z++) {
             for (int y = FLOOR_Y + 1; y <= FLOOR_Y + 14; y++) {
                 Material wall = y == FLOOR_Y + 6 || y == FLOOR_Y + 10
                         ? Material.GRAY_STAINED_GLASS : Material.GRAY_CONCRETE;
-                world.getBlockAt(-27, y, z).setType(wall, false);
-                world.getBlockAt(27, y, z).setType(wall, false);
+                world.getBlockAt(-39, y, z).setType(wall, false);
+                world.getBlockAt(39, y, z).setType(wall, false);
             }
         }
-        for (int x = -27; x <= 27; x++) {
-            for (int z = -22; z <= 22; z++) {
+        for (int x = -39; x <= 39; x++) {
+            for (int z = -27; z <= 27; z++) {
                 world.getBlockAt(x, FLOOR_Y + 15, z).setType(Material.GRAY_STAINED_GLASS, false);
             }
         }
-        for (int x = -20; x <= 20; x += 10) {
-            for (int z = -18; z <= 18; z += 9) {
+        for (int x = -30; x <= 30; x += 15) {
+            for (int z = -24; z <= 24; z += 12) {
                 world.getBlockAt(x, FLOOR_Y + 12, z).setType(Material.SEA_LANTERN, false);
                 world.getBlockAt(x, FLOOR_Y + 11, z).setType(Material.IRON_CHAIN, false);
             }
@@ -204,32 +204,26 @@ public final class HoopsRemasteredRuntime implements Listener {
             double dz = Math.sin(angle) * radius;
             int x = (int) Math.round(hoopX + (left ? dx : -dx));
             int z = (int) Math.round(dz);
-            if (Math.abs(x) < 23 && Math.abs(z) < 13) {
+            if (Math.abs(x) < 35 && Math.abs(z) < 20) {
                 world.getBlockAt(x, FLOOR_Y, z).setType(Material.WHITE_CONCRETE, false);
             }
         }
     }
 
     private static void buildHoop(World world, int side) {
-        int backboardX = side < 0 ? -23 : 23;
-        int rimX = side < 0 ? -20 : 20;
+        int backboardX = side < 0 ? -34 : 34;
+        int rimX = side < 0 ? -30 : 30;
         Material board = side < 0 ? Material.RED_STAINED_GLASS : Material.LIGHT_BLUE_STAINED_GLASS;
         for (int y = 67; y <= 70; y++) {
             for (int z = -3; z <= 3; z++) world.getBlockAt(backboardX, y, z).setType(board, false);
         }
-        // Open rim; the authoritative scoring cylinder is checked by the runtime.
-        // Leave the centre cell open so the ball can pass through the rim.
-        world.getBlockAt(rimX - 1, 66, 0).setType(Material.IRON_BARS, false);
-        world.getBlockAt(rimX + 1, 66, 0).setType(Material.IRON_BARS, false);
-        world.getBlockAt(rimX, 66, -1).setType(Material.IRON_BARS, false);
-        world.getBlockAt(rimX, 66, 1).setType(Material.IRON_BARS, false);
-        // White pane mesh makes the hanging net visible from the court while
-        // leaving its centre open for the authoritative ball trajectory.
+        // Mineplex's hoop is a cobweb below the backboard. Keep its centre
+        // clear so the server-authoritative ball path can score through it.
         for (int y = FLOOR_Y + 1; y <= FLOOR_Y + 2; y++) {
             for (int x = -1; x <= 1; x++) {
                 for (int z = -1; z <= 1; z++) {
                     if (x != 0 || z != 0) {
-                        world.getBlockAt(rimX + x, y, z).setType(Material.WHITE_STAINED_GLASS_PANE, false);
+                        world.getBlockAt(rimX + x, y, z).setType(Material.COBWEB, false);
                     }
                 }
             }
@@ -569,8 +563,10 @@ public final class HoopsRemasteredRuntime implements Listener {
             ball.mode = BallMode.LOOSE;
             ball.bounces++;
         }
-        if (ball.location.getX() < -24.5D || ball.location.getX() > 24.5D
-                || ball.location.getZ() < -14.5D || ball.location.getZ() > 14.5D
+        if (ball.location.getX() < -HoopsRemasteredRules.COURT_HALF_LENGTH - 0.5D
+                || ball.location.getX() > HoopsRemasteredRules.COURT_HALF_LENGTH + 0.5D
+                || ball.location.getZ() < -HoopsRemasteredRules.COURT_HALF_WIDTH - 0.5D
+                || ball.location.getZ() > HoopsRemasteredRules.COURT_HALF_WIDTH + 0.5D
                 || now - ball.createdAt > GameDebugRuntimeOverrides.longValue("HOOPS_BALL_LOOSE_LIMIT_MILLIS", HoopsRemasteredRules.BALL_LOOSE_LIMIT_MILLIS)
                 || ball.bounces > GameDebugRuntimeOverrides.intValue("HOOPS_BALL_MAX_BOUNCES", HoopsRemasteredRules.BALL_MAX_BOUNCES)) {
             ball.mode = BallMode.LOOSE;
@@ -582,8 +578,10 @@ public final class HoopsRemasteredRuntime implements Listener {
                 return;
             }
         }
-        if (ball.location.getX() < -23.5D || ball.location.getX() > 23.5D
-                || ball.location.getZ() < -13.5D || ball.location.getZ() > 13.5D) {
+        if (ball.location.getX() < -HoopsRemasteredRules.COURT_HALF_LENGTH + 0.5D
+                || ball.location.getX() > HoopsRemasteredRules.COURT_HALF_LENGTH - 0.5D
+                || ball.location.getZ() < -HoopsRemasteredRules.COURT_HALF_WIDTH + 0.5D
+                || ball.location.getZ() > HoopsRemasteredRules.COURT_HALF_WIDTH - 0.5D) {
             int lastTeam = ball.lastToucher == null ? -1 : current.teams.getOrDefault(ball.lastToucher, -1);
             Location outLocation = ball.location.clone();
             removeBall(current);
@@ -661,7 +659,7 @@ public final class HoopsRemasteredRuntime implements Listener {
     private boolean isOpenRimHardware(Ball ball, Block block) {
         Material type = block.getType();
         if (type != Material.IRON_BARS && type != Material.IRON_CHAIN
-                && type != Material.WHITE_STAINED_GLASS_PANE) return false;
+                && type != Material.WHITE_STAINED_GLASS_PANE && type != Material.COBWEB) return false;
         double hoopX = ball.defendingTeam == 0 ? LEFT_HOOP_X : RIGHT_HOOP_X;
         return Math.abs(block.getX() - hoopX) <= 1
                 && Math.abs(block.getZ()) <= 1
@@ -767,7 +765,7 @@ public final class HoopsRemasteredRuntime implements Listener {
         }
         // The conceding team inbounds from under its own basket.
         givePossessionToTeam(current, opponent, new Location(current.world,
-                opponent == 0 ? -20.0D : 20.0D, FLOOR_Y + 1.0D, 0.0D));
+                opponent == 0 ? LEFT_HOOP_X : RIGHT_HOOP_X, FLOOR_Y + 1.0D, 0.0D));
     }
 
     private void givePossessionToTeam(Match current, int team, Location inbound) {
@@ -1423,7 +1421,7 @@ public final class HoopsRemasteredRuntime implements Listener {
         Player player = event.getPlayer();
         if (!current.players.containsKey(player.getUniqueId()) || player.getWorld() != current.world) return;
         Location to = event.getTo();
-        if (to.getX() >= -23.5D && to.getX() <= 23.5D && to.getZ() >= -13.5D && to.getZ() <= 13.5D) return;
+        if (HoopsRemasteredRules.isInsideCourt(to.getX(), to.getZ())) return;
         event.setTo(event.getFrom());
         if (current.holderId != null && current.holderId.equals(player.getUniqueId())) {
             int opponent = 1 - current.teams.getOrDefault(player.getUniqueId(), 0);

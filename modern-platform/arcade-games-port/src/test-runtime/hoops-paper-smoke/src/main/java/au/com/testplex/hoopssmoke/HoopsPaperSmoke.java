@@ -509,9 +509,12 @@ public final class HoopsPaperSmoke extends JavaPlugin {
                 "four-player queue was not balanced 2v2: RED=" + teamCounts[0] + " BLUE=" + teamCounts[1]);
         require(world.getBlockAt(10, 63, 10).getType() == Material.BIRCH_PLANKS,
                 "generated hardwood court is missing");
-        require(world.getBlockAt(-23, 67, -3).getType() == Material.RED_STAINED_GLASS
-                        && world.getBlockAt(23, 67, -3).getType() == Material.LIGHT_BLUE_STAINED_GLASS,
-                "both source-coloured stained-glass backboards must be present at x=-23/+23");
+        require(world.getBlockAt(-34, 67, -3).getType() == Material.RED_STAINED_GLASS
+                        && world.getBlockAt(34, 67, -3).getType() == Material.LIGHT_BLUE_STAINED_GLASS,
+                "both source-coloured backboards must be present at the expanded court ends");
+        require(world.getBlockAt(-31, 64, 0).getType() == Material.COBWEB
+                        && world.getBlockAt(31, 64, 0).getType() == Material.COBWEB,
+                "source-style cobweb hoops must hang below both backboards");
         require(((BossBar) field(firstMatch, "bossBar")).isVisible(), "live boss bar is not visible");
         TextDisplay display = (TextDisplay) field(firstMatch, "scoreboardDisplay");
         require(display != null && display.isValid(), "floating centre-court scoreboard was not spawned");
@@ -596,8 +599,9 @@ public final class HoopsPaperSmoke extends JavaPlugin {
 
         // Put the carrier eight blocks from the hoop: a normal two-point shot.
         World world = (World) field(firstMatch, "world");
-        double hoopX = team == 0 ? 20.0D : -20.0D;
-        Location release = new Location(world, team == 0 ? 12.0D : -12.0D, 64.0D, 0.0D);
+        double hoopX = team == 0 ? 30.0D : -30.0D;
+        // Keep the controlled two-point release eight blocks from the scaled court's hoop.
+        Location release = new Location(world, team == 0 ? 22.0D : -22.0D, 64.0D, 0.0D);
         release.setDirection(new Vector(hoopX - release.getX(), 66.2D - 65.62D, 0.0D));
         shooter.teleport(release);
         shooter.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
@@ -751,7 +755,7 @@ public final class HoopsPaperSmoke extends JavaPlugin {
             player.teleport(new Location(world, i % 2 == 0 ? -18.0D : 18.0D, 64.0D,
                     i < 2 ? -12.0D : 12.0D));
         }
-        double hoopX = teams.get(thief.getUniqueId()) == 0 ? 20.0D : -20.0D;
+        double hoopX = teams.get(thief.getUniqueId()) == 0 ? 30.0D : -30.0D;
         Location release = new Location(world, 0.0D, 64.0D, 0.0D);
         release.setDirection(new Vector(hoopX, 66.2D - 65.62D, 0.0D));
         thief.teleport(release);
