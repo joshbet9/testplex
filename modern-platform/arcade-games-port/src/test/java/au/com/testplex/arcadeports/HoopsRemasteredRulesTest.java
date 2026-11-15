@@ -18,6 +18,15 @@ class HoopsRemasteredRulesTest {
         assertFalse(HoopsRemasteredRules.supportsPlayerCount(17));
     }
 
+    @Test void expandedCourtBoundsAreSharedByPlayerAndBallOutOfBoundsRules() {
+        assertTrue(HoopsRemasteredRules.isInsideCourt(35.49D, 20.49D));
+        assertFalse(HoopsRemasteredRules.isInsideCourt(35.51D, 0.0D));
+        assertFalse(HoopsRemasteredRules.isInsideCourt(0.0D, -20.51D));
+        assertFalse(HoopsRemasteredRules.isInsideCourt(Double.NaN, 0.0D));
+        assertEquals(36.0D, HoopsRemasteredRules.COURT_HALF_LENGTH);
+        assertEquals(21.0D, HoopsRemasteredRules.COURT_HALF_WIDTH);
+    }
+
     @Test void twoAndThreePointShotBoundaryIsExplicit() {
         assertEquals(2, HoopsRemasteredRules.scoreValue(12.49D));
         assertEquals(3, HoopsRemasteredRules.scoreValue(12.5D));
@@ -143,10 +152,10 @@ class HoopsRemasteredRulesTest {
         assertEquals(0, HoopsRemasteredRules.teamForSpawnIndex(0));
         assertEquals(1, HoopsRemasteredRules.teamForSpawnIndex(1));
         assertEquals(0, HoopsRemasteredRules.teamForSpawnIndex(2));
-        assertEquals(-10.0D, HoopsRemasteredRules.spawnX(0));
-        assertEquals(10.0D, HoopsRemasteredRules.spawnX(1));
-        assertEquals(-8.0D, HoopsRemasteredRules.spawnZ(0));
-        assertEquals(8.0D, HoopsRemasteredRules.spawnZ(7));
+        assertEquals(-15.0D, HoopsRemasteredRules.spawnX(0));
+        assertEquals(15.0D, HoopsRemasteredRules.spawnX(1));
+        assertEquals(-12.0D, HoopsRemasteredRules.spawnZ(0));
+        assertEquals(12.0D, HoopsRemasteredRules.spawnZ(7));
         Set<Double> lanes = new HashSet<>();
         for (int player = 0; player < 8; player++) lanes.add(HoopsRemasteredRules.spawnZ(player));
         assertEquals(8, lanes.size(), "Each team must have eight distinct spawn lanes for 8v8.");
