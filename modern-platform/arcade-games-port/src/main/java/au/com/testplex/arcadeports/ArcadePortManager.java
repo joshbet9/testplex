@@ -154,6 +154,7 @@ import org.bukkit.event.player.PlayerToggleSneakEvent;
 import org.bukkit.event.player.PlayerToggleSprintEvent;
 import org.bukkit.event.player.PlayerVelocityEvent;
 import org.bukkit.event.player.PlayerUnleashEntityEvent;
+import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
@@ -10001,7 +10002,7 @@ public final class ArcadePortManager implements Listener {
     private void initializeSkyWarsMapResources(Session session, SourceMapCatalog.MapData map) {
         if (session == null || map == null || session.type != ArcadePortGame.SKY_WARS) return;
 
-        int chests = SkyWarsChestLoot.populate(map);
+        int chests = SkyWarsChestLoot.populate(map, session.skyWarsPopulatedChests);
         if (map.hasBounds()) {
             session.skyWarsCrumbleMinX = map.minX();
             session.skyWarsCrumbleMaxX = map.maxX();
@@ -10748,6 +10749,17 @@ public final class ArcadePortManager implements Listener {
                 zombie.setTarget(null);
                 zombie.getPathfinder().moveTo(home, SkyWarsMixedArcadeRules.guardianHomeSpeed());
             }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onSkyWarsChunkLoad(ChunkLoadEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.SKY_WARS
+                || session.world != event.getWorld()) return;
+        SourceMapCatalog.MapData map = sourceMapData.get(ArcadePortGame.SKY_WARS.id());
+        if (map != null) {
+            SkyWarsChestLoot.populateChunk(event.getChunk(), map, session.skyWarsPopulatedChests);
         }
     }
 
@@ -35619,6 +35631,7 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> quiverPendingBowKillers = new HashSet<>();
         final Set<UUID> quiverPendingNinjaVanishKillers = new HashSet<>();
         final Map<UUID, Double> skyWarsStartingIslandY = new HashMap<>();
+        final Set<String> skyWarsPopulatedChests = new HashSet<>();
         final Map<UUID, SkyWarsAchievementRules.MatchTracker> skyWarsAchievementTrackers = new HashMap<>();
         final Map<UUID, Location> skyWarsIceBridgeStarts = new HashMap<>();
         final Map<Block, UUID> skyWarsIceBridgeBlockOwners = new HashMap<>();
