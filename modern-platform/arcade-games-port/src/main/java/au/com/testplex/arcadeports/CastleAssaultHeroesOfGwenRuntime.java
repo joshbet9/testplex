@@ -163,6 +163,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final NamespacedKey castleArcherArrowKey;
     private final NamespacedKey shopItemKey;
     private final NamespacedKey shopRoleKey;
+    private final NamespacedKey shopCategoryKey;
     private final NamespacedKey kingKey;
     private final NamespacedKey towerKey;
     private final NamespacedKey minionTeamKey;
@@ -180,6 +181,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final Map<UUID, Map<String, Map<String, ItemStack>>> heroesOfGwenPurchasedEquipment = new HashMap<>();
     private final Map<UUID, ItemStack> carriedTntOldHelmet = new HashMap<>();
     private final Map<Integer, List<TowerState>> towers = new HashMap<>();
+    private final Map<UUID, HeroesScoreboardView> heroesScoreboards = new HashMap<>();
     private final Map<UUID, Integer> heroesOfGwenMinionTeams = new HashMap<>();
     private final Map<UUID, List<Location>> heroesOfGwenMinionPaths = new HashMap<>();
     private final Map<UUID, Integer> heroesOfGwenMinionPathIndices = new HashMap<>();
@@ -209,6 +211,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private long heroesOfGwenMonochromeEndsAt;
     private long heroesOfGwenNextHpRegenAt;
     private long heroesOfGwenLiveStartedAt;
+    private long heroesOfGwenNextScoreboardAt;
     private boolean heroesOfGwenOvertime;
     private List<Location> heroesOfGwenOvertimePathBlueToRed = List.of();
     private final Map<Integer, List<Location>> heroesOfGwenOvertimePaths = new HashMap<>();
@@ -338,6 +341,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         this.castleArcherArrowKey = new NamespacedKey(plugin, "castle-archer-shot");
         this.shopItemKey = new NamespacedKey(plugin, "heroes-gwen-store-item");
         this.shopRoleKey = new NamespacedKey(plugin, "heroes-gwen-store-role");
+        this.shopCategoryKey = new NamespacedKey(plugin, "heroes-gwen-store-category");
         this.kingKey = new NamespacedKey(plugin, "castle-king-team");
         this.towerKey = new NamespacedKey(plugin, "heroes-gwen-tower");
         this.minionTeamKey = new NamespacedKey(plugin, "heroes-gwen-minion-team");
@@ -402,6 +406,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         listenersRegistered = true;
         if (game == ArcadePortGame.HEROES_OF_GWEN) {
             heroesOfGwenLiveStartedAt = System.currentTimeMillis();
+            setupHeroesOfGwenScoreboards();
             heroesOfGwenNextHpRegenAt = heroesOfGwenLiveStartedAt
                     + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS", ArcadePortRules.HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS);
         }
@@ -2134,6 +2139,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void tickHeroesOfGwen(long now) {
+        if (now >= heroesOfGwenNextScoreboardAt) {
+            updateHeroesOfGwenScoreboards(now);
+            heroesOfGwenNextScoreboardAt = now + 1_000L;
+        }
         updateHeroesOfGwenOvertime(now);
         updateHeroesOfGwenHealthRegen(now);
         updateMobaWithers(now);
@@ -2176,6 +2185,75 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             nextStructureUpdateAt = now + mobaTowerUpdateInterval();
         }
         checkTeamDeparture();
+    }
+
+    private void setupHeroesOfGwenScoreboards() {
+        if (Bukkit.getScoreboardManager() == null) return;
+        for (Player player : players.values()) {
+            if (player == null || !player.isOnline()) continue;
+            Scoreboard board = Bukkit.getScoreboardManager().getNewScoreboard();
+            Objective objective = board.registerNewObjective("heroesgwen", "dummy", ChatColor.GOLD + "HEROES OF GWEN");
+            objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+            List<Team> lineTeams = new ArrayList<>(15);
+            List<String> entries = new ArrayList<>(15);
+            for (int index = 0; index < 15; index++) {
+                Team line = board.registerNewTeam("hogline" + index);
+                String entry = ChatColor.values()[index].toString() + ChatColor.RESET;
+                line.addEntry(entry);
+                lineTeams.add(line);
+                entries.add(entry);
+            }
+            heroesScoreboards.put(player.getUniqueId(), new HeroesScoreboardView(board, objective, lineTeams, entries));
+            player.setScoreboard(board);
+        }
+    }
+
+    private void updateHeroesOfGwenScoreboards(long now) {
+        for (Player player : players.values()) {
+            if (player == null || !player.isOnline()) continue;
+            HeroesScoreboardView view = heroesScoreboards.get(player.getUniqueId());
+            if (view == null) continue;
+            for (String entry : view.entries) view.scoreboard.resetScores(entry);
+            int team = teams.getOrDefault(player.getUniqueId(), -1);
+            List<String> lines = HeroesOfGwenScoreboardRules.lines(team,
+                    heroesOfGwenBaseStatus(0), heroesOfGwenBaseStatus(1), heroesOfGwenCaptureStatuses(),
+                    playerGold.getOrDefault(player.getUniqueId(), 0), now - heroesOfGwenLiveStartedAt);
+            for (int index = 0; index < lines.size() && index < view.lineTeams.size(); index++) {
+                Team line = view.lineTeams.get(index);
+                line.setPrefix(lines.get(index));
+                view.objective.getScore(view.entries.get(index)).setScore(lines.size() - index);
+            }
+            if (player.getScoreboard() != view.scoreboard) player.setScoreboard(view.scoreboard);
+        }
+    }
+
+    private String heroesOfGwenBaseStatus(int team) {
+        StringBuilder result = new StringBuilder();
+        List<TowerState> teamTowers = towers.getOrDefault(team, List.of());
+        for (TowerState tower : teamTowers) {
+            ChatColor color = tower.dead || tower.health <= 0.0D ? ChatColor.GRAY
+                    : tower.health / Math.max(1.0D, tower.maxHealth) > 0.6D ? ChatColor.GREEN
+                    : tower.health / Math.max(1.0D, tower.maxHealth) > 0.3D ? ChatColor.YELLOW : ChatColor.RED;
+            result.append(color).append("♛ ");
+        }
+        Wither wither = withers.get(team);
+        if (wither != null && wither.isValid()) {
+            result.append(ChatColor.DARK_PURPLE).append("Wither ")
+                    .append(ChatColor.WHITE).append(Math.max(0, (int) Math.ceil(wither.getHealth())));
+        } else {
+            result.append(ChatColor.GRAY).append("Wither down");
+        }
+        return result.toString();
+    }
+
+    private List<String> heroesOfGwenCaptureStatuses() {
+        if (capturePoints.isEmpty()) return List.of();
+        List<String> statuses = new ArrayList<>(capturePoints.size());
+        for (CapturePointState point : capturePoints) {
+            ChatColor color = point.owner == 0 ? ChatColor.RED : point.owner == 1 ? ChatColor.AQUA : ChatColor.GRAY;
+            statuses.add(color + point.name + ": " + (point.owner < 0 ? "Neutral" : point.owner == 0 ? "Red" : "Blue"));
+        }
+        return statuses;
     }
 
     private boolean isAtEnemyCrystal(Player carrier) {
@@ -2694,7 +2772,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (stopped || game != ArcadePortGame.HEROES_OF_GWEN || !event.isSneaking()) return;
         Player player = event.getPlayer();
         String hero = selectedHeroesOfGwen.get(player.getUniqueId());
-        if ("devon".equals(hero)) {
+        if ("hattori".equals(hero)) {
+            ItemStack skill = player.getInventory().getItem(2);
+            if (shouldActivateHattoriDashOnSneak(hero, heroSkillId(skill))) {
+                activateHeroesOfGwenSkill(player, "hattori.ninja_dash");
+            }
+        } else if ("devon".equals(hero)) {
             ItemStack skill = player.getInventory().getItem(2);
             if ("devon.hunters_boost".equals(heroSkillId(skill))) {
                 activateHeroesOfGwenSkill(player, "devon.hunters_boost");
@@ -2735,6 +2818,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 activateHeroesOfGwenSkill(player, "anath.flame_dash");
             }
         }
+    }
+
+    static boolean shouldActivateHattoriDashOnSneak(String hero, String abilityId) {
+        return "hattori".equals(hero) && "hattori.ninja_dash".equals(abilityId);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -3953,40 +4040,59 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void openStore(Player player, String role) {
+        openStore(player, role, null);
+    }
+
+    private void openStore(Player player, String role, String category) {
         if (role == null) {
             openStore(player);
             return;
         }
-        StoreHolder holder = new StoreHolder(player.getUniqueId(), role);
-        Inventory inventory = Bukkit.createInventory(holder, 45, ChatColor.DARK_GREEN + "Heroes of Gwen: " + role);
+        StoreHolder holder = new StoreHolder(player.getUniqueId(), role, category);
+        String title = category == null ? "Heroes of Gwen: " + role + " Upgrades" : role + " > " + category;
+        Inventory inventory = Bukkit.createInventory(holder, 45, ChatColor.DARK_GREEN + title);
         holder.inventory = inventory;
-        int slot = 0;
-        for (int index = 0; index < storeEntries.size() && slot < 45; index++) {
-            StoreEntry entry = storeEntries.get(index);
-            if (!entry.role.equals(role)) continue;
-            int price = ArcadePortRules.heroesOfGwenStoreItemCost(entry.cost, mixedArcade);
-            ItemStack item = new ItemStack(entry.material);
-            ItemMeta meta = item.getItemMeta();
-            meta.setDisplayName(ChatColor.GREEN + entry.name);
-            List<String> lore = new ArrayList<>();
-            if (entry.description != null && !entry.description.isBlank()) {
-                lore.add(ChatColor.GRAY + entry.description);
+        if (category == null) {
+            List<String> categories = heroesOfGwenStoreCategories(role);
+            int[] categorySlots = {10, 11, 12, 13, 14, 15, 16, 22};
+            for (int index = 0; index < categories.size() && index < categorySlots.length; index++) {
+                String name = categories.get(index);
+                ItemStack item = new ItemStack(heroesOfGwenStoreCategoryIcon(name));
+                ItemMeta meta = item.getItemMeta();
+                meta.setDisplayName(ChatColor.GREEN + name);
+                meta.setLore(List.of(ChatColor.GRAY + Integer.toString(heroesOfGwenStoreCategoryCount(role, name)) + " upgrades",
+                        ChatColor.YELLOW + "Click to view this category."));
+                meta.getPersistentDataContainer().set(shopCategoryKey, PersistentDataType.STRING, name);
+                item.setItemMeta(meta);
+                inventory.setItem(categorySlots[index], item);
             }
-            lore.add(ChatColor.WHITE + "Standard cost: " + ChatColor.GRAY + entry.cost);
-            lore.add(ChatColor.WHITE + "Your cost: " + ChatColor.GOLD + price + " gold");
-            lore.add(ChatColor.YELLOW + "Click to purchase");
-            meta.setLore(lore);
-            meta.getPersistentDataContainer().set(shopItemKey, PersistentDataType.INTEGER, index);
-            item.setItemMeta(meta);
-            inventory.setItem(slot++, item);
+        } else {
+            int slot = 0;
+            for (int index = 0; index < storeEntries.size() && slot < 44; index++) {
+                StoreEntry entry = storeEntries.get(index);
+                if (!entry.role.equals(role) || !category.equals(heroesOfGwenStoreCategory(entry.material))) continue;
+                int price = ArcadePortRules.heroesOfGwenStoreItemCost(entry.cost, mixedArcade);
+                ItemStack item = new ItemStack(entry.material);
+                ItemMeta meta = item.getItemMeta();
+                meta.setDisplayName(ChatColor.GREEN + entry.name);
+                List<String> lore = new ArrayList<>();
+                if (entry.description != null && !entry.description.isBlank()) lore.add(ChatColor.GRAY + entry.description);
+                lore.add(ChatColor.WHITE + "Standard cost: " + ChatColor.GRAY + entry.cost);
+                lore.add(ChatColor.WHITE + "Your cost: " + ChatColor.GOLD + price + " gold");
+                lore.add(ChatColor.YELLOW + "Click to purchase");
+                meta.setLore(lore);
+                meta.getPersistentDataContainer().set(shopItemKey, PersistentDataType.INTEGER, index);
+                item.setItemMeta(meta);
+                inventory.setItem(slot++, item);
+            }
+            ItemStack back = new ItemStack(Material.ARROW);
+            ItemMeta backMeta = back.getItemMeta();
+            backMeta.setDisplayName(ChatColor.YELLOW + "Back to upgrade categories");
+            backMeta.setLore(List.of(ChatColor.GRAY + "Choose a different upgrade category."));
+            backMeta.getPersistentDataContainer().set(shopRoleKey, PersistentDataType.STRING, "categories");
+            back.setItemMeta(backMeta);
+            inventory.setItem(44, back);
         }
-        ItemStack back = new ItemStack(Material.ARROW);
-        ItemMeta backMeta = back.getItemMeta();
-        backMeta.setDisplayName(ChatColor.YELLOW + "Back to role selection");
-        backMeta.setLore(List.of(ChatColor.GRAY + "Choose a different role's store."));
-        backMeta.getPersistentDataContainer().set(shopRoleKey, PersistentDataType.STRING, "back");
-        back.setItemMeta(backMeta);
-        inventory.setItem(44, back);
         openStores.put(player.getUniqueId(), holder);
         player.openInventory(inventory);
         updateGoldActionBar(player);
@@ -4005,14 +4111,68 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         String selectedRole = clicked.getItemMeta().getPersistentDataContainer()
                 .get(shopRoleKey, PersistentDataType.STRING);
         if (selectedRole != null) {
-            openStore(player, "back".equals(selectedRole) ? null : selectedRole);
+            if ("categories".equals(selectedRole)) openStore(player, holder.role);
+            else openStore(player, "back".equals(selectedRole) ? null : selectedRole);
+            return;
+        }
+        String selectedCategory = clicked.getItemMeta().getPersistentDataContainer()
+                .get(shopCategoryKey, PersistentDataType.STRING);
+        if (selectedCategory != null && holder.category == null
+                && heroesOfGwenStoreCategories(holder.role).contains(selectedCategory)) {
+            openStore(player, holder.role, selectedCategory);
             return;
         }
         Integer index = clicked.getItemMeta().getPersistentDataContainer().get(shopItemKey, PersistentDataType.INTEGER);
         if (index == null || index < 0 || index >= storeEntries.size()) return;
         StoreEntry entry = storeEntries.get(index);
-        if (!entry.role.equals(holder.role)) return;
+        if (!entry.role.equals(holder.role) || holder.category == null
+                || !holder.category.equals(heroesOfGwenStoreCategory(entry.material))) return;
         purchaseStoreItem(player, entry);
+    }
+
+    static String heroesOfGwenStoreCategory(Material material) {
+        if (material == null) return "Consumables";
+        String materialName = material.name();
+        if (materialName.endsWith("_SWORD")) return "Sword";
+        if (material == Material.BOW) return "Bow";
+        if (materialName.endsWith("_HELMET")) return "Helmet";
+        if (materialName.endsWith("_CHESTPLATE")) return "Chestplate";
+        if (materialName.endsWith("_LEGGINGS")) return "Leggings";
+        if (materialName.endsWith("_BOOTS")) return "Boots";
+        return "Consumables";
+    }
+
+    private List<String> heroesOfGwenStoreCategories(String role) {
+        List<String> result = new ArrayList<>();
+        for (StoreEntry entry : storeEntries) {
+            if (entry.role.equals(role)) {
+                String category = heroesOfGwenStoreCategory(entry.material);
+                if (!result.contains(category)) result.add(category);
+            }
+        }
+        List<String> sourceOrder = List.of("Sword", "Bow", "Helmet", "Chestplate", "Leggings", "Boots", "Consumables");
+        result.sort(java.util.Comparator.comparingInt(sourceOrder::indexOf));
+        return result;
+    }
+
+    private int heroesOfGwenStoreCategoryCount(String role, String category) {
+        int count = 0;
+        for (StoreEntry entry : storeEntries) {
+            if (entry.role.equals(role) && category.equals(heroesOfGwenStoreCategory(entry.material))) count++;
+        }
+        return count;
+    }
+
+    private Material heroesOfGwenStoreCategoryIcon(String category) {
+        return switch (category) {
+            case "Sword" -> Material.IRON_SWORD;
+            case "Bow" -> Material.BOW;
+            case "Helmet" -> Material.IRON_HELMET;
+            case "Chestplate" -> Material.IRON_CHESTPLATE;
+            case "Leggings" -> Material.IRON_LEGGINGS;
+            case "Boots" -> Material.IRON_BOOTS;
+            default -> Material.POTION;
+        };
     }
 
     @EventHandler
@@ -7275,6 +7435,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     void stop() {
         if (stopped) return;
         stopped = true;
+        heroesScoreboards.clear();
         if (listenersRegistered) {
             org.bukkit.event.HandlerList.unregisterAll(this);
             listenersRegistered = false;
@@ -7667,12 +7828,27 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private static final class StoreHolder implements InventoryHolder {
         final UUID owner;
         final String role;
+        final String category;
         Inventory inventory;
-        StoreHolder(UUID owner, String role) {
+        StoreHolder(UUID owner, String role, String category) {
             this.owner = owner;
             this.role = role;
+            this.category = category;
         }
         @Override public Inventory getInventory() { return inventory; }
+    }
+
+    private static final class HeroesScoreboardView {
+        final Scoreboard scoreboard;
+        final Objective objective;
+        final List<Team> lineTeams;
+        final List<String> entries;
+        HeroesScoreboardView(Scoreboard scoreboard, Objective objective, List<Team> lineTeams, List<String> entries) {
+            this.scoreboard = scoreboard;
+            this.objective = objective;
+            this.lineTeams = lineTeams;
+            this.entries = entries;
+        }
     }
 
     private static final class HeroSelectionHolder implements InventoryHolder {
