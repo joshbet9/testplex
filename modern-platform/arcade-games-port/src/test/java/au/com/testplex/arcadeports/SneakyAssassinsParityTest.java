@@ -8,6 +8,11 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SneakyAssassinsParityTest {
+
+    @Test
+    void ambientTownVillagersUseTheirNormalMobAi() {
+        assertTrue(SneakyAssassinsRules.ambientVillagerAiEnabled());
+    }
     @Test void registersAndNormalizesTheFourSourceKits() {
         assertEquals("escape-artist", SneakyAssassinsMechanics.normalizeKit("Escape Artist"));
         assertEquals("escape-artist", SneakyAssassinsMechanics.normalizeKit("escape_artist"));

@@ -547,7 +547,7 @@ final class SneakyAssassinsMechanics {
         Location location = randomSafeTownLocation();
         if (location == null) return;
         Villager npc = world.spawn(location, Villager.class);
-        npc.setAI(false);
+        npc.setAI(SneakyAssassinsRules.ambientVillagerAiEnabled());
         npc.setSilent(true);
         npc.setPersistent(true);
         npc.setRemoveWhenFarAway(false);
