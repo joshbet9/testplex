@@ -8,6 +8,11 @@ import org.junit.jupiter.api.Test;
 
 class SneakyAssassinsPacketDisguiseBridgeTest {
     @Test
+    void disguisedVillagerDoesNotExposeThePlayerNametag() {
+        assertFalse(SneakyAssassinsPacketDisguiseBridge.exposeDisguisedPlayerNameTag());
+    }
+
+    @Test
     void forwardsOnlyEntityMetadataSharedByPlayersAndVillagers() {
         for (int index = 0; index <= 7; index++) {
             assertTrue(SneakyAssassinsPacketDisguiseBridge.isVillagerCompatibleMetadataIndex(index),

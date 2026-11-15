@@ -6,7 +6,6 @@ import com.github.retrooper.packetevents.event.PacketListenerCommon;
 import com.github.retrooper.packetevents.event.PacketListenerPriority;
 import com.github.retrooper.packetevents.event.PacketSendEvent;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
-import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes;
 import com.github.retrooper.packetevents.protocol.packettype.PacketType;
 import com.github.retrooper.packetevents.util.Vector3d;
@@ -14,7 +13,6 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDe
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnEntity;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnPlayer;
-import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -130,20 +128,15 @@ public final class SneakyAssassinsPacketDisguiseBridge implements PacketListener
         return metadataIndices.anyMatch(index -> !isVillagerCompatibleMetadataIndex(index));
     }
 
+    static boolean exposeDisguisedPlayerNameTag() {
+        return false;
+    }
+
     private void sendVillagerSpawn(Player viewer, int entityId, UUID playerId,
             double x, double y, double z, float yaw, float pitch) {
-        Player target = Bukkit.getPlayer(playerId);
-        String name = target == null ? "" : target.getName();
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
                 new WrapperPlayServerSpawnEntity(entityId, Optional.of(playerId), EntityTypes.VILLAGER,
                         new Vector3d(x, y, z), pitch, yaw, yaw, 0, Optional.empty()));
-        if (!name.isBlank()) {
-            PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
-                    new WrapperPlayServerEntityMetadata(entityId, List.of(
-                            new EntityData<>(2, EntityDataTypes.OPTIONAL_ADV_COMPONENT,
-                                    Optional.of(Component.text(name))),
-                            new EntityData<>(3, EntityDataTypes.BOOLEAN, true))));
-        }
     }
 
     private void sendPlayerSpawn(Player viewer, Player target) {
