@@ -8,6 +8,7 @@ import java.lang.reflect.Proxy;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -36,6 +37,16 @@ class ModernArcadeLobbyRuntimeTest {
         ModernArcadeLobbyRuntime.normalizeKitZombieAge(zombie);
 
         assertTrue(adultFormApplied.get(), "kit NPC zombies must be explicitly grown before display");
+    }
+
+    @Test
+    void botSetupShowsOnlyConfiguredRosterAndSupportsZeroBots() {
+        assertEquals(0, ModernArcadeLobbyRuntime.visibleBotConfigurationCount(0));
+        assertEquals(1, ModernArcadeLobbyRuntime.visibleBotConfigurationCount(1));
+        assertEquals(5, ModernArcadeLobbyRuntime.visibleBotConfigurationCount(5));
+        assertEquals(ArcadeTestPlayerManager.TARGET_ROSTER_SIZE,
+                ModernArcadeLobbyRuntime.visibleBotConfigurationCount(ArcadeTestPlayerManager.TARGET_ROSTER_SIZE + 4));
+        assertEquals(0, ModernArcadeLobbyRuntime.visibleBotConfigurationCount(-1));
     }
 
     @Test
