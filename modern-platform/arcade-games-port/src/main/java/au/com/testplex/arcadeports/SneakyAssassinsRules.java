@@ -65,7 +65,10 @@ final class SneakyAssassinsRules {
     public static final int REVEALER_STARTING_DIAMONDS = 3;
     public static final int POWERUP_SMOKE_BOMBS = 1;
     public static final int KILL_BONUS_SMOKE_BOMBS = 1;
+    public static final boolean AMBIENT_VILLAGER_AI_ENABLED = true;
     private SneakyAssassinsRules() { }
+
+    static boolean ambientVillagerAiEnabled() { return AMBIENT_VILLAGER_AI_ENABLED; }
 
     static boolean shouldAwardYouNeedDirections(boolean masterAssassin, boolean directPlayerAttack,
             boolean actualMasterCompass, boolean lethalHit) {
