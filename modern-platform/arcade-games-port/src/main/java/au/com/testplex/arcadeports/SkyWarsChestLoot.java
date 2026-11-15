@@ -1,7 +1,9 @@
 package au.com.testplex.arcadeports;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.bukkit.Material;
@@ -18,14 +20,24 @@ import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 final class SkyWarsChestLoot {
     private SkyWarsChestLoot() { }
 
-    static int populate(SourceMapCatalog.MapData map) {
+    static int populate(SourceMapCatalog.MapData map, Set<String> populatedChests) {
         if (map == null) return 0;
+        Set<String> populated = populatedChests == null ? new HashSet<>() : populatedChests;
         int total = 0;
-        total += populateFamily(map.dataLocations("BROWN"), islandPools());
-        total += populateFamily(map.dataLocations("GRAY"), connectorPools());
-        total += populateFamily(map.dataLocations("BLACK"), middlePools());
-        if (total == 0) total = populateExistingSourceChests(map);
+        total += populateFamily(map.dataLocations("BROWN"), islandPools(), populated);
+        total += populateFamily(map.dataLocations("GRAY"), connectorPools(), populated);
+        total += populateFamily(map.dataLocations("BLACK"), middlePools(), populated);
+        // Authored marker families can be incomplete on otherwise valid maps. Fill
+        // unmarked source chests in loaded chunks too; do not make this conditional
+        // on there being zero markers, which left all unmarked chests empty.
+        total += populateExistingSourceChests(map, populated);
         return total;
+    }
+
+    /** Fill source chests in a newly loaded SkyWars chunk once, without rerolling on reload. */
+    static int populateChunk(Chunk chunk, SourceMapCatalog.MapData map, Set<String> populatedChests) {
+        if (chunk == null || map == null || populatedChests == null) return 0;
+        return populateExistingSourceChestsInChunk(chunk, map, populatedChests);
     }
 
     /**
@@ -33,37 +45,67 @@ final class SkyWarsChestLoot {
      * their map archives contain real chests. Keep those maps playable by filling
      * their authored chests rather than leaving an apparently empty SkyWars map.
      */
-    private static int populateExistingSourceChests(SourceMapCatalog.MapData map) {
+    private static int populateExistingSourceChests(SourceMapCatalog.MapData map, Set<String> populated) {
         List<org.bukkit.Location> starts = map.spawnLocations();
         if (starts.isEmpty()) starts = map.dataLocations("GREEN");
         if (starts.isEmpty() || starts.getFirst().getWorld() == null) return 0;
         org.bukkit.World world = starts.getFirst().getWorld();
-        double centerX = map.hasBounds() ? map.centerX() : world.getSpawnLocation().getX();
-        double centerZ = map.hasBounds() ? map.centerZ() : world.getSpawnLocation().getZ();
         int count = 0;
         for (Chunk chunk : world.getLoadedChunks()) {
-            if (map.hasBounds() && (chunk.getX() * 16 > map.maxX() || chunk.getX() * 16 + 15 < map.minX()
-                    || chunk.getZ() * 16 > map.maxZ() || chunk.getZ() * 16 + 15 < map.minZ())) continue;
-            for (org.bukkit.block.BlockState state : chunk.getTileEntities()) {
-                if (!(state instanceof Chest chest)) continue;
-                org.bukkit.Location location = chest.getLocation();
-                double nearestIsland = starts.stream().mapToDouble(spawn -> {
-                    double dx = location.getX() - spawn.getX();
-                    double dz = location.getZ() - spawn.getZ();
-                    return dx * dx + dz * dz;
-                }).min().orElse(Double.POSITIVE_INFINITY);
-                double fromCenterX = location.getX() - centerX;
-                double fromCenterZ = location.getZ() - centerZ;
-                double centerDistance = fromCenterX * fromCenterX + fromCenterZ * fromCenterZ;
-                List<Pool> pools = nearestIsland <= 32.0D * 32.0D
-                        ? islandPools()
-                        : centerDistance <= 20.0D * 20.0D ? middlePools() : connectorPools();
-                populateChest(chest, pools);
-                count++;
-            }
+            count += populateExistingSourceChestsInChunk(chunk, map, populated);
         }
         return count;
     }
+
+    private static int populateExistingSourceChestsInChunk(Chunk chunk, SourceMapCatalog.MapData map,
+            Set<String> populated) {
+        List<org.bukkit.Location> starts = map.spawnLocations();
+        if (starts.isEmpty()) starts = map.dataLocations("GREEN");
+        if (starts.isEmpty() || starts.getFirst().getWorld() == null
+                || chunk.getWorld() != starts.getFirst().getWorld()) return 0;
+        if (map.hasBounds() && (chunk.getX() * 16 > map.maxX() || chunk.getX() * 16 + 15 < map.minX()
+                || chunk.getZ() * 16 > map.maxZ() || chunk.getZ() * 16 + 15 < map.minZ())) return 0;
+        double centerX = map.hasBounds() ? map.centerX() : chunk.getWorld().getSpawnLocation().getX();
+        double centerZ = map.hasBounds() ? map.centerZ() : chunk.getWorld().getSpawnLocation().getZ();
+        int count = 0;
+        for (org.bukkit.block.BlockState state : chunk.getTileEntities()) {
+            if (!(state instanceof Chest chest)) continue;
+            org.bukkit.Location location = chest.getLocation();
+            if (map.hasBounds() && (location.getBlockX() < map.minX() || location.getBlockX() > map.maxX()
+                    || location.getBlockZ() < map.minZ() || location.getBlockZ() > map.maxZ())) continue;
+            if (!populated.add(chestKey(location))) continue;
+            SourceChestTier tier = sourceChestTier(location.getX(), location.getZ(), starts, centerX, centerZ);
+            List<Pool> pools = switch (tier) {
+                case ISLAND -> islandPools();
+                case CONNECTOR -> connectorPools();
+                case MIDDLE -> middlePools();
+            };
+            populateChest(chest, pools);
+            count++;
+        }
+        return count;
+    }
+
+    private static String chestKey(org.bukkit.Location location) {
+        return location.getWorld().getUID() + ":" + location.getBlockX() + ":"
+                + location.getBlockY() + ":" + location.getBlockZ();
+    }
+
+    static SourceChestTier sourceChestTier(double x, double z, List<org.bukkit.Location> starts,
+            double centerX, double centerZ) {
+        double nearestIsland = starts.stream().mapToDouble(spawn -> {
+            double dx = x - spawn.getX();
+            double dz = z - spawn.getZ();
+            return dx * dx + dz * dz;
+        }).min().orElse(Double.POSITIVE_INFINITY);
+        if (nearestIsland <= 32.0D * 32.0D) return SourceChestTier.ISLAND;
+        double fromCenterX = x - centerX;
+        double fromCenterZ = z - centerZ;
+        return fromCenterX * fromCenterX + fromCenterZ * fromCenterZ <= 20.0D * 20.0D
+                ? SourceChestTier.MIDDLE : SourceChestTier.CONNECTOR;
+    }
+
+    enum SourceChestTier { ISLAND, CONNECTOR, MIDDLE }
 
     static ItemStack randomMiddleItem() {
         List<Pool> pools = middlePools();
@@ -74,12 +116,14 @@ final class SkyWarsChestLoot {
         if (chest != null) populateChest(chest, islandPools());
     }
 
-    private static int populateFamily(List<org.bukkit.Location> locations, List<Pool> pools) {
+    private static int populateFamily(List<org.bukkit.Location> locations, List<Pool> pools,
+            Set<String> populated) {
         int count = 0;
         for (org.bukkit.Location location : locations) {
             if (location == null || location.getWorld() == null) continue;
             Block block = location.getBlock();
             block.setType(Material.CHEST, false);
+            if (!populated.add(chestKey(location))) continue;
             if (block.getBlockData() instanceof Directional directional) {
                 List<BlockFace> openFaces = new ArrayList<>();
                 for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
