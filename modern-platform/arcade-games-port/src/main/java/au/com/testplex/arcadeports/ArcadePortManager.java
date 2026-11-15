@@ -128,6 +128,7 @@ import org.bukkit.event.entity.PotionSplashEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.PlayerArmorStandManipulateEvent;
@@ -33310,6 +33311,27 @@ public final class ArcadePortManager implements Listener {
         if (event.getView().getTopInventory().getHolder() instanceof GladiatorMenuHolder) {
             event.setCancelled(true);
         }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onGladiatorVoteMenuClose(InventoryCloseEvent event) {
+        if (!(event.getPlayer() instanceof Player player)
+                || !(event.getView().getTopInventory().getHolder() instanceof GladiatorMenuHolder holder)
+                || holder.type != GladiatorMenuType.VOTE || holder.lobbyVote) return;
+        Session session = active;
+        long now = System.currentTimeMillis();
+        if (session == null || session.type != ArcadePortGame.GLADIATORS
+                || !ArcadePortRules.shouldReopenGladiatorVoteMenu(true,
+                        session.players.containsKey(player.getUniqueId()), session.gladiatorVotingEndsAt, now)) return;
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            Session current = active;
+            if (player.isOnline() && current == session
+                    && ArcadePortRules.shouldReopenGladiatorVoteMenu(true,
+                            current.players.containsKey(player.getUniqueId()),
+                            current.gladiatorVotingEndsAt, System.currentTimeMillis())) {
+                openGladiatorVoteMenu(player);
+            }
+        });
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
