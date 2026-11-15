@@ -1436,6 +1436,12 @@ public final class ArcadePortRules {
         return clickedBlockIsLiquid || targetBlockIsLiquid;
     }
 
+    /** Builder bricks follow vanilla build-height limits, not the Digger's map-area restriction. */
+    public static boolean isDragonEscapeBuilderPlacementHeightAllowed(
+            int blockY, int minBuildHeight, int maxBuildHeight) {
+        return blockY >= minBuildHeight && blockY < maxBuildHeight;
+    }
+
     /** Vanilla placement collision checks exclude the placer but still protect other racers. */
     public static boolean shouldRejectDragonEscapeBuilderEntityOverlap(
             boolean isPlacingRacer, boolean overlapsRacer) {
