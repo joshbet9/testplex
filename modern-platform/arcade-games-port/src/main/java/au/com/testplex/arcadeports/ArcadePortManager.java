@@ -29638,10 +29638,19 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onProjectileHit(ProjectileHitEvent event) {
         Session session = active;
         if (session == null || !isSessionWorld(session, event.getEntity().getWorld())) return;
+
+        boolean trackedEvolutionProjectile = session.type == ArcadePortGame.EVOLUTION
+                && (session.evolutionFlameProjectiles.contains(event.getEntity().getUniqueId())
+                        || session.evolutionSulphurBombs.contains(event.getEntity().getUniqueId())
+                        || (event.getEntity() instanceof Egg
+                                && event.getEntity().getShooter() instanceof Player eggShooter
+                                && session.evolutionLevels.getOrDefault(eggShooter.getUniqueId(), 0) == 4));
+        if (!EvolutionProjectileImpactRules.shouldProcessHit(
+                session.type, trackedEvolutionProjectile, event.isCancelled())) return;
 
         if (session.type == ArcadePortGame.EVOLUTION
                 && event.getEntity() instanceof Projectile evolutionProjectile) {
