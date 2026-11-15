@@ -1660,6 +1660,17 @@ class ArcadePortGameTest {
         assertEquals(0, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.BACON_BRAWL, "Arena"));
     }
 
+    @Test void heroesOfGwenDisablesFallDamageAndUsesTeamGlassForCaptureBeacons() {
+        assertFalse(ArcadePortRules.shouldApplyLegacyFallDamage(ArcadePortGame.HEROES_OF_GWEN));
+        assertTrue(ArcadePortRules.shouldApplyLegacyFallDamage(ArcadePortGame.CASTLE_ASSAULT));
+        assertEquals(Material.WHITE_STAINED_GLASS,
+                ArcadePortRules.heroesOfGwenCaptureBeaconMaterial(-1));
+        assertEquals(Material.RED_STAINED_GLASS,
+                ArcadePortRules.heroesOfGwenCaptureBeaconMaterial(0));
+        assertEquals(Material.LIGHT_BLUE_STAINED_GLASS,
+                ArcadePortRules.heroesOfGwenCaptureBeaconMaterial(1));
+    }
+
     @Test void dragonEscapeWaterDamageUsesTheNormalDamageAndHalfSecondRecharge() {
         assertEquals(500L, ArcadePortRules.DRAGON_ESCAPE_WATER_DAMAGE_INTERVAL_MILLIS);
         assertEquals(4, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGON_ESCAPE, "Pirate"));

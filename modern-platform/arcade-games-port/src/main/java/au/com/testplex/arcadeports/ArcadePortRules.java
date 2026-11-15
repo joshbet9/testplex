@@ -574,7 +574,13 @@ public final class ArcadePortRules {
     public static boolean shouldApplyLegacyFallDamage(ArcadePortGame game) {
         return game != null && game != ArcadePortGame.GLADIATORS
                 && game != ArcadePortGame.PAINTBALL && game != ArcadePortGame.TURF_WARS
+                && game != ArcadePortGame.HEROES_OF_GWEN
                 && !game.isMonsterMaze();
+    }
+
+    public static Material heroesOfGwenCaptureBeaconMaterial(int owner) {
+        return owner < 0 ? Material.WHITE_STAINED_GLASS
+                : owner == 0 ? Material.RED_STAINED_GLASS : Material.LIGHT_BLUE_STAINED_GLASS;
     }
 
     public static final int BACON_METER_MAX = 100;
