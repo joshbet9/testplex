@@ -7,6 +7,7 @@ import au.com.testplex.arcadeports.GameDebugRuntimeOverrides;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WizardsRulesTest {
@@ -174,6 +175,21 @@ class WizardsRulesTest {
         assertEquals(3.0D, WizardsRules.spectralArrowDamage(1, 0), 0.000001D);
         assertEquals(3.0D, WizardsRules.rumbleDamage(1), 0.000001D);
         assertEquals(0.25D, WizardsRules.rumbleExplosionDamage(1), 0.000001D);
+    }
+
+    @Test
+    void fireballUsesSourceBlockRadiusWandLabelsAndProtectedDropSlots() {
+        assertEquals(2.3D, WizardsRules.fireballBlockRadius(1), 0.000001D);
+        assertEquals(2.6D, WizardsRules.fireballBlockRadius(2), 0.000001D);
+        assertEquals(2.9D, WizardsRules.fireballBlockRadius(99), 0.000001D);
+        assertEquals(org.bukkit.ChatColor.WHITE + "" + org.bukkit.ChatColor.BOLD + "Fireball",
+                WizardsRules.wandDisplayName(WizardsSpell.FIREBALL));
+        assertEquals(org.bukkit.ChatColor.WHITE + "Spell Wand", WizardsRules.wandDisplayName(null));
+        assertTrue(WizardsRules.isProtectedDropSlot(0));
+        assertTrue(WizardsRules.isProtectedDropSlot(4));
+        assertTrue(WizardsRules.isProtectedDropSlot(8));
+        assertFalse(WizardsRules.isProtectedDropSlot(5));
+        assertFalse(WizardsRules.isProtectedDropSlot(7));
     }
 
     @Test

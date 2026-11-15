@@ -1,6 +1,7 @@
 package au.com.testplex.wizards;
 
 import au.com.testplex.arcadeports.GameDebugRuntimeOverrides;
+import org.bukkit.ChatColor;
 import org.bukkit.Material;
 
 import java.util.List;
@@ -150,6 +151,21 @@ public final class WizardsRules {
 
     public static double fireballDamage(int spellLevel) {
         return (Math.max(0, spellLevel) + 3.0D) * spellDamageMultiplier();
+    }
+
+    /** Source fireball explosion size: level * 0.3 + 4; block destruction uses size - 2. */
+    public static double fireballBlockRadius(int spellLevel) {
+        int level = Math.max(1, Math.min(WizardsSpell.FIREBALL.maximumLevel(), spellLevel));
+        return level * 0.3D + 2.0D;
+    }
+
+    public static String wandDisplayName(WizardsSpell spell) {
+        return spell == null ? ChatColor.WHITE + "Spell Wand"
+                : ChatColor.WHITE + "" + ChatColor.BOLD + spell.displayName();
+    }
+
+    public static boolean isProtectedDropSlot(int heldSlot) {
+        return (heldSlot >= 0 && heldSlot < WAND_SLOT_COUNT) || heldSlot == 8;
     }
 
     public static double lightningStrikeDamage(int spellLevel) {

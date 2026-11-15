@@ -1057,6 +1057,32 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         }
     }
 
+    /** Source SpellFireball uses explosion-size minus two for blocks and drops none. */
+    private void destroyFireballBlocks(Location centre, double radius) {
+        World world = centre.getWorld();
+        if (world == null || !Double.isFinite(radius) || radius <= 0.0D) return;
+        int extent = (int) Math.ceil(radius);
+        double radiusSquared = radius * radius;
+        for (int x = -extent; x <= extent; x++) {
+            for (int y = -extent; y <= extent; y++) {
+                int blockY = centre.getBlockY() + y;
+                if (blockY < world.getMinHeight() || blockY >= world.getMaxHeight()) continue;
+                for (int z = -extent; z <= extent; z++) {
+                    Block block = world.getBlockAt(centre.getBlockX() + x, blockY, centre.getBlockZ() + z);
+                    if (block.getType().isAir() || block.getType() == Material.BEDROCK
+                            || block.getType() == Material.BARRIER
+                            || block.getState() instanceof InventoryHolder
+                            || block.getState() instanceof TileState) continue;
+                    Location blockCentre = block.getLocation().add(0.5D, 0.5D, 0.5D);
+                    if (blockCentre.distanceSquared(centre) > radiusSquared) continue;
+                    world.spawnParticle(Particle.BLOCK, blockCentre, 6, 0.25D, 0.25D, 0.25D,
+                            0.05D, block.getBlockData());
+                    block.setType(Material.AIR, false);
+                }
+            }
+        }
+    }
+
     private List<Player> alivePlayers() {
         List<Player> players = new ArrayList<>();
         for (Map.Entry<UUID, WizardState> entry : states.entrySet()) {
@@ -1197,7 +1223,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         ItemStack item = new ItemStack(Material.BLAZE_ROD);
         ItemMeta meta = item.getItemMeta();
         WizardsSpell spell = state.wands[slot];
-        meta.setDisplayName(ChatColor.WHITE + (spell == null ? "Spell Wand" : spell.displayName() + " Wand"));
+        meta.setDisplayName(WizardsRules.wandDisplayName(spell));
         List<String> lore = new ArrayList<>();
         if (spell == null) {
             lore.add(ChatColor.GRAY + "Right-click to choose a spell");
@@ -1720,6 +1746,9 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
                     victim.setFireTicks(Math.max(victim.getFireTicks(), 80));
                 }
             }
+            int spellLevel = projectile.getPersistentDataContainer().getOrDefault(
+                    anvilLevelKey, PersistentDataType.INTEGER, 1);
+            destroyFireballBlocks(location, WizardsRules.fireballBlockRadius(spellLevel));
             location.getWorld().spawnParticle(Particle.FLAME, location, 32, 0.6D, 0.6D, 0.6D, 0.04D);
             location.getWorld().spawnParticle(Particle.LAVA, location, 8, 0.35D, 0.35D, 0.35D, 0.0D);
             location.getWorld().playSound(location, Sound.ENTITY_GENERIC_EXPLODE, 0.8F, 1.1F);
