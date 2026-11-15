@@ -1315,10 +1315,40 @@ public final class SourceMapCatalog {
             return null;
         }
         inferred.teamSpawns.put("INFERRED_TEST_STARTS", starts);
+        if (resource != null && resource.toLowerCase(java.util.Locale.ROOT).contains("evolution")) {
+            List<Location> viewingLocations = inferEvolutionViewingLocations(
+                    starts, inferred.centerX(), inferred.centerZ(), 12.0D, 16);
+            if (!viewingLocations.isEmpty()) {
+                inferred.dataLocations.put("INFERRED_EVOLUTION_VIEWING", viewingLocations);
+                plugin.getLogger().warning("Using " + viewingLocations.size()
+                        + " terrain-checked INFERRED Evolution viewing locations for " + resource
+                        + ". Authored GREEN pedestal markers are absent; these test locations do not recreate original pedestal geometry.");
+            }
+        }
         plugin.getLogger().warning("Using INFERRED TEST CONFIG for " + resource + ": bounds came from "
                 + bounds.activeChunks() + " populated terrain chunks and " + starts.size()
                 + " safe surface starts. Original WorldConfig.dat objectives and authored spawns are absent.");
         return inferred;
+    }
+
+    private static List<Location> inferEvolutionViewingLocations(
+            List<Location> starts, double centerX, double centerZ, double minimumSpacing, int maximum) {
+        if (starts == null || starts.isEmpty() || maximum <= 0) return List.of();
+        List<Location> candidates = starts.stream().filter(java.util.Objects::nonNull)
+                .sorted(java.util.Comparator.comparingDouble(location ->
+                        Math.pow(location.getX() - centerX, 2.0D) + Math.pow(location.getZ() - centerZ, 2.0D)))
+                .toList();
+        List<Location> selected = new ArrayList<>();
+        double minimumDistanceSquared = minimumSpacing * minimumSpacing;
+        for (Location candidate : candidates) {
+            boolean spaced = selected.stream().allMatch(existing ->
+                    existing.getWorld() != candidate.getWorld()
+                            || existing.distanceSquared(candidate) >= minimumDistanceSquared);
+            if (spaced) selected.add(candidate.clone());
+            if (selected.size() >= maximum) break;
+        }
+        if (selected.isEmpty()) selected.add(candidates.get(0).clone());
+        return List.copyOf(selected);
     }
 
     /**
@@ -2019,6 +2049,12 @@ public final class SourceMapCatalog {
         }
         public List<Location> customLocations(String name) {
             return copyLocations(customLocations.get(name == null ? "" : name.toUpperCase(java.util.Locale.ROOT)));
+        }
+
+        /** Authored Evolution GREEN viewing markers, or explicitly inferred terrain-only test locations. */
+        public List<Location> evolutionViewingLocations() {
+            List<Location> authored = dataLocations("GREEN");
+            return authored.isEmpty() ? dataLocations("INFERRED_EVOLUTION_VIEWING") : authored;
         }
 
         /**
