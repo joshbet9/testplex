@@ -3365,7 +3365,7 @@ public final class ArcadePortRules {
 
 
     public static final long GLADIATOR_ROUND_COUNTDOWN_MILLIS = 5_000L;
-    public static final long GLADIATOR_VOTE_MILLIS = 15_000L;
+    public static final long GLADIATOR_VOTE_MILLIS = 10_000L;
     public static final long GLADIATOR_ARENA_TRANSITION_MILLIS = 15_000L;
     /** -1 preserves lobby-size-based source tier selection; 0 through 3 force an arena tier for testing. */
     public static final int GLADIATOR_STARTING_TIER_OVERRIDE = -1;
@@ -3393,6 +3393,11 @@ public final class ArcadePortRules {
 
     public static long gladiatorsVoteMillis() {
         return Math.max(0L, GameDebugRuntimeOverrides.longValue("GLADIATOR_VOTE_MILLIS", GLADIATOR_VOTE_MILLIS));
+    }
+
+    public static boolean shouldReopenGladiatorVoteMenu(boolean matchVote, boolean participant,
+            long voteEndsAt, long now) {
+        return matchVote && participant && voteEndsAt > now;
     }
 
     public static long gladiatorsArenaTransitionMillis() {

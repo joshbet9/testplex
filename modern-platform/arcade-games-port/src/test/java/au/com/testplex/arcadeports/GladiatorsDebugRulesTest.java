@@ -125,7 +125,11 @@ class GladiatorsDebugRulesTest {
     void tournamentSetupControlsKeepVoteDefaultsAndCanForceModeTierAndPacing() {
         assertFalse(ArcadePortRules.gladiatorsForceModeEnabled());
         assertEquals(0, ArcadePortRules.gladiatorsModeOverrideIndex());
-        assertEquals(15_000L, ArcadePortRules.gladiatorsVoteMillis());
+        assertEquals(10_000L, ArcadePortRules.gladiatorsVoteMillis());
+        assertTrue(ArcadePortRules.shouldReopenGladiatorVoteMenu(true, true, 10_000L, 9_999L));
+        assertFalse(ArcadePortRules.shouldReopenGladiatorVoteMenu(true, true, 10_000L, 10_000L));
+        assertFalse(ArcadePortRules.shouldReopenGladiatorVoteMenu(false, true, 10_000L, 0L));
+        assertFalse(ArcadePortRules.shouldReopenGladiatorVoteMenu(true, false, 10_000L, 0L));
         assertEquals(15_000L, ArcadePortRules.gladiatorsArenaTransitionMillis());
         assertEquals(5, ArcadePortRules.gladiatorsPotionCount());
         assertEquals(3, ArcadePortRules.gladiatorsStartingTierForPlayers(2));
