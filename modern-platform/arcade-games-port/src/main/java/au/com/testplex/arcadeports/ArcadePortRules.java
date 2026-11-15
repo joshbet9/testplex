@@ -3,6 +3,7 @@ package au.com.testplex.arcadeports;
 import org.bukkit.Material;
 import org.bukkit.Color;
 import org.bukkit.ChatColor;
+import org.bukkit.entity.EnderDragon;
 import org.bukkit.util.Vector;
 import java.util.Collection;
 import java.util.ArrayList;
@@ -1192,7 +1193,8 @@ public final class ArcadePortRules {
     public static final int DRAGONS_MAX_DRAGONS = 5;
     public static final boolean DRAGONS_SPAWNING_ENABLED = true;
     public static final boolean DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED = true;
-    public static final double DRAGONS_AUTONOMOUS_FLIGHT_SPEED = 0.32D;
+    /** Native Ender Dragon flight attribute default; 0.32 was a teleport-step speed that made flight sluggish. */
+    public static final double DRAGONS_AUTONOMOUS_FLIGHT_SPEED = 0.6D;
     public static final double DRAGONS_TAMER_FLIGHT_SPEED = 0.42D;
     /** UpdateType.SEC_05: Reborn adds one dragon every five seconds. */
     public static final long DRAGONS_SPAWN_INTERVAL_MILLIS = 5_000L;
@@ -1728,19 +1730,9 @@ public final class ArcadePortRules {
                 "DRAGONS_RETARGET_DISTANCE_SQUARED", DRAGONS_RETARGET_DISTANCE_SQUARED);
     }
 
-    /** Return a fixed per-tick flight vector toward the current source-selected target. */
-    public static Vector dragonsFlightVelocity(Vector position, Vector target, double speed) {
-        if (position == null || target == null || !Double.isFinite(speed) || speed <= 0.0D) return new Vector();
-        Vector direction = target.clone().subtract(position);
-        if (!Double.isFinite(direction.getX()) || !Double.isFinite(direction.getY())
-                || !Double.isFinite(direction.getZ()) || direction.lengthSquared() < 1.0E-8D) return new Vector();
-        return direction.normalize().multiply(speed);
-    }
-
-    /** Position reached by the explicit per-tick dragon steering used when Paper AI is disabled. */
-    public static Vector dragonsFlightStep(Vector position, Vector target, double speed) {
-        if (position == null) return new Vector();
-        return position.clone().add(dragonsFlightVelocity(position, target, speed));
+    /** Source player targets use the dragon's strafe phase; source block waypoints use native flight. */
+    public static EnderDragon.Phase dragonsAutonomousPhase(boolean hasPlayerTarget) {
+        return hasPlayerTarget ? EnderDragon.Phase.STRAFING : EnderDragon.Phase.FLY_TO_PORTAL;
     }
 
     /** Only allow a Dragons entity to target the living player selected by the round controller. */
