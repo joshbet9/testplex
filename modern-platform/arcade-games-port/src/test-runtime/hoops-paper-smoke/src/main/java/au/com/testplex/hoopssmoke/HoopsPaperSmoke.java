@@ -501,6 +501,7 @@ public final class HoopsPaperSmoke extends JavaPlugin {
             require(team == 0 || team == 1, "invalid team assignment for " + player.getName());
             teamCounts[team]++;
             require(player.getAllowFlight(), "Hops flight was not enabled for " + player.getName());
+            require(player.isInvulnerable(), "Hoops participant damage protection was not enabled for " + player.getName());
             require(player.getScoreboard() == field(firstMatch, "scoreboard"),
                     "match scoreboard was not applied to " + player.getName());
         }
