@@ -1059,9 +1059,9 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.bombLobbersKitUsesArmor("unknown"));
     }
 
-    @Test void bombLobbersUsesItsLegacyFiveDamageWaterPenalty() {
+    @Test void gamesWithWaterOutOfBoundsUseTheirSourceWaterPenalty() {
         assertEquals(5, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.BOMB_LOBBERS, "Mighty Lava Arena"));
-        assertEquals(0, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.BACON_BRAWL, "Mighty Lava Arena"));
+        assertEquals(4, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.BACON_BRAWL, "Bacon Tropics"));
     }
 
     @Test void bombLobbersSpectatorCompassTargetsOnlyOpponentsAndUsesThreeSecondTeleportCooldown() {
@@ -1657,7 +1657,7 @@ class ArcadePortGameTest {
         assertEquals(4, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.SPLEEF, "Spleef"));
         assertEquals(4, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGON_ESCAPE, "Pirate"));
         assertEquals(0, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGON_ESCAPE, "Through Hell"));
-        assertEquals(0, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.BACON_BRAWL, "Arena"));
+        assertEquals(4, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.BACON_BRAWL, "Arena"));
     }
 
     @Test void heroesOfGwenDisablesFallDamageAndUsesTeamGlassForCaptureBeacons() {
