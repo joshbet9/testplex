@@ -1958,11 +1958,14 @@ class ArcadePortGameTest {
                 ArcadePortRules.dragonEscapeNextTntChargeAt(-1_000L) - (-1_000L));
     }
 
-    @Test void dragonEscapeBuilderBrickRemainsUntilUsedAndVacatedOrOwnerEliminated() {
-        assertFalse(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(false, false, true));
-        assertFalse(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(true, true, true));
-        assertTrue(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(true, false, true));
-        assertTrue(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(false, false, false));
+    @Test void dragonEscapeBuilderBrickRemainsUntilUsedAndThenLingersHalfSecondAfterVacating() {
+        assertFalse(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(false, false, true, 10_000L, 0L));
+        assertFalse(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(true, true, true, 10_000L, 0L));
+        assertFalse(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(true, false, true, 10_499L, 10_000L));
+        assertTrue(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(true, false, true, 10_500L, 10_000L));
+        assertFalse(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(true, true, true, 10_500L, 10_000L),
+                "re-entering the brick cancels the vacated grace timer");
+        assertTrue(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(false, false, false, 10_000L, 0L));
         assertFalse(ArcadePortRules.shouldRejectDragonEscapeBuilderEntityOverlap(true, true));
         assertTrue(ArcadePortRules.shouldRejectDragonEscapeBuilderEntityOverlap(false, true));
         assertFalse(ArcadePortRules.shouldRejectDragonEscapeBuilderEntityOverlap(false, false));

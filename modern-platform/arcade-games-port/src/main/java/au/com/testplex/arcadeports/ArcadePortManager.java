@@ -17426,6 +17426,14 @@ public final class ArcadePortManager implements Listener {
         // state and inventory immediately to the placing client (including high ping).
         player.sendBlockChange(target.getLocation(), target.getBlockData());
         player.updateInventory();
+        // A cancelled use-item packet can make a high-latency client briefly retain
+        // its predicted stack. Re-send both authoritative values after Bukkit has
+        // completed this interaction so a placement never appears free to the owner.
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!player.isOnline() || active != session || !session.alive.contains(id)) return;
+            player.sendBlockChange(target.getLocation(), target.getBlockData());
+            player.updateInventory();
+        });
         session.dragonEscapeBuilderBricks.put(id, new DragonEscapeBuilderBrick(previous));
         session.dragonEscapeBuilderLastPlacedAt.put(id, System.currentTimeMillis());
         session.dragonEscapeNextBrickAt.put(id,
@@ -17436,6 +17444,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void updateDragonEscapeBuilderBricks(Session session) {
+        long now = System.currentTimeMillis();
         for (Map.Entry<UUID, DragonEscapeBuilderBrick> entry
                 : new ArrayList<>(session.dragonEscapeBuilderBricks.entrySet())) {
             Player owner = session.players.get(entry.getKey());
@@ -17450,13 +17459,16 @@ public final class ArcadePortManager implements Listener {
                     && owner.getLocation().getZ() < block.getZ() + 1.3D;
             if (standingOnBrick) {
                 brick.used = true;
+                brick.vacatedAt = 0L;
                 if (session.alive.contains(entry.getKey())) {
                     session.dragonEscapeBuilderFootholds.computeIfAbsent(
                             entry.getKey(), ignored -> new HashSet<>()).add(brick);
                 }
+            } else if (brick.used && brick.vacatedAt == 0L) {
+                brick.vacatedAt = now;
             }
             if (ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(
-                    brick.used, standingOnBrick, session.alive.contains(entry.getKey()))
+                    brick.used, standingOnBrick, session.alive.contains(entry.getKey()), now, brick.vacatedAt)
                     || block.getType() != Material.BRICKS) {
                 restoreDragonEscapeBuilderBrick(brick);
                 session.dragonEscapeBuilderBricks.remove(entry.getKey());
@@ -35502,6 +35514,7 @@ public final class ArcadePortManager implements Listener {
     private static final class DragonEscapeBuilderBrick {
         final BlockState original;
         boolean used;
+        long vacatedAt;
 
         DragonEscapeBuilderBrick(BlockState original) {
             this.original = original;
