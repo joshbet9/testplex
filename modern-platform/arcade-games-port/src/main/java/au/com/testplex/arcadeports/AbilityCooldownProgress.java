@@ -69,6 +69,12 @@ public final class AbilityCooldownProgress implements Listener {
         if (player != null) active.remove(player.getUniqueId());
     }
 
+    /** Formats remaining duration using the shared 0.1-second action-bar precision. */
+    public static String formatDurationTenths(long remainingMillis) {
+        long tenths = Math.max(0L, (Math.max(0L, remainingMillis) + 99L) / 100L);
+        return tenths / 10L + "." + tenths % 10L + " seconds";
+    }
+
     @EventHandler
     public void onPlayerDeath(PlayerDeathEvent event) {
         stop(event.getEntity());

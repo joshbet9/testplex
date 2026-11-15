@@ -28,6 +28,9 @@ final class CastleAssaultDebugRulesTest {
         assertEquals(10.0D, ArcadePortRules.castleAssaultTntDamage(0.0D, 4.0D));
         assertEquals(5.0D, ArcadePortRules.castleAssaultTntDamage(2.0D, 4.0D));
         assertEquals(0.0D, ArcadePortRules.castleAssaultTntDamage(4.0D, 4.0D));
+        assertEquals(5.0D, ArcadePortRules.castleAssaultTntDamageForTarget(true, true, 0.0D, 4.0D));
+        assertEquals(10.0D, ArcadePortRules.castleAssaultTntDamageForTarget(false, true, 0.0D, 4.0D));
+        assertEquals(10.0D, ArcadePortRules.castleAssaultTntDamageForTarget(true, false, 0.0D, 4.0D));
         assertEquals(1.0D, ArcadePortRules.castleAssaultTntKnockbackMultiplier());
     }
 
