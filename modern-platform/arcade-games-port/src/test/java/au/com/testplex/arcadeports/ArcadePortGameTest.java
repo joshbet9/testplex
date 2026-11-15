@@ -2442,6 +2442,18 @@ class ArcadePortGameTest {
                 new Vector(), new Vector(0.0D, 0.0D, 1.0D), Double.NaN).length(), 0.00001D);
     }
 
+    @Test void dragonsAutonomousFlightStepAdvancesTheEntityWhenNativeAiIsDisabled() {
+        Vector position = new Vector(4.0D, 70.0D, 8.0D);
+        Vector next = ArcadePortRules.dragonsFlightStep(
+                position, new Vector(4.0D, 70.0D, 18.0D), 0.32D);
+
+        assertEquals(4.0D, next.getX(), 0.00001D);
+        assertEquals(70.0D, next.getY(), 0.00001D);
+        assertEquals(8.32D, next.getZ(), 0.00001D);
+        assertEquals(4.0D, position.getX(), 0.00001D);
+        assertEquals(8.0D, position.getZ(), 0.00001D);
+    }
+
     @Test void dragonsDisableDirectAndProjectilePvpAndOnlyAllowEmeraldWorldItems() {
         assertTrue(ArcadePortRules.shouldCancelDragonsPvp(true, false));
         assertTrue(ArcadePortRules.shouldCancelDragonsPvp(false, true));

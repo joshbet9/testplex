@@ -1723,6 +1723,12 @@ public final class ArcadePortRules {
         return direction.normalize().multiply(speed);
     }
 
+    /** Position reached by the explicit per-tick dragon steering used when Paper AI is disabled. */
+    public static Vector dragonsFlightStep(Vector position, Vector target, double speed) {
+        if (position == null) return new Vector();
+        return position.clone().add(dragonsFlightVelocity(position, target, speed));
+    }
+
     /** Only allow a Dragons entity to target the living player selected by the round controller. */
     public static boolean shouldAllowDragonEntityTarget(UUID requestedTargetId, UUID selectedTargetId,
             boolean targetAlive, boolean dragonControlled) {

@@ -16599,15 +16599,23 @@ public final class ArcadePortManager implements Listener {
                             ArcadePortRules.DRAGONS_AUTONOMOUS_MOVEMENT_ENABLED)) {
                 Location target = session.dragonTargetLocations.get(dragonId);
                 if (target != null) {
-                    Vector heading = ArcadePortRules.dragonsFlightVelocity(
-                            dragon.getLocation().toVector(), target.toVector(), GameDebugRuntimeOverrides.doubleValue(
-                                    "DRAGONS_AUTONOMOUS_FLIGHT_SPEED", ArcadePortRules.DRAGONS_AUTONOMOUS_FLIGHT_SPEED));
+                    Location current = dragon.getLocation();
+                    Vector currentPosition = current.toVector();
+                    double speed = GameDebugRuntimeOverrides.doubleValue(
+                            "DRAGONS_AUTONOMOUS_FLIGHT_SPEED", ArcadePortRules.DRAGONS_AUTONOMOUS_FLIGHT_SPEED);
+                    Vector heading = ArcadePortRules.dragonsFlightVelocity(currentPosition, target.toVector(), speed);
                     if (heading.lengthSquared() > 0.0D) {
-                        dragon.setVelocity(heading);
-                        Location facing = dragon.getLocation().clone();
-                        facing.setDirection(heading);
-                        dragon.setRotation(facing.getYaw(), facing.getPitch());
-                        session.dragonFlightVectors.put(dragonId, heading.clone());
+                        Vector nextPosition = ArcadePortRules.dragonsFlightStep(currentPosition, target.toVector(), speed);
+                        Location next = new Location(current.getWorld(), nextPosition.getX(),
+                                nextPosition.getY(), nextPosition.getZ());
+                        next.setDirection(heading);
+                        // With the EnderDragon brain disabled, Paper's dragon movement controller
+                        // ignores setVelocity. Advance the source-selected flight vector directly
+                        // each tick so dragons actually cross the arena and swoop toward players.
+                        if (dragon.teleport(next)) {
+                            dragon.setVelocity(new Vector());
+                            session.dragonFlightVectors.put(dragonId, heading.clone());
+                        }
                     }
                 }
             }
