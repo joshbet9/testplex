@@ -265,6 +265,10 @@ public final class HoopsRemasteredRuntime implements Listener {
             player.setFallDistance(0.0F);
             player.getInventory().clear();
             player.getInventory().setHeldItemSlot(0);
+            // Hoops has no combat damage. Keep the engine-level guard as well as
+            // cancelling damage events so another plugin cannot turn fist attacks
+            // into real damage by un-cancelling a Bukkit event later in the chain.
+            player.setInvulnerable(true);
             equipTeamUniform(player, team);
             player.setWalkSpeed(0.2F);
             player.setGameMode(org.bukkit.GameMode.ADVENTURE);
@@ -1449,6 +1453,7 @@ public final class HoopsRemasteredRuntime implements Listener {
         if (current == null || event.getEntity().getWorld() != current.world) return;
         if (event.getEntity() instanceof Player player && current.players.containsKey(player.getUniqueId())) {
             event.setCancelled(true);
+            player.setInvulnerable(true);
         }
     }
 
