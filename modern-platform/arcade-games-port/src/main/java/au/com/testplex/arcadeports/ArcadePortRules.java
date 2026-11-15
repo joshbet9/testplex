@@ -3577,6 +3577,10 @@ public final class ArcadePortRules {
         if (game == null) return 0;
         return switch (game) {
             case BOMB_LOBBERS -> 5;
+            // Bacon Brawl arenas use water as the out-of-bounds floor on several maps.
+            // Apply the same steady four-health-per-second world-water penalty used by
+            // the other source games that rely on water instead of a void kill plane.
+            case BACON_BRAWL -> 4;
             case DRAGONS, RUNNER, SPLEEF -> 4;
             case DRAGON_ESCAPE -> mapName == null
                     || !mapName.toLowerCase(java.util.Locale.ROOT).contains("through hell") ? 4 : 0;
