@@ -32678,6 +32678,12 @@ public final class ArcadePortManager implements Listener {
         if (cancelPrepareAction(event.getPlayer(), event)) return;
         Session session = active;
         if (session == null || !session.players.containsKey(event.getPlayer().getUniqueId())) return;
+        if (session.type == ArcadePortGame.WIZARDS) {
+            if (WizardsRules.isProtectedDropSlot(event.getPlayer().getInventory().getHeldItemSlot())) {
+                event.setCancelled(true);
+            }
+            return;
+        }
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
             ItemStack dropped = event.getItemDrop().getItemStack();
             boolean sword = dropped != null && dropped.getType().name().endsWith("_SWORD");
