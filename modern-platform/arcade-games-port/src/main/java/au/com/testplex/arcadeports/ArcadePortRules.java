@@ -2568,6 +2568,8 @@ public final class ArcadePortRules {
     public static final long EVOLUTION_BLAZE_FLAMETHROWER_DURATION_MILLIS = 1_000L;
     public static final long EVOLUTION_BLAZE_FLAMETHROWER_TICK_MILLIS = 50L;
     public static final double EVOLUTION_BLAZE_FLAME_SPEED = 1.6D;
+    public static final double EVOLUTION_BLAZE_FLAME_DAMAGE = 2.0D;
+    public static final double EVOLUTION_BLAZE_FLAME_KNOCKBACK = 0.7D;
     public static final long EVOLUTION_SLIME_SLAM_COOLDOWN_MILLIS = 7_000L;
     public static final double EVOLUTION_SLIME_SLAM_RADIUS = 2.0D;
     public static final double EVOLUTION_SLIME_SLAM_DAMAGE = 8.0D;
@@ -2589,7 +2591,13 @@ public final class ArcadePortRules {
     public static final long EVOLUTION_SULPHUR_BOMB_COOLDOWN_MILLIS = 3_000L;
     public static final double EVOLUTION_SULPHUR_BOMB_SPEED = 1.2D;
     public static final double EVOLUTION_SULPHUR_BOMB_RADIUS = 2.5D;
-    public static final double EVOLUTION_SULPHUR_BOMB_DAMAGE = 4.0D;
+    public static final double EVOLUTION_SULPHUR_BOMB_DAMAGE = 5.0D;
+    public static final double EVOLUTION_SULPHUR_BOMB_KNOCKBACK = 1.5D;
+
+    public static boolean shouldApplyEvolutionProjectileDamage(
+            boolean shooterAlive, boolean targetAlive, boolean selfHit) {
+        return shooterAlive && targetAlive && !selfHit;
+    }
     public static final double EVOLUTION_CHARGE_BASE_PER_TICK = 0.012D;
     public static final double EVOLUTION_CHARGE_PER_EXTRA_KILL = 0.003D;
     public static final double EVOLUTION_CHARGE_MAX_PER_TICK = 0.022D;
