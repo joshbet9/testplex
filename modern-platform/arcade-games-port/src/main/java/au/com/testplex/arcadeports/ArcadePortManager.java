@@ -17435,7 +17435,8 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (target.getWorld() != session.world || !target.isEmpty()
-                || !isDragonEscapeDiggerBuildLocationAllowed(session, target)) {
+                || !ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(
+                        target.getY(), session.world.getMinHeight(), session.world.getMaxHeight())) {
             player.sendActionBar(ChatColor.YELLOW + "You cannot place a temporary brick there.");
             return;
         }

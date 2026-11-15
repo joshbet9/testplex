@@ -1981,6 +1981,11 @@ class ArcadePortGameTest {
                 ArcadePortRules.dragonEscapeBuilderPlacementTouchesWater(false, true)));
         assertTrue(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false,
                 ArcadePortRules.dragonEscapeBuilderPlacementTouchesWater(false, false)));
+        assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(64, -64, 320));
+        assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(-64, -64, 320));
+        assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(319, -64, 320));
+        assertFalse(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(-65, -64, 320));
+        assertFalse(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(320, -64, 320));
     }
 
     @Test void dragonEscapeBuilderPlacementGetsBoundedAuthoritativeResyncGrace() {
