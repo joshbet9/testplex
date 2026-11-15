@@ -5329,6 +5329,7 @@ public final class ArcadePortManager implements Listener {
             }
         }
         active = session;
+        markBaconBrawlLegacyFoodIsolation(session);
         activateDebugProfile(requester != null ? requester : sender instanceof Player player ? player : null, type);
         if (type == ArcadePortGame.SKY_WARS) {
             initializeSkyWarsMapResources(session, sourceMapData.get(type.id()));
@@ -14767,6 +14768,23 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private void markBaconBrawlLegacyFoodIsolation(Session session) {
+        if (!ArcadePortRules.shouldIsolateBaconBrawlLegacyFoodReset(session.type)) return;
+        for (Player player : session.players.values()) {
+            if (player != null && player.isOnline()) {
+                player.setMetadata("testplex-modern-bacon-brawl",
+                        new org.bukkit.metadata.FixedMetadataValue(plugin, true));
+            }
+        }
+    }
+
+    private void clearBaconBrawlLegacyFoodIsolation(Session session) {
+        if (!ArcadePortRules.shouldIsolateBaconBrawlLegacyFoodReset(session.type)) return;
+        for (Player player : session.players.values()) {
+            if (player != null) player.removeMetadata("testplex-modern-bacon-brawl", plugin);
+        }
+    }
+
     private void updateCrispyBaconBurning(Session session, long now) {
         for (Map.Entry<UUID, Long> entry : new ArrayList<>(session.baconCrispyFlamedUntil.entrySet())) {
             UUID targetId = entry.getKey();
@@ -23180,6 +23198,7 @@ public final class ArcadePortManager implements Listener {
             restoreDragonEscapePracticeCourse(session);
             if (session.dragonEscapePractice) session.dragonEscapeBlockRestoreTokens.clear();
         }
+        clearBaconBrawlLegacyFoodIsolation(session);
         active = null;
         GameDebugRuntimeOverrides.clear();
         if (activeDebugProfileGame == session.type) {

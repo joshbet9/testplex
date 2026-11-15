@@ -916,6 +916,12 @@ public class GameFlagManager implements Listener
 		//Not Playing
 		for (Player player : UtilServer.getPlayers())
 		{
+			// Modern Bacon Brawl owns its own hunger/health simulation. This
+			// legacy lobby reset writes directly to Player and bypasses Bukkit's
+			// FoodLevelChangeEvent, immediately undoing the modern hunger drain.
+			if (player.hasMetadata("testplex-modern-bacon-brawl"))
+				continue;
+
 			if (game == null || game.inLobby() || (!game.IsAlive(player) && game.shouldHeal(player)))
 			{
 				player.setMaxHealth(20);
@@ -933,6 +939,9 @@ public class GameFlagManager implements Listener
 		{
 			for (Player player : game.GetPlayers(true))
 			{
+				if (player.hasMetadata("testplex-modern-bacon-brawl"))
+					continue;
+
 				if (Manager.GetCondition().HasCondition(player, ConditionType.ARCADE_HUNGER_DISABLE, null))
 					continue;
 
@@ -945,6 +954,9 @@ public class GameFlagManager implements Listener
 		{
 			for (Player player : game.GetPlayers(true))
 			{
+				if (player.hasMetadata("testplex-modern-bacon-brawl"))
+					continue;
+
 				player.setHealth(Math.min(game.HealthSet, player.getMaxHealth()));
 			}
 		}
