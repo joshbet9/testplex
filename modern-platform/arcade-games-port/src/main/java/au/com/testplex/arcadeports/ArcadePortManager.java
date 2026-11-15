@@ -28141,8 +28141,8 @@ public final class ArcadePortManager implements Listener {
         session.runnerLeapTracking.add(id);
         session.runnerLeapLastPosition.put(id, player.getLocation().clone());
         cooldownProgress.start(player, "Leap", GameDebugRuntimeOverrides.longValue("RUNNER_LEAP_COOLDOWN_MILLIS", ArcadePortRules.RUNNER_LEAP_COOLDOWN_MILLIS));
-        Vector velocity = player.getLocation().getDirection().normalize().multiply(ArcadePortRules.runnerLeapHorizontalSpeed());
-        velocity.setY(ArcadePortRules.runnerLeapVerticalSpeed());
+        Vector velocity = ArcadePortRules.runnerLeapVelocity(player.getLocation().getDirection(), player.isOnGround());
+        if (velocity == null) velocity = new Vector(0.0D, 0.0D, 0.0D);
         player.setVelocity(velocity);
         player.setFallDistance(0.0F);
         player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation(), 8, 0.2D, 0.15D, 0.2D, 0.02D);

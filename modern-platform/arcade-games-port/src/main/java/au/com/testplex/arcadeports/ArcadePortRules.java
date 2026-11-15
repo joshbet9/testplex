@@ -2473,6 +2473,18 @@ public final class ArcadePortRules {
         return GameDebugRuntimeOverrides.doubleValue("RUNNER_LEAP_VERTICAL_SPEED", RUNNER_LEAP_VERTICAL_SPEED);
     }
 
+    /** Source PerkLeap: normalize facing, apply power, add 0.2 Y, cap Y, then boost grounded Y by 0.2. */
+    public static Vector runnerLeapVelocity(Vector facing, boolean grounded) {
+        if (facing == null || !Double.isFinite(facing.getX()) || !Double.isFinite(facing.getY())
+                || !Double.isFinite(facing.getZ()) || facing.lengthSquared() < 1.0E-12D) {
+            return null;
+        }
+        Vector velocity = facing.clone().normalize().multiply(runnerLeapHorizontalSpeed());
+        velocity.setY(Math.min(runnerLeapVerticalSpeed(), velocity.getY() + 0.2D));
+        if (grounded) velocity.setY(velocity.getY() + 0.2D);
+        return velocity;
+    }
+
     public static double runnerQuickshotProjectileSpeed() {
         return GameDebugRuntimeOverrides.doubleValue("RUNNER_QUICKSHOT_PROJECTILE_SPEED", RUNNER_QUICKSHOT_PROJECTILE_SPEED);
     }

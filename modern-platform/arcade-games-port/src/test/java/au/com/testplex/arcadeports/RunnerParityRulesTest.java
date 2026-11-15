@@ -1,11 +1,13 @@
 package au.com.testplex.arcadeports;
 
 import org.junit.jupiter.api.Test;
+import org.bukkit.util.Vector;
 
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class RunnerParityRulesTest {
@@ -84,6 +86,21 @@ final class RunnerParityRulesTest {
         assertEquals(16, ArcadePortRules.RUNNER_MAX_FROSTBALLS);
         assertEquals(40, ArcadePortRules.RUNNER_FROSTBALL_SLOW_TICKS);
         assertEquals(2, ArcadePortRules.RUNNER_FROSTBALL_SLOW_AMPLIFIER);
+    }
+
+    @Test
+    void leapVelocityMatchesSourcePowerVerticalAdditionAndGroundBoost() {
+        Vector grounded = ArcadePortRules.runnerLeapVelocity(new Vector(0.0D, 0.0D, 1.0D), true);
+        assertEquals(0.0D, grounded.getX(), 1.0E-9D);
+        assertEquals(0.4D, grounded.getY(), 1.0E-9D);
+        assertEquals(1.2D, grounded.getZ(), 1.0E-9D);
+
+        Vector airborne = ArcadePortRules.runnerLeapVelocity(new Vector(0.0D, 0.0D, 1.0D), false);
+        assertEquals(0.2D, airborne.getY(), 1.0E-9D);
+
+        Vector steepAim = ArcadePortRules.runnerLeapVelocity(new Vector(0.0D, 1.0D, 0.0D), true);
+        assertEquals(1.4D, steepAim.getY(), 1.0E-9D);
+        assertNull(ArcadePortRules.runnerLeapVelocity(new Vector(), true));
     }
 
     @Test
