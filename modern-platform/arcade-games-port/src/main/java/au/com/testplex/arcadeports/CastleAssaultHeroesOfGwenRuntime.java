@@ -181,6 +181,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final Map<UUID, Map<String, Map<String, ItemStack>>> heroesOfGwenPurchasedEquipment = new HashMap<>();
     private final Map<UUID, ItemStack> carriedTntOldHelmet = new HashMap<>();
     private final Map<Integer, List<TowerState>> towers = new HashMap<>();
+    private final Map<UUID, Long> heroesOfGwenTowerBlockHitAt = new HashMap<>();
     private final Map<UUID, HeroesScoreboardView> heroesScoreboards = new HashMap<>();
     private final Map<UUID, Integer> heroesOfGwenMinionTeams = new HashMap<>();
     private final Map<UUID, List<Location>> heroesOfGwenMinionPaths = new HashMap<>();
@@ -830,7 +831,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             List<Location> path = heroesOfGwenMinionPaths.getOrDefault(minion.getUniqueId(), List.of());
             int pathIndex = heroesOfGwenMinionPathIndices.getOrDefault(minion.getUniqueId(), 0);
             if (goal == null && !path.isEmpty()) {
-                if (pathIndex < path.size() && minion.getLocation().distanceSquared(path.get(pathIndex)) < 4.0D) {
+                if (pathIndex < path.size()
+                        && HeroesOfGwenMinionMovementRules.shouldAdvanceWaypoint(
+                                minion.getLocation().distanceSquared(path.get(pathIndex)))) {
                     pathIndex = Math.min(pathIndex + 1, path.size() - 1);
                     heroesOfGwenMinionPathIndices.put(minion.getUniqueId(), pathIndex);
                 }
@@ -841,7 +844,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 goal.setY(heroesOfGwenMinionLaneY.getOrDefault(
                         minion.getUniqueId(), minion.getLocation().getY()));
             }
-            if (goal != null && minion.getLocation().distanceSquared(goal) >= 9.0D) {
+            if (goal != null && HeroesOfGwenMinionMovementRules.shouldMoveTowardWaypoint(
+                    minion.getLocation().distanceSquared(goal))) {
                 Location next = minion.getLocation();
                 Vector direction = goal.toVector().subtract(next.toVector());
                 if (direction.lengthSquared() > 0.001D) {
@@ -2686,6 +2690,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 throwPlayerTnt(player);
             }
         } else if (game == ArcadePortGame.HEROES_OF_GWEN) {
+            if (event.getAction() == org.bukkit.event.block.Action.LEFT_CLICK_BLOCK
+                    && event.getClickedBlock() != null
+                    && tryDamageHeroesOfGwenTowerFromStepBlock(player, event.getClickedBlock().getLocation())) {
+                event.setCancelled(true);
+                return;
+            }
             if (event.getAction().isRightClick() && isHeroSelectorItem(event.getItem())) {
                 event.setCancelled(true);
                 openHeroSelection(player);
@@ -3850,6 +3860,42 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private void damageMobaTower(TowerState tower, double damage, Player attacker) {
         damageMobaTower(tower, damage, attacker, attacker == null ? "minion" : "player");
+    }
+
+    private boolean tryDamageHeroesOfGwenTowerFromStepBlock(Player attacker, Location clickedBlock) {
+        if (!activePlayers.contains(attacker.getUniqueId())
+                || !hooks.debugFeatureEnabled(attacker, "tower-damage")) return false;
+        int attackerTeam = teams.getOrDefault(attacker.getUniqueId(), -1);
+        if (attackerTeam < 0 || clickedBlock == null || clickedBlock.getWorld() != world) return false;
+        TowerState tower = towers.values().stream().flatMap(List::stream)
+                .filter(candidate -> !candidate.dead && candidate.owner != attackerTeam)
+                .filter(candidate -> candidate.location.getWorld() == clickedBlock.getWorld())
+                .filter(candidate -> HeroesOfGwenTowerInteractionRules.isStepHitBlock(
+                        candidate.location.distanceSquared(clickedBlock.clone().add(0.5D, 0.5D, 0.5D))))
+                .min(java.util.Comparator.comparingDouble(candidate ->
+                        candidate.location.distanceSquared(clickedBlock))).orElse(null);
+        if (tower == null) return false;
+        if (attacker.getLocation().distanceSquared(tower.location)
+                > ArcadePortRules.heroesOfGwenTowerRangeSquared()) {
+            attacker.sendMessage(ChatColor.RED + "You must enter the tower's 10-block range to damage it.");
+            return true;
+        }
+        if (!canDamageMobaTower(tower, attackerTeam)) {
+            attacker.sendMessage(ChatColor.RED + "Destroy the enemy outer tower before attacking this tower.");
+            return true;
+        }
+        long now = System.currentTimeMillis();
+        long nextAllowed = heroesOfGwenTowerBlockHitAt.getOrDefault(attacker.getUniqueId(), 0L);
+        if (now < nextAllowed) return true;
+        heroesOfGwenTowerBlockHitAt.put(attacker.getUniqueId(), now + 200L);
+        var attackDamage = attacker.getAttribute(Attribute.ATTACK_DAMAGE);
+        double baseDamage = attackDamage == null ? 1.0D : attackDamage.getValue();
+        double strength = attacker.getAttackCooldown();
+        double vanillaDamage = baseDamage * (0.2D + strength * strength * 0.8D);
+        double damage = ArcadePortRules.heroesOfGwenStorePlayerCombatDamage(
+                vanillaDamage, heroesOfGwenOwnedStoreItemNames(attacker), false, true);
+        damageMobaTower(tower, damage, attacker);
+        return true;
     }
 
     private void damageMobaTower(TowerState tower, double damage, Player attacker, String damageSource) {
@@ -7436,6 +7482,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (stopped) return;
         stopped = true;
         heroesScoreboards.clear();
+        heroesOfGwenTowerBlockHitAt.clear();
         if (listenersRegistered) {
             org.bukkit.event.HandlerList.unregisterAll(this);
             listenersRegistered = false;
