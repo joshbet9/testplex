@@ -1948,7 +1948,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 ChatColor.GRAY + "Configured for " + game.displayName() + ".",
                 ChatColor.DARK_GRAY + "Human players reduce the available slots."));
         inventory.setItem(15, testBotButton(Material.LIME_CONCRETE, "More bots", "bot-count:+1"));
-        for (int index = 0; index < ArcadeTestPlayerManager.TARGET_ROSTER_SIZE; index++) {
+        inventory.setItem(17, testBotButton(Material.BARRIER, "Load no bots", "bot-count:zero"));
+        for (int index = 0; index < visibleBotConfigurationCount(count); index++) {
             String kit = manager.configuredTestBotKit(game, index);
             int team = manager.configuredTestBotTeam(game, index);
             String kitName = kit.isBlank() ? "Default kit" : kit.replace('-', ' ');
@@ -2037,6 +2038,9 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 int delta = "bot-count:+1".equals(action) ? 1 : -1;
                 manager.setConfiguredTestBotCount(game, manager.configuredTestBotCount(game) + delta);
                 openTestBotSetup(player, game);
+            } else if ("bot-count:zero".equals(action)) {
+                manager.setConfiguredTestBotCount(game, 0);
+                openTestBotSetup(player, game);
             } else if (action != null && action.startsWith("bot-slot:")) {
                 int index = Integer.parseInt(action.substring("bot-slot:".length()));
                 openTestBotLoadout(player, game, index);
@@ -2087,6 +2091,10 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private static int botGridSlot(int index) {
         int[] slots = {19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34, 37, 38};
         return slots[index];
+    }
+
+    static int visibleBotConfigurationCount(int configuredCount) {
+        return Math.max(0, Math.min(ArcadeTestPlayerManager.TARGET_ROSTER_SIZE, configuredCount));
     }
 
     private static int[] menuSlots() {
