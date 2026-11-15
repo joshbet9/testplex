@@ -8,6 +8,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 class AbilityCooldownProgressTest {
+    @Test void progressDurationUsesSharedTenthsPrecisionAndClampsAtZero() {
+        assertEquals("7.4 seconds", AbilityCooldownProgress.formatDurationTenths(7_400L));
+        assertEquals("0.0 seconds", AbilityCooldownProgress.formatDurationTenths(-1L));
+    }
+
     @Test
     void displaysTheCooldownThatWillFinishSoonestThenContinuesTheLongerOne() {
         var brick = new AbilityCooldownProgress.Cooldown("builder:brick", "Brick", 1_000L, 4_000L);

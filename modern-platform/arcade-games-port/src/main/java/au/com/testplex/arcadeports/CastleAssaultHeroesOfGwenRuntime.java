@@ -2046,9 +2046,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             if (i == filled) bar.append(ChatColor.RED);
             bar.append('█');
         }
-        long secondsLeft = Math.max(0L, (carrierFuse - elapsed + 999L) / 1_000L);
+        long remainingMillis = Math.max(0L, carrierFuse - elapsed);
         carrier.sendActionBar(ChatColor.BOLD + "TNT Detonation " + ChatColor.RESET + bar
-                + ChatColor.RESET + " " + secondsLeft + "s");
+                + ChatColor.RESET + " " + AbilityCooldownProgress.formatDurationTenths(remainingMillis));
         if (now >= objectiveCarrierLastEffectAt) {
             Color burst = teams.getOrDefault(carrier.getUniqueId(), -1) == 0 ? Color.RED : Color.AQUA;
             world.spawnParticle(Particle.FIREWORK, carrier.getEyeLocation(), 4, 0.12D, 0.12D, 0.12D, 0.01D);
@@ -3514,17 +3514,28 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         world.playSound(center, Sound.ENTITY_GENERIC_EXPLODE, 1.3F, 0.9F);
         int attackingTeam = teams.getOrDefault(owner.getUniqueId(), -1);
         for (Player target : activeMatchPlayers()) {
-            if (target.equals(owner) && objective) continue;
-            if (!target.equals(owner) && teams.getOrDefault(target.getUniqueId(), -2) == attackingTeam) continue;
+            boolean objectiveCarrierSelfDamage = objective && target.equals(owner);
+            if (!objectiveCarrierSelfDamage && !target.equals(owner)
+                    && teams.getOrDefault(target.getUniqueId(), -2) == attackingTeam) continue;
             double distance = target.getLocation().distance(center);
             if (distance > radius) continue;
-            double damage = ArcadePortRules.castleAssaultTntDamage(distance, radius);
-            damage *= ArcadePortRules.castleAssaultBlastDamageMultiplier(castleBlastProtectionEpf(target));
+            double damage = ArcadePortRules.castleAssaultTntDamageForTarget(
+                    objectiveCarrierSelfDamage, objective, distance, radius);
+            if (!objectiveCarrierSelfDamage) {
+                damage *= ArcadePortRules.castleAssaultBlastDamageMultiplier(castleBlastProtectionEpf(target));
+            }
             if (damage <= 0.0D) continue;
             if (target.getHealth() <= damage) {
-                recordCastleKill(owner, target, objective, !objective);
-                hooks.eliminate(target, owner, "was caught in a Castle Assault TNT blast");
-            } else target.setHealth(target.getHealth() - damage);
+                if (!objectiveCarrierSelfDamage) recordCastleKill(owner, target, objective, !objective);
+                hooks.eliminate(target, objectiveCarrierSelfDamage ? null : owner,
+                        objectiveCarrierSelfDamage
+                                ? "was caught in their own Castle Assault TNT blast"
+                                : "was caught in a Castle Assault TNT blast");
+            } else {
+                target.setHealth(target.getHealth() - damage);
+                if (objectiveCarrierSelfDamage) target.playEffect(org.bukkit.EntityEffect.HURT);
+            }
+            if (objectiveCarrierSelfDamage) continue;
             Vector direction = target.getLocation().toVector().subtract(center.toVector());
             if (direction.lengthSquared() > 0.001D) {
                 double knockback = ArcadePortRules.castleAssaultBlastKnockbackMultiplier(

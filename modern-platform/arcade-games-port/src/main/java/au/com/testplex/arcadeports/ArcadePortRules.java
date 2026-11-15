@@ -80,6 +80,13 @@ public final class ArcadePortRules {
         return maximum * Math.max(0.0D, 1.0D - distance / radius);
     }
 
+    /** Source Castle Siege applies five fixed damage to the objective TNT carrier on detonation. */
+    public static double castleAssaultTntDamageForTarget(boolean objectiveCarrierSelfDamage,
+            boolean objectiveTnt, double distance, double radius) {
+        if (objectiveCarrierSelfDamage && objectiveTnt) return 5.0D;
+        return castleAssaultTntDamage(distance, radius);
+    }
+
     public static double castleAssaultTntKnockbackMultiplier() {
         return Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
                 "CASTLE_ASSAULT_TNT_KNOCKBACK_MULTIPLIER", CASTLE_ASSAULT_TNT_KNOCKBACK_MULTIPLIER));
