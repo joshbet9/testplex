@@ -599,7 +599,8 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         // Put the carrier eight blocks from the hoop: a normal two-point shot.
         World world = (World) field(firstMatch, "world");
         double hoopX = team == 0 ? 30.0D : -30.0D;
-        Location release = new Location(world, team == 0 ? 12.0D : -12.0D, 64.0D, 0.0D);
+        // Keep the controlled two-point release eight blocks from the scaled court's hoop.
+        Location release = new Location(world, team == 0 ? 22.0D : -22.0D, 64.0D, 0.0D);
         release.setDirection(new Vector(hoopX - release.getX(), 66.2D - 65.62D, 0.0D));
         shooter.teleport(release);
         shooter.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
