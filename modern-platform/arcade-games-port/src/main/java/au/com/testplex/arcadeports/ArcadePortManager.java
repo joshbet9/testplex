@@ -21924,6 +21924,10 @@ public final class ArcadePortManager implements Listener {
         session.evolutionKillsAtAttempt.put(id, session.evolutionKillsSinceEvolution.getOrDefault(id, 0));
         session.evolutionHealthRestoredAtAttempt.put(id, Math.max(0.0D, player.getMaxHealth() - player.getHealth()));
         session.evolutionLifeKills.put(id, 0);
+        Location viewingLocation = evolutionViewingLocation(session, id);
+        if (viewingLocation != null && viewingLocation.getWorld() == session.world) {
+            player.teleport(viewingLocation);
+        }
         session.evolutionLockedLocations.put(id, player.getLocation().clone());
         beginEvolutionEggEffect(session, player);
         player.setExp(0.0F);
@@ -22011,6 +22015,19 @@ public final class ArcadePortManager implements Listener {
             player.getWorld().spawnParticle(Particle.EXPLOSION, player.getLocation().add(0.0D, 1.0D, 0.0D),
                     1, 0.1D, 0.1D, 0.1D, 0.0D);
         }, totalAnimationTicks);
+    }
+
+    private Location evolutionViewingLocation(Session session, UUID playerId) {
+        if (session == null || playerId == null) return null;
+        SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
+        if (mapData == null) return null;
+        return selectEvolutionViewingLocation(mapData.evolutionViewingLocations(), playerId);
+    }
+
+    static Location selectEvolutionViewingLocation(List<Location> locations, UUID playerId) {
+        if (locations == null || locations.isEmpty() || playerId == null) return null;
+        int index = Math.floorMod(playerId.hashCode(), locations.size());
+        return locations.get(index).clone();
     }
 
     /** Keep respawning team players on their own archived team spawns. */

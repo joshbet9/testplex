@@ -1,6 +1,10 @@
 # Catalog WorldDownloader archives without WorldConfig.dat
 These archives use inferred test metadata. See ../../INFERRED-METADATA-NOTE.md.
 
+Evolution's missing GREEN viewing markers are inferred from spaced, terrain-checked
+safe surfaces near the map centre. They provide a test teleport destination during
+evolution; they do not recreate the original Mineplex pedestal geometry.
+
 Evolution_Bonzai.zip
 Evolution_Guardian Island.zip
 Evolution_Oasis.zip
