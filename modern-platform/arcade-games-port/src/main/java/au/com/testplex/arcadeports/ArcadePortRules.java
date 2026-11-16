@@ -646,6 +646,11 @@ public final class ArcadePortRules {
     public static final long BOMB_LOBBERS_POWERUP_RETRY_DELAY_MILLIS = 10_000L;
     public static final int BOMB_LOBBERS_POWERUP_SPEED_DURATION_TICKS = 240;
 
+    /** Short source-style action-bar notice used when a power-up is collected. */
+    public static String bombLobbersPowerupObtainedLabel() {
+        return "Power-up obtained";
+    }
+
     public static boolean bombLobbersPowerupsEnabled() {
         return GameDebugRuntimeOverrides.booleanValue(
                 "BOMB_LOBBERS_POWERUP_SPAWNING_ENABLED", BOMB_LOBBERS_POWERUP_SPAWNING_ENABLED);
