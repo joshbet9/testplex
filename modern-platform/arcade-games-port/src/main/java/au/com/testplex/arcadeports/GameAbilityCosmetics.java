@@ -25,6 +25,11 @@ final class GameAbilityCosmetics {
         emit(viewer, center, optionId, abilityName, 0.38D);
     }
 
+    static void activation(Player viewer, Location center, String optionId, String abilityName) {
+        if (!GameDebugRuntimeOverrides.globalCosmeticsEnabled() || optionId == null || optionId.isBlank()) return;
+        emit(viewer, center, optionId, abilityName, 0.85D);
+    }
+
     static void celebrate(Player scorer, Location center, String optionId) {
         if (!GameDebugRuntimeOverrides.globalCosmeticsEnabled() || optionId == null || optionId.isBlank()) return;
         emit(scorer, center, optionId, "", 1.15D);
@@ -243,6 +248,15 @@ final class GameAbilityCosmetics {
     static Palette abilityPalette(Palette style, String abilityName) {
         if (style == null || abilityName == null || abilityName.isBlank()) return style;
         String ability = abilityName.toLowerCase(Locale.ROOT);
+        Motif baconMotif = switch (ability) {
+            case "bacon blast" -> Motif.BURST;
+            case "crispy shot" -> Motif.SPLASH;
+            case "crouch dash" -> Motif.SLASH;
+            case "cloak" -> Motif.ORBIT;
+            case "brutus" -> Motif.RING;
+            case "body slam" -> Motif.GRID;
+            default -> null;
+        };
         Motif wizardMotif = switch (ability) {
             case "anvil drop" -> Motif.EYE;
             case "fireball" -> Motif.BURST;
@@ -254,7 +268,7 @@ final class GameAbilityCosmetics {
             case "frost barrier" -> Motif.ARC;
             default -> null;
         };
-        Motif motif = wizardMotif != null ? wizardMotif
+        Motif motif = baconMotif != null ? baconMotif : wizardMotif != null ? wizardMotif
                 : ability.contains("leap") || ability.contains("jump") || ability.contains("glide")
                 ? Motif.ARC
                 : ability.contains("dash") || ability.contains("slide") || ability.contains("strike")
