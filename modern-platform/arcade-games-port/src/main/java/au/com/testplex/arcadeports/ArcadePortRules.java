@@ -2133,6 +2133,11 @@ public final class ArcadePortRules {
         return !physicalAction;
     }
 
+    /** Names the source kill message for the two Bomb Lobbers TNT hit paths. */
+    public static String bombLobbersKillMode(boolean directHit) {
+        return directHit ? "Direct Hit" : "TNT Explosion";
+    }
+
     /** Legacy PerkDoubleJump is recharged by Recharge.useForce(player, perkName, 50). */
     public static final long BOMB_LOBBERS_DOUBLE_JUMP_RECHARGE_MILLIS = 50L;
 

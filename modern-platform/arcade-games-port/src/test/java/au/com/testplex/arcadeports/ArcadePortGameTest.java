@@ -1004,6 +1004,11 @@ class ArcadePortGameTest {
                         new org.bukkit.util.Vector(0.0D, 0.0D, 0.0D), true));
     }
 
+    @Test void bombLobbersDirectAndExplosionKillsHaveDistinctSourceModes() {
+        assertEquals("Direct Hit", ArcadePortRules.bombLobbersKillMode(true));
+        assertEquals("TNT Explosion", ArcadePortRules.bombLobbersKillMode(false));
+    }
+
     @Test void bombLobbersDoubleJumpAppliesLegacyGroundBoostAfterVelocityCap() {
         assertEquals(50L, ArcadePortRules.BOMB_LOBBERS_DOUBLE_JUMP_RECHARGE_MILLIS);
         assertEquals(1_050L, ArcadePortRules.nextBombLobbersDoubleJumpReadyAt(1_000L));

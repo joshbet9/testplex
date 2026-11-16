@@ -23671,18 +23671,22 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void recordBombLobbersDamage(Session session, Player target, UUID sourceId, long now) {
-        recordBombLobbersDamage(session, target, sourceId, now, null);
+        recordBombLobbersDamage(session, target, sourceId, now, null,
+                ArcadePortRules.bombLobbersKillMode(false));
     }
 
 
 
-    private void recordBombLobbersDamage(Session session, Player target, UUID sourceId, long now, UUID bombId) {
+    private void recordBombLobbersDamage(Session session, Player target, UUID sourceId, long now, UUID bombId,
+            String killMode) {
         if (session == null || target == null || sourceId == null || sourceId.equals(target.getUniqueId())
                 || !session.players.containsKey(sourceId)) return;
         UUID targetId = target.getUniqueId();
         int sourceTeam = session.teams.getOrDefault(sourceId, -1);
         int targetTeam = session.teams.getOrDefault(targetId, -2);
         if (!ArcadePortRules.areBombLobbersEnemies(sourceTeam, targetTeam)) return;
+        session.lastHitKillerByVictim.put(targetId, sourceId);
+        session.lastHitModeByVictim.put(targetId, killMode);
         session.bombDamageContributors.computeIfAbsent(targetId, ignored -> new HashMap<>()).put(sourceId, now);
     }
 
@@ -34205,7 +34209,8 @@ public final class ArcadePortManager implements Listener {
                 if (ArcadePortRules.bombLobbersTntIgnites(directHitPowerup)) target.setFireTicks(100);
                 if (directHitDamage > 0.0D) {
                     session.bombPlayersDamaged.add(target.getUniqueId());
-                    recordBombLobbersDamage(session, target, ownerId, now, bombId);
+                    recordBombLobbersDamage(session, target, ownerId, now, bombId,
+                            ArcadePortRules.bombLobbersKillMode(true));
                     if (!testPlayers.isTestPlayer(ownerId) && !GameDebugRuntimeOverrides.isDebugSession()) {
                         String directHitsPath = localStatsPath(ownerId, "bomb-lobbers") + "direct-hits";
                         plugin.getConfig().set(directHitsPath, plugin.getConfig().getInt(directHitsPath, 0) + 1);
@@ -35118,7 +35123,8 @@ public final class ArcadePortManager implements Listener {
                 }
                 if (blastDamage > 0.0D) {
                     session.bombPlayersDamaged.add(target.getUniqueId());
-                    recordBombLobbersDamage(session, target, ownerId, System.currentTimeMillis(), bombId);
+                    recordBombLobbersDamage(session, target, ownerId, System.currentTimeMillis(), bombId,
+                            ArcadePortRules.bombLobbersKillMode(false));
                     if (target.getHealth() <= blastDamage) {
                         if (bombLobbersBlast && owner != null && owner.isOnline()
                                 && session.players.containsKey(ownerId) && !target.getUniqueId().equals(ownerId)) {
