@@ -8423,7 +8423,7 @@ public final class ArcadePortManager implements Listener {
                 case "traitor" -> player.getInventory().addItem(namedItem(Material.IRON_AXE,
                         "Runner Traitor", "Heavy knockback on melee hits."));
                 case "turtle" -> player.getInventory().addItem(namedItem(Material.COPPER_AXE,
-                        "Runner Turtle", "Melee hits shell Chasers and stack Slowness and Weakness. Earn Wind Charges every 3 hits."));
+                        "Runner Turtle", "Melee hits shell Chasers and stack Slowness and Weakness. Earn up to 3 Wind Charges every 3 hits."));
                 case "trickster" -> {
                     player.getInventory().addItem(namedItem(Material.ENDER_EYE,
                             "Chaser Swap", "Right-click to swap with a random living Chaser. One use."));
@@ -8471,6 +8471,9 @@ public final class ArcadePortManager implements Listener {
             disguise.setPersistent(true);
             disguise.setRemoveWhenFarAway(false);
             disguise.setGravity(false);
+            if (disguise instanceof org.bukkit.entity.AbstractSkeleton skeleton) {
+                skeleton.setShouldBurnInDay(DeathTagChaserRules.shouldBurnInDaylight());
+            }
             disguise.setCollidable(false);
             disguise.setCanPickupItems(false);
             disguise.setCustomName(ChatColor.RED + player.getName());
@@ -9244,16 +9247,47 @@ public final class ArcadePortManager implements Listener {
             }, effectTicks);
         }
         runner.playSound(runner.getLocation(), Sound.ITEM_ARMOR_EQUIP_TURTLE, 0.8F, 1.2F);
-        int charges = session.deathTagTurtleWindCharges.merge(runnerId, 1, Integer::sum);
         int hitsPerWindCharge = ArcadePortRules.deathTagTurtleHitsPerWindCharge();
-        if (charges >= hitsPerWindCharge) {
-            session.deathTagTurtleWindCharges.put(runnerId, charges - hitsPerWindCharge);
+        int heldCharges = deathTagTurtleWindChargeCount(runner);
+        int currentProgress = session.deathTagTurtleWindCharges.getOrDefault(runnerId, 0);
+        DeathTagTurtleChargeProgress.HitResult result = DeathTagTurtleChargeProgress.recordHit(
+                currentProgress, hitsPerWindCharge, heldCharges);
+        if (heldCharges >= DeathTagTurtleChargeProgress.MAX_HELD_CHARGES) {
+            session.deathTagTurtleWindCharges.remove(runnerId);
+        } else if (result.awardsCharge()) {
             ItemStack windCharge = namedItem(Material.WIND_CHARGE, "Turtle Wind Charge",
                     "Hit Chasers to earn more charges.");
             Map<Integer, ItemStack> overflow = runner.getInventory().addItem(windCharge);
-            overflow.values().forEach(stackItem -> runner.getWorld().dropItemNaturally(runner.getLocation(), stackItem));
-            runner.sendMessage(ChatColor.AQUA + "Turtle shell formed a Wind Charge!");
+            if (overflow.isEmpty()) {
+                session.deathTagTurtleWindCharges.remove(runnerId);
+                runner.sendMessage(ChatColor.AQUA + "Turtle shell formed a Wind Charge!");
+            } else {
+                session.deathTagTurtleWindCharges.put(runnerId, Math.max(0, hitsPerWindCharge - 1));
+                runner.sendMessage(ChatColor.YELLOW + "Free an inventory slot to receive your Wind Charge.");
+            }
+        } else {
+            session.deathTagTurtleWindCharges.put(runnerId, result.hitProgress());
         }
+        updateDeathTagTurtleWindChargeBar(session, runner);
+    }
+
+    private int deathTagTurtleWindChargeCount(Player runner) {
+        int count = 0;
+        for (ItemStack item : runner.getInventory().getContents()) {
+            if (item != null && item.getType() == Material.WIND_CHARGE) count += item.getAmount();
+        }
+        return count;
+    }
+
+    private void updateDeathTagTurtleWindChargeBar(Session session, Player runner) {
+        if (session == null || runner == null || !runner.isOnline()) return;
+        UUID id = runner.getUniqueId();
+        int held = Math.min(DeathTagTurtleChargeProgress.MAX_HELD_CHARGES,
+                deathTagTurtleWindChargeCount(runner));
+        int hits = session.deathTagTurtleWindCharges.getOrDefault(id, 0);
+        int hitsPerCharge = ArcadePortRules.deathTagTurtleHitsPerWindCharge();
+        runner.setLevel(held);
+        runner.setExp(DeathTagTurtleChargeProgress.experienceProgress(hits, hitsPerCharge, held));
     }
 
     private void useDeathTagTricksterSwap(Session session, Player runner) {
@@ -30840,6 +30874,13 @@ public final class ArcadePortManager implements Listener {
             }
         }
         if (!session.alive.contains(player.getUniqueId())) return;
+        if (session.type == ArcadePortGame.DEATH_TAG && event.getAction().isRightClick()
+                && item == Material.WIND_CHARGE
+                && "turtle".equals(session.deathTagRunnerKits.getOrDefault(player.getUniqueId(), "basher"))) {
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (active == session && player.isOnline()) updateDeathTagTurtleWindChargeBar(session, player);
+            });
+        }
         if (session.type == ArcadePortGame.TURF_WARS
                 && event.getAction().isRightClick() && item == Material.BOW
                 && "shredder".equals(session.turfWarsKits.getOrDefault(player.getUniqueId(), "marksman"))) {
