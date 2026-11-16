@@ -2105,6 +2105,19 @@ public final class ArcadePortRules {
     public static boolean bombLobbersTntIgnites(String powerupType) {
         return "fiery-tnt".equalsIgnoreCase(powerupType);
     }
+    /** Correct Minecraft material for the colour shown through a Dragon Escape finish beacon. */
+    public static Material dragonEscapeBeaconGlassMaterial(String colour) {
+        String normalized = colour == null ? "white"
+                : colour.toLowerCase(java.util.Locale.ROOT).replace('_', '-');
+        if ("silver".equals(normalized)) return Material.LIGHT_GRAY_STAINED_GLASS;
+        String material = normalized.replace('-', '_').toUpperCase(java.util.Locale.ROOT);
+        try {
+            return Material.valueOf(material + "_STAINED_GLASS");
+        } catch (IllegalArgumentException ignored) {
+            return Material.WHITE_STAINED_GLASS;
+        }
+    }
+
 
     /** Mirrors TeamGame's 1.8 scoreboard cutoff: individual players below thirteen alive. */
     public static boolean bombLobbersScoreboardShowsPlayerNames(int alivePlayers) {
