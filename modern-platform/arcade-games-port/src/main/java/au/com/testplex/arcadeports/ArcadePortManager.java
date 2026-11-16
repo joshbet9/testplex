@@ -20568,6 +20568,7 @@ public final class ArcadePortManager implements Listener {
             UUID victimId = player.getUniqueId();
             if (!session.alive.remove(victimId)) return;
             session.bombDoubleJumpAvailable.remove(victimId);
+            session.bombDoubleJumpJumpsSinceGround.remove(victimId);
             player.leaveVehicle();
             if (player.isOnline()) {
                 player.setGameMode(GameMode.SPECTATOR);
@@ -23370,6 +23371,7 @@ public final class ArcadePortManager implements Listener {
         session.bombAssists.clear();
         session.bombDoubleJumpUsed.clear();
         session.bombDoubleJumpCounts.clear();
+        session.bombDoubleJumpJumpsSinceGround.clear();
         session.bombMvpPressurePlayers.clear();
         session.bombPlayersDamaged.clear();
         session.dragonContactCooldowns.clear();
@@ -34041,8 +34043,14 @@ public final class ArcadePortManager implements Listener {
         }
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
-            if (!player.isFlying() && player.isOnGround()
-                    && now >= session.bombDoubleJumpReadyAt.getOrDefault(id, 0L)) {
+            long doubleJumpReadyAt = session.bombDoubleJumpReadyAt.getOrDefault(id, 0L);
+            if (!player.isFlying() && player.isOnGround() && now >= doubleJumpReadyAt) {
+                session.bombDoubleJumpJumpsSinceGround.put(id, 0);
+                session.bombDoubleJumpAvailable.add(id);
+                if (!player.getAllowFlight()) player.setAllowFlight(true);
+            } else if (!player.isFlying() && !player.isOnGround()
+                    && ArcadePortRules.canUseBombLobbersAirDoubleJump(
+                            session.bombDoubleJumpJumpsSinceGround.getOrDefault(id, 0), now, doubleJumpReadyAt)) {
                 session.bombDoubleJumpAvailable.add(id);
                 if (!player.getAllowFlight()) player.setAllowFlight(true);
             }
@@ -34854,6 +34862,7 @@ public final class ArcadePortManager implements Listener {
         player.setAllowFlight(false);
         session.bombDoubleJumpUsed.add(id);
         session.bombDoubleJumpCounts.merge(id, 1, Integer::sum);
+        session.bombDoubleJumpJumpsSinceGround.merge(id, 1, Integer::sum);
         String kit = session.bombLobbersKits.getOrDefault(id, "acrobat");
         double power = "acrobat".equals(kit) ? 1.2D : 0.9D;
         Vector velocity = ArcadePortRules.bombLobbersDoubleJumpVelocity(
@@ -34863,7 +34872,9 @@ public final class ArcadePortManager implements Listener {
         long now = System.currentTimeMillis();
         long readyAt = ArcadePortRules.nextBombLobbersDoubleJumpReadyAt(now);
         session.bombDoubleJumpReadyAt.put(id, readyAt);
-        cooldownProgress.start(player, "Double Jump", Math.max(1L, readyAt - now));
+        if (ArcadePortRules.bombLobbersShowsDoubleJumpCooldown(kit)) {
+            cooldownProgress.start(player, "Double Jump", Math.max(1L, readyAt - now));
+        }
         player.playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 0.7F, 1.3F);
     }
 

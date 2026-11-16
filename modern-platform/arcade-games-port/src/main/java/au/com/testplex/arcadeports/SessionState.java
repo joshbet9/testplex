@@ -502,6 +502,8 @@ class SessionState {
     final Set<UUID> bombDoubleJumpAvailable = new HashSet<>();
     final Set<UUID> bombDoubleJumpUsed = new HashSet<>();
     final Map<UUID, Integer> bombDoubleJumpCounts = new HashMap<>();
+    /** Count of perk jumps since the most recent landing (0..2). */
+    final Map<UUID, Integer> bombDoubleJumpJumpsSinceGround = new HashMap<>();
     final Set<UUID> bombImpactDetonatedTnt = new HashSet<>();
     final Map<UUID, Integer> bombWonderkidImpactKills = new HashMap<>();
     final Map<UUID, Set<UUID>> bombCloseRangeTargets = new HashMap<>();
