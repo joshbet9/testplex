@@ -153,6 +153,10 @@ public final class MobThemeManager implements Listener {
         Action a=e.getAction(); if(a!=Action.RIGHT_CLICK_AIR&&a!=Action.RIGHT_CLICK_BLOCK)return;
         Player p=e.getPlayer(); if(p.getInventory().getHeldItemSlot()!=SLOT||!isSelector(p.getInventory().getItemInMainHand()))return;
         e.setCancelled(true);
+        cycleTheme(p);
+    }
+
+    private void cycleTheme(Player p) {
         List<String> enabled = enabledThemes(p);
         String c = nextTheme(selected(p), enabled);
         choices.put(p.getUniqueId(), c);
@@ -209,8 +213,20 @@ public final class MobThemeManager implements Listener {
     }
     @EventHandler public void onInventoryClick(InventoryClickEvent e) {
         if(!(e.getWhoClicked() instanceof Player))return; Player p=(Player)e.getWhoClicked();
-        if(isSelector(e.getCurrentItem())||isSelector(e.getCursor())||e.getHotbarButton()==SLOT
-                ||(e.getClickedInventory()==p.getInventory()&&e.getSlot()==SLOT))e.setCancelled(true);
+        boolean playerInventory = e.getClickedInventory() == p.getInventory();
+        boolean selectorClicked = isSelector(e.getCurrentItem());
+        if (shouldCycleSelectorInventoryClick(playerInventory, selectorClicked, e.isRightClick())) {
+            e.setCancelled(true);
+            cycleTheme(p);
+            return;
+        }
+        if(selectorClicked||isSelector(e.getCursor())||e.getHotbarButton()==SLOT
+                ||(playerInventory&&e.getSlot()==SLOT))e.setCancelled(true);
+    }
+
+    static boolean shouldCycleSelectorInventoryClick(boolean playerInventory, boolean selectorClicked,
+                                                       boolean rightClick) {
+        return playerInventory && selectorClicked && rightClick;
     }
     @EventHandler public void onDrop(PlayerDropItemEvent e){if(isSelector(e.getItemDrop().getItemStack()))e.setCancelled(true);}
     @EventHandler public void onJoin(PlayerJoinEvent e){laterRefresh(e.getPlayer());}
