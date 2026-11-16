@@ -124,6 +124,7 @@ class SessionState {
     long masterBuildersNextScoreboardAt;
     Scoreboard sharedMatchScoreboard;
     Objective sharedMatchScoreboardObjective;
+    final List<String> bombLobbersScoreboardEntries = new ArrayList<>();
     final List<Team> sharedMatchScoreboardTeams = new ArrayList<>();
     final List<String> sharedMatchScoreboardEntries = new ArrayList<>();
     long sharedMatchNextScoreboardAt;

@@ -8579,24 +8579,6 @@ public final class ArcadePortManager implements Listener {
         session.bombLobbersScoreboard = scoreboard;
         session.bombLobbersScoreboardObjective = objective;
 
-        session.bombRedScoreboardLine = scoreboard.registerNewTeam("bombred");
-        session.bombRedScoreboardEntry = ChatColor.RED.toString();
-        session.bombRedScoreboardLine.addEntry(session.bombRedScoreboardEntry);
-        session.bombRedScoreboardLine.setPrefix(ChatColor.RED + "Red Team: ");
-        objective.getScore(session.bombRedScoreboardEntry).setScore(3);
-
-        Team blank = scoreboard.registerNewTeam("bombblank");
-        String blankEntry = ChatColor.DARK_GRAY.toString();
-        blank.addEntry(blankEntry);
-        blank.setPrefix(" ");
-        objective.getScore(blankEntry).setScore(2);
-
-        session.bombBlueScoreboardLine = scoreboard.registerNewTeam("bombblue");
-        session.bombBlueScoreboardEntry = ChatColor.BLUE.toString();
-        session.bombBlueScoreboardLine.addEntry(session.bombBlueScoreboardEntry);
-        session.bombBlueScoreboardLine.setPrefix(ChatColor.BLUE + "Blue Team: ");
-        objective.getScore(session.bombBlueScoreboardEntry).setScore(1);
-
         for (Player player : session.players.values()) {
             if (player != null && player.isOnline()) player.setScoreboard(scoreboard);
         }
@@ -8727,29 +8709,62 @@ public final class ArcadePortManager implements Listener {
 
     private void updateBombLobbersScoreboard(Session session) {
         if (session == null || session.bombLobbersScoreboardObjective == null) return;
-        int red = (int) alivePlayers(session).stream()
-                .filter(player -> session.teams.getOrDefault(player.getUniqueId(), -1) == 0).count();
-        int blue = (int) alivePlayers(session).stream()
-                .filter(player -> session.teams.getOrDefault(player.getUniqueId(), -1) == 1).count();
-        if (session.bombRedScoreboardLine != null) {
-            session.bombRedScoreboardLine.setSuffix(bombLobbersPowerupScoreboardText(session, 0)
-                    + ChatColor.WHITE + Integer.toString(red));
+        Objective objective = session.bombLobbersScoreboardObjective;
+        for (String entry : session.bombLobbersScoreboardEntries) objective.getScoreboard().resetScores(entry);
+        session.bombLobbersScoreboardEntries.clear();
+
+        List<Player> alive = alivePlayers(session);
+        int red = 0;
+        int blue = 0;
+        for (Player player : alive) {
+            int team = session.teams.getOrDefault(player.getUniqueId(), -1);
+            if (team == 0) red++;
+            else if (team == 1) blue++;
         }
-        if (session.bombBlueScoreboardLine != null) {
-            session.bombBlueScoreboardLine.setSuffix(bombLobbersPowerupScoreboardText(session, 1)
-                    + ChatColor.WHITE + Integer.toString(blue));
+
+        int score = 15;
+        if (ArcadePortRules.bombLobbersScoreboardShowsPlayerNames(alive.size())) {
+            if (red > 0) {
+                for (Player player : alive) {
+                    if (session.teams.getOrDefault(player.getUniqueId(), -1) == 0) {
+                        score = addBombLobbersScoreboardLine(session, ChatColor.RED + player.getName(), score);
+                    }
+                }
+            }
+            if (red > 0 && blue > 0) {
+                score = addBombLobbersScoreboardLine(session, ChatColor.DARK_GRAY.toString(), score);
+            }
+            if (blue > 0) {
+                for (Player player : alive) {
+                    if (session.teams.getOrDefault(player.getUniqueId(), -1) == 1) {
+                        score = addBombLobbersScoreboardLine(session, ChatColor.BLUE + player.getName(), score);
+                    }
+                }
+            }
+        } else {
+            score = addBombLobbersScoreboardLine(session, ChatColor.RED + "Red Team", score);
+            score = addBombLobbersScoreboardLine(session, ChatColor.RED.toString() + red + " Alive", score);
+            score = addBombLobbersScoreboardLine(session, ChatColor.BLUE + "Blue Team", score);
+            score = addBombLobbersScoreboardLine(session, ChatColor.BLUE.toString() + blue + " Alive", score);
         }
+
+        score = addBombLobbersScoreboardLine(session,
+                ChatColor.RED + "Red Power-up: " + ChatColor.GRAY
+                        + bombLobbersPowerupScoreboardText(session, 0), score);
+        addBombLobbersScoreboardLine(session,
+                ChatColor.BLUE + "Blue Power-up: " + ChatColor.GRAY
+                        + bombLobbersPowerupScoreboardText(session, 1), score);
+    }
+
+    private int addBombLobbersScoreboardLine(Session session, String text, int score) {
+        session.bombLobbersScoreboardObjective.getScore(text).setScore(score);
+        session.bombLobbersScoreboardEntries.add(text);
+        return score - 1;
     }
 
     private String bombLobbersPowerupScoreboardText(Session session, int team) {
         BombLobbersPowerupStatus status = session.bombPowerupStatusByTeam.get(team);
-        if (status == null) return "";
-        ChatColor color = switch (status) {
-            case SPAWNED -> ChatColor.DARK_GRAY;
-            case OBTAINED -> ChatColor.YELLOW;
-            case ACTIVATED -> ChatColor.GREEN;
-        };
-        return color + " Powerup " + ChatColor.RESET;
+        return ArcadePortRules.bombLobbersPowerupScoreboardLabel(status == null ? null : status.name());
     }
 
     private void updateDeathTagLights(Session session, long now) {
