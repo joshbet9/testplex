@@ -1,7 +1,9 @@
 package au.com.testplex.arcadeports;
 
+import java.util.EnumSet;
 import java.util.Locale;
 import java.util.Set;
+import org.bukkit.Material;
 import org.bukkit.util.Vector;
 
 /** Pure source-contract rules for Wither Assault's Human kit selection and Editor limits. */
@@ -52,6 +54,7 @@ public final class WitherAssaultRules {
     public static final double HUMAN_LEAP_VERTICAL_LOOK_ADD = 0.35D;
     public static final double SKULL_LAUNCH_SPEED = 1.15D;
     private static final Set<String> HUMAN_KITS = Set.of("archer", "medic", "editor", "warden");
+    private static final Set<Material> EDITOR_ADVENTURE_BLOCKS = buildEditorAdventureBlocks();
 
     private WitherAssaultRules() { }
 
@@ -72,6 +75,19 @@ public final class WitherAssaultRules {
         if (!Double.isFinite(witherSpawnY) || underOtherPlayer) return false;
         return blockY >= Math.ceil(witherSpawnY - GameDebugRuntimeOverrides.intValue(
                 "WITHER_ASSAULT_EDITOR_BUILD_DEPTH_BELOW_MARKER", EDITOR_BUILD_DEPTH_BELOW_MARKER));
+    }
+
+    /** Adventure-mode block permissions for Editor items; event handlers enforce the map and height limits. */
+    public static Set<Material> editorAdventureBlocks() {
+        return EDITOR_ADVENTURE_BLOCKS;
+    }
+
+    private static Set<Material> buildEditorAdventureBlocks() {
+        EnumSet<Material> blocks = EnumSet.allOf(Material.class);
+        blocks.remove(Material.AIR);
+        blocks.remove(Material.CAVE_AIR);
+        blocks.remove(Material.VOID_AIR);
+        return Set.copyOf(blocks);
     }
 
 

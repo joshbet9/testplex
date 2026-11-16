@@ -5,6 +5,7 @@ import org.junit.jupiter.api.AfterEach;
 
 import java.util.List;
 import java.util.Map;
+import org.bukkit.Material;
 
 import static org.junit.jupiter.api.Assertions.*;
 import org.bukkit.util.Vector;
@@ -60,6 +61,16 @@ final class WitherAssaultRulesTest {
         assertFalse(WitherAssaultRules.canEditorModifyBlock(71, 76.0D, false));
         assertFalse(WitherAssaultRules.canEditorModifyBlock(76, 76.0D, true));
         assertFalse(WitherAssaultRules.canEditorModifyBlock(76, Double.NaN, false));
+    }
+
+    @Test
+    void editorAdventurePermissionsCoverBlockToolsAndPlacementSurfaces() {
+        assertTrue(WitherAssaultRules.editorAdventureBlocks().contains(Material.STONE));
+        assertTrue(WitherAssaultRules.editorAdventureBlocks().contains(Material.DIRT));
+        assertTrue(WitherAssaultRules.editorAdventureBlocks().contains(Material.OAK_PLANKS));
+        assertFalse(WitherAssaultRules.editorAdventureBlocks().contains(Material.AIR));
+        assertFalse(WitherAssaultRules.canEditorModifyBlock(71, 76.0D, false));
+        assertFalse(WitherAssaultRules.canEditorModifyBlock(76, 76.0D, true));
     }
 
     @Test
