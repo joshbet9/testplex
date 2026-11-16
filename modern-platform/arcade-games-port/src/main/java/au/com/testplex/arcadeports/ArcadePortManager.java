@@ -8743,9 +8743,9 @@ public final class ArcadePortManager implements Listener {
             }
         } else {
             score = addBombLobbersScoreboardLine(session, ChatColor.RED + "Red Team", score);
-            score = addBombLobbersScoreboardLine(session, ChatColor.RED + red + " Alive", score);
+            score = addBombLobbersScoreboardLine(session, ChatColor.RED.toString() + red + " Alive", score);
             score = addBombLobbersScoreboardLine(session, ChatColor.BLUE + "Blue Team", score);
-            score = addBombLobbersScoreboardLine(session, ChatColor.BLUE + blue + " Alive", score);
+            score = addBombLobbersScoreboardLine(session, ChatColor.BLUE.toString() + blue + " Alive", score);
         }
 
         score = addBombLobbersScoreboardLine(session,
