@@ -25,6 +25,17 @@ class GameManagerTeleportOrientationTest {
     }
 
     @Test
+    void safePadReturnFacesForwardCourseDirectionRatherThanBackTowardTheFallingPlayer() {
+        World world = testWorld();
+        Location fallingPlayer = new Location(world, 0.5D, 64.0D, 12.5D);
+        Location previousPad = new Location(world, 0.5D, 64.0D, 0.5D);
+        Location nextPad = new Location(world, 0.5D, 64.0D, 10.5D);
+
+        assertEquals(180.0F, Math.abs(GameManager.yawToward(fallingPlayer, nextPad)), 0.001F);
+        assertEquals(0.0F, GameManager.safePadTeleportYaw(fallingPlayer, previousPad, nextPad), 0.001F);
+    }
+
+    @Test
     void preservesCurrentYawWhenThereIsNoHorizontalTravelDirection() {
         World world = testWorld();
         Location from = new Location(world, 12.5D, 64.0D, -4.5D, 37.0F, 25.0F);

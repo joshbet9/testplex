@@ -84,6 +84,8 @@ public class GameManager implements Listener {
 
     private SafePad safePad;          // active pad
     private SafePad nextSafePad;      // preview pad (spawns at t=2)
+    /** Previous active pad, used to preserve forward course facing when returning a player. */
+    private Location safePadTravelFrom;
     private final LinkedList<SafePad> oldSafePads = new LinkedList<SafePad>();
 
     private int curSafe = 1;
@@ -404,6 +406,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
                     broadcast(ChatColor.AQUA + "Solo mode: survive as long as you can!");
                 }
 
+                safePadTravelFrom = null;
                 spawnSafePad();
                 safePad = nextSafePad;
                 nextSafePad = null;
@@ -699,6 +702,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
             }
 
             monsterManager.spawnMore(getMode().additionalMonstersPerSafePad());
+            safePadTravelFrom = safePad == null ? null : safePad.getLocation().clone();
             stopSafePad();
             playersOnPad.clear();
             padLockIns.clear();
@@ -1039,11 +1043,16 @@ public void startGame(Location preferCenter, int requestedPattern) {
         if (player == null || safePad == null || !player.isOnline()) return;
         Location from = player.getLocation();
         Location destination = safePad.getLocation().clone();
-        destination.setYaw(yawToward(from, destination));
+        destination.setYaw(safePadTeleportYaw(from, safePadTravelFrom, destination));
         destination.setPitch(0.0F);
         player.setFallDistance(0.0F);
         player.setVelocity(new Vector(0, 0, 0));
         player.teleport(destination);
+    }
+
+    /** Preserve course-forward facing when the player is teleported back from beyond the new pad. */
+    static float safePadTeleportYaw(Location playerLocation, Location previousSafePad, Location target) {
+        return yawToward(previousSafePad == null ? playerLocation : previousSafePad, target);
     }
 
     /** Calculate the horizontal Minecraft yaw needed to face from one point toward another. */
