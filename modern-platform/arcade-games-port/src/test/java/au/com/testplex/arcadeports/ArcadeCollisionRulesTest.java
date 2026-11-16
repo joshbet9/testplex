@@ -6,7 +6,7 @@ import org.bukkit.scoreboard.Team;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Proxy;
-import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -26,7 +26,7 @@ class ArcadeCollisionRulesTest {
             return null;
         });
         Scoreboard scoreboard = proxy(Scoreboard.class, (method, args) -> switch (method) {
-            case "getTeams" -> List.of(team);
+            case "getTeams" -> Set.of(team);
             case "getEntryTeam" -> team;
             case "getTeam" -> null;
             default -> null;
