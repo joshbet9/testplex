@@ -605,7 +605,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 String[] parts = name.split("[ _-]+");
                 if (parts.length < 3) continue;
                 Location center = markerLocations.get(0).clone();
-                capturePoints.add(new CapturePointState(parts[1], parts[2], center, capturePointWool(center)));
+                CapturePointState point = new CapturePointState(parts[1], parts[2], center, capturePointWool(center));
+                capturePoints.add(point);
+                // The authored beacon must remain glass throughout capture progress.
+                // The surrounding wool ring carries the progress colour; the beacon
+                // itself changes from neutral white glass to team glass on ownership.
+                setCapturePointBeacon(point, -1);
             }
         }
         if (found == 0) {
