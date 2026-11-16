@@ -348,6 +348,7 @@ public final class ArcadePortManager implements Listener {
     static final int MANUAL_START_COUNTDOWN_SECONDS = 0;
     private final ArcadeMechanicsModernPlugin plugin;
     private final GameDebugProfiles debugProfiles;
+    private final Map<UUID, Long> cosmeticPreviewReadyAt = new HashMap<>();
     private UUID activeDebugProfileOwner;
     private ArcadePortGame activeDebugProfileGame;
     private final Set<String> activeDebugFeatureKeys = new HashSet<>();
@@ -2108,6 +2109,92 @@ public final class ArcadePortManager implements Listener {
 
     public void handlePreviewCommand(org.bukkit.command.CommandSender sender, String[] args) {
         lobbyRuntime.handlePreviewCommand(sender, args);
+    }
+
+    /** Runs a non-interactive, damage-free preview for an option in the shared cosmetics menu. */
+    public void previewCosmetic(Player viewer, String[] args) {
+        if (viewer == null || !viewer.isOnline() || args == null || args.length < 3) return;
+        String gameId = args[0].toLowerCase(java.util.Locale.ROOT);
+        String lineId = args[1].toLowerCase(java.util.Locale.ROOT);
+        String optionId = args[2].toLowerCase(java.util.Locale.ROOT);
+        ArcadePortGame game = ArcadePortGame.fromId(gameId);
+        if (game == null || !isCosmeticPreviewId(lineId) || !isCosmeticPreviewId(optionId)) {
+            viewer.sendMessage(ChatColor.RED + "That game cosmetic is not available.");
+            return;
+        }
+        if (game == ArcadePortGame.DRAGON_ESCAPE
+                && (!"winner-beacon-colour".equals(lineId) || !isDragonEscapeBeaconColour(optionId))) {
+            viewer.sendMessage(ChatColor.RED + "That Dragon Escape finish-beacon style is not available.");
+            return;
+        }
+        if (game == ArcadePortGame.BOMB_LOBBERS && !"tnt-explosions".equals(lineId)) {
+            viewer.sendMessage(ChatColor.RED + "That Bomb Lobbers impact style is not available.");
+            return;
+        }
+        String lineTitle = cosmeticPreviewTitle(lineId);
+        String optionTitle = cosmeticPreviewTitle(optionId);
+        long now = System.currentTimeMillis();
+        if (now < cosmeticPreviewReadyAt.getOrDefault(viewer.getUniqueId(), 0L)) {
+            viewer.sendMessage(ChatColor.YELLOW + "Please wait a moment before previewing another style.");
+            return;
+        }
+        cosmeticPreviewReadyAt.put(viewer.getUniqueId(), now + 1_000L);
+        if ("dragon-escape".equals(gameId) && "winner-beacon-colour".equals(lineId)) {
+            previewDragonEscapeBeacon(viewer, optionId);
+            viewer.sendMessage(ChatColor.AQUA + "Previewed the Dragon Escape finish beacon: "
+                    + ChatColor.WHITE + optionTitle);
+            return;
+        }
+
+        Location center = viewer.getLocation().clone().add(0.0D, 0.2D, 0.0D);
+        if ("bomb-lobbers".equals(gameId) && "tnt-explosions".equals(lineId)) {
+            viewer.getWorld().spawnParticle(Particle.EXPLOSION_EMITTER, center, 1);
+            viewer.getWorld().spawnParticle(Particle.FLAME, center, 44, 0.7D, 0.45D, 0.7D, 0.05D);
+            viewer.getWorld().spawnParticle(Particle.CLOUD, center, 30, 0.65D, 0.4D, 0.65D, 0.08D);
+            viewer.playSound(center, Sound.ENTITY_GENERIC_EXPLODE, 0.75F, 1.0F);
+        }
+        GameAbilityCosmetics.preview(viewer, center, optionId);
+        viewer.sendMessage(ChatColor.AQUA + "Previewed " + lineTitle + ": "
+                + ChatColor.WHITE + optionTitle);
+    }
+
+    private static boolean isCosmeticPreviewId(String value) {
+        return value != null && value.length() <= 48 && value.matches("[a-z0-9]+(?:-[a-z0-9]+)*");
+    }
+
+    private static boolean isDragonEscapeBeaconColour(String value) {
+        return Set.of("white", "orange", "magenta", "light-blue", "yellow", "lime", "pink", "gray",
+                "light-gray", "cyan", "purple", "blue", "brown", "green", "red", "black", "silver")
+                .contains(value);
+    }
+
+    private static String cosmeticPreviewTitle(String value) {
+        StringBuilder title = new StringBuilder();
+        boolean capitalize = true;
+        for (char character : value.replace('-', ' ').toCharArray()) {
+            title.append(capitalize ? Character.toUpperCase(character) : character);
+            capitalize = character == ' ';
+        }
+        return title.toString();
+    }
+
+    private void previewDragonEscapeBeacon(Player viewer, String colour) {
+        Vector direction = viewer.getLocation().getDirection().setY(0.0D);
+        if (direction.lengthSquared() < 1.0E-6D) direction.setZ(1.0D);
+        else direction.normalize();
+        Location base = viewer.getLocation().getBlock().getLocation().add(direction.multiply(2.0D));
+        base.setY(Math.max(viewer.getWorld().getMinHeight() + 1,
+                Math.min(viewer.getWorld().getMaxHeight() - 3, base.getBlockY())));
+        BlockDisplay beacon = viewer.getWorld().spawn(base, BlockDisplay.class);
+        beacon.setBlock(Bukkit.createBlockData(Material.BEACON));
+        beacon.setPersistent(false);
+        BlockDisplay glass = viewer.getWorld().spawn(base.clone().add(0.0D, 1.0D, 0.0D), BlockDisplay.class);
+        glass.setBlock(Bukkit.createBlockData(ArcadePortRules.dragonEscapeBeaconGlassMaterial(colour)));
+        glass.setPersistent(false);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (beacon.isValid()) beacon.remove();
+            if (glass.isValid()) glass.remove();
+        }, 80L);
     }
 
     /**
@@ -19202,9 +19289,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private Material dragonEscapeBeaconGlassMaterial(String colour) {
-        String name = colour == null ? "WHITE" : colour.replace('-', '_').toUpperCase(java.util.Locale.ROOT);
-        try { return Material.valueOf(name + "_STAINED_GLASS"); }
-        catch (IllegalArgumentException ignored) { return Material.WHITE_STAINED_GLASS; }
+        return ArcadePortRules.dragonEscapeBeaconGlassMaterial(colour);
     }
 
     private int getDragonEscapeWaypointIndex(Session session, Location location, int currentProgress) {

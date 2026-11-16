@@ -672,6 +672,13 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             case "preview":
                 manager.handlePreviewCommand(sender, java.util.Arrays.copyOfRange(args, 1, args.length));
                 return true;
+            case "cosmetic-preview":
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage("Players only.");
+                    return true;
+                }
+                manager.previewCosmetic(player, java.util.Arrays.copyOfRange(args, 1, args.length));
+                return true;
             case "maps":
             case "map":
                 if (!hasAdminAccess(sender)) {

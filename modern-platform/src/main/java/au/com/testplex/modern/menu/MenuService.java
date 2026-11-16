@@ -666,7 +666,8 @@ public final class MenuService implements Listener {
                             selected.contains(option.getId()) ? ChatColor.GREEN + "Selected" : ChatColor.GRAY + "Not selected",
                             selectionHint,
                             selected.contains(option.getId())
-                                    ? ChatColor.RED + "Right click to disable" : ChatColor.DARK_GRAY + "Right click does nothing"));
+                                    ? ChatColor.RED + "Right click to disable" : ChatColor.DARK_GRAY + "Right click does nothing",
+                            ChatColor.AQUA + "Shift-right-click to preview"));
             mark(item, "cosmetic-option", game, line, option.getId());
             inventory.setItem(index - start, item);
         }
@@ -769,7 +770,10 @@ public final class MenuService implements Listener {
             if ("cosmetic-option".equals(action) && game != null && lineId != null && optionId != null) {
                 CosmeticLineDefinition line = findLine(game, lineId);
                 if (line != null) {
-                    if (event.getClick().isRightClick()) {
+                    if (event.getClick().isRightClick() && event.getClick().isShiftClick()) {
+                        player.performCommand("arcadeport cosmetic-preview " + game.getId() + " "
+                                + line.getId() + " " + optionId);
+                    } else if (event.getClick().isRightClick()) {
                         boolean disabled = preferences.disableOption(player.getUniqueId(), game, line, optionId);
                         player.sendMessage(disabled ? ChatColor.YELLOW + "Disabled " + line.getTitle() + "."
                                 : ChatColor.GRAY + "That option is not currently selected.");
