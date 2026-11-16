@@ -10081,9 +10081,9 @@ public final class ArcadePortManager implements Listener {
             }
             case TURF_WARS: {
                 String kit = session.turfWarsKits.getOrDefault(player.getUniqueId(), "marksman");
-                player.getInventory().addItem(new ItemStack(Material.BOW));
-                if ("infiltrator".equals(kit)) {
-                    player.getInventory().addItem(new ItemStack(Material.IRON_SWORD));
+                List<Material> hotbar = TurfWarsRules.startingHotbar(kit);
+                for (int slot = 0; slot < hotbar.size(); slot++) {
+                    player.getInventory().setItem(slot, new ItemStack(hotbar.get(slot)));
                 }
                 break;
             }
@@ -22513,6 +22513,12 @@ public final class ArcadePortManager implements Listener {
                 || !session.alive.contains(attacker.getUniqueId())) return;
         if (target.getHealth() > damage) {
             target.setHealth(target.getHealth() - damage);
+            if (!bowHit) {
+                Vector direction = target.getLocation().toVector()
+                        .subtract(attacker.getLocation().toVector());
+                Vector knockback = TurfWarsRules.meleeKnockback(target.getVelocity(), direction);
+                if (knockback != null) target.setVelocity(knockback);
+            }
             playLegacyDamageFeedback(target);
             target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
             target.getWorld().spawnParticle(Particle.CRIT, target.getLocation().add(0.0D, 1.0D, 0.0D),
