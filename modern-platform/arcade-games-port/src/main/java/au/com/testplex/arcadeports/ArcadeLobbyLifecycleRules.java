@@ -15,6 +15,9 @@ final class ArcadeLobbyLifecycleRules {
     /** Gameplay input is not accepted until the session's Prepare phase has ended. */
     static boolean gameplayInputAllowed(boolean liveStarted) { return liveStarted; }
 
+    /** The persistent Arcade lobby keeps its hotbar items; players cannot drop them there. */
+    static boolean lobbyItemDropAllowed(boolean inLobbyWorld) { return !inLobbyWorld; }
+
     /** Move an absolute game timestamp forward by time spent in the Prepare phase. */
     static long shiftPausedTimestamp(long timestamp, long pausedMillis) {
         if (timestamp <= 0L || pausedMillis <= 0L) return timestamp;

@@ -33001,6 +33001,10 @@ public final class ArcadePortManager implements Listener {
     public void onDrop(PlayerDropItemEvent event) {
         if (cancelPrepareAction(event.getPlayer(), event)) return;
         Session session = active;
+        if (!ArcadeLobbyLifecycleRules.lobbyItemDropAllowed(lobby.isLobbyWorld(event.getPlayer().getWorld()))) {
+            event.setCancelled(true);
+            return;
+        }
         if (session == null || !session.players.containsKey(event.getPlayer().getUniqueId())) return;
         if (session.type == ArcadePortGame.WIZARDS) {
             if (WizardsRules.isProtectedDropSlot(event.getPlayer().getInventory().getHeldItemSlot())) {

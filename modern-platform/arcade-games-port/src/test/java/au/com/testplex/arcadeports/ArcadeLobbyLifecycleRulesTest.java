@@ -17,6 +17,11 @@ class ArcadeLobbyLifecycleRulesTest {
         assertEquals(true, ArcadeLobbyLifecycleRules.gameplayInputAllowed(true));
     }
 
+    @Test void lobbyHotbarItemsCannotBeDroppedButMatchDropsRemainPossible() {
+        assertEquals(false, ArcadeLobbyLifecycleRules.lobbyItemDropAllowed(true));
+        assertEquals(true, ArcadeLobbyLifecycleRules.lobbyItemDropAllowed(false));
+    }
+
     @Test void preparedTimeIsExcludedFromGameDeadlinesAndCooldowns() {
         assertEquals(15_000L, ArcadeLobbyLifecycleRules.shiftPausedTimestamp(5_000L, 10_000L));
         assertEquals(0L, ArcadeLobbyLifecycleRules.shiftPausedTimestamp(0L, 10_000L));
