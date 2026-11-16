@@ -7708,10 +7708,8 @@ public final class ArcadePortManager implements Listener {
                 double speed = attackSpeed == null ? scoreboardMode.attackSpeedBaseValue() : attackSpeed.getValue();
                 GladiatorsModernCombatHud.View combatHud = GladiatorsModernCombatHud.view(
                         viewer.isBlocking(), viewer.getAttackCooldown(), speed);
-                lines.add(ChatColor.AQUA + "Shield");
-                lines.add(ChatColor.WHITE + combatHud.shieldStatus());
-                lines.add(ChatColor.AQUA + "Attack");
-                lines.add(ChatColor.WHITE + combatHud.cooldownStatus());
+                lines.add(ChatColor.AQUA + "Shield: " + ChatColor.WHITE + combatHud.shieldStatus());
+                lines.add(ChatColor.AQUA + "Attack: " + ChatColor.WHITE + combatHud.cooldownStatus());
             }
             String bracketStatus = gladiatorBracketStatus(session, scoreboardEntry.getKey());
             if (bracketStatus != null) {
