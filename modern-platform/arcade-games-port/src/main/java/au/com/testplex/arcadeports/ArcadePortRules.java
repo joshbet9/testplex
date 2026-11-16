@@ -2144,8 +2144,10 @@ public final class ArcadePortRules {
     }
 
     /** Allows one source-style follow-up jump after the initial airborne jump recharges. */
-    public static boolean canUseBombLobbersAirDoubleJump(int jumpsSinceGround, long nowMillis, long readyAtMillis) {
-        return jumpsSinceGround == 1 && nowMillis >= readyAtMillis;
+    public static boolean canUseBombLobbersAirDoubleJump(
+            String kit, int jumpsSinceGround, long nowMillis, long readyAtMillis) {
+        if (nowMillis < readyAtMillis) return false;
+        return kit != null && "acrobat".equalsIgnoreCase(kit) || jumpsSinceGround == 1;
     }
 
     /** Acrobat's continuous jump recharge has no cooldown meter; other kits retain it. */

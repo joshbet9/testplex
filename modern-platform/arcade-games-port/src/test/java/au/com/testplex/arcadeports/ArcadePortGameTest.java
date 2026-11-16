@@ -1007,10 +1007,11 @@ class ArcadePortGameTest {
     @Test void bombLobbersDoubleJumpAppliesLegacyGroundBoostAfterVelocityCap() {
         assertEquals(50L, ArcadePortRules.BOMB_LOBBERS_DOUBLE_JUMP_RECHARGE_MILLIS);
         assertEquals(1_050L, ArcadePortRules.nextBombLobbersDoubleJumpReadyAt(1_000L));
-        assertTrue(ArcadePortRules.canUseBombLobbersAirDoubleJump(1, 1_050L, 1_050L));
-        assertFalse(ArcadePortRules.canUseBombLobbersAirDoubleJump(0, 1_050L, 1_050L));
-        assertFalse(ArcadePortRules.canUseBombLobbersAirDoubleJump(2, 1_050L, 1_050L));
-        assertFalse(ArcadePortRules.canUseBombLobbersAirDoubleJump(1, 1_049L, 1_050L));
+        assertTrue(ArcadePortRules.canUseBombLobbersAirDoubleJump("jumper", 1, 1_050L, 1_050L));
+        assertFalse(ArcadePortRules.canUseBombLobbersAirDoubleJump("jumper", 0, 1_050L, 1_050L));
+        assertFalse(ArcadePortRules.canUseBombLobbersAirDoubleJump("jumper", 2, 1_050L, 1_050L));
+        assertFalse(ArcadePortRules.canUseBombLobbersAirDoubleJump("jumper", 1, 1_049L, 1_050L));
+        assertTrue(ArcadePortRules.canUseBombLobbersAirDoubleJump("acrobat", 5, 1_050L, 1_050L));
         assertFalse(ArcadePortRules.bombLobbersShowsDoubleJumpCooldown("acrobat"));
         assertTrue(ArcadePortRules.bombLobbersShowsDoubleJumpCooldown("jumper"));
         var look = new org.bukkit.util.Vector(1.0D, 0.0D, 0.0D);

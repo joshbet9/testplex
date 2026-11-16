@@ -34050,6 +34050,7 @@ public final class ArcadePortManager implements Listener {
                 if (!player.getAllowFlight()) player.setAllowFlight(true);
             } else if (!player.isFlying() && !player.isOnGround()
                     && ArcadePortRules.canUseBombLobbersAirDoubleJump(
+                            session.bombLobbersKits.getOrDefault(id, "acrobat"),
                             session.bombDoubleJumpJumpsSinceGround.getOrDefault(id, 0), now, doubleJumpReadyAt)) {
                 session.bombDoubleJumpAvailable.add(id);
                 if (!player.getAllowFlight()) player.setAllowFlight(true);
