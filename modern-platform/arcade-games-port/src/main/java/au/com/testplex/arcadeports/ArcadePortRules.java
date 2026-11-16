@@ -2143,6 +2143,18 @@ public final class ArcadePortRules {
         return nowMillis + cooldown;
     }
 
+    /** Allows one source-style follow-up jump after the initial airborne jump recharges. */
+    public static boolean canUseBombLobbersAirDoubleJump(
+            String kit, int jumpsSinceGround, long nowMillis, long readyAtMillis) {
+        if (nowMillis < readyAtMillis) return false;
+        return kit != null && "acrobat".equalsIgnoreCase(kit) || jumpsSinceGround == 1;
+    }
+
+    /** Acrobat's continuous jump recharge has no cooldown meter; other kits retain it. */
+    public static boolean bombLobbersShowsDoubleJumpCooldown(String kit) {
+        return kit == null || !"acrobat".equalsIgnoreCase(kit);
+    }
+
     /** Mirrors UtilAction.velocity for PerkDoubleJump's view vector, Y cap, and optional ground boost. */
     public static org.bukkit.util.Vector bombLobbersDoubleJumpVelocity(
             org.bukkit.util.Vector lookDirection, double power) {
