@@ -20,4 +20,11 @@ class SuperSploorEngineMaterialTest {
         assertFalse(SuperSploorEngine.isPaintable(Material.STONE));
         assertFalse(SuperSploorEngine.isPaintable(null));
     }
+
+    @Test
+    void paintableBlocksAtSpawnRemainPartOfTerritory() {
+        assertTrue(SuperSploorEngine.shouldTrackTerritoryBlock(Material.RED_WOOL));
+        assertTrue(SuperSploorEngine.shouldTrackTerritoryBlock(Material.LIGHT_BLUE_TERRACOTTA));
+        assertFalse(SuperSploorEngine.shouldTrackTerritoryBlock(Material.STONE));
+    }
 }

@@ -42,6 +42,7 @@ import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerToggleSneakEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
@@ -50,6 +51,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
+import org.bukkit.scoreboard.Team;
 import org.bukkit.util.Vector;
 
 /**
@@ -192,9 +194,9 @@ public final class SuperSploorRuntime implements Listener {
 
     private SuperSploorEngine engine;
     private World world;
-    private Scoreboard scoreboard;
-    private Objective objective;
-    private final List<String> sidebarEntries = new ArrayList<>();
+    private final Map<UUID, Scoreboard> scoreboards = new HashMap<>();
+    private final Map<UUID, Objective> objectives = new HashMap<>();
+    private final Map<UUID, List<String>> sidebarEntries = new HashMap<>();
     private IntConsumer finishMatch;
     private long matchEndsAt;
     private long overtimeEndsAt;
@@ -316,7 +318,7 @@ public final class SuperSploorRuntime implements Listener {
                 + ChatColor.AQUA + "Blue" + ChatColor.GRAY + " — paint the most territory.");
         for (Player player : players.values()) {
             player.sendMessage(ChatColor.YELLOW + "Right-click your primary weapon to paint; slot 2 is your secondary, slot 3 your Special, and Dualies also has Dodge Roll in slot 4.");
-            player.sendMessage(ChatColor.AQUA + "Switch away from your paint gun while on your team's paint to become a squid. Select your paint gun to exit.");
+            player.sendMessage(ChatColor.AQUA + "Crouch or press Q on your team's paint to become a squid. Select your paint gun to exit.");
         }
         updateScoreboard(now);
     }
@@ -369,14 +371,6 @@ public final class SuperSploorRuntime implements Listener {
         updateTemporaryDevices(now);
         updateStampedes(now);
         updateAfterimages(now);
-        for (Map.Entry<UUID, Long> charge : new ArrayList<>(chargerChargeStartedAt.entrySet())) {
-            Player chargingPlayer = players.get(charge.getKey());
-            if (chargingPlayer != null && chargingPlayer.isOnline()) {
-                long chargeDuration = Math.max(1L, SuperSploorRules.debugLong("CHARGER_FULL_CHARGE_MILLIS", SuperSploorRules.CHARGER_FULL_CHARGE_MILLIS));
-                long percent = Math.min(100L, Math.max(0L, (now - charge.getValue()) * 100L / chargeDuration));
-                chargingPlayer.sendActionBar(ChatColor.AQUA + "CHARGER " + percent + "%");
-            }
-        }
         lastTickAt = now;
         for (UUID id : new ArrayList<>(players.keySet())) {
             Player player = players.get(id);
@@ -542,19 +536,19 @@ public final class SuperSploorRuntime implements Listener {
 
     private void useSecondary(Player player, UUID id) {
         if (!GameDebugRuntimeOverrides.booleanValue("SUPER_SPLOOR_SECONDARIES_ENABLED", SuperSploorRules.SECONDARIES_ENABLED)) {
-            player.sendActionBar(ChatColor.RED + "Secondary abilities are disabled in this debug profile.");
+            player.sendMessage(ChatColor.RED + "Secondary abilities are disabled in this debug profile.");
             return;
         }
         String kit = kits.getOrDefault(id, "sprayer");
         int cost = SuperSploorRules.secondaryInkCost(kit);
         long now = System.currentTimeMillis();
         if (now < secondaryReadyAt.getOrDefault(id, 0L)) {
-            player.sendActionBar(ChatColor.YELLOW + "Secondary recharging.");
+            player.sendMessage(ChatColor.YELLOW + "Secondary recharging.");
             return;
         }
         int current = ink.getOrDefault(id, 0);
         if (current < cost) {
-            player.sendActionBar(ChatColor.RED + "Not enough ink for " + secondaryName(kit) + ".");
+            player.sendMessage(ChatColor.RED + "Not enough ink for " + secondaryName(kit) + ".");
             return;
         }
         ink.put(id, SuperSploorRules.spendInk(current, cost));
@@ -572,7 +566,7 @@ public final class SuperSploorRuntime implements Listener {
             world.spawnParticle(Particle.DUST, mineLocation, 12, 0.25D, 0.1D, 0.25D, 0.0D,
                     new Particle.DustOptions(teamColour(teams.get(id)), 1.4F));
             player.playSound(player.getLocation(), Sound.BLOCK_STONE_PRESSURE_PLATE_CLICK_ON, 0.7F, 1.4F);
-            player.sendActionBar(ChatColor.GREEN + "INK MINE PLACED");
+            player.sendMessage(ChatColor.GREEN + "INK MINE PLACED");
         } else {
             String kind = switch (kit) {
                 case "charger" -> "tracker-flare";
@@ -581,7 +575,7 @@ public final class SuperSploorRuntime implements Listener {
                 default -> "burst-bomb";
             };
             launchAbilityProjectile(player, id, kind, 1.45D);
-            player.sendActionBar(ChatColor.GREEN + secondaryName(kit).toUpperCase(java.util.Locale.ROOT)
+            player.sendMessage(ChatColor.GREEN + secondaryName(kit).toUpperCase(java.util.Locale.ROOT)
                     + ChatColor.GRAY + " launched");
         }
         updateInkBar(player, id);
@@ -603,17 +597,17 @@ public final class SuperSploorRuntime implements Listener {
 
     private void useSpecial(Player player, UUID id) {
         if (!GameDebugRuntimeOverrides.booleanValue("SUPER_SPLOOR_SPECIALS_ENABLED", SuperSploorRules.SPECIALS_ENABLED)) {
-            player.sendActionBar(ChatColor.RED + "Special abilities are disabled in this debug profile.");
+            player.sendMessage(ChatColor.RED + "Special abilities are disabled in this debug profile.");
             return;
         }
         String kit = kits.getOrDefault(id, "sprayer");
         if (!debugSpecialEnabled(player, "special-" + kit)) {
-            player.sendActionBar(ChatColor.RED + specialName(kit) + " is disabled in your debug profile.");
+            player.sendMessage(ChatColor.RED + specialName(kit) + " is disabled in your debug profile.");
             return;
         }
         double charge = specialCharge.getOrDefault(id, 0.0D);
         if (!SuperSploorRules.canUseSpecial(charge)) {
-            player.sendActionBar(ChatColor.LIGHT_PURPLE + "Special " + (int) Math.floor(charge) + "% — keep painting!");
+            player.sendMessage(ChatColor.LIGHT_PURPLE + "Special " + (int) Math.floor(charge) + "% — keep painting!");
             return;
         }
         specialCharge.put(id, 0.0D);
@@ -655,7 +649,7 @@ public final class SuperSploorRuntime implements Listener {
             default -> {
                 launchAbilityProjectile(player, id, "colourburst", 1.45D);
                 player.playSound(player.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 0.9F, 1.2F);
-                player.sendActionBar(ChatColor.LIGHT_PURPLE + "COLOURBURST!");
+                player.sendMessage(ChatColor.LIGHT_PURPLE + "COLOURBURST!");
             }
         }
         updateInkBar(player, id);
@@ -762,7 +756,7 @@ public final class SuperSploorRuntime implements Listener {
                 stampedeUntil.remove(id); stampedeNextPaintAt.remove(id); stampedeHitPlayers.remove(id);
                 specialChargeSuppressed.remove(id);
                 player.setWalkSpeed(0.2F);
-                player.sendActionBar(ChatColor.GRAY + "Stampede ended.");
+                player.sendMessage(ChatColor.GRAY + "Stampede ended.");
                 continue;
             }
             if (now < stampedeNextPaintAt.getOrDefault(id, 0L) || respawnAt.containsKey(id)) continue;
@@ -1044,16 +1038,6 @@ public final class SuperSploorRuntime implements Listener {
         int value = ink.getOrDefault(id, 0);
         player.setExp(value / 100.0F);
         player.setLevel(value);
-        int special = (int) Math.floor(specialCharge.getOrDefault(id, 0.0D));
-        String kit = kits.getOrDefault(id, "sprayer");
-        String specialStatus = special >= 100
-                ? ChatColor.GREEN + specialName(kit).toUpperCase(java.util.Locale.ROOT) + " READY"
-                : ChatColor.LIGHT_PURPLE + "SPECIAL " + special + "%";
-        player.sendActionBar(ChatColor.AQUA + "INK " + value + "%"
-                + (squidMode.contains(id) ? ChatColor.GREEN + "  SQUID" : "")
-                + ChatColor.GRAY + "  | " + specialStatus
-                + ChatColor.GRAY + "  |  " + ChatColor.RED + engine.redUnits() + ChatColor.GRAY
-                + " : " + ChatColor.AQUA + engine.blueUnits());
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
@@ -1104,18 +1088,18 @@ public final class SuperSploorRuntime implements Listener {
         int minimumShotCost = SuperSploorRules.chargerInkCost(
                 SuperSploorRules.chargerChargeFraction(0L));
         if (ink.getOrDefault(id, 0) < minimumShotCost) {
-            player.sendActionBar(ChatColor.RED + "Not enough ink to charge (minimum "
+            player.sendMessage(ChatColor.RED + "Not enough ink to charge (minimum "
                     + minimumShotCost + ").");
             return;
         }
         long lastShot = lastShotAt.getOrDefault(id, 0L);
         if (now - lastShot < 1_000L) {
-            player.sendActionBar(ChatColor.YELLOW + "Charger recharging.");
+            player.sendMessage(ChatColor.YELLOW + "Charger recharging.");
             return;
         }
         chargerChargeStartedAt.put(id, now);
         player.playSound(player.getLocation(), Sound.BLOCK_BEACON_AMBIENT, 0.35F, 1.7F);
-        player.sendActionBar(ChatColor.AQUA + "CHARGER 0%");
+        player.sendMessage(ChatColor.AQUA + "CHARGER 0%");
     }
 
     private void releaseChargerCharge(Player player, UUID id) {
@@ -1132,7 +1116,7 @@ public final class SuperSploorRuntime implements Listener {
         int cost = SuperSploorRules.chargerInkCost(charge);
         int current = ink.getOrDefault(id, 0);
         if (current < cost) {
-            player.sendActionBar(ChatColor.RED + "Not enough ink for that charge.");
+            player.sendMessage(ChatColor.RED + "Not enough ink for that charge.");
             return;
         }
         ink.put(id, SuperSploorRules.spendInk(current, cost));
@@ -1153,7 +1137,7 @@ public final class SuperSploorRuntime implements Listener {
         projectileLastLocations.put(projectileId, projectile.getLocation().clone());
         if (charge >= 0.99D) fullyChargedProjectiles.add(projectileId);
         player.playSound(player.getLocation(), Sound.ENTITY_SNOWBALL_THROW, 0.9F, 1.9F);
-        player.sendActionBar(ChatColor.AQUA + "CHARGER " + Math.round(charge * 100.0D) + "%");
+        player.sendMessage(ChatColor.AQUA + "CHARGER " + Math.round(charge * 100.0D) + "%");
         updateInkBar(player, id);
     }
 
@@ -1162,7 +1146,7 @@ public final class SuperSploorRuntime implements Listener {
         int charges = dodgeRollCharges.getOrDefault(id, 0);
         if (charges <= 0) {
             long readyAt = nextDodgeRollRechargeAt.getOrDefault(id, now + 5_000L);
-            player.sendActionBar(ChatColor.YELLOW + "Dodge Roll recharging: "
+            player.sendMessage(ChatColor.YELLOW + "Dodge Roll recharging: "
                     + Math.max(0L, (readyAt - now + 999L) / 1_000L) + "s");
             return;
         }
@@ -1181,7 +1165,7 @@ public final class SuperSploorRuntime implements Listener {
         player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 0.7F, 1.5F);
         player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation(), 12,
                 0.25D, 0.2D, 0.25D, 0.04D);
-        player.sendActionBar(ChatColor.AQUA + "DODGE ROLL  •  " + (charges - 1) + "/2 charges");
+        player.sendMessage(ChatColor.AQUA + "DODGE ROLL  •  " + (charges - 1) + "/2 charges");
     }
 
     private void rechargeDodgeRolls(long now) {
@@ -1211,7 +1195,7 @@ public final class SuperSploorRuntime implements Listener {
         int cost = SuperSploorRules.primaryInkCost(kit);
         long interval = SuperSploorRules.primaryIntervalMillis(kit);
         if (current < cost || now < previous || now - previous < interval) {
-            if (current < cost) player.sendActionBar(ChatColor.RED + "Out of ink! Swim through your team's paint to refill.");
+            if (current < cost) player.sendMessage(ChatColor.RED + "Out of ink! Swim through your team's paint to refill.");
             return;
         }
         ink.put(id, SuperSploorRules.spendInk(current, cost));
@@ -1441,7 +1425,13 @@ public final class SuperSploorRuntime implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onDrop(PlayerDropItemEvent event) {
-        if (running && players.containsKey(event.getPlayer().getUniqueId())) event.setCancelled(true);
+        if (!running || !players.containsKey(event.getPlayer().getUniqueId())) return;
+        event.setCancelled(true);
+        Player player = event.getPlayer();
+        UUID id = player.getUniqueId();
+        if (respawnAt.containsKey(id)) return;
+        applySquidModeAction(player, id, SuperSploorRules.squidModeAction(
+                squidMode.contains(id), false, false, true, false));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
@@ -1493,7 +1483,7 @@ public final class SuperSploorRuntime implements Listener {
             }
             splat(targetId, target, attackerId);
         } else {
-            target.sendActionBar(ChatColor.RED + "SPLAT MARK " + count + "/"
+            target.sendMessage(ChatColor.RED + "SPLAT MARK " + count + "/"
                     + GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_MAX_PAINT_MARKS", SuperSploorRules.MAX_PAINT_MARKS));
         }
     }
@@ -1624,27 +1614,35 @@ public final class SuperSploorRuntime implements Listener {
         Player player = event.getPlayer();
         UUID id = player.getUniqueId();
         if (!players.containsKey(id) || respawnAt.containsKey(id)) return;
-        if (event.getNewSlot() == PRIMARY_SLOT) {
-            if (squidMode.contains(id)) exitSquidMode(player, id);
-            return;
-        }
+        applySquidModeAction(player, id, SuperSploorRules.squidModeAction(
+                squidMode.contains(id), false, false, false, event.getNewSlot() == PRIMARY_SLOT));
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onSneak(PlayerToggleSneakEvent event) {
+        if (!running) return;
+        Player player = event.getPlayer();
+        UUID id = player.getUniqueId();
+        if (!players.containsKey(id) || respawnAt.containsKey(id)) return;
+        applySquidModeAction(player, id, SuperSploorRules.squidModeAction(
+                squidMode.contains(id), event.isSneaking(), !event.isSneaking(), false, false));
+    }
+
+    private void applySquidModeAction(Player player, UUID id, SuperSploorRules.SquidModeAction action) {
+        if (action == SuperSploorRules.SquidModeAction.EXIT) exitSquidMode(player, id);
+        else if (action == SuperSploorRules.SquidModeAction.ENTER) tryEnterSquidMode(player, id);
+    }
+
+    private void tryEnterSquidMode(Player player, UUID id) {
         if (!GameDebugRuntimeOverrides.booleanValue("SUPER_SPLOOR_SQUID_MODE_ENABLED", SuperSploorRules.SQUID_MODE_ENABLED)) {
-            event.setCancelled(true);
-            player.sendActionBar(ChatColor.RED + "Squid Mode is disabled in this debug profile.");
+            player.sendMessage(ChatColor.RED + "Squid Mode is disabled in this debug profile.");
             return;
         }
-        // 1.8 entered Squid Mode by switching away from the paint gun. Any other
-        // selected slot activates it while standing on friendly paint.
-        if (event.getNewSlot() != PRIMARY_SLOT) {
-            if (!engine.isFriendlySurface(player.getLocation(), teams.getOrDefault(id, -1))) {
-                event.setCancelled(true);
-                player.sendActionBar(ChatColor.RED + "You can only enter Squid Mode on your team's paint.");
-                return;
-            }
-            enterSquidMode(player, id);
-        } else if (squidMode.contains(id)) {
-            exitSquidMode(player, id);
+        if (!engine.isFriendlySurface(player.getLocation(), teams.getOrDefault(id, -1))) {
+            player.sendMessage(ChatColor.RED + "You can only enter Squid Mode on your team's paint.");
+            return;
         }
+        enterSquidMode(player, id);
     }
 
     private void enterSquidMode(Player player, UUID id) {
@@ -1658,7 +1656,7 @@ public final class SuperSploorRuntime implements Listener {
         player.hideEntity(plugin, squid);
         player.setWalkSpeed((float) GameDebugRuntimeOverrides.doubleValue("SUPER_SPLOOR_SQUID_WALK_SPEED", SuperSploorRules.SQUID_WALK_SPEED));
         player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_SPLASH, 0.7F, 1.4F);
-        player.sendActionBar(ChatColor.GREEN + "SQUID MODE — climb friendly-painted walls and refill ink faster.");
+        player.sendMessage(ChatColor.GREEN + "SQUID MODE — climb friendly-painted walls and refill ink faster.");
     }
 
     private Squid spawnSquid(Player player, int team) {
@@ -1698,7 +1696,7 @@ public final class SuperSploorRuntime implements Listener {
             if (squid != null) player.showEntity(plugin, squid);
             for (Player viewer : Bukkit.getOnlinePlayers()) viewer.showPlayer(plugin, player);
             player.setWalkSpeed(0.2F);
-            player.sendActionBar(ChatColor.YELLOW + "Squid Mode ended.");
+            player.sendMessage(ChatColor.YELLOW + "Squid Mode ended.");
         }
     }
 
@@ -1716,40 +1714,87 @@ public final class SuperSploorRuntime implements Listener {
 
     private void setupScoreboard() {
         if (Bukkit.getScoreboardManager() == null) return;
-        scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
-        objective = scoreboard.registerNewObjective("sploor", "dummy", ChatColor.GOLD + "" + ChatColor.BOLD + "SUPER SPLOOR");
-        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
-        for (Player player : players.values()) player.setScoreboard(scoreboard);
+        for (Map.Entry<UUID, Player> participant : players.entrySet()) {
+            Scoreboard board = Bukkit.getScoreboardManager().getNewScoreboard();
+            Objective objective = board.registerNewObjective("sploor", "dummy",
+                    ChatColor.GOLD + "" + ChatColor.BOLD + "SUPER SPLOOR");
+            objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+            Team redTeam = board.registerNewTeam("sploor_red");
+            redTeam.setColor(SuperSploorRules.scoreboardNameColor(RED));
+            Team blueTeam = board.registerNewTeam("sploor_blue");
+            blueTeam.setColor(SuperSploorRules.scoreboardNameColor(BLUE));
+            for (Map.Entry<UUID, Player> entry : players.entrySet()) {
+                Team team = teams.getOrDefault(entry.getKey(), -1) == RED ? redTeam : blueTeam;
+                team.addEntry(entry.getValue().getName());
+            }
+            UUID id = participant.getKey();
+            scoreboards.put(id, board);
+            objectives.put(id, objective);
+            participant.getValue().setScoreboard(board);
+        }
     }
 
     private void updateScoreboard(long now) {
-        if (objective == null || engine == null) return;
-        for (String old : sidebarEntries) scoreboard.resetScores(old);
-        sidebarEntries.clear();
+        if (engine == null) return;
+        if (Bukkit.getScoreboardManager() != null) {
+            for (Map.Entry<UUID, Player> participant : players.entrySet()) {
+                if (objectives.containsKey(participant.getKey())) continue;
+                Scoreboard board = Bukkit.getScoreboardManager().getNewScoreboard();
+                Objective objective = board.registerNewObjective("sploor", "dummy",
+                        ChatColor.GOLD + "" + ChatColor.BOLD + "SUPER SPLOOR");
+                objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+                Team redTeam = board.registerNewTeam("sploor_red");
+                redTeam.setColor(SuperSploorRules.scoreboardNameColor(RED));
+                Team blueTeam = board.registerNewTeam("sploor_blue");
+                blueTeam.setColor(SuperSploorRules.scoreboardNameColor(BLUE));
+                for (Map.Entry<UUID, Player> entry : players.entrySet()) {
+                    (teams.getOrDefault(entry.getKey(), -1) == RED ? redTeam : blueTeam)
+                            .addEntry(entry.getValue().getName());
+                }
+                scoreboards.put(participant.getKey(), board);
+                objectives.put(participant.getKey(), objective);
+                participant.getValue().setScoreboard(board);
+            }
+        }
         int total = Math.max(1, engine.totalUnits());
         String red = String.format(java.util.Locale.ROOT, "%.1f%%", engine.redUnits() * 100.0D / total);
         String blue = String.format(java.util.Locale.ROOT, "%.1f%%", engine.blueUnits() * 100.0D / total);
         String neutral = String.format(java.util.Locale.ROOT, "%.1f%%", engine.neutralUnits() * 100.0D / total);
         long remain = overtime ? Math.max(0L, overtimeEndsAt - now) : Math.max(0L, matchEndsAt - now);
         String timer = String.format(java.util.Locale.ROOT, "%d:%02d", remain / 60_000L, (remain / 1_000L) % 60L);
-        List<String> lines = List.of(
-                ChatColor.WHITE + "Time: " + ChatColor.YELLOW + timer + (overtime ? ChatColor.GOLD + " OT" : ""),
-                ChatColor.RED + "Red: " + red,
-                ChatColor.AQUA + "Blue: " + blue,
-                ChatColor.GRAY + "Neutral: " + neutral,
-                ChatColor.LIGHT_PURPLE + "Special: see action bar",
-                ChatColor.DARK_GRAY + " ",
-                ChatColor.WHITE + "Ink: " + ChatColor.AQUA + "XP bar");
-        int score = lines.size();
-        for (String line : lines) {
-            sidebarEntries.add(line);
-            objective.getScore(line).setScore(score--);
+        for (Map.Entry<UUID, Objective> entry : objectives.entrySet()) {
+            UUID id = entry.getKey();
+            Scoreboard board = scoreboards.get(id);
+            if (board == null) continue;
+            List<String> oldEntries = sidebarEntries.computeIfAbsent(id, ignored -> new ArrayList<>());
+            for (String old : oldEntries) board.resetScores(old);
+            oldEntries.clear();
+            int special = (int) Math.floor(specialCharge.getOrDefault(id, 0.0D));
+            String specialText = special >= 100 ? ChatColor.GREEN + "READY"
+                    : ChatColor.LIGHT_PURPLE.toString() + special + "%";
+            long chargeStartedAt = chargerChargeStartedAt.getOrDefault(id, 0L);
+            String chargeText = chargeStartedAt == 0L ? ChatColor.GRAY + "-"
+                    : ChatColor.AQUA.toString() + Math.min(100L, Math.max(0L,
+                            (now - chargeStartedAt) * 100L / Math.max(1L,
+                                    SuperSploorRules.debugLong("CHARGER_FULL_CHARGE_MILLIS",
+                                            SuperSploorRules.CHARGER_FULL_CHARGE_MILLIS)))) + "%";
+            List<String> lines = List.of(
+                    ChatColor.WHITE + "Time: " + ChatColor.YELLOW + timer + (overtime ? ChatColor.GOLD + " OT" : ""),
+                    ChatColor.RED + "Red: " + red,
+                    ChatColor.AQUA + "Blue: " + blue,
+                    ChatColor.GRAY + "Neutral: " + neutral,
+                    ChatColor.LIGHT_PURPLE + "Special: " + specialText,
+                    ChatColor.AQUA + "Charge: " + chargeText,
+                    ChatColor.DARK_GRAY + " ",
+                    ChatColor.WHITE + "Ink: " + ChatColor.AQUA + "XP bar");
+            int score = lines.size();
+            for (String line : lines) {
+                oldEntries.add(line);
+                entry.getValue().getScore(line).setScore(score--);
+            }
         }
         lastScoreboardAt = now;
-        for (Player player : players.values()) {
-            if (!player.isOnline()) continue;
-            updateInkBar(player, player.getUniqueId());
-        }
+        for (Player player : players.values()) if (player.isOnline()) updateInkBar(player, player.getUniqueId());
     }
 
     private void announce(String message) {
@@ -1817,7 +1862,7 @@ public final class SuperSploorRuntime implements Listener {
             exitSquidMode(player, id);
         }
         if (engine != null) engine.restore();
-        if (objective != null) {
+        for (Objective objective : objectives.values()) {
             try { objective.unregister(); } catch (IllegalArgumentException ignored) { }
         }
         for (Player player : players.values()) {
@@ -1865,10 +1910,10 @@ public final class SuperSploorRuntime implements Listener {
         contributorTimes.clear();
         squidMode.clear();
         sidebarEntries.clear();
+        objectives.clear();
+        scoreboards.clear();
         engine = null;
         world = null;
-        scoreboard = null;
-        objective = null;
         finishMatch = null;
         matchEndsAt = 0L;
         overtimeEndsAt = 0L;

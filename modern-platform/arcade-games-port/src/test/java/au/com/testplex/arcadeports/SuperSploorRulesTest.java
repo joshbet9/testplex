@@ -101,15 +101,6 @@ class SuperSploorRulesTest {
     }
 
     @Test
-    void spawnRoomFootprintIsExcludedFromTerritory() {
-        assertTrue(SuperSploorRules.isSpawnSafeTerritoryBlock(10, 64, 10, 10, 64, 10));
-        assertTrue(SuperSploorRules.isSpawnSafeTerritoryBlock(13, 67, 10, 10, 64, 10));
-        assertFalse(SuperSploorRules.isSpawnSafeTerritoryBlock(14, 64, 10, 10, 64, 10));
-        assertFalse(SuperSploorRules.isSpawnSafeTerritoryBlock(10, 68, 10, 10, 64, 10));
-        assertFalse(SuperSploorRules.isSpawnSafeTerritoryBlock(10, 61, 10, 10, 64, 10));
-    }
-
-    @Test
     void specialMarksRequireAnAliveUnprotectedOpponent() {
         assertTrue(SuperSploorRules.canMarkTarget(0, 1, false, 10_000L, 8_000L));
         assertFalse(SuperSploorRules.canMarkTarget(0, 0, false, 10_000L, 8_000L));
@@ -198,6 +189,22 @@ class SuperSploorRulesTest {
         assertTrue(SuperSploorRules.shouldCountSquidTravel(1.5, false));
         assertFalse(SuperSploorRules.shouldCountSquidTravel(200, false));
         assertFalse(SuperSploorRules.shouldCountSquidTravel(1.5, true));
+    }
+
+    @Test
+    void squidModeRequiresCrouchOrDropAndOrdinarySlotChangesDoNotActivateIt() {
+        assertEquals(SuperSploorRules.SquidModeAction.ENTER,
+                SuperSploorRules.squidModeAction(false, true, false, false, false));
+        assertEquals(SuperSploorRules.SquidModeAction.ENTER,
+                SuperSploorRules.squidModeAction(false, false, false, true, false));
+        assertEquals(SuperSploorRules.SquidModeAction.NONE,
+                SuperSploorRules.squidModeAction(false, false, false, false, false));
+        assertEquals(SuperSploorRules.SquidModeAction.EXIT,
+                SuperSploorRules.squidModeAction(true, false, true, false, false));
+        assertEquals(SuperSploorRules.SquidModeAction.EXIT,
+                SuperSploorRules.squidModeAction(true, false, false, false, true));
+        assertEquals(org.bukkit.ChatColor.RED, SuperSploorRules.scoreboardNameColor(0));
+        assertEquals(org.bukkit.ChatColor.AQUA, SuperSploorRules.scoreboardNameColor(1));
     }
 
     @Test

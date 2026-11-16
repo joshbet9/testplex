@@ -32,7 +32,6 @@ public final class SuperSploorEngine {
     private final World world;
     private final int redSpawnCount;
     private final int blueSpawnCount;
-    private final List<Location> spawnExclusionCenters;
     private final Map<Block, BlockData> originals = new LinkedHashMap<>();
     private final Map<Block, Integer> owners = new HashMap<>();
     private int redUnits;
@@ -52,9 +51,6 @@ public final class SuperSploorEngine {
         }
         this.redSpawnCount = redSpawns.size();
         this.blueSpawnCount = blueSpawns.size();
-        this.spawnExclusionCenters = new java.util.ArrayList<>();
-        for (Location spawn : redSpawns) this.spawnExclusionCenters.add(spawn.clone());
-        for (Location spawn : blueSpawns) this.spawnExclusionCenters.add(spawn.clone());
         int minY = map.hasVerticalBounds() ? map.minY() : Math.max(world.getMinHeight(), 32);
         int maxY = map.hasVerticalBounds() ? map.maxY() : Math.min(world.getMaxHeight() - 1, 128);
         minY = Math.max(world.getMinHeight(), minY);
@@ -74,7 +70,7 @@ public final class SuperSploorEngine {
             for (int z = map.minZ(); z < map.maxZ(); z++) {
                 for (int y = minY; y <= maxY; y++) {
                     Block block = world.getBlockAt(x, y, z);
-                    if (!isPaintable(block.getType()) || isSpawnSafeTerritoryBlock(block)) continue;
+                    if (!shouldTrackTerritoryBlock(block.getType())) continue;
                     originals.putIfAbsent(block, block.getBlockData().clone());
                     owners.put(block, -1);
                 }
@@ -86,15 +82,6 @@ public final class SuperSploorEngine {
         }
     }
 
-    private boolean isSpawnSafeTerritoryBlock(Block block) {
-        for (Location spawn : spawnExclusionCenters) {
-            if (SuperSploorRules.isSpawnSafeTerritoryBlock(
-                    block.getX(), block.getY(), block.getZ(),
-                    spawn.getBlockX(), spawn.getBlockY(), spawn.getBlockZ())) return true;
-        }
-        return false;
-    }
-
     public static boolean isPaintable(Material material) {
         if (material == null) return false;
         String name = material.name();
@@ -104,6 +91,11 @@ public final class SuperSploorEngine {
             if (name.endsWith(suffix)) return true;
         }
         return false;
+    }
+
+    /** Every authored paintable surface remains part of territory, including the spawn pads. */
+    public static boolean shouldTrackTerritoryBlock(Material material) {
+        return isPaintable(material);
     }
 
     public PaintResult paint(Location centre, int team, int radius) {
