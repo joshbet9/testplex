@@ -240,6 +240,7 @@ class SessionState {
     final Map<UUID, Long> gladiatorAdvanceDoorCloseAt = new HashMap<>();
     final Set<UUID> gladiatorDoorWorldsInitialized = new HashSet<>();
     final Map<Integer, Long> gladiatorFightStartsAtByPair = new HashMap<>();
+    final Map<Integer, Integer> gladiatorRoundCountdownShownByPair = new HashMap<>();
     final Map<Integer, Long> gladiatorRoundStartedAtByPair = new HashMap<>();
     final Map<Integer, Long> gladiatorNextPoisonAtByPair = new HashMap<>();
     final Map<UUID, UUID> gladiatorArrowOwners = new HashMap<>();

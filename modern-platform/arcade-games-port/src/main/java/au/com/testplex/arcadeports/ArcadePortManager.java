@@ -7651,6 +7651,7 @@ public final class ArcadePortManager implements Listener {
         if (session == null || session.gladiatorScoreboards.isEmpty()
                 || now < session.gladiatorNextScoreboardAt) return;
         session.gladiatorNextScoreboardAt = now + 500L;
+        updateGladiatorRoundCountdowns(session, now);
         int activeMatches = 0;
         long nextFightAt = Long.MAX_VALUE;
         long nextPoisonAt = Long.MAX_VALUE;
@@ -7673,7 +7674,7 @@ public final class ArcadePortManager implements Listener {
         }
         else if (activeMatches == 0) status = "Waiting";
         else if (now < nextFightAt) status = "Starting in " + Math.max(1, (nextFightAt - now + 999L) / 1_000L) + "s";
-        else if (now >= nextPoisonAt) status = "Poison Active";
+        else if (now >= nextPoisonAt) status = "Active";
         else status = "Poison in " + Math.max(0, (nextPoisonAt - now + 500L) / 1_000L) + "s";
 
         List<Player> players = alivePlayers(session).stream()
@@ -7699,6 +7700,17 @@ public final class ArcadePortManager implements Listener {
             lines.add(ChatColor.YELLOW + "Players");
             if (players.size() > 7) lines.add(ChatColor.WHITE + Integer.toString(players.size()) + " Players");
             else for (Player player : players) lines.add(ChatColor.WHITE + player.getName());
+            GladiatorsMode scoreboardMode = GladiatorsMode.fromId(session.gladiatorMode);
+            if (viewer != null && viewer.isOnline() && scoreboardMode != null
+                    && scoreboardMode.usesModernCombat()
+                    && session.gladiatorPairs.containsKey(viewer.getUniqueId())) {
+                org.bukkit.attribute.AttributeInstance attackSpeed = viewer.getAttribute(Attribute.ATTACK_SPEED);
+                double speed = attackSpeed == null ? scoreboardMode.attackSpeedBaseValue() : attackSpeed.getValue();
+                GladiatorsModernCombatHud.View combatHud = GladiatorsModernCombatHud.view(
+                        viewer.isBlocking(), viewer.getAttackCooldown(), speed);
+                lines.add(ChatColor.AQUA + "Shield: " + ChatColor.WHITE + combatHud.shieldStatus());
+                lines.add(ChatColor.AQUA + "Attack: " + ChatColor.WHITE + combatHud.cooldownStatus());
+            }
             String bracketStatus = gladiatorBracketStatus(session, scoreboardEntry.getKey());
             if (bracketStatus != null) {
                 lines.add("   ");
@@ -7720,6 +7732,33 @@ public final class ArcadePortManager implements Listener {
             }
         }
     }
+
+
+    private void updateGladiatorRoundCountdowns(Session session, long now) {
+        if (session.gladiatorBracket == null) return;
+        for (Map.Entry<Integer, Long> entry : session.gladiatorFightStartsAtByPair.entrySet()) {
+            int pair = entry.getKey();
+            if (session.gladiatorResolvedPairs.contains(pair)) continue;
+            Integer matchId = session.gladiatorBracketMatchByPair.get(pair);
+            GladiatorsBracket.MatchView match = matchId == null
+                    ? null : session.gladiatorBracket.match(matchId);
+            if (match == null) continue;
+            int seconds = GladiatorsRoundCountdown.secondsRemaining(entry.getValue(), now);
+            Integer previous = session.gladiatorRoundCountdownShownByPair.put(pair, seconds);
+            if (previous != null && previous == seconds) continue;
+            String title = "Round " + match.round();
+            String subtitle = seconds == 0 ? ChatColor.GREEN + "Fight!"
+                    : ChatColor.YELLOW + "Starting in " + seconds + "...";
+            for (Map.Entry<UUID, Integer> fighter : session.gladiatorPairs.entrySet()) {
+                if (fighter.getValue() != pair) continue;
+                Player player = session.players.get(fighter.getKey());
+                if (player != null && player.isOnline()) {
+                    player.sendTitle(ChatColor.GOLD + title, subtitle, 0, 16, 2);
+                }
+            }
+        }
+    }
+
 
     private String gladiatorBracketStatus(Session session, UUID playerId) {
         if (session.gladiatorBracket == null) return null;
@@ -7850,6 +7889,7 @@ public final class ArcadePortManager implements Listener {
             session.gladiatorPairBrackets.clear();
             session.gladiatorResolvedPairs.clear();
             session.gladiatorFightStartsAtByPair.clear();
+            session.gladiatorRoundCountdownShownByPair.clear();
             session.gladiatorRoundStartedAtByPair.clear();
             session.gladiatorNextPoisonAtByPair.clear();
             session.gladiatorWinnerBracketStarted = false;
@@ -7904,7 +7944,10 @@ public final class ArcadePortManager implements Listener {
             finish(session, session.players.get(session.gladiatorBracket.champion()), true);
             return;
         }
-        List<GladiatorsBracket.MatchView> ready = session.gladiatorBracket.readyMatches();
+        List<GladiatorsBracket.MatchView> readyNow = session.gladiatorBracket.readyMatches();
+        List<GladiatorsBracket.MatchView> allMatches = session.gladiatorBracket.matches();
+        List<GladiatorsBracket.MatchView> ready = GladiatorsRoundStartGate.readyMatches(
+                allMatches, readyNow);
         for (GladiatorsBracket.MatchView match : ready) {
             if (active != session) return;
             Player first = session.players.get(match.first());
@@ -21312,6 +21355,7 @@ public final class ArcadePortManager implements Listener {
             session.gladiatorPairBrackets.remove(pair);
             session.gladiatorArenaCentersByPair.remove(pair);
             session.gladiatorFightStartsAtByPair.remove(pair);
+            session.gladiatorRoundCountdownShownByPair.remove(pair);
             session.gladiatorRoundStartedAtByPair.remove(pair);
             session.gladiatorNextPoisonAtByPair.remove(pair);
             progressGladiators(session);
@@ -21340,6 +21384,7 @@ public final class ArcadePortManager implements Listener {
         }
         session.gladiatorArenaCentersByPair.remove(pair);
         session.gladiatorFightStartsAtByPair.remove(pair);
+            session.gladiatorRoundCountdownShownByPair.remove(pair);
         session.gladiatorRoundStartedAtByPair.remove(pair);
         session.gladiatorNextPoisonAtByPair.remove(pair);
         if (creditedPlayerKill) {
@@ -21451,6 +21496,7 @@ public final class ArcadePortManager implements Listener {
             session.gladiatorPairBrackets.remove(pair);
             session.gladiatorArenaCentersByPair.remove(pair);
             session.gladiatorFightStartsAtByPair.remove(pair);
+            session.gladiatorRoundCountdownShownByPair.remove(pair);
             session.gladiatorRoundStartedAtByPair.remove(pair);
             session.gladiatorNextPoisonAtByPair.remove(pair);
             if (opponentId != null) {
