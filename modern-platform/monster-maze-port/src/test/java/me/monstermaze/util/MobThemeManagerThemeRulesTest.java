@@ -63,6 +63,14 @@ class MobThemeManagerThemeRulesTest {
     }
 
     @Test
+    void selectorCanBeRightClickedInThePlayerInventoryWithoutBeingMoved() {
+        assertTrue(MobThemeManager.shouldCycleSelectorInventoryClick(true, true, true));
+        assertFalse(MobThemeManager.shouldCycleSelectorInventoryClick(false, true, true));
+        assertFalse(MobThemeManager.shouldCycleSelectorInventoryClick(true, false, true));
+        assertFalse(MobThemeManager.shouldCycleSelectorInventoryClick(true, true, false));
+    }
+
+    @Test
     void selectorCyclesOnlyCosmeticMenuEnabledThemes() {
         List<String> enabled = MobThemeManager.allowedThemes(Set.of("map_default", "axolotl", "frog"));
 
