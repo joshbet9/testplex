@@ -1,6 +1,7 @@
 package au.com.testplex.arcadeports;
 
 import org.bukkit.Material;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Zombie;
 import org.junit.jupiter.api.Test;
 
@@ -37,6 +38,25 @@ class ModernArcadeLobbyRuntimeTest {
         ModernArcadeLobbyRuntime.normalizeKitZombieAge(zombie);
 
         assertTrue(adultFormApplied.get(), "kit NPC zombies must be explicitly grown before display");
+    }
+
+    @Test
+    void lobbyNpcsPersistWhenTheLobbyChunkUnloadsDuringAMatch() {
+        AtomicBoolean persistent = new AtomicBoolean();
+        AtomicBoolean removeWhenFarAway = new AtomicBoolean(true);
+        LivingEntity entity = (LivingEntity) Proxy.newProxyInstance(LivingEntity.class.getClassLoader(),
+                new Class<?>[] {LivingEntity.class}, (proxy, method, args) -> {
+                    if (method.getName().equals("setPersistent")) persistent.set((boolean) args[0]);
+                    if (method.getName().equals("setRemoveWhenFarAway")) {
+                        removeWhenFarAway.set((boolean) args[0]);
+                    }
+                    return null;
+                });
+
+        ModernArcadeLobbyRuntime.configureLobbyNpcPersistence(entity);
+
+        assertTrue(persistent.get(), "lobby kit/team NPCs must save with their chunk and reload after a match");
+        assertFalse(removeWhenFarAway.get(), "lobby NPCs must not despawn when players are away");
     }
 
     @Test

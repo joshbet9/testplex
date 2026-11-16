@@ -366,12 +366,18 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         sheep.setCustomName(label);
         sheep.setCustomNameVisible(true);
         sheep.setInvulnerable(true);
-        sheep.setRemoveWhenFarAway(false);
-        sheep.setPersistent(false);
+        configureLobbyNpcPersistence(sheep);
         sheep.setSilent(true);
         sheep.setGravity(false);
         sheep.setCollidable(false);
         sheep.setAI(false);
+    }
+
+    static void configureLobbyNpcPersistence(LivingEntity entity) {
+        entity.setRemoveWhenFarAway(false);
+        // The kit and team selection NPCs must survive the lobby unloading while
+        // every player is in a match. Otherwise they disappear before players return.
+        entity.setPersistent(true);
     }
 
     private LivingEntity spawnKitNpc(World world, Location at, ArcadeLobbyKitCatalogue.KitChoice choice) {
@@ -379,8 +385,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         npc.setCustomName(choice.unlock.nameColor + ChatColor.BOLD.toString() + choice.name);
         npc.setCustomNameVisible(true);
         npc.setInvulnerable(true);
-        npc.setRemoveWhenFarAway(false);
-        npc.setPersistent(false);
+        configureLobbyNpcPersistence(npc);
         npc.setSilent(true);
         npc.setGravity(false);
         npc.setCollidable(false);
