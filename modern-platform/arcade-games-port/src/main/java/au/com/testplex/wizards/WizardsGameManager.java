@@ -2174,7 +2174,8 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         state.manaSpentWithoutElimination += manaCost;
         int cooldown = spell.cooldownSeconds(level, state.cooldownModifier);
         state.cooldowns.put(spell, now + cooldown * 1000L);
-        cooldownProgress.start(player, spell.displayName(), cooldown * 1_000L);
+        cooldownProgress.start(player, spell.displayName(), cooldown * 1_000L,
+                selectedPlayer -> spellFromItem(selectedPlayer.getInventory().getItemInMainHand()) == spell);
         refreshManaBar(player, state);
         updateWandLabels(player, state);
         player.sendMessage(ChatColor.DARK_AQUA + spell.displayName() + ChatColor.GRAY + " cast • " +

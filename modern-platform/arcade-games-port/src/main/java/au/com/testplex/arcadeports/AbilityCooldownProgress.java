@@ -5,6 +5,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.UUID;
+import java.util.function.Predicate;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
@@ -42,20 +43,28 @@ public final class AbilityCooldownProgress implements Listener {
         if (cooldowns == null) return false;
         long now = System.currentTimeMillis();
         for (Cooldown cooldown : cooldowns.values()) {
-            if (now < cooldown.startedAt + cooldown.durationMillis) return true;
+            if (now < cooldown.startedAt + cooldown.durationMillis && cooldown.isVisible(player)) return true;
         }
         return false;
     }
 
     public void start(Player player, String name, long durationMillis) {
-        start(player, name, durationMillis, null);
+        start(player, name, durationMillis, null, ignored -> true);
     }
 
     public void start(Player player, String name, long durationMillis, ArcadePortGame cosmeticGame) {
+        start(player, name, durationMillis, cosmeticGame, ignored -> true);
+    }
+    /** Starts a cooldown whose progress is shown only while the supplied ability is selected. */
+    public void start(Player player, String name, long durationMillis, Predicate<Player> displayWhen) {
+        start(player, name, durationMillis, null, displayWhen);
+    }
+    private void start(Player player, String name, long durationMillis, ArcadePortGame cosmeticGame,
+                       Predicate<Player> displayWhen) {
         if (player == null || !player.isOnline() || durationMillis <= 0L) return;
         String key = (cosmeticGame == null ? "" : cosmeticGame.id() + ":") + name;
         active.computeIfAbsent(player.getUniqueId(), ignored -> new HashMap<>())
-                .put(key, new Cooldown(key, name, System.currentTimeMillis(), durationMillis));
+                .put(key, new Cooldown(key, name, System.currentTimeMillis(), durationMillis, displayWhen));
         if (plugin instanceof ArcadeMechanicsModernPlugin arcadePlugin) {
             ArcadePortManager manager = arcadePlugin.getArcadePortManager();
             if (manager != null) {
@@ -98,23 +107,29 @@ public final class AbilityCooldownProgress implements Listener {
             }
             Cooldown cooldown = null;
             Cooldown lastCompleted = null;
+            boolean hasUnexpiredCooldown = false;
             Iterator<Cooldown> cooldownIterator = cooldowns.values().iterator();
             while (cooldownIterator.hasNext()) {
                 Cooldown candidate = cooldownIterator.next();
                 long readyAt = candidate.startedAt + candidate.durationMillis;
                 if (now >= readyAt) {
                     cooldownIterator.remove();
-                    if (lastCompleted == null
-                            || readyAt > lastCompleted.startedAt + lastCompleted.durationMillis) {
+                    if (candidate.isVisible(player) && (lastCompleted == null
+                            || readyAt > lastCompleted.startedAt + lastCompleted.durationMillis)) {
                         lastCompleted = candidate;
                     }
-                } else if (cooldown == null
-                        || readyAt < cooldown.startedAt + cooldown.durationMillis) {
-                    cooldown = candidate;
+                } else {
+                    hasUnexpiredCooldown = true;
+                    if (candidate.isVisible(player) && (cooldown == null
+                            || readyAt < cooldown.startedAt + cooldown.durationMillis)) {
+                        cooldown = candidate;
+                    }
                 }
             }
-            if (cooldown == null) {
+            if (!hasUnexpiredCooldown) {
                 iterator.remove();
+            }
+            if (cooldown == null) {
                 if (lastCompleted != null) {
                     player.sendActionBar(ChatColor.GREEN + ChatColor.BOLD.toString()
                             + lastCompleted.name + " Recharged");
@@ -139,16 +154,31 @@ public final class AbilityCooldownProgress implements Listener {
     }
 
     static Cooldown nextCooldown(Iterable<Cooldown> cooldowns, long now) {
+        return nextCooldown(cooldowns, now, ignored -> true);
+    }
+
+    static Cooldown nextCooldown(Iterable<Cooldown> cooldowns, long now,
+                                 Predicate<Cooldown> isVisible) {
         if (cooldowns == null) return null;
         Cooldown next = null;
         for (Cooldown candidate : cooldowns) {
             long readyAt = candidate.startedAt + candidate.durationMillis;
-            if (now < readyAt && (next == null || readyAt < next.startedAt + next.durationMillis)) {
+            if (now < readyAt && isVisible.test(candidate)
+                    && (next == null || readyAt < next.startedAt + next.durationMillis)) {
                 next = candidate;
             }
         }
         return next;
     }
 
-    record Cooldown(String key, String name, long startedAt, long durationMillis) { }
+    record Cooldown(String key, String name, long startedAt, long durationMillis,
+                    Predicate<Player> displayWhen) {
+        Cooldown(String key, String name, long startedAt, long durationMillis) {
+            this(key, name, startedAt, durationMillis, ignored -> true);
+        }
+
+        boolean isVisible(Player player) {
+            return displayWhen == null || displayWhen.test(player);
+        }
+    }
 }

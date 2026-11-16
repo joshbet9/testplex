@@ -3,6 +3,7 @@ package au.com.testplex.arcadeports;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -41,5 +42,17 @@ class AbilityCooldownProgressTest {
         var second = new AbilityCooldownProgress.Cooldown("second", "Second", 2_000L, 4_000L);
 
         assertEquals(first, AbilityCooldownProgress.nextCooldown(List.of(first, second), 2_000L));
+    }
+
+    @Test
+    void selectedAbilityFilterHidesOtherCooldownsWithoutDiscardingThem() {
+        var fireball = new AbilityCooldownProgress.Cooldown("fireball", "Fireball", 1_000L, 5_000L);
+        var blink = new AbilityCooldownProgress.Cooldown("blink", "Blink", 1_000L, 3_000L);
+        Set<String> selected = Set.of("fireball");
+
+        assertEquals(fireball, AbilityCooldownProgress.nextCooldown(
+                List.of(fireball, blink), 1_000L, cooldown -> selected.contains(cooldown.key())));
+        assertEquals(blink, AbilityCooldownProgress.nextCooldown(
+                List.of(blink), 1_000L, cooldown -> cooldown.key().equals("blink")));
     }
 }
