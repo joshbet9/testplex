@@ -3262,7 +3262,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    // ArcadePortManager resolves all live Heroes player damage at HIGHEST and
+    // cancels the Bukkit event before applying the source-compatible health and
+    // knockback itself. Resolve tagged projectile damage before that shared
+    // handler, otherwise its early cancellation skips this ability-specific
+    // damage/attribution path (both listeners belong to the same plugin and the
+    // manager is registered first).
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onHeroesOfGwenProjectileDamage(EntityDamageByEntityEvent event) {
         if (stopped || game != ArcadePortGame.HEROES_OF_GWEN) return;
         Entity damager = event.getDamager();

@@ -2,6 +2,10 @@ package au.com.testplex.arcadeports;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterEach;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 
 import java.util.List;
 import java.util.Map;
@@ -9,6 +13,19 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CastleAssaultHeroesOfGwenMixedVariantTest {
+
+    @Test
+    void heroProjectileDamageIsResolvedBeforeSharedPlayerDamageCancellation() throws Exception {
+        EventHandler sharedDamage = ArcadePortManager.class
+                .getMethod("onDamage", EntityDamageEvent.class).getAnnotation(EventHandler.class);
+        EventHandler heroProjectile = CastleAssaultHeroesOfGwenRuntime.class
+                .getMethod("onHeroesOfGwenProjectileDamage", EntityDamageByEntityEvent.class)
+                .getAnnotation(EventHandler.class);
+
+        assertEquals(EventPriority.HIGHEST, sharedDamage.priority());
+        assertEquals(EventPriority.HIGH, heroProjectile.priority());
+        assertTrue(heroProjectile.ignoreCancelled());
+    }
 
     @Test
     void goldMineRequiresTwoUninterruptedMinutesOfBeaconControl() {
