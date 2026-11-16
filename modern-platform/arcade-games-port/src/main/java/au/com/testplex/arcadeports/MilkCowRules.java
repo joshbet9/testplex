@@ -1,5 +1,9 @@
 package au.com.testplex.arcadeports;
 
+import org.bukkit.Material;
+
+import java.util.List;
+
 /** Shared source constants and score/role calculations for Milk the Cow. */
 public final class MilkCowRules {
     public record ChargeKnockback(double horizontal, double vertical) { }
@@ -56,6 +60,13 @@ public final class MilkCowRules {
     public static final double FARMER_DOUBLE_JUMP_MAX_VERTICAL = 0.9D;
 
     private MilkCowRules() { }
+
+    /** Source KitFarmerJump and KitCow item materials, keyed by the match role. */
+    public static List<Material> loadoutMaterials(int teamId) {
+        return teamId == 1
+                ? List.of(Material.IRON_AXE, Material.IRON_SHOVEL, Material.LEATHER)
+                : List.of(Material.BUCKET);
+    }
 
     /** Keep at least one player on each side when the lobby has two or more players. */
     public static int cowCountForPlayers(int playerCount) {

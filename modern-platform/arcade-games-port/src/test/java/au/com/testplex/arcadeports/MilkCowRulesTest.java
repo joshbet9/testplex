@@ -2,6 +2,7 @@ package au.com.testplex.arcadeports;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterEach;
+import org.bukkit.Material;
 
 import java.util.Map;
 
@@ -9,6 +10,13 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class MilkCowRulesTest {
     @AfterEach void clearOverrides() { GameDebugRuntimeOverrides.clear(); }
+
+    @Test void roleLoadoutsMatchSourceFarmerAndCowItems() {
+        assertEquals(java.util.List.of(Material.BUCKET), MilkCowRules.loadoutMaterials(0));
+        assertEquals(java.util.List.of(Material.IRON_AXE, Material.IRON_SHOVEL, Material.LEATHER),
+                MilkCowRules.loadoutMaterials(1));
+        assertEquals(java.util.List.of(Material.BUCKET), MilkCowRules.loadoutMaterials(2));
+    }
 
     @Test void chargeAndHerdTuningChangesLiveRuleOutputsAndResetsToDefaults() {
         assertEquals(250L, MilkCowRules.cowChargeHungerIntervalMillis());
