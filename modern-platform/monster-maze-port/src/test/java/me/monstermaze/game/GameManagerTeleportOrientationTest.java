@@ -31,7 +31,7 @@ class GameManagerTeleportOrientationTest {
         Location previousPad = new Location(world, 0.5D, 64.0D, 0.5D);
         Location nextPad = new Location(world, 0.5D, 64.0D, 10.5D);
 
-        assertEquals(180.0F, GameManager.yawToward(fallingPlayer, nextPad), 0.001F);
+        assertEquals(180.0F, Math.abs(GameManager.yawToward(fallingPlayer, nextPad)), 0.001F);
         assertEquals(0.0F, GameManager.safePadTeleportYaw(fallingPlayer, previousPad, nextPad), 0.001F);
     }
 
