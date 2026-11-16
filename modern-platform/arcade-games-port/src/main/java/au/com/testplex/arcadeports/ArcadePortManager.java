@@ -1455,9 +1455,13 @@ public final class ArcadePortManager implements Listener {
             String ability = held != null && held.hasItemMeta() && held.getItemMeta().hasDisplayName()
                     ? ChatColor.stripColor(held.getItemMeta().getDisplayName()) : "";
             if ("Chaser Swap".equals(ability)) {
-                boolean usedBefore = session.deathTagTricksterSwapUsed.contains(tester.getUniqueId());
+                boolean readyBefore = DeathTagTricksterSwapRules.isReady(
+                        System.currentTimeMillis(), session.deathTagTricksterSwapReadyAt.getOrDefault(
+                                tester.getUniqueId(), 0L));
                 useDeathTagTricksterSwap(session, tester);
-                triggered = !usedBefore && session.deathTagTricksterSwapUsed.contains(tester.getUniqueId());
+                triggered = readyBefore && !DeathTagTricksterSwapRules.isReady(
+                        System.currentTimeMillis(), session.deathTagTricksterSwapReadyAt.getOrDefault(
+                                tester.getUniqueId(), 0L));
             } else if ("Runner Distraction".equals(ability)) {
                 long now = System.currentTimeMillis();
                 long readyBefore = session.deathTagTricksterFireworksReadyAt.getOrDefault(
@@ -8426,7 +8430,7 @@ public final class ArcadePortManager implements Listener {
                         "Runner Turtle", "Melee hits shell Chasers and stack Slowness and Weakness. Earn Wind Charges every 3 hits."));
                 case "trickster" -> {
                     player.getInventory().addItem(namedItem(Material.ENDER_EYE,
-                            "Chaser Swap", "Right-click to swap with a random living Chaser. One use."));
+                            "Chaser Swap", "Right-click to swap with a random grounded Chaser. 30-second cooldown."));
                     player.getInventory().addItem(namedItem(Material.FIREWORK_ROCKET,
                             "Runner Distraction", "Right-click to launch fireworks from every other living Runner. 30-second cooldown."));
                 }
@@ -9259,8 +9263,12 @@ public final class ArcadePortManager implements Listener {
     private void useDeathTagTricksterSwap(Session session, Player runner) {
         if (!isDebugAbilityAllowed(runner, ArcadePortGame.DEATH_TAG, "trickster")) return;
         UUID id = runner.getUniqueId();
-        if (session.deathTagTricksterSwapUsed.contains(id)) {
-            runner.sendMessage(ChatColor.RED + "Your Chaser Swap has already been used this round.");
+        long now = System.currentTimeMillis();
+        long readyAt = session.deathTagTricksterSwapReadyAt.getOrDefault(id, 0L);
+        if (!DeathTagTricksterSwapRules.isReady(now, readyAt)) {
+            runner.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR,
+                    new net.md_5.bungee.api.chat.TextComponent(ChatColor.RED + "Chaser Swap recharges in "
+                            + String.format(java.util.Locale.ROOT, "%.1f", (readyAt - now) / 1000.0D) + " seconds"));
             return;
         }
         if (!runner.isOnGround()) {
@@ -9291,7 +9299,8 @@ public final class ArcadePortManager implements Listener {
         long graceUntil = System.currentTimeMillis() + 1_000L;
         session.deathTagRespawnGraceUntil.put(id, graceUntil);
         session.deathTagRespawnGraceUntil.put(target.getUniqueId(), graceUntil);
-        session.deathTagTricksterSwapUsed.add(id);
+        session.deathTagTricksterSwapReadyAt.put(id, now + DeathTagTricksterSwapRules.COOLDOWN_MILLIS);
+        runner.setCooldown(Material.ENDER_EYE, (int) (DeathTagTricksterSwapRules.COOLDOWN_MILLIS / 50L));
         if (nearbyChaser) {
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 if (active == session && runner.isOnline() && session.alive.contains(id)
@@ -9300,7 +9309,6 @@ public final class ArcadePortManager implements Listener {
                 }
             }, 600L);
         }
-        runner.getInventory().remove(Material.ENDER_EYE);
         runner.playSound(runner.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 1.15F);
         target.playSound(target.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 0.85F);
         runner.sendMessage(ChatColor.LIGHT_PURPLE + "You swapped places with " + target.getName() + "!");
