@@ -34002,10 +34002,8 @@ public final class ArcadePortManager implements Listener {
         if (powerupTeam != null) {
             session.bombPowerupStatusByTeam.put(powerupTeam, BombLobbersPowerupStatus.OBTAINED);
         }
-        player.sendMessage(ChatColor.GOLD + "Power-up collected: "
-                + ChatColor.YELLOW + bombLobbersPowerupName(powerup) + ChatColor.GRAY
-                + ("wind-charge".equals(powerup) || "speed-boost".equals(powerup)
-                        ? " - right-click to activate." : " - throw with your TNT to activate."));
+        player.sendActionBar(ChatColor.GREEN + ChatColor.BOLD.toString()
+                + ArcadePortRules.bombLobbersPowerupObtainedLabel());
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (!drop.isValid()) {
                 session.bombPowerupDrops.remove(drop.getUniqueId());

@@ -457,6 +457,10 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.areBombLobbersEnemies(1, ArcadePortRules.opposingBombLobbersTeam(1)));
     }
 
+    @Test void bombLobbersPickupNoticeIsShortAndActionBarReady() {
+        assertEquals("Power-up obtained", ArcadePortRules.bombLobbersPowerupObtainedLabel());
+    }
+
     @Test void bombLobbersPowerupUsesPairedOneMinuteAverageWaveAndTwoActiveDrops() {
         assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(1));
         assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(2));
