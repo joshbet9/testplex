@@ -2092,6 +2092,11 @@ public final class ArcadePortRules {
                 : GameDebugRuntimeOverrides.doubleValue("BOMB_LOBBERS_DIRECT_HIT_DAMAGE", BOMB_LOBBERS_DIRECT_HIT_DAMAGE);
     }
 
+    /** Fiery TNT keeps its fire trail visual separate from normal and Super TNT. */
+    public static boolean bombLobbersFieryTrailEnabled(String powerupType) {
+        return "fiery-tnt".equalsIgnoreCase(powerupType == null ? "" : powerupType);
+    }
+
     public static boolean bombLobbersTntIgnites(String powerupType) {
         return "fiery-tnt".equalsIgnoreCase(powerupType);
     }
