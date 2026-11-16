@@ -36,6 +36,13 @@ class GameAbilityCosmeticsTest {
     }
 
     @Test
+    void bombLobbersImpactUsesAFullScaleStyleWhileOtherHitsStayCompact() {
+        assertEquals(1.0D, GameAbilityCosmetics.hitScale("TNT Explosion"));
+        assertEquals(0.38D, GameAbilityCosmetics.hitScale("Body Slam"));
+        assertEquals(0.38D, GameAbilityCosmetics.hitScale(null));
+    }
+
+    @Test
     void onlyAbilityEffectLinesUseTheSharedParticleRenderer() {
         ArcadeCatalog catalog = new ArcadeCatalog();
         int effectLines = 0;

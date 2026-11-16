@@ -34107,7 +34107,8 @@ public final class ArcadePortManager implements Listener {
             Location current = bomb.getLocation().clone();
             Location previous = session.bombLastLocations.put(bombId, current);
             if (previous == null) previous = current;
-            if (!bomb.isOnGround()) renderBombLobbersTrail(session, ownerId, previous, current);
+            if (!bomb.isOnGround()) renderBombLobbersTrail(session, ownerId, previous, current,
+                    session.bombPowerTypes.getOrDefault(bombId, "normal"));
 
             // Reborn ray-traces blocks first and clips entity collision to that first block hit.
             // Without this, a swept bounding-box test can register direct hits through solid walls.
@@ -34292,7 +34293,8 @@ public final class ArcadePortManager implements Listener {
      * branch on team, its count is 2 (not 0), so the trail uses default red dust rather
      * than RGB-tinted particles.
      */
-    private void renderBombLobbersTrail(Session session, UUID ownerId, Location previous, Location current) {
+    private void renderBombLobbersTrail(Session session, UUID ownerId, Location previous, Location current,
+            String powerupType) {
         if (session == null || ownerId == null || previous == null || current == null
                 || previous.getWorld() != session.world || current.getWorld() != session.world) return;
         Vector segment = current.toVector().subtract(previous.toVector());
@@ -34312,6 +34314,10 @@ public final class ArcadePortManager implements Listener {
             Location point = previous.clone().add(direction.clone().multiply(offset)).add(0.0D, 0.5D, 0.0D);
             session.world.spawnParticle(Particle.DUST, point, 2,
                     spread, spread, spread, speed, dust);
+            if (ArcadePortRules.bombLobbersFieryTrailEnabled(powerupType)) {
+                session.world.spawnParticle(Particle.FLAME, point, 5,
+                        0.12D, 0.14D, 0.12D, 0.01D);
+            }
         }
     }
 
@@ -34352,7 +34358,7 @@ public final class ArcadePortManager implements Listener {
 
         String cosmetic = owner == null ? "ember-ring"
                 : selectedGameCosmeticOption(owner, "bomb-lobbers", "tnt-explosions", "ember-ring");
-        GameAbilityCosmetics.hit(owner, blast, cosmetic);
+        GameAbilityCosmetics.hit(owner, blast, cosmetic, "TNT Explosion");
     }
 
     private void removeBombTracking(Session session, UUID bombId) {

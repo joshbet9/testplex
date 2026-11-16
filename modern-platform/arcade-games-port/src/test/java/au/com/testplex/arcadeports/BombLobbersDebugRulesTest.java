@@ -63,6 +63,14 @@ class BombLobbersDebugRulesTest {
     }
 
     @Test
+    void fieryTntAloneEmitsTheFireTrail() {
+        assertTrue(ArcadePortRules.bombLobbersFieryTrailEnabled("fiery-tnt"));
+        assertFalse(ArcadePortRules.bombLobbersFieryTrailEnabled("normal"));
+        assertFalse(ArcadePortRules.bombLobbersFieryTrailEnabled("super-tnt"));
+        assertFalse(ArcadePortRules.bombLobbersFieryTrailEnabled(null));
+    }
+
+    @Test
     void powerupWaveScheduleUsesConfiguredInclusiveBoundsAndResets() {
         assertEquals(20_000L, ArcadePortRules.bombLobbersPowerupSpawnDelayMillis(0L));
         assertEquals(100_000L, ArcadePortRules.bombLobbersPowerupSpawnDelayMillis(80_000L));
