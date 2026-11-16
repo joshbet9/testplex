@@ -16,6 +16,18 @@ class BombLobbersDebugRulesTest {
     }
 
     @Test
+    void scoreboardMatchesTheSourceRosterCutoffAndPowerupStates() {
+        assertTrue(ArcadePortRules.bombLobbersScoreboardShowsPlayerNames(12));
+        assertFalse(ArcadePortRules.bombLobbersScoreboardShowsPlayerNames(13));
+        assertTrue(ArcadePortRules.bombLobbersScoreboardShowsPlayerNames(0));
+
+        assertEquals("Waiting", ArcadePortRules.bombLobbersPowerupScoreboardLabel(null));
+        assertEquals("Dropped", ArcadePortRules.bombLobbersPowerupScoreboardLabel("SPAWNED"));
+        assertEquals("Ready", ArcadePortRules.bombLobbersPowerupScoreboardLabel("OBTAINED"));
+        assertEquals("Used", ArcadePortRules.bombLobbersPowerupScoreboardLabel("ACTIVATED"));
+    }
+
+    @Test
     void powerupToggleIsProfileBackedAndConsumedByTheRuntimeRule() {
         assertTrue(ArcadePortRules.bombLobbersPowerupsEnabled());
         assertTrue(GameDebugVariableCatalog.variables(ArcadePortGame.BOMB_LOBBERS).stream()

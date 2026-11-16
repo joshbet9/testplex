@@ -2096,6 +2096,22 @@ public final class ArcadePortRules {
         return "fiery-tnt".equalsIgnoreCase(powerupType);
     }
 
+    /** Mirrors TeamGame's 1.8 scoreboard cutoff: individual players below thirteen alive. */
+    public static boolean bombLobbersScoreboardShowsPlayerNames(int alivePlayers) {
+        return Math.max(0, alivePlayers) < 13;
+    }
+
+    /** Human-readable per-team power-up state kept on its own scoreboard row. */
+    public static String bombLobbersPowerupScoreboardLabel(String state) {
+        if (state == null || state.isBlank()) return "Waiting";
+        return switch (state.toUpperCase(java.util.Locale.ROOT)) {
+            case "SPAWNED" -> "Dropped";
+            case "OBTAINED" -> "Ready";
+            case "ACTIVATED" -> "Used";
+            default -> "Waiting";
+        };
+    }
+
     /** Returns the opposing Bomb Lobbers side, or -1 when the supplied team is invalid. */
     public static int opposingBombLobbersTeam(int teamId) {
         return teamId == 0 ? 1 : teamId == 1 ? 0 : -1;
