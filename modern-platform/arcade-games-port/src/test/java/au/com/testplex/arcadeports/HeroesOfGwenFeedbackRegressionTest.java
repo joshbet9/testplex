@@ -4,6 +4,9 @@ import org.bukkit.Material;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -46,5 +49,17 @@ class HeroesOfGwenFeedbackRegressionTest {
         assertTrue(lines.get(7).contains("Beacon A: Red"));
         assertEquals("§f350", lines.get(10));
         assertEquals("§f02:05", lines.get(13));
+    }
+
+    @Test
+    void neutralCaptureBeaconIsInitializedAsGlassBeforeProgressBegins() throws IOException {
+        assertEquals(Material.WHITE_STAINED_GLASS, ArcadePortRules.heroesOfGwenCaptureBeaconMaterial(-1));
+        Path source = Path.of("src/main/java/au/com/testplex/arcadeports/CastleAssaultHeroesOfGwenRuntime.java");
+        if (!Files.isRegularFile(source)) {
+            source = Path.of("modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/"
+                    + "CastleAssaultHeroesOfGwenRuntime.java");
+        }
+        String runtime = Files.readString(source);
+        assertTrue(runtime.contains("setCapturePointBeacon(point, -1)"));
     }
 }
