@@ -9894,9 +9894,10 @@ public final class ArcadePortManager implements Listener {
                             "Right-click to warp to the next-ranked racer ahead. One use."));
                 } else if ("digger".equals(kit)) {
                     int digs = session.dragonEscapeDiggerUsesRemaining.getOrDefault(id, GameDebugRuntimeOverrides.intValue("DRAGON_ESCAPE_DIGGER_MAX_USES", ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES));
-                    player.getInventory().addItem(namedItem(Material.DIAMOND_PICKAXE, "Digger Pickaxe",
-                            "Left-click course blocks to recover and place as shortcuts (" + digs + " digs left).",
-                            Math.max(1, digs)));
+                    int pickaxes = ArcadePortRules.dragonEscapeDiggerPickaxeItemCount(digs);
+                    player.getInventory().setItem(0, pickaxes == 0 ? null : namedItem(Material.DIAMOND_PICKAXE,
+                            "Digger Pickaxe (" + digs + " uses left)",
+                            "Left-click course blocks to recover and place as shortcuts.", pickaxes));
                 }
                 setDragonEscapeGhostHotbarItem(player);
                 if (session.dragonEscapePractice) setDragonEscapePracticeHotbarItems(player);
@@ -17961,18 +17962,25 @@ public final class ArcadePortManager implements Listener {
 
     /** Keep the Digger tool in its inventory slot; Reborn allowed tunnelling with it selected or not. */
     private void updateDragonEscapeDiggerPickaxe(Player player, int remaining) {
+        int toolSlot = -1;
         for (int slot = 0; slot < player.getInventory().getSize(); slot++) {
             ItemStack existing = player.getInventory().getItem(slot);
             if (existing == null || existing.getType() != Material.DIAMOND_PICKAXE) continue;
-            if (remaining <= 0) {
-                player.getInventory().setItem(slot, null);
+            if (toolSlot < 0) {
+                toolSlot = slot;
             } else {
-                player.getInventory().setItem(slot, namedItem(Material.DIAMOND_PICKAXE, "Digger Pickaxe",
-                        "Left-click course blocks to recover and place as shortcuts (" + remaining + " digs left).",
-                        remaining));
+                player.getInventory().setItem(slot, null);
             }
+        }
+        if (remaining <= 0) {
+            if (toolSlot >= 0) player.getInventory().setItem(toolSlot, null);
             return;
         }
+        if (toolSlot < 0) toolSlot = 0;
+        player.getInventory().setItem(toolSlot, namedItem(Material.DIAMOND_PICKAXE,
+                "Digger Pickaxe (" + remaining + " uses left)",
+                "Left-click course blocks to recover and place as shortcuts.",
+                ArcadePortRules.dragonEscapeDiggerPickaxeItemCount(remaining)));
     }
 
     /** Adventure mode cannot rely on vanilla block placement for Digger's recovered blocks. */
