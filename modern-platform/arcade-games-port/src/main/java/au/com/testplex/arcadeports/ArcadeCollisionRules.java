@@ -11,9 +11,12 @@ final class ArcadeCollisionRules {
 
     static void disable(Player player) {
         if (player == null || !player.isOnline()) return;
-        if (player.isCollidable()) player.setCollidable(false);
-        // Scoreboard teams can override the entity flag, and some game controllers
-        // replace their scoreboard while a match is running. Normalize all teams.
+        // Paper documents setCollidable for non-player entities only. Player
+        // pass-through is controlled by scoreboard teams; avoid changing the
+        // player's entity collision flag so native melee and projectile targeting
+        // continue to see the normal player hitbox.
+        // Some game controllers replace their scoreboard while a match is running.
+        // Normalize all teams on the active scoreboard to preserve pass-through.
         Scoreboard scoreboard = player.getScoreboard();
         for (Team team : scoreboard.getTeams()) {
             if (team.getOption(Team.Option.COLLISION_RULE) != Team.OptionStatus.NEVER) {
