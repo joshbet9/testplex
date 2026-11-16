@@ -14608,10 +14608,17 @@ public final class ArcadePortManager implements Listener {
                 player.setInvulnerable(false);
                 player.setCollidable(false);
                 player.setWalkSpeed(0.2F);
+                if (session.type == ArcadePortGame.DRAGON_ESCAPE
+                        && ArcadePortRules.shouldDragonEscapeRestorePrepareSprint(
+                                session.dragonEscapePrepareSprintRequests.contains(player.getUniqueId()),
+                                session.alive.contains(player.getUniqueId()))) {
+                    player.setSprinting(true);
+                }
                 if (session.type == ArcadePortGame.DEATH_TAG) player.sendActionBar(Component.empty());
                 player.sendTitle(ChatColor.GREEN + "In Progress...", ChatColor.GRAY + session.type.displayName(), 5, 25, 5);
                 player.playSound(player.getLocation(), Sound.UI_TOAST_IN, 0.8F, 1.1F);
             }
+            session.dragonEscapePrepareSprintRequests.clear();
             setLobbyLifecycleStatus("In Progress...");
             announce(session, ChatColor.GREEN + session.type.displayName() + " is now in progress!");
             if (session.type == ArcadePortGame.HOOPS_REMASTERED) {
@@ -35710,6 +35717,13 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
     public void onPrepareSprintToggle(PlayerToggleSprintEvent event) {
+        Session session = active;
+        Player player = event.getPlayer();
+        if (session != null && session.type == ArcadePortGame.DRAGON_ESCAPE && !session.liveStarted
+                && session.players.containsKey(player.getUniqueId())) {
+            if (event.isSprinting()) session.dragonEscapePrepareSprintRequests.add(player.getUniqueId());
+            else session.dragonEscapePrepareSprintRequests.remove(player.getUniqueId());
+        }
         cancelPrepareAction(event.getPlayer(), event);
     }
 
@@ -35933,6 +35947,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, DragonEscapeBuilderBrick> dragonEscapeBuilderBricks = new HashMap<>();
         final Map<UUID, Long> dragonEscapeBuilderLastPlacedAt = new HashMap<>();
         final Map<UUID, List<DragonEscapeGhostFrame>> dragonEscapeRunGhostFrames = new HashMap<>();
+        final Set<UUID> dragonEscapePrepareSprintRequests = new HashSet<>();
         final PriorityQueue<SkyWarsCrumbleCandidate> skyWarsCrumbleQueue = new PriorityQueue<>(
                 (left, right) -> {
                     int distanceOrder = Double.compare(right.distanceSquared(), left.distanceSquared());
