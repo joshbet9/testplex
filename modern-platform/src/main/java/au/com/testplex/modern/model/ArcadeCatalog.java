@@ -404,10 +404,8 @@ public final class ArcadeCatalog {
             case "bacon-brawl" -> List.of(line("ability-effects", "Bacon Ability Styles",
                     "One visual style ties together this player's kit abilities.", "PORKCHOP",
                     style("blue-flame", "Blue Flame", "Blue fire and matching accents across Bacon Brawl abilities."),
-                    style("crispy-comet", "Crispy Comet", "A warm comet finish across this player's abilities."),
-                    style("smokehouse", "Smokehouse", "Smoky curls and ember accents across abilities."),
-                    style("molten-pepper", "Molten Pepper", "A molten orange theme across the kit."),
-                    style("frosted-bacon", "Frosted Bacon", "Cool frost accents across the kit.")));
+                    style("cinder-drift", "Cinder Drift", "Hot orange embers curve into every kit ability."),
+                    style("frosted-bacon", "Frosted Bacon", "Icy shards and pale blue arcs mark every kit ability.")));
             case "bomb-lobbers" -> List.of(line("tnt-explosions", "TNT Explosion Effects",
                     "The regular TNT explosion always plays; this adds the thrower's chosen visual effect.", "TNT",
                     style("ember-ring", "Ember Ring", "An extra ring of orange sparks around the blast."),

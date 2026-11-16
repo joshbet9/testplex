@@ -13029,7 +13029,11 @@ public final class ArcadePortManager implements Listener {
         String style = game == ArcadePortGame.CAMERA_SHY
                 ? selectedGameCosmeticOption(player, "camera-shy", "camera-flash", "vintage-flash")
                 : abilityEffectCosmeticOption(player, game);
-        GameAbilityCosmetics.hit(player, effectAt, style, abilityName);
+        if (game == ArcadePortGame.BACON_BRAWL) {
+            GameAbilityCosmetics.activation(player, effectAt, style, abilityName);
+        } else {
+            GameAbilityCosmetics.hit(player, effectAt, style, abilityName);
+        }
     }
 
     private void updatePaintballWeaponSkin(Session session, Player player) {
@@ -15744,7 +15748,14 @@ public final class ArcadePortManager implements Listener {
                 : charge;
         // Other abilities spend their full current charge; none use a wall-clock cooldown.
         session.baconAbilitiesUsed.add(id);
-        showAbilityActivationCosmetic(player);
+        String abilityCosmetic = switch (kit) {
+            case "mama-piggles" -> "Bacon Blast";
+            case "chris-p-bacon" -> crouchDash ? "Crouch Dash" : "Crispy Shot";
+            case "pig" -> "Cloak";
+            case "brutus-bacon" -> "Brutus";
+            default -> "Body Slam";
+        };
+        showAbilityActivationCosmetic(player, abilityCosmetic);
         session.baconMeters.put(id, unlimitedAbilityDebug ? GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", ArcadePortRules.BACON_METER_MAX)
                 : Math.max(0, charge - chargeCost));
         updateBaconMeterItem(session, player);

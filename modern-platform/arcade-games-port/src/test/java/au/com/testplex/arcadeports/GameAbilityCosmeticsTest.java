@@ -61,6 +61,20 @@ class GameAbilityCosmeticsTest {
     }
 
     @Test
+    void baconStylesGiveEveryAbilityItsOwnShapeAndKeepTheSelectedPalette() {
+        for (String styleId : Set.of("blue-flame", "cinder-drift", "frosted-bacon")) {
+            GameAbilityCosmetics.Palette style = GameAbilityCosmetics.palette(styleId);
+            Set<GameAbilityCosmetics.Motif> motifs = new HashSet<>();
+            for (String ability : Set.of("Bacon Blast", "Crispy Shot", "Crouch Dash", "Cloak", "Brutus", "Body Slam")) {
+                GameAbilityCosmetics.Palette result = GameAbilityCosmetics.abilityPalette(style, ability);
+                assertEquals(style.colour(), result.colour(), styleId + " keeps its own palette for " + ability);
+                motifs.add(result.motif());
+            }
+            assertEquals(6, motifs.size(), styleId + " needs a recognizable effect for every Bacon ability");
+        }
+    }
+
+    @Test
     void namedFallbackPalettesMatchTheirLabels() {
         assertEquals(org.bukkit.Color.fromRGB(91, 208, 255),
                 GameAbilityCosmetics.palette("blue-flame").colour());
