@@ -16,24 +16,14 @@ if [[ ! "$EXPECTED_SOURCE" =~ ^[0-9a-f]{40}$ ]]; then
     exit 1
 fi
 if [[ -L "$WORLD_ROOT" ]]; then
-    echo "Refusing to place Monster Maze worlds in a symbolic-link directory." >&2
+    echo "Refusing to provision maps through a symbolic-link world container." >&2
     exit 1
 fi
-case "$WORLD_ROOT" in
-    /server|/server/*)
-        echo "Refusing to place replaceable worlds on the persistent /server data volume." >&2
-        exit 1
-        ;;
-esac
 mkdir -p -- "$WORLD_ROOT"
 if [[ -z "${MSYSTEM:-}" ]]; then
     chmod 0750 -- "$WORLD_ROOT"
 fi
 WORLD_ROOT="$(realpath -e -- "$WORLD_ROOT")"
-if [[ "$WORLD_ROOT" == /server || "$WORLD_ROOT" == /server/* ]]; then
-    echo "Refusing to place replaceable worlds on the persistent /server data volume." >&2
-    exit 1
-fi
 
 for world in "${WORLD_NAMES[@]}"; do
     source="$SOURCE_ROOT/$world"
@@ -44,12 +34,16 @@ for world in "${WORLD_NAMES[@]}"; do
 done
 
 has_complete_world_set() {
-    [[ -f "$WORLD_ROOT/.testplex-mm-source-maps" ]] \
-        && [[ "$(tr -d '\r\n[:space:]' < "$WORLD_ROOT/.testplex-mm-source-maps")" == "$EXPECTED_SOURCE" ]] \
-        || return 1
+    local installed_source
+    [[ -f "$WORLD_ROOT/.testplex-mm-source-maps" ]] || return 1
+    installed_source="$(tr -d '\r\n[:space:]' < "$WORLD_ROOT/.testplex-mm-source-maps")"
+    [[ "$installed_source" == "$EXPECTED_SOURCE" ]] || return 1
     local world
     for world in "${WORLD_NAMES[@]}"; do
-        [[ -s "$WORLD_ROOT/$world/level.dat" && -d "$WORLD_ROOT/$world/region" && ! -L "$WORLD_ROOT/$world" ]] || return 1
+        local installed_target
+        [[ -L "$WORLD_ROOT/$world" ]] || return 1
+        installed_target="$(readlink -f -- "$WORLD_ROOT/$world")"
+        [[ "$installed_target" == "$SOURCE_ROOT/$world" ]] || return 1
     done
 }
 
@@ -61,24 +55,32 @@ fi
 stage="$(mktemp -d "$WORLD_ROOT/.testplex-mm-stage.XXXXXX")"
 cleanup() { rm -rf -- "$stage"; }
 trap cleanup EXIT
+
+# Never delete or replace data already present in Paper's persistent world
+# container. New map entries are symlinks to this image's assets, keeping their
+# large region data outside the player/world-data volume.
 for world in "${WORLD_NAMES[@]}"; do
-    cp -a -- "$SOURCE_ROOT/$world" "$stage/$world"
-    test -s "$stage/$world/level.dat"
-    test -d "$stage/$world/region"
+    link="$WORLD_ROOT/$world"
+    target="$SOURCE_ROOT/$world"
+    if [[ -e "$link" || -L "$link" ]]; then
+        if [[ ! -L "$link" || "$(readlink -f -- "$link")" != "$target" ]]; then
+            echo "Refusing to overwrite existing world data at $link" >&2
+            exit 1
+        fi
+    else
+        ln -s -- "$target" "$stage/$world"
+    fi
 done
 
 if [[ -n "${TESTPLEX_WORLD_OWNER:-}" ]]; then
-    chown -R -- "$TESTPLEX_WORLD_OWNER" "$stage"
+    chown -- "$TESTPLEX_WORLD_OWNER" "$stage"
 fi
-
-# Only replace the seven named source maps in the non-persistent world root.
-# The /server volume containing stats and plugin data is never touched here.
-rm -f -- "$WORLD_ROOT/.testplex-mm-source-maps"
 for world in "${WORLD_NAMES[@]}"; do
-    rm -rf -- "$WORLD_ROOT/$world"
-    mv -- "$stage/$world" "$WORLD_ROOT/$world"
+    if [[ -L "$stage/$world" ]]; then
+        mv -- "$stage/$world" "$WORLD_ROOT/$world"
+    fi
 done
 printf '%s\n' "$EXPECTED_SOURCE" > "$stage/.testplex-mm-source-maps"
-mv -- "$stage/.testplex-mm-source-maps" "$WORLD_ROOT/.testplex-mm-source-maps"
+mv -f -- "$stage/.testplex-mm-source-maps" "$WORLD_ROOT/.testplex-mm-source-maps"
 has_complete_world_set || { echo "Monster Maze source worlds failed post-install verification." >&2; exit 1; }
-echo "Installed and verified seven Monster Maze source worlds at revision $EXPECTED_SOURCE."
+echo "Linked and verified seven Monster Maze source worlds at revision $EXPECTED_SOURCE; persistent player/world data was preserved."

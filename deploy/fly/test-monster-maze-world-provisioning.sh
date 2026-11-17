@@ -6,8 +6,11 @@ PROVISION="$SCRIPT_DIR/provision-monster-maze-worlds.sh"
 ROOT="$(mktemp -d)"
 trap 'rm -rf -- "$ROOT"' EXIT
 SOURCE="$ROOT/image/MonsterMazeMaps"
-WORLD_ROOT="$ROOT/runtime/worlds"
+WORLD_ROOT="$ROOT/runtime/server"
 mkdir -p "$SOURCE"
+mkdir -p "$WORLD_ROOT/world/playerdata"
+printf 'player-world-data-must-survive\n' > "$WORLD_ROOT/world/playerdata/preserve.dat"
+printf 'plugin-stats-must-survive\n' > "$WORLD_ROOT/player-stats.db"
 
 write_source() {
     local revision="$1" marker="$2"
@@ -26,35 +29,34 @@ revision_two=2222222222222222222222222222222222222222
 write_source "$revision_one" first
 TESTPLEX_WORLD_OWNER= bash "$PROVISION" "$SOURCE" "$WORLD_ROOT"
 [[ "$(cat "$WORLD_ROOT/.testplex-mm-source-maps")" == "$revision_one" ]]
-[[ "$(find "$WORLD_ROOT" -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 7 ]]
-[[ ! -e "$WORLD_ROOT/mm_void/session.lock" && ! -e "$WORLD_ROOT/mm_void/uid.dat" ]]
+[[ -L "$WORLD_ROOT/mm_void" && "$(readlink -f "$WORLD_ROOT/mm_void")" == "$SOURCE/mm_void" ]]
+[[ "$(cat "$WORLD_ROOT/world/playerdata/preserve.dat")" == 'player-world-data-must-survive' ]]
+[[ "$(cat "$WORLD_ROOT/player-stats.db")" == 'plugin-stats-must-survive' ]]
 
-# A deployment with the same pinned revision must preserve the live world copy.
-printf 'preserve-me\n' > "$WORLD_ROOT/mm_void/runtime-marker.txt"
+# A deployment with the same pinned revision must preserve unrelated player data.
+printf 'preserve-me\n' > "$WORLD_ROOT/world/runtime-marker.txt"
 TESTPLEX_WORLD_OWNER= bash "$PROVISION" "$SOURCE" "$WORLD_ROOT"
-grep -Fxq 'preserve-me' "$WORLD_ROOT/mm_void/runtime-marker.txt"
+grep -Fxq 'preserve-me' "$WORLD_ROOT/world/runtime-marker.txt"
 
-# A changed source revision replaces only the seven source worlds.
+# A changed image revision updates its marker without altering persistent data.
 write_source "$revision_two" second
 TESTPLEX_WORLD_OWNER= bash "$PROVISION" "$SOURCE" "$WORLD_ROOT"
 [[ "$(cat "$WORLD_ROOT/.testplex-mm-source-maps")" == "$revision_two" ]]
 grep -Fxq 'mm_void:second' "$WORLD_ROOT/mm_void/level.dat"
-[[ ! -e "$WORLD_ROOT/mm_void/runtime-marker.txt" ]]
+grep -Fxq 'preserve-me' "$WORLD_ROOT/world/runtime-marker.txt"
+[[ "$(cat "$WORLD_ROOT/player-stats.db")" == 'plugin-stats-must-survive' ]]
 
 # Validate every source before replacement so a broken image cannot partially
 # overwrite the previous complete map set.
-printf 'keep-on-failure\n' > "$WORLD_ROOT/mm_void/runtime-marker.txt"
+printf 'keep-on-failure\n' > "$WORLD_ROOT/world/runtime-marker.txt"
 rm -rf "$SOURCE/mm_swampland/region"
 if TESTPLEX_WORLD_OWNER= bash "$PROVISION" "$SOURCE" "$WORLD_ROOT"; then
     echo 'Expected incomplete source maps to fail validation.' >&2
     exit 1
 fi
 [[ "$(cat "$WORLD_ROOT/.testplex-mm-source-maps")" == "$revision_two" ]]
-grep -Fxq 'keep-on-failure' "$WORLD_ROOT/mm_void/runtime-marker.txt"
-
-if TESTPLEX_WORLD_OWNER= bash "$PROVISION" "$SOURCE" /server 2>/dev/null; then
-    echo 'Expected persistent /server world paths to be rejected.' >&2
-    exit 1
-fi
+grep -Fxq 'keep-on-failure' "$WORLD_ROOT/world/runtime-marker.txt"
+[[ "$(cat "$WORLD_ROOT/world/playerdata/preserve.dat")" == 'player-world-data-must-survive' ]]
+[[ "$(cat "$WORLD_ROOT/player-stats.db")" == 'plugin-stats-must-survive' ]]
 
 echo 'Monster Maze world provisioning checks passed.'

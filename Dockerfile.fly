@@ -60,6 +60,7 @@ RUN set -eu; \
       rm -f "/opt/testplex/MonsterMazeMaps/$world/session.lock" "/opt/testplex/MonsterMazeMaps/$world/uid.dat"; \
     done; \
     printf '%s\n' "$revision" > /opt/testplex/MonsterMazeMaps/.testplex-mm-source-maps; \
+    chown -R minecraft:minecraft /opt/testplex/MonsterMazeMaps; \
     rm -rf "$archive" "$source_root"; \
     test "$(find /opt/testplex/MonsterMazeMaps -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 7
 

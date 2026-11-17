@@ -155,10 +155,12 @@ jobs:
         run: |
           set -euo pipefail
           docker run --rm --entrypoint /bin/bash testplex-modern-fly:ci -ec '
-            /usr/local/bin/provision-monster-maze-worlds /opt/testplex/MonsterMazeMaps /tmp/testplex-ci-worlds
-            test "$(cat /tmp/testplex-ci-worlds/.testplex-mm-source-maps)" = "$(cat /opt/testplex/MonsterMazeMaps/.testplex-mm-source-maps)"
-            test "$(find /tmp/testplex-ci-worlds -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 7
-            test ! -e /server/.testplex-mm-source-maps
+            mkdir -p /tmp/testplex-ci-server/world/playerdata
+            echo retained > /tmp/testplex-ci-server/world/playerdata/preserve.dat
+            /usr/local/bin/provision-monster-maze-worlds /opt/testplex/MonsterMazeMaps /tmp/testplex-ci-server
+            test "$(cat /tmp/testplex-ci-server/.testplex-mm-source-maps)" = "$(cat /opt/testplex/MonsterMazeMaps/.testplex-mm-source-maps)"
+            test -L /tmp/testplex-ci-server/mm_void
+            test "$(cat /tmp/testplex-ci-server/world/playerdata/preserve.dat)" = retained
           '
 
       - name: Verify modern plugin metadata and packaged classes

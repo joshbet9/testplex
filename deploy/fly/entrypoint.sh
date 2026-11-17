@@ -6,7 +6,6 @@ PORT="${TESTPLEX_PORT:-25566}"
 PLUGIN_DIR="$DATA_ROOT/plugins"
 FPP_DATA_DIR="$PLUGIN_DIR/FakePlayerPlugin"
 FPP_CONFIG="$FPP_DATA_DIR/config.yml"
-WORLD_ROOT="/tmp/testplex-worlds"
 
 # Refuse to start without the persistent volume. This prevents a deployment
 # from silently recreating an empty /server and appearing to reset player data.
@@ -122,12 +121,12 @@ install -d -o minecraft -g minecraft "$DATA_ROOT/update/maps"
 tar -xzf /opt/testplex/WizardsSourceMaps.tar.gz -C "$DATA_ROOT/update/maps"
 chown -R minecraft:minecraft "$DATA_ROOT/update/maps/Wizards" "$DATA_ROOT/update/maps/Nano Wizards"
 
-# Keep source maps and generated game worlds outside the persistent player-data
-# volume. The revision is shared with Hyper-V and is validated before startup.
+# Keep the persistent Paper world container so vanilla player data and plugin
+# data remain on the Fly volume. Only the seven source-map entries are symlinked
+# to image assets, keeping their large region data outside the volume.
 TESTPLEX_WORLD_OWNER=minecraft:minecraft \
     /usr/local/bin/provision-monster-maze-worlds \
-    /opt/testplex/MonsterMazeMaps "$WORLD_ROOT"
-chown minecraft:minecraft "$WORLD_ROOT"
+    /opt/testplex/MonsterMazeMaps "$DATA_ROOT"
 
 cd "$DATA_ROOT"
-exec gosu minecraft java -Xms384M -Xmx3G -jar /opt/testplex/paper.jar --universe "$WORLD_ROOT" --nogui
+exec gosu minecraft java -Xms384M -Xmx3G -jar /opt/testplex/paper.jar --nogui
