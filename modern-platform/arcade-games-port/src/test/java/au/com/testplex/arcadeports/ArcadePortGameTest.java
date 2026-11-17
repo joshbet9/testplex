@@ -1997,11 +1997,10 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(true, true, true, 10_500L, 10_000L),
                 "re-entering the brick cancels the vacated grace timer");
         assertTrue(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(false, false, false, 10_000L, 0L));
-        assertTrue(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false));
-        assertTrue(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(1_000L, 0L, false),
-                "Builder's starting charges must be usable immediately when no recharge deadline exists");
-        assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(9L, 10L, false));
-        assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, true));
+        assertTrue(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(2));
+        assertTrue(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(1),
+                "A remaining starting brick must be usable without waiting for the recharge timer");
+        assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(0));
     }
 
     @Test void dragonEscapeBuilderPlacementRoutesFromKitAndActionNotEventItemPrediction() {

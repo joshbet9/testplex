@@ -17670,38 +17670,31 @@ public final class ArcadePortManager implements Listener {
         if (active != session || !session.alive.contains(id)
                 || !"builder".equals(session.dragonEscapeKits.get(id))) return;
         ItemStack held = player.getInventory().getItemInMainHand();
-        if (held == null || held.getType() != Material.BRICKS || inventoryCount(player, Material.BRICKS) <= 0) {
+        int availableBricks = inventoryCount(player, Material.BRICKS);
+        if (held == null || held.getType() != Material.BRICKS
+                || !ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(availableBricks)) {
             player.sendActionBar(ChatColor.YELLOW + "Your Builder bricks are missing from your hand.");
             return;
         }
-        long now = System.currentTimeMillis();
-        long nextChargeAt = session.dragonEscapeNextBrickAt.getOrDefault(id, 0L);
         Block target = dragonEscapeKitPlacementTarget(clicked, face);
         if (target == null) {
             player.sendActionBar(ChatColor.YELLOW + "Right-click a block face to place your brick.");
-            return;
-        }
-        boolean pendingBrick = session.dragonEscapeBuilderBricks.containsKey(id);
-        if (!ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(
-                now, nextChargeAt, pendingBrick)) {
-            player.sendActionBar(ChatColor.YELLOW + (pendingBrick
-                    ? "Wait for your previous brick to disappear."
-                    : "Your next Builder brick is still recharging."));
             return;
         }
         if (!isDragonEscapeKitPlacementTargetAllowed(session, target)) {
             player.sendActionBar(ChatColor.YELLOW + "You cannot place a temporary brick there.");
             return;
         }
-        int remainingCharges = inventoryCount(player, Material.BRICKS) - 1;
         if (!isDragonEscapeKitPlacementSpaceClear(session, target)) {
             player.sendActionBar(ChatColor.YELLOW + "A racer is occupying that space.");
             return;
         }
+        long now = System.currentTimeMillis();
+        int remainingCharges = availableBricks - 1;
         BlockState previous = target.getState();
         target.setType(Material.BRICKS, false);
-        DragonEscapeBuilderBrick placed = new DragonEscapeBuilderBrick(previous, now, remainingCharges);
-        session.dragonEscapeBuilderBricks.put(id, placed);
+        DragonEscapeBuilderBrick placed = new DragonEscapeBuilderBrick(previous, now);
+        session.dragonEscapeBuilderBricks.computeIfAbsent(id, ignored -> new ArrayList<>()).add(placed);
         setDragonEscapeKitBlockCharges(player, Material.BRICKS, "Temporary Brick",
                 "Right-click a block face to place a foothold. It disappears after you step off.",
                 remainingCharges);
@@ -17715,11 +17708,11 @@ public final class ArcadePortManager implements Listener {
         // completed this interaction so a placement never appears free to the owner.
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (!player.isOnline() || active != session || !session.alive.contains(id)
-                    || session.dragonEscapeBuilderBricks.get(id) != placed) return;
+                    || !session.dragonEscapeBuilderBricks.getOrDefault(id, List.of()).contains(placed)) return;
             if (target.getType() != Material.BRICKS) target.setType(Material.BRICKS, false);
             setDragonEscapeKitBlockCharges(player, Material.BRICKS, "Temporary Brick",
                     "Right-click a block face to place a foothold. It disappears after you step off.",
-                    placed.remainingCharges);
+                    inventoryCount(player, Material.BRICKS));
             player.sendBlockChange(target.getLocation(), target.getBlockData());
             player.updateInventory();
             placed.authoritativeResyncSent = true;
@@ -17727,63 +17720,69 @@ public final class ArcadePortManager implements Listener {
         session.dragonEscapeBuilderLastPlacedAt.put(id, System.currentTimeMillis());
         session.dragonEscapeNextBrickAt.put(id,
                 System.currentTimeMillis() + ArcadePortRules.DRAGON_ESCAPE_BUILDER_RECHARGE_MILLIS);
-        cooldownProgress.start(player, "Builder Brick",
+        // Builder can use every brick currently held, just like Digger can place
+        // every recovered block. This timer replenishes the charge; it is not a
+        // lock on the remaining starting brick or on an already placed platform.
+        cooldownProgress.start(player, "Builder Recharge",
                 ArcadePortRules.DRAGON_ESCAPE_BUILDER_RECHARGE_MILLIS);
         player.playSound(target.getLocation(), Sound.BLOCK_STONE_PLACE, 0.65F, 1.3F);
     }
 
     private void updateDragonEscapeBuilderBricks(Session session) {
         long now = System.currentTimeMillis();
-        for (Map.Entry<UUID, DragonEscapeBuilderBrick> entry
+        for (Map.Entry<UUID, List<DragonEscapeBuilderBrick>> entry
                 : new ArrayList<>(session.dragonEscapeBuilderBricks.entrySet())) {
-            Player owner = session.players.get(entry.getKey());
-            DragonEscapeBuilderBrick brick = entry.getValue();
-            Block block = brick.original.getBlock();
-            boolean standingOnBrick = owner != null && owner.isOnline() && owner.isOnGround()
-                    && owner.getWorld() == block.getWorld()
-                    && Math.abs(owner.getLocation().getY() - (block.getY() + 1.0D)) < 0.18D
-                    && owner.getLocation().getX() > block.getX() - 0.3D
-                    && owner.getLocation().getX() < block.getX() + 1.3D
-                    && owner.getLocation().getZ() > block.getZ() - 0.3D
-                    && owner.getLocation().getZ() < block.getZ() + 1.3D;
-            if (standingOnBrick) {
-                brick.used = true;
-                brick.vacatedAt = 0L;
-                if (session.alive.contains(entry.getKey())) {
-                    session.dragonEscapeBuilderFootholds.computeIfAbsent(
-                            entry.getKey(), ignored -> new HashSet<>()).add(brick);
+            UUID ownerId = entry.getKey();
+            Player owner = session.players.get(ownerId);
+            List<DragonEscapeBuilderBrick> bricks = entry.getValue();
+            for (DragonEscapeBuilderBrick brick : new ArrayList<>(bricks)) {
+                Block block = brick.original.getBlock();
+                boolean standingOnBrick = owner != null && owner.isOnline() && owner.isOnGround()
+                        && owner.getWorld() == block.getWorld()
+                        && Math.abs(owner.getLocation().getY() - (block.getY() + 1.0D)) < 0.18D
+                        && owner.getLocation().getX() > block.getX() - 0.3D
+                        && owner.getLocation().getX() < block.getX() + 1.3D
+                        && owner.getLocation().getZ() > block.getZ() - 0.3D
+                        && owner.getLocation().getZ() < block.getZ() + 1.3D;
+                if (standingOnBrick) {
+                    brick.used = true;
+                    brick.vacatedAt = 0L;
+                    if (session.alive.contains(ownerId)) {
+                        session.dragonEscapeBuilderFootholds.computeIfAbsent(
+                                ownerId, ignored -> new HashSet<>()).add(brick);
+                    }
+                } else if (brick.used && brick.vacatedAt == 0L) {
+                    brick.vacatedAt = now;
                 }
-            } else if (brick.used && brick.vacatedAt == 0L) {
-                brick.vacatedAt = now;
-            }
-            boolean missingBrick = block.getType() != Material.BRICKS;
-            if (session.alive.contains(entry.getKey())
-                    && ArcadePortRules.shouldResyncDragonEscapeBuilderPlacement(
-                    now, brick.placedAtMillis, missingBrick)) {
-                block.setType(Material.BRICKS, false);
-                if (!brick.authoritativeResyncSent && owner != null && owner.isOnline()) {
-                    setDragonEscapeKitBlockCharges(owner, Material.BRICKS, "Temporary Brick",
-                            "Right-click a block face to place a foothold. It disappears after you step off.",
-                            brick.remainingCharges);
-                    owner.sendBlockChange(block.getLocation(), block.getBlockData());
-                    owner.updateInventory();
-                    brick.authoritativeResyncSent = true;
+                boolean missingBrick = block.getType() != Material.BRICKS;
+                if (session.alive.contains(ownerId)
+                        && ArcadePortRules.shouldResyncDragonEscapeBuilderPlacement(
+                        now, brick.placedAtMillis, missingBrick)) {
+                    block.setType(Material.BRICKS, false);
+                    if (!brick.authoritativeResyncSent && owner != null && owner.isOnline()) {
+                        setDragonEscapeKitBlockCharges(owner, Material.BRICKS, "Temporary Brick",
+                                "Right-click a block face to place a foothold. It disappears after you step off.",
+                                inventoryCount(owner, Material.BRICKS));
+                        owner.sendBlockChange(block.getLocation(), block.getBlockData());
+                        owner.updateInventory();
+                        brick.authoritativeResyncSent = true;
+                    }
+                    continue;
                 }
-                continue;
+                if (ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(
+                        brick.used, standingOnBrick, session.alive.contains(ownerId), now, brick.vacatedAt)
+                        || missingBrick) {
+                    restoreDragonEscapeBuilderBrick(brick);
+                    bricks.remove(brick);
+                }
             }
-            if (ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(
-                    brick.used, standingOnBrick, session.alive.contains(entry.getKey()), now, brick.vacatedAt)
-                    || missingBrick) {
-                restoreDragonEscapeBuilderBrick(brick);
-                session.dragonEscapeBuilderBricks.remove(entry.getKey());
-            }
+            if (bricks.isEmpty()) session.dragonEscapeBuilderBricks.remove(ownerId);
         }
     }
 
     private void restoreAllDragonEscapeBuilderBricks(Session session) {
-        for (DragonEscapeBuilderBrick brick : session.dragonEscapeBuilderBricks.values()) {
-            restoreDragonEscapeBuilderBrick(brick);
-        }
+        session.dragonEscapeBuilderBricks.values().stream().flatMap(List::stream)
+                .forEach(this::restoreDragonEscapeBuilderBrick);
         session.dragonEscapeBuilderBricks.clear();
     }
 
@@ -18002,7 +18001,7 @@ public final class ArcadePortManager implements Listener {
                 || !isDragonEscapeCourseBuildLocationAllowed(session, block)
                 || block.getState() instanceof org.bukkit.block.Container) return;
         // Temporary Builder platforms are not recoverable Digger material.
-        if (session.dragonEscapeBuilderBricks.values().stream()
+        if (session.dragonEscapeBuilderBricks.values().stream().flatMap(List::stream)
                 .anyMatch(brick -> brick.original.getBlock().equals(block))) return;
 
         Location center = block.getLocation().add(0.5D, 0.5D, 0.5D);
@@ -32593,12 +32592,16 @@ public final class ArcadePortManager implements Listener {
                 && session.alive.contains(event.getPlayer().getUniqueId())) {
             Player breaker = event.getPlayer();
             if ("builder".equals(session.dragonEscapeKits.getOrDefault(breaker.getUniqueId(), "jumper"))) {
-                DragonEscapeBuilderBrick brick =
+                List<DragonEscapeBuilderBrick> bricks =
                         session.dragonEscapeBuilderBricks.get(breaker.getUniqueId());
-                if (brick != null && brick.original.getBlock().equals(event.getBlock())) {
+                DragonEscapeBuilderBrick brick = bricks == null ? null : bricks.stream()
+                        .filter(candidate -> candidate.original.getBlock().equals(event.getBlock()))
+                        .findFirst().orElse(null);
+                if (brick != null) {
                     event.setCancelled(true);
                     restoreDragonEscapeBuilderBrick(brick);
-                    session.dragonEscapeBuilderBricks.remove(breaker.getUniqueId());
+                    bricks.remove(brick);
+                    if (bricks.isEmpty()) session.dragonEscapeBuilderBricks.remove(breaker.getUniqueId());
                     return;
                 }
             }
@@ -35942,15 +35945,13 @@ public final class ArcadePortManager implements Listener {
     private static final class DragonEscapeBuilderBrick {
         final BlockState original;
         final long placedAtMillis;
-        final int remainingCharges;
         boolean used;
         long vacatedAt;
         boolean authoritativeResyncSent;
 
-        DragonEscapeBuilderBrick(BlockState original, long placedAtMillis, int remainingCharges) {
+        DragonEscapeBuilderBrick(BlockState original, long placedAtMillis) {
             this.original = original;
             this.placedAtMillis = placedAtMillis;
-            this.remainingCharges = remainingCharges;
         }
     }
 
@@ -36064,7 +36065,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, MicroDasherJumpState> microDasherJumps = new HashMap<>();
         final Map<UUID, MicroBattlesArrowHit> microSniperArrowHits = new HashMap<>();
         final Map<UUID, DragonTamerControl> dragonTamerControls = new HashMap<>();
-        final Map<UUID, DragonEscapeBuilderBrick> dragonEscapeBuilderBricks = new HashMap<>();
+        final Map<UUID, List<DragonEscapeBuilderBrick>> dragonEscapeBuilderBricks = new HashMap<>();
         final Map<UUID, Long> dragonEscapeBuilderLastPlacedAt = new HashMap<>();
         final Map<UUID, List<DragonEscapeGhostFrame>> dragonEscapeRunGhostFrames = new HashMap<>();
         final Set<UUID> dragonEscapePrepareSprintRequests = new HashSet<>();
