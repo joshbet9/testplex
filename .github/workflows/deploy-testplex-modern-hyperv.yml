@@ -55,7 +55,7 @@ jobs:
     if: ${{ inputs.deploy_to_modern_test_server }}
     runs-on: ubuntu-22.04
     environment: hyperv
-    timeout-minutes: 60
+    timeout-minutes: 100
     steps:
       - name: Connect runner to Hyper-V over Tailscale
         uses: tailscale/github-action@v4
