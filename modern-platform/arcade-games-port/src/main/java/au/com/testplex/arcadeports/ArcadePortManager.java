@@ -8809,10 +8809,9 @@ public final class ArcadePortManager implements Listener {
             for (int team = 0; team < 2; team++) {
                 final int teamIndex = team;
                 ChatColor colour = team == 0 ? ChatColor.AQUA : ChatColor.RED;
-                living.stream()
-                        .filter(player -> session.teams.getOrDefault(player.getUniqueId(), -1) == teamIndex)
-                        .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
-                        .forEach(player -> lines.add(colour + player.getName()));
+                PaintballScoreboardLayout.forEachInRosterOrder(living,
+                        player -> session.teams.getOrDefault(player.getUniqueId(), -1), teamIndex,
+                        player -> lines.add(colour + player.getName()));
             }
         } else {
             for (int team = 0; team < 2; team++) {
