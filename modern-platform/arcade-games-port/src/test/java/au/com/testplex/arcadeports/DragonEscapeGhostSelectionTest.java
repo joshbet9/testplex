@@ -52,4 +52,24 @@ class DragonEscapeGhostSelectionTest {
         assertTrue(personal.length() <= 16);
         assertTrue(kit.length() <= 16);
     }
+
+    @Test void ghostLabelUsesOwnerNameAndFallsBackOnlyWhenUnavailable() {
+        assertEquals("RacerName", DragonEscapeGhostLabel.displayName("RacerName", "ViewerName"));
+        assertEquals("ViewerName", DragonEscapeGhostLabel.displayName(null, "ViewerName"));
+        assertEquals("ViewerName", DragonEscapeGhostLabel.displayName("  ", "ViewerName"));
+    }
+
+    @Test void nameTagPacketEntityIdsCannotOverlapGhostPlayerIds() {
+        UUID personal = UUID.nameUUIDFromBytes("personal".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        UUID kit = UUID.nameUUIDFromBytes("kit".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        int personalPlayerId = 1_800_000_000 - (personal.hashCode() & 0x1fffffff);
+        int kitPlayerId = 1_800_000_000 - (kit.hashCode() & 0x1fffffff);
+        int personalLabelId = DragonEscapeGhostLabel.entityId(personal);
+        int kitLabelId = DragonEscapeGhostLabel.entityId(kit);
+
+        assertTrue(DragonEscapeGhostLabel.usesSeparateEntityIdRange(personalPlayerId, personalLabelId));
+        assertTrue(DragonEscapeGhostLabel.usesSeparateEntityIdRange(kitPlayerId, kitLabelId));
+        assertNotEquals(personalLabelId, kitLabelId);
+        assertEquals(1.65D, DragonEscapeGhostLabel.HEIGHT_OFFSET);
+    }
 }

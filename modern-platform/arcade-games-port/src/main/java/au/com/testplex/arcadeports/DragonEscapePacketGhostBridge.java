@@ -47,6 +47,7 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
     private static final byte GLOWING_FLAG = 0x40;
     private static final byte SNEAKING_FLAG = 0x02;
     private static final byte SPRINTING_FLAG = 0x08;
+    private static final byte ARMOR_STAND_MARKER_FLAG = 0x10;
 
     private final Map<UUID, Map<String, GhostState>> ghosts = new HashMap<>();
 
@@ -94,6 +95,11 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
                         new Vector3d(location.getX(), location.getY(), location.getZ()),
                         location.getYaw(), location.getPitch(), onGround));
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
+                new WrapperPlayServerEntityTeleport(state.nameTagEntityId,
+                        new Vector3d(location.getX(), location.getY() + DragonEscapeGhostLabel.HEIGHT_OFFSET,
+                                location.getZ()),
+                        location.getYaw(), 0.0F, onGround));
+        PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
                 new WrapperPlayServerEntityHeadLook(state.entityId, location.getYaw()));
 
         byte flags = (byte) (INVISIBLE_FLAG | GLOWING_FLAG
@@ -119,7 +125,7 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
                         .getBytes(StandardCharsets.UTF_8));
         // Use the racer’s name for the overhead label so the replay is identifiable.
         String sourceName = sourcePlayerId == null ? null : Bukkit.getOfflinePlayer(sourcePlayerId).getName();
-        String displayName = sourceName == null || sourceName.isBlank() ? viewer.getName() : sourceName;
+        String displayName = DragonEscapeGhostLabel.displayName(sourceName, viewer.getName());
         // The profile and team entry must be unique per ghost. The visible custom name
         // remains the real racer's name, even when one racer owns multiple selected records.
         String profileName = profileName(ghostUuid);
@@ -127,6 +133,7 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
         String teamName = "deg" + suffix;
         // Keep packet-only NPC IDs positive and far outside normal server entity IDs.
         int entityId = 1_800_000_000 - (ghostUuid.hashCode() & 0x1fffffff);
+        int nameTagEntityId = DragonEscapeGhostLabel.entityId(ghostUuid);
 
         Player sourceOnline = sourcePlayerId == null ? null : Bukkit.getPlayer(sourcePlayerId);
         User sourceUser = sourceOnline == null ? null : PacketEvents.getAPI().getPlayerManager().getUser(sourceOnline);
@@ -155,12 +162,13 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
                         Component.text("Dragon Escape PB Ghost"),
                         Component.empty(),
                         Component.empty(),
-                        WrapperPlayServerTeams.NameTagVisibility.ALWAYS,
+                        // The synthetic player profile is intentionally uniquely named. Its
+                        // default nameplate is hidden; a separate packet-only marker provides
+                        // the real racer name without colliding with a live player's team entry.
+                        WrapperPlayServerTeams.NameTagVisibility.NEVER,
                         WrapperPlayServerTeams.CollisionRule.NEVER,
                         NamedTextColor.WHITE,
                         WrapperPlayServerTeams.OptionData.FRIENDLY_CAN_SEE_INVISIBLE);
-        // The ghost profile name is the source racer's name, so the overhead nametag
-        // identifies whose run this ghost represents.
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
                 new WrapperPlayServerTeams(teamName, WrapperPlayServerTeams.TeamMode.CREATE,
                         teamInfo, List.of(profileName)));
@@ -176,12 +184,25 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
                 new WrapperPlayServerEntityMetadata(entityId, List.of(
                         new EntityData<>(0, EntityDataTypes.BYTE, flags),
+                        new EntityData<>(6, EntityDataTypes.ENTITY_POSE, EntityPose.STANDING))));
+
+        UUID nameTagUuid = UUID.nameUUIDFromBytes(
+                (ghostUuid + ":owner-name-tag").getBytes(StandardCharsets.UTF_8));
+        Location nameTagLocation = location.clone().add(0.0D, DragonEscapeGhostLabel.HEIGHT_OFFSET, 0.0D);
+        PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
+                new WrapperPlayServerSpawnEntity(nameTagEntityId, Optional.of(nameTagUuid), EntityTypes.ARMOR_STAND,
+                        new Vector3d(nameTagLocation.getX(), nameTagLocation.getY(), nameTagLocation.getZ()),
+                        0.0F, location.getYaw(), location.getYaw(), 0, Optional.empty()));
+        PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
+                new WrapperPlayServerEntityMetadata(nameTagEntityId, List.of(
+                        new EntityData<>(0, EntityDataTypes.BYTE, INVISIBLE_FLAG),
                         new EntityData<>(2, EntityDataTypes.OPTIONAL_ADV_COMPONENT,
                                 Optional.of(Component.text(displayName))),
                         new EntityData<>(3, EntityDataTypes.BOOLEAN, true),
-                        new EntityData<>(6, EntityDataTypes.ENTITY_POSE, EntityPose.STANDING))));
+                        new EntityData<>(5, EntityDataTypes.BOOLEAN, true),
+                        new EntityData<>(15, EntityDataTypes.BYTE, ARMOR_STAND_MARKER_FLAG))));
 
-        return new GhostState(entityId, ghostUuid, teamName, profileName, sourcePlayerId,
+        return new GhostState(entityId, nameTagEntityId, ghostUuid, teamName, profileName, sourcePlayerId,
                 flags, EntityPose.STANDING);
     }
 
@@ -211,7 +232,7 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
     private void hideState(Player viewer, GhostState state) {
 
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
-                new WrapperPlayServerDestroyEntities(state.entityId));
+                new WrapperPlayServerDestroyEntities(state.entityId, state.nameTagEntityId));
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
                 new WrapperPlayServerTeams(state.teamName, WrapperPlayServerTeams.TeamMode.REMOVE,
                         (WrapperPlayServerTeams.ScoreBoardTeamInfo) null));
@@ -222,6 +243,7 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
 
     private static final class GhostState {
         private final int entityId;
+        private final int nameTagEntityId;
         private final UUID profileUuid;
         private final String teamName;
         private final String profileName;
@@ -229,9 +251,11 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
         private byte entityFlags;
         private EntityPose entityPose;
 
-        private GhostState(int entityId, UUID profileUuid, String teamName, String profileName, UUID sourcePlayerId,
+        private GhostState(int entityId, int nameTagEntityId, UUID profileUuid, String teamName,
+                           String profileName, UUID sourcePlayerId,
                            byte entityFlags, EntityPose entityPose) {
             this.entityId = entityId;
+            this.nameTagEntityId = nameTagEntityId;
             this.profileUuid = profileUuid;
             this.teamName = teamName;
             this.profileName = profileName;
