@@ -431,7 +431,7 @@ jobs:
           MM_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.mm_maps_required }}
           MAP_EXPANDED_KB: ${{ steps.stage-jars.outputs.map_expanded_kb }}
           ARTIFACT_SIZE_BYTES: ${{ steps.source-artifact.outputs.artifact_size_bytes }}
-          ARTIFACT_DOWNLOAD_CONFIG: ${{ runner.temp }}/testplex-artifact-download.curl
+          ARTIFACT_DOWNLOAD_CONFIG: ${{ runner.temp }}/testplex-modern-verified/ArtifactDownloadUrl.curl
           WIZARDS_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.wizards_maps_required }}
         run: |
           set -euo pipefail
