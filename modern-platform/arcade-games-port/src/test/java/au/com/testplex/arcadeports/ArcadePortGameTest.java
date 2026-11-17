@@ -1997,25 +1997,20 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(true, true, true, 10_500L, 10_000L),
                 "re-entering the brick cancels the vacated grace timer");
         assertTrue(ArcadePortRules.shouldRemoveDragonEscapeBuilderBrick(false, false, false, 10_000L, 0L));
-        assertFalse(ArcadePortRules.shouldRejectDragonEscapeBuilderEntityOverlap(true, true));
-        assertTrue(ArcadePortRules.shouldRejectDragonEscapeBuilderEntityOverlap(false, true));
-        assertFalse(ArcadePortRules.shouldRejectDragonEscapeBuilderEntityOverlap(false, false));
         assertTrue(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false));
         assertTrue(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(1_000L, 0L, false),
                 "Builder's starting charges must be usable immediately when no recharge deadline exists");
         assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(9L, 10L, false));
         assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, true));
-        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(true, Material.STONE));
-        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, Material.WATER),
-                "Builder must replace water the same way Digger does");
-        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, Material.LAVA));
-        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, Material.SHORT_GRASS));
-        assertFalse(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, Material.STONE));
-        assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(64, -64, 320));
-        assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(-64, -64, 320));
-        assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(319, -64, 320));
-        assertFalse(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(-65, -64, 320));
-        assertFalse(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(320, -64, 320));
+    }
+
+    @Test void dragonEscapeBuilderPlacementRoutesFromKitAndActionNotEventItemPrediction() {
+        assertTrue(ArcadePortRules.shouldRouteDragonEscapeBuilderPlacement(true, true, true, true, true));
+        assertFalse(ArcadePortRules.shouldRouteDragonEscapeBuilderPlacement(true, true, false, true, true));
+        assertFalse(ArcadePortRules.shouldRouteDragonEscapeBuilderPlacement(true, false, true, true, true));
+        assertFalse(ArcadePortRules.shouldRouteDragonEscapeBuilderPlacement(true, true, true, false, true));
+        assertFalse(ArcadePortRules.shouldRouteDragonEscapeBuilderPlacement(false, true, true, true, true));
+        assertFalse(ArcadePortRules.shouldRouteDragonEscapeBuilderPlacement(true, true, true, true, false));
     }
 
     @Test void dragonEscapeBuilderPlacementGetsBoundedAuthoritativeResyncGrace() {

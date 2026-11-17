@@ -17642,18 +17642,45 @@ public final class ArcadePortManager implements Listener {
     }
 
     /** Builder placement follows vanilla block-face placement; air clicks do nothing. */
+    private Block dragonEscapeKitPlacementTarget(Block clicked, BlockFace face) {
+        if (clicked == null || face == null || face == BlockFace.SELF || clicked.getType().isAir()) return null;
+        return ArcadePortRules.shouldPlaceDragonEscapeKitIntoClickedBlock(clicked.getType())
+                ? clicked : clicked.getRelative(face);
+    }
+
+    private boolean isDragonEscapeKitPlacementTargetAllowed(Session session, Block target) {
+        return target != null && target.getWorld() == session.world
+                && (target.isEmpty()
+                        || ArcadePortRules.shouldPlaceDragonEscapeKitIntoClickedBlock(target.getType()))
+                && isDragonEscapeCourseBuildLocationAllowed(session, target);
+    }
+
+    private boolean isDragonEscapeKitPlacementSpaceClear(Session session, Block target) {
+        org.bukkit.util.BoundingBox box = new org.bukkit.util.BoundingBox(
+                target.getX(), target.getY(), target.getZ(),
+                target.getX() + 1, target.getY() + 1, target.getZ() + 1);
+        for (Player racer : alivePlayers(session)) {
+            if (racer.getWorld() == session.world && racer.getBoundingBox().overlaps(box)) return false;
+        }
+        return true;
+    }
+
     private void placeDragonEscapeBuilderBrick(Session session, Player player, Block clicked, BlockFace face) {
         UUID id = player.getUniqueId();
         if (active != session || !session.alive.contains(id)
                 || !"builder".equals(session.dragonEscapeKits.get(id))) return;
+        ItemStack held = player.getInventory().getItemInMainHand();
+        if (held == null || held.getType() != Material.BRICKS || inventoryCount(player, Material.BRICKS) <= 0) {
+            player.sendActionBar(ChatColor.YELLOW + "Your Builder bricks are missing from your hand.");
+            return;
+        }
         long now = System.currentTimeMillis();
         long nextChargeAt = session.dragonEscapeNextBrickAt.getOrDefault(id, 0L);
-        if (clicked == null || face == null || face == BlockFace.SELF || clicked.getType().isAir()) {
+        Block target = dragonEscapeKitPlacementTarget(clicked, face);
+        if (target == null) {
             player.sendActionBar(ChatColor.YELLOW + "Right-click a block face to place your brick.");
             return;
         }
-        Block target = ArcadePortRules.shouldPlaceDragonEscapeKitIntoClickedBlock(clicked.getType())
-                ? clicked : clicked.getRelative(face);
         boolean pendingBrick = session.dragonEscapeBuilderBricks.containsKey(id);
         if (!ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(
                 now, nextChargeAt, pendingBrick)) {
@@ -17662,31 +17689,14 @@ public final class ArcadePortManager implements Listener {
                     : "Your next Builder brick is still recharging."));
             return;
         }
-        if (target.getWorld() != session.world || !ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(
-                    target.isEmpty(), target.getType())
-                || !ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(
-                        target.getY(), session.world.getMinHeight(), session.world.getMaxHeight())) {
+        if (!isDragonEscapeKitPlacementTargetAllowed(session, target)) {
             player.sendActionBar(ChatColor.YELLOW + "You cannot place a temporary brick there.");
             return;
         }
-        if (inventoryCount(player, Material.BRICKS) <= 0
-                || player.getInventory().getItemInMainHand().getType() != Material.BRICKS) return;
         int remainingCharges = inventoryCount(player, Material.BRICKS) - 1;
-        // No block is allowed to appear inside another racer's body, including the owner.
-        org.bukkit.util.BoundingBox placementBox = new org.bukkit.util.BoundingBox(
-                target.getX(), target.getY(), target.getZ(),
-                target.getX() + 1, target.getY() + 1, target.getZ() + 1);
-        for (Player racer : alivePlayers(session)) {
-            // Vanilla block placement ignores the placing player when checking for
-            // entity collisions. Keep other racers protected, but allow the builder
-            // to place a foothold beside their own hitbox.
-            boolean overlaps = racer.getWorld() == session.world
-                    && racer.getBoundingBox().overlaps(placementBox);
-            if (ArcadePortRules.shouldRejectDragonEscapeBuilderEntityOverlap(
-                    racer.getUniqueId().equals(id), overlaps)) {
-                player.sendActionBar(ChatColor.YELLOW + "A racer is occupying that space.");
-                return;
-            }
+        if (!isDragonEscapeKitPlacementSpaceClear(session, target)) {
+            player.sendActionBar(ChatColor.YELLOW + "A racer is occupying that space.");
+            return;
         }
         BlockState previous = target.getState();
         target.setType(Material.BRICKS, false);
@@ -17962,7 +17972,7 @@ public final class ArcadePortManager implements Listener {
                 && material != Material.JIGSAW;
     }
 
-    private boolean isDragonEscapeDiggerBuildLocationAllowed(Session session, Block block) {
+    private boolean isDragonEscapeCourseBuildLocationAllowed(Session session, Block block) {
         if (block.getY() < 1 || block.getY() >= session.world.getMaxHeight() - 1) return false;
         SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
         if (mapData != null && mapData.hasBounds()) {
@@ -17989,7 +17999,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (!isDragonEscapeDiggerBlockAllowed(block.getType())
-                || !isDragonEscapeDiggerBuildLocationAllowed(session, block)
+                || !isDragonEscapeCourseBuildLocationAllowed(session, block)
                 || block.getState() instanceof org.bukkit.block.Container) return;
         // Temporary Builder platforms are not recoverable Digger material.
         if (session.dragonEscapeBuilderBricks.values().stream()
@@ -18066,24 +18076,14 @@ public final class ArcadePortManager implements Listener {
 
     /** Adventure mode cannot rely on vanilla block placement for Digger's recovered blocks. */
     private void placeDragonEscapeDiggerBlock(Session session, Player player, Block clicked, BlockFace face) {
-        if (clicked == null || face == null || face == BlockFace.SELF) return;
         UUID id = player.getUniqueId();
         if (active != session || !session.alive.contains(id)
                 || !"digger".equals(session.dragonEscapeKits.get(id))) return;
         ItemStack held = player.getInventory().getItemInMainHand();
         if (held == null || !isDragonEscapeDiggerBlockAllowed(held.getType())) return;
-        Block target = ArcadePortRules.shouldPlaceDragonEscapeKitIntoClickedBlock(clicked.getType())
-                ? clicked : clicked.getRelative(face);
-        if (target.getWorld() != session.world
-                || (!target.isEmpty()
-                        && !ArcadePortRules.shouldPlaceDragonEscapeKitIntoClickedBlock(target.getType()))
-                || !isDragonEscapeDiggerBuildLocationAllowed(session, target)) return;
-        org.bukkit.util.BoundingBox box = new org.bukkit.util.BoundingBox(
-                target.getX(), target.getY(), target.getZ(),
-                target.getX() + 1, target.getY() + 1, target.getZ() + 1);
-        for (Player racer : alivePlayers(session)) {
-            if (racer.getWorld() == session.world && racer.getBoundingBox().overlaps(box)) return;
-        }
+        Block target = dragonEscapeKitPlacementTarget(clicked, face);
+        if (!isDragonEscapeKitPlacementTargetAllowed(session, target)
+                || !isDragonEscapeKitPlacementSpaceClear(session, target)) return;
         BlockState previous = target.getState();
         if (session.dragonEscapePractice)
             session.dragonEscapePracticeChangedBlocks.putIfAbsent(target, previous.getBlockData().clone());
@@ -30615,11 +30615,12 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
         }
-        if (session.type == ArcadePortGame.DRAGON_ESCAPE
-                && session.alive.contains(event.getPlayer().getUniqueId())
-                && "builder".equals(session.dragonEscapeKits.get(event.getPlayer().getUniqueId()))
-                && event.getAction().isRightClick() && event.getItem() != null
-                && event.getItem().getType() == Material.BRICKS) {
+        if (ArcadePortRules.shouldRouteDragonEscapeBuilderPlacement(
+                session.type == ArcadePortGame.DRAGON_ESCAPE,
+                session.alive.contains(event.getPlayer().getUniqueId()),
+                "builder".equals(session.dragonEscapeKits.get(event.getPlayer().getUniqueId())),
+                event.getAction().isRightClick(),
+                event.getPlayer().getInventory().getItemInMainHand().getType() == Material.BRICKS)) {
             event.setCancelled(true);
             if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
                 placeDragonEscapeBuilderBrick(session, event.getPlayer(), event.getClickedBlock(), event.getBlockFace());
@@ -32904,7 +32905,7 @@ public final class ArcadePortManager implements Listener {
             boolean allowed = session.alive.contains(player.getUniqueId())
                     && "digger".equals(session.dragonEscapeKits.getOrDefault(player.getUniqueId(), "jumper"))
                     && isDragonEscapeDiggerBlockAllowed(placed.getType())
-                    && isDragonEscapeDiggerBuildLocationAllowed(session, placed);
+                    && isDragonEscapeCourseBuildLocationAllowed(session, placed);
             if (!allowed) {
                 event.setCancelled(true);
             } else {

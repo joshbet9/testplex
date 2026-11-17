@@ -1450,22 +1450,10 @@ public final class ArcadePortRules {
         return !hasPendingBrick && now >= nextChargeAt;
     }
 
-    /** Builder bricks follow Digger's replaceable-cell placement, including water and lava. */
-    public static boolean isDragonEscapeBuilderTargetReplaceable(
-            boolean targetIsEmpty, Material targetType) {
-        return targetIsEmpty || shouldPlaceDragonEscapeKitIntoClickedBlock(targetType);
-    }
-
-    /** Builder bricks follow vanilla build-height limits, not the Digger's map-area restriction. */
-    public static boolean isDragonEscapeBuilderPlacementHeightAllowed(
-            int blockY, int minBuildHeight, int maxBuildHeight) {
-        return blockY >= minBuildHeight && blockY < maxBuildHeight;
-    }
-
-    /** Vanilla placement collision checks exclude the placer but still protect other racers. */
-    public static boolean shouldRejectDragonEscapeBuilderEntityOverlap(
-            boolean isPlacingRacer, boolean overlapsRacer) {
-        return !isPlacingRacer && overlapsRacer;
+    public static boolean shouldRouteDragonEscapeBuilderPlacement(
+            boolean dragonEscapeGame, boolean alive, boolean builderKit, boolean rightClick,
+            boolean holdingBuilderBricks) {
+        return dragonEscapeGame && alive && builderKit && rightClick && holdingBuilderBricks;
     }
 
     public static boolean isDragonEscapeWaterContact(boolean inWater, boolean feetInWater, boolean headInWater) {
