@@ -2111,6 +2111,9 @@ class ArcadePortGameTest {
         assertEquals(10.0D, ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS, 0.00001D);
         assertTrue(ArcadePortRules.shouldDragonEscapePlayerBeCaught(25.01D, 25.0D));
         assertFalse(ArcadePortRules.shouldDragonEscapePlayerBeCaught(24.99D, 25.0D));
+        assertTrue(ArcadePortRules.shouldDragonEscapeRestorePrepareSprint(true, true));
+        assertFalse(ArcadePortRules.shouldDragonEscapeRestorePrepareSprint(false, true));
+        assertFalse(ArcadePortRules.shouldDragonEscapeRestorePrepareSprint(true, false));
         assertFalse(ArcadePortRules.isDragonEscapeFinishReached(10.0D, 64.0D, 77.5D));
         assertFalse(ArcadePortRules.isDragonEscapeFinishReached(0.5D, 70.0D, 77.5D));
         assertFalse(ArcadePortRules.isDragonEscapeFinishReached(0.5D, 64.0D, 74.4D));
