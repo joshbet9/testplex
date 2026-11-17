@@ -1450,12 +1450,13 @@ public final class ArcadePortRules {
     }
 
     /**
-     * Builder bricks may replace fluid and passable course cells, as ordinary
-     * vanilla block placement can, while leaving occupied solid course blocks intact.
+     * Builder bricks may replace air and passable non-fluid course cells, while
+     * leaving water, lava, and occupied solid course blocks intact. Fluids can
+     * immediately wash away a temporary brick before its charge state is observed.
      */
     public static boolean isDragonEscapeBuilderTargetReplaceable(
             boolean targetIsEmpty, boolean targetIsLiquid, boolean targetIsPassable) {
-        return targetIsEmpty || targetIsLiquid || targetIsPassable;
+        return targetIsEmpty || (!targetIsLiquid && targetIsPassable);
     }
 
     /** Builder bricks follow vanilla build-height limits, not the Digger's map-area restriction. */
