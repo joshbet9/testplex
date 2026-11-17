@@ -1445,9 +1445,8 @@ public final class ArcadePortRules {
     public static final double DRAGON_ESCAPE_LEAP_FACING_Y_BONUS = 0.2D;
     public static final double DRAGON_ESCAPE_LEAP_GROUNDED_Y_BONUS = 0.2D;
 
-    public static boolean shouldAllowDragonEscapeBuilderPlacement(
-            long now, long nextChargeAt, boolean hasPendingBrick) {
-        return !hasPendingBrick && now >= nextChargeAt;
+    public static boolean shouldAllowDragonEscapeBuilderPlacement(int bricksHeld) {
+        return bricksHeld > 0;
     }
 
     public static boolean shouldRouteDragonEscapeBuilderPlacement(
