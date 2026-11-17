@@ -110,6 +110,18 @@ class SuperSploorRulesTest {
     }
 
     @Test
+    void sourceStyleScoreboardShowsTeamHeadingAndPaintedBlockCount() {
+        assertEquals(org.bukkit.ChatColor.RED + "" + org.bukkit.ChatColor.BOLD + "Red",
+                SuperSploorRules.scoreboardTeamHeading("Red", org.bukkit.ChatColor.RED));
+        assertEquals(org.bukkit.ChatColor.AQUA + "" + org.bukkit.ChatColor.BOLD + "Blue",
+                SuperSploorRules.scoreboardTeamHeading("Blue", org.bukkit.ChatColor.AQUA));
+        assertEquals(org.bukkit.ChatColor.WHITE + "37 Blocks " + org.bukkit.ChatColor.GRAY + "(42.0%)",
+                SuperSploorRules.scoreboardPaintedBlocks(37, "42.0%"));
+        assertEquals(org.bukkit.ChatColor.WHITE + "0 Blocks " + org.bukkit.ChatColor.GRAY + "(0.0%)",
+                SuperSploorRules.scoreboardPaintedBlocks(-3, "0.0%"));
+    }
+
+    @Test
     void inkRegenerationWaitsAfterPrimaryOrSecondaryUseUnlessSwimmingOnFriendlyPaint() {
         assertFalse(SuperSploorRules.canRegenerateInk(10_999L, 10_000L, false, false));
         assertTrue(SuperSploorRules.canRegenerateInk(11_000L, 10_000L, false, false));

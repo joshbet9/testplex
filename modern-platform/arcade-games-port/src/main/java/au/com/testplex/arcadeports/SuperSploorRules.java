@@ -110,6 +110,15 @@ public final class SuperSploorRules {
         return team == 0 ? org.bukkit.ChatColor.RED : org.bukkit.ChatColor.AQUA;
     }
 
+    public static String scoreboardTeamHeading(String name, org.bukkit.ChatColor color) {
+        return color + "" + org.bukkit.ChatColor.BOLD + name;
+    }
+
+    public static String scoreboardPaintedBlocks(int blocks, String percentage) {
+        return org.bukkit.ChatColor.WHITE + Integer.toString(Math.max(0, blocks)) + " Blocks "
+                + org.bukkit.ChatColor.GRAY + "(" + percentage + ")";
+    }
+
     public static int debugInt(String suffix, int fallback) {
         return GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_" + suffix, fallback);
     }

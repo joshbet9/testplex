@@ -1780,8 +1780,10 @@ public final class SuperSploorRuntime implements Listener {
                                             SuperSploorRules.CHARGER_FULL_CHARGE_MILLIS)))) + "%";
             List<String> lines = List.of(
                     ChatColor.WHITE + "Time: " + ChatColor.YELLOW + timer + (overtime ? ChatColor.GOLD + " OT" : ""),
-                    ChatColor.RED + "Red: " + red,
-                    ChatColor.AQUA + "Blue: " + blue,
+                    SuperSploorRules.scoreboardTeamHeading("Red", ChatColor.RED),
+                    SuperSploorRules.scoreboardPaintedBlocks(engine.redUnits(), red),
+                    SuperSploorRules.scoreboardTeamHeading("Blue", ChatColor.AQUA),
+                    SuperSploorRules.scoreboardPaintedBlocks(engine.blueUnits(), blue),
                     ChatColor.GRAY + "Neutral: " + neutral,
                     ChatColor.LIGHT_PURPLE + "Special: " + specialText,
                     ChatColor.AQUA + "Charge: " + chargeText,
