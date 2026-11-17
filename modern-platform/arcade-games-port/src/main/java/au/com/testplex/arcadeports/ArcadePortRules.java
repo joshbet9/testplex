@@ -3906,6 +3906,10 @@ public final class ArcadePortRules {
         return dragonProgress > playerProgress;
     }
 
+    public static int dragonEscapeDiggerPickaxeItemCount(int digsRemaining) {
+        return digsRemaining > 0 ? 1 : 0;
+    }
+
     public static boolean shouldDragonEscapeRestorePrepareSprint(boolean requestedDuringPrepare, boolean alive) {
         return requestedDuringPrepare && alive;
     }
