@@ -88,6 +88,7 @@ final class ArcadeLobbyLeaderboardService implements Listener {
         final List<TextDisplay> rows = new ArrayList<>();
         Interaction hitbox;
         int index;
+        String game;
         String lastContent = "";
 
         void remove() {
@@ -238,13 +239,17 @@ final class ArcadeLobbyLeaderboardService implements Listener {
     }
 
     private void render(Player viewer, World world) {
+        String game = selectedGame();
         List<Board> layouts = boards(viewer.getUniqueId());
         List<Panel> panels = visible.computeIfAbsent(viewer.getUniqueId(), ignored -> new ArrayList<>());
-        if (panels.size() != layouts.size()) {
+        if (panels.size() != layouts.size()
+                || (!panels.isEmpty() && !game.equals(panels.getFirst().game))) {
             clear(viewer.getUniqueId());
             panels = new ArrayList<>();
             visible.put(viewer.getUniqueId(), panels);
-            for (int i = 0; i < layouts.size(); i++) panels.add(spawnPanel(viewer, world, i, layouts.size()));
+            for (int i = 0; i < layouts.size(); i++) {
+                panels.add(spawnPanel(viewer, world, i, layouts.size(), game));
+            }
         }
         for (int i = 0; i < panels.size(); i++) {
             Panel panel = panels.get(i);
@@ -258,13 +263,14 @@ final class ArcadeLobbyLeaderboardService implements Listener {
         }
     }
 
-    private Panel spawnPanel(Player viewer, World world, int index, int count) {
+    private Panel spawnPanel(Player viewer, World world, int index, int count, String game) {
         Panel panel = new Panel();
         panel.index = index;
+        panel.game = game;
         double x = (index - (count - 1) / 2.0D) * 9.2D;
         double z = -28.0D;
         for (int line = 0; line < 15; line++) {
-            Location at = new Location(world, x, 106.8D - line * 0.32D, z);
+            Location at = new Location(world, x, ArcadeLobbyLeaderboardPosition.rowY(game, line), z);
             TextDisplay display = world.spawn(at, TextDisplay.class, entity -> {
                 entity.setVisibleByDefault(false);
                 entity.setPersistent(false);
@@ -282,7 +288,8 @@ final class ArcadeLobbyLeaderboardService implements Listener {
             viewer.showEntity(plugin, display);
             panel.rows.add(display);
         }
-        panel.hitbox = world.spawn(new Location(world, x, 104.2D, z), Interaction.class, entity -> {
+        panel.hitbox = world.spawn(new Location(world, x, ArcadeLobbyLeaderboardPosition.hitboxY(game), z),
+                Interaction.class, entity -> {
             entity.setVisibleByDefault(false);
             entity.setPersistent(false);
             entity.setInteractionWidth(6.0F);
