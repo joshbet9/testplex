@@ -406,6 +406,7 @@ class SessionState {
     final Map<UUID, Integer> baconBlastKills = new HashMap<>();
     final Set<UUID> baconGoatStyEligible = new HashSet<>();
     final Set<UUID> baconStarvationDamaged = new HashSet<>();
+    final Map<UUID, Integer> baconObservedFoodLevels = new HashMap<>();
     final BaconSlamRecoveryTracker baconSlamRecoveries = new BaconSlamRecoveryTracker();
     final BaconBrawlAchievementTracker baconAchievements = new BaconBrawlAchievementTracker();
     final Map<UUID, UUID> baconBabyPigs = new HashMap<>();
