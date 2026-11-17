@@ -3323,11 +3323,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
     }
 
     private ChatColor categoryColour(WizardsSpell spell) {
-        return switch (spell.category()) {
-            case ATTACK -> ChatColor.RED;
-            case SUPPORT -> ChatColor.GREEN;
-            case MISC -> ChatColor.AQUA;
-        };
+        return WizardsRules.spellCategoryColour(spell);
     }
 
     private String prettyKit(WizardsKit kit) {

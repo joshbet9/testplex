@@ -182,8 +182,16 @@ class WizardsRulesTest {
         assertEquals(2.3D, WizardsRules.fireballBlockRadius(1), 0.000001D);
         assertEquals(2.6D, WizardsRules.fireballBlockRadius(2), 0.000001D);
         assertEquals(2.9D, WizardsRules.fireballBlockRadius(99), 0.000001D);
-        assertEquals(org.bukkit.ChatColor.WHITE + "" + org.bukkit.ChatColor.BOLD + "Fireball",
+        assertEquals(org.bukkit.ChatColor.RED + "" + org.bukkit.ChatColor.BOLD + "Fireball",
                 WizardsRules.wandDisplayName(WizardsSpell.FIREBALL));
+        assertEquals(org.bukkit.ChatColor.GREEN + "" + org.bukkit.ChatColor.BOLD + "Flash",
+                WizardsRules.wandDisplayName(WizardsSpell.FLASH));
+        assertEquals(org.bukkit.ChatColor.AQUA + "" + org.bukkit.ChatColor.BOLD + "Gust",
+                WizardsRules.wandDisplayName(WizardsSpell.GUST));
+        assertEquals(org.bukkit.ChatColor.RED, WizardsRules.spellCategoryColour(WizardsSpell.FIREBALL));
+        assertEquals(org.bukkit.ChatColor.GREEN, WizardsRules.spellCategoryColour(WizardsSpell.FLASH));
+        assertEquals(org.bukkit.ChatColor.AQUA, WizardsRules.spellCategoryColour(WizardsSpell.GUST));
+        assertEquals(org.bukkit.ChatColor.WHITE, WizardsRules.spellCategoryColour(null));
         assertEquals(org.bukkit.ChatColor.WHITE + "Spell Wand", WizardsRules.wandDisplayName(null));
         assertTrue(WizardsRules.isProtectedDropSlot(0));
         assertTrue(WizardsRules.isProtectedDropSlot(4));
