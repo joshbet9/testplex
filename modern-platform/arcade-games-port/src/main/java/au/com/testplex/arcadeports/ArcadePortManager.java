@@ -17652,7 +17652,8 @@ public final class ArcadePortManager implements Listener {
             player.sendActionBar(ChatColor.YELLOW + "Right-click a block face to place your brick.");
             return;
         }
-        Block target = clicked.getRelative(face);
+        Block target = ArcadePortRules.shouldPlaceDragonEscapeKitIntoClickedBlock(clicked.getType())
+                ? clicked : clicked.getRelative(face);
         boolean pendingBrick = session.dragonEscapeBuilderBricks.containsKey(id);
         if (!ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(
                 now, nextChargeAt, pendingBrick)) {
@@ -17662,7 +17663,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (target.getWorld() != session.world || !ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(
-                    target.isEmpty(), target.isLiquid(), target.isPassable())
+                    target.isEmpty(), target.getType())
                 || !ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(
                         target.getY(), session.world.getMinHeight(), session.world.getMaxHeight())) {
             player.sendActionBar(ChatColor.YELLOW + "You cannot place a temporary brick there.");
@@ -18071,11 +18072,11 @@ public final class ArcadePortManager implements Listener {
                 || !"digger".equals(session.dragonEscapeKits.get(id))) return;
         ItemStack held = player.getInventory().getItemInMainHand();
         if (held == null || !isDragonEscapeDiggerBlockAllowed(held.getType())) return;
-        Block target = ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(clicked.getType())
+        Block target = ArcadePortRules.shouldPlaceDragonEscapeKitIntoClickedBlock(clicked.getType())
                 ? clicked : clicked.getRelative(face);
         if (target.getWorld() != session.world
                 || (!target.isEmpty()
-                        && !ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(target.getType()))
+                        && !ArcadePortRules.shouldPlaceDragonEscapeKitIntoClickedBlock(target.getType()))
                 || !isDragonEscapeDiggerBuildLocationAllowed(session, target)) return;
         org.bukkit.util.BoundingBox box = new org.bukkit.util.BoundingBox(
                 target.getX(), target.getY(), target.getZ(),
@@ -30614,6 +30615,19 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
         }
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE
+                && session.alive.contains(event.getPlayer().getUniqueId())
+                && "builder".equals(session.dragonEscapeKits.get(event.getPlayer().getUniqueId()))
+                && event.getAction().isRightClick() && event.getItem() != null
+                && event.getItem().getType() == Material.BRICKS) {
+            event.setCancelled(true);
+            if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
+                placeDragonEscapeBuilderBrick(session, event.getPlayer(), event.getClickedBlock(), event.getBlockFace());
+            } else {
+                event.getPlayer().sendActionBar(ChatColor.YELLOW + "Right-click a block face to place your brick.");
+            }
+            return;
+        }
         if (session.type == ArcadePortGame.DRAGONS
                 && session.dragonTamerControls.containsKey(event.getPlayer().getUniqueId())) {
             event.setCancelled(true);
@@ -31000,15 +31014,6 @@ public final class ArcadePortManager implements Listener {
                 event.setCancelled(true);
                 if (!isDebugAbilityAllowed(player, ArcadePortGame.DRAGON_ESCAPE, kit)) return;
                 throwDragonEscapeMine(session, player);
-                return;
-            }
-            if (event.getAction().isRightClick() && item == Material.BRICKS && "builder".equals(kit)) {
-                event.setCancelled(true);
-                if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
-                    placeDragonEscapeBuilderBrick(session, player, event.getClickedBlock(), event.getBlockFace());
-                } else {
-                    player.sendActionBar(ChatColor.YELLOW + "Right-click a block face to place your brick.");
-                }
                 return;
             }
         }

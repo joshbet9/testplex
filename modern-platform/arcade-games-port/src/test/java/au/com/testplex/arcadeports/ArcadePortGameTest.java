@@ -1748,12 +1748,12 @@ class ArcadePortGameTest {
         assertEquals(0.5D, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y, 0.00001D);
     }
 
-    @Test void dragonEscapeDiggerPlacesIntoReplaceableTerrainAndBlocksOffhandUse() {
-        assertTrue(ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(Material.WATER));
-        assertTrue(ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(Material.LAVA));
-        assertTrue(ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(Material.SNOW));
-        assertTrue(ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(Material.SHORT_GRASS));
-        assertFalse(ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(Material.STONE));
+    @Test void dragonEscapeBuilderAndDiggerShareReplaceableTargeting() {
+        assertTrue(ArcadePortRules.shouldPlaceDragonEscapeKitIntoClickedBlock(Material.WATER));
+        assertTrue(ArcadePortRules.shouldPlaceDragonEscapeKitIntoClickedBlock(Material.LAVA));
+        assertTrue(ArcadePortRules.shouldPlaceDragonEscapeKitIntoClickedBlock(Material.SNOW));
+        assertTrue(ArcadePortRules.shouldPlaceDragonEscapeKitIntoClickedBlock(Material.SHORT_GRASS));
+        assertFalse(ArcadePortRules.shouldPlaceDragonEscapeKitIntoClickedBlock(Material.STONE));
         assertTrue(ArcadePortRules.shouldBlockDragonEscapeOffhandSwap(ArcadePortGame.DRAGON_ESCAPE, true));
         assertFalse(ArcadePortRules.shouldBlockDragonEscapeOffhandSwap(ArcadePortGame.DRAGONS, true));
         assertFalse(ArcadePortRules.shouldBlockDragonEscapeOffhandSwap(ArcadePortGame.DRAGON_ESCAPE, false));
@@ -2003,11 +2003,12 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false));
         assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(9L, 10L, false));
         assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, true));
-        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(true, false, false));
-        assertFalse(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, true, true),
-                "Builder bricks must not be placed into fluid cells that can wash them away");
-        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, false, true));
-        assertFalse(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, false, false));
+        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(true, Material.STONE));
+        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, Material.WATER),
+                "Builder must replace water the same way Digger does");
+        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, Material.LAVA));
+        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, Material.SHORT_GRASS));
+        assertFalse(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, Material.STONE));
         assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(64, -64, 320));
         assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(-64, -64, 320));
         assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(319, -64, 320));

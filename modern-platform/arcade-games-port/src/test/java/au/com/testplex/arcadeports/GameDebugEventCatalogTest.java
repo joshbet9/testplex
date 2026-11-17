@@ -11,6 +11,21 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class GameDebugEventCatalogTest {
     @Test
+    void dragonEscapeBuilderPlacementRunsBeforeTheGenericCourseBlockGuard() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        int interact = manager.indexOf("public void onPlayerInteract(PlayerInteractEvent event)");
+        int builderRoute = manager.indexOf("placeDragonEscapeBuilderBrick(session, event.getPlayer()", interact);
+        int genericGuard = manager.indexOf("isDragonEscapeUsableBlock(event.getClickedBlock())", interact);
+        assertTrue(interact >= 0 && builderRoute > interact && genericGuard > builderRoute,
+                "Builder right-clicks must be handled before the generic Dragon Escape block guard cancels them");
+    }
+
+    @Test
     void everyGameHasAtLeastOneGameScopedEventTool() {
         for (ArcadePortGame game : ArcadePortGame.values()) {
             assertFalse(GameDebugEventCatalog.events(game).isEmpty(),
