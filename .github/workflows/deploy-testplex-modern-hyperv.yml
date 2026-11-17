@@ -124,6 +124,15 @@ jobs:
           echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
           echo "Selected modern build $source_sha from run $SOURCE_RUN_ID"
 
+      - name: Download modern plugin artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.source-artifact.outputs.artifact_name }}
+          path: ${{ runner.temp }}/testplex-modern-artifact
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Find the successful build currently installed on the VM
         id: base-artifact
         shell: bash
@@ -133,6 +142,7 @@ jobs:
           HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
           HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
           TARGET_SHA: ${{ steps.source-artifact.outputs.source_sha }}
+          TARGET_ARTIFACT_DIR: ${{ runner.temp }}/testplex-modern-artifact
         run: |
           set -euo pipefail
           SSH_PORT="${HYPERV_SSH_PORT:-22}"
@@ -160,6 +170,27 @@ jobs:
             echo "Target build is already installed; no base artifact is needed."
             exit 0
           fi
+          # A deployment-only commit can produce byte-identical gameplay JARs.
+          # In that case no entry-delta base is needed; checking the installed JARs
+          # first avoids requiring a historical Actions artifact just to prove a no-op.
+          identical_jars=true
+          for jar in TestplexModernArcade.jar ArcadeMechanicsModern.jar; do
+            matches="$(find "$TARGET_ARTIFACT_DIR" -type f -name "$jar" | wc -l | tr -d ' ')"
+            [[ "$matches" == 1 ]] || { echo "Expected exactly one target $jar before comparing installed artifacts; got $matches." >&2; exit 1; }
+            target_jar="$(find "$TARGET_ARTIFACT_DIR" -type f -name "$jar" -print -quit)"
+            target_hash="$(sha256sum "$target_jar" | awk '{print $1}')"
+            installed_hash="$(timeout --foreground --signal=TERM --kill-after=10s 90s ssh "${ssh_opts[@]}" "$remote" \
+              sudo -n sha256sum "/home/monstermaze/servers/testplex-modern/plugins/$jar" 2>/dev/null | awk '{print $1}' || true)"
+            if [[ "$target_hash" != "$installed_hash" ]]; then
+              identical_jars=false
+              break
+            fi
+          done
+          if [[ "$identical_jars" == true ]]; then
+            echo "base_run_id=" >> "$GITHUB_OUTPUT"
+            echo "Target and installed gameplay JAR checksums match; no historical base artifact is required."
+            exit 0
+          fi
           runs_json="$RUNNER_TEMP/testplex-modern-base-runs.json"
           curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
             "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/workflows/testplex-modern-build.yml/runs?branch=feat%2Ftestplex-modern-26.3-platform&status=success&per_page=100" -o "$runs_json"
@@ -184,15 +215,6 @@ jobs:
           path: ${{ runner.temp }}/testplex-modern-base-artifact
           repository: ${{ github.repository }}
           run-id: ${{ steps.base-artifact.outputs.base_run_id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Download modern plugin artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ steps.source-artifact.outputs.artifact_name }}
-          path: ${{ runner.temp }}/testplex-modern-artifact
-          repository: ${{ github.repository }}
-          run-id: ${{ inputs.source_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Checkout deployment recovery helper source
