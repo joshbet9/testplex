@@ -398,15 +398,15 @@ jobs:
           done
           # The measured Hyper-V SSH path is slow. Fail before opening a deployment
           # transaction if the JAR delta cannot fit within the transfer time budget.
-          (( delta_bytes <= 16777216 )) || {
-            echo "Verified JAR deltas total $delta_bytes bytes, above the 16 MiB transfer budget. Refusing a long upload; server state is unchanged." >&2
+          (( delta_bytes <= 9437184 )) || {
+            echo "Verified JAR deltas total $delta_bytes bytes, above the 9 MiB transfer budget. Refusing a long upload; server state is unchanged." >&2
             exit 1
           }
           echo "changed_jars=$(IFS=,; echo "${changed[*]}")" >> "$GITHUB_OUTPUT"
           echo "target_jars_kb=$target_jars_kb" >> "$GITHUB_OUTPUT"
           echo "delta_bytes=$delta_bytes" >> "$GITHUB_OUTPUT"
           echo "Changed JARs: ${changed[*]:-(none)}"
-          echo "JAR delta transfer payload: $delta_bytes bytes (limit 16777216 bytes)."
+          echo "JAR delta transfer payload: $delta_bytes bytes (limit 9437184 bytes)."
       - name: Validate isolated target without changing service state
         id: remote-preflight
         shell: bash
@@ -510,7 +510,7 @@ jobs:
           done
           [[ "$MAP_EXPANDED_KB" =~ ^[0-9]+$ && "$TARGET_JARS_KB" =~ ^[0-9]+$ && "$DELTA_BYTES" =~ ^[0-9]+$ ]] || { echo "Invalid deployment size budget." >&2; exit 1; }
 
-          timeout --foreground --signal=TERM --kill-after=10s 60s ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" "$stage_kb" "$staged_delta_kb" "$TARGET_JARS_KB" "$MAP_EXPANDED_KB" <<'REMOTE_STAGE_PREP'
+          timeout --foreground --signal=TERM --kill-after=10s 45s ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" "$stage_kb" "$staged_delta_kb" "$TARGET_JARS_KB" "$MAP_EXPANDED_KB" <<'REMOTE_STAGE_PREP'
           set -euo pipefail
           upload_dir="$1"
           stage_kb="$2"
@@ -644,8 +644,7 @@ jobs:
           echo "Staging space passed: /var/tmp=$((tmp_avail_kb / 1024)) MiB (needs $((tmp_required_kb / 1024)) MiB); server filesystem=$((server_avail_kb / 1024)) MiB (needs $((server_required_kb / 1024)) MiB); backup filesystem=$((state_avail_kb / 1024)) MiB (needs $((state_required_kb / 1024)) MiB); payload=$((stage_kb / 1024)) MiB; JAR deltas=$((staged_delta_kb / 1024)) MiB; reconstructed JARs=$((target_jars_kb / 1024)) MiB; maps=$((map_expanded_kb / 1024)) MiB; rollback snapshot=$((snapshot_kb / 1024)) MiB; reserve=512 MiB."
           install -d -m 0700 -- "$upload_dir"
           REMOTE_STAGE_PREP
-          # Transfer only small manifests and maps over Tailscale. The VM fetches
-          # the selected artifact directly from the short-lived GitHub blob URL.
+          # Transfer only small manifests, verified deltas, and changed maps over Tailscale.
           sftp_opts=(-P "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
@@ -700,14 +699,14 @@ jobs:
           [[ "$upload_payload_bytes" =~ ^[0-9]+$ ]] || { echo "Could not measure verified upload payload." >&2; exit 1; }
           upload_started_epoch="$(date +%s)"
           echo "Uploading verified JAR deltas, manifests, and required maps over SFTP."
-          timeout --foreground --signal=TERM --kill-after=10s 120s sftp "${sftp_opts[@]}" -b "$batch_file" "$remote"
+          timeout --foreground --signal=TERM --kill-after=10s 115s sftp "${sftp_opts[@]}" -b "$batch_file" "$remote"
           upload_elapsed_seconds=$(( $(date +%s) - upload_started_epoch ))
           if (( upload_elapsed_seconds > 0 )); then
             echo "SFTP payload transfer completed in ${upload_elapsed_seconds}s."
           fi
-          timeout --foreground --signal=TERM --kill-after=10s 25s scp "${scp_opts[@]}" \
+          timeout --foreground --signal=TERM --kill-after=5s 15s scp "${scp_opts[@]}" \
             "$STAGE_DIR/SHA256SUMS" "$remote:$upload_dir/SHA256SUMS"
-          timeout --foreground --signal=TERM --kill-after=10s 105s ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" "$MM_MAPS_REQUIRED" <<'REMOTE_ASSEMBLE_ARCADE'
+          timeout --foreground --signal=TERM --kill-after=5s 95s ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" "$MM_MAPS_REQUIRED" <<'REMOTE_ASSEMBLE_ARCADE'
           set -euo pipefail
           upload_dir="$1"
           mm_maps_required="$2"
@@ -747,7 +746,7 @@ jobs:
           done < ChangedModernJars.txt
           sha256sum -c SHA256SUMS
           REMOTE_ASSEMBLE_ARCADE
-          timeout --foreground --signal=TERM --kill-after=10s 25s ssh "${ssh_opts[@]}" "$remote" "echo 'Disk after verified delta assembly:'; df -h /var/tmp; du -sh '$upload_dir'; cd '$upload_dir' && for jar in \$(cat ChangedModernJars.txt); do unzip -tq \"\$jar\" >/dev/null; done"
+          timeout --foreground --signal=TERM --kill-after=5s 15s ssh "${ssh_opts[@]}" "$remote" "echo 'Disk after verified delta assembly:'; df -h /var/tmp; du -sh '$upload_dir'; cd '$upload_dir' && for jar in \$(cat ChangedModernJars.txt); do unzip -tq \"\$jar\" >/dev/null; done"
           echo "upload_dir=$upload_dir" >> "$GITHUB_OUTPUT"
 
       - name: Provision and start only testplex-modern.service
