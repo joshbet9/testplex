@@ -121,5 +121,12 @@ install -d -o minecraft -g minecraft "$DATA_ROOT/update/maps"
 tar -xzf /opt/testplex/WizardsSourceMaps.tar.gz -C "$DATA_ROOT/update/maps"
 chown -R minecraft:minecraft "$DATA_ROOT/update/maps/Wizards" "$DATA_ROOT/update/maps/Nano Wizards"
 
+# Keep the persistent Paper world container so vanilla player data and plugin
+# data remain on the Fly volume. Only the seven source-map entries are symlinked
+# to image assets, keeping their large region data outside the volume.
+TESTPLEX_WORLD_OWNER=minecraft:minecraft \
+    /usr/local/bin/provision-monster-maze-worlds \
+    /opt/testplex/MonsterMazeMaps "$DATA_ROOT"
+
 cd "$DATA_ROOT"
 exec gosu minecraft java -Xms384M -Xmx3G -jar /opt/testplex/paper.jar --nogui

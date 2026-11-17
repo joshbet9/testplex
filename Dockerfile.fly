@@ -41,6 +41,29 @@ RUN set -eu; \
 
 COPY deploy/fly/packetevents-spigot-2.14.0.jar /opt/testplex/packetevents.jar
 
+# Keep Fly's Monster Maze worlds on the same immutable source revision as
+# Hyper-V. The source repo is public and pinned in one shared revision file.
+COPY deploy/monster-maze-source-revision.txt /opt/testplex/monster-maze-source-revision.txt
+RUN set -eu; \
+    revision="$(tr -d '\r\n[:space:]' < /opt/testplex/monster-maze-source-revision.txt)"; \
+    printf '%s' "$revision" | grep -Eq '^[0-9a-f]{40}$'; \
+    archive=/tmp/monster-maze-source.tar.gz; \
+    source_root=/tmp/monster-maze-source; \
+    curl --fail --location --silent --show-error --retry 3 \
+      "https://github.com/joshbet9/MonsterMaze/archive/${revision}.tar.gz" -o "$archive"; \
+    mkdir -p "$source_root" /opt/testplex/MonsterMazeMaps; \
+    tar -xzf "$archive" --strip-components=1 -C "$source_root"; \
+    for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do \
+      test -s "$source_root/solo/1.21/maps/$world/level.dat"; \
+      test -d "$source_root/solo/1.21/maps/$world/region"; \
+      cp -a "$source_root/solo/1.21/maps/$world" /opt/testplex/MonsterMazeMaps/; \
+      rm -f "/opt/testplex/MonsterMazeMaps/$world/session.lock" "/opt/testplex/MonsterMazeMaps/$world/uid.dat"; \
+    done; \
+    printf '%s\n' "$revision" > /opt/testplex/MonsterMazeMaps/.testplex-mm-source-maps; \
+    chown -R minecraft:minecraft /opt/testplex/MonsterMazeMaps; \
+    rm -rf "$archive" "$source_root"; \
+    test "$(find /opt/testplex/MonsterMazeMaps -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 7
+
 # This vendored artifact's SHA-512 was verified against the pinned 2.14.0
 # release before deployment. The builder's unzip implementation returns a
 # nonzero status for this valid jar, so do not use unzip -t as an integrity gate.
@@ -48,9 +71,12 @@ COPY deploy/fly/packetevents-spigot-2.14.0.jar /opt/testplex/packetevents.jar
 COPY modern-platform/target/TestplexModernArcade.jar /opt/testplex/plugins/TestplexModernArcade.jar
 COPY modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar /opt/testplex/plugins/ArcadeMechanicsModern.jar
 COPY deploy/fly/WizardsSourceMaps.tar.gz /opt/testplex/WizardsSourceMaps.tar.gz
+COPY deploy/fly/provision-monster-maze-worlds.sh /usr/local/bin/provision-monster-maze-worlds
 COPY deploy/fly/entrypoint.sh /usr/local/bin/testplex-entrypoint
 RUN sed -i 's/\r$//' /usr/local/bin/testplex-entrypoint \
+    && sed -i 's/\r$//' /usr/local/bin/provision-monster-maze-worlds \
     && chmod 0755 /usr/local/bin/testplex-entrypoint \
+    && chmod 0755 /usr/local/bin/provision-monster-maze-worlds \
     && test "$(head -n 1 /usr/local/bin/testplex-entrypoint)" = '#!/usr/bin/env bash'
 
 ENV TESTPLEX_PORT=25566 \
