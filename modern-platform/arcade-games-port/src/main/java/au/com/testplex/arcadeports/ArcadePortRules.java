@@ -3911,7 +3911,7 @@ public final class ArcadePortRules {
     }
 
     public static int dragonEscapeDiggerPickaxeItemCount(int digsRemaining) {
-        return digsRemaining > 0 ? 1 : 0;
+        return Math.max(0, Math.min(64, digsRemaining));
     }
 
     public static boolean shouldDragonEscapeRestorePrepareSprint(boolean requestedDuringPrepare, boolean alive) {
