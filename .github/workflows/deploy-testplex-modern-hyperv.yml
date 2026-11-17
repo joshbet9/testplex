@@ -501,7 +501,6 @@ jobs:
           stage_kb="$(du -sk "$STAGE_DIR" | awk '{print $1}')"
           [[ "$stage_kb" =~ ^[0-9]+$ ]] && (( stage_kb > 0 )) || { echo "Could not determine the verified deployment payload size." >&2; exit 1; }
           shopt -s nullglob
-          shopt -s nullglob
           staged_delta_files=("$STAGE_DIR"/*.delta.zip "$STAGE_DIR"/*.delta.json)
           staged_delta_kb=0
           for file in "${staged_delta_files[@]}"; do
@@ -664,29 +663,6 @@ jobs:
             echo "Invalid Monster Maze map staging flag: $MM_MAPS_REQUIRED" >&2
             exit 1
           fi
-          # Request the expiring URL immediately before transfer so map staging cannot
-          # consume its validity window. The URL is validated and never printed.
-          headers="$RUNNER_TEMP/testplex-artifact-download-headers.txt"
-          download_url="$(curl -sS -D "$headers" -o /dev/null \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" &&
-            awk 'tolower($1) == "location:" { sub(/^[^:]*:[[:space:]]*/, ""); sub(/\r$/, ""); print; exit }' "$headers")"
-          rm -f -- "$headers"
-          [[ -n "$download_url" && "$download_url" != *$'\r'* && "$download_url" != *$'\n'* && "$download_url" != *'"'* ]] || {
-            echo "GitHub did not provide a safe artifact download URL." >&2
-            exit 1
-          }
-          python3 - "$download_url" <<'PY'
-          import sys
-          from urllib.parse import urlparse
-          parsed = urlparse(sys.argv[1])
-          if parsed.scheme != "https" or not parsed.hostname or not parsed.hostname.endswith(".blob.core.windows.net") or parsed.username or parsed.password or parsed.fragment:
-              raise SystemExit("Artifact URL is not an approved HTTPS GitHub Actions blob URL.")
-          PY
-          printf 'url = "%s"\n' "$download_url" > "$ARTIFACT_DOWNLOAD_CONFIG"
-          chmod 0600 "$ARTIFACT_DOWNLOAD_CONFIG"
-          unset download_url
           batch_file="$RUNNER_TEMP/testplex-modern-upload.sftp"
           {
             printf 'cd "%s"\n' "$upload_dir"
@@ -699,10 +675,14 @@ jobs:
             done < "$STAGE_DIR/ChangedModernJars.txt"
             while IFS= read -r jar; do
               [[ -n "$jar" ]] || continue
-              [[ -s "$STAGE_DIR/$jar" ]] || { echo "Missing verified JAR $jar in the selected artifact." >&2; exit 1; }
+              [[ -s "$STAGE_DIR/$jar.delta.zip" && -s "$STAGE_DIR/$jar.delta.json" ]] || { echo "Missing verified delta files for $jar." >&2; exit 1; }
             done < "$STAGE_DIR/ChangedModernJars.txt"
             printf 'put "%s" "%s"\n' "$STAGE_DIR/ChangedModernJars.txt" "ChangedModernJars.txt"
-            printf 'put "%s" "%s"\n' "$ARTIFACT_DOWNLOAD_CONFIG" "ArtifactDownloadUrl.curl"
+            printf 'put "%s" "%s"\n' "$STAGE_DIR/testplex-jar-delta.py" "testplex-jar-delta.py"
+            for jar in TestplexModernArcade.jar ArcadeMechanicsModern.jar; do
+              [[ -s "$STAGE_DIR/$jar.delta.zip" ]] && printf 'put "%s" "%s"\n' "$STAGE_DIR/$jar.delta.zip" "$jar.delta.zip"
+              [[ -s "$STAGE_DIR/$jar.delta.json" ]] && printf 'put "%s" "%s"\n' "$STAGE_DIR/$jar.delta.json" "$jar.delta.json"
+            done
             printf 'put "%s" "%s"\n' "$STAGE_DIR/MonsterMazeMapsSource.txt" "MonsterMazeMapsSource.txt"
             printf 'put "%s" "%s"\n' "$STAGE_DIR/WizardsSourceMaps.sha256" "WizardsSourceMaps.sha256"
             if [[ "$WIZARDS_MAPS_REQUIRED" == true ]]; then
@@ -719,19 +699,18 @@ jobs:
           upload_payload_bytes="$(du -sb "$STAGE_DIR" | awk '{print $1}')"
           [[ "$upload_payload_bytes" =~ ^[0-9]+$ ]] || { echo "Could not measure verified upload payload." >&2; exit 1; }
           upload_started_epoch="$(date +%s)"
-          echo "Uploading deployment manifests and required maps with SFTP; the VM will fetch plugin JARs directly from the validated GitHub artifact."
-          timeout --foreground --signal=TERM --kill-after=30s 12m sftp "${sftp_opts[@]}" -b "$batch_file" "$remote"
+          echo "Uploading verified JAR deltas, manifests, and required maps over SFTP."
+          timeout --foreground --signal=TERM --kill-after=10s 120s sftp "${sftp_opts[@]}" -b "$batch_file" "$remote"
           upload_elapsed_seconds=$(( $(date +%s) - upload_started_epoch ))
           if (( upload_elapsed_seconds > 0 )); then
             echo "SFTP payload transfer completed in ${upload_elapsed_seconds}s."
           fi
-          timeout --foreground --signal=TERM --kill-after=15s 3m scp "${scp_opts[@]}" \
+          timeout --foreground --signal=TERM --kill-after=10s 25s scp "${scp_opts[@]}" \
             "$STAGE_DIR/SHA256SUMS" "$remote:$upload_dir/SHA256SUMS"
-          timeout --foreground --signal=TERM --kill-after=30s 45m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" "$MM_MAPS_REQUIRED" "$ARTIFACT_SIZE_BYTES" <<'REMOTE_ASSEMBLE_ARCADE'
+          timeout --foreground --signal=TERM --kill-after=10s 105s ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" "$MM_MAPS_REQUIRED" <<'REMOTE_ASSEMBLE_ARCADE'
           set -euo pipefail
           upload_dir="$1"
           mm_maps_required="$2"
-          artifact_size_bytes="$3"
           cd "$upload_dir"
           shopt -s nullglob
           map_parts=(MonsterMazeMaps.tar.gz.part.*)
@@ -751,74 +730,24 @@ jobs:
             echo "Unexpected Monster Maze map payload for unchanged source maps." >&2
             exit 1
           fi
-          # Authenticate the uploaded manifest and non-JAR payload before it selects
-          # archive entries. The JAR checksums are verified after direct download.
-          sha256sum --ignore-missing -c SHA256SUMS
-          if [[ -s ChangedModernJars.txt ]]; then
-            [[ "$artifact_size_bytes" =~ ^[1-9][0-9]*$ ]] || { echo "Invalid source artifact size." >&2; exit 1; }
-            (( artifact_size_bytes <= 2147483648 )) || { echo "Source artifact exceeds the 2 GiB safety limit." >&2; exit 1; }
-            artifact_archive="$upload_dir/modern-build-artifact.zip"
-            cleanup_artifact_download() { rm -f -- "$artifact_archive" "$upload_dir/ArtifactDownloadUrl.curl"; }
-            trap cleanup_artifact_download EXIT
-            [[ -s ArtifactDownloadUrl.curl ]] || { echo "Short-lived artifact download URL is missing." >&2; exit 1; }
-            curl --config ArtifactDownloadUrl.curl --fail --location --silent --show-error \
-              --retry 3 --connect-timeout 30 --max-time 2700 --max-filesize "$artifact_size_bytes" \
-              --output "$artifact_archive"
-            downloaded_bytes="$(stat -c %s "$artifact_archive")"
-            [[ "$downloaded_bytes" == "$artifact_size_bytes" ]] || {
-              echo "Downloaded artifact size mismatch: got $downloaded_bytes bytes, expected $artifact_size_bytes." >&2
-              exit 1
-            }
-            python3 - "$artifact_archive" "$upload_dir" <<'PY'
-          import os
-          import stat
-          import sys
-          from zipfile import BadZipFile, ZipFile
-          archive, output_dir = sys.argv[1:]
-          allowed = {"TestplexModernArcade.jar", "ArcadeMechanicsModern.jar"}
-          with open(os.path.join(output_dir, "ChangedModernJars.txt"), encoding="utf-8") as manifest:
-              requested = [line.strip() for line in manifest if line.strip()]
-          if not requested or len(requested) != len(set(requested)) or any(name not in allowed for name in requested):
-              raise SystemExit("Changed JAR manifest contains invalid or duplicate entries.")
-          try:
-              with ZipFile(archive) as bundle:
-                  matches = {name: [] for name in requested}
-                  for info in bundle.infolist():
-                      basename = info.filename.rsplit("/", 1)[-1]
-                      if basename not in matches:
-                          continue
-                      mode = info.external_attr >> 16
-                      kind = stat.S_IFMT(mode)
-                      if info.is_dir() or (kind not in (0, stat.S_IFREG)) or (info.flag_bits & 1):
-                          raise SystemExit(f"Unsafe plugin entry in build artifact: {info.filename!r}")
-                      matches[basename].append(info)
-                  for name, entries in matches.items():
-                      if len(entries) != 1:
-                          raise SystemExit(f"Expected exactly one {name} in build artifact; found {len(entries)}.")
-                      info = entries[0]
-                      if info.file_size <= 0 or info.file_size > 1610612736:
-                          raise SystemExit(f"Invalid uncompressed size for {name}: {info.file_size}.")
-                      target = os.path.join(output_dir, name)
-                      with bundle.open(info) as source, open(target, "xb") as destination:
-                          while chunk := source.read(1024 * 1024):
-                              destination.write(chunk)
-          except BadZipFile as exc:
-              raise SystemExit(f"GitHub build artifact is not a valid ZIP: {exc}")
-          PY
-            rm -f -- "$artifact_archive" "$upload_dir/ArtifactDownloadUrl.curl"
-            trap - EXIT
-          elif [[ -e ArtifactDownloadUrl.curl ]]; then
-            rm -f -- ArtifactDownloadUrl.curl
-          fi
+          # Authenticate the transferred manifests and deltas before applying them.
           sha256sum -c SHA256SUMS
           server_dir=/home/monstermaze/servers/testplex-modern
           while IFS= read -r jar; do
             [[ -n "$jar" ]] || continue
-            [[ -s "$upload_dir/$jar" ]] || { echo "Changed JAR $jar is missing from the upload payload." >&2; exit 1; }
+            case "$jar" in TestplexModernArcade.jar|ArcadeMechanicsModern.jar) ;; *) echo "Invalid changed JAR name: $jar" >&2; exit 1 ;; esac
+            [[ -s "$upload_dir/$jar.delta.zip" && -s "$upload_dir/$jar.delta.json" ]] || {
+              echo "Verified JAR delta is incomplete for $jar." >&2
+              exit 1
+            }
+            sudo -n python3 "$upload_dir/testplex-jar-delta.py" apply \
+              "$server_dir/plugins/$jar" "$upload_dir/$jar.delta.zip" \
+              "$upload_dir/$jar.delta.json" "$upload_dir/$jar"
             sudo -n unzip -tq "$upload_dir/$jar" >/dev/null
           done < ChangedModernJars.txt
+          sha256sum -c SHA256SUMS
           REMOTE_ASSEMBLE_ARCADE
-          timeout --foreground --signal=TERM --kill-after=15s 3m ssh "${ssh_opts[@]}" "$remote" "echo 'Disk after transfer and patch assembly:'; df -h /var/tmp; du -sh '$upload_dir'; cd '$upload_dir' && for jar in \$(cat ChangedModernJars.txt); do unzip -tq \"\$jar\" >/dev/null; done"
+          timeout --foreground --signal=TERM --kill-after=10s 25s ssh "${ssh_opts[@]}" "$remote" "echo 'Disk after verified delta assembly:'; df -h /var/tmp; du -sh '$upload_dir'; cd '$upload_dir' && for jar in \$(cat ChangedModernJars.txt); do unzip -tq \"\$jar\" >/dev/null; done"
           echo "upload_dir=$upload_dir" >> "$GITHUB_OUTPUT"
 
       - name: Provision and start only testplex-modern.service
