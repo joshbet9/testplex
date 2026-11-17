@@ -126,15 +126,10 @@ final class SneakyAssassinsRules {
 
     static long firstPowerUpDelayMillis() { return value("FIRST_POWERUP_DELAY_MILLIS", FIRST_POWERUP_DELAY_MILLIS); }
     static long nextPowerUpDelayMillis() { return value("NEXT_POWERUP_DELAY_MILLIS", NEXT_POWERUP_DELAY_MILLIS); }
-    /**
-     * Keeps future power-ups possible at any active count while reducing their frequency
-     * as the map becomes busier. Linear interval growth makes two or three concurrent
-     * beacons plausible without imposing a hard cap.
-     */
-    static long powerUpSpawnDelayMillis(int activePowerUps) {
-        long baseDelay = nextPowerUpDelayMillis();
-        long multiplier = Math.max(1L, activePowerUps + 1L);
-        return baseDelay > Long.MAX_VALUE / multiplier ? Long.MAX_VALUE : baseDelay * multiplier;
+    /** A new beacon is guaranteed with none active, then has a 1/(n+1) chance per interval. */
+    static boolean shouldSpawnPowerUp(int activePowerUps, int roll) {
+        int active = Math.max(0, activePowerUps);
+        return roll >= 0 && roll <= active && roll == 0;
     }
     static int npcPatrolOrderChanceDenominator() { return Math.max(1, GameDebugRuntimeOverrides.intValue(
             "SNEAKY_ASSASSINS_NPC_PATROL_ORDER_CHANCE_DENOMINATOR", NPC_PATROL_ORDER_CHANCE_DENOMINATOR)); }

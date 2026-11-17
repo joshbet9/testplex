@@ -897,7 +897,14 @@ final class SneakyAssassinsMechanics {
             for (PowerUp powerUp : new ArrayList<>(powerUps)) removePowerUp(powerUp);
         } else {
         if (now >= nextPowerUpAt) {
-            if (spawnPowerUp(now)) nextPowerUpAt = now + SneakyAssassinsRules.powerUpSpawnDelayMillis(powerUps.size());
+            int activePowerUps = powerUps.size();
+            if (SneakyAssassinsRules.shouldSpawnPowerUp(activePowerUps,
+                    ThreadLocalRandom.current().nextInt(activePowerUps + 1))) {
+                spawnPowerUp(now);
+            }
+            // Always wait for the next interval, including when no valid unused spawn
+            // point exists, instead of scanning every server tick while overdue.
+            nextPowerUpAt = now + SneakyAssassinsRules.nextPowerUpDelayMillis();
         }
         for (PowerUp powerUp : new ArrayList<>(powerUps)) {
             if (powerUp.item != null && (!powerUp.item.isValid() || powerUp.item.isDead())) {
@@ -946,7 +953,7 @@ final class SneakyAssassinsMechanics {
                         <= SneakyAssassinsRules.powerUpPickupRadiusSquared()) {
                     collectPowerUp(player);
                     removePowerUp(powerUp);
-                    nextPowerUpAt = now + SneakyAssassinsRules.powerUpSpawnDelayMillis(powerUps.size());
+                    nextPowerUpAt = now + SneakyAssassinsRules.nextPowerUpDelayMillis();
                     break;
                 }
             }
