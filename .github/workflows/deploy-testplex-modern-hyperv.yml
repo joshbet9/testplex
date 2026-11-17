@@ -55,7 +55,7 @@ jobs:
     if: ${{ inputs.deploy_to_modern_test_server }}
     runs-on: ubuntu-22.04
     environment: hyperv
-    timeout-minutes: 60
+    timeout-minutes: 100
     steps:
       - name: Connect runner to Hyper-V over Tailscale
         uses: tailscale/github-action@v4
@@ -589,13 +589,13 @@ jobs:
           # Request the expiring URL immediately before transfer so map staging cannot
           # consume its validity window. The URL is validated and never printed.
           headers="$RUNNER_TEMP/testplex-artifact-download-headers.txt"
-          download_url="$(curl -sS -D "$headers" -o /dev/null \\
-            -H "Authorization: Bearer $GH_TOKEN" \\
-            -H "Accept: application/vnd.github+json" \\
+          download_url="$(curl -sS -D "$headers" -o /dev/null \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
             "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" &&
-            awk 'tolower($1) == "location:" { sub(/^[^:]*:[[:space:]]*/, ""); sub(/\\r$/, ""); print; exit }' "$headers")"
+            awk 'tolower($1) == "location:" { sub(/^[^:]*:[[:space:]]*/, ""); sub(/\r$/, ""); print; exit }' "$headers")"
           rm -f -- "$headers"
-          [[ -n "$download_url" && "$download_url" != *$'\\r'* && "$download_url" != *$'\\n'* && "$download_url" != *'"'* ]] || {
+          [[ -n "$download_url" && "$download_url" != *$'\r'* && "$download_url" != *$'\n'* && "$download_url" != *'"'* ]] || {
             echo "GitHub did not provide a safe artifact download URL." >&2
             exit 1
           }
@@ -606,7 +606,7 @@ jobs:
           if parsed.scheme != "https" or not parsed.hostname or not parsed.hostname.endswith(".blob.core.windows.net") or parsed.username or parsed.password or parsed.fragment:
               raise SystemExit("Artifact URL is not an approved HTTPS GitHub Actions blob URL.")
           PY
-          printf 'url = "%s"\\n' "$download_url" > "$ARTIFACT_DOWNLOAD_CONFIG"
+          printf 'url = "%s"\n' "$download_url" > "$ARTIFACT_DOWNLOAD_CONFIG"
           chmod 0600 "$ARTIFACT_DOWNLOAD_CONFIG"
           unset download_url
           batch_file="$RUNNER_TEMP/testplex-modern-upload.sftp"

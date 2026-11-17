@@ -310,6 +310,16 @@ jobs:
           grep -Fq 'Unsafe plugin entry in build artifact' "$deploy_workflow"
           grep -Fq 'artifact_size_bytes' "$deploy_workflow"
           grep -Fq 'sha256sum --ignore-missing -c SHA256SUMS' "$deploy_workflow"
+          python3 - "$deploy_workflow" <<'PY'
+          import sys
+          source = open(sys.argv[1], encoding="utf-8").read()
+          slash = chr(92)
+          first_curl_line = next(line for line in source.splitlines() if 'curl -sS -D "$headers"' in line)
+          assert first_curl_line.endswith(slash) and not first_curl_line.endswith(slash * 2), "artifact curl continuation must be exactly one backslash"
+          assert 'sub(/' + slash + 'r$/, "")' in source and 'sub(/' + slash * 2 + 'r' not in source, "Location parser must strip a real CR"
+          assert "*$'" + slash + "r'*" in source and "$'" + slash * 2 + "r'" not in source, "URL validation must reject actual CR characters"
+          assert "printf 'url = \"%s\"" + slash + "n' " in source and "printf 'url = \"%s\"" + slash * 2 + "n'" not in source, "curl config must end with a newline"
+          PY
           grep -Fq 'PE_VERSION="2.14.0"' "$deploy_workflow"
           grep -Fq 'PE_SHA512="18a942cb55f64783a63b28deea2cebbbe782e5d6a1089f6700430e183bfbce0a45398a640ed0dff4361b55190dcf47017f2ca7788f4a5c8c9efad1f549a63fe3"' "$deploy_workflow"
           grep -Fq 'packetevents-spigot-$PE_VERSION.jar' "$deploy_workflow"
