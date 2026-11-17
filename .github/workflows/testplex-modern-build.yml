@@ -303,6 +303,13 @@ jobs:
             exit 1
           fi
           grep -Fq 'WizardsSourceMaps.sha256' "$deploy_workflow"
+          # Large gameplay artifacts are fetched by the VM from a short-lived,
+          # host-validated GitHub URL; they must not traverse the Tailscale SFTP link.
+          grep -Fq 'ArtifactDownloadUrl.curl' "$deploy_workflow"
+          grep -Fq 'curl --config ArtifactDownloadUrl.curl' "$deploy_workflow"
+          grep -Fq 'Unsafe plugin entry in build artifact' "$deploy_workflow"
+          grep -Fq 'artifact_size_bytes' "$deploy_workflow"
+          grep -Fq 'sha256sum --ignore-missing -c SHA256SUMS' "$deploy_workflow"
           grep -Fq 'PE_VERSION="2.14.0"' "$deploy_workflow"
           grep -Fq 'PE_SHA512="18a942cb55f64783a63b28deea2cebbbe782e5d6a1089f6700430e183bfbce0a45398a640ed0dff4361b55190dcf47017f2ca7788f4a5c8c9efad1f549a63fe3"' "$deploy_workflow"
           grep -Fq 'packetevents-spigot-$PE_VERSION.jar' "$deploy_workflow"
