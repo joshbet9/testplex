@@ -30615,6 +30615,19 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
         }
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE
+                && session.alive.contains(event.getPlayer().getUniqueId())
+                && "builder".equals(session.dragonEscapeKits.get(event.getPlayer().getUniqueId()))
+                && event.getAction().isRightClick() && event.getItem() != null
+                && event.getItem().getType() == Material.BRICKS) {
+            event.setCancelled(true);
+            if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
+                placeDragonEscapeBuilderBrick(session, event.getPlayer(), event.getClickedBlock(), event.getBlockFace());
+            } else {
+                event.getPlayer().sendActionBar(ChatColor.YELLOW + "Right-click a block face to place your brick.");
+            }
+            return;
+        }
         if (session.type == ArcadePortGame.DRAGONS
                 && session.dragonTamerControls.containsKey(event.getPlayer().getUniqueId())) {
             event.setCancelled(true);
@@ -31001,15 +31014,6 @@ public final class ArcadePortManager implements Listener {
                 event.setCancelled(true);
                 if (!isDebugAbilityAllowed(player, ArcadePortGame.DRAGON_ESCAPE, kit)) return;
                 throwDragonEscapeMine(session, player);
-                return;
-            }
-            if (event.getAction().isRightClick() && item == Material.BRICKS && "builder".equals(kit)) {
-                event.setCancelled(true);
-                if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
-                    placeDragonEscapeBuilderBrick(session, player, event.getClickedBlock(), event.getBlockFace());
-                } else {
-                    player.sendActionBar(ChatColor.YELLOW + "Right-click a block face to place your brick.");
-                }
                 return;
             }
         }
