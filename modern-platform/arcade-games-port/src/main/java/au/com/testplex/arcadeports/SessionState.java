@@ -230,6 +230,8 @@ class SessionState {
     final Set<Integer> gladiatorResolvedPairs = new HashSet<>();
     final Map<Integer, Integer> gladiatorPairBrackets = new HashMap<>();
     final Map<Integer, Location> gladiatorArenaCentersByPair = new HashMap<>();
+    final Map<Integer, Location> gladiatorOpeningArenaCentersByMatch = new HashMap<>();
+    final Map<Integer, Location[]> gladiatorOpeningSpawnsByMatch = new HashMap<>();
     final Map<UUID, Location> gladiatorPreviousArenaCentersByPlayer = new HashMap<>();
     final Map<UUID, Location> gladiatorAdvanceSpawns = new HashMap<>();
     final Map<UUID, Long> gladiatorAdvanceUntil = new HashMap<>();

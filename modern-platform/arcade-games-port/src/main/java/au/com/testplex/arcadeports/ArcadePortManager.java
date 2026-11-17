@@ -7223,6 +7223,17 @@ public final class ArcadePortManager implements Listener {
         session.gladiatorMode = GladiatorsMode.defaultMode().id();
         session.gladiatorVotingStartedAt = System.currentTimeMillis();
         session.gladiatorVotingEndsAt = session.gladiatorVotingStartedAt + ArcadePortRules.gladiatorsVoteMillis();
+        if (session.players.size() >= 2) {
+            if (!prepareGladiatorLosersWorld(session)) {
+                announce(session, ChatColor.RED + "Gladiators could not prepare the mirrored loser's map. The match was stopped safely.");
+                stop("Gladiators mirror map initialization failed");
+                return;
+            }
+            // Create and seed the fixed bracket once, before the ballot opens. This lets
+            // the opening fighters wait at their actual first-round arenas during voting.
+            startGladiatorsRound(session, alivePlayers(session), true);
+            seatOpeningGladiatorMatches(session);
+        }
         announce(session, ChatColor.GOLD + "Gladiators vote: choose the PvP rules for this tournament.");
         for (Player player : session.players.values()) {
             if (player == null || !player.isOnline()) continue;
@@ -7233,7 +7244,52 @@ public final class ArcadePortManager implements Listener {
             if (!session.gladiatorVotes.containsKey(player.getUniqueId())) {
                 player.sendMessage(ChatColor.YELLOW + "You have not voted in the lobby yet — choose a ruleset now.");
             }
-            openGladiatorVoteMenu(player);
+            // Opening immediately after closeInventory can be lost by the client/server
+            // inventory transition. Reopen on the next tick so the ballot is visible
+            // from the first vote tick, including for players with a prior lobby menu.
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                Session current = active;
+                if (player.isOnline() && current == session
+                        && current.gladiatorVotingEndsAt > System.currentTimeMillis()
+                        && current.players.containsKey(player.getUniqueId())) {
+                    openGladiatorVoteMenu(player);
+                }
+            });
+        }
+    }
+
+    private void seatOpeningGladiatorMatches(Session session) {
+        if (session.gladiatorBracket == null || session.world == null) return;
+        int arenaRound = session.gladiatorRound;
+        List<Location> centers = gladiatorArenaCenters(session, arenaRound, false);
+        SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
+        if (centers.isEmpty() || !hasGladiatorSourceArenas(session, arenaRound, false) || mapData == null) return;
+
+        session.gladiatorOpeningArenaCentersByMatch.clear();
+        session.gladiatorOpeningSpawnsByMatch.clear();
+        List<GladiatorsOpeningSeatPlan.Seat> seats = GladiatorsOpeningSeatPlan.create(
+                session.gladiatorBracket.readyMatches(), centers.size());
+        Set<String> allocated = new HashSet<>();
+        for (GladiatorsOpeningSeatPlan.Seat seat : seats) {
+            Location center = centers.get(seat.arenaIndex()).clone();
+            if (!allocated.add(centerKey(center))) continue;
+            Location[] spawns = gladiatorArenaSpawnPair(session, center, true, false);
+            if (spawns == null || spawns.length != 2) continue;
+            int matchId = seat.match().id();
+            session.gladiatorOpeningArenaCentersByMatch.put(matchId, center.clone());
+            session.gladiatorOpeningSpawnsByMatch.put(matchId,
+                    new Location[]{spawns[0].clone(), spawns[1].clone()});
+            for (int i = 0; i < 2; i++) {
+                Player player = session.players.get(i == 0 ? seat.match().first() : seat.match().second());
+                if (player == null || !player.isOnline()) continue;
+                player.closeInventory();
+                player.leaveVehicle();
+                player.teleport(spawns[i]);
+                player.setGameMode(GameMode.ADVENTURE);
+                player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+                player.setFallDistance(0.0F);
+                giveGladiatorVoteItem(player);
+            }
         }
     }
 
@@ -7820,12 +7876,7 @@ public final class ArcadePortManager implements Listener {
         }
         announce(session, ChatColor.GOLD + "Gladiators rules selected: " + ChatColor.YELLOW
                 + selected.displayName() + ChatColor.GOLD + ". First-loss players enter the parallel loser's bracket.");
-        if (session.players.size() >= 2 && !prepareGladiatorLosersWorld(session)) {
-            announce(session, ChatColor.RED + "Gladiators could not prepare the mirrored loser's map. The match was stopped safely.");
-            stop("Gladiators mirror map initialization failed");
-            return;
-        }
-        startGladiatorsRound(session, alivePlayers(session), true);
+        progressGladiators(session);
     }
 
     private boolean prepareGladiatorLosersWorld(Session session) {
@@ -8042,7 +8093,10 @@ public final class ArcadePortManager implements Listener {
                 .collect(java.util.stream.Collectors.toSet());
         Location advancingCenter = !losersBracket && bracket == GLADIATOR_BRACKET_WINNERS
                 ? gladiatorNextArenaCenter(session, centers, firstId, secondId) : null;
-        center = advancingCenter != null && !occupied.contains(centerKey(advancingCenter)) ? advancingCenter
+        Location reservedCenter = session.gladiatorOpeningArenaCentersByMatch.remove(bracketMatchId);
+        Location[] reservedSpawns = session.gladiatorOpeningSpawnsByMatch.remove(bracketMatchId);
+        center = reservedCenter != null ? reservedCenter.clone()
+                : advancingCenter != null && !occupied.contains(centerKey(advancingCenter)) ? advancingCenter
                 : centers.stream().filter(candidate -> !occupied.contains(centerKey(candidate)))
                         .findFirst().map(Location::clone).orElse(null);
         if (matchWorld == null || center == null || !sourceArenas || matchMapData == null) {
@@ -8062,7 +8116,9 @@ public final class ArcadePortManager implements Listener {
         session.gladiatorArenaCentersByPair.put(pair, center.clone());
 
         Location[] spawns;
-        if (sourceArenas) {
+        if (reservedSpawns != null && reservedSpawns.length == 2) {
+            spawns = new Location[]{reservedSpawns[0].clone(), reservedSpawns[1].clone()};
+        } else if (sourceArenas) {
             spawns = gladiatorArenaSpawnPair(session, center, true, losersBracket);
         } else {
             Location left = center.clone().add(-2.0D, 0.0D, 0.0D);
