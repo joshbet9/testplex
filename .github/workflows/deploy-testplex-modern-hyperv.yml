@@ -137,12 +137,9 @@ jobs:
         id: base-artifact
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
           HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
           HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
-          TARGET_SHA: ${{ steps.source-artifact.outputs.source_sha }}
-          TARGET_ARTIFACT_DIR: ${{ runner.temp }}/testplex-modern-artifact
         run: |
           set -euo pipefail
           SSH_PORT="${HYPERV_SSH_PORT:-22}"
@@ -165,57 +162,43 @@ jobs:
           fi
           [[ "$installed_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Installed source build marker is invalid; refusing a full-JAR fallback." >&2; exit 1; }
           echo "installed_sha=$installed_sha" >> "$GITHUB_OUTPUT"
-          if [[ "$installed_sha" == "$TARGET_SHA" ]]; then
-            echo "base_run_id=" >> "$GITHUB_OUTPUT"
-            echo "Target build is already installed; no base artifact is needed."
-            exit 0
-          fi
-          # A deployment-only commit can produce byte-identical gameplay JARs.
-          # In that case no entry-delta base is needed; checking the installed JARs
-          # first avoids requiring a historical Actions artifact just to prove a no-op.
-          identical_jars=true
-          for jar in TestplexModernArcade.jar ArcadeMechanicsModern.jar; do
-            matches="$(find "$TARGET_ARTIFACT_DIR" -type f -name "$jar" | wc -l | tr -d ' ')"
-            [[ "$matches" == 1 ]] || { echo "Expected exactly one target $jar before comparing installed artifacts; got $matches." >&2; exit 1; }
-            target_jar="$(find "$TARGET_ARTIFACT_DIR" -type f -name "$jar" -print -quit)"
-            target_hash="$(sha256sum "$target_jar" | awk '{print $1}')"
-            installed_hash="$(timeout --foreground --signal=TERM --kill-after=10s 90s ssh "${ssh_opts[@]}" "$remote" \
-              sudo -n sha256sum "/home/monstermaze/servers/testplex-modern/plugins/$jar" 2>/dev/null | awk '{print $1}' || true)"
-            if [[ "$target_hash" != "$installed_hash" ]]; then
-              identical_jars=false
-              break
-            fi
-          done
-          if [[ "$identical_jars" == true ]]; then
-            echo "base_run_id=" >> "$GITHUB_OUTPUT"
-            echo "Target and installed gameplay JAR checksums match; no historical base artifact is required."
-            exit 0
-          fi
-          runs_json="$RUNNER_TEMP/testplex-modern-base-runs.json"
-          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
-            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/workflows/testplex-modern-build.yml/runs?branch=feat%2Ftestplex-modern-26.3-platform&status=success&per_page=100" -o "$runs_json"
-          base_run_id="$(jq -er --arg sha "$installed_sha" \
-            '[.workflow_runs[] | select(.head_sha == $sha and .head_branch == "feat/testplex-modern-26.3-platform" and .conclusion == "success")] | sort_by(.run_number) | last | .id | tostring' \
-            "$runs_json")" || { echo "No successful modern build run for installed SHA $installed_sha; refusing an unbounded full-JAR upload." >&2; exit 1; }
-          artifacts_json="$RUNNER_TEMP/testplex-modern-base-artifacts.json"
-          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
-            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$base_run_id/artifacts" -o "$artifacts_json"
-          jq -e '[.artifacts[] | select(.expired == false and .name == "testplex-modern-paper-26.3")] | length == 1' "$artifacts_json" >/dev/null || {
-            echo "Base build artifact for installed SHA $installed_sha is missing or expired; refusing a full-JAR fallback." >&2
-            exit 1
-          }
-          echo "base_run_id=$base_run_id" >> "$GITHUB_OUTPUT"
-          echo "Found exact base artifact for installed SHA $installed_sha in run $base_run_id."
+          echo "The installed JARs will be used directly as the delta base; no historical Actions artifact lookup is required."
 
-      - name: Download installed base build artifact
-        if: ${{ steps.base-artifact.outputs.base_run_id != '' }}
-        uses: actions/download-artifact@v4
-        with:
-          name: testplex-modern-paper-26.3
-          path: ${{ runner.temp }}/testplex-modern-base-artifact
-          repository: ${{ github.repository }}
-          run-id: ${{ steps.base-artifact.outputs.base_run_id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download installed base plugin JARs
+        if: ${{ steps.base-artifact.outputs.installed_sha != 'none' }}
+        shell: bash
+        env:
+          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
+          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
+          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
+          BASE_ARTIFACT_DIR: ${{ runner.temp }}/testplex-modern-base-artifact
+        run: |
+          set -euo pipefail
+          SSH_PORT="${HYPERV_SSH_PORT:-22}"
+          remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
+          ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
+            -o BatchMode=yes -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
+          mkdir -p "$BASE_ARTIFACT_DIR"
+          for jar in TestplexModernArcade.jar ArcadeMechanicsModern.jar; do
+            remote_path="/home/monstermaze/servers/testplex-modern/plugins/$jar"
+            remote_hash="$(timeout --foreground --signal=TERM --kill-after=10s 90s ssh "${ssh_opts[@]}" "$remote" \
+              sudo -n bash -s -- "$remote_path" <<'REMOTE_INSTALLED_JAR_SHA'
+          set -euo pipefail
+          path="$1"
+          [[ -f "$path" && ! -L "$path" ]] || { echo "Installed plugin JAR is missing or is a symlink: $path" >&2; exit 1; }
+          sudo -n sha256sum "$path" | awk '{print $1}'
+          REMOTE_INSTALLED_JAR_SHA
+            )"
+            [[ "$remote_hash" =~ ^[0-9a-f]{64}$ ]] || { echo "Invalid installed JAR checksum for $jar." >&2; exit 1; }
+            timeout --foreground --signal=TERM --kill-after=10s 90s ssh "${ssh_opts[@]}" "$remote" \
+              sudo -n cat "$remote_path" > "$BASE_ARTIFACT_DIR/$jar"
+            local_hash="$(sha256sum "$BASE_ARTIFACT_DIR/$jar" | awk '{print $1}')"
+            [[ "$local_hash" == "$remote_hash" ]] || { echo "Transferred installed JAR checksum mismatch for $jar." >&2; exit 1; }
+            unzip -tq "$BASE_ARTIFACT_DIR/$jar" >/dev/null
+          done
+          echo "Downloaded and verified the exact two installed gameplay JARs as delta bases."
 
       - name: Checkout deployment recovery helper source
         uses: actions/checkout@v4
