@@ -134,6 +134,66 @@ jobs:
           run-id: ${{ inputs.source_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Find exact deployed build artifact for delta base
+        id: delta-base
+        shell: bash
+        env:
+          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+          HYPERV_SSH_HOST: \${{ secrets.HYPERV_SSH_HOST }}
+          HYPERV_SSH_USER: \${{ secrets.HYPERV_SSH_USER }}
+          HYPERV_SSH_PORT: \${{ secrets.HYPERV_SSH_PORT }}
+        run: |
+          set -euo pipefail
+          SSH_PORT="\${HYPERV_SSH_PORT:-22}"
+          ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
+            -o BatchMode=yes -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
+          deployed_sha="$(timeout --foreground --signal=TERM --kill-after=10s 45s ssh "\${ssh_opts[@]}" \
+            "$HYPERV_SSH_USER@$HYPERV_SSH_HOST" \
+            "sudo -n cat /home/monstermaze/servers/testplex-modern/.testplex-modern-deployed-build")"
+          [[ "$deployed_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Remote deployed-build marker is missing or invalid; refusing a slow full-JAR transfer." >&2; exit 1; }
+          runs_json="$RUNNER_TEMP/testplex-modern-base-runs.json"
+          curl --fail --silent --show-error --max-time 20 \
+            -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/workflows/testplex-modern-build.yml/runs?head_sha=$deployed_sha&per_page=100" \
+            -o "$runs_json"
+          mapfile -t candidates < <(jq -r --arg sha "$deployed_sha" --arg repo "$GITHUB_REPOSITORY" '
+            .workflow_runs[] |
+            select(.head_sha == $sha and .head_branch == "feat/testplex-modern-26.3-platform" and
+              (.head_repository.full_name // "" | ascii_downcase) == ($repo | ascii_downcase) and
+              .path == ".github/workflows/testplex-modern-build.yml") | .id' "$runs_json")
+          for run_id in "\${candidates[@]}"; do
+            jobs_json="$RUNNER_TEMP/testplex-modern-base-jobs-$run_id.json"
+            curl --fail --silent --show-error --max-time 20 \
+              -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100" -o "$jobs_json"
+            jq -e '.jobs[] | select(.name == "Build and test Paper 26.3 plugin" and .conclusion == "success")' "$jobs_json" >/dev/null || continue
+            artifacts_json="$RUNNER_TEMP/testplex-modern-base-artifacts-$run_id.json"
+            curl --fail --silent --show-error --max-time 20 \
+              -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$run_id/artifacts?per_page=100" -o "$artifacts_json"
+            artifact_id="$(jq -er '[.artifacts[] | select(.expired == false and .name == "testplex-modern-paper-26.3")] | if length == 1 then .[0].id else empty end' "$artifacts_json" 2>/dev/null || true)"
+            if [[ "$artifact_id" =~ ^[0-9]+$ ]]; then
+              echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+              echo "artifact_id=$artifact_id" >> "$GITHUB_OUTPUT"
+              echo "base_sha=$deployed_sha" >> "$GITHUB_OUTPUT"
+              echo "Found verified deployed JAR base $deployed_sha in build run $run_id."
+              exit 0
+            fi
+          done
+          echo "No retained successful build artifact matches deployed SHA $deployed_sha. Refusing slow full-JAR fallback; server state is unchanged." >&2
+          exit 1
+
+      - name: Download deployed build artifact for delta base
+        uses: actions/download-artifact@v4
+        with:
+          name: testplex-modern-paper-26.3
+          path: \${{ runner.temp }}/testplex-modern-base-artifact
+          repository: \${{ github.repository }}
+          run-id: \${{ steps.delta-base.outputs.run_id }}
+          github-token: \${{ secrets.GITHUB_TOKEN }}
+
       - name: Checkout deployment recovery helper source
         uses: actions/checkout@v4
         with:
