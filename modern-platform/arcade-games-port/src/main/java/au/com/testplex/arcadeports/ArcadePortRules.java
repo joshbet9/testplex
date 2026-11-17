@@ -3768,6 +3768,11 @@ public final class ArcadePortRules {
         return null;
     }
 
+    /** A first recorded time is a completion, not an improvement to a missing PB. */
+    public static boolean dragonEscapeImprovesExistingPersonalBest(long previousBestMillis, long elapsedMillis) {
+        return previousBestMillis > 0L && elapsedMillis > 0L && elapsedMillis < previousBestMillis;
+    }
+
     /** Backwards-compatible fallback when a map has no authored vertical bounds. */
     public static double dragonEscapeVoidThresholdY(String mapName) {
         return dragonEscapeVoidThresholdY(mapName, false, 0);

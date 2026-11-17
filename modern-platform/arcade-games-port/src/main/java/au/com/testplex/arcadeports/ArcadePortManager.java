@@ -18427,7 +18427,6 @@ public final class ArcadePortManager implements Listener {
                 session.dragonEscapeWinner = id;
                 session.dragonEscapeFinishWindowEndsAt = now
                         + ArcadePortRules.DRAGON_ESCAPE_FINISH_WINDOW_MILLIS;
-                announce(session, ChatColor.YELLOW + "FIRST COMPLETION!");
                 announce(session, ArcadePortRules.dragonEscapeFinishWindowMessage());
             }
             if (persistentPlayer && !GameDebugRuntimeOverrides.isDebugSession()) {
@@ -18553,8 +18552,13 @@ public final class ArcadePortManager implements Listener {
         boolean newWorldRecord = previousWorldRecord != null && elapsed < previousWorldRecord.timeMillis();
         boolean newKitWorldRecord = previousKitWorldRecord != null
                 && elapsed < previousKitWorldRecord.timeMillis();
-        boolean newPersonalBest = previousOverallPb <= 0L || elapsed < previousOverallPb;
-        boolean newKitPersonalBest = improvedKit && (previousKitPb <= 0L || elapsed < previousKitPb);
+        // A player's initial completion is a completion milestone, not an
+        // improvement over a personal best that did not exist. This keeps the
+        // approved FIRST COMPLETION/first-kit-completion fallbacks reachable.
+        boolean newPersonalBest = ArcadePortRules.dragonEscapeImprovesExistingPersonalBest(
+                previousOverallPb, elapsed);
+        boolean newKitPersonalBest = improvedKit && ArcadePortRules.dragonEscapeImprovesExistingPersonalBest(
+                previousKitPb, elapsed);
         String message = ArcadePortRules.dragonEscapeRecordMilestone(firstCompletion, firstKitCompletion,
                 newWorldRecord, newKitWorldRecord, newPersonalBest, newKitPersonalBest, kit);
         if (message != null) announce(session, ChatColor.YELLOW + message);
