@@ -133,101 +133,6 @@ jobs:
           run-id: ${{ inputs.source_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Find the successful build currently installed on the VM
-        id: base-artifact
-        shell: bash
-        env:
-          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
-          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
-          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
-        run: |
-          set -euo pipefail
-          SSH_PORT="${HYPERV_SSH_PORT:-22}"
-          remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
-          ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
-            -o BatchMode=yes -o StrictHostKeyChecking=yes
-            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
-            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
-          installed_sha="$(timeout --foreground --signal=TERM --kill-after=10s 90s ssh "${ssh_opts[@]}" "$remote" bash -s <<'REMOTE_READ_BASE_SHA'
-          set -euo pipefail
-          marker=/home/monstermaze/servers/testplex-modern/.testplex-modern-deployed-build
-          if sudo -n test -f "$marker"; then sudo -n cat "$marker"; else echo none; fi
-          REMOTE_READ_BASE_SHA
-          )"
-          if [[ "$installed_sha" == none ]]; then
-            echo "installed_sha=none" >> "$GITHUB_OUTPUT"
-            echo "base_run_id=" >> "$GITHUB_OUTPUT"
-            echo "No deployed build marker exists; this is a first install and has no entry-delta base."
-            exit 0
-          fi
-          [[ "$installed_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Installed source build marker is invalid; refusing a full-JAR fallback." >&2; exit 1; }
-          echo "installed_sha=$installed_sha" >> "$GITHUB_OUTPUT"
-          echo "The installed JARs will be used directly as the delta base; no historical Actions artifact lookup is required."
-
-      - name: Download installed base plugin JARs
-        if: ${{ steps.base-artifact.outputs.installed_sha != 'none' }}
-        shell: bash
-        env:
-          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
-          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
-          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
-          BASE_ARTIFACT_DIR: ${{ runner.temp }}/testplex-modern-base-artifact
-        run: |
-          set -euo pipefail
-          SSH_PORT="${HYPERV_SSH_PORT:-22}"
-          remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
-          ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
-            -o BatchMode=yes -o StrictHostKeyChecking=yes
-            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
-            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
-          mkdir -p "$BASE_ARTIFACT_DIR"
-          for jar in TestplexModernArcade.jar ArcadeMechanicsModern.jar; do
-            remote_path="/home/monstermaze/servers/testplex-modern/plugins/$jar"
-            remote_hash="$(timeout --foreground --signal=TERM --kill-after=10s 90s ssh "${ssh_opts[@]}" "$remote" \
-              sudo -n bash -s -- "$remote_path" <<'REMOTE_INSTALLED_JAR_SHA'
-          set -euo pipefail
-          path="$1"
-          [[ -f "$path" && ! -L "$path" ]] || { echo "Installed plugin JAR is missing or is a symlink: $path" >&2; exit 1; }
-          sudo -n sha256sum "$path" | awk '{print $1}'
-          REMOTE_INSTALLED_JAR_SHA
-            )"
-            [[ "$remote_hash" =~ ^[0-9a-f]{64}$ ]] || { echo "Invalid installed JAR checksum for $jar." >&2; exit 1; }
-            remote_size="$(timeout --foreground --signal=TERM --kill-after=10s 90s ssh "${ssh_opts[@]}" "$remote" \
-              sudo -n stat --format=%s "$remote_path")"
-            [[ "$remote_size" =~ ^[0-9]+$ && "$remote_size" -gt 0 ]] || { echo "Invalid installed JAR size for $jar." >&2; exit 1; }
-            local_path="$BASE_ARTIFACT_DIR/$jar"
-            chunk_path="$BASE_ARTIFACT_DIR/$jar.chunk"
-            : > "$local_path"
-            chunk_mib=4
-            chunk_bytes=$((chunk_mib * 1024 * 1024))
-            for ((offset=0; offset<remote_size; offset+=chunk_bytes)); do
-              expected_bytes=$((remote_size - offset))
-              (( expected_bytes > chunk_bytes )) && expected_bytes="$chunk_bytes"
-              skip_mib=$((offset / (1024 * 1024)))
-              for attempt in 1 2 3; do
-                rm -f -- "$chunk_path"
-                if timeout --foreground --signal=TERM --kill-after=10s 180s ssh "${ssh_opts[@]}" "$remote" \
-                    sudo -n dd if="$remote_path" bs=1M skip="$skip_mib" count="$chunk_mib" status=none > "$chunk_path"; then
-                  chunk_size="$(stat --format=%s "$chunk_path")"
-                  if [[ "$chunk_size" == "$expected_bytes" ]]; then
-                    cat -- "$chunk_path" >> "$local_path"
-                    break
-                  fi
-                fi
-                if (( attempt == 3 )); then
-                  echo "Failed to transfer chunk at byte $offset of installed $jar after three attempts." >&2
-                  exit 1
-                fi
-                echo "Retrying installed $jar transfer at byte $offset (attempt $((attempt + 1))/3)."
-              done
-            done
-            rm -f -- "$chunk_path"
-            local_hash="$(sha256sum "$BASE_ARTIFACT_DIR/$jar" | awk '{print $1}')"
-            [[ "$local_hash" == "$remote_hash" ]] || { echo "Transferred installed JAR checksum mismatch for $jar." >&2; exit 1; }
-            unzip -tq "$BASE_ARTIFACT_DIR/$jar" >/dev/null
-          done
-          echo "Downloaded and verified the exact two installed gameplay JARs as delta bases."
-
       - name: Checkout deployment recovery helper source
         uses: actions/checkout@v4
         with:
@@ -284,10 +189,6 @@ jobs:
           test -s "$recovery_helper" || { echo "Independent modern recovery helper is missing." >&2; exit 1; }
           cp "$recovery_helper" "$stage_dir/testplex-modern-recovery.sh"
           chmod 0755 "$stage_dir/testplex-modern-recovery.sh"
-          delta_helper="$GITHUB_WORKSPACE/deployment-source/scripts/testplex-jar-delta.py"
-          test -s "$delta_helper" || { echo "Verified JAR entry-delta helper is missing." >&2; exit 1; }
-          cp "$delta_helper" "$stage_dir/testplex-jar-delta.py"
-
           # These physical worlds are required by the Monster Maze game module bundled inside ArcadeMechanicsModern.
           map_root="$GITHUB_WORKSPACE/monstermaze-source/solo/1.21/maps"
           map_source_sha="$(git -C "$GITHUB_WORKSPACE/monstermaze-source" rev-parse HEAD)"
@@ -382,8 +283,6 @@ jobs:
           STAGE_DIR: ${{ steps.stage-jars.outputs.stage_dir }}
           MM_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.mm_maps_required }}
           WIZARDS_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.wizards_maps_required }}
-          BASE_ARTIFACT_DIR: ${{ runner.temp }}/testplex-modern-base-artifact
-          INSTALLED_SHA: ${{ steps.base-artifact.outputs.installed_sha }}
         run: |
           set -euo pipefail
           SSH_PORT="${HYPERV_SSH_PORT:-22}"
@@ -402,37 +301,18 @@ jobs:
               echo "Unchanged plugin JAR; omitting upload: $jar ($local_sha)"
             else
               changed+=("$jar")
-              if [[ "$INSTALLED_SHA" != none ]]; then
-                [[ -d "$BASE_ARTIFACT_DIR" ]] || { echo "Exact installed base artifact was not downloaded; refusing full-JAR transfer." >&2; exit 1; }
-                base_matches="$(find "$BASE_ARTIFACT_DIR" -type f -name "$jar" | wc -l | tr -d ' ')"
-                [[ "$base_matches" == 1 ]] || { echo "Expected exactly one $jar in the installed base artifact; got $base_matches." >&2; exit 1; }
-                base_jar="$(find "$BASE_ARTIFACT_DIR" -type f -name "$jar" -print -quit)"
-                base_sha="$(sha256sum "$base_jar" | awk '{print $1}')"
-                python3 "$STAGE_DIR/testplex-jar-delta.py" create "$base_jar" "$STAGE_DIR/$jar" \
-                  "$STAGE_DIR/$jar.delta.zip" "$STAGE_DIR/$jar.delta.json"
-                verify_jar="$RUNNER_TEMP/$jar.entry-delta-verify"
-                python3 "$STAGE_DIR/testplex-jar-delta.py" apply "$base_jar" "$STAGE_DIR/$jar.delta.zip" \
-                  "$STAGE_DIR/$jar.delta.json" "$verify_jar"
-                unzip -tq "$verify_jar" >/dev/null
-                rm -- "$verify_jar"
-                rm -- "$STAGE_DIR/$jar"
-                echo "Created entry-level patch for $jar from installed build artifact $INSTALLED_SHA (artifact=$base_sha, installed file=$installed_sha, target=$local_sha); remote assembly verifies every installed entry against the base manifest."
-              else
-                echo "Initial install: retaining full JAR payload for $jar ($local_sha)."
-              fi
+              echo "Retaining verified full JAR for changed plugin $jar ($installed_sha -> $local_sha)."
             fi
           done
           printf '%s\n' "${changed[@]}" > "$STAGE_DIR/ChangedModernJars.txt"
-          checksum_files=("$STAGE_DIR/ChangedModernJars.txt" "$STAGE_DIR/MonsterMazeMapsSource.txt" "$STAGE_DIR/WizardsSourceMaps.sha256" "$STAGE_DIR/testplex-modern-recovery.sh" "$STAGE_DIR/testplex-jar-delta.py")
+          checksum_files=("$STAGE_DIR/ChangedModernJars.txt" "$STAGE_DIR/MonsterMazeMapsSource.txt" "$STAGE_DIR/WizardsSourceMaps.sha256" "$STAGE_DIR/testplex-modern-recovery.sh")
           [[ ! -f "$STAGE_DIR/MonsterMazeMaps.tar.gz" ]] || checksum_files+=("$STAGE_DIR/MonsterMazeMaps.tar.gz")
           [[ ! -f "$STAGE_DIR/WizardsSourceMaps.tar.gz" ]] || checksum_files+=("$STAGE_DIR/WizardsSourceMaps.tar.gz")
           shopt -s nullglob
           staged_jars=("$STAGE_DIR"/*.jar)
           checksum_files+=("${staged_jars[@]}")
-          staged_deltas=("$STAGE_DIR"/*.delta.zip "$STAGE_DIR"/*.delta.json)
-          checksum_files+=("${staged_deltas[@]}")
           (cd "$STAGE_DIR" && sha256sum "${checksum_files[@]/$STAGE_DIR\//}" > SHA256SUMS)
-          transfer_files=("$STAGE_DIR"/*.delta.zip "$STAGE_DIR"/*.delta.json "$STAGE_DIR"/*.jar)
+          transfer_files=("$STAGE_DIR"/*.jar)
           transfer_bytes=0
           for file in "${transfer_files[@]}"; do
             file_bytes="$(stat -c %s "$file")"
@@ -442,7 +322,7 @@ jobs:
           echo "changed_jars=$(IFS=,; echo "${changed[*]}")" >> "$GITHUB_OUTPUT"
           echo "transfer_bytes=$transfer_bytes" >> "$GITHUB_OUTPUT"
           echo "Changed JARs: ${changed[*]:-(none)}"
-          echo "Plugin artifact transfer payload: $transfer_bytes bytes (entry deltas for existing installations)."
+          echo "Plugin artifact transfer payload: $transfer_bytes bytes (changed full JARs only)."
 
       - name: Validate isolated target without changing service state
         id: remote-preflight
@@ -513,7 +393,6 @@ jobs:
           HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
           BUILD_SHA: ${{ steps.source-artifact.outputs.source_sha }}
           STAGE_DIR: ${{ steps.stage-jars.outputs.stage_dir }}
-          CHANGED_JARS: ${{ steps.jar-diff.outputs.changed_jars }}
           MM_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.mm_maps_required }}
           MAP_EXPANDED_KB: ${{ steps.stage-jars.outputs.map_expanded_kb }}
           WIZARDS_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.wizards_maps_required }}
@@ -545,13 +424,12 @@ jobs:
           done
           [[ "$MAP_EXPANDED_KB" =~ ^[0-9]+$ ]] || { echo "Invalid map expansion budget." >&2; exit 1; }
 
-          timeout --foreground --signal=TERM --kill-after=20s 3m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" "$stage_kb" "$staged_jar_kb" "$MAP_EXPANDED_KB" "$CHANGED_JARS" <<'REMOTE_STAGE_PREP'
+          timeout --foreground --signal=TERM --kill-after=20s 3m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" "$stage_kb" "$staged_jar_kb" "$MAP_EXPANDED_KB" <<'REMOTE_STAGE_PREP'
           set -euo pipefail
           upload_dir="$1"
           stage_kb="$2"
           staged_jar_kb="$3"
           map_expanded_kb="$4"
-          changed_jars_csv="$5"
           state_dir=/var/lib/testplex-modern-deploy
           backup_root="$state_dir/backups"
           server_dir=/home/monstermaze/servers/testplex-modern
@@ -650,23 +528,11 @@ jobs:
           server_device="$(df -P "$server_fs" | awk 'END {print $1}')"
           state_device="$(df -P "$state_dir" | awk 'END {print $1}')"
           reserve_kb=524288
-          # Delta patches expand into a target JAR and a temporary assembling JAR
-          # while entry checksums are verified. Budget both next to the rollback snapshot.
-          seed_jars_kb=0
-          IFS=, read -r -a changed_jars <<< "$changed_jars_csv"
-          for jar in "${changed_jars[@]}"; do
-            [[ -n "$jar" ]] || continue
-            case "$jar" in TestplexModernArcade.jar|ArcadeMechanicsModern.jar) ;; *) echo "Invalid changed JAR name in upload request: $jar" >&2; exit 2 ;; esac
-            installed="$server_dir/plugins/$jar"
-            if sudo -n test -s "$installed"; then
-              jar_kb="$(sudo -n du -sk -- "$installed" | awk '{print $1}')"
-              [[ "$jar_kb" =~ ^[0-9]+$ ]] || { echo "Could not size installed plugin JAR: $jar" >&2; exit 1; }
-              seed_jars_kb=$((seed_jars_kb + jar_kb))
-            fi
-          done
+          # Changed full JARs remain staged in /var/tmp until installation. Include
+          # their actual size alongside the rollback snapshot and runtime reserve.
           non_jar_payload_kb=$((stage_kb - staged_jar_kb))
           (( non_jar_payload_kb >= 0 )) || { echo "Invalid JAR/payload size accounting." >&2; exit 1; }
-          jar_stage_kb=$((staged_jar_kb + 2 * seed_jars_kb))
+          jar_stage_kb="$staged_jar_kb"
           tmp_required_kb=$((non_jar_payload_kb + jar_stage_kb))
           server_required_kb=0
           state_required_kb=0
@@ -690,11 +556,11 @@ jobs:
             echo "Insufficient deployment staging space: /var/tmp available=${tmp_avail_kb:-unknown} KiB required=$tmp_required_kb KiB; server filesystem available=${server_avail_kb:-unknown} KiB required=$server_required_kb KiB; backup filesystem available=${state_avail_kb:-unknown} KiB required=$state_required_kb KiB; payload=$stage_kb KiB; map expansion=$map_expanded_kb KiB; rollback snapshot=$snapshot_kb KiB; runtime reserve=$reserve_kb KiB." >&2
             exit 1
           fi
-          echo "Staging space passed: /var/tmp=$((tmp_avail_kb / 1024)) MiB (needs $((tmp_required_kb / 1024)) MiB); server filesystem=$((server_avail_kb / 1024)) MiB (needs $((server_required_kb / 1024)) MiB); backup filesystem=$((state_avail_kb / 1024)) MiB (needs $((state_required_kb / 1024)) MiB); payload=$((stage_kb / 1024)) MiB; changed JARs=$((staged_jar_kb / 1024)) MiB; installed JAR seeds=$((seed_jars_kb / 1024)) MiB; maps=$((map_expanded_kb / 1024)) MiB; rollback snapshot=$((snapshot_kb / 1024)) MiB; reserve=512 MiB."
+          echo "Staging space passed: /var/tmp=$((tmp_avail_kb / 1024)) MiB (needs $((tmp_required_kb / 1024)) MiB); server filesystem=$((server_avail_kb / 1024)) MiB (needs $((server_required_kb / 1024)) MiB); backup filesystem=$((state_avail_kb / 1024)) MiB (needs $((state_required_kb / 1024)) MiB); payload=$((stage_kb / 1024)) MiB; changed JARs=$((staged_jar_kb / 1024)) MiB; maps=$((map_expanded_kb / 1024)) MiB; rollback snapshot=$((snapshot_kb / 1024)) MiB; reserve=512 MiB."
           install -d -m 0700 -- "$upload_dir"
           REMOTE_STAGE_PREP
-          # Send only changed ZIP entries for installed JARs; full JAR transfer is
-          # reserved for a first installation with no deployed build to patch from.
+          # Send only changed full JARs. Downloading installed JARs over SSH stdout
+          # has repeatedly timed out on the Hyper-V Tailscale path.
           sftp_opts=(-P "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
@@ -727,11 +593,8 @@ jobs:
               if [[ -f "$STAGE_DIR/$jar" ]]; then
                 printf 'put "%s" "%s"\n' "$STAGE_DIR/$jar" "$jar"
               else
-                [[ -s "$STAGE_DIR/$jar.delta.zip" && -s "$STAGE_DIR/$jar.delta.json" ]] || {
-                  echo "Missing entry-delta payload for changed JAR $jar" >&2; exit 1;
-                }
-                printf 'put "%s" "%s"\n' "$STAGE_DIR/$jar.delta.zip" "$jar.delta.zip"
-                printf 'put "%s" "%s"\n' "$STAGE_DIR/$jar.delta.json" "$jar.delta.json"
+                echo "Missing full JAR payload for changed JAR $jar" >&2
+                exit 1
               fi
             done < "$STAGE_DIR/ChangedModernJars.txt"
             printf 'put "%s" "%s"\n' "$STAGE_DIR/ChangedModernJars.txt" "ChangedModernJars.txt"
@@ -744,7 +607,6 @@ jobs:
               exit 1
             fi
             printf 'put "%s" "%s"\n' "$STAGE_DIR/testplex-modern-recovery.sh" "testplex-modern-recovery.sh"
-            printf 'put "%s" "%s"\n' "$STAGE_DIR/testplex-jar-delta.py" "testplex-jar-delta.py"
             for file in "${world_chunks[@]}"; do
               printf 'put "%s" "%s"\n' "$file" "${file##*/}"
             done
@@ -752,7 +614,7 @@ jobs:
           upload_payload_bytes="$(du -sb "$STAGE_DIR" | awk '{print $1}')"
           [[ "$upload_payload_bytes" =~ ^[0-9]+$ ]] || { echo "Could not measure verified upload payload." >&2; exit 1; }
           upload_started_epoch="$(date +%s)"
-          echo "Uploading verified JAR entry deltas and required map/config payload ($((upload_payload_bytes / 1048576)) MiB staged) with SFTP."
+          echo "Uploading checksummed changed full JARs and required map/config payload ($((upload_payload_bytes / 1048576)) MiB staged) with SFTP."
           timeout --foreground --signal=TERM --kill-after=30s 12m sftp "${sftp_opts[@]}" -b "$batch_file" "$remote"
           upload_elapsed_seconds=$(( $(date +%s) - upload_started_epoch ))
           if (( upload_elapsed_seconds > 0 )); then
@@ -787,15 +649,8 @@ jobs:
           server_dir=/home/monstermaze/servers/testplex-modern
           while IFS= read -r jar; do
             [[ -n "$jar" ]] || continue
-            if [[ -s "$jar.delta.zip" && -s "$jar.delta.json" ]]; then
-              echo "Applying verified entry delta for $jar."
-              sudo -n python3 "$upload_dir/testplex-jar-delta.py" apply \
-                "$server_dir/plugins/$jar" "$upload_dir/$jar.delta.zip" "$upload_dir/$jar.delta.json" "$upload_dir/$jar"
-              sudo -n unzip -tq "$upload_dir/$jar" >/dev/null
-            elif [[ ! -s "$jar" ]]; then
-              echo "Changed JAR $jar has neither a full artifact nor a complete entry delta." >&2
-              exit 1
-            fi
+            [[ -s "$upload_dir/$jar" ]] || { echo "Changed JAR $jar is missing from the upload payload." >&2; exit 1; }
+            sudo -n unzip -tq "$upload_dir/$jar" >/dev/null
           done < ChangedModernJars.txt
           REMOTE_ASSEMBLE_ARCADE
           timeout --foreground --signal=TERM --kill-after=15s 3m ssh "${ssh_opts[@]}" "$remote" "echo 'Disk after transfer and patch assembly:'; df -h /var/tmp; du -sh '$upload_dir'; cd '$upload_dir' && for jar in \$(cat ChangedModernJars.txt); do unzip -tq \"\$jar\" >/dev/null; done"
@@ -1903,7 +1758,7 @@ jobs:
             echo
             echo "- Source build SHA: $SOURCE_SHA"
             echo "- Replaced plugin JARs: ${CHANGED_JARS:-none}"
-            echo "- Plugin transfer payload: ${JAR_TRANSFER_BYTES:-unknown} bytes of entry deltas/full first-install JARs; transfer checksummed before assembly"
+            echo "- Plugin transfer payload: ${JAR_TRANSFER_BYTES:-unknown} bytes of changed full JARs; transfer checksummed before install"
             echo "- Paper and FakePlayerPlugin: reused when the installed versions match"
             echo "- PacketEvents: server-side 2.14.0 plugin installed and SHA-512 verified; clients need no mod"
             echo "- Monster Maze maps uploaded: ${MM_MAPS_REQUIRED:-unknown}"
@@ -1914,5 +1769,3 @@ jobs:
             echo "- Memory safety: only Testplex's own legacy service is stopped; separate Monster Maze services are left untouched, and deployment aborts rather than stopping them when memory is insufficient; successful deployments leave only modern Paper running"
             echo "- Rollback: modern-only backup created before replacement; startup is checked before success"
           } >> "$GITHUB_STEP_SUMMARY"
-
-
