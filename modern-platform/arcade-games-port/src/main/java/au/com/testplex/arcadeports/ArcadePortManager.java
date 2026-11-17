@@ -62,6 +62,7 @@ import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.data.BlockData;
+import org.bukkit.block.data.Directional;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Ageable;
@@ -127,6 +128,7 @@ import org.bukkit.event.entity.PlayerLeashEntityEvent;
 import org.bukkit.event.entity.PotionSplashEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
@@ -7223,6 +7225,17 @@ public final class ArcadePortManager implements Listener {
         session.gladiatorMode = GladiatorsMode.defaultMode().id();
         session.gladiatorVotingStartedAt = System.currentTimeMillis();
         session.gladiatorVotingEndsAt = session.gladiatorVotingStartedAt + ArcadePortRules.gladiatorsVoteMillis();
+        if (session.players.size() >= 2) {
+            if (!prepareGladiatorLosersWorld(session)) {
+                announce(session, ChatColor.RED + "Gladiators could not prepare the mirrored loser's map. The match was stopped safely.");
+                stop("Gladiators mirror map initialization failed");
+                return;
+            }
+            // Create and seed the fixed bracket once, before the ballot opens. This lets
+            // the opening fighters wait at their actual first-round arenas during voting.
+            startGladiatorsRound(session, alivePlayers(session), true);
+            seatOpeningGladiatorMatches(session);
+        }
         announce(session, ChatColor.GOLD + "Gladiators vote: choose the PvP rules for this tournament.");
         for (Player player : session.players.values()) {
             if (player == null || !player.isOnline()) continue;
@@ -7233,7 +7246,54 @@ public final class ArcadePortManager implements Listener {
             if (!session.gladiatorVotes.containsKey(player.getUniqueId())) {
                 player.sendMessage(ChatColor.YELLOW + "You have not voted in the lobby yet — choose a ruleset now.");
             }
-            openGladiatorVoteMenu(player);
+            // Opening immediately after closeInventory can be lost by the client/server
+            // inventory transition. Reopen on the next tick so the ballot is visible
+            // from the first vote tick, including for players with a prior lobby menu.
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                Session current = active;
+                if (player.isOnline() && current == session
+                        && current.gladiatorVotingEndsAt > System.currentTimeMillis()
+                        && current.players.containsKey(player.getUniqueId())) {
+                    openGladiatorVoteMenu(player);
+                }
+            });
+        }
+    }
+
+    private void seatOpeningGladiatorMatches(Session session) {
+        if (session.gladiatorBracket == null || session.world == null) return;
+        int arenaRound = session.gladiatorRound;
+        List<Location> centers = gladiatorArenaCenters(session, arenaRound, false);
+        SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
+        if (centers.isEmpty() || !hasGladiatorSourceArenas(session, arenaRound, false) || mapData == null) return;
+
+        session.gladiatorOpeningArenaCentersByMatch.clear();
+        session.gladiatorOpeningSpawnsByMatch.clear();
+        Set<String> seenCenters = new HashSet<>();
+        List<Location> uniqueCenters = centers.stream()
+                .filter(center -> seenCenters.add(centerKey(center)))
+                .toList();
+        List<GladiatorsOpeningSeatPlan.Seat> seats = GladiatorsOpeningSeatPlan.create(
+                session.gladiatorBracket.readyMatches(), uniqueCenters.size());
+        for (GladiatorsOpeningSeatPlan.Seat seat : seats) {
+            Location center = uniqueCenters.get(seat.arenaIndex()).clone();
+            Location[] spawns = gladiatorArenaSpawnPair(session, center, true, false);
+            if (spawns == null || spawns.length != 2) continue;
+            int matchId = seat.match().id();
+            session.gladiatorOpeningArenaCentersByMatch.put(matchId, center.clone());
+            session.gladiatorOpeningSpawnsByMatch.put(matchId,
+                    new Location[]{spawns[0].clone(), spawns[1].clone()});
+            for (int i = 0; i < 2; i++) {
+                Player player = session.players.get(i == 0 ? seat.match().first() : seat.match().second());
+                if (player == null || !player.isOnline()) continue;
+                player.closeInventory();
+                player.leaveVehicle();
+                player.teleport(spawns[i]);
+                player.setGameMode(GameMode.ADVENTURE);
+                player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+                player.setFallDistance(0.0F);
+                giveGladiatorVoteItem(player);
+            }
         }
     }
 
@@ -7820,12 +7880,7 @@ public final class ArcadePortManager implements Listener {
         }
         announce(session, ChatColor.GOLD + "Gladiators rules selected: " + ChatColor.YELLOW
                 + selected.displayName() + ChatColor.GOLD + ". First-loss players enter the parallel loser's bracket.");
-        if (session.players.size() >= 2 && !prepareGladiatorLosersWorld(session)) {
-            announce(session, ChatColor.RED + "Gladiators could not prepare the mirrored loser's map. The match was stopped safely.");
-            stop("Gladiators mirror map initialization failed");
-            return;
-        }
-        startGladiatorsRound(session, alivePlayers(session), true);
+        progressGladiators(session);
     }
 
     private boolean prepareGladiatorLosersWorld(Session session) {
@@ -8042,7 +8097,10 @@ public final class ArcadePortManager implements Listener {
                 .collect(java.util.stream.Collectors.toSet());
         Location advancingCenter = !losersBracket && bracket == GLADIATOR_BRACKET_WINNERS
                 ? gladiatorNextArenaCenter(session, centers, firstId, secondId) : null;
-        center = advancingCenter != null && !occupied.contains(centerKey(advancingCenter)) ? advancingCenter
+        Location reservedCenter = session.gladiatorOpeningArenaCentersByMatch.remove(bracketMatchId);
+        Location[] reservedSpawns = session.gladiatorOpeningSpawnsByMatch.remove(bracketMatchId);
+        center = reservedCenter != null ? reservedCenter.clone()
+                : advancingCenter != null && !occupied.contains(centerKey(advancingCenter)) ? advancingCenter
                 : centers.stream().filter(candidate -> !occupied.contains(centerKey(candidate)))
                         .findFirst().map(Location::clone).orElse(null);
         if (matchWorld == null || center == null || !sourceArenas || matchMapData == null) {
@@ -8062,7 +8120,9 @@ public final class ArcadePortManager implements Listener {
         session.gladiatorArenaCentersByPair.put(pair, center.clone());
 
         Location[] spawns;
-        if (sourceArenas) {
+        if (reservedSpawns != null && reservedSpawns.length == 2) {
+            spawns = new Location[]{reservedSpawns[0].clone(), reservedSpawns[1].clone()};
+        } else if (sourceArenas) {
             spawns = gladiatorArenaSpawnPair(session, center, true, losersBracket);
         } else {
             Location left = center.clone().add(-2.0D, 0.0D, 0.0D);
@@ -11034,6 +11094,13 @@ public final class ArcadePortManager implements Listener {
                 || !(event.getPlayer() instanceof Player player)
                 || !session.alive.contains(player.getUniqueId())) return;
         if (!event.isCancelled() && event.getInventory().getHolder() instanceof org.bukkit.block.Chest) {
+            org.bukkit.block.Chest chest = (org.bukkit.block.Chest) event.getInventory().getHolder();
+            SourceMapCatalog.MapData map = sourceMapData.get(ArcadePortGame.SKY_WARS.id());
+            if (SkyWarsChestLoot.populateOpenedSourceChest(chest, map, session.skyWarsPopulatedChests) > 0) {
+                plugin.getLogger().info("Populated a previously missed SkyWars source chest at "
+                        + chest.getWorld().getName() + " " + chest.getX() + ", " + chest.getY()
+                        + ", " + chest.getZ() + ".");
+            }
             if (plugin.hasAdminAccess(player) && !debugFeatureEnabled(player.getUniqueId(),
                     ArcadePortGame.SKY_WARS, "chest-looting", true)) {
                 event.setCancelled(true);
@@ -14609,10 +14676,17 @@ public final class ArcadePortManager implements Listener {
                 player.setInvulnerable(false);
                 player.setCollidable(false);
                 player.setWalkSpeed(0.2F);
+                if (session.type == ArcadePortGame.DRAGON_ESCAPE
+                        && ArcadePortRules.shouldDragonEscapeRestorePrepareSprint(
+                                session.dragonEscapePrepareSprintRequests.contains(player.getUniqueId()),
+                                session.alive.contains(player.getUniqueId()))) {
+                    player.setSprinting(true);
+                }
                 if (session.type == ArcadePortGame.DEATH_TAG) player.sendActionBar(Component.empty());
                 player.sendTitle(ChatColor.GREEN + "In Progress...", ChatColor.GRAY + session.type.displayName(), 5, 25, 5);
                 player.playSound(player.getLocation(), Sound.UI_TOAST_IN, 0.8F, 1.1F);
             }
+            session.dragonEscapePrepareSprintRequests.clear();
             setLobbyLifecycleStatus("In Progress...");
             announce(session, ChatColor.GREEN + session.type.displayName() + " is now in progress!");
             if (session.type == ArcadePortGame.HOOPS_REMASTERED) {
@@ -17582,18 +17656,16 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         Block target = clicked.getRelative(face);
-        boolean placementTouchesWater = ArcadePortRules.dragonEscapeBuilderPlacementTouchesWater(
-                clicked.isLiquid(), target.isLiquid());
         boolean pendingBrick = session.dragonEscapeBuilderBricks.containsKey(id);
         if (!ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(
-                now, nextChargeAt, pendingBrick, placementTouchesWater)) {
+                now, nextChargeAt, pendingBrick)) {
             player.sendActionBar(ChatColor.YELLOW + (pendingBrick
                     ? "Wait for your previous brick to disappear."
-                    : placementTouchesWater ? "You cannot place a temporary brick in water."
                     : "Your next Builder brick is still recharging."));
             return;
         }
-        if (target.getWorld() != session.world || !target.isEmpty()
+        if (target.getWorld() != session.world || !ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(
+                    target.isEmpty(), target.getType() == Material.WATER)
                 || !ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(
                         target.getY(), session.world.getMinHeight(), session.world.getMaxHeight())) {
             player.sendActionBar(ChatColor.YELLOW + "You cannot place a temporary brick there.");
@@ -17991,8 +18063,11 @@ public final class ArcadePortManager implements Listener {
                 || !"digger".equals(session.dragonEscapeKits.get(id))) return;
         ItemStack held = player.getInventory().getItemInMainHand();
         if (held == null || !isDragonEscapeDiggerBlockAllowed(held.getType())) return;
-        Block target = clicked.getRelative(face);
-        if (target.getWorld() != session.world || !target.isEmpty()
+        Block target = ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(clicked.getType())
+                ? clicked : clicked.getRelative(face);
+        if (target.getWorld() != session.world
+                || (!target.isEmpty()
+                        && !ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(target.getType()))
                 || !isDragonEscapeDiggerBuildLocationAllowed(session, target)) return;
         org.bukkit.util.BoundingBox box = new org.bukkit.util.BoundingBox(
                 target.getX(), target.getY(), target.getZ(),
@@ -18003,8 +18078,14 @@ public final class ArcadePortManager implements Listener {
         BlockState previous = target.getState();
         if (session.dragonEscapePractice)
             session.dragonEscapePracticeChangedBlocks.putIfAbsent(target, previous.getBlockData().clone());
-        target.setType(held.getType(), false);
-        scheduleDragonEscapeBlockRestore(session, previous, target.getBlockData().clone());
+        BlockData placedData = held.getType().createBlockData();
+        if (placedData instanceof Directional directional && directional.getFaces().contains(player.getFacing())) {
+            directional.setFacing(player.getFacing());
+        }
+        target.setBlockData(placedData, false);
+        scheduleDragonEscapeBlockRestore(session, previous, target.getBlockData().clone(),
+                GameDebugRuntimeOverrides.intValue("DRAGON_ESCAPE_DIGGER_PLACED_BLOCK_RESTORE_TICKS",
+                        ArcadePortRules.DRAGON_ESCAPE_DIGGER_PLACED_BLOCK_RESTORE_TICKS));
         trackDragonEscapeDiggerPillar(session, id, target);
         consumeHeld(player);
         player.playSound(target.getLocation(), Sound.BLOCK_STONE_PLACE, 0.65F, 1.1F);
@@ -18019,6 +18100,13 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void scheduleDragonEscapeBlockRestore(Session session, BlockState previousState, BlockData expectedCurrent) {
+        scheduleDragonEscapeBlockRestore(session, previousState, expectedCurrent,
+                GameDebugRuntimeOverrides.intValue("DRAGON_ESCAPE_DIGGER_BLOCK_RESTORE_TICKS",
+                        ArcadePortRules.DRAGON_ESCAPE_DIGGER_BLOCK_RESTORE_TICKS));
+    }
+
+    private void scheduleDragonEscapeBlockRestore(Session session, BlockState previousState, BlockData expectedCurrent,
+            int restoreAfterTicks) {
         Block block = previousState.getBlock();
         String key = block.getWorld().getUID() + ":" + block.getX() + ":" + block.getY() + ":" + block.getZ();
         long token = ++session.dragonEscapeBlockRestoreSequence;
@@ -18032,7 +18120,7 @@ public final class ArcadePortManager implements Listener {
             Block current = world.getBlockAt(block.getX(), block.getY(), block.getZ());
             if (!current.getBlockData().matches(expectedCurrent)) return;
             previousState.update(true, false);
-        }, GameDebugRuntimeOverrides.intValue("DRAGON_ESCAPE_DIGGER_BLOCK_RESTORE_TICKS", ArcadePortRules.DRAGON_ESCAPE_DIGGER_BLOCK_RESTORE_TICKS));
+        }, Math.max(1, restoreAfterTicks));
     }
 
     private float dragonEscapePitch(Vector vector) {
@@ -33121,6 +33209,15 @@ public final class ArcadePortManager implements Listener {
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
         if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
+        Session sessionAtClick = active;
+        if (event.getWhoClicked() instanceof Player player
+                && event.getClick() == ClickType.SWAP_OFFHAND
+                && ArcadePortRules.shouldBlockDragonEscapeOffhandSwap(
+                        sessionAtClick == null ? null : sessionAtClick.type,
+                        sessionAtClick != null && sessionAtClick.players.containsKey(player.getUniqueId()))) {
+            event.setCancelled(true);
+            return;
+        }
         if (event.getView().getTopInventory().getHolder() instanceof KitCommandMenuHolder holder) {
             event.setCancelled(true);
             if (!(event.getWhoClicked() instanceof Player player)
@@ -35718,6 +35815,13 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
     public void onPrepareSprintToggle(PlayerToggleSprintEvent event) {
+        Session session = active;
+        Player player = event.getPlayer();
+        if (session != null && session.type == ArcadePortGame.DRAGON_ESCAPE && !session.liveStarted
+                && session.players.containsKey(player.getUniqueId())) {
+            if (event.isSprinting()) session.dragonEscapePrepareSprintRequests.add(player.getUniqueId());
+            else session.dragonEscapePrepareSprintRequests.remove(player.getUniqueId());
+        }
         cancelPrepareAction(event.getPlayer(), event);
     }
 
@@ -35738,6 +35842,14 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
     public void onPrepareHandSwap(PlayerSwapHandItemsEvent event) {
+        Session currentSession = active;
+        if (currentSession != null && currentSession.type == ArcadePortGame.DRAGON_ESCAPE
+                && currentSession.players.containsKey(event.getPlayer().getUniqueId())
+                && ArcadePortRules.shouldBlockDragonEscapeOffhandSwap(currentSession.type,
+                        currentSession.players.containsKey(event.getPlayer().getUniqueId()))) {
+            event.setCancelled(true);
+            return;
+        }
         cancelPrepareAction(event.getPlayer(), event);
     }
 
@@ -35941,6 +36053,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, DragonEscapeBuilderBrick> dragonEscapeBuilderBricks = new HashMap<>();
         final Map<UUID, Long> dragonEscapeBuilderLastPlacedAt = new HashMap<>();
         final Map<UUID, List<DragonEscapeGhostFrame>> dragonEscapeRunGhostFrames = new HashMap<>();
+        final Set<UUID> dragonEscapePrepareSprintRequests = new HashSet<>();
         final PriorityQueue<SkyWarsCrumbleCandidate> skyWarsCrumbleQueue = new PriorityQueue<>(
                 (left, right) -> {
                     int distanceOrder = Double.compare(right.distanceSquared(), left.distanceSquared());

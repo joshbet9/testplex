@@ -2237,22 +2237,19 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private String heroesOfGwenBaseStatus(int team) {
-        StringBuilder result = new StringBuilder();
         List<TowerState> teamTowers = towers.getOrDefault(team, List.of());
+        boolean towersRemain = teamTowers.stream().anyMatch(tower -> !tower.dead && tower.health > 0.0D);
+        List<String> towerIcons = new ArrayList<>(teamTowers.size());
         for (TowerState tower : teamTowers) {
             ChatColor color = tower.dead || tower.health <= 0.0D ? ChatColor.GRAY
                     : tower.health / Math.max(1.0D, tower.maxHealth) > 0.6D ? ChatColor.GREEN
                     : tower.health / Math.max(1.0D, tower.maxHealth) > 0.3D ? ChatColor.YELLOW : ChatColor.RED;
-            result.append(color).append("♛ ");
+            towerIcons.add(color + "♛ ");
         }
         Wither wither = withers.get(team);
-        if (wither != null && wither.isValid()) {
-            result.append(ChatColor.DARK_PURPLE).append("Wither ")
-                    .append(ChatColor.WHITE).append(Math.max(0, (int) Math.ceil(wither.getHealth())));
-        } else {
-            result.append(ChatColor.GRAY).append("Wither down");
-        }
-        return result.toString();
+        boolean witherAlive = wither != null && wither.isValid();
+        int witherHealth = witherAlive ? (int) Math.ceil(wither.getHealth()) : 0;
+        return HeroesOfGwenScoreboardRules.baseStatus(towerIcons, towersRemain, witherAlive, witherHealth);
     }
 
     private List<String> heroesOfGwenCaptureStatuses() {

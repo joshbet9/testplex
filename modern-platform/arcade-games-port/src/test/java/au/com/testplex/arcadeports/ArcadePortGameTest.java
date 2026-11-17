@@ -1748,6 +1748,18 @@ class ArcadePortGameTest {
         assertEquals(0.5D, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y, 0.00001D);
     }
 
+    @Test void dragonEscapeDiggerPlacesIntoReplaceableTerrainAndBlocksOffhandUse() {
+        assertTrue(ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(Material.WATER));
+        assertTrue(ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(Material.LAVA));
+        assertTrue(ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(Material.SNOW));
+        assertTrue(ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(Material.SHORT_GRASS));
+        assertFalse(ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(Material.STONE));
+        assertTrue(ArcadePortRules.shouldBlockDragonEscapeOffhandSwap(ArcadePortGame.DRAGON_ESCAPE, true));
+        assertFalse(ArcadePortRules.shouldBlockDragonEscapeOffhandSwap(ArcadePortGame.DRAGONS, true));
+        assertFalse(ArcadePortRules.shouldBlockDragonEscapeOffhandSwap(ArcadePortGame.DRAGON_ESCAPE, false));
+        assertEquals(20, ArcadePortRules.DRAGON_ESCAPE_DIGGER_PLACED_BLOCK_RESTORE_TICKS);
+    }
+
     @Test void dragonEscapeSourceMapBoundsUseInclusiveWorldDataLimits() {
         int minX = -100, maxX = 100, minZ = -80, maxZ = 80, minY = 20, maxY = 130;
         assertTrue(ArcadePortRules.isOutsideDragonEscapeMapBounds(-100.0D, 64.0D, 0.0D,
@@ -1988,16 +2000,12 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldRejectDragonEscapeBuilderEntityOverlap(true, true));
         assertTrue(ArcadePortRules.shouldRejectDragonEscapeBuilderEntityOverlap(false, true));
         assertFalse(ArcadePortRules.shouldRejectDragonEscapeBuilderEntityOverlap(false, false));
-        assertTrue(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false, false));
-        assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(9L, 10L, false, false));
-        assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, true, false));
-        assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false, true));
-        assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false,
-                ArcadePortRules.dragonEscapeBuilderPlacementTouchesWater(true, false)));
-        assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false,
-                ArcadePortRules.dragonEscapeBuilderPlacementTouchesWater(false, true)));
-        assertTrue(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false,
-                ArcadePortRules.dragonEscapeBuilderPlacementTouchesWater(false, false)));
+        assertTrue(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false));
+        assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(9L, 10L, false));
+        assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, true));
+        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(true, false));
+        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, true));
+        assertFalse(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, false));
         assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(64, -64, 320));
         assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(-64, -64, 320));
         assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(319, -64, 320));
@@ -2115,6 +2123,9 @@ class ArcadePortGameTest {
         assertEquals(10.0D, ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS, 0.00001D);
         assertTrue(ArcadePortRules.shouldDragonEscapePlayerBeCaught(25.01D, 25.0D));
         assertFalse(ArcadePortRules.shouldDragonEscapePlayerBeCaught(24.99D, 25.0D));
+        assertTrue(ArcadePortRules.shouldDragonEscapeRestorePrepareSprint(true, true));
+        assertFalse(ArcadePortRules.shouldDragonEscapeRestorePrepareSprint(false, true));
+        assertFalse(ArcadePortRules.shouldDragonEscapeRestorePrepareSprint(true, false));
         assertFalse(ArcadePortRules.isDragonEscapeFinishReached(10.0D, 64.0D, 77.5D));
         assertFalse(ArcadePortRules.isDragonEscapeFinishReached(0.5D, 70.0D, 77.5D));
         assertFalse(ArcadePortRules.isDragonEscapeFinishReached(0.5D, 64.0D, 74.4D));
