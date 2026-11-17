@@ -138,18 +138,18 @@ jobs:
         id: delta-base
         shell: bash
         env:
-          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
-          HYPERV_SSH_HOST: \${{ secrets.HYPERV_SSH_HOST }}
-          HYPERV_SSH_USER: \${{ secrets.HYPERV_SSH_USER }}
-          HYPERV_SSH_PORT: \${{ secrets.HYPERV_SSH_PORT }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
+          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
+          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
         run: |
           set -euo pipefail
-          SSH_PORT="\${HYPERV_SSH_PORT:-22}"
+          SSH_PORT="${HYPERV_SSH_PORT:-22}"
           ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
-          deployed_sha="$(timeout --foreground --signal=TERM --kill-after=10s 45s ssh "\${ssh_opts[@]}" \
+          deployed_sha="$(timeout --foreground --signal=TERM --kill-after=10s 45s ssh "${ssh_opts[@]}" \
             "$HYPERV_SSH_USER@$HYPERV_SSH_HOST" \
             "sudo -n cat /home/monstermaze/servers/testplex-modern/.testplex-modern-deployed-build")"
           [[ "$deployed_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Remote deployed-build marker is missing or invalid; refusing a slow full-JAR transfer." >&2; exit 1; }
@@ -163,7 +163,7 @@ jobs:
             select(.head_sha == $sha and .head_branch == "feat/testplex-modern-26.3-platform" and
               (.head_repository.full_name // "" | ascii_downcase) == ($repo | ascii_downcase) and
               .path == ".github/workflows/testplex-modern-build.yml") | .id' "$runs_json")
-          for run_id in "\${candidates[@]}"; do
+          for run_id in "${candidates[@]}"; do
             jobs_json="$RUNNER_TEMP/testplex-modern-base-jobs-$run_id.json"
             curl --fail --silent --show-error --max-time 20 \
               -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
@@ -189,10 +189,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: testplex-modern-paper-26.3
-          path: \${{ runner.temp }}/testplex-modern-base-artifact
-          repository: \${{ github.repository }}
-          run-id: \${{ steps.delta-base.outputs.run_id }}
-          github-token: \${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/testplex-modern-base-artifact
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.delta-base.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Checkout deployment recovery helper source
         uses: actions/checkout@v4
@@ -338,17 +338,17 @@ jobs:
         id: jar-diff
         shell: bash
         env:
-          HYPERV_SSH_HOST: \${{ secrets.HYPERV_SSH_HOST }}
-          HYPERV_SSH_USER: \${{ secrets.HYPERV_SSH_USER }}
-          HYPERV_SSH_PORT: \${{ secrets.HYPERV_SSH_PORT }}
-          STAGE_DIR: \${{ steps.stage-jars.outputs.stage_dir }}
-          BASE_DIR: \${{ runner.temp }}/testplex-modern-base-artifact
-          BASE_SHA: \${{ steps.delta-base.outputs.base_sha }}
-          MM_MAPS_REQUIRED: \${{ steps.stage-jars.outputs.mm_maps_required }}
-          WIZARDS_MAPS_REQUIRED: \${{ steps.stage-jars.outputs.wizards_maps_required }}
+          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
+          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
+          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
+          STAGE_DIR: ${{ steps.stage-jars.outputs.stage_dir }}
+          BASE_DIR: ${{ runner.temp }}/testplex-modern-base-artifact
+          BASE_SHA: ${{ steps.delta-base.outputs.base_sha }}
+          MM_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.mm_maps_required }}
+          WIZARDS_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.wizards_maps_required }}
         run: |
           set -euo pipefail
-          SSH_PORT="\${HYPERV_SSH_PORT:-22}"
+          SSH_PORT="${HYPERV_SSH_PORT:-22}"
           remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
           ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
             -o BatchMode=yes -o StrictHostKeyChecking=yes
@@ -362,7 +362,7 @@ jobs:
           for jar in TestplexModernArcade.jar ArcadeMechanicsModern.jar; do
             target="$STAGE_DIR/$jar"
             local_sha="$(sha256sum "$target" | awk '{print $1}')"
-            installed_sha="$(timeout --foreground --signal=TERM --kill-after=10s 45s ssh "\${ssh_opts[@]}" "$remote" \
+            installed_sha="$(timeout --foreground --signal=TERM --kill-after=10s 45s ssh "${ssh_opts[@]}" "$remote" \
               sudo -n sha256sum "/home/monstermaze/servers/testplex-modern/plugins/$jar" 2>/dev/null | awk '{print $1}' || true)"
             if [[ "$local_sha" == "$installed_sha" ]]; then
               rm -- "$target"
@@ -370,28 +370,28 @@ jobs:
               continue
             fi
             mapfile -t base_matches < <(find "$BASE_DIR" -type f -name "$jar" -print)
-            [[ \${#base_matches[@]} -eq 1 && -s "\${base_matches[0]}" ]] || {
+            [[ ${#base_matches[@]} -eq 1 && -s "${base_matches[0]}" ]] || {
               echo "Expected exactly one $jar in the deployed build artifact." >&2
               exit 1
             }
-            unzip -tq "\${base_matches[0]}" >/dev/null
-            python3 "$helper" create "\${base_matches[0]}" "$target" "$STAGE_DIR/$jar.delta.zip" "$STAGE_DIR/$jar.delta.json"
+            unzip -tq "${base_matches[0]}" >/dev/null
+            python3 "$helper" create "${base_matches[0]}" "$target" "$STAGE_DIR/$jar.delta.zip" "$STAGE_DIR/$jar.delta.json"
             size_kb="$(du -sk "$target" | awk '{print $1}')"
             [[ "$size_kb" =~ ^[0-9]+$ ]] || { echo "Could not size target JAR $jar." >&2; exit 1; }
             target_jars_kb=$((target_jars_kb + size_kb))
             changed+=("$jar")
             rm -- "$target"
           done
-          printf '%s\n' "\${changed[@]}" > "$STAGE_DIR/ChangedModernJars.txt"
+          printf '%s\n' "${changed[@]}" > "$STAGE_DIR/ChangedModernJars.txt"
           checksum_files=("$STAGE_DIR/ChangedModernJars.txt" "$STAGE_DIR/MonsterMazeMapsSource.txt" "$STAGE_DIR/WizardsSourceMaps.sha256" "$STAGE_DIR/testplex-modern-recovery.sh" "$STAGE_DIR/testplex-jar-delta.py")
           [[ ! -f "$STAGE_DIR/MonsterMazeMaps.tar.gz" ]] || checksum_files+=("$STAGE_DIR/MonsterMazeMaps.tar.gz")
           [[ ! -f "$STAGE_DIR/WizardsSourceMaps.tar.gz" ]] || checksum_files+=("$STAGE_DIR/WizardsSourceMaps.tar.gz")
           shopt -s nullglob
           delta_files=("$STAGE_DIR"/*.delta.zip "$STAGE_DIR"/*.delta.json)
-          checksum_files+=("\${delta_files[@]}")
-          (cd "$STAGE_DIR" && sha256sum "\${checksum_files[@]/$STAGE_DIR\//}" > SHA256SUMS)
+          checksum_files+=("${delta_files[@]}")
+          (cd "$STAGE_DIR" && sha256sum "${checksum_files[@]/$STAGE_DIR\//}" > SHA256SUMS)
           delta_bytes=0
-          for file in "\${delta_files[@]}"; do
+          for file in "${delta_files[@]}"; do
             file_bytes="$(stat -c %s "$file")"
             [[ "$file_bytes" =~ ^[0-9]+$ ]] || { echo "Could not measure JAR delta $file." >&2; exit 1; }
             delta_bytes=$((delta_bytes + file_bytes))
@@ -402,10 +402,10 @@ jobs:
             echo "Verified JAR deltas total $delta_bytes bytes, above the 16 MiB transfer budget. Refusing a long upload; server state is unchanged." >&2
             exit 1
           }
-          echo "changed_jars=$(IFS=,; echo "\${changed[*]}")" >> "$GITHUB_OUTPUT"
+          echo "changed_jars=$(IFS=,; echo "${changed[*]}")" >> "$GITHUB_OUTPUT"
           echo "target_jars_kb=$target_jars_kb" >> "$GITHUB_OUTPUT"
           echo "delta_bytes=$delta_bytes" >> "$GITHUB_OUTPUT"
-          echo "Changed JARs: \${changed[*]:-(none)}"
+          echo "Changed JARs: ${changed[*]:-(none)}"
           echo "JAR delta transfer payload: $delta_bytes bytes (limit 16777216 bytes)."
       - name: Validate isolated target without changing service state
         id: remote-preflight
