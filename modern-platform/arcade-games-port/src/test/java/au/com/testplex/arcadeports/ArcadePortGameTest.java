@@ -2923,6 +2923,10 @@ class ArcadePortGameTest {
     }
 
     @Test void turfWarsBuildPlacementStaysInsideSourceBoundsAndTerritory() {
+        assertFalse(ArcadePortRules.shouldSkipCancelledBlockBreak(ArcadePortGame.TURF_WARS, true));
+        assertTrue(ArcadePortRules.shouldSkipCancelledBlockBreak(ArcadePortGame.GLADIATORS, true));
+        assertFalse(ArcadePortRules.shouldSkipCancelledBlockBreak(ArcadePortGame.TURF_WARS, false));
+
         assertTrue(ArcadePortRules.isTurfWarsBuildWithinBounds(100, -10, 100, 140, -20, 20));
         assertTrue(ArcadePortRules.isTurfWarsBuildWithinBounds(139, 19, 100, 140, -20, 20));
         assertFalse(ArcadePortRules.isTurfWarsBuildWithinBounds(99, 0, 100, 140, -20, 20));

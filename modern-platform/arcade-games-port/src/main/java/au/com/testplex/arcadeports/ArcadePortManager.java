@@ -32516,8 +32516,7 @@ public final class ArcadePortManager implements Listener {
             event.setCancelled(true);
             return;
         }
-        if (event.isCancelled() && session.type != ArcadePortGame.MICRO_BATTLES
-                && session.type != ArcadePortGame.MASTER_BUILDERS) return;
+        if (ArcadePortRules.shouldSkipCancelledBlockBreak(session.type, event.isCancelled())) return;
         if (session.type == ArcadePortGame.SKY_WARS
                 && session.alive.contains(event.getPlayer().getUniqueId())) {
             Block broken = event.getBlock();
@@ -32642,6 +32641,7 @@ public final class ArcadePortManager implements Listener {
                 }
                 if ((team == 0 && broken == Material.RED_WOOL)
                         || (team == 1 && broken == Material.LIGHT_BLUE_WOOL)) {
+                    event.setCancelled(false);
                     event.setDropItems(false);
                     event.setExpToDrop(0);
                     session.turfPlacedBlockOwners.remove(event.getBlock());
