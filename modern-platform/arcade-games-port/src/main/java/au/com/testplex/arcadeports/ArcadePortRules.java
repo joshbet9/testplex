@@ -1327,7 +1327,8 @@ public final class ArcadePortRules {
         return nowMillis >= nextUseAtMillis;
     }
 
-    public static boolean shouldPlaceDragonEscapeDiggerIntoClickedBlock(Material material) {
+    /** Builder and Digger use the same replace-in-place targeting for fluids and foliage. */
+    public static boolean shouldPlaceDragonEscapeKitIntoClickedBlock(Material material) {
         return material == Material.WATER || material == Material.LAVA || material == Material.SNOW
                 || material == Material.SHORT_GRASS || material == Material.TALL_GRASS
                 || material == Material.FERN || material == Material.LARGE_FERN;
@@ -1449,14 +1450,10 @@ public final class ArcadePortRules {
         return !hasPendingBrick && now >= nextChargeAt;
     }
 
-    /**
-     * Builder bricks may replace air and passable non-fluid course cells, while
-     * leaving water, lava, and occupied solid course blocks intact. Fluids can
-     * immediately wash away a temporary brick before its charge state is observed.
-     */
+    /** Builder bricks follow Digger's replaceable-cell placement, including water and lava. */
     public static boolean isDragonEscapeBuilderTargetReplaceable(
             boolean targetIsEmpty, boolean targetIsLiquid, boolean targetIsPassable) {
-        return targetIsEmpty || (!targetIsLiquid && targetIsPassable);
+        return targetIsEmpty || targetIsLiquid || targetIsPassable;
     }
 
     /** Builder bricks follow vanilla build-height limits, not the Digger's map-area restriction. */

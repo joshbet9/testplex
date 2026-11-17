@@ -17652,7 +17652,8 @@ public final class ArcadePortManager implements Listener {
             player.sendActionBar(ChatColor.YELLOW + "Right-click a block face to place your brick.");
             return;
         }
-        Block target = clicked.getRelative(face);
+        Block target = ArcadePortRules.shouldPlaceDragonEscapeKitIntoClickedBlock(clicked.getType())
+                ? clicked : clicked.getRelative(face);
         boolean pendingBrick = session.dragonEscapeBuilderBricks.containsKey(id);
         if (!ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(
                 now, nextChargeAt, pendingBrick)) {
@@ -18071,7 +18072,7 @@ public final class ArcadePortManager implements Listener {
                 || !"digger".equals(session.dragonEscapeKits.get(id))) return;
         ItemStack held = player.getInventory().getItemInMainHand();
         if (held == null || !isDragonEscapeDiggerBlockAllowed(held.getType())) return;
-        Block target = ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(clicked.getType())
+        Block target = ArcadePortRules.shouldPlaceDragonEscapeKitIntoClickedBlock(clicked.getType())
                 ? clicked : clicked.getRelative(face);
         if (target.getWorld() != session.world
                 || (!target.isEmpty()

@@ -611,7 +611,7 @@ class ArcadePortGameTest {
         Path nestedWorld = temporaryDirectory.resolve("Mighty Lava Arena");
         java.nio.file.Files.createDirectories(nestedWorld);
         java.nio.file.Files.write(nestedWorld.resolve("level.dat"), new byte[] {1, 2, 3});
-        java.nio.file.Files.writeString(nestedWorld.resolve("WorldConfig.dat"), "MAP_NAME:Mighty Lava Arena\\n");
+        java.nio.file.Files.writeString(nestedWorld.resolve("WorldConfig.dat"), "MAP_NAME:Mighty Lava Arena\r\n");
         java.nio.file.Files.createDirectories(nestedWorld.resolve("region"));
         java.nio.file.Files.write(nestedWorld.resolve("region/r.0.0.mca"), new byte[] {1});
 
@@ -626,7 +626,7 @@ class ArcadePortGameTest {
         java.nio.file.Files.createDirectories(worldRoot.resolve("entities"));
         java.nio.file.Files.write(worldRoot.resolve("entities/r.0.0.mca"), new byte[] {4});
         java.nio.file.Files.write(worldRoot.resolve("level.dat"), new byte[] {1});
-        java.nio.file.Files.writeString(worldRoot.resolve("WorldConfig.dat"), "MAP_NAME:Mighty Lava Arena\\n");
+        java.nio.file.Files.writeString(worldRoot.resolve("WorldConfig.dat"), "MAP_NAME:Mighty Lava Arena\r\n");
 
         SourceMapCatalog.preparePaper26WorldStorage(worldRoot);
         Path modernRoot = worldRoot.resolve("dimensions/minecraft/overworld");
@@ -687,7 +687,7 @@ class ArcadePortGameTest {
         java.nio.file.Files.createDirectories(legacyRoot);
         java.nio.file.Files.createDirectories(migratedWorldFolder);
         Path legacyConfig = legacyRoot.resolve("WorldConfig.dat");
-        java.nio.file.Files.writeString(legacyConfig, "MAP_NAME:Mighty Lava Arena\\n");
+        java.nio.file.Files.writeString(legacyConfig, "MAP_NAME:Mighty Lava Arena\r\n");
 
         assertEquals(legacyConfig, SourceMapCatalog.resolveWorldConfigPath(
                 migratedWorldFolder, temporaryDirectory, "arcadeport_source_bacon_brawl"));
@@ -1748,12 +1748,12 @@ class ArcadePortGameTest {
         assertEquals(0.5D, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y, 0.00001D);
     }
 
-    @Test void dragonEscapeDiggerPlacesIntoReplaceableTerrainAndBlocksOffhandUse() {
-        assertTrue(ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(Material.WATER));
-        assertTrue(ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(Material.LAVA));
-        assertTrue(ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(Material.SNOW));
-        assertTrue(ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(Material.SHORT_GRASS));
-        assertFalse(ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(Material.STONE));
+    @Test void dragonEscapeBuilderAndDiggerShareReplaceableTargeting() {
+        assertTrue(ArcadePortRules.shouldPlaceDragonEscapeKitIntoClickedBlock(Material.WATER));
+        assertTrue(ArcadePortRules.shouldPlaceDragonEscapeKitIntoClickedBlock(Material.LAVA));
+        assertTrue(ArcadePortRules.shouldPlaceDragonEscapeKitIntoClickedBlock(Material.SNOW));
+        assertTrue(ArcadePortRules.shouldPlaceDragonEscapeKitIntoClickedBlock(Material.SHORT_GRASS));
+        assertFalse(ArcadePortRules.shouldPlaceDragonEscapeKitIntoClickedBlock(Material.STONE));
         assertTrue(ArcadePortRules.shouldBlockDragonEscapeOffhandSwap(ArcadePortGame.DRAGON_ESCAPE, true));
         assertFalse(ArcadePortRules.shouldBlockDragonEscapeOffhandSwap(ArcadePortGame.DRAGONS, true));
         assertFalse(ArcadePortRules.shouldBlockDragonEscapeOffhandSwap(ArcadePortGame.DRAGON_ESCAPE, false));
@@ -2004,8 +2004,8 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(9L, 10L, false));
         assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, true));
         assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(true, false, false));
-        assertFalse(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, true, true),
-                "Builder bricks must not be placed into fluid cells that can wash them away");
+        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, true, true),
+                "Builder must replace water and lava the same way Digger does");
         assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, false, true));
         assertFalse(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, false, false));
         assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(64, -64, 320));
