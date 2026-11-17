@@ -2004,7 +2004,8 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(9L, 10L, false));
         assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, true));
         assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(true, false, false));
-        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, true, true));
+        assertFalse(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, true, true),
+                "Builder bricks must not be placed into fluid cells that can wash them away");
         assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, false, true));
         assertFalse(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, false, false));
         assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(64, -64, 320));
