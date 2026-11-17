@@ -1327,6 +1327,16 @@ public final class ArcadePortRules {
         return nowMillis >= nextUseAtMillis;
     }
 
+    public static boolean shouldPlaceDragonEscapeDiggerIntoClickedBlock(Material material) {
+        return material == Material.WATER || material == Material.LAVA || material == Material.SNOW
+                || material == Material.SHORT_GRASS || material == Material.TALL_GRASS
+                || material == Material.FERN || material == Material.LARGE_FERN;
+    }
+
+    public static boolean shouldBlockDragonEscapeOffhandSwap(ArcadePortGame game, boolean gameParticipant) {
+        return game == ArcadePortGame.DRAGON_ESCAPE && gameParticipant;
+    }
+
     public static boolean shouldPreventDragonEscapeDigger(double distanceToBlockCenter, double distanceAboveBlock) {
         double radius = Math.max(0.0D, GameDebugRuntimeOverrides.doubleValue(
                 "DRAGON_ESCAPE_DIGGER_NEARBY_PLAYER_RADIUS", DRAGON_ESCAPE_DIGGER_NEARBY_PLAYER_RADIUS));
@@ -1412,6 +1422,7 @@ public final class ArcadePortRules {
     public static final long DRAGON_ESCAPE_DIGGER_OPENING_LOCKOUT_MILLIS = 10_000L;
     public static final long DRAGON_ESCAPE_DIGGER_RECHARGE_MILLIS = 100L;
     public static final int DRAGON_ESCAPE_DIGGER_BLOCK_RESTORE_TICKS = 2_400;
+    public static final int DRAGON_ESCAPE_DIGGER_PLACED_BLOCK_RESTORE_TICKS = 20;
     public static final double DRAGON_ESCAPE_DIGGER_NEARBY_PLAYER_RADIUS = 1.5D;
     public static final long DRAGON_ESCAPE_WARPER_GRACE_MILLIS = 1_000L;
     public static final int DRAGON_ESCAPE_ROUTE_BOUNDS_MARGIN = 32;

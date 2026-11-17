@@ -1748,6 +1748,18 @@ class ArcadePortGameTest {
         assertEquals(0.5D, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y, 0.00001D);
     }
 
+    @Test void dragonEscapeDiggerPlacesIntoReplaceableTerrainAndBlocksOffhandUse() {
+        assertTrue(ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(Material.WATER));
+        assertTrue(ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(Material.LAVA));
+        assertTrue(ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(Material.SNOW));
+        assertTrue(ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(Material.SHORT_GRASS));
+        assertFalse(ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(Material.STONE));
+        assertTrue(ArcadePortRules.shouldBlockDragonEscapeOffhandSwap(ArcadePortGame.DRAGON_ESCAPE, true));
+        assertFalse(ArcadePortRules.shouldBlockDragonEscapeOffhandSwap(ArcadePortGame.DRAGONS, true));
+        assertFalse(ArcadePortRules.shouldBlockDragonEscapeOffhandSwap(ArcadePortGame.DRAGON_ESCAPE, false));
+        assertEquals(20, ArcadePortRules.DRAGON_ESCAPE_DIGGER_PLACED_BLOCK_RESTORE_TICKS);
+    }
+
     @Test void dragonEscapeSourceMapBoundsUseInclusiveWorldDataLimits() {
         int minX = -100, maxX = 100, minZ = -80, maxZ = 80, minY = 20, maxY = 130;
         assertTrue(ArcadePortRules.isOutsideDragonEscapeMapBounds(-100.0D, 64.0D, 0.0D,

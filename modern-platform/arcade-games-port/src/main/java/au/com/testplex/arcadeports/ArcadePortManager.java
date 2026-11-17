@@ -62,6 +62,7 @@ import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.data.BlockData;
+import org.bukkit.block.data.Directional;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Ageable;
@@ -127,6 +128,7 @@ import org.bukkit.event.entity.PlayerLeashEntityEvent;
 import org.bukkit.event.entity.PotionSplashEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
@@ -18053,8 +18055,11 @@ public final class ArcadePortManager implements Listener {
                 || !"digger".equals(session.dragonEscapeKits.get(id))) return;
         ItemStack held = player.getInventory().getItemInMainHand();
         if (held == null || !isDragonEscapeDiggerBlockAllowed(held.getType())) return;
-        Block target = clicked.getRelative(face);
-        if (target.getWorld() != session.world || !target.isEmpty()
+        Block target = ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(clicked.getType())
+                ? clicked : clicked.getRelative(face);
+        if (target.getWorld() != session.world
+                || (!target.isEmpty()
+                        && !ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(target.getType()))
                 || !isDragonEscapeDiggerBuildLocationAllowed(session, target)) return;
         org.bukkit.util.BoundingBox box = new org.bukkit.util.BoundingBox(
                 target.getX(), target.getY(), target.getZ(),
@@ -18065,8 +18070,14 @@ public final class ArcadePortManager implements Listener {
         BlockState previous = target.getState();
         if (session.dragonEscapePractice)
             session.dragonEscapePracticeChangedBlocks.putIfAbsent(target, previous.getBlockData().clone());
-        target.setType(held.getType(), false);
-        scheduleDragonEscapeBlockRestore(session, previous, target.getBlockData().clone());
+        BlockData placedData = held.getType().createBlockData();
+        if (placedData instanceof Directional directional && directional.getFaces().contains(player.getFacing())) {
+            directional.setFacing(player.getFacing());
+        }
+        target.setBlockData(placedData, false);
+        scheduleDragonEscapeBlockRestore(session, previous, target.getBlockData().clone(),
+                GameDebugRuntimeOverrides.intValue("DRAGON_ESCAPE_DIGGER_PLACED_BLOCK_RESTORE_TICKS",
+                        ArcadePortRules.DRAGON_ESCAPE_DIGGER_PLACED_BLOCK_RESTORE_TICKS));
         trackDragonEscapeDiggerPillar(session, id, target);
         consumeHeld(player);
         player.playSound(target.getLocation(), Sound.BLOCK_STONE_PLACE, 0.65F, 1.1F);
@@ -18081,6 +18092,13 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void scheduleDragonEscapeBlockRestore(Session session, BlockState previousState, BlockData expectedCurrent) {
+        scheduleDragonEscapeBlockRestore(session, previousState, expectedCurrent,
+                GameDebugRuntimeOverrides.intValue("DRAGON_ESCAPE_DIGGER_BLOCK_RESTORE_TICKS",
+                        ArcadePortRules.DRAGON_ESCAPE_DIGGER_BLOCK_RESTORE_TICKS));
+    }
+
+    private void scheduleDragonEscapeBlockRestore(Session session, BlockState previousState, BlockData expectedCurrent,
+            int restoreAfterTicks) {
         Block block = previousState.getBlock();
         String key = block.getWorld().getUID() + ":" + block.getX() + ":" + block.getY() + ":" + block.getZ();
         long token = ++session.dragonEscapeBlockRestoreSequence;
@@ -18094,7 +18112,7 @@ public final class ArcadePortManager implements Listener {
             Block current = world.getBlockAt(block.getX(), block.getY(), block.getZ());
             if (!current.getBlockData().matches(expectedCurrent)) return;
             previousState.update(true, false);
-        }, GameDebugRuntimeOverrides.intValue("DRAGON_ESCAPE_DIGGER_BLOCK_RESTORE_TICKS", ArcadePortRules.DRAGON_ESCAPE_DIGGER_BLOCK_RESTORE_TICKS));
+        }, Math.max(1, restoreAfterTicks));
     }
 
     private float dragonEscapePitch(Vector vector) {
@@ -33183,6 +33201,15 @@ public final class ArcadePortManager implements Listener {
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
         if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
+        Session sessionAtClick = active;
+        if (event.getWhoClicked() instanceof Player player
+                && event.getClick() == ClickType.SWAP_OFFHAND
+                && ArcadePortRules.shouldBlockDragonEscapeOffhandSwap(
+                        sessionAtClick == null ? null : sessionAtClick.type,
+                        sessionAtClick != null && sessionAtClick.players.containsKey(player.getUniqueId()))) {
+            event.setCancelled(true);
+            return;
+        }
         if (event.getView().getTopInventory().getHolder() instanceof KitCommandMenuHolder holder) {
             event.setCancelled(true);
             if (!(event.getWhoClicked() instanceof Player player)
@@ -35807,6 +35834,14 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
     public void onPrepareHandSwap(PlayerSwapHandItemsEvent event) {
+        Session currentSession = active;
+        if (currentSession != null && currentSession.type == ArcadePortGame.DRAGON_ESCAPE
+                && currentSession.players.containsKey(event.getPlayer().getUniqueId())
+                && ArcadePortRules.shouldBlockDragonEscapeOffhandSwap(currentSession.type,
+                        currentSession.players.containsKey(event.getPlayer().getUniqueId()))) {
+            event.setCancelled(true);
+            return;
+        }
         cancelPrepareAction(event.getPlayer(), event);
     }
 
