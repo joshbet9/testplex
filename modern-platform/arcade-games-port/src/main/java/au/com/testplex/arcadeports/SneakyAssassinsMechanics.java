@@ -896,8 +896,8 @@ final class SneakyAssassinsMechanics {
         if (!powerUpsEnabled) {
             for (PowerUp powerUp : new ArrayList<>(powerUps)) removePowerUp(powerUp);
         } else {
-        if (powerUps.size() < SneakyAssassinsRules.maxActivePowerUps() && now >= nextPowerUpAt) {
-            if (spawnPowerUp(now)) nextPowerUpAt = now + SneakyAssassinsRules.nextPowerUpDelayMillis();
+        if (now >= nextPowerUpAt) {
+            if (spawnPowerUp(now)) nextPowerUpAt = now + SneakyAssassinsRules.powerUpSpawnDelayMillis(powerUps.size());
         }
         for (PowerUp powerUp : new ArrayList<>(powerUps)) {
             if (powerUp.item != null && (!powerUp.item.isValid() || powerUp.item.isDead())) {
@@ -946,7 +946,7 @@ final class SneakyAssassinsMechanics {
                         <= SneakyAssassinsRules.powerUpPickupRadiusSquared()) {
                     collectPowerUp(player);
                     removePowerUp(powerUp);
-                    nextPowerUpAt = now + SneakyAssassinsRules.nextPowerUpDelayMillis();
+                    nextPowerUpAt = now + SneakyAssassinsRules.powerUpSpawnDelayMillis(powerUps.size());
                     break;
                 }
             }

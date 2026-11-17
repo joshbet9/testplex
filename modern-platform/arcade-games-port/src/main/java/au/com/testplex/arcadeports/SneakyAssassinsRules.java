@@ -7,7 +7,6 @@ final class SneakyAssassinsRules {
     public static final long POWERUP_KILL_WINDOW_MILLIS = 1_000L;
     public static final long FIRST_POWERUP_DELAY_MILLIS = 12_000L;
     public static final long NEXT_POWERUP_DELAY_MILLIS = 7_000L;
-    public static final int MAX_ACTIVE_POWERUPS = 2;
     public static final int MASTER_ASSASSIN_POWERUPS_REQUIRED = 4;
     public static final int REVEAL_RADIUS_BLOCKS = 12;
     public static final int SMOKE_RADIUS_BLOCKS = 5;
@@ -127,7 +126,16 @@ final class SneakyAssassinsRules {
 
     static long firstPowerUpDelayMillis() { return value("FIRST_POWERUP_DELAY_MILLIS", FIRST_POWERUP_DELAY_MILLIS); }
     static long nextPowerUpDelayMillis() { return value("NEXT_POWERUP_DELAY_MILLIS", NEXT_POWERUP_DELAY_MILLIS); }
-    static int maxActivePowerUps() { return GameDebugRuntimeOverrides.intValue("SNEAKY_ASSASSINS_MAX_ACTIVE_POWERUPS", MAX_ACTIVE_POWERUPS); }
+    /**
+     * Keeps future power-ups possible at any active count while reducing their frequency
+     * as the map becomes busier. Linear interval growth makes two or three concurrent
+     * beacons plausible without imposing a hard cap.
+     */
+    static long powerUpSpawnDelayMillis(int activePowerUps) {
+        long baseDelay = nextPowerUpDelayMillis();
+        long multiplier = Math.max(1L, activePowerUps + 1L);
+        return baseDelay > Long.MAX_VALUE / multiplier ? Long.MAX_VALUE : baseDelay * multiplier;
+    }
     static int npcPatrolOrderChanceDenominator() { return Math.max(1, GameDebugRuntimeOverrides.intValue(
             "SNEAKY_ASSASSINS_NPC_PATROL_ORDER_CHANCE_DENOMINATOR", NPC_PATROL_ORDER_CHANCE_DENOMINATOR)); }
 
@@ -327,7 +335,7 @@ final class SneakyAssassinsRules {
     static boolean debuggableRule(String name) {
         return switch (name) {
             case "POWERUP_KILL_WINDOW_MILLIS", "FIRST_POWERUP_DELAY_MILLIS", "NEXT_POWERUP_DELAY_MILLIS",
-                    "MAX_ACTIVE_POWERUPS", "MASTER_ASSASSIN_POWERUPS_REQUIRED", "REVEAL_RADIUS_BLOCKS",
+                    "MASTER_ASSASSIN_POWERUPS_REQUIRED", "REVEAL_RADIUS_BLOCKS",
                     "SMOKE_RADIUS_BLOCKS", "GLOBAL_REVEAL_CYCLE_MILLIS", "REVEALER_DURATION_MILLIS",
                     "SMOKE_CLOAK_DURATION_MILLIS", "BRIBE_COOLDOWN_MILLIS", "SOURCE_NPC_COUNT",
                     "NPC_CULL_INTERVAL_MILLIS", "NPC_PATROL_ANCHOR_DISTANCE_BLOCKS",
