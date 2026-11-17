@@ -24,19 +24,19 @@ write_source() {
 revision_one=1111111111111111111111111111111111111111
 revision_two=2222222222222222222222222222222222222222
 write_source "$revision_one" first
-TESTPLEX_WORLD_OWNER= "$PROVISION" "$SOURCE" "$WORLD_ROOT"
+TESTPLEX_WORLD_OWNER= bash "$PROVISION" "$SOURCE" "$WORLD_ROOT"
 [[ "$(cat "$WORLD_ROOT/.testplex-mm-source-maps")" == "$revision_one" ]]
 [[ "$(find "$WORLD_ROOT" -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 7 ]]
 [[ ! -e "$WORLD_ROOT/mm_void/session.lock" && ! -e "$WORLD_ROOT/mm_void/uid.dat" ]]
 
 # A deployment with the same pinned revision must preserve the live world copy.
 printf 'preserve-me\n' > "$WORLD_ROOT/mm_void/runtime-marker.txt"
-TESTPLEX_WORLD_OWNER= "$PROVISION" "$SOURCE" "$WORLD_ROOT"
+TESTPLEX_WORLD_OWNER= bash "$PROVISION" "$SOURCE" "$WORLD_ROOT"
 grep -Fxq 'preserve-me' "$WORLD_ROOT/mm_void/runtime-marker.txt"
 
 # A changed source revision replaces only the seven source worlds.
 write_source "$revision_two" second
-TESTPLEX_WORLD_OWNER= "$PROVISION" "$SOURCE" "$WORLD_ROOT"
+TESTPLEX_WORLD_OWNER= bash "$PROVISION" "$SOURCE" "$WORLD_ROOT"
 [[ "$(cat "$WORLD_ROOT/.testplex-mm-source-maps")" == "$revision_two" ]]
 grep -Fxq 'mm_void:second' "$WORLD_ROOT/mm_void/level.dat"
 [[ ! -e "$WORLD_ROOT/mm_void/runtime-marker.txt" ]]
@@ -45,14 +45,14 @@ grep -Fxq 'mm_void:second' "$WORLD_ROOT/mm_void/level.dat"
 # overwrite the previous complete map set.
 printf 'keep-on-failure\n' > "$WORLD_ROOT/mm_void/runtime-marker.txt"
 rm -rf "$SOURCE/mm_swampland/region"
-if TESTPLEX_WORLD_OWNER= "$PROVISION" "$SOURCE" "$WORLD_ROOT"; then
+if TESTPLEX_WORLD_OWNER= bash "$PROVISION" "$SOURCE" "$WORLD_ROOT"; then
     echo 'Expected incomplete source maps to fail validation.' >&2
     exit 1
 fi
 [[ "$(cat "$WORLD_ROOT/.testplex-mm-source-maps")" == "$revision_two" ]]
 grep -Fxq 'keep-on-failure' "$WORLD_ROOT/mm_void/runtime-marker.txt"
 
-if TESTPLEX_WORLD_OWNER= "$PROVISION" "$SOURCE" /server 2>/dev/null; then
+if TESTPLEX_WORLD_OWNER= bash "$PROVISION" "$SOURCE" /server 2>/dev/null; then
     echo 'Expected persistent /server world paths to be rejected.' >&2
     exit 1
 fi
