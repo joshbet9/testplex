@@ -121,6 +121,7 @@ jobs:
           artifact_record="$(jq -ce '[.artifacts[] | select(.expired == false and .name == "testplex-modern-paper-26.3")] | if length == 1 then .[0] else error("Expected exactly one unexpired testplex-modern-paper-26.3 artifact") end' "$artifacts_json")"
           echo "artifact_name=$(jq -er '.name' <<< "$artifact_record")" >> "$GITHUB_OUTPUT"
           echo "artifact_id=$(jq -er '.id | tostring' <<< "$artifact_record")" >> "$GITHUB_OUTPUT"
+          echo "artifact_size_bytes=$(jq -er '.size_in_bytes | tostring' <<< "$artifact_record")" >> "$GITHUB_OUTPUT"
           echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
           echo "Selected modern build $source_sha from run $SOURCE_RUN_ID"
 
@@ -132,6 +133,40 @@ jobs:
           repository: ${{ github.repository }}
           run-id: ${{ inputs.source_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create short-lived artifact download URL for Hyper-V
+        id: artifact-download
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ARTIFACT_ID: ${{ steps.source-artifact.outputs.artifact_id }}
+          STAGE_DIR: ${{ runner.temp }}/testplex-modern-verified
+        run: |
+          set -euo pipefail
+          headers="$RUNNER_TEMP/testplex-artifact-download-headers.txt"
+          config="$RUNNER_TEMP/testplex-artifact-download.curl"
+          curl -sS -D "$headers" -o /dev/null \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip"
+          download_url="$(awk 'BEGIN { IGNORECASE=1 } /^location:/ { sub(/^[^:]*:[[:space:]]*/, ""); sub(/\r$/, ""); print; exit }' "$headers")"
+          [[ -n "$download_url" && "$download_url" != *$'\r'* && "$download_url" != *$'\n'* && "$download_url" != *'"'* ]] || {
+            echo "GitHub did not provide a safe artifact download URL." >&2
+            exit 1
+          }
+          python3 - "$download_url" <<'PY'
+          import sys
+          from urllib.parse import urlparse
+          parsed = urlparse(sys.argv[1])
+          if parsed.scheme != "https" or not parsed.hostname or not parsed.hostname.endswith(".blob.core.windows.net") or parsed.username or parsed.password or parsed.fragment:
+              raise SystemExit("Artifact URL is not an approved HTTPS GitHub Actions blob URL.")
+          PY
+          install -d -m 0700 "$STAGE_DIR"
+          printf 'url = "%s"\n' "$download_url" > "$config"
+          chmod 0600 "$config"
+          install -m 0600 "$config" "$STAGE_DIR/ArtifactDownloadUrl.curl"
+          rm -f -- "$headers" "$config"
+          echo "Prepared an expiring, host-validated artifact URL for direct Hyper-V download; signed URL contents are not logged."
 
       - name: Checkout deployment recovery helper source
         uses: actions/checkout@v4
@@ -395,6 +430,8 @@ jobs:
           STAGE_DIR: ${{ steps.stage-jars.outputs.stage_dir }}
           MM_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.mm_maps_required }}
           MAP_EXPANDED_KB: ${{ steps.stage-jars.outputs.map_expanded_kb }}
+          ARTIFACT_SIZE_BYTES: ${{ steps.source-artifact.outputs.artifact_size_bytes }}
+          ARTIFACT_DOWNLOAD_CONFIG: ${{ runner.temp }}/testplex-artifact-download.curl
           WIZARDS_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.wizards_maps_required }}
         run: |
           set -euo pipefail
@@ -423,13 +460,16 @@ jobs:
             staged_jar_kb=$((staged_jar_kb + jar_kb))
           done
           [[ "$MAP_EXPANDED_KB" =~ ^[0-9]+$ ]] || { echo "Invalid map expansion budget." >&2; exit 1; }
+          [[ "$ARTIFACT_SIZE_BYTES" =~ ^[1-9][0-9]*$ ]] || { echo "Invalid source artifact size." >&2; exit 1; }
+          artifact_kb=$(( (ARTIFACT_SIZE_BYTES + 1023) / 1024 ))
 
-          timeout --foreground --signal=TERM --kill-after=20s 3m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" "$stage_kb" "$staged_jar_kb" "$MAP_EXPANDED_KB" <<'REMOTE_STAGE_PREP'
+          timeout --foreground --signal=TERM --kill-after=20s 3m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" "$stage_kb" "$staged_jar_kb" "$MAP_EXPANDED_KB" "$artifact_kb" <<'REMOTE_STAGE_PREP'
           set -euo pipefail
           upload_dir="$1"
           stage_kb="$2"
           staged_jar_kb="$3"
           map_expanded_kb="$4"
+          artifact_kb="$5"
           state_dir=/var/lib/testplex-modern-deploy
           backup_root="$state_dir/backups"
           server_dir=/home/monstermaze/servers/testplex-modern
@@ -533,7 +573,7 @@ jobs:
           non_jar_payload_kb=$((stage_kb - staged_jar_kb))
           (( non_jar_payload_kb >= 0 )) || { echo "Invalid JAR/payload size accounting." >&2; exit 1; }
           jar_stage_kb="$staged_jar_kb"
-          tmp_required_kb=$((non_jar_payload_kb + jar_stage_kb))
+          tmp_required_kb=$((non_jar_payload_kb + jar_stage_kb + artifact_kb))
           server_required_kb=0
           state_required_kb=0
           if [[ "$tmp_device" == "$server_device" ]]; then
@@ -559,8 +599,8 @@ jobs:
           echo "Staging space passed: /var/tmp=$((tmp_avail_kb / 1024)) MiB (needs $((tmp_required_kb / 1024)) MiB); server filesystem=$((server_avail_kb / 1024)) MiB (needs $((server_required_kb / 1024)) MiB); backup filesystem=$((state_avail_kb / 1024)) MiB (needs $((state_required_kb / 1024)) MiB); payload=$((stage_kb / 1024)) MiB; changed JARs=$((staged_jar_kb / 1024)) MiB; maps=$((map_expanded_kb / 1024)) MiB; rollback snapshot=$((snapshot_kb / 1024)) MiB; reserve=512 MiB."
           install -d -m 0700 -- "$upload_dir"
           REMOTE_STAGE_PREP
-          # Send only changed full JARs. Downloading installed JARs over SSH stdout
-          # has repeatedly timed out on the Hyper-V Tailscale path.
+          # Transfer only small manifests and maps over Tailscale. The VM fetches
+          # the selected artifact directly from the short-lived GitHub blob URL.
           sftp_opts=(-P "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
@@ -590,14 +630,10 @@ jobs:
             done < "$STAGE_DIR/ChangedModernJars.txt"
             while IFS= read -r jar; do
               [[ -n "$jar" ]] || continue
-              if [[ -f "$STAGE_DIR/$jar" ]]; then
-                printf 'put "%s" "%s"\n' "$STAGE_DIR/$jar" "$jar"
-              else
-                echo "Missing full JAR payload for changed JAR $jar" >&2
-                exit 1
-              fi
+              [[ -s "$STAGE_DIR/$jar" ]] || { echo "Missing verified JAR $jar in the selected artifact." >&2; exit 1; }
             done < "$STAGE_DIR/ChangedModernJars.txt"
             printf 'put "%s" "%s"\n' "$STAGE_DIR/ChangedModernJars.txt" "ChangedModernJars.txt"
+            printf 'put "%s" "%s"\n' "$ARTIFACT_DOWNLOAD_CONFIG" "ArtifactDownloadUrl.curl"
             printf 'put "%s" "%s"\n' "$STAGE_DIR/MonsterMazeMapsSource.txt" "MonsterMazeMapsSource.txt"
             printf 'put "%s" "%s"\n' "$STAGE_DIR/WizardsSourceMaps.sha256" "WizardsSourceMaps.sha256"
             if [[ "$WIZARDS_MAPS_REQUIRED" == true ]]; then
@@ -614,7 +650,7 @@ jobs:
           upload_payload_bytes="$(du -sb "$STAGE_DIR" | awk '{print $1}')"
           [[ "$upload_payload_bytes" =~ ^[0-9]+$ ]] || { echo "Could not measure verified upload payload." >&2; exit 1; }
           upload_started_epoch="$(date +%s)"
-          echo "Uploading checksummed changed full JARs and required map/config payload ($((upload_payload_bytes / 1048576)) MiB staged) with SFTP."
+          echo "Uploading deployment manifests and required maps with SFTP; the VM will fetch plugin JARs directly from the validated GitHub artifact."
           timeout --foreground --signal=TERM --kill-after=30s 12m sftp "${sftp_opts[@]}" -b "$batch_file" "$remote"
           upload_elapsed_seconds=$(( $(date +%s) - upload_started_epoch ))
           if (( upload_elapsed_seconds > 0 )); then
@@ -622,10 +658,11 @@ jobs:
           fi
           timeout --foreground --signal=TERM --kill-after=15s 3m scp "${scp_opts[@]}" \
             "$STAGE_DIR/SHA256SUMS" "$remote:$upload_dir/SHA256SUMS"
-          timeout --foreground --signal=TERM --kill-after=30s 6m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" "$MM_MAPS_REQUIRED" <<'REMOTE_ASSEMBLE_ARCADE'
+          timeout --foreground --signal=TERM --kill-after=30s 45m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" "$MM_MAPS_REQUIRED" "$ARTIFACT_SIZE_BYTES" <<'REMOTE_ASSEMBLE_ARCADE'
           set -euo pipefail
           upload_dir="$1"
           mm_maps_required="$2"
+          artifact_size_bytes="$3"
           cd "$upload_dir"
           shopt -s nullglob
           map_parts=(MonsterMazeMaps.tar.gz.part.*)
@@ -644,6 +681,65 @@ jobs:
           elif [[ "$mm_maps_required" != false || ${#map_parts[@]} -ne 0 ]]; then
             echo "Unexpected Monster Maze map payload for unchanged source maps." >&2
             exit 1
+          fi
+          # Authenticate the uploaded manifest and non-JAR payload before it selects
+          # archive entries. The JAR checksums are verified after direct download.
+          sha256sum --ignore-missing -c SHA256SUMS
+          if [[ -s ChangedModernJars.txt ]]; then
+            [[ "$artifact_size_bytes" =~ ^[1-9][0-9]*$ ]] || { echo "Invalid source artifact size." >&2; exit 1; }
+            (( artifact_size_bytes <= 2147483648 )) || { echo "Source artifact exceeds the 2 GiB safety limit." >&2; exit 1; }
+            artifact_archive="$upload_dir/modern-build-artifact.zip"
+            cleanup_artifact_download() { rm -f -- "$artifact_archive" "$upload_dir/ArtifactDownloadUrl.curl"; }
+            trap cleanup_artifact_download EXIT
+            [[ -s ArtifactDownloadUrl.curl ]] || { echo "Short-lived artifact download URL is missing." >&2; exit 1; }
+            curl --config ArtifactDownloadUrl.curl --fail --location --silent --show-error \
+              --retry 3 --connect-timeout 30 --max-time 2700 --max-filesize "$artifact_size_bytes" \
+              --output "$artifact_archive"
+            downloaded_bytes="$(stat -c %s "$artifact_archive")"
+            [[ "$downloaded_bytes" == "$artifact_size_bytes" ]] || {
+              echo "Downloaded artifact size mismatch: got $downloaded_bytes bytes, expected $artifact_size_bytes." >&2
+              exit 1
+            }
+            python3 - "$artifact_archive" "$upload_dir" <<'PY'
+          import os
+          import stat
+          import sys
+          from zipfile import BadZipFile, ZipFile
+          archive, output_dir = sys.argv[1:]
+          allowed = {"TestplexModernArcade.jar", "ArcadeMechanicsModern.jar"}
+          with open(os.path.join(output_dir, "ChangedModernJars.txt"), encoding="utf-8") as manifest:
+              requested = [line.strip() for line in manifest if line.strip()]
+          if not requested or len(requested) != len(set(requested)) or any(name not in allowed for name in requested):
+              raise SystemExit("Changed JAR manifest contains invalid or duplicate entries.")
+          try:
+              with ZipFile(archive) as bundle:
+                  matches = {name: [] for name in requested}
+                  for info in bundle.infolist():
+                      basename = info.filename.rsplit("/", 1)[-1]
+                      if basename not in matches:
+                          continue
+                      mode = info.external_attr >> 16
+                      kind = stat.S_IFMT(mode)
+                      if info.is_dir() or (kind not in (0, stat.S_IFREG)) or (info.flag_bits & 1):
+                          raise SystemExit(f"Unsafe plugin entry in build artifact: {info.filename!r}")
+                      matches[basename].append(info)
+                  for name, entries in matches.items():
+                      if len(entries) != 1:
+                          raise SystemExit(f"Expected exactly one {name} in build artifact; found {len(entries)}.")
+                      info = entries[0]
+                      if info.file_size <= 0 or info.file_size > 1610612736:
+                          raise SystemExit(f"Invalid uncompressed size for {name}: {info.file_size}.")
+                      target = os.path.join(output_dir, name)
+                      with bundle.open(info) as source, open(target, "xb") as destination:
+                          while chunk := source.read(1024 * 1024):
+                              destination.write(chunk)
+          except BadZipFile as exc:
+              raise SystemExit(f"GitHub build artifact is not a valid ZIP: {exc}")
+          PY
+            rm -f -- "$artifact_archive" "$upload_dir/ArtifactDownloadUrl.curl"
+            trap - EXIT
+          elif [[ -e ArtifactDownloadUrl.curl ]]; then
+            rm -f -- ArtifactDownloadUrl.curl
           fi
           sha256sum -c SHA256SUMS
           server_dir=/home/monstermaze/servers/testplex-modern
