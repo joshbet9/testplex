@@ -470,6 +470,7 @@ jobs:
       - name: Upload verified JARs to the isolated directory
         id: upload
         shell: bash
+        timeout-minutes: 5
         env:
           HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
           HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
@@ -478,10 +479,8 @@ jobs:
           STAGE_DIR: ${{ steps.stage-jars.outputs.stage_dir }}
           MM_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.mm_maps_required }}
           MAP_EXPANDED_KB: ${{ steps.stage-jars.outputs.map_expanded_kb }}
-          ARTIFACT_SIZE_BYTES: ${{ steps.source-artifact.outputs.artifact_size_bytes }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ARTIFACT_ID: ${{ steps.source-artifact.outputs.artifact_id }}
-          ARTIFACT_DOWNLOAD_CONFIG: ${{ runner.temp }}/testplex-artifact-download.curl
+          TARGET_JARS_KB: ${{ steps.jar-diff.outputs.target_jars_kb }}
+          DELTA_BYTES: ${{ steps.jar-diff.outputs.delta_bytes }}
           WIZARDS_MAPS_REQUIRED: ${{ steps.stage-jars.outputs.wizards_maps_required }}
         run: |
           set -euo pipefail
@@ -502,24 +501,23 @@ jobs:
           stage_kb="$(du -sk "$STAGE_DIR" | awk '{print $1}')"
           [[ "$stage_kb" =~ ^[0-9]+$ ]] && (( stage_kb > 0 )) || { echo "Could not determine the verified deployment payload size." >&2; exit 1; }
           shopt -s nullglob
-          staged_jars=("$STAGE_DIR"/*.jar)
-          staged_jar_kb=0
-          for jar in "${staged_jars[@]}"; do
-            jar_kb="$(du -sk "$jar" | awk '{print $1}')"
-            [[ "$jar_kb" =~ ^[0-9]+$ ]] || { echo "Could not size staged plugin JAR: $jar" >&2; exit 1; }
-            staged_jar_kb=$((staged_jar_kb + jar_kb))
+          shopt -s nullglob
+          staged_delta_files=("$STAGE_DIR"/*.delta.zip "$STAGE_DIR"/*.delta.json)
+          staged_delta_kb=0
+          for file in "${staged_delta_files[@]}"; do
+            file_kb="$(du -sk "$file" | awk '{print $1}')"
+            [[ "$file_kb" =~ ^[0-9]+$ ]] || { echo "Could not size JAR delta: $file" >&2; exit 1; }
+            staged_delta_kb=$((staged_delta_kb + file_kb))
           done
-          [[ "$MAP_EXPANDED_KB" =~ ^[0-9]+$ ]] || { echo "Invalid map expansion budget." >&2; exit 1; }
-          [[ "$ARTIFACT_SIZE_BYTES" =~ ^[1-9][0-9]*$ ]] || { echo "Invalid source artifact size." >&2; exit 1; }
-          artifact_kb=$(( (ARTIFACT_SIZE_BYTES + 1023) / 1024 ))
+          [[ "$MAP_EXPANDED_KB" =~ ^[0-9]+$ && "$TARGET_JARS_KB" =~ ^[0-9]+$ && "$DELTA_BYTES" =~ ^[0-9]+$ ]] || { echo "Invalid deployment size budget." >&2; exit 1; }
 
-          timeout --foreground --signal=TERM --kill-after=20s 3m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" "$stage_kb" "$staged_jar_kb" "$MAP_EXPANDED_KB" "$artifact_kb" <<'REMOTE_STAGE_PREP'
+          timeout --foreground --signal=TERM --kill-after=10s 60s ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" "$stage_kb" "$staged_delta_kb" "$TARGET_JARS_KB" "$MAP_EXPANDED_KB" <<'REMOTE_STAGE_PREP'
           set -euo pipefail
           upload_dir="$1"
           stage_kb="$2"
-          staged_jar_kb="$3"
-          map_expanded_kb="$4"
-          artifact_kb="$5"
+          staged_delta_kb="$3"
+          target_jars_kb="$4"
+          map_expanded_kb="$5"
           state_dir=/var/lib/testplex-modern-deploy
           backup_root="$state_dir/backups"
           server_dir=/home/monstermaze/servers/testplex-modern
@@ -618,12 +616,10 @@ jobs:
           server_device="$(df -P "$server_fs" | awk 'END {print $1}')"
           state_device="$(df -P "$state_dir" | awk 'END {print $1}')"
           reserve_kb=524288
-          # Changed full JARs remain staged in /var/tmp until installation. Include
-          # their actual size alongside the rollback snapshot and runtime reserve.
-          non_jar_payload_kb=$((stage_kb - staged_jar_kb))
-          (( non_jar_payload_kb >= 0 )) || { echo "Invalid JAR/payload size accounting." >&2; exit 1; }
-          jar_stage_kb="$staged_jar_kb"
-          tmp_required_kb=$((non_jar_payload_kb + jar_stage_kb + artifact_kb))
+          # Transfer deltas and reserve space for the reconstructed target JARs.
+          non_delta_payload_kb=$((stage_kb - staged_delta_kb))
+          (( non_delta_payload_kb >= 0 )) || { echo "Invalid delta/payload size accounting." >&2; exit 1; }
+          tmp_required_kb=$((non_delta_payload_kb + staged_delta_kb + target_jars_kb))
           server_required_kb=0
           state_required_kb=0
           if [[ "$tmp_device" == "$server_device" ]]; then
@@ -646,7 +642,7 @@ jobs:
             echo "Insufficient deployment staging space: /var/tmp available=${tmp_avail_kb:-unknown} KiB required=$tmp_required_kb KiB; server filesystem available=${server_avail_kb:-unknown} KiB required=$server_required_kb KiB; backup filesystem available=${state_avail_kb:-unknown} KiB required=$state_required_kb KiB; payload=$stage_kb KiB; map expansion=$map_expanded_kb KiB; rollback snapshot=$snapshot_kb KiB; runtime reserve=$reserve_kb KiB." >&2
             exit 1
           fi
-          echo "Staging space passed: /var/tmp=$((tmp_avail_kb / 1024)) MiB (needs $((tmp_required_kb / 1024)) MiB); server filesystem=$((server_avail_kb / 1024)) MiB (needs $((server_required_kb / 1024)) MiB); backup filesystem=$((state_avail_kb / 1024)) MiB (needs $((state_required_kb / 1024)) MiB); payload=$((stage_kb / 1024)) MiB; changed JARs=$((staged_jar_kb / 1024)) MiB; maps=$((map_expanded_kb / 1024)) MiB; rollback snapshot=$((snapshot_kb / 1024)) MiB; reserve=512 MiB."
+          echo "Staging space passed: /var/tmp=$((tmp_avail_kb / 1024)) MiB (needs $((tmp_required_kb / 1024)) MiB); server filesystem=$((server_avail_kb / 1024)) MiB (needs $((server_required_kb / 1024)) MiB); backup filesystem=$((state_avail_kb / 1024)) MiB (needs $((state_required_kb / 1024)) MiB); payload=$((stage_kb / 1024)) MiB; JAR deltas=$((staged_delta_kb / 1024)) MiB; reconstructed JARs=$((target_jars_kb / 1024)) MiB; maps=$((map_expanded_kb / 1024)) MiB; rollback snapshot=$((snapshot_kb / 1024)) MiB; reserve=512 MiB."
           install -d -m 0700 -- "$upload_dir"
           REMOTE_STAGE_PREP
           # Transfer only small manifests and maps over Tailscale. The VM fetches
