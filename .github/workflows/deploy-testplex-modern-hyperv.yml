@@ -528,8 +528,8 @@ jobs:
           server_device="$(df -P "$server_fs" | awk 'END {print $1}')"
           state_device="$(df -P "$state_dir" | awk 'END {print $1}')"
           reserve_kb=524288
-          # Delta patches expand into a target JAR and a temporary assembling JAR
-          # while entry checksums are verified. Budget both next to the rollback snapshot.
+          # Changed full JARs remain staged in /var/tmp until installation. Include
+          # their actual size alongside the rollback snapshot and runtime reserve.
           non_jar_payload_kb=$((stage_kb - staged_jar_kb))
           (( non_jar_payload_kb >= 0 )) || { echo "Invalid JAR/payload size accounting." >&2; exit 1; }
           jar_stage_kb="$staged_jar_kb"
@@ -1769,6 +1769,3 @@ jobs:
             echo "- Memory safety: only Testplex's own legacy service is stopped; separate Monster Maze services are left untouched, and deployment aborts rather than stopping them when memory is insufficient; successful deployments leave only modern Paper running"
             echo "- Rollback: modern-only backup created before replacement; startup is checked before success"
           } >> "$GITHUB_STEP_SUMMARY"
-
-
-
