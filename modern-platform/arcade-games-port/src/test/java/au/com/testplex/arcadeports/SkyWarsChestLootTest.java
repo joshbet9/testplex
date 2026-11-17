@@ -19,4 +19,12 @@ final class SkyWarsChestLootTest {
         assertEquals(SkyWarsChestLoot.SourceChestTier.CONNECTOR,
                 SkyWarsChestLoot.sourceChestTier(48.0D, 0.0D, spawns, 0.0D, 0.0D));
     }
+
+    @Test
+    void unmarkedChestsCanStillBeTieredWhenMapHasNoUsableSpawnMarkers() {
+        assertEquals(SkyWarsChestLoot.SourceChestTier.MIDDLE,
+                SkyWarsChestLoot.sourceChestTier(5.5D, -4.5D, List.of(), 0.0D, 0.0D));
+        assertEquals(SkyWarsChestLoot.SourceChestTier.CONNECTOR,
+                SkyWarsChestLoot.sourceChestTier(48.5D, 0.5D, List.of(), 0.0D, 0.0D));
+    }
 }

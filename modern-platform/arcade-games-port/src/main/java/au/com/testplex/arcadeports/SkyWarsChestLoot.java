@@ -40,6 +40,28 @@ final class SkyWarsChestLoot {
         return populateExistingSourceChestsInChunk(chunk, map, populatedChests);
     }
 
+    /** Last-chance population for a source chest missed by a marker or chunk-load pass. */
+    static int populateOpenedSourceChest(Chest chest, SourceMapCatalog.MapData map,
+            Set<String> populatedChests) {
+        if (chest == null || map == null || populatedChests == null) return 0;
+        List<org.bukkit.Location> starts = map.spawnLocations();
+        if (starts.isEmpty()) starts = map.dataLocations("GREEN");
+        org.bukkit.World world = starts.isEmpty() || starts.getFirst().getWorld() == null
+                ? chest.getWorld() : starts.getFirst().getWorld();
+        if (chest.getWorld() != world || !populatedChests.add(chestKey(chest.getLocation()))) return 0;
+        if (!chest.getBlockInventory().isEmpty()) return 0;
+        double centerX = map.hasBounds() ? map.centerX() : world.getSpawnLocation().getX();
+        double centerZ = map.hasBounds() ? map.centerZ() : world.getSpawnLocation().getZ();
+        List<Pool> pools = switch (sourceChestTier(
+                chest.getX() + 0.5D, chest.getZ() + 0.5D, starts, centerX, centerZ)) {
+            case ISLAND -> islandPools();
+            case CONNECTOR -> connectorPools();
+            case MIDDLE -> middlePools();
+        };
+        populateChest(chest, pools);
+        return 1;
+    }
+
     /**
      * Some original WorldConfig files omit the coloured chest markers even though
      * their map archives contain real chests. Keep those maps playable by filling
@@ -63,16 +85,12 @@ final class SkyWarsChestLoot {
         if (starts.isEmpty()) starts = map.dataLocations("GREEN");
         if (starts.isEmpty() || starts.getFirst().getWorld() == null
                 || chunk.getWorld() != starts.getFirst().getWorld()) return 0;
-        if (map.hasBounds() && (chunk.getX() * 16 > map.maxX() || chunk.getX() * 16 + 15 < map.minX()
-                || chunk.getZ() * 16 > map.maxZ() || chunk.getZ() * 16 + 15 < map.minZ())) return 0;
         double centerX = map.hasBounds() ? map.centerX() : chunk.getWorld().getSpawnLocation().getX();
         double centerZ = map.hasBounds() ? map.centerZ() : chunk.getWorld().getSpawnLocation().getZ();
         int count = 0;
         for (org.bukkit.block.BlockState state : chunk.getTileEntities()) {
             if (!(state instanceof Chest chest)) continue;
             org.bukkit.Location location = chest.getLocation();
-            if (map.hasBounds() && (location.getBlockX() < map.minX() || location.getBlockX() > map.maxX()
-                    || location.getBlockZ() < map.minZ() || location.getBlockZ() > map.maxZ())) continue;
             if (!populated.add(chestKey(location))) continue;
             SourceChestTier tier = sourceChestTier(location.getX(), location.getZ(), starts, centerX, centerZ);
             List<Pool> pools = switch (tier) {
@@ -143,6 +161,7 @@ final class SkyWarsChestLoot {
     }
 
     private static void populateChest(Chest chest, List<Pool> pools) {
+        chest.setLootTable(null);
         chest.getBlockInventory().clear();
         List<Integer> slots = new ArrayList<>();
         for (int slot = 0; slot < chest.getBlockInventory().getSize(); slot++) slots.add(slot);
