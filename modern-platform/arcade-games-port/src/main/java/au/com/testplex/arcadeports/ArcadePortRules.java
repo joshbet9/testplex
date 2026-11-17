@@ -1434,13 +1434,13 @@ public final class ArcadePortRules {
     public static final double DRAGON_ESCAPE_LEAP_GROUNDED_Y_BONUS = 0.2D;
 
     public static boolean shouldAllowDragonEscapeBuilderPlacement(
-            long now, long nextChargeAt, boolean hasPendingBrick, boolean placementTouchesWater) {
-        return !hasPendingBrick && !placementTouchesWater && now >= nextChargeAt;
+            long now, long nextChargeAt, boolean hasPendingBrick) {
+        return !hasPendingBrick && now >= nextChargeAt;
     }
 
-    public static boolean dragonEscapeBuilderPlacementTouchesWater(
-            boolean clickedBlockIsLiquid, boolean targetBlockIsLiquid) {
-        return clickedBlockIsLiquid || targetBlockIsLiquid;
+    /** Builder bricks can replace water as vanilla solid-block placement does. */
+    public static boolean isDragonEscapeBuilderTargetReplaceable(boolean targetIsEmpty, boolean targetIsWater) {
+        return targetIsEmpty || targetIsWater;
     }
 
     /** Builder bricks follow vanilla build-height limits, not the Digger's map-area restriction. */

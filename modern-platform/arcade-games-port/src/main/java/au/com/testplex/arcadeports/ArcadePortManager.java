@@ -17581,18 +17581,16 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         Block target = clicked.getRelative(face);
-        boolean placementTouchesWater = ArcadePortRules.dragonEscapeBuilderPlacementTouchesWater(
-                clicked.isLiquid(), target.isLiquid());
         boolean pendingBrick = session.dragonEscapeBuilderBricks.containsKey(id);
         if (!ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(
-                now, nextChargeAt, pendingBrick, placementTouchesWater)) {
+                now, nextChargeAt, pendingBrick)) {
             player.sendActionBar(ChatColor.YELLOW + (pendingBrick
                     ? "Wait for your previous brick to disappear."
-                    : placementTouchesWater ? "You cannot place a temporary brick in water."
                     : "Your next Builder brick is still recharging."));
             return;
         }
-        if (target.getWorld() != session.world || !target.isEmpty()
+        if (target.getWorld() != session.world || !ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(
+                    target.isEmpty(), target.getType() == Material.WATER)
                 || !ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(
                         target.getY(), session.world.getMinHeight(), session.world.getMaxHeight())) {
             player.sendActionBar(ChatColor.YELLOW + "You cannot place a temporary brick there.");
