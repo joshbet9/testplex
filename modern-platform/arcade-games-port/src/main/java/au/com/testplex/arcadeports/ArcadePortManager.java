@@ -11033,6 +11033,13 @@ public final class ArcadePortManager implements Listener {
                 || !(event.getPlayer() instanceof Player player)
                 || !session.alive.contains(player.getUniqueId())) return;
         if (!event.isCancelled() && event.getInventory().getHolder() instanceof org.bukkit.block.Chest) {
+            org.bukkit.block.Chest chest = (org.bukkit.block.Chest) event.getInventory().getHolder();
+            SourceMapCatalog.MapData map = sourceMapData.get(ArcadePortGame.SKY_WARS.id());
+            if (SkyWarsChestLoot.populateOpenedSourceChest(chest, map, session.skyWarsPopulatedChests) > 0) {
+                plugin.getLogger().info("Populated a previously missed SkyWars source chest at "
+                        + chest.getWorld().getName() + " " + chest.getX() + ", " + chest.getY()
+                        + ", " + chest.getZ() + ".");
+            }
             if (plugin.hasAdminAccess(player) && !debugFeatureEnabled(player.getUniqueId(),
                     ArcadePortGame.SKY_WARS, "chest-looting", true)) {
                 event.setCancelled(true);
