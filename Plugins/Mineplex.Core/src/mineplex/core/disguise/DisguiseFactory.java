@@ -43,7 +43,7 @@ public class DisguiseFactory
 			case RABBIT:
 				return new DisguiseRabbit(disguised);
 			case SILVERFISH:
-				return new DisguiseSilverfish(disguised);
+				return new DisguiseSilverfishModern(disguised);
 			case PLAYER:
 				throw new UnsupportedOperationException("Player disguises must be initialized via constructor");
 			case SHEEP:
