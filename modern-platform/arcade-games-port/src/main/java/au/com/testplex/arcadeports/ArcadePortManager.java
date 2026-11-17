@@ -29219,10 +29219,12 @@ public final class ArcadePortManager implements Listener {
             castleAssaultPlayerHit = castleAttacker != null && !castleAttacker.equals(castleVictim)
                     && session.players.containsKey(castleAttacker.getUniqueId());
         }
-        if (event.isCancelled() && !gladiatorPlayerHit && !castleAssaultPlayerHit
-                && !(session.type == ArcadePortGame.BACON_BRAWL
-                    && event.getCause() == EntityDamageEvent.DamageCause.VOID
-                    && event.getEntity() instanceof Player)) return;
+        boolean baconVoidHit = session.type == ArcadePortGame.BACON_BRAWL
+                && event.getCause() == EntityDamageEvent.DamageCause.VOID
+                && event.getEntity() instanceof Player;
+        boolean gameOwnedHit = gladiatorPlayerHit || castleAssaultPlayerHit || baconVoidHit
+                || isWitherAssaultManagedHit(session, event);
+        if (ArcadePortRules.shouldSkipCancelledDamageEvent(event.isCancelled(), gameOwnedHit)) return;
         if (event.getEntity() instanceof Player debugTarget
                 && session.players.containsKey(debugTarget.getUniqueId())) {
             UUID debugId = debugTarget.getUniqueId();
@@ -32518,6 +32520,26 @@ public final class ArcadePortManager implements Listener {
         player.getWorld().playSound(player.getLocation(), Sound.ENTITY_WITHER_SHOOT, 0.8F, 1.0F);
     }
 
+    private boolean isWitherAssaultManagedHit(Session session, EntityDamageEvent event) {
+        if (session.type != ArcadePortGame.WITHER_ASSAULT
+                || !(event instanceof EntityDamageByEntityEvent hit)
+                || !(event.getEntity() instanceof Player target)
+                || !session.players.containsKey(target.getUniqueId())) return false;
+        Entity damager = hit.getDamager();
+        if (session.teams.getOrDefault(target.getUniqueId(), 0) == 1) {
+            return damager instanceof Arrow arrow && session.witherBlindArrows.contains(arrow.getUniqueId());
+        }
+        if (damager instanceof WitherSkull skull) return session.entities.contains(skull);
+        if (damager instanceof Skeleton minion) return session.witherMinionOwners.containsKey(minion.getUniqueId());
+        if (!(damager instanceof Projectile projectile)) return false;
+        if (projectile.getShooter() instanceof Player shooter) {
+            return session.players.containsKey(shooter.getUniqueId())
+                    && session.teams.getOrDefault(shooter.getUniqueId(), 0) == 1;
+        }
+        return projectile.getShooter() instanceof Skeleton minion
+                && session.witherMinionOwners.containsKey(minion.getUniqueId());
+    }
+
     private Set<Integer> randomPlayerSlots(int playerCount, int selectedCount) {
         if (playerCount <= 0 || selectedCount <= 0) return Set.of();
         List<Integer> slots = new ArrayList<>();
@@ -35660,7 +35682,10 @@ public final class ArcadePortManager implements Listener {
     public void onExplode(EntityExplodeEvent event) {
         Session session = active;
         if (session == null || event.getEntity() == null || event.getEntity().getWorld() != session.world) return;
-        if (event.isCancelled() && session.type != ArcadePortGame.BOMB_LOBBERS) return;
+        boolean managedWitherSkull = session.type == ArcadePortGame.WITHER_ASSAULT
+                && event.getEntity() instanceof WitherSkull skull && session.entities.contains(skull);
+        if (session.type != ArcadePortGame.BOMB_LOBBERS
+                && WitherAssaultRules.shouldIgnoreCancelledExplosion(event.isCancelled(), managedWitherSkull)) return;
         if (session.type == ArcadePortGame.WITHER_ASSAULT
                 && event.getEntity() instanceof WitherSkull skull && session.entities.contains(skull)) {
             event.blockList().clear();

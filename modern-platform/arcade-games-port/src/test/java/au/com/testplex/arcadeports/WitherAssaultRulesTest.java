@@ -180,6 +180,12 @@ final class WitherAssaultRulesTest {
 
     @Test
     void combatAndSkullObjectiveControlsChangeDamageAndRestoreSourceValues() {
+        assertFalse(ArcadePortRules.shouldSkipCancelledDamageEvent(true, true));
+        assertTrue(ArcadePortRules.shouldSkipCancelledDamageEvent(true, false));
+        assertFalse(ArcadePortRules.shouldSkipCancelledDamageEvent(false, false));
+        assertFalse(WitherAssaultRules.shouldIgnoreCancelledExplosion(false, false));
+        assertTrue(WitherAssaultRules.shouldIgnoreCancelledExplosion(true, false));
+        assertFalse(WitherAssaultRules.shouldIgnoreCancelledExplosion(true, true));
         assertEquals(0.75D, WitherAssaultRules.humanArrowDamageMultiplier());
         assertEquals(12.0D, WitherAssaultRules.skullDamageAtDistance(0.0D, 1.0D), 1.0e-9);
         assertEquals(2.0D, WitherAssaultRules.skullDamageAtDistance(7.0D, 1.0D), 1.0e-9);
