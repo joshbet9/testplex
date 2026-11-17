@@ -1913,8 +1913,19 @@ class ArcadePortGameTest {
                 false, false, false, false, false, true, "jumper"));
         assertEquals("FIRST COMPLETION!", ArcadePortRules.dragonEscapeRecordMilestone(
                 true, true, false, false, false, false, "jumper"));
+        assertEquals("FIRST JUMPER COMPLETION!", ArcadePortRules.dragonEscapeRecordMilestone(
+                false, true, false, false, false, false, "jumper"));
         assertEquals(null, ArcadePortRules.dragonEscapeRecordMilestone(
                 false, false, false, false, false, false, "jumper"));
+    }
+
+    @Test void dragonEscapeInitialCompletionIsNotMisclassifiedAsPersonalBest() {
+        assertFalse(ArcadePortRules.dragonEscapeImprovesExistingPersonalBest(-1L, 12_000L));
+        assertFalse(ArcadePortRules.dragonEscapeImprovesExistingPersonalBest(0L, 12_000L));
+        assertFalse(ArcadePortRules.dragonEscapeImprovesExistingPersonalBest(10_000L, 10_000L));
+        assertFalse(ArcadePortRules.dragonEscapeImprovesExistingPersonalBest(10_000L, 11_000L));
+        assertTrue(ArcadePortRules.dragonEscapeImprovesExistingPersonalBest(10_000L, 9_999L));
+        assertFalse(ArcadePortRules.dragonEscapeImprovesExistingPersonalBest(10_000L, 0L));
     }
 
     @Test void baconAbilityMeterIsShownAsTheXpBarLevel() {
