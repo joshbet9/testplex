@@ -15,7 +15,7 @@ class TurfFortifierTemplateTest {
                 .filter(offset -> offset.up() == 0).count());
         assertEquals(2, TurfFortifierTemplate.PANEL_2X2.offsets(99).stream()
                 .filter(offset -> offset.up() == 1).count());
-        assertEquals(2, TurfFortifierTemplate.PANEL_3X3.offsets(99).stream()
+        assertEquals(3, TurfFortifierTemplate.PANEL_3X3.offsets(99).stream()
                 .filter(offset -> offset.up() == 2).count());
         assertEquals(4, TurfFortifierTemplate.FORT.offsets(99).stream()
                 .filter(offset -> offset.lateral() == -2).count());
