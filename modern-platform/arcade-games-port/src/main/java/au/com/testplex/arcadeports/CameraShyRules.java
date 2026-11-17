@@ -121,6 +121,11 @@ public final class CameraShyRules {
         return now >= nextCameraReadyAt && now >= targetProtectedUntil;
     }
 
+    /** F is the photo trigger; starting to use the spyglass is only for aiming, not a prerequisite. */
+    public static boolean shouldTriggerPhoto(boolean live, boolean participant, boolean cameraInMainHand) {
+        return live && participant && cameraInMainHand;
+    }
+
     public static boolean isClosePhoto(double distance) {
         return distance >= 0.0D && distance <= GameDebugRuntimeOverrides.doubleValue(
                 "CAMERA_SHY_CLOSE_PHOTO_BLOCKS", CLOSE_PHOTO_BLOCKS);

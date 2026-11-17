@@ -17,6 +17,14 @@ class CameraShyRulesTest {
     }
 
     @Test
+    void pressingSwapHandsWithTheCameraTriggersPhotoWithoutAnActiveUseState() {
+        assertTrue(CameraShyRules.shouldTriggerPhoto(true, true, true));
+        assertFalse(CameraShyRules.shouldTriggerPhoto(false, true, true));
+        assertFalse(CameraShyRules.shouldTriggerPhoto(true, false, true));
+        assertFalse(CameraShyRules.shouldTriggerPhoto(true, true, false));
+    }
+
+    @Test
     void photoEliminationDistanceAndLensSettingsChangeLiveRulesAndRestore() {
         assertFalse(CameraShyRules.eliminatedAt(4));
         assertTrue(CameraShyRules.eliminatedAt(5));
