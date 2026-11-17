@@ -3615,9 +3615,9 @@ public final class ArcadePortRules {
         return alivePlayers <= 1;
     }
 
-    /** Only the modern Bacon Brawl session overrides the legacy Arcade food/health reset. */
-    public static boolean shouldIsolateBaconBrawlLegacyFoodReset(ArcadePortGame game) {
-        return game == ArcadePortGame.BACON_BRAWL;
+    /** Modern hunger games own their food level and must bypass the legacy Arcade reset. */
+    public static boolean shouldIsolateLegacyFoodReset(ArcadePortGame game) {
+        return game == ArcadePortGame.BACON_BRAWL || game == ArcadePortGame.SPLEEF;
     }
 
     /** Test a player against a world border whose centre may not be at world origin. */

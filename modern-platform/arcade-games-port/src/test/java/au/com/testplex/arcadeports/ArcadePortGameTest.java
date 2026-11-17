@@ -1278,8 +1278,9 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldFinishBaconBrawl(0));
         assertFalse(ArcadePortRules.shouldFinishBaconBrawl(2));
         assertFalse(ArcadePortRules.shouldFinishBaconBrawl(16));
-        assertTrue(ArcadePortRules.shouldIsolateBaconBrawlLegacyFoodReset(ArcadePortGame.BACON_BRAWL));
-        assertFalse(ArcadePortRules.shouldIsolateBaconBrawlLegacyFoodReset(ArcadePortGame.DRAGONS));
+        assertTrue(ArcadePortRules.shouldIsolateLegacyFoodReset(ArcadePortGame.BACON_BRAWL));
+        assertTrue(ArcadePortRules.shouldIsolateLegacyFoodReset(ArcadePortGame.SPLEEF));
+        assertFalse(ArcadePortRules.shouldIsolateLegacyFoodReset(ArcadePortGame.DRAGONS));
         assertEquals(4_000L, ArcadePortRules.BACON_HUNGER_INTERVAL_MILLIS);
         assertEquals(2, ArcadePortRules.BACON_HUNGER_DRAIN_PER_INTERVAL,
                 "the selected balance change doubles Bacon Brawl hunger drain");
