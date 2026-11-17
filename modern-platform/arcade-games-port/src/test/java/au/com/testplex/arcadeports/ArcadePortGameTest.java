@@ -2003,9 +2003,10 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false));
         assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(9L, 10L, false));
         assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, true));
-        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(true, false));
-        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, true));
-        assertFalse(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, false));
+        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(true, false, false));
+        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, true, true));
+        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, false, true));
+        assertFalse(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, false, false));
         assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(64, -64, 320));
         assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(-64, -64, 320));
         assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(319, -64, 320));
