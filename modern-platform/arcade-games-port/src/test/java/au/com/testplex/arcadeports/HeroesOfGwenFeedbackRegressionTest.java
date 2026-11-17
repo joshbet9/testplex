@@ -52,6 +52,19 @@ class HeroesOfGwenFeedbackRegressionTest {
     }
 
     @Test
+    void witherReplacesTowerIconsOnlyAfterEveryTowerHasFallen() {
+        String towers = HeroesOfGwenScoreboardRules.baseStatus(
+                List.of("§a♛ ", "§7♛ ", "§a♛ "), true, true, 37);
+        assertTrue(towers.contains("♛"));
+        assertFalse(towers.contains("Wither"));
+
+        assertEquals("§5Wither §f37",
+                HeroesOfGwenScoreboardRules.baseStatus(List.of("§7♛ ", "§7♛ "), false, true, 37));
+        assertEquals("§7Wither down",
+                HeroesOfGwenScoreboardRules.baseStatus(List.of("§7♛ "), false, false, 0));
+    }
+
+    @Test
     void neutralCaptureBeaconIsInitializedAsGlassBeforeProgressBegins() throws IOException {
         assertEquals(Material.WHITE_STAINED_GLASS, ArcadePortRules.heroesOfGwenCaptureBeaconMaterial(-1));
         Path source = Path.of("src/main/java/au/com/testplex/arcadeports/CastleAssaultHeroesOfGwenRuntime.java");

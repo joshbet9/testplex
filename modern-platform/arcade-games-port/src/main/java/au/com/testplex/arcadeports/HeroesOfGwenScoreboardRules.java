@@ -33,4 +33,12 @@ final class HeroesOfGwenScoreboardRules {
         lines.add(ChatColor.WHITE + String.format(Locale.ROOT, "%02d:%02d", seconds / 60L, seconds % 60L));
         return lines;
     }
+
+    static String baseStatus(List<String> towerIcons, boolean towersRemain,
+                             boolean witherAlive, int witherHealth) {
+        if (towersRemain) return String.join("", towerIcons == null ? List.of() : towerIcons);
+        return witherAlive
+                ? ChatColor.DARK_PURPLE + "Wither " + ChatColor.WHITE + Math.max(0, witherHealth)
+                : ChatColor.GRAY + "Wither down";
+    }
 }
