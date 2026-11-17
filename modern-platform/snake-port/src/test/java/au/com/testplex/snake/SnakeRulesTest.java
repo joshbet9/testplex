@@ -1,6 +1,7 @@
 package au.com.testplex.snake;
 
 import org.junit.jupiter.api.Test;
+import org.bukkit.util.Vector;
 import au.com.testplex.arcadeports.GameDebugRuntimeOverrides;
 import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
@@ -30,6 +31,16 @@ class SnakeRulesTest {
         assertEquals(0.39D, SnakeRules.movementSpeed(90, true), 0.000001D);
         assertEquals(0.45D, SnakeRules.movementSpeed(126, true), 0.000001D);
         assertEquals(180, SnakeRules.SPEED_REFERENCE_LENGTH);
+    }
+
+    @Test void movementUsesHorizontalSourceSpeedAsEntityVelocity() {
+        Vector velocity = SnakeRules.movementVelocity(new Vector(3.0D, 9.0D, 4.0D), 90, false);
+
+        assertEquals(0.18D, velocity.getX(), 0.000001D);
+        assertEquals(0.0D, velocity.getY(), 0.000001D);
+        assertEquals(0.24D, velocity.getZ(), 0.000001D);
+        assertEquals(0.3D, velocity.length(), 0.000001D);
+        assertEquals(0.0D, SnakeRules.movementVelocity(new Vector(), 90, false).length(), 0.000001D);
     }
 
     @Test void snakeColorsFollowParticipantOrderAndWrap() {
