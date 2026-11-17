@@ -368,4 +368,110 @@ jobs:
       source_run_id: ${{ format('{0}', github.run_id) }}
     secrets: inherit
 
+  deploy-modern-fly:
+    name: Deploy the verified integration build to Fly production
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/feat/testplex-modern-26.3-platform' }}
+    needs:
+      - build-modern-arcade
+      - deploy-modern-test-server
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_APP: monstermaze
+    steps:
+      - name: Check out the exact Hyper-V build source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Download the exact tested Paper 26.3 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: testplex-modern-paper-26.3
+          path: modern-platform
+
+      - name: Set up pinned flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@fc53c09e1bc3be6f54706524e3b82c4f462f77be
+        with:
+          version: 0.5.5
+
+      - name: Verify the existing production volume before deploy
+        id: volume-before
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "$FLY_API_TOKEN" ]] || { echo "FLY_API_TOKEN is not configured." >&2; exit 1; }
+          flyctl volumes list --app "$FLY_APP" --json > "$RUNNER_TEMP/fly-volumes-before.json"
+          flyctl machine list --app "$FLY_APP" --json > "$RUNNER_TEMP/fly-machines-before.json"
+          volume_id="$(jq -er '[.[] | select(.name == "testplex_data_restore")] | if length == 1 then .[0].id else error("expected exactly one existing Testplex data volume") end' "$RUNNER_TEMP/fly-volumes-before.json")"
+          machine_id="$(jq -er '[.[] | select(.config.process_group == "mm21")] | if length == 1 then .[0].id else error("expected exactly one existing Testplex machine") end' "$RUNNER_TEMP/fly-machines-before.json")"
+          attached_volume="$(jq -er --arg id "$machine_id" '[.[] | select(.id == $id)][0].config.mounts[] | select(.path == "/server") | .volume' "$RUNNER_TEMP/fly-machines-before.json")"
+          [[ "$attached_volume" == "$volume_id" ]] || { echo "The existing /server volume is not attached to the Testplex machine; refusing deployment." >&2; exit 1; }
+          printf 'id=%s\n' "$volume_id" >> "$GITHUB_OUTPUT"
+          echo "Verified existing persistent volume $volume_id is attached at /server."
+
+      - name: Deploy the exact tested build to Fly without creating a spare VM
+        shell: bash
+        run: |
+          set -euo pipefail
+          flyctl deploy \
+            --app "$FLY_APP" \
+            --config fly.toml \
+            --dockerfile Dockerfile.fly \
+            --remote-only \
+            --build-arg "SOURCE_SHA=$GITHUB_SHA" \
+            --ha=false \
+            --strategy immediate \
+            --yes
+
+      - name: Verify the production image, persistent data volume and runtime readiness
+        shell: bash
+        env:
+          EXPECTED_VOLUME_ID: ${{ steps.volume-before.outputs.id }}
+        run: |
+          set -euo pipefail
+          flyctl volumes list --app "$FLY_APP" --json > "$RUNNER_TEMP/fly-volumes-after.json"
+          actual_volume_id="$(jq -er '[.[] | select(.name == "testplex_data_restore")] | if length == 1 then .[0].id else error("expected exactly one Testplex data volume after deploy") end' "$RUNNER_TEMP/fly-volumes-after.json")"
+          [[ "$actual_volume_id" == "$EXPECTED_VOLUME_ID" ]] || { echo "Fly persistent volume changed from $EXPECTED_VOLUME_ID to $actual_volume_id; investigate before accepting release." >&2; exit 1; }
+
+          flyctl machine list --app "$FLY_APP" --json > "$RUNNER_TEMP/fly-machines-after.json"
+          machine_id="$(jq -er '[.[] | select(.config.process_group == "mm21")] | if length == 1 then .[0].id else error("expected exactly one Testplex machine after deploy") end' "$RUNNER_TEMP/fly-machines-after.json")"
+          attached_volume="$(jq -er --arg id "$machine_id" '[.[] | select(.id == $id)][0].config.mounts[] | select(.path == "/server") | .volume' "$RUNNER_TEMP/fly-machines-after.json")"
+          [[ "$attached_volume" == "$EXPECTED_VOLUME_ID" ]] || { echo "The original persistent volume is not mounted by the deployed machine." >&2; exit 1; }
+          state="$(jq -er --arg id "$machine_id" '[.[] | select(.id == $id)][0].state' "$RUNNER_TEMP/fly-machines-after.json")"
+          if [[ "$state" == "stopped" ]]; then
+            flyctl machine start "$machine_id" --app "$FLY_APP"
+          fi
+
+          ready=false
+          for attempt in $(seq 1 30); do
+            flyctl machine list --app "$FLY_APP" --json > "$RUNNER_TEMP/fly-machines-after.json"
+            if jq -e --arg id "$machine_id" --arg sha "$GITHUB_SHA" '
+              [.[] | select(.id == $id)] as $m |
+              ($m | length) == 1 and
+              $m[0].state == "started" and
+              $m[0].host_status == "ok" and
+              $m[0].image_ref.labels["org.opencontainers.image.revision"] == $sha and
+              any($m[0].checks[]?; .status == "passing")
+            ' "$RUNNER_TEMP/fly-machines-after.json" >/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 5
+          done
+          [[ "$ready" == true ]] || { echo "Fly machine did not become healthy on the expected release SHA $GITHUB_SHA." >&2; cat "$RUNNER_TEMP/fly-machines-after.json"; exit 1; }
+
+          remote_command="set -eu; test \"\$(cat /opt/testplex/source-build.txt)\" = \"$GITHUB_SHA\"; test -L /server/mm_void; test -L /server/mm_volcano; test -L /server/mm_colombia; test -L /server/mm_sandycoast; test -L /server/mm_siberian; test -L /server/mm_swampland; test -L /server/mm_tesorohundido; test -d '/server/update/maps/Wizards'; test -d '/server/update/maps/Nano Wizards'; echo TESTPLEX_FLY_RUNTIME_VERIFIED:$GITHUB_SHA"
+          flyctl ssh console --app "$FLY_APP" --machine "$machine_id" --command "$remote_command"
+          flyctl logs --app "$FLY_APP" --machine "$machine_id" --no-tail > "$RUNNER_TEMP/fly-startup.log"
+          grep -F 'TESTPLEX_ARCADE_BOOTSTRAP phase=complete' "$RUNNER_TEMP/fly-startup.log"
+          flyctl volumes list --app "$FLY_APP" --json > "$RUNNER_TEMP/fly-volumes-final.json"
+          final_volume_id="$(jq -er '[.[] | select(.name == "testplex_data_restore")] | if length == 1 then .[0].id else error("Testplex data volume missing after runtime verification") end' "$RUNNER_TEMP/fly-volumes-final.json")"
+          [[ "$final_volume_id" == "$EXPECTED_VOLUME_ID" ]]
+          echo "Fly production is running $GITHUB_SHA with the original stats volume $final_volume_id."
+
 
