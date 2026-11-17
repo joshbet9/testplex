@@ -18076,7 +18076,7 @@ public final class ArcadePortManager implements Listener {
                 ? clicked : clicked.getRelative(face);
         if (target.getWorld() != session.world
                 || (!target.isEmpty()
-                        && !ArcadePortRules.shouldPlaceDragonEscapeDiggerIntoClickedBlock(target.getType()))
+                        && !ArcadePortRules.shouldPlaceDragonEscapeKitIntoClickedBlock(target.getType()))
                 || !isDragonEscapeDiggerBuildLocationAllowed(session, target)) return;
         org.bukkit.util.BoundingBox box = new org.bukkit.util.BoundingBox(
                 target.getX(), target.getY(), target.getZ(),
