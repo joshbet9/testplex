@@ -611,7 +611,7 @@ class ArcadePortGameTest {
         Path nestedWorld = temporaryDirectory.resolve("Mighty Lava Arena");
         java.nio.file.Files.createDirectories(nestedWorld);
         java.nio.file.Files.write(nestedWorld.resolve("level.dat"), new byte[] {1, 2, 3});
-        java.nio.file.Files.writeString(nestedWorld.resolve("WorldConfig.dat"), "MAP_NAME:Mighty Lava Arena\r\n");
+        java.nio.file.Files.writeString(nestedWorld.resolve("WorldConfig.dat"), "MAP_NAME:Mighty Lava Arena\\n");
         java.nio.file.Files.createDirectories(nestedWorld.resolve("region"));
         java.nio.file.Files.write(nestedWorld.resolve("region/r.0.0.mca"), new byte[] {1});
 
@@ -626,7 +626,7 @@ class ArcadePortGameTest {
         java.nio.file.Files.createDirectories(worldRoot.resolve("entities"));
         java.nio.file.Files.write(worldRoot.resolve("entities/r.0.0.mca"), new byte[] {4});
         java.nio.file.Files.write(worldRoot.resolve("level.dat"), new byte[] {1});
-        java.nio.file.Files.writeString(worldRoot.resolve("WorldConfig.dat"), "MAP_NAME:Mighty Lava Arena\r\n");
+        java.nio.file.Files.writeString(worldRoot.resolve("WorldConfig.dat"), "MAP_NAME:Mighty Lava Arena\\n");
 
         SourceMapCatalog.preparePaper26WorldStorage(worldRoot);
         Path modernRoot = worldRoot.resolve("dimensions/minecraft/overworld");
@@ -687,7 +687,7 @@ class ArcadePortGameTest {
         java.nio.file.Files.createDirectories(legacyRoot);
         java.nio.file.Files.createDirectories(migratedWorldFolder);
         Path legacyConfig = legacyRoot.resolve("WorldConfig.dat");
-        java.nio.file.Files.writeString(legacyConfig, "MAP_NAME:Mighty Lava Arena\r\n");
+        java.nio.file.Files.writeString(legacyConfig, "MAP_NAME:Mighty Lava Arena\\n");
 
         assertEquals(legacyConfig, SourceMapCatalog.resolveWorldConfigPath(
                 migratedWorldFolder, temporaryDirectory, "arcadeport_source_bacon_brawl"));
