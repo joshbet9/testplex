@@ -299,33 +299,33 @@ jobs:
           grep -Fq 'MonsterMazeStandalone' "$deploy_workflow"
           grep -Fq 'me.monstermaze.MonsterMazePlugin' "$deploy_workflow"
           grep -Fq 'retired-monster-maze-plugins' "$deploy_workflow"
-          # Repeated deploys must transfer only changed JARs and map archives;
-          # installed JARs are compared by remote checksum and never downloaded over SSH stdout.
+          # Repeated deploys must use a verified delta from the exact installed build.
           grep -Fq 'ChangedModernJars.txt' "$deploy_workflow"
-          grep -Fq 'Unchanged plugin JAR; omitting upload' "$deploy_workflow"
-          grep -Fq 'Retaining verified full JAR for changed plugin' "$deploy_workflow"
-          grep -Fq 'changed full JARs only' "$deploy_workflow"
-          if grep -Fq 'sudo -n dd if=' "$deploy_workflow"; then
-            echo 'Hyper-V deployment must not download installed JARs over SSH stdout.' >&2
+          grep -Fq 'Unchanged plugin JAR; omitting transfer' "$deploy_workflow"
+          grep -Fq 'Create verified JAR deltas against the deployed build' "$deploy_workflow"
+          grep -Fq 'testplex-jar-delta.py create' "$deploy_workflow"
+          grep -Fq 'testplex-jar-delta.py" apply' "$deploy_workflow"
+          grep -Fq 'No retained successful build artifact matches deployed SHA' "$deploy_workflow"
+          grep -Fq 'JAR delta transfer payload' "$deploy_workflow"
+          grep -Fq 'delta_bytes <= 9437184' "$deploy_workflow"
+          grep -Fq 'timeout-minutes: 5' "$deploy_workflow"
+          grep -Fq 'sha256sum -c SHA256SUMS' "$deploy_workflow"
+          grep -Fq 'test_testplex_jar_delta' ".github/workflows/testplex-modern-build.yml"
+          if grep -Fq 'ArtifactDownloadUrl.curl' "$deploy_workflow" || grep -Fq 'curl --config ArtifactDownloadUrl.curl' "$deploy_workflow"; then
+            echo 'Hyper-V deployment must not download the full plugin artifact on the VM.' >&2
             exit 1
           fi
-          grep -Fq 'WizardsSourceMaps.sha256' "$deploy_workflow"
-          # Large gameplay artifacts are fetched by the VM from a short-lived,
-          # host-validated GitHub URL; they must not traverse the Tailscale SFTP link.
-          grep -Fq 'ArtifactDownloadUrl.curl' "$deploy_workflow"
-          grep -Fq 'curl --config ArtifactDownloadUrl.curl' "$deploy_workflow"
-          grep -Fq 'Unsafe plugin entry in build artifact' "$deploy_workflow"
-          grep -Fq 'artifact_size_bytes' "$deploy_workflow"
-          grep -Fq 'sha256sum --ignore-missing -c SHA256SUMS' "$deploy_workflow"
+          if grep -Fq -- '--max-time 2700' "$deploy_workflow"; then
+            echo 'Hyper-V deployment must not have an unbounded full-artifact download.' >&2
+            exit 1
+          fi
           python3 - "$deploy_workflow" <<'PY'
           import sys
           source = open(sys.argv[1], encoding="utf-8").read()
-          slash = chr(92)
-          first_curl_line = next(line for line in source.splitlines() if 'curl -sS -D "$headers"' in line)
-          assert first_curl_line.endswith(slash) and not first_curl_line.endswith(slash * 2), "artifact curl continuation must be exactly one backslash"
-          assert 'sub(/' + slash + 'r$/, "")' in source and 'sub(/' + slash * 2 + 'r' not in source, "Location parser must strip a real CR"
-          assert "*$'" + slash + "r'*" in source and "$'" + slash * 2 + "r'" not in source, "URL validation must reject actual CR characters"
-          assert "printf 'url = \"%s\"" + slash + "n' " in source and "printf 'url = \"%s\"" + slash * 2 + "n'" not in source, "curl config must end with a newline"
+          assert "timeout-minutes: 5" in source, "JAR upload/assembly step must have a five-minute cap"
+          assert "delta_bytes <= 9437184" in source, "oversized deltas must fail before server state changes"
+          assert "testplex-modern-base-artifact" in source, "must use the exact deployed-build artifact as the delta base"
+          assert "sha256sum -c SHA256SUMS" in source, "uploaded delta payload must be checksum verified"
           PY
           grep -Fq 'PE_VERSION="2.14.0"' "$deploy_workflow"
           grep -Fq 'PE_SHA512="18a942cb55f64783a63b28deea2cebbbe782e5d6a1089f6700430e183bfbce0a45398a640ed0dff4361b55190dcf47017f2ca7788f4a5c8c9efad1f549a63fe3"' "$deploy_workflow"
