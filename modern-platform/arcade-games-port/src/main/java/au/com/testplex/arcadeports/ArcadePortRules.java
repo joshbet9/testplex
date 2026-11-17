@@ -1452,8 +1452,8 @@ public final class ArcadePortRules {
 
     /** Builder bricks follow Digger's replaceable-cell placement, including water and lava. */
     public static boolean isDragonEscapeBuilderTargetReplaceable(
-            boolean targetIsEmpty, boolean targetIsLiquid, boolean targetIsPassable) {
-        return targetIsEmpty || targetIsLiquid || targetIsPassable;
+            boolean targetIsEmpty, Material targetType) {
+        return targetIsEmpty || shouldPlaceDragonEscapeKitIntoClickedBlock(targetType);
     }
 
     /** Builder bricks follow vanilla build-height limits, not the Digger's map-area restriction. */

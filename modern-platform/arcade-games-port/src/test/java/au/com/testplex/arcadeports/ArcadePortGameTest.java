@@ -2003,11 +2003,12 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false));
         assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(9L, 10L, false));
         assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, true));
-        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(true, false, false));
-        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, true, true),
-                "Builder must replace water and lava the same way Digger does");
-        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, false, true));
-        assertFalse(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, false, false));
+        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(true, Material.STONE));
+        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, Material.WATER),
+                "Builder must replace water the same way Digger does");
+        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, Material.LAVA));
+        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, Material.SHORT_GRASS));
+        assertFalse(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, Material.STONE));
         assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(64, -64, 320));
         assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(-64, -64, 320));
         assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(319, -64, 320));
