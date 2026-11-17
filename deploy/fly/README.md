@@ -1,9 +1,16 @@
 # Testplex Modern on Fly.io
 
-The Paper server data root is `/server`. The `fly.toml` mount named
-`testplex_data_restore` is required: it holds worlds, plugin configuration,
-player statistics, achievements, profiles, and other server state across
+The Paper data root is `/server`. The `fly.toml` mount named
+`testplex_data_restore` is required: it holds plugin configuration, player
+statistics, achievements, profiles, and other persistent server state across
 machine replacements and deployments.
+
+Paper's world container is `/tmp/testplex-worlds`, outside the persistent
+volume. The Fly image provisions the seven Monster Maze source worlds from the
+same pinned repository revision used by Hyper-V, then points Paper at that
+runtime world root. Large map data and generated match worlds therefore do not
+consume the stats volume; they can be recreated from the image after a machine
+replacement. Keep all player and plugin data under `/server`.
 
 The Fly entrypoint checks `/proc/mounts` before writing anything and exits if
 the volume is missing. Keep that check and the `[[mounts]]` declaration in

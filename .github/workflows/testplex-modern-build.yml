@@ -12,6 +12,9 @@ on:
       - ".github/workflows/deploy-testplex-modern-hyperv.yml"
       - ".github/testplex-modern-recovery.sh"
       - ".github/testplex-modern-recovery-test.sh"
+      - "Dockerfile.fly"
+      - "fly.toml"
+      - "deploy/**"
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
@@ -20,6 +23,9 @@ on:
       - ".github/workflows/deploy-testplex-modern-hyperv.yml"
       - ".github/testplex-modern-recovery.sh"
       - ".github/testplex-modern-recovery-test.sh"
+      - "Dockerfile.fly"
+      - "fly.toml"
+      - "deploy/**"
   workflow_dispatch:
 
 permissions:
@@ -58,6 +64,9 @@ jobs:
 
       - name: Build shared Arcade mechanics, Snake and Monster Maze modules
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/arcade-games-port/pom.xml clean verify
+
+      - name: Test isolated Fly Monster Maze world provisioning
+        run: bash deploy/fly/test-monster-maze-world-provisioning.sh
 
       - name: Build disposable Hoops Paper 26.3 acceptance harness
         shell: bash
@@ -136,6 +145,21 @@ jobs:
           done
           tar -tzf modern-platform/target/WizardsSourceMaps.tar.gz >/dev/null
           sha256sum modern-platform/target/WizardsSourceMaps.tar.gz
+
+      - name: Build Fly production image with pinned game worlds
+        shell: bash
+        run: docker build --build-arg SOURCE_SHA="$GITHUB_SHA" --tag testplex-modern-fly:ci --file Dockerfile.fly .
+
+      - name: Verify Fly image provisions all seven Monster Maze worlds outside persistent data
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint /bin/bash testplex-modern-fly:ci -ec '
+            /usr/local/bin/provision-monster-maze-worlds /opt/testplex/MonsterMazeMaps /tmp/testplex-ci-worlds
+            test "$(cat /tmp/testplex-ci-worlds/.testplex-mm-source-maps)" = "$(cat /opt/testplex/MonsterMazeMaps/.testplex-mm-source-maps)"
+            test "$(find /tmp/testplex-ci-worlds -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 7
+            test ! -e /server/.testplex-mm-source-maps
+          '
 
       - name: Verify modern plugin metadata and packaged classes
         shell: bash

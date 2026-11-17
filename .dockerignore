@@ -2,7 +2,9 @@
 !Dockerfile.fly
 !deploy/
 !deploy/fly/
+!deploy/monster-maze-source-revision.txt
 !deploy/fly/entrypoint.sh
+!deploy/fly/provision-monster-maze-worlds.sh
 !deploy/fly/packetevents-spigot-2.14.0.jar
 !deploy/fly/WizardsSourceMaps.tar.gz
 !modern-platform/

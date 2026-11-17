@@ -201,12 +201,21 @@ jobs:
           ref: ${{ steps.source-artifact.outputs.source_sha }}
           path: deployment-source
 
+      - name: Read shared Monster Maze source revision
+        id: monster-maze-revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          revision="$(tr -d '\r\n[:space:]' < deployment-source/deploy/monster-maze-source-revision.txt)"
+          [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid shared Monster Maze source revision." >&2; exit 1; }
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+
       - name: Checkout pinned Monster Maze source world assets
         uses: actions/checkout@v4
         with:
           repository: joshbet9/MonsterMaze
-          # Match the exact 1.21 source revision used for the gameplay port.
-          ref: 231fb1830ca53a3cdd7451391ac3d384a03ec5bb
+          # Fly and Hyper-V both read the same pinned source revision.
+          ref: ${{ steps.monster-maze-revision.outputs.revision }}
           path: monstermaze-source
 
       - name: Verify and stage the four Testplex JARs and Monster Maze worlds
