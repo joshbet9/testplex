@@ -161,7 +161,16 @@ public final class WizardsRules {
 
     public static String wandDisplayName(WizardsSpell spell) {
         return spell == null ? ChatColor.WHITE + "Spell Wand"
-                : ChatColor.WHITE + "" + ChatColor.BOLD + spell.displayName();
+                : spellCategoryColour(spell) + "" + ChatColor.BOLD + spell.displayName();
+    }
+
+    public static ChatColor spellCategoryColour(WizardsSpell spell) {
+        if (spell == null) return ChatColor.WHITE;
+        return switch (spell.category()) {
+            case ATTACK -> ChatColor.RED;
+            case SUPPORT -> ChatColor.GREEN;
+            case MISC -> ChatColor.AQUA;
+        };
     }
 
     public static boolean isProtectedDropSlot(int heldSlot) {
