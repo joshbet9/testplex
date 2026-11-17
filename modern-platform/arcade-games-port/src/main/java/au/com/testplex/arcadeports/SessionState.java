@@ -563,6 +563,7 @@ class SessionState {
     final Map<UUID, Long> spleefLeapReadyAt = new HashMap<>();
     final Map<UUID, Long> spleefSmasherReadyAt = new HashMap<>();
     final Map<UUID, Long> spleefGustReadyAt = new HashMap<>();
+    final Set<UUID> spleefGustProjectiles = new HashSet<>();
     final Map<String, Long> spleefKnockbackAt = new HashMap<>();
     final Map<UUID, Integer> spleefBlocksBroken = new HashMap<>();
     final Map<UUID, Long> spleefSpectateNextTeleportAt = new HashMap<>();

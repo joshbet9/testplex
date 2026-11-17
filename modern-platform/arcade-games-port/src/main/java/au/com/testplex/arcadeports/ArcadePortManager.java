@@ -27967,7 +27967,6 @@ public final class ArcadePortManager implements Listener {
             if (now >= readyAt) {
                 session.spleefSmasherReadyAt.put(player.getUniqueId(),
                         now + GameDebugRuntimeOverrides.longValue("SPLEEF_SMASHER_COOLDOWN_MILLIS", ArcadePortRules.SPLEEF_SMASHER_COOLDOWN_MILLIS));
-                cooldownProgress.start(player, "Smasher", GameDebugRuntimeOverrides.longValue("SPLEEF_SMASHER_COOLDOWN_MILLIS", ArcadePortRules.SPLEEF_SMASHER_COOLDOWN_MILLIS));
                 Set<Block> smashBlocks = new HashSet<>();
                 for (ArcadePortRules.SpleefBlockOffset offset : ArcadePortRules.spleefSmasherOffsets()) {
                     Block affected = block.getRelative(offset.x(), offset.y(), offset.z());
@@ -28231,6 +28230,32 @@ public final class ArcadePortManager implements Listener {
         } else {
             block.setType(damaged, false);
         }
+    }
+
+    private void resolveSpleefGustImpact(Session session, Projectile projectile, Player shooter) {
+        if (active != session || session.type != ArcadePortGame.SPLEEF
+                || shooter == null || !session.alive.contains(shooter.getUniqueId())) return;
+        Location impact = projectile.getLocation();
+        double radius = ArcadePortRules.spleefGustRadiusBlocks();
+        double radiusSquared = radius * radius;
+        long now = System.currentTimeMillis();
+        for (Player target : alivePlayers(session)) {
+            Vector offset = target.getEyeLocation().toVector().subtract(impact.toVector());
+            if (offset.lengthSquared() >= radiusSquared) continue;
+            Vector impulse = ArcadePortRules.spleefGustVelocity(offset);
+            if (impulse.lengthSquared() <= 1.0E-8D) continue;
+            target.setVelocity(target.getVelocity().add(impulse));
+            target.setFallDistance(0.0F);
+            if (!target.equals(shooter)) {
+                UUID shooterId = shooter.getUniqueId();
+                session.spleefLastHit.put(target.getUniqueId(), new SpleefHit(shooterId, "wind-charge",
+                        !target.isOnGround(), now,
+                        session.spleefBrawlerBigSmashAt.getOrDefault(shooterId, 0L),
+                        session.spleefBrawlerSmashBlocks.getOrDefault(shooterId, 0)));
+            }
+        }
+        impact.getWorld().spawnParticle(Particle.CLOUD, impact, 18, 0.35D, 0.35D, 0.35D, 0.07D);
+        impact.getWorld().playSound(impact, Sound.ENTITY_GENERIC_EXPLODE, 0.6F, 1.7F);
     }
 
     private boolean isSpleefWoolOrTerracotta(Material material) {
@@ -29835,6 +29860,16 @@ public final class ArcadePortManager implements Listener {
         if (!EvolutionProjectileImpactRules.shouldProcessHit(
                 session.type, trackedEvolutionProjectile, event.isCancelled())) return;
 
+        if (session.type == ArcadePortGame.SPLEEF
+                && event.getEntity() instanceof Projectile gustProjectile
+                && session.spleefGustProjectiles.remove(gustProjectile.getUniqueId())) {
+            Player shooter = gustProjectile.getShooter() instanceof Player player ? player : null;
+            resolveSpleefGustImpact(session, gustProjectile, shooter);
+            session.entities.remove(gustProjectile);
+            gustProjectile.remove();
+            return;
+        }
+
         if (session.type == ArcadePortGame.EVOLUTION
                 && event.getEntity() instanceof Projectile evolutionProjectile) {
             UUID projectileId = evolutionProjectile.getUniqueId();
@@ -30095,13 +30130,27 @@ public final class ArcadePortManager implements Listener {
                     double arrowSpeed = arrow.getVelocity().length();
                     double radius = ArcadePortRules.spleefProjectileImpactRadius(true, arrowSpeed);
                     int limit = ArcadePortRules.spleefProjectileClearRadius(true, arrowSpeed);
+                    for (Player target : alivePlayers(session)) {
+                        if (target.equals(shooter)) continue;
+                        Location feet = target.getLocation();
+                        Block floor = feet.getBlock().getRelative(BlockFace.DOWN);
+                        if (isSpleefProtectedBlock(floor.getType())
+                                || !ArcadePortRules.spleefArrowBreaksPlayerFloor(
+                                        center.getX(), center.getY(), center.getZ(),
+                                        feet.getBlockX(), feet.getBlockY(), feet.getBlockZ(), radius)) continue;
+                        UUID shooterId = shooter.getUniqueId();
+                        session.spleefLastHit.put(target.getUniqueId(), new SpleefHit(shooterId, "arrow",
+                                !target.isOnGround(), now,
+                                session.spleefBrawlerBigSmashAt.getOrDefault(shooterId, 0L),
+                                session.spleefBrawlerSmashBlocks.getOrDefault(shooterId, 0)));
+                    }
                     fadeSpleefBlock(session, shooter, center, false);
                     for (int dx = -limit; dx <= limit; dx++) {
                         for (int dy = -limit; dy <= limit; dy++) {
                             for (int dz = -limit; dz <= limit; dz++) {
                                 if ((dx == 0 && dy == 0 && dz == 0)
-                                        || dx * dx + dy * dy + dz * dz > radius * radius) continue;
-                                fadeSpleefBlock(session, shooter, center.getRelative(dx, dy, dz), true);
+                                        || !ArcadePortRules.spleefArrowClearsOffset(dx, dy, dz, radius)) continue;
+                                fadeSpleefBlock(session, shooter, center.getRelative(dx, dy, dz), false);
                             }
                         }
                     }
@@ -30973,6 +31022,28 @@ public final class ArcadePortManager implements Listener {
                 && item == Material.DIAMOND_SHOVEL && event.getAction().isRightClick()) {
             event.setCancelled(true);
             useQuiverGroundPound(session, player, System.currentTimeMillis());
+            return;
+        }
+        if (session.type == ArcadePortGame.SPLEEF
+                && session.alive.contains(player.getUniqueId())
+                && "gust".equals(session.spleefKits.getOrDefault(player.getUniqueId(), "snowballer"))
+                && event.getAction().isRightClick() && item == Material.WIND_CHARGE) {
+            event.setCancelled(true);
+            if (!isDebugAbilityAllowed(player, ArcadePortGame.SPLEEF, "gust")) return;
+            long now = System.currentTimeMillis();
+            long readyAt = session.spleefGustReadyAt.getOrDefault(player.getUniqueId(), 0L);
+            if (now < readyAt) return;
+            consumeHeld(player);
+            Snowball gust = player.launchProjectile(Snowball.class);
+            gust.setItem(new ItemStack(Material.WIND_CHARGE));
+            gust.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(1.5D));
+            session.entities.add(gust);
+            session.spleefGustProjectiles.add(gust.getUniqueId());
+            long cooldown = GameDebugRuntimeOverrides.longValue("SPLEEF_GUST_COOLDOWN_MILLIS",
+                    ArcadePortRules.SPLEEF_GUST_COOLDOWN_MILLIS);
+            session.spleefGustReadyAt.put(player.getUniqueId(), now + cooldown);
+            cooldownProgress.start(player, "Gust", cooldown);
+            player.playSound(player.getLocation(), Sound.ENTITY_EGG_THROW, 0.8F, 0.9F);
             return;
         }
         if (session.type == ArcadePortGame.SPLEEF

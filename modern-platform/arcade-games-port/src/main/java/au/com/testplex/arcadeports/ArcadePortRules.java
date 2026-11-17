@@ -1064,6 +1064,9 @@ public final class ArcadePortRules {
     public static final long SPLEEF_BRAWLER_LEAP_COOLDOWN_MILLIS = 30_000L;
     public static final long SPLEEF_KNOCKBACK_COOLDOWN_MILLIS = 400L;
     public static final long SPLEEF_GUST_COOLDOWN_MILLIS = 20_000L;
+    public static final double SPLEEF_GUST_RADIUS_BLOCKS = 4.0D;
+    public static final double SPLEEF_GUST_POWER = 1.35D;
+    public static final double SPLEEF_GUST_VERTICAL_BOOST = 0.65D;
     public static final double SPLEEF_DEFAULT_KNOCKBACK = 0.3D;
     public static final double SPLEEF_BRAWLER_KNOCKBACK = 0.6D;
     public static final long SPLEEF_SMASHER_COOLDOWN_MILLIS = 250L;
@@ -2614,10 +2617,55 @@ public final class ArcadePortRules {
         return arrow ? spleefArrowClearRadius(velocity) : 1.0D;
     }
 
+    public static boolean spleefArrowClearsOffset(int dx, int dy, int dz, double radius) {
+        return Double.isFinite(radius) && radius >= 0.0D
+                && dx * dx + dy * dy + dz * dz <= radius * radius;
+    }
+
+    public static boolean spleefArrowBreaksPlayerFloor(int impactX, int impactY, int impactZ,
+            int playerX, int playerY, int playerZ, double radius) {
+        return spleefArrowClearsOffset(playerX - impactX, playerY - 1 - impactY,
+                playerZ - impactZ, radius);
+    }
+
+    public static double spleefGustRadiusBlocks() {
+        return Math.max(1.0D, Math.min(8.0D, GameDebugRuntimeOverrides.doubleValue(
+                "SPLEEF_GUST_RADIUS_BLOCKS", SPLEEF_GUST_RADIUS_BLOCKS)));
+    }
+
+    private static double spleefGustPower() {
+        return Math.max(0.0D, Math.min(5.0D, GameDebugRuntimeOverrides.doubleValue(
+                "SPLEEF_GUST_POWER", SPLEEF_GUST_POWER)));
+    }
+
+    private static double spleefGustVerticalBoost() {
+        return Math.max(0.0D, Math.min(4.0D, GameDebugRuntimeOverrides.doubleValue(
+                "SPLEEF_GUST_VERTICAL_BOOST", SPLEEF_GUST_VERTICAL_BOOST)));
+    }
+
     public static int spleefHungerAfterHit(int currentFoodLevel) {
         int restore = Math.max(0, Math.min(20, GameDebugRuntimeOverrides.intValue(
                 "SPLEEF_HUNGER_RESTORE_PER_HIT", SPLEEF_HUNGER_RESTORE_PER_HIT)));
         return Math.max(0, Math.min(20, currentFoodLevel + restore));
+    }
+
+    /** A wind burst pushes entities away from its impact point, with a reliable upward recovery impulse. */
+    public static Vector spleefGustVelocity(Vector fromImpact) {
+        if (fromImpact == null || !Double.isFinite(fromImpact.getX())
+                || !Double.isFinite(fromImpact.getY()) || !Double.isFinite(fromImpact.getZ())) {
+            return new Vector(0.0D, spleefGustVerticalBoost(), 0.0D);
+        }
+        double distance = fromImpact.length();
+        double radius = spleefGustRadiusBlocks();
+        double power = spleefGustPower();
+        double verticalBoost = spleefGustVerticalBoost();
+        if (!Double.isFinite(distance) || distance >= radius) return new Vector();
+        Vector direction = distance < 1.0E-6D
+                ? new Vector(0.0D, 1.0D, 0.0D) : fromImpact.clone().normalize();
+        double scale = 1.0D - distance / radius;
+        direction.multiply(power * scale);
+        direction.setY(Math.max(verticalBoost * scale, direction.getY()));
+        return direction;
     }
 
     public static final long EVOLUTION_RESPAWN_TICKS = 80L;
