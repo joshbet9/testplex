@@ -5736,9 +5736,9 @@ public final class ArcadePortManager implements Listener {
                 session.dragonEscapeDiggerUsesRemaining.put(playerId, GameDebugRuntimeOverrides.intValue("DRAGON_ESCAPE_DIGGER_MAX_USES", ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES));
                 session.dragonEscapeNextTntAt.put(playerId,
                         now + GameDebugRuntimeOverrides.longValue("DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS", ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS));
-                session.dragonEscapeNextBrickAt.put(playerId,
-                        now + GameDebugRuntimeOverrides.longValue("DRAGON_ESCAPE_BUILDER_RECHARGE_MILLIS",
-                                ArcadePortRules.DRAGON_ESCAPE_BUILDER_RECHARGE_MILLIS));
+                // The starting brick charges are immediately usable. Record the
+                // recharge deadline only after the first placement, as Digger
+                // does for a use-specific cooldown.
             }
             int teamCount = teamCountForGame(type);
             boolean teamMode = teamCount > 0;

@@ -2001,6 +2001,8 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldRejectDragonEscapeBuilderEntityOverlap(false, true));
         assertFalse(ArcadePortRules.shouldRejectDragonEscapeBuilderEntityOverlap(false, false));
         assertTrue(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false));
+        assertTrue(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(1_000L, 0L, false),
+                "Builder's starting charges must be usable immediately when no recharge deadline exists");
         assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(9L, 10L, false));
         assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, true));
         assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(true, Material.STONE));
