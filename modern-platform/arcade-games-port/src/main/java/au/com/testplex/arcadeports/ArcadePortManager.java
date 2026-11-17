@@ -9954,10 +9954,7 @@ public final class ArcadePortManager implements Listener {
                             "Right-click to warp to the next-ranked racer ahead. One use."));
                 } else if ("digger".equals(kit)) {
                     int digs = session.dragonEscapeDiggerUsesRemaining.getOrDefault(id, GameDebugRuntimeOverrides.intValue("DRAGON_ESCAPE_DIGGER_MAX_USES", ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES));
-                    int pickaxes = ArcadePortRules.dragonEscapeDiggerPickaxeItemCount(digs);
-                    player.getInventory().setItem(0, pickaxes == 0 ? null : namedItem(Material.DIAMOND_PICKAXE,
-                            "Digger Pickaxe (" + digs + " uses left)",
-                            "Left-click course blocks to recover and place as shortcuts.", pickaxes));
+                    player.getInventory().setItem(0, dragonEscapeDiggerItem(digs));
                 }
                 setDragonEscapeGhostHotbarItem(player);
                 if (session.dragonEscapePractice) setDragonEscapePracticeHotbarItems(player);
@@ -18049,10 +18046,21 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (toolSlot < 0) toolSlot = 0;
-        player.getInventory().setItem(toolSlot, namedItem(Material.DIAMOND_PICKAXE,
-                "Digger Pickaxe (" + remaining + " uses left)",
-                "Left-click course blocks to recover and place as shortcuts.",
-                ArcadePortRules.dragonEscapeDiggerPickaxeItemCount(remaining)));
+        player.getInventory().setItem(toolSlot, dragonEscapeDiggerItem(remaining));
+    }
+
+    private ItemStack dragonEscapeDiggerItem(int usesRemaining) {
+        int count = ArcadePortRules.dragonEscapeDiggerPickaxeItemCount(usesRemaining);
+        if (count == 0) return null;
+        ItemStack pickaxes = namedItem(Material.DIAMOND_PICKAXE,
+                "Digger Pickaxe (" + count + " uses left)",
+                "Left-click course blocks to recover and place as shortcuts.", count);
+        ItemMeta meta = pickaxes.getItemMeta();
+        // Diamond pickaxes normally cannot stack. Give this charge display a
+        // bounded per-item stack size so one slot shows the source count (6, 5 … 1).
+        meta.setMaxStackSize(count);
+        pickaxes.setItemMeta(meta);
+        return pickaxes;
     }
 
     /** Adventure mode cannot rely on vanilla block placement for Digger's recovered blocks. */

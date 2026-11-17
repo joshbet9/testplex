@@ -2135,10 +2135,12 @@ class ArcadePortGameTest {
     }
 
     @Test void dragonEscapeDiggerKeepsItsChargesOnOneUnstackablePickaxe() {
-        assertEquals(1, ArcadePortRules.dragonEscapeDiggerPickaxeItemCount(6));
+        assertEquals(6, ArcadePortRules.dragonEscapeDiggerPickaxeItemCount(6));
+        assertEquals(5, ArcadePortRules.dragonEscapeDiggerPickaxeItemCount(5));
         assertEquals(1, ArcadePortRules.dragonEscapeDiggerPickaxeItemCount(1));
         assertEquals(0, ArcadePortRules.dragonEscapeDiggerPickaxeItemCount(0));
         assertEquals(0, ArcadePortRules.dragonEscapeDiggerPickaxeItemCount(-1));
+        assertEquals(64, ArcadePortRules.dragonEscapeDiggerPickaxeItemCount(100));
     }
 
     @Test void dragonEscapeFinishBeaconOnlyCompletesNearTheFinalRouteSegment() {
