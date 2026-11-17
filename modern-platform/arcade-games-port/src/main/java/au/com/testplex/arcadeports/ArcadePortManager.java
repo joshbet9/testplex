@@ -9578,6 +9578,90 @@ public final class ArcadePortManager implements Listener {
         return wool == Material.AIR ? 0 : inventoryCount(player, wool);
     }
 
+    private void consumeTurfWarsWool(Player player, Material wool, int amount) {
+        int remaining = amount;
+        for (int slot = 0; slot < 36 && remaining > 0; slot++) {
+            ItemStack stack = player.getInventory().getItem(slot);
+            if (stack == null || stack.getType() != wool) continue;
+            int consumed = Math.min(remaining, stack.getAmount());
+            remaining -= consumed;
+            if (consumed == stack.getAmount()) player.getInventory().setItem(slot, null);
+            else stack.setAmount(stack.getAmount() - consumed);
+        }
+    }
+
+    private boolean canPlaceTurfWarsFortifierBlock(Session session, int team,
+            Material ownWool, Material ownTurf, Block placed) {
+        if (!placed.isEmpty()
+                || !ArcadePortRules.isTurfWarsBuildWithinBounds(placed.getX(), placed.getZ(),
+                        session.turfFrontlineMinX, session.turfFrontlineMaxXExclusive,
+                        session.turfMinZ, session.turfMaxZExclusive)
+                || !ArcadePortRules.canTurfWarsBuildOnTerritory(team, placed.getX(), session.turfFrontlineX)) {
+            return false;
+        }
+        Block ground = placed.getRelative(BlockFace.DOWN);
+        while (ground.getY() > Math.max(0, session.world.getMinHeight()) && ground.getType().isAir()) {
+            ground = ground.getRelative(BlockFace.DOWN);
+        }
+        if (ground.getType() != ownTurf && ground.getType() != ownWool) return false;
+        for (int y = 1; y <= 5; y++) {
+            Material below = placed.getRelative(0, -y, 0).getType();
+            if (below == Material.RED_TERRACOTTA || below == Material.LIGHT_BLUE_TERRACOTTA) return true;
+        }
+        return false;
+    }
+
+    private void placeTurfWarsFortifierTemplate(Session session, Player player,
+            Block clicked, BlockFace clickedFace) {
+        UUID id = player.getUniqueId();
+        int team = session.teams.getOrDefault(id, -1);
+        Material ownWool = team == 0 ? Material.RED_WOOL : team == 1 ? Material.LIGHT_BLUE_WOOL : Material.AIR;
+        Material ownTurf = team == 0 ? Material.RED_TERRACOTTA : team == 1 ? Material.LIGHT_BLUE_TERRACOTTA : Material.AIR;
+        if (session.turfCombat || !session.alive.contains(id) || ownWool == Material.AIR) {
+            player.sendActionBar(ChatColor.RED + "Fortifier templates are only available to living players during Build Time.");
+            return;
+        }
+        TurfFortifierTemplate template = session.turfFortifierTemplatesByPlayer.getOrDefault(
+                id, TurfFortifierTemplate.PANEL_2X2);
+        int available = countTurfWarsWool(player, team);
+        List<TurfFortifierTemplate.Offset> offsets = template.offsets(available);
+        if (offsets.isEmpty()) {
+            player.sendActionBar(ChatColor.RED + "You need team wool to build a Fortifier template.");
+            return;
+        }
+
+        Block origin = clicked.getRelative(clickedFace);
+        BlockFace facing = player.getFacing();
+        BlockFace lateral = facing.getModX() != 0 ? BlockFace.SOUTH : BlockFace.EAST;
+        List<Block> placement = new ArrayList<>(offsets.size());
+        for (TurfFortifierTemplate.Offset offset : offsets) {
+            Block block = origin;
+            if (offset.lateral() < 0) block = block.getRelative(lateral.getOppositeFace(), -offset.lateral());
+            else if (offset.lateral() > 0) block = block.getRelative(lateral, offset.lateral());
+            block = block.getRelative(0, offset.up(), 0);
+            if (!canPlaceTurfWarsFortifierBlock(session, team, ownWool, ownTurf, block)) {
+                player.sendActionBar(ChatColor.RED + "That template does not fit on your team's build area.");
+                return;
+            }
+            placement.add(block);
+        }
+
+        for (Block block : placement) {
+            block.setType(ownWool, false);
+            session.turfPlacedBlockOwners.put(block, id);
+        }
+        consumeTurfWarsWool(player, ownWool, placement.size());
+        if (!testPlayers.isTestPlayer(player) && !GameDebugRuntimeOverrides.isDebugSession()) {
+            String base = "local-stats." + id + ".turf-wars.";
+            plugin.getConfig().set(base + "blocks-placed",
+                    plugin.getConfig().getInt(base + "blocks-placed", 0) + placement.size());
+        }
+        player.updateInventory();
+        player.playSound(player.getLocation(), Sound.BLOCK_WOOL_PLACE, 0.8F, 1.0F);
+        player.sendActionBar(ChatColor.GREEN + "Fortifier built " + placement.size() + " wool: "
+                + template.displayName() + ".");
+    }
+
     private int countTurfWarsFletchedArrows(Player player) {
         int count = 0;
         for (ItemStack stack : player.getInventory().getContents()) {
@@ -30442,6 +30526,31 @@ public final class ArcadePortManager implements Listener {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Session session = active;
         if (session == null) return;
+        if (session.type == ArcadePortGame.TURF_WARS
+                && event.getAction() == Action.RIGHT_CLICK_BLOCK
+                && event.getClickedBlock() != null
+                && session.alive.contains(event.getPlayer().getUniqueId())
+                && "fortifier".equals(session.turfWarsKits.getOrDefault(
+                        event.getPlayer().getUniqueId(), "marksman"))) {
+            int team = session.teams.getOrDefault(event.getPlayer().getUniqueId(), -1);
+            Material teamWool = team == 0 ? Material.RED_WOOL
+                    : team == 1 ? Material.LIGHT_BLUE_WOOL : Material.AIR;
+            if (event.getItem() != null && event.getItem().getType() == teamWool
+                    && event.getClickedBlock().getType() == teamWool) {
+                event.setCancelled(true);
+                if (event.getPlayer().isSneaking()) {
+                    TurfFortifierTemplate next = session.turfFortifierTemplatesByPlayer
+                            .getOrDefault(event.getPlayer().getUniqueId(), TurfFortifierTemplate.PANEL_2X2).next();
+                    session.turfFortifierTemplatesByPlayer.put(event.getPlayer().getUniqueId(), next);
+                    event.getPlayer().sendActionBar(ChatColor.YELLOW + "Fortifier template: "
+                            + next.displayName() + ". Right-click team wool to build.");
+                } else {
+                    placeTurfWarsFortifierTemplate(session, event.getPlayer(),
+                            event.getClickedBlock(), event.getBlockFace());
+                }
+                return;
+            }
+        }
         if (session.type == ArcadePortGame.GLADIATORS
                 && session.gladiatorVotingEndsAt > System.currentTimeMillis()
                 && event.getAction().isRightClick() && event.getItem() != null
@@ -35878,6 +35987,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Integer> spleefFinalSmashBlocks = new HashMap<>();
         final Map<UUID, Integer> turfMarksmanBowKills = new HashMap<>();
         final Map<Block, UUID> turfPlacedBlockOwners = new HashMap<>();
+        final Map<UUID, TurfFortifierTemplate> turfFortifierTemplatesByPlayer = new HashMap<>();
         final Set<UUID> turfBehindEnemyLinesAwarded = new HashSet<>();
         final Map<UUID, Integer> quiverBowKills = new HashMap<>();
         final Map<UUID, Integer> quiverMeleeKills = new HashMap<>();
