@@ -303,7 +303,7 @@ jobs:
           grep -Fq 'ChangedModernJars.txt' "$deploy_workflow"
           grep -Fq 'Unchanged plugin JAR; omitting transfer' "$deploy_workflow"
           grep -Fq 'Create verified JAR deltas against the deployed build' "$deploy_workflow"
-          grep -Fq 'testplex-jar-delta.py create' "$deploy_workflow"
+          grep -Fq 'python3 "$helper" create' "$deploy_workflow"
           grep -Fq 'testplex-jar-delta.py" apply' "$deploy_workflow"
           grep -Fq 'No retained successful build artifact matches deployed SHA' "$deploy_workflow"
           grep -Fq 'JAR delta transfer payload' "$deploy_workflow"
