@@ -20,11 +20,6 @@ public final class TurfWarsRules {
         return List.of(Material.BOW);
     }
 
-    public static String fortifierPerkDescription(int woolCap) {
-        return "Passively receives one team-coloured wool every 4 seconds, up to "
-                + Math.max(1, woolCap) + " held (Marksman carries up to 8).";
-    }
-
     /** Recreates the basic 1.8-style melee impulse when custom damage bypasses Bukkit's hit response. */
     public static Vector meleeKnockback(Vector currentVelocity, Vector horizontalDirection) {
         if (currentVelocity == null || horizontalDirection == null

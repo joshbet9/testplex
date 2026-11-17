@@ -17,13 +17,6 @@ class TurfWarsRulesTest {
     }
 
     @Test
-    void fortifierDescriptionExplainsItsPassiveWoolReplenishmentAndHigherCap() {
-        assertEquals("Passively receives one team-coloured wool every 4 seconds, up to 12 held "
-                        + "(Marksman carries up to 8).",
-                TurfWarsRules.fortifierPerkDescription(12));
-    }
-
-    @Test
     void meleeHitAddsLegacyImpulseAndPreservesExistingUpwardMomentum() {
         assertEquals(new Vector(0.4D, 0.36D, 0.0D),
                 TurfWarsRules.meleeKnockback(new Vector(0.0D, 0.1D, 0.0D),

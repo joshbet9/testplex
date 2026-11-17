@@ -815,8 +815,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     it = item(choice.icon, ChatColor.YELLOW + choice.name,
                             ChatColor.GRAY + "Unlock with Genius Mathematician:",
                             ChatColor.GRAY + "win without leaving your base or being killed.",
-                            ChatColor.GRAY + TurfWarsRules.fortifierPerkDescription(
-                                    ArcadePortRules.turfWarsConstructorMax("fortifier")),
+                            ChatColor.GRAY + "Carries 12 team-coloured wool.",
                             unlocked ? ChatColor.GREEN + "Click to select" : ChatColor.RED + "Locked");
                 } else if (selectedGame == ArcadePortGame.SUPER_SPLOOR) {
                     String selectedKit = plugin.getConfig().getString(
