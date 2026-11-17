@@ -71,17 +71,15 @@ def create_delta(base_path: Path, target_path: Path, delta_path: Path, manifest_
     target, target_index = index_archive(target_path)
     try:
         changed = []
-        base_entries = [
-            {"name": name, "sha256": entry_sha256(base, name)}
-            for name in base_index
-        ]
+        base_digests = {name: entry_sha256(base, name) for name in base_index}
+        base_entries = [{"name": name, "sha256": digest} for name, digest in base_digests.items()]
         target_entries = []
         for name, info in target_index.items():
             digest = entry_sha256(target, name)
             target_entry = metadata(info)
             target_entry["sha256"] = digest
             target_entries.append(target_entry)
-            if name not in base_index or entry_sha256(base, name) != digest:
+            if name not in base_digests or base_digests[name] != digest:
                 changed.append(name)
 
         delta_path.parent.mkdir(parents=True, exist_ok=True)
