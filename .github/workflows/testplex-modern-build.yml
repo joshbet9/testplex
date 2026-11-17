@@ -408,7 +408,7 @@ jobs:
           flyctl volumes list --app "$FLY_APP" --json > "$RUNNER_TEMP/fly-volumes-before.json"
           flyctl machine list --app "$FLY_APP" --json > "$RUNNER_TEMP/fly-machines-before.json"
           volume_id="$(jq -er '[.[] | select(.name == "testplex_data_restore")] | if length == 1 then .[0].id else error("expected exactly one existing Testplex data volume") end' "$RUNNER_TEMP/fly-volumes-before.json")"
-          machine_id="$(jq -er '[.[] | select(.config.process_group == "mm21")] | if length == 1 then .[0].id else error("expected exactly one existing Testplex machine") end' "$RUNNER_TEMP/fly-machines-before.json")"
+          machine_id="$(jq -er --arg volume "$volume_id" '[.[] | select(any(.config.mounts[]?; .path == "/server" and .volume == $volume))] | if length == 1 then .[0].id else error("expected exactly one existing Testplex machine with the preserved /server volume") end' "$RUNNER_TEMP/fly-machines-before.json")"
           attached_volume="$(jq -er --arg id "$machine_id" '[.[] | select(.id == $id)][0].config.mounts[] | select(.path == "/server") | .volume' "$RUNNER_TEMP/fly-machines-before.json")"
           [[ "$attached_volume" == "$volume_id" ]] || { echo "The existing /server volume is not attached to the Testplex machine; refusing deployment." >&2; exit 1; }
           printf 'id=%s\n' "$volume_id" >> "$GITHUB_OUTPUT"
@@ -439,7 +439,7 @@ jobs:
           [[ "$actual_volume_id" == "$EXPECTED_VOLUME_ID" ]] || { echo "Fly persistent volume changed from $EXPECTED_VOLUME_ID to $actual_volume_id; investigate before accepting release." >&2; exit 1; }
 
           flyctl machine list --app "$FLY_APP" --json > "$RUNNER_TEMP/fly-machines-after.json"
-          machine_id="$(jq -er '[.[] | select(.config.process_group == "mm21")] | if length == 1 then .[0].id else error("expected exactly one Testplex machine after deploy") end' "$RUNNER_TEMP/fly-machines-after.json")"
+          machine_id="$(jq -er --arg volume "$EXPECTED_VOLUME_ID" '[.[] | select(any(.config.mounts[]?; .path == "/server" and .volume == $volume))] | if length == 1 then .[0].id else error("expected exactly one deployed Testplex machine with the preserved /server volume") end' "$RUNNER_TEMP/fly-machines-after.json")"
           attached_volume="$(jq -er --arg id "$machine_id" '[.[] | select(.id == $id)][0].config.mounts[] | select(.path == "/server") | .volume' "$RUNNER_TEMP/fly-machines-after.json")"
           [[ "$attached_volume" == "$EXPECTED_VOLUME_ID" ]] || { echo "The original persistent volume is not mounted by the deployed machine." >&2; exit 1; }
           state="$(jq -er --arg id "$machine_id" '[.[] | select(.id == $id)][0].state' "$RUNNER_TEMP/fly-machines-after.json")"
