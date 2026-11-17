@@ -7267,12 +7267,14 @@ public final class ArcadePortManager implements Listener {
 
         session.gladiatorOpeningArenaCentersByMatch.clear();
         session.gladiatorOpeningSpawnsByMatch.clear();
+        Set<String> seenCenters = new HashSet<>();
+        List<Location> uniqueCenters = centers.stream()
+                .filter(center -> seenCenters.add(centerKey(center)))
+                .toList();
         List<GladiatorsOpeningSeatPlan.Seat> seats = GladiatorsOpeningSeatPlan.create(
-                session.gladiatorBracket.readyMatches(), centers.size());
-        Set<String> allocated = new HashSet<>();
+                session.gladiatorBracket.readyMatches(), uniqueCenters.size());
         for (GladiatorsOpeningSeatPlan.Seat seat : seats) {
-            Location center = centers.get(seat.arenaIndex()).clone();
-            if (!allocated.add(centerKey(center))) continue;
+            Location center = uniqueCenters.get(seat.arenaIndex()).clone();
             Location[] spawns = gladiatorArenaSpawnPair(session, center, true, false);
             if (spawns == null || spawns.length != 2) continue;
             int matchId = seat.match().id();
