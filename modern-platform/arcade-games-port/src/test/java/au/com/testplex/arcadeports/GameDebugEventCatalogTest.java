@@ -23,6 +23,32 @@ class GameDebugEventCatalogTest {
         int genericGuard = manager.indexOf("isDragonEscapeUsableBlock(event.getClickedBlock())", interact);
         assertTrue(interact >= 0 && builderRoute > interact && genericGuard > builderRoute,
                 "Builder right-clicks must be handled before the generic Dragon Escape block guard cancels them");
+        int builderCondition = manager.lastIndexOf(
+                "if (ArcadePortRules.shouldRouteDragonEscapeBuilderPlacement(", builderRoute);
+        String builderRouteCondition = manager.substring(builderCondition, builderRoute);
+        assertFalse(builderRouteCondition.contains("event.getItem()"),
+                "Builder routing must not depend on Paper's predicted interaction item; validate the server hand in placement logic");
+    }
+
+    @Test
+    void dragonEscapeBuilderAndDiggerUseTheSamePlacementTargetAndCollisionHelpers() throws IOException {
+        Path sourceRoot = Path.of("src", "main", "java", "au", "com", "testplex", "arcadeports");
+        if (!Files.isDirectory(sourceRoot)) {
+            sourceRoot = Path.of("modern-platform", "arcade-games-port", "src", "main", "java", "au",
+                    "com", "testplex", "arcadeports");
+        }
+        String manager = Files.readString(sourceRoot.resolve("ArcadePortManager.java"));
+        int builderStart = manager.indexOf("private void placeDragonEscapeBuilderBrick(");
+        int diggerStart = manager.indexOf("private void placeDragonEscapeDiggerBlock(");
+        int builderEnd = manager.indexOf("\n    private ", builderStart + 1);
+        int diggerEnd = manager.indexOf("\n    private ", diggerStart + 1);
+        String builderPlacement = manager.substring(builderStart, builderEnd);
+        String diggerPlacement = manager.substring(diggerStart, diggerEnd);
+        for (String helper : List.of("dragonEscapeKitPlacementTarget(",
+                "isDragonEscapeKitPlacementTargetAllowed(", "isDragonEscapeKitPlacementSpaceClear(")) {
+            assertTrue(builderPlacement.contains(helper), "Builder must use shared Digger placement helper " + helper);
+            assertTrue(diggerPlacement.contains(helper), "Digger must use shared placement helper " + helper);
+        }
     }
 
     @Test

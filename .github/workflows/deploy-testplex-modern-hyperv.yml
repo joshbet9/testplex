@@ -147,7 +147,7 @@ jobs:
           ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
-            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
           installed_sha="$(timeout --foreground --signal=TERM --kill-after=10s 90s ssh "${ssh_opts[@]}" "$remote" bash -s <<'REMOTE_READ_BASE_SHA'
           set -euo pipefail
           marker=/home/monstermaze/servers/testplex-modern/.testplex-modern-deployed-build
@@ -192,8 +192,36 @@ jobs:
           REMOTE_INSTALLED_JAR_SHA
             )"
             [[ "$remote_hash" =~ ^[0-9a-f]{64}$ ]] || { echo "Invalid installed JAR checksum for $jar." >&2; exit 1; }
-            timeout --foreground --signal=TERM --kill-after=10s 90s ssh "${ssh_opts[@]}" "$remote" \
-              sudo -n cat "$remote_path" > "$BASE_ARTIFACT_DIR/$jar"
+            remote_size="$(timeout --foreground --signal=TERM --kill-after=10s 90s ssh "${ssh_opts[@]}" "$remote" \
+              sudo -n stat --format=%s "$remote_path")"
+            [[ "$remote_size" =~ ^[0-9]+$ && "$remote_size" -gt 0 ]] || { echo "Invalid installed JAR size for $jar." >&2; exit 1; }
+            local_path="$BASE_ARTIFACT_DIR/$jar"
+            chunk_path="$BASE_ARTIFACT_DIR/$jar.chunk"
+            : > "$local_path"
+            chunk_mib=4
+            chunk_bytes=$((chunk_mib * 1024 * 1024))
+            for ((offset=0; offset<remote_size; offset+=chunk_bytes)); do
+              expected_bytes=$((remote_size - offset))
+              (( expected_bytes > chunk_bytes )) && expected_bytes="$chunk_bytes"
+              skip_mib=$((offset / (1024 * 1024)))
+              for attempt in 1 2 3; do
+                rm -f -- "$chunk_path"
+                if timeout --foreground --signal=TERM --kill-after=10s 180s ssh "${ssh_opts[@]}" "$remote" \
+                    sudo -n dd if="$remote_path" bs=1M skip="$skip_mib" count="$chunk_mib" status=none > "$chunk_path"; then
+                  chunk_size="$(stat --format=%s "$chunk_path")"
+                  if [[ "$chunk_size" == "$expected_bytes" ]]; then
+                    cat -- "$chunk_path" >> "$local_path"
+                    break
+                  fi
+                fi
+                if (( attempt == 3 )); then
+                  echo "Failed to transfer chunk at byte $offset of installed $jar after three attempts." >&2
+                  exit 1
+                fi
+                echo "Retrying installed $jar transfer at byte $offset (attempt $((attempt + 1))/3)."
+              done
+            done
+            rm -f -- "$chunk_path"
             local_hash="$(sha256sum "$BASE_ARTIFACT_DIR/$jar" | awk '{print $1}')"
             [[ "$local_hash" == "$remote_hash" ]] || { echo "Transferred installed JAR checksum mismatch for $jar." >&2; exit 1; }
             unzip -tq "$BASE_ARTIFACT_DIR/$jar" >/dev/null
