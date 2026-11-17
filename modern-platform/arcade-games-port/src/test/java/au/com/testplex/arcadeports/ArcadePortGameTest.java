@@ -1988,16 +1988,12 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldRejectDragonEscapeBuilderEntityOverlap(true, true));
         assertTrue(ArcadePortRules.shouldRejectDragonEscapeBuilderEntityOverlap(false, true));
         assertFalse(ArcadePortRules.shouldRejectDragonEscapeBuilderEntityOverlap(false, false));
-        assertTrue(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false, false));
-        assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(9L, 10L, false, false));
-        assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, true, false));
-        assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false, true));
-        assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false,
-                ArcadePortRules.dragonEscapeBuilderPlacementTouchesWater(true, false)));
-        assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false,
-                ArcadePortRules.dragonEscapeBuilderPlacementTouchesWater(false, true)));
-        assertTrue(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false,
-                ArcadePortRules.dragonEscapeBuilderPlacementTouchesWater(false, false)));
+        assertTrue(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, false));
+        assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(9L, 10L, false));
+        assertFalse(ArcadePortRules.shouldAllowDragonEscapeBuilderPlacement(10L, 10L, true));
+        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(true, false));
+        assertTrue(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, true));
+        assertFalse(ArcadePortRules.isDragonEscapeBuilderTargetReplaceable(false, false));
         assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(64, -64, 320));
         assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(-64, -64, 320));
         assertTrue(ArcadePortRules.isDragonEscapeBuilderPlacementHeightAllowed(319, -64, 320));
