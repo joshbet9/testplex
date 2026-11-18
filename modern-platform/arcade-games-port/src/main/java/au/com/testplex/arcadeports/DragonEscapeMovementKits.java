@@ -89,14 +89,17 @@ final class DragonEscapeMovementKits {
         int wallClingTicksRemaining;
 
         /**
-         * Wall kicks are chainable with no time-based cooldown. A new press
-         * after releasing Space is required for each kick, and the caller
-         * checks actual wall contact for every attempted kick.
+         * A wall kick needs a new Space press while AIRBORNE and touching a
+         * wall. A standing player pressing Space beside a wall only performs
+         * their normal ground jump; they must release and press again once
+         * airborne to wall-kick. No time-based cooldown limits chaining.
+         * Update the input latch even on the ground so holding the original
+         * jump press cannot accidentally trigger the kick a tick later.
          */
-        boolean pressedForWallKick(boolean jumpHeld) {
+        boolean pressedForWallKick(boolean jumpHeld, boolean grounded) {
             boolean freshPress = jumpHeld && !previouslyHeld;
             previouslyHeld = jumpHeld;
-            return freshPress;
+            return freshPress && !grounded;
         }
 
         /**
