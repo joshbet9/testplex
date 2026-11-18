@@ -5811,15 +5811,19 @@ public final class ArcadePortManager implements Listener {
                 session.runnerNextFrostBallAt.put(playerId, now + GameDebugRuntimeOverrides.longValue(
                         "RUNNER_FROSTBALL_INTERVAL_MILLIS", ArcadePortRules.RUNNER_FROSTBALL_INTERVAL_MILLIS));
                 String selectedTrail = runnerTrailCosmeticOption(playerId);
-                String requestedTrail = selectedTrail.startsWith("trail-")
-                        ? selectedTrail.substring("trail-".length()) : selectedTrail;
-                String resolvedTrail = ArcadePortRules.resolveRunnerTrailColour(
-                        requestedTrail, session.runnerMapPaletteCounts);
-                session.runnerTrailOptions.put(playerId, "trail-" + resolvedTrail);
-                if (!requestedTrail.equalsIgnoreCase(resolvedTrail)) {
-                    player.sendMessage(ChatColor.GRAY + "Your " + requestedTrail.replace('-', ' ')
-                            + " Runner trail clashes with this map's palette; "
-                            + resolvedTrail.replace('-', ' ') + " is used for this round.");
+                if (selectedTrail != null) {
+                    String requestedTrail = selectedTrail.startsWith("trail-")
+                            ? selectedTrail.substring("trail-".length()) : selectedTrail;
+                    String resolvedTrail = ArcadePortRules.resolveRunnerTrailColour(
+                            requestedTrail, session.runnerMapPaletteCounts);
+                    session.runnerTrailOptions.put(playerId, "trail-" + resolvedTrail);
+                    if (!requestedTrail.equalsIgnoreCase(resolvedTrail)) {
+                        player.sendMessage(ChatColor.GRAY + "Your " + requestedTrail.replace('-', ' ')
+                                + " Runner trail clashes with this map's palette; "
+                                + resolvedTrail.replace('-', ' ') + " is used for this round.");
+                    }
+                } else {
+                    session.runnerTrailOptions.remove(playerId);
                 }
             }
             if (type == ArcadePortGame.DRAGONS) {
@@ -17118,13 +17122,13 @@ public final class ArcadePortManager implements Listener {
     }
 
     private String selectedDragonCosmetic(UUID playerId, String lineId, String defaultOption) {
-        String selected = selectedGameCosmeticOption(playerId, "dragons", lineId, defaultOption);
-        return selected == null || selected.isBlank() ? defaultOption : selected.toLowerCase(java.util.Locale.ROOT);
+        return CosmeticSelectionRules.normalizeOrDisabled(
+                selectedGameCosmeticOption(playerId, "dragons", lineId, defaultOption));
     }
 
     private void renderDragonSparklerBurst(Session session, Location location, String style) {
         if (!GameDebugRuntimeOverrides.globalCosmeticsEnabled()
-                || location == null || location.getWorld() == null) return;
+                || style == null || location == null || location.getWorld() == null) return;
         var world = location.getWorld();
         List<Player> receivers = session == null ? List.of() : new ArrayList<>(session.players.values());
         if (receivers.isEmpty()) return;
@@ -22060,8 +22064,10 @@ public final class ArcadePortManager implements Listener {
     }
 
     private String evolutionEggVariant(UUID playerId) {
-        String selected = selectedGameCosmeticOption(playerId, "evolution", "metamorphosis", "shell-fragments");
-        return switch (selected == null ? "charged" : selected.toLowerCase(java.util.Locale.ROOT)) {
+        String selected = CosmeticSelectionRules.normalizeOrDisabled(
+                selectedGameCosmeticOption(playerId, "evolution", "metamorphosis", "shell-fragments"));
+        if (selected == null) return null;
+        return switch (selected) {
             case "void", "void-unfold" -> "void";
             case "nature", "nature-bloom" -> "nature";
             case "charged", "shell-fragments" -> "charged";
@@ -22073,6 +22079,8 @@ public final class ArcadePortManager implements Listener {
         UUID id = player.getUniqueId();
         cleanupEvolutionEggEffect(session, id);
         if (!GameDebugRuntimeOverrides.globalCosmeticsEnabled()) return;
+        String variant = evolutionEggVariant(id);
+        if (variant == null) return;
         BlockDisplay display = session.world.spawn(
                 player.getLocation().clone().add(0.0D, 1.15D, 0.0D), BlockDisplay.class);
         display.setBlock(Material.DRAGON_EGG.createBlockData());
@@ -22080,7 +22088,7 @@ public final class ArcadePortManager implements Listener {
         display.setPersistent(false);
         session.entities.add(display);
         session.evolutionEggDisplays.put(id, display);
-        session.evolutionEggVariants.put(id, evolutionEggVariant(id));
+        session.evolutionEggVariants.put(id, variant);
         session.evolutionEggNextParticleAt.put(id, 0L);
     }
 
@@ -22092,10 +22100,15 @@ public final class ArcadePortManager implements Listener {
         }
         if (now < session.evolutionEggNextParticleAt.getOrDefault(id, 0L)) return;
         session.evolutionEggNextParticleAt.put(id, now + 250L);
+        String variant = evolutionEggVariant(id);
+        if (variant == null) {
+            cleanupEvolutionEggEffect(session, id);
+            return;
+        }
+        session.evolutionEggVariants.put(id, variant);
         Location centre = player.getLocation().clone().add(0.0D, 1.15D, 0.0D);
         BlockDisplay display = session.evolutionEggDisplays.get(id);
         if (display != null && display.isValid()) display.teleport(centre);
-        String variant = session.evolutionEggVariants.getOrDefault(id, "charged");
         // World.spawnParticle broadcasts to everyone in this isolated game world.
         switch (variant) {
             case "void" -> {
@@ -27852,6 +27865,7 @@ public final class ArcadePortManager implements Listener {
     /** Read the shared catalogue selection without creating a hard plugin dependency. */
     private String runnerTrailCosmeticOption(UUID playerId) {
         String fallback = "trail-red";
+        if (!GameDebugRuntimeOverrides.globalCosmeticsEnabled()) return null;
         org.bukkit.plugin.Plugin cosmeticsPlugin = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
         if (cosmeticsPlugin == null || !cosmeticsPlugin.isEnabled()) return fallback;
         try {
@@ -27859,12 +27873,13 @@ public final class ArcadePortManager implements Listener {
                     .getMethod("getSelectedCosmeticOption", UUID.class, String.class, String.class)
                     .invoke(cosmeticsPlugin, playerId, "runner", "trail-colour");
             if (selected instanceof String value) {
+                if (value.isBlank()) return null;
                 String colour = value.toLowerCase(java.util.Locale.ROOT).replace('_', '-');
                 if ("red".equals(colour)) return "trail-red";
                 return ArcadePortRules.runnerTrailColours().contains(colour)
                         ? "trail-" + colour : fallback;
             }
-            return fallback;
+            return null;
         } catch (ReflectiveOperationException | LinkageError exception) {
             plugin.getLogger().fine("Runner trail preference bridge unavailable: " + exception.getMessage());
             return fallback;
@@ -27923,8 +27938,9 @@ public final class ArcadePortManager implements Listener {
     }
 
     private Material runnerTrailMaterial(Session session, Player owner) {
-        if (!GameDebugRuntimeOverrides.globalCosmeticsEnabled()) return Material.AIR;
-        String selected = session.runnerTrailOptions.getOrDefault(owner.getUniqueId(), "trail-cyan");
+        if (!GameDebugRuntimeOverrides.globalCosmeticsEnabled() || owner == null) return Material.AIR;
+        String selected = session.runnerTrailOptions.get(owner.getUniqueId());
+        if (selected == null) return Material.AIR;
         String colour = selected.startsWith("trail-") ? selected.substring("trail-".length()) : selected;
         Material material = Material.matchMaterial(
                 colour.toUpperCase(java.util.Locale.ROOT).replace('-', '_') + "_TERRACOTTA");
