@@ -1,6 +1,7 @@
 package au.com.testplex.arcadeports;
 
 import org.junit.jupiter.api.Test;
+import org.bukkit.Material;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -24,6 +25,22 @@ class ArcadeGameDirectoryTest {
         assertTrue(ArcadeGameDirectory.find("monster-maze") != null);
         assertTrue(ArcadeGameDirectory.find("monster-maze-speed") == null);
         assertTrue(ArcadeGameDirectory.find("monster-maze-modern") == null);
+    }
+
+    @Test
+    void mapEditorHasTheSameRealIconsAsThePlayerFacingGameDirectory() {
+        // The Map Editor uses the directory entries, not ArcadePortGame.floor()
+        // (that value is a build-material choice rather than a game icon).
+        for (ArcadeGameDirectory.Game game : ArcadeGameDirectory.games()) {
+            assertTrue(ArcadePortGame.fromId(game.id()) != null, game.id());
+            assertTrue(game.icon() != Material.AIR, game.id());
+            assertTrue(game.icon() != Material.BARRIER, game.id());
+        }
+        assertEquals(Material.DRAGON_EGG, ArcadeGameDirectory.find("dragon-escape").icon());
+        assertEquals(Material.IRON_SWORD, ArcadeGameDirectory.find("gladiators").icon());
+        assertEquals(Material.ENDER_PEARL, ArcadeGameDirectory.find("paintball").icon());
+        assertEquals(Material.SPYGLASS, ArcadeGameDirectory.find("camera-shy").icon());
+        assertEquals(Material.WITHER_SKELETON_SKULL, ArcadeGameDirectory.find("wither-assault").icon());
     }
 
     @Test

@@ -99,13 +99,19 @@ final class MapEditorUi implements Listener {
         }
         Inventory inv = menu("Choose Game");
         Map<Integer, Consumer<Player>> actions = new HashMap<>();
-        List<ArcadePortGame> games = new ArrayList<>(List.of(ArcadePortGame.values()));
-        games.sort(Comparator.comparing(ArcadePortGame::displayName));
+        // Reuse the same 30-game directory (and icons) as Stats, Game Preferences,
+        // and the main Set Game panel. The lobby floor is not a game's menu icon.
+        List<ArcadeGameDirectory.Game> games = new ArrayList<>(ArcadeGameDirectory.games());
+        games.sort(Comparator.comparing(ArcadeGameDirectory.Game::name));
         int slot = 0;
-        for (ArcadePortGame game : games) {
+        for (ArcadeGameDirectory.Game entry : games) {
+            ArcadePortGame game = ArcadePortGame.fromId(entry.id());
+            if (game == null) continue;
             List<SourceMapCatalog.MapArchive> maps = SourceMapCatalog.mapsFor(plugin, game);
-            inv.setItem(slot, item(maps.isEmpty() ? Material.BARRIER : game.floor(), game.displayName(), null,
-                    maps.size() + " available map(s)", maps.isEmpty() ? "No source maps available" : "Click to choose a map"));
+            // Keep the correct icon even for generated games with no source archive.
+            inv.setItem(slot, item(entry.icon(), entry.name(), null,
+                    maps.size() + " available map(s)",
+                    maps.isEmpty() ? "No source maps available" : "Click to choose a map"));
             if (!maps.isEmpty()) actions.put(slot, p -> chooseMap(p, game, 0));
             slot++;
         }
