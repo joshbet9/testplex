@@ -29,9 +29,25 @@ done
 # Check the Paper server's own persistent startup log, rather than Fly's
 # best-effort recent log stream. This is the actual final Arcade bootstrap marker.
 startup_log="$server_root/logs/latest.log"
-if [ ! -f "$startup_log" ] || ! grep -Fq 'TESTPLEX_ARCADE_BOOTSTRAP phase=full-runtime-readiness-published' "$startup_log"; then
-    echo "Fly Arcade bootstrap completion marker is missing from $startup_log" >&2
+max_checks="${TESTPLEX_VERIFY_BOOTSTRAP_ATTEMPTS:-75}"
+case "$max_checks" in
+    ''|*[!0-9]*) echo "Invalid Arcade bootstrap readiness attempt limit." >&2; exit 1 ;;
+esac
+if [ "$max_checks" -lt 1 ]; then
+    echo "Arcade bootstrap readiness attempt limit must be positive." >&2
     exit 1
 fi
+attempt=1
+while :; do
+    if [ -f "$startup_log" ] && grep -Fq 'TESTPLEX_ARCADE_BOOTSTRAP phase=full-runtime-readiness-published' "$startup_log"; then
+        break
+    fi
+    if [ "$attempt" -ge "$max_checks" ]; then
+        echo "Fly Arcade bootstrap completion marker did not appear in $startup_log after $attempt check(s)." >&2
+        exit 1
+    fi
+    sleep 2
+    attempt=$((attempt + 1))
+done
 
 printf 'TESTPLEX_FLY_RUNTIME_VERIFIED:%s\n' "$expected_sha"

@@ -361,7 +361,7 @@ jobs:
             exit 1
           fi
           : > "$fixture_root/server/logs/latest.log"
-          if TESTPLEX_VERIFY_ROOT="$fixture_root" sh deploy/fly/verify-runtime.sh '0123456789abcdef0123456789abcdef01234567'; then
+          if TESTPLEX_VERIFY_ROOT="$fixture_root" TESTPLEX_VERIFY_BOOTSTRAP_ATTEMPTS=1 sh deploy/fly/verify-runtime.sh '0123456789abcdef0123456789abcdef01234567'; then
             echo 'Fly runtime verifier accepted a missing Arcade bootstrap marker.' >&2
             exit 1
           fi
