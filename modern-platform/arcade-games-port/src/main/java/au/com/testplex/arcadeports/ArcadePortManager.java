@@ -17925,7 +17925,10 @@ public final class ArcadePortManager implements Listener {
 
             DragonEscapeMovementKits.AcrobatState acrobat = session.dragonEscapeAcrobatStates
                     .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.AcrobatState());
-            boolean pressed = acrobat.pressedForWallKick(jumpHeld);
+            // A wall kick only works after a normal jump, while airborne and
+            // in physical contact with the wall. Merely standing beside the wall
+            // and pressing Space must remain an ordinary ground jump.
+            boolean pressed = acrobat.pressedForWallKick(jumpHeld, grounded);
             if (player.isInWater()
                     || !debugKitFeatureEnabled(player, ArcadePortGame.DRAGON_ESCAPE, kit)) {
                 acrobat.tickWallCling(false, true, false);
