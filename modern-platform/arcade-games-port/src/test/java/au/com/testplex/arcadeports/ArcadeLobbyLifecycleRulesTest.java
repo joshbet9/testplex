@@ -37,19 +37,20 @@ class ArcadeLobbyLifecycleRulesTest {
         assertEquals("Starting in 10 Seconds", ArcadeLobbyLifecycleRules.countdownStatus(10));
     }
 
-    @Test void lobbyReturnRefreshesWhenSelectionOrItsNpcPadsAreMissing() {
+    @Test void lobbyReturnUsesPersistedSelectionAndFallsBackWhenItIsInvalid() {
         assertEquals(ArcadePortGame.DRAGON_ESCAPE,
                 ArcadeLobbyLifecycleRules.selectedGameAfterReturn("dragon-escape", ArcadePortGame.BACON_BRAWL));
+        assertEquals(ArcadePortGame.DRAGON_ESCAPE,
+                ArcadeLobbyLifecycleRules.selectedGameAfterReturn("dragon-escape", ArcadePortGame.DRAGON_ESCAPE));
         assertEquals(ArcadePortGame.BACON_BRAWL,
                 ArcadeLobbyLifecycleRules.selectedGameAfterReturn("unknown-game", ArcadePortGame.BACON_BRAWL));
         assertEquals(ArcadePortGame.SHEEP_QUEST,
                 ArcadeLobbyLifecycleRules.selectedGameAfterReturn(null, ArcadePortGame.SHEEP_QUEST));
-        assertEquals(true, ArcadeLobbyLifecycleRules.lobbySelectionNeedsRefresh(
-                "dragon-escape", ArcadePortGame.BACON_BRAWL, 4, 4, 1, 1));
-        assertEquals(true, ArcadeLobbyLifecycleRules.lobbySelectionNeedsRefresh(
-                "dragon-escape", ArcadePortGame.DRAGON_ESCAPE, 3, 4, 1, 1));
-        assertEquals(false, ArcadeLobbyLifecycleRules.lobbySelectionNeedsRefresh(
-                "dragon-escape", ArcadePortGame.DRAGON_ESCAPE, 4, 4, 1, 1));
+    }
+
+    @Test void sameTickLobbyReturnsScheduleOnlyOneFullSelectionRefresh() {
+        assertEquals(true, ArcadeLobbyLifecycleRules.shouldScheduleLobbyReturnRefresh(false));
+        assertEquals(false, ArcadeLobbyLifecycleRules.shouldScheduleLobbyReturnRefresh(true));
     }
 
 }
