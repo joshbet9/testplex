@@ -23,7 +23,7 @@ class DragonEscapeMovementKitsTest {
     @Test
     void featherHeldRightClickOnlySpendsOnceUntilAnInputPause() {
         var flutter = new DragonEscapeMovementKits.FlutterState();
-        assertEquals(500L, DragonEscapeMovementKits.FLUTTER_RIGHT_CLICK_REARM_GAP_MILLIS);
+        assertEquals(200L, DragonEscapeMovementKits.FLUTTER_RIGHT_CLICK_REARM_GAP_MILLIS);
         assertTrue(flutter.acceptRightClick(1_000L));
         assertTrue(flutter.useBounce(false, 1_000L));
         // A client holding the feather keeps emitting right-click packets.
@@ -31,18 +31,32 @@ class DragonEscapeMovementKitsTest {
             assertFalse(flutter.acceptRightClick(time));
         }
         assertEquals(4, flutter.charges, "Holding must not use multiple stored charges");
-        assertTrue(flutter.acceptRightClick(2_601L), "A fresh press after release can bounce");
-        assertTrue(flutter.useBounce(false, 2_601L));
+        assertTrue(flutter.acceptRightClick(2_301L), "A fresh press after 200 ms quiet can bounce");
+        assertTrue(flutter.useBounce(false, 2_301L));
         assertEquals(3, flutter.charges);
-        assertFalse(flutter.acceptRightClick(2_602L), "Same-tick duplicate is ignored");
+        assertFalse(flutter.acceptRightClick(2_302L), "Same-tick duplicate is ignored");
 
         // Ground clicks must latch too: keeping the button held during takeoff
-        // should never automatically consume a mid-air charge.
+        // should never automatically consume a mid-air charge when repeats are frequent.
         var grounded = new DragonEscapeMovementKits.FlutterState();
         assertTrue(grounded.acceptRightClick(3_000L));
         assertFalse(grounded.useBounce(true, 3_000L));
         assertFalse(grounded.acceptRightClick(3_200L));
         assertEquals(5, grounded.charges);
+    }
+
+    @Test
+    void featherCanChainAtJustOverTwoHundredMillisecondsInsteadOfFiveHundred() {
+        var flutter = new DragonEscapeMovementKits.FlutterState();
+        assertTrue(flutter.acceptRightClick(1_000L));
+        assertTrue(flutter.useBounce(false, 1_000L));
+        assertFalse(flutter.acceptRightClick(1_199L), "199 ms is a held/repeated input");
+        assertTrue(flutter.acceptRightClick(1_400L), "201 ms quiet should allow another press");
+        assertTrue(flutter.useBounce(false, 1_400L));
+        assertFalse(flutter.acceptRightClick(1_599L));
+        assertTrue(flutter.acceptRightClick(1_800L));
+        assertTrue(flutter.useBounce(false, 1_800L));
+        assertEquals(2, flutter.charges);
     }
 
     @Test
