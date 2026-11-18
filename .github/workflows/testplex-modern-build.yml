@@ -612,33 +612,62 @@ jobs:
           flyctl volumes list --app "$FLY_APP" --json > "$RUNNER_TEMP/fly-volumes-final.json"
           final_volume_id="$(jq -er '[.[] | select(.name == "testplex_data_restore")] | if length == 1 then .[0].id else error("Testplex data volume missing after runtime verification") end' "$RUNNER_TEMP/fly-volumes-final.json")"
           [[ "$final_volume_id" == "$EXPECTED_VOLUME_ID" ]]
-          restore_fly_autostop
+          if ! restore_fly_autostop; then
+            echo "Fly autostop restoration failed before final release verification." >&2
+            exit 1
+          fi
+          echo "FLY_AUTOSTOP_RESTORED:$restore_autostop"
 
           # Restoring an idle-stop policy may stop the already-verified Machine
-          # immediately. Runtime readiness and the startup marker were checked
-          # immediately before restoration; final verification now checks that
-          # the same image, volume attachment, and original autostop policy remain.
-          flyctl machine list --app "$FLY_APP" --json > "$RUNNER_TEMP/fly-machines-final.json"
-          flyctl volumes list --app "$FLY_APP" --json > "$RUNNER_TEMP/fly-volumes-final.json"
-          final_volume_id="$(jq -er '[.[] | select(.name == "testplex_data_restore")] | if length == 1 then .[0].id else error("Testplex data volume missing after runtime verification") end' "$RUNNER_TEMP/fly-volumes-final.json")"
-          [[ "$final_volume_id" == "$EXPECTED_VOLUME_ID" ]]
-          if ! jq -e --arg id "$machine_id" --arg sha "$GITHUB_SHA" --arg policy "$restore_autostop" --arg volume "$final_volume_id" '
-            [.[] | select(.id == $id)] as $m |
-            ($m | length) == 1 and
-            ($m[0].state == "started" or
-              ($policy == "stop" and ($m[0].state == "stopped" or $m[0].state == "stopping")) or
-              ($policy == "suspend" and ($m[0].state == "suspended" or $m[0].state == "suspending"))) and
-            $m[0].image_ref.labels["org.opencontainers.image.revision"] == $sha and
-            any($m[0].config.mounts[]?; .volume == $volume or .volume_id == $volume) and
-            ([$m[0].config.services[] | .autostop | tostring] | all(. == $policy or ($policy == "stop" and . == "true"))) and
-            ($m[0].state != "started" or ($m[0].host_status == "ok" and any($m[0].checks[]?; .status == "passing")))
-          ' "$RUNNER_TEMP/fly-machines-final.json" >/dev/null; then
-            echo "Fly final state failed verification after runtime readiness and autostop restoration." >&2
-            jq --arg id "$machine_id" '[.[] | select(.id == $id)] | map({id,state,host_status,image_ref,config:{mounts:.config.mounts,services:.config.services}})' "$RUNNER_TEMP/fly-machines-final.json" >&2
+          # immediately. Poll the control plane through that transition and retain
+          # diagnostics for transient API failures instead of exiting silently.
+          final_snapshot_ready=false
+          final_snapshot_error="$RUNNER_TEMP/fly-final-snapshot.error"
+          for attempt in $(seq 1 12); do
+            if flyctl machine list --app "$FLY_APP" --json > "$RUNNER_TEMP/fly-machines-final.json" 2> "$final_snapshot_error"; then
+              if jq -e --arg id "$machine_id" --arg sha "$GITHUB_SHA" --arg policy "$restore_autostop" --arg volume "$EXPECTED_VOLUME_ID" '
+                [.[] | select(.id == $id)] as $m |
+                ($m | length) == 1 and
+                ($m[0].state == "started" or
+                  ($policy == "stop" and ($m[0].state == "stopped" or $m[0].state == "stopping")) or
+                  ($policy == "suspend" and ($m[0].state == "suspended" or $m[0].state == "suspending"))) and
+                $m[0].image_ref.labels["org.opencontainers.image.revision"] == $sha and
+                any($m[0].config.mounts[]?; .volume == $volume or .volume_id == $volume) and
+                ([$m[0].config.services[]?.autostop | tostring] | length > 0 and all(. == $policy or ($policy == "stop" and . == "true"))) and
+                ($m[0].state != "started" or ($m[0].host_status == "ok" and any($m[0].checks[]?; .status == "passing")))
+              ' "$RUNNER_TEMP/fly-machines-final.json" >/dev/null 2>&1; then
+                final_snapshot_ready=true
+                break
+              fi
+            fi
+            if [[ "$attempt" -lt 12 ]]; then
+              echo "Waiting for Fly's final Machine snapshot after restoring autostop ($attempt/12)."
+              sleep 5
+            fi
+          done
+
+          if [[ "$final_snapshot_ready" != true ]]; then
+            echo "Fly final state did not verify after runtime readiness and autostop restoration." >&2
+            echo "Last Fly control-plane error:" >&2
+            cat "$final_snapshot_error" >&2 || true
+            echo "Last Machine snapshot:" >&2
+            cat "$RUNNER_TEMP/fly-machines-final.json" >&2 || true
             flyctl machine status "$machine_id" --app "$FLY_APP" >&2 || true
             exit 1
           fi
-          echo "Fly release $GITHUB_SHA passed runtime readiness before autostop restoration; machine is $(jq -er --arg id "$machine_id" '[.[] | select(.id == $id)][0].state' "$RUNNER_TEMP/fly-machines-final.json") with preserved volume $final_volume_id and restored autostop policy $restore_autostop."
+
+          if ! flyctl volumes list --app "$FLY_APP" --json > "$RUNNER_TEMP/fly-volumes-final.json"; then
+            echo "Could not query Fly volumes after runtime verification." >&2
+            exit 1
+          fi
+          final_volume_id="$(jq -er '[.[] | select(.name == "testplex_data_restore")] | if length == 1 then .[0].id else error("Testplex data volume missing after runtime verification") end' "$RUNNER_TEMP/fly-volumes-final.json")"
+          if [[ "$final_volume_id" != "$EXPECTED_VOLUME_ID" ]]; then
+            echo "Fly persistent volume changed from $EXPECTED_VOLUME_ID to $final_volume_id after runtime verification." >&2
+            exit 1
+          fi
+          final_state="$(jq -er --arg id "$machine_id" '[.[] | select(.id == $id)][0].state' "$RUNNER_TEMP/fly-machines-final.json")"
+          echo "FLY_FINAL_STATE_VERIFIED:$GITHUB_SHA:$final_state:$final_volume_id:$restore_autostop"
+          echo "Fly release $GITHUB_SHA passed runtime readiness; machine is $final_state with preserved volume $final_volume_id and restored autostop policy $restore_autostop."
 
 
 
