@@ -39,6 +39,23 @@ class DragonEscapeMapDraftRulesTest {
     }
 
     @Test
+    void supportsEveryGameCatalogWithoutCrossGameAccess() {
+        String paintball = SourceMapCatalog.resourceFor(ArcadePortGame.PAINTBALL);
+        String dragonEscape = SourceMapCatalog.resourceFor(ArcadePortGame.DRAGON_ESCAPE);
+        assertEquals("paintball", DragonEscapeMapDraftRules.mapSlug(paintball, ArcadePortGame.PAINTBALL));
+        assertNull(DragonEscapeMapDraftRules.mapSlug(paintball, ArcadePortGame.DRAGON_ESCAPE));
+        assertNull(DragonEscapeMapDraftRules.worldName(paintball, "repair", ArcadePortGame.DRAGON_ESCAPE));
+        String world = DragonEscapeMapDraftRules.worldName(paintball, "repair", ArcadePortGame.PAINTBALL);
+        assertTrue(SourceMapCatalog.isReservedSourceWorldName(world));
+        assertNotEquals(world, DragonEscapeMapDraftRules.worldName(dragonEscape, "repair",
+                ArcadePortGame.DRAGON_ESCAPE));
+        assertEquals("speed-builders", DragonEscapeMapDraftRules.mapSlug(
+                "source-maps/Speed Builders/Speed_Builders.zip", ArcadePortGame.SPEED_BUILDERS));
+        assertNull(DragonEscapeMapDraftRules.mapSlug(
+                "source-maps/Speed Builders/Speed_Builders.zip", ArcadePortGame.SNAKE));
+    }
+
+    @Test
     void addsAndRemovesOnlyTheRequestedAuthoredMarker() {
         List<String> initial = List.of("MAP_NAME: Test Course", "DATA_NAME: BLACK", "DATA_LOCS: 1,2,3");
         List<String> added = DragonEscapeMapDraftRules.addPoint(initial, "DATA", "BLACK", 4.5, 70, -3);
