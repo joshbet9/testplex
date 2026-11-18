@@ -1207,6 +1207,24 @@ public final class SourceMapCatalog {
     }
 
     /**
+     * Editor reads must use the opened archive, never the currently selected game-panel map.
+     * This also avoids auto-inferring positions while a tester is deliberately repairing raw markers.
+     */
+    static MapData readEditorDraft(JavaPlugin plugin, ArcadePortGame game, String resource, World world) {
+        if (plugin == null || world == null || !resourcePathBelongsToGame(game, resource)) return null;
+        Path config = resolveWorldConfigPath(world.getWorldFolder().toPath(),
+                Bukkit.getWorldContainer().toPath(), world.getName());
+        if (config != null && Files.isRegularFile(config, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+            try {
+                return parseMapConfig(world, Files.readAllLines(config, StandardCharsets.UTF_8));
+            } catch (IOException exception) {
+                plugin.getLogger().warning("Could not read draft metadata: " + exception.getMessage());
+            }
+        }
+        return readResource(plugin, resource, world);
+    }
+
+    /**
      * Reads the map-specific Reborn metadata. Paper 26.1+ imports an API-created
      * CraftBukkit world into the main world's dimensions folder and deletes the
      * old standalone world directory. Paper migrates region/entities/poi, but it
