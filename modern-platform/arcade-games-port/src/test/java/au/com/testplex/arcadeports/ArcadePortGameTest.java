@@ -1287,8 +1287,11 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldFinishBaconBrawl(0));
         assertFalse(ArcadePortRules.shouldFinishBaconBrawl(2));
         assertFalse(ArcadePortRules.shouldFinishBaconBrawl(16));
-        assertTrue(ArcadePortRules.shouldIsolateBaconBrawlLegacyFoodReset(ArcadePortGame.BACON_BRAWL));
-        assertFalse(ArcadePortRules.shouldIsolateBaconBrawlLegacyFoodReset(ArcadePortGame.DRAGONS));
+        for (ArcadePortGame game : ArcadePortGame.values()) {
+            assertTrue(ArcadePortRules.shouldIsolateModernArcadeFromLegacyFoodReset(game),
+                    "the shared legacy reset must skip every active modern Arcade game: " + game);
+        }
+        assertFalse(ArcadePortRules.shouldIsolateModernArcadeFromLegacyFoodReset(null));
         assertEquals(18, ArcadePortRules.baconFoodLevelAfterExternalUpdate(18, 20),
                 "an external refill must not undo Bacon Brawl's hunger drain");
         assertEquals(17, ArcadePortRules.baconFoodLevelAfterExternalUpdate(18, 17),

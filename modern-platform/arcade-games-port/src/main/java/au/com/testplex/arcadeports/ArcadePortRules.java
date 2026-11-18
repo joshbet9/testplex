@@ -3679,9 +3679,14 @@ public final class ArcadePortRules {
         return alivePlayers <= 1;
     }
 
-    /** Only the modern Bacon Brawl session overrides the legacy Arcade food/health reset. */
+    /** Every modern Arcade session owns its participants' health and food state. */
+    public static boolean shouldIsolateModernArcadeFromLegacyFoodReset(ArcadePortGame game) {
+        return game != null;
+    }
+
+    /** Backwards-compatible name retained for existing tests and module callers. */
     public static boolean shouldIsolateBaconBrawlLegacyFoodReset(ArcadePortGame game) {
-        return game == ArcadePortGame.BACON_BRAWL;
+        return shouldIsolateModernArcadeFromLegacyFoodReset(game);
     }
 
     /** Keep Bacon Brawl's intentionally decreasing hunger from external food resets. */
