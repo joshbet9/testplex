@@ -26,7 +26,8 @@ final class DragonEscapeMapDraftRules {
         if (name.regionMatches(true, 0, "DragonEscape_", 0, "DragonEscape_".length())) {
             name = name.substring("DragonEscape_".length());
         }
-        return draftSlug(name.replace(' ', '-').replace('.', '-'));
+        return draftSlug(name.replace("'", "").replace("’", "")
+                .replace(' ', '-').replace('.', '-'));
     }
 
     static String worldName(String mapResource, String draftName) {
