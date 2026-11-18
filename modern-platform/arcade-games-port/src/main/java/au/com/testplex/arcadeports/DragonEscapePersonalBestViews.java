@@ -43,6 +43,8 @@ final class DragonEscapePersonalBestViews {
             case "warper" -> Material.ENDER_PEARL;
             case "builder" -> Material.BRICK;
             case "digger" -> Material.DIAMOND_PICKAXE;
+            case "flutterfly" -> Material.FEATHER;
+            case "acrobat" -> Material.RABBIT_FOOT;
             default -> Material.CLOCK;
         };
     }
