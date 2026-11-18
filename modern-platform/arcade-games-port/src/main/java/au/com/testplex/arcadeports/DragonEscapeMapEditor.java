@@ -524,21 +524,24 @@ final class DragonEscapeMapEditor implements Listener {
     }
 
     private void publish(CommandSender sender, String[] args) {
-        if (args.length != 4 || !"confirm".equalsIgnoreCase(args[3])) {
-            sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport mapedit publish <map-id> <draft> confirm");
+        if ((args.length != 4 && args.length != 5)
+                || !"confirm".equalsIgnoreCase(args[args.length - 1])) {
+            sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport mapedit publish <game-id> <map-id> <draft> confirm");
             return;
         }
         if (!arcadePlugin.getArcadePortManager().canStartExternalGame()) {
             sender.sendMessage(ChatColor.RED + "Publishing is locked while an Arcade match is active.");
             return;
         }
-        SourceMapCatalog.MapArchive map = findMap(args[1]);
-        String draft = DragonEscapeMapDraftRules.draftSlug(args[2]);
+        ArcadePortGame game = args.length == 5 ? ArcadePortGame.fromId(args[1]) : ArcadePortGame.DRAGON_ESCAPE;
+        int offset = args.length == 5 ? 1 : 0;
+        SourceMapCatalog.MapArchive map = findMap(game, args[1 + offset]);
+        String draft = DragonEscapeMapDraftRules.draftSlug(args[2 + offset]);
         if (map == null || draft == null) {
             sender.sendMessage(ChatColor.RED + "Unknown map or invalid draft name. Use /arcadeport mapedit list.");
             return;
         }
-        DraftSession session = sessionForDraft(map.resource(), draft);
+        DraftSession session = sessionForDraft(game, map.resource(), draft);
         if (session == null) {
             sender.sendMessage(ChatColor.RED + "Open the named draft in the editor and save it before publishing.");
             return;
@@ -555,7 +558,8 @@ final class DragonEscapeMapEditor implements Listener {
             String previousKey = currentKey.replace(".current.", ".previous.");
             String current = plugin.getConfig().getString(currentKey);
             String version = Long.toString(System.currentTimeMillis());
-            String publishedRelative = PUBLISHED_DIRECTORY + "/" + mapId(map.resource()) + "/" + draft + "-" + version + ".zip";
+            String publishedRelative = PUBLISHED_DIRECTORY + "/" + game.id() + "/" + mapId(map.resource(), game)
+                    + "/" + draft + "-" + version + ".zip";
             Path published = safePluginPath(publishedRelative);
             if (published == null) throw new IOException("Unsafe published archive path.");
             Files.createDirectories(published.getParent());
@@ -573,24 +577,26 @@ final class DragonEscapeMapEditor implements Listener {
                 throw new IOException("Could not persist the new map version pointer.", saveFailure);
             }
             sender.sendMessage(ChatColor.GREEN + "Published " + session.mapName + " as a new reversible map version.");
-            sender.sendMessage(ChatColor.GRAY + "It will be used by the next Dragon Escape match. Use mapedit rollback "
-                    + mapId(map.resource()) + " confirm to switch back.");
+            sender.sendMessage(ChatColor.GRAY + "The next " + game.displayName() + " match will use this version. Rollback: /arcadeport mapedit rollback "
+                    + game.id() + " " + mapId(map.resource(), game) + " confirm");
         } catch (IOException exception) {
-            plugin.getLogger().warning("Could not publish Dragon Escape map draft " + draft + ": " + exception.getMessage());
+            plugin.getLogger().warning("Could not publish map draft " + draft + ": " + exception.getMessage());
             sender.sendMessage(ChatColor.RED + "Publish failed before switching the active map version; the previous version is unchanged.");
         }
     }
 
     private void rollback(CommandSender sender, String[] args) {
-        if (args.length != 3 || !"confirm".equalsIgnoreCase(args[2])) {
-            sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport mapedit rollback <map-id> confirm");
+        if ((args.length != 3 && args.length != 4)
+                || !"confirm".equalsIgnoreCase(args[args.length - 1])) {
+            sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport mapedit rollback <game-id> <map-id> confirm");
             return;
         }
         if (!arcadePlugin.getArcadePortManager().canStartExternalGame()) {
             sender.sendMessage(ChatColor.RED + "Rollback is locked while an Arcade match is active.");
             return;
         }
-        SourceMapCatalog.MapArchive map = findMap(args[1]);
+        ArcadePortGame game = args.length == 4 ? ArcadePortGame.fromId(args[1]) : ArcadePortGame.DRAGON_ESCAPE;
+        SourceMapCatalog.MapArchive map = findMap(game, args[args.length == 4 ? 2 : 1]);
         if (map == null) {
             sender.sendMessage(ChatColor.RED + "Unknown map ID. Use /arcadeport mapedit list.");
             return;
@@ -614,15 +620,15 @@ final class DragonEscapeMapEditor implements Listener {
             return;
         }
         sender.sendMessage(ChatColor.GREEN + "Rolled " + map.displayName() + " back to its previous immutable version.");
-        sender.sendMessage(ChatColor.GRAY + "The next Dragon Escape match will load the restored version; no source ZIP was modified.");
+        sender.sendMessage(ChatColor.GRAY + "The next " + game.displayName() + " match will load this version; no source ZIP was modified.");
     }
 
     private Path exportDraft(DraftSession session) throws IOException {
         ensureLocalWorldConfig(session.world);
         session.world.save();
         String version = Long.toString(System.currentTimeMillis());
-        Path export = safePluginPath(EXPORTS_DIRECTORY + "/" + mapId(session.resource) + "/"
-                + session.draftName + "-" + version + ".zip");
+        Path export = safePluginPath(EXPORTS_DIRECTORY + "/" + session.game.id() + "/"
+                + mapId(session.resource, session.game) + "/" + session.draftName + "-" + version + ".zip");
         if (export == null) throw new IOException("Unsafe export path.");
         Files.createDirectories(export.getParent());
         Path staging = export.resolveSibling(export.getFileName() + ".building-" + UUID.randomUUID());
@@ -655,13 +661,14 @@ final class DragonEscapeMapEditor implements Listener {
         return export;
     }
 
-    private DraftSession sessionForDraft(String resource, String draft) {
-        String expectedWorld = DragonEscapeMapDraftRules.worldName(resource, draft);
+    private DraftSession sessionForDraft(ArcadePortGame game, String resource, String draft) {
+        String expectedWorld = DragonEscapeMapDraftRules.worldName(resource, draft, game);
         World world = expectedWorld == null ? null : Bukkit.getWorld(expectedWorld);
         if (world == null) return null;
         for (Map.Entry<UUID, DraftSession> entry : sessions.entrySet()) {
             DraftSession session = entry.getValue();
-            if (session.world == world && session.resource.equals(resource) && session.draftName.equals(draft)) return session;
+            if (session.world == world && session.game == game && session.resource.equals(resource)
+                    && session.draftName.equals(draft)) return session;
         }
         return null;
     }
@@ -678,7 +685,7 @@ final class DragonEscapeMapEditor implements Listener {
             }
             return local;
         } catch (IOException exception) {
-            plugin.getLogger().warning("Could not prepare local Dragon Escape draft metadata: " + exception.getMessage());
+            plugin.getLogger().warning("Could not prepare local map draft metadata: " + exception.getMessage());
             return local;
         }
     }
@@ -690,24 +697,58 @@ final class DragonEscapeMapEditor implements Listener {
         }
         DraftSession session = sessions.get(player.getUniqueId());
         if (session == null || session.world != player.getWorld()) {
-            player.sendMessage(ChatColor.YELLOW + "Open a Dragon Escape draft first: /arcadeport mapedit open <map-id> <draft>");
+            player.sendMessage(ChatColor.YELLOW + "Open a map from the Map Editor in the lobby first.");
             return null;
         }
         return session;
     }
 
-    private SourceMapCatalog.MapArchive findMap(String id) {
-        if (id == null) return null;
-        return SourceMapCatalog.mapsFor(plugin, ArcadePortGame.DRAGON_ESCAPE).stream()
-                .filter(map -> mapId(map.resource()).equalsIgnoreCase(id)
+    private ArcadePortGame selectedGame() {
+        return ArcadePortGame.fromId(plugin.getConfig().getString("lobby-selected-game", ""));
+    }
+
+    boolean isEditing(Player player) {
+        if (player == null) return false;
+        DraftSession session = sessions.get(player.getUniqueId());
+        return session != null && session.world == player.getWorld();
+    }
+
+    ArcadePortGame activeGame(Player player) {
+        DraftSession session = player == null ? null : sessions.get(player.getUniqueId());
+        return session != null && session.world == player.getWorld() ? session.game : null;
+    }
+
+    String activeResource(Player player) {
+        DraftSession session = player == null ? null : sessions.get(player.getUniqueId());
+        return session != null && session.world == player.getWorld() ? session.resource : null;
+    }
+
+    String activeDraft(Player player) {
+        DraftSession session = player == null ? null : sessions.get(player.getUniqueId());
+        return session != null && session.world == player.getWorld() ? session.draftName : null;
+    }
+
+    private SourceMapCatalog.MapArchive findMap(ArcadePortGame game, String id) {
+        if (game == null || id == null) return null;
+        return SourceMapCatalog.mapsFor(plugin, game).stream()
+                .filter(map -> mapId(map.resource(), game).equalsIgnoreCase(id)
                         || map.displayName().equalsIgnoreCase(id)
                         || map.resource().equalsIgnoreCase(id))
                 .findFirst().orElse(null);
     }
 
-    private static String mapId(String resource) {
-        String slug = DragonEscapeMapDraftRules.mapSlug(resource);
+    private static String mapId(String resource, ArcadePortGame game) {
+        String slug = DragonEscapeMapDraftRules.mapSlug(resource, game);
         return slug == null ? "default" : slug;
+    }
+
+    private Path draftManifestPath(ArcadePortGame game, String resource, String draft) throws IOException {
+        String worldName = DragonEscapeMapDraftRules.worldName(resource, draft, game);
+        if (worldName == null) throw new IOException("Unsafe map or draft identifier.");
+        Path candidate = safePluginPath(DRAFTS_DIRECTORY + "/" + game.id() + "/"
+                + worldName.substring(WORLD_PREFIX.length()) + "/" + draft + "/draft.yml");
+        if (candidate == null) throw new IOException("Unsafe draft manifest path.");
+        return candidate;
     }
 
     private Path draftManifestPath(String draft) throws IOException {
@@ -757,7 +798,7 @@ final class DragonEscapeMapEditor implements Listener {
                 ensureLocalWorldConfig(session.world);
                 session.world.save();
             } catch (RuntimeException exception) {
-                plugin.getLogger().warning("Could not save Dragon Escape map draft " + session.draftName
+                plugin.getLogger().warning("Could not save map draft " + session.draftName
                         + " during shutdown: " + exception.getMessage());
             }
         }
@@ -765,18 +806,19 @@ final class DragonEscapeMapEditor implements Listener {
         worldOwners.clear();
     }
 
-    @EventHandler(ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onDraftBlockBreak(BlockBreakEvent event) {
-        if (isEditorWorld(event.getBlock().getWorld()) && !isDraftOwner(event.getPlayer(), event.getBlock().getWorld())) {
-            event.setCancelled(true);
-        }
+        World world = event.getBlock().getWorld();
+        if (!isEditorWorld(world)) return;
+        // Gameplay/lobby protections must not prevent authorised edits in isolated draft worlds.
+        event.setCancelled(!isDraftOwner(event.getPlayer(), world));
     }
 
-    @EventHandler(ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onDraftBlockPlace(BlockPlaceEvent event) {
-        if (isEditorWorld(event.getBlock().getWorld()) && !isDraftOwner(event.getPlayer(), event.getBlock().getWorld())) {
-            event.setCancelled(true);
-        }
+        World world = event.getBlock().getWorld();
+        if (!isEditorWorld(world)) return;
+        event.setCancelled(!isDraftOwner(event.getPlayer(), world));
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -795,8 +837,10 @@ final class DragonEscapeMapEditor implements Listener {
     public void onEditorQuit(PlayerQuitEvent event) {
         DraftSession session = sessions.remove(event.getPlayer().getUniqueId());
         if (session != null) {
+            ensureLocalWorldConfig(session.world);
             session.world.save();
             worldOwners.remove(session.world.getName(), event.getPlayer().getUniqueId());
+            ui.endSession(event.getPlayer());
         }
     }
 
@@ -809,6 +853,7 @@ final class DragonEscapeMapEditor implements Listener {
         return world != null && world.getName().startsWith(WORLD_PREFIX);
     }
 
-    private record DraftSession(String draftName, String resource, String mapName, World world,
-            Location returnLocation, GameMode returnGameMode, boolean returnAllowFlight) {}
+    private record DraftSession(ArcadePortGame game, String draftName, String resource, String mapName, World world,
+            Location returnLocation, GameMode returnGameMode, boolean returnAllowFlight,
+            ItemStack[] returnInventory, Path manifestPath) {}
 }
