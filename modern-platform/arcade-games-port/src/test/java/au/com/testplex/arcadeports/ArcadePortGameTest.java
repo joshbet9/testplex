@@ -1280,6 +1280,11 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldFinishBaconBrawl(16));
         assertTrue(ArcadePortRules.shouldIsolateBaconBrawlLegacyFoodReset(ArcadePortGame.BACON_BRAWL));
         assertFalse(ArcadePortRules.shouldIsolateBaconBrawlLegacyFoodReset(ArcadePortGame.DRAGONS));
+        assertEquals(18, ArcadePortRules.baconFoodLevelAfterExternalUpdate(18, 20),
+                "an external refill must not undo Bacon Brawl's hunger drain");
+        assertEquals(17, ArcadePortRules.baconFoodLevelAfterExternalUpdate(18, 17),
+                "legitimate hunger loss must still take effect");
+        assertEquals(0, ArcadePortRules.baconFoodLevelAfterExternalUpdate(0, 20));
         assertEquals(4_000L, ArcadePortRules.BACON_HUNGER_INTERVAL_MILLIS);
         assertEquals(2, ArcadePortRules.BACON_HUNGER_DRAIN_PER_INTERVAL,
                 "the selected balance change doubles Bacon Brawl hunger drain");

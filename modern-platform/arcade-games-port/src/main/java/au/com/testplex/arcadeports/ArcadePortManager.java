@@ -14959,6 +14959,7 @@ public final class ArcadePortManager implements Listener {
         // The first landing after a recovery Slam ends the Got em' window, even
         // when the player jumps or is struck off again later in the same match.
         for (Player player : alivePlayers(session)) {
+            enforceBaconBrawlHunger(session, player);
             if (player.isOnGround()) session.baconSlamRecoveries.landed(player.getUniqueId());
         }
         updateCrispyBaconBurning(session, now);
@@ -15020,6 +15021,15 @@ public final class ArcadePortManager implements Listener {
         for (Player player : session.players.values()) {
             if (player != null) player.removeMetadata("testplex-modern-bacon-brawl", plugin);
         }
+    }
+
+    private void enforceBaconBrawlHunger(Session session, Player player) {
+        UUID id = player.getUniqueId();
+        int current = player.getFoodLevel();
+        int previous = session.baconObservedFoodLevels.getOrDefault(id, current);
+        int allowed = ArcadePortRules.baconFoodLevelAfterExternalUpdate(previous, current);
+        if (allowed != current) player.setFoodLevel(allowed);
+        session.baconObservedFoodLevels.put(id, allowed);
     }
 
     private void updateCrispyBaconBurning(Session session, long now) {

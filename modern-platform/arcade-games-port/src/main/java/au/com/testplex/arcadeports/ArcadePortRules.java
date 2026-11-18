@@ -3620,6 +3620,11 @@ public final class ArcadePortRules {
         return game == ArcadePortGame.BACON_BRAWL;
     }
 
+    /** Keep Bacon Brawl's intentionally decreasing hunger from external food resets. */
+    public static int baconFoodLevelAfterExternalUpdate(int previousLevel, int currentLevel) {
+        return Math.max(0, Math.min(20, Math.min(previousLevel, currentLevel)));
+    }
+
     /** Test a player against a world border whose centre may not be at world origin. */
     public static boolean isOutsideWorldBorder(double playerX, double playerZ,
             double centerX, double centerZ, double borderSize) {
