@@ -6251,7 +6251,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         wolf.setHealth(GameDebugRuntimeOverrides.doubleValue("HEROES_OF_GWEN_BARDOLF_WOLF_HEALTH", ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_HEALTH));
         wolf.setTamed(true);
         wolf.setOwner(player);
-        wolf.setCollarColor(teams.getOrDefault(ownerId, 0) == 0 ? DyeColor.RED : DyeColor.BLUE);
+        wolf.setCollarColor(teams.getOrDefault(ownerId, 0) == 0 ? DyeColor.RED : DyeColor.LIGHT_BLUE);
         wolf.setRemoveWhenFarAway(false);
         wolf.setCustomName(teamColour(teams.getOrDefault(ownerId, 0)) + player.getName() + "'s Wolf");
         wolf.setCustomNameVisible(true);
@@ -6495,7 +6495,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         int team = teams.getOrDefault(ownerId, 0);
         IvyThornWallState state = new IvyThornWallState(player.getLocation().clone(),
                 System.currentTimeMillis() + GameDebugRuntimeOverrides.longValue("HEROES_OF_GWEN_IVY_THORN_WALL_DURATION_MILLIS", ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_DURATION_MILLIS));
-        Material floorMaterial = team == 0 ? Material.RED_TERRACOTTA : Material.BLUE_TERRACOTTA;
+        Material floorMaterial = team == 0 ? Material.RED_TERRACOTTA : Material.LIGHT_BLUE_TERRACOTTA;
         int radius = GameDebugRuntimeOverrides.intValue("HEROES_OF_GWEN_IVY_THORN_WALL_BLOCK_RADIUS", ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_BLOCK_RADIUS);
 
         for (int x = -radius; x <= radius; x++) {

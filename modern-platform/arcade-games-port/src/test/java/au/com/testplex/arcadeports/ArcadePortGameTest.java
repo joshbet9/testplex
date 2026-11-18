@@ -1020,7 +1020,16 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.canUseBombLobbersAirDoubleJump("jumper", 0, 1_050L, 1_050L));
         assertFalse(ArcadePortRules.canUseBombLobbersAirDoubleJump("jumper", 2, 1_050L, 1_050L));
         assertFalse(ArcadePortRules.canUseBombLobbersAirDoubleJump("jumper", 1, 1_049L, 1_050L));
-        assertTrue(ArcadePortRules.canUseBombLobbersAirDoubleJump("acrobat", 5, 1_050L, 1_050L));
+        assertTrue(ArcadePortRules.canUseBombLobbersAirDoubleJump("acrobat", 1, 1_050L, 1_050L));
+        assertFalse(ArcadePortRules.canUseBombLobbersAirDoubleJump("acrobat", 2, 1_050L, 1_050L),
+                "Acrobat can complete the source triple jump but cannot chain powered jumps indefinitely");
+        assertTrue(ArcadePortRules.shouldRearmBombLobbersGroundJump(true, false, 0, 1_050L, 1_050L));
+        assertFalse(ArcadePortRules.shouldRearmBombLobbersGroundJump(true, false, 1, 1_050L, 1_050L),
+                "a stale ground sample immediately after takeoff must not refund another jump");
+        assertFalse(ArcadePortRules.shouldRearmBombLobbersGroundJump(false, true, 1, 1_050L, 1_050L));
+        assertTrue(ArcadePortRules.shouldRearmBombLobbersGroundJump(true, true, 1, 1_050L, 1_050L),
+                "a jump is restored after the player was observed airborne and then landed");
+        assertFalse(ArcadePortRules.shouldRearmBombLobbersGroundJump(true, true, 1, 1_049L, 1_050L));
         assertFalse(ArcadePortRules.bombLobbersShowsDoubleJumpCooldown("acrobat"));
         assertTrue(ArcadePortRules.bombLobbersShowsDoubleJumpCooldown("jumper"));
         var look = new org.bukkit.util.Vector(1.0D, 0.0D, 0.0D);

@@ -4312,12 +4312,7 @@ public final class ArcadePortManager implements Listener {
                 group.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
                 group.setPrefix(ModernLobbyScoreboard.rankPrefix(plugin, tabPlayer));
                 if (teamId >= 0) {
-                    group.setColor(switch (teamId) {
-                        case 0 -> ChatColor.RED;
-                        case 1 -> ChatColor.BLUE;
-                        case 2 -> ChatColor.GREEN;
-                        default -> ChatColor.YELLOW;
-                    });
+                    group.setColor(ArcadePortRules.arcadeTeamChatColor(teamId));
                 }
                 group.addEntry(tabPlayer.getName());
             }
@@ -7629,7 +7624,7 @@ public final class ArcadePortManager implements Listener {
         List<String> lines = new ArrayList<>();
         List<Integer> teamIds = session.teams.values().stream().distinct().sorted().toList();
         if (teamIds.size() > 1) {
-            ChatColor[] colors = {ChatColor.RED, ChatColor.BLUE, ChatColor.GREEN, ChatColor.YELLOW,
+            ChatColor[] colors = {ChatColor.RED, ChatColor.AQUA, ChatColor.GREEN, ChatColor.YELLOW,
                     ChatColor.AQUA, ChatColor.LIGHT_PURPLE, ChatColor.GOLD, ChatColor.WHITE};
             String[] names = {"Red", "Blue", "Green", "Yellow", "Aqua", "Pink", "Gold", "White"};
             for (int index = 0; index < Math.min(teamIds.size(), 4); index++) {
@@ -8772,6 +8767,13 @@ public final class ArcadePortManager implements Listener {
         session.bombLobbersScoreboard = scoreboard;
         session.bombLobbersScoreboardObjective = objective;
 
+        Team redNames = scoreboard.registerNewTeam("blrednames");
+        redNames.setColor(ChatColor.RED);
+        redNames.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
+        Team blueNames = scoreboard.registerNewTeam("blbluenames");
+        blueNames.setColor(ChatColor.AQUA);
+        blueNames.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
+
         for (Player player : session.players.values()) {
             if (player != null && player.isOnline()) ArcadeCollisionRules.assign(player, scoreboard);
         }
@@ -8906,58 +8908,39 @@ public final class ArcadePortManager implements Listener {
         for (String entry : session.bombLobbersScoreboardEntries) objective.getScoreboard().resetScores(entry);
         session.bombLobbersScoreboardEntries.clear();
 
-        List<Player> alive = alivePlayers(session);
-        int red = 0;
-        int blue = 0;
-        for (Player player : alive) {
-            int team = session.teams.getOrDefault(player.getUniqueId(), -1);
-            if (team == 0) red++;
-            else if (team == 1) blue++;
+        List<String> redPlayers = new ArrayList<>();
+        List<String> bluePlayers = new ArrayList<>();
+        Team redNames = objective.getScoreboard().getTeam("blrednames");
+        Team blueNames = objective.getScoreboard().getTeam("blbluenames");
+        Set<UUID> aliveIds = new HashSet<>();
+        for (Player alive : alivePlayers(session)) aliveIds.add(alive.getUniqueId());
+        for (Player player : session.players.values()) {
+            if (player == null || !player.isOnline()) continue;
+            if (player.getScoreboard() != objective.getScoreboard()) ArcadeCollisionRules.assign(player, objective.getScoreboard());
+            int playerTeam = session.teams.getOrDefault(player.getUniqueId(), -1);
+            if (playerTeam == 0) {
+                if (aliveIds.contains(player.getUniqueId())) redPlayers.add(player.getName());
+                if (redNames != null && objective.getScoreboard().getEntryTeam(player.getName()) != redNames) {
+                    redNames.addEntry(player.getName());
+                }
+            } else if (playerTeam == 1) {
+                if (aliveIds.contains(player.getUniqueId())) bluePlayers.add(player.getName());
+                if (blueNames != null && objective.getScoreboard().getEntryTeam(player.getName()) != blueNames) {
+                    blueNames.addEntry(player.getName());
+                }
+            }
         }
 
         int score = 15;
-        if (ArcadePortRules.bombLobbersScoreboardShowsPlayerNames(alive.size())) {
-            if (red > 0) {
-                for (Player player : alive) {
-                    if (session.teams.getOrDefault(player.getUniqueId(), -1) == 0) {
-                        score = addBombLobbersScoreboardLine(session, ChatColor.RED + player.getName(), score);
-                    }
-                }
-            }
-            if (red > 0 && blue > 0) {
-                score = addBombLobbersScoreboardLine(session, ChatColor.DARK_GRAY.toString(), score);
-            }
-            if (blue > 0) {
-                for (Player player : alive) {
-                    if (session.teams.getOrDefault(player.getUniqueId(), -1) == 1) {
-                        score = addBombLobbersScoreboardLine(session, ChatColor.BLUE + player.getName(), score);
-                    }
-                }
-            }
-        } else {
-            score = addBombLobbersScoreboardLine(session, ChatColor.RED + "Red Team", score);
-            score = addBombLobbersScoreboardLine(session, ChatColor.RED.toString() + red + " Alive", score);
-            score = addBombLobbersScoreboardLine(session, ChatColor.BLUE + "Blue Team", score);
-            score = addBombLobbersScoreboardLine(session, ChatColor.BLUE.toString() + blue + " Alive", score);
+        for (String line : ArcadePortRules.bombLobbersScoreboardRoster(redPlayers, bluePlayers)) {
+            score = addBombLobbersScoreboardLine(session, line, score);
         }
-
-        score = addBombLobbersScoreboardLine(session,
-                ChatColor.RED + "Red Power-up: " + ChatColor.GRAY
-                        + bombLobbersPowerupScoreboardText(session, 0), score);
-        addBombLobbersScoreboardLine(session,
-                ChatColor.BLUE + "Blue Power-up: " + ChatColor.GRAY
-                        + bombLobbersPowerupScoreboardText(session, 1), score);
     }
 
     private int addBombLobbersScoreboardLine(Session session, String text, int score) {
         session.bombLobbersScoreboardObjective.getScore(text).setScore(score);
         session.bombLobbersScoreboardEntries.add(text);
         return score - 1;
-    }
-
-    private String bombLobbersPowerupScoreboardText(Session session, int team) {
-        BombLobbersPowerupStatus status = session.bombPowerupStatusByTeam.get(team);
-        return ArcadePortRules.bombLobbersPowerupScoreboardLabel(status == null ? null : status.name());
     }
 
     private void updateDeathTagLights(Session session, long now) {
@@ -20857,6 +20840,7 @@ public final class ArcadePortManager implements Listener {
             if (!session.alive.remove(victimId)) return;
             session.bombDoubleJumpAvailable.remove(victimId);
             session.bombDoubleJumpJumpsSinceGround.remove(victimId);
+            session.bombDoubleJumpAirborneSinceUse.remove(victimId);
             player.leaveVehicle();
             if (player.isOnline()) {
                 player.setGameMode(GameMode.SPECTATOR);
@@ -22727,7 +22711,7 @@ public final class ArcadePortManager implements Listener {
             if (active != session) return;
         }
         if (active == session) {
-            announce(session, (team == 0 ? ChatColor.RED + "Red" : ChatColor.BLUE + "Blue")
+            announce(session, (team == 0 ? ChatColor.RED + "Red" : ChatColor.AQUA + "Blue")
                     + ChatColor.WHITE + " captured turf. Remaining lines - Red: "
                     + turfWarsRemainingLines(session, 0) + ", Blue: " + turfWarsRemainingLines(session, 1) + ".");
         }
@@ -23672,6 +23656,7 @@ public final class ArcadePortManager implements Listener {
         session.bombDoubleJumpUsed.clear();
         session.bombDoubleJumpCounts.clear();
         session.bombDoubleJumpJumpsSinceGround.clear();
+        session.bombDoubleJumpAirborneSinceUse.clear();
         session.bombMvpPressurePlayers.clear();
         session.bombPlayersDamaged.clear();
         session.dragonContactCooldowns.clear();
@@ -34160,7 +34145,8 @@ public final class ArcadePortManager implements Listener {
             drop.setPickupDelay(10);
             drop.setInvulnerable(true);
             drop.setGlowing(true);
-            drop.setCustomName(ChatColor.GOLD + ChatColor.BOLD.toString() + bombLobbersPowerupName(powerup));
+            drop.setCustomName(ChatColor.GOLD + ChatColor.BOLD.toString()
+                    + ArcadePortRules.bombLobbersPowerupName(powerup));
             drop.setCustomNameVisible(true);
             drop.getPersistentDataContainer().set(bombPowerupKey, PersistentDataType.STRING, powerup);
             session.entities.add(drop);
@@ -34230,23 +34216,13 @@ public final class ArcadePortManager implements Listener {
             case "fiery-tnt" -> "Throw this TNT to ignite opponents caught in its blast.";
             default -> "Picked up instantly: Speed II for 12 seconds.";
         };
-        ItemStack stack = namedItem(icon, bombLobbersPowerupName(type), lore, 1);
+        ItemStack stack = namedItem(icon, ArcadePortRules.bombLobbersPowerupName(type), lore, 1);
         ItemMeta meta = stack.getItemMeta();
         if (meta != null) {
             meta.getPersistentDataContainer().set(bombPowerupKey, PersistentDataType.STRING, type);
             stack.setItemMeta(meta);
         }
         return stack;
-    }
-
-    private String bombLobbersPowerupName(String type) {
-        return switch (type) {
-            case "wind-charge" -> "Wind Charge";
-            case "super-tnt" -> "Super Explosive TNT";
-            case "fiery-tnt" -> "Fiery TNT";
-            case "speed-boost" -> "Speed Boost";
-            default -> "Power-up";
-        };
     }
 
     private String bombLobbersPowerupType(ItemStack item) {
@@ -34300,9 +34276,18 @@ public final class ArcadePortManager implements Listener {
         updateBombLobbersScoreboard(session);
     }
 
-    private void activateBombLobbersPowerup(Session session, Integer team) {
-        if (session == null || team == null) return;
-        session.bombPowerupStatusByTeam.put(team, BombLobbersPowerupStatus.ACTIVATED);
+    private void activateBombLobbersPowerup(Session session, Player player, ItemStack powerupItem) {
+        if (session == null || player == null || powerupItem == null) return;
+        Integer team = bombLobbersPowerupTeam(powerupItem);
+        String type = bombLobbersPowerupType(powerupItem);
+        if (team != null) session.bombPowerupStatusByTeam.put(team, BombLobbersPowerupStatus.ACTIVATED);
+        String message = ArcadePortRules.bombLobbersPowerupActivationMessage(
+                player.getName(), team == null ? -1 : team, type);
+        if (!message.isEmpty()) {
+            for (Player recipient : session.players.values()) {
+                if (recipient != null && recipient.isOnline()) recipient.sendMessage(message);
+            }
+        }
         updateBombLobbersScoreboard(session);
     }
 
@@ -34310,7 +34295,7 @@ public final class ArcadePortManager implements Listener {
         if (session == null || active != session || player == null || held == null
                 || !session.alive.contains(player.getUniqueId())
                 || !"speed-boost".equals(bombLobbersPowerupType(held))) return;
-        activateBombLobbersPowerup(session, bombLobbersPowerupTeam(held));
+        activateBombLobbersPowerup(session, player, held);
         consumeHeld(player);
         int speedDurationTicks = ArcadePortRules.bombLobbersPowerupSpeedDurationTicks();
         player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, speedDurationTicks, 1, false, true));
@@ -34343,16 +34328,25 @@ public final class ArcadePortManager implements Listener {
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
             long doubleJumpReadyAt = session.bombDoubleJumpReadyAt.getOrDefault(id, 0L);
-            if (!player.isFlying() && player.isOnGround() && now >= doubleJumpReadyAt) {
-                session.bombDoubleJumpJumpsSinceGround.put(id, 0);
+            int jumpsSinceGround = session.bombDoubleJumpJumpsSinceGround.getOrDefault(id, 0);
+            boolean grounded = player.isOnGround();
+            if (!player.isFlying() && ArcadePortRules.shouldRearmBombLobbersGroundJump(
+                    grounded, session.bombDoubleJumpAirborneSinceUse.contains(id),
+                    jumpsSinceGround, now, doubleJumpReadyAt)) {
+                if (jumpsSinceGround > 0) {
+                    session.bombDoubleJumpJumpsSinceGround.put(id, 0);
+                    session.bombDoubleJumpAirborneSinceUse.remove(id);
+                }
                 session.bombDoubleJumpAvailable.add(id);
                 if (!player.getAllowFlight()) player.setAllowFlight(true);
-            } else if (!player.isFlying() && !player.isOnGround()
-                    && ArcadePortRules.canUseBombLobbersAirDoubleJump(
-                            session.bombLobbersKits.getOrDefault(id, "acrobat"),
-                            session.bombDoubleJumpJumpsSinceGround.getOrDefault(id, 0), now, doubleJumpReadyAt)) {
-                session.bombDoubleJumpAvailable.add(id);
-                if (!player.getAllowFlight()) player.setAllowFlight(true);
+            } else if (!player.isFlying() && !grounded) {
+                if (jumpsSinceGround > 0) session.bombDoubleJumpAirborneSinceUse.add(id);
+                if (ArcadePortRules.canUseBombLobbersAirDoubleJump(
+                        session.bombLobbersKits.getOrDefault(id, "acrobat"),
+                        jumpsSinceGround, now, doubleJumpReadyAt)) {
+                    session.bombDoubleJumpAvailable.add(id);
+                    if (!player.getAllowFlight()) player.setAllowFlight(true);
+                }
             }
             long elapsed = Math.max(0L, now - session.startedAt);
             // Recharge.use() returns true immediately when the source cooldown key is absent.
@@ -34680,7 +34674,7 @@ public final class ArcadePortManager implements Listener {
                 || !session.alive.contains(player.getUniqueId())) return;
         ItemStack held = player.getInventory().getItemInMainHand();
         if (!"wind-charge".equals(bombLobbersPowerupType(held))) return;
-        activateBombLobbersPowerup(session, bombLobbersPowerupTeam(held));
+        activateBombLobbersPowerup(session, player, held);
         consumeHeld(player);
         Snowball gust = player.launchProjectile(Snowball.class);
         gust.setItem(new ItemStack(Material.WIND_CHARGE));
@@ -34761,7 +34755,7 @@ public final class ArcadePortManager implements Listener {
         if (!isBombLobbersThrownTnt(held)) return false;
         String powerupType = bombLobbersPowerupType(held);
         if (powerupType == null) powerupType = "normal";
-        if (!"normal".equals(powerupType)) activateBombLobbersPowerup(session, bombLobbersPowerupTeam(held));
+        if (!"normal".equals(powerupType)) activateBombLobbersPowerup(session, player, held);
         session.bombLastThrowAt.put(ownerId, now);
         if (ArcadeTestPlayerManager.shouldPersistProgression(ownerId, testPlayers.isTestPlayer(ownerId))) {
             String throwsPath = localStatsPath(ownerId, "bomb-lobbers") + "thrown";

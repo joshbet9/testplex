@@ -2,7 +2,9 @@ package au.com.testplex.arcadeports;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.bukkit.ChatColor;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -16,15 +18,35 @@ class BombLobbersDebugRulesTest {
     }
 
     @Test
-    void scoreboardMatchesTheSourceRosterCutoffAndPowerupStates() {
+    void scoreboardMatchesTheSourceRosterCutoffWithoutPowerupRows() {
         assertTrue(ArcadePortRules.bombLobbersScoreboardShowsPlayerNames(12));
         assertFalse(ArcadePortRules.bombLobbersScoreboardShowsPlayerNames(13));
         assertTrue(ArcadePortRules.bombLobbersScoreboardShowsPlayerNames(0));
 
-        assertEquals("Waiting", ArcadePortRules.bombLobbersPowerupScoreboardLabel(null));
-        assertEquals("Dropped", ArcadePortRules.bombLobbersPowerupScoreboardLabel("SPAWNED"));
-        assertEquals("Ready", ArcadePortRules.bombLobbersPowerupScoreboardLabel("OBTAINED"));
-        assertEquals("Used", ArcadePortRules.bombLobbersPowerupScoreboardLabel("ACTIVATED"));
+        assertEquals(List.of(ChatColor.RED + "RedPlayer", ChatColor.DARK_GRAY.toString(),
+                        ChatColor.AQUA + "BluePlayer"),
+                ArcadePortRules.bombLobbersScoreboardRoster(List.of("RedPlayer"), List.of("BluePlayer")));
+        List<String> largeRoster = ArcadePortRules.bombLobbersScoreboardRoster(
+                List.of("R1", "R2", "R3", "R4", "R5", "R6"),
+                List.of("B1", "B2", "B3", "B4", "B5", "B6", "B7"));
+        assertEquals(List.of(ChatColor.RED + "Red Team", ChatColor.RED + "6 Alive",
+                ChatColor.AQUA + "Blue Team", ChatColor.AQUA + "7 Alive"), largeRoster);
+        assertTrue(largeRoster.stream().noneMatch(line -> line.toLowerCase(java.util.Locale.ROOT).contains("power-up")));
+    }
+
+    @Test
+    void powerupActivationChatUsesTeamAndPowerupColours() {
+        assertEquals(ChatColor.RED + "RedPlayer" + ChatColor.GRAY + " has activated Powerup "
+                        + ChatColor.GOLD + "Fiery TNT",
+                ArcadePortRules.bombLobbersPowerupActivationMessage("RedPlayer", 0, "fiery-tnt"));
+        assertEquals(ChatColor.AQUA + "BluePlayer" + ChatColor.GRAY + " has activated Powerup "
+                        + ChatColor.DARK_RED + "Super Explosive TNT",
+                ArcadePortRules.bombLobbersPowerupActivationMessage("BluePlayer", 1, "super-tnt"));
+        assertEquals(ChatColor.GREEN, ArcadePortRules.bombLobbersPowerupChatColor("speed-boost"));
+        assertEquals(ChatColor.AQUA, ArcadePortRules.bombLobbersTeamChatColor(1));
+        assertEquals(ChatColor.AQUA, ArcadePortRules.arcadeTeamChatColor(1));
+        assertEquals(ChatColor.GREEN, ArcadePortRules.arcadeTeamChatColor(2));
+        assertEquals(ChatColor.YELLOW, ArcadePortRules.arcadeTeamChatColor(3));
     }
 
     @Test
