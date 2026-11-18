@@ -1986,11 +1986,10 @@ public final class ArcadePortManager implements Listener {
         boolean brutusActive = brutusUntil > now;
         boolean backstab = isBaconBrutusBackstab(target, attackerLocation);
         if (ArcadePortRules.shouldBaconBrutusGuardHit(brutusActive, backstab)) {
-
             Location guard = target.getLocation().clone().add(0.0D, 1.0D, 0.0D);
             target.getWorld().spawnParticle(Particle.TOTEM_OF_UNDYING, guard, 10,
                     0.35D, 0.45D, 0.35D, 0.01D);
-            target.playSound(target.getLocation(), Sound.ITEM_SHIELD_BLOCK, 0.8F, 1.5F);
+            showBaconBrutusBlockedHit(session, target);
             return false;
         }
         if (brutusActive && backstab) {
@@ -9903,8 +9902,14 @@ public final class ArcadePortManager implements Listener {
                 String kit = session.baconKits.getOrDefault(player.getUniqueId(), "el-muchacho-pigo");
                 player.getInventory().setArmorContents(new ItemStack[4]);
                 player.getInventory().setItemInOffHand(null);
-                player.getInventory().setItem(0, namedItem(Material.IRON_AXE, "Kit Ability",
+                player.getInventory().setItem(0, namedItem(Material.IRON_AXE,
+                        BaconBrawlAbilityFeedback.itemName(kit, Material.IRON_AXE),
                         baconAbilityMeterLore(kit, session.baconMeters.getOrDefault(player.getUniqueId(), 0))));
+                if ("chris-p-bacon".equals(kit)) {
+                    player.getInventory().setItem(1, namedItem(Material.BLAZE_POWDER,
+                            BaconBrawlAbilityFeedback.itemName(kit, Material.BLAZE_POWDER),
+                            "Right-click to dash."));
+                }
                 if ("mama-piggles".equals(kit)) {
                     player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 60, 1, false, false, false));
                 }
@@ -15214,23 +15219,20 @@ public final class ArcadePortManager implements Listener {
         session.baconMeters.put(id, meter);
         if (previous < GameDebugRuntimeOverrides.intValue("BACON_METER_MIN_ABILITY", ArcadePortRules.BACON_METER_MIN_ABILITY)
                 && meter >= GameDebugRuntimeOverrides.intValue("BACON_METER_MIN_ABILITY", ArcadePortRules.BACON_METER_MIN_ABILITY)) {
-            player.sendMessage(ChatColor.GREEN + baconAbilityName(session, id) + " is ready!");
+            player.sendActionBar(ChatColor.GREEN + BaconBrawlAbilityFeedback.readyMessage(
+                    session.baconKits.getOrDefault(id, "el-muchacho-pigo")));
         }
         if (previous < GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", ArcadePortRules.BACON_METER_MAX) && meter >= GameDebugRuntimeOverrides.intValue("BACON_METER_MAX", ArcadePortRules.BACON_METER_MAX)) {
-            player.sendMessage(ChatColor.GOLD + baconAbilityName(session, id) + " is maxed!");
+            player.sendActionBar(ChatColor.GREEN + BaconBrawlAbilityFeedback.maxMessage(
+                    session.baconKits.getOrDefault(id, "el-muchacho-pigo")));
         }
         updateBaconMeterItem(session, player);
         updateBaconMeterScoreboard(session);
     }
 
     private String baconAbilityName(Session session, UUID playerId) {
-        return switch (session.baconKits.getOrDefault(playerId, "el-muchacho-pigo")) {
-            case "mama-piggles" -> "Bacon Blast";
-            case "chris-p-bacon" -> "Crispy Bacon";
-            case "pig" -> "Cloak";
-            case "brutus-bacon" -> "Brutus Bacon";
-            default -> "Body Slam";
-        };
+        return BaconBrawlAbilityFeedback.abilityName(
+                session.baconKits.getOrDefault(playerId, "el-muchacho-pigo"));
     }
 
     /** The XP bar tracks timed critical progress and its level displays the ability meter charge. */
@@ -15254,7 +15256,9 @@ public final class ArcadePortManager implements Listener {
         ItemStack ability = player.getInventory().getItem(0);
         if (ability != null && ability.getType() == Material.IRON_AXE
                 && ability.hasItemMeta() && ability.getItemMeta().hasDisplayName()
-                && "Kit Ability".equals(ChatColor.stripColor(ability.getItemMeta().getDisplayName()))) {
+                && BaconBrawlAbilityFeedback.primaryItemName(
+                        session.baconKits.getOrDefault(playerId, "el-muchacho-pigo"))
+                        .equals(ChatColor.stripColor(ability.getItemMeta().getDisplayName()))) {
             ItemMeta meta = ability.getItemMeta();
             if (meta != null) {
                 List<String> lore = List.of(ChatColor.GRAY + baconAbilityMeterLore(
@@ -15323,6 +15327,16 @@ public final class ArcadePortManager implements Listener {
             if (display.isValid()) display.remove();
             session.entities.remove(display);
         }, 18L);
+    }
+
+    private void showBaconBrutusBlockedHit(Session session, Player target) {
+        playLegacyDamageFeedback(target);
+        Location feedbackLocation = target.getLocation().clone().add(0.0D, 1.0D, 0.0D);
+        target.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR, feedbackLocation,
+                6, 0.25D, 0.3D, 0.25D, 0.0D);
+        showFloatingCombatLabel(session, target.getLocation(),
+                BaconBrawlAbilityFeedback.brutusBlockedHitLabel(), ChatColor.AQUA);
+        target.playSound(target.getLocation(), Sound.ITEM_SHIELD_BLOCK, 0.8F, 1.5F);
     }
 
     private void showBaconHitFeedback(Session session, Player attacker, Player target, String source,
@@ -16297,9 +16311,7 @@ public final class ArcadePortManager implements Listener {
             }
             target.getWorld().spawnParticle(Particle.TOTEM_OF_UNDYING,
                     target.getLocation().add(0.0D, 1.0D, 0.0D), 10, 0.35D, 0.45D, 0.35D, 0.01D);
-            target.getWorld().spawnParticle(Particle.CRIT,
-                    target.getLocation().add(0.0D, 1.0D, 0.0D), 8, 0.25D, 0.35D, 0.25D, 0.03D);
-            target.playSound(target.getLocation(), Sound.ITEM_SHIELD_BLOCK, 0.8F, 1.5F);
+            showBaconBrutusBlockedHit(session, target);
             return;
         }
         boolean normalTimedHit = "melee".equals(source) || "projectile hit".equals(source);
@@ -31094,6 +31106,12 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.BACON_BRAWL && event.getAction().isRightClick()) {
             String kit = session.baconKits.getOrDefault(player.getUniqueId(), "el-muchacho-pigo");
+            if (BaconBrawlAbilityFeedback.isCrispyDashInput(kit, item,
+                    event.getAction().isRightClick())) {
+                event.setCancelled(true);
+                useBaconBrawlAbility(session, player, System.currentTimeMillis(), true);
+                return;
+            }
             boolean clickedUsableBlock = event.getClickedBlock() != null
                     && event.getClickedBlock().getType().isInteractable();
             if (!ArcadePortRules.shouldActivateBaconBrawlAbility(event.getAction().isRightClick(),
@@ -35812,22 +35830,7 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
     public void onPrepareSneakToggle(PlayerToggleSneakEvent event) {
-        Player player = event.getPlayer();
-        cancelPrepareAction(player, event);
-        if (event.isCancelled() || !event.isSneaking()) return;
-        Session session = active;
-        UUID id = player.getUniqueId();
-        if (session == null || session.type != ArcadePortGame.BACON_BRAWL
-                || !session.liveStarted || !session.alive.contains(id)
-                || !"chris-p-bacon".equals(session.baconKits.getOrDefault(id, ""))) return;
-        Bukkit.getScheduler().runTask(plugin, () -> {
-            // Sneak toggles arrive before Paper updates the player's pose/on-ground state. Chris
-            // rides a pig avatar, so checking Player.isOnGround() here rejects valid ground dashes.
-            if (active != session || !player.isOnline() || !session.alive.contains(id)
-                    || session.baconCrispyDashes.containsKey(id)
-                    || !ArcadePortRules.canUseBaconMeterAbility(session.baconMeters.getOrDefault(id, 0))) return;
-            useBaconBrawlAbility(session, player, System.currentTimeMillis(), true);
-        });
+        cancelPrepareAction(event.getPlayer(), event);
     }
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
