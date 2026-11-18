@@ -17909,7 +17909,7 @@ public final class ArcadePortManager implements Listener {
                                 player.getVelocity(), flutter.activated));
                         if (flutter.activated) {
                             player.getWorld().playSound(player.getLocation(),
-                                    DragonEscapeMovementKits.FLUTTER_SOUND, 0.8F, 1.2F);
+                                    Sound.valueOf(DragonEscapeMovementKits.FLUTTER_SOUND_NAME), 0.8F, 1.2F);
                         }
                         if (session.ticks % 4L == 0L) {
                             player.getWorld().spawnParticle(Particle.CLOUD,
@@ -17949,7 +17949,7 @@ public final class ArcadePortManager implements Listener {
                     player.getLocation().add(0.0D, 0.65D, 0.0D),
                     12, 0.25D, 0.3D, 0.25D, 0.035D);
             player.getWorld().playSound(player.getLocation(),
-                    DragonEscapeMovementKits.WALL_KICK_SOUND, 0.85F, 1.25F);
+                    Sound.valueOf(DragonEscapeMovementKits.WALL_KICK_SOUND_NAME), 0.85F, 1.25F);
         }
     }
 
