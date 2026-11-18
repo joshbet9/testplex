@@ -1526,6 +1526,7 @@ public final class ArcadePortManager implements Listener {
                     .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.FlutterState());
             flutter.charges = DragonEscapeMovementKits.FLUTTER_MAX_CHARGES;
             flutter.nextChargeAtMillis = 0L;
+            flutter.lastRightClickAtMillis = Long.MIN_VALUE;
             setDragonEscapeFlutterItem(tester, flutter, System.currentTimeMillis());
             return true;
         }
@@ -9974,7 +9975,7 @@ public final class ArcadePortManager implements Listener {
                     int digs = session.dragonEscapeDiggerUsesRemaining.getOrDefault(id, GameDebugRuntimeOverrides.intValue("DRAGON_ESCAPE_DIGGER_MAX_USES", ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES));
                     player.getInventory().setItem(0, dragonEscapeDiggerItem(digs));
                 } else if ("flutterfly".equals(kit)) {
-                    // Feather bounces use three independently recharging charges.
+                    // Feather bounces use five independently recharging charges.
                     DragonEscapeMovementKits.FlutterState flutter = session.dragonEscapeFlutterStates
                             .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.FlutterState());
                     setDragonEscapeFlutterItem(player, flutter, System.currentTimeMillis());
@@ -17916,12 +17917,15 @@ public final class ArcadePortManager implements Listener {
         if (active != session || !session.liveStarted || !session.alive.contains(id)
                 || !"flutterfly".equals(session.dragonEscapeKits.getOrDefault(id, "jumper"))
                 || !debugKitFeatureEnabled(player, ArcadePortGame.DRAGON_ESCAPE, "flutterfly")) return;
+        DragonEscapeMovementKits.FlutterState flutter = session.dragonEscapeFlutterStates
+                .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.FlutterState());
+        // A held right-click repeats interaction events. Only a fresh click can
+        // spend a charge; ground clicks must also latch to prevent takeoff auto-use.
+        if (!flutter.acceptRightClick(nowMillis)) return;
         if (player.isOnGround() || player.isInWater() || player.isInsideVehicle()) {
             player.sendActionBar(ChatColor.YELLOW + "Use Flutter Bounce while airborne.");
             return;
         }
-        DragonEscapeMovementKits.FlutterState flutter = session.dragonEscapeFlutterStates
-                .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.FlutterState());
         if (!flutter.useBounce(false, nowMillis)) {
             player.sendActionBar(ChatColor.YELLOW + "Flutter Bounce is recharging.");
             return;
