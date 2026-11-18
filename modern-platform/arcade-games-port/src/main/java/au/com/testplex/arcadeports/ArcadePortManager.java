@@ -1832,6 +1832,7 @@ public final class ArcadePortManager implements Listener {
         lobby.ensurePlayerInLobby(player);
         PlayerSnapshot snapshot = new PlayerSnapshot(player);
         session.players.put(id, player);
+        markModernArcadeLegacyFoodIsolation(player);
         session.snapshots.put(id, snapshot);
         applyLegacyAttackSpeed(player);
         player.closeInventory();
@@ -3811,6 +3812,7 @@ public final class ArcadePortManager implements Listener {
         session.snapshots.put(id, new PlayerSnapshot(player));
         applyLegacyAttackSpeed(player);
         session.players.put(id, player);
+        markModernArcadeLegacyFoodIsolation(player);
         session.alive.add(id);
         session.respawning.remove(id);
         session.scores.put(id, 0);
@@ -3968,6 +3970,7 @@ public final class ArcadePortManager implements Listener {
         session.snapshots.put(id, snapshot);
         applyLegacyAttackSpeed(player);
         session.players.put(id, player);
+        markModernArcadeLegacyFoodIsolation(player);
         session.alive.add(id);
         session.scores.put(id, 0);
         session.teams.put(id, team);
@@ -4422,6 +4425,7 @@ public final class ArcadePortManager implements Listener {
                 session.snapshots.put(id, snapshot);
                 applyLegacyAttackSpeed(player);
                 session.players.put(id, player);
+                markModernArcadeLegacyFoodIsolation(player);
                 session.participantIds.add(id);
                 session.alive.add(id);
                 session.scores.put(id, 0);
@@ -5177,6 +5181,7 @@ public final class ArcadePortManager implements Listener {
                     session.snapshots.put(id, snapshot);
                     applyLegacyAttackSpeed(player);
                     session.players.put(id, player);
+                    markModernArcadeLegacyFoodIsolation(player);
                     session.alive.add(id);
                     session.scores.put(id, 0);
                 }
@@ -5239,6 +5244,7 @@ public final class ArcadePortManager implements Listener {
                 session.snapshots.put(id, snapshot);
                 applyLegacyAttackSpeed(participant);
                 session.players.put(id, participant);
+                markModernArcadeLegacyFoodIsolation(participant);
                 session.alive.add(id);
                 session.scores.put(id, 0);
                 session.lastLocations.put(id, participant.getLocation().clone());
@@ -5427,7 +5433,6 @@ public final class ArcadePortManager implements Listener {
             }
         }
         active = session;
-        markBaconBrawlLegacyFoodIsolation(session);
         activateDebugProfile(requester != null ? requester : sender instanceof Player player ? player : null, type);
         if (type == ArcadePortGame.SKY_WARS) {
             initializeSkyWarsMapResources(session, sourceMapData.get(type.id()));
@@ -5676,6 +5681,7 @@ public final class ArcadePortManager implements Listener {
             session.snapshots.put(player.getUniqueId(), snapshot);
             applyLegacyAttackSpeed(player);
             session.players.put(player.getUniqueId(), player);
+            markModernArcadeLegacyFoodIsolation(player);
             session.alive.add(player.getUniqueId());
             session.scores.put(player.getUniqueId(), 0);
             if (type == ArcadePortGame.PAINTBALL) {
@@ -15026,20 +15032,21 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    private void markBaconBrawlLegacyFoodIsolation(Session session) {
-        if (!ArcadePortRules.shouldIsolateBaconBrawlLegacyFoodReset(session.type)) return;
-        for (Player player : session.players.values()) {
-            if (player != null && player.isOnline()) {
-                player.setMetadata("testplex-modern-bacon-brawl",
-                        new org.bukkit.metadata.FixedMetadataValue(plugin, true));
-            }
-        }
+    private void markModernArcadeLegacyFoodIsolation(Player player) {
+        if (player == null || !player.isOnline()) return;
+        org.bukkit.metadata.FixedMetadataValue marker =
+                new org.bukkit.metadata.FixedMetadataValue(plugin, true);
+        player.setMetadata("testplex-modern-arcade-session", marker);
+        // Keep the original marker as an alias for deployed legacy GameFlagManager versions.
+        player.setMetadata("testplex-modern-bacon-brawl", marker);
     }
 
-    private void clearBaconBrawlLegacyFoodIsolation(Session session) {
-        if (!ArcadePortRules.shouldIsolateBaconBrawlLegacyFoodReset(session.type)) return;
+    private void clearModernArcadeLegacyFoodIsolation(Session session) {
+        if (!ArcadePortRules.shouldIsolateModernArcadeFromLegacyFoodReset(session.type)) return;
         for (Player player : session.players.values()) {
-            if (player != null) player.removeMetadata("testplex-modern-bacon-brawl", plugin);
+            if (player == null) continue;
+            player.removeMetadata("testplex-modern-arcade-session", plugin);
+            player.removeMetadata("testplex-modern-bacon-brawl", plugin);
         }
     }
 
@@ -23713,7 +23720,7 @@ public final class ArcadePortManager implements Listener {
             restoreDragonEscapePracticeCourse(session);
             if (session.dragonEscapePractice) session.dragonEscapeBlockRestoreTokens.clear();
         }
-        clearBaconBrawlLegacyFoodIsolation(session);
+        clearModernArcadeLegacyFoodIsolation(session);
         active = null;
         GameDebugRuntimeOverrides.clear();
         if (activeDebugProfileGame == session.type) {
@@ -35782,6 +35789,7 @@ public final class ArcadePortManager implements Listener {
             Session session = active;
             if (session == null || !session.players.containsKey(playerId)) return;
             session.players.put(playerId, respawned);
+            markModernArcadeLegacyFoodIsolation(respawned);
             if (session.alive.contains(playerId)) {
                 Bukkit.getScheduler().runTaskLater(plugin, () -> {
                     if (active != session || !session.alive.contains(playerId)) return;
