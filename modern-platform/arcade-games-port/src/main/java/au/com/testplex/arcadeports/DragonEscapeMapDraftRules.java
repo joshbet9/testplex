@@ -30,8 +30,24 @@ final class DragonEscapeMapDraftRules {
                 .replace(' ', '-').replace('.', '-'));
     }
 
+    /** Validate the source's game ownership before producing an editor-facing map ID. */
+    static String mapSlug(String resource, ArcadePortGame game) {
+        if (!SourceMapCatalog.resourcePathBelongsToGame(game, resource)) return null;
+        if (game == ArcadePortGame.DRAGON_ESCAPE) return mapSlug(resource);
+        String name = resource.substring(resource.lastIndexOf('/') + 1);
+        if (name.toLowerCase(Locale.ROOT).endsWith(".zip")) name = name.substring(0, name.length() - 4);
+        name = name.toLowerCase(Locale.ROOT).replace("'", "").replace("’", "");
+        name = name.replaceAll("[^a-z0-9]+", "-").replaceAll("^-+|-+$", "");
+        if (name.isEmpty()) return null;
+        return draftSlug(name.substring(0, Math.min(name.length(), 32)).replaceAll("-+$", ""));
+    }
+
     static String worldName(String mapResource, String draftName) {
-        String map = mapSlug(mapResource);
+        return worldName(mapResource, draftName, ArcadePortGame.DRAGON_ESCAPE);
+    }
+
+    static String worldName(String mapResource, String draftName, ArcadePortGame game) {
+        String map = mapSlug(mapResource, game);
         String draft = draftSlug(draftName);
         if (map == null || draft == null) return null;
         String seed = mapResource + "\n" + draft;
