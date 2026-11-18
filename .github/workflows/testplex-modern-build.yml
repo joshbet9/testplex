@@ -353,9 +353,9 @@ jobs:
             ln -s "/source/$world" "$fixture_root/server/$world"
           done
           printf '%s\n' '0123456789abcdef0123456789abcdef01234567' > "$fixture_root/opt/testplex/source-build.txt"
-          output="$(TESTPLEX_VERIFY_ROOT="$fixture_root" deploy/fly/verify-runtime.sh '0123456789abcdef0123456789abcdef01234567')"
+          output="$(TESTPLEX_VERIFY_ROOT="$fixture_root" sh deploy/fly/verify-runtime.sh '0123456789abcdef0123456789abcdef01234567')"
           grep -Fx 'TESTPLEX_FLY_RUNTIME_VERIFIED:0123456789abcdef0123456789abcdef01234567' <<< "$output"
-          if TESTPLEX_VERIFY_ROOT="$fixture_root" deploy/fly/verify-runtime.sh 'fedcba9876543210fedcba9876543210fedcba98'; then
+          if TESTPLEX_VERIFY_ROOT="$fixture_root" sh deploy/fly/verify-runtime.sh 'fedcba9876543210fedcba9876543210fedcba98'; then
             echo 'Fly runtime verifier accepted a mismatched source SHA.' >&2
             exit 1
           fi
