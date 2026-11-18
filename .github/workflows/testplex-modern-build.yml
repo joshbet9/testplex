@@ -547,7 +547,7 @@ jobs:
           trap restore_on_exit EXIT
           if [[ "$restore_autostop" != off ]]; then
             autostop_restore_needed=true
-            flyctl machine update "$machine_id" --app "$FLY_APP" --autostop=off --yes --wait-timeout 300
+            fly_machine_update_autostop off
           fi
 
           ready=false
