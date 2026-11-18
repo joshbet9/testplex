@@ -40,6 +40,11 @@ final class BaconBrawlAbilityFeedback {
         return "chris-p-bacon".equals(kit) && item == Material.BLAZE_POWDER && rightClick;
     }
 
+    /** Route equipped abilities from entity clicks as well as air/block interaction packets. */
+    static boolean shouldRouteRightClickAbility(String kit, Material item) {
+        return item == Material.IRON_AXE || isCrispyDashInput(kit, item, true);
+    }
+
     static String brutusBlockedHitLabel() {
         return "Shield!";
     }
