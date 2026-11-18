@@ -497,20 +497,41 @@ jobs:
           # Fly's idle autostop can terminate this single-machine app while this
           # workflow performs the in-container verifier. Temporarily disable only
           # autostop on the existing volume-owning Machine, then restore the exact
-          # previous policy in an EXIT trap. fly machine update preserves the
-          # existing Machine config/mount and waits for its checks before returning.
-          autostop_policy="$(jq -er --arg id "$machine_id" '[.[] | select(.id == $id)][0].config.services[] | .autostop | tostring' "$RUNNER_TEMP/fly-machines-after.json" | head -n 1)"
+          # previous policy in an EXIT trap. Deploy can return while Fly still holds
+          # a replacement lock, so retry only that documented transient conflict.
+          autostop_policy="$(jq -er --arg id "$machine_id" '[.[] | select(.id == $id)][0].config.services | map(.autostop | tostring) | unique | if length == 1 then .[0] else error("expected one consistent Fly autostop policy") end' "$RUNNER_TEMP/fly-machines-after.json")"
           case "$autostop_policy" in
             true|stop) restore_autostop=stop ;;
             suspend) restore_autostop=suspend ;;
             false|off) restore_autostop=off ;;
             *) echo "Unexpected Fly autostop policy [$autostop_policy]; refusing to alter it." >&2; exit 1 ;;
           esac
+          fly_machine_update_autostop() {
+            local policy="$1"
+            local attempt output
+            for attempt in $(seq 1 12); do
+              if output="$(flyctl machine update "$machine_id" --app "$FLY_APP" --autostop="$policy" --yes --wait-timeout 300 2>&1)"; then
+                printf '%s\n' "$output"
+                return 0
+              fi
+              printf '%s\n' "$output" >&2
+              if ! grep -Eiq 'machine is replacing|concurrent update in progress' <<< "$output"; then
+                echo "Fly rejected an autostop update for a reason that is not a transient replacement lock." >&2
+                return 1
+              fi
+              if [[ "$attempt" -lt 12 ]]; then
+                echo "Fly is still replacing the existing Machine; retrying autostop update in five seconds ($attempt/12)." >&2
+                sleep 5
+              fi
+            done
+            echo "Fly replacement lock did not clear within one minute; refusing to claim runtime verification." >&2
+            return 1
+          }
           autostop_restore_needed=false
           restore_fly_autostop() {
             if [[ "$autostop_restore_needed" == true ]]; then
               echo "Restoring Fly autostop policy [$restore_autostop] on the existing Machine."
-              flyctl machine update "$machine_id" --app "$FLY_APP" --autostop="$restore_autostop" --yes --wait-timeout 300
+              fly_machine_update_autostop "$restore_autostop"
               autostop_restore_needed=false
             fi
           }
@@ -547,13 +568,11 @@ jobs:
           done
           if [[ "$ready" != true ]]; then
             echo "Fly machine did not become healthy on the expected release SHA $GITHUB_SHA." >&2
-            cat "$connection_log" >&2 || true
             cat "$RUNNER_TEMP/fly-machines-after.json" >&2
             flyctl machine status "$machine_id" --app "$FLY_APP" || true
             flyctl logs --app "$FLY_APP" --machine "$machine_id" --no-tail || true
             exit 1
           fi
-          cat "$connection_log"
 
           remote_command="/usr/local/bin/testplex-verify-runtime $GITHUB_SHA"
           flyctl ssh console --app "$FLY_APP" --machine "$machine_id" --command "$remote_command" \
