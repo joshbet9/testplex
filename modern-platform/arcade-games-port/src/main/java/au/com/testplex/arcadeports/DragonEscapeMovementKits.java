@@ -28,7 +28,7 @@ final class DragonEscapeMovementKits {
     static final double WALL_KICK_PITCH_LIFT = 0.60D;
     static final double WALL_KICK_MIN_UPWARD_SPEED = 0.20D;
     static final double WALL_KICK_MAX_UPWARD_SPEED = 1.20D;
-    static final long WALL_KICK_GROUNDED_COOLDOWN_MILLIS = 10_000L;
+    static final long WALL_KICK_GROUNDED_COOLDOWN_MILLIS = 5_000L;
     static final double WALL_KICK_MIN_OUTWARD_SPEED = 0.28D;
     // No fixed wall-stick duration: active Shift steadily drains its own XP bar.
     static final double WALL_CLING_DRAIN_PER_TICK = 0.0125D;
