@@ -192,4 +192,5 @@ final class DragonEscapeMovementKits {
             }
         }
         return best;
-    }}
+    }
+}
