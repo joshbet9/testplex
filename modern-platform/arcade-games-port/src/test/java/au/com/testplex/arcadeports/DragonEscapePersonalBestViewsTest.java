@@ -9,8 +9,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class DragonEscapePersonalBestViewsTest {
     @Test
-    void cyclesOverallBestAndAllFiveSelectableKitsWithoutSkippingOne() {
-        assertEquals(List.of("best-time", "jumper", "disruptor", "warper", "builder", "digger"),
+    void cyclesOverallBestAndAllSevenSelectableKitsWithoutSkippingOne() {
+        assertEquals(List.of("best-time", "jumper", "disruptor", "warper", "builder", "digger", "flutterfly", "acrobat"),
                 DragonEscapePersonalBestViews.all());
         int view = 0;
         for (String expected : DragonEscapePersonalBestViews.all()) {
@@ -22,7 +22,8 @@ class DragonEscapePersonalBestViewsTest {
         assertEquals("Builder", DragonEscapePersonalBestViews.name("builder"));
         assertEquals("Unknown (legacy record)", DragonEscapePersonalBestViews.name(null));
         assertEquals(List.of(Material.CLOCK, Material.FEATHER, Material.TNT,
-                        Material.ENDER_PEARL, Material.BRICK, Material.DIAMOND_PICKAXE),
+                        Material.ENDER_PEARL, Material.BRICK, Material.DIAMOND_PICKAXE,
+                        Material.FEATHER, Material.RABBIT_FOOT),
                 DragonEscapePersonalBestViews.all().stream().map(DragonEscapePersonalBestViews::icon).toList());
     }
 
