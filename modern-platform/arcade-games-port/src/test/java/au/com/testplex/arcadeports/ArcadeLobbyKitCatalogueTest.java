@@ -137,8 +137,8 @@ class ArcadeLobbyKitCatalogueTest {
                 choices.stream().map(choice -> choice.id).toList());
         assertEquals(ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT, choices.get(3).unlock);
         assertEquals(ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT, choices.get(4).unlock);
-        assertEquals(ArcadeLobbyKitCatalogue.Unlock.FREE, choices.get(5).unlock);
-        assertEquals(ArcadeLobbyKitCatalogue.Unlock.FREE, choices.get(6).unlock);
+        assertEquals(ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT, choices.get(5).unlock);
+        assertEquals(ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT, choices.get(6).unlock);
     }
 
     @Test
