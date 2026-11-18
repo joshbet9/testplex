@@ -19282,10 +19282,10 @@ public final class ArcadePortManager implements Listener {
         List<String> entries = new ArrayList<>(DragonEscapeRaceScoreboardLayout.MAX_ROWS);
         for (int i = 0; i < DragonEscapeRaceScoreboardLayout.MAX_ROWS; i++) {
             String teamName = switch (i) {
+                case DragonEscapeRaceScoreboardLayout.STANDINGS_SEPARATOR_ROW -> "degap1";
                 case DragonEscapeRaceScoreboardLayout.MAP_PB_ROW -> "depb";
-                case DragonEscapeRaceScoreboardLayout.MAP_WR_ROW -> "dewr";
                 case DragonEscapeRaceScoreboardLayout.KIT_PB_ROW -> "dekpb";
-                case DragonEscapeRaceScoreboardLayout.KIT_WR_ROW -> "dekWr";
+                case DragonEscapeRaceScoreboardLayout.FINISH_SEPARATOR_ROW -> "degap2";
                 case DragonEscapeRaceScoreboardLayout.FINISH_TIMER_LABEL_ROW -> "detimer";
                 case DragonEscapeRaceScoreboardLayout.FINISH_TIMER_VALUE_ROW -> "detimerv";
                 default -> "derank" + i;
@@ -19303,7 +19303,7 @@ public final class ArcadePortManager implements Listener {
         ArcadeCollisionRules.disable(player);
     }
 
-    /** Keep racers in race order, followed by separate map and kit PB/WR rows. */
+    /** Display the top three and the viewer's local neighbourhood, with compact PB and timer sections. */
     private void updateDragonEscapeRaceScoreboard(Session session, long now) {
         if (session.type != ArcadePortGame.DRAGON_ESCAPE) return;
         refreshDragonEscapeDisplayRankScores(session);
@@ -19324,6 +19324,10 @@ public final class ArcadePortManager implements Listener {
                     session.dragonEscapePlayerRankScores.getOrDefault(left.getUniqueId(),
                             dragonEscapeFallbackRankScore(session, left))));
         }
+        Map<UUID, Integer> positionsByPlayer = new HashMap<>();
+        for (int index = 0; index < ranked.size(); index++) {
+            positionsByPlayer.put(ranked.get(index).getUniqueId(), index);
+        }
         List<Player> liveOrder = dragonEscapeRaceOrder(session);
         Player liveLeader = liveOrder.isEmpty() ? null : liveOrder.get(0);
         boolean firstLiveScoreboardFrame = session.liveStarted
@@ -19331,22 +19335,21 @@ public final class ArcadePortManager implements Listener {
         if (session.liveStarted) session.dragonEscapeScoreboardZeroFrameShown = true;
         long elapsed = DragonEscapeRaceScoreboardLayout.displayedElapsedMillis(
                 now - session.startedAt, !session.liveStarted || firstLiveScoreboardFrame);
-        DragonEscapeTimeRecord worldRecord = session.dragonEscapeMapResource == null ? null
-                : dragonEscapeWorldRecord(session.dragonEscapeMapResource, null);
         for (Player viewer : session.players.values()) {
             ensureDragonEscapeRaceScoreboard(session, viewer);
             if (viewer == null || !viewer.isOnline()) continue;
             DragonEscapeRaceScoreboardView view = dragonEscapeRaceScoreboards.get(viewer.getUniqueId());
             if (view == null) continue;
-            // Reattach the match board if another plugin or reconnect replaced it.
             if (viewer.getScoreboard() != view.scoreboard()) ArcadeCollisionRules.assign(viewer, view.scoreboard());
-            // Reserve two final rows for the post-finish countdown and four rows for
-            // the map/kit records; racer order carries rank without #1/#2 labels.
-            for (int i = 0; i < DragonEscapeRaceScoreboardLayout.RACER_ROW_COUNT; i++) {
-                Team line = view.teams().get(i);
-                String entry = view.entries().get(i);
-                if (i < ranked.size()) {
-                    Player racer = ranked.get(i);
+
+            List<Integer> visibleRanks = DragonEscapeRaceScoreboardLayout.visibleRankPositions(
+                    ranked.size(), positionsByPlayer.getOrDefault(viewer.getUniqueId(), -1));
+            for (int slot = 0; slot < DragonEscapeRaceScoreboardLayout.RACER_ROW_COUNT; slot++) {
+                Team line = view.teams().get(slot);
+                String entry = view.entries().get(slot);
+                if (slot < visibleRanks.size()) {
+                    int rankIndex = visibleRanks.get(slot);
+                    Player racer = ranked.get(rankIndex);
                     UUID racerId = racer.getUniqueId();
                     boolean completed = session.dragonEscapeCompleted.contains(racerId);
                     boolean alive = session.alive.contains(racerId);
@@ -19354,7 +19357,9 @@ public final class ArcadePortManager implements Listener {
                             ? DragonEscapeRaceScoreboardLayout.RacerStatus.FINISHED
                             : alive ? DragonEscapeRaceScoreboardLayout.RacerStatus.RUNNING
                                     : DragonEscapeRaceScoreboardLayout.RacerStatus.ELIMINATED;
-                    line.setPrefix(DragonEscapeRaceScoreboardLayout.racerName(racer.getName(), status));
+                    line.setPrefix(DragonEscapeRaceScoreboardLayout.racerName(
+                            racer.getName(), status, rankIndex + 1,
+                            racerId.equals(viewer.getUniqueId())));
                     String timeText;
                     if (completed || !alive) {
                         long stoppedAt = session.dragonEscapeStoppedTimesMillis.getOrDefault(racerId, elapsed);
@@ -19367,21 +19372,38 @@ public final class ArcadePortManager implements Listener {
                     } else {
                         timeText = ArcadePortRules.formatDragonEscapeTime(elapsed);
                     }
-                    line.setSuffix(DragonEscapeRaceScoreboardLayout.racerTime(timeText, status, i == 0));
-                    view.objective().getScore(entry).setScore(
-                            DragonEscapeRaceScoreboardLayout.MAX_ROWS - i);
+                    line.setSuffix(DragonEscapeRaceScoreboardLayout.racerTime(timeText, status, rankIndex == 0));
+                    view.objective().getScore(entry).setScore(DragonEscapeRaceScoreboardLayout.MAX_ROWS - slot);
                 } else {
                     line.setPrefix("");
                     line.setSuffix("");
                     view.scoreboard().resetScores(entry);
                 }
             }
+
+            // Compute all remaining scores from the actual visible standings count:
+            // there is exactly one blank line between each populated section.
+            int nextScore = DragonEscapeRaceScoreboardLayout.MAX_ROWS - visibleRanks.size();
+            int standingsSeparator = DragonEscapeRaceScoreboardLayout.STANDINGS_SEPARATOR_ROW;
+            Team standingsGap = view.teams().get(standingsSeparator);
+            String standingsGapEntry = view.entries().get(standingsSeparator);
+            if (!visibleRanks.isEmpty()) {
+                standingsGap.setPrefix(" ");
+                standingsGap.setSuffix("");
+                view.objective().getScore(standingsGapEntry).setScore(nextScore--);
+            } else {
+                standingsGap.setPrefix("");
+                standingsGap.setSuffix("");
+                view.scoreboard().resetScores(standingsGapEntry);
+            }
+
             long pb = session.dragonEscapeMapResource == null ? -1L
                     : dragonEscapePersonalBestMillis(viewer.getUniqueId(), session.dragonEscapeMapResource);
             String kit = session.dragonEscapeKits.getOrDefault(viewer.getUniqueId(), "jumper");
             String pbPath = dragonEscapePbPath(viewer.getUniqueId(), session.dragonEscapeMapResource);
             long kitPb = pbPath.isEmpty() ? -1L
                     : plugin.getConfig().getLong(pbPath + "kits." + kit + ".time-ms", -1L);
+
             String pbEntry = view.entries().get(DragonEscapeRaceScoreboardLayout.MAP_PB_ROW);
             Team pbTeam = view.teams().get(DragonEscapeRaceScoreboardLayout.MAP_PB_ROW);
             pbTeam.setPrefix(ChatColor.AQUA + "PB");
@@ -19390,20 +19412,8 @@ public final class ArcadePortManager implements Listener {
                 pbSuffix += " " + dragonEscapeScoreDelta(session, viewer, viewer.getUniqueId(), pb, null, elapsed);
             }
             pbTeam.setSuffix(ChatColor.WHITE + pbSuffix);
-            view.objective().getScore(pbEntry).setScore(
-                    DragonEscapeRaceScoreboardLayout.MAX_ROWS - DragonEscapeRaceScoreboardLayout.MAP_PB_ROW);
-            String wrEntry = view.entries().get(DragonEscapeRaceScoreboardLayout.MAP_WR_ROW);
-            Team wrTeam = view.teams().get(DragonEscapeRaceScoreboardLayout.MAP_WR_ROW);
-            wrTeam.setPrefix(ChatColor.GOLD + "WR");
-            long wrTime = worldRecord == null ? -1L : worldRecord.timeMillis();
-            String wrSuffix = wrTime > 0L ? " " + ArcadePortRules.formatDragonEscapeTime(wrTime) : " —";
-            if (wrTime > 0L && session.liveStarted && session.alive.contains(viewer.getUniqueId())) {
-                wrSuffix += " " + dragonEscapeScoreDelta(
-                        session, viewer, worldRecord.playerId(), wrTime, null, elapsed);
-            }
-            wrTeam.setSuffix(ChatColor.WHITE + wrSuffix);
-            view.objective().getScore(wrEntry).setScore(
-                    DragonEscapeRaceScoreboardLayout.MAX_ROWS - DragonEscapeRaceScoreboardLayout.MAP_WR_ROW);
+            view.objective().getScore(pbEntry).setScore(nextScore--);
+
             String kitPbEntry = view.entries().get(DragonEscapeRaceScoreboardLayout.KIT_PB_ROW);
             Team kitPbTeam = view.teams().get(DragonEscapeRaceScoreboardLayout.KIT_PB_ROW);
             kitPbTeam.setPrefix(ChatColor.AQUA + DragonEscapeRaceScoreboardLayout.kitRecordLabel(kit, false));
@@ -19413,42 +19423,28 @@ public final class ArcadePortManager implements Listener {
                         session, viewer, viewer.getUniqueId(), kitPb, kit, elapsed);
             }
             kitPbTeam.setSuffix(ChatColor.WHITE + kitPbSuffix);
-            view.objective().getScore(kitPbEntry).setScore(
-                    DragonEscapeRaceScoreboardLayout.MAX_ROWS - DragonEscapeRaceScoreboardLayout.KIT_PB_ROW);
-            String kitWrEntry = view.entries().get(DragonEscapeRaceScoreboardLayout.KIT_WR_ROW);
-            Team kitWrTeam = view.teams().get(DragonEscapeRaceScoreboardLayout.KIT_WR_ROW);
-            kitWrTeam.setPrefix(ChatColor.GOLD + DragonEscapeRaceScoreboardLayout.kitRecordLabel(kit, true));
-            DragonEscapeTimeRecord kitRecord = session.dragonEscapeMapResource == null ? null
-                    : dragonEscapeWorldRecord(session.dragonEscapeMapResource, kit);
-            long kitWr = kitRecord == null ? -1L : kitRecord.timeMillis();
-            String kitWrSuffix = kitWr > 0L ? " " + ArcadePortRules.formatDragonEscapeTime(kitWr) : " —";
-            if (kitWr > 0L && session.liveStarted && session.alive.contains(viewer.getUniqueId())) {
-                kitWrSuffix += " " + dragonEscapeScoreDelta(
-                        session, viewer, kitRecord.playerId(), kitWr, kit, elapsed);
-            }
-            kitWrTeam.setSuffix(ChatColor.WHITE + kitWrSuffix);
-            view.objective().getScore(kitWrEntry).setScore(
-                    DragonEscapeRaceScoreboardLayout.MAX_ROWS - DragonEscapeRaceScoreboardLayout.KIT_WR_ROW);
-            String timerLabelEntry = view.entries().get(DragonEscapeRaceScoreboardLayout.FINISH_TIMER_LABEL_ROW);
-            String timerValueEntry = view.entries().get(DragonEscapeRaceScoreboardLayout.FINISH_TIMER_VALUE_ROW);
+            view.objective().getScore(kitPbEntry).setScore(nextScore--);
+
+            int finishSeparator = DragonEscapeRaceScoreboardLayout.FINISH_SEPARATOR_ROW;
+            int finishLabelRow = DragonEscapeRaceScoreboardLayout.FINISH_TIMER_LABEL_ROW;
+            int finishValueRow = DragonEscapeRaceScoreboardLayout.FINISH_TIMER_VALUE_ROW;
             long remaining = DragonEscapeRaceScoreboardLayout.remainingFinishWindowMillis(
                     session.dragonEscapeFinishWindowEndsAt, now);
             if (remaining > 0L) {
-                Team timerLabel = view.teams().get(DragonEscapeRaceScoreboardLayout.FINISH_TIMER_LABEL_ROW);
+                Team timerGap = view.teams().get(finishSeparator);
+                timerGap.setPrefix(" ");
+                timerGap.setSuffix("");
+                view.objective().getScore(view.entries().get(finishSeparator)).setScore(nextScore--);
+                Team timerLabel = view.teams().get(finishLabelRow);
                 timerLabel.setPrefix(ChatColor.GOLD + "Time Left:");
                 timerLabel.setSuffix("");
-                view.objective().getScore(timerLabelEntry).setScore(
-                        DragonEscapeRaceScoreboardLayout.MAX_ROWS
-                                - DragonEscapeRaceScoreboardLayout.FINISH_TIMER_LABEL_ROW);
-                Team timerValue = view.teams().get(DragonEscapeRaceScoreboardLayout.FINISH_TIMER_VALUE_ROW);
+                view.objective().getScore(view.entries().get(finishLabelRow)).setScore(nextScore--);
+                Team timerValue = view.teams().get(finishValueRow);
                 timerValue.setPrefix(ChatColor.YELLOW + DragonEscapeRaceScoreboardLayout.finishWindowSeconds(remaining));
                 timerValue.setSuffix("");
-                view.objective().getScore(timerValueEntry).setScore(
-                        DragonEscapeRaceScoreboardLayout.MAX_ROWS
-                                - DragonEscapeRaceScoreboardLayout.FINISH_TIMER_VALUE_ROW);
+                view.objective().getScore(view.entries().get(finishValueRow)).setScore(nextScore);
             } else {
-                for (int timerRow : List.of(DragonEscapeRaceScoreboardLayout.FINISH_TIMER_LABEL_ROW,
-                        DragonEscapeRaceScoreboardLayout.FINISH_TIMER_VALUE_ROW)) {
+                for (int timerRow : List.of(finishSeparator, finishLabelRow, finishValueRow)) {
                     view.teams().get(timerRow).setPrefix("");
                     view.teams().get(timerRow).setSuffix("");
                     view.scoreboard().resetScores(view.entries().get(timerRow));
