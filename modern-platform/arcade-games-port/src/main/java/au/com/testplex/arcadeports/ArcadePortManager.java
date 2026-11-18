@@ -20813,6 +20813,21 @@ public final class ArcadePortManager implements Listener {
                 killer = session.players.get(recentHit.attackerId());
             }
         }
+        if (session.type == ArcadePortGame.BACON_BRAWL) {
+            UUID victimId = player.getUniqueId();
+            UUID suppliedKillerId = killer == null ? null : killer.getUniqueId();
+            UUID lastDamagerId = session.baconLastDamager.get(victimId);
+            UUID resolvedKillerId = BaconBrawlKillCreditRules.resolveForDeathMessage(
+                    suppliedKillerId,
+                    suppliedKillerId != null && session.scores.containsKey(suppliedKillerId),
+                    victimId,
+                    lastDamagerId,
+                    lastDamagerId != null && session.scores.containsKey(lastDamagerId),
+                    System.currentTimeMillis(),
+                    session.baconLastDamagedAt.getOrDefault(victimId, 0L),
+                    ArcadePortRules.isBaconArenaKnockoutReason(reason));
+            killer = resolvedKillerId == null ? null : session.players.get(resolvedKillerId);
+        }
         broadcastSourceStyleDeathMessage(session, player, killer, reason);
         if (session.type == ArcadePortGame.DRAGON_ESCAPE && reason != null
                 && reason.toLowerCase(java.util.Locale.ROOT).contains("fell")) {
@@ -20902,23 +20917,6 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.BACON_BRAWL
                 && session.alive.contains(player.getUniqueId())) {
             UUID playerId = player.getUniqueId();
-            UUID suppliedKillerId = killer == null ? null : killer.getUniqueId();
-            boolean suppliedKillerIsValid = suppliedKillerId != null
-                    && !suppliedKillerId.equals(playerId)
-                    && session.scores.containsKey(suppliedKillerId);
-            if (!suppliedKillerIsValid && reason != null) {
-                boolean fallKnockout = ArcadePortRules.isBaconArenaKnockoutReason(reason);
-                long lastHitAt = session.baconLastDamagedAt.getOrDefault(playerId, 0L);
-                if (ArcadePortRules.shouldCreditBaconFallKill(
-                        System.currentTimeMillis(), lastHitAt, fallKnockout)) {
-                    UUID lastAttackerId = session.baconLastDamager.get(playerId);
-                    Player lastAttacker = lastAttackerId == null ? null : session.players.get(lastAttackerId);
-                    if (lastAttackerId != null && session.scores.containsKey(lastAttackerId)
-                            && !lastAttackerId.equals(playerId)) {
-                        killer = lastAttacker;
-                    }
-                }
-            }
             String lastHitSource = session.baconLastHitSource.get(playerId);
             BaconBlastCombo blastCombo = session.baconBlastCombosByVictim.remove(playerId);
             UUID recoveryInterrupterId = session.baconSlamRecoveries.knockout(playerId,
