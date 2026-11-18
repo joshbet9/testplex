@@ -54,6 +54,7 @@ public final class ModernArcadeLobby implements Listener {
     public static final int PLANE_MIN = -50;
     public static final int PLANE_MAX_EXCLUSIVE = 50;
     public static final int FLOOR_Y = 100;
+    public static final int HOTBAR_MAP_EDITOR_SLOT = 0;
     public static final int HOTBAR_PREVIEW_SLOT = 3;
     public static final int HOTBAR_FEEDBACK_SLOT = 1;
     public static final int HOTBAR_LEADERBOARDS_SLOT = 2;
@@ -229,6 +230,15 @@ public final class ModernArcadeLobby implements Listener {
         for (int slot = 0; slot < inventory.getStorageContents().length; slot++) {
             ItemStack item = inventory.getItem(slot);
             if (isLobbyHotbarItem(item)) inventory.setItem(slot, null);
+        }
+        if (plugin instanceof ArcadeMechanicsModernPlugin arcadePlugin
+                && arcadePlugin.hasAdminAccess(player)) {
+            inventory.setItem(HOTBAR_MAP_EDITOR_SLOT, createHotbarItem(Material.GOLDEN_AXE,
+                    ChatColor.GOLD + "Dragon Escape Map Editor",
+                    List.of(ChatColor.GRAY + "Edit an isolated draft of the selected Dragon Escape map.",
+                            ChatColor.YELLOW + "Select Dragon Escape in the Game Panel first.",
+                            ChatColor.DARK_GRAY + "Right-click to open the current map."),
+                    "arcadeport mapedit current"));
         }
         inventory.setItem(HOTBAR_LEADERBOARDS_SLOT, createHotbarItem(Material.NAME_TAG,
                 ChatColor.AQUA + "Lobby Leaderboards",
