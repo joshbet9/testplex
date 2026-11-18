@@ -17900,7 +17900,7 @@ public final class ArcadePortManager implements Listener {
             if ("flutterfly".equals(kit)) {
                 DragonEscapeMovementKits.FlutterState flutter = session.dragonEscapeFlutterStates
                         .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.FlutterState());
-                if (!isDebugAbilityAllowed(player, ArcadePortGame.DRAGON_ESCAPE, kit)) {
+                if (!debugKitFeatureEnabled(player, ArcadePortGame.DRAGON_ESCAPE, kit)) {
                     flutter.tick(false, true);
                 } else {
                     flutter.tick(jumpHeld, grounded);
