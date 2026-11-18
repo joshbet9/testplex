@@ -2,6 +2,7 @@ package au.com.testplex.arcadeports;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import org.bukkit.Sound;
 import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
 import org.junit.jupiter.api.Test;
@@ -55,6 +56,12 @@ class DragonEscapeMovementKitsTest {
         assertEquals(DragonEscapeMovementKits.FLUTTER_FALL_SPEED, result.getY(), 0.0001D);
         Vector reactivated = DragonEscapeMovementKits.flutterVelocity(new Vector(0.1D, -0.3D, 0.0D), true);
         assertEquals(DragonEscapeMovementKits.FLUTTER_START_Y, reactivated.getY(), 0.0001D);
+    }
+
+    @Test
+    void flutterAndWallKickUseTheirRequestedSoundEffects() {
+        assertEquals(Sound.ENTITY_SLIME_JUMP, DragonEscapeMovementKits.FLUTTER_SOUND);
+        assertEquals(Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, DragonEscapeMovementKits.WALL_KICK_SOUND);
     }
 
     @Test
