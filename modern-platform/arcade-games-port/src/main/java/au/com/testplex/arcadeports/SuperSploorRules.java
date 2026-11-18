@@ -2,6 +2,7 @@ package au.com.testplex.arcadeports;
 
 /** Shared, deterministic rules for the Super Sploor territory shooter. */
 public final class SuperSploorRules {
+    public enum SquidModeAction { ENTER, EXIT, NONE }
     public static final int MAX_INK = 100;
     public static final int INK_PER_PRIMARY_SHOT = 4;
     public static final long PRIMARY_SHOT_INTERVAL_MILLIS = 200L;
@@ -96,6 +97,27 @@ public final class SuperSploorRules {
     public static final double ROLLER_PRIMARY_HIT_WIDTH_BLOCKS = 1.25D;
 
     private SuperSploorRules() { }
+
+    /** Squid Mode responds to explicit crouch/drop controls, never ordinary slot changes. */
+    public static SquidModeAction squidModeAction(boolean active, boolean crouchStarted,
+            boolean crouchReleased, boolean dropPressed, boolean primarySelected) {
+        if (active && (crouchReleased || dropPressed || primarySelected)) return SquidModeAction.EXIT;
+        if (!active && (crouchStarted || dropPressed)) return SquidModeAction.ENTER;
+        return SquidModeAction.NONE;
+    }
+
+    public static org.bukkit.ChatColor scoreboardNameColor(int team) {
+        return team == 0 ? org.bukkit.ChatColor.RED : org.bukkit.ChatColor.AQUA;
+    }
+
+    public static String scoreboardTeamHeading(String name, org.bukkit.ChatColor color) {
+        return color + "" + org.bukkit.ChatColor.BOLD + name;
+    }
+
+    public static String scoreboardPaintedBlocks(int blocks, String percentage) {
+        return org.bukkit.ChatColor.WHITE + Integer.toString(Math.max(0, blocks)) + " Blocks "
+                + org.bukkit.ChatColor.GRAY + "(" + percentage + ")";
+    }
 
     public static int debugInt(String suffix, int fallback) {
         return GameDebugRuntimeOverrides.intValue("SUPER_SPLOOR_" + suffix, fallback);
@@ -299,12 +321,4 @@ public final class SuperSploorRules {
                 && nowMillis >= spawnProtectedUntil;
     }
 
-    /** Exclude the authored spawn pad and its immediate room from territory and charge. */
-    public static boolean isSpawnSafeTerritoryBlock(int blockX, int blockY, int blockZ,
-            int spawnX, int spawnY, int spawnZ) {
-        int dx = blockX - spawnX;
-        int dz = blockZ - spawnZ;
-        int dy = blockY - spawnY;
-        return dx * dx + dz * dz <= 9 && dy >= -2 && dy <= 3;
-    }
 }
