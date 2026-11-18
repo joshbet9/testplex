@@ -612,7 +612,12 @@ jobs:
           flyctl volumes list --app "$FLY_APP" --json > "$RUNNER_TEMP/fly-volumes-final.json"
           final_volume_id="$(jq -er '[.[] | select(.name == "testplex_data_restore")] | if length == 1 then .[0].id else error("Testplex data volume missing after runtime verification") end' "$RUNNER_TEMP/fly-volumes-final.json")"
           [[ "$final_volume_id" == "$EXPECTED_VOLUME_ID" ]]
-          restore_fly_autostop
+          if restore_fly_autostop; then
+            echo "FLY_AUTOSTOP_RESTORED:$restore_autostop"
+          else
+            echo "Fly autostop restore returned failure; the exit trap will retry." >&2
+            exit 1
+          fi
 
           # Restoring an idle-stop policy may stop the already-verified Machine
           # immediately. Runtime readiness and the startup marker were checked
