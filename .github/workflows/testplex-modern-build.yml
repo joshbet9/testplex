@@ -529,10 +529,10 @@ jobs:
             local attempt output
             for attempt in $(seq 1 12); do
               if output="$(flyctl machine update "$machine_id" --app "$FLY_APP" --autostop="$policy" --yes --wait-timeout 300 2>&1)"; then
-                printf '%s\\n' "$output"
+                printf '%s\n' "$output"
                 return 0
               fi
-              printf '%s\\n' "$output" >&2
+              printf '%s\n' "$output" >&2
               if ! grep -Eiq 'machine is replacing|concurrent update in progress' <<< "$output"; then
                 echo "Fly rejected an autostop update for a reason that is not a transient replacement lock." >&2
                 return 1
