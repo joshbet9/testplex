@@ -82,6 +82,9 @@ public final class SourceMapCatalog {
             case TURF_WARS -> List.of("Turf Wars");
             case DRAW_MY_THING -> List.of("Draw My Thing");
             case MASTER_BUILDERS -> List.of("Master Builders");
+            case SPEED_BUILDERS -> List.of("Speed Builders");
+            case SNAKE -> List.of("Snake");
+            case MONSTER_MAZE, MONSTER_MAZE_SPEED, MONSTER_MAZE_MODERN -> List.of("Monster Maze");
             case CAMERA_SHY -> List.of();
             case SKY_WARS -> List.of("Skywars");
             case MILK_THE_COW -> List.of("Milk the Cow");
