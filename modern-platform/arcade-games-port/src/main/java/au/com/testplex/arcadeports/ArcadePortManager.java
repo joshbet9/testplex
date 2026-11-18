@@ -17383,6 +17383,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void respawnDragonEscapePractice(Session session, Player player) {
+        releaseAcrobatWallCling(session, player);
         UUID id = player.getUniqueId();
         Location checkpoint = session.dragonEscapePracticeCheckpoints.get(id);
         Location start = session.dragonEscapeStartLocations.get(id);
@@ -17423,6 +17424,7 @@ public final class ArcadePortManager implements Listener {
         session.dragonEscapeSafeLocations.remove(id);
         session.dragonEscapeLeapReadyAt.remove(id);
         session.dragonEscapeFlutterStates.remove(id);
+        releaseAcrobatWallCling(session, player);
         session.dragonEscapeAcrobatStates.remove(id);
         session.dragonEscapeLeapUsesRemaining.put(id,
                 ArcadePortRules.dragonEscapeLeapUses(session.dragonEscapeKits.getOrDefault(id, "jumper")));
@@ -17879,10 +17881,20 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    /** Restore the exact prior gravity state on cling exit, elimination, quit or cleanup. */
+    private void releaseAcrobatWallCling(Session session, Player player) {
+        if (session == null || session.type != ArcadePortGame.DRAGON_ESCAPE || player == null) return;
+        DragonEscapeMovementKits.AcrobatState acrobat =
+                session.dragonEscapeAcrobatStates.get(player.getUniqueId());
+        if (acrobat == null || !acrobat.gravityManaged) return;
+        player.setGravity(acrobat.gravityBeforeCling);
+        acrobat.gravityManaged = false;
+    }
+
     /**
-     * Space is read from Paper's current input each tick: no client-side mod or
-     * extra item is required. Flutterfly can re-flutter on release/repress;
-     * Acrobat must physically touch a wall, regardless of look direction.
+     * Space is read from Paper's current input each tick: no client mod.
+     * Acrobat pins the exact wall-cling Y until the input or charge ends;
+     * cooldown is landing-triggered and never interrupts airborne chains.
      */
     private void updateDragonEscapeMovementKits(Session session, long now) {
         if (!session.liveStarted) return;
@@ -17928,15 +17940,22 @@ public final class ArcadePortManager implements Listener {
 
             DragonEscapeMovementKits.AcrobatState acrobat = session.dragonEscapeAcrobatStates
                     .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.AcrobatState());
-            // Every kick needs an active, XP-draining airborne Shift-stick against
-            // a real wall. Grounded Shift/Space, wall proximity and held jumps
-            // cannot kick. No fixed cling timeout: XP determines hold duration.
+            // Every kick needs an existing XP-draining airborne Shift-stick. A
+            // wall-kick chain has no cooldown until the player next lands.
             boolean enabled = !player.isInWater()
                     && debugKitFeatureEnabled(player, ArcadePortGame.DRAGON_ESCAPE, kit);
             Vector contactNormal = enabled ? DragonEscapeMovementKits.touchingWallNormal(player) : null;
             boolean sticking = acrobat.tickWallCling(enabled && player.isSneaking(),
-                    grounded, contactNormal != null);
+                    grounded, contactNormal != null, now);
             boolean pressed = acrobat.pressedForWallKick(jumpHeld, grounded, sticking);
+            if (!sticking) {
+                releaseAcrobatWallCling(session, player);
+            } else if (!acrobat.gravityManaged) {
+                acrobat.gravityBeforeCling = player.hasGravity();
+                acrobat.clingHeight = player.getLocation().getY();
+                player.setGravity(false);
+                acrobat.gravityManaged = true;
+            }
             player.setLevel(0);
             player.setExp((float) acrobat.charge);
             if (!enabled) continue;
@@ -17946,15 +17965,24 @@ public final class ArcadePortManager implements Listener {
             }
             if (!pressed || contactNormal == null) {
                 if (sticking) {
+                    // No vertical lift, gravity or lateral travel. Retain the
+                    // exact wall height while the player turns to aim the kick.
+                    Location held = player.getLocation();
+                    if (Math.abs(held.getY() - acrobat.clingHeight) > 0.015D) {
+                        held.setY(acrobat.clingHeight);
+                        player.teleport(held);
+                    }
                     player.setVelocity(DragonEscapeMovementKits.wallClingVelocity());
                     player.setFallDistance(0.0F);
                 }
                 continue;
             }
             Vector launch = DragonEscapeMovementKits.wallKickVelocity(
-                    player.getLocation().getDirection(), contactNormal);
+                    player.getLocation().getDirection(), contactNormal,
+                    acrobat.nextWallKickStrength());
             if (launch.lengthSquared() == 0.0D) continue;
-            acrobat.cancelWallClingForKick();
+            acrobat.completeWallKick();
+            releaseAcrobatWallCling(session, player);
             // Preserve the velocity-event protection already used by Dragon Escape leaps.
             pendingDragonEscapeLeapVelocity.put(id, launch);
             player.setVelocity(launch.clone());
@@ -17963,9 +17991,8 @@ public final class ArcadePortManager implements Listener {
                     pendingDragonEscapeLeapVelocity.remove(id);
                 }
             }, 2L);
-            // Champions' original kick supplied a horizontal launch and lift.
-            // Acrobat also uses look pitch to trade horizontal momentum for height;
-            // collision contact, not facing, decides whether the kick is allowed.
+            // Consecutive airborne kicks use 50/75/100% of original Leap;
+            // yaw/pitch steer, and collision contact—not facing—gates use.
             player.getWorld().spawnParticle(Particle.CLOUD,
                     player.getLocation().add(0.0D, 0.65D, 0.0D),
                     12, 0.25D, 0.3D, 0.25D, 0.035D);
@@ -20699,6 +20726,7 @@ public final class ArcadePortManager implements Listener {
     private void eliminate(Session session, Player player, Player killer, String reason) {
         if (active != session || player == null || !session.players.containsKey(player.getUniqueId())
                 || !session.alive.contains(player.getUniqueId())) return;
+        releaseAcrobatWallCling(session, player);
         if (session.dragonEscapePractice) {
             respawnDragonEscapePractice(session, player);
             return;
@@ -23441,6 +23469,11 @@ public final class ArcadePortManager implements Listener {
 
     private void finish(Session session, Player winner, boolean announceWinner) {
         if (active != session) return;
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
+            for (Player participant : session.players.values()) {
+                releaseAcrobatWallCling(session, participant);
+            }
+        }
         if (session.dragonEscapePractice && winner != null) {
             restartDragonEscapePracticeRun(session, winner, false);
             return;
@@ -27376,6 +27409,11 @@ public final class ArcadePortManager implements Listener {
             pendingMixedArcadeVariant = false;
         }
         Session stopping = active;
+        if (stopping != null && stopping.type == ArcadePortGame.DRAGON_ESCAPE) {
+            for (Player participant : stopping.players.values()) {
+                releaseAcrobatWallCling(stopping, participant);
+            }
+        }
         List<Player> participantsToReturn = stopping == null
                 ? List.of() : new ArrayList<>(stopping.players.values());
         Map<UUID, PlayerSnapshot> stopSnapshots = stopping == null
@@ -35624,6 +35662,7 @@ public final class ArcadePortManager implements Listener {
         }
         Session session = active;
         if (session == null || !session.players.containsKey(id)) return;
+        releaseAcrobatWallCling(session, event.getPlayer());
         if (session.dragonEscapePractice) {
             stop("Solo Dragon Escape practice player disconnected");
             return;
