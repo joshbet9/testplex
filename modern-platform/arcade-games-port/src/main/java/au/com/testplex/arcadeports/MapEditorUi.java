@@ -148,7 +148,8 @@ final class MapEditorUi implements Listener {
     private List<MarkerGroup> groups(Player player) {
         ArcadePortGame game = editor.activeGame(player);
         if (game == null) return List.of();
-        SourceMapCatalog.MapData data = SourceMapCatalog.read(plugin, game, player.getWorld());
+        SourceMapCatalog.MapData data = SourceMapCatalog.readEditorDraft(plugin, game,
+                editor.activeResource(player), player.getWorld());
         Map<String, MarkerGroup> all = new LinkedHashMap<>();
         if (data != null) {
             collect(all, "DATA", data.dataLocationGroups());
