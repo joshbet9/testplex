@@ -1300,6 +1300,8 @@ public final class ArcadePortRules {
             case "builder" -> "builder";
             case "warper" -> "warper";
             case "digger" -> "digger";
+            case "flutterfly" -> "flutterfly";
+            case "acrobat" -> "acrobat";
             default -> null;
         };
     }
@@ -1405,6 +1407,7 @@ public final class ArcadePortRules {
             case "disruptor" -> Math.max(0, GameDebugRuntimeOverrides.intValue(
                     "DRAGON_ESCAPE_DISRUPTOR_LEAP_USES", DRAGON_ESCAPE_DISRUPTOR_LEAP_USES));
             case "builder" -> 3;
+            case "acrobat" -> DRAGON_ESCAPE_ACROBAT_LEAP_USES;
             case "warper" -> Math.max(0, GameDebugRuntimeOverrides.intValue(
                     "DRAGON_ESCAPE_WARPER_LEAP_USES", DRAGON_ESCAPE_WARPER_LEAP_USES));
             default -> 0;
@@ -1442,6 +1445,7 @@ public final class ArcadePortRules {
     public static final int DRAGON_ESCAPE_JUMPER_LEAP_USES = 4;
     public static final int DRAGON_ESCAPE_DISRUPTOR_LEAP_USES = 3;
     public static final int DRAGON_ESCAPE_WARPER_LEAP_USES = 2;
+    public static final int DRAGON_ESCAPE_ACROBAT_LEAP_USES = 2;
     public static final double DRAGON_ESCAPE_LEAP_FACING_Y_BONUS = 0.2D;
     public static final double DRAGON_ESCAPE_LEAP_GROUNDED_Y_BONUS = 0.2D;
 
