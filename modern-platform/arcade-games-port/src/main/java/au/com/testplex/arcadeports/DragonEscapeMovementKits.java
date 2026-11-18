@@ -6,8 +6,8 @@ import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
 
 /**
- * New Dragon Escape movement kits. Keeps control/physics rules independent of
- * the match lifecycle so they can be tested without a running Paper server.
+ * Dragon Escape movement kits. Keep input rules, cooldowns and vectors
+ * testable independently of a live Paper server.
  */
 final class DragonEscapeMovementKits {
     // Keep rule helpers independent of Paper's runtime-only sound registry.
@@ -15,27 +15,27 @@ final class DragonEscapeMovementKits {
     static final String WALL_KICK_SOUND_NAME = "ENTITY_FIREWORK_ROCKET_LAUNCH";
     static final String WALL_CLING_SOUND_NAME = "BLOCK_SLIME_BLOCK_PLACE";
     static final double FLUTTER_ACTIVATION_COST = 0.08D;
-    // Approximately 34% less charge per tick than the original hover implementation.
-    static final double FLUTTER_DRAIN_PER_TICK = 0.0125D;
+    // 40% faster XP consumption than the prior 0.0125/tick flutter.
+    static final double FLUTTER_DRAIN_PER_TICK = 0.0175D;
     static final double FLUTTER_REGEN_PER_TICK = 0.009D;
-    // Each fresh airborne Space press buys one up/down/up flutter arc.
+    // A one-block rise precedes each 28-tick Yoshi flutter arc.
+    // Five 0.2-block vertical steps lift the player by approximately one block.
+    static final int FLUTTER_LIFT_TICKS = 5;
+    static final double FLUTTER_LIFT_VERTICAL_SPEED = 0.20D;
     static final int FLUTTER_WAVE_TICKS = 28;
+    static final int FLUTTER_TOTAL_TICKS = FLUTTER_LIFT_TICKS + FLUTTER_WAVE_TICKS;
     static final double FLUTTER_WAVE_BASE_Y = -0.025D;
     static final double FLUTTER_WAVE_AMPLITUDE_Y = 0.22D;
-    // Vanilla level-ground sprint is ~5.612 blocks/s: 80% / 20 TPS.
-    static final double FLUTTER_HORIZONTAL_SPEED = 0.8D * 5.612D / 20.0D;
-    static final double FLUTTER_END_FORWARD_SPEED = 0.26D; // Brief post-flutter carry.
+    // 25% faster than the prior 80%-sprint flutter: now about sprint speed.
+    static final double FLUTTER_HORIZONTAL_SPEED = 1.25D * 0.8D * 5.612D / 20.0D;
+    static final double FLUTTER_END_FORWARD_SPEED = 0.30D; // Brief post-flutter carry.
 
-    static final double WALL_KICK_FORWARD_SPEED = 1.20D;
-    static final double WALL_KICK_UPWARD_SPEED = 0.72D;
-    static final double WALL_KICK_PITCH_LIFT = 0.60D;
-    static final double WALL_KICK_MIN_UPWARD_SPEED = 0.20D;
-    static final double WALL_KICK_MAX_UPWARD_SPEED = 1.20D;
+    // Every wall-jump chain uses fractions of the existing Dragon Escape Leap.
+    static final long WALL_KICK_GROUNDED_COOLDOWN_MILLIS = 10_000L;
     static final double WALL_KICK_MIN_OUTWARD_SPEED = 0.28D;
     // No fixed wall-stick duration: active Shift steadily drains its own XP bar.
     static final double WALL_CLING_DRAIN_PER_TICK = 0.0125D;
     static final double WALL_CLING_REGEN_PER_TICK = 0.009D;
-    static final double WALL_CLING_GRAVITY_COMPENSATION_Y = 0.078D;
     static final double ACROBAT_FALL_DAMAGE_MULTIPLIER = 0.50D;
     private static final double TOUCH_TOLERANCE = 0.055D;
     private static final double MAX_PENETRATION = 0.025D;
@@ -55,6 +55,7 @@ final class DragonEscapeMovementKits {
          * Never activate from a held ground-jump. A release while airborne must
          * arm the next fresh Space press. A press grants exactly ONE 28-tick arc:
          * continuing to hold Space through its end cannot repeat it.
+         * The first five ticks are a one-block lift before the 28-tick arc.
          */
         void tick(boolean jumpHeld, boolean grounded) {
             activated = false;
@@ -71,7 +72,7 @@ final class DragonEscapeMovementKits {
 
             if (!jumpHeld) releasedWhileAirborne = true;
             if (fluttering) {
-                if (!jumpHeld || flutterTicks >= FLUTTER_WAVE_TICKS
+                if (!jumpHeld || flutterTicks >= FLUTTER_TOTAL_TICKS
                         || charge < FLUTTER_DRAIN_PER_TICK) {
                     fluttering = false;
                     ended = true;
@@ -98,7 +99,43 @@ final class DragonEscapeMovementKits {
         boolean crouchConsumed;
         boolean clingActivated;
         boolean clingActive;
+        boolean gravityManaged;
+        boolean gravityBeforeCling;
+        double clingHeight;
         double charge = 1.0D;
+
+        // An airborne chain is unrestricted; cooldown starts ONLY after landing.
+        int wallKicksThisAirborneChain;
+        boolean awaitingLandingAfterKick;
+        long cooldownEndsAtMillis;
+
+        /** Landing after at least one kick starts the full 10-second cooldown. */
+        void tickLanding(boolean grounded, long nowMillis) {
+            if (grounded && awaitingLandingAfterKick) {
+                cooldownEndsAtMillis = Math.max(cooldownEndsAtMillis,
+                        nowMillis + WALL_KICK_GROUNDED_COOLDOWN_MILLIS);
+                awaitingLandingAfterKick = false;
+                wallKicksThisAirborneChain = 0;
+                clingActive = false;
+            }
+        }
+
+        boolean wallKickCoolingDown(long nowMillis) {
+            return nowMillis < cooldownEndsAtMillis;
+        }
+
+        /** First/second/third-or-later consecutive airborne wall kicks: 50/75/100%. */
+        double nextWallKickStrength() {
+            return wallKicksThisAirborneChain == 0 ? 0.50D
+                    : wallKicksThisAirborneChain == 1 ? 0.75D : 1.0D;
+        }
+
+        /** Called only after a real, successful wall kick. */
+        void completeWallKick() {
+            wallKicksThisAirborneChain++;
+            awaitingLandingAfterKick = true;
+            cancelWallClingForKick();
+        }
 
         /**
          * Every wall kick needs a fresh airborne Space press while an already
@@ -111,16 +148,19 @@ final class DragonEscapeMovementKits {
         }
 
         /**
-         * Hold Shift against a real wall while airborne. Stick has NO fixed
-         * duration; energy drains each tick until exhausted or released.
-         * Loss of wall contact, landing, kick, or exhaustion cancels the stick.
-         * A used Shift hold never restarts itself after the bar regenerates.
+         * While airborne, Shift sticks to a physically touched wall and drains
+         * XP continuously. A landing after a wall kick starts a 10-second
+         * lockout; no cooldown ever starts midair, including between chain kicks.
          */
-        boolean tickWallCling(boolean crouching, boolean grounded, boolean touchingWall) {
+        boolean tickWallCling(boolean crouching, boolean grounded, boolean touchingWall, long nowMillis) {
+            tickLanding(grounded, nowMillis);
             clingActivated = false;
             if (!crouching) {
                 crouchConsumed = false;
                 clingActive = false;
+            } else if (wallKickCoolingDown(nowMillis)) {
+                clingActive = false;
+                crouchConsumed = true; // A held Shift during cooldown cannot auto-arm.
             } else if (grounded || !touchingWall) {
                 clingActive = false;
             } else if (!crouchConsumed) {
@@ -131,7 +171,8 @@ final class DragonEscapeMovementKits {
                 }
             }
 
-            boolean sticking = crouching && !grounded && touchingWall && clingActive;
+            boolean sticking = crouching && !grounded && touchingWall && clingActive
+                    && !wallKickCoolingDown(nowMillis);
             if (sticking) {
                 if (charge >= WALL_CLING_DRAIN_PER_TICK) {
                     charge = Math.max(0.0D, charge - WALL_CLING_DRAIN_PER_TICK);
@@ -140,9 +181,7 @@ final class DragonEscapeMovementKits {
                     sticking = false;
                 }
             }
-            if (!sticking) {
-                charge = Math.min(1.0D, charge + WALL_CLING_REGEN_PER_TICK);
-            }
+            if (!sticking) charge = Math.min(1.0D, charge + WALL_CLING_REGEN_PER_TICK);
             return sticking;
         }
 
@@ -153,7 +192,7 @@ final class DragonEscapeMovementKits {
     }
 
     /**
-     * User input steers each flutter at about 80% of standard ground sprint.
+     * User input steers each flutter at around 100% of standard ground sprint.
      * If no directional key is held, continue existing travel direction;
      * looking direction is a fallback when starting from standstill.
      */
@@ -172,12 +211,16 @@ final class DragonEscapeMovementKits {
         return momentum.lengthSquared() > 1.0E-6D ? momentum.normalize() : look;
     }
 
-    /** One bounded Yoshi-style up/down/up arc, never a looping held-space wave. */
+    /** One-block rise followed by one bounded Yoshi up/down/up arc; never repeats on hold. */
     static Vector flutterVelocity(Vector current, Vector travelDirection, int flutterTicks) {
         Vector next = current.clone();
-        double phase = (Math.max(1, Math.min(FLUTTER_WAVE_TICKS, flutterTicks)) - 1)
-                * 2.0D * Math.PI / FLUTTER_WAVE_TICKS;
-        next.setY(FLUTTER_WAVE_BASE_Y + FLUTTER_WAVE_AMPLITUDE_Y * Math.cos(phase));
+        if (flutterTicks <= FLUTTER_LIFT_TICKS) {
+            next.setY(FLUTTER_LIFT_VERTICAL_SPEED);
+        } else {
+            int arcTick = Math.min(FLUTTER_WAVE_TICKS, flutterTicks - FLUTTER_LIFT_TICKS);
+            double phase = (arcTick - 1) * 2.0D * Math.PI / FLUTTER_WAVE_TICKS;
+            next.setY(FLUTTER_WAVE_BASE_Y + FLUTTER_WAVE_AMPLITUDE_Y * Math.cos(phase));
+        }
         Vector direction = travelDirection.clone().setY(0.0D);
         if (direction.lengthSquared() > 1.0E-8D) {
             direction.normalize().multiply(FLUTTER_HORIZONTAL_SPEED);
@@ -205,39 +248,32 @@ final class DragonEscapeMovementKits {
     }
 
     static Vector wallClingVelocity() {
-        // Bukkit applies gravity after each velocity update. Compensate only
-        // during active clinging, without a persistent gravity-state change.
-        return new Vector(0.0D, WALL_CLING_GRAVITY_COMPENSATION_Y, 0.0D);
+        // Used with temporary gravity suppression and a fixed vertical anchor.
+        // No upward velocity is applied: sticking must never act as wall climbing.
+        return new Vector(0.0D, 0.0D, 0.0D);
     }
 
     /**
-     * A Champions-inspired kick steered by the player's full look angle.
-     * Yaw controls horizontal direction; looking up trades horizontal distance
-     * for height, and looking down produces a flatter/lower jump. The outward
-     * minimum prevents a valid wall kick from disappearing into the collision
-     * surface when the player looks directly at the wall.
+     * Original Dragon Escape leap velocity scaled by 50/75/100% for consecutive
+     * airborne wall jumps. The minimum outward push is just collision recovery
+     * when the player aims into the wall, not an extra launch multiplier.
      */
-    static Vector wallKickVelocity(Vector facing, Vector wallNormal) {
-        if (facing == null || wallNormal == null
-                || !Double.isFinite(facing.getX()) || !Double.isFinite(facing.getY())
-                || !Double.isFinite(facing.getZ()) || facing.lengthSquared() < 1.0E-6D) {
+    static Vector wallKickVelocity(Vector facing, Vector wallNormal, double strength) {
+        if (wallNormal == null || !Double.isFinite(strength) || strength <= 0.0D)
             return new Vector();
-        }
-        Vector aim = facing.clone().normalize();
-        Vector horizontal = aim.clone().setY(0.0D).multiply(WALL_KICK_FORWARD_SPEED);
+        Vector launch = ArcadePortRules.dragonEscapeLeapVelocity(facing, false)
+                .multiply(strength);
+        if (launch.lengthSquared() < 1.0E-8D) return new Vector();
         Vector outward = wallNormal.clone().setY(0.0D);
         if (outward.lengthSquared() > 1.0E-6D) {
             outward.normalize();
-            double outwardSpeed = horizontal.dot(outward);
-            if (outwardSpeed < WALL_KICK_MIN_OUTWARD_SPEED) {
-                horizontal.add(outward.multiply(WALL_KICK_MIN_OUTWARD_SPEED - outwardSpeed));
+            double minOutward = WALL_KICK_MIN_OUTWARD_SPEED * strength;
+            double outwardSpeed = launch.dot(outward);
+            if (outwardSpeed < minOutward) {
+                launch.add(outward.multiply(minOutward - outwardSpeed));
             }
         }
-        double upward = Math.max(WALL_KICK_MIN_UPWARD_SPEED,
-                Math.min(WALL_KICK_MAX_UPWARD_SPEED,
-                        WALL_KICK_UPWARD_SPEED + aim.getY() * WALL_KICK_PITCH_LIFT));
-        horizontal.setY(upward);
-        return horizontal;
+        return launch;
     }
 
     /**
