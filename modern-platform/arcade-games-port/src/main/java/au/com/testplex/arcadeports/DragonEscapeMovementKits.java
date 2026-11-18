@@ -97,6 +97,15 @@ final class DragonEscapeMovementKits {
         }
     }
 
+    /** The XP level is the remaining number of Leaps; the bar is cling energy. */
+    record AcrobatExperience(int level, float progress) { }
+
+    static AcrobatExperience acrobatExperience(int remainingLeaps, double wallStickCharge) {
+        int level = Math.max(0, Math.min(ArcadePortRules.DRAGON_ESCAPE_ACROBAT_LEAP_USES, remainingLeaps));
+        float progress = (float) Math.max(0.0D, Math.min(1.0D, wallStickCharge));
+        return new AcrobatExperience(level, progress);
+    }
+
     static final class AcrobatState {
         boolean previouslyHeld;
         boolean crouchConsumed;
