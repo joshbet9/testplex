@@ -17907,6 +17907,10 @@ public final class ArcadePortManager implements Listener {
                     if (flutter.fluttering) {
                         player.setVelocity(DragonEscapeMovementKits.flutterVelocity(
                                 player.getVelocity(), flutter.activated));
+                        if (flutter.activated) {
+                            player.getWorld().playSound(player.getLocation(),
+                                    DragonEscapeMovementKits.FLUTTER_SOUND, 0.8F, 1.2F);
+                        }
                         if (session.ticks % 4L == 0L) {
                             player.getWorld().spawnParticle(Particle.CLOUD,
                                     player.getLocation().add(0.0D, 0.25D, 0.0D),
@@ -17921,7 +17925,7 @@ public final class ArcadePortManager implements Listener {
 
             DragonEscapeMovementKits.AcrobatState acrobat = session.dragonEscapeAcrobatStates
                     .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.AcrobatState());
-            boolean pressed = acrobat.pressedForWallKick(jumpHeld, now);
+            boolean pressed = acrobat.pressedForWallKick(jumpHeld);
             if (!pressed || player.isInWater()
                     || !isDebugAbilityAllowed(player, ArcadePortGame.DRAGON_ESCAPE, kit)) continue;
             // This checks collision geometry, not merely blocks near the player.
@@ -17930,7 +17934,6 @@ public final class ArcadePortManager implements Listener {
             Vector launch = DragonEscapeMovementKits.wallKickVelocity(
                     player.getLocation().getDirection(), contactNormal);
             if (launch.lengthSquared() == 0.0D) continue;
-            acrobat.nextWallKickAt = now + DragonEscapeMovementKits.WALL_KICK_COOLDOWN_MILLIS;
             // Preserve the velocity-event protection already used by Dragon Escape leaps.
             pendingDragonEscapeLeapVelocity.put(id, launch);
             player.setVelocity(launch.clone());
@@ -17945,7 +17948,8 @@ public final class ArcadePortManager implements Listener {
             player.getWorld().spawnParticle(Particle.CLOUD,
                     player.getLocation().add(0.0D, 0.65D, 0.0D),
                     12, 0.25D, 0.3D, 0.25D, 0.035D);
-            player.playSound(player.getLocation(), Sound.ENTITY_BAT_TAKEOFF, 0.85F, 1.25F);
+            player.getWorld().playSound(player.getLocation(),
+                    DragonEscapeMovementKits.WALL_KICK_SOUND, 0.85F, 1.25F);
         }
     }
 
