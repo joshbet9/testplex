@@ -14,10 +14,14 @@ final class DragonEscapeMovementKits {
     static final String FLUTTER_SOUND_NAME = "ENTITY_SLIME_JUMP";
     static final String WALL_KICK_SOUND_NAME = "ENTITY_FIREWORK_ROCKET_LAUNCH";
     static final double FLUTTER_ACTIVATION_COST = 0.08D;
-    static final double FLUTTER_DRAIN_PER_TICK = 0.019D;
+    // Approximately 34% less charge per tick than the original hover implementation.
+    static final double FLUTTER_DRAIN_PER_TICK = 0.0125D;
     static final double FLUTTER_REGEN_PER_TICK = 0.009D;
-    static final double FLUTTER_START_Y = 0.16D;
-    static final double FLUTTER_FALL_SPEED = -0.09D;
+    // Yoshi-style movement: repeated, smooth rising and falling arcs.
+    // The slightly negative baseline prevents unlimited height gain on one hold.
+    static final int FLUTTER_WAVE_TICKS = 28;
+    static final double FLUTTER_WAVE_BASE_Y = -0.025D;
+    static final double FLUTTER_WAVE_AMPLITUDE_Y = 0.22D;
     static final double FLUTTER_HORIZONTAL_MAX = 0.20D;
     static final double WALL_KICK_FORWARD_SPEED = 1.20D;
     static final double WALL_KICK_UPWARD_SPEED = 0.72D;
@@ -25,6 +29,9 @@ final class DragonEscapeMovementKits {
     static final double WALL_KICK_MIN_UPWARD_SPEED = 0.20D;
     static final double WALL_KICK_MAX_UPWARD_SPEED = 1.20D;
     static final double WALL_KICK_MIN_OUTWARD_SPEED = 0.28D;
+    static final int WALL_CLING_MAX_TICKS = 10; // 0.5 seconds at 20 TPS.
+    static final double WALL_CLING_GRAVITY_COMPENSATION_Y = 0.078D;
+    static final double ACROBAT_FALL_DAMAGE_MULTIPLIER = 0.50D;
     private static final double TOUCH_TOLERANCE = 0.055D;
     private static final double MAX_PENETRATION = 0.025D;
 
@@ -36,11 +43,13 @@ final class DragonEscapeMovementKits {
         boolean activated;
         boolean usedCurrentHold;
         int airborneTicks;
+        int flutterTicks;
 
         void tick(boolean jumpHeld, boolean grounded) {
             activated = false;
             if (grounded) {
                 airborneTicks = 0;
+                flutterTicks = 0;
                 fluttering = false;
                 usedCurrentHold = false;
                 charge = Math.min(1.0D, charge + FLUTTER_REGEN_PER_TICK);
@@ -49,6 +58,7 @@ final class DragonEscapeMovementKits {
             airborneTicks++;
             if (!jumpHeld) {
                 fluttering = false;
+                flutterTicks = 0;
                 usedCurrentHold = false;
             } else if (!usedCurrentHold && airborneTicks >= 3) {
                 // Waiting for the third airborne tick allows players to keep
@@ -57,10 +67,12 @@ final class DragonEscapeMovementKits {
                 if (charge >= FLUTTER_ACTIVATION_COST) {
                     charge -= FLUTTER_ACTIVATION_COST;
                     fluttering = true;
+                    flutterTicks = 0;
                     activated = true;
                 }
             }
             if (fluttering) {
+                flutterTicks++;
                 charge = Math.max(0.0D, charge - FLUTTER_DRAIN_PER_TICK);
                 if (charge == 0.0D) fluttering = false;
             } else {
@@ -73,6 +85,8 @@ final class DragonEscapeMovementKits {
 
     static final class AcrobatState {
         boolean previouslyHeld;
+        boolean crouchConsumed;
+        int wallClingTicksRemaining;
 
         /**
          * Wall kicks are chainable with no time-based cooldown. A new press
@@ -84,12 +98,49 @@ final class DragonEscapeMovementKits {
             previouslyHeld = jumpHeld;
             return freshPress;
         }
+
+        /**
+         * Holding crouch against a wall arrests momentum for at most half a
+         * second. One cling per crouch hold: it cannot refresh until Shift
+         * is released, and walking/jumping away cancels the cling immediately.
+         * The caller runs this only while the ability is enabled.
+         */
+        boolean tickWallCling(boolean crouching, boolean grounded, boolean touchingWall) {
+            if (!crouching) {
+                crouchConsumed = false;
+                wallClingTicksRemaining = 0;
+                return false;
+            }
+            if (grounded || !touchingWall) {
+                wallClingTicksRemaining = 0;
+                return false;
+            }
+            if (!crouchConsumed) {
+                wallClingTicksRemaining = WALL_CLING_MAX_TICKS;
+                crouchConsumed = true;
+            }
+            if (wallClingTicksRemaining <= 0) return false;
+            wallClingTicksRemaining--;
+            return true;
+        }
+
+        void cancelWallClingForKick() {
+            wallClingTicksRemaining = 0;
+            crouchConsumed = true;
+        }
     }
 
-    static Vector flutterVelocity(Vector current, boolean activated) {
+    /**
+     * A held flutter traces repeating up-down-up arcs, rather than applying a
+     * one-off hop followed by a fixed downward hover velocity. The wave is
+     * phase-locked to each fresh flutter burst, so release/repress begins a
+     * new arc; every continuous hold retains its repeating flutter movement.
+     */
+    static Vector flutterVelocity(Vector current, int flutterTicks) {
         Vector next = current.clone();
-        next.setY(activated ? Math.max(next.getY(), FLUTTER_START_Y)
-                : Math.max(next.getY(), FLUTTER_FALL_SPEED));
+        int phaseTicks = Math.max(0, flutterTicks - 1) % FLUTTER_WAVE_TICKS;
+        double phase = phaseTicks * 2.0D * Math.PI / FLUTTER_WAVE_TICKS;
+        next.setY(FLUTTER_WAVE_BASE_Y + FLUTTER_WAVE_AMPLITUDE_Y * Math.cos(phase));
         double horizontal = Math.hypot(next.getX(), next.getZ());
         if (horizontal > FLUTTER_HORIZONTAL_MAX) {
             double scale = FLUTTER_HORIZONTAL_MAX / horizontal;
@@ -97,6 +148,18 @@ final class DragonEscapeMovementKits {
             next.setZ(next.getZ() * scale);
         }
         return next;
+    }
+
+    static double acrobatFallDamage(String kit, double vanillaFallDamage) {
+        return "acrobat".equals(kit) ? vanillaFallDamage * ACROBAT_FALL_DAMAGE_MULTIPLIER
+                : vanillaFallDamage;
+    }
+
+    static Vector wallClingVelocity() {
+        // Bukkit applies gravity after each velocity update. This slight
+        // upward compensation keeps the player nearly stationary for 10 ticks
+        // without changing persistent Player gravity or requiring cleanup.
+        return new Vector(0.0D, WALL_CLING_GRAVITY_COMPENSATION_Y, 0.0D);
     }
 
     /**
