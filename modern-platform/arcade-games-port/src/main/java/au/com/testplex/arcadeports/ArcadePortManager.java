@@ -17886,7 +17886,7 @@ public final class ArcadePortManager implements Listener {
     /**
      * Space is read from Paper's current input each tick: no client-side mod or
      * extra item is required. Flutterfly can re-flutter on release/repress;
-     * Acrobat must physically touch a wall with its back toward that wall.
+     * Acrobat must physically touch a wall, regardless of look direction.
      */
     private void updateDragonEscapeMovementKits(Session session, long now) {
         if (!session.liveStarted) return;
@@ -17921,14 +17921,14 @@ public final class ArcadePortManager implements Listener {
 
             DragonEscapeMovementKits.AcrobatState acrobat = session.dragonEscapeAcrobatStates
                     .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.AcrobatState());
-            boolean pressed = acrobat.pressedForWallKick(jumpHeld, grounded, now);
+            boolean pressed = acrobat.pressedForWallKick(jumpHeld, now);
             if (!pressed || player.isInWater()
                     || !isDebugAbilityAllowed(player, ArcadePortGame.DRAGON_ESCAPE, kit)) continue;
             // This checks collision geometry, not merely blocks near the player.
             Vector contactNormal = DragonEscapeMovementKits.touchingWallNormal(player);
             if (contactNormal == null) continue;
             Vector launch = DragonEscapeMovementKits.wallKickVelocity(
-                    player.getLocation().getDirection());
+                    player.getLocation().getDirection(), contactNormal);
             if (launch.lengthSquared() == 0.0D) continue;
             acrobat.nextWallKickAt = now + DragonEscapeMovementKits.WALL_KICK_COOLDOWN_MILLIS;
             // Preserve the velocity-event protection already used by Dragon Escape leaps.
@@ -17939,9 +17939,9 @@ public final class ArcadePortManager implements Listener {
                     pendingDragonEscapeLeapVelocity.remove(id);
                 }
             }, 2L);
-            // Champions' original kick is 0.7 horizontal + 0.7 upward.
-            // Acrobat's 1.2 horizontal + 0.72 upward makes the wall launch
-            // substantial enough for Dragon Escape's faster parkour courses.
+            // Champions' original kick supplied a horizontal launch and lift.
+            // Acrobat also uses look pitch to trade horizontal momentum for height;
+            // collision contact, not facing, decides whether the kick is allowed.
             player.getWorld().spawnParticle(Particle.CLOUD,
                     player.getLocation().add(0.0D, 0.65D, 0.0D),
                     12, 0.25D, 0.3D, 0.25D, 0.035D);
