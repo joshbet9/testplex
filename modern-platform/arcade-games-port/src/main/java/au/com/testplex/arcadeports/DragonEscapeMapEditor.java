@@ -44,7 +44,7 @@ import java.util.UUID;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-/** Admin-only, isolated Dragon Escape map drafts with validated export and reversible publishing. */
+/** Admin-only, isolated source map drafts across every Arcade game with reversible publishing. */
 final class DragonEscapeMapEditor implements Listener {
     private static final String DRAFTS_DIRECTORY = "map-editor/drafts";
     private static final String EXPORTS_DIRECTORY = "map-editor/exports";
@@ -821,11 +821,12 @@ final class DragonEscapeMapEditor implements Listener {
         event.setCancelled(!isDraftOwner(event.getPlayer(), world));
     }
 
-    @EventHandler(ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onDraftInteract(PlayerInteractEvent event) {
-        if (isEditorWorld(event.getPlayer().getWorld()) && !isDraftOwner(event.getPlayer(), event.getPlayer().getWorld())) {
-            event.setCancelled(true);
-        }
+        World world = event.getPlayer().getWorld();
+        if (!isEditorWorld(world)) return;
+        // The dedicated editor UI listener runs after this and cancels its own tool interactions.
+        event.setCancelled(!isDraftOwner(event.getPlayer(), world));
     }
 
     @EventHandler(ignoreCancelled = true)
