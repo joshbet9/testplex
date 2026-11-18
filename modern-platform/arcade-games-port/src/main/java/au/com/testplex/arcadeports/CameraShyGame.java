@@ -308,7 +308,7 @@ public final class CameraShyGame implements Listener {
             player.setFireTicks(Math.max(0, fireTicks));
             player.setFallDistance(Math.max(0.0F, fallDistance));
             player.setVelocity(velocity.clone());
-            if (scoreboard != null) player.setScoreboard(scoreboard);
+            if (scoreboard != null) ArcadeCollisionRules.assign(player, scoreboard);
         }
         private static ItemStack[] cloneItems(ItemStack[] source) {
             ItemStack[] result = new ItemStack[source.length];
@@ -816,7 +816,7 @@ public final class CameraShyGame implements Listener {
             matchScoreboardEntries.add(entry);
         }
         for (Player player : players.values()) {
-            if (player != null && player.isOnline()) player.setScoreboard(scoreboard);
+            if (player != null && player.isOnline()) ArcadeCollisionRules.assign(player, scoreboard);
         }
         updateMatchScoreboard(System.currentTimeMillis());
     }
@@ -862,7 +862,7 @@ public final class CameraShyGame implements Listener {
         }
         for (Player player : players.values()) {
             if (player != null && player.isOnline() && player.getScoreboard() != matchScoreboard) {
-                player.setScoreboard(matchScoreboard);
+                ArcadeCollisionRules.assign(player, matchScoreboard);
             }
         }
     }

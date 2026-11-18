@@ -1,5 +1,6 @@
 package me.monstermaze.util;
 
+import au.com.testplex.arcadeports.ArcadeCollisionRules;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
@@ -206,7 +207,7 @@ public class GameScoreboard {
     public void apply(List<Player> players) {
         for (Player p : players) {
             Scoreboard board = boards.get(p.getUniqueId());
-            if (board != null) p.setScoreboard(board);
+            if (board != null) ArcadeCollisionRules.assign(p, board);
         }
     }
     public void clear(List<Player> players) {
@@ -214,7 +215,7 @@ public class GameScoreboard {
         if (players == null) return;
         for (Player p : players) {
             if (p == null) continue;
-            if (p.isOnline()) p.setScoreboard(main);
+            if (p.isOnline()) ArcadeCollisionRules.assign(p, main);
             boards.remove(p.getUniqueId());
             layoutPlayerCounts.remove(p.getUniqueId());
         }

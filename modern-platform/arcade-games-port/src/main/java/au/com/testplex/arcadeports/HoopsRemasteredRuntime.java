@@ -283,7 +283,7 @@ public final class HoopsRemasteredRuntime implements Listener {
         current.shotClockEndsAt = System.currentTimeMillis() + GameDebugRuntimeOverrides.longValue("HOOPS_SHOT_CLOCK_MILLIS", HoopsRemasteredRules.SHOT_CLOCK_MILLIS);
         current.scoreboard = createScoreboard(current);
         for (Player player : current.players.values()) {
-            if (player != null && player.isOnline()) player.setScoreboard(current.scoreboard);
+            if (player != null && player.isOnline()) ArcadeCollisionRules.assign(player, current.scoreboard);
         }
         List<Player> starters = new ArrayList<>(current.players.values());
         Player first = starters.get(ThreadLocalRandom.current().nextInt(starters.size()));

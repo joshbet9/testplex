@@ -1288,7 +1288,7 @@ public final class PlexballGame implements Listener {
             }
             playerHuds.put(id, hud);
         }
-        if (player.getScoreboard() != hud.scoreboard) player.setScoreboard(hud.scoreboard);
+        if (player.getScoreboard() != hud.scoreboard) ArcadeCollisionRules.assign(player, hud.scoreboard);
         renderScoreboard(player, hud);
     }
 

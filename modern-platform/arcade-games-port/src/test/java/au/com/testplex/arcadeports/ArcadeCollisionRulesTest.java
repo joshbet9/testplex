@@ -53,6 +53,40 @@ class ArcadeCollisionRulesTest {
                 "scoreboard collision rule must still let players pass through one another");
     }
 
+    @Test
+    void assigningReplacementScoreboardImmediatelyDisablesCollisionOnItsTeams() {
+        AtomicBoolean assigned = new AtomicBoolean(false);
+        AtomicBoolean collisionRuleDisabled = new AtomicBoolean(false);
+        Team replacementTeam = proxy(Team.class, (method, args) -> {
+            if (method.equals("getOption")) return Team.OptionStatus.ALWAYS;
+            if (method.equals("setOption") && args[0] == Team.Option.COLLISION_RULE) {
+                collisionRuleDisabled.set(args[1] == Team.OptionStatus.NEVER);
+            }
+            return null;
+        });
+        Scoreboard replacement = proxy(Scoreboard.class, (method, args) -> switch (method) {
+            case "getTeams" -> Set.of(replacementTeam);
+            case "getEntryTeam" -> replacementTeam;
+            case "getTeam" -> null;
+            default -> null;
+        });
+        Player player = proxy(Player.class, (method, args) -> switch (method) {
+            case "isOnline" -> true;
+            case "setScoreboard" -> {
+                assigned.set(args[0] == replacement);
+                yield null;
+            }
+            case "getScoreboard" -> replacement;
+            default -> null;
+        });
+
+        ArcadeCollisionRules.assign(player, replacement);
+
+        assertTrue(assigned.get(), "the replacement game scoreboard must be installed");
+        assertTrue(collisionRuleDisabled.get(),
+                "all teams on a replacement scoreboard must immediately preserve player pass-through");
+    }
+
     private static <T> T proxy(Class<T> type, ProxyCall call) {
         return type.cast(Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type}, (proxy, method, args) -> {
             if (method.getDeclaringClass() == Object.class) {

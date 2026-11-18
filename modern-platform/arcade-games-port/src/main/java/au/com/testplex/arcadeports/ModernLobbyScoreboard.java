@@ -68,7 +68,7 @@ public final class ModernLobbyScoreboard {
         int score = lines.size();
         for (String line : lines) sidebar.getScore(line).setScore(score--);
         applyLobbyTabTeams(scoreboard);
-        player.setScoreboard(scoreboard);
+        ArcadeCollisionRules.assign(player, scoreboard);
     }
 
     /**
