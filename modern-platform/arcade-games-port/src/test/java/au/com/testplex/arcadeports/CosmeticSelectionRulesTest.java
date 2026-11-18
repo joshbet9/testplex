@@ -16,4 +16,11 @@ class CosmeticSelectionRulesTest {
     void selectedCosmeticIsNormalizedForRuntimeConsumers() {
         assertEquals("golden-thread", CosmeticSelectionRules.normalizeOrDisabled(" Golden-Thread "));
     }
+
+    @Test
+    void disabledBeaconColourUsesItsOriginalDefault() {
+        assertEquals("white", CosmeticSelectionRules.selectedOrDefault(null, "white"));
+        assertEquals("white", CosmeticSelectionRules.selectedOrDefault("", "white"));
+        assertEquals("violet", CosmeticSelectionRules.selectedOrDefault(" Violet ", "white"));
+    }
 }

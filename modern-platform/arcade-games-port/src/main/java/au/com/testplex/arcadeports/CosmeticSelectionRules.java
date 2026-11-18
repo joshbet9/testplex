@@ -10,3 +10,9 @@ final class CosmeticSelectionRules {
         return selected == null || selected.isBlank() ? null : selected.trim().toLowerCase(Locale.ROOT);
     }
 }
+
+    static String selectedOrDefault(String selected, String fallback) {
+        String normalized = normalizeOrDisabled(selected);
+        return normalized == null ? fallback : normalized;
+    }
+}

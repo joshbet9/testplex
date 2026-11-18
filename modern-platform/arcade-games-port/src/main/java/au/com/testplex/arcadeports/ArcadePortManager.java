@@ -25451,25 +25451,11 @@ public final class ArcadePortManager implements Listener {
     }
 
     public String dragonEscapeBeaconColor(UUID playerId) {
-        if (playerId == null) return "white";
-        org.bukkit.plugin.Plugin cosmetics = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
-        if (cosmetics != null && cosmetics.isEnabled()) {
-            String selected = selectedGameCosmeticOption(playerId, "dragon-escape",
-                    "winner-beacon-colour", "white");
-            if (selected != null && DRAGON_ESCAPE_BEACON_COLOR_NAMES.contains(selected)) return selected;
-            File preferencesFile = new File(cosmetics.getDataFolder(), "player-preferences.yml");
-            YamlConfiguration preferences = YamlConfiguration.loadConfiguration(preferencesFile);
-            String legacySelected = preferences.getString("players." + playerId
-                    + ".games.dragon-escape.cosmetics.leader-beacon.selected", null);
-            if (legacySelected != null) {
-                legacySelected = legacySelected.toLowerCase(java.util.Locale.ROOT).replace('_', '-');
-                if (DRAGON_ESCAPE_BEACON_COLOR_NAMES.contains(legacySelected)) return legacySelected;
-            }
-        }
-        String value = plugin.getConfig().getString("dragon-escape-beacon-color." + playerId, "white");
-        if (value == null) return "white";
-        value = value.toLowerCase(java.util.Locale.ROOT);
-        return DRAGON_ESCAPE_BEACON_COLOR_NAMES.contains(value) ? value : "white";
+        if (playerId == null || !GameDebugRuntimeOverrides.globalCosmeticsEnabled()) return "white";
+        String selected = selectedGameCosmeticOption(playerId, "dragon-escape",
+                "winner-beacon-colour", "white");
+        String colour = CosmeticSelectionRules.selectedOrDefault(selected, "white");
+        return DRAGON_ESCAPE_BEACON_COLOR_NAMES.contains(colour) ? colour : "white";
     }
 
     public boolean setDragonEscapeBeaconColor(Player player, String requested) {
