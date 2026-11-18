@@ -27128,17 +27128,8 @@ public final class ArcadePortManager implements Listener {
                     + ChatColor.YELLOW + killer.getName() + ChatColor.GRAY + " with "
                     + ChatColor.AQUA + killMode + ChatColor.GRAY + ".";
         } else if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
-            String normalized = reason == null ? "" : reason.toLowerCase(java.util.Locale.ROOT);
-            if (normalized.contains("dragon")) {
-                body = ChatColor.YELLOW + victim.getName() + ChatColor.GRAY
-                        + " was caught by Douglas the Dragon!";
-            } else if (normalized.contains("fell") || normalized.contains("fall")) {
-                body = ChatColor.YELLOW + victim.getName() + ChatColor.GRAY
-                        + " fell from the Skylands course!";
-            } else {
-                body = ChatColor.YELLOW + victim.getName() + ChatColor.GRAY
-                        + " couldn't escape the dragon!";
-            }
+            body = ChatColor.YELLOW + victim.getName() + ChatColor.GRAY + " "
+                    + SourceDeathMessageRules.dragonEscapeCause(reason);
         } else if (killer != null && killer.isOnline() && !killer.getUniqueId().equals(victim.getUniqueId())) {
             body = ChatColor.YELLOW + victim.getName() + ChatColor.GRAY + " was killed by "
                     + ChatColor.YELLOW + killer.getName() + ChatColor.GRAY + " with "
@@ -27224,14 +27215,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private static String sourceDeathCause(String reason) {
-        if (reason == null || reason.isBlank()) return "has died";
-        String normalized = reason.toLowerCase(java.util.Locale.ROOT).trim();
-        if (normalized.contains("fell") || normalized.contains("fall")) return "fell to their death";
-        if (normalized.contains("void")) return "fell into the void";
-        if (normalized.contains("starv")) return "starved to death";
-        if (normalized.contains("burn")) return "burned to death";
-        if (normalized.startsWith("was ")) return normalized;
-        return "was killed by " + normalized;
+        return SourceDeathMessageRules.genericCause(reason);
     }
 
     public void stop(String reason) {
