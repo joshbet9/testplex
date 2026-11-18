@@ -530,7 +530,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             addPlayerToWitherTeamHud(player);
             refreshHeroesOfGwenTowerHealthForOpponentTeam(team);
         }
-        if (castleScoreboard != null) player.setScoreboard(castleScoreboard);
+
         return true;
     }
 
@@ -1992,7 +1992,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             updateCastleScoreboardTeams();
         }
         for (Player player : players.values()) {
-            if (player != null && player.isOnline()) player.setScoreboard(castleScoreboard);
+
         }
     }
 
@@ -2213,7 +2213,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 entries.add(entry);
             }
             heroesScoreboards.put(player.getUniqueId(), new HeroesScoreboardView(board, objective, lineTeams, entries));
-            player.setScoreboard(board);
+
         }
     }
 
@@ -2232,7 +2232,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 line.setPrefix(lines.get(index));
                 view.objective.getScore(view.entries.get(index)).setScore(lines.size() - index);
             }
-            if (player.getScoreboard() != view.scoreboard) player.setScoreboard(view.scoreboard);
+
         }
     }
 

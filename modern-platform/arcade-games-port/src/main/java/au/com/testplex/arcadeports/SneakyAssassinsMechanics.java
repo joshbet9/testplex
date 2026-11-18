@@ -410,7 +410,7 @@ final class SneakyAssassinsMechanics {
         for (Player player : players.values()) {
             if (player != null && player.isOnline()) {
                 previousScoreboards.put(player.getUniqueId(), player.getScoreboard());
-                player.setScoreboard(scoreboard);
+
             }
         }
     }
@@ -1346,7 +1346,7 @@ final class SneakyAssassinsMechanics {
     void onPlayerRespawn(Player player) {
         if (player == null || !players.containsKey(player.getUniqueId())) return;
         players.put(player.getUniqueId(), player);
-        if (scoreboard != null && player.isOnline()) player.setScoreboard(scoreboard);
+
     }
 
     void onKill(Player killer, Player victim) {
@@ -1520,7 +1520,7 @@ final class SneakyAssassinsMechanics {
             if (player != null) {
                 player.removePotionEffect(PotionEffectType.WITHER);
                 Scoreboard previous = previousScoreboards.get(id);
-                if (player.isOnline() && previous != null) player.setScoreboard(previous);
+
             }
         }
         for (PowerUp powerUp : new ArrayList<>(powerUps)) removePowerUp(powerUp);

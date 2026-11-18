@@ -1117,7 +1117,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         Objective objective = scoreboard.registerNewObjective("wizards", Criteria.DUMMY, ChatColor.YELLOW + "Wizards");
         objective.setDisplaySlot(DisplaySlot.SIDEBAR);
         matchObjectives.put(player.getUniqueId(), objective);
-        player.setScoreboard(scoreboard);
+
         updateMatchScoreboard(player, objective);
     }
 
@@ -3490,7 +3490,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
             if (location != null && location.getWorld() != null) player.teleport(location);
             if (compassTarget != null && compassTarget.getWorld() != null) player.setCompassTarget(compassTarget);
             player.setSprinting(sprinting);
-            if (scoreboard != null) player.setScoreboard(scoreboard);
+
             player.setInvulnerable(invulnerable);
         }
 

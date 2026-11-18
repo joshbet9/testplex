@@ -1719,7 +1719,7 @@ public final class SuperSploorRuntime implements Listener {
         scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
         objective = scoreboard.registerNewObjective("sploor", "dummy", ChatColor.GOLD + "" + ChatColor.BOLD + "SUPER SPLOOR");
         objective.setDisplaySlot(DisplaySlot.SIDEBAR);
-        for (Player player : players.values()) player.setScoreboard(scoreboard);
+
     }
 
     private void updateScoreboard(long now) {

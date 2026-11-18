@@ -5,8 +5,15 @@ import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 
 /** Shared Mineplex 1.8 player pass-through behavior for active arcade matches. */
-final class ArcadeCollisionRules {
+public final class ArcadeCollisionRules {
     private ArcadeCollisionRules() {
+    }
+
+    /** Assigns a game or lobby scoreboard and immediately reapplies pass-through. */
+    public static void assign(Player player, Scoreboard scoreboard) {
+        if (player == null || !player.isOnline() || scoreboard == null) return;
+        player.setScoreboard(scoreboard);
+        disable(player);
     }
 
     static void disable(Player player) {
