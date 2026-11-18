@@ -26,4 +26,12 @@ for map_directory in "Wizards" "Nano Wizards"; do
     fi
 done
 
+# Check the Paper server's own persistent startup log, rather than Fly's
+# best-effort recent log stream. This is the actual final Arcade bootstrap marker.
+startup_log="$server_root/logs/latest.log"
+if [ ! -f "$startup_log" ] || ! grep -Fq 'TESTPLEX_ARCADE_BOOTSTRAP phase=full-runtime-readiness-published' "$startup_log"; then
+    echo "Fly Arcade bootstrap completion marker is missing from $startup_log" >&2
+    exit 1
+fi
+
 printf 'TESTPLEX_FLY_RUNTIME_VERIFIED:%s\n' "$expected_sha"
