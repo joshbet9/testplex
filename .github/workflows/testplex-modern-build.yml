@@ -494,31 +494,40 @@ jobs:
             flyctl machine start "$machine_id" --app "$FLY_APP"
           fi
 
-          # Fly may auto-stop the machine while a deployment verifier polls its
-          # health state without an active service connection. Keep one harmless
-          # TCP connection to the Minecraft port open during startup checks so
-          # auto-stop cannot race the verifier and turn a healthy release into a
-          # false failure. The connection sends no game packets and is closed as
-          # soon as the checks finish.
-          connection_log="$RUNNER_TEMP/fly-runtime-connection.log"
-          (
-            for attempt in $(seq 1 90); do
-              if exec 3<>/dev/tcp/monstermaze.fly.dev/25566 2>/dev/null; then
-                echo "Connected to the deployed Minecraft service; holding connection through health verification."
-                sleep 180
-                exit 0
-              fi
-              sleep 2
-            done
-            echo "Could not establish a connection to monstermaze.fly.dev:25566 during startup."
-            exit 1
-          ) >"$connection_log" 2>&1 &
-          connection_guard_pid=$!
-          cleanup_connection_guard() {
-            kill "$connection_guard_pid" 2>/dev/null || true
-            wait "$connection_guard_pid" 2>/dev/null || true
+          # Fly's idle autostop can terminate this single-machine app while this
+          # workflow performs the in-container verifier. Temporarily disable only
+          # autostop on the existing volume-owning Machine, then restore the exact
+          # previous policy in an EXIT trap. fly machine update preserves the
+          # existing Machine config/mount and waits for its checks before returning.
+          autostop_policy="$(jq -er --arg id "$machine_id" '[.[] | select(.id == $id)][0].config.services[] | .autostop | tostring' "$RUNNER_TEMP/fly-machines-after.json" | head -n 1)"
+          case "$autostop_policy" in
+            true|stop) restore_autostop=stop ;;
+            suspend) restore_autostop=suspend ;;
+            false|off) restore_autostop=off ;;
+            *) echo "Unexpected Fly autostop policy [$autostop_policy]; refusing to alter it." >&2; exit 1 ;;
+          esac
+          autostop_restore_needed=false
+          restore_fly_autostop() {
+            if [[ "$autostop_restore_needed" == true ]]; then
+              echo "Restoring Fly autostop policy [$restore_autostop] on the existing Machine."
+              flyctl machine update "$machine_id" --app "$FLY_APP" --autostop="$restore_autostop" --yes --wait-timeout 300
+              autostop_restore_needed=false
+            fi
           }
-          trap cleanup_connection_guard EXIT
+          restore_on_exit() {
+            exit_status=$?
+            trap - EXIT
+            if ! restore_fly_autostop; then
+              echo "Could not restore the original Fly autostop policy; manual recovery is required." >&2
+              exit_status=1
+            fi
+            exit "$exit_status"
+          }
+          trap restore_on_exit EXIT
+          if [[ "$restore_autostop" != off ]]; then
+            autostop_restore_needed=true
+            flyctl machine update "$machine_id" --app "$FLY_APP" --autostop=off --yes --wait-timeout 300
+          fi
 
           ready=false
           for attempt in $(seq 1 30); do
@@ -555,7 +564,27 @@ jobs:
           flyctl volumes list --app "$FLY_APP" --json > "$RUNNER_TEMP/fly-volumes-final.json"
           final_volume_id="$(jq -er '[.[] | select(.name == "testplex_data_restore")] | if length == 1 then .[0].id else error("Testplex data volume missing after runtime verification") end' "$RUNNER_TEMP/fly-volumes-final.json")"
           [[ "$final_volume_id" == "$EXPECTED_VOLUME_ID" ]]
-          echo "Fly production is running $GITHUB_SHA with the original stats volume $final_volume_id."
+          restore_fly_autostop
+
+          # The autostop-policy restoration recreates the Machine from its saved
+          # image. Re-check the exact release after that restart and collect the
+          # corresponding startup log before declaring production healthy.
+          flyctl ssh console --app "$FLY_APP" --machine "$machine_id" \
+            --command "$remote_command" | tee "$RUNNER_TEMP/fly-runtime-verification-restored.log"
+          grep -Fx "TESTPLEX_FLY_RUNTIME_VERIFIED:$GITHUB_SHA" "$RUNNER_TEMP/fly-runtime-verification-restored.log"
+          flyctl logs --app "$FLY_APP" --machine "$machine_id" --no-tail > "$RUNNER_TEMP/fly-startup-restored.log"
+          grep -F 'TESTPLEX_ARCADE_BOOTSTRAP phase=complete' "$RUNNER_TEMP/fly-startup-restored.log"
+
+          flyctl machine list --app "$FLY_APP" --json > "$RUNNER_TEMP/fly-machines-final.json"
+          jq -e --arg id "$machine_id" --arg sha "$GITHUB_SHA" --arg policy "$restore_autostop" '
+            [.[] | select(.id == $id)] as $m |
+            ($m | length) == 1 and
+            $m[0].state == "started" and
+            $m[0].host_status == "ok" and
+            $m[0].image_ref.labels["org.opencontainers.image.revision"] == $sha and
+            ([$m[0].config.services[] | .autostop | tostring] | all(. == $policy or ($policy == "stop" and . == "true")))
+          ' "$RUNNER_TEMP/fly-machines-final.json" >/dev/null
+          echo "Fly production is running $GITHUB_SHA with the original stats volume $final_volume_id and restored autostop policy $restore_autostop."
 
 
 
