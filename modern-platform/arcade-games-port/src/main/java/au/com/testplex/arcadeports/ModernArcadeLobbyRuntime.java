@@ -31,6 +31,7 @@ import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerAnimationEvent;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
@@ -239,6 +240,33 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         refreshKitAndTeamNpcs();
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=selected-game-kit-team-npcs-complete");
         if (cosmeticPreviewWorld != null) refreshShowcase();
+    }
+
+    /** Restore selected-game pads only when the persisted selection or its NPC set is stale. */
+    void refreshCurrentSelection() {
+        String configuredId = plugin.getConfig().getString("lobby-selected-game");
+        ArcadePortGame current = ArcadeLobbyLifecycleRules.selectedGameAfterReturn(configuredId, selectedGame);
+        int expectedKitNpcs = kitChoicesFor(current).size();
+        int expectedTeamNpcs = Math.max(1, ArcadePortManager.teamCountForGame(current));
+        boolean npcListsReady = kitNpcs.size() == expectedKitNpcs
+                && kitNpcs.stream().allMatch(entity -> entity != null && entity.isValid())
+                && teamNpcs.size() == expectedTeamNpcs
+                && teamNpcs.stream().allMatch(entity -> entity != null && entity.isValid());
+        if (!npcListsReady || ArcadeLobbyLifecycleRules.lobbySelectionNeedsRefresh(configuredId, selectedGame,
+                kitNpcs.size(), expectedKitNpcs, teamNpcs.size(), expectedTeamNpcs)) {
+            setSelectedGame(current);
+        }
+    }
+
+    @EventHandler
+    public void onPlayerReturnToLobby(PlayerChangedWorldEvent event) {
+        if (!lobby.isLobbyWorld(event.getPlayer().getWorld())) return;
+        // Wait for the teleport and lobby chunks to finish loading before repairing the selector.
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (event.getPlayer().isOnline() && lobby.isLobbyWorld(event.getPlayer().getWorld())) {
+                refreshCurrentSelection();
+            }
+        });
     }
 
     public void refreshDisplays() {
