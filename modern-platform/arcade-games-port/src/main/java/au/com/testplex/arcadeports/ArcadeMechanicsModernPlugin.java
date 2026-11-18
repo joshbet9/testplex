@@ -25,6 +25,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     private WizardsGameManager wizards;
     private PlexballGame plexball;
     private ArcadeMapSelectionMenu mapMenu;
+    private DragonEscapeMapEditor dragonEscapeMapEditor;
     private GamePreferenceMenu preferenceMenu;
     private CameraShyGame cameraShy;
     private SpeedBuildersGame speedBuilders;
@@ -94,6 +95,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         plexball = new PlexballGame(this);
         getServer().getPluginManager().registerEvents(plexball, this);
         mapMenu = new ArcadeMapSelectionMenu(this);
+        dragonEscapeMapEditor = new DragonEscapeMapEditor(this);
         speedBuilders = new SpeedBuildersGame(this);
         getServer().getPluginManager().registerEvents(speedBuilders, this);
         preferenceMenu = new GamePreferenceMenu(this, manager);
@@ -323,6 +325,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         else if (wizards != null) wizards.shutdown();
         if (speedBuilders != null) speedBuilders.shutdown();
         if (plexball != null) plexball.shutdown();
+        if (dragonEscapeMapEditor != null) dragonEscapeMapEditor.saveOpenDrafts();
     }
 
     private void publishArcadeRuntimeReadiness() {
@@ -581,6 +584,13 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         }
         String sub = args.length == 0 ? "help" : args[0].toLowerCase(java.util.Locale.ROOT);
         switch (sub) {
+            case "mapedit":
+                if (dragonEscapeMapEditor == null) {
+                    sender.sendMessage(ChatColor.RED + "The Dragon Escape map editor is unavailable.");
+                    return true;
+                }
+                return dragonEscapeMapEditor.handle(sender,
+                        java.util.Arrays.copyOfRange(args, 1, args.length));
             case "join":
             case "play":
                 if (!(sender instanceof Player player)) {

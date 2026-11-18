@@ -19,6 +19,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Base64;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -240,7 +241,7 @@ public final class SourceMapCatalog {
         }
         if (relative.isAbsolute()) return null;
         Path candidate = root.resolve(relative).normalize();
-        if (!candidate.startsWith(root) || candidate.equals(root)
+        if (Files.isSymbolicLink(root) || !candidate.startsWith(root) || candidate.equals(root)
                 || hasSymbolicLinkBetween(root, candidate)
                 || !Files.isRegularFile(candidate, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return null;
         return candidate;
@@ -248,6 +249,9 @@ public final class SourceMapCatalog {
 
     private static InputStream openMapArchive(JavaPlugin plugin, String resource) throws IOException {
         if (plugin == null || resource == null || resource.isBlank()) return null;
+        Path publishedOverride = publishedOverridePath(plugin.getDataFolder().toPath(),
+                plugin.getConfig().getString(publishedOverrideConfigKey(resource)));
+        if (publishedOverride != null) return Files.newInputStream(publishedOverride);
         InputStream bundled = plugin.getResource(resource);
         if (bundled != null) return bundled;
         for (Path root : externalMapRoots(plugin)) {
@@ -255,6 +259,36 @@ public final class SourceMapCatalog {
             if (external != null) return Files.newInputStream(external);
         }
         return null;
+    }
+
+    static String publishedOverrideConfigKey(String resource) {
+        if (resource == null || resource.isBlank()) return null;
+        String encoded = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(resource.getBytes(StandardCharsets.UTF_8));
+        return "map-editor.published.current." + encoded;
+    }
+
+    /** Resolve only immutable editor exports under this plugin's own data directory. */
+    static Path publishedOverridePath(Path pluginData, String configuredPath) {
+        if (pluginData == null || configuredPath == null || configuredPath.isBlank()
+                || configuredPath.indexOf('\\') >= 0 || configuredPath.startsWith("/")
+                || configuredPath.contains("..")) return null;
+        Path root = pluginData.toAbsolutePath().normalize();
+        Path relative;
+        try {
+            relative = Path.of(configuredPath);
+        } catch (InvalidPathException exception) {
+            return null;
+        }
+        if (relative.isAbsolute() || relative.getNameCount() < 3
+                || !"map-editor".equals(relative.getName(0).toString())
+                || !"published".equals(relative.getName(1).toString())
+                || !configuredPath.toLowerCase(java.util.Locale.ROOT).endsWith(".zip")) return null;
+        Path candidate = root.resolve(relative).normalize();
+        if (!candidate.startsWith(root) || candidate.equals(root)
+                || hasSymbolicLinkBetween(root, candidate)
+                || !Files.isRegularFile(candidate, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return null;
+        return candidate;
     }
 
     private static String mapNameFromResource(String resource) {
@@ -977,6 +1011,19 @@ public final class SourceMapCatalog {
     /** Extract a selected archive discovered from any validated source-map folder pool. */
     public static boolean installResource(JavaPlugin plugin, String resource, String worldName) {
         return installResourceInternal(plugin, resource, worldName, false);
+    }
+
+    /** Install one explicitly selected approved map into an isolated source world. */
+    public static boolean installResource(JavaPlugin plugin, ArcadePortGame game, String resource, String worldName) {
+        if (!resourcePathBelongsToGame(game, resource)) {
+            if (plugin != null) plugin.getLogger().severe("Refusing a source map outside the "
+                    + (game == null ? "unknown game's" : game.displayName() + "'s") + " approved map pool: " + resource);
+            return false;
+        }
+        // Dragon Escape's older downloader archives may omit Reborn WorldConfig.dat;
+        // the map editor is specifically where their missing route points get repaired.
+        return installResourceInternal(plugin, resource, worldName,
+                game == ArcadePortGame.WIZARDS || game == ArcadePortGame.DRAGON_ESCAPE);
     }
 
     /** Compatibility entry point used by the existing shared Arcade map loader. */
@@ -2085,6 +2132,14 @@ public final class SourceMapCatalog {
             public boolean contains(int x, int z) {
                 return x >= minX && x <= maxX && z >= minZ && z <= maxZ;
             }
+        }
+        /** All authored DATA marker groups, copied so editors cannot mutate cached match metadata. */
+        public Map<String, List<Location>> dataLocationGroups() {
+            Map<String, List<Location>> copy = new LinkedHashMap<>();
+            for (Map.Entry<String, List<Location>> entry : dataLocations.entrySet()) {
+                copy.put(entry.getKey(), copyLocations(entry.getValue()));
+            }
+            return Map.copyOf(copy);
         }
         /** All authored custom marker groups, copied so match runtimes cannot mutate map metadata. */
         public Map<String, List<Location>> customLocationGroups() {
