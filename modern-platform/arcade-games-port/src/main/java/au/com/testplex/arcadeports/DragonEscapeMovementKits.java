@@ -1,6 +1,5 @@
 package au.com.testplex.arcadeports;
 
-import java.util.Collection;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.util.BoundingBox;
@@ -20,6 +19,10 @@ final class DragonEscapeMovementKits {
     static final long WALL_KICK_COOLDOWN_MILLIS = 1_500L;
     static final double WALL_KICK_FORWARD_SPEED = 1.20D;
     static final double WALL_KICK_UPWARD_SPEED = 0.72D;
+    static final double WALL_KICK_PITCH_LIFT = 0.60D;
+    static final double WALL_KICK_MIN_UPWARD_SPEED = 0.20D;
+    static final double WALL_KICK_MAX_UPWARD_SPEED = 1.20D;
+    static final double WALL_KICK_MIN_OUTWARD_SPEED = 0.28D;
     private static final double TOUCH_TOLERANCE = 0.055D;
     private static final double MAX_PENETRATION = 0.025D;
 
@@ -68,21 +71,15 @@ final class DragonEscapeMovementKits {
 
     static final class AcrobatState {
         boolean previouslyHeld;
-        boolean releasedSinceJump;
-        int airborneTicks;
         long nextWallKickAt;
 
-        boolean pressedForWallKick(boolean jumpHeld, boolean grounded, long now) {
-            if (grounded) {
-                airborneTicks = 0;
-                releasedSinceJump = false;
-                previouslyHeld = jumpHeld;
-                return false;
-            }
-            airborneTicks++;
-            if (!jumpHeld) releasedSinceJump = true;
-            boolean freshPress = jumpHeld && !previouslyHeld && releasedSinceJump
-                    && airborneTicks >= 2 && now >= nextWallKickAt;
+        /**
+         * A fresh Space press can wall-kick while grounded or airborne, provided
+         * the player is physically touching a wall (checked by the caller).
+         * Holding Space cannot repeatedly fire kicks.
+         */
+        boolean pressedForWallKick(boolean jumpHeld, long now) {
+            boolean freshPress = jumpHeld && !previouslyHeld && now >= nextWallKickAt;
             previouslyHeld = jumpHeld;
             return freshPress;
         }
@@ -101,28 +98,43 @@ final class DragonEscapeMovementKits {
         return next;
     }
 
-    /** The Champions Assassin Leap wall kick launches along the player's facing. */
-    static Vector wallKickVelocity(Vector facing) {
-        Vector forward = facing.clone().setY(0.0D);
-        if (forward.lengthSquared() < 1.0E-6D) return new Vector();
-        forward.normalize().multiply(WALL_KICK_FORWARD_SPEED);
-        forward.setY(WALL_KICK_UPWARD_SPEED);
-        return forward;
+    /**
+     * A Champions-inspired kick steered by the player's full look angle.
+     * Yaw controls horizontal direction; looking up trades horizontal distance
+     * for height, and looking down produces a flatter/lower jump. The outward
+     * minimum prevents a valid wall kick from disappearing into the collision
+     * surface when the player looks directly at the wall.
+     */
+    static Vector wallKickVelocity(Vector facing, Vector wallNormal) {
+        if (facing == null || wallNormal == null
+                || !Double.isFinite(facing.getX()) || !Double.isFinite(facing.getY())
+                || !Double.isFinite(facing.getZ()) || facing.lengthSquared() < 1.0E-6D) {
+            return new Vector();
+        }
+        Vector aim = facing.clone().normalize();
+        Vector horizontal = aim.clone().setY(0.0D).multiply(WALL_KICK_FORWARD_SPEED);
+        Vector outward = wallNormal.clone().setY(0.0D);
+        if (outward.lengthSquared() > 1.0E-6D) {
+            outward.normalize();
+            double outwardSpeed = horizontal.dot(outward);
+            if (outwardSpeed < WALL_KICK_MIN_OUTWARD_SPEED) {
+                horizontal.add(outward.multiply(WALL_KICK_MIN_OUTWARD_SPEED - outwardSpeed));
+            }
+        }
+        double upward = Math.max(WALL_KICK_MIN_UPWARD_SPEED,
+                Math.min(WALL_KICK_MAX_UPWARD_SPEED,
+                        WALL_KICK_UPWARD_SPEED + aim.getY() * WALL_KICK_PITCH_LIFT));
+        horizontal.setY(upward);
+        return horizontal;
     }
 
     /**
-     * Contact means the player's actual bounding box touches a collidable
-     * side-face of the wall (not a proximity check or an adjacent block scan).
-     * The player must face away from the wall, as in Champions' back-wall kick.
-     * Blocks below the feet alone cannot count as a wall.
+     * Only physical collision-box contact with a collidable wall side counts.
+     * Facing toward, away from or along the wall all qualify. Floor/ceiling
+     * contact and merely being near a wall do not.
      */
     static Vector touchingWallNormal(Player player) {
         BoundingBox hitbox = player.getBoundingBox();
-        Vector facing = player.getLocation().getDirection().setY(0.0D);
-        if (facing.lengthSquared() < 1.0E-6D) return null;
-        facing.normalize();
-        Vector winner = null;
-        double bestDot = 0.35D;
         for (int x = (int) Math.floor(hitbox.getMinX() - TOUCH_TOLERANCE);
                 x <= Math.floor(hitbox.getMaxX() + TOUCH_TOLERANCE); x++) {
             for (int y = (int) Math.floor(hitbox.getMinY() + 0.15D);
@@ -133,22 +145,17 @@ final class DragonEscapeMovementKits {
                     if (block.isEmpty()) continue;
                     for (BoundingBox shape : block.getCollisionShape().getBoundingBoxes()) {
                         BoundingBox worldShape = shape.clone().shift(x, y, z);
-                        Vector normal = contactNormal(hitbox, worldShape, facing);
-                        if (normal == null) continue;
-                        double dot = normal.dot(facing);
-                        if (dot > bestDot) {
-                            bestDot = dot;
-                            winner = normal;
-                        }
+                        Vector normal = contactNormal(hitbox, worldShape);
+                        if (normal != null) return normal;
                     }
                 }
             }
         }
-        return winner;
+        return null;
     }
 
     /** Testable side-contact check, using full collision shapes (including slabs/fences). */
-    static Vector contactNormal(BoundingBox player, BoundingBox wall, Vector facing) {
+    static Vector contactNormal(BoundingBox player, BoundingBox wall) {
         double yOverlap = Math.min(player.getMaxY() - 0.12D, wall.getMaxY())
                 - Math.max(player.getMinY() + 0.15D, wall.getMinY());
         if (yOverlap < 0.25D) return null;
@@ -157,34 +164,32 @@ final class DragonEscapeMovementKits {
         double zOverlap = Math.min(player.getMaxZ(), wall.getMaxZ())
                 - Math.max(player.getMinZ(), wall.getMinZ());
         Vector best = null;
-        double score = 0.35D;
+        double nearestGap = Double.POSITIVE_INFINITY;
         if (zOverlap > 0.08D) {
-            double westWallGap = player.getMinX() - wall.getMaxX();
-            if (westWallGap >= -MAX_PENETRATION && westWallGap <= TOUCH_TOLERANCE
-                    && facing.getX() > score) {
+            double westGap = player.getMinX() - wall.getMaxX();
+            if (westGap >= -MAX_PENETRATION && westGap <= TOUCH_TOLERANCE) {
                 best = new Vector(1, 0, 0);
-                score = facing.getX();
+                nearestGap = Math.abs(westGap);
             }
-            double eastWallGap = wall.getMinX() - player.getMaxX();
-            if (eastWallGap >= -MAX_PENETRATION && eastWallGap <= TOUCH_TOLERANCE
-                    && -facing.getX() > score) {
+            double eastGap = wall.getMinX() - player.getMaxX();
+            if (eastGap >= -MAX_PENETRATION && eastGap <= TOUCH_TOLERANCE
+                    && Math.abs(eastGap) < nearestGap) {
                 best = new Vector(-1, 0, 0);
-                score = -facing.getX();
+                nearestGap = Math.abs(eastGap);
             }
         }
         if (xOverlap > 0.08D) {
-            double northWallGap = player.getMinZ() - wall.getMaxZ();
-            if (northWallGap >= -MAX_PENETRATION && northWallGap <= TOUCH_TOLERANCE
-                    && facing.getZ() > score) {
+            double northGap = player.getMinZ() - wall.getMaxZ();
+            if (northGap >= -MAX_PENETRATION && northGap <= TOUCH_TOLERANCE
+                    && Math.abs(northGap) < nearestGap) {
                 best = new Vector(0, 0, 1);
-                score = facing.getZ();
+                nearestGap = Math.abs(northGap);
             }
-            double southWallGap = wall.getMinZ() - player.getMaxZ();
-            if (southWallGap >= -MAX_PENETRATION && southWallGap <= TOUCH_TOLERANCE
-                    && -facing.getZ() > score) {
+            double southGap = wall.getMinZ() - player.getMaxZ();
+            if (southGap >= -MAX_PENETRATION && southGap <= TOUCH_TOLERANCE
+                    && Math.abs(southGap) < nearestGap) {
                 best = new Vector(0, 0, -1);
             }
         }
         return best;
-    }
-}
+    }}
