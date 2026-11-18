@@ -5419,7 +5419,7 @@ public final class ArcadePortManager implements Listener {
             }
         }
         active = session;
-        markBaconBrawlLegacyFoodIsolation(session);
+        markLegacyFoodIsolation(session);
         activateDebugProfile(requester != null ? requester : sender instanceof Player player ? player : null, type);
         if (type == ArcadePortGame.SKY_WARS) {
             initializeSkyWarsMapResources(session, sourceMapData.get(type.id()));
@@ -15001,18 +15001,20 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    private void markBaconBrawlLegacyFoodIsolation(Session session) {
-        if (!ArcadePortRules.shouldIsolateBaconBrawlLegacyFoodReset(session.type)) return;
+    private void markLegacyFoodIsolation(Session session) {
+        if (!ArcadePortRules.shouldIsolateLegacyFoodReset(session.type)) return;
         for (Player player : session.players.values()) {
             if (player != null && player.isOnline()) {
+                // Keep this metadata key stable: the legacy GameFlagManager uses it to skip
+                // its direct FAST-tick hunger/health reset. Spleef shares that reset path.
                 player.setMetadata("testplex-modern-bacon-brawl",
                         new org.bukkit.metadata.FixedMetadataValue(plugin, true));
             }
         }
     }
 
-    private void clearBaconBrawlLegacyFoodIsolation(Session session) {
-        if (!ArcadePortRules.shouldIsolateBaconBrawlLegacyFoodReset(session.type)) return;
+    private void clearLegacyFoodIsolation(Session session) {
+        if (!ArcadePortRules.shouldIsolateLegacyFoodReset(session.type)) return;
         for (Player player : session.players.values()) {
             if (player != null) player.removeMetadata("testplex-modern-bacon-brawl", plugin);
         }
@@ -23529,7 +23531,7 @@ public final class ArcadePortManager implements Listener {
             restoreDragonEscapePracticeCourse(session);
             if (session.dragonEscapePractice) session.dragonEscapeBlockRestoreTokens.clear();
         }
-        clearBaconBrawlLegacyFoodIsolation(session);
+        clearLegacyFoodIsolation(session);
         active = null;
         GameDebugRuntimeOverrides.clear();
         if (activeDebugProfileGame == session.type) {
