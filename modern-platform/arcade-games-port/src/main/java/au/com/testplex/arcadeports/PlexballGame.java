@@ -1925,7 +1925,8 @@ public final class PlexballGame implements Listener {
     private Material ballCosmeticMaterial(UUID ownerId) {
         String option = "carbon";
         Plugin cosmetics = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
-        if (ownerId != null && cosmetics != null && cosmetics.isEnabled()) {
+        if (ownerId != null && cosmetics != null && cosmetics.isEnabled()
+                && GameDebugRuntimeOverrides.globalCosmeticsEnabled()) {
             try {
                 Object selected = cosmetics.getClass()
                         .getMethod("getSelectedCosmeticOption", UUID.class, String.class, String.class)
