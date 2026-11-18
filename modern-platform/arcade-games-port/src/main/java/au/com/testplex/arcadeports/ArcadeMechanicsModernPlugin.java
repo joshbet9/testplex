@@ -102,6 +102,9 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(mapMenu, this);
         getServer().getPluginManager().registerEvents(preferenceMenu, this);
+        // Independently owned lobby/game scoreboards are also covered by the shared
+        // blank-number policy. Re-check newly assigned boards without changing scores.
+        Bukkit.getScheduler().runTaskTimer(this, SidebarNumberFormat::applyToOnlinePlayers, 1L, 5L);
         Bukkit.getWorlds().forEach(ArcadeMechanicsModernPlugin::disableLocatorBar);
         getCommand("stats").setExecutor(this);
         getCommand("arcadeport").setExecutor(this);

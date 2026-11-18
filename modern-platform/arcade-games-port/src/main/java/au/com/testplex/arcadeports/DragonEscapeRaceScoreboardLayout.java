@@ -1,23 +1,40 @@
 package au.com.testplex.arcadeports;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.TreeSet;
 import org.bukkit.ChatColor;
 
-/** Layout and row styling for the compact Dragon Escape race sidebar. */
+/** Viewer-local, compact Dragon Escape sidebar layout and racer styling. */
 final class DragonEscapeRaceScoreboardLayout {
-    static final int MAX_ROWS = 15;
-    static final int RECORD_ROW_COUNT = 4;
-    static final int FINISH_TIMER_ROW_COUNT = 2;
-    static final int RACER_ROW_COUNT = MAX_ROWS - RECORD_ROW_COUNT - FINISH_TIMER_ROW_COUNT;
-    static final int MAP_PB_ROW = RACER_ROW_COUNT;
-    static final int MAP_WR_ROW = MAP_PB_ROW + 1;
-    static final int KIT_PB_ROW = MAP_WR_ROW + 1;
-    static final int KIT_WR_ROW = KIT_PB_ROW + 1;
-    static final int FINISH_TIMER_LABEL_ROW = KIT_WR_ROW + 1;
+    static final int MAX_ROWS = 12;
+    static final int RACER_ROW_COUNT = 6;
+    static final int STANDINGS_SEPARATOR_ROW = RACER_ROW_COUNT;
+    static final int MAP_PB_ROW = STANDINGS_SEPARATOR_ROW + 1;
+    static final int KIT_PB_ROW = MAP_PB_ROW + 1;
+    static final int FINISH_SEPARATOR_ROW = KIT_PB_ROW + 1;
+    static final int FINISH_TIMER_LABEL_ROW = FINISH_SEPARATOR_ROW + 1;
     static final int FINISH_TIMER_VALUE_ROW = FINISH_TIMER_LABEL_ROW + 1;
 
     enum RacerStatus { RUNNING, FINISHED, ELIMINATED }
 
     private DragonEscapeRaceScoreboardLayout() { }
+
+    /**
+     * The leading three racers and the viewer's nearest neighbours are always
+     * included, in actual placement order. Overlap never produces duplicates.
+     */
+    static List<Integer> visibleRankPositions(int racerCount, int viewerIndex) {
+        if (racerCount <= 0) return List.of();
+        TreeSet<Integer> positions = new TreeSet<>();
+        for (int index = 0; index < Math.min(3, racerCount); index++) positions.add(index);
+        if (viewerIndex >= 0 && viewerIndex < racerCount) {
+            if (viewerIndex > 0) positions.add(viewerIndex - 1);
+            positions.add(viewerIndex);
+            if (viewerIndex + 1 < racerCount) positions.add(viewerIndex + 1);
+        }
+        return new ArrayList<>(positions);
+    }
 
     static long displayedElapsedMillis(long elapsedMillis, boolean firstLiveFrame) {
         return firstLiveFrame ? 0L : Math.max(0L, elapsedMillis);
@@ -48,6 +65,11 @@ final class DragonEscapeRaceScoreboardLayout {
 
     static String racerName(String name, RacerStatus status) {
         return color(status).toString() + strikethrough(status) + name;
+    }
+
+    static String racerName(String name, RacerStatus status, int placement, boolean ownName) {
+        return (ownName ? ChatColor.GREEN : color(status)).toString()
+                + strikethrough(status) + placement + ". " + name;
     }
 
     static String racerTime(String value, RacerStatus status) {
