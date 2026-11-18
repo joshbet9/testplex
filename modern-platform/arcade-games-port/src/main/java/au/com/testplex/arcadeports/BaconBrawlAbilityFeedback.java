@@ -1,5 +1,6 @@
 package au.com.testplex.arcadeports;
 
+import org.bukkit.ChatColor;
 import org.bukkit.Material;
 
 /** Names and input routing for Bacon Brawl's charge-meter ability feedback. */
@@ -18,11 +19,11 @@ final class BaconBrawlAbilityFeedback {
     }
 
     static String readyMessage(String kit) {
-        return abilityName(kit) + " Ready";
+        return ChatColor.BOLD + abilityName(kit) + " Ready";
     }
 
     static String maxMessage(String kit) {
-        return abilityName(kit) + " MAX";
+        return ChatColor.BOLD + abilityName(kit) + " MAX";
     }
 
     static String primaryItemName(String kit) {
