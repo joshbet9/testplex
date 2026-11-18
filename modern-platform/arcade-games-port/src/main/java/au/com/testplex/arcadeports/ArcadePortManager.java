@@ -7500,6 +7500,11 @@ public final class ArcadePortManager implements Listener {
         objective.setDisplaySlot(DisplaySlot.SIDEBAR);
         session.sharedMatchScoreboard = scoreboard;
         session.sharedMatchScoreboardObjective = objective;
+        if (session.type == ArcadePortGame.MILK_THE_COW) {
+            session.milkCowBelowNameObjective = scoreboard.registerNewObjective(
+                    "milk", "dummy", ChatColor.GOLD + "Milk");
+            session.milkCowBelowNameObjective.setDisplaySlot(DisplaySlot.BELOW_NAME);
+        }
         for (int index = 0; index < 15; index++) {
             Team line = scoreboard.registerNewTeam("matchline" + index);
             String entry = ChatColor.values()[index].toString() + ChatColor.RESET;
@@ -7527,6 +7532,23 @@ public final class ArcadePortManager implements Listener {
                             session.alive.contains(player.getUniqueId())))
                     .toList();
             lines.addAll(RunnerScoreboardRules.lines(runners));
+        } else if (session.type == ArcadePortGame.MILK_THE_COW) {
+            List<Player> players = session.participantIds.stream()
+                    .map(session.players::get)
+                    .filter(java.util.Objects::nonNull)
+                    .sorted((left, right) -> Integer.compare(
+                            session.scores.getOrDefault(right.getUniqueId(), 0),
+                            session.scores.getOrDefault(left.getUniqueId(), 0)))
+                    .toList();
+            for (Player player : players) {
+                int score = session.scores.getOrDefault(player.getUniqueId(), 0);
+                int role = session.teams.getOrDefault(player.getUniqueId(), 0);
+                ChatColor roleColor = role == 1 ? ChatColor.RED : ChatColor.AQUA;
+                lines.add(roleColor + player.getName() + ChatColor.WHITE + ": " + score);
+                if (session.milkCowBelowNameObjective != null) {
+                    session.milkCowBelowNameObjective.getScore(player.getName()).setScore(score);
+                }
+            }
         } else if (session.type == ArcadePortGame.TURF_WARS) {
             lines.add(ChatColor.RED + Integer.toString(turfWarsRemainingLines(session, 0)) + " Red");
             lines.add(ChatColor.AQUA + Integer.toString(turfWarsRemainingLines(session, 1)) + " Blue");
@@ -9925,6 +9947,24 @@ public final class ArcadePortManager implements Listener {
                 }
                 updateBaconMeterItem(session, player);
 
+                break;
+            }
+            case MILK_THE_COW: {
+                int role = session.teams.getOrDefault(player.getUniqueId(), 0);
+                List<Material> loadout = MilkCowRules.loadoutMaterials(role);
+                for (int slot = 0; slot < loadout.size(); slot++) {
+                    Material material = loadout.get(slot);
+                    ItemStack item = switch (material) {
+                        case IRON_AXE -> namedItem(material, "Cow Bomb",
+                                "Right-click to hurl a cow bomb at the Farmers.");
+                        case IRON_SHOVEL -> namedItem(material, "Body Slam",
+                                "Right-click to leap and slam into nearby Farmers.");
+                        case LEATHER -> namedItem(material, "Cow Charge",
+                                "Sprint into Farmers to knock them back and empty their milk.");
+                        default -> new ItemStack(material);
+                    };
+                    player.getInventory().setItem(slot, item);
+                }
                 break;
             }
             case BOMB_LOBBERS: {
@@ -30776,6 +30816,36 @@ public final class ArcadePortManager implements Listener {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Session session = active;
         if (session == null) return;
+        if (session.type == ArcadePortGame.MILK_THE_COW) {
+            Player player = event.getPlayer();
+            ItemStack held = event.getItem();
+            String action = held != null && held.hasItemMeta() && held.getItemMeta().hasDisplayName()
+                    ? ChatColor.stripColor(held.getItemMeta().getDisplayName()) : "";
+            if (session.alive.contains(player.getUniqueId())
+                    && session.teams.getOrDefault(player.getUniqueId(), 0) == 1
+                    && event.getAction().isRightClick()) {
+                if ("Cow Bomb".equals(action)) {
+                    event.setCancelled(true);
+                    if (!plugin.hasAdminAccess(player) || debugFeatureEnabled(player.getUniqueId(),
+                            ArcadePortGame.MILK_THE_COW, "cow-bomb", true)) {
+                        launchMilkCowBomb(session, player, System.currentTimeMillis());
+                    } else {
+                        player.sendActionBar(ChatColor.RED + "Cow Bomb is disabled in your debug profile.");
+                    }
+                    return;
+                }
+                if ("Body Slam".equals(action)) {
+                    event.setCancelled(true);
+                    if (!plugin.hasAdminAccess(player) || debugFeatureEnabled(player.getUniqueId(),
+                            ArcadePortGame.MILK_THE_COW, "body-slam", true)) {
+                        startMilkCowBodySlam(session, player, System.currentTimeMillis());
+                    } else {
+                        player.sendActionBar(ChatColor.RED + "Body Slam is disabled in your debug profile.");
+                    }
+                    return;
+                }
+            }
+        }
         if (session.type == ArcadePortGame.GLADIATORS
                 && session.gladiatorVotingEndsAt > System.currentTimeMillis()
                 && event.getAction().isRightClick() && event.getItem() != null
