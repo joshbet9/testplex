@@ -489,22 +489,40 @@ jobs:
           [[ "$machine_id" == "$EXPECTED_MACHINE_ID" ]] || { echo "Fly deployment selected a different machine than the existing volume owner; refusing to continue." >&2; exit 1; }
           attached_volume="$(jq -er --arg id "$machine_id" '[.[] | select(.id == $id)][0].config.mounts[] | select(.path == "/server") | .volume' "$RUNNER_TEMP/fly-machines-after.json")"
           [[ "$attached_volume" == "$EXPECTED_VOLUME_ID" ]] || { echo "The original persistent volume is not mounted by the deployed machine." >&2; exit 1; }
-          state="$(jq -er --arg id "$machine_id" '[.[] | select(.id == $id)][0].state' "$RUNNER_TEMP/fly-machines-after.json")"
-          if [[ "$state" == "stopped" ]]; then
-            flyctl machine start "$machine_id" --app "$FLY_APP"
+          # Wait for Fly to finish promoting the replacement before issuing another
+          # Machine update. A deploy can return while the previous image is still replacing.
+          replacement_ready=false
+          for attempt in $(seq 1 36); do
+            flyctl machine list --app "$FLY_APP" --json > "$RUNNER_TEMP/fly-machines-after.json"
+            if jq -e --arg id "$machine_id" --arg sha "$GITHUB_SHA" --arg volume "$EXPECTED_VOLUME_ID" '
+              [.[] | select(.id == $id)] as $m |
+              ($m | length) == 1 and
+              $m[0].host_status == "ok" and
+              ($m[0].state == "stopped" or $m[0].state == "started") and
+              $m[0].image_ref.labels["org.opencontainers.image.revision"] == $sha and
+              any($m[0].config.mounts[]?; .path == "/server" and (.volume == $volume or .volume_id == $volume))
+            ' "$RUNNER_TEMP/fly-machines-after.json" >/dev/null; then
+              replacement_ready=true
+              break
+            fi
+            sleep 5
+          done
+          if [[ "$replacement_ready" != true ]]; then
+            echo "Fly did not finish promoting the expected image on the original volume-owning Machine." >&2
+            cat "$RUNNER_TEMP/fly-machines-after.json" >&2
+            flyctl machine status "$machine_id" --app "$FLY_APP" || true
+            flyctl logs --app "$FLY_APP" --machine "$machine_id" --no-tail || true
+            exit 1
           fi
 
-          # Fly's idle autostop can terminate this single-machine app while this
-          # workflow performs the in-container verifier. Temporarily disable only
-          # autostop on the existing volume-owning Machine, then restore the exact
-          # previous policy in an EXIT trap. Deploy can return while Fly still holds
-          # a replacement lock, so retry only that documented transient conflict.
-          autostop_policy="$(jq -er --arg id "$machine_id" '[.[] | select(.id == $id)][0].config.services | map(.autostop | tostring) | unique | if length == 1 then .[0] else error("expected one consistent Fly autostop policy") end' "$RUNNER_TEMP/fly-machines-after.json")"
-          case "$autostop_policy" in
+          # The checked-in app config is authoritative. The previous failed attempt
+          # may have left the Machine's temporary autostop setting at off.
+          restore_autostop="$(awk -F '"' '/^[[:space:]]*auto_stop_machines[[:space:]]*=/{print $2; exit}' fly.toml)"
+          case "$restore_autostop" in
             true|stop) restore_autostop=stop ;;
             suspend) restore_autostop=suspend ;;
             false|off) restore_autostop=off ;;
-            *) echo "Unexpected Fly autostop policy [$autostop_policy]; refusing to alter it." >&2; exit 1 ;;
+            *) echo "Could not read the intended auto_stop_machines policy from fly.toml." >&2; exit 1 ;;
           esac
           fly_machine_update_autostop() {
             local policy="$1"
@@ -530,7 +548,7 @@ jobs:
           autostop_restore_needed=false
           restore_fly_autostop() {
             if [[ "$autostop_restore_needed" == true ]]; then
-              echo "Restoring Fly autostop policy [$restore_autostop] on the existing Machine."
+              echo "Restoring Fly autostop policy [$restore_autostop] from fly.toml."
               fly_machine_update_autostop "$restore_autostop"
               autostop_restore_needed=false
             fi
@@ -539,15 +557,26 @@ jobs:
             exit_status=$?
             trap - EXIT
             if ! restore_fly_autostop; then
-              echo "Could not restore the original Fly autostop policy; manual recovery is required." >&2
+              echo "Could not restore the configured Fly autostop policy; manual recovery is required." >&2
               exit_status=1
             fi
             exit "$exit_status"
           }
           trap restore_on_exit EXIT
+
+          # Disable autostop before waking a stopped machine; otherwise Fly can
+          # stop it again between the start request and runtime verification.
           if [[ "$restore_autostop" != off ]]; then
             autostop_restore_needed=true
             fly_machine_update_autostop off
+          fi
+          flyctl machine list --app "$FLY_APP" --json > "$RUNNER_TEMP/fly-machines-after.json"
+          state="$(jq -er --arg id "$machine_id" '[.[] | select(.id == $id)][0].state' "$RUNNER_TEMP/fly-machines-after.json")"
+          if [[ "$state" == "stopped" || "$state" == "suspended" ]]; then
+            flyctl machine start "$machine_id" --app "$FLY_APP"
+          elif [[ "$state" != "started" ]]; then
+            echo "Cannot start Fly Machine from unexpected state [$state]." >&2
+            exit 1
           fi
 
           ready=false
