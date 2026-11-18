@@ -1,5 +1,6 @@
 package au.com.testplex.snake;
 
+import au.com.testplex.arcadeports.ArcadeCollisionRules;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.DyeColor;
@@ -550,7 +551,7 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
             matchScoreboardEntries.add(entry);
         }
         for (SnakeState state : snakes.values()) {
-            if (state.player.isOnline()) state.player.setScoreboard(scoreboard);
+            if (state.player.isOnline()) ArcadeCollisionRules.assign(state.player, scoreboard);
         }
         updateMatchScoreboard(System.currentTimeMillis());
     }
@@ -599,7 +600,7 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
         }
         for (SnakeState state : snakes.values()) {
             if (state.player.isOnline() && state.player.getScoreboard() != matchScoreboard) {
-                state.player.setScoreboard(matchScoreboard);
+                ArcadeCollisionRules.assign(state.player, matchScoreboard);
             }
         }
     }
@@ -1897,7 +1898,7 @@ public final class SnakeGameManager implements Listener, ArcadeGameModule, Comma
             for (PotionEffect effect : potionEffects) player.addPotionEffect(effect);
             player.setAllowFlight(allowFlight);
             if (allowFlight) player.setFlying(flying);
-            if (scoreboard != null) player.setScoreboard(scoreboard);
+            if (scoreboard != null) ArcadeCollisionRules.assign(player, scoreboard);
         }
 
         private static ItemStack[] cloneItems(ItemStack[] items) {
