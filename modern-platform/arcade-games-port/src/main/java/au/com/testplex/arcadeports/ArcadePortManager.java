@@ -17906,7 +17906,7 @@ public final class ArcadePortManager implements Listener {
                     flutter.tick(jumpHeld, grounded);
                     if (flutter.fluttering) {
                         player.setVelocity(DragonEscapeMovementKits.flutterVelocity(
-                                player.getVelocity(), flutter.activated));
+                                player.getVelocity(), flutter.flutterTicks));
                         if (flutter.activated) {
                             player.getWorld().playSound(player.getLocation(),
                                     Sound.valueOf(DragonEscapeMovementKits.FLUTTER_SOUND_NAME), 0.8F, 1.2F);
@@ -17926,14 +17926,25 @@ public final class ArcadePortManager implements Listener {
             DragonEscapeMovementKits.AcrobatState acrobat = session.dragonEscapeAcrobatStates
                     .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.AcrobatState());
             boolean pressed = acrobat.pressedForWallKick(jumpHeld);
-            if (!pressed || player.isInWater()
-                    || !isDebugAbilityAllowed(player, ArcadePortGame.DRAGON_ESCAPE, kit)) continue;
-            // This checks collision geometry, not merely blocks near the player.
+            if (player.isInWater()
+                    || !debugKitFeatureEnabled(player, ArcadePortGame.DRAGON_ESCAPE, kit)) {
+                acrobat.tickWallCling(false, true, false);
+                continue;
+            }
+            // The collision shape, not mere block proximity or camera facing,
+            // decides wall contact for both immediate kicks and optional clings.
             Vector contactNormal = DragonEscapeMovementKits.touchingWallNormal(player);
-            if (contactNormal == null) continue;
+            if (!pressed || contactNormal == null) {
+                if (acrobat.tickWallCling(player.isSneaking(), grounded, contactNormal != null)) {
+                    player.setVelocity(DragonEscapeMovementKits.wallClingVelocity());
+                    player.setFallDistance(0.0F);
+                }
+                continue;
+            }
             Vector launch = DragonEscapeMovementKits.wallKickVelocity(
                     player.getLocation().getDirection(), contactNormal);
             if (launch.lengthSquared() == 0.0D) continue;
+            acrobat.cancelWallClingForKick();
             // Preserve the velocity-event protection already used by Dragon Escape leaps.
             pendingDragonEscapeLeapVelocity.put(id, launch);
             player.setVelocity(launch.clone());
@@ -29516,18 +29527,21 @@ public final class ArcadePortManager implements Listener {
             if (session.type == ArcadePortGame.DRAGON_ESCAPE
                     && session.alive.contains(target.getUniqueId())
                     && event.getCause() == EntityDamageEvent.DamageCause.FALL) {
-                // Preserve vanilla fall damage while the shared handler cancels the
-                // native event to keep all Arcade damage in one consistent path.
-                if (incomingDamage > 0.0D) {
+                // Preserve vanilla fall damage for existing kits. Acrobat gets
+                // 50% mitigation, applied before the shared health/elimination path.
+                double fallDamage = DragonEscapeMovementKits.acrobatFallDamage(
+                        session.dragonEscapeKits.getOrDefault(target.getUniqueId(), "jumper"),
+                        incomingDamage);
+                if (fallDamage > 0.0D) {
                     session.dragonEscapeDamageTaken.add(target.getUniqueId());
                     target.playEffect(EntityEffect.HURT);
                     target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.9F, 0.85F);
                     target.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
                             target.getLocation().clone().add(0.0D, 1.0D, 0.0D),
                             5, 0.25D, 0.3D, 0.25D, 0.02D);
-                    if (target.getHealth() <= incomingDamage) eliminate(session, target, null, "fell");
+                    if (target.getHealth() <= fallDamage) eliminate(session, target, null, "fell");
                     else {
-                        target.setHealth(target.getHealth() - incomingDamage);
+                        target.setHealth(target.getHealth() - fallDamage);
                         playLegacyDamageFeedback(target);
                     }
                 }
