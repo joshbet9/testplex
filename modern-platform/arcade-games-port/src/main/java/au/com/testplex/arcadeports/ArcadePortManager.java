@@ -31522,7 +31522,8 @@ public final class ArcadePortManager implements Listener {
         UUID id = player.getUniqueId();
         Material item = heldItem.getType();
         return switch (session.type) {
-            case BACON_BRAWL -> item == Material.IRON_AXE;
+            case BACON_BRAWL -> BaconBrawlAbilityFeedback.shouldRouteRightClickAbility(
+                    session.baconKits.getOrDefault(id, "el-muchacho-pigo"), item);
             case BOMB_LOBBERS -> isBombLobbersThrownTnt(heldItem)
                     || "wind-charge".equals(bombLobbersPowerupType(heldItem))
                     || "speed-boost".equals(bombLobbersPowerupType(heldItem))

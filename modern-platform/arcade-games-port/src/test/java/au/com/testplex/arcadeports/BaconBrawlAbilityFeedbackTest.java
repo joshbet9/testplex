@@ -35,6 +35,16 @@ class BaconBrawlAbilityFeedbackTest {
     }
 
     @Test
+    void crispyDashRightClickIsRoutedRegardlessOfClickedTarget() {
+        assertTrue(BaconBrawlAbilityFeedback.shouldRouteRightClickAbility(
+                "chris-p-bacon", Material.BLAZE_POWDER));
+        assertTrue(BaconBrawlAbilityFeedback.shouldRouteRightClickAbility(
+                "el-muchacho-pigo", Material.IRON_AXE));
+        assertFalse(BaconBrawlAbilityFeedback.shouldRouteRightClickAbility(
+                "mama-piggles", Material.BLAZE_POWDER));
+    }
+
+    @Test
     void blockedBrutusHitHasDedicatedFeedbackLabel() {
         assertEquals("Shield!", BaconBrawlAbilityFeedback.brutusBlockedHitLabel());
     }
