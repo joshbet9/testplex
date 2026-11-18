@@ -95,27 +95,44 @@ class DragonEscapeMovementKitsTest {
     }
 
     @Test
-    void wallKicksChainOnEveryFreshSpacePressWithoutATimer() {
+    void wallKicksChainOnEveryNewAirborneSpacePressWithoutCooldown() {
         DragonEscapeMovementKits.AcrobatState state = new DragonEscapeMovementKits.AcrobatState();
-        // On-ground and midair contact are both eligible; the caller checks
-        // the player's physical contact with a wall on each activation.
-        assertTrue(state.pressedForWallKick(true));
-        assertFalse(state.pressedForWallKick(true)); // Holding is not auto-repeat.
-        assertFalse(state.pressedForWallKick(false));
-        assertTrue(state.pressedForWallKick(true));  // Immediate second kick.
-        assertFalse(state.pressedForWallKick(false));
-        assertTrue(state.pressedForWallKick(true));  // Immediate third kick.
-        assertFalse(state.pressedForWallKick(true));
+        // A ground jump against an already-touching wall is NOT a wall kick.
+        assertFalse(state.pressedForWallKick(true, true));
+        assertFalse(state.pressedForWallKick(true, false),
+                "Continuing to hold the normal ground jump cannot kick");
+        // Release and press while airborne against a wall; each new press
+        // can kick immediately, subject to the caller's wall-contact check.
+        assertFalse(state.pressedForWallKick(false, false));
+        assertTrue(state.pressedForWallKick(true, false));
+        assertFalse(state.pressedForWallKick(true, false)); // Holding is not auto-repeat.
+        assertFalse(state.pressedForWallKick(false, false));
+        assertTrue(state.pressedForWallKick(true, false));  // Immediate second kick.
+        assertFalse(state.pressedForWallKick(false, false));
+        assertTrue(state.pressedForWallKick(true, false));  // Immediate third kick.
+        assertFalse(state.pressedForWallKick(true, true), "Grounded kicks are never permitted");
     }
 
     @Test
     void failedWallContactStillRequiresReleaseBeforeAnotherKickAttempt() {
         DragonEscapeMovementKits.AcrobatState state = new DragonEscapeMovementKits.AcrobatState();
         // The input edge gets consumed even if the caller detects no wall.
-        assertTrue(state.pressedForWallKick(true));
-        assertFalse(state.pressedForWallKick(true));
-        assertFalse(state.pressedForWallKick(false));
-        assertTrue(state.pressedForWallKick(true));
+        assertTrue(state.pressedForWallKick(true, false));
+        assertFalse(state.pressedForWallKick(true, false));
+        assertFalse(state.pressedForWallKick(false, false));
+        assertTrue(state.pressedForWallKick(true, false));
+    }
+
+    @Test
+    void groundedSpacePressCannotBecomeAWallKickUponLeavingTheGround() {
+        DragonEscapeMovementKits.AcrobatState state = new DragonEscapeMovementKits.AcrobatState();
+        assertFalse(state.pressedForWallKick(false, true));
+        assertFalse(state.pressedForWallKick(true, true));
+        assertFalse(state.pressedForWallKick(true, false));
+        assertFalse(state.pressedForWallKick(false, false));
+        assertTrue(state.pressedForWallKick(true, false));
+        assertFalse(state.pressedForWallKick(false, true));
+        assertFalse(state.pressedForWallKick(true, true));
     }
 
     @Test
