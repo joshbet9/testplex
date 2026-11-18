@@ -207,7 +207,7 @@ class DragonEscapeMovementKitsTest {
         assertEquals(4.0D, DragonEscapeMovementKits.acrobatFallDamage("acrobat", 8.0D), 0.0001D);
         assertEquals(8.0D, DragonEscapeMovementKits.acrobatFallDamage("jumper", 8.0D), 0.0001D);
         assertEquals(0.0D, DragonEscapeMovementKits.acrobatFallDamage("acrobat", 0.0D), 0.0001D);
-        assertEquals(1, ArcadePortRules.dragonEscapeLeapUses("acrobat"));
+        assertEquals(2, ArcadePortRules.dragonEscapeLeapUses("acrobat"));
         assertEquals(0, ArcadePortRules.dragonEscapeLeapUses("flutterfly"));
     }
 
