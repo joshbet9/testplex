@@ -99,6 +99,11 @@ final class AchievementKitUnlockPolicy {
         add(rules, "dragon-escape", "builder", "Builder", "paralympics");
         add(rules, "dragon-escape", "digger", "Digger",
                 "skylands-master", "to-hell-and-back", "plundered");
+        // New movement kits share Digger's three already-earnable map achievements.
+        add(rules, "dragon-escape", "flutterfly", "Flutterfly",
+                "skylands-master", "to-hell-and-back", "plundered");
+        add(rules, "dragon-escape", "acrobat", "Acrobat",
+                "skylands-master", "to-hell-and-back", "plundered");
         add(rules, "evolution", "health-harvester", "Health Harvester", "second-wind");
         add(rules, "evolution", "neanderthal", "Neanderthal", "pity-party");
         add(rules, "micro-battles", "dasher", "Dasher", "speedster");

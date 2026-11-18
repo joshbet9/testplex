@@ -30,8 +30,20 @@ class ArcadeAchievementKitRequirementsTest {
     @Test void knownRewardsCanBeShownInAchievementTooltips() {
         assertEquals(java.util.List.of("builder"),
                 ArcadeAchievementKitRequirements.kitIdsForAchievement("dragon-escape", "paralympics"));
+        var digger = ArcadeAchievementKitRequirements.find("dragon-escape", "digger");
+        assertNotNull(digger);
         assertEquals(java.util.List.of("skylands-master", "to-hell-and-back", "plundered"),
-                ArcadeAchievementKitRequirements.find("dragon-escape", "digger").achievementIds());
+                digger.achievementIds());
+        for (String kit : java.util.List.of("flutterfly", "acrobat")) {
+            var requirement = ArcadeAchievementKitRequirements.find("dragon-escape", kit);
+            assertNotNull(requirement);
+            assertFalse(requirement.allAchievements());
+            assertEquals(digger.achievementIds(), requirement.achievementIds());
+        }
+        for (String achievement : digger.achievementIds()) {
+            assertEquals(java.util.List.of("acrobat", "digger", "flutterfly"),
+                    ArcadeAchievementKitRequirements.kitIdsForAchievement("dragon-escape", achievement));
+        }
         assertEquals(java.util.List.of("dasher"),
                 ArcadeAchievementKitRequirements.kitIdsForAchievement("micro-battles", "speedster"));
         assertEquals(java.util.List.of("runnerkit-switcher"),
