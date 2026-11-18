@@ -2128,15 +2128,67 @@ public final class ArcadePortRules {
         return Math.max(0, alivePlayers) < 13;
     }
 
-    /** Human-readable per-team power-up state kept on its own scoreboard row. */
-    public static String bombLobbersPowerupScoreboardLabel(String state) {
-        if (state == null || state.isBlank()) return "Waiting";
-        return switch (state.toUpperCase(java.util.Locale.ROOT)) {
-            case "SPAWNED" -> "Dropped";
-            case "OBTAINED" -> "Ready";
-            case "ACTIVATED" -> "Used";
-            default -> "Waiting";
+    /** Builds the source-style roster rows; power-up state is intentionally not part of the scoreboard. */
+    public static List<String> bombLobbersScoreboardRoster(List<String> redPlayers, List<String> bluePlayers) {
+        List<String> red = redPlayers == null ? List.of() : redPlayers;
+        List<String> blue = bluePlayers == null ? List.of() : bluePlayers;
+        List<String> lines = new ArrayList<>();
+        if (bombLobbersScoreboardShowsPlayerNames(red.size() + blue.size())) {
+            red.stream().filter(java.util.Objects::nonNull)
+                    .forEach(name -> lines.add(ChatColor.RED + name));
+            if (!red.isEmpty() && !blue.isEmpty()) lines.add(ChatColor.DARK_GRAY.toString());
+            blue.stream().filter(java.util.Objects::nonNull)
+                    .forEach(name -> lines.add(ChatColor.AQUA + name));
+        } else {
+            lines.add(ChatColor.RED + "Red Team");
+            lines.add(ChatColor.RED.toString() + red.size() + " Alive");
+            lines.add(ChatColor.AQUA + "Blue Team");
+            lines.add(ChatColor.AQUA.toString() + blue.size() + " Alive");
+        }
+        return List.copyOf(lines);
+    }
+
+    public static ChatColor bombLobbersTeamChatColor(int team) {
+        return team >= 0 && team < 4 ? arcadeTeamChatColor(team) : ChatColor.GRAY;
+    }
+
+    /** Standard scoreboard/chat colour for the lobby's ordered arcade teams. */
+    public static ChatColor arcadeTeamChatColor(int team) {
+        return switch (team) {
+            case 0 -> ChatColor.RED;
+            case 1 -> ChatColor.AQUA;
+            case 2 -> ChatColor.GREEN;
+            case 3 -> ChatColor.YELLOW;
+            default -> ChatColor.GRAY;
         };
+    }
+
+    public static ChatColor bombLobbersPowerupChatColor(String type) {
+        if (type == null) return ChatColor.GRAY;
+        return switch (type.toLowerCase(java.util.Locale.ROOT)) {
+            case "wind-charge" -> ChatColor.AQUA;
+            case "super-tnt" -> ChatColor.DARK_RED;
+            case "fiery-tnt" -> ChatColor.GOLD;
+            case "speed-boost" -> ChatColor.GREEN;
+            default -> ChatColor.GRAY;
+        };
+    }
+
+    public static String bombLobbersPowerupName(String type) {
+        if (type == null) return "Power-up";
+        return switch (type.toLowerCase(java.util.Locale.ROOT)) {
+            case "wind-charge" -> "Wind Charge";
+            case "super-tnt" -> "Super Explosive TNT";
+            case "fiery-tnt" -> "Fiery TNT";
+            case "speed-boost" -> "Speed Boost";
+            default -> "Power-up";
+        };
+    }
+
+    public static String bombLobbersPowerupActivationMessage(String playerName, int team, String type) {
+        if (playerName == null || playerName.isBlank() || type == null || type.isBlank()) return "";
+        return bombLobbersTeamChatColor(team) + playerName + ChatColor.GRAY + " has activated Powerup "
+                + bombLobbersPowerupChatColor(type) + bombLobbersPowerupName(type);
     }
 
     /** Returns the opposing Bomb Lobbers side, or -1 when the supplied team is invalid. */
@@ -2191,11 +2243,19 @@ public final class ArcadePortRules {
         return nowMillis + cooldown;
     }
 
-    /** Allows one source-style follow-up jump after the initial airborne jump recharges. */
+    /** Allows a second powered jump after the first, producing the source-style triple jump. */
     public static boolean canUseBombLobbersAirDoubleJump(
             String kit, int jumpsSinceGround, long nowMillis, long readyAtMillis) {
         if (nowMillis < readyAtMillis) return false;
-        return kit != null && "acrobat".equalsIgnoreCase(kit) || jumpsSinceGround == 1;
+        return jumpsSinceGround == 1;
+    }
+
+    /** A stale grounded sample after takeoff must not refund another jump. */
+    public static boolean shouldRearmBombLobbersGroundJump(
+            boolean grounded, boolean airborneSinceLastUse, int jumpsSinceGround,
+            long nowMillis, long readyAtMillis) {
+        return grounded && nowMillis >= readyAtMillis
+                && (jumpsSinceGround <= 0 || airborneSinceLastUse);
     }
 
     /** Acrobat's continuous jump recharge has no cooldown meter; other kits retain it. */

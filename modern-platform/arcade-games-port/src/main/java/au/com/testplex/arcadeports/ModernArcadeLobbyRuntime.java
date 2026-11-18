@@ -289,7 +289,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         if (teamCount > 0) {
             StringBuilder counts = new StringBuilder();
             String[] labels = {"Red", "Blue", "Green", "Yellow"};
-            ChatColor[] colours = {ChatColor.RED, ChatColor.BLUE, ChatColor.GREEN, ChatColor.YELLOW};
+            ChatColor[] colours = {ChatColor.RED, ChatColor.AQUA, ChatColor.GREEN, ChatColor.YELLOW};
             for (int team = 0; team < teamCount; team++) {
                 if (counts.length() > 0) counts.append(ChatColor.WHITE).append("  |  ");
                 counts.append(colours[team]).append(labels[team]).append(" ")
@@ -346,15 +346,15 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         }
         int teamCount = ArcadePortManager.teamCountForGame(selectedGame);
         int[] teamCentres = teamCount == 4 ? new int[] {9, 3, -3, -9} : new int[] {3, -3};
-        Material[] teamWools = {Material.RED_WOOL, Material.BLUE_WOOL, Material.GREEN_WOOL, Material.YELLOW_WOOL};
-        DyeColor[] teamDyes = {DyeColor.RED, DyeColor.BLUE, DyeColor.GREEN, DyeColor.YELLOW};
+        Material[] teamWools = {Material.RED_WOOL, Material.LIGHT_BLUE_WOOL, Material.GREEN_WOOL, Material.YELLOW_WOOL};
+        DyeColor[] teamDyes = {DyeColor.RED, DyeColor.LIGHT_BLUE, DyeColor.GREEN, DyeColor.YELLOW};
         String[] teamLabels = {"Red Team", "Blue Team", "Green Team", "Yellow Team"};
         if (teamCount > 0) {
             for (int team = 0; team < teamCount; team++) {
                 pedestals.add(new Pedestal(QUEUE_PEDESTAL_X, teamCentres[team], teamWools[team]));
             }
         } else {
-            pedestals.add(new Pedestal(QUEUE_PEDESTAL_X, 0, Material.BLUE_WOOL));
+            pedestals.add(new Pedestal(QUEUE_PEDESTAL_X, 0, Material.LIGHT_BLUE_WOOL));
         }
         buildLegacyPedestals(world, pedestals);
 
@@ -958,8 +958,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                                 : "Free-for-all: no team is required."),
                 ChatColor.GRAY + "Players queued: " + manager.queuedCount(selectedGame)));
         if (teamCount > 0) {
-            Material[] dyes = {Material.RED_DYE, Material.BLUE_DYE, Material.GREEN_DYE, Material.YELLOW_DYE};
-            ChatColor[] colours = {ChatColor.RED, ChatColor.BLUE, ChatColor.GREEN, ChatColor.YELLOW};
+            Material[] dyes = {Material.RED_DYE, Material.LIGHT_BLUE_DYE, Material.GREEN_DYE, Material.YELLOW_DYE};
+            ChatColor[] colours = {ChatColor.RED, ChatColor.AQUA, ChatColor.GREEN, ChatColor.YELLOW};
             for (int team = 0; team < teamCount; team++) {
                 ItemStack choice = item(dyes[team], colours[team] + teamName(team),
                         ChatColor.GRAY + "Queued: " + manager.queuedCountForTeam(selectedGame, team),

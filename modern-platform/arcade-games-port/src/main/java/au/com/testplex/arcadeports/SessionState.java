@@ -509,6 +509,8 @@ class SessionState {
     final Map<UUID, Integer> bombDoubleJumpCounts = new HashMap<>();
     /** Count of perk jumps since the most recent landing (0..2). */
     final Map<UUID, Integer> bombDoubleJumpJumpsSinceGround = new HashMap<>();
+    /** Set only after a used jump has been observed airborne; prevents stale ground-state refunds. */
+    final Set<UUID> bombDoubleJumpAirborneSinceUse = new HashSet<>();
     final Set<UUID> bombImpactDetonatedTnt = new HashSet<>();
     final Map<UUID, Integer> bombWonderkidImpactKills = new HashMap<>();
     final Map<UUID, Set<UUID>> bombCloseRangeTargets = new HashMap<>();
