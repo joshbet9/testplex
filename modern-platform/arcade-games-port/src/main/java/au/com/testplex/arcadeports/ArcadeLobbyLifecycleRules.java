@@ -25,4 +25,17 @@ final class ArcadeLobbyLifecycleRules {
     static int prepareSeconds(int seconds) { return Math.max(3, Math.min(30, seconds)); }
     static int endPresentationSeconds(int seconds) { return Math.max(0, Math.min(30, seconds)); }
     static String countdownStatus(int seconds) { return "Starting in " + Math.max(0, seconds) + " Seconds"; }
+
+    /** Keep the persisted lobby selection, falling back to the live value if config is invalid. */
+    static ArcadePortGame selectedGameAfterReturn(String configuredId, ArcadePortGame currentSelection) {
+        ArcadePortGame configured = ArcadePortGame.fromId(configuredId);
+        return configured == null ? currentSelection : configured;
+    }
+
+    static boolean lobbySelectionNeedsRefresh(String configuredId, ArcadePortGame currentSelection,
+            int actualKitNpcCount, int expectedKitNpcCount, int actualTeamNpcCount, int expectedTeamNpcCount) {
+        return selectedGameAfterReturn(configuredId, currentSelection) != currentSelection
+                || actualKitNpcCount != expectedKitNpcCount
+                || actualTeamNpcCount != expectedTeamNpcCount;
+    }
 }
