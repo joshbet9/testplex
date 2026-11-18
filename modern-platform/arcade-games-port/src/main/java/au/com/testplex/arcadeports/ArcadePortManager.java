@@ -1528,6 +1528,13 @@ public final class ArcadePortManager implements Listener {
             tester.setExp(1.0F);
             return true;
         }
+        if ("acrobat".equals(kit)) {
+            DragonEscapeMovementKits.AcrobatState acrobat = session.dragonEscapeAcrobatStates
+                    .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.AcrobatState());
+            acrobat.charge = 1.0D;
+            tester.setExp(1.0F);
+            return true;
+        }
         return false;
     }
 
@@ -9982,6 +9989,12 @@ public final class ArcadePortManager implements Listener {
                             .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.FlutterState());
                     player.setLevel(0);
                     player.setExp((float) flutter.charge);
+                } else if ("acrobat".equals(kit)) {
+                    // Acrobat uses XP for a finite number of charged wall-sticks.
+                    DragonEscapeMovementKits.AcrobatState acrobat = session.dragonEscapeAcrobatStates
+                            .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.AcrobatState());
+                    player.setLevel(0);
+                    player.setExp((float) acrobat.charge);
                 }
                 setDragonEscapeGhostHotbarItem(player);
                 if (session.dragonEscapePractice) setDragonEscapePracticeHotbarItems(player);
@@ -17925,20 +17938,24 @@ public final class ArcadePortManager implements Listener {
 
             DragonEscapeMovementKits.AcrobatState acrobat = session.dragonEscapeAcrobatStates
                     .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.AcrobatState());
-            // A wall kick only works after a normal jump, while airborne and
-            // in physical contact with the wall. Merely standing beside the wall
-            // and pressing Space must remain an ordinary ground jump.
-            boolean pressed = acrobat.pressedForWallKick(jumpHeld, grounded);
-            if (player.isInWater()
-                    || !debugKitFeatureEnabled(player, ArcadePortGame.DRAGON_ESCAPE, kit)) {
-                acrobat.tickWallCling(false, true, false);
-                continue;
+            // Every wall kick must follow a PAID, airborne Shift-stick against a
+            // real collision face. Space alone cannot kick, nor can a grounded
+            // crouch/jump or a held ground-jump input. Each stick grants one kick.
+            boolean enabled = !player.isInWater()
+                    && debugKitFeatureEnabled(player, ArcadePortGame.DRAGON_ESCAPE, kit);
+            Vector contactNormal = enabled ? DragonEscapeMovementKits.touchingWallNormal(player) : null;
+            boolean sticking = acrobat.tickWallCling(enabled && player.isSneaking(),
+                    grounded, contactNormal != null);
+            boolean pressed = acrobat.pressedForWallKick(jumpHeld, grounded, sticking);
+            player.setLevel(0);
+            player.setExp((float) acrobat.charge);
+            if (!enabled) continue;
+            if (acrobat.clingActivated) {
+                player.getWorld().playSound(player.getLocation(),
+                        Sound.valueOf(DragonEscapeMovementKits.WALL_CLING_SOUND_NAME), 0.8F, 1.0F);
             }
-            // The collision shape, not mere block proximity or camera facing,
-            // decides wall contact for both immediate kicks and optional clings.
-            Vector contactNormal = DragonEscapeMovementKits.touchingWallNormal(player);
             if (!pressed || contactNormal == null) {
-                if (acrobat.tickWallCling(player.isSneaking(), grounded, contactNormal != null)) {
+                if (sticking) {
                     player.setVelocity(DragonEscapeMovementKits.wallClingVelocity());
                     player.setFallDistance(0.0F);
                 }
