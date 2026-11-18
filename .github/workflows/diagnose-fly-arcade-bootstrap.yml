@@ -1,0 +1,38 @@
+name: Diagnose Fly Arcade bootstrap (read-only)
+on:
+  push:
+    branches:
+      - diagnostics/fly-map-editor-bootstrap-20261118
+    paths:
+      - .github/workflows/diagnose-fly-arcade-bootstrap.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    name: Inspect latest Fly Arcade bootstrap records
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Install pinned Fly CLI
+        uses: superfly/flyctl-actions/setup-flyctl@fc53c09e1bc3be6f54706524e3b82c4f462f77be
+        with:
+          version: 0.5.5
+      - name: Read current machine and filtered Arcade startup records
+        shell: bash
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          FLY_APP: monstermaze
+        run: |
+          set -euo pipefail
+          [[ -n "${FLY_API_TOKEN}" ]] || exit 1
+          flyctl machine list --app "$FLY_APP" --json > "$RUNNER_TEMP/machines.json"
+          jq -r '.[] | {id, state, host_status, image_revision:.image_ref.labels["org.opencontainers.image.revision"], mounts:.config.mounts}' "$RUNNER_TEMP/machines.json"
+          machine_id="$(jq -er '[.[] | select(any(.config.mounts[]?; .path == "/server"))] | if length == 1 then .[0].id else error("expected one volume-owning machine") end' "$RUNNER_TEMP/machines.json")"
+          echo '=== Filtered recent Fly platform startup output ==='
+          timeout 30s flyctl logs --app "$FLY_APP" --machine "$machine_id" --no-tail > "$RUNNER_TEMP/logs.txt" 2>&1 || true
+          grep -iE 'ArcadeMechanicsModern|TESTPLEX_ARCADE_BOOTSTRAP|Error occurred while enabling|Could not load|Failed to load|NoClassDefFound|ExceptionInInitializer|SEVERE|BOOTSTRAP' "$RUNNER_TEMP/logs.txt" | tail -n 75 || true
+          echo '=== Guest Paper startup and plugin status (read-only) ==='
+          timeout 40s flyctl ssh console --app "$FLY_APP" --machine "$machine_id" \
+            --command "sh -c 'echo GUEST_LOG; ls -l /server/logs/latest.log; grep -iE \"ArcadeMechanicsModern|TESTPLEX_ARCADE_BOOTSTRAP|Error occurred while enabling|Could not load|Failed to load|NoClassDefFound|ExceptionInInitializer|SEVERE\" /server/logs/latest.log | tail -n 70'" || true
