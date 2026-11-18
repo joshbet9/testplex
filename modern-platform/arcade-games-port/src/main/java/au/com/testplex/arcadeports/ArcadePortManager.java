@@ -17912,7 +17912,7 @@ public final class ArcadePortManager implements Listener {
         player.getInventory().setItem(0, namedItem(Material.FEATHER, "Flutter Bounce",
                 "Right-click while airborne to bounce. Charges: " + flutter.charges
                         + "/" + DragonEscapeMovementKits.FLUTTER_MAX_CHARGES
-                        + ". Restores one charge every 8 seconds."));
+                        + ". Restores one charge every 6 seconds."));
         player.setLevel(flutter.charges);
         player.setExp(flutter.rechargeProgress(nowMillis));
     }
@@ -17966,8 +17966,9 @@ public final class ArcadePortManager implements Listener {
 
     /**
      * Space is read from Paper's current input each tick: no client mod.
-     * Acrobat pins the exact wall-cling Y until the input or charge ends;
-     * cooldown is landing-triggered and never interrupts airborne chains.
+     * Acrobat pins the exact wall-cling Y after Shift activates a stick;
+     * releasing Shift does not detach, but losing wall contact or charge does.
+     * Cooldown is landing-triggered and never interrupts airborne chains.
      */
     private void updateDragonEscapeMovementKits(Session session, long now) {
         if (!session.liveStarted) return;
@@ -17996,8 +17997,8 @@ public final class ArcadePortManager implements Listener {
 
             DragonEscapeMovementKits.AcrobatState acrobat = session.dragonEscapeAcrobatStates
                     .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.AcrobatState());
-            // Every kick needs an existing XP-draining airborne Shift-stick. A
-            // wall-kick chain has no cooldown until the player next lands.
+            // Shift begins an XP-draining wall-stick; the player may release Shift
+            // before pressing Space. Cooldown starts only after the next landing.
             boolean enabled = !player.isInWater()
                     && debugKitFeatureEnabled(player, ArcadePortGame.DRAGON_ESCAPE, kit);
             Vector contactNormal = enabled ? DragonEscapeMovementKits.touchingWallNormal(player) : null;
@@ -18055,7 +18056,7 @@ public final class ArcadePortManager implements Listener {
                 }
             }, 2L);
             // Restore the full pre-#738 boosted wall-jump vector for
-            // testing; still require a real airborne Shift cling and fresh Space.
+            // testing; still require Shift to activate the stick and fresh Space.
             player.getWorld().spawnParticle(Particle.CLOUD,
                     player.getLocation().add(0.0D, 0.65D, 0.0D),
                     12, 0.25D, 0.3D, 0.25D, 0.035D);

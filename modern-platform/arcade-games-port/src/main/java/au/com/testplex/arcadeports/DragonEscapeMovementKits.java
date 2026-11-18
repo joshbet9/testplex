@@ -20,7 +20,8 @@ final class DragonEscapeMovementKits {
     // 200 ms event-free interval to infer a new press rather than a held-repeat.
     // Hold repeat rates vary, so this is a playtest compromise, not an exact release detector.
     static final long FLUTTER_RIGHT_CLICK_REARM_GAP_MILLIS = 200L;
-    static final long FLUTTER_CHARGE_RECHARGE_MILLIS = 8_000L;
+    // A six-second interval regenerates Flutterfly charges 33.3% faster.
+    static final long FLUTTER_CHARGE_RECHARGE_MILLIS = 6_000L;
     // Slightly quicker forward launch, closer to the feel of a sprint jump.
     static final double FLUTTER_HORIZONTAL_SPEED = 0.32D;
     // Lower arc than the previous bounce, without changing regular jumps.
@@ -61,7 +62,7 @@ final class DragonEscapeMovementKits {
         }
 
         /**
-         * Charges replenish individually every eight seconds, including in air.
+         * Charges replenish individually every six seconds, including in air.
          * Spending another charge cannot delay an already-scheduled recharge.
          */
         boolean recharge(long nowMillis) {
@@ -87,7 +88,7 @@ final class DragonEscapeMovementKits {
             return true;
         }
 
-        /** Fraction of the current eight-second recharge interval completed. */
+        /** Fraction of the current six-second recharge interval completed. */
         float rechargeProgress(long nowMillis) {
             if (charges >= FLUTTER_MAX_CHARGES || nextChargeAtMillis <= 0L) return 1.0F;
             long remaining = Math.max(0L, nextChargeAtMillis - nowMillis);
@@ -111,7 +112,7 @@ final class DragonEscapeMovementKits {
         boolean awaitingLandingAfterKick;
         long cooldownEndsAtMillis;
 
-        /** Landing after at least one kick starts the full 10-second cooldown. */
+        /** Landing after at least one kick starts the five-second cooldown. */
         void tickLanding(boolean grounded, long nowMillis) {
             if (grounded && awaitingLandingAfterKick) {
                 cooldownEndsAtMillis = Math.max(cooldownEndsAtMillis,
@@ -134,8 +135,9 @@ final class DragonEscapeMovementKits {
         }
 
         /**
-         * Every wall kick needs a fresh airborne Space press while an already
-         * active Shift-stick holds physical wall contact. One stick buys one kick.
+         * Every wall kick needs a fresh airborne Space press after a crouch
+         * activated wall-stick. Shift can be released before jumping. One stick
+         * buys one kick as long as physical wall contact is maintained.
          */
         boolean pressedForWallKick(boolean jumpHeld, boolean grounded, boolean sticking) {
             boolean freshPress = jumpHeld && !previouslyHeld;
@@ -144,30 +146,31 @@ final class DragonEscapeMovementKits {
         }
 
         /**
-         * While airborne, Shift sticks to a physically touched wall and drains
-         * XP continuously. A landing after a wall kick starts a 10-second
-         * lockout; no cooldown ever starts midair, including between chain kicks.
+         * Crouch activates an airborne wall-stick. The stick remains latched
+         * after releasing Shift so the player can press Space normally.
+         * Charge drains throughout the cling, which ends on a kick, contact
+         * loss, landing, cooldown, or XP exhaustion. A new stick needs a
+         * fresh crouch after any of those endings.
          */
         boolean tickWallCling(boolean crouching, boolean grounded, boolean touchingWall, long nowMillis) {
             tickLanding(grounded, nowMillis);
             clingActivated = false;
-            if (!crouching) {
-                crouchConsumed = false;
+            // Releasing Shift re-arms the next activation without detaching now.
+            if (!crouching) crouchConsumed = false;
+            if (wallKickCoolingDown(nowMillis)) {
                 clingActive = false;
-            } else if (wallKickCoolingDown(nowMillis)) {
-                clingActive = false;
-                crouchConsumed = true; // A held Shift during cooldown cannot auto-arm.
+                if (crouching) crouchConsumed = true; // Holding Shift cannot auto-arm after cooldown.
             } else if (grounded || !touchingWall) {
                 clingActive = false;
-            } else if (!crouchConsumed) {
+            } else if (crouching && !crouchConsumed) {
                 crouchConsumed = true;
-                if (charge >= WALL_CLING_DRAIN_PER_TICK) {
+                if (!clingActive && charge >= WALL_CLING_DRAIN_PER_TICK) {
                     clingActive = true;
                     clingActivated = true;
                 }
             }
 
-            boolean sticking = crouching && !grounded && touchingWall && clingActive
+            boolean sticking = !grounded && touchingWall && clingActive
                     && !wallKickCoolingDown(nowMillis);
             if (sticking) {
                 if (charge >= WALL_CLING_DRAIN_PER_TICK) {
