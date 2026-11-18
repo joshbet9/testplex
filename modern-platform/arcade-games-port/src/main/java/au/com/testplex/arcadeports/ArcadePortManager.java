@@ -9973,7 +9973,7 @@ public final class ArcadePortManager implements Listener {
                     player.setLevel(0);
                     player.setExp((float) flutter.charge);
                 } else if ("acrobat".equals(kit)) {
-                    // Acrobat uses XP for a finite number of charged wall-sticks.
+                    // Acrobat uses XP as continuously draining wall-stick energy.
                     DragonEscapeMovementKits.AcrobatState acrobat = session.dragonEscapeAcrobatStates
                             .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.AcrobatState());
                     player.setLevel(0);
@@ -17891,7 +17891,8 @@ public final class ArcadePortManager implements Listener {
             UUID id = player.getUniqueId();
             String kit = session.dragonEscapeKits.getOrDefault(id, "jumper");
             if (!"flutterfly".equals(kit) && !"acrobat".equals(kit)) continue;
-            boolean jumpHeld = player.getCurrentInput().isJump();
+            var movementInput = player.getCurrentInput();
+            boolean jumpHeld = movementInput.isJump();
             boolean grounded = player.isOnGround();
             if ("flutterfly".equals(kit)) {
                 DragonEscapeMovementKits.FlutterState flutter = session.dragonEscapeFlutterStates
@@ -17901,8 +17902,12 @@ public final class ArcadePortManager implements Listener {
                 } else {
                     flutter.tick(jumpHeld, grounded);
                     if (flutter.fluttering) {
+                        Vector travelDirection = DragonEscapeMovementKits.flutterTravelDirection(
+                                player.getVelocity(), player.getLocation().getDirection(),
+                                movementInput.isForward(), movementInput.isBackward(),
+                                movementInput.isLeft(), movementInput.isRight());
                         player.setVelocity(DragonEscapeMovementKits.flutterVelocity(
-                                player.getVelocity(), flutter.flutterTicks));
+                                player.getVelocity(), travelDirection, flutter.flutterTicks));
                         if (flutter.activated) {
                             player.getWorld().playSound(player.getLocation(),
                                     Sound.valueOf(DragonEscapeMovementKits.FLUTTER_SOUND_NAME), 0.8F, 1.2F);
@@ -17912,6 +17917,8 @@ public final class ArcadePortManager implements Listener {
                                     player.getLocation().add(0.0D, 0.25D, 0.0D),
                                     5, 0.18D, 0.13D, 0.18D, 0.012D);
                         }
+                    } else if (flutter.ended) {
+                        player.setVelocity(DragonEscapeMovementKits.flutterEndVelocity(player.getVelocity()));
                     }
                 }
                 player.setLevel(0);
@@ -17921,9 +17928,9 @@ public final class ArcadePortManager implements Listener {
 
             DragonEscapeMovementKits.AcrobatState acrobat = session.dragonEscapeAcrobatStates
                     .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.AcrobatState());
-            // Every wall kick must follow a PAID, airborne Shift-stick against a
-            // real collision face. Space alone cannot kick, nor can a grounded
-            // crouch/jump or a held ground-jump input. Each stick grants one kick.
+            // Every kick needs an active, XP-draining airborne Shift-stick against
+            // a real wall. Grounded Shift/Space, wall proximity and held jumps
+            // cannot kick. No fixed cling timeout: XP determines hold duration.
             boolean enabled = !player.isInWater()
                     && debugKitFeatureEnabled(player, ArcadePortGame.DRAGON_ESCAPE, kit);
             Vector contactNormal = enabled ? DragonEscapeMovementKits.touchingWallNormal(player) : null;
