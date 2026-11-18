@@ -1026,6 +1026,12 @@ public final class SourceMapCatalog {
                 game == ArcadePortGame.WIZARDS || game == ArcadePortGame.DRAGON_ESCAPE);
     }
 
+    /** Editor-only import: allow incomplete legacy metadata for repair, never change gameplay's strict import. */
+    static boolean installEditableResource(JavaPlugin plugin, ArcadePortGame game, String resource, String worldName) {
+        if (!resourcePathBelongsToGame(game, resource)) return false;
+        return installResourceInternal(plugin, resource, worldName, true);
+    }
+
     /** Compatibility entry point used by the existing shared Arcade map loader. */
     public static boolean installResource(JavaPlugin plugin, String gameName, String resource, String worldName) {
         if (plugin == null || gameName == null || gameName.isBlank()
