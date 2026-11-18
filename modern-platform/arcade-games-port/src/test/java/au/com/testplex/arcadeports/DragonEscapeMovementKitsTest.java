@@ -101,31 +101,80 @@ class DragonEscapeMovementKitsTest {
     }
 
     @Test
-    void flutterRisesOneBlockBeforeItsSingleYoshiArc() {
-        Vector current = new Vector(0.4D, -0.6D, 0.0D);
-        Vector direction = new Vector(0, 0, 1);
+    void flutterArcFinishesAtItsAbsoluteHighestPointAfterAClimbDipClimb() {
         assertEquals(5, DragonEscapeMovementKits.FLUTTER_LIFT_TICKS);
         assertEquals(0.2D, DragonEscapeMovementKits.FLUTTER_LIFT_VERTICAL_SPEED, 0.00001D);
-        double totalInitialLift = 0.0D;
+        Vector direction = new Vector(0, 0, 1);
+        double absoluteHeight = 0.0D;
         for (int tick = 1; tick <= DragonEscapeMovementKits.FLUTTER_LIFT_TICKS; tick++) {
-            Vector velocity = DragonEscapeMovementKits.flutterVelocity(current, direction, tick);
-            totalInitialLift += velocity.getY();
-            assertEquals(DragonEscapeMovementKits.FLUTTER_HORIZONTAL_SPEED,
-                    velocity.getZ(), 0.00001D);
+            Vector velocity = DragonEscapeMovementKits.flutterVelocity(new Vector(), direction, tick);
+            absoluteHeight += velocity.getY();
         }
-        assertEquals(1.0D, totalInitialLift, 0.00001D);
-        Vector firstRise = DragonEscapeMovementKits.flutterVelocity(
-                current, direction, DragonEscapeMovementKits.FLUTTER_LIFT_TICKS + 1);
-        Vector dip = DragonEscapeMovementKits.flutterVelocity(
-                current, direction, DragonEscapeMovementKits.FLUTTER_LIFT_TICKS + 15);
-        Vector finalRise = DragonEscapeMovementKits.flutterVelocity(
-                current, direction, DragonEscapeMovementKits.FLUTTER_TOTAL_TICKS);
-        assertTrue(firstRise.getY() > 0.15D);
-        assertTrue(dip.getY() < -0.15D);
-        assertTrue(finalRise.getY() > 0.15D);
-        assertTrue(finalRise.getY() > dip.getY());
-        assertEquals(DragonEscapeMovementKits.FLUTTER_HORIZONTAL_SPEED,
-                firstRise.getZ(), 0.00001D);
+        assertEquals(1.0D, absoluteHeight, 0.00001D);
+        double highestBeforeEnd = absoluteHeight;
+        boolean sawUp = false;
+        boolean sawDown = false;
+        boolean sawFinalUp = false;
+        for (int arcTick = 1; arcTick <= DragonEscapeMovementKits.FLUTTER_WAVE_TICKS; arcTick++) {
+            Vector velocity = DragonEscapeMovementKits.flutterVelocity(new Vector(), direction,
+                    DragonEscapeMovementKits.FLUTTER_LIFT_TICKS + arcTick);
+            absoluteHeight += velocity.getY();
+            if (arcTick < DragonEscapeMovementKits.FLUTTER_WAVE_TICKS) {
+                highestBeforeEnd = Math.max(highestBeforeEnd, absoluteHeight);
+            }
+            if (arcTick < 10 && velocity.getY() > 0.05D) sawUp = true;
+            if (arcTick >= 10 && arcTick <= 20 && velocity.getY() < -0.05D) sawDown = true;
+            if (arcTick > 20 && velocity.getY() > 0.05D) sawFinalUp = true;
+        }
+        assertTrue(sawUp && sawDown && sawFinalUp,
+                "Flutter must visibly climb, dip, and climb again");
+        assertEquals(1.0D + DragonEscapeMovementKits.FLUTTER_ARC_NET_RISE,
+                absoluteHeight, 0.00001D);
+        assertTrue(absoluteHeight > highestBeforeEnd,
+                "Flutter must terminate at its absolute peak, not below an earlier high point");
+        assertEquals(0.0D, DragonEscapeMovementKits.flutterArcHeight(0), 0.00001D);
+        assertEquals(DragonEscapeMovementKits.FLUTTER_ARC_NET_RISE,
+                DragonEscapeMovementKits.flutterArcHeight(DragonEscapeMovementKits.FLUTTER_WAVE_TICKS),
+                0.00001D);
+    }
+
+    @Test
+    void exactlyThreeFlutterActivationsAreAllowedPerAirborneRun() {
+        DragonEscapeMovementKits.FlutterState state = new DragonEscapeMovementKits.FlutterState();
+        state.tick(true, true); // Normal ground jump.
+        state.tick(true, false);
+        assertFalse(state.activated);
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            state.tick(false, false); // Release in the air.
+            state.charge = 1.0D; // Isolate the use cap from the XP charge constraint.
+            state.tick(true, false);
+            assertTrue(state.activated, "Airborne press " + attempt + " should flutter");
+            assertEquals(attempt, state.fluttersThisAirborneRun);
+            state.tick(false, false);
+        }
+        state.charge = 1.0D;
+        state.tick(true, false);
+        assertFalse(state.activated, "A fourth flutter must be blocked until landing");
+        assertFalse(state.fluttering);
+        assertEquals(3, state.fluttersThisAirborneRun);
+        state.tick(false, true); // Actual ground contact resets the limit.
+        assertEquals(0, state.fluttersThisAirborneRun);
+        state.tick(false, false);
+        state.tick(true, false);
+        assertTrue(state.activated, "The next airborne run gets three new flutters");
+        assertEquals(1, state.fluttersThisAirborneRun);
+    }
+
+    @Test
+    void insufficientXpCannotStartAFlutterEvenWithRemainingAirborneUses() {
+        DragonEscapeMovementKits.FlutterState state = new DragonEscapeMovementKits.FlutterState();
+        state.tick(false, false);
+        state.charge = DragonEscapeMovementKits.FLUTTER_ACTIVATION_COST
+                + DragonEscapeMovementKits.FLUTTER_DRAIN_PER_TICK - 0.01D;
+        state.tick(true, false);
+        assertFalse(state.activated);
+        assertEquals(0, state.fluttersThisAirborneRun);
+        assertFalse(state.fluttering);
     }
 
     @Test
@@ -167,8 +216,8 @@ class DragonEscapeMovementKitsTest {
 
     @Test
     void flutterKeepsReducedXpDrainAndIdleRegeneration() {
-        assertEquals(0.0175D, DragonEscapeMovementKits.FLUTTER_DRAIN_PER_TICK, 0.00001D);
-        assertEquals(0.0125D * 1.40D, DragonEscapeMovementKits.FLUTTER_DRAIN_PER_TICK, 0.00001D);
+        assertEquals(0.0175D * 0.75D, DragonEscapeMovementKits.FLUTTER_DRAIN_PER_TICK, 0.00001D);
+        assertEquals(0.08D * 0.75D, DragonEscapeMovementKits.FLUTTER_ACTIVATION_COST, 0.00001D);
         DragonEscapeMovementKits.FlutterState state = new DragonEscapeMovementKits.FlutterState();
         state.tick(false, false);
         state.tick(true, false);
@@ -303,40 +352,39 @@ class DragonEscapeMovementKitsTest {
     }
 
     @Test
-    void wallJumpStrengthScalesTheActualDragonEscapeLeap() {
+    void restoredWallKickUsesOriginalBoostedVelocityNotScaledVanillaLeap() {
         Vector facing = new Vector(0, 0, 1);
-        Vector outward = new Vector(0, 0, 1);
-        Vector fullLeap = ArcadePortRules.dragonEscapeLeapVelocity(facing, false);
-        Vector first = DragonEscapeMovementKits.wallKickVelocity(facing, outward, 0.50D);
-        Vector second = DragonEscapeMovementKits.wallKickVelocity(facing, outward, 0.75D);
-        Vector third = DragonEscapeMovementKits.wallKickVelocity(facing, outward, 1.00D);
-        assertEquals(fullLeap.clone().multiply(0.50D), first);
-        assertEquals(fullLeap.clone().multiply(0.75D), second);
-        assertEquals(fullLeap, third);
-        assertTrue(first.length() < second.length());
-        assertTrue(second.length() < third.length());
+        Vector normal = new Vector(1, 0, 0);
+        Vector kick = DragonEscapeMovementKits.wallKickVelocity(facing, normal);
+        assertEquals(1.20D, DragonEscapeMovementKits.WALL_KICK_FORWARD_SPEED, 0.00001D);
+        assertEquals(0.72D, DragonEscapeMovementKits.WALL_KICK_UPWARD_SPEED, 0.00001D);
+        assertEquals(DragonEscapeMovementKits.WALL_KICK_FORWARD_SPEED,
+                kick.getZ(), 0.00001D);
+        assertEquals(DragonEscapeMovementKits.WALL_KICK_UPWARD_SPEED,
+                kick.getY(), 0.00001D);
+        assertTrue(kick.getX() >= DragonEscapeMovementKits.WALL_KICK_MIN_OUTWARD_SPEED);
+        Vector vanilla = ArcadePortRules.dragonEscapeLeapVelocity(facing, false);
+        assertTrue(kick.getY() > vanilla.getY(),
+                "Restore the boosted .72 Y launch, not a weak fraction of ordinary Leap");
         Vector up = DragonEscapeMovementKits.wallKickVelocity(
-                new Vector(0, 1, 1), outward, 1.0D);
+                new Vector(0, 1, 1), normal);
         Vector down = DragonEscapeMovementKits.wallKickVelocity(
-                new Vector(0, -1, 1), outward, 1.0D);
-        assertTrue(up.getY() > third.getY());
-        assertTrue(down.getY() < third.getY());
+                new Vector(0, -1, 1), normal);
+        assertTrue(up.getY() > kick.getY());
+        assertTrue(down.getY() < kick.getY());
     }
 
     @Test
-    void lookingIntoWallAlwaysPushesOutByAStrengthScaledMinimum() {
+    void wallKickLookingIntoWallKeepsOriginalOutwardCollisionRecovery() {
         Vector normal = new Vector(1, 0, 0);
-        for (double strength : new double[] {0.50D, 0.75D, 1.0D}) {
-            Vector intoWall = DragonEscapeMovementKits.wallKickVelocity(
-                    new Vector(-1, 0, 0), normal, strength);
-            assertEquals(DragonEscapeMovementKits.WALL_KICK_MIN_OUTWARD_SPEED * strength,
-                    intoWall.getX(), 0.00001D);
-            assertEquals(ArcadePortRules.dragonEscapeLeapVelocity(
-                    new Vector(-1, 0, 0), false).getY() * strength,
-                    intoWall.getY(), 0.00001D);
-        }
+        Vector intoWall = DragonEscapeMovementKits.wallKickVelocity(
+                new Vector(-1, 0, 0), normal);
+        assertEquals(DragonEscapeMovementKits.WALL_KICK_MIN_OUTWARD_SPEED,
+                intoWall.getX(), 0.00001D);
+        assertEquals(DragonEscapeMovementKits.WALL_KICK_UPWARD_SPEED,
+                intoWall.getY(), 0.00001D);
         assertEquals(new Vector(), DragonEscapeMovementKits.wallKickVelocity(
-                new Vector(), normal, 0.5D));
+                new Vector(), normal));
     }
 
     @Test
@@ -352,28 +400,28 @@ class DragonEscapeMovementKitsTest {
         DragonEscapeMovementKits.AcrobatState state = new DragonEscapeMovementKits.AcrobatState();
         long now = 5_000L;
         assertFalse(state.wallKickCoolingDown(now));
-        assertEquals(0.5D, state.nextWallKickStrength(), 0.00001D);
+        assertEquals(0, state.wallKicksThisAirborneChain);
         assertTrue(state.tickWallCling(true, false, true, now));
         state.completeWallKick();
-        assertEquals(0.75D, state.nextWallKickStrength(), 0.00001D);
+        assertEquals(1, state.wallKicksThisAirborneChain);
         assertFalse(state.wallKickCoolingDown(now));
         state.tickWallCling(false, false, false, now + 100L);
         assertTrue(state.tickWallCling(true, false, true, now + 200L));
         state.completeWallKick();
-        assertEquals(1.0D, state.nextWallKickStrength(), 0.00001D);
+        assertEquals(2, state.wallKicksThisAirborneChain);
         assertFalse(state.wallKickCoolingDown(now + 200L));
         state.tickWallCling(false, false, false, now + 300L);
         assertTrue(state.tickWallCling(true, false, true, now + 400L));
         state.completeWallKick();
-        assertEquals(1.0D, state.nextWallKickStrength(), 0.00001D,
-                "The third and later airborne jumps remain full-strength");
+        assertEquals(3, state.wallKicksThisAirborneChain,
+                "The airborne chain can continue with no cooldown until landing");
         assertFalse(state.wallKickCoolingDown(now + 400L));
 
         long landing = now + 600L;
         assertFalse(state.tickWallCling(true, true, true, landing));
         assertTrue(state.wallKickCoolingDown(landing));
         assertEquals(0, state.wallKicksThisAirborneChain);
-        assertEquals(0.5D, state.nextWallKickStrength(), 0.00001D);
+        assertEquals(0, state.wallKicksThisAirborneChain);
         state.tickWallCling(false, false, false, landing + 100L);
         assertFalse(state.tickWallCling(true, false, true, landing + 9_999L));
         assertFalse(state.tickWallCling(true, false, true, landing + 10_000L),
@@ -391,7 +439,7 @@ class DragonEscapeMovementKitsTest {
         state.tickWallCling(false, false, false, 2_300L);
         state.tickWallCling(false, true, false, 2_400L);
         assertFalse(state.wallKickCoolingDown(2_400L));
-        assertEquals(0.5D, state.nextWallKickStrength(), 0.00001D);
+        assertEquals(0, state.wallKicksThisAirborneChain);
     }
 
     @Test
