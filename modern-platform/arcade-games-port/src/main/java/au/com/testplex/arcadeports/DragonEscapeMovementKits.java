@@ -18,21 +18,23 @@ final class DragonEscapeMovementKits {
     // Approximately 34% less charge per tick than the original hover implementation.
     static final double FLUTTER_DRAIN_PER_TICK = 0.0125D;
     static final double FLUTTER_REGEN_PER_TICK = 0.009D;
-    // Yoshi-style movement: repeated, smooth rising and falling arcs.
-    // The slightly negative baseline prevents unlimited height gain on one hold.
+    // Each fresh airborne Space press buys one up/down/up flutter arc.
     static final int FLUTTER_WAVE_TICKS = 28;
     static final double FLUTTER_WAVE_BASE_Y = -0.025D;
     static final double FLUTTER_WAVE_AMPLITUDE_Y = 0.22D;
-    static final double FLUTTER_HORIZONTAL_MAX = 0.20D;
+    // Vanilla level-ground sprint is ~5.612 blocks/s: 80% / 20 TPS.
+    static final double FLUTTER_HORIZONTAL_SPEED = 0.8D * 5.612D / 20.0D;
+    static final double FLUTTER_END_FORWARD_SPEED = 0.26D; // Brief post-flutter carry.
+
     static final double WALL_KICK_FORWARD_SPEED = 1.20D;
     static final double WALL_KICK_UPWARD_SPEED = 0.72D;
     static final double WALL_KICK_PITCH_LIFT = 0.60D;
     static final double WALL_KICK_MIN_UPWARD_SPEED = 0.20D;
     static final double WALL_KICK_MAX_UPWARD_SPEED = 1.20D;
     static final double WALL_KICK_MIN_OUTWARD_SPEED = 0.28D;
-    static final int WALL_CLING_MAX_TICKS = 10; // 0.5 seconds at 20 TPS.
-    static final double WALL_CLING_USE_COST = 0.25D; // Four sticks from a full XP bar.
-    static final double WALL_CLING_REGEN_PER_TICK = 0.010D; // Refill when not clinging.
+    // No fixed wall-stick duration: active Shift steadily drains its own XP bar.
+    static final double WALL_CLING_DRAIN_PER_TICK = 0.0125D;
+    static final double WALL_CLING_REGEN_PER_TICK = 0.009D;
     static final double WALL_CLING_GRAVITY_COMPENSATION_Y = 0.078D;
     static final double ACROBAT_FALL_DAMAGE_MULTIPLIER = 0.50D;
     private static final double TOUCH_TOLERANCE = 0.055D;
@@ -44,45 +46,50 @@ final class DragonEscapeMovementKits {
         double charge = 1.0D;
         boolean fluttering;
         boolean activated;
-        boolean usedCurrentHold;
-        int airborneTicks;
+        boolean ended;
+        boolean previouslyHeld;
+        boolean releasedWhileAirborne;
         int flutterTicks;
 
+        /**
+         * Never activate from a held ground-jump. A release while airborne must
+         * arm the next fresh Space press. A press grants exactly ONE 28-tick arc:
+         * continuing to hold Space through its end cannot repeat it.
+         */
         void tick(boolean jumpHeld, boolean grounded) {
             activated = false;
+            ended = false;
+            boolean freshPress = jumpHeld && !previouslyHeld;
+            previouslyHeld = jumpHeld;
             if (grounded) {
-                airborneTicks = 0;
-                flutterTicks = 0;
                 fluttering = false;
-                usedCurrentHold = false;
+                flutterTicks = 0;
+                releasedWhileAirborne = false;
                 charge = Math.min(1.0D, charge + FLUTTER_REGEN_PER_TICK);
                 return;
             }
-            airborneTicks++;
-            if (!jumpHeld) {
-                fluttering = false;
-                flutterTicks = 0;
-                usedCurrentHold = false;
-            } else if (!usedCurrentHold && airborneTicks >= 3) {
-                // Waiting for the third airborne tick allows players to keep
-                // holding Space from their initial, normal jump.
-                usedCurrentHold = true;
-                if (charge >= FLUTTER_ACTIVATION_COST) {
-                    charge -= FLUTTER_ACTIVATION_COST;
-                    fluttering = true;
-                    flutterTicks = 0;
-                    activated = true;
-                }
-            }
+
+            if (!jumpHeld) releasedWhileAirborne = true;
             if (fluttering) {
-                flutterTicks++;
-                charge = Math.max(0.0D, charge - FLUTTER_DRAIN_PER_TICK);
-                if (charge == 0.0D) fluttering = false;
-            } else {
-                // The XP bar is energy, not a per-jump charge counter. Recover
-                // whenever Flutter is inactive, even in midair between bursts.
-                charge = Math.min(1.0D, charge + FLUTTER_REGEN_PER_TICK);
+                if (!jumpHeld || flutterTicks >= FLUTTER_WAVE_TICKS
+                        || charge < FLUTTER_DRAIN_PER_TICK) {
+                    fluttering = false;
+                    ended = true;
+                } else {
+                    flutterTicks++;
+                    charge = Math.max(0.0D, charge - FLUTTER_DRAIN_PER_TICK);
+                    return;
+                }
+            } else if (freshPress && releasedWhileAirborne
+                    && charge >= FLUTTER_ACTIVATION_COST + FLUTTER_DRAIN_PER_TICK) {
+                charge -= FLUTTER_ACTIVATION_COST + FLUTTER_DRAIN_PER_TICK;
+                fluttering = true;
+                activated = true;
+                releasedWhileAirborne = false;
+                flutterTicks = 1;
+                return;
             }
+            charge = Math.min(1.0D, charge + FLUTTER_REGEN_PER_TICK);
         }
     }
 
@@ -90,14 +97,12 @@ final class DragonEscapeMovementKits {
         boolean previouslyHeld;
         boolean crouchConsumed;
         boolean clingActivated;
+        boolean clingActive;
         double charge = 1.0D;
-        int wallClingTicksRemaining;
 
         /**
-         * A wall kick requires a fresh airborne Space press while an existing
-         * airborne Shift-stick is active. Ground jumping, wall contact alone,
-         * and pressing Space in the same tick that starts a stick cannot kick.
-         * No separate time-based wall-kick cooldown is imposed.
+         * Every wall kick needs a fresh airborne Space press while an already
+         * active Shift-stick holds physical wall contact. One stick buys one kick.
          */
         boolean pressedForWallKick(boolean jumpHeld, boolean grounded, boolean sticking) {
             boolean freshPress = jumpHeld && !previouslyHeld;
@@ -106,58 +111,90 @@ final class DragonEscapeMovementKits {
         }
 
         /**
-         * A charged Shift-stick can start only while airborne and physically
-         * touching a wall. Each fresh Shift hold buys at most one 10-tick stick
-         * for 25% XP; holding Shift cannot renew it. Releasing Shift, landing,
-         * or losing contact cancels it. XP regenerates while not sticking.
+         * Hold Shift against a real wall while airborne. Stick has NO fixed
+         * duration; energy drains each tick until exhausted or released.
+         * Loss of wall contact, landing, kick, or exhaustion cancels the stick.
+         * A used Shift hold never restarts itself after the bar regenerates.
          */
         boolean tickWallCling(boolean crouching, boolean grounded, boolean touchingWall) {
             clingActivated = false;
             if (!crouching) {
                 crouchConsumed = false;
-                wallClingTicksRemaining = 0;
+                clingActive = false;
             } else if (grounded || !touchingWall) {
-                wallClingTicksRemaining = 0;
+                clingActive = false;
             } else if (!crouchConsumed) {
                 crouchConsumed = true;
-                if (charge + 1.0E-9D >= WALL_CLING_USE_COST) {
-                    charge = Math.max(0.0D, charge - WALL_CLING_USE_COST);
-                    wallClingTicksRemaining = WALL_CLING_MAX_TICKS;
+                if (charge >= WALL_CLING_DRAIN_PER_TICK) {
+                    clingActive = true;
                     clingActivated = true;
                 }
             }
 
-            boolean sticking = crouching && !grounded && touchingWall && wallClingTicksRemaining > 0;
+            boolean sticking = crouching && !grounded && touchingWall && clingActive;
             if (sticking) {
-                wallClingTicksRemaining--;
-            } else {
+                if (charge >= WALL_CLING_DRAIN_PER_TICK) {
+                    charge = Math.max(0.0D, charge - WALL_CLING_DRAIN_PER_TICK);
+                } else {
+                    clingActive = false;
+                    sticking = false;
+                }
+            }
+            if (!sticking) {
                 charge = Math.min(1.0D, charge + WALL_CLING_REGEN_PER_TICK);
             }
             return sticking;
         }
 
         void cancelWallClingForKick() {
-            wallClingTicksRemaining = 0;
+            clingActive = false;
             crouchConsumed = true;
         }
     }
 
     /**
-     * A held flutter traces repeating up-down-up arcs, rather than applying a
-     * one-off hop followed by a fixed downward hover velocity. The wave is
-     * phase-locked to each fresh flutter burst, so release/repress begins a
-     * new arc; every continuous hold retains its repeating flutter movement.
+     * User input steers each flutter at about 80% of standard ground sprint.
+     * If no directional key is held, continue existing travel direction;
+     * looking direction is a fallback when starting from standstill.
      */
-    static Vector flutterVelocity(Vector current, int flutterTicks) {
+    static Vector flutterTravelDirection(Vector current, Vector facing,
+            boolean forward, boolean backward, boolean left, boolean right) {
+        Vector look = facing == null ? new Vector(0, 0, 1) : facing.clone().setY(0.0D);
+        if (look.lengthSquared() < 1.0E-8D) look = new Vector(0, 0, 1);
+        look.normalize();
+        Vector rightVector = new Vector(-look.getZ(), 0.0D, look.getX());
+        double forwardInput = (forward ? 1.0D : 0.0D) - (backward ? 1.0D : 0.0D);
+        double rightInput = (right ? 1.0D : 0.0D) - (left ? 1.0D : 0.0D);
+        Vector steering = look.clone().multiply(forwardInput)
+                .add(rightVector.multiply(rightInput));
+        if (steering.lengthSquared() > 1.0E-8D) return steering.normalize();
+        Vector momentum = current.clone().setY(0.0D);
+        return momentum.lengthSquared() > 1.0E-6D ? momentum.normalize() : look;
+    }
+
+    /** One bounded Yoshi-style up/down/up arc, never a looping held-space wave. */
+    static Vector flutterVelocity(Vector current, Vector travelDirection, int flutterTicks) {
         Vector next = current.clone();
-        int phaseTicks = Math.max(0, flutterTicks - 1) % FLUTTER_WAVE_TICKS;
-        double phase = phaseTicks * 2.0D * Math.PI / FLUTTER_WAVE_TICKS;
+        double phase = (Math.max(1, Math.min(FLUTTER_WAVE_TICKS, flutterTicks)) - 1)
+                * 2.0D * Math.PI / FLUTTER_WAVE_TICKS;
         next.setY(FLUTTER_WAVE_BASE_Y + FLUTTER_WAVE_AMPLITUDE_Y * Math.cos(phase));
-        double horizontal = Math.hypot(next.getX(), next.getZ());
-        if (horizontal > FLUTTER_HORIZONTAL_MAX) {
-            double scale = FLUTTER_HORIZONTAL_MAX / horizontal;
-            next.setX(next.getX() * scale);
-            next.setZ(next.getZ() * scale);
+        Vector direction = travelDirection.clone().setY(0.0D);
+        if (direction.lengthSquared() > 1.0E-8D) {
+            direction.normalize().multiply(FLUTTER_HORIZONTAL_SPEED);
+            next.setX(direction.getX());
+            next.setZ(direction.getZ());
+        }
+        return next;
+    }
+
+    /** Brief capped forward carry on completion or early release, then vanilla air drag. */
+    static Vector flutterEndVelocity(Vector current) {
+        Vector next = current.clone();
+        Vector horizontal = current.clone().setY(0.0D);
+        if (horizontal.lengthSquared() > 1.0E-8D) {
+            horizontal.normalize().multiply(FLUTTER_END_FORWARD_SPEED);
+            next.setX(horizontal.getX());
+            next.setZ(horizontal.getZ());
         }
         return next;
     }
@@ -168,9 +205,8 @@ final class DragonEscapeMovementKits {
     }
 
     static Vector wallClingVelocity() {
-        // Bukkit applies gravity after each velocity update. This slight
-        // upward compensation keeps the player nearly stationary for 10 ticks
-        // without changing persistent Player gravity or requiring cleanup.
+        // Bukkit applies gravity after each velocity update. Compensate only
+        // during active clinging, without a persistent gravity-state change.
         return new Vector(0.0D, WALL_CLING_GRAVITY_COMPENSATION_Y, 0.0D);
     }
 
