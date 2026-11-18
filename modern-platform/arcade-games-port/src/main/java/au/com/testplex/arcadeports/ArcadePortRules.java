@@ -3773,6 +3773,11 @@ public final class ArcadePortRules {
         return previousBestMillis > 0L && elapsedMillis > 0L && elapsedMillis < previousBestMillis;
     }
 
+    /** A runner's first completion is based on their own saved map PB, not the global record. */
+    public static boolean dragonEscapeHasPreviousMapCompletion(long previousMapBestMillis) {
+        return previousMapBestMillis > 0L;
+    }
+
     /** Backwards-compatible fallback when a map has no authored vertical bounds. */
     public static double dragonEscapeVoidThresholdY(String mapName) {
         return dragonEscapeVoidThresholdY(mapName, false, 0);

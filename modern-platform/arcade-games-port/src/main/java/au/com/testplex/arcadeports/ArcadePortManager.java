@@ -18547,8 +18547,8 @@ public final class ArcadePortManager implements Listener {
             long previousOverallPb, long previousKitPb, DragonEscapeTimeRecord previousWorldRecord,
             DragonEscapeTimeRecord previousKitWorldRecord, boolean improvedKit, boolean firstFinisher) {
         if (player == null || session == null) return;
-        boolean firstCompletion = previousWorldRecord == null;
-        boolean firstKitCompletion = previousKitWorldRecord == null;
+        boolean firstCompletion = !ArcadePortRules.dragonEscapeHasPreviousMapCompletion(previousOverallPb);
+        boolean firstKitCompletion = !ArcadePortRules.dragonEscapeHasPreviousMapCompletion(previousKitPb);
         boolean newWorldRecord = previousWorldRecord != null && elapsed < previousWorldRecord.timeMillis();
         boolean newKitWorldRecord = previousKitWorldRecord != null
                 && elapsed < previousKitWorldRecord.timeMillis();

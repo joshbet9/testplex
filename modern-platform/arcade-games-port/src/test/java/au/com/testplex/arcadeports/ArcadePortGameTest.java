@@ -1919,6 +1919,17 @@ class ArcadePortGameTest {
                 false, false, false, false, false, false, "jumper"));
     }
 
+    @Test void dragonEscapeFirstCompletionIsPerRunnerAndPerMap() {
+        // Another runner may already hold the world's record; this player still gets
+        // their first-completion milestone when they have no saved map PB.
+        assertFalse(ArcadePortRules.dragonEscapeHasPreviousMapCompletion(-1L));
+        assertFalse(ArcadePortRules.dragonEscapeHasPreviousMapCompletion(0L));
+        assertTrue(ArcadePortRules.dragonEscapeHasPreviousMapCompletion(12_000L));
+        assertEquals("FIRST COMPLETION!", ArcadePortRules.dragonEscapeRecordMilestone(
+                !ArcadePortRules.dragonEscapeHasPreviousMapCompletion(-1L), true,
+                false, false, false, false, "jumper"));
+    }
+
     @Test void dragonEscapeInitialCompletionIsNotMisclassifiedAsPersonalBest() {
         assertFalse(ArcadePortRules.dragonEscapeImprovesExistingPersonalBest(-1L, 12_000L));
         assertFalse(ArcadePortRules.dragonEscapeImprovesExistingPersonalBest(0L, 12_000L));
