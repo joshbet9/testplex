@@ -16405,6 +16405,11 @@ public final class ArcadePortManager implements Listener {
             knockbackMultiplier *= ArcadePortRules.baconBrawlKnockbackMultiplier(true);
             target.playSound(target.getLocation(), Sound.ENTITY_PIG_DEATH, 1.0F, 2.0F);
         }
+        if (!GameDebugRuntimeOverrides.booleanValue("BACON_BRAWL_HITS_DAMAGE_HEALTH",
+                ArcadePortRules.BACON_BRAWL_HITS_DAMAGE_HEALTH)) {
+            target.setHealth(BaconBrawlCombatRules.healthAfterHit(
+                    target.getHealth(), target.getMaxHealth(), rawDamage));
+        }
         target.setVelocity(baconBrawlKnockbackVelocity(attacker, target,
                 "melee".equals(source) ? 6.0D : rawDamage,
                 knockbackMultiplier, projectileVelocity));
