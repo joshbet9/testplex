@@ -14,10 +14,12 @@ import org.bukkit.block.Block;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
@@ -98,6 +100,17 @@ public final class ModernArcadeLobby implements Listener {
         this.hotbarActionKey = new NamespacedKey(plugin, "lobby-hotbar-action");
         this.legacyPanelItemKey = new NamespacedKey(plugin, "game-panel-item");
         this.feedbackActionKey = new NamespacedKey(plugin, "feedback-menu-action");
+    }
+
+    static boolean shouldCancelLobbyItemDrop(String worldName) {
+        return WORLD_NAME.equals(worldName);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onLobbyItemDrop(PlayerDropItemEvent event) {
+        if (shouldCancelLobbyItemDrop(event.getPlayer().getWorld().getName())) {
+            event.setCancelled(true);
+        }
     }
 
     public World ensureWorld() {
