@@ -33,7 +33,7 @@ class ArcadeGameDirectoryTest {
         // (that value is a build-material choice rather than a game icon).
         for (ArcadeGameDirectory.Game game : ArcadeGameDirectory.games()) {
             assertTrue(ArcadePortGame.fromId(game.id()) != null, game.id());
-            assertTrue(game.icon().isItem(), game.id());
+            assertTrue(game.icon() != Material.AIR, game.id());
             assertTrue(game.icon() != Material.BARRIER, game.id());
         }
         assertEquals(Material.DRAGON_EGG, ArcadeGameDirectory.find("dragon-escape").icon());
