@@ -20,6 +20,14 @@ class DragonEscapeMapDraftRulesTest {
     }
 
     @Test
+    void mapIdsNormalizeApostrophesWithoutColliding() {
+        assertEquals("a-builders-bedroom", DragonEscapeMapDraftRules.mapSlug(
+                "source-maps/Dragon Escape/DragonEscape_A Builder's Bedroom.zip"));
+        assertEquals("poseidons-realm", DragonEscapeMapDraftRules.mapSlug(
+                "source-maps/Dragon Escape/DragonEscape_Poseidon's Realm.zip"));
+    }
+
+    @Test
     void derivesStableReservedWorldNamesForMapAndDraftPairs() {
         String resource = "source-maps/Dragon Escape/DragonEscape_Zodiac.zip";
         String first = DragonEscapeMapDraftRules.worldName(resource, "repair");
