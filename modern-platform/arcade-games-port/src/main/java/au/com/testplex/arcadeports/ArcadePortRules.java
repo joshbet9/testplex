@@ -1445,7 +1445,7 @@ public final class ArcadePortRules {
     public static final int DRAGON_ESCAPE_JUMPER_LEAP_USES = 4;
     public static final int DRAGON_ESCAPE_DISRUPTOR_LEAP_USES = 3;
     public static final int DRAGON_ESCAPE_WARPER_LEAP_USES = 2;
-    public static final int DRAGON_ESCAPE_ACROBAT_LEAP_USES = 1;
+    public static final int DRAGON_ESCAPE_ACROBAT_LEAP_USES = 2;
     public static final double DRAGON_ESCAPE_LEAP_FACING_Y_BONUS = 0.2D;
     public static final double DRAGON_ESCAPE_LEAP_GROUNDED_Y_BONUS = 0.2D;
 
