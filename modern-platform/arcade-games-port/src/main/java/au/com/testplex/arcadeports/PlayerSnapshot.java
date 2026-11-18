@@ -97,7 +97,7 @@ final class PlayerSnapshot {
         p.setCompassTarget(compassTarget == null ? null : compassTarget.clone());
         p.setCollidable(collidable);
         p.setInvulnerable(invulnerable);
-
+        ArcadeCollisionRules.assign(p, scoreboard);
         p.setPlayerListName(playerListName);
         p.setAllowFlight(allowFlight);
         var maxHealthAttribute = p.getAttribute(Attribute.MAX_HEALTH);

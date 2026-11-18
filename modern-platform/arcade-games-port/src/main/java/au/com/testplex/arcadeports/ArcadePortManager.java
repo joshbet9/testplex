@@ -7410,7 +7410,7 @@ public final class ArcadePortManager implements Listener {
         }
         session.evolutionScoreboards.put(player.getUniqueId(),
                 new SessionState.EvolutionScoreboardView(scoreboard, objective, lineTeams, entries));
-
+        ArcadeCollisionRules.assign(player, scoreboard);
     }
 
     private void updateEvolutionScoreboards(Session session, long now) {
@@ -7467,7 +7467,7 @@ public final class ArcadePortManager implements Listener {
                     view.scoreboard.resetScores(entry);
                 }
             }
-
+            if (viewer.getScoreboard() != view.scoreboard) ArcadeCollisionRules.assign(viewer, view.scoreboard);
         }
     }
 
@@ -7487,7 +7487,7 @@ public final class ArcadePortManager implements Listener {
             session.sharedMatchScoreboardEntries.add(entry);
         }
         for (Player player : session.players.values()) {
-
+            if (player != null && player.isOnline()) ArcadeCollisionRules.assign(player, scoreboard);
         }
         applySessionTeamTabTeams(session);
         updateSharedMatchScoreboard(session, System.currentTimeMillis());
@@ -7620,7 +7620,7 @@ public final class ArcadePortManager implements Listener {
 
         for (Player player : session.players.values()) {
             if (player != null && player.isOnline() && player.getScoreboard() != scoreboard) {
-
+                ArcadeCollisionRules.assign(player, scoreboard);
             }
         }
         applySessionTeamTabTeams(session);
@@ -7705,7 +7705,7 @@ public final class ArcadePortManager implements Listener {
             }
             session.gladiatorScoreboards.put(player.getUniqueId(),
                     new GladiatorScoreboardView(scoreboard, objective, teams, entries));
-
+            ArcadeCollisionRules.assign(player, scoreboard);
         }
         applySessionTeamTabTeams(session);
         updateGladiatorsScoreboard(session, System.currentTimeMillis());
@@ -8664,7 +8664,7 @@ public final class ArcadePortManager implements Listener {
         session.dragonDeadScoreboardTeam = scoreboard.registerNewTeam("drgdead");
         session.dragonDeadScoreboardTeam.setPrefix(ChatColor.GRAY.toString());
         for (Player player : session.players.values()) {
-
+            if (player != null && player.isOnline()) ArcadeCollisionRules.assign(player, scoreboard);
         }
         updateDragonsScoreboard(session, System.currentTimeMillis());
     }
@@ -8714,7 +8714,7 @@ public final class ArcadePortManager implements Listener {
         }
         for (Player player : roster) {
             if (player != null && player.isOnline() && player.getScoreboard() != scoreboard) {
-
+                ArcadeCollisionRules.assign(player, scoreboard);
             }
         }
     }
@@ -8747,7 +8747,7 @@ public final class ArcadePortManager implements Listener {
         objective.getScore(session.deathTagChaserScoreboardEntry).setScore(1);
 
         for (Player player : session.players.values()) {
-
+            if (player != null && player.isOnline()) ArcadeCollisionRules.assign(player, scoreboard);
         }
         updateDeathTagScoreboard(session);
     }
@@ -8774,7 +8774,7 @@ public final class ArcadePortManager implements Listener {
         session.bombLobbersScoreboardObjective = objective;
 
         for (Player player : session.players.values()) {
-
+            if (player != null && player.isOnline()) ArcadeCollisionRules.assign(player, scoreboard);
         }
         updateBombLobbersScoreboard(session);
     }
@@ -8787,7 +8787,7 @@ public final class ArcadePortManager implements Listener {
         session.paintballScoreboard = scoreboard;
         session.paintballScoreboardObjective = objective;
         for (Player player : session.players.values()) {
-
+            if (player != null && player.isOnline()) ArcadeCollisionRules.assign(player, scoreboard);
         }
         updatePaintballScoreboard(session, System.currentTimeMillis());
     }
@@ -8801,7 +8801,7 @@ public final class ArcadePortManager implements Listener {
         session.masterBuildersScoreboard = scoreboard;
         session.masterBuildersScoreboardObjective = objective;
         for (Player player : session.players.values()) {
-
+            if (player != null && player.isOnline()) ArcadeCollisionRules.assign(player, scoreboard);
         }
         updateMasterBuildersScoreboard(session, System.currentTimeMillis());
     }
@@ -8896,7 +8896,7 @@ public final class ArcadePortManager implements Listener {
         }
         for (Player player : session.players.values()) {
             if (player != null && player.isOnline() && player.getScoreboard() != session.paintballScoreboard) {
-
+                ArcadeCollisionRules.assign(player, session.paintballScoreboard);
             }
         }
     }
@@ -15063,7 +15063,7 @@ public final class ArcadePortManager implements Listener {
             session.baconDisguiseScoreboard = scoreboard;
             session.baconDisguiseTeam = disguiseTeam;
             for (Player player : participants) {
-
+                ArcadeCollisionRules.assign(player, scoreboard);
                 String entry = player.getName();
                 Team previous = scoreboard.getEntryTeam(entry);
                 session.baconPreviousNameTeams.put(player.getUniqueId(), previous == disguiseTeam ? null : previous);
@@ -15125,7 +15125,7 @@ public final class ArcadePortManager implements Listener {
         if (scoreboard == null) {
             scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
             for (Player player : session.players.values()) {
-
+                if (player != null && player.isOnline()) ArcadeCollisionRules.assign(player, scoreboard);
             }
         }
         session.baconMeterScoreboard = scoreboard;
@@ -19065,7 +19065,7 @@ public final class ArcadePortManager implements Listener {
             session.quiverScoreboardEntries.add(entry);
         }
         for (Player player : session.players.values()) {
-
+            if (player != null && player.isOnline()) ArcadeCollisionRules.assign(player, scoreboard);
         }
         updateQuiverScoreboard(session);
     }
@@ -19165,7 +19165,7 @@ public final class ArcadePortManager implements Listener {
         }
         DragonEscapeRaceScoreboardView view = new DragonEscapeRaceScoreboardView(scoreboard, objective, teams, entries);
         dragonEscapeRaceScoreboards.put(player.getUniqueId(), view);
-
+        ArcadeCollisionRules.assign(player, scoreboard);
         ArcadeCollisionRules.disable(player);
     }
 
@@ -19205,7 +19205,7 @@ public final class ArcadePortManager implements Listener {
             DragonEscapeRaceScoreboardView view = dragonEscapeRaceScoreboards.get(viewer.getUniqueId());
             if (view == null) continue;
             // Reattach the match board if another plugin or reconnect replaced it.
-
+            if (viewer.getScoreboard() != view.scoreboard()) ArcadeCollisionRules.assign(viewer, view.scoreboard());
             // Reserve two final rows for the post-finish countdown and four rows for
             // the map/kit records; racer order carries rank without #1/#2 labels.
             for (int i = 0; i < DragonEscapeRaceScoreboardLayout.RACER_ROW_COUNT; i++) {

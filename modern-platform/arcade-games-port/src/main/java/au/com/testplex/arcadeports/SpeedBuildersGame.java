@@ -1307,7 +1307,7 @@ public final class SpeedBuildersGame implements Listener {
             team.setPrefix(lines.get(i));
             objective.getScore(entry).setScore(lines.size() - i);
         }
-
+        ArcadeCollisionRules.assign(state.player, board);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -1897,7 +1897,7 @@ public final class SpeedBuildersGame implements Listener {
             player.setFireTicks(Math.max(0, fireTicks));
             player.setFallDistance(Math.max(0.0F, fallDistance));
             player.setVelocity(velocity.clone());
-
+            if (scoreboard != null) ArcadeCollisionRules.assign(player, scoreboard);
         }
 
         private static ItemStack[] cloneItems(ItemStack[] source) {
