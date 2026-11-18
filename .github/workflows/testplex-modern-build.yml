@@ -517,7 +517,7 @@ jobs:
 
           # The checked-in app config is authoritative. The previous failed attempt
           # may have left the Machine's temporary autostop setting at off.
-          restore_autostop="$(awk -F= '/^[[:space:]]*auto_stop_machines[[:space:]]*=/{gsub(/[[:space:]\"\\047]/, \"\", $2); print $2; exit}' fly.toml)"
+          restore_autostop="$(awk -F '"' '/^[[:space:]]*auto_stop_machines[[:space:]]*=/{print $2; exit}' fly.toml)"
           case "$restore_autostop" in
             true|stop) restore_autostop=stop ;;
             suspend) restore_autostop=suspend ;;
