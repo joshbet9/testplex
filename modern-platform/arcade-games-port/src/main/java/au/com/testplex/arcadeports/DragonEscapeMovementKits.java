@@ -1,6 +1,5 @@
 package au.com.testplex.arcadeports;
 
-import org.bukkit.Sound;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.util.BoundingBox;
@@ -11,8 +10,9 @@ import org.bukkit.util.Vector;
  * the match lifecycle so they can be tested without a running Paper server.
  */
 final class DragonEscapeMovementKits {
-    static final Sound FLUTTER_SOUND = Sound.ENTITY_SLIME_JUMP;
-    static final Sound WALL_KICK_SOUND = Sound.ENTITY_FIREWORK_ROCKET_LAUNCH;
+    // Keep rule helpers independent of Paper's runtime-only sound registry.
+    static final String FLUTTER_SOUND_NAME = "ENTITY_SLIME_JUMP";
+    static final String WALL_KICK_SOUND_NAME = "ENTITY_FIREWORK_ROCKET_LAUNCH";
     static final double FLUTTER_ACTIVATION_COST = 0.08D;
     static final double FLUTTER_DRAIN_PER_TICK = 0.019D;
     static final double FLUTTER_REGEN_PER_TICK = 0.009D;
