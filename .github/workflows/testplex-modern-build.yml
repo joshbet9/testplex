@@ -293,6 +293,15 @@ jobs:
           jar tf "$arcade_jar" | grep -Fxq "maps/micro-battles.zip"
           jar tf "$arcade_jar" | grep -Fxq "maps/paintball.zip"
 
+          # Keep Fly startup verification aligned with the readiness marker emitted only after all modules initialize.
+          python3 - <<'PY'
+          from pathlib import Path
+          workflow = Path(".github/workflows/testplex-modern-build.yml").read_text(encoding="utf-8")
+          plugin = Path("modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/ArcadeMechanicsModernPlugin.java").read_text(encoding="utf-8")
+          marker = "TESTPLEX_ARCADE_BOOTSTRAP phase=full-runtime-readiness-published"
+          assert marker in plugin, "runtime plugin no longer emits the full readiness marker"
+          assert f"grep -F '{marker}'" in workflow, "Fly deployment does not verify the runtime readiness marker"
+          PY
           # Guard the deployment path against the real standalone source artifact name.
           deploy_workflow=".github/workflows/deploy-testplex-modern-hyperv.yml"
           grep -Fq 'plugins/MonsterMazeStandalone' "$deploy_workflow"
@@ -608,7 +617,7 @@ jobs:
             | tee "$RUNNER_TEMP/fly-runtime-verification.log"
           grep -Fx "TESTPLEX_FLY_RUNTIME_VERIFIED:$GITHUB_SHA" "$RUNNER_TEMP/fly-runtime-verification.log"
           flyctl logs --app "$FLY_APP" --machine "$machine_id" --no-tail > "$RUNNER_TEMP/fly-startup.log"
-          grep -F 'TESTPLEX_ARCADE_BOOTSTRAP phase=complete' "$RUNNER_TEMP/fly-startup.log"
+          grep -F 'TESTPLEX_ARCADE_BOOTSTRAP phase=full-runtime-readiness-published' "$RUNNER_TEMP/fly-startup.log"
           flyctl volumes list --app "$FLY_APP" --json > "$RUNNER_TEMP/fly-volumes-final.json"
           final_volume_id="$(jq -er '[.[] | select(.name == "testplex_data_restore")] | if length == 1 then .[0].id else error("Testplex data volume missing after runtime verification") end' "$RUNNER_TEMP/fly-volumes-final.json")"
           [[ "$final_volume_id" == "$EXPECTED_VOLUME_ID" ]]
