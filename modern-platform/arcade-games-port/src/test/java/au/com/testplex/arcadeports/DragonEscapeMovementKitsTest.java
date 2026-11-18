@@ -11,13 +11,13 @@ class DragonEscapeMovementKitsTest {
     void featherBounceBeginsWithFiveChargesAndRejectsGroundClicks() {
         var flutter = new DragonEscapeMovementKits.FlutterState();
         assertEquals(5, DragonEscapeMovementKits.FLUTTER_MAX_CHARGES);
-        assertEquals(8_000L, DragonEscapeMovementKits.FLUTTER_CHARGE_RECHARGE_MILLIS);
+        assertEquals(6_000L, DragonEscapeMovementKits.FLUTTER_CHARGE_RECHARGE_MILLIS);
         assertEquals(5, flutter.charges);
         assertFalse(flutter.useBounce(true, 1_000L));
         assertEquals(5, flutter.charges);
         assertTrue(flutter.useBounce(false, 1_000L));
         assertEquals(4, flutter.charges);
-        assertEquals(9_000L, flutter.nextChargeAtMillis);
+        assertEquals(7_000L, flutter.nextChargeAtMillis);
     }
 
     @Test
@@ -69,42 +69,42 @@ class DragonEscapeMovementKitsTest {
         }
         assertEquals(0, flutter.charges);
         assertFalse(flutter.useBounce(false, 5_001L));
-        assertEquals(9_000L, flutter.nextChargeAtMillis,
+        assertEquals(7_000L, flutter.nextChargeAtMillis,
                 "Additional bounces must never postpone the earliest recharge");
     }
 
     @Test
-    void featherChargesRestoreOneEveryEightSecondsIncludingInAir() {
+    void featherChargesRestoreOneEverySixSecondsIncludingInAir() {
         var flutter = new DragonEscapeMovementKits.FlutterState();
         for (int i = 0; i < 5; i++) assertTrue(flutter.useBounce(false, 1_000L + i));
-        assertFalse(flutter.recharge(8_999L));
-        assertTrue(flutter.recharge(9_000L));
+        assertFalse(flutter.recharge(6_999L));
+        assertTrue(flutter.recharge(7_000L));
         assertEquals(1, flutter.charges);
-        assertEquals(17_000L, flutter.nextChargeAtMillis);
-        assertTrue(flutter.recharge(17_000L));
+        assertEquals(13_000L, flutter.nextChargeAtMillis);
+        assertTrue(flutter.recharge(13_000L));
         assertEquals(2, flutter.charges);
-        assertTrue(flutter.useBounce(false, 17_001L));
+        assertTrue(flutter.useBounce(false, 13_001L));
         assertEquals(1, flutter.charges);
-        assertEquals(25_000L, flutter.nextChargeAtMillis);
+        assertEquals(19_000L, flutter.nextChargeAtMillis);
+        assertTrue(flutter.recharge(19_000L));
         assertTrue(flutter.recharge(25_000L));
-        assertTrue(flutter.recharge(33_000L));
-        assertTrue(flutter.recharge(41_000L));
-        assertTrue(flutter.recharge(49_000L));
+        assertTrue(flutter.recharge(31_000L));
+        assertTrue(flutter.recharge(37_000L));
         assertEquals(5, flutter.charges);
         assertEquals(0L, flutter.nextChargeAtMillis);
         assertFalse(flutter.recharge(100_000L));
     }
 
     @Test
-    void featherChargeProgressFillsDuringEightSecondRecharge() {
+    void featherChargeProgressFillsDuringSixSecondRecharge() {
         var flutter = new DragonEscapeMovementKits.FlutterState();
         assertEquals(1.0F, flutter.rechargeProgress(1_000L), 0.00001F);
         flutter.useBounce(false, 1_000L);
         assertEquals(0.0F, flutter.rechargeProgress(1_000L), 0.00001F);
-        assertEquals(0.5F, flutter.rechargeProgress(5_000L), 0.00001F);
-        assertEquals(1.0F, flutter.rechargeProgress(9_000L), 0.00001F);
-        flutter.recharge(9_000L);
-        assertEquals(1.0F, flutter.rechargeProgress(9_000L), 0.00001F);
+        assertEquals(0.5F, flutter.rechargeProgress(4_000L), 0.00001F);
+        assertEquals(1.0F, flutter.rechargeProgress(7_000L), 0.00001F);
+        flutter.recharge(7_000L);
+        assertEquals(1.0F, flutter.rechargeProgress(7_000L), 0.00001F);
     }
 
     @Test
@@ -174,6 +174,52 @@ class DragonEscapeMovementKitsTest {
     }
 
     @Test
+    void wallStickRemainsLatchedAfterUncrouchingAndSpaceCanKickNormally() {
+        var state = new DragonEscapeMovementKits.AcrobatState();
+        assertFalse(state.tickWallCling(false, false, true, 1_000L),
+                "Wall contact without crouching does not initiate a stick");
+        assertFalse(state.pressedForWallKick(true, false, false),
+                "Space without a Shift-activated cling does not kick");
+        state.pressedForWallKick(false, false, false);
+
+        assertTrue(state.tickWallCling(true, false, true, 1_050L));
+        assertTrue(state.clingActivated);
+        assertFalse(state.pressedForWallKick(false, false, true));
+        double chargeAfterActivation = state.charge;
+
+        assertTrue(state.tickWallCling(false, false, true, 1_100L),
+                "Releasing Shift preserves the active wall-stick");
+        assertFalse(state.clingActivated, "Releasing Shift is not a new stick");
+        assertTrue(state.charge < chargeAfterActivation,
+                "The XP cost must continue while Shift is released");
+        assertTrue(state.tickWallCling(false, false, true, 1_150L));
+        assertTrue(state.pressedForWallKick(true, false, true),
+                "A fresh Space press after releasing Shift performs the kick");
+
+        state.completeWallKick();
+        assertFalse(state.clingActive, "The kick consumes the current stick");
+        assertFalse(state.tickWallCling(false, false, true, 1_200L),
+                "Releasing Shift cannot automatically reattach after a kick");
+    }
+
+    @Test
+    void wallStickMustHaveWallContactAndDoesNotReactivateWithoutNewCrouch() {
+        var state = new DragonEscapeMovementKits.AcrobatState();
+        assertFalse(state.tickWallCling(true, false, false, 1_000L));
+        assertTrue(state.tickWallCling(true, false, true, 1_050L));
+        assertTrue(state.tickWallCling(false, false, true, 1_100L));
+        assertFalse(state.tickWallCling(false, false, false, 1_150L));
+        assertFalse(state.tickWallCling(false, false, true, 1_200L),
+                "Returning to wall with Shift released cannot resume a lost stick");
+        assertTrue(state.tickWallCling(true, false, true, 1_250L),
+                "A fresh crouch while touching a wall can start a new stick");
+        assertFalse(state.tickWallCling(false, true, true, 1_300L),
+                "Landing cancels the stick even without holding Shift");
+        assertFalse(state.tickWallCling(false, false, true, 1_350L),
+                "Jumping off the ground without another crouch cannot stick");
+    }
+
+    @Test
     void wallStickLastsLongerThanHalfSecondAndDrainsContinuously() {
         DragonEscapeMovementKits.AcrobatState state = new DragonEscapeMovementKits.AcrobatState();
         assertTrue(state.tickWallCling(true, false, true, 1_000L));
@@ -228,8 +274,14 @@ class DragonEscapeMovementKitsTest {
                 "Holding Shift through landing cannot re-arm on takeoff");
         state.tickWallCling(false, false, true, 1_000L);
         assertTrue(state.tickWallCling(true, false, true, 1_000L));
-        assertFalse(state.tickWallCling(false, false, true, 1_000L));
+        assertTrue(state.tickWallCling(false, false, true, 1_000L),
+                "Uncrouching must NOT detach a latched wall-stick");
+        assertTrue(state.clingActive);
+        assertFalse(state.tickWallCling(false, false, false, 1_000L),
+                "A released Shift stick still ends immediately on wall-contact loss");
         assertFalse(state.clingActive);
+        assertFalse(state.tickWallCling(false, false, true, 1_000L),
+                "Returning to the wall without crouching cannot auto-rearm");
     }
 
     @Test
