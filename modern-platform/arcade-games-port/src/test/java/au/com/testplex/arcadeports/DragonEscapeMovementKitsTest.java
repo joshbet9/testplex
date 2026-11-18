@@ -8,34 +8,61 @@ import org.junit.jupiter.api.Test;
 
 class DragonEscapeMovementKitsTest {
     @Test
-    void featherBounceBeginsWithThreeChargesAndRejectsGroundClicks() {
+    void featherBounceBeginsWithFiveChargesAndRejectsGroundClicks() {
         var flutter = new DragonEscapeMovementKits.FlutterState();
-        assertEquals(3, DragonEscapeMovementKits.FLUTTER_MAX_CHARGES);
+        assertEquals(5, DragonEscapeMovementKits.FLUTTER_MAX_CHARGES);
         assertEquals(8_000L, DragonEscapeMovementKits.FLUTTER_CHARGE_RECHARGE_MILLIS);
-        assertEquals(3, flutter.charges);
+        assertEquals(5, flutter.charges);
         assertFalse(flutter.useBounce(true, 1_000L));
-        assertEquals(3, flutter.charges);
+        assertEquals(5, flutter.charges);
         assertTrue(flutter.useBounce(false, 1_000L));
-        assertEquals(2, flutter.charges);
+        assertEquals(4, flutter.charges);
         assertEquals(9_000L, flutter.nextChargeAtMillis);
     }
 
     @Test
-    void featherCanSpendThreeChargesInSameAirbornePeriodWithoutSpace() {
+    void featherHeldRightClickOnlySpendsOnceUntilAnInputPause() {
         var flutter = new DragonEscapeMovementKits.FlutterState();
+        assertEquals(500L, DragonEscapeMovementKits.FLUTTER_RIGHT_CLICK_REARM_GAP_MILLIS);
+        assertTrue(flutter.acceptRightClick(1_000L));
         assertTrue(flutter.useBounce(false, 1_000L));
-        assertTrue(flutter.useBounce(false, 2_000L));
-        assertTrue(flutter.useBounce(false, 3_000L));
+        // A client holding the feather keeps emitting right-click packets.
+        for (long time = 1_100L; time <= 2_100L; time += 100L) {
+            assertFalse(flutter.acceptRightClick(time));
+        }
+        assertEquals(4, flutter.charges, "Holding must not use multiple stored charges");
+        assertTrue(flutter.acceptRightClick(2_601L), "A fresh press after release can bounce");
+        assertTrue(flutter.useBounce(false, 2_601L));
+        assertEquals(3, flutter.charges);
+        assertFalse(flutter.acceptRightClick(2_602L), "Same-tick duplicate is ignored");
+
+        // Ground clicks must latch too: keeping the button held during takeoff
+        // should never automatically consume a mid-air charge.
+        var grounded = new DragonEscapeMovementKits.FlutterState();
+        assertTrue(grounded.acceptRightClick(3_000L));
+        assertFalse(grounded.useBounce(true, 3_000L));
+        assertFalse(grounded.acceptRightClick(3_200L));
+        assertEquals(5, grounded.charges);
+    }
+
+    @Test
+    void featherCanSpendFiveChargesInSameAirbornePeriodWithSeparatePresses() {
+        var flutter = new DragonEscapeMovementKits.FlutterState();
+        for (int i = 0; i < 5; i++) {
+            long now = 1_000L + i * 1_000L;
+            assertTrue(flutter.acceptRightClick(now));
+            assertTrue(flutter.useBounce(false, now));
+        }
         assertEquals(0, flutter.charges);
-        assertFalse(flutter.useBounce(false, 3_001L));
+        assertFalse(flutter.useBounce(false, 5_001L));
         assertEquals(9_000L, flutter.nextChargeAtMillis,
-                "Spending more charges must never postpone the earlier recharge");
+                "Additional bounces must never postpone the earliest recharge");
     }
 
     @Test
     void featherChargesRestoreOneEveryEightSecondsIncludingInAir() {
         var flutter = new DragonEscapeMovementKits.FlutterState();
-        for (int i = 0; i < 3; i++) assertTrue(flutter.useBounce(false, 1_000L + i));
+        for (int i = 0; i < 5; i++) assertTrue(flutter.useBounce(false, 1_000L + i));
         assertFalse(flutter.recharge(8_999L));
         assertTrue(flutter.recharge(9_000L));
         assertEquals(1, flutter.charges);
@@ -47,7 +74,9 @@ class DragonEscapeMovementKitsTest {
         assertEquals(25_000L, flutter.nextChargeAtMillis);
         assertTrue(flutter.recharge(25_000L));
         assertTrue(flutter.recharge(33_000L));
-        assertEquals(3, flutter.charges);
+        assertTrue(flutter.recharge(41_000L));
+        assertTrue(flutter.recharge(49_000L));
+        assertEquals(5, flutter.charges);
         assertEquals(0L, flutter.nextChargeAtMillis);
         assertFalse(flutter.recharge(100_000L));
     }
@@ -65,22 +94,26 @@ class DragonEscapeMovementKitsTest {
     }
 
     @Test
-    void featherRightClickBounceRetainsFlutterHorizontalSpeedAndSteering() {
-        double sprint = 1.25D * 0.8D * 5.612D / 20.0D;
-        assertEquals(sprint, DragonEscapeMovementKits.FLUTTER_HORIZONTAL_SPEED, 0.00001D);
+    void featherBounceHasLowerSprintLikeArcAndPreservesFasterMomentum() {
+        assertEquals(0.32D, DragonEscapeMovementKits.FLUTTER_HORIZONTAL_SPEED, 0.00001D);
         Vector north = DragonEscapeMovementKits.flutterBounceVelocity(
                 new Vector(0, -0.6, 0), new Vector(0, 0.2, -1),
                 true, false, false, false);
-        assertEquals(sprint, Math.hypot(north.getX(), north.getZ()), 0.00001D);
-        assertEquals(0.60D, north.getY(), 0.00001D);
-        assertTrue(north.getZ() < -0.27D);
+        assertEquals(0.32D, Math.hypot(north.getX(), north.getZ()), 0.00001D);
+        assertEquals(0.52D, north.getY(), 0.00001D);
+        assertTrue(north.getZ() < -0.31D);
         Vector diagonal = DragonEscapeMovementKits.flutterBounceVelocity(
                 new Vector(), new Vector(0, 0, -1), true, false, false, true);
-        assertEquals(sprint, Math.hypot(diagonal.getX(), diagonal.getZ()), 0.00001D);
+        assertEquals(0.32D, Math.hypot(diagonal.getX(), diagonal.getZ()), 0.00001D);
         Vector momentum = DragonEscapeMovementKits.flutterBounceVelocity(
                 new Vector(0.3, 0, 0), new Vector(0, 0, -1),
                 false, false, false, false);
-        assertTrue(momentum.getX() > 0.27D);
+        assertTrue(momentum.getX() >= 0.32D);
+        Vector fasterMomentum = DragonEscapeMovementKits.flutterBounceVelocity(
+                new Vector(0.42, 0, 0), new Vector(0, 0, -1),
+                false, false, false, false);
+        assertEquals(0.42D, fasterMomentum.getX(), 0.00001D,
+                "The feather cannot slow existing sprint momentum");
     }
 
     @Test

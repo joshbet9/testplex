@@ -27,7 +27,7 @@ class AchievementKitUnlockPolicyTest {
     }
 
     @Test void everyReviewedAchievementKitHasStableEarnableRequirements() {
-        assertEquals(24, AchievementKitUnlockPolicy.all().size());
+        assertEquals(26, AchievementKitUnlockPolicy.all().size());
         for (AchievementKitUnlockPolicy.Rule rule : AchievementKitUnlockPolicy.all()) {
             assertFalse(rule.requirements().isEmpty(), rule.kitId());
             assertEquals(rule.requirements().size(), Set.copyOf(rule.requirements()).size(), rule.kitId());
@@ -62,7 +62,7 @@ class AchievementKitUnlockPolicyTest {
                 assertNotNull(AchievementKitUnlockPolicy.find(game, choice.id), game.id() + ":" + choice.id);
             }
         }
-        assertEquals(24, purple);
+        assertEquals(26, purple);
     }
 
     @Test void combinationsRequireEverySpecificAchievement() {
@@ -79,6 +79,16 @@ class AchievementKitUnlockPolicyTest {
         earned.addAll(Set.of("skylands-master", "plundered"));
         assertTrue(digger.unlocked(earned::contains));
         assertFalse(digger.requirements().contains("learn-to-code"));
+        for (String movementKit : java.util.List.of("flutterfly", "acrobat")) {
+            var movementRule = AchievementKitUnlockPolicy.find(ArcadePortGame.DRAGON_ESCAPE, movementKit);
+            assertNotNull(movementRule);
+            assertEquals(digger.requirements(), movementRule.requirements());
+            assertTrue(movementRule.unlocked(earned::contains));
+            assertFalse(movementRule.unlocked(Set.of("skylands-master", "plundered")::contains));
+            assertTrue(ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.DRAGON_ESCAPE, java.util.List.of())
+                    .stream().anyMatch(kit -> kit.id.equals(movementKit)
+                            && kit.unlock == ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT));
+        }
         var builder = AchievementKitUnlockPolicy.find(ArcadePortGame.DRAGON_ESCAPE, "builder");
         assertEquals(java.util.List.of("paralympics"), builder.requirements());
         assertFalse(builder.unlocked(earned::contains));

@@ -15,12 +15,15 @@ final class DragonEscapeMovementKits {
     static final String WALL_KICK_SOUND_NAME = "ENTITY_FIREWORK_ROCKET_LAUNCH";
     static final String WALL_CLING_SOUND_NAME = "BLOCK_SLIME_BLOCK_PLACE";
     // A single right-click launches a bounce. XP no longer powers Flutterfly.
-    static final int FLUTTER_MAX_CHARGES = 3;
+    static final int FLUTTER_MAX_CHARGES = 5;
+    // Bukkit has no use-button release event for ordinary feathers. Repeated held-click
+    // packets are ignored until a quiet interval separates intentional presses.
+    static final long FLUTTER_RIGHT_CLICK_REARM_GAP_MILLIS = 500L;
     static final long FLUTTER_CHARGE_RECHARGE_MILLIS = 8_000L;
-    // Preserve the live Flutterfly's horizontal travel speed (~5.6 blocks/s).
-    static final double FLUTTER_HORIZONTAL_SPEED = 1.25D * 0.8D * 5.612D / 20.0D;
-    // A one-shot jump of similar lift to the previous sustained flutter arc.
-    static final double FLUTTER_BOUNCE_UPWARD_SPEED = 0.60D;
+    // Slightly quicker forward launch, closer to the feel of a sprint jump.
+    static final double FLUTTER_HORIZONTAL_SPEED = 0.32D;
+    // Lower arc than the previous bounce, without changing regular jumps.
+    static final double FLUTTER_BOUNCE_UPWARD_SPEED = 0.52D;
 
     // Restore the pre-#738 boosted wall kick (no weak scaled vanilla Leap).
     static final double WALL_KICK_FORWARD_SPEED = 1.20D;
@@ -42,6 +45,19 @@ final class DragonEscapeMovementKits {
     static final class FlutterState {
         int charges = FLUTTER_MAX_CHARGES;
         long nextChargeAtMillis;
+        long lastRightClickAtMillis = Long.MIN_VALUE;
+
+        /**
+         * Ordinary feathers can produce repeated PlayerInteractEvents during one
+         * sustained right-click. Refresh the latch even for ignored repeats, so
+         * one hold spends only one charge, without imposing a recharge cooldown.
+         */
+        boolean acceptRightClick(long nowMillis) {
+            boolean newPress = lastRightClickAtMillis == Long.MIN_VALUE
+                    || nowMillis - lastRightClickAtMillis > FLUTTER_RIGHT_CLICK_REARM_GAP_MILLIS;
+            lastRightClickAtMillis = nowMillis;
+            return newPress;
+        }
 
         /**
          * Charges replenish individually every eight seconds, including in air.
@@ -199,7 +215,10 @@ final class DragonEscapeMovementKits {
             boolean forward, boolean backward, boolean left, boolean right) {
         Vector direction = flutterTravelDirection(current, facing,
                 forward, backward, left, right);
-        return direction.multiply(FLUTTER_HORIZONTAL_SPEED)
+        // Do not slow a player who is already carrying greater sprint momentum.
+        double horizontalSpeed = current == null ? 0.0D
+                : Math.hypot(current.getX(), current.getZ());
+        return direction.multiply(Math.max(FLUTTER_HORIZONTAL_SPEED, horizontalSpeed))
                 .setY(FLUTTER_BOUNCE_UPWARD_SPEED);
     }
 

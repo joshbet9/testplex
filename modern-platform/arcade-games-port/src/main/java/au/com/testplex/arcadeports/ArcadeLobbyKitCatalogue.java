@@ -119,9 +119,9 @@ final class ArcadeLobbyKitCatalogue {
                     choice("digger", "Digger", Material.IRON_PICKAXE,
                             Unlock.ACHIEVEMENT, Zombie.class, Material.DIAMOND_PICKAXE),
                     choice("flutterfly", "Flutterfly", Material.FEATHER,
-                            Unlock.FREE, Zombie.class, Material.FEATHER),
+                            Unlock.ACHIEVEMENT, Zombie.class, Material.FEATHER),
                     choice("acrobat", "Acrobat", Material.RABBIT_FOOT,
-                            Unlock.FREE, Zombie.class, Material.IRON_AXE));
+                            Unlock.ACHIEVEMENT, Zombie.class, Material.IRON_AXE));
             case DRAGONS -> List.of(
                     choice("coward", "Coward", Material.FEATHER,
                             Unlock.FREE, Zombie.class, Material.IRON_AXE,
