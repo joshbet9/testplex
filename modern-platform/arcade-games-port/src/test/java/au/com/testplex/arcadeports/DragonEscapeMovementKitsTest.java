@@ -49,12 +49,43 @@ class DragonEscapeMovementKitsTest {
     }
 
     @Test
-    void flutterCapsHorizontalSpeedAndSlowsFalling() {
-        Vector result = DragonEscapeMovementKits.flutterVelocity(new Vector(0.5D, -0.6D, 0.0D), false);
-        assertEquals(DragonEscapeMovementKits.FLUTTER_HORIZONTAL_MAX, result.getX(), 0.0001D);
-        assertEquals(DragonEscapeMovementKits.FLUTTER_FALL_SPEED, result.getY(), 0.0001D);
-        Vector reactivated = DragonEscapeMovementKits.flutterVelocity(new Vector(0.1D, -0.3D, 0.0D), true);
-        assertEquals(DragonEscapeMovementKits.FLUTTER_START_Y, reactivated.getY(), 0.0001D);
+    void flutterTracesRepeatedYoshiStyleUpDownUpArcsWithoutHovering() {
+        Vector current = new Vector(0.5D, -0.6D, 0.0D);
+        Vector firstRise = DragonEscapeMovementKits.flutterVelocity(current, 1);
+        Vector descending = DragonEscapeMovementKits.flutterVelocity(current, 15);
+        Vector renewedRise = DragonEscapeMovementKits.flutterVelocity(current, 29);
+        assertTrue(firstRise.getY() > 0.15D, "First phase should actually climb");
+        assertTrue(descending.getY() < -0.15D, "Halfway into the wave should descend");
+        assertEquals(firstRise.getY(), renewedRise.getY(), 0.00001D,
+                "Held flutter should rise again within the same burst");
+        assertEquals(DragonEscapeMovementKits.FLUTTER_HORIZONTAL_MAX, firstRise.getX(), 0.0001D);
+        assertTrue(firstRise.getY() > descending.getY());
+    }
+
+    @Test
+    void flutterUsesOneThirdLessEnergyAndLastsLongerThanOldHover() {
+        assertEquals(0.0125D, DragonEscapeMovementKits.FLUTTER_DRAIN_PER_TICK, 0.00001D);
+        assertTrue(DragonEscapeMovementKits.FLUTTER_DRAIN_PER_TICK <= 0.019D * 0.67D);
+        DragonEscapeMovementKits.FlutterState state = new DragonEscapeMovementKits.FlutterState();
+        for (int tick = 0; tick < 60; tick++) state.tick(true, false);
+        assertTrue(state.fluttering, "One continuous hold should last at least three seconds");
+        assertTrue(state.flutterTicks >= 55);
+        assertTrue(state.charge > 0.1D);
+        for (int tick = 0; tick < 50; tick++) state.tick(true, false);
+        assertFalse(state.fluttering, "Exhaustion should still stop sustained flight");
+    }
+
+    @Test
+    void flutterReleaseAndRepressResetsTheArcToTheFirstRisingPhase() {
+        DragonEscapeMovementKits.FlutterState state = new DragonEscapeMovementKits.FlutterState();
+        for (int tick = 0; tick < 21; tick++) state.tick(true, false);
+        assertTrue(state.flutterTicks >= 19);
+        state.tick(false, false);
+        assertEquals(0, state.flutterTicks);
+        state.tick(true, false);
+        assertTrue(state.activated);
+        assertEquals(1, state.flutterTicks);
+        assertTrue(DragonEscapeMovementKits.flutterVelocity(new Vector(), state.flutterTicks).getY() > 0.15D);
     }
 
     @Test
@@ -85,6 +116,46 @@ class DragonEscapeMovementKitsTest {
         assertFalse(state.pressedForWallKick(true));
         assertFalse(state.pressedForWallKick(false));
         assertTrue(state.pressedForWallKick(true));
+    }
+
+    @Test
+    void crouchWallClingLastsHalfASecondAndDoesNotAutomaticallyRepeat() {
+        DragonEscapeMovementKits.AcrobatState state = new DragonEscapeMovementKits.AcrobatState();
+        for (int tick = 0; tick < DragonEscapeMovementKits.WALL_CLING_MAX_TICKS; tick++) {
+            assertTrue(state.tickWallCling(true, false, true));
+        }
+        assertEquals(0, state.wallClingTicksRemaining);
+        assertFalse(state.tickWallCling(true, false, true));
+        assertFalse(state.tickWallCling(true, false, true));
+        assertFalse(state.tickWallCling(false, false, true));
+        assertTrue(state.tickWallCling(true, false, true), "Release/repress Shift permits a new cling");
+    }
+
+    @Test
+    void crouchWallClingRequiresAirborneWallContactAndCancelsOnKick() {
+        DragonEscapeMovementKits.AcrobatState state = new DragonEscapeMovementKits.AcrobatState();
+        assertFalse(state.tickWallCling(true, true, true), "Ground crouching should remain normal crouching");
+        assertFalse(state.tickWallCling(true, false, false), "No wall contact means no cling");
+        assertTrue(state.tickWallCling(true, false, true));
+        assertTrue(state.wallClingTicksRemaining > 0);
+        state.cancelWallClingForKick();
+        assertEquals(0, state.wallClingTicksRemaining);
+        assertFalse(state.tickWallCling(true, false, true), "A successful kick cannot instantly re-cling");
+        assertFalse(state.tickWallCling(false, false, true));
+        assertTrue(state.tickWallCling(true, false, true));
+        assertFalse(state.tickWallCling(true, false, false), "Losing wall contact cancels the hold");
+        Vector hold = DragonEscapeMovementKits.wallClingVelocity();
+        assertEquals(0.0D, hold.getX(), 0.00001D);
+        assertTrue(hold.getY() > 0.0D && hold.getY() < 0.1D);
+    }
+
+    @Test
+    void acrobatReducesOnlyItsOwnFallDamageByHalf() {
+        assertEquals(4.0D, DragonEscapeMovementKits.acrobatFallDamage("acrobat", 8.0D), 0.0001D);
+        assertEquals(8.0D, DragonEscapeMovementKits.acrobatFallDamage("jumper", 8.0D), 0.0001D);
+        assertEquals(0.0D, DragonEscapeMovementKits.acrobatFallDamage("acrobat", 0.0D), 0.0001D);
+        assertEquals(1, ArcadePortRules.dragonEscapeLeapUses("acrobat"));
+        assertEquals(0, ArcadePortRules.dragonEscapeLeapUses("flutterfly"));
     }
 
     @Test
