@@ -39,6 +39,8 @@ final class DragonEscapeRaceScoreboardLayout {
             case "disruptor" -> "Disruptor";
             case "jumper" -> "Jumper";
             case "warper" -> "Warper";
+            case "flutterfly" -> "Flutterfly";
+            case "acrobat" -> "Acrobat";
             default -> "Kit";
         };
         return kitName + (worldRecord ? " WR" : " PB");
