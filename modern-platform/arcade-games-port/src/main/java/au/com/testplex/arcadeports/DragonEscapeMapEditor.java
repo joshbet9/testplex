@@ -377,7 +377,7 @@ final class DragonEscapeMapEditor implements Listener {
     private void markers(CommandSender sender) {
         DraftSession session = current(sender);
         if (session == null) return;
-        SourceMapCatalog.MapData data = SourceMapCatalog.read(plugin, session.game, session.world);
+        SourceMapCatalog.MapData data = SourceMapCatalog.readEditorDraft(plugin, session.game, session.resource, session.world);
         sender.sendMessage(ChatColor.GOLD + "Draft markers for " + session.mapName + ":");
         if (data == null) {
             sender.sendMessage(ChatColor.RED + "No WorldConfig.dat exists yet. Add the required data, team or custom points.");
@@ -473,7 +473,7 @@ final class DragonEscapeMapEditor implements Listener {
                 || !Files.isDirectory(worldFolder.resolve("region"), LinkOption.NOFOLLOW_LINKS)) {
             errors.add("The draft world is missing level.dat or region files.");
         }
-        SourceMapCatalog.MapData data = SourceMapCatalog.read(plugin, session.game, session.world);
+        SourceMapCatalog.MapData data = SourceMapCatalog.readEditorDraft(plugin, session.game, session.resource, session.world);
         if (data == null) {
             errors.add("WorldConfig.dat is missing or unreadable.");
             return errors;
