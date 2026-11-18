@@ -7541,24 +7541,15 @@ public final class ArcadePortManager implements Listener {
                 lines.add(ChatColor.WHITE + Integer.toString(Math.max(0, allPlayers.size() - alive.size())));
             }
         } else if (session.type == ArcadePortGame.SKY_WARS) {
-            lines.add(ChatColor.YELLOW + "Players");
             List<Player> alive = alivePlayers(session);
-            if (alive.size() > 10) {
-                lines.add(ChatColor.WHITE + Integer.toString(alive.size()));
-            } else {
-                for (Player player : alive) lines.add(ChatColor.WHITE + player.getName());
-            }
+            lines.addAll(SkyWarsSoloScoreboardLayout.playersSection(
+                    alive.stream().map(Player::getName).toList()));
             lines.add(" ");
             lines.add(ChatColor.GREEN + "Throwable TNT");
             long tntRemaining = session.skyWarsNextTntAt - now;
             lines.add(tntRemaining > 0L
                     ? ChatColor.WHITE + formatMatchScoreboardTime(tntRemaining)
                     : ChatColor.GREEN + "Lootable");
-            if (session.endsAt > 0L) {
-                lines.add("  ");
-                lines.add(ChatColor.YELLOW + "Time Left: "
-                        + ChatColor.WHITE + formatMatchScoreboardTime(Math.max(0L, session.endsAt - now)));
-            }
         } else {
             if (!session.liveStarted) {
                 long remaining = Math.max(0L, session.prepareEndsAt - now);
