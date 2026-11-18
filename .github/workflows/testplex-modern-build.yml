@@ -345,6 +345,20 @@ jobs:
           set -euo pipefail
           chmod 0755 .github/testplex-modern-recovery.sh
           bash -n .github/testplex-modern-recovery.sh
+          sh -n deploy/fly/verify-runtime.sh
+          fixture_root="$(mktemp -d)"
+          trap 'rm -rf "$fixture_root"' EXIT
+          mkdir -p "$fixture_root/opt/testplex" "$fixture_root/server/update/maps/Wizards" "$fixture_root/server/update/maps/Nano Wizards"
+          for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+            ln -s "/source/$world" "$fixture_root/server/$world"
+          done
+          printf '%s\n' '0123456789abcdef0123456789abcdef01234567' > "$fixture_root/opt/testplex/source-build.txt"
+          output="$(TESTPLEX_VERIFY_ROOT="$fixture_root" deploy/fly/verify-runtime.sh '0123456789abcdef0123456789abcdef01234567')"
+          grep -Fx 'TESTPLEX_FLY_RUNTIME_VERIFIED:0123456789abcdef0123456789abcdef01234567' <<< "$output"
+          if TESTPLEX_VERIFY_ROOT="$fixture_root" deploy/fly/verify-runtime.sh 'fedcba9876543210fedcba9876543210fedcba98'; then
+            echo 'Fly runtime verifier accepted a mismatched source SHA.' >&2
+            exit 1
+          fi
           bash -n .github/testplex-modern-recovery-test.sh
           bash .github/testplex-modern-recovery-test.sh
 
@@ -532,8 +546,10 @@ jobs:
           fi
           cat "$connection_log"
 
-          remote_command="set -eu; test \"\$(cat /opt/testplex/source-build.txt)\" = \"$GITHUB_SHA\"; test -L /server/mm_void; test -L /server/mm_volcano; test -L /server/mm_colombia; test -L /server/mm_sandycoast; test -L /server/mm_siberian; test -L /server/mm_swampland; test -L /server/mm_tesorohundido; test -d '/server/update/maps/Wizards'; test -d '/server/update/maps/Nano Wizards'; echo TESTPLEX_FLY_RUNTIME_VERIFIED:$GITHUB_SHA"
-          flyctl ssh console --app "$FLY_APP" --machine "$machine_id" --command "$remote_command"
+          remote_command="/usr/local/bin/testplex-verify-runtime $GITHUB_SHA"
+          flyctl ssh console --app "$FLY_APP" --machine "$machine_id" --command "$remote_command" \
+            | tee "$RUNNER_TEMP/fly-runtime-verification.log"
+          grep -Fx "TESTPLEX_FLY_RUNTIME_VERIFIED:$GITHUB_SHA" "$RUNNER_TEMP/fly-runtime-verification.log"
           flyctl logs --app "$FLY_APP" --machine "$machine_id" --no-tail > "$RUNNER_TEMP/fly-startup.log"
           grep -F 'TESTPLEX_ARCADE_BOOTSTRAP phase=complete' "$RUNNER_TEMP/fly-startup.log"
           flyctl volumes list --app "$FLY_APP" --json > "$RUNNER_TEMP/fly-volumes-final.json"
