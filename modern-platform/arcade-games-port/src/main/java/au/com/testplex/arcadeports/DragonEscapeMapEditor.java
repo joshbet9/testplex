@@ -69,6 +69,7 @@ final class DragonEscapeMapEditor implements Listener {
         switch (args[0].toLowerCase(Locale.ROOT)) {
             case "list" -> listMaps(sender);
             case "open" -> open(sender, args);
+            case "current" -> openCurrentMap(sender, args);
             case "close" -> close(sender);
             case "save" -> save(sender);
             case "markers" -> markers(sender);
@@ -85,6 +86,7 @@ final class DragonEscapeMapEditor implements Listener {
 
     private void sendHelp(CommandSender sender) {
         sender.sendMessage(ChatColor.GOLD + "Dragon Escape map drafts");
+        sender.sendMessage(ChatColor.YELLOW + "/arcadeport mapedit current" + ChatColor.GRAY + " — open the map currently selected for Dragon Escape");
         sender.sendMessage(ChatColor.YELLOW + "/arcadeport mapedit list" + ChatColor.GRAY + " — list maps and their IDs");
         sender.sendMessage(ChatColor.YELLOW + "/arcadeport mapedit open <map-id> <draft>" + ChatColor.GRAY + " — create/open an isolated creative copy");
         sender.sendMessage(ChatColor.YELLOW + "/arcadeport mapedit markers" + ChatColor.GRAY + " — list authored points in this draft");
@@ -213,6 +215,32 @@ final class DragonEscapeMapEditor implements Listener {
                 + ChatColor.GREEN + " for " + archive.displayName() + ". Source files are unchanged.");
         player.sendMessage(ChatColor.GRAY + "Build in creative, then use /arcadeport mapedit markers and validate before export or publish.");
         markers(player);
+    }
+
+    private void openCurrentMap(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(ChatColor.RED + "Map drafts must be opened in-game.");
+            return;
+        }
+        if (args.length != 1) {
+            player.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport mapedit current");
+            return;
+        }
+        ArcadePortGame selectedGame = ArcadePortGame.fromId(
+                plugin.getConfig().getString("lobby-selected-game", ""));
+        if (selectedGame != ArcadePortGame.DRAGON_ESCAPE) {
+            player.sendMessage(ChatColor.YELLOW + "Select Dragon Escape in the lobby Game Panel, then use the Map Editor in hotbar slot 1.");
+            return;
+        }
+        String selectedResource = SourceMapCatalog.selectedResource(plugin, ArcadePortGame.DRAGON_ESCAPE);
+        String mapId = DragonEscapeMapDraftRules.mapSlug(selectedResource);
+        if (mapId == null || findMap(mapId) == null) {
+            player.sendMessage(ChatColor.RED + "The currently selected Dragon Escape map could not be identified.");
+            return;
+        }
+        // Reuse the per-map draft on repeated hotbar clicks while keeping every map
+        // in its own isolated world and draft folder.
+        open(sender, new String[] {"open", mapId, mapId});
     }
 
     private void close(CommandSender sender) {
