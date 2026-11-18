@@ -73,10 +73,13 @@ COPY modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar /opt/tes
 COPY deploy/fly/WizardsSourceMaps.tar.gz /opt/testplex/WizardsSourceMaps.tar.gz
 COPY deploy/fly/provision-monster-maze-worlds.sh /usr/local/bin/provision-monster-maze-worlds
 COPY deploy/fly/entrypoint.sh /usr/local/bin/testplex-entrypoint
+COPY deploy/fly/verify-runtime.sh /usr/local/bin/testplex-verify-runtime
 RUN sed -i 's/\r$//' /usr/local/bin/testplex-entrypoint \
     && sed -i 's/\r$//' /usr/local/bin/provision-monster-maze-worlds \
+    && sed -i 's/\r$//' /usr/local/bin/testplex-verify-runtime \
     && chmod 0755 /usr/local/bin/testplex-entrypoint \
     && chmod 0755 /usr/local/bin/provision-monster-maze-worlds \
+    && chmod 0755 /usr/local/bin/testplex-verify-runtime \
     && test "$(head -n 1 /usr/local/bin/testplex-entrypoint)" = '#!/usr/bin/env bash'
 
 ENV TESTPLEX_PORT=25566 \
