@@ -1495,7 +1495,7 @@ public final class ArcadePortManager implements Listener {
         UUID id = tester.getUniqueId();
         String kit = session.dragonEscapeKits.getOrDefault(id, "jumper");
         if (!isDebugAbilityAllowed(tester, ArcadePortGame.DRAGON_ESCAPE, kit)) return false;
-        if ("jumper".equals(kit)) {
+        if ("jumper".equals(kit) || "acrobat".equals(kit)) {
             int before = session.dragonEscapeLeapUsesRemaining.getOrDefault(id, 0);
             useDragonEscapeLeap(session, tester);
             return session.dragonEscapeLeapUsesRemaining.getOrDefault(id, 0) < before;
@@ -1520,6 +1520,13 @@ public final class ArcadePortManager implements Listener {
             session.dragonEscapeNextTntAt.put(id, 0L);
             updateDragonEscapeResources(session, System.currentTimeMillis());
             return inventoryCount(tester, Material.TNT) > before;
+        }
+        if ("flutterfly".equals(kit)) {
+            DragonEscapeMovementKits.FlutterState flutter = session.dragonEscapeFlutterStates
+                    .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.FlutterState());
+            flutter.charge = 1.0D;
+            tester.setExp(1.0F);
+            return true;
         }
         return false;
     }
@@ -5732,6 +5739,11 @@ public final class ArcadePortManager implements Listener {
                                 dragonEscapeKitPreferences.get(playerId)), "jumper");
                 session.dragonEscapeKits.put(playerId, kit);
                 session.dragonEscapeLeapUsesRemaining.put(playerId, ArcadePortRules.dragonEscapeLeapUses(kit));
+                if ("flutterfly".equals(kit)) {
+                    session.dragonEscapeFlutterStates.put(playerId, new DragonEscapeMovementKits.FlutterState());
+                } else if ("acrobat".equals(kit)) {
+                    session.dragonEscapeAcrobatStates.put(playerId, new DragonEscapeMovementKits.AcrobatState());
+                }
                 session.dragonEscapeDiggerUsesRemaining.put(playerId, GameDebugRuntimeOverrides.intValue("DRAGON_ESCAPE_DIGGER_MAX_USES", ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES));
                 session.dragonEscapeNextTntAt.put(playerId,
                         now + GameDebugRuntimeOverrides.longValue("DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS", ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS));
@@ -9946,7 +9958,7 @@ public final class ArcadePortManager implements Listener {
                         Integer.MAX_VALUE, 0, false, false, false));
                 String kit = session.dragonEscapeKits.getOrDefault(id, "jumper");
                 int leaps = session.dragonEscapeLeapUsesRemaining.getOrDefault(id, ArcadePortRules.dragonEscapeLeapUses(kit));
-                if (!"digger".equals(kit)) {
+                if (leaps > 0) {
                     setDragonEscapeLeapItem(player, leaps, ArcadePortRules.dragonEscapeLeapUses(kit));
                 }
                 if ("disruptor".equals(kit)) {
@@ -9964,6 +9976,12 @@ public final class ArcadePortManager implements Listener {
                 } else if ("digger".equals(kit)) {
                     int digs = session.dragonEscapeDiggerUsesRemaining.getOrDefault(id, GameDebugRuntimeOverrides.intValue("DRAGON_ESCAPE_DIGGER_MAX_USES", ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES));
                     player.getInventory().setItem(0, dragonEscapeDiggerItem(digs));
+                } else if ("flutterfly".equals(kit)) {
+                    // Flutterfly owns the XP bar as an energy gauge, not leap charges.
+                    DragonEscapeMovementKits.FlutterState flutter = session.dragonEscapeFlutterStates
+                            .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.FlutterState());
+                    player.setLevel(0);
+                    player.setExp((float) flutter.charge);
                 }
                 setDragonEscapeGhostHotbarItem(player);
                 if (session.dragonEscapePractice) setDragonEscapePracticeHotbarItems(player);
@@ -14793,6 +14811,7 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
             updateDragonEscapeSafeLocations(session);
             updateDragonEscapeTunnelBlocks(session);
+            updateDragonEscapeMovementKits(session, now);
             updateDragonEscapeResources(session, now);
             updateDragonEscapeMines(session);
             updateDragonEscapeBuilderBricks(session);
@@ -17407,6 +17426,8 @@ public final class ArcadePortManager implements Listener {
         session.dragonEscapeRunGhostFrames.remove(id);
         session.dragonEscapeSafeLocations.remove(id);
         session.dragonEscapeLeapReadyAt.remove(id);
+        session.dragonEscapeFlutterStates.remove(id);
+        session.dragonEscapeAcrobatStates.remove(id);
         session.dragonEscapeLeapUsesRemaining.put(id,
                 ArcadePortRules.dragonEscapeLeapUses(session.dragonEscapeKits.getOrDefault(id, "jumper")));
         session.dragonEscapeDiggerUsesRemaining.put(id, GameDebugRuntimeOverrides.intValue(
@@ -17859,6 +17880,76 @@ public final class ArcadePortManager implements Listener {
                     viewer.sendBlockChange(location, entry.getValue());
                 }
             }
+        }
+    }
+
+    /**
+     * Space is read from Paper's current input each tick: no client-side mod or
+     * extra item is required. Flutterfly can re-flutter on release/repress;
+     * Acrobat must physically touch a wall, regardless of look direction.
+     */
+    private void updateDragonEscapeMovementKits(Session session, long now) {
+        if (!session.liveStarted) return;
+        for (Player player : alivePlayers(session)) {
+            if (player == null || !player.isOnline()) continue;
+            UUID id = player.getUniqueId();
+            String kit = session.dragonEscapeKits.getOrDefault(id, "jumper");
+            if (!"flutterfly".equals(kit) && !"acrobat".equals(kit)) continue;
+            boolean jumpHeld = player.getCurrentInput().isJump();
+            boolean grounded = player.isOnGround();
+            if ("flutterfly".equals(kit)) {
+                DragonEscapeMovementKits.FlutterState flutter = session.dragonEscapeFlutterStates
+                        .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.FlutterState());
+                if (!debugKitFeatureEnabled(player, ArcadePortGame.DRAGON_ESCAPE, kit)) {
+                    flutter.tick(false, true);
+                } else {
+                    flutter.tick(jumpHeld, grounded);
+                    if (flutter.fluttering) {
+                        player.setVelocity(DragonEscapeMovementKits.flutterVelocity(
+                                player.getVelocity(), flutter.activated));
+                        if (flutter.activated) {
+                            player.getWorld().playSound(player.getLocation(),
+                                    Sound.valueOf(DragonEscapeMovementKits.FLUTTER_SOUND_NAME), 0.8F, 1.2F);
+                        }
+                        if (session.ticks % 4L == 0L) {
+                            player.getWorld().spawnParticle(Particle.CLOUD,
+                                    player.getLocation().add(0.0D, 0.25D, 0.0D),
+                                    5, 0.18D, 0.13D, 0.18D, 0.012D);
+                        }
+                    }
+                }
+                player.setLevel(0);
+                player.setExp((float) flutter.charge);
+                continue;
+            }
+
+            DragonEscapeMovementKits.AcrobatState acrobat = session.dragonEscapeAcrobatStates
+                    .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.AcrobatState());
+            boolean pressed = acrobat.pressedForWallKick(jumpHeld);
+            if (!pressed || player.isInWater()
+                    || !isDebugAbilityAllowed(player, ArcadePortGame.DRAGON_ESCAPE, kit)) continue;
+            // This checks collision geometry, not merely blocks near the player.
+            Vector contactNormal = DragonEscapeMovementKits.touchingWallNormal(player);
+            if (contactNormal == null) continue;
+            Vector launch = DragonEscapeMovementKits.wallKickVelocity(
+                    player.getLocation().getDirection(), contactNormal);
+            if (launch.lengthSquared() == 0.0D) continue;
+            // Preserve the velocity-event protection already used by Dragon Escape leaps.
+            pendingDragonEscapeLeapVelocity.put(id, launch);
+            player.setVelocity(launch.clone());
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (pendingDragonEscapeLeapVelocity.get(id) == launch) {
+                    pendingDragonEscapeLeapVelocity.remove(id);
+                }
+            }, 2L);
+            // Champions' original kick supplied a horizontal launch and lift.
+            // Acrobat also uses look pitch to trade horizontal momentum for height;
+            // collision contact, not facing, decides whether the kick is allowed.
+            player.getWorld().spawnParticle(Particle.CLOUD,
+                    player.getLocation().add(0.0D, 0.65D, 0.0D),
+                    12, 0.25D, 0.3D, 0.25D, 0.035D);
+            player.getWorld().playSound(player.getLocation(),
+                    Sound.valueOf(DragonEscapeMovementKits.WALL_KICK_SOUND_NAME), 0.85F, 1.25F);
         }
     }
 
@@ -18824,7 +18915,7 @@ public final class ArcadePortManager implements Listener {
                 .resolve(playerId.toString());
         // Keep the legacy overall PB replay filename backwards compatible.
         if (kitId == null) return playerFolder.resolve(safeMapKey + ".ghost.gz");
-        if (!Set.of("jumper", "disruptor", "builder", "warper", "digger").contains(kitId)) return null;
+        if (ArcadePortRules.normalizeDragonEscapeKit(kitId) == null) return null;
         return playerFolder.resolve(safeMapKey).resolve(kitId + ".ghost.gz");
     }
 
@@ -31011,7 +31102,8 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
             String kit = session.dragonEscapeKits.getOrDefault(player.getUniqueId(), "jumper");
-            if (event.getAction().isRightClick() && item == Material.IRON_AXE && !"digger".equals(kit)) {
+            if (event.getAction().isRightClick() && item == Material.IRON_AXE
+                    && ArcadePortRules.dragonEscapeLeapUses(kit) > 0) {
                 event.setCancelled(true);
                 useDragonEscapeLeap(session, player);
                 return;
@@ -31313,7 +31405,7 @@ public final class ArcadePortManager implements Listener {
                             && item == Material.BRICKS);
             case DRAGON_ESCAPE -> {
                 String kit = session.dragonEscapeKits.getOrDefault(id, "jumper");
-                yield (item == Material.IRON_AXE && !"digger".equals(kit))
+                yield (item == Material.IRON_AXE && ArcadePortRules.dragonEscapeLeapUses(kit) > 0)
                         || (item == Material.ENDER_PEARL && "warper".equals(kit))
                         || (item == Material.TNT && "disruptor".equals(kit))
                         || (item == Material.BRICKS && "builder".equals(kit))
@@ -35977,6 +36069,8 @@ public final class ArcadePortManager implements Listener {
         boolean dragonEscapeScoreboardZeroFrameShown;
         long dragonEscapeFinishWindowEndsAt;
         final Map<UUID, Location> dragonEscapePracticeCheckpoints = new HashMap<>();
+        final Map<UUID, DragonEscapeMovementKits.FlutterState> dragonEscapeFlutterStates = new HashMap<>();
+        final Map<UUID, DragonEscapeMovementKits.AcrobatState> dragonEscapeAcrobatStates = new HashMap<>();
         final Map<Block, BlockData> dragonEscapePracticeChangedBlocks = new HashMap<>();
         final Map<UUID, BaconBlastCombo> baconBlastCombosByVictim = new HashMap<>();
         final Map<UUID, Set<MasterBuilderBlockKey>> masterBuilderPlacedBlocks = new HashMap<>();
