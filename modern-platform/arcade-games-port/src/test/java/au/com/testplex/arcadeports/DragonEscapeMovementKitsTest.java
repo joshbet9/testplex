@@ -89,54 +89,72 @@ class DragonEscapeMovementKitsTest {
     }
 
     @Test
-    void flutterAndWallKickUseTheirRequestedSoundEffects() {
+    void flutterStickAndWallKickHaveDistinctSounds() {
         assertEquals("ENTITY_SLIME_JUMP", DragonEscapeMovementKits.FLUTTER_SOUND_NAME);
+        assertEquals("BLOCK_SLIME_BLOCK_PLACE", DragonEscapeMovementKits.WALL_CLING_SOUND_NAME);
         assertEquals("ENTITY_FIREWORK_ROCKET_LAUNCH", DragonEscapeMovementKits.WALL_KICK_SOUND_NAME);
     }
 
     @Test
-    void wallKicksChainOnEveryNewAirborneSpacePressWithoutCooldown() {
+    void groundJumpAndUnstuckSpaceCannotTriggerWallKick() {
         DragonEscapeMovementKits.AcrobatState state = new DragonEscapeMovementKits.AcrobatState();
-        // A ground jump against an already-touching wall is NOT a wall kick.
-        assertFalse(state.pressedForWallKick(true, true));
-        assertFalse(state.pressedForWallKick(true, false),
-                "Continuing to hold the normal ground jump cannot kick");
-        // Release and press while airborne against a wall; each new press
-        // can kick immediately, subject to the caller's wall-contact check.
-        assertFalse(state.pressedForWallKick(false, false));
-        assertTrue(state.pressedForWallKick(true, false));
-        assertFalse(state.pressedForWallKick(true, false)); // Holding is not auto-repeat.
-        assertFalse(state.pressedForWallKick(false, false));
-        assertTrue(state.pressedForWallKick(true, false));  // Immediate second kick.
-        assertFalse(state.pressedForWallKick(false, false));
-        assertTrue(state.pressedForWallKick(true, false));  // Immediate third kick.
-        assertFalse(state.pressedForWallKick(true, true), "Grounded kicks are never permitted");
+        assertFalse(state.tickWallCling(true, true, true));
+        assertEquals(1.0D, state.charge, 0.00001D, "Grounded crouch must not spend XP");
+        assertFalse(state.pressedForWallKick(true, true, false));
+        assertFalse(state.pressedForWallKick(true, false, false),
+                "Holding a normal jump into the air must not kick");
+        assertFalse(state.pressedForWallKick(false, false, false));
+        assertFalse(state.pressedForWallKick(true, false, false),
+                "Airborne Space with no preceding charged stick must not kick");
     }
 
     @Test
-    void failedWallContactStillRequiresReleaseBeforeAnotherKickAttempt() {
+    void airborneShiftStickMustPrecedeFreshSpaceKick() {
         DragonEscapeMovementKits.AcrobatState state = new DragonEscapeMovementKits.AcrobatState();
-        // The input edge gets consumed even if the caller detects no wall.
-        assertTrue(state.pressedForWallKick(true, false));
-        assertFalse(state.pressedForWallKick(true, false));
-        assertFalse(state.pressedForWallKick(false, false));
-        assertTrue(state.pressedForWallKick(true, false));
+        assertFalse(state.tickWallCling(true, false, false),
+                "A nearby but noncontacting wall cannot activate a stick");
+        assertEquals(1.0D, state.charge, 0.00001D);
+        assertTrue(state.tickWallCling(true, false, true));
+        assertTrue(state.clingActivated);
+        assertEquals(0.75D, state.charge, 0.00001D);
+        assertFalse(state.pressedForWallKick(true, false, true),
+                "Space in the same tick as Shift-stick cannot skip the stick");
+        assertFalse(state.pressedForWallKick(false, false, true));
+        assertTrue(state.tickWallCling(true, false, true));
+        assertFalse(state.clingActivated);
+        assertTrue(state.pressedForWallKick(true, false, true),
+                "A later fresh Space press while sticking can wall-kick");
+        state.cancelWallClingForKick();
+        assertEquals(0, state.wallClingTicksRemaining);
+        assertFalse(state.tickWallCling(true, false, true),
+                "One Shift-stick cannot grant repeated wall kicks");
+        assertFalse(state.pressedForWallKick(false, false, false));
+        assertFalse(state.pressedForWallKick(true, false, false));
     }
 
     @Test
-    void groundedSpacePressCannotBecomeAWallKickUponLeavingTheGround() {
+    void fourChargedShiftSticksRearmWithoutAnyWallKickCooldown() {
         DragonEscapeMovementKits.AcrobatState state = new DragonEscapeMovementKits.AcrobatState();
-        assertFalse(state.pressedForWallKick(false, true));
-        assertFalse(state.pressedForWallKick(true, true));
-        assertFalse(state.pressedForWallKick(true, false));
-        assertFalse(state.pressedForWallKick(false, false));
-        assertTrue(state.pressedForWallKick(true, false));
-        assertFalse(state.pressedForWallKick(false, true));
-        assertFalse(state.pressedForWallKick(true, true));
+        double last = state.charge;
+        for (int use = 0; use < 4; use++) {
+            state.tickWallCling(false, false, true);
+            assertTrue(state.tickWallCling(true, false, true), "Stick " + use + " should activate");
+            assertTrue(state.clingActivated);
+            assertEquals(last + DragonEscapeMovementKits.WALL_CLING_REGEN_PER_TICK
+                    - DragonEscapeMovementKits.WALL_CLING_USE_COST, state.charge, 0.0001D);
+            state.cancelWallClingForKick();
+            assertEquals(0, state.wallClingTicksRemaining);
+            last = state.charge;
+        }
+        state.tickWallCling(false, false, true);
+        assertFalse(state.tickWallCling(true, false, true),
+                "Cannot buy another stick while the XP bar has insufficient charge");
+        assertFalse(state.clingActivated);
+        assertEquals(0, state.wallClingTicksRemaining);
     }
 
     @Test
-    void crouchWallClingLastsHalfASecondAndDoesNotAutomaticallyRepeat() {
+    void shiftStickLastsHalfSecondAndExpiresWithoutAutoRenew() {
         DragonEscapeMovementKits.AcrobatState state = new DragonEscapeMovementKits.AcrobatState();
         for (int tick = 0; tick < DragonEscapeMovementKits.WALL_CLING_MAX_TICKS; tick++) {
             assertTrue(state.tickWallCling(true, false, true));
@@ -144,26 +162,38 @@ class DragonEscapeMovementKitsTest {
         assertEquals(0, state.wallClingTicksRemaining);
         assertFalse(state.tickWallCling(true, false, true));
         assertFalse(state.tickWallCling(true, false, true));
+        assertFalse(state.pressedForWallKick(true, false, false),
+                "Expired Shift-stick cannot activate a late wall kick");
         assertFalse(state.tickWallCling(false, false, true));
-        assertTrue(state.tickWallCling(true, false, true), "Release/repress Shift permits a new cling");
+        assertTrue(state.tickWallCling(true, false, true), "Release/repress Shift spends another use");
+        assertEquals(0.50D + 3 * DragonEscapeMovementKits.WALL_CLING_REGEN_PER_TICK,
+                state.charge, 0.0001D);
     }
 
     @Test
-    void crouchWallClingRequiresAirborneWallContactAndCancelsOnKick() {
+    void contactLossLandingAndShiftReleaseCancelSticking() {
         DragonEscapeMovementKits.AcrobatState state = new DragonEscapeMovementKits.AcrobatState();
-        assertFalse(state.tickWallCling(true, true, true), "Ground crouching should remain normal crouching");
-        assertFalse(state.tickWallCling(true, false, false), "No wall contact means no cling");
+        assertFalse(state.tickWallCling(true, true, true));
         assertTrue(state.tickWallCling(true, false, true));
         assertTrue(state.wallClingTicksRemaining > 0);
-        state.cancelWallClingForKick();
-        assertEquals(0, state.wallClingTicksRemaining);
-        assertFalse(state.tickWallCling(true, false, true), "A successful kick cannot instantly re-cling");
-        assertFalse(state.tickWallCling(false, false, true));
+        assertFalse(state.tickWallCling(true, false, false), "Losing contact cancels stick");
+        assertFalse(state.tickWallCling(true, false, true),
+                "Retouching the wall with the same Shift hold cannot renew a used stick");
+        state.tickWallCling(false, false, true);
         assertTrue(state.tickWallCling(true, false, true));
-        assertFalse(state.tickWallCling(true, false, false), "Losing wall contact cancels the hold");
+        assertFalse(state.tickWallCling(true, true, true), "Landing cancels the airborne stick");
         Vector hold = DragonEscapeMovementKits.wallClingVelocity();
         assertEquals(0.0D, hold.getX(), 0.00001D);
         assertTrue(hold.getY() > 0.0D && hold.getY() < 0.1D);
+    }
+
+    @Test
+    void acrobatXpRechargesWhenNotSticking() {
+        DragonEscapeMovementKits.AcrobatState state = new DragonEscapeMovementKits.AcrobatState();
+        assertTrue(state.tickWallCling(true, false, true));
+        assertEquals(1.0D - DragonEscapeMovementKits.WALL_CLING_USE_COST, state.charge, 0.00001D);
+        for (int tick = 0; tick < 50; tick++) state.tickWallCling(false, false, false);
+        assertEquals(1.0D, state.charge, 0.00001D);
     }
 
     @Test
