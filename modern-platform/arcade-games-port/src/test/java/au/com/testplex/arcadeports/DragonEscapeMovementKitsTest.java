@@ -58,41 +58,71 @@ class DragonEscapeMovementKitsTest {
     }
 
     @Test
-    void wallKickMustBeASecondPressInMidairAndRespectsCooldown() {
+    void wallKickUsesFreshSpacePressOnGroundOrInAirWithSeparateCooldown() {
         DragonEscapeMovementKits.AcrobatState state = new DragonEscapeMovementKits.AcrobatState();
-        assertFalse(state.pressedForWallKick(true, true, 1L));
-        assertFalse(state.pressedForWallKick(true, false, 2L));
-        assertFalse(state.pressedForWallKick(false, false, 3L));
-        assertTrue(state.pressedForWallKick(true, false, 4L));
+        // Ground contact is eligible; the caller separately requires touching a wall.
+        assertTrue(state.pressedForWallKick(true, 1L));
+        assertFalse(state.pressedForWallKick(true, 2L)); // Holding is not a second press.
+        assertFalse(state.pressedForWallKick(false, 3L));
         state.nextWallKickAt = 1_504L;
-        state.pressedForWallKick(false, false, 5L);
-        assertFalse(state.pressedForWallKick(true, false, 10L));
-        state.pressedForWallKick(false, false, 1_505L);
-        assertTrue(state.pressedForWallKick(true, false, 1_506L));
+        assertFalse(state.pressedForWallKick(true, 4L));
+        state.pressedForWallKick(false, 1_505L);
+        assertTrue(state.pressedForWallKick(true, 1_506L));
     }
 
     @Test
-    void championsInspiredKickHasStrongForwardAndUpwardMomentum() {
-        Vector next = DragonEscapeMovementKits.wallKickVelocity(new Vector(0, -0.2, 1));
-        assertEquals(DragonEscapeMovementKits.WALL_KICK_FORWARD_SPEED, next.getZ(), 0.0001);
-        assertEquals(DragonEscapeMovementKits.WALL_KICK_UPWARD_SPEED, next.getY(), 0.0001);
+    void wallKickFollowsYawAndPitchWithSubstantialMomentum() {
+        Vector outward = new Vector(1, 0, 0);
+        Vector level = DragonEscapeMovementKits.wallKickVelocity(new Vector(0, 0, 1), outward);
+        assertEquals(DragonEscapeMovementKits.WALL_KICK_FORWARD_SPEED, level.getZ(), 0.0001D);
+        assertEquals(DragonEscapeMovementKits.WALL_KICK_UPWARD_SPEED, level.getY(), 0.0001D);
+        assertTrue(level.getX() >= DragonEscapeMovementKits.WALL_KICK_MIN_OUTWARD_SPEED);
+
+        Vector up = DragonEscapeMovementKits.wallKickVelocity(new Vector(0, 1, 1), outward);
+        Vector down = DragonEscapeMovementKits.wallKickVelocity(new Vector(0, -1, 1), outward);
+        assertTrue(up.getY() > level.getY(), "Looking up must increase vertical momentum");
+        assertTrue(down.getY() < level.getY(), "Looking down must reduce vertical momentum");
+        assertTrue(level.getZ() > up.getZ(), "A steep look trades horizontal distance for height");
+        assertEquals(0.0D, up.getX() - level.getX(), 0.0001D);
+
+        Vector west = DragonEscapeMovementKits.wallKickVelocity(
+                new Vector(-1, 0, 0), new Vector(0, 0, 1));
+        assertTrue(west.getX() < -1.0D, "Yaw should steer strongly to the west");
     }
 
     @Test
-    void wallKickRejectsProximityAndFloorOnlyContact() {
+    void lookingAtWallStillKicksOutInsteadOfBeingAbsorbedByCollision() {
+        Vector normal = new Vector(1, 0, 0);
+        Vector intoWall = DragonEscapeMovementKits.wallKickVelocity(new Vector(-1, 0, 0), normal);
+        assertEquals(DragonEscapeMovementKits.WALL_KICK_MIN_OUTWARD_SPEED,
+                intoWall.getX(), 0.0001D);
+        assertEquals(DragonEscapeMovementKits.WALL_KICK_UPWARD_SPEED, intoWall.getY(), 0.0001D);
+        Vector vertical = DragonEscapeMovementKits.wallKickVelocity(new Vector(0, 1, 0), normal);
+        assertTrue(vertical.getY() > intoWall.getY());
+        assertTrue(vertical.getX() >= DragonEscapeMovementKits.WALL_KICK_MIN_OUTWARD_SPEED);
+    }
+
+    @Test
+    void wallKickRequiresRealSideContactRegardlessOfFacingDirection() {
         BoundingBox player = new BoundingBox(0, 0, 0, 0.6, 1.8, 0.6);
-        Vector facingAway = new Vector(1, 0, 0);
-        // Solid west wall with its east face exactly against the player.
-        assertEquals(new Vector(1, 0, 0), DragonEscapeMovementKits.contactNormal(
-                player, new BoundingBox(-1, 0, 0, 0, 2, 0.6), facingAway));
-        // A 0.15-block gap is NOT physical contact.
+        BoundingBox westWall = new BoundingBox(-1, 0, 0, 0, 2, 0.6);
+        // Facing away, into or along the wall must all be equally eligible.
+        assertEquals(new Vector(1, 0, 0), DragonEscapeMovementKits.contactNormal(player, westWall));
+        assertEquals(new Vector(-1, 0, 0), DragonEscapeMovementKits.contactNormal(
+                player, new BoundingBox(0.6, 0, 0, 1.6, 2, 0.6)));
+        assertEquals(new Vector(0, 0, 1), DragonEscapeMovementKits.contactNormal(
+                player, new BoundingBox(0, 0, -1, 0.6, 2, 0)));
+        assertEquals(new Vector(0, 0, -1), DragonEscapeMovementKits.contactNormal(
+                player, new BoundingBox(0, 0, 0.6, 0.6, 2, 1.6)));
+        // A 0.15-block gap must not count as contact.
         assertNull(DragonEscapeMovementKits.contactNormal(
-                player, new BoundingBox(-1.15, 0, 0, -0.15, 2, 0.6), facingAway));
-        // A block touching only the player's boots is a floor, not a wall.
+                player, new BoundingBox(-1.15, 0, 0, -0.15, 2, 0.6)));
+        // A block only under the player's feet is a floor, not a wall.
         assertNull(DragonEscapeMovementKits.contactNormal(
-                player, new BoundingBox(-1, -1, 0, 0, 0, 0.6), facingAway));
-        // Must have the wall behind you, as in Champions' Assassin Leap.
+                player, new BoundingBox(-1, -1, 0, 0, 0, 0.6)));
+        // A ceiling touching the head is not a wall either.
         assertNull(DragonEscapeMovementKits.contactNormal(
-                player, new BoundingBox(-1, 0, 0, 0, 2, 0.6), new Vector(-1, 0, 0)));
+                player, new BoundingBox(0, 1.8, 0, 0.6, 2.8, 0.6)));
     }
+
 }
