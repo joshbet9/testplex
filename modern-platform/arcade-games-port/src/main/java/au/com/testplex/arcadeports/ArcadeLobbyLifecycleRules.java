@@ -32,10 +32,9 @@ final class ArcadeLobbyLifecycleRules {
         return configured == null ? currentSelection : configured;
     }
 
-    static boolean lobbySelectionNeedsRefresh(String configuredId, ArcadePortGame currentSelection,
-            int actualKitNpcCount, int expectedKitNpcCount, int actualTeamNpcCount, int expectedTeamNpcCount) {
-        return selectedGameAfterReturn(configuredId, currentSelection) != currentSelection
-                || actualKitNpcCount != expectedKitNpcCount
-                || actualTeamNpcCount != expectedTeamNpcCount;
+    /** Coalesce multiple same-tick return events into one complete lobby selection refresh. */
+    static boolean shouldScheduleLobbyReturnRefresh(boolean refreshAlreadyPending) {
+        return !refreshAlreadyPending;
     }
+
 }

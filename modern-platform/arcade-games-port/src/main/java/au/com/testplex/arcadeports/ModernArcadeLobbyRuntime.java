@@ -117,6 +117,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     }
     private record DebugPrompt(ArcadePortGame game, String operation) {}
     private BukkitTask task;
+    private BukkitTask lobbyReturnRefreshTask;
 
     ModernArcadeLobbyRuntime(ArcadeMechanicsModernPlugin plugin, ArcadePortManager manager, ModernArcadeLobby lobby) {
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=lobby-runtime-constructor-start");
@@ -229,10 +230,16 @@ public final class ModernArcadeLobbyRuntime implements Listener {
 
     public void setSelectedGame(ArcadePortGame game) {
         if (game == null) return;
+        applySelectedGame(game, true);
+    }
+
+    private void applySelectedGame(ArcadePortGame game, boolean persistSelection) {
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=selected-game-refresh-start game=" + game.id());
         selectedGame = game;
-        plugin.getConfig().set("lobby-selected-game", game.id());
-        plugin.saveConfig();
+        if (persistSelection && !game.id().equals(plugin.getConfig().getString("lobby-selected-game"))) {
+            plugin.getConfig().set("lobby-selected-game", game.id());
+            plugin.saveConfig();
+        }
         lobby.refreshLobbyScoreboards();
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=selected-game-scoreboards-complete");
         refreshDisplays();
@@ -242,30 +249,23 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         if (cosmeticPreviewWorld != null) refreshShowcase();
     }
 
-    /** Restore selected-game pads only when the persisted selection or its NPC set is stale. */
+    /** Re-run every selected-game side effect when the match lifecycle returns players to the lobby. */
     void refreshCurrentSelection() {
         String configuredId = plugin.getConfig().getString("lobby-selected-game");
         ArcadePortGame current = ArcadeLobbyLifecycleRules.selectedGameAfterReturn(configuredId, selectedGame);
-        int expectedKitNpcs = kitChoicesFor(current).size();
-        int expectedTeamNpcs = Math.max(1, ArcadePortManager.teamCountForGame(current));
-        boolean npcListsReady = kitNpcs.size() == expectedKitNpcs
-                && kitNpcs.stream().allMatch(entity -> entity != null && entity.isValid())
-                && teamNpcs.size() == expectedTeamNpcs
-                && teamNpcs.stream().allMatch(entity -> entity != null && entity.isValid());
-        if (!npcListsReady || ArcadeLobbyLifecycleRules.lobbySelectionNeedsRefresh(configuredId, selectedGame,
-                kitNpcs.size(), expectedKitNpcs, teamNpcs.size(), expectedTeamNpcs)) {
-            setSelectedGame(current);
-        }
+        applySelectedGame(current, false);
     }
 
     @EventHandler
     public void onPlayerReturnToLobby(PlayerChangedWorldEvent event) {
         if (!lobby.isLobbyWorld(event.getPlayer().getWorld())) return;
-        // Wait for the teleport and lobby chunks to finish loading before repairing the selector.
-        Bukkit.getScheduler().runTask(plugin, () -> {
-            if (event.getPlayer().isOnline() && lobby.isLobbyWorld(event.getPlayer().getWorld())) {
-                refreshCurrentSelection();
-            }
+        // One game end can return many players in the same tick. Rebuild selection once,
+        // after their teleports, rather than once per returning player.
+        boolean refreshPending = lobbyReturnRefreshTask != null && !lobbyReturnRefreshTask.isCancelled();
+        if (!ArcadeLobbyLifecycleRules.shouldScheduleLobbyReturnRefresh(refreshPending)) return;
+        lobbyReturnRefreshTask = Bukkit.getScheduler().runTask(plugin, () -> {
+            lobbyReturnRefreshTask = null;
+            refreshCurrentSelection();
         });
     }
 
@@ -2660,7 +2660,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         showBotImpact(bot, target, null, null, null);
     }
 
-    public void shutdown(){if(task!=null)task.cancel();returnBotsToLobby();for(Entity e:new ArrayList<>(showcase))if(e!=null&&e.isValid())e.remove();for(Entity e:new ArrayList<>(kitNpcs))if(e!=null&&e.isValid())e.remove();for (Entity entity : new ArrayList<>(teamNpcs)) if (entity != null && entity.isValid()) entity.remove(); teamNpcs.clear();}
+    public void shutdown(){if(task!=null)task.cancel();if(lobbyReturnRefreshTask!=null)lobbyReturnRefreshTask.cancel();returnBotsToLobby();for(Entity e:new ArrayList<>(showcase))if(e!=null&&e.isValid())e.remove();for(Entity e:new ArrayList<>(kitNpcs))if(e!=null&&e.isValid())e.remove();for (Entity entity : new ArrayList<>(teamNpcs)) if (entity != null && entity.isValid()) entity.remove(); teamNpcs.clear();}
 
     private final class Bot{
         final String key,name;String theme,form,kit;Entity actor;Location actorLocation,arenaSpawn;boolean inGame;ArcadePortGame deployedGame;int team=-1;long nextAttackAt,knockbackUntil;
