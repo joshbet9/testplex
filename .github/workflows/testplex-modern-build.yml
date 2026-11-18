@@ -565,6 +565,16 @@ jobs:
           final_volume_id="$(jq -er '[.[] | select(.name == "testplex_data_restore")] | if length == 1 then .[0].id else error("Testplex data volume missing after runtime verification") end' "$RUNNER_TEMP/fly-volumes-final.json")"
           [[ "$final_volume_id" == "$EXPECTED_VOLUME_ID" ]]
           restore_fly_autostop
+
+          # The autostop-policy restoration recreates the Machine from its saved
+          # image. Re-check the exact release after that restart and collect the
+          # corresponding startup log before declaring production healthy.
+          flyctl ssh console --app "$FLY_APP" --machine "$machine_id" \
+            --command "$remote_command" | tee "$RUNNER_TEMP/fly-runtime-verification-restored.log"
+          grep -Fx "TESTPLEX_FLY_RUNTIME_VERIFIED:$GITHUB_SHA" "$RUNNER_TEMP/fly-runtime-verification-restored.log"
+          flyctl logs --app "$FLY_APP" --machine "$machine_id" --no-tail > "$RUNNER_TEMP/fly-startup-restored.log"
+          grep -F 'TESTPLEX_ARCADE_BOOTSTRAP phase=complete' "$RUNNER_TEMP/fly-startup-restored.log"
+
           flyctl machine list --app "$FLY_APP" --json > "$RUNNER_TEMP/fly-machines-final.json"
           jq -e --arg id "$machine_id" --arg sha "$GITHUB_SHA" --arg policy "$restore_autostop" '
             [.[] | select(.id == $id)] as $m |
