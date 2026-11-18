@@ -1,6 +1,7 @@
 package au.com.testplex.hoopssmoke;
 
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -1066,7 +1067,12 @@ public final class HoopsPaperSmoke extends JavaPlugin {
             ItemStack[] items = player.getInventory().getStorageContents();
             for (int slot = 0; slot < items.length; slot++) {
                 ItemStack item = items[slot];
-                if (slot == 1) {
+                if (slot == 0 && player.isOp()) {
+                    if (item == null || item.getType() != Material.GOLDEN_AXE
+                            || !item.hasItemMeta()
+                            || !(ChatColor.GOLD + "Dragon Escape Map Editor")
+                                    .equals(item.getItemMeta().getDisplayName())) return false;
+                } else if (slot == 1) {
                     if (item == null || item.getType() != Material.WRITABLE_BOOK) return false;
                 } else if (slot == 2) {
                     if (item == null || item.getType() != Material.NAME_TAG) return false;
