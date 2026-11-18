@@ -28,6 +28,8 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -38,6 +40,7 @@ final class MapEditorUi implements Listener {
     private final NamespacedKey toolKey;
     private final Map<UUID, Menu> menus = new HashMap<>();
     private final Map<UUID, Location> firstBounds = new HashMap<>();
+    private final Set<UUID> shiftClicking = new HashSet<>();
 
     private record Menu(Inventory inventory, Map<Integer, Consumer<Player>> actions) {}
     private record MarkerGroup(String type, String name, List<Location> points) {}
@@ -213,7 +216,7 @@ final class MapEditorUi implements Listener {
                     String.format("X %.1f  Y %.1f  Z %.1f", point.getX(), point.getY(), point.getZ()),
                     "Click: teleport and highlight", "Shift-click: confirm deletion"));
             actions.put(slot, p -> {
-                if (p.isSneaking()) {
+                if (p.isSneaking() || shiftClicking.contains(p.getUniqueId())) {
                     confirm(p, "Remove point #" + index + "?", () -> {
                         editor.handle(p, new String[] {"point", "remove", type, group, Integer.toString(index)});
                         markerPoints(p, type, group, Math.max(0, page - (index > points.size() - 1 ? 1 : 0)));
@@ -347,7 +350,10 @@ final class MapEditorUi implements Listener {
         event.setCancelled(true);
         if (event.getClickedInventory() != menu.inventory()) return;
         Consumer<Player> action = menu.actions().get(event.getRawSlot());
-        if (action != null) action.accept(player);
+        if (action != null) {
+            if (event.isShiftClick()) shiftClicking.add(player.getUniqueId());
+            try { action.accept(player); } finally { shiftClicking.remove(player.getUniqueId()); }
+        }
     }
 
     @EventHandler
@@ -368,6 +374,7 @@ final class MapEditorUi implements Listener {
     void endSession(Player player) {
         firstBounds.remove(player.getUniqueId());
         menus.remove(player.getUniqueId());
+        shiftClicking.remove(player.getUniqueId());
     }
 
     @EventHandler
