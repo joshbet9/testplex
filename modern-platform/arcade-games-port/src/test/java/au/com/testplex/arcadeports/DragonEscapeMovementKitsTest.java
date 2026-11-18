@@ -8,191 +8,276 @@ import org.junit.jupiter.api.Test;
 
 class DragonEscapeMovementKitsTest {
     @Test
-    void flutterStartsAfterNormalHeldJumpAndDrainsXp() {
+    void holdingGroundJumpDoesNotTriggerFlutterAfterTakeoff() {
         DragonEscapeMovementKits.FlutterState state = new DragonEscapeMovementKits.FlutterState();
-        state.tick(true, true);
-        assertFalse(state.fluttering);
-        state.tick(true, false);
-        state.tick(true, false);
-        assertFalse(state.fluttering);
+        state.tick(true, true); // Ordinary on-ground jump.
+        for (int tick = 0; tick < 45; tick++) {
+            state.tick(true, false); // Same held Space input through takeoff.
+            assertFalse(state.fluttering, "A held ground jump must not become a flutter");
+            assertFalse(state.activated);
+        }
+        assertEquals(1.0D, state.charge, 0.0001D);
+        state.tick(false, false); // Airborne release explicitly arms the next press.
         state.tick(true, false);
         assertTrue(state.fluttering);
-        assertTrue(state.activated);
-        assertTrue(state.charge < 1.0D);
-    }
-
-    @Test
-    void releaseAndRepressChainsFlutterWhileRecoveringBetweenBursts() {
-        DragonEscapeMovementKits.FlutterState state = new DragonEscapeMovementKits.FlutterState();
-        for (int tick = 0; tick < 5; tick++) state.tick(true, false);
-        double beforeRelease = state.charge;
-        state.tick(false, false);
-        assertFalse(state.fluttering);
-        assertTrue(state.charge > beforeRelease);
-        state.tick(true, false);
-        assertTrue(state.activated);
-        assertTrue(state.fluttering);
-    }
-
-    @Test
-    void exhaustedFlutterStopsAndRequiresAnotherPressToRestart() {
-        DragonEscapeMovementKits.FlutterState state = new DragonEscapeMovementKits.FlutterState();
-        for (int tick = 0; tick < 100; tick++) state.tick(true, false);
-        assertFalse(state.fluttering);
-        double before = state.charge;
-        for (int tick = 0; tick < 12; tick++) state.tick(true, false);
-        assertFalse(state.fluttering);
-        assertTrue(state.charge > before);
-        state.tick(false, false);
-        state.tick(true, false);
-        assertTrue(state.fluttering);
-    }
-
-    @Test
-    void flutterTracesRepeatedYoshiStyleUpDownUpArcsWithoutHovering() {
-        Vector current = new Vector(0.5D, -0.6D, 0.0D);
-        Vector firstRise = DragonEscapeMovementKits.flutterVelocity(current, 1);
-        Vector descending = DragonEscapeMovementKits.flutterVelocity(current, 15);
-        Vector renewedRise = DragonEscapeMovementKits.flutterVelocity(current, 29);
-        assertTrue(firstRise.getY() > 0.15D, "First phase should actually climb");
-        assertTrue(descending.getY() < -0.15D, "Halfway into the wave should descend");
-        assertEquals(firstRise.getY(), renewedRise.getY(), 0.00001D,
-                "Held flutter should rise again within the same burst");
-        assertEquals(DragonEscapeMovementKits.FLUTTER_HORIZONTAL_MAX, firstRise.getX(), 0.0001D);
-        assertTrue(firstRise.getY() > descending.getY());
-    }
-
-    @Test
-    void flutterUsesOneThirdLessEnergyAndLastsLongerThanOldHover() {
-        assertEquals(0.0125D, DragonEscapeMovementKits.FLUTTER_DRAIN_PER_TICK, 0.00001D);
-        assertTrue(DragonEscapeMovementKits.FLUTTER_DRAIN_PER_TICK <= 0.019D * 0.67D);
-        DragonEscapeMovementKits.FlutterState state = new DragonEscapeMovementKits.FlutterState();
-        for (int tick = 0; tick < 60; tick++) state.tick(true, false);
-        assertTrue(state.fluttering, "One continuous hold should last at least three seconds");
-        assertTrue(state.flutterTicks >= 55);
-        assertTrue(state.charge > 0.1D);
-        for (int tick = 0; tick < 50; tick++) state.tick(true, false);
-        assertFalse(state.fluttering, "Exhaustion should still stop sustained flight");
-    }
-
-    @Test
-    void flutterReleaseAndRepressResetsTheArcToTheFirstRisingPhase() {
-        DragonEscapeMovementKits.FlutterState state = new DragonEscapeMovementKits.FlutterState();
-        for (int tick = 0; tick < 21; tick++) state.tick(true, false);
-        assertTrue(state.flutterTicks >= 19);
-        state.tick(false, false);
-        assertEquals(0, state.flutterTicks);
-        state.tick(true, false);
         assertTrue(state.activated);
         assertEquals(1, state.flutterTicks);
-        assertTrue(DragonEscapeMovementKits.flutterVelocity(new Vector(), state.flutterTicks).getY() > 0.15D);
     }
 
     @Test
-    void flutterStickAndWallKickHaveDistinctSounds() {
+    void aFreshSpacePressWithoutAnEarlierAirborneReleaseCannotFlutter() {
+        DragonEscapeMovementKits.FlutterState state = new DragonEscapeMovementKits.FlutterState();
+        // Even if the input polling missed the initial grounded tick, do not
+        // interpret the first observed held-airborne jump as a second press.
+        state.tick(true, false);
+        assertFalse(state.fluttering);
+        state.tick(false, false);
+        state.tick(true, false);
+        assertTrue(state.fluttering);
+    }
+
+    @Test
+    void heldSpaceDoesExactlyOneFlutterArcAndCannotAutoRepeat() {
+        DragonEscapeMovementKits.FlutterState state = new DragonEscapeMovementKits.FlutterState();
+        state.tick(false, true);
+        state.tick(false, false);
+        state.tick(true, false);
+        assertTrue(state.activated);
+        for (int tick = 1; tick < DragonEscapeMovementKits.FLUTTER_WAVE_TICKS; tick++) {
+            state.tick(true, false);
+            assertTrue(state.fluttering);
+        }
+        assertEquals(DragonEscapeMovementKits.FLUTTER_WAVE_TICKS, state.flutterTicks);
+        state.tick(true, false);
+        assertFalse(state.fluttering);
+        assertTrue(state.ended, "Completing one arc should trigger a forward carry");
+        for (int tick = 0; tick < 80; tick++) {
+            state.tick(true, false);
+            assertFalse(state.fluttering, "Holding Space must never repeat a flutter");
+            assertFalse(state.activated);
+        }
+        state.tick(false, false);
+        state.tick(true, false);
+        assertTrue(state.activated, "Release and press in midair should chain the next flutter");
+        assertEquals(1, state.flutterTicks);
+    }
+
+    @Test
+    void releasingSpaceEndsFlutterAndASecondPressRestartsIt() {
+        DragonEscapeMovementKits.FlutterState state = new DragonEscapeMovementKits.FlutterState();
+        state.tick(false, false);
+        state.tick(true, false);
+        for (int tick = 0; tick < 7; tick++) state.tick(true, false);
+        double chargeBeforeRelease = state.charge;
+        state.tick(false, false);
+        assertFalse(state.fluttering);
+        assertTrue(state.ended);
+        assertTrue(state.charge > chargeBeforeRelease);
+        state.tick(true, false);
+        assertTrue(state.fluttering);
+        assertTrue(state.activated);
+        assertEquals(1, state.flutterTicks);
+    }
+
+    @Test
+    void flutterExhaustionCannotRestartUntilFreshPressAndEnoughEnergy() {
+        DragonEscapeMovementKits.FlutterState state = new DragonEscapeMovementKits.FlutterState();
+        state.charge = DragonEscapeMovementKits.FLUTTER_ACTIVATION_COST
+                + 2.0D * DragonEscapeMovementKits.FLUTTER_DRAIN_PER_TICK;
+        state.tick(false, false);
+        state.tick(true, false);
+        assertTrue(state.fluttering);
+        for (int tick = 0; tick < 12; tick++) state.tick(true, false);
+        assertFalse(state.fluttering);
+        assertFalse(state.activated);
+        for (int tick = 0; tick < 30; tick++) {
+            state.tick(true, false);
+            assertFalse(state.fluttering);
+        }
+        state.tick(false, false);
+        for (int tick = 0; tick < 15; tick++) state.tick(false, false);
+        state.tick(true, false);
+        assertTrue(state.fluttering);
+    }
+
+    @Test
+    void aFlutterIsOneYoshiStyleRiseDipRiseWave() {
+        Vector current = new Vector(0.4D, -0.6D, 0.0D);
+        Vector direction = new Vector(0, 0, 1);
+        Vector initialRise = DragonEscapeMovementKits.flutterVelocity(current, direction, 1);
+        Vector dip = DragonEscapeMovementKits.flutterVelocity(current, direction, 15);
+        Vector finalRise = DragonEscapeMovementKits.flutterVelocity(current, direction, 28);
+        assertTrue(initialRise.getY() > 0.15D);
+        assertTrue(dip.getY() < -0.15D);
+        assertTrue(finalRise.getY() > 0.15D);
+        assertTrue(finalRise.getY() > dip.getY());
+        assertEquals(DragonEscapeMovementKits.FLUTTER_HORIZONTAL_SPEED,
+                initialRise.getZ(), 0.00001D);
+        assertEquals(0.0D, initialRise.getX(), 0.00001D);
+    }
+
+    @Test
+    void flutterHorizontalSteeringTargetsEightyPercentGroundSprint() {
+        double expected = 0.8D * 5.612D / 20.0D;
+        assertEquals(expected, DragonEscapeMovementKits.FLUTTER_HORIZONTAL_SPEED, 0.00001D);
+        Vector facingNorth = new Vector(0, 0.2, -1);
+        Vector direction = DragonEscapeMovementKits.flutterTravelDirection(
+                new Vector(0.01, 0, 0), facingNorth, true, false, false, false);
+        assertEquals(0, direction.getX(), 0.00001D);
+        assertTrue(direction.getZ() < -0.99D);
+        Vector velocity = DragonEscapeMovementKits.flutterVelocity(
+                new Vector(0.01, -0.3, 0), direction, 1);
+        assertEquals(expected, Math.hypot(velocity.getX(), velocity.getZ()), 0.00001D);
+
+        Vector right = DragonEscapeMovementKits.flutterTravelDirection(
+                new Vector(), facingNorth, false, false, false, true);
+        assertTrue(right.getX() > 0.99D);
+        Vector diagonal = DragonEscapeMovementKits.flutterTravelDirection(
+                new Vector(), facingNorth, true, false, false, true);
+        assertEquals(1.0D, diagonal.length(), 0.00001D,
+                "Diagonal input should not exceed intended horizontal flutter speed");
+        Vector momentumDirection = DragonEscapeMovementKits.flutterTravelDirection(
+                new Vector(0.3D, 0, 0), facingNorth, false, false, false, false);
+        assertTrue(momentumDirection.getX() > 0.99D,
+                "Without new WASD input, retain the airborne travel direction");
+    }
+
+    @Test
+    void endingFlutterAddsBriefCappedForwardMomentum() {
+        Vector active = DragonEscapeMovementKits.flutterVelocity(
+                new Vector(), new Vector(0, 0, 1), 28);
+        Vector carry = DragonEscapeMovementKits.flutterEndVelocity(active);
+        assertEquals(DragonEscapeMovementKits.FLUTTER_END_FORWARD_SPEED,
+                Math.hypot(carry.getX(), carry.getZ()), 0.00001D);
+        assertTrue(carry.getZ() > active.getZ());
+        assertEquals(active.getY(), carry.getY(), 0.00001D);
+    }
+
+    @Test
+    void flutterKeepsReducedXpDrainAndIdleRegeneration() {
+        assertEquals(0.0125D, DragonEscapeMovementKits.FLUTTER_DRAIN_PER_TICK, 0.00001D);
+        DragonEscapeMovementKits.FlutterState state = new DragonEscapeMovementKits.FlutterState();
+        state.tick(false, false);
+        state.tick(true, false);
+        for (int tick = 1; tick < DragonEscapeMovementKits.FLUTTER_WAVE_TICKS; tick++) {
+            state.tick(true, false);
+        }
+        assertTrue(state.charge > 0.5D);
+        double before = state.charge;
+        state.tick(true, false);
+        assertTrue(state.charge > before, "XP should regenerate after the finite arc expires");
+    }
+
+    @Test
+    void flutterStickAndWallKickKeepDistinctSounds() {
         assertEquals("ENTITY_SLIME_JUMP", DragonEscapeMovementKits.FLUTTER_SOUND_NAME);
         assertEquals("BLOCK_SLIME_BLOCK_PLACE", DragonEscapeMovementKits.WALL_CLING_SOUND_NAME);
         assertEquals("ENTITY_FIREWORK_ROCKET_LAUNCH", DragonEscapeMovementKits.WALL_KICK_SOUND_NAME);
     }
 
     @Test
-    void groundJumpAndUnstuckSpaceCannotTriggerWallKick() {
+    void wallKicksRequireAnAlreadyActiveAirborneWallStick() {
         DragonEscapeMovementKits.AcrobatState state = new DragonEscapeMovementKits.AcrobatState();
         assertFalse(state.tickWallCling(true, true, true));
-        assertEquals(1.0D, state.charge, 0.00001D, "Grounded crouch must not spend XP");
+        assertEquals(1.0D, state.charge, 0.00001D);
         assertFalse(state.pressedForWallKick(true, true, false));
-        assertFalse(state.pressedForWallKick(true, false, false),
-                "Holding a normal jump into the air must not kick");
+        assertFalse(state.pressedForWallKick(true, false, false));
         assertFalse(state.pressedForWallKick(false, false, false));
         assertFalse(state.pressedForWallKick(true, false, false),
-                "Airborne Space with no preceding charged stick must not kick");
-    }
+                "An airborne Space press without Shift-stick cannot wall-kick");
 
-    @Test
-    void airborneShiftStickMustPrecedeFreshSpaceKick() {
-        DragonEscapeMovementKits.AcrobatState state = new DragonEscapeMovementKits.AcrobatState();
-        assertFalse(state.tickWallCling(true, false, false),
-                "A nearby but noncontacting wall cannot activate a stick");
-        assertEquals(1.0D, state.charge, 0.00001D);
+        state.pressedForWallKick(false, false, false);
+        assertFalse(state.tickWallCling(true, false, false));
         assertTrue(state.tickWallCling(true, false, true));
         assertTrue(state.clingActivated);
-        assertEquals(0.75D, state.charge, 0.00001D);
         assertFalse(state.pressedForWallKick(true, false, true),
-                "Space in the same tick as Shift-stick cannot skip the stick");
+                "A wall kick must not occur on the same tick Shift-stick begins");
         assertFalse(state.pressedForWallKick(false, false, true));
         assertTrue(state.tickWallCling(true, false, true));
         assertFalse(state.clingActivated);
-        assertTrue(state.pressedForWallKick(true, false, true),
-                "A later fresh Space press while sticking can wall-kick");
+        assertTrue(state.pressedForWallKick(true, false, true));
         state.cancelWallClingForKick();
-        assertEquals(0, state.wallClingTicksRemaining);
+        assertFalse(state.clingActive);
         assertFalse(state.tickWallCling(true, false, true),
-                "One Shift-stick cannot grant repeated wall kicks");
+                "Cannot use a single Shift-stick for multiple kicks");
         assertFalse(state.pressedForWallKick(false, false, false));
         assertFalse(state.pressedForWallKick(true, false, false));
     }
 
     @Test
-    void fourChargedShiftSticksRearmWithoutAnyWallKickCooldown() {
+    void wallStickLastsLongerThanHalfSecondAndDrainsContinuously() {
         DragonEscapeMovementKits.AcrobatState state = new DragonEscapeMovementKits.AcrobatState();
-        for (int use = 0; use < 4; use++) {
-            state.tickWallCling(false, false, true);
-            double before = state.charge;
-            assertTrue(state.tickWallCling(true, false, true), "Stick " + use + " should activate");
-            assertTrue(state.clingActivated);
-            assertEquals(before - DragonEscapeMovementKits.WALL_CLING_USE_COST,
-                    state.charge, 0.0001D);
-            state.cancelWallClingForKick();
-            assertEquals(0, state.wallClingTicksRemaining);
+        assertTrue(state.tickWallCling(true, false, true));
+        double afterFirst = state.charge;
+        assertEquals(1.0D - DragonEscapeMovementKits.WALL_CLING_DRAIN_PER_TICK,
+                afterFirst, 0.00001D);
+        for (int tick = 0; tick < 30; tick++) {
+            assertTrue(state.tickWallCling(true, false, true),
+                    "Cling must not expire at 10 ticks / 0.5 seconds");
         }
-        state.tickWallCling(false, false, true);
-        assertFalse(state.tickWallCling(true, false, true),
-                "Cannot buy another stick while the XP bar has insufficient charge");
-        assertFalse(state.clingActivated);
-        assertEquals(0, state.wallClingTicksRemaining);
+        assertTrue(state.clingActive);
+        assertEquals(1.0D - 31 * DragonEscapeMovementKits.WALL_CLING_DRAIN_PER_TICK,
+                state.charge, 0.00001D);
     }
 
     @Test
-    void shiftStickLastsHalfSecondAndExpiresWithoutAutoRenew() {
+    void wallStickStopsOnEnergyExhaustionAndCannotRenewFromSameHold() {
         DragonEscapeMovementKits.AcrobatState state = new DragonEscapeMovementKits.AcrobatState();
-        for (int tick = 0; tick < DragonEscapeMovementKits.WALL_CLING_MAX_TICKS; tick++) {
-            assertTrue(state.tickWallCling(true, false, true));
+        int activeTicks = 0;
+        for (int tick = 0; tick < 110; tick++) {
+            if (state.tickWallCling(true, false, true)) activeTicks++;
         }
-        assertEquals(0, state.wallClingTicksRemaining);
-        assertFalse(state.tickWallCling(true, false, true));
+        assertTrue(activeTicks >= 79 && activeTicks <= 81);
+        assertFalse(state.clingActive);
         assertFalse(state.tickWallCling(true, false, true));
         assertFalse(state.pressedForWallKick(true, false, false),
-                "Expired Shift-stick cannot activate a late wall kick");
-        assertFalse(state.tickWallCling(false, false, true));
-        assertTrue(state.tickWallCling(true, false, true), "Release/repress Shift spends another use");
-        assertEquals(0.50D + 3 * DragonEscapeMovementKits.WALL_CLING_REGEN_PER_TICK,
-                state.charge, 0.0001D);
-    }
-
-    @Test
-    void contactLossLandingAndShiftReleaseCancelSticking() {
-        DragonEscapeMovementKits.AcrobatState state = new DragonEscapeMovementKits.AcrobatState();
-        assertFalse(state.tickWallCling(true, true, true));
-        assertTrue(state.tickWallCling(true, false, true));
-        assertTrue(state.wallClingTicksRemaining > 0);
-        assertFalse(state.tickWallCling(true, false, false), "Losing contact cancels stick");
-        assertFalse(state.tickWallCling(true, false, true),
-                "Retouching the wall with the same Shift hold cannot renew a used stick");
+                "Out-of-energy clings cannot generate a wall kick");
+        // Regenerate while not sticking; continuing to hold Shift must not
+        // automatically restart the cling without a new Shift press.
+        for (int tick = 0; tick < 105; tick++) {
+            assertFalse(state.tickWallCling(true, false, true));
+        }
+        assertTrue(state.charge > 0.9D);
         state.tickWallCling(false, false, true);
         assertTrue(state.tickWallCling(true, false, true));
-        assertFalse(state.tickWallCling(true, true, true), "Landing cancels the airborne stick");
-        Vector hold = DragonEscapeMovementKits.wallClingVelocity();
-        assertEquals(0.0D, hold.getX(), 0.00001D);
-        assertTrue(hold.getY() > 0.0D && hold.getY() < 0.1D);
     }
 
     @Test
-    void acrobatXpRechargesWhenNotSticking() {
+    void landingReleaseAndPhysicalContactLossCancelWallStick() {
+        DragonEscapeMovementKits.AcrobatState state = new DragonEscapeMovementKits.AcrobatState();
+        assertFalse(state.tickWallCling(true, true, true));
+        assertFalse(state.tickWallCling(true, false, false));
+        assertEquals(1.0D, state.charge, 0.00001D);
+        assertTrue(state.tickWallCling(true, false, true));
+        assertFalse(state.tickWallCling(true, false, false));
+        assertFalse(state.tickWallCling(true, false, true),
+                "Contact loss cancels the stick until a new Shift press");
+        state.tickWallCling(false, false, true);
+        assertTrue(state.tickWallCling(true, false, true));
+        assertFalse(state.tickWallCling(true, true, true));
+        assertFalse(state.tickWallCling(true, false, true),
+                "Holding Shift through landing cannot re-arm on takeoff");
+        state.tickWallCling(false, false, true);
+        assertTrue(state.tickWallCling(true, false, true));
+        assertFalse(state.tickWallCling(false, false, true));
+        assertFalse(state.clingActive);
+    }
+
+    @Test
+    void wallStickXpRegeneratesOffWallAndKickNeedsAnotherStick() {
         DragonEscapeMovementKits.AcrobatState state = new DragonEscapeMovementKits.AcrobatState();
         assertTrue(state.tickWallCling(true, false, true));
-        assertEquals(1.0D - DragonEscapeMovementKits.WALL_CLING_USE_COST, state.charge, 0.00001D);
-        for (int tick = 0; tick < 50; tick++) state.tickWallCling(false, false, false);
-        assertEquals(1.0D, state.charge, 0.00001D);
+        for (int tick = 0; tick < 15; tick++) state.tickWallCling(true, false, true);
+        double spent = state.charge;
+        assertTrue(spent < 1.0D);
+        state.cancelWallClingForKick();
+        state.tickWallCling(true, false, true);
+        assertTrue(state.charge > spent);
+        assertFalse(state.clingActive);
+        state.tickWallCling(false, false, true);
+        assertTrue(state.tickWallCling(true, false, true),
+                "A fresh Shift-stick can start immediately without a cooldown");
+        assertTrue(state.clingActivated);
     }
 
     @Test
