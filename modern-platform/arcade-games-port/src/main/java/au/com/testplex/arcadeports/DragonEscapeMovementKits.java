@@ -13,6 +13,7 @@ final class DragonEscapeMovementKits {
     // Keep rule helpers independent of Paper's runtime-only sound registry.
     static final String FLUTTER_SOUND_NAME = "ENTITY_SLIME_JUMP";
     static final String WALL_KICK_SOUND_NAME = "ENTITY_FIREWORK_ROCKET_LAUNCH";
+    static final String WALL_CLING_SOUND_NAME = "BLOCK_SLIME_BLOCK_PLACE";
     static final double FLUTTER_ACTIVATION_COST = 0.08D;
     // Approximately 34% less charge per tick than the original hover implementation.
     static final double FLUTTER_DRAIN_PER_TICK = 0.0125D;
@@ -30,6 +31,8 @@ final class DragonEscapeMovementKits {
     static final double WALL_KICK_MAX_UPWARD_SPEED = 1.20D;
     static final double WALL_KICK_MIN_OUTWARD_SPEED = 0.28D;
     static final int WALL_CLING_MAX_TICKS = 10; // 0.5 seconds at 20 TPS.
+    static final double WALL_CLING_USE_COST = 0.25D; // Four sticks from a full XP bar.
+    static final double WALL_CLING_REGEN_PER_TICK = 0.010D; // Refill when not clinging.
     static final double WALL_CLING_GRAVITY_COMPENSATION_Y = 0.078D;
     static final double ACROBAT_FALL_DAMAGE_MULTIPLIER = 0.50D;
     private static final double TOUCH_TOLERANCE = 0.055D;
@@ -86,45 +89,51 @@ final class DragonEscapeMovementKits {
     static final class AcrobatState {
         boolean previouslyHeld;
         boolean crouchConsumed;
+        boolean clingActivated;
+        double charge = 1.0D;
         int wallClingTicksRemaining;
 
         /**
-         * A wall kick needs a new Space press while AIRBORNE and touching a
-         * wall. A standing player pressing Space beside a wall only performs
-         * their normal ground jump; they must release and press again once
-         * airborne to wall-kick. No time-based cooldown limits chaining.
-         * Update the input latch even on the ground so holding the original
-         * jump press cannot accidentally trigger the kick a tick later.
+         * A wall kick requires a fresh airborne Space press while an existing
+         * airborne Shift-stick is active. Ground jumping, wall contact alone,
+         * and pressing Space in the same tick that starts a stick cannot kick.
+         * No separate time-based wall-kick cooldown is imposed.
          */
-        boolean pressedForWallKick(boolean jumpHeld, boolean grounded) {
+        boolean pressedForWallKick(boolean jumpHeld, boolean grounded, boolean sticking) {
             boolean freshPress = jumpHeld && !previouslyHeld;
             previouslyHeld = jumpHeld;
-            return freshPress && !grounded;
+            return freshPress && !grounded && sticking && !clingActivated;
         }
 
         /**
-         * Holding crouch against a wall arrests momentum for at most half a
-         * second. One cling per crouch hold: it cannot refresh until Shift
-         * is released, and walking/jumping away cancels the cling immediately.
-         * The caller runs this only while the ability is enabled.
+         * A charged Shift-stick can start only while airborne and physically
+         * touching a wall. Each fresh Shift hold buys at most one 10-tick stick
+         * for 25% XP; holding Shift cannot renew it. Releasing Shift, landing,
+         * or losing contact cancels it. XP regenerates while not sticking.
          */
         boolean tickWallCling(boolean crouching, boolean grounded, boolean touchingWall) {
+            clingActivated = false;
             if (!crouching) {
                 crouchConsumed = false;
                 wallClingTicksRemaining = 0;
-                return false;
-            }
-            if (grounded || !touchingWall) {
+            } else if (grounded || !touchingWall) {
                 wallClingTicksRemaining = 0;
-                return false;
-            }
-            if (!crouchConsumed) {
-                wallClingTicksRemaining = WALL_CLING_MAX_TICKS;
+            } else if (!crouchConsumed) {
                 crouchConsumed = true;
+                if (charge + 1.0E-9D >= WALL_CLING_USE_COST) {
+                    charge = Math.max(0.0D, charge - WALL_CLING_USE_COST);
+                    wallClingTicksRemaining = WALL_CLING_MAX_TICKS;
+                    clingActivated = true;
+                }
             }
-            if (wallClingTicksRemaining <= 0) return false;
-            wallClingTicksRemaining--;
-            return true;
+
+            boolean sticking = crouching && !grounded && touchingWall && wallClingTicksRemaining > 0;
+            if (sticking) {
+                wallClingTicksRemaining--;
+            } else {
+                charge = Math.min(1.0D, charge + WALL_CLING_REGEN_PER_TICK);
+            }
+            return sticking;
         }
 
         void cancelWallClingForKick() {
