@@ -234,11 +234,11 @@ public final class ModernArcadeLobby implements Listener {
         if (plugin instanceof ArcadeMechanicsModernPlugin arcadePlugin
                 && arcadePlugin.hasAdminAccess(player)) {
             inventory.setItem(HOTBAR_MAP_EDITOR_SLOT, createHotbarItem(Material.GOLDEN_AXE,
-                    ChatColor.GOLD + "Dragon Escape Map Editor",
-                    List.of(ChatColor.GRAY + "Edit an isolated draft of the selected Dragon Escape map.",
-                            ChatColor.YELLOW + "Select Dragon Escape in the Game Panel first.",
-                            ChatColor.DARK_GRAY + "Right-click to open the current map."),
-                    "arcadeport mapedit current"));
+                    ChatColor.GOLD + "Map Editor",
+                    List.of(ChatColor.GRAY + "Choose a game and a map to edit.",
+                            ChatColor.YELLOW + "Build in an isolated creative copy.",
+                            ChatColor.DARK_GRAY + "Right-click to open the map selector."),
+                    "arcadeport mapedit"));
         }
         inventory.setItem(HOTBAR_LEADERBOARDS_SLOT, createHotbarItem(Material.NAME_TAG,
                 ChatColor.AQUA + "Lobby Leaderboards",
