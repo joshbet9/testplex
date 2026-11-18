@@ -17945,8 +17945,16 @@ public final class ArcadePortManager implements Listener {
             boolean enabled = !player.isInWater()
                     && debugKitFeatureEnabled(player, ArcadePortGame.DRAGON_ESCAPE, kit);
             Vector contactNormal = enabled ? DragonEscapeMovementKits.touchingWallNormal(player) : null;
+            long cooldownBeforeTick = acrobat.cooldownEndsAtMillis;
             boolean sticking = acrobat.tickWallCling(enabled && player.isSneaking(),
                     grounded, contactNormal != null, now);
+            if (acrobat.cooldownEndsAtMillis != cooldownBeforeTick) {
+                // Match the red/green segmented action-bar cooldown used by
+                // the other kits. This starts ON LANDING, never midair.
+                cooldownProgress.start(player, "Wall Kick",
+                        DragonEscapeMovementKits.WALL_KICK_GROUNDED_COOLDOWN_MILLIS,
+                        ArcadePortGame.DRAGON_ESCAPE);
+            }
             boolean pressed = acrobat.pressedForWallKick(jumpHeld, grounded, sticking);
             if (!sticking) {
                 releaseAcrobatWallCling(session, player);
@@ -17978,8 +17986,7 @@ public final class ArcadePortManager implements Listener {
                 continue;
             }
             Vector launch = DragonEscapeMovementKits.wallKickVelocity(
-                    player.getLocation().getDirection(), contactNormal,
-                    acrobat.nextWallKickStrength());
+                    player.getLocation().getDirection(), contactNormal);
             if (launch.lengthSquared() == 0.0D) continue;
             acrobat.completeWallKick();
             releaseAcrobatWallCling(session, player);
@@ -17991,8 +17998,8 @@ public final class ArcadePortManager implements Listener {
                     pendingDragonEscapeLeapVelocity.remove(id);
                 }
             }, 2L);
-            // Consecutive airborne kicks use 50/75/100% of original Leap;
-            // yaw/pitch steer, and collision contact—not facing—gates use.
+            // Restore the full pre-#738 boosted wall-jump vector for
+            // testing; still require a real airborne Shift cling and fresh Space.
             player.getWorld().spawnParticle(Particle.CLOUD,
                     player.getLocation().add(0.0D, 0.65D, 0.0D),
                     12, 0.25D, 0.3D, 0.25D, 0.035D);
