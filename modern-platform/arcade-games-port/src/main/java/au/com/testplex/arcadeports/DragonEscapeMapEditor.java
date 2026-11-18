@@ -18,6 +18,7 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.Vector;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -323,7 +324,7 @@ final class DragonEscapeMapEditor implements Listener {
         Path container = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
         if (!root.equals(container.resolve(session.world.getName()).normalize())
                 || !session.world.getName().startsWith(WORLD_PREFIX)
-                || Files.isSymbolicLink(root)) {
+                || Files.isSymbolicLink(root) || Files.isSymbolicLink(container)) {
             sender.sendMessage(ChatColor.RED + "Draft world folder location is unsafe; refusing deletion.");
             return;
         }
@@ -335,8 +336,11 @@ final class DragonEscapeMapEditor implements Listener {
         try {
             deleteTree(root);
             Path manifestDirectory = session.manifestPath.getParent();
-            if (manifestDirectory == null || !manifestDirectory.startsWith(plugin.getDataFolder().toPath().toAbsolutePath().normalize())
-                    || Files.isSymbolicLink(manifestDirectory)) throw new IOException("Unsafe draft manifest directory.");
+            Path dataFolder = plugin.getDataFolder().toPath().toAbsolutePath().normalize();
+            if (manifestDirectory == null || !manifestDirectory.startsWith(dataFolder.resolve(DRAFTS_DIRECTORY))
+                    || Files.isSymbolicLink(manifestDirectory)
+                    || !manifestDirectory.toRealPath().startsWith(dataFolder.toRealPath()))
+                throw new IOException("Unsafe draft manifest directory.");
             deleteTree(manifestDirectory);
             sender.sendMessage(ChatColor.GREEN + "Permanently deleted isolated draft " + session.draftName
                     + ". Published and original maps were not changed.");
@@ -832,6 +836,25 @@ final class DragonEscapeMapEditor implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onDraftDamage(EntityDamageEvent event) {
         if (isEditorWorld(event.getEntity().getWorld())) event.setCancelled(true);
+    }
+
+    /** A normal teleport or external lobby command must never strand a player in an active draft. */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onEditorWorldExit(PlayerChangedWorldEvent event) {
+        DraftSession session = sessions.get(event.getPlayer().getUniqueId());
+        if (session == null || event.getFrom() != session.world || event.getPlayer().getWorld() == session.world) return;
+        ensureLocalWorldConfig(session.world);
+        session.world.save();
+        sessions.remove(event.getPlayer().getUniqueId());
+        worldOwners.remove(session.world.getName(), event.getPlayer().getUniqueId());
+        ui.endSession(event.getPlayer());
+        Player player = event.getPlayer();
+        player.setFlying(false);
+        player.setAllowFlight(session.returnAllowFlight);
+        player.setGameMode(session.returnGameMode);
+        player.getInventory().setContents(session.returnInventory);
+        player.updateInventory();
+        player.sendMessage(ChatColor.YELLOW + "Exited the Map Editor; your isolated draft was automatically saved.");
     }
 
     @EventHandler
