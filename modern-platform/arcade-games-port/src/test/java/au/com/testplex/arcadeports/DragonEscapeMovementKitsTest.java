@@ -8,226 +8,86 @@ import org.junit.jupiter.api.Test;
 
 class DragonEscapeMovementKitsTest {
     @Test
-    void holdingGroundJumpDoesNotTriggerFlutterAfterTakeoff() {
-        DragonEscapeMovementKits.FlutterState state = new DragonEscapeMovementKits.FlutterState();
-        state.tick(true, true); // Ordinary on-ground jump.
-        for (int tick = 0; tick < 45; tick++) {
-            state.tick(true, false); // Same held Space input through takeoff.
-            assertFalse(state.fluttering, "A held ground jump must not become a flutter");
-            assertFalse(state.activated);
-        }
-        assertEquals(1.0D, state.charge, 0.0001D);
-        state.tick(false, false); // Airborne release explicitly arms the next press.
-        state.tick(true, false);
-        assertTrue(state.fluttering);
-        assertTrue(state.activated);
-        assertEquals(1, state.flutterTicks);
+    void featherBounceBeginsWithThreeChargesAndRejectsGroundClicks() {
+        var flutter = new DragonEscapeMovementKits.FlutterState();
+        assertEquals(3, DragonEscapeMovementKits.FLUTTER_MAX_CHARGES);
+        assertEquals(8_000L, DragonEscapeMovementKits.FLUTTER_CHARGE_RECHARGE_MILLIS);
+        assertEquals(3, flutter.charges);
+        assertFalse(flutter.useBounce(true, 1_000L));
+        assertEquals(3, flutter.charges);
+        assertTrue(flutter.useBounce(false, 1_000L));
+        assertEquals(2, flutter.charges);
+        assertEquals(9_000L, flutter.nextChargeAtMillis);
     }
 
     @Test
-    void aFreshSpacePressWithoutAnEarlierAirborneReleaseCannotFlutter() {
-        DragonEscapeMovementKits.FlutterState state = new DragonEscapeMovementKits.FlutterState();
-        // Even if the input polling missed the initial grounded tick, do not
-        // interpret the first observed held-airborne jump as a second press.
-        state.tick(true, false);
-        assertFalse(state.fluttering);
-        state.tick(false, false);
-        state.tick(true, false);
-        assertTrue(state.fluttering);
+    void featherCanSpendThreeChargesInSameAirbornePeriodWithoutSpace() {
+        var flutter = new DragonEscapeMovementKits.FlutterState();
+        assertTrue(flutter.useBounce(false, 1_000L));
+        assertTrue(flutter.useBounce(false, 2_000L));
+        assertTrue(flutter.useBounce(false, 3_000L));
+        assertEquals(0, flutter.charges);
+        assertFalse(flutter.useBounce(false, 3_001L));
+        assertEquals(9_000L, flutter.nextChargeAtMillis,
+                "Spending more charges must never postpone the earlier recharge");
     }
 
     @Test
-    void heldSpaceDoesExactlyOneFlutterArcAndCannotAutoRepeat() {
-        DragonEscapeMovementKits.FlutterState state = new DragonEscapeMovementKits.FlutterState();
-        state.tick(false, true);
-        state.tick(false, false);
-        state.tick(true, false);
-        assertTrue(state.activated);
-        for (int tick = 1; tick < DragonEscapeMovementKits.FLUTTER_TOTAL_TICKS; tick++) {
-            state.tick(true, false);
-            assertTrue(state.fluttering);
-        }
-        assertEquals(DragonEscapeMovementKits.FLUTTER_TOTAL_TICKS, state.flutterTicks);
-        state.tick(true, false);
-        assertFalse(state.fluttering);
-        assertTrue(state.ended, "Completing one arc should trigger a forward carry");
-        for (int tick = 0; tick < 80; tick++) {
-            state.tick(true, false);
-            assertFalse(state.fluttering, "Holding Space must never repeat a flutter");
-            assertFalse(state.activated);
-        }
-        state.tick(false, false);
-        state.tick(true, false);
-        assertTrue(state.activated, "Release and press in midair should chain the next flutter");
-        assertEquals(1, state.flutterTicks);
+    void featherChargesRestoreOneEveryEightSecondsIncludingInAir() {
+        var flutter = new DragonEscapeMovementKits.FlutterState();
+        for (int i = 0; i < 3; i++) assertTrue(flutter.useBounce(false, 1_000L + i));
+        assertFalse(flutter.recharge(8_999L));
+        assertTrue(flutter.recharge(9_000L));
+        assertEquals(1, flutter.charges);
+        assertEquals(17_000L, flutter.nextChargeAtMillis);
+        assertTrue(flutter.recharge(17_000L));
+        assertEquals(2, flutter.charges);
+        assertTrue(flutter.useBounce(false, 17_001L));
+        assertEquals(1, flutter.charges);
+        assertEquals(25_000L, flutter.nextChargeAtMillis);
+        assertTrue(flutter.recharge(25_000L));
+        assertTrue(flutter.recharge(33_000L));
+        assertEquals(3, flutter.charges);
+        assertEquals(0L, flutter.nextChargeAtMillis);
+        assertFalse(flutter.recharge(100_000L));
     }
 
     @Test
-    void releasingSpaceEndsFlutterAndASecondPressRestartsIt() {
-        DragonEscapeMovementKits.FlutterState state = new DragonEscapeMovementKits.FlutterState();
-        state.tick(false, false);
-        state.tick(true, false);
-        for (int tick = 0; tick < 7; tick++) state.tick(true, false);
-        double chargeBeforeRelease = state.charge;
-        state.tick(false, false);
-        assertFalse(state.fluttering);
-        assertTrue(state.ended);
-        assertTrue(state.charge > chargeBeforeRelease);
-        state.tick(true, false);
-        assertTrue(state.fluttering);
-        assertTrue(state.activated);
-        assertEquals(1, state.flutterTicks);
+    void featherChargeProgressFillsDuringEightSecondRecharge() {
+        var flutter = new DragonEscapeMovementKits.FlutterState();
+        assertEquals(1.0F, flutter.rechargeProgress(1_000L), 0.00001F);
+        flutter.useBounce(false, 1_000L);
+        assertEquals(0.0F, flutter.rechargeProgress(1_000L), 0.00001F);
+        assertEquals(0.5F, flutter.rechargeProgress(5_000L), 0.00001F);
+        assertEquals(1.0F, flutter.rechargeProgress(9_000L), 0.00001F);
+        flutter.recharge(9_000L);
+        assertEquals(1.0F, flutter.rechargeProgress(9_000L), 0.00001F);
     }
 
     @Test
-    void flutterExhaustionCannotRestartUntilFreshPressAndEnoughEnergy() {
-        DragonEscapeMovementKits.FlutterState state = new DragonEscapeMovementKits.FlutterState();
-        state.charge = DragonEscapeMovementKits.FLUTTER_ACTIVATION_COST
-                + 2.0D * DragonEscapeMovementKits.FLUTTER_DRAIN_PER_TICK;
-        state.tick(false, false);
-        state.tick(true, false);
-        assertTrue(state.fluttering);
-        for (int tick = 0; tick < 12; tick++) state.tick(true, false);
-        assertFalse(state.fluttering);
-        assertFalse(state.activated);
-        for (int tick = 0; tick < 30; tick++) {
-            state.tick(true, false);
-            assertFalse(state.fluttering);
-        }
-        state.tick(false, false);
-        for (int tick = 0; tick < 15; tick++) state.tick(false, false);
-        state.tick(true, false);
-        assertTrue(state.fluttering);
+    void featherRightClickBounceRetainsFlutterHorizontalSpeedAndSteering() {
+        double sprint = 1.25D * 0.8D * 5.612D / 20.0D;
+        assertEquals(sprint, DragonEscapeMovementKits.FLUTTER_HORIZONTAL_SPEED, 0.00001D);
+        Vector north = DragonEscapeMovementKits.flutterBounceVelocity(
+                new Vector(0, -0.6, 0), new Vector(0, 0.2, -1),
+                true, false, false, false);
+        assertEquals(sprint, Math.hypot(north.getX(), north.getZ()), 0.00001D);
+        assertEquals(0.60D, north.getY(), 0.00001D);
+        assertTrue(north.getZ() < -0.27D);
+        Vector diagonal = DragonEscapeMovementKits.flutterBounceVelocity(
+                new Vector(), new Vector(0, 0, -1), true, false, false, true);
+        assertEquals(sprint, Math.hypot(diagonal.getX(), diagonal.getZ()), 0.00001D);
+        Vector momentum = DragonEscapeMovementKits.flutterBounceVelocity(
+                new Vector(0.3, 0, 0), new Vector(0, 0, -1),
+                false, false, false, false);
+        assertTrue(momentum.getX() > 0.27D);
     }
 
     @Test
-    void flutterArcFinishesAtItsAbsoluteHighestPointAfterAClimbDipClimb() {
-        assertEquals(5, DragonEscapeMovementKits.FLUTTER_LIFT_TICKS);
-        assertEquals(0.2D, DragonEscapeMovementKits.FLUTTER_LIFT_VERTICAL_SPEED, 0.00001D);
-        Vector direction = new Vector(0, 0, 1);
-        double absoluteHeight = 0.0D;
-        for (int tick = 1; tick <= DragonEscapeMovementKits.FLUTTER_LIFT_TICKS; tick++) {
-            Vector velocity = DragonEscapeMovementKits.flutterVelocity(new Vector(), direction, tick);
-            absoluteHeight += velocity.getY();
-        }
-        assertEquals(1.0D, absoluteHeight, 0.00001D);
-        double highestBeforeEnd = absoluteHeight;
-        boolean sawUp = false;
-        boolean sawDown = false;
-        boolean sawFinalUp = false;
-        for (int arcTick = 1; arcTick <= DragonEscapeMovementKits.FLUTTER_WAVE_TICKS; arcTick++) {
-            Vector velocity = DragonEscapeMovementKits.flutterVelocity(new Vector(), direction,
-                    DragonEscapeMovementKits.FLUTTER_LIFT_TICKS + arcTick);
-            absoluteHeight += velocity.getY();
-            if (arcTick < DragonEscapeMovementKits.FLUTTER_WAVE_TICKS) {
-                highestBeforeEnd = Math.max(highestBeforeEnd, absoluteHeight);
-            }
-            if (arcTick < 10 && velocity.getY() > 0.05D) sawUp = true;
-            if (arcTick >= 10 && arcTick <= 20 && velocity.getY() < -0.05D) sawDown = true;
-            if (arcTick > 20 && velocity.getY() > 0.05D) sawFinalUp = true;
-        }
-        assertTrue(sawUp && sawDown && sawFinalUp,
-                "Flutter must visibly climb, dip, and climb again");
-        assertEquals(1.0D + DragonEscapeMovementKits.FLUTTER_ARC_NET_RISE,
-                absoluteHeight, 0.00001D);
-        assertTrue(absoluteHeight > highestBeforeEnd,
-                "Flutter must terminate at its absolute peak, not below an earlier high point");
-        assertEquals(0.0D, DragonEscapeMovementKits.flutterArcHeight(0), 0.00001D);
-        assertEquals(DragonEscapeMovementKits.FLUTTER_ARC_NET_RISE,
-                DragonEscapeMovementKits.flutterArcHeight(DragonEscapeMovementKits.FLUTTER_WAVE_TICKS),
-                0.00001D);
-    }
-
-    @Test
-    void exactlyThreeFlutterActivationsAreAllowedPerAirborneRun() {
-        DragonEscapeMovementKits.FlutterState state = new DragonEscapeMovementKits.FlutterState();
-        state.tick(true, true); // Normal ground jump.
-        state.tick(true, false);
-        assertFalse(state.activated);
-        for (int attempt = 1; attempt <= 3; attempt++) {
-            state.tick(false, false); // Release in the air.
-            state.charge = 1.0D; // Isolate the use cap from the XP charge constraint.
-            state.tick(true, false);
-            assertTrue(state.activated, "Airborne press " + attempt + " should flutter");
-            assertEquals(attempt, state.fluttersThisAirborneRun);
-            state.tick(false, false);
-        }
-        state.charge = 1.0D;
-        state.tick(true, false);
-        assertFalse(state.activated, "A fourth flutter must be blocked until landing");
-        assertFalse(state.fluttering);
-        assertEquals(3, state.fluttersThisAirborneRun);
-        state.tick(false, true); // Actual ground contact resets the limit.
-        assertEquals(0, state.fluttersThisAirborneRun);
-        state.tick(false, false);
-        state.tick(true, false);
-        assertTrue(state.activated, "The next airborne run gets three new flutters");
-        assertEquals(1, state.fluttersThisAirborneRun);
-    }
-
-    @Test
-    void insufficientXpCannotStartAFlutterEvenWithRemainingAirborneUses() {
-        DragonEscapeMovementKits.FlutterState state = new DragonEscapeMovementKits.FlutterState();
-        state.tick(false, false);
-        state.charge = DragonEscapeMovementKits.FLUTTER_ACTIVATION_COST
-                + DragonEscapeMovementKits.FLUTTER_DRAIN_PER_TICK - 0.01D;
-        state.tick(true, false);
-        assertFalse(state.activated);
-        assertEquals(0, state.fluttersThisAirborneRun);
-        assertFalse(state.fluttering);
-    }
-
-    @Test
-    void flutterHorizontalSteeringTargetsFullGroundSprint() {
-        double expected = 1.25D * 0.8D * 5.612D / 20.0D;
-        assertEquals(expected, DragonEscapeMovementKits.FLUTTER_HORIZONTAL_SPEED, 0.00001D);
-        Vector facingNorth = new Vector(0, 0.2, -1);
-        Vector direction = DragonEscapeMovementKits.flutterTravelDirection(
-                new Vector(0.01, 0, 0), facingNorth, true, false, false, false);
-        assertEquals(0, direction.getX(), 0.00001D);
-        assertTrue(direction.getZ() < -0.99D);
-        Vector velocity = DragonEscapeMovementKits.flutterVelocity(
-                new Vector(0.01, -0.3, 0), direction, 1);
-        assertEquals(expected, Math.hypot(velocity.getX(), velocity.getZ()), 0.00001D);
-
-        Vector right = DragonEscapeMovementKits.flutterTravelDirection(
-                new Vector(), facingNorth, false, false, false, true);
-        assertTrue(right.getX() > 0.99D);
-        Vector diagonal = DragonEscapeMovementKits.flutterTravelDirection(
-                new Vector(), facingNorth, true, false, false, true);
-        assertEquals(1.0D, diagonal.length(), 0.00001D,
-                "Diagonal input should not exceed intended horizontal flutter speed");
-        Vector momentumDirection = DragonEscapeMovementKits.flutterTravelDirection(
-                new Vector(0.3D, 0, 0), facingNorth, false, false, false, false);
-        assertTrue(momentumDirection.getX() > 0.99D,
-                "Without new WASD input, retain the airborne travel direction");
-    }
-
-    @Test
-    void endingFlutterAddsBriefCappedForwardMomentum() {
-        Vector active = DragonEscapeMovementKits.flutterVelocity(
-                new Vector(), new Vector(0, 0, 1), 28);
-        Vector carry = DragonEscapeMovementKits.flutterEndVelocity(active);
-        assertEquals(DragonEscapeMovementKits.FLUTTER_END_FORWARD_SPEED,
-                Math.hypot(carry.getX(), carry.getZ()), 0.00001D);
-        assertTrue(carry.getZ() > active.getZ());
-        assertEquals(active.getY(), carry.getY(), 0.00001D);
-    }
-
-    @Test
-    void flutterKeepsReducedXpDrainAndIdleRegeneration() {
-        assertEquals(0.0175D * 0.75D, DragonEscapeMovementKits.FLUTTER_DRAIN_PER_TICK, 0.00001D);
-        assertEquals(0.08D * 0.75D, DragonEscapeMovementKits.FLUTTER_ACTIVATION_COST, 0.00001D);
-        DragonEscapeMovementKits.FlutterState state = new DragonEscapeMovementKits.FlutterState();
-        state.tick(false, false);
-        state.tick(true, false);
-        for (int tick = 1; tick < DragonEscapeMovementKits.FLUTTER_TOTAL_TICKS; tick++) {
-            state.tick(true, false);
-        }
-        assertTrue(state.charge > 0.25D);
-        double before = state.charge;
-        state.tick(true, false);
-        assertTrue(state.charge > before, "XP should regenerate after the finite arc expires");
+    void acrobatGetsTwoNormalLeapChargesInAdditionToWallKick() {
+        assertEquals(2, ArcadePortRules.DRAGON_ESCAPE_ACROBAT_LEAP_USES);
+        assertEquals(2, ArcadePortRules.dragonEscapeLeapUses("acrobat"));
+        assertEquals(0, ArcadePortRules.dragonEscapeLeapUses("flutterfly"));
     }
 
     @Test
@@ -347,7 +207,7 @@ class DragonEscapeMovementKitsTest {
         assertEquals(4.0D, DragonEscapeMovementKits.acrobatFallDamage("acrobat", 8.0D), 0.0001D);
         assertEquals(8.0D, DragonEscapeMovementKits.acrobatFallDamage("jumper", 8.0D), 0.0001D);
         assertEquals(0.0D, DragonEscapeMovementKits.acrobatFallDamage("acrobat", 0.0D), 0.0001D);
-        assertEquals(1, ArcadePortRules.dragonEscapeLeapUses("acrobat"));
+        assertEquals(2, ArcadePortRules.dragonEscapeLeapUses("acrobat"));
         assertEquals(0, ArcadePortRules.dragonEscapeLeapUses("flutterfly"));
     }
 
@@ -420,15 +280,17 @@ class DragonEscapeMovementKitsTest {
         long landing = now + 600L;
         assertFalse(state.tickWallCling(true, true, true, landing));
         assertTrue(state.wallKickCoolingDown(landing));
+        assertEquals(5_000L, DragonEscapeMovementKits.WALL_KICK_GROUNDED_COOLDOWN_MILLIS);
+        assertEquals(landing + 5_000L, state.cooldownEndsAtMillis);
         assertEquals(0, state.wallKicksThisAirborneChain);
         assertEquals(0, state.wallKicksThisAirborneChain);
         state.tickWallCling(false, false, false, landing + 100L);
-        assertFalse(state.tickWallCling(true, false, true, landing + 9_999L));
-        assertFalse(state.tickWallCling(true, false, true, landing + 10_000L),
+        assertFalse(state.tickWallCling(true, false, true, landing + 4_999L));
+        assertFalse(state.tickWallCling(true, false, true, landing + 5_000L),
                 "Holding Shift through cooldown must not automatically start a cling");
-        state.tickWallCling(false, false, true, landing + 10_001L);
-        assertTrue(state.tickWallCling(true, false, true, landing + 10_002L),
-                "A fresh Shift after ten seconds enables the next chain");
+        state.tickWallCling(false, false, true, landing + 5_001L);
+        assertTrue(state.tickWallCling(true, false, true, landing + 5_002L),
+                "A fresh Shift after five seconds enables the next chain");
     }
 
     @Test

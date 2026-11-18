@@ -1524,8 +1524,9 @@ public final class ArcadePortManager implements Listener {
         if ("flutterfly".equals(kit)) {
             DragonEscapeMovementKits.FlutterState flutter = session.dragonEscapeFlutterStates
                     .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.FlutterState());
-            flutter.charge = 1.0D;
-            tester.setExp(1.0F);
+            flutter.charges = DragonEscapeMovementKits.FLUTTER_MAX_CHARGES;
+            flutter.nextChargeAtMillis = 0L;
+            setDragonEscapeFlutterItem(tester, flutter, System.currentTimeMillis());
             return true;
         }
         if ("acrobat".equals(kit)) {
@@ -9973,11 +9974,10 @@ public final class ArcadePortManager implements Listener {
                     int digs = session.dragonEscapeDiggerUsesRemaining.getOrDefault(id, GameDebugRuntimeOverrides.intValue("DRAGON_ESCAPE_DIGGER_MAX_USES", ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES));
                     player.getInventory().setItem(0, dragonEscapeDiggerItem(digs));
                 } else if ("flutterfly".equals(kit)) {
-                    // Flutterfly owns the XP bar as an energy gauge, not leap charges.
+                    // Feather bounces use three independently recharging charges.
                     DragonEscapeMovementKits.FlutterState flutter = session.dragonEscapeFlutterStates
                             .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.FlutterState());
-                    player.setLevel(0);
-                    player.setExp((float) flutter.charge);
+                    setDragonEscapeFlutterItem(player, flutter, System.currentTimeMillis());
                 } else if ("acrobat".equals(kit)) {
                     // Acrobat uses XP as continuously draining wall-stick energy.
                     DragonEscapeMovementKits.AcrobatState acrobat = session.dragonEscapeAcrobatStates
@@ -17888,6 +17888,63 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private boolean isDragonEscapeFlutterFeather(ItemStack item) {
+        if (item == null || item.getType() != Material.FEATHER || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        return meta != null && meta.hasDisplayName()
+                && "Flutter Bounce".equals(ChatColor.stripColor(meta.getDisplayName()));
+    }
+
+    /** Keep an unconsumable feather in slot one even with zero stored charges. */
+    private void setDragonEscapeFlutterItem(Player player,
+            DragonEscapeMovementKits.FlutterState flutter, long nowMillis) {
+        if (player == null || flutter == null) return;
+        for (int slot = 0; slot < player.getInventory().getSize(); slot++) {
+            ItemStack existing = player.getInventory().getItem(slot);
+            if (isDragonEscapeFlutterFeather(existing)) player.getInventory().setItem(slot, null);
+        }
+        player.getInventory().setItem(0, namedItem(Material.FEATHER, "Flutter Bounce",
+                "Right-click while airborne to bounce. Charges: " + flutter.charges
+                        + "/" + DragonEscapeMovementKits.FLUTTER_MAX_CHARGES
+                        + ". Restores one charge every 8 seconds."));
+        player.setLevel(flutter.charges);
+        player.setExp(flutter.rechargeProgress(nowMillis));
+    }
+
+    private void useDragonEscapeFlutterBounce(Session session, Player player, long nowMillis) {
+        UUID id = player.getUniqueId();
+        if (active != session || !session.liveStarted || !session.alive.contains(id)
+                || !"flutterfly".equals(session.dragonEscapeKits.getOrDefault(id, "jumper"))
+                || !debugKitFeatureEnabled(player, ArcadePortGame.DRAGON_ESCAPE, "flutterfly")) return;
+        if (player.isOnGround() || player.isInWater() || player.isInsideVehicle()) {
+            player.sendActionBar(ChatColor.YELLOW + "Use Flutter Bounce while airborne.");
+            return;
+        }
+        DragonEscapeMovementKits.FlutterState flutter = session.dragonEscapeFlutterStates
+                .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.FlutterState());
+        if (!flutter.useBounce(false, nowMillis)) {
+            player.sendActionBar(ChatColor.YELLOW + "Flutter Bounce is recharging.");
+            return;
+        }
+        var input = player.getCurrentInput();
+        Vector launch = DragonEscapeMovementKits.flutterBounceVelocity(
+                player.getVelocity(), player.getLocation().getDirection(),
+                input.isForward(), input.isBackward(), input.isLeft(), input.isRight());
+        pendingDragonEscapeLeapVelocity.put(id, launch);
+        player.setVelocity(launch.clone());
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (pendingDragonEscapeLeapVelocity.get(id) == launch) {
+                pendingDragonEscapeLeapVelocity.remove(id);
+            }
+        }, 2L);
+        setDragonEscapeFlutterItem(player, flutter, nowMillis);
+        player.getWorld().playSound(player.getLocation(),
+                Sound.valueOf(DragonEscapeMovementKits.FLUTTER_SOUND_NAME), 0.8F, 1.2F);
+        player.getWorld().spawnParticle(Particle.CLOUD,
+                player.getLocation().add(0.0D, 0.35D, 0.0D),
+                12, 0.25D, 0.20D, 0.25D, 0.035D);
+    }
+
     /** Restore the exact prior gravity state on cling exit, elimination, quit or cleanup. */
     private void releaseAcrobatWallCling(Session session, Player player) {
         if (session == null || session.type != ArcadePortGame.DRAGON_ESCAPE || player == null) return;
@@ -17916,32 +17973,15 @@ public final class ArcadePortManager implements Listener {
             if ("flutterfly".equals(kit)) {
                 DragonEscapeMovementKits.FlutterState flutter = session.dragonEscapeFlutterStates
                         .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.FlutterState());
-                if (!debugKitFeatureEnabled(player, ArcadePortGame.DRAGON_ESCAPE, kit)) {
-                    flutter.tick(false, true);
+                if (flutter.recharge(now)) {
+                    setDragonEscapeFlutterItem(player, flutter, now);
+                    player.getWorld().playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.4F, 1.6F);
                 } else {
-                    flutter.tick(jumpHeld, grounded);
-                    if (flutter.fluttering) {
-                        Vector travelDirection = DragonEscapeMovementKits.flutterTravelDirection(
-                                player.getVelocity(), player.getLocation().getDirection(),
-                                movementInput.isForward(), movementInput.isBackward(),
-                                movementInput.isLeft(), movementInput.isRight());
-                        player.setVelocity(DragonEscapeMovementKits.flutterVelocity(
-                                player.getVelocity(), travelDirection, flutter.flutterTicks));
-                        if (flutter.activated) {
-                            player.getWorld().playSound(player.getLocation(),
-                                    Sound.valueOf(DragonEscapeMovementKits.FLUTTER_SOUND_NAME), 0.8F, 1.2F);
-                        }
-                        if (session.ticks % 4L == 0L) {
-                            player.getWorld().spawnParticle(Particle.CLOUD,
-                                    player.getLocation().add(0.0D, 0.25D, 0.0D),
-                                    5, 0.18D, 0.13D, 0.18D, 0.012D);
-                        }
-                    } else if (flutter.ended) {
-                        player.setVelocity(DragonEscapeMovementKits.flutterEndVelocity(player.getVelocity()));
-                    }
+                    // XP level = stored charges. XP bar = next recharge progress.
+                    // Space is no longer an ability input.
+                    player.setLevel(flutter.charges);
+                    player.setExp(flutter.rechargeProgress(now));
                 }
-                player.setLevel(0);
-                player.setExp((float) flutter.charge);
                 continue;
             }
 
@@ -25606,6 +25646,9 @@ public final class ArcadePortManager implements Listener {
         if (isDragonEscapeGhostHotbarItem(event.getCurrentItem())
                 || isDragonEscapeGhostHotbarItem(event.getCursor())
                 || isDragonEscapeGhostHotbarItem(hotbarSwap)
+                || isDragonEscapeFlutterFeather(event.getCurrentItem())
+                || isDragonEscapeFlutterFeather(event.getCursor())
+                || isDragonEscapeFlutterFeather(hotbarSwap)
                 || session.dragonEscapePractice && (dragonEscapePracticeAction(event.getCurrentItem()) != null
                         || dragonEscapePracticeAction(event.getCursor()) != null
                         || dragonEscapePracticeAction(hotbarSwap) != null)) event.setCancelled(true);
@@ -25622,6 +25665,8 @@ public final class ArcadePortManager implements Listener {
                 || !session.alive.contains(event.getWhoClicked().getUniqueId())) return;
         if (isDragonEscapeGhostHotbarItem(event.getOldCursor())
                 || event.getNewItems().values().stream().anyMatch(this::isDragonEscapeGhostHotbarItem)
+                || isDragonEscapeFlutterFeather(event.getOldCursor())
+                || event.getNewItems().values().stream().anyMatch(this::isDragonEscapeFlutterFeather)
                 || session.dragonEscapePractice && (dragonEscapePracticeAction(event.getOldCursor()) != null
                         || event.getNewItems().values().stream().anyMatch(
                                 item -> dragonEscapePracticeAction(item) != null))) {
@@ -31176,6 +31221,12 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
             String kit = session.dragonEscapeKits.getOrDefault(player.getUniqueId(), "jumper");
+            if (event.getAction().isRightClick() && "flutterfly".equals(kit)
+                    && isDragonEscapeFlutterFeather(heldItem)) {
+                event.setCancelled(true);
+                useDragonEscapeFlutterBounce(session, player, System.currentTimeMillis());
+                return;
+            }
             if (event.getAction().isRightClick() && item == Material.IRON_AXE
                     && ArcadePortRules.dragonEscapeLeapUses(kit) > 0) {
                 event.setCancelled(true);
@@ -31480,6 +31531,7 @@ public final class ArcadePortManager implements Listener {
             case DRAGON_ESCAPE -> {
                 String kit = session.dragonEscapeKits.getOrDefault(id, "jumper");
                 yield (item == Material.IRON_AXE && ArcadePortRules.dragonEscapeLeapUses(kit) > 0)
+                        || ("flutterfly".equals(kit) && isDragonEscapeFlutterFeather(heldItem))
                         || (item == Material.ENDER_PEARL && "warper".equals(kit))
                         || (item == Material.TNT && "disruptor".equals(kit))
                         || (item == Material.BRICKS && "builder".equals(kit))

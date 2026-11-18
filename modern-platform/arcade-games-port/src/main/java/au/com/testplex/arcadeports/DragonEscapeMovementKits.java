@@ -14,26 +14,13 @@ final class DragonEscapeMovementKits {
     static final String FLUTTER_SOUND_NAME = "ENTITY_SLIME_JUMP";
     static final String WALL_KICK_SOUND_NAME = "ENTITY_FIREWORK_ROCKET_LAUNCH";
     static final String WALL_CLING_SOUND_NAME = "BLOCK_SLIME_BLOCK_PLACE";
-    // 25% less XP consumption for both starting and sustaining a flutter.
-    static final double FLUTTER_ACTIVATION_COST = 0.06D;
-    static final double FLUTTER_DRAIN_PER_TICK = 0.013125D;
-    static final int FLUTTER_MAX_AIRBORNE_USES = 3;
-    static final double FLUTTER_REGEN_PER_TICK = 0.009D;
-    // A one-block rise precedes each 28-tick Yoshi flutter arc.
-    // Five 0.2-block vertical steps lift the player by approximately one block.
-    static final int FLUTTER_LIFT_TICKS = 5;
-    static final double FLUTTER_LIFT_VERTICAL_SPEED = 0.20D;
-    static final int FLUTTER_WAVE_TICKS = 28;
-    static final int FLUTTER_TOTAL_TICKS = FLUTTER_LIFT_TICKS + FLUTTER_WAVE_TICKS;
-    // Shape a climb-dip-climb path whose FINAL position is the highest.
-    // The original cosine velocity loop had a negative net displacement and
-    // left the player BELOW its first peak. The new path ends +2 blocks
-    // above the start of the arc (in addition to the initial 1-block lift).
-    static final double FLUTTER_ARC_NET_RISE = 2.0D;
-    static final double FLUTTER_ARC_DIP_AMPLITUDE = 0.95D;
-    // 25% faster than the prior 80%-sprint flutter: now about sprint speed.
+    // A single right-click launches a bounce. XP no longer powers Flutterfly.
+    static final int FLUTTER_MAX_CHARGES = 3;
+    static final long FLUTTER_CHARGE_RECHARGE_MILLIS = 8_000L;
+    // Preserve the live Flutterfly's horizontal travel speed (~5.6 blocks/s).
     static final double FLUTTER_HORIZONTAL_SPEED = 1.25D * 0.8D * 5.612D / 20.0D;
-    static final double FLUTTER_END_FORWARD_SPEED = 0.30D; // Brief post-flutter carry.
+    // A one-shot jump of similar lift to the previous sustained flutter arc.
+    static final double FLUTTER_BOUNCE_UPWARD_SPEED = 0.60D;
 
     // Restore the pre-#738 boosted wall kick (no weak scaled vanilla Leap).
     static final double WALL_KICK_FORWARD_SPEED = 1.20D;
@@ -41,7 +28,7 @@ final class DragonEscapeMovementKits {
     static final double WALL_KICK_PITCH_LIFT = 0.60D;
     static final double WALL_KICK_MIN_UPWARD_SPEED = 0.20D;
     static final double WALL_KICK_MAX_UPWARD_SPEED = 1.20D;
-    static final long WALL_KICK_GROUNDED_COOLDOWN_MILLIS = 10_000L;
+    static final long WALL_KICK_GROUNDED_COOLDOWN_MILLIS = 5_000L;
     static final double WALL_KICK_MIN_OUTWARD_SPEED = 0.28D;
     // No fixed wall-stick duration: active Shift steadily drains its own XP bar.
     static final double WALL_CLING_DRAIN_PER_TICK = 0.0125D;
@@ -53,58 +40,42 @@ final class DragonEscapeMovementKits {
     private DragonEscapeMovementKits() { }
 
     static final class FlutterState {
-        double charge = 1.0D;
-        boolean fluttering;
-        boolean activated;
-        boolean ended;
-        boolean previouslyHeld;
-        boolean releasedWhileAirborne;
-        int flutterTicks;
-        int fluttersThisAirborneRun;
+        int charges = FLUTTER_MAX_CHARGES;
+        long nextChargeAtMillis;
 
         /**
-         * Never activate from a held ground-jump. A release while airborne must
-         * arm the next fresh Space press. A press grants exactly ONE 28-tick arc:
-         * continuing to hold Space through its end cannot repeat it.
-         * The first five ticks are a one-block lift before the 28-tick arc.
+         * Charges replenish individually every eight seconds, including in air.
+         * Spending another charge cannot delay an already-scheduled recharge.
          */
-        void tick(boolean jumpHeld, boolean grounded) {
-            activated = false;
-            ended = false;
-            boolean freshPress = jumpHeld && !previouslyHeld;
-            previouslyHeld = jumpHeld;
-            if (grounded) {
-                fluttering = false;
-                flutterTicks = 0;
-                fluttersThisAirborneRun = 0;
-                releasedWhileAirborne = false;
-                charge = Math.min(1.0D, charge + FLUTTER_REGEN_PER_TICK);
-                return;
+        boolean recharge(long nowMillis) {
+            if (charges >= FLUTTER_MAX_CHARGES || nextChargeAtMillis <= 0L) return false;
+            boolean changed = false;
+            while (charges < FLUTTER_MAX_CHARGES && nowMillis >= nextChargeAtMillis) {
+                charges++;
+                changed = true;
+                nextChargeAtMillis = charges == FLUTTER_MAX_CHARGES
+                        ? 0L : nextChargeAtMillis + FLUTTER_CHARGE_RECHARGE_MILLIS;
             }
+            return changed;
+        }
 
-            if (!jumpHeld) releasedWhileAirborne = true;
-            if (fluttering) {
-                if (!jumpHeld || flutterTicks >= FLUTTER_TOTAL_TICKS
-                        || charge < FLUTTER_DRAIN_PER_TICK) {
-                    fluttering = false;
-                    ended = true;
-                } else {
-                    flutterTicks++;
-                    charge = Math.max(0.0D, charge - FLUTTER_DRAIN_PER_TICK);
-                    return;
-                }
-            } else if (freshPress && releasedWhileAirborne
-                    && fluttersThisAirborneRun < FLUTTER_MAX_AIRBORNE_USES
-                    && charge >= FLUTTER_ACTIVATION_COST + FLUTTER_DRAIN_PER_TICK) {
-                charge -= FLUTTER_ACTIVATION_COST + FLUTTER_DRAIN_PER_TICK;
-                fluttersThisAirborneRun++;
-                fluttering = true;
-                activated = true;
-                releasedWhileAirborne = false;
-                flutterTicks = 1;
-                return;
+        /** Consume one stored feather bounce only while actually airborne. */
+        boolean useBounce(boolean grounded, long nowMillis) {
+            recharge(nowMillis);
+            if (grounded || charges <= 0) return false;
+            charges--;
+            if (nextChargeAtMillis == 0L) {
+                nextChargeAtMillis = nowMillis + FLUTTER_CHARGE_RECHARGE_MILLIS;
             }
-            charge = Math.min(1.0D, charge + FLUTTER_REGEN_PER_TICK);
+            return true;
+        }
+
+        /** Fraction of the current eight-second recharge interval completed. */
+        float rechargeProgress(long nowMillis) {
+            if (charges >= FLUTTER_MAX_CHARGES || nextChargeAtMillis <= 0L) return 1.0F;
+            long remaining = Math.max(0L, nextChargeAtMillis - nowMillis);
+            return (float) (1.0D - Math.min(1.0D,
+                    (double) remaining / FLUTTER_CHARGE_RECHARGE_MILLIS));
         }
     }
 
@@ -220,48 +191,16 @@ final class DragonEscapeMovementKits {
     }
 
     /**
-     * Cumulative vertical displacement of the Yoshi arc. Starts at zero,
-     * briefly climbs, dips, then rises to its highest position EXACTLY at
-     * FLUTTER_WAVE_TICKS. Smoothstep provides zero slopes at both endpoints.
+     * One mid-air feather click applies normal Minecraft velocity, not a
+     * repeating Yoshi flutter. WASD steers the horizontal push, using the
+     * current momentum/facing as fallback; gravity resumes immediately.
      */
-    static double flutterArcHeight(int elapsedTicks) {
-        double t = Math.max(0.0D, Math.min(1.0D,
-                (double) elapsedTicks / FLUTTER_WAVE_TICKS));
-        double smoothRise = t * t * (3.0D - 2.0D * t);
-        double dip = Math.sin(2.0D * Math.PI * t) * Math.sin(Math.PI * t);
-        return FLUTTER_ARC_NET_RISE * smoothRise + FLUTTER_ARC_DIP_AMPLITUDE * dip;
-    }
-
-    /** Initial one-block rise, then a single climb/dip/climb finishing at its apex. */
-    static Vector flutterVelocity(Vector current, Vector travelDirection, int flutterTicks) {
-        Vector next = current.clone();
-        if (flutterTicks <= FLUTTER_LIFT_TICKS) {
-            next.setY(FLUTTER_LIFT_VERTICAL_SPEED);
-        } else {
-            int arcTick = Math.min(FLUTTER_WAVE_TICKS, flutterTicks - FLUTTER_LIFT_TICKS);
-            // Per-tick motion is the difference between successive heights,
-            // not a cycling cosine that ends far below its initial peak.
-            next.setY(flutterArcHeight(arcTick) - flutterArcHeight(arcTick - 1));
-        }
-        Vector direction = travelDirection.clone().setY(0.0D);
-        if (direction.lengthSquared() > 1.0E-8D) {
-            direction.normalize().multiply(FLUTTER_HORIZONTAL_SPEED);
-            next.setX(direction.getX());
-            next.setZ(direction.getZ());
-        }
-        return next;
-    }
-
-    /** Brief capped forward carry on completion or early release, then vanilla air drag. */
-    static Vector flutterEndVelocity(Vector current) {
-        Vector next = current.clone();
-        Vector horizontal = current.clone().setY(0.0D);
-        if (horizontal.lengthSquared() > 1.0E-8D) {
-            horizontal.normalize().multiply(FLUTTER_END_FORWARD_SPEED);
-            next.setX(horizontal.getX());
-            next.setZ(horizontal.getZ());
-        }
-        return next;
+    static Vector flutterBounceVelocity(Vector current, Vector facing,
+            boolean forward, boolean backward, boolean left, boolean right) {
+        Vector direction = flutterTravelDirection(current, facing,
+                forward, backward, left, right);
+        return direction.multiply(FLUTTER_HORIZONTAL_SPEED)
+                .setY(FLUTTER_BOUNCE_UPWARD_SPEED);
     }
 
     static double acrobatFallDamage(String kit, double vanillaFallDamage) {
