@@ -24,7 +24,7 @@ class DragonEscapeRaceScoreboardLayoutTest {
     void showsTopThreeAndImmediateNeighboursOfViewerWithoutDuplication() {
         assertEquals(List.of(0, 1, 2, 5, 6, 7),
                 DragonEscapeRaceScoreboardLayout.visibleRankPositions(16, 6));
-        assertEquals(List.of(0, 1, 2, 3),
+        assertEquals(List.of(0, 1, 2),
                 DragonEscapeRaceScoreboardLayout.visibleRankPositions(16, 1));
         assertEquals(List.of(0, 1, 2, 3, 4),
                 DragonEscapeRaceScoreboardLayout.visibleRankPositions(16, 3));
