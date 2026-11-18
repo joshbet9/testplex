@@ -1526,7 +1526,6 @@ public final class ArcadePortManager implements Listener {
                     .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.FlutterState());
             flutter.charges = DragonEscapeMovementKits.FLUTTER_MAX_CHARGES;
             flutter.nextChargeAtMillis = 0L;
-            flutter.lastRightClickAtMillis = Long.MIN_VALUE;
             setDragonEscapeFlutterItem(tester, flutter, System.currentTimeMillis());
             return true;
         }
@@ -17924,9 +17923,6 @@ public final class ArcadePortManager implements Listener {
                 || !debugKitFeatureEnabled(player, ArcadePortGame.DRAGON_ESCAPE, "flutterfly")) return;
         DragonEscapeMovementKits.FlutterState flutter = session.dragonEscapeFlutterStates
                 .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.FlutterState());
-        // A held right-click repeats interaction events. Only a fresh click can
-        // spend a charge; ground clicks must also latch to prevent takeoff auto-use.
-        if (!flutter.acceptRightClick(nowMillis)) return;
         if (player.isOnGround() || player.isInWater() || player.isInsideVehicle()) {
             player.sendActionBar(ChatColor.YELLOW + "Use Flutter Bounce while airborne.");
             return;

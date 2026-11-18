@@ -21,28 +21,29 @@ class DragonEscapeMovementKitsTest {
     }
 
     @Test
-    void featherHeldRightClickOnlySpendsOnceUntilAnInputPause() {
+    void flutterBouncesChainOnEveryEligibleRightClickWithoutArtificialDelay() {
         var flutter = new DragonEscapeMovementKits.FlutterState();
-        assertEquals(500L, DragonEscapeMovementKits.FLUTTER_RIGHT_CLICK_REARM_GAP_MILLIS);
-        assertTrue(flutter.acceptRightClick(1_000L));
-        assertTrue(flutter.useBounce(false, 1_000L));
-        // A client holding the feather keeps emitting right-click packets.
-        for (long time = 1_100L; time <= 2_100L; time += 100L) {
-            assertFalse(flutter.acceptRightClick(time));
+        long[] eventTimes = {1_000L, 1_025L, 1_050L, 1_090L, 1_130L};
+        for (int i = 0; i < eventTimes.length; i++) {
+            assertTrue(flutter.useBounce(false, eventTimes[i]),
+                    "Each airborne right-click must bounce, even within 500 ms");
+            assertEquals(4 - i, flutter.charges);
         }
-        assertEquals(4, flutter.charges, "Holding must not use multiple stored charges");
-        assertTrue(flutter.acceptRightClick(2_601L), "A fresh press after release can bounce");
-        assertTrue(flutter.useBounce(false, 2_601L));
-        assertEquals(3, flutter.charges);
-        assertFalse(flutter.acceptRightClick(2_602L), "Same-tick duplicate is ignored");
+        assertEquals(0, flutter.charges);
+        assertEquals(9_000L, flutter.nextChargeAtMillis);
+        assertFalse(flutter.useBounce(false, 1_155L), "An empty bar cannot bounce");
+    }
 
-        // Ground clicks must latch too: keeping the button held during takeoff
-        // should never automatically consume a mid-air charge.
-        var grounded = new DragonEscapeMovementKits.FlutterState();
-        assertTrue(grounded.acceptRightClick(3_000L));
-        assertFalse(grounded.useBounce(true, 3_000L));
-        assertFalse(grounded.acceptRightClick(3_200L));
-        assertEquals(5, grounded.charges);
+    @Test
+    void groundedRightClickDoesNotDelayAnImmediateAirborneClick() {
+        var flutter = new DragonEscapeMovementKits.FlutterState();
+        assertFalse(flutter.useBounce(true, 1_000L));
+        assertEquals(5, flutter.charges);
+        assertTrue(flutter.useBounce(false, 1_025L),
+                "No click lockout may carry over from a ground attempt");
+        assertEquals(4, flutter.charges);
+        assertTrue(flutter.useBounce(false, 1_050L));
+        assertEquals(3, flutter.charges);
     }
 
     @Test
@@ -50,7 +51,6 @@ class DragonEscapeMovementKitsTest {
         var flutter = new DragonEscapeMovementKits.FlutterState();
         for (int i = 0; i < 5; i++) {
             long now = 1_000L + i * 1_000L;
-            assertTrue(flutter.acceptRightClick(now));
             assertTrue(flutter.useBounce(false, now));
         }
         assertEquals(0, flutter.charges);
