@@ -20814,10 +20814,10 @@ public final class ArcadePortManager implements Listener {
             UUID lastDamagerId = session.baconLastDamager.get(victimId);
             UUID resolvedKillerId = BaconBrawlKillCreditRules.resolveForDeathMessage(
                     suppliedKillerId,
-                    session.scores.containsKey(suppliedKillerId),
+                    suppliedKillerId != null && session.scores.containsKey(suppliedKillerId),
                     victimId,
                     lastDamagerId,
-                    session.scores.containsKey(lastDamagerId),
+                    lastDamagerId != null && session.scores.containsKey(lastDamagerId),
                     System.currentTimeMillis(),
                     session.baconLastDamagedAt.getOrDefault(victimId, 0L),
                     ArcadePortRules.isBaconArenaKnockoutReason(reason));
