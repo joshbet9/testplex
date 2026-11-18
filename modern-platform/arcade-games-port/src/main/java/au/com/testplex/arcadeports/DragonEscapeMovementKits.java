@@ -16,7 +16,6 @@ final class DragonEscapeMovementKits {
     static final double FLUTTER_START_Y = 0.16D;
     static final double FLUTTER_FALL_SPEED = -0.09D;
     static final double FLUTTER_HORIZONTAL_MAX = 0.20D;
-    static final long WALL_KICK_COOLDOWN_MILLIS = 1_500L;
     static final double WALL_KICK_FORWARD_SPEED = 1.20D;
     static final double WALL_KICK_UPWARD_SPEED = 0.72D;
     static final double WALL_KICK_PITCH_LIFT = 0.60D;
@@ -71,15 +70,14 @@ final class DragonEscapeMovementKits {
 
     static final class AcrobatState {
         boolean previouslyHeld;
-        long nextWallKickAt;
 
         /**
-         * A fresh Space press can wall-kick while grounded or airborne, provided
-         * the player is physically touching a wall (checked by the caller).
-         * Holding Space cannot repeatedly fire kicks.
+         * Wall kicks are chainable with no time-based cooldown. A new press
+         * after releasing Space is required for each kick, and the caller
+         * checks actual wall contact for every attempted kick.
          */
-        boolean pressedForWallKick(boolean jumpHeld, long now) {
-            boolean freshPress = jumpHeld && !previouslyHeld && now >= nextWallKickAt;
+        boolean pressedForWallKick(boolean jumpHeld) {
+            boolean freshPress = jumpHeld && !previouslyHeld;
             previouslyHeld = jumpHeld;
             return freshPress;
         }
