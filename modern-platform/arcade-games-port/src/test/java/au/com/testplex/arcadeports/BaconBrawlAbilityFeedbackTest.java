@@ -1,5 +1,6 @@
 package au.com.testplex.arcadeports;
 
+import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.junit.jupiter.api.Test;
 
@@ -10,11 +11,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class BaconBrawlAbilityFeedbackTest {
     @Test
     void namesEveryKitAbilityForReadyAndMaximumMeterFeedback() {
-        assertEquals("Body Slam Ready", BaconBrawlAbilityFeedback.readyMessage("el-muchacho-pigo"));
-        assertEquals("Bacon Blast MAX", BaconBrawlAbilityFeedback.maxMessage("mama-piggles"));
-        assertEquals("Crispy Ready", BaconBrawlAbilityFeedback.readyMessage("chris-p-bacon"));
-        assertEquals("Cloak Ready", BaconBrawlAbilityFeedback.readyMessage("pig"));
-        assertEquals("Brutus MAX", BaconBrawlAbilityFeedback.maxMessage("brutus-bacon"));
+        assertEquals(ChatColor.BOLD + "Body Slam Ready", BaconBrawlAbilityFeedback.readyMessage("el-muchacho-pigo"));
+        assertEquals(ChatColor.BOLD + "Bacon Blast MAX", BaconBrawlAbilityFeedback.maxMessage("mama-piggles"));
+        assertEquals(ChatColor.BOLD + "Crispy Ready", BaconBrawlAbilityFeedback.readyMessage("chris-p-bacon"));
+        assertEquals(ChatColor.BOLD + "Cloak Ready", BaconBrawlAbilityFeedback.readyMessage("pig"));
+        assertEquals(ChatColor.BOLD + "Brutus MAX", BaconBrawlAbilityFeedback.maxMessage("brutus-bacon"));
     }
 
     @Test
