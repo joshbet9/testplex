@@ -279,20 +279,87 @@ final class DragonEscapeMapEditor implements Listener {
 
     private void close(CommandSender sender) {
         if (!(sender instanceof Player player)) return;
-        DraftSession session = sessions.remove(player.getUniqueId());
+        DraftSession session = sessions.get(player.getUniqueId());
         if (session == null) {
-            player.sendMessage(ChatColor.YELLOW + "You are not editing a Dragon Escape map draft.");
+            player.sendMessage(ChatColor.YELLOW + "No map draft is currently open.");
             return;
         }
-        session.world.save();
+        leaveEditor(player, session, true);
+        player.sendMessage(ChatColor.GREEN + "Saved and closed draft " + session.draftName + ".");
+    }
+
+    private void leaveEditor(Player player, DraftSession session, boolean save) {
+        if (save) {
+            ensureLocalWorldConfig(session.world);
+            session.world.save();
+        }
+        sessions.remove(player.getUniqueId());
         worldOwners.remove(session.world.getName(), player.getUniqueId());
+        ui.endSession(player);
         player.setFlying(false);
         player.setAllowFlight(false);
-        player.teleport(session.returnLocation);
+        Location destination = session.returnLocation.getWorld() == null
+                ? plugin.getServer().getWorlds().get(0).getSpawnLocation() : session.returnLocation;
+        player.teleport(destination);
         player.setGameMode(session.returnGameMode);
         player.setAllowFlight(session.returnAllowFlight);
-        if (session.returnAllowFlight && session.returnLocation.getWorld() != null) player.setFlying(false);
-        player.sendMessage(ChatColor.GREEN + "Saved and closed draft " + session.draftName + ".");
+        player.getInventory().setContents(session.returnInventory);
+        player.updateInventory();
+    }
+
+    private void delete(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) return;
+        DraftSession session = current(sender);
+        if (session == null) return;
+        if (args.length != 2 || !"confirm".equalsIgnoreCase(args[1])) {
+            sender.sendMessage(ChatColor.YELLOW + "Delete permanently? Use the Delete Draft confirmation in the editor menu.");
+            return;
+        }
+        if (session.world.getPlayers().size() != 1) {
+            sender.sendMessage(ChatColor.RED + "Other players are present in the draft world. Ask them to leave before deletion.");
+            return;
+        }
+        Path root = session.world.getWorldFolder().toPath().toAbsolutePath().normalize();
+        Path container = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
+        if (!root.equals(container.resolve(session.world.getName()).normalize())
+                || !session.world.getName().startsWith(WORLD_PREFIX)
+                || Files.isSymbolicLink(root)) {
+            sender.sendMessage(ChatColor.RED + "Draft world folder location is unsafe; refusing deletion.");
+            return;
+        }
+        leaveEditor(player, session, false);
+        if (!Bukkit.unloadWorld(session.world, false)) {
+            sender.sendMessage(ChatColor.RED + "Draft was closed, but the world is still loaded. No draft files were deleted.");
+            return;
+        }
+        try {
+            deleteTree(root);
+            Path manifestDirectory = session.manifestPath.getParent();
+            if (manifestDirectory == null || !manifestDirectory.startsWith(plugin.getDataFolder().toPath().toAbsolutePath().normalize())
+                    || Files.isSymbolicLink(manifestDirectory)) throw new IOException("Unsafe draft manifest directory.");
+            deleteTree(manifestDirectory);
+            sender.sendMessage(ChatColor.GREEN + "Permanently deleted isolated draft " + session.draftName
+                    + ". Published and original maps were not changed.");
+        } catch (IOException exception) {
+            plugin.getLogger().warning("Could not fully delete map draft: " + exception.getMessage());
+            sender.sendMessage(ChatColor.RED + "Draft was closed but deletion was incomplete. Review the server log.");
+        }
+    }
+
+    private static void deleteTree(Path root) throws IOException {
+        if (!Files.exists(root, LinkOption.NOFOLLOW_LINKS)) return;
+        if (Files.isSymbolicLink(root)) throw new IOException("Refusing to delete a symbolic-link root.");
+        Files.walkFileTree(root, new SimpleFileVisitor<>() {
+            @Override public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                Files.delete(file);
+                return FileVisitResult.CONTINUE;
+            }
+            @Override public FileVisitResult postVisitDirectory(Path dir, IOException error) throws IOException {
+                if (error != null) throw error;
+                Files.delete(dir);
+                return FileVisitResult.CONTINUE;
+            }
+        });
     }
 
     private void save(CommandSender sender) {
@@ -306,16 +373,17 @@ final class DragonEscapeMapEditor implements Listener {
     private void markers(CommandSender sender) {
         DraftSession session = current(sender);
         if (session == null) return;
-        SourceMapCatalog.MapData data = SourceMapCatalog.read(plugin, ArcadePortGame.DRAGON_ESCAPE, session.world);
+        SourceMapCatalog.MapData data = SourceMapCatalog.read(plugin, session.game, session.world);
         sender.sendMessage(ChatColor.GOLD + "Draft markers for " + session.mapName + ":");
         if (data == null) {
-            sender.sendMessage(ChatColor.RED + "No WorldConfig.dat exists yet. Add RED, BLACK and GREEN DATA points.");
+            sender.sendMessage(ChatColor.RED + "No WorldConfig.dat exists yet. Add the required data, team or custom points.");
             return;
         }
         sendGroups(sender, "DATA", data.dataLocationGroups());
         sendGroups(sender, "TEAM", data.teamSpawns());
         sendGroups(sender, "CUSTOM", data.customLocationGroups());
-        sender.sendMessage(ChatColor.GRAY + "Dragon Escape requires DATA RED (start), DATA BLACK (route, at least two), and DATA GREEN (speed marker).");
+        if (session.game == ArcadePortGame.DRAGON_ESCAPE)
+            sender.sendMessage(ChatColor.GRAY + "Dragon Escape requires DATA RED (start), DATA BLACK (route, at least two), and DATA GREEN (speed marker).");
     }
 
     private void sendGroups(CommandSender sender, String type, Map<String, List<Location>> groups) {
@@ -385,7 +453,9 @@ final class DragonEscapeMapEditor implements Listener {
         if (session == null) return;
         List<String> errors = validateDraft(session);
         if (errors.isEmpty()) {
-            sender.sendMessage(ChatColor.GREEN + "Draft validation passed: world files, bounds and Dragon Escape route markers are usable.");
+            sender.sendMessage(ChatColor.GREEN + "Draft validation passed: terrain, bounds and authored markers passed basic checks.");
+            if (session.game != ArcadePortGame.DRAGON_ESCAPE)
+                sender.sendMessage(ChatColor.YELLOW + "Game-specific objective/spawn behaviour still requires an in-game staging test.");
         } else {
             sender.sendMessage(ChatColor.RED + "Draft needs " + errors.size() + " correction(s):");
             errors.forEach(error -> sender.sendMessage(ChatColor.RED + " • " + error));
@@ -399,7 +469,7 @@ final class DragonEscapeMapEditor implements Listener {
                 || !Files.isDirectory(worldFolder.resolve("region"), LinkOption.NOFOLLOW_LINKS)) {
             errors.add("The draft world is missing level.dat or region files.");
         }
-        SourceMapCatalog.MapData data = SourceMapCatalog.read(plugin, ArcadePortGame.DRAGON_ESCAPE, session.world);
+        SourceMapCatalog.MapData data = SourceMapCatalog.read(plugin, session.game, session.world);
         if (data == null) {
             errors.add("WorldConfig.dat is missing or unreadable.");
             return errors;
@@ -407,24 +477,26 @@ final class DragonEscapeMapEditor implements Listener {
         if (!data.hasBounds() || data.maxX() <= data.minX() || data.maxZ() <= data.minZ()) {
             errors.add("Valid MIN/MAX X and Z map bounds are required.");
         }
-        List<Location> starts = data.dataLocations("RED");
-        List<Location> route = data.dataLocations("BLACK");
-        List<Location> speed = data.dataLocations("GREEN");
-        if (starts.isEmpty()) errors.add("Add a DATA RED start point.");
-        if (route.size() < 2) errors.add("Add at least two DATA BLACK route points, including the finish.");
-        if (speed.isEmpty()) errors.add("Add a DATA GREEN speed marker.");
-        List<Location> routePoints = new ArrayList<>(starts);
-        routePoints.addAll(route);
-        routePoints.addAll(speed);
-        for (Location point : routePoints) {
+        List<Location> points = new ArrayList<>();
+        data.dataLocationGroups().values().forEach(points::addAll);
+        data.teamSpawns().values().forEach(points::addAll);
+        data.customLocationGroups().values().forEach(points::addAll);
+        if (points.isEmpty()) errors.add("This map needs authored spawn, team or objective datapoints.");
+        if (session.game == ArcadePortGame.DRAGON_ESCAPE) {
+            if (data.dataLocations("RED").isEmpty()) errors.add("Add a DATA RED start point.");
+            if (data.dataLocations("BLACK").size() < 2)
+                errors.add("Add at least two DATA BLACK route points, including the finish.");
+            if (data.dataLocations("GREEN").isEmpty()) errors.add("Add a DATA GREEN speed marker.");
+        }
+        for (Location point : points) {
             if (point.getWorld() != session.world || point.getY() < session.world.getMinHeight()
                     || point.getY() >= session.world.getMaxHeight()) {
-                errors.add("A route marker falls outside the draft world's vertical range.");
+                errors.add("An authored marker falls outside the draft world's vertical range.");
                 break;
             }
             if (data.hasBounds() && (point.getBlockX() < data.minX() || point.getBlockX() > data.maxX()
                     || point.getBlockZ() < data.minZ() || point.getBlockZ() > data.maxZ())) {
-                errors.add("A RED, BLACK or GREEN route marker falls outside the authored X/Z bounds.");
+                errors.add("An authored marker falls outside the map's X/Z bounds.");
                 break;
             }
         }
@@ -446,7 +518,7 @@ final class DragonEscapeMapEditor implements Listener {
                     + plugin.getDataFolder().toPath().relativize(target.toAbsolutePath().normalize()).toString().replace('\\', '/') + ".");
             sender.sendMessage(ChatColor.GRAY + "The source map is unchanged. Publishing is a separate explicit step.");
         } catch (IOException exception) {
-            plugin.getLogger().warning("Could not export Dragon Escape draft " + session.draftName + ": " + exception.getMessage());
+            plugin.getLogger().warning("Could not export map draft " + session.draftName + ": " + exception.getMessage());
             sender.sendMessage(ChatColor.RED + "Could not create the reviewable package; source map remains unchanged.");
         }
     }
