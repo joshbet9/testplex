@@ -16,9 +16,10 @@ final class DragonEscapeMovementKits {
     static final String WALL_CLING_SOUND_NAME = "BLOCK_SLIME_BLOCK_PLACE";
     // A single right-click launches a bounce. XP no longer powers Flutterfly.
     static final int FLUTTER_MAX_CHARGES = 5;
-    // Bukkit has no use-button release event for ordinary feathers. Repeated held-click
-    // packets are ignored until a quiet interval separates intentional presses.
-    static final long FLUTTER_RIGHT_CLICK_REARM_GAP_MILLIS = 500L;
+    // Bukkit has no use-button release event for ordinary feathers. Keep a brief
+    // 200 ms event-free interval to infer a new press rather than a held-repeat.
+    // Hold repeat rates vary, so this is a playtest compromise, not an exact release detector.
+    static final long FLUTTER_RIGHT_CLICK_REARM_GAP_MILLIS = 200L;
     static final long FLUTTER_CHARGE_RECHARGE_MILLIS = 8_000L;
     // Slightly quicker forward launch, closer to the feel of a sprint jump.
     static final double FLUTTER_HORIZONTAL_SPEED = 0.32D;
