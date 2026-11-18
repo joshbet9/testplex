@@ -1071,7 +1071,7 @@ public final class HoopsPaperSmoke extends JavaPlugin {
                 if (slot == 0 && player.isOp()) {
                     if (item == null || item.getType() != Material.GOLDEN_AXE
                             || !item.hasItemMeta()
-                            || !(ChatColor.GOLD + "Dragon Escape Map Editor")
+                            || !(ChatColor.GOLD + "Map Editor")
                                     .equals(item.getItemMeta().getDisplayName())) return false;
                 } else if (slot == 1) {
                     if (item == null || item.getType() != Material.WRITABLE_BOOK) return false;
