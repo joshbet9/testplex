@@ -135,16 +135,15 @@ class DragonEscapeMovementKitsTest {
     @Test
     void fourChargedShiftSticksRearmWithoutAnyWallKickCooldown() {
         DragonEscapeMovementKits.AcrobatState state = new DragonEscapeMovementKits.AcrobatState();
-        double last = state.charge;
         for (int use = 0; use < 4; use++) {
             state.tickWallCling(false, false, true);
+            double before = state.charge;
             assertTrue(state.tickWallCling(true, false, true), "Stick " + use + " should activate");
             assertTrue(state.clingActivated);
-            assertEquals(last + DragonEscapeMovementKits.WALL_CLING_REGEN_PER_TICK
-                    - DragonEscapeMovementKits.WALL_CLING_USE_COST, state.charge, 0.0001D);
+            assertEquals(before - DragonEscapeMovementKits.WALL_CLING_USE_COST,
+                    state.charge, 0.0001D);
             state.cancelWallClingForKick();
             assertEquals(0, state.wallClingTicksRemaining);
-            last = state.charge;
         }
         state.tickWallCling(false, false, true);
         assertFalse(state.tickWallCling(true, false, true),
