@@ -82,6 +82,9 @@ public final class SourceMapCatalog {
             case TURF_WARS -> List.of("Turf Wars");
             case DRAW_MY_THING -> List.of("Draw My Thing");
             case MASTER_BUILDERS -> List.of("Master Builders");
+            case SPEED_BUILDERS -> List.of("Speed Builders");
+            case SNAKE -> List.of("Snake");
+            case MONSTER_MAZE, MONSTER_MAZE_SPEED, MONSTER_MAZE_MODERN -> List.of("Monster Maze");
             case CAMERA_SHY -> List.of();
             case SKY_WARS -> List.of("Skywars");
             case MILK_THE_COW -> List.of("Milk the Cow");
@@ -1026,6 +1029,12 @@ public final class SourceMapCatalog {
                 game == ArcadePortGame.WIZARDS || game == ArcadePortGame.DRAGON_ESCAPE);
     }
 
+    /** Editor-only import: allow incomplete legacy metadata for repair, never change gameplay's strict import. */
+    static boolean installEditableResource(JavaPlugin plugin, ArcadePortGame game, String resource, String worldName) {
+        if (!resourcePathBelongsToGame(game, resource)) return false;
+        return installResourceInternal(plugin, resource, worldName, true);
+    }
+
     /** Compatibility entry point used by the existing shared Arcade map loader. */
     public static boolean installResource(JavaPlugin plugin, String gameName, String resource, String worldName) {
         if (plugin == null || gameName == null || gameName.isBlank()
@@ -1195,6 +1204,24 @@ public final class SourceMapCatalog {
         if (!legacyRoot.startsWith(container) || legacyRoot.equals(container)) return local;
         Path legacyConfig = legacyRoot.resolve("WorldConfig.dat");
         return Files.isRegularFile(legacyConfig) ? legacyConfig : local;
+    }
+
+    /**
+     * Editor reads must use the opened archive, never the currently selected game-panel map.
+     * This also avoids auto-inferring positions while a tester is deliberately repairing raw markers.
+     */
+    static MapData readEditorDraft(JavaPlugin plugin, ArcadePortGame game, String resource, World world) {
+        if (plugin == null || world == null || !resourcePathBelongsToGame(game, resource)) return null;
+        Path config = resolveWorldConfigPath(world.getWorldFolder().toPath(),
+                Bukkit.getWorldContainer().toPath(), world.getName());
+        if (config != null && Files.isRegularFile(config, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+            try {
+                return parseMapConfig(world, Files.readAllLines(config, StandardCharsets.UTF_8));
+            } catch (IOException exception) {
+                plugin.getLogger().warning("Could not read draft metadata: " + exception.getMessage());
+            }
+        }
+        return readResource(plugin, resource, world);
     }
 
     /**
