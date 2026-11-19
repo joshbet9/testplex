@@ -1059,7 +1059,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         }
     }
 
-    /** Source SpellFireball uses explosion-size minus two for blocks and drops none. */
+    /** Break blocks in the source-sized radius and spill inventory contents before removing their container. */
     private void destroyFireballBlocks(Location centre, double radius) {
         World world = centre.getWorld();
         if (world == null || !Double.isFinite(radius) || radius <= 0.0D) return;
