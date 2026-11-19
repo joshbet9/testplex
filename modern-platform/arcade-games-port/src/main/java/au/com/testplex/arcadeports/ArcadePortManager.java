@@ -26898,7 +26898,7 @@ public final class ArcadePortManager implements Listener {
                 tierMeta.getPersistentDataContainer().set(statsEntryKey, PersistentDataType.STRING,
                         "milestone:" + track.id() + ":" + (stage + 1));
                 tier.setItemMeta(tierMeta);
-                inventory.setItem(9 * (stage - stageStart + 1) + column, tier);
+                inventory.setItem(ArcadeStatsLayout.milestoneTierSlot(stage - stageStart, column), tier);
             }
         }
         if (tracks.isEmpty()) inventory.setItem(22, statsItem(Material.BARRIER,
