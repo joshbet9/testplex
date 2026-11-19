@@ -150,9 +150,17 @@ public final class MonsterMazePlugin {
         this.gameManager.getMonsterManager().setMobType(mapManager.activeMob());
         this.monsterEntityListener = new MonsterEntityListener(this, gameManager);
         getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=gameplay-listeners-created");
-        // The already-deployed PacketEvents plugin is preferred over optional ProtocolLib.
-        // Load only by reflection: a missing packet plugin must not break the game module.
-        if (Bukkit.getPluginManager().isPluginEnabled("packetevents")) {
+        // Emergency startup safety: PR #787's PacketEvents spawn/metadata rewriting
+        // coincided with clients disconnecting each time Monster Maze started.
+        // Leave real Snow Golems and gameplay mechanics untouched by default;
+        // enable cosmetic packet rewriting only in an explicitly configured test.
+        if (!packetMobDisguisesEnabled(getConfig())
+                && Bukkit.getPluginManager().isPluginEnabled("packetevents")) {
+            getLogger().warning("Monster Maze experimental PacketEvents mob disguises are disabled " 
+                    + "for client connection safety; base mob models will render.");
+        }
+        if (packetMobDisguisesEnabled(getConfig())
+                && Bukkit.getPluginManager().isPluginEnabled("packetevents")) {
             try {
                 Class<?> type = Class.forName("me.monstermaze.entity.MonsterMazePacketDisguiseBridge");
                 Object bridge = type.getConstructor(MonsterMazePlugin.class).newInstance(this);
@@ -272,6 +280,13 @@ public final class MonsterMazePlugin {
         try { refreshMonsterDisguisesMethod.invoke(monsterDisguiseListener, player); }
         catch (Throwable ignored) { }
     }
+    /** Never rewrite Monster Maze entity packets on production by default.
+     * Explicit opt-in exists only for staging/isolated packet-protocol verification.
+     */
+    static boolean packetMobDisguisesEnabled(FileConfiguration config) {
+        return config != null && config.getBoolean("experimental-packet-mob-disguises", false);
+    }
+
     public boolean hasPerPlayerMobDisguises() {
         return monsterDisguiseListener != null && refreshMonsterDisguisesMethod != null;
     }
