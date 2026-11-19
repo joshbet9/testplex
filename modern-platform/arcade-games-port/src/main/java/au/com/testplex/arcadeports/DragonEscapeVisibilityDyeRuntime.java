@@ -28,6 +28,13 @@ final class DragonEscapeVisibilityDyeRuntime implements Listener {
         return visible ? Material.LIME_DYE : Material.GRAY_DYE;
     }
 
+    static ItemStack withVisibilityDye(ItemStack item, boolean visible) {
+        if (item == null || item.getType().isAir()) return item;
+        ItemStack dye = item.clone();
+        dye.setType(dyeForVisibility(visible));
+        return dye;
+    }
+
     @EventHandler(priority = EventPriority.MONITOR)
     public void onRaceWorldEntered(PlayerChangedWorldEvent event) {
         refreshNextTick(event.getPlayer());
@@ -69,9 +76,7 @@ final class DragonEscapeVisibilityDyeRuntime implements Listener {
             Material desired = dyeForVisibility(visible);
             if (item.getType() == desired) return;
 
-            ItemStack dye = item.clone();
-            dye.setType(desired);
-            player.getInventory().setItem(slot, dye);
+            player.getInventory().setItem(slot, withVisibilityDye(item, visible));
         });
     }
 }
