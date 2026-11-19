@@ -446,6 +446,7 @@ public final class ArcadePortManager implements Listener {
     private final NamespacedKey gladiatorPotionKey;
     private final NamespacedKey gladiatorHotbarKey;
     private final NamespacedKey dragonEscapeGhostHotbarKey;
+    private final NamespacedKey dragonEscapePlayerVisibilityHotbarKey;
     private final NamespacedKey dragonEscapeGhostMenuActionKey;
     private final NamespacedKey dragonEscapePracticeHotbarKey;
     private final ModernArcadeLobby lobby;
@@ -556,6 +557,7 @@ public final class ArcadePortManager implements Listener {
         this.gladiatorPotionKey = new NamespacedKey(plugin, "gladiators-healing-pot");
         this.gladiatorHotbarKey = new NamespacedKey(plugin, "gladiators-hotbar-editor");
         this.dragonEscapeGhostHotbarKey = new NamespacedKey(plugin, "dragon-escape-ghost-toggle");
+        this.dragonEscapePlayerVisibilityHotbarKey = new NamespacedKey(plugin, "dragon-escape-player-visibility-toggle");
         this.dragonEscapeGhostMenuActionKey = new NamespacedKey(plugin, "dragon-escape-ghost-menu-action");
         this.dragonEscapePracticeHotbarKey = new NamespacedKey(plugin, "dragon-escape-practice-action");
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=manager-keys-ready");
@@ -10050,6 +10052,7 @@ public final class ArcadePortManager implements Listener {
                             .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.AcrobatState());
                     updateDragonEscapeAcrobatExperience(session, player, acrobat);
                 }
+                setDragonEscapePlayerVisibilityHotbarItem(player);
                 setDragonEscapeGhostHotbarItem(player);
                 if (session.dragonEscapePractice) setDragonEscapePracticeHotbarItems(player);
                 break;
@@ -25816,30 +25819,47 @@ public final class ArcadePortManager implements Listener {
         plugin.getConfig().set("dragon-escape-player-visible." + player.getUniqueId(), visible);
         plugin.saveConfig();
         applyDragonEscapePlayerVisibility(player, visible);
-        setDragonEscapeGhostHotbarItem(player);
+        setDragonEscapePlayerVisibilityHotbarItem(player);
         player.sendMessage(ChatColor.AQUA + "Dragon Escape visibility "
                 + (visible ? ChatColor.GREEN + "enabled" : ChatColor.RED + "disabled")
                 + ChatColor.GRAY + ". Other racers " + (visible ? "can see you." : "cannot see you."));
     }
 
-    /** Slot nine keeps player visibility and PB ghost controls available during the race. */
+    /** Keep the player's own visibility toggle separate from the PB ghost controls. */
+    private void setDragonEscapePlayerVisibilityHotbarItem(Player player) {
+        if (player == null) return;
+        boolean visible = isDragonEscapePlayerVisible(player.getUniqueId());
+        ItemStack toggle = namedItem(Material.NAME_TAG,
+                "Player Visibility: " + (visible ? ChatColor.GREEN + "Visible" : ChatColor.RED + "Invisible"),
+                "Right-click to toggle whether other racers can see you.");
+        ItemMeta meta = toggle.getItemMeta();
+        meta.getPersistentDataContainer().set(dragonEscapePlayerVisibilityHotbarKey, PersistentDataType.BYTE, (byte) 1);
+        toggle.setItemMeta(meta);
+        player.getInventory().setItem(DragonEscapeMovementKits.DRAGON_ESCAPE_PLAYER_VISIBILITY_SLOT, toggle);
+    }
+
+    private boolean isDragonEscapePlayerVisibilityHotbarItem(ItemStack item) {
+        return item != null && item.hasItemMeta()
+                && item.getItemMeta().getPersistentDataContainer()
+                        .has(dragonEscapePlayerVisibilityHotbarKey, PersistentDataType.BYTE);
+    }
+
+    /** Slot nine remains dedicated to PB/WR ghost controls during the race. */
     private void setDragonEscapeGhostHotbarItem(Player player) {
         if (player == null) return;
         boolean enabled = isDragonEscapeGhostEnabled(player.getUniqueId());
         Session session = active;
         int selectedCount = session != null && session.type == ArcadePortGame.DRAGON_ESCAPE
                 ? selectedDragonEscapeGhosts(player, session).size() : 0;
-        boolean playersVisible = isDragonEscapePlayerVisible(player.getUniqueId());
         ItemStack toggle = namedItem(Material.ENDER_EYE,
-                "Players: " + (playersVisible ? ChatColor.GREEN + "Visible" : ChatColor.RED + "Invisible"),
-                "Right-click to toggle your visibility to other racers; sneak-right-click to "
-                        + (enabled ? "hide" : "show") + " PB/WR ghosts. Left-click to choose ghosts ("
-                        + selectedCount + "/4)."
-                        + (dragonEscapeGhostBridge == null ? " Requires PacketEvents 2.14.0 for race ghosts." : ""));
+                "PB Ghost: " + (enabled ? ChatColor.GREEN + "ON" : ChatColor.RED + "OFF"),
+                "Selected: " + selectedCount + "/4. Right-click to " + (enabled ? "hide" : "show")
+                        + " ghosts; left-click to choose which PB/WR ghosts to race."
+                        + (dragonEscapeGhostBridge == null ? " Requires PacketEvents 2.14.0." : ""));
         ItemMeta meta = toggle.getItemMeta();
         meta.getPersistentDataContainer().set(dragonEscapeGhostHotbarKey, PersistentDataType.BYTE, (byte) 1);
         toggle.setItemMeta(meta);
-        player.getInventory().setItem(8, toggle);
+        player.getInventory().setItem(DragonEscapeMovementKits.DRAGON_ESCAPE_GHOST_SLOT, toggle);
     }
 
     private boolean isDragonEscapeGhostHotbarItem(ItemStack item) {
@@ -25859,6 +25879,9 @@ public final class ArcadePortManager implements Listener {
         if (isDragonEscapeGhostHotbarItem(event.getCurrentItem())
                 || isDragonEscapeGhostHotbarItem(event.getCursor())
                 || isDragonEscapeGhostHotbarItem(hotbarSwap)
+                || isDragonEscapePlayerVisibilityHotbarItem(event.getCurrentItem())
+                || isDragonEscapePlayerVisibilityHotbarItem(event.getCursor())
+                || isDragonEscapePlayerVisibilityHotbarItem(hotbarSwap)
                 || isDragonEscapeFlutterFeather(event.getCurrentItem())
                 || isDragonEscapeFlutterFeather(event.getCursor())
                 || isDragonEscapeFlutterFeather(hotbarSwap)
@@ -25877,7 +25900,9 @@ public final class ArcadePortManager implements Listener {
         if (session == null || session.type != ArcadePortGame.DRAGON_ESCAPE
                 || !session.alive.contains(event.getWhoClicked().getUniqueId())) return;
         if (isDragonEscapeGhostHotbarItem(event.getOldCursor())
+                || isDragonEscapePlayerVisibilityHotbarItem(event.getOldCursor())
                 || event.getNewItems().values().stream().anyMatch(this::isDragonEscapeGhostHotbarItem)
+                || event.getNewItems().values().stream().anyMatch(this::isDragonEscapePlayerVisibilityHotbarItem)
                 || isDragonEscapeFlutterFeather(event.getOldCursor())
                 || event.getNewItems().values().stream().anyMatch(this::isDragonEscapeFlutterFeather)
                 || session.dragonEscapePractice && (dragonEscapePracticeAction(event.getOldCursor()) != null
@@ -31123,15 +31148,22 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE
                 && session.alive.contains(event.getPlayer().getUniqueId())
-                && isDragonEscapeGhostHotbarItem(event.getItem())) {
+                && isDragonEscapePlayerVisibilityHotbarItem(event.getItem())) {
             event.setCancelled(true);
             if (event.getAction().isRightClick()) {
                 Player player = event.getPlayer();
-                if (player.isSneaking()) setDragonEscapeGhost(player, "toggle");
-                else setDragonEscapePlayerVisibility(player,
+                setDragonEscapePlayerVisibility(player,
                         DragonEscapeMovementKits.toggleDragonEscapePlayerVisibility(
                                 isDragonEscapePlayerVisible(player.getUniqueId())));
-            } else if (event.getAction().isLeftClick()) openDragonEscapeGhostOptions(event.getPlayer());
+            }
+            return;
+        }
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE
+                && session.alive.contains(event.getPlayer().getUniqueId())
+                && isDragonEscapeGhostHotbarItem(event.getItem())) {
+            event.setCancelled(true);
+            if (event.getAction().isRightClick()) setDragonEscapeGhost(event.getPlayer(), "toggle");
+            else if (event.getAction().isLeftClick()) openDragonEscapeGhostOptions(event.getPlayer());
             return;
         }
 
@@ -31868,6 +31900,7 @@ public final class ArcadePortManager implements Listener {
                         || (item == Material.TNT && "disruptor".equals(kit))
                         || (item == Material.BRICKS && "builder".equals(kit))
                         || isDragonEscapeGhostHotbarItem(heldItem)
+                        || isDragonEscapePlayerVisibilityHotbarItem(heldItem)
                         || (DragonEscapeSpectatorRules.shouldReceiveSpectatorTools(
                                 session.alive.contains(id), session.dragonEscapeCompleted.contains(id))
                                 && isDragonEscapeTrackingCompass(heldItem));
