@@ -148,7 +148,9 @@ public class GameScoreboard {
     /** Each viewer has an independent scoreboard, so statuses may differ per target. */
     static String kitNametagTeamName(UUID playerId) {
         if (playerId == null) return "mmk_unknown";
-        return "mmk_" + playerId.toString().replace("-", "").substring(0, 12);
+        String hex = playerId.toString().replace("-", "");
+        // Include the UUID tail as well: scripted test players may share long prefixes.
+        return "mmk_" + hex.substring(0, 6) + hex.substring(hex.length() - 6);
     }
 
     private Team kitNametagTeam(Scoreboard board, Player target) {
