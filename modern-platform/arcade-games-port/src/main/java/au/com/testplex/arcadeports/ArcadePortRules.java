@@ -1442,6 +1442,11 @@ public final class ArcadePortRules {
         return bricksHeld > 0;
     }
 
+    /** Only spending from a full stack begins a new Builder recharge cycle. */
+    public static boolean shouldStartDragonEscapeBuilderRecharge(int chargesBeforePlacement, int maximumCharges) {
+        return maximumCharges > 0 && chargesBeforePlacement >= maximumCharges;
+    }
+
     /** Let a player place a foothold through their own hitbox while keeping other racers clear. */
     public static boolean shouldBlockDragonEscapeKitPlacementOccupant(
             java.util.UUID placingPlayerId, java.util.UUID occupyingPlayerId) {
