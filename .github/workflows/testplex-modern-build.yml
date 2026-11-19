@@ -521,6 +521,26 @@ jobs:
             exit 1
           fi
 
+          # flyctl deploy applies the checked-in fly.toml again, which can
+          # restore auto-stop=stop even though it was disabled before deployment.
+          # Disable it again after image promotion, then wake the original
+          # volume-owning Machine if the deploy caused it to stop before the
+          # in-guest runtime verifier can connect.
+          if [[ "$restore_autostop" != off ]]; then
+            autostop_restore_needed=true
+            fly_machine_update_autostop off
+          fi
+          flyctl machine list --app "$FLY_APP" --json > "$RUNNER_TEMP/fly-machines-after-autostop.json"
+          post_deploy_state="$(jq -er --arg id "$machine_id" '[.[] | select(.id == $id)][0].state' "$RUNNER_TEMP/fly-machines-after-autostop.json")"
+          if [[ "$post_deploy_state" == stopped || "$post_deploy_state" == suspended ]]; then
+            echo "Waking the verified Fly release after disabling deployment auto-stop."
+            flyctl machine start "$machine_id" --app "$FLY_APP"
+          elif [[ "$post_deploy_state" != started ]]; then
+            echo "Fly Machine entered unexpected state [$post_deploy_state] after disabling auto-stop." >&2
+            cat "$RUNNER_TEMP/fly-machines-after-autostop.json" >&2
+            exit 1
+          fi
+
           # The checked-in app config is authoritative. The previous failed attempt
           # may have left the Machine's temporary autostop setting at off.
           restore_autostop="$(awk -F '"' '/^[[:space:]]*auto_stop_machines[[:space:]]*=/{print $2; exit}' fly.toml)"
@@ -666,6 +686,5 @@ jobs:
           fi
           echo "FLY_FINAL_STATE_VERIFIED:$GITHUB_SHA"
           echo "Fly release $GITHUB_SHA passed runtime readiness and final-state verification; machine is $(jq -er --arg id "$machine_id" '[.[] | select(.id == $id)][0].state' "$RUNNER_TEMP/fly-machines-final.json") with preserved volume $final_volume_id and restored autostop policy $restore_autostop."
-
 
 
