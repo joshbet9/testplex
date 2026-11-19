@@ -239,6 +239,11 @@ public final class WitherAssaultRules {
                 SKULL_BLAST_RADIUS_BLOCKS);
     }
 
+    /** Managed skull damage is resolved by this game, even when another listener cancels vanilla terrain explosions. */
+    public static boolean shouldIgnoreCancelledExplosion(boolean explosionCancelled, boolean managedSkull) {
+        return explosionCancelled && !managedSkull;
+    }
+
     public static double skullDamageAtDistance(double distance, double ageScale) {
         double radius = skullBlastRadiusBlocks();
         if (!Double.isFinite(distance) || distance < 0.0D || distance > radius) return 0.0D;

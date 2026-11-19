@@ -1751,6 +1751,10 @@ public final class ArcadePortRules {
         return game == ArcadePortGame.DRAGONS && targetAlive;
     }
 
+    public static boolean shouldSkipCancelledDamageEvent(boolean eventCancelled, boolean gameOwnsHit) {
+        return eventCancelled && !gameOwnsHit;
+    }
+
     /** Shared custom-combat immunity window matching the 10-tick 1.8 hurt interval. */
     public static boolean canReceiveCustomPlayerHit(long nowMillis, long nextAllowedAtMillis) {
         return nowMillis >= nextAllowedAtMillis;
