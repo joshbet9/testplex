@@ -3269,6 +3269,15 @@ public final class ArcadePortRules {
         return team == 1;
     }
 
+    /**
+     * Server-side test players may report projectile contact without a damage event.
+     * Resolve that impact only when both shooter and target belong to the live match.
+     */
+    public static boolean shouldResolvePaintballImpactFallback(boolean playerTarget,
+            boolean validShooter, boolean validTarget) {
+        return playerTarget && validShooter && validTarget;
+    }
+
     public static Color paintballTeamColor(int team) {
         return isPaintballRedTeam(team) ? Color.RED : Color.AQUA;
     }

@@ -30685,7 +30685,25 @@ public final class ArcadePortManager implements Listener {
                 && session.paintProjectileDamage.containsKey(paintProjectile.getUniqueId())) {
             paintPaintballBlockImpact(session, paintProjectile);
             session.paintballProjectileCosmetics.remove(paintProjectile.getUniqueId());
-            if (event.getHitBlock() != null || !(event.getHitEntity() instanceof Player)) {
+            Entity impactTarget = event.getHitEntity();
+            Player shooter = paintProjectile.getShooter() instanceof Player player ? player : null;
+            Player target = impactTarget instanceof Player player ? player : null;
+            if (ArcadePortRules.shouldResolvePaintballImpactFallback(target != null,
+                    shooter != null && session.players.containsKey(shooter.getUniqueId())
+                            && session.alive.contains(shooter.getUniqueId()),
+                    target != null && session.players.containsKey(target.getUniqueId())
+                            && session.alive.contains(target.getUniqueId()))) {
+                // Some bot implementations provide contact without a damage event.
+                // The hit helper de-duplicates this if normal damage already ran.
+                hitProjectile(session, paintProjectile, shooter, target);
+                session.paintProjectileDamage.remove(paintProjectile.getUniqueId());
+                session.paintProjectileTeams.remove(paintProjectile.getUniqueId());
+                session.paintProjectileImpacts.remove(paintProjectile.getUniqueId());
+                session.entities.remove(paintProjectile);
+                paintProjectile.remove();
+                return;
+            }
+            if (event.getHitBlock() != null || target == null) {
                 recordPaintballShotMiss(session, paintProjectile);
                 session.paintProjectileDamage.remove(paintProjectile.getUniqueId());
                 session.paintProjectileTeams.remove(paintProjectile.getUniqueId());
@@ -30694,6 +30712,12 @@ public final class ArcadePortManager implements Listener {
                 paintProjectile.remove();
                 return;
             }
+            session.paintProjectileDamage.remove(paintProjectile.getUniqueId());
+            session.paintProjectileTeams.remove(paintProjectile.getUniqueId());
+            session.paintProjectileImpacts.remove(paintProjectile.getUniqueId());
+            session.entities.remove(paintProjectile);
+            paintProjectile.remove();
+            return;
         }
 
         // Handle Dragons fireballs here rather than relying on damage-event ordering.

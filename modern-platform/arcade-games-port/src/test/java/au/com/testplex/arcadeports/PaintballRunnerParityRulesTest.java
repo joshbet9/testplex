@@ -41,6 +41,14 @@ final class PaintballRunnerParityRulesTest {
     }
 
     @Test
+    void paintballImpactFallbackRequiresALiveSessionPlayerTargetAndShooter() {
+        assertTrue(ArcadePortRules.shouldResolvePaintballImpactFallback(true, true, true));
+        assertFalse(ArcadePortRules.shouldResolvePaintballImpactFallback(false, true, true));
+        assertFalse(ArcadePortRules.shouldResolvePaintballImpactFallback(true, false, true));
+        assertFalse(ArcadePortRules.shouldResolvePaintballImpactFallback(true, true, false));
+    }
+
+    @Test
     void paintballUsesTheTwentyMinuteRebornGameTimeout() {
         assertEquals(1_200_000L, ArcadePortRules.PAINTBALL_GAME_TIMEOUT_MILLIS);
     }
