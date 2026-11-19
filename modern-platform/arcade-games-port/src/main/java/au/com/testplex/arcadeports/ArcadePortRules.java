@@ -1442,6 +1442,13 @@ public final class ArcadePortRules {
         return bricksHeld > 0;
     }
 
+    /** Let a player place a foothold through their own hitbox while keeping other racers clear. */
+    public static boolean shouldBlockDragonEscapeKitPlacementOccupant(
+            java.util.UUID placingPlayerId, java.util.UUID occupyingPlayerId) {
+        return placingPlayerId == null || occupyingPlayerId == null
+                || !placingPlayerId.equals(occupyingPlayerId);
+    }
+
     public static boolean shouldRouteDragonEscapeBuilderPlacement(
             boolean dragonEscapeGame, boolean alive, boolean builderKit, boolean rightClick,
             boolean holdingBuilderBricks) {
