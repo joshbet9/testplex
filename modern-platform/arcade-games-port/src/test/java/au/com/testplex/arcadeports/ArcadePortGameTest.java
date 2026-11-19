@@ -2045,6 +2045,15 @@ class ArcadePortGameTest {
                 "unknown placement ownership must keep the safety check enabled");
     }
 
+    @Test void dragonEscapeBuilderSecondStartingBrickDoesNotRestartRecharge() {
+        assertTrue(ArcadePortRules.shouldStartDragonEscapeBuilderRecharge(2, 2),
+                "spending from a full stack starts the eight-second recharge");
+        assertFalse(ArcadePortRules.shouldStartDragonEscapeBuilderRecharge(1, 2),
+                "spending the remaining starting brick keeps the existing timer");
+        assertFalse(ArcadePortRules.shouldStartDragonEscapeBuilderRecharge(0, 2));
+        assertFalse(ArcadePortRules.shouldStartDragonEscapeBuilderRecharge(0, 0));
+    }
+
     @Test void dragonEscapeBuilderPlacementRoutesFromKitAndActionNotEventItemPrediction() {
         assertTrue(ArcadePortRules.shouldRouteDragonEscapeBuilderPlacement(true, true, true, true, true));
         assertFalse(ArcadePortRules.shouldRouteDragonEscapeBuilderPlacement(true, true, false, true, true));
