@@ -684,20 +684,22 @@ public final class ArcadeCatalog {
     }
 
     private static CosmeticLineDefinition monsterMazeMobSetLine() {
+        // Two square blocks maximum of X/Z footprint; height is irrelevant.
+        // Exclude former oversize Sniffer plus oversize Camel, Camel Husk,
+        // Elder Guardian and Ravager. Keep tall/narrow Wither Skeleton.
         String[] mobSets = {
                 "map_default", "allay", "armadillo", "axolotl", "bat", "bee", "blaze",
-                "bogged", "breeze", "camel", "camel_husk", "cat", "cave_spider", "chicken",
-                "cod", "copper_golem", "cow", "creaking", "creeper", "dolphin", "donkey",
-                "drowned", "elder_guardian", "enderman", "endermite", "evoker", "fox", "frog",
-                "glow_squid", "goat", "guardian", "hoglin", "horse", "husk", "illusioner",
-                "iron_golem", "llama", "magma_cube", "mooshroom", "mule", "nautilus", "ocelot",
-                "panda", "parched", "parrot", "phantom", "pig", "piglin", "piglin_brute",
-                "pillager", "polar_bear", "pufferfish", "rabbit", "ravager", "salmon", "sheep",
-                "shulker", "silverfish", "skeleton", "skeleton_horse", "slime", "sniffer", "snowman",
-                "spider", "squid", "stray", "strider", "sulfur_cube", "tadpole", "trader_llama",
-                "tropical_fish", "turtle", "vex", "villager", "vindicator", "wandering_trader", "warden",
-                "witch", "wither_skeleton", "wolf", "zoglin", "zombie", "zombie_horse", "zombie_nautilus",
-                "zombie_pigman", "zombie_villager", "random"};
+                "bogged", "breeze", "cat", "cave_spider", "chicken", "cod", "copper_golem",
+                "cow", "creaking", "creeper", "dolphin", "donkey", "drowned", "enderman",
+                "endermite", "evoker", "fox", "frog", "glow_squid", "goat", "guardian",
+                "hoglin", "horse", "husk", "illusioner", "iron_golem", "llama", "magma_cube",
+                "mooshroom", "mule", "nautilus", "ocelot", "panda", "parched", "parrot",
+                "phantom", "pig", "piglin", "piglin_brute", "pillager", "polar_bear", "pufferfish",
+                "rabbit", "salmon", "sheep", "shulker", "silverfish", "skeleton", "skeleton_horse",
+                "slime", "snowman", "spider", "squid", "stray", "strider", "sulfur_cube",
+                "tadpole", "trader_llama", "tropical_fish", "turtle", "vex", "villager", "vindicator",
+                "wandering_trader", "warden", "witch", "wither_skeleton", "wolf", "zoglin", "zombie",
+                "zombie_horse", "zombie_nautilus", "zombie_pigman", "zombie_villager", "random"};
         String[] dyeColours = {"white", "orange", "magenta", "light_blue", "yellow", "lime", "pink", "gray",
                 "light_gray", "cyan", "purple", "blue", "brown", "green", "red", "black"};
         List<CosmeticOption> options = new ArrayList<>();
