@@ -1,5 +1,6 @@
 package au.com.testplex.arcadeports;
 
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
@@ -13,6 +14,27 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ArcadeCollisionRulesTest {
+
+    @Test
+    void mobPassThroughDisablesPhysicalPushingButKeepsPlayerCombatHitboxes() {
+        AtomicBoolean mobCollidable = new AtomicBoolean(true);
+        LivingEntity mob = proxy(LivingEntity.class, (method, args) -> switch (method) {
+            case "isCollidable" -> mobCollidable.get();
+            case "setCollidable" -> {
+                mobCollidable.set((Boolean) args[0]);
+                yield null;
+            }
+            default -> null;
+        });
+        Player player = proxy(Player.class, (method, args) -> {
+            throw new AssertionError("player collision must remain controlled by scoreboard teams");
+        });
+
+        assertTrue(ArcadeCollisionRules.disableMobCollision(mob));
+        assertFalse(mobCollidable.get(), "mobs must not push or physically block players");
+        assertFalse(ArcadeCollisionRules.disableMobCollision(player),
+                "players and fake-player bots must keep their native combat hitboxes");
+    }
 
     @Test
     void passThroughDisablesPlayerPushingWithoutChangingPlayerHitboxFlag() {
