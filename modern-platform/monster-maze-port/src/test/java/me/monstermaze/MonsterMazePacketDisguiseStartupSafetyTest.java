@@ -6,24 +6,24 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Guards against auto-enabling packet mob disguises after the startup disconnect regression. */
+/** Per-viewer mob cosmetics are normal gameplay; only an explicit admin kill switch disables them. */
 class MonsterMazePacketDisguiseStartupSafetyTest {
     @Test
-    void newAndLegacyConfigsLeavePacketRewriteDisabled() {
+    void viewerLocalMobAppearancesAreEnabledByDefault() {
         YamlConfiguration config = new YamlConfiguration();
-        assertFalse(MonsterMazePlugin.packetMobDisguisesEnabled(config));
-        assertFalse(MonsterMazePlugin.packetMobDisguisesEnabled(null));
+        assertTrue(MonsterMazePlugin.virtualMobAppearancesEnabled(config));
+        assertTrue(MonsterMazePlugin.virtualMobAppearancesEnabled(null));
         config.set("mode", "modern");
         config.set("solo-mode", true);
-        assertFalse(MonsterMazePlugin.packetMobDisguisesEnabled(config));
+        assertTrue(MonsterMazePlugin.virtualMobAppearancesEnabled(config));
     }
 
     @Test
-    void experimentalMobPacketsRequireAnExplicitOptIn() {
+    void explicitEmergencyDisableCanPreventPacketRendering() {
         YamlConfiguration config = new YamlConfiguration();
-        config.set("experimental-packet-mob-disguises", true);
-        assertTrue(MonsterMazePlugin.packetMobDisguisesEnabled(config));
-        config.set("experimental-packet-mob-disguises", false);
-        assertFalse(MonsterMazePlugin.packetMobDisguisesEnabled(config));
+        config.set("virtual-mob-appearances", false);
+        assertFalse(MonsterMazePlugin.virtualMobAppearancesEnabled(config));
+        config.set("virtual-mob-appearances", true);
+        assertTrue(MonsterMazePlugin.virtualMobAppearancesEnabled(config));
     }
 }
