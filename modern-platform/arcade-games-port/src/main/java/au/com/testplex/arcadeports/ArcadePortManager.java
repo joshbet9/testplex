@@ -17871,13 +17871,18 @@ public final class ArcadePortManager implements Listener {
             placed.authoritativeResyncSent = true;
         });
         session.dragonEscapeBuilderLastPlacedAt.put(id, System.currentTimeMillis());
-        session.dragonEscapeNextBrickAt.put(id,
-                System.currentTimeMillis() + ArcadePortRules.DRAGON_ESCAPE_BUILDER_RECHARGE_MILLIS);
-        // Builder can use every brick currently held, just like Digger can place
-        // every recovered block. This timer replenishes the charge; it is not a
-        // lock on the remaining starting brick or on an already placed platform.
-        cooldownProgress.start(player, "Builder Recharge",
-                ArcadePortRules.DRAGON_ESCAPE_BUILDER_RECHARGE_MILLIS);
+        int maximumBricks = Math.max(0, GameDebugRuntimeOverrides.intValue(
+                "DRAGON_ESCAPE_BUILDER_MAX_BRICKS", ArcadePortRules.DRAGON_ESCAPE_BUILDER_MAX_BRICKS));
+        // Start recharge only when spending from a full stack. Using the second
+        // starting brick must not push the first brick's timer back by 8 seconds.
+        if (ArcadePortRules.shouldStartDragonEscapeBuilderRecharge(availableBricks, maximumBricks)) {
+            long rechargeMillis = Math.max(0L, GameDebugRuntimeOverrides.longValue(
+                    "DRAGON_ESCAPE_BUILDER_RECHARGE_MILLIS",
+                    ArcadePortRules.DRAGON_ESCAPE_BUILDER_RECHARGE_MILLIS));
+            long nextBrickAt = now + rechargeMillis;
+            session.dragonEscapeNextBrickAt.put(id, nextBrickAt);
+            cooldownProgress.start(player, "Builder Recharge", rechargeMillis);
+        }
         player.playSound(target.getLocation(), Sound.BLOCK_STONE_PLACE, 0.65F, 1.3F);
     }
 
