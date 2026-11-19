@@ -279,6 +279,11 @@ public void startGame(int requestedPattern) {
     startGame(null, requestedPattern);
 }
 
+/** The generator builds the arena surface at center Y - 1; center is already the standing-height, block-centred spawn. */
+static Location initialSpawnLocation(Location arenaCenter) {
+    return arenaCenter == null ? null : arenaCenter.clone();
+}
+
 /** @param preferCenter optional player location when /mm start is used without setcenter */
 public void startGame(Location preferCenter) {
     startGame(preferCenter, -1);
@@ -370,7 +375,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
                     }
                     if (testplexManagedRound) {
                         p.closeInventory();
-                        Location spawn = center.clone().add(0.5D, 1.0D, 0.5D);
+                        Location spawn = initialSpawnLocation(center);
                         if (!p.teleport(spawn) || !isInArenaWorld(center.getWorld(), p.getWorld())) {
                             plugin.getLogger().warning("Monster Maze could not place registered participant "
                                     + p.getName() + " into the generated arena; excluding them from this round.");
@@ -384,7 +389,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
                     }
                     alive.add(playerId);
                     preparePlayer(p);
-                    if (!p.teleport(center.clone().add(0.5D, 1.0D, 0.5D))
+                    if (!p.teleport(initialSpawnLocation(center))
                             || !isInArenaWorld(center.getWorld(), p.getWorld())) {
                         alive.remove(playerId);
                         roundParticipants.remove(playerId);
