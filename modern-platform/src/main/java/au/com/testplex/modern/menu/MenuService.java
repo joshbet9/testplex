@@ -698,6 +698,15 @@ public final class MenuService implements Listener {
             mark(next, "maze-mob-page", game, line, Integer.toString(page + 1));
             inventory.setItem(52, next);
         }
+        boolean allEnabled = mobs.stream().allMatch(option -> selected.contains(option.getId()));
+        ItemStack enableAll = makeItem(allEnabled ? Material.EMERALD_BLOCK : Material.CHEST,
+                allEnabled ? ChatColor.GREEN + "All Mob Sets Enabled" : ChatColor.GOLD + "Enable All Mob Sets",
+                List.of(allEnabled ? ChatColor.GREEN + "Every mob form is in the in-game cycle."
+                                : ChatColor.GRAY + "Add every eligible mob form to the in-game cycle.",
+                        ChatColor.GRAY + "Your saved Safe Pad and beacon colours stay unchanged.",
+                        ChatColor.YELLOW + "Click to enable all."));
+        mark(enableAll, "maze-mob-enable-all", game, line, null);
+        inventory.setItem(48, enableAll);
         player.openInventory(inventory);
     }
 
@@ -900,7 +909,18 @@ public final class MenuService implements Listener {
 
 
         if (MAZE_MOBS_TITLE.equals(title) && game != null && "monster-maze".equals(game.getId())) {
-            if ("maze-mob-page".equals(action) && optionId != null) {
+            if ("maze-mob-enable-all".equals(action)) {
+                CosmeticLineDefinition line = findLine(game, "mob-sets");
+                if (line != null) {
+                    List<String> mobIds = line.getOptions().stream()
+                            .filter(MenuService::isMonsterMazeMobChoice)
+                            .map(CosmeticOption::getId)
+                            .toList();
+                    preferences.chooseOptions(player.getUniqueId(), game, line, mobIds);
+                    refreshMonsterMazeCosmetics(player);
+                    openMonsterMazeMobSets(player, game);
+                }
+            } else if ("maze-mob-page".equals(action) && optionId != null) {
                 try {
                     openMonsterMazeMobSets(player, game, Integer.parseInt(optionId));
                 } catch (NumberFormatException ignored) {
