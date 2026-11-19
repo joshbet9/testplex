@@ -87,6 +87,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         // in Monster Maze must not leave players in the unrelated survival world.
         getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=arcade-manager-construction-start");
         manager = new ArcadePortManager(this);
+        getServer().getPluginManager().registerEvents(new DragonEscapeVisibilityDyeRuntime(this), this);
         wizards = new WizardsGameManager(this);
         getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=arcade-manager-construction-complete");
         cameraShy = new CameraShyGame(this, manager);
