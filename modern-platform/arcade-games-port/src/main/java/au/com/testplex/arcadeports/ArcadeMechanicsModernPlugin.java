@@ -105,7 +105,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         // Independently owned lobby/game scoreboards are also covered by the shared
         // blank-number policy. Re-check newly assigned boards without changing scores.
         Bukkit.getScheduler().runTaskTimer(this, SidebarNumberFormat::applyToOnlinePlayers, 1L, 5L);
-        Bukkit.getWorlds().forEach(ArcadeMechanicsModernPlugin::disableLocatorBar);
+        Bukkit.getWorlds().forEach(world -> {
+            disableLocatorBar(world);
+            ArcadeCollisionRules.disableExistingMobCollisions(world);
+        });
         getCommand("stats").setExecutor(this);
         getCommand("arcadeport").setExecutor(this);
         getCommand("gamepreferences").setExecutor(this);
@@ -138,6 +141,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     @EventHandler
     public void onWorldLoadDisableLocatorBar(WorldLoadEvent event) {
         disableLocatorBar(event.getWorld());
+        ArcadeCollisionRules.disableExistingMobCollisions(event.getWorld());
     }
 
     private static void disableLocatorBar(World world) {
@@ -428,8 +432,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     /** All game mobs are pass-through actors; collision never affects hit targeting. */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onGameEntitySpawn(EntitySpawnEvent event) {
-        if (event.getEntity() instanceof LivingEntity living && !(living instanceof Player)) {
-            living.setCollidable(false);
+        if (event.getEntity() instanceof LivingEntity living) {
+            ArcadeCollisionRules.disableMobCollision(living);
         }
     }
 
