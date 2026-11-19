@@ -67,11 +67,12 @@ class ArcadeStatsThirtyGameLayoutTest {
                     Set<Integer> occupied = new HashSet<>();
                     for (int index = 0; index < visible.size(); index++) {
                         int column = columns.get(index);
-                        assertTrue(occupied.add(column), id + " colliding milestone headers");
+                        int categorySlot = ArcadeStatsLayout.milestoneCategorySlot(column);
+                        assertTrue(occupied.add(categorySlot), id + " colliding milestone category blocks");
                         for (int stage = stageStart; stage < Math.min(visible.get(index).length, stageStart + 4); stage++) {
-                            int slot = 9 * (stage - stageStart + 1) + column;
+                            int slot = ArcadeStatsLayout.milestoneTierSlot(stage - stageStart, column);
                             assertTrue(occupied.add(slot), id + " milestone tier collision at " + slot);
-                            assertTrue(slot >= 9 && slot <= 44, id + " milestone outside middle rows");
+                            assertTrue(slot >= 0 && slot <= 44, id + " milestone outside content rows");
                             visitedTiers++;
                         }
                     }

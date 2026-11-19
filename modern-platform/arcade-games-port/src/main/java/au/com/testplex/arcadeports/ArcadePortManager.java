@@ -26874,7 +26874,7 @@ public final class ArcadePortManager implements Listener {
                 trackLore.add(ChatColor.GRAY + formatMilestoneValue(progress.remaining(), track.unit())
                         + " remaining");
             }
-            inventory.setItem(column, statsItem(progress.complete() ? Material.SEA_LANTERN
+            inventory.setItem(ArcadeStatsLayout.milestoneCategorySlot(column), statsItem(progress.complete() ? Material.SEA_LANTERN
                             : progress.earnedTiers() > 0 ? Material.PRISMARINE : Material.BLACKSTONE,
                     (progress.earnedTiers() > 0 ? ChatColor.GREEN : ChatColor.GRAY) + track.name(),
                     trackLore, "noop", null, gameId));
