@@ -1,6 +1,7 @@
 package me.monstermaze.entity;
 
 import com.github.retrooper.packetevents.event.PacketListener;
+import me.monstermaze.util.MobThemeManager;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
@@ -10,6 +11,23 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Regression checks for viewer-local models that do not touch vanilla outbound entity packets. */
 class MonsterMazePacketDisguiseBridgeTest {
+    @Test
+    void selectableModernMobIdsMapToStableClientEntityNames() {
+        // PacketEvents' registry is initialized by the server plugin, not in a
+        // pure JUnit unit test. Validate all name mappings offline and verify
+        // actual model support in the dedicated multi-client Paper acceptance.
+        for (String choice : MobThemeManager.allowedThemes(null)) {
+            if ("map_default".equals(choice) || "random".equals(choice)) continue;
+            String id = MonsterMazePacketDisguiseBridge.clientTypeName(choice);
+            assertNotNull(id, choice);
+            assertTrue(id.matches("[a-z_]+"), "Invalid entity identifier: " + id);
+        }
+        assertEquals("wither_skeleton",
+                MonsterMazePacketDisguiseBridge.clientTypeName("wither_skeleton"));
+        assertEquals("sulfur_cube",
+                MonsterMazePacketDisguiseBridge.clientTypeName("sulfur_cube"));
+    }
+
     @Test
     void savedMobThemeAliasesResolveToModernMobNames() {
         assertEquals("snow_golem", MonsterMazePacketDisguiseBridge.clientTypeName("snowman"));

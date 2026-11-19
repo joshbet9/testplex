@@ -22,6 +22,38 @@ class MobThemeManagerThemeRulesTest {
     }
 
     @Test
+    void twoBlockRuleMeasuresMazeFootprintNotVerticalHeight() {
+        // Wither Skeleton is taller than two blocks but only ~0.7 block wide.
+        for (String tallAndNarrow : List.of("wither_skeleton", "enderman", "iron_golem",
+                "warden", "creaking", "villager")) {
+            assertEquals(tallAndNarrow, MobThemeManager.normalize(tallAndNarrow));
+        }
+        assertEquals(Material.WITHER_SKELETON_SKULL,
+                MobThemeManager.selectorIcon("wither_skeleton"));
+    }
+
+    @Test
+    void modernTwentySixThreeMobFormsAreAvailableAsPersonalViewCosmetics() {
+        var available = MobThemeManager.allowedThemes(Set.of("wither_skeleton",
+                "bogged", "breeze", "parched", "copper_golem", "sulfur_cube",
+                "nautilus", "zombie_nautilus", "camel_husk", "elder_guardian"));
+        assertEquals(10, available.size());
+        assertTrue(available.contains("wither_skeleton"));
+        assertTrue(available.contains("sulfur_cube"));
+        assertTrue(available.contains("camel_husk"));
+    }
+
+    @Test
+    void oversizeHorizontalBossModelsCannotBeSelectedOrRandomized() {
+        for (String oversized : List.of("ghast", "happy_ghast", "ender_dragon",
+                "giant", "wither")) {
+            assertEquals("creeper", MobThemeManager.normalize(oversized));
+        }
+        assertEquals(List.of("map_default"),
+                MobThemeManager.allowedThemes(Set.of("ghast", "happy_ghast")));
+    }
+
+    @Test
     void paletteColorsMatchTheMobThemeMappings() {
         assertEquals("LIME", MobThemeManager.color("creeper"));
         assertEquals("PURPLE", MobThemeManager.color("witch"));

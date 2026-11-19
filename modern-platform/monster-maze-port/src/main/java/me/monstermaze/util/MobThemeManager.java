@@ -26,13 +26,33 @@ import java.util.*;
 public final class MobThemeManager implements Listener {
     public static final String MOB_METADATA = "monstermaze_mob";
     private static final int SLOT = 6;
+    /**
+     * Java 26.3 mob forms with at most a two-block HORIZONTAL maze footprint.
+     * This is not a two-block height limit: Wither Skeletons, Endermen, Iron
+     * Golems, Wardens and other tall but narrow forms remain eligible.
+     * Do not include huge horizontal forms (Ender Dragon, Ghast, Happy Ghast,
+     * Giant, Wither boss). Slime/Magma/Sulfur Cube default client-only renders
+     * use the small form; do not send enlarged size metadata to fake entities.
+     *
+     * The server's actual mobs remain Snow Golems; these are viewer-only models.
+     */
     private static final List<String> THEMES = Collections.unmodifiableList(Arrays.asList(
-        "map_default","creeper","skeleton","spider","zombie","slime","zombie_pigman","enderman","cave_spider",
-        "silverfish","blaze","magma_cube","bat","witch","endermite","guardian","pig","sheep","cow",
-        "chicken","squid","wolf","mooshroom","snowman","ocelot","horse","rabbit","villager",
-        // Current-era mob forms are kept to silhouettes within the cosmetic slot's
-        // two-block height and length limit. Oversized forms such as camel are omitted.
-        "axolotl","allay","frog","goat","fox","panda","parrot","turtle","bee","sniffer","armadillo",
+        "map_default",
+        "allay", "armadillo", "axolotl", "bat", "bee", "blaze", "bogged", "breeze",
+        "camel", "camel_husk", "cat", "cave_spider", "chicken", "cod", "copper_golem",
+        "cow", "creaking", "creeper", "dolphin", "donkey", "drowned",
+        "elder_guardian", "enderman", "endermite", "evoker", "fox", "frog",
+        "glow_squid", "goat", "guardian", "hoglin", "horse", "husk",
+        "illusioner", "iron_golem", "llama", "magma_cube", "mooshroom", "mule",
+        "nautilus", "ocelot", "panda", "parched", "parrot", "phantom", "pig",
+        "piglin", "piglin_brute", "pillager", "polar_bear", "pufferfish",
+        "rabbit", "ravager", "salmon", "sheep", "shulker", "silverfish",
+        "skeleton", "skeleton_horse", "slime", "sniffer", "snowman", "spider",
+        "squid", "stray", "strider", "sulfur_cube", "tadpole", "trader_llama",
+        "tropical_fish", "turtle", "vex", "villager", "vindicator",
+        "wandering_trader", "warden", "witch", "wither_skeleton", "wolf",
+        "zoglin", "zombie", "zombie_horse", "zombie_nautilus",
+        "zombie_pigman", "zombie_villager",
         "random"));
     private final MonsterMazePlugin plugin;
 
@@ -66,6 +86,8 @@ public final class MobThemeManager implements Listener {
         if("random".equals(theme))return Material.NETHER_STAR;
         if("creeper".equals(theme))return Material.CREEPER_HEAD;
         if("skeleton".equals(theme))return Material.SKELETON_SKULL;
+        if("wither_skeleton".equals(theme))return Material.WITHER_SKELETON_SKULL;
+        if("bogged".equals(theme)||"stray".equals(theme)||"parched".equals(theme))return Material.SKELETON_SKULL;
         if("zombie".equals(theme))return Material.ZOMBIE_HEAD;
         if("snowman".equals(theme))return Material.PUMPKIN;
         return spawnEggMaterial(theme);
@@ -75,7 +97,7 @@ public final class MobThemeManager implements Listener {
         if("zombie_pigman".equals(id))id="zombified_piglin";
         if("snowman".equals(id))id="snow_golem";
         Material egg=Material.matchMaterial(id.toUpperCase(Locale.ROOT)+"_SPAWN_EGG");
-        if(egg==null)egg=Material.PIG_SPAWN_EGG;
+        if(egg==null)egg=Material.PAPER;
         return egg;
     }
     public void registerSafePad(Location center) {
@@ -171,10 +193,13 @@ public final class MobThemeManager implements Listener {
         return allowedThemes(configured);
     }
 
-    static List<String> allowedThemes(java.util.Collection<String> configured) {
+    public static List<String> allowedThemes(java.util.Collection<String> configured) {
         if (configured == null) return THEMES;
         java.util.Set<String> selected = new java.util.LinkedHashSet<>();
-        for (String choice : configured) selected.add(normalize(choice));
+        for (String choice : configured) {
+            String recognized = recognizedTheme(choice);
+            if (recognized != null) selected.add(recognized);
+        }
         List<String> enabled = THEMES.stream().filter(selected::contains).toList();
         return enabled.isEmpty() ? List.of("map_default") : enabled;
     }
@@ -274,10 +299,18 @@ public final class MobThemeManager implements Listener {
     private boolean visibleTo(Player p,PadVisual d){if(p==null||!p.isOnline()||d.center.getWorld()==null||!p.getWorld().equals(d.center.getWorld()))return false;Location l=p.getLocation();return Math.abs(l.getX()-d.center.getX())<=192&&Math.abs(l.getZ()-d.center.getZ())<=192;}
     private String palette(Player p){String s=selected(p);if("map_default".equals(s))return s;return "random".equals(s)?randomConcrete(p.getUniqueId(),null):s;}
     private String defaultTheme(){try{String s=plugin.getMapManager()==null?null:plugin.getMapManager().activeMob();return normalize(s==null?"creeper":s);}catch(Throwable ignored){return "creeper";}}
+    private static String recognizedTheme(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        String id = raw.trim().toLowerCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
+        if ("pig_zombie".equals(id) || "zombified_piglin".equals(id)) id = "zombie_pigman";
+        if ("snow_golem".equals(id)) id = "snowman";
+        if ("mushroom_cow".equals(id)) id = "mooshroom";
+        if ("eyeofender".equals(id) || "eye_of_ender".equals(id)) id = "enderman";
+        return THEMES.contains(id) ? id : null;
+    }
     static String normalize(String s) {
-        if(s==null||s.trim().isEmpty())return "creeper";s=s.trim().toLowerCase(Locale.ROOT).replace('-','_').replace(' ','_');
-        if("pig_zombie".equals(s)||"zombified_piglin".equals(s))s="zombie_pigman";if("snow_golem".equals(s))s="snowman";
-        if("mushroom_cow".equals(s))s="mooshroom";if("eyeofender".equals(s)||"eye_of_ender".equals(s))s="enderman";return THEMES.contains(s)?s:"creeper";
+        String recognized = recognizedTheme(s);
+        return recognized == null ? "creeper" : recognized;
     }
     static String randomConcrete(UUID viewer,UUID entity){int h=viewer.hashCode();if(entity!=null)h=31*h+entity.hashCode();return THEMES.get(1+Math.floorMod(h,THEMES.size()-2));}
     static String color(String s) {
@@ -290,7 +323,13 @@ public final class MobThemeManager implements Listener {
             case "cow":case "horse":case "armadillo":return "BROWN";case "squid":case "allay":return "BLUE";
             case "ocelot":case "bee":return "YELLOW";case "axolotl":case "parrot":return "PINK";
             case "fox":return "ORANGE";case "goat":case "panda":return "LIGHT_GRAY";
-            case "frog":case "turtle":case "sniffer":return "GREEN";default:return "LIME";
+            case "frog":case "turtle":case "sniffer":case "bogged":case "drowned":case "copper_golem":return "GREEN";
+            case "wither_skeleton":case "creaking":case "shulker":return "BLACK";
+            case "warden":case "elder_guardian":case "nautilus":case "zombie_nautilus":case "glow_squid":return "CYAN";
+            case "stray":case "parched":return "LIGHT_GRAY";
+            case "husk":case "camel_husk":case "camel":case "donkey":case "mule":case "llama":case "trader_llama":return "BROWN";
+            case "sulfur_cube":case "breeze":case "tadpole":return "YELLOW";
+            default:return "LIME";
         }
     }
     static String displayName(String s){if("map_default".equals(s))return "Map Default";if("random".equals(s))return "Random Mob";StringBuilder b=new StringBuilder();for(String part:normalize(s).split("_")){if(b.length()>0)b.append(' ');b.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));}return b.toString();}
