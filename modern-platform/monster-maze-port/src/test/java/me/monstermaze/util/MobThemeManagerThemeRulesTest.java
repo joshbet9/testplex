@@ -71,6 +71,15 @@ class MobThemeManagerThemeRulesTest {
     }
 
     @Test
+    void selectorRotatesAmongMultipleSelectedMobSetsEvenWithGroupedPaletteOptionsPresent() {
+        List<String> enabled = MobThemeManager.allowedThemes(Set.of(
+                "creeper", "skeleton", "beacon-creeper-red", "pad-skeleton-blue"));
+        assertEquals(List.of("creeper", "skeleton"), enabled);
+        assertEquals("skeleton", MobThemeManager.nextTheme("creeper", enabled));
+        assertEquals("creeper", MobThemeManager.nextTheme("skeleton", enabled));
+    }
+
+    @Test
     void selectorCyclesOnlyCosmeticMenuEnabledThemes() {
         List<String> enabled = MobThemeManager.allowedThemes(Set.of("map_default", "axolotl", "frog"));
 

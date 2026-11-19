@@ -151,7 +151,7 @@ public final class MobThemeManager implements Listener {
     @EventHandler public void onThemeClick(PlayerInteractEvent e) {
         if(e.getHand()!=EquipmentSlot.HAND)return;
         Action a=e.getAction(); if(a!=Action.RIGHT_CLICK_AIR&&a!=Action.RIGHT_CLICK_BLOCK)return;
-        Player p=e.getPlayer(); if(p.getInventory().getHeldItemSlot()!=SLOT||!isSelector(p.getInventory().getItemInMainHand()))return;
+        Player p=e.getPlayer(); if(!isSelector(e.getItem()))return;
         e.setCancelled(true);
         cycleTheme(p);
     }
@@ -211,13 +211,17 @@ public final class MobThemeManager implements Listener {
         event.setCancelled(true);
         schedulePadRefresh(pad, null, new long[] {1L, 2L, 4L, 10L, 20L, 40L});
     }
-    @EventHandler public void onInventoryClick(InventoryClickEvent e) {
+    @EventHandler(priority=org.bukkit.event.EventPriority.HIGHEST) public void onInventoryClick(InventoryClickEvent e) {
         if(!(e.getWhoClicked() instanceof Player))return; Player p=(Player)e.getWhoClicked();
         boolean playerInventory = e.getClickedInventory() == p.getInventory();
         boolean selectorClicked = isSelector(e.getCurrentItem());
         if (shouldCycleSelectorInventoryClick(playerInventory, selectorClicked, e.isRightClick())) {
             e.setCancelled(true);
-            cycleTheme(p);
+            // Never replace the clicked ItemStack during InventoryClickEvent: some server
+            // inventory synchronization paths overwrite that mutation at event completion.
+            Bukkit.getScheduler().runTask(plugin.getHostPlugin(), () -> {
+                if (p.isOnline() && isSelector(p.getInventory().getItem(SLOT))) cycleTheme(p);
+            });
             return;
         }
         if(selectorClicked||isSelector(e.getCursor())||e.getHotbarButton()==SLOT
