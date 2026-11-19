@@ -742,7 +742,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
             safePad = nextSafePad;
             nextSafePad = null;
             rebuildSafePadNavigation();
-            if (curSafe <= 2) launchPadFirework(safePad);
+            launchPadFirework(safePad);
 
             checkWin();
         }
@@ -1090,11 +1090,15 @@ public void startGame(Location preferCenter, int requestedPattern) {
         return (float) Math.toDegrees(Math.atan2(-dx, dz));
     }
 
-    /** The first two active pads get a brief, non-damaging celebration firework. */
-    /** First two active Safe Pads get three brighter, harmless fireworks. */
+    static boolean shouldLaunchPadFirework(int stage, boolean padPresent) {
+        return padPresent && stage >= 1;
+    }
+
+    /** Every active Safe Pad gets the original three-shot firework signal. */
     private void launchPadFirework(SafePad pad) {
-        if(pad==null||curSafe>2)return;
-        final Location center=pad.getLocation().clone().add(0,1,0);final boolean firstPad=curSafe==1;
+        if (!shouldLaunchPadFirework(curSafe, pad != null)) return;
+        // Alternate the familiar green/purple first-stage palettes on later pads.
+        final Location center=pad.getLocation().clone().add(0,1,0);final boolean firstPad=(curSafe % 2 == 1);
         for(int i=0;i<3;i++){
             final int shot=i;
             Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(),new Runnable(){@Override public void run(){
