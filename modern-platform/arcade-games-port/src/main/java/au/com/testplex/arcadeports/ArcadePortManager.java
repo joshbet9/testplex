@@ -17806,12 +17806,14 @@ public final class ArcadePortManager implements Listener {
                 && isDragonEscapeCourseBuildLocationAllowed(session, target);
     }
 
-    private boolean isDragonEscapeKitPlacementSpaceClear(Session session, Block target) {
+    private boolean isDragonEscapeKitPlacementSpaceClear(Session session, Block target, UUID placingPlayerId) {
         org.bukkit.util.BoundingBox box = new org.bukkit.util.BoundingBox(
                 target.getX(), target.getY(), target.getZ(),
                 target.getX() + 1, target.getY() + 1, target.getZ() + 1);
         for (Player racer : alivePlayers(session)) {
-            if (racer.getWorld() == session.world && racer.getBoundingBox().overlaps(box)) return false;
+            if (ArcadePortRules.shouldBlockDragonEscapeKitPlacementOccupant(
+                    placingPlayerId, racer.getUniqueId())
+                    && racer.getWorld() == session.world && racer.getBoundingBox().overlaps(box)) return false;
         }
         return true;
     }
@@ -17836,7 +17838,7 @@ public final class ArcadePortManager implements Listener {
             player.sendActionBar(ChatColor.YELLOW + "You cannot place a temporary brick there.");
             return;
         }
-        if (!isDragonEscapeKitPlacementSpaceClear(session, target)) {
+        if (!isDragonEscapeKitPlacementSpaceClear(session, target, id)) {
             player.sendActionBar(ChatColor.YELLOW + "A racer is occupying that space.");
             return;
         }
@@ -18419,7 +18421,7 @@ public final class ArcadePortManager implements Listener {
         if (held == null || !isDragonEscapeDiggerBlockAllowed(held.getType())) return;
         Block target = dragonEscapeKitPlacementTarget(clicked, face);
         if (!isDragonEscapeKitPlacementTargetAllowed(session, target)
-                || !isDragonEscapeKitPlacementSpaceClear(session, target)) return;
+                || !isDragonEscapeKitPlacementSpaceClear(session, target, id)) return;
         BlockState previous = target.getState();
         if (session.dragonEscapePractice)
             session.dragonEscapePracticeChangedBlocks.putIfAbsent(target, previous.getBlockData().clone());
