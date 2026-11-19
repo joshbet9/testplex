@@ -308,7 +308,9 @@ jobs:
           grep -Fq 'No retained successful build artifact matches deployed SHA' "$deploy_workflow"
           grep -Fq 'JAR delta transfer payload' "$deploy_workflow"
           grep -Fq 'delta_bytes <= 9437184' "$deploy_workflow"
-          grep -Fq 'timeout-minutes: 5' "$deploy_workflow"
+          grep -Fq 'timeout-minutes: 12' "$deploy_workflow"
+          grep -Fq -- '-B 65536 -R 64' "$deploy_workflow"
+          grep -Fq '480s sftp' "$deploy_workflow"
           grep -Fq 'sha256sum -c SHA256SUMS' "$deploy_workflow"
           grep -Fq 'test_testplex_jar_delta' ".github/workflows/testplex-modern-build.yml"
           if grep -Fq 'ArtifactDownloadUrl.curl' "$deploy_workflow" || grep -Fq 'curl --config ArtifactDownloadUrl.curl' "$deploy_workflow"; then
