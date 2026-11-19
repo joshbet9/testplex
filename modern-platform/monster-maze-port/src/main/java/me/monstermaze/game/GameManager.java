@@ -106,6 +106,7 @@ public class GameManager implements Listener {
     private int liveTick;
     private final Map<UUID, Long> lastExpBarStates = new HashMap<UUID, Long>();
     private final Map<UUID, Location> lastCompassTargets = new HashMap<UUID, Location>();
+    private final Map<UUID, Location> lastScoreboardBlockPositions = new HashMap<UUID, Location>();
     private final Set<UUID> firstPadPlayers = new HashSet<UUID>();
     private final Map<UUID, Integer> firstPadStageByPlayer = new HashMap<UUID, Integer>();
     private final Map<Integer, Map<UUID, Set<UUID>>> outOfCupTargetsByStage = new HashMap<Integer, Map<UUID, Set<UUID>>>();
@@ -313,6 +314,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         padLockIns.clear();
         lastExpBarStates.clear();
         lastCompassTargets.clear();
+        lastScoreboardBlockPositions.clear();
         safePadNavigation.clear();
         curSafe = 1;
         phaseTimer = 60;
@@ -499,9 +501,10 @@ public void startGame(Location preferCenter, int requestedPattern) {
                 kitManager.tickJumperFlight();
                 kitManager.tickJumpLock();
 
-                // PERF: the scoreboard/KB/pad info only changes on stage/phase transitions
-                // (and the PB lookup is per player), so update it 2x/s instead of 20x/s.
-                if ((liveTick % 10) == 1) {
+                // Refresh standings as soon as a player moves to a different block. Keep the
+                // 10-tick refresh for phase, pad, and other non-movement changes.
+                boolean blockChanged = trackScoreboardBlockChanges(aliveNow);
+                if (blockChanged || (liveTick % 10) == 1) {
                     List<GameScoreboard.PlayerDistance> distanceStandings = updateDistanceStandings(aliveNow);
                     if (curSafe == 1) emitStageOneGuidance(aliveNow);
                     int pattern = getPatternIndex();
@@ -547,6 +550,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         padLockIns.clear();
         lastExpBarStates.clear();
         lastCompassTargets.clear();
+        lastScoreboardBlockPositions.clear();
         playersOnPad.clear();
         destroyAllPads();
         List<Player> arenaPlayers = getRoundPlayersForCleanup();
@@ -1098,6 +1102,31 @@ public void startGame(Location preferCenter, int requestedPattern) {
                 marker.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, marker, 1, 0.05, 0.08, 0.05, 0.0);
             }
         }
+    }
+
+    /** Ignore fractional movement and rotation: distances are displayed in whole blocks. */
+    static boolean sameScoreboardBlock(Location previous, Location current) {
+        return previous != null && current != null && previous.getWorld() == current.getWorld()
+                && previous.getBlockX() == current.getBlockX()
+                && previous.getBlockY() == current.getBlockY()
+                && previous.getBlockZ() == current.getBlockZ();
+    }
+
+    private boolean trackScoreboardBlockChanges(List<Player> aliveNow) {
+        boolean changed = false;
+        Set<UUID> present = new HashSet<UUID>();
+        for (Player player : aliveNow) {
+            UUID id = player.getUniqueId();
+            present.add(id);
+            Location current = player.getLocation();
+            if (!sameScoreboardBlock(lastScoreboardBlockPositions.get(id), current)) {
+                lastScoreboardBlockPositions.put(id, current.clone());
+                changed = true;
+            }
+        }
+        // Player elimination or disconnect also changes the standings immediately.
+        if (lastScoreboardBlockPositions.keySet().removeIf(id -> !present.contains(id))) changed = true;
+        return changed;
     }
 
     private List<GameScoreboard.PlayerDistance> updateDistanceStandings(List<Player> aliveNow) {
