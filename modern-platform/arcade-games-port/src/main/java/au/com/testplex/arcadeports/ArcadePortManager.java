@@ -20985,15 +20985,27 @@ public final class ArcadePortManager implements Listener {
                     ArcadePortRules.isBaconArenaKnockoutReason(reason));
             killer = resolvedKillerId == null ? null : session.players.get(resolvedKillerId);
         }
-        broadcastSourceStyleDeathMessage(session, player, killer, reason);
-        if (session.type == ArcadePortGame.DRAGON_ESCAPE && reason != null
-                && reason.toLowerCase(java.util.Locale.ROOT).contains("fell")) {
+        UUID disruptorOwnerId = null;
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
             UUID victimId = player.getUniqueId();
             UUID mineOwnerId = session.dragonEscapeMineLaunchedBy.remove(victimId);
             long launchedAt = session.dragonEscapeMineLaunchedAt.getOrDefault(victimId, 0L);
             session.dragonEscapeMineLaunchedAt.remove(victimId);
+            long now = System.currentTimeMillis();
+            if (killer == null && ArcadePortRules.shouldCreditDragonEscapeDisruptor(
+                    now, launchedAt, mineOwnerId, victimId, reason)) {
+                disruptorOwnerId = mineOwnerId;
+                Player mineOwner = session.players.get(mineOwnerId);
+                if (mineOwner != null && !testPlayers.isTestPlayer(mineOwner)
+                        && !GameDebugRuntimeOverrides.isDebugSession()) {
+                    String statsPath = localStatsPath(mineOwnerId, ArcadePortGame.DRAGON_ESCAPE.id());
+                    plugin.getConfig().set(statsPath + "disruptor-kills",
+                            plugin.getConfig().getInt(statsPath + "disruptor-kills", 0) + 1);
+                    plugin.saveConfig();
+                }
+            }
             if (mineOwnerId != null && ArcadePortRules.shouldCreditDragonEscapeRagebaiter(
-                    System.currentTimeMillis(), launchedAt, reason)) {
+                    now, launchedAt, reason)) {
                 int mineKills = session.dragonEscapeDisruptorKills.merge(mineOwnerId, 1, Integer::sum);
                 Player mineOwner = session.players.get(mineOwnerId);
                 if (ArcadePortRules.shouldAwardDragonEscapeRagebaiter(mineKills) && mineOwner != null) {
@@ -21001,6 +21013,7 @@ public final class ArcadePortManager implements Listener {
                 }
             }
         }
+        broadcastSourceStyleDeathMessage(session, player, killer, reason, disruptorOwnerId);
         if (session.type == ArcadePortGame.DRAGONS && session.alive.size() == 2
                 && session.alive.contains(player.getUniqueId()) && reason != null
                 && (reason.toLowerCase(java.util.Locale.ROOT).contains("fell")
@@ -27520,7 +27533,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     /** Recreate the source CombatManager death output for Arcade games using detailed messages. */
-    private void broadcastSourceStyleDeathMessage(Session session, Player victim, Player killer, String reason) {
+    private void broadcastSourceStyleDeathMessage(Session session, Player victim, Player killer, String reason,
+            UUID disruptorOwnerId) {
         String killMode = killer == null ? "" : sourceKillMode(session, victim, killer, reason);
         if (session.type == ArcadePortGame.EVOLUTION || session.type == ArcadePortGame.SUPER_SPLOOR) {
             // These source games select DeathMessageType.Simple: only the victim and killer receive it.
@@ -27539,7 +27553,14 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         String body;
-        if (session.type == ArcadePortGame.DRAGON_ESCAPE && killer != null && killer.isOnline()
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE && disruptorOwnerId != null) {
+            Player owner = session.players.get(disruptorOwnerId);
+            String ownerName = owner == null ? Bukkit.getOfflinePlayer(disruptorOwnerId).getName() : owner.getName();
+            if (ownerName == null || ownerName.isBlank()) ownerName = "a Disruptor";
+            body = ChatColor.YELLOW + victim.getName() + ChatColor.GRAY + " was disrupted by "
+                    + ChatColor.YELLOW + ownerName + ChatColor.GRAY + " and "
+                    + SourceDeathMessageRules.dragonEscapeDisruptorCause(reason);
+        } else if (session.type == ArcadePortGame.DRAGON_ESCAPE && killer != null && killer.isOnline()
                 && !killer.getUniqueId().equals(victim.getUniqueId())) {
             body = ChatColor.YELLOW + victim.getName() + ChatColor.GRAY + " was killed by "
                     + ChatColor.YELLOW + killer.getName() + ChatColor.GRAY + " with "
