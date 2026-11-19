@@ -235,10 +235,10 @@ public final class ModernArcadeLobby implements Listener {
                 && arcadePlugin.hasAdminAccess(player)) {
             inventory.setItem(HOTBAR_MAP_EDITOR_SLOT, createHotbarItem(Material.GOLDEN_AXE,
                     ChatColor.GOLD + "Map Editor",
-                    List.of(ChatColor.GRAY + "Choose a game and a map to edit.",
+                    List.of(ChatColor.GRAY + "Edit the map selected in the Game Panel.",
                             ChatColor.YELLOW + "Build in an isolated creative copy.",
-                            ChatColor.DARK_GRAY + "Right-click to open the map selector."),
-                    "arcadeport mapedit"));
+                            ChatColor.DARK_GRAY + "Right-click to edit the current selection."),
+                    "arcadeport mapedit current"));
         }
         inventory.setItem(HOTBAR_LEADERBOARDS_SLOT, createHotbarItem(Material.NAME_TAG,
                 ChatColor.AQUA + "Lobby Leaderboards",
