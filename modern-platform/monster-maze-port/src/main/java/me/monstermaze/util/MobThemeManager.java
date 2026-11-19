@@ -36,24 +36,35 @@ public final class MobThemeManager implements Listener {
      *
      * The server's actual mobs remain Snow Golems; these are viewer-only models.
      */
+    /**
+     * Viewer-local cosmetic mobs restricted to at most TWO SQUARE BLOCKS of
+     * horizontal (X/Z) footprint, not two blocks of vertical height.
+     * In Java's base entity dimensions the footprint is width * width.
+     * Exclude oversized Sniffer (1.9), Camel/Camel Husk (1.7),
+     * Elder Guardian (1.9975) and Ravager (1.95) even though several of
+     * those were offered previously. Also exclude enormous boss models.
+     * Tall/narrow Wither Skeleton (0.7) and Warden (0.9) remain allowed.
+     */
     private static final List<String> THEMES = Collections.unmodifiableList(Arrays.asList(
-        "map_default",
-        "allay", "armadillo", "axolotl", "bat", "bee", "blaze", "bogged", "breeze",
-        "camel", "camel_husk", "cat", "cave_spider", "chicken", "cod", "copper_golem",
-        "cow", "creaking", "creeper", "dolphin", "donkey", "drowned",
-        "elder_guardian", "enderman", "endermite", "evoker", "fox", "frog",
-        "glow_squid", "goat", "guardian", "hoglin", "horse", "husk",
-        "illusioner", "iron_golem", "llama", "magma_cube", "mooshroom", "mule",
-        "nautilus", "ocelot", "panda", "parched", "parrot", "phantom", "pig",
-        "piglin", "piglin_brute", "pillager", "polar_bear", "pufferfish",
-        "rabbit", "ravager", "salmon", "sheep", "shulker", "silverfish",
-        "skeleton", "skeleton_horse", "slime", "sniffer", "snowman", "spider",
-        "squid", "stray", "strider", "sulfur_cube", "tadpole", "trader_llama",
-        "tropical_fish", "turtle", "vex", "villager", "vindicator",
-        "wandering_trader", "warden", "witch", "wither_skeleton", "wolf",
-        "zoglin", "zombie", "zombie_horse", "zombie_nautilus",
-        "zombie_pigman", "zombie_villager",
-        "random"));
+        "map_default", "allay", "armadillo", "axolotl", "bat", "bee", "blaze",
+        "bogged", "breeze", "cat", "cave_spider", "chicken", "cod", "copper_golem",
+        "cow", "creaking", "creeper", "dolphin", "donkey", "drowned", "enderman",
+        "endermite", "evoker", "fox", "frog", "glow_squid", "goat", "guardian",
+        "hoglin", "horse", "husk", "illusioner", "iron_golem", "llama", "magma_cube",
+        "mooshroom", "mule", "nautilus", "ocelot", "panda", "parched", "parrot",
+        "phantom", "pig", "piglin", "piglin_brute", "pillager", "polar_bear", "pufferfish",
+        "rabbit", "salmon", "sheep", "shulker", "silverfish", "skeleton", "skeleton_horse",
+        "slime", "snowman", "spider", "squid", "stray", "strider", "sulfur_cube",
+        "tadpole", "trader_llama", "tropical_fish", "turtle", "vex", "villager", "vindicator",
+        "wandering_trader", "warden", "witch", "wither_skeleton", "wolf", "zoglin", "zombie",
+        "zombie_horse", "zombie_nautilus", "zombie_pigman", "zombie_villager", "random"));
+
+    static boolean fitsMazeFloorFootprint(double xWidth, double zLength) {
+        return Double.isFinite(xWidth) && Double.isFinite(zLength)
+                && xWidth > 0.0D && zLength > 0.0D
+                && xWidth * zLength <= 2.0D;
+    }
+
     private final MonsterMazePlugin plugin;
 
     private final File file;
@@ -360,11 +371,11 @@ public final class MobThemeManager implements Listener {
             case "cow":case "horse":case "armadillo":return "BROWN";case "squid":case "allay":return "BLUE";
             case "ocelot":case "bee":return "YELLOW";case "axolotl":case "parrot":return "PINK";
             case "fox":return "ORANGE";case "goat":case "panda":return "LIGHT_GRAY";
-            case "frog":case "turtle":case "sniffer":case "bogged":case "drowned":case "copper_golem":return "GREEN";
+            case "frog":case "turtle":case "bogged":case "drowned":case "copper_golem":return "GREEN";
             case "wither_skeleton":case "creaking":case "shulker":return "BLACK";
-            case "warden":case "elder_guardian":case "nautilus":case "zombie_nautilus":case "glow_squid":return "CYAN";
+            case "warden":case "nautilus":case "zombie_nautilus":case "glow_squid":return "CYAN";
             case "stray":case "parched":return "LIGHT_GRAY";
-            case "husk":case "camel_husk":case "camel":case "donkey":case "mule":case "llama":case "trader_llama":return "BROWN";
+            case "husk":case "donkey":case "mule":case "llama":case "trader_llama":return "BROWN";
             case "sulfur_cube":case "breeze":case "tadpole":return "YELLOW";
             default:return "LIME";
         }
