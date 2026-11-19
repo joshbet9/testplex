@@ -18114,7 +18114,11 @@ public final class ArcadePortManager implements Listener {
             // before pressing Space. Cooldown starts only after the next landing.
             boolean enabled = !player.isInWater()
                     && debugKitFeatureEnabled(player, ArcadePortGame.DRAGON_ESCAPE, kit);
-            Vector contactNormal = enabled ? DragonEscapeMovementKits.touchingWallNormal(player) : null;
+            Vector contactNormal = enabled
+                    ? (acrobat.clingActive && acrobat.clingAnchor != null
+                            ? DragonEscapeMovementKits.touchingWallNormal(player, acrobat.clingAnchor)
+                            : DragonEscapeMovementKits.touchingWallNormal(player))
+                    : null;
             long cooldownBeforeTick = acrobat.cooldownEndsAtMillis;
             boolean sticking = acrobat.tickWallCling(enabled && player.isSneaking(),
                     grounded, contactNormal != null, now);

@@ -298,14 +298,36 @@ final class DragonEscapeMovementKits {
      * contact and merely being near a wall do not.
      */
     static Vector touchingWallNormal(Player player) {
-        BoundingBox hitbox = player.getBoundingBox();
+        return touchingWallNormal(player.getWorld(), player.getBoundingBox());
+    }
+
+    /**
+     * Keep wall contact tied to the latched position, not a transient attempted
+     * movement position. Otherwise a held movement key can move the live hitbox
+     * off the wall before the movement event pins it back to the cling anchor.
+     */
+    static Vector touchingWallNormal(Player player, Location anchor) {
+        if (player == null || anchor == null || anchor.getWorld() != player.getWorld()) return null;
+        BoundingBox hitbox = wallClingBoundingBox(
+                player.getBoundingBox(), player.getLocation(), anchor);
+        return touchingWallNormal(player.getWorld(), hitbox);
+    }
+
+    static BoundingBox wallClingBoundingBox(BoundingBox current, Location currentLocation, Location anchor) {
+        if (current == null || currentLocation == null || anchor == null
+                || currentLocation.getWorld() != anchor.getWorld()) return current;
+        return current.clone().shift(anchor.getX() - currentLocation.getX(),
+                anchor.getY() - currentLocation.getY(), anchor.getZ() - currentLocation.getZ());
+    }
+
+    private static Vector touchingWallNormal(org.bukkit.World world, BoundingBox hitbox) {
         for (int x = (int) Math.floor(hitbox.getMinX() - TOUCH_TOLERANCE);
                 x <= Math.floor(hitbox.getMaxX() + TOUCH_TOLERANCE); x++) {
             for (int y = (int) Math.floor(hitbox.getMinY() + 0.15D);
                     y <= Math.floor(hitbox.getMaxY() - 0.15D); y++) {
                 for (int z = (int) Math.floor(hitbox.getMinZ() - TOUCH_TOLERANCE);
                         z <= Math.floor(hitbox.getMaxZ() + TOUCH_TOLERANCE); z++) {
-                    Block block = player.getWorld().getBlockAt(x, y, z);
+                    Block block = world.getBlockAt(x, y, z);
                     if (block.isEmpty()) continue;
                     for (BoundingBox shape : block.getCollisionShape().getBoundingBoxes()) {
                         BoundingBox worldShape = shape.clone().shift(x, y, z);
