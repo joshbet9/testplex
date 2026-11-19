@@ -226,7 +226,8 @@ public final class HoopsPaperSmoke extends JavaPlugin {
                 require(owner.getOpenInventory().getTitle().endsWith("Milestones"), id + " milestones did not open");
                 require(statsFooterSlot(inventory, Material.DIAMOND) >= 0,
                         id + " missing diamond achievements return");
-                for (int slot = 9; slot <= 44; slot++) {
+                // Milestone tiers now rise through the top row while category blocks sit at the bottom.
+                for (int slot = 0; slot <= 44; slot++) {
                     String entry = statsEntry(inventory.getItem(slot), entryKey);
                     if (entry == null) continue;
                     require(expectedMilestoneTiers.contains(entry), id + " unexpected milestone " + entry);
