@@ -154,7 +154,7 @@ public final class MobThemeManager implements Listener {
         Action a=e.getAction(); if(a!=Action.RIGHT_CLICK_AIR&&a!=Action.RIGHT_CLICK_BLOCK)return;
         Player p=e.getPlayer(); if(!isSelector(e.getItem()))return;
         e.setCancelled(true);
-        cycleTheme(p);
+        cycleThemeFromVirtualMob(p);
     }
 
     /**
@@ -168,7 +168,7 @@ public final class MobThemeManager implements Listener {
         if (!shouldCycleSelectorEntityInteract(e.getHand() == EquipmentSlot.HAND,
                 isSelector(p.getInventory().getItemInMainHand()))) return;
         e.setCancelled(true);
-        cycleTheme(p);
+        cycleThemeFromVirtualMob(p);
     }
 
     /**
