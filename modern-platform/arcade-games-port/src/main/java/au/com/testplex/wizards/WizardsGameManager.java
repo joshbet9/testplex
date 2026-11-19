@@ -124,6 +124,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
     private final Map<UUID, Objective> matchObjectives = new HashMap<>();
     private final Map<Location, TemporaryBlock> temporaryBlocks = new HashMap<>();
     private final Set<UUID> ownedEntities = new HashSet<>();
+    private final Set<UUID> resolvedFireballImpacts = new HashSet<>();
     private final Set<UUID> spellDamageSources = new HashSet<>();
     private final Map<UUID, UUID> spellKillAttribution = new HashMap<>();
     private final Map<UUID, SpectralArrowData> spectralArrows = new HashMap<>();
@@ -1070,12 +1071,22 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
                 if (blockY < world.getMinHeight() || blockY >= world.getMaxHeight()) continue;
                 for (int z = -extent; z <= extent; z++) {
                     Block block = world.getBlockAt(centre.getBlockX() + x, blockY, centre.getBlockZ() + z);
-                    if (block.getType().isAir() || block.getType() == Material.BEDROCK
-                            || block.getType() == Material.BARRIER
-                            || block.getState() instanceof InventoryHolder
-                            || block.getState() instanceof TileState) continue;
+                    var blockState = block.getState();
+                    boolean inventoryHolder = blockState instanceof InventoryHolder;
+                    if (!WizardsRules.shouldDestroyFireballBlock(block.getType(), inventoryHolder,
+                            blockState instanceof TileState)) continue;
                     Location blockCentre = block.getLocation().add(0.5D, 0.5D, 0.5D);
                     if (blockCentre.distanceSquared(centre) > radiusSquared) continue;
+                    if (blockState instanceof InventoryHolder holder) {
+                        Inventory inventory = blockState instanceof Chest chest
+                                ? chest.getBlockInventory() : holder.getInventory();
+                        for (ItemStack item : inventory.getContents()) {
+                            if (item != null && !item.getType().isAir()) {
+                                world.dropItemNaturally(blockCentre, item.clone());
+                            }
+                        }
+                        inventory.clear();
+                    }
                     world.spawnParticle(Particle.BLOCK, blockCentre, 6, 0.25D, 0.25D, 0.25D,
                             0.05D, block.getBlockData());
                     block.setType(Material.AIR, false);
@@ -1711,7 +1722,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         event.setDamage(WizardsRules.capMeleeDamage(event.getDamage()));
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onProjectileHit(ProjectileHitEvent event) {
         Projectile projectile = event.getEntity();
         if (projectile instanceof Fireball meteor
@@ -1721,6 +1732,8 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         }
         String spell = projectile.getPersistentDataContainer().get(projectileKey, PersistentDataType.STRING);
         if (spell == null) return;
+        if ("fireball".equals(spell)
+                && !resolvedFireballImpacts.add(projectile.getUniqueId())) return;
         Location location = projectile.getLocation();
         if ("web-shot".equals(spell)) {
             Location target = event.getHitEntity() == null
@@ -1765,6 +1778,8 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
             location.getWorld().spawnParticle(Particle.FLAME, location, 32, 0.6D, 0.6D, 0.6D, 0.04D);
             location.getWorld().spawnParticle(Particle.LAVA, location, 8, 0.35D, 0.35D, 0.35D, 0.0D);
             location.getWorld().playSound(location, Sound.ENTITY_GENERIC_EXPLODE, 0.8F, 1.1F);
+            ownedEntities.remove(projectile.getUniqueId());
+            projectile.remove();
         } else if ("anvil-drop".equals(spell)) {
             handleAnvilImpact(projectile);
         } else {
@@ -3109,6 +3124,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
             if (entity != null && entity.isValid()) entity.remove();
         }
         ownedEntities.clear();
+        resolvedFireballImpacts.clear();
         spellDamageSources.clear();
 
         if (!arcadeManaged) {

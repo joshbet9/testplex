@@ -159,6 +159,15 @@ public final class WizardsRules {
         return level * 0.3D + 2.0D;
     }
 
+    /** Fireballs break ordinary blocks and inventory containers, while protected tile blocks remain intact. */
+    public static boolean shouldDestroyFireballBlock(Material material, boolean inventoryHolder, boolean tileState) {
+        if (material == null || material == Material.AIR || material == Material.CAVE_AIR
+                || material == Material.VOID_AIR || material == Material.BEDROCK || material == Material.BARRIER) {
+            return false;
+        }
+        return !tileState || inventoryHolder;
+    }
+
     public static String wandDisplayName(WizardsSpell spell) {
         return spell == null ? ChatColor.WHITE + "Spell Wand"
                 : spellCategoryColour(spell) + "" + ChatColor.BOLD + spell.displayName();
