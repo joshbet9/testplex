@@ -2,10 +2,13 @@ package me.monstermaze.entity;
 
 import me.monstermaze.MonsterMazePlugin;
 import me.monstermaze.game.GameManager;
+import com.destroystokyo.paper.event.entity.EntityKnockbackByEntityEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityCombustEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
@@ -61,6 +64,28 @@ public final class MonsterEntityListener implements Listener {
             default:
                 break;
         }
+    }
+
+    /**
+     * Maze bump() already sets the exact source-game launch velocity. Since mob damage
+     * was restored, Paper also produces its normal entity-hit knockback after that
+     * custom velocity, changing the launch felt by players. Suppress only the extra
+     * vanilla impulse for a live player struck by one of THIS Maze's managed mobs.
+     * Never cancel the damage event: players must still lose two hearts per bump.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onMobKnockback(EntityKnockbackByEntityEvent event) {
+        if (!(event.getEntity() instanceof Player player)) return;
+        if (!isMazeContactKnockback(game.isLive(),
+                game.getAlivePlayers().contains(player),
+                game.getMonsterManager().isManagedMonster(event.getHitBy()))) return;
+        event.setCancelled(true);
+    }
+
+    /** Deliberately narrow predicate: never alter arbitrary player or global knockback. */
+    static boolean isMazeContactKnockback(boolean mazeLive, boolean activeParticipant,
+            boolean managedMazeMonsterSource) {
+        return mazeLive && activeParticipant && managedMazeMonsterSource;
     }
 
     private boolean isMonster(Entity entity) {
