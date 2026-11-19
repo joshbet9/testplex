@@ -13697,6 +13697,9 @@ public final class ArcadePortManager implements Listener {
             after = Math.max(0, before - piecesToPaint);
             session.paintPiecesRemaining.put(targetId, after);
             target.setHealth(ArcadePortRules.paintballHealthAfterHit(after));
+            if (ArcadeCustomHitFeedback.shouldShowLegacyHurtFeedback(session.type, true)) {
+                playLegacyDamageFeedback(target);
+            }
         }
         target.getWorld().playSound(target.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.7F, 1.8F);
         target.getWorld().spawnParticle(Particle.SPLASH, target.getLocation().add(0.0D, 1.0D, 0.0D),
@@ -28469,7 +28472,9 @@ public final class ArcadePortManager implements Listener {
         if (direction.lengthSquared() <= 0.000001D) return;
         Vector velocity = ArcadePortRules.spleefKnockbackVelocity(direction, target.isOnGround(), power);
         target.setVelocity(velocity);
-        target.playEffect(EntityEffect.HURT);
+        if (ArcadeCustomHitFeedback.shouldShowLegacyHurtFeedback(session.type, true)) {
+            playLegacyDamageFeedback(target);
+        }
     }
 
     /**
