@@ -21,12 +21,21 @@ class MonsterMazeCosmeticMenuRulesTest {
                 .filter(MenuService::isMonsterMazeMobChoice).map(CosmeticOption::getId).toList();
 
         assertTrue(mobs.size() > 30);
-        assertTrue(mobs.size() <= 45, "All forms should fit in one inventory page");
+        assertTrue(mobs.size() > 45, "Expanded 26.3 roster must be reachable through multiple pages");
+        assertEquals(2, MenuService.monsterMazeMobPageCount(mobs.size()));
+        assertEquals(0, MenuService.monsterMazeMobPage(-50, mobs.size()));
+        assertEquals(1, MenuService.monsterMazeMobPage(500, mobs.size()));
+        assertEquals(1, MenuService.monsterMazeMobPage(1, mobs.size()));
+        assertTrue(mobs.subList(45, mobs.size()).contains("wither_skeleton"),
+                "Wither Skeleton and later entries must be reachable on page two");
         assertEquals(mobs.size(), Set.copyOf(mobs).size(), "Each mob appears exactly once");
         assertTrue(mobs.contains("map_default"));
         assertTrue(mobs.contains("random"));
         assertTrue(mobs.contains("creeper"));
         assertTrue(mobs.contains("axolotl"));
+        assertTrue(mobs.contains("wither_skeleton"));
+        assertTrue(mobs.contains("sulfur_cube"));
+        assertFalse(mobs.contains("ghast"));
         assertTrue(mobs.stream().noneMatch(id -> id.startsWith("pad-") || id.startsWith("beacon-")));
     }
 
