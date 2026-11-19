@@ -40,7 +40,8 @@ public final class MonsterMazeVirtualMobInteractionListener implements PacketLis
 
         WrapperPlayClientInteractEntity packet = new WrapperPlayClientInteractEntity(event);
         UUID viewerId = event.getUser().getUUID();
-        if (!belongsToViewer(fakeIdsByViewer, viewerId, packet.getEntityId())) return;
+        int targetEntityId = packet.getEntityId();
+        if (!belongsToViewer(fakeIdsByViewer, viewerId, targetEntityId)) return;
 
         // The entity ID is synthetic and must never be processed by vanilla
         // interaction logic, regardless of whether the player is holding the selector.
@@ -51,7 +52,7 @@ public final class MonsterMazeVirtualMobInteractionListener implements PacketLis
         Bukkit.getScheduler().runTask(plugin.getHostPlugin(), () -> {
             Player viewer = Bukkit.getPlayer(viewerId);
             if (viewer != null && viewer.isOnline()
-                    && belongsToViewer(fakeIdsByViewer, viewerId, packet.getEntityId())
+                    && belongsToViewer(fakeIdsByViewer, viewerId, targetEntityId)
                     && plugin.getMobThemeManager() != null) {
                 plugin.getMobThemeManager().cycleThemeFromVirtualMob(viewer);
             }
