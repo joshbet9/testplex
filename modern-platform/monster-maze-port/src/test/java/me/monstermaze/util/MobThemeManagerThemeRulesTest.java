@@ -95,6 +95,13 @@ class MobThemeManagerThemeRulesTest {
     }
 
     @Test
+    void selectorCyclesWhenLookingAtMobButOnlyForMainHand() {
+        assertTrue(MobThemeManager.shouldCycleSelectorEntityInteract(true, true));
+        assertFalse(MobThemeManager.shouldCycleSelectorEntityInteract(false, true));
+        assertFalse(MobThemeManager.shouldCycleSelectorEntityInteract(true, false));
+    }
+
+    @Test
     void selectorCanBeRightClickedInThePlayerInventoryWithoutBeingMoved() {
         assertTrue(MobThemeManager.shouldCycleSelectorInventoryClick(true, true, true));
         assertFalse(MobThemeManager.shouldCycleSelectorInventoryClick(false, true, true));

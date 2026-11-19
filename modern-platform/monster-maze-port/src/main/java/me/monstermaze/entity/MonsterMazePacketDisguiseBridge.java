@@ -1,6 +1,8 @@
 package me.monstermaze.entity;
 
 import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.event.PacketListenerCommon;
+import com.github.retrooper.packetevents.event.PacketListenerPriority;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityType;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes;
 import com.github.retrooper.packetevents.util.Vector3d;
@@ -26,6 +28,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 
@@ -49,6 +52,9 @@ public final class MonsterMazePacketDisguiseBridge {
     private final MonsterMazePlugin plugin;
     private final Map<UUID, Map<UUID, ClientMob>> displaysByViewer = new HashMap<>();
     private final Set<UUID> failedViewers = new HashSet<>();
+    // Read by Netty's inbound listener; all mutations on Bukkit's main thread.
+    private final Map<UUID, Set<Integer>> fakeIdsByViewer = new ConcurrentHashMap<>();
+    private PacketListenerCommon mobInteractListener;
     private BukkitTask updateTask;
     private int tick;
 
@@ -62,6 +68,9 @@ public final class MonsterMazePacketDisguiseBridge {
             if (PacketEvents.getAPI() == null || PacketEvents.getAPI().getPlayerManager() == null) {
                 return false;
             }
+            mobInteractListener = PacketEvents.getAPI().getEventManager().registerListener(
+                    new MonsterMazeVirtualMobInteractionListener(plugin, fakeIdsByViewer),
+                    PacketListenerPriority.NORMAL);
             updateTask = Bukkit.getScheduler().runTaskTimer(
                     plugin.getHostPlugin(), this::tick, 1L, 2L);
             plugin.getLogger().info("Monster Maze per-viewer virtual mob renderers enabled (no vanilla packet rewriting).");
@@ -77,8 +86,14 @@ public final class MonsterMazePacketDisguiseBridge {
             updateTask.cancel();
             updateTask = null;
         }
+        PacketListenerCommon previousListener = mobInteractListener;
+        mobInteractListener = null;
+        if (previousListener != null) {
+            PacketEvents.getAPI().getEventManager().unregisterListener(previousListener);
+        }
         for (Player viewer : Bukkit.getOnlinePlayers()) clearViewer(viewer);
         displaysByViewer.clear();
+        fakeIdsByViewer.clear();
         failedViewers.clear();
     }
 
@@ -108,6 +123,7 @@ public final class MonsterMazePacketDisguiseBridge {
             moveViewerDisplays(viewer);
         }
         displaysByViewer.keySet().removeIf(id -> !online.contains(id));
+        fakeIdsByViewer.keySet().removeIf(id -> !online.contains(id));
         failedViewers.retainAll(online);
     }
 
@@ -148,6 +164,8 @@ public final class MonsterMazePacketDisguiseBridge {
                 int fakeId = NEXT_CLIENT_ENTITY_ID.getAndDecrement();
                 UUID fakeUuid = virtualUuid(viewerId, realId);
                 viewer.hideEntity(plugin.getHostPlugin(), real);
+                fakeIdsByViewer.computeIfAbsent(viewerId, id -> ConcurrentHashMap.newKeySet())
+                        .add(fakeId);
                 sendSpawn(viewer, fakeId, fakeUuid, target, at);
                 existing.put(realId, new ClientMob(real, fakeId, fakeUuid, target, at.clone()));
             } catch (RuntimeException | LinkageError failure) {
@@ -192,6 +210,8 @@ public final class MonsterMazePacketDisguiseBridge {
     }
 
     private void destroyViewerDisplay(Player viewer, ClientMob mob, LivingEntity showReal) {
+        Set<Integer> fakeIds = fakeIdsByViewer.get(viewer.getUniqueId());
+        if (fakeIds != null) fakeIds.remove(mob.entityId);
         try {
             PacketEvents.getAPI().getPlayerManager().sendPacket(
                     viewer, new WrapperPlayServerDestroyEntities(mob.entityId));
