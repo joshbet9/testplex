@@ -20,6 +20,8 @@ final class DragonEscapeMovementKits {
     // Bukkit has no use-button release event for ordinary feathers. A 100 ms
     // quiet interval distinguishes a new Feather click from held-button repeats.
     static final long FLUTTER_RIGHT_CLICK_REARM_GAP_MILLIS = 100L;
+    static final int DRAGON_ESCAPE_PLAYER_VISIBILITY_SLOT = 7;
+    static final int DRAGON_ESCAPE_GHOST_SLOT = 8;
     // A six-second interval regenerates Flutterfly charges 33.3% faster.
     static final long FLUTTER_CHARGE_RECHARGE_MILLIS = 6_000L;
     // Raise the tested Flutterfly bounce's minimum horizontal impulse by 20%.
