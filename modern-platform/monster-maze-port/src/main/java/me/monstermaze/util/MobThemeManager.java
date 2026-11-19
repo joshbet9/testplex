@@ -193,7 +193,7 @@ public final class MobThemeManager implements Listener {
         return allowedThemes(configured);
     }
 
-    static List<String> allowedThemes(java.util.Collection<String> configured) {
+    public static List<String> allowedThemes(java.util.Collection<String> configured) {
         if (configured == null) return THEMES;
         java.util.Set<String> selected = new java.util.LinkedHashSet<>();
         for (String choice : configured) {
