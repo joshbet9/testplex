@@ -5,10 +5,12 @@ import au.com.testplex.modern.model.CosmeticLineDefinition;
 import au.com.testplex.modern.model.GameDefinition;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PlayerPreferenceStoreTest {
     private CosmeticLineDefinition line(String gameId) {
@@ -54,6 +56,26 @@ class PlayerPreferenceStoreTest {
         assertEquals(Set.of(), PlayerPreferenceStore.selectionAfterDisable(Set.of("classic-pellet"), "classic-pellet"));
         assertEquals(Set.of("classic-pellet"), PlayerPreferenceStore.selectionAfterDisable(
                 Set.of("classic-pellet"), "not-selected"));
+    }
+
+    @Test
+    void enablingAllMonsterMazeMobSetsPreservesPerMobColoursAndIsIdempotent() {
+        var game = new ArcadeCatalog().getGame("monster-maze");
+        CosmeticLineDefinition mobSets = game.getCosmeticLines().stream()
+                .filter(item -> item.getId().equals("mob-sets")).findFirst().orElseThrow();
+        List<String> allMobs = mobSets.getOptions().stream()
+                .filter(option -> option.getSelectionGroup() == null)
+                .map(option -> option.getId()).toList();
+        Set<String> original = Set.of("map_default", "pad-creeper-lime", "beacon-zombie-purple");
+
+        Set<String> enabled = PlayerPreferenceStore.selectionAfterAddingOptions(mobSets, original, allMobs);
+
+        assertTrue(enabled.containsAll(allMobs));
+        assertTrue(enabled.contains("pad-creeper-lime"));
+        assertTrue(enabled.contains("beacon-zombie-purple"));
+        assertEquals(enabled,
+                PlayerPreferenceStore.selectionAfterAddingOptions(mobSets, enabled, allMobs));
+        assertEquals(82, allMobs.size());
     }
 
     @Test
