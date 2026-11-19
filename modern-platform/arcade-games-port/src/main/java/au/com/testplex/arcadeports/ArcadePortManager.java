@@ -18063,7 +18063,9 @@ public final class ArcadePortManager implements Listener {
         if (session == null || session.type != ArcadePortGame.DRAGON_ESCAPE || player == null) return;
         DragonEscapeMovementKits.AcrobatState acrobat =
                 session.dragonEscapeAcrobatStates.get(player.getUniqueId());
-        if (acrobat == null || !acrobat.gravityManaged) return;
+        if (acrobat == null) return;
+        acrobat.clingAnchor = null;
+        if (!acrobat.gravityManaged) return;
         player.setGravity(acrobat.gravityBeforeCling);
         acrobat.gravityManaged = false;
     }
@@ -18121,7 +18123,8 @@ public final class ArcadePortManager implements Listener {
                 releaseAcrobatWallCling(session, player);
             } else if (!acrobat.gravityManaged) {
                 acrobat.gravityBeforeCling = player.hasGravity();
-                acrobat.clingHeight = player.getLocation().getY();
+                acrobat.clingAnchor = player.getLocation().clone();
+                acrobat.clingHeight = acrobat.clingAnchor.getY();
                 player.setGravity(false);
                 acrobat.gravityManaged = true;
             }
@@ -18133,12 +18136,14 @@ public final class ArcadePortManager implements Listener {
             }
             if (!pressed || contactNormal == null) {
                 if (sticking) {
-                    // No vertical lift, gravity or lateral travel. Retain the
-                    // exact wall height while the player turns to aim the kick.
+                    // OnMove prevents WASD from detaching horizontally; correct
+                    // any residual positional drift while preserving yaw/pitch.
                     Location held = player.getLocation();
-                    if (Math.abs(held.getY() - acrobat.clingHeight) > 0.015D) {
-                        held.setY(acrobat.clingHeight);
-                        player.teleport(held);
+                    Location pinned = DragonEscapeMovementKits.wallClingDestination(
+                            held, acrobat.clingAnchor);
+                    if (pinned != null && pinned.getWorld() == held.getWorld()
+                            && held.distanceSquared(pinned) > 0.0004D) {
+                        player.teleport(pinned);
                     }
                     player.setVelocity(DragonEscapeMovementKits.wallClingVelocity());
                     player.setFallDistance(0.0F);
@@ -27948,6 +27953,18 @@ public final class ArcadePortManager implements Listener {
                 }
             }
             return;
+        }
+        // Once Acrobat is latched to a wall, block *all* positional movement
+        // (forward, backward, strafe, sneaking) while preserving head rotation.
+        // The wall kick's fresh jump press clears clingActive before launch.
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE && session.alive.contains(playerId)
+                && !(event instanceof PlayerTeleportEvent)
+                && "acrobat".equals(session.dragonEscapeKits.getOrDefault(playerId, "jumper"))) {
+            DragonEscapeMovementKits.AcrobatState state = session.dragonEscapeAcrobatStates.get(playerId);
+            if (state != null && state.clingActive && state.gravityManaged && state.clingAnchor != null) {
+                event.setTo(DragonEscapeMovementKits.wallClingDestination(event.getTo(), state.clingAnchor));
+                return;
+            }
         }
         if (session.type == ArcadePortGame.DRAGONS && session.alive.contains(playerId)
                 && !(event instanceof PlayerTeleportEvent)
