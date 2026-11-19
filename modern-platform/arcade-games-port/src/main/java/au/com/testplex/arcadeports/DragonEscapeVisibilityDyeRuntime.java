@@ -18,10 +18,12 @@ import org.bukkit.persistence.PersistentDataType;
 final class DragonEscapeVisibilityDyeRuntime implements Listener {
     private final ArcadeMechanicsModernPlugin plugin;
     private final NamespacedKey visibilityToggleKey;
+    private final NamespacedKey practiceControlKey;
 
     DragonEscapeVisibilityDyeRuntime(ArcadeMechanicsModernPlugin plugin) {
         this.plugin = plugin;
         this.visibilityToggleKey = new NamespacedKey(plugin, "dragon-escape-player-visibility-toggle");
+        this.practiceControlKey = new NamespacedKey(plugin, "dragon-escape-practice-action");
     }
 
     static Material dyeForVisibility(boolean visible) {
@@ -54,13 +56,21 @@ final class DragonEscapeVisibilityDyeRuntime implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
     public void onVisibilityToggle(PlayerInteractEvent event) {
-        if (isVisibilityToggle(event.getItem())) refreshNextTick(event.getPlayer());
+        if (isVisibilityToggle(event.getItem()) || isPracticeControl(event.getItem())) {
+            refreshNextTick(event.getPlayer());
+        }
     }
 
     private boolean isVisibilityToggle(ItemStack item) {
         return item != null && item.hasItemMeta()
                 && item.getItemMeta().getPersistentDataContainer()
                         .has(visibilityToggleKey, PersistentDataType.BYTE);
+    }
+
+    private boolean isPracticeControl(ItemStack item) {
+        return item != null && item.hasItemMeta()
+                && item.getItemMeta().getPersistentDataContainer()
+                        .has(practiceControlKey, PersistentDataType.STRING);
     }
 
     private void refreshNextTick(Player player) {
