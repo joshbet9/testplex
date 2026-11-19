@@ -26,6 +26,27 @@ final class DragonEscapeGhostSelection {
 
     static List<String> sourceKeys() { return SOURCE_KEYS; }
 
+    static String kitDisplayName(String kitId) {
+        if (kitId == null || kitId.isBlank()) return "Unknown Kit";
+        String normalized = kitId.trim().toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            case "jumper" -> "Jumper";
+            case "disruptor" -> "Disruptor";
+            case "builder" -> "Builder";
+            case "warper" -> "Warper";
+            case "digger" -> "Digger";
+            default -> {
+                StringBuilder name = new StringBuilder();
+                for (String word : normalized.replace('-', ' ').replace('_', ' ').split("\\s+")) {
+                    if (word.isBlank()) continue;
+                    if (!name.isEmpty()) name.append(' ');
+                    name.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
+                }
+                yield name.isEmpty() ? "Unknown Kit" : name.toString();
+            }
+        };
+    }
+
     static List<Source> limitConcurrent(List<Source> sources) {
         if (sources == null || sources.isEmpty()) return List.of();
         return List.copyOf(sources.subList(0, Math.min(sources.size(), MAX_CONCURRENT_SOURCES)));
