@@ -614,7 +614,7 @@ public final class SourceMapCatalog {
      * layer; the copy lives under java.io.tmpdir, outside the persistent data
      * volume, and is reused for the lifetime of the machine.
      */
-    static boolean prepareMonsterMazeWorld(JavaPlugin plugin, String worldName) {
+    public static boolean prepareMonsterMazeWorld(JavaPlugin plugin, String worldName) {
         synchronized (MONSTER_MAZE_WORLD_PREPARATION_LOCK) {
             return prepareMonsterMazeWorldLocked(plugin, worldName);
         }
