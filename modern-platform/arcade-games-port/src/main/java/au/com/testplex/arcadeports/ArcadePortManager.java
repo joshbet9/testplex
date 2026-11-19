@@ -7787,19 +7787,15 @@ public final class ArcadePortManager implements Listener {
             nextPoisonAt = Math.min(nextPoisonAt,
                     session.gladiatorNextPoisonAtByPair.getOrDefault(pair, Long.MAX_VALUE));
         }
-        String status;
         boolean voting = activeMatches == 0 && session.gladiatorVotingEndsAt > now;
         GladiatorVoteProgress.View voteProgress = voting
                 ? GladiatorVoteProgress.at(now, session.gladiatorVotingStartedAt, session.gladiatorVotingEndsAt)
                 : null;
-        if (voting) {
-            long seconds = voteProgress.secondsLeft();
-            status = "Voting " + seconds + (seconds == 1L ? " second" : " seconds") + " left";
-        }
-        else if (activeMatches == 0) status = "Waiting";
-        else if (now < nextFightAt) status = "Starting in " + Math.max(1, (nextFightAt - now + 999L) / 1_000L) + "s";
-        else if (now >= nextPoisonAt) status = "Active";
-        else status = "Poison in " + Math.max(0, (nextPoisonAt - now + 500L) / 1_000L) + "s";
+        // A tournament can have several independent duels at different stages. Once any
+        // unresolved duel has entered poison, a later duel's countdown must not hide it.
+        String status = GladiatorsScoreboardStatus.display(voting,
+                voteProgress == null ? 0L : voteProgress.secondsLeft(), activeMatches,
+                now, nextFightAt, nextPoisonAt);
 
         List<Player> players = alivePlayers(session).stream()
                 .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER)).toList();
