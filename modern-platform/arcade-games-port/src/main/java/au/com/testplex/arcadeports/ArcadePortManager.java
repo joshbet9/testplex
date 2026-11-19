@@ -9983,8 +9983,7 @@ public final class ArcadePortManager implements Listener {
                     // Acrobat uses XP as continuously draining wall-stick energy.
                     DragonEscapeMovementKits.AcrobatState acrobat = session.dragonEscapeAcrobatStates
                             .computeIfAbsent(id, ignored -> new DragonEscapeMovementKits.AcrobatState());
-                    player.setLevel(0);
-                    player.setExp((float) acrobat.charge);
+                    updateDragonEscapeAcrobatExperience(session, player, acrobat);
                 }
                 setDragonEscapeGhostHotbarItem(player);
                 if (session.dragonEscapePractice) setDragonEscapePracticeHotbarItems(player);
@@ -17517,6 +17516,12 @@ public final class ArcadePortManager implements Listener {
                         session.dragonEscapeKits.getOrDefault(id, "jumper"))))));
         setDragonEscapeLeapItem(player, remaining, ArcadePortRules.dragonEscapeLeapUses(
                 session.dragonEscapeKits.getOrDefault(id, "jumper")));
+        // The generic Leap item also sets XP progress to Leap uses. Acrobat's
+        // bar instead displays remaining wall-stick energy immediately after use.
+        if ("acrobat".equals(session.dragonEscapeKits.getOrDefault(id, "jumper"))) {
+            DragonEscapeMovementKits.AcrobatState acrobat = session.dragonEscapeAcrobatStates.get(id);
+            if (acrobat != null) updateDragonEscapeAcrobatExperience(session, player, acrobat);
+        }
         Vector velocity = ArcadePortRules.dragonEscapeLeapVelocity(
                 player.getLocation().getDirection(), player.isOnGround());
         pendingDragonEscapeLeapVelocity.put(id, velocity);
@@ -17917,6 +17922,17 @@ public final class ArcadePortManager implements Listener {
         player.setExp(flutter.rechargeProgress(nowMillis));
     }
 
+    /** Keep Leap count visible without replacing Acrobat's wall-stick XP bar. */
+    private void updateDragonEscapeAcrobatExperience(Session session, Player player,
+            DragonEscapeMovementKits.AcrobatState acrobat) {
+        int remainingLeaps = session.dragonEscapeLeapUsesRemaining.getOrDefault(
+                player.getUniqueId(), ArcadePortRules.DRAGON_ESCAPE_ACROBAT_LEAP_USES);
+        DragonEscapeMovementKits.AcrobatExperience display =
+                DragonEscapeMovementKits.acrobatExperience(remainingLeaps, acrobat.charge);
+        player.setLevel(display.level());
+        player.setExp(display.progress());
+    }
+
     private void useDragonEscapeFlutterBounce(Session session, Player player, long nowMillis) {
         UUID id = player.getUniqueId();
         if (active != session || !session.liveStarted || !session.alive.contains(id)
@@ -18021,8 +18037,7 @@ public final class ArcadePortManager implements Listener {
                 player.setGravity(false);
                 acrobat.gravityManaged = true;
             }
-            player.setLevel(0);
-            player.setExp((float) acrobat.charge);
+            updateDragonEscapeAcrobatExperience(session, player, acrobat);
             if (!enabled) continue;
             if (acrobat.clingActivated) {
                 player.getWorld().playSound(player.getLocation(),

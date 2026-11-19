@@ -131,6 +131,28 @@ class DragonEscapeMovementKitsTest {
     }
 
     @Test
+    void acrobatExperienceShowsRemainingLeapsAndPreservesWallStickEnergy() {
+        assertEquals(2, ArcadePortRules.DRAGON_ESCAPE_ACROBAT_LEAP_USES);
+        var full = DragonEscapeMovementKits.acrobatExperience(2, 1.0D);
+        assertEquals(2, full.level());
+        assertEquals(1.0F, full.progress(), 0.00001F);
+
+        var afterFirstLeap = DragonEscapeMovementKits.acrobatExperience(1, 0.625D);
+        assertEquals(1, afterFirstLeap.level());
+        assertEquals(0.625F, afterFirstLeap.progress(), 0.00001F,
+                "Remaining Leaps must not replace wall-stick energy in the XP bar");
+
+        var afterSecondLeap = DragonEscapeMovementKits.acrobatExperience(0, 0.3D);
+        assertEquals(0, afterSecondLeap.level());
+        assertEquals(0.3F, afterSecondLeap.progress(), 0.00001F);
+
+        assertEquals(0, DragonEscapeMovementKits.acrobatExperience(-2, 0.0D).level());
+        assertEquals(2, DragonEscapeMovementKits.acrobatExperience(50, 1.0D).level());
+        assertEquals(0.0F, DragonEscapeMovementKits.acrobatExperience(1, -1.0D).progress());
+        assertEquals(1.0F, DragonEscapeMovementKits.acrobatExperience(1, 1.5D).progress());
+    }
+
+    @Test
     void acrobatGetsTwoNormalLeapChargesInAdditionToWallKick() {
         assertEquals(2, ArcadePortRules.DRAGON_ESCAPE_ACROBAT_LEAP_USES);
         assertEquals(2, ArcadePortRules.dragonEscapeLeapUses("acrobat"));
