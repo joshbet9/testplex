@@ -182,6 +182,11 @@ class WizardsRulesTest {
         assertEquals(2.3D, WizardsRules.fireballBlockRadius(1), 0.000001D);
         assertEquals(2.6D, WizardsRules.fireballBlockRadius(2), 0.000001D);
         assertEquals(2.9D, WizardsRules.fireballBlockRadius(99), 0.000001D);
+        assertTrue(WizardsRules.shouldDestroyFireballBlock(org.bukkit.Material.CHEST, true, true));
+        assertTrue(WizardsRules.shouldDestroyFireballBlock(org.bukkit.Material.STONE, false, false));
+        assertFalse(WizardsRules.shouldDestroyFireballBlock(org.bukkit.Material.OAK_SIGN, false, true));
+        assertFalse(WizardsRules.shouldDestroyFireballBlock(org.bukkit.Material.BEDROCK, false, false));
+        assertFalse(WizardsRules.shouldDestroyFireballBlock(org.bukkit.Material.AIR, false, false));
         assertEquals(org.bukkit.ChatColor.RED + "" + org.bukkit.ChatColor.BOLD + "Fireball",
                 WizardsRules.wandDisplayName(WizardsSpell.FIREBALL));
         assertEquals(org.bukkit.ChatColor.GREEN + "" + org.bukkit.ChatColor.BOLD + "Flash",
