@@ -2115,6 +2115,12 @@ public final class ArcadePortRules {
         }
     }
 
+    /** The winner-beacon tint changes only when the current race leader changes. */
+    public static boolean shouldUpdateDragonEscapeBeaconLeader(java.util.UUID previousLeader,
+            java.util.UUID currentLeader) {
+        return currentLeader != null && !currentLeader.equals(previousLeader);
+    }
+
 
     /** Mirrors TeamGame's 1.8 scoreboard cutoff: individual players below thirteen alive. */
     public static boolean bombLobbersScoreboardShowsPlayerNames(int alivePlayers) {

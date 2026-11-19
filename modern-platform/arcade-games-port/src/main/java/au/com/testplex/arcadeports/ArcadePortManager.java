@@ -19717,17 +19717,14 @@ public final class ArcadePortManager implements Listener {
         List<Player> order = dragonEscapeRaceOrder(session);
         if (order.isEmpty()) return;
         Player leader = order.get(0);
-        UUID winnerId = session.dragonEscapeWinner;
-        if (winnerId != null && GameDebugRuntimeOverrides.globalCosmeticsEnabled()) {
-            Player winner = session.players.getOrDefault(winnerId, leader);
-            String winnerColour = dragonEscapeBeaconColor(winnerId);
-            if (!winnerId.equals(session.dragonEscapeBeaconLeader)) {
-                session.dragonEscapeBeaconLeader = winnerId;
-                session.dragonEscapeBeaconColor = winnerColour;
-                applyDragonEscapeWinnerBeaconColour(session, winnerColour);
-                announce(session, ChatColor.GOLD + winner.getName() + ChatColor.YELLOW
-                        + " won the race! The finish beacon now reflects their colour: " + winnerColour + ".");
-            }
+        UUID leaderId = leader.getUniqueId();
+        if (GameDebugRuntimeOverrides.globalCosmeticsEnabled()
+                && ArcadePortRules.shouldUpdateDragonEscapeBeaconLeader(
+                        session.dragonEscapeBeaconLeader, leaderId)) {
+            restoreDragonEscapeBeaconGlass(session);
+            session.dragonEscapeBeaconLeader = leaderId;
+            session.dragonEscapeBeaconColor = dragonEscapeBeaconColor(leaderId);
+            applyDragonEscapeWinnerBeaconColour(session, session.dragonEscapeBeaconColor);
         }
         for (int i = 0; i < order.size(); i++) {
             Player racer = order.get(i);
