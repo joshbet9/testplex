@@ -190,6 +190,26 @@ class DragonEscapeMovementKitsTest {
     }
 
     @Test
+    void acrobatWallContactUsesTheLatchedHitboxAfterAttemptedMovement() {
+        Location attempted = new Location(null, 23.0D, 75.0D, -10.0D);
+        Location anchor = new Location(null, 22.5D, 74.75D, -11.5D);
+        BoundingBox movedHitbox = new BoundingBox(22.7D, 75.0D, -10.3D,
+                23.3D, 76.8D, -9.7D);
+
+        BoundingBox anchored = DragonEscapeMovementKits.wallClingBoundingBox(
+                movedHitbox, attempted, anchor);
+
+        assertEquals(22.2D, anchored.getMinX(), 0.00001D);
+        assertEquals(22.8D, anchored.getMaxX(), 0.00001D);
+        assertEquals(74.75D, anchored.getMinY(), 0.00001D);
+        assertEquals(76.55D, anchored.getMaxY(), 0.00001D);
+        assertEquals(-11.8D, anchored.getMinZ(), 0.00001D);
+        assertEquals(-11.2D, anchored.getMaxZ(), 0.00001D);
+        assertEquals(22.7D, movedHitbox.getMinX(), 0.00001D,
+                "The live player hitbox must not be modified while checking anchor contact");
+    }
+
+    @Test
     void wallKicksRequireAnAlreadyActiveAirborneWallStick() {
         DragonEscapeMovementKits.AcrobatState state = new DragonEscapeMovementKits.AcrobatState();
         assertFalse(state.tickWallCling(true, true, true, 1_000L));
