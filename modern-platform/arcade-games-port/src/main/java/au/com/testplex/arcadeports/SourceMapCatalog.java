@@ -547,6 +547,61 @@ public final class SourceMapCatalog {
     }
 
     /**
+     * Resolve one deployed Monster Maze source world without allowing a map link
+     * to escape into arbitrary filesystem data. Hyper-V keeps real directories
+     * inside the world container; Fly links these seven names to the immutable
+     * image's separately packaged map root to keep map regions off its data volume.
+     */
+    static Path resolveMonsterMazeWorldSource(Path container, String worldName, Path packagedAssetsRoot) {
+        if (container == null || !MONSTER_MAZE_WORLD_NAMES.contains(worldName)) return null;
+        Path normalizedContainer = container.toAbsolutePath().normalize();
+        Path entry = normalizedContainer.resolve(worldName).normalize();
+        if (!entry.startsWith(normalizedContainer) || entry.equals(normalizedContainer)) return null;
+
+        try {
+            Path realContainer = normalizedContainer.toRealPath();
+            Path source;
+            if (Files.isSymbolicLink(entry)) {
+                if (packagedAssetsRoot == null || Files.isSymbolicLink(packagedAssetsRoot)
+                        || !Files.isDirectory(packagedAssetsRoot, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return null;
+                Path realAssets = packagedAssetsRoot.toRealPath();
+                // Packaged map assets must be separate from the persistent world/data volume.
+                if (realAssets.startsWith(realContainer) || realAssets.equals(realContainer)) return null;
+                Path marker = realAssets.resolve(".testplex-mm-source-maps");
+                if (Files.isSymbolicLink(marker)
+                        || !Files.isRegularFile(marker, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                        || !Files.readString(marker, StandardCharsets.UTF_8).trim().matches("[0-9a-f]{40}")) return null;
+                source = entry.toRealPath();
+                if (!realAssets.equals(source.getParent()) || !worldName.equals(source.getFileName().toString())) return null;
+            } else {
+                source = entry.toRealPath();
+                if (!source.startsWith(realContainer) || source.equals(realContainer)
+                        || !worldName.equals(source.getFileName().toString())) return null;
+            }
+
+            if (!Files.isDirectory(source, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                    || Files.isSymbolicLink(source.resolve("level.dat"))
+                    || !Files.isRegularFile(source.resolve("level.dat"), java.nio.file.LinkOption.NOFOLLOW_LINKS)) return null;
+            Path legacyRegion = source.resolve("region");
+            Path modernRegion = source.resolve("dimensions/minecraft/overworld/region");
+            Path region = Files.isDirectory(legacyRegion, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                    && !Files.isSymbolicLink(legacyRegion) ? legacyRegion
+                    : Files.isDirectory(modernRegion, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                            && !Files.isSymbolicLink(modernRegion) ? modernRegion : null;
+            if (region == null) return null;
+            try (Stream<Path> files = Files.list(region)) {
+                if (files.noneMatch(path -> Files.isRegularFile(path, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                        && path.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".mca"))) {
+                    return null;
+                }
+            }
+            return source;
+        } catch (IOException | SecurityException exception) {
+            return null;
+        }
+    }
+
+    /**
      * Prepare one of the deployed Monster Maze source worlds for Paper 26.3.
      * A deployment can restore the original {@code mm_*} folder while Paper's
      * previous import still exists under {@code world/dimensions/minecraft}.
@@ -557,10 +612,13 @@ public final class SourceMapCatalog {
         if (plugin == null || !MONSTER_MAZE_WORLD_NAMES.contains(worldName)) return false;
 
         Path container = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
-        Path source = container.resolve(worldName).normalize();
-        if (!source.startsWith(container) || source.equals(container) || Files.isSymbolicLink(source)
-                || !Files.isDirectory(source) || !Files.isRegularFile(source.resolve("level.dat"))) {
-            plugin.getLogger().warning("Monster Maze source world is missing or unsafe: " + source);
+        String configuredAssets = System.getProperty("testplex.monster-maze-source-root");
+        Path assetsRoot = configuredAssets == null || configuredAssets.isBlank()
+                ? null : Path.of(configuredAssets);
+        Path source = resolveMonsterMazeWorldSource(container, worldName, assetsRoot);
+        if (source == null) {
+            plugin.getLogger().warning("Monster Maze source world is missing or unsafe: "
+                    + container.resolve(worldName).normalize());
             return false;
         }
 
