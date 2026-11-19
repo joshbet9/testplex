@@ -18,14 +18,19 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 /** Short-lived modern-only floating health feedback above players in Monster Maze. */
 public final class PlayerFeedback implements Listener {
     private final MonsterMazePlugin plugin;
     private final GameManager game;
     private final Set<TextDisplay> activeDisplays = new HashSet<TextDisplay>();
+    /** Keep per-viewer visibility state to avoid re-sending show/hide packets every tick. */
+    private final Map<TextDisplay, Set<UUID>> visibleTo = new HashMap<TextDisplay, Set<UUID>>();
 
     public PlayerFeedback(MonsterMazePlugin plugin, GameManager game) {
         this.plugin = plugin;
@@ -54,9 +59,11 @@ public final class PlayerFeedback implements Listener {
         display.setAlignment(TextDisplay.TextAlignment.CENTER);
         display.setDefaultBackground(false);
         display.setShadowed(true);
-        display.setSeeThrough(true);
+        // Ordinary text depth/shadow gives sharper glyphs than see-through holograms.
+        display.setSeeThrough(false);
         display.setLineWidth(100);
-        display.setViewRange(1.0f);
+        display.setViewRange(2.0f);
+        display.setTeleportDuration(2);
         display.setPersistent(false);
         display.setInvulnerable(true);
         display.setSilent(true);
@@ -74,6 +81,7 @@ public final class PlayerFeedback implements Listener {
                 if (!game.isLive() || !player.isOnline() || !display.isValid() || age >= 24) {
                     display.remove();
                     activeDisplays.remove(display);
+                    visibleTo.remove(display);
                     cancel();
                     return;
                 }
@@ -81,21 +89,36 @@ public final class PlayerFeedback implements Listener {
                 showToAllowedViewers(player, display);
                 Location next = player.getLocation().clone().add(0.0D, 2.25D + age * 0.025D, 0.0D);
                 display.teleport(next);
-                display.setTextOpacity((byte) Math.max(0, 255 - age * 10));
-                age++;
+                // Interpolate two-tick movement and avoid 24 opacity metadata packets.
+                // The brief popup disappears cleanly when its lifetime ends.
+                age += 2;
             }
-        }.runTaskTimer(plugin.getHostPlugin(), 1L, 1L);
+        }.runTaskTimer(plugin.getHostPlugin(), 1L, 2L);
     }
 
     private void showToAllowedViewers(Player subject, TextDisplay display) {
+        Set<UUID> shown = visibleTo.computeIfAbsent(display, ignored -> new HashSet<UUID>());
+        Set<UUID> online = new HashSet<UUID>();
         for (Player viewer : Bukkit.getOnlinePlayers()) {
-            if (viewer.getWorld() != subject.getWorld()
-                    || game.getKitManager().isHiddenFrom(viewer, subject)) {
-                viewer.hideEntity(plugin.getHostPlugin(), display);
-            } else {
+            UUID id = viewer.getUniqueId();
+            online.add(id);
+            boolean allowed = viewer.getWorld() == subject.getWorld()
+                    && !game.getKitManager().isHiddenFrom(viewer, subject);
+            if (!shouldUpdateVisibility(allowed, shown.contains(id))) continue;
+            if (allowed) {
                 viewer.showEntity(plugin.getHostPlugin(), display);
+                shown.add(id);
+            } else {
+                viewer.hideEntity(plugin.getHostPlugin(), display);
+                shown.remove(id);
             }
         }
+        shown.retainAll(online);
+    }
+
+    /** Only emit a visibility packet when the desired state actually changes. */
+    static boolean shouldUpdateVisibility(boolean shouldShow, boolean currentlyShown) {
+        return shouldShow != currentlyShown;
     }
 
     /** Clear any outstanding displays when the round is stopped. */
@@ -104,5 +127,6 @@ public final class PlayerFeedback implements Listener {
             if (display != null && display.isValid()) display.remove();
         }
         activeDisplays.clear();
+        visibleTo.clear();
     }
 }
