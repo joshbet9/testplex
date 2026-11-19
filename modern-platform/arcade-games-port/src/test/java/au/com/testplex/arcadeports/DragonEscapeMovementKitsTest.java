@@ -2,6 +2,7 @@ package au.com.testplex.arcadeports;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import org.bukkit.Location;
 import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
 import org.junit.jupiter.api.Test;
@@ -164,6 +165,28 @@ class DragonEscapeMovementKitsTest {
         assertEquals("ENTITY_SLIME_JUMP", DragonEscapeMovementKits.FLUTTER_SOUND_NAME);
         assertEquals("BLOCK_SLIME_BLOCK_PLACE", DragonEscapeMovementKits.WALL_CLING_SOUND_NAME);
         assertEquals("ENTITY_FIREWORK_ROCKET_LAUNCH", DragonEscapeMovementKits.WALL_KICK_SOUND_NAME);
+    }
+
+    @Test
+    void acrobatWallClingIgnoresWasdJumpAndSneakMovementButAllowsLooking() {
+        Location anchor = new Location(null, 22.50, 74.75, -11.50, 0.0F, 0.0F);
+        for (double[] move : new double[][] {
+                {23.50, 74.75, -11.50}, // Forward / away from wall
+                {21.50, 74.75, -11.50}, // Backward
+                {22.50, 74.75, -10.50}, // Strafe
+                {22.50, 74.75, -12.50},
+                {22.50, 75.75, -11.50}, // Sneak / jump drift
+                {22.50, 73.75, -11.50}
+        }) {
+            Location attempted = new Location(null, move[0], move[1], move[2], 107.0F, -25.0F);
+            Location held = DragonEscapeMovementKits.wallClingDestination(attempted, anchor);
+            assertEquals(anchor.getX(), held.getX(), 0.00001D);
+            assertEquals(anchor.getY(), held.getY(), 0.00001D);
+            assertEquals(anchor.getZ(), held.getZ(), 0.00001D);
+            assertEquals(107.0F, held.getYaw(), 0.00001F, "Must still turn to aim wall kick");
+            assertEquals(-25.0F, held.getPitch(), 0.00001F);
+        }
+        assertNull(DragonEscapeMovementKits.wallClingDestination(null, anchor));
     }
 
     @Test
