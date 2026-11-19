@@ -650,7 +650,7 @@ jobs:
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15
             -o ServerAliveCountMax=40 -o TCPKeepAlive=yes
-            -B 262144 -R 64)
+            -B 131072 -R 32)
           chunk_dir="$RUNNER_TEMP/testplex-modern-arcade-chunks"
           mkdir -p "$chunk_dir"
           world_chunks=()
