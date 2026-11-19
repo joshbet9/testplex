@@ -84,8 +84,8 @@ public class GameManager implements Listener {
 
     private SafePad safePad;          // active pad
     private SafePad nextSafePad;      // preview pad (spawns at t=2)
-    /** Previous active pad, used to preserve forward course facing when returning a player. */
-    private Location safePadTravelFrom;
+    /** Last recorded yaw/pitch when each player walks off the current Safe Pad. */
+    private final Map<UUID, float[]> padDepartureFacing = new HashMap<UUID, float[]>();
     private final LinkedList<SafePad> oldSafePads = new LinkedList<SafePad>();
 
     private int curSafe = 1;
@@ -106,6 +106,7 @@ public class GameManager implements Listener {
     private int liveTick;
     private final Map<UUID, Long> lastExpBarStates = new HashMap<UUID, Long>();
     private final Map<UUID, Location> lastCompassTargets = new HashMap<UUID, Location>();
+    private final Map<UUID, Location> lastScoreboardBlockPositions = new HashMap<UUID, Location>();
     private final Set<UUID> firstPadPlayers = new HashSet<UUID>();
     private final Map<UUID, Integer> firstPadStageByPlayer = new HashMap<UUID, Integer>();
     private final Map<Integer, Map<UUID, Set<UUID>>> outOfCupTargetsByStage = new HashMap<Integer, Map<UUID, Set<UUID>>>();
@@ -279,6 +280,11 @@ public void startGame(int requestedPattern) {
     startGame(null, requestedPattern);
 }
 
+/** The generator builds the arena surface at center Y - 1; center is already the standing-height, block-centred spawn. */
+static Location initialSpawnLocation(Location arenaCenter) {
+    return arenaCenter == null ? null : arenaCenter.clone();
+}
+
 /** @param preferCenter optional player location when /mm start is used without setcenter */
 public void startGame(Location preferCenter) {
     startGame(preferCenter, -1);
@@ -311,8 +317,10 @@ public void startGame(Location preferCenter, int requestedPattern) {
         spectators.clear();
         playersOnPad.clear();
         padLockIns.clear();
+        padDepartureFacing.clear();
         lastExpBarStates.clear();
         lastCompassTargets.clear();
+        lastScoreboardBlockPositions.clear();
         safePadNavigation.clear();
         curSafe = 1;
         phaseTimer = 60;
@@ -370,7 +378,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
                     }
                     if (testplexManagedRound) {
                         p.closeInventory();
-                        Location spawn = center.clone().add(0.5D, 1.0D, 0.5D);
+                        Location spawn = initialSpawnLocation(center);
                         if (!p.teleport(spawn) || !isInArenaWorld(center.getWorld(), p.getWorld())) {
                             plugin.getLogger().warning("Monster Maze could not place registered participant "
                                     + p.getName() + " into the generated arena; excluding them from this round.");
@@ -384,7 +392,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
                     }
                     alive.add(playerId);
                     preparePlayer(p);
-                    if (!p.teleport(center.clone().add(0.5D, 1.0D, 0.5D))
+                    if (!p.teleport(initialSpawnLocation(center))
                             || !isInArenaWorld(center.getWorld(), p.getWorld())) {
                         alive.remove(playerId);
                         roundParticipants.remove(playerId);
@@ -406,7 +414,6 @@ public void startGame(Location preferCenter, int requestedPattern) {
                     broadcast(ChatColor.AQUA + "Solo mode: survive as long as you can!");
                 }
 
-                safePadTravelFrom = null;
                 spawnSafePad();
                 safePad = nextSafePad;
                 nextSafePad = null;
@@ -499,9 +506,10 @@ public void startGame(Location preferCenter, int requestedPattern) {
                 kitManager.tickJumperFlight();
                 kitManager.tickJumpLock();
 
-                // PERF: the scoreboard/KB/pad info only changes on stage/phase transitions
-                // (and the PB lookup is per player), so update it 2x/s instead of 20x/s.
-                if ((liveTick % 10) == 1) {
+                // Refresh standings as soon as a player moves to a different block. Keep the
+                // 10-tick refresh for phase, pad, and other non-movement changes.
+                boolean blockChanged = trackScoreboardBlockChanges(aliveNow);
+                if (blockChanged || (liveTick % 10) == 1) {
                     List<GameScoreboard.PlayerDistance> distanceStandings = updateDistanceStandings(aliveNow);
                     if (curSafe == 1) emitStageOneGuidance(aliveNow);
                     int pattern = getPatternIndex();
@@ -545,8 +553,10 @@ public void startGame(Location preferCenter, int requestedPattern) {
         feedback.clear();
         safePadNavigation.clear();
         padLockIns.clear();
+        padDepartureFacing.clear();
         lastExpBarStates.clear();
         lastCompassTargets.clear();
+        lastScoreboardBlockPositions.clear();
         playersOnPad.clear();
         destroyAllPads();
         List<Player> arenaPlayers = getRoundPlayersForCleanup();
@@ -702,10 +712,10 @@ public void startGame(Location preferCenter, int requestedPattern) {
             }
 
             monsterManager.spawnMore(getMode().additionalMonstersPerSafePad());
-            safePadTravelFrom = safePad == null ? null : safePad.getLocation().clone();
             stopSafePad();
             playersOnPad.clear();
             padLockIns.clear();
+        padDepartureFacing.clear();
             photoFinishRivalsThisPhase.clear();
             firstClaimedThisPhase = false;
 
@@ -1043,16 +1053,20 @@ public void startGame(Location preferCenter, int requestedPattern) {
         if (player == null || safePad == null || !player.isOnline()) return;
         Location from = player.getLocation();
         Location destination = safePad.getLocation().clone();
-        destination.setYaw(safePadTeleportYaw(from, safePadTravelFrom, destination));
-        destination.setPitch(0.0F);
+        float[] facing = safePadTeleportFacing(from, padDepartureFacing.get(player.getUniqueId()));
+        destination.setYaw(facing[0]);
+        destination.setPitch(facing[1]);
         player.setFallDistance(0.0F);
         player.setVelocity(new Vector(0, 0, 0));
         player.teleport(destination);
     }
 
-    /** Preserve course-forward facing when the player is teleported back from beyond the new pad. */
-    static float safePadTeleportYaw(Location playerLocation, Location previousSafePad, Location target) {
-        return yawToward(previousSafePad == null ? playerLocation : previousSafePad, target);
+    /** Return the actual view direction when this player left the pad, not a shared travel vector. */
+    static float[] safePadTeleportFacing(Location playerLocation, float[] departureFacing) {
+        if (departureFacing != null && departureFacing.length == 2) return departureFacing.clone();
+        return playerLocation == null
+                ? new float[] {0.0F, 0.0F}
+                : new float[] {playerLocation.getYaw(), playerLocation.getPitch()};
     }
 
     /** Calculate the horizontal Minecraft yaw needed to face from one point toward another. */
@@ -1098,6 +1112,31 @@ public void startGame(Location preferCenter, int requestedPattern) {
                 marker.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, marker, 1, 0.05, 0.08, 0.05, 0.0);
             }
         }
+    }
+
+    /** Ignore fractional movement and rotation: distances are displayed in whole blocks. */
+    static boolean sameScoreboardBlock(Location previous, Location current) {
+        return previous != null && current != null && previous.getWorld() == current.getWorld()
+                && previous.getBlockX() == current.getBlockX()
+                && previous.getBlockY() == current.getBlockY()
+                && previous.getBlockZ() == current.getBlockZ();
+    }
+
+    private boolean trackScoreboardBlockChanges(List<Player> aliveNow) {
+        boolean changed = false;
+        Set<UUID> present = new HashSet<UUID>();
+        for (Player player : aliveNow) {
+            UUID id = player.getUniqueId();
+            present.add(id);
+            Location current = player.getLocation();
+            if (!sameScoreboardBlock(lastScoreboardBlockPositions.get(id), current)) {
+                lastScoreboardBlockPositions.put(id, current.clone());
+                changed = true;
+            }
+        }
+        // Player elimination or disconnect also changes the standings immediately.
+        if (lastScoreboardBlockPositions.keySet().removeIf(id -> !present.contains(id))) changed = true;
+        return changed;
     }
 
     private List<GameScoreboard.PlayerDistance> updateDistanceStandings(List<Player> aliveNow) {
@@ -1233,6 +1272,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         UUID id = player.getUniqueId();
         scoreboard.clear(Collections.singletonList(player));
         padLockIns.remove(id);
+        padDepartureFacing.remove(id);
         lastExpBarStates.remove(id);
         lastCompassTargets.remove(id);
         
@@ -1294,6 +1334,15 @@ public void startGame(Location preferCenter, int requestedPattern) {
         Player p = event.getPlayer();
         if (!alive.contains(p.getUniqueId())) return;
         if (center == null) return;
+
+        // Remember each individual player\'s facing at the moment they walk off the pad.
+        // The previous-pad -> current-pad vector is not the direction the player left it.
+        Location destination = event.getTo();
+        if (safePad != null && padLockIns.contains(p.getUniqueId()) && destination != null
+                && safePad.isOn(event.getFrom()) && !safePad.isOn(destination)) {
+            padDepartureFacing.put(p.getUniqueId(),
+                    new float[] {destination.getYaw(), destination.getPitch()});
+        }
 
         if (p.getLocation().getY() < center.getY() - 3) {
             if (padLockIns.contains(p.getUniqueId()) && safePad != null) {

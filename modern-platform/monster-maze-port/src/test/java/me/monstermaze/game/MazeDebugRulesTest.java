@@ -41,6 +41,11 @@ class MazeDebugRulesTest {
     @Test void bumpRangeDamageAndCooldownSettingsChangeProductionPredicates() {
         assertTrue(MazeDebugRules.isBumpHitWithinRange(MazeMode.ORIGINAL, 0.9D, 0.9D));
         assertFalse(MazeDebugRules.isBumpHitWithinRange(MazeMode.ORIGINAL, 1.0D, 0.5D));
+        // A 1-block height difference can still be physical contact with
+        // the 1.9-block-high mob hitbox; the old spherical origin test missed it.
+        assertTrue(MazeDebugRules.isBumpHitWithinRange(MazeMode.ORIGINAL, 0.25D, 1.25D));
+        assertFalse(MazeDebugRules.isBumpHitWithinRange(MazeMode.ORIGINAL, 0.25D, 4.25D));
+
         assertEquals(4.0D, MazeDebugRules.bumpDamage(MazeMode.ORIGINAL));
         assertFalse(MazeDebugRules.isBumpCooldownReady(MazeMode.ORIGINAL, 1_999L, 1_000L));
         assertTrue(MazeDebugRules.isBumpCooldownReady(MazeMode.ORIGINAL, 2_000L, 1_000L));

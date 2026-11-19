@@ -366,7 +366,7 @@ public class MonsterManager {
                 }
 
                 double bumpDamage = MazeDebugRules.bumpDamage(game.getMode());
-                if (bumpDamage > 0.0D) player.damage(bumpDamage);
+                applyMobContactDamage(player, ent, bumpDamage);
                 Bukkit.getPluginManager().callEvent(new MonsterBumpPlayerEvent(player));
                 break;
             }
@@ -401,6 +401,17 @@ public class MonsterManager {
                 MazeDebugRules.doubleValue(game.getMode(), "BUMP_KNOCKBACK_Y_ADD", MazeDebugRules.BUMP_KNOCKBACK_Y_ADD),
                 MazeDebugRules.doubleValue(game.getMode(), "BUMP_KNOCKBACK_Y_MAX", MazeDebugRules.BUMP_KNOCKBACK_Y_MAX), true);
         return out;
+    }
+
+    /**
+     * Attribute bumps to the real managed maze mob, rather than sending an anonymous
+     * CUSTOM damage event. Other Arcade games may reject unattributed damage events,
+     * while Bukkit's normal entity damage path preserves protections and death handling.
+     * Never bypass damage events with setHealth().
+     */
+    static void applyMobContactDamage(Player player, LivingEntity monster, double damage) {
+        if (player == null || monster == null || !Double.isFinite(damage) || damage <= 0.0D) return;
+        player.damage(damage, monster);
     }
 
     private boolean canBump(Player player) {

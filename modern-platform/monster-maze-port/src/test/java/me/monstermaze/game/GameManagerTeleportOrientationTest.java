@@ -25,14 +25,23 @@ class GameManagerTeleportOrientationTest {
     }
 
     @Test
-    void safePadReturnFacesForwardCourseDirectionRatherThanBackTowardTheFallingPlayer() {
+    void safePadReturnKeepsTheViewFromWhenThisPlayerDepartedThePad() {
         World world = testWorld();
-        Location fallingPlayer = new Location(world, 0.5D, 64.0D, 12.5D);
-        Location previousPad = new Location(world, 0.5D, 64.0D, 0.5D);
-        Location nextPad = new Location(world, 0.5D, 64.0D, 10.5D);
+        // The player can leave in any direction, independent of the previous pad route.
+        Location fallingPlayer = new Location(world, 0.5D, 64.0D, 12.5D, 175.0F, 20.0F);
+        float[] departure = new float[] { -72.0F, -15.0F };
+        assertArrayEquals(departure, GameManager.safePadTeleportFacing(fallingPlayer, departure), 0.001F);
+        assertEquals(175.0F, fallingPlayer.getYaw(), 0.001F);
+    }
 
-        assertEquals(180.0F, Math.abs(GameManager.yawToward(fallingPlayer, nextPad)), 0.001F);
-        assertEquals(0.0F, GameManager.safePadTeleportYaw(fallingPlayer, previousPad, nextPad), 0.001F);
+    @Test
+    void safePadReturnWithoutARecordedDeparturePreservesTheCurrentView() {
+        World world = testWorld();
+        Location fallingPlayer = new Location(world, 0.5D, 64.0D, 12.5D, 135.0F, 25.0F);
+        assertArrayEquals(new float[] {135.0F, 25.0F},
+                GameManager.safePadTeleportFacing(fallingPlayer, null), 0.001F);
+        assertArrayEquals(new float[] {0.0F, 0.0F},
+                GameManager.safePadTeleportFacing(null, null), 0.001F);
     }
 
     @Test
