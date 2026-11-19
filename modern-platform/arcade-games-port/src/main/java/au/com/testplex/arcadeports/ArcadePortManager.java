@@ -10017,9 +10017,8 @@ public final class ArcadePortManager implements Listener {
                 break;
             case DRAGON_ESCAPE: {
                 UUID id = player.getUniqueId();
-                // Reborn grants invisibility to every runner when their Dragon Escape kit is given.
-                player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY,
-                        Integer.MAX_VALUE, 0, false, false, false));
+                // Preserve the source default (invisible), unless this racer has toggled visibility on.
+                applyDragonEscapePlayerVisibility(player, isDragonEscapePlayerVisible(id));
                 String kit = session.dragonEscapeKits.getOrDefault(id, "jumper");
                 int leaps = session.dragonEscapeLeapUsesRemaining.getOrDefault(id, ArcadePortRules.dragonEscapeLeapUses(kit));
                 if (leaps > 0) {
@@ -18046,10 +18045,8 @@ public final class ArcadePortManager implements Listener {
             player.sendActionBar(ChatColor.YELLOW + "Flutter Bounce is recharging.");
             return;
         }
-        var input = player.getCurrentInput();
         Vector launch = DragonEscapeMovementKits.flutterBounceVelocity(
-                player.getVelocity(), player.getLocation().getDirection(),
-                input.isForward(), input.isBackward(), input.isLeft(), input.isRight());
+                player.getVelocity(), player.getLocation().getDirection());
         pendingDragonEscapeLeapVelocity.put(id, launch);
         player.setVelocity(launch.clone());
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -25801,18 +25798,44 @@ public final class ArcadePortManager implements Listener {
         viewer.openInventory(inventory);
     }
 
-    /** A dedicated last-slot control, independent of /stats and the Dragon Escape cosmetics menu. */
+    private boolean isDragonEscapePlayerVisible(UUID playerId) {
+        return playerId != null && plugin.getConfig().getBoolean(
+                "dragon-escape-player-visible." + playerId,
+                DragonEscapeMovementKits.dragonEscapePlayerVisibleByDefault());
+    }
+
+    private void applyDragonEscapePlayerVisibility(Player player, boolean visible) {
+        if (player == null) return;
+        if (visible) player.removePotionEffect(PotionEffectType.INVISIBILITY);
+        else player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY,
+                Integer.MAX_VALUE, 0, false, false, false));
+    }
+
+    private void setDragonEscapePlayerVisibility(Player player, boolean visible) {
+        if (player == null) return;
+        plugin.getConfig().set("dragon-escape-player-visible." + player.getUniqueId(), visible);
+        plugin.saveConfig();
+        applyDragonEscapePlayerVisibility(player, visible);
+        setDragonEscapeGhostHotbarItem(player);
+        player.sendMessage(ChatColor.AQUA + "Dragon Escape visibility "
+                + (visible ? ChatColor.GREEN + "enabled" : ChatColor.RED + "disabled")
+                + ChatColor.GRAY + ". Other racers " + (visible ? "can see you." : "cannot see you."));
+    }
+
+    /** Slot nine keeps player visibility and PB ghost controls available during the race. */
     private void setDragonEscapeGhostHotbarItem(Player player) {
         if (player == null) return;
         boolean enabled = isDragonEscapeGhostEnabled(player.getUniqueId());
         Session session = active;
         int selectedCount = session != null && session.type == ArcadePortGame.DRAGON_ESCAPE
                 ? selectedDragonEscapeGhosts(player, session).size() : 0;
+        boolean playersVisible = isDragonEscapePlayerVisible(player.getUniqueId());
         ItemStack toggle = namedItem(Material.ENDER_EYE,
-                "PB Ghost: " + (enabled ? ChatColor.GREEN + "ON" : ChatColor.RED + "OFF"),
-                "Selected: " + selectedCount + "/4. Right-click to " + (enabled ? "hide" : "show")
-                        + " ghosts; left-click to choose which PB/WR ghosts to race."
-                        + (dragonEscapeGhostBridge == null ? " Requires PacketEvents 2.14.0." : ""));
+                "Players: " + (playersVisible ? ChatColor.GREEN + "Visible" : ChatColor.RED + "Invisible"),
+                "Right-click to toggle your visibility to other racers; sneak-right-click to "
+                        + (enabled ? "hide" : "show") + " PB/WR ghosts. Left-click to choose ghosts ("
+                        + selectedCount + "/4)."
+                        + (dragonEscapeGhostBridge == null ? " Requires PacketEvents 2.14.0 for race ghosts." : ""));
         ItemMeta meta = toggle.getItemMeta();
         meta.getPersistentDataContainer().set(dragonEscapeGhostHotbarKey, PersistentDataType.BYTE, (byte) 1);
         toggle.setItemMeta(meta);
@@ -31102,8 +31125,13 @@ public final class ArcadePortManager implements Listener {
                 && session.alive.contains(event.getPlayer().getUniqueId())
                 && isDragonEscapeGhostHotbarItem(event.getItem())) {
             event.setCancelled(true);
-            if (event.getAction().isRightClick()) setDragonEscapeGhost(event.getPlayer(), "toggle");
-            else if (event.getAction().isLeftClick()) openDragonEscapeGhostOptions(event.getPlayer());
+            if (event.getAction().isRightClick()) {
+                Player player = event.getPlayer();
+                if (player.isSneaking()) setDragonEscapeGhost(player, "toggle");
+                else setDragonEscapePlayerVisibility(player,
+                        DragonEscapeMovementKits.toggleDragonEscapePlayerVisibility(
+                                isDragonEscapePlayerVisible(player.getUniqueId())));
+            } else if (event.getAction().isLeftClick()) openDragonEscapeGhostOptions(event.getPlayer());
             return;
         }
 
@@ -31891,8 +31919,10 @@ public final class ArcadePortManager implements Listener {
             }
         }
         int charges = Math.max(0, Math.min(maximumUses, remaining));
-        player.getInventory().setItem(0, namedItem(Material.IRON_AXE, "Leap",
-                "Right-click to leap forward.", 1));
+        if (DragonEscapeMovementKits.shouldShowDragonEscapeLeapItem(charges)) {
+            player.getInventory().setItem(0, namedItem(Material.IRON_AXE, "Leap",
+                    "Right-click to leap forward.", 1));
+        }
         player.setLevel(charges);
         player.setExp(charges / (float) maximumUses);
     }
