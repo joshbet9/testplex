@@ -163,9 +163,9 @@ public final class MobThemeManager implements Listener {
      */
     @EventHandler(priority=org.bukkit.event.EventPriority.HIGHEST)
     public void onThemeEntityClick(PlayerInteractEntityEvent e) {
-        if (e.getHand() != EquipmentSlot.HAND) return;
         Player p = e.getPlayer();
-        if (!isSelector(p.getInventory().getItemInMainHand())) return;
+        if (!shouldCycleSelectorEntityInteract(e.getHand() == EquipmentSlot.HAND,
+                isSelector(p.getInventory().getItemInMainHand()))) return;
         e.setCancelled(true);
         cycleTheme(p);
     }
@@ -240,6 +240,10 @@ public final class MobThemeManager implements Listener {
         }
         if(selectorClicked||isSelector(e.getCursor())||e.getHotbarButton()==SLOT
                 ||(playerInventory&&e.getSlot()==SLOT))e.setCancelled(true);
+    }
+
+    static boolean shouldCycleSelectorEntityInteract(boolean mainHand, boolean selectorHeld) {
+        return mainHand && selectorHeld;
     }
 
     static boolean shouldCycleSelectorInventoryClick(boolean playerInventory, boolean selectorClicked,
