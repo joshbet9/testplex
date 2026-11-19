@@ -39,7 +39,8 @@ public final class MonsterMazeVirtualMobInteractionListener implements PacketLis
             return;
 
         WrapperPlayClientInteractEntity packet = new WrapperPlayClientInteractEntity(event);
-        UUID viewerId = event.getUser().getUUID();
+        UUID viewerId = event.getUser() == null ? null : event.getUser().getUUID();
+        if (viewerId == null) return;
         int targetEntityId = packet.getEntityId();
         if (!belongsToViewer(fakeIdsByViewer, viewerId, targetEntityId)) return;
 
@@ -61,6 +62,7 @@ public final class MonsterMazeVirtualMobInteractionListener implements PacketLis
 
     static boolean belongsToViewer(Map<UUID, Set<Integer>> fakeIdsByViewer, UUID viewerId,
             int entityId) {
+        if (viewerId == null) return false;
         Set<Integer> ids = fakeIdsByViewer.get(viewerId);
         return ids != null && ids.contains(entityId);
     }
