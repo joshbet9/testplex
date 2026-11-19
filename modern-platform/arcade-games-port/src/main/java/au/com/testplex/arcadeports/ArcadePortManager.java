@@ -26449,6 +26449,15 @@ public final class ArcadePortManager implements Listener {
         } else {
             String catalogId = statsCatalogId(gameId);
             for (ArcadeProgressCatalog.Milestone milestone : ArcadeProgressCatalog.milestones(catalogId)) {
+                if ("dragon-escape".equals(catalogId) && "world-tour".equals(milestone.id())) {
+                    List<String> mapResources = SourceMapCatalog.mapsFor(plugin, ArcadePortGame.DRAGON_ESCAPE)
+                            .stream().map(SourceMapCatalog.MapArchive::resource).toList();
+                    long[] dynamicStages = ArcadeProgressCatalog
+                            .worldTourProgress(mapResources, java.util.Set.of()).stages();
+                    entries.add(new StatsMilestone(milestone.id(), milestone.name(), milestone.unit(),
+                            dynamicStages, id -> milestone.progress(plugin, id, catalogId).value()));
+                    continue;
+                }
                 entries.add(new StatsMilestone(milestone.id(), milestone.name(), milestone.unit(),
                         // Avoid four duplicate "Tier 1" blocks for tiny source totals such as Precision (1).
                         java.util.Arrays.stream(milestone.stages()).distinct().toArray(),
