@@ -31057,6 +31057,15 @@ public final class ArcadePortManager implements Listener {
             else if (event.getAction().isLeftClick()) openDragonEscapeGhostOptions(event.getPlayer());
             return;
         }
+        // Authored course doors, trapdoors and gates take precedence over a
+        // leap or kit item so every racer can use the map controls.
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE
+                && event.getAction().isRightClick()
+                && event.getClickedBlock() != null
+                && ArcadePortRules.isDragonEscapeDoorInteractionAllowed(
+                        event.getClickedBlock().getType().name())) {
+            return;
+        }
         if (session.type == ArcadePortGame.GLADIATORS && event.getPlayer().getGameMode() == GameMode.SPECTATOR) {
             ItemStack held = event.getItem();
             if (held != null && held.hasItemMeta() && "spectator-menu".equals(held.getItemMeta()
@@ -31476,7 +31485,8 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
             if (event.getAction().isRightClick() && item == Material.IRON_AXE
-                    && ArcadePortRules.dragonEscapeLeapUses(kit) > 0) {
+                    && ArcadePortRules.shouldUseDragonEscapeLeap(
+                            session.dragonEscapeLeapUsesRemaining.getOrDefault(player.getUniqueId(), 0))) {
                 event.setCancelled(true);
                 useDragonEscapeLeap(session, player);
                 return;
@@ -31779,7 +31789,9 @@ public final class ArcadePortManager implements Listener {
                             && item == Material.BRICKS);
             case DRAGON_ESCAPE -> {
                 String kit = session.dragonEscapeKits.getOrDefault(id, "jumper");
-                yield (item == Material.IRON_AXE && ArcadePortRules.dragonEscapeLeapUses(kit) > 0)
+                yield (item == Material.IRON_AXE && ArcadePortRules.shouldUseDragonEscapeLeap(
+                        session.dragonEscapeLeapUsesRemaining.getOrDefault(
+                                id, ArcadePortRules.dragonEscapeLeapUses(kit))))
                         || ("flutterfly".equals(kit) && isDragonEscapeFlutterFeather(heldItem))
                         || (item == Material.ENDER_PEARL && "warper".equals(kit))
                         || (item == Material.TNT && "disruptor".equals(kit))
