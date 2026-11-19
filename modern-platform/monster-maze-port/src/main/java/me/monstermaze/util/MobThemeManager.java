@@ -156,6 +156,20 @@ public final class MobThemeManager implements Listener {
         cycleTheme(p);
     }
 
+    /**
+     * Looking at a mob sends an entity-interact packet rather than RIGHT_CLICK_AIR.
+     * Handle that packet using the exact same personal-view selector and only the
+     * main hand; the offhand would otherwise advance the choice twice.
+     */
+    @EventHandler(priority=org.bukkit.event.EventPriority.HIGHEST)
+    public void onThemeEntityClick(PlayerInteractEntityEvent e) {
+        if (e.getHand() != EquipmentSlot.HAND) return;
+        Player p = e.getPlayer();
+        if (!isSelector(p.getInventory().getItemInMainHand())) return;
+        e.setCancelled(true);
+        cycleTheme(p);
+    }
+
     private void cycleTheme(Player p) {
         List<String> enabled = enabledThemes(p);
         String c = nextTheme(selected(p), enabled);
