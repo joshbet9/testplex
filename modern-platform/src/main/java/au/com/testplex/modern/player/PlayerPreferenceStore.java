@@ -9,6 +9,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -85,6 +86,29 @@ public final class PlayerPreferenceStore {
         }
         save();
         return true;
+    }
+
+    public void chooseOptions(UUID player, GameDefinition game, CosmeticLineDefinition line,
+            Collection<String> optionIds) {
+        if (line.getSelectionMode() != CosmeticLineDefinition.SelectionMode.MULTI) {
+            throw new IllegalArgumentException("Bulk selection requires a MULTI cosmetic line");
+        }
+        Set<String> selected = selectionAfterAddingOptions(line, getSelected(player, game, line), optionIds);
+        data.set(linePath(player, game, line), new ArrayList<>(selected));
+        save();
+    }
+
+    static Set<String> selectionAfterAddingOptions(
+            CosmeticLineDefinition line, Set<String> currentSelections, Collection<String> optionIds) {
+        Set<String> selected = new LinkedHashSet<>(currentSelections);
+        for (String optionId : optionIds) {
+            boolean belongs = line.getOptions().stream().anyMatch(option -> option.getId().equals(optionId));
+            if (!belongs) throw new IllegalArgumentException("Option does not belong to " + line.getId());
+            if (!selected.contains(optionId)) {
+                selected = new LinkedHashSet<>(selectionAfterChoice(line, selected, optionId));
+            }
+        }
+        return selected;
     }
 
     static Set<String> selectionAfterChoice(
