@@ -150,9 +150,12 @@ public final class MonsterMazePlugin {
         this.gameManager.getMonsterManager().setMobType(mapManager.activeMob());
         this.monsterEntityListener = new MonsterEntityListener(this, gameManager);
         getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=gameplay-listeners-created");
-        // The already-deployed PacketEvents plugin is preferred over optional ProtocolLib.
-        // Load only by reflection: a missing packet plugin must not break the game module.
-        if (Bukkit.getPluginManager().isPluginEnabled("packetevents")) {
+        // Keep mob cosmetics player-specific, just like the Safe Pad/beacon colours.
+        // Virtual client-only mob IDs avoid rewriting the real Snow Golem's spawn
+        // packets/metadata, which likely caused #797's startup disconnects.
+        // The default is ON; an explicit config false remains an emergency kill switch.
+        if (virtualMobAppearancesEnabled(getConfig())
+                && Bukkit.getPluginManager().isPluginEnabled("packetevents")) {
             try {
                 Class<?> type = Class.forName("me.monstermaze.entity.MonsterMazePacketDisguiseBridge");
                 Object bridge = type.getConstructor(MonsterMazePlugin.class).newInstance(this);
@@ -160,11 +163,10 @@ public final class MonsterMazePlugin {
                     monsterDisguiseListener = bridge;
                     refreshMonsterDisguisesMethod = type.getMethod("refreshPlayer", Player.class);
                     shutdownMonsterDisguisesMethod = type.getMethod("shutdown");
-                    getLogger().info("PacketEvents detected; viewer-specific Monster Maze mob appearances enabled.");
+                    getLogger().info("PacketEvents virtual mobs enabled: independent viewer-specific Monster Maze appearances.");
                 }
             } catch (Throwable failure) {
-                getLogger().log(Level.WARNING,
-                        "PacketEvents mob-appearance bridge failed; trying optional ProtocolLib.", failure);
+                getLogger().log(Level.WARNING, "Monster Maze virtual mob renderer failed to initialize.", failure);
             }
         }
         if (monsterDisguiseListener == null && Bukkit.getPluginManager().isPluginEnabled("ProtocolLib")) {
@@ -272,6 +274,11 @@ public final class MonsterMazePlugin {
         try { refreshMonsterDisguisesMethod.invoke(monsterDisguiseListener, player); }
         catch (Throwable ignored) { }
     }
+    /** Independent per-viewer mob appearances default ON; allow an emergency admin kill switch. */
+    static boolean virtualMobAppearancesEnabled(FileConfiguration config) {
+        return config == null || config.getBoolean("virtual-mob-appearances", true);
+    }
+
     public boolean hasPerPlayerMobDisguises() {
         return monsterDisguiseListener != null && refreshMonsterDisguisesMethod != null;
     }
