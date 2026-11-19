@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -102,6 +103,21 @@ class SourceMapCatalogMonsterMazeWorldTest {
         assertTrue(Files.isRegularFile(packagedWorld.resolve("region/r.0.0.mca")));
         assertFalse(Files.exists(packagedWorld.resolve("dimensions/minecraft/overworld/region")));
         assertEquals(second, container.resolve("mm_void").toRealPath());
+    }
+
+    @Test
+    void selectedWorldValidationUsesKnownAndInstalledWorldStateInsteadOfArchivePaths() {
+        Set<String> known = Set.of("swampland", "siberian");
+        Set<String> installed = Set.of("swampland");
+
+        assertTrue(SourceMapCatalog.monsterMazeWorldSelectionAvailable(
+                "Swampland", known::contains, installed::contains));
+        assertFalse(SourceMapCatalog.monsterMazeWorldSelectionAvailable(
+                "siberian", known::contains, installed::contains));
+        assertFalse(SourceMapCatalog.monsterMazeWorldSelectionAvailable(
+                "unknown", known::contains, ignored -> true));
+        assertFalse(SourceMapCatalog.monsterMazeWorldSelectionAvailable(
+                null, known::contains, installed::contains));
     }
 
     private static Path createWorld(Path root, String name) throws IOException {

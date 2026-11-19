@@ -416,8 +416,28 @@ public final class SourceMapCatalog {
      * resources remain valid for backwards-compatible configurations.
      */
     public static boolean isInstalledResource(JavaPlugin plugin, ArcadePortGame game, String resource) {
-        return plugin != null && resourcePathBelongsToGame(game, resource)
-                && archiveAvailable(plugin, resource);
+        if (plugin == null || game == null) return false;
+        // Monster Maze maps are complete world folders managed by MapManager,
+        // not selected ZIP archives. Validate its actual active world instead
+        // of rejecting Fly's packaged worlds through the generic archive path.
+        if (game.isMonsterMaze()) return isInstalledMonsterMazeWorld(plugin);
+        return resourcePathBelongsToGame(game, resource) && archiveAvailable(plugin, resource);
+    }
+
+    private static boolean isInstalledMonsterMazeWorld(JavaPlugin plugin) {
+        if (!(plugin instanceof ArcadeMechanicsModernPlugin arcadePlugin)) return false;
+        me.monstermaze.MonsterMazePlugin monsterMaze = arcadePlugin.getMonsterMazeModule();
+        if (monsterMaze == null || monsterMaze.getMapManager() == null) return false;
+        me.monstermaze.world.MapManager maps = monsterMaze.getMapManager();
+        return monsterMazeWorldSelectionAvailable(maps.getActiveMap(), maps::isKnown, maps::isAvailable);
+    }
+
+    static boolean monsterMazeWorldSelectionAvailable(
+            String mapName, java.util.function.Predicate<String> isKnown,
+            java.util.function.Predicate<String> isInstalled) {
+        if (mapName == null || mapName.isBlank() || isKnown == null || isInstalled == null) return false;
+        String normalized = mapName.trim().toLowerCase(java.util.Locale.ROOT);
+        return isKnown.test(normalized) && isInstalled.test(normalized);
     }
 
     /** Pure path validation, kept separate so the game's resource mapping is unit-testable. */
