@@ -14,9 +14,6 @@ import me.monstermaze.util.TextUtil;
 import me.monstermaze.util.UtilAction;
 import me.monstermaze.util.UtilAlg;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -28,9 +25,6 @@ import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.block.Block;
 import org.bukkit.Location;
-import org.bukkit.entity.Display;
-import org.bukkit.entity.ItemDisplay;
-import org.bukkit.entity.TextDisplay;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -116,10 +110,7 @@ public class KitManager implements Listener {
     /** Player -> how they view OTHER players (their dye state). Default VISIBLE. */
     private final Map<UUID, VisMode> visMode = new HashMap<UUID, VisMode>();
 
-    /** Modern floating kit icon + live ability value, rendered per observer above each player. */
-    private final Map<UUID, ItemDisplay> kitNameplateIcons = new HashMap<UUID, ItemDisplay>();
-    private final Map<UUID, TextDisplay> kitNameplateCounts = new HashMap<UUID, TextDisplay>();
-    private final Map<UUID, Material> lastKitNameplateMaterials = new HashMap<UUID, Material>();
+    /** Last live kit badge sent for each player; the badge is part of the native nametag. */
     private final Map<UUID, String> lastKitNameplateValues = new HashMap<UUID, String>();
     private int kitNameplateTick;
 
@@ -516,67 +507,35 @@ public class KitManager implements Listener {
         }
     }
 
+    /**
+     * Native nametags support styled text but cannot render actual item icons without
+     * a resource pack. Keep the kit and live charge/READY state on the player's name
+     * using a scoreboard-team suffix, with no detached ItemDisplay/TextDisplay entities.
+     */
+    static String kitNametagSuffix(KitType kit, String value) {
+        if (kit == null) return "";
+        ChatColor colour;
+        String label;
+        switch (kit) {
+            case JUMPER: colour = ChatColor.YELLOW; label = "Jumper"; break;
+            case SLOWBALL: colour = ChatColor.AQUA; label = "Slowball"; break;
+            case BODY_BUILDER: colour = ChatColor.RED; label = "Body"; break;
+            case REPULSOR: colour = ChatColor.GREEN; label = "Repulsor"; break;
+            case MAVERICK: colour = ChatColor.GOLD; label = "Maverick"; break;
+            default: return "";
+        }
+        String status = value == null ? "?" : value;
+        return ChatColor.DARK_GRAY + " [" + colour + label + ChatColor.WHITE
+                + " " + status + ChatColor.DARK_GRAY + "]";
+    }
+
     private void updateKitNameplate(Player player) {
+        String suffix = kitNametagSuffix(getKit(player),
+                getKitNameplateValue(player, getKit(player)));
         UUID id = player.getUniqueId();
-        KitType kit = getKit(player);
-        boolean iconCreated = false;
-        boolean countCreated = false;
-
-        ItemDisplay icon = kitNameplateIcons.get(id);
-        if (icon == null || !icon.isValid()) {
-            icon = player.getWorld().spawn(player.getLocation().clone().add(-0.24D, 2.35D, 0.0D), ItemDisplay.class);
-            icon.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.GUI);
-            icon.setBillboard(Display.Billboard.CENTER);
-            icon.setViewRange(1.0f);
-            icon.setPersistent(false);
-            icon.setInvulnerable(true);
-            icon.setSilent(true);
-            icon.setGravity(false);
-            icon.setVisibleByDefault(false);
-            kitNameplateIcons.put(id, icon);
-            iconCreated = true;
-        }
-
-        if (iconCreated || lastKitNameplateMaterials.get(id) != kit.icon) {
-            icon.setItemStack(new ItemStack(kit.icon));
-            lastKitNameplateMaterials.put(id, kit.icon);
-        }
-
-        TextDisplay count = kitNameplateCounts.get(id);
-        if (count == null || !count.isValid()) {
-            count = player.getWorld().spawn(player.getLocation().clone().add(0.20D, 2.35D, 0.0D), TextDisplay.class);
-            count.setBillboard(Display.Billboard.CENTER);
-            count.setAlignment(TextDisplay.TextAlignment.CENTER);
-            count.setDefaultBackground(false);
-            count.setShadowed(true);
-            count.setSeeThrough(true);
-            count.setLineWidth(40);
-            count.setViewRange(1.0f);
-            count.setPersistent(false);
-            count.setInvulnerable(true);
-            count.setSilent(true);
-            count.setGravity(false);
-            count.setVisibleByDefault(false);
-            kitNameplateCounts.put(id, count);
-            countCreated = true;
-        }
-
-        String value = getKitNameplateValue(player, kit);
-        if (countCreated || !value.equals(lastKitNameplateValues.get(id))) {
-            NamedTextColor colour;
-            if (kit == KitType.SLOWBALL) {
-                colour = "READY".equals(value) ? NamedTextColor.GREEN : NamedTextColor.GOLD;
-            } else {
-                colour = "0".equals(value) ? NamedTextColor.RED : NamedTextColor.YELLOW;
-            }
-            count.text(Component.text(value, colour).decorate(TextDecoration.BOLD));
-            lastKitNameplateValues.put(id, value);
-        }
-
-        Location base = player.getLocation();
-        icon.teleport(base.clone().add(-0.24D, 2.35D, 0.0D));
-        count.teleport(base.clone().add(0.20D, 2.35D, 0.0D));
-        if (iconCreated || countCreated) refreshKitNameplateVisibility();
+        if (suffix.equals(lastKitNameplateValues.get(id))) return;
+        lastKitNameplateValues.put(id, suffix);
+        scoreboard.updateKitNametag(player, suffix);
     }
 
     /** Read the actual remaining kit stack, except Slowballer which shows Cryo Blitz status. */
@@ -623,39 +582,15 @@ public class KitManager implements Listener {
         return ((remainingMs + 999L) / 1000L) + "s";
     }
 
-    /** Keep above-name displays consistent with each viewer's VISIBLE / HIDDEN / GHOST setting. */
-    private void refreshKitNameplateVisibility() {
-        for (Map.Entry<UUID, ItemDisplay> entry : kitNameplateIcons.entrySet()) {
-            Player target = Bukkit.getPlayer(entry.getKey());
-            ItemDisplay icon = entry.getValue();
-            TextDisplay count = kitNameplateCounts.get(entry.getKey());
-            if (target == null || !target.isOnline() || icon == null || count == null) continue;
-
-            for (Player observer : Bukkit.getOnlinePlayers()) {
-                boolean visible = observer.getWorld() == target.getWorld() && !isHiddenFrom(observer, target);
-                if (visible) {
-                    observer.showEntity(plugin.getHostPlugin(), icon);
-                    observer.showEntity(plugin.getHostPlugin(), count);
-                } else {
-                    observer.hideEntity(plugin.getHostPlugin(), icon);
-                    observer.hideEntity(plugin.getHostPlugin(), count);
-                }
-            }
-        }
-    }
-
     private void removeKitNameplate(UUID id) {
-        ItemDisplay icon = kitNameplateIcons.remove(id);
-        if (icon != null && icon.isValid()) icon.remove();
-        TextDisplay count = kitNameplateCounts.remove(id);
-        if (count != null && count.isValid()) count.remove();
-        lastKitNameplateMaterials.remove(id);
         lastKitNameplateValues.remove(id);
+        scoreboard.clearKitNametag(id);
     }
 
     private void clearKitNameplates() {
-        for (UUID id : new HashSet<UUID>(kitNameplateIcons.keySet())) removeKitNameplate(id);
-        for (UUID id : new HashSet<UUID>(kitNameplateCounts.keySet())) removeKitNameplate(id);
+        for (UUID id : new HashSet<UUID>(lastKitNameplateValues.keySet())) {
+            removeKitNameplate(id);
+        }
     }
 
     // -------------------- Slowball --------------------
@@ -1221,7 +1156,6 @@ public class KitManager implements Listener {
                 }
             }
         }
-        refreshKitNameplateVisibility();
     }
 
     /** INVISIBILITY amp 1 (level II) = transparent ghost body (see-through). Remove when false. */
