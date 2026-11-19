@@ -279,12 +279,12 @@ public void startGame(int requestedPattern) {
     startGame(null, requestedPattern);
 }
 
-/** @param preferCenter optional player location when /mm start is used without setcenter */
 /** The generator builds the arena surface at center Y - 1; center is already the standing-height, block-centred spawn. */
 static Location initialSpawnLocation(Location arenaCenter) {
     return arenaCenter == null ? null : arenaCenter.clone();
 }
 
+/** @param preferCenter optional player location when /mm start is used without setcenter */
 public void startGame(Location preferCenter) {
     startGame(preferCenter, -1);
 }
