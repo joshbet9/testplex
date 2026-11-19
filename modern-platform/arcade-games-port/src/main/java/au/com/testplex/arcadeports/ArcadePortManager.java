@@ -25518,7 +25518,8 @@ public final class ArcadePortManager implements Listener {
                 : plugin.getConfig().getLong(ownPath + "kits." + kit + ".time-ms", -1L);
         if (kitPb > 0L && isDragonEscapeGhostSourceEnabled(viewerId, "kit-pb")) {
             sources.add(new DragonEscapeGhostSelection.Source(
-                    "kit-pb", viewerId, kitPb, kit, player.getName() + " " + kit + " PB"));
+                    "kit-pb", viewerId, kitPb, kit, player.getName() + " "
+                    + DragonEscapeGhostSelection.kitDisplayName(kit) + " PB"));
         }
         DragonEscapeTimeRecord overallRecord = dragonEscapeWorldRecord(resource, null);
         if (overallRecord != null && overallRecord.timeMillis() > 0L
@@ -25540,7 +25541,7 @@ public final class ArcadePortManager implements Listener {
                     .orElse("Kit World Record");
             sources.add(new DragonEscapeGhostSelection.Source(
                     "kit-record", kitRecord.playerId(), kitRecord.timeMillis(), kit,
-                    name + " " + kit + " WR"));
+                    name + " " + DragonEscapeGhostSelection.kitDisplayName(kit) + " WR"));
         }
         UUID targetId = dragonEscapeGhostTarget(viewerId);
         if (targetId != null && isDragonEscapeGhostSourceEnabled(viewerId, "target")
@@ -25656,11 +25657,13 @@ public final class ArcadePortManager implements Listener {
         inventory.setItem(10, dragonEscapeGhostSourceItem(viewer, "personal-pb", Material.CLOCK,
                 "Overall PB", "Replay your best time on this map."));
         inventory.setItem(12, dragonEscapeGhostSourceItem(viewer, "kit-pb", Material.IRON_AXE,
-                kit + " PB", "Replay your best time with the selected kit."));
+                DragonEscapeGhostSelection.kitDisplayName(kit) + " PB",
+                "Replay your best time with the selected kit."));
         inventory.setItem(14, dragonEscapeGhostSourceItem(viewer, "world-record", Material.GOLD_INGOT,
                 "Overall WR", "Race the map record holder's run."));
         inventory.setItem(16, dragonEscapeGhostSourceItem(viewer, "kit-record", Material.NETHER_STAR,
-                kit + " WR", "Race the selected kit's map record holder."));
+                DragonEscapeGhostSelection.kitDisplayName(kit) + " WR",
+                "Race the selected kit's map record holder."));
         String targetName = plugin.getConfig().getString(
                 "dragon-escape-ghost-target-name." + viewer.getUniqueId(), "None selected");
         inventory.setItem(22, dragonEscapeGhostMenuItem(Material.PLAYER_HEAD,

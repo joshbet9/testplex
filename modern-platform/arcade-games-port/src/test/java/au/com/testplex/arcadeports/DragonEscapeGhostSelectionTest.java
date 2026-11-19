@@ -7,6 +7,13 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 
 class DragonEscapeGhostSelectionTest {
+    @Test
+    void kitLabelsUsePlayerFacingProperNames() {
+        assertEquals("Jumper", DragonEscapeGhostSelection.kitDisplayName("jumper"));
+        assertEquals("Builder", DragonEscapeGhostSelection.kitDisplayName("BUILDER"));
+        assertEquals("Digger", DragonEscapeGhostSelection.kitDisplayName("digger"));
+    }
+
     private final UUID a = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private final UUID b = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
