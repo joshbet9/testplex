@@ -470,7 +470,7 @@ jobs:
       - name: Upload verified JARs to the isolated directory
         id: upload
         shell: bash
-        timeout-minutes: 5
+        timeout-minutes: 12
         env:
           HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
           HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
@@ -650,7 +650,7 @@ jobs:
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15
             -o ServerAliveCountMax=40 -o TCPKeepAlive=yes
-            -B 262144 -R 64)
+            -B 65536 -R 64)
           chunk_dir="$RUNNER_TEMP/testplex-modern-arcade-chunks"
           mkdir -p "$chunk_dir"
           world_chunks=()
@@ -699,7 +699,7 @@ jobs:
           [[ "$upload_payload_bytes" =~ ^[0-9]+$ ]] || { echo "Could not measure verified upload payload." >&2; exit 1; }
           upload_started_epoch="$(date +%s)"
           echo "Uploading verified JAR deltas, manifests, and required maps over SFTP."
-          timeout --foreground --signal=TERM --kill-after=10s 240s sftp "${sftp_opts[@]}" -b "$batch_file" "$remote"
+          timeout --foreground --signal=TERM --kill-after=10s 480s sftp "${sftp_opts[@]}" -b "$batch_file" "$remote"
           upload_elapsed_seconds=$(( $(date +%s) - upload_started_epoch ))
           if (( upload_elapsed_seconds > 0 )); then
             echo "SFTP payload transfer completed in ${upload_elapsed_seconds}s."
