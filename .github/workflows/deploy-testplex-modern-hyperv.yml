@@ -250,6 +250,9 @@ jobs:
           test -s "$recovery_helper" || { echo "Independent modern recovery helper is missing." >&2; exit 1; }
           cp "$recovery_helper" "$stage_dir/testplex-modern-recovery.sh"
           chmod 0755 "$stage_dir/testplex-modern-recovery.sh"
+          map_archive_helper="$GITHUB_WORKSPACE/deployment-source/deploy/testplex-map-archive.py"
+          test -s "$map_archive_helper" || { echo "Pinned Monster Maze map archive helper is missing." >&2; exit 1; }
+          cp "$map_archive_helper" "$stage_dir/testplex-map-archive.py"
           # These physical worlds are required by the Monster Maze game module bundled inside ArcadeMechanicsModern.
           map_root="$GITHUB_WORKSPACE/monstermaze-source/solo/1.21/maps"
           map_source_sha="$(git -C "$GITHUB_WORKSPACE/monstermaze-source" rev-parse HEAD)"
@@ -318,11 +321,8 @@ jobs:
           )"
           [[ "$need_mm_maps" == true || "$need_mm_maps" == false ]] || { echo "Remote Monster Maze map-cache check returned an invalid result." >&2; exit 1; }
           if [[ "$need_mm_maps" == true ]]; then
-            tar --exclude='*/session.lock' --exclude='*/uid.dat' -czf "$stage_dir/MonsterMazeMaps.tar.gz" \
-              -C "$map_root" mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido
-            tar -tzf "$stage_dir/MonsterMazeMaps.tar.gz" >/dev/null
             map_expanded_kb="$(du -sk "$map_root"/mm_void "$map_root"/mm_volcano "$map_root"/mm_colombia "$map_root"/mm_sandycoast "$map_root"/mm_siberian "$map_root"/mm_swampland "$map_root"/mm_tesorohundido | awk '{sum += $1} END {print sum+0}')"
-            echo "Monster Maze source changed or is incomplete on the VM; staging its source-world archive."
+            echo "Monster Maze source changed or is incomplete on the VM; the VM will fetch the pinned source archive directly from GitHub."
           else
             map_expanded_kb=0
             echo "Monster Maze source SHA $map_source_sha and all seven installed worlds are verified; omitting unchanged world archive."
@@ -383,8 +383,7 @@ jobs:
             rm -- "$target"
           done
           printf '%s\n' "${changed[@]}" > "$STAGE_DIR/ChangedModernJars.txt"
-          checksum_files=("$STAGE_DIR/ChangedModernJars.txt" "$STAGE_DIR/MonsterMazeMapsSource.txt" "$STAGE_DIR/WizardsSourceMaps.sha256" "$STAGE_DIR/testplex-modern-recovery.sh" "$STAGE_DIR/testplex-jar-delta.py")
-          [[ ! -f "$STAGE_DIR/MonsterMazeMaps.tar.gz" ]] || checksum_files+=("$STAGE_DIR/MonsterMazeMaps.tar.gz")
+          checksum_files=("$STAGE_DIR/ChangedModernJars.txt" "$STAGE_DIR/MonsterMazeMapsSource.txt" "$STAGE_DIR/WizardsSourceMaps.sha256" "$STAGE_DIR/testplex-modern-recovery.sh" "$STAGE_DIR/testplex-map-archive.py" "$STAGE_DIR/testplex-jar-delta.py")
           [[ ! -f "$STAGE_DIR/WizardsSourceMaps.tar.gz" ]] || checksum_files+=("$STAGE_DIR/WizardsSourceMaps.tar.gz")
           shopt -s nullglob
           delta_files=("$STAGE_DIR"/*.delta.zip "$STAGE_DIR"/*.delta.json)
@@ -644,21 +643,15 @@ jobs:
           echo "Staging space passed: /var/tmp=$((tmp_avail_kb / 1024)) MiB (needs $((tmp_required_kb / 1024)) MiB); server filesystem=$((server_avail_kb / 1024)) MiB (needs $((server_required_kb / 1024)) MiB); backup filesystem=$((state_avail_kb / 1024)) MiB (needs $((state_required_kb / 1024)) MiB); payload=$((stage_kb / 1024)) MiB; JAR deltas=$((staged_delta_kb / 1024)) MiB; reconstructed JARs=$((target_jars_kb / 1024)) MiB; maps=$((map_expanded_kb / 1024)) MiB; rollback snapshot=$((snapshot_kb / 1024)) MiB; reserve=512 MiB."
           install -d -m 0700 -- "$upload_dir"
           REMOTE_STAGE_PREP
-          # Transfer only small manifests, verified deltas, and changed maps over Tailscale.
+          # Transfer only small manifests and verified deltas over Tailscale. Large
+          # pinned map archives are fetched directly by the VM from their public source.
           sftp_opts=(-P "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15
             -o ServerAliveCountMax=40 -o TCPKeepAlive=yes
             -B 131072 -R 32)
-          chunk_dir="$RUNNER_TEMP/testplex-modern-arcade-chunks"
-          mkdir -p "$chunk_dir"
-          world_chunks=()
-          if [[ "$MM_MAPS_REQUIRED" == true ]]; then
-            split -b 8M -d -a 3 "$STAGE_DIR/MonsterMazeMaps.tar.gz" "$chunk_dir/MonsterMazeMaps.tar.gz.part."
-            mapfile -t world_chunks < <(printf '%s\n' "$chunk_dir"/MonsterMazeMaps.tar.gz.part.* | sort)
-            test "${#world_chunks[@]}" -gt 0
-          elif [[ "$MM_MAPS_REQUIRED" != false ]]; then
+          if [[ "$MM_MAPS_REQUIRED" != true && "$MM_MAPS_REQUIRED" != false ]]; then
             echo "Invalid Monster Maze map staging flag: $MM_MAPS_REQUIRED" >&2
             exit 1
           fi
@@ -684,6 +677,7 @@ jobs:
             done
             printf 'put "%s" "%s"\n' "$STAGE_DIR/MonsterMazeMapsSource.txt" "MonsterMazeMapsSource.txt"
             printf 'put "%s" "%s"\n' "$STAGE_DIR/WizardsSourceMaps.sha256" "WizardsSourceMaps.sha256"
+            printf 'put "%s" "%s"\n' "$STAGE_DIR/testplex-map-archive.py" "testplex-map-archive.py"
             if [[ "$WIZARDS_MAPS_REQUIRED" == true ]]; then
               printf 'put "%s" "%s"\n' "$STAGE_DIR/WizardsSourceMaps.tar.gz" "WizardsSourceMaps.tar.gz"
             elif [[ "$WIZARDS_MAPS_REQUIRED" != false ]]; then
@@ -691,14 +685,11 @@ jobs:
               exit 1
             fi
             printf 'put "%s" "%s"\n' "$STAGE_DIR/testplex-modern-recovery.sh" "testplex-modern-recovery.sh"
-            for file in "${world_chunks[@]}"; do
-              printf 'put "%s" "%s"\n' "$file" "${file##*/}"
-            done
           } > "$batch_file"
           upload_payload_bytes="$(du -sb "$STAGE_DIR" | awk '{print $1}')"
           [[ "$upload_payload_bytes" =~ ^[0-9]+$ ]] || { echo "Could not measure verified upload payload." >&2; exit 1; }
           upload_started_epoch="$(date +%s)"
-          echo "Uploading verified JAR deltas, manifests, and required maps over SFTP."
+          echo "Uploading verified JAR deltas and small manifests over SFTP; the VM fetches pinned Monster Maze map data directly from GitHub."
           timeout --foreground --signal=TERM --kill-after=10s 240s sftp "${sftp_opts[@]}" -b "$batch_file" "$remote"
           upload_elapsed_seconds=$(( $(date +%s) - upload_started_epoch ))
           if (( upload_elapsed_seconds > 0 )); then
@@ -713,18 +704,19 @@ jobs:
           cd "$upload_dir"
           shopt -s nullglob
           map_parts=(MonsterMazeMaps.tar.gz.part.*)
-          # Assemble each payload in place: remove a chunk only after it has been
-          # appended successfully. This bounds the peak of (remaining parts + output)
-          # to one copy of each source file instead of retaining two full copies.
           if [[ "$mm_maps_required" == true ]]; then
-            [[ ${#map_parts[@]} -gt 0 ]] || { echo "Monster Maze map update requested but no archive parts arrived." >&2; exit 1; }
-            : > MonsterMazeMaps.tar.gz.tmp
-            for part in "${map_parts[@]}"; do
-              cat "$part" >> MonsterMazeMaps.tar.gz.tmp
-              rm -- "$part"
-            done
-            mv MonsterMazeMaps.tar.gz.tmp MonsterMazeMaps.tar.gz
-            echo "Assembled MonsterMazeMaps.tar.gz ($(stat -c %s MonsterMazeMaps.tar.gz) bytes)."
+            [[ ${#map_parts[@]} -eq 0 ]] || { echo "Unexpected uploaded Monster Maze map chunks." >&2; exit 1; }
+            source_sha="$(tr -d '\r\n[:space:]' < MonsterMazeMapsSource.txt)"
+            [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid pinned Monster Maze source revision." >&2; exit 1; }
+            source_archive="MonsterMazeSource.tar.gz"
+            source_url="https://codeload.github.com/joshbet9/MonsterMaze/tar.gz/$source_sha"
+            echo "[deploy] fetching pinned Monster Maze source maps directly from GitHub (120 second limit)."
+            timeout --foreground --signal=TERM --kill-after=5s 120s curl --fail --location --retry 3 --retry-all-errors \
+              --connect-timeout 10 --user-agent "TestplexModernDeploy/1.0 (https://github.com/joshbet9/testplex)" \
+              "$source_url" -o "$source_archive"
+            python3 testplex-map-archive.py "$source_archive" MonsterMazeMaps.tar.gz
+            rm -- "$source_archive"
+            sha256sum MonsterMazeMaps.tar.gz >> SHA256SUMS
           elif [[ "$mm_maps_required" != false || ${#map_parts[@]} -ne 0 ]]; then
             echo "Unexpected Monster Maze map payload for unchanged source maps." >&2
             exit 1
@@ -801,10 +793,13 @@ jobs:
             sudo -n test -s "$UPLOAD_DIR/$jar"
           done
           sudo -n test -s "$UPLOAD_DIR/testplex-modern-recovery.sh"
+          sudo -n test -s "$UPLOAD_DIR/testplex-map-archive.py"
           sudo -n test -s "$UPLOAD_DIR/MonsterMazeMapsSource.txt"
           sudo -n test -s "$UPLOAD_DIR/WizardsSourceMaps.sha256"
           if [[ "$MM_MAPS_REQUIRED" == true ]]; then
-            sudo -n test -s "$UPLOAD_DIR/MonsterMazeMaps.tar.gz"
+            # The pinned map source is fetched from GitHub during the pre-install
+            # assembly phase, then checksum-validated and checked for all seven worlds.
+            :
           elif [[ "$MM_MAPS_REQUIRED" != false || -e "$UPLOAD_DIR/MonsterMazeMaps.tar.gz" ]]; then
             echo "Invalid Monster Maze map payload state; refusing deployment." >&2
             exit 1
@@ -1006,6 +1001,7 @@ jobs:
           MAP_STAGE_DIR="$UPLOAD_DIR/mm-map-stage"
           if [[ "$MM_MAPS_REQUIRED" == true ]]; then
             mkdir -p "$MAP_STAGE_DIR"
+            sudo -n test -s "$UPLOAD_DIR/MonsterMazeMaps.tar.gz"
             tar -xzf "$UPLOAD_DIR/MonsterMazeMaps.tar.gz" -C "$MAP_STAGE_DIR"
             for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
               test -s "$MAP_STAGE_DIR/$world/level.dat"
@@ -1854,7 +1850,7 @@ jobs:
             echo "- Plugin transfer payload: ${JAR_TRANSFER_BYTES:-unknown} bytes of changed full JARs; transfer checksummed before install"
             echo "- Paper and FakePlayerPlugin: reused when the installed versions match"
             echo "- PacketEvents: server-side 2.14.0 plugin installed and SHA-512 verified; clients need no mod"
-            echo "- Monster Maze maps uploaded: ${MM_MAPS_REQUIRED:-unknown}"
+            echo "- Monster Maze maps refreshed from the pinned GitHub source when required: ${MM_MAPS_REQUIRED:-unknown}"
             echo "- Wizards map archive uploaded: ${WIZARDS_MAPS_REQUIRED:-unknown}"
             echo "- Destination: /home/monstermaze/servers/testplex-modern"
             echo "- Dedicated unit: testplex-modern.service"
