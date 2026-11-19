@@ -20,6 +20,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class GameScoreboard {
     private final Map<UUID, Scoreboard> boards = new ConcurrentHashMap<UUID, Scoreboard>();
     private final Map<UUID, Integer> layoutPlayerCounts = new ConcurrentHashMap<UUID, Integer>();
+    /** Player-specific kit labels rendered as suffixes of native nametags, never entities. */
+    private final Map<UUID, String> kitNametagSuffixes = new ConcurrentHashMap<UUID, String>();
     private final Object optionalVisibilityAdapter;
     private final java.lang.reflect.Method sendInvisibleMetadataMethod;
 
@@ -143,6 +145,55 @@ public class GameScoreboard {
     private String getUniqueEntry(int index){return ChatColor.values()[Math.abs(index)%15].toString()+ChatColor.RESET;}
 
     /** Apply the observer's mode without changing another observer's client view. */
+    /** Each viewer has an independent scoreboard, so statuses may differ per target. */
+    static String kitNametagTeamName(UUID playerId) {
+        if (playerId == null) return "mmk_unknown";
+        String hex = playerId.toString().replace("-", "");
+        // Include the UUID tail as well: scripted test players may share long prefixes.
+        return "mmk_" + hex.substring(0, 6) + hex.substring(hex.length() - 6);
+    }
+
+    private Team kitNametagTeam(Scoreboard board, Player target) {
+        String teamName = kitNametagTeamName(target.getUniqueId());
+        Team team = board.getTeam(teamName);
+        if (team == null) team = board.registerNewTeam(teamName);
+        team.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
+        String suffix = kitNametagSuffixes.get(target.getUniqueId());
+        if (suffix != null && !suffix.equals(team.getSuffix())) team.setSuffix(suffix);
+        return team;
+    }
+
+    private void restoreKitNametag(Scoreboard board, Player target) {
+        if (board == null || target == null || !kitNametagSuffixes.containsKey(target.getUniqueId())) return;
+        Team ghostTeam = board.getTeam("mm_ghosts");
+        // The transparent viewer mode must keep both players on the shared
+        // ghost team; a player cannot belong to two native scoreboard teams.
+        if (ghostTeam != null && ghostTeam.hasEntry(target.getName())) return;
+        Team team = kitNametagTeam(board, target);
+        if (!team.hasEntry(target.getName())) team.addEntry(target.getName());
+    }
+
+    /** Update the real name-tag suffix per observer without spawning floating entities. */
+    public void updateKitNametag(Player target, String suffix) {
+        if (target == null || suffix == null) return;
+        kitNametagSuffixes.put(target.getUniqueId(), suffix);
+        for (Map.Entry<UUID, Scoreboard> entry : boards.entrySet()) {
+            if (entry.getKey().equals(target.getUniqueId())) continue;
+            restoreKitNametag(entry.getValue(), target);
+        }
+    }
+
+    /** Remove match-only suffixes when a player quits, switches kits or leaves the game. */
+    public void clearKitNametag(UUID targetId) {
+        if (targetId == null) return;
+        kitNametagSuffixes.remove(targetId);
+        String teamName = kitNametagTeamName(targetId);
+        for (Scoreboard board : boards.values()) {
+            Team team = board.getTeam(teamName);
+            if (team != null) team.unregister();
+        }
+    }
+
     private void applyVisibility(Player observer) {
         if (observer == null || !observer.isOnline()) return;
         Team ghostTeam = boardFor(observer).getTeam("mm_ghosts");
@@ -154,6 +205,7 @@ public class GameScoreboard {
             if (mode == VisibilityMode.INVISIBLE) {
                 observer.hidePlayer(target);
                 if (ghostTeam != null) ghostTeam.removeEntry(target.getName());
+                restoreKitNametag(boardFor(observer), target);
                 sendInvisibleMetadata(observer, target, false);
             } else if (mode == VisibilityMode.TRANSPARENT) {
                 observer.showPlayer(target);
@@ -162,6 +214,7 @@ public class GameScoreboard {
             } else {
                 observer.showPlayer(target);
                 if (ghostTeam != null) ghostTeam.removeEntry(target.getName());
+                restoreKitNametag(boardFor(observer), target);
                 sendInvisibleMetadata(observer, target, false);
             }
         }
@@ -190,13 +243,16 @@ public class GameScoreboard {
         Player op = Bukkit.getPlayer(observer);
         if (op == null || !op.isOnline()) return;
         Scoreboard board = boardFor(op);
-        Team t = board.getTeam("mm_ghosts");
-        if (t == null) return;
-        Player hp = Bukkit.getPlayer(hidden);
-        if (hp == null || !hp.isOnline()) return;
+        Team team = board.getTeam("mm_ghosts");
+        if (team == null) return;
+        Player target = Bukkit.getPlayer(hidden);
+        if (target == null || !target.isOnline()) return;
         if (ghost) {
-            if (!t.hasEntry(hp.getName())) t.addEntry(hp.getName());
-        } else t.removeEntry(hp.getName());
+            if (!team.hasEntry(target.getName())) team.addEntry(target.getName());
+        } else {
+            if (team.hasEntry(target.getName())) team.removeEntry(target.getName());
+            restoreKitNametag(board, target);
+        }
     }
 
     private void updateTeam(Scoreboard board, String teamName, String prefix, String suffix) {
@@ -224,5 +280,6 @@ public class GameScoreboard {
             boards.remove(p.getUniqueId());
             layoutPlayerCounts.remove(p.getUniqueId());
         }
+        kitNametagSuffixes.clear();
     }
 }
