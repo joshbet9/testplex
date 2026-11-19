@@ -31016,6 +31016,16 @@ public final class ArcadePortManager implements Listener {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Session session = active;
         if (session == null) return;
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE
+                && session.alive.contains(event.getPlayer().getUniqueId())
+                && event.getAction().isRightClick()
+                && event.getClickedBlock() != null
+                && ArcadePortRules.isDragonEscapeDoorInteractionAllowed(
+                        event.getClickedBlock().getType().name())) {
+            // Course controls take precedence over every kit item, including
+            // the leap axe and the ghost selector.
+            return;
+        }
         if (session.type == ArcadePortGame.GLADIATORS
                 && session.gladiatorVotingEndsAt > System.currentTimeMillis()
                 && event.getAction().isRightClick() && event.getItem() != null
@@ -31057,15 +31067,7 @@ public final class ArcadePortManager implements Listener {
             else if (event.getAction().isLeftClick()) openDragonEscapeGhostOptions(event.getPlayer());
             return;
         }
-        // Authored course doors, trapdoors and gates take precedence over a
-        // leap or kit item so every racer can use the map controls.
-        if (session.type == ArcadePortGame.DRAGON_ESCAPE
-                && event.getAction().isRightClick()
-                && event.getClickedBlock() != null
-                && ArcadePortRules.isDragonEscapeDoorInteractionAllowed(
-                        event.getClickedBlock().getType().name())) {
-            return;
-        }
+
         if (session.type == ArcadePortGame.GLADIATORS && event.getPlayer().getGameMode() == GameMode.SPECTATOR) {
             ItemStack held = event.getItem();
             if (held != null && held.hasItemMeta() && "spectator-menu".equals(held.getItemMeta()
