@@ -8,6 +8,7 @@ fi
 
 SOURCE_ROOT="$(realpath -e -- "$1")"
 WORLD_ROOT="$2"
+RUNTIME_ROOT="${TESTPLEX_MM_RUNTIME_ROOT:-/tmp/testplex-monster-maze-runtime}"
 EXPECTED_SOURCE="$(tr -d '\r\n[:space:]' < "$SOURCE_ROOT/.testplex-mm-source-maps")"
 WORLD_NAMES=(mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido)
 
@@ -63,13 +64,25 @@ for world in "${WORLD_NAMES[@]}"; do
     link="$WORLD_ROOT/$world"
     target="$SOURCE_ROOT/$world"
     if [[ -e "$link" || -L "$link" ]]; then
-        if [[ ! -L "$link" || "$(readlink -f -- "$link")" != "$target" ]]; then
+        if [[ ! -L "$link" ]]; then
             echo "Refusing to overwrite existing world data at $link" >&2
             exit 1
         fi
-    else
-        ln -s -- "$target" "$stage/$world"
+        installed_target="$(readlink -f -- "$link" || true)"
+        if [[ "$installed_target" == "$target" ]]; then
+            continue
+        fi
+        link_target="$(readlink -- "$link" || true)"
+        if [[ "$link_target" != "$RUNTIME_ROOT/$world" ]]; then
+            echo "Refusing to replace an unexpected Monster Maze world link at $link" >&2
+            exit 1
+        fi
+        # A prior Paper session redirected this known link to its private
+        # runtime copy. Repoint only that exact symlink to immutable assets;
+        # the next map load creates/reuses its writable copy outside the volume.
+        rm -f -- "$link"
     fi
+    ln -s -- "$target" "$stage/$world"
 done
 
 if [[ -n "${TESTPLEX_WORLD_OWNER:-}" ]]; then
