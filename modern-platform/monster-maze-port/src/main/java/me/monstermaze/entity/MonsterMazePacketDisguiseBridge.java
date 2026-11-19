@@ -162,7 +162,9 @@ public final class MonsterMazePacketDisguiseBridge {
         while (it.hasNext()) {
             Map.Entry<UUID, ClientMob> entry = it.next();
             if (present.contains(entry.getKey())) continue;
-            destroyViewerDisplay(viewer, entry.getValue(), null);
+            // Even if the server mob has been removed, clear Bukkit's per-player
+            // hide state so it cannot accumulate across repeated rounds.
+            destroyViewerDisplay(viewer, entry.getValue(), entry.getValue().realEntity);
             it.remove();
         }
     }
@@ -196,7 +198,7 @@ public final class MonsterMazePacketDisguiseBridge {
         } catch (RuntimeException | LinkageError failure) {
             plugin.getLogger().log(Level.WARNING, "Could not remove a viewer-only Monster Maze mob.", failure);
         }
-        if (showReal != null && showReal.isValid()) safeShow(viewer, showReal);
+        if (showReal != null) safeShow(viewer, showReal);
     }
 
     private void clearViewer(Player viewer) {
@@ -217,7 +219,7 @@ public final class MonsterMazePacketDisguiseBridge {
 
     private void safeShow(Player viewer, LivingEntity real) {
         try {
-            if (real != null && real.isValid() && viewer.isOnline()) {
+            if (real != null && viewer.isOnline()) {
                 viewer.showEntity(plugin.getHostPlugin(), real);
             }
         } catch (RuntimeException failure) {
