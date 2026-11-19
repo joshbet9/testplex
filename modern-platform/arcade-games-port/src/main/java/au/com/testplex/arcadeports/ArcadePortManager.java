@@ -18229,11 +18229,18 @@ public final class ArcadePortManager implements Listener {
 
     /** Reborn's CompassModule points every eliminated racer at the nearest living opponent. */
     private void updateDragonEscapeSpectatorCompasses(Session session) {
-        List<Player> alive = alivePlayers(session);
-        if (alive.isEmpty()) return;
+        List<Player> alive = alivePlayers(session).stream()
+                .filter(candidate -> DragonEscapeSpectatorRules.isCompassTarget(
+                        candidate.isOnline(), session.alive.contains(candidate.getUniqueId()),
+                        session.dragonEscapeCompleted.contains(candidate.getUniqueId()),
+                        candidate.getGameMode() == GameMode.SPECTATOR))
+                .toList();
         for (Player spectator : session.players.values()) {
-            if (spectator == null || !spectator.isOnline()
-                    || session.alive.contains(spectator.getUniqueId())) continue;
+            if (spectator == null || !spectator.isOnline()) continue;
+            UUID spectatorId = spectator.getUniqueId();
+            boolean completed = session.dragonEscapeCompleted.contains(spectatorId);
+            if (!DragonEscapeSpectatorRules.shouldReceiveSpectatorTools(
+                    session.alive.contains(spectatorId), completed)) continue;
             if (inventoryCount(spectator, Material.COMPASS) == 0) {
                 spectator.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
                         "Points toward the nearest living Dragon Escape racer."));
@@ -18763,9 +18770,16 @@ public final class ArcadePortManager implements Listener {
         boolean firstFinisher = session.dragonEscapeCompleted.size() == 1 && newlyCompleted;
         if (newlyCompleted) {
             session.dragonEscapeStoppedTimesMillis.put(id, elapsed);
-            player.setGameMode(GameMode.CREATIVE);
-            player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY,
-                    Integer.MAX_VALUE, 0, false, false, false));
+            // A finished racer spectates the remainder of the round. Keep only
+            // the two useful spectator controls: tracking and PB ghost setup.
+            player.getInventory().clear();
+            player.getInventory().setArmorContents(null);
+            player.removePotionEffect(PotionEffectType.INVISIBILITY);
+            player.setGameMode(GameMode.SPECTATOR);
+            player.getInventory().setItem(0, namedItem(Material.COMPASS, "Tracking Compass",
+                    "Points toward the nearest living Dragon Escape racer."));
+            setDragonEscapeGhostHotbarItem(player);
+            updateDragonEscapeSpectatorCompasses(session);
             announce(session, ArcadePortRules.dragonEscapeCompletionMessage(player.getName(), elapsed));
             if (firstFinisher) {
                 session.dragonEscapeWinner = id;
@@ -31355,7 +31369,9 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE
-                && !session.alive.contains(player.getUniqueId())
+                && DragonEscapeSpectatorRules.shouldReceiveSpectatorTools(
+                        session.alive.contains(player.getUniqueId()),
+                        session.dragonEscapeCompleted.contains(player.getUniqueId()))
                 && isDragonEscapeTrackingCompass(heldItem)) {
             // Keep the tracker in the spectator inventory. Vanilla spectator controls
             // remain available; the compass itself continuously points at the nearest racer.
@@ -31799,7 +31815,9 @@ public final class ArcadePortManager implements Listener {
                         || (item == Material.TNT && "disruptor".equals(kit))
                         || (item == Material.BRICKS && "builder".equals(kit))
                         || isDragonEscapeGhostHotbarItem(heldItem)
-                        || (!session.alive.contains(id) && isDragonEscapeTrackingCompass(heldItem));
+                        || (DragonEscapeSpectatorRules.shouldReceiveSpectatorTools(
+                                session.alive.contains(id), session.dragonEscapeCompleted.contains(id))
+                                && isDragonEscapeTrackingCompass(heldItem));
             }
             case DRAGONS -> {
                 String kit = session.dragonKits.getOrDefault(id, "coward");
